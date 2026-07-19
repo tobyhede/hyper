@@ -5,7 +5,7 @@ import {
   canGoPrev,
   clampStepIndex,
   nextStepIndex,
-  nodeIdAtStep,
+  cardIdAtStep,
   prevStepIndex,
   stepAt,
   stepCount,
@@ -48,10 +48,10 @@ describe('path navigation', () => {
     expect(canGoNext(path, 2)).toBe(false);
   });
 
-  it('resolves the target node id at a step', () => {
-    expect(nodeIdAtStep(path, 0)).toBe('n0');
-    expect(nodeIdAtStep(path, 2)).toBe('n2');
-    expect(nodeIdAtStep(path, 99)).toBe('n2');
+  it('resolves the target card id at a step', () => {
+    expect(cardIdAtStep(path, 0)).toBe('n0');
+    expect(cardIdAtStep(path, 2)).toBe('n2');
+    expect(cardIdAtStep(path, 99)).toBe('n2');
     expect(stepAt(path, 1)?.target).toBe('n1');
   });
 });

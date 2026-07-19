@@ -2,26 +2,26 @@ import { useEffect } from 'react';
 import { Background, Controls, MiniMap, ReactFlow, useReactFlow, type Edge } from '@xyflow/react';
 import { nodeTypes, type CardFlowNode } from '@project/react-flow-adapter';
 
-/** Frames the graph: fits the active node while presenting, refits the whole
+/** Frames the graph: fits the active card while presenting, refits the whole
  *  graph in overview once the ELK layout resolves. */
 function ViewController({
-  activeNodeId,
+  activeCardId,
   layoutReady,
 }: {
-  activeNodeId: string | null;
+  activeCardId: string | null;
   layoutReady: boolean;
 }) {
   const { fitView } = useReactFlow();
 
   useEffect(() => {
-    if (!activeNodeId) return;
-    void fitView({ nodes: [{ id: activeNodeId }], duration: 600, padding: 0.4, maxZoom: 1.3 });
-  }, [activeNodeId, fitView]);
+    if (!activeCardId) return;
+    void fitView({ nodes: [{ id: activeCardId }], duration: 600, padding: 0.4, maxZoom: 1.3 });
+  }, [activeCardId, fitView]);
 
   useEffect(() => {
-    if (activeNodeId) return;
+    if (activeCardId) return;
     void fitView({ duration: 400, padding: 0.2 });
-  }, [layoutReady, activeNodeId, fitView]);
+  }, [layoutReady, activeCardId, fitView]);
 
   return null;
 }
@@ -29,11 +29,11 @@ function ViewController({
 export interface GraphViewProps {
   nodes: CardFlowNode[];
   edges: Edge[];
-  activeNodeId: string | null;
+  activeCardId: string | null;
   layoutReady: boolean;
 }
 
-export function GraphView({ nodes, edges, activeNodeId, layoutReady }: GraphViewProps) {
+export function GraphView({ nodes, edges, activeCardId, layoutReady }: GraphViewProps) {
   return (
     <ReactFlow
       nodes={nodes}
@@ -49,7 +49,7 @@ export function GraphView({ nodes, edges, activeNodeId, layoutReady }: GraphView
       <Background gap={24} />
       <Controls showInteractive={false} />
       <MiniMap pannable zoomable />
-      <ViewController activeNodeId={activeNodeId} layoutReady={layoutReady} />
+      <ViewController activeCardId={activeCardId} layoutReady={layoutReady} />
     </ReactFlow>
   );
 }

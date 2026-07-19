@@ -10,12 +10,8 @@ function baseManifest(): Manifest {
       { id: 'a', title: 'A', content: 'cards/a.md' },
       { id: 'b', title: 'B', content: 'cards/b.md' },
     ],
-    nodes: [
-      { id: 'a-node', cardId: 'a', position: { x: 0, y: 0 } },
-      { id: 'b-node', cardId: 'b', position: { x: 1, y: 1 } },
-    ],
-    edges: [{ id: 'a-b', source: 'a-node', target: 'b-node', kind: 'sequence' }],
-    paths: [{ id: 'main', title: 'Main', steps: [{ target: 'a-node' }, { target: 'b-node' }] }],
+    edges: [{ id: 'a-b', source: 'a', target: 'b', kind: 'sequence' }],
+    paths: [{ id: 'main', title: 'Main', steps: [{ target: 'a' }, { target: 'b' }] }],
   };
 }
 
@@ -25,27 +21,18 @@ describe('validateReferences', () => {
     expect(isValidGraph(baseManifest())).toBe(true);
   });
 
-  it('detects an unresolved card reference on a node', () => {
-    const m = baseManifest();
-    m.nodes[0]!.cardId = 'missing';
-    const errors = validateReferences(m);
-    expect(errors).toHaveLength(1);
-    expect(errors[0]!.kind).toBe('unresolved-node-card');
-    expect(errors[0]!.ref).toBe('missing');
-  });
-
   it('detects an unresolved edge source', () => {
     const m = baseManifest();
-    m.edges[0]!.source = 'ghost-node';
+    m.edges[0]!.source = 'ghost-card';
     const errors = validateReferences(m);
-    expect(errors.some((e) => e.kind === 'unresolved-edge-source' && e.ref === 'ghost-node')).toBe(
+    expect(errors.some((e) => e.kind === 'unresolved-edge-source' && e.ref === 'ghost-card')).toBe(
       true,
     );
   });
 
   it('detects an unresolved edge target', () => {
     const m = baseManifest();
-    m.edges[0]!.target = 'ghost-node';
+    m.edges[0]!.target = 'ghost-card';
     const errors = validateReferences(m);
     expect(errors.some((e) => e.kind === 'unresolved-edge-target')).toBe(true);
   });
@@ -57,10 +44,10 @@ describe('validateReferences', () => {
     expect(errors.some((e) => e.kind === 'unresolved-path-step' && e.ref === 'nowhere')).toBe(true);
   });
 
-  it('detects duplicate node ids', () => {
+  it('detects duplicate card ids', () => {
     const m = baseManifest();
-    m.nodes.push({ id: 'a-node', cardId: 'b', position: { x: 5, y: 5 } });
+    m.cards.push({ id: 'a', title: 'A dup', content: 'cards/a2.md' });
     const errors = validateReferences(m);
-    expect(errors.some((e) => e.kind === 'duplicate-node-id')).toBe(true);
+    expect(errors.some((e) => e.kind === 'duplicate-card-id' && e.ref === 'a')).toBe(true);
   });
 });

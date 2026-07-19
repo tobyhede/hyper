@@ -3,7 +3,7 @@ import type { Manifest } from '@project/core';
 /**
  * Derives the graph's ports and connections from its presentation paths.
  *
- * The model: every path that steps through a node gives that node one inbound
+ * The model: every path that steps through a card gives that card one inbound
  * port (`<pathId>::in`, on the left) and one outbound port (`<pathId>::out`, on
  * the right). Consecutive steps become a port-to-port edge belonging to that
  * path. This is what makes each path render as its own "rail" through the graph
@@ -16,7 +16,7 @@ export interface PathHandleRef {
   pathId: string;
 }
 
-export interface NodeHandleSet {
+export interface CardHandleSet {
   /** Outbound ports (right / EAST). */
   sourceHandles: PathHandleRef[];
   /** Inbound ports (left / WEST). */
@@ -37,14 +37,14 @@ export interface PathEdge {
 export const outHandleId = (pathId: string): string => `${pathId}::out`;
 export const inHandleId = (pathId: string): string => `${pathId}::in`;
 
-/** Map each node id to the in/out ports contributed by the paths through it. */
-export function buildNodeHandles(manifest: Manifest): Map<string, NodeHandleSet> {
-  const map = new Map<string, NodeHandleSet>();
-  const ensure = (nodeId: string): NodeHandleSet => {
-    let set = map.get(nodeId);
+/** Map each card id to the in/out ports contributed by the paths through it. */
+export function buildCardHandles(manifest: Manifest): Map<string, CardHandleSet> {
+  const map = new Map<string, CardHandleSet>();
+  const ensure = (cardId: string): CardHandleSet => {
+    let set = map.get(cardId);
     if (!set) {
       set = { sourceHandles: [], targetHandles: [] };
-      map.set(nodeId, set);
+      map.set(cardId, set);
     }
     return set;
   };
@@ -73,8 +73,8 @@ export function buildNodeHandles(manifest: Manifest): Map<string, NodeHandleSet>
   return map;
 }
 
-/** The distinct node ids a path visits, in first-visit order. */
-export function pathNodeIds(manifest: Manifest, pathId: string): string[] {
+/** The distinct card ids a path visits, in first-visit order. */
+export function pathCardIds(manifest: Manifest, pathId: string): string[] {
   const path = manifest.paths.find((p) => p.id === pathId);
   if (!path) return [];
   const seen = new Set<string>();
@@ -90,15 +90,15 @@ export function pathNodeIds(manifest: Manifest, pathId: string): string[] {
 
 /** Keep only the handles belonging to a single path. */
 export function filterHandlesByPath(
-  handlesByNode: ReadonlyMap<string, NodeHandleSet>,
+  handlesByCard: ReadonlyMap<string, CardHandleSet>,
   pathId: string,
-): Map<string, NodeHandleSet> {
-  const filtered = new Map<string, NodeHandleSet>();
-  for (const [nodeId, set] of handlesByNode) {
+): Map<string, CardHandleSet> {
+  const filtered = new Map<string, CardHandleSet>();
+  for (const [cardId, set] of handlesByCard) {
     const sourceHandles = set.sourceHandles.filter((h) => h.pathId === pathId);
     const targetHandles = set.targetHandles.filter((h) => h.pathId === pathId);
     if (sourceHandles.length || targetHandles.length) {
-      filtered.set(nodeId, { sourceHandles, targetHandles });
+      filtered.set(cardId, { sourceHandles, targetHandles });
     }
   }
   return filtered;

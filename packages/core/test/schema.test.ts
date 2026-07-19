@@ -4,27 +4,25 @@ import { parseManifest, safeParseManifest, type Manifest } from '../src/index';
 const validManifest = {
   version: 1,
   title: 'Test deck',
-  cards: [{ id: 'a', title: 'A', content: 'cards/a.md' }],
-  nodes: [{ id: 'a-node', cardId: 'a', position: { x: 0, y: 0 } }],
+  cards: [
+    { id: 'a', title: 'A', content: 'cards/a.md' },
+    { id: 'b', title: 'B', content: 'cards/b.md' },
+  ],
   edges: [],
-  paths: [{ id: 'main', title: 'Main', steps: [{ target: 'a-node' }] }],
+  paths: [{ id: 'main', title: 'Main', steps: [{ target: 'a' }] }],
 };
 
 describe('manifest schema', () => {
   it('parses a valid manifest', () => {
     const manifest = parseManifest(validManifest);
     expect(manifest.title).toBe('Test deck');
-    expect(manifest.cards).toHaveLength(1);
+    expect(manifest.cards).toHaveLength(2);
   });
 
   it('defaults edge kind to "sequence"', () => {
     const manifest = parseManifest({
       ...validManifest,
-      nodes: [
-        { id: 'a-node', cardId: 'a', position: { x: 0, y: 0 } },
-        { id: 'b-node', cardId: 'a', position: { x: 1, y: 1 } },
-      ],
-      edges: [{ id: 'e', source: 'a-node', target: 'b-node' }],
+      edges: [{ id: 'e', source: 'a', target: 'b' }],
     }) satisfies Manifest;
     expect(manifest.edges[0]?.kind).toBe('sequence');
   });
@@ -58,7 +56,7 @@ describe('manifest schema', () => {
   it('rejects an unknown edge kind', () => {
     const result = safeParseManifest({
       ...validManifest,
-      edges: [{ id: 'e', source: 'a-node', target: 'a-node', kind: 'wormhole' }],
+      edges: [{ id: 'e', source: 'a', target: 'b', kind: 'wormhole' }],
     });
     expect(result.success).toBe(false);
   });

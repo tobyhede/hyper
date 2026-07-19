@@ -1,12 +1,7 @@
 import type { Edge, Node } from '@xyflow/react';
 import { MarkerType } from '@xyflow/react';
 import type { Manifest } from '@project/core';
-import {
-  getCardForNode,
-  type NodeHandleSet,
-  type PathEdge,
-  type PathHandleRef,
-} from '@project/graph';
+import type { CardHandleSet, PathEdge, PathHandleRef } from '@project/graph';
 import type { ElkLayoutResult, ElkNodeLayout } from './elk/types';
 
 const FALLBACK_COLOR = '#8a94a6';
@@ -25,7 +20,6 @@ export type CardHandle = {
  *  React Flow's `Record<string, unknown>` data constraint, and it includes the
  *  handle arrays the ELK layout needs. */
 export type CardNodeData = {
-  nodeId: string;
   cardId: string;
   title: string;
   markdown: string;
@@ -41,19 +35,19 @@ export type CardFlowNode = Node<CardNodeData, 'card'>;
 export type MarkdownByCardId = Readonly<Record<string, string>>;
 export type ColorByPathId = Readonly<Record<string, string>>;
 
-const EMPTY_HANDLES: NodeHandleSet = { sourceHandles: [], targetHandles: [] };
+const EMPTY_HANDLES: CardHandleSet = { sourceHandles: [], targetHandles: [] };
 
 export interface ProjectCardNodesOptions {
-  /** Node id of the current presentation step, if any, to flag as active. */
-  activeNodeId?: string | null;
+  /** Card id of the current presentation step, if any, to flag as active. */
+  activeCardId?: string | null;
   /** The path being presented, if any. */
   activePathId?: string | null;
   /** ELK layout result; positions and port offsets come from here when present. */
   layout?: ElkLayoutResult;
   /** Node height used to evenly distribute handles before the layout resolves. */
   nodeHeight?: number;
-  /** Restrict the projection to these node ids (e.g. one path's nodes). */
-  nodeIds?: readonly string[];
+  /** Restrict the projection to these card ids (e.g. one path's cards). */
+  cardIds?: readonly string[];
 }
 
 function resolveHandles(
@@ -77,44 +71,43 @@ function resolveHandles(
 }
 
 /**
- * Map graph nodes → React Flow card nodes, attaching per-path handles positioned
- * at their ELK port offsets and each card's markdown body.
+ * Map cards → React Flow card nodes, attaching per-path handles positioned at
+ * their ELK port offsets and each card's markdown body. The card id is the React
+ * Flow node id.
  */
 export function projectCardNodes(
   manifest: Manifest,
   markdownByCardId: MarkdownByCardId,
-  handlesByNode: ReadonlyMap<string, NodeHandleSet>,
+  handlesByCard: ReadonlyMap<string, CardHandleSet>,
   colors: ColorByPathId,
   options: ProjectCardNodesOptions = {},
 ): CardFlowNode[] {
-  const activeNodeId = options.activeNodeId ?? null;
+  const activeCardId = options.activeCardId ?? null;
   const activePathId = options.activePathId ?? null;
   const layout = options.layout;
   const nodeHeight = options.nodeHeight ?? DEFAULT_NODE_HEIGHT;
-  const visible = options.nodeIds ? new Set(options.nodeIds) : null;
+  const visible = options.cardIds ? new Set(options.cardIds) : null;
 
-  const source = visible ? manifest.nodes.filter((n) => visible.has(n.id)) : manifest.nodes;
+  const source = visible ? manifest.cards.filter((c) => visible.has(c.id)) : manifest.cards;
 
-  return source.map((node) => {
-    const card = getCardForNode(manifest, node.id);
-    const handles = handlesByNode.get(node.id) ?? EMPTY_HANDLES;
-    const nodeLayout = layout?.[node.id];
-    const active = node.id === activeNodeId;
-    const position = nodeLayout ?? node.position ?? { x: 0, y: 0 };
+  return source.map((card) => {
+    const handles = handlesByCard.get(card.id) ?? EMPTY_HANDLES;
+    const cardLayout = layout?.[card.id];
+    const active = card.id === activeCardId;
+    const position = cardLayout ?? { x: 0, y: 0 };
 
     return {
-      id: node.id,
+      id: card.id,
       type: 'card',
       position: { x: position.x, y: position.y },
       data: {
-        nodeId: node.id,
-        cardId: node.cardId,
-        title: card?.title ?? node.cardId,
-        markdown: markdownByCardId[node.cardId] ?? '',
+        cardId: card.id,
+        title: card.title,
+        markdown: markdownByCardId[card.id] ?? '',
         active,
         activePathId,
-        sourceHandles: resolveHandles(handles.sourceHandles, colors, nodeLayout, nodeHeight),
-        targetHandles: resolveHandles(handles.targetHandles, colors, nodeLayout, nodeHeight),
+        sourceHandles: resolveHandles(handles.sourceHandles, colors, cardLayout, nodeHeight),
+        targetHandles: resolveHandles(handles.targetHandles, colors, cardLayout, nodeHeight),
       },
       className: active ? 'rf-card-node rf-card-node--active' : 'rf-card-node',
     } satisfies CardFlowNode;

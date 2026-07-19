@@ -21,8 +21,8 @@ export function stepAt(path: PresentationPath, index: number): PathStep | undefi
   return path.steps[index];
 }
 
-/** The graph node id targeted by the step at `index` (clamped). */
-export function nodeIdAtStep(path: PresentationPath, index: number): string | undefined {
+/** The card id targeted by the step at `index` (clamped). */
+export function cardIdAtStep(path: PresentationPath, index: number): string | undefined {
   return stepAt(path, clampStepIndex(path, index))?.target;
 }
 

@@ -9,13 +9,12 @@ function manifestFromIds(ids: string[]): Manifest {
     version: 1,
     title: 'Generated',
     cards: ids.map((id) => ({ id: `card-${id}`, title: id, content: `cards/${id}.md` })),
-    nodes: ids.map((id) => ({ id: `node-${id}`, cardId: `card-${id}`, position: { x: 0, y: 0 } })),
     edges: [],
     paths: [
       {
         id: 'main',
         title: 'Main',
-        steps: ids.map((id) => ({ target: `node-${id}` })),
+        steps: ids.map((id) => ({ target: `card-${id}` })),
       },
     ],
   };

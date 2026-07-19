@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import {
   getPath,
   nextStepIndex,
-  nodeIdAtStep,
+  cardIdAtStep,
   prevStepIndex,
   clampStepIndex,
 } from '@project/graph';
@@ -60,10 +60,10 @@ export const usePresentationStore = create<PresentationState>((set, get) => ({
   },
 }));
 
-/** Node id of the current presentation step, or `null` outside presentation. */
-export function selectActiveNodeId(state: PresentationState): string | null {
+/** Card id of the current presentation step, or `null` outside presentation. */
+export function selectActiveCardId(state: PresentationState): string | null {
   if (state.mode !== 'presenting' || !state.selectedPathId) return null;
   const path = getPath(manifest, state.selectedPathId);
   if (!path) return null;
-  return nodeIdAtStep(path, state.stepIndex) ?? null;
+  return cardIdAtStep(path, state.stepIndex) ?? null;
 }

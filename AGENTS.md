@@ -2,7 +2,7 @@
 
 Instructions for AI coding agents working in this repo.
 
-A local, file-first prototype for **graph-native technical presentations**: Markdown cards on a spatial graph, authored as a JSON manifest and presented as a curated path (a single colored "rail") that elkjs lays out automatically. pnpm + TypeScript (strict) monorepo.
+A local, file-first prototype for **graph-native technical presentations**: Markdown cards on a spatial graph, authored as a JSON manifest and presented as curated routes that elkjs lays out automatically. The app currently renders one route at a time, as a single colored "rail" — a *current view choice*, not a domain limit (see Scope discipline). pnpm + TypeScript (strict) monorepo.
 
 ## Commands
 
@@ -34,8 +34,9 @@ Hard rules:
 - **`verbatimModuleSyntax` + ESLint `consistent-type-imports` are on** — use `import type` for type-only imports or lint/typecheck fails.
 - **Cross-package imports** use the `@project/*` path aliases (declared in `tsconfig.base.json` AND mirrored in `vitest.config.ts` `resolve.alias`; Vite resolves them via the workspace). Keep the two alias lists in sync when adding a package.
 - **Relative imports inside a package are EXTENSIONLESS** (`./foo`, not `./foo.ts`).
-- **One path at a time.** The app renders the single selected path; elkjs lays out only that path's chain. Overlaying multiple paths is a deliberate non-goal — it makes ELK reconcile conflicting orderings and the graph turns to spaghetti.
 - **ELK port offsets are applied to handles.** ELK computes each port's position; those exact offsets drive where `CardNode` handles render so the colored rails line up. Don't hardcode handle positions.
+- **ELK port ids must be unique per card (known bug).** The shipped `buildElkGraph` uses the bare handle id (`<pathId>::out`/`::in`) as both the ELK port id and the edge endpoint, but that id repeats on every card a route passes through, so ELK can't tell which card an edge attaches to — it mislays *even single-route* graphs (the bundled demo's `paths` card collapses a layer). Namespace port ids per card. See `.scratch/multiple-routes/findings.md`.
+- **"path" == Route.** The code and this file say `path`/`paths` (`buildPathEdges`, `pathCardIds`); CONTEXT.md's domain term is **Route** and lists "path" under _Avoid_. Same concept — the glossary is the naming target; the code hasn't been renamed yet.
 - **Styling is split:** `ui` uses Tailwind v4 + shadcn-style primitives; the graph/card CSS stays hand-rolled in `packages/app/src/styles.css`. Tailwind scans `app` + `ui/src` via `@source` in `tailwind.css`.
 - **Markdown is excluded from Prettier** (`.prettierignore`) — don't rely on `format` to touch `*.md`.
 
@@ -47,4 +48,16 @@ Hard rules:
 
 ## Scope discipline
 
-Keep to the MVP. Don't over-generalize the domain model, don't re-introduce multi-path overlay, and don't add features beyond what's asked.
+Keep to the MVP. Don't over-generalize the domain model and don't add features beyond what's asked.
+
+On multi-route rendering (the old "no overlay" rule, corrected): the single-route view is what ships. Overlaying **compatible** routes — their combined step-order (every route's `step[i] → step[i+1]`, unioned) is acyclic — lays out cleanly and is a legitimate direction. **Conflicting-order** routes (two routes disagreeing on the order of shared nodes, a reverse route, or a route that revisits a node) always force a backward rail: renderable *legibly* only via ELK's own orthogonal edge routing, or by unrolling revisits into duplicate nodes sharing a card — never as a clean forward line while keeping one node per card. Don't build any multi-route rendering without reading `.scratch/multiple-routes/findings.md` first.
+
+## Agent skills
+
+### Issue tracker
+
+Issues and specs live as local markdown under `.scratch/<feature>/` (no remote; this is a local prototype). See `docs/agents/issue-tracker.md`.
+
+### Domain docs
+
+Single-context: one root `CONTEXT.md` + `docs/adr/`. See `docs/agents/domain.md`.

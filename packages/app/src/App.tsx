@@ -9,20 +9,20 @@ import {
   type ElkPortData,
 } from '@project/react-flow-adapter';
 import {
-  buildNodeHandles,
+  buildCardHandles,
   buildPathEdges,
   canGoNext,
   canGoPrev,
   filterHandlesByPath,
-  getCardForNode,
+  getCard,
   getPath,
-  pathNodeIds,
+  pathCardIds,
   stepCount,
-  type NodeHandleSet,
+  type CardHandleSet,
 } from '@project/graph';
 import { manifest, markdownByCardId, referenceErrors } from './manifest';
 import { pathColorMap } from './colors';
-import { selectActiveNodeId, usePresentationStore } from './store';
+import { selectActiveCardId, usePresentationStore } from './store';
 import { GraphView } from './components/GraphView';
 import { PresentationLayer } from './components/PresentationLayer';
 
@@ -33,7 +33,7 @@ const CARD_HEIGHT = 300;
 
 // Derived once from the (static) manifest.
 const colors = pathColorMap(manifest);
-const allHandles = buildNodeHandles(manifest);
+const allHandles = buildCardHandles(manifest);
 const allPathEdges = buildPathEdges(manifest);
 
 export function App() {
@@ -46,19 +46,19 @@ export function App() {
   const next = usePresentationStore((s) => s.next);
   const prev = usePresentationStore((s) => s.prev);
 
-  const activeNodeId = usePresentationStore(selectActiveNodeId);
+  const activeCardId = usePresentationStore(selectActiveCardId);
   const presenting = mode === 'presenting';
 
   // The graph shows one path at a time — a single linear flow ELK lays out cleanly.
-  const visibleNodeIds = useMemo(
-    () => (selectedPathId ? pathNodeIds(manifest, selectedPathId) : []),
+  const visibleCardIds = useMemo(
+    () => (selectedPathId ? pathCardIds(manifest, selectedPathId) : []),
     [selectedPathId],
   );
-  const pathHandles = useMemo<ReadonlyMap<string, NodeHandleSet>>(
+  const pathHandles = useMemo<ReadonlyMap<string, CardHandleSet>>(
     () =>
       selectedPathId
         ? filterHandlesByPath(allHandles, selectedPathId)
-        : new Map<string, NodeHandleSet>(),
+        : new Map<string, CardHandleSet>(),
     [selectedPathId],
   );
   const pathEdges = useMemo(
@@ -68,7 +68,7 @@ export function App() {
 
   const layoutNodes = useMemo<Node<ElkPortData>[]>(
     () =>
-      visibleNodeIds.map((id) => {
+      visibleCardIds.map((id) => {
         const handles = pathHandles.get(id) ?? { sourceHandles: [], targetHandles: [] };
         return {
           id,
@@ -78,7 +78,7 @@ export function App() {
           data: { sourceHandles: handles.sourceHandles, targetHandles: handles.targetHandles },
         };
       }),
-    [visibleNodeIds, pathHandles],
+    [visibleCardIds, pathHandles],
   );
 
   const layoutEdges = useMemo(
@@ -109,13 +109,13 @@ export function App() {
   const nodes = useMemo(
     () =>
       projectCardNodes(manifest, markdownByCardId, pathHandles, colors, {
-        activeNodeId,
+        activeCardId,
         activePathId: selectedPathId,
         layout: layout ?? undefined,
         nodeHeight: CARD_HEIGHT,
-        nodeIds: visibleNodeIds,
+        cardIds: visibleCardIds,
       }),
-    [activeNodeId, selectedPathId, layout, pathHandles, visibleNodeIds],
+    [activeCardId, selectedPathId, layout, pathHandles, visibleCardIds],
   );
 
   const edges = useMemo(
@@ -124,7 +124,7 @@ export function App() {
   );
 
   const path = selectedPathId ? getPath(manifest, selectedPathId) : undefined;
-  const activeCard = activeNodeId ? getCardForNode(manifest, activeNodeId) : undefined;
+  const activeCard = activeCardId ? getCard(manifest, activeCardId) : undefined;
 
   // Keyboard navigation while presenting.
   useEffect(() => {
@@ -183,7 +183,7 @@ export function App() {
           <GraphView
             nodes={nodes}
             edges={edges}
-            activeNodeId={activeNodeId}
+            activeCardId={activeCardId}
             layoutReady={layout !== null}
           />
         </ReactFlowProvider>

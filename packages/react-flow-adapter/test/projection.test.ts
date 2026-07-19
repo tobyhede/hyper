@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Manifest } from '@project/core';
-import { buildNodeHandles, buildPathEdges } from '@project/graph';
+import { buildCardHandles, buildPathEdges } from '@project/graph';
 import { projectCardNodes, projectPathEdges } from '../src/index';
 
 const manifest: Manifest = {
@@ -10,25 +10,21 @@ const manifest: Manifest = {
     { id: 'a', title: 'Card A', content: 'cards/a.md' },
     { id: 'b', title: 'Card B', content: 'cards/b.md' },
   ],
-  nodes: [
-    { id: 'a-node', cardId: 'a', position: { x: 10, y: 20 } },
-    { id: 'b-node', cardId: 'b', position: { x: 30, y: 40 } },
-  ],
   edges: [],
   paths: [
-    { id: 'main', title: 'Main', steps: [{ target: 'a-node' }, { target: 'b-node' }] },
-    { id: 'alt', title: 'Alt', steps: [{ target: 'b-node' }, { target: 'a-node' }] },
+    { id: 'main', title: 'Main', steps: [{ target: 'a' }, { target: 'b' }] },
+    { id: 'alt', title: 'Alt', steps: [{ target: 'b' }, { target: 'a' }] },
   ],
 };
 
 const markdown = { a: '# A body', b: '# B body' };
 const colors = { main: '#111111', alt: '#222222' };
-const handles = buildNodeHandles(manifest);
+const handles = buildCardHandles(manifest);
 
 describe('projectCardNodes', () => {
-  it('maps graph nodes to card nodes with resolved markdown and title', () => {
+  it('maps cards to card nodes with resolved markdown and title', () => {
     const nodes = projectCardNodes(manifest, markdown, handles, colors);
-    const a = nodes.find((n) => n.id === 'a-node')!;
+    const a = nodes.find((n) => n.id === 'a')!;
     expect(a.type).toBe('card');
     expect(a.data.title).toBe('Card A');
     expect(a.data.markdown).toBe('# A body');
@@ -37,8 +33,8 @@ describe('projectCardNodes', () => {
 
   it('attaches per-path handles colored by path', () => {
     const nodes = projectCardNodes(manifest, markdown, handles, colors);
-    const a = nodes.find((n) => n.id === 'a-node')!;
-    // main leaves a-node (out); alt ends at a-node (in).
+    const a = nodes.find((n) => n.id === 'a')!;
+    // main leaves card a (out); alt ends at card a (in).
     expect(a.data.sourceHandles).toMatchObject([
       { id: 'main::out', pathId: 'main', color: '#111111' },
     ]);
@@ -52,7 +48,7 @@ describe('projectCardNodes', () => {
   it('uses ELK port offsets and positions when a layout is supplied', () => {
     const nodes = projectCardNodes(manifest, markdown, handles, colors, {
       layout: {
-        'a-node': {
+        a: {
           x: 500,
           y: 600,
           width: 260,
@@ -61,17 +57,17 @@ describe('projectCardNodes', () => {
         },
       },
     });
-    const a = nodes.find((n) => n.id === 'a-node')!;
+    const a = nodes.find((n) => n.id === 'a')!;
     expect(a.position).toEqual({ x: 500, y: 600 });
     expect(a.data.sourceHandles[0]!.offsetY).toBe(42);
-    // b-node is absent from the layout → falls back to its manifest position.
-    expect(nodes.find((n) => n.id === 'b-node')!.position).toEqual({ x: 30, y: 40 });
+    // card b is absent from the layout → falls back to the origin (no authored position).
+    expect(nodes.find((n) => n.id === 'b')!.position).toEqual({ x: 0, y: 0 });
   });
 
-  it('flags the active node', () => {
-    const nodes = projectCardNodes(manifest, markdown, handles, colors, { activeNodeId: 'b-node' });
-    expect(nodes.find((n) => n.id === 'b-node')!.data.active).toBe(true);
-    expect(nodes.find((n) => n.id === 'b-node')!.className).toContain('rf-card-node--active');
+  it('flags the active card', () => {
+    const nodes = projectCardNodes(manifest, markdown, handles, colors, { activeCardId: 'b' });
+    expect(nodes.find((n) => n.id === 'b')!.data.active).toBe(true);
+    expect(nodes.find((n) => n.id === 'b')!.className).toContain('rf-card-node--active');
   });
 });
 
@@ -83,8 +79,8 @@ describe('projectPathEdges', () => {
     expect(edges).toHaveLength(2);
     const mainEdge = edges.find((e) => e.id === 'main::0')!;
     expect(mainEdge).toMatchObject({
-      source: 'a-node',
-      target: 'b-node',
+      source: 'a',
+      target: 'b',
       sourceHandle: 'main::out',
       targetHandle: 'main::in',
     });

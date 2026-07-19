@@ -1,20 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import type { Manifest } from '@project/core';
-import { buildNodeHandles, buildPathEdges, filterHandlesByPath, pathNodeIds } from '../src/index';
+import { buildCardHandles, buildPathEdges, filterHandlesByPath, pathCardIds } from '../src/index';
 
 // a → b → c  (main),  a → c  (quick): c is shared, a fans out.
 const manifest: Manifest = {
   version: 1,
   title: 'Test',
   cards: [
-    { id: 'ca', title: 'A', content: 'a.md' },
-    { id: 'cb', title: 'B', content: 'b.md' },
-    { id: 'cc', title: 'C', content: 'c.md' },
-  ],
-  nodes: [
-    { id: 'a', cardId: 'ca', position: { x: 0, y: 0 } },
-    { id: 'b', cardId: 'cb', position: { x: 0, y: 0 } },
-    { id: 'c', cardId: 'cc', position: { x: 0, y: 0 } },
+    { id: 'a', title: 'A', content: 'a.md' },
+    { id: 'b', title: 'B', content: 'b.md' },
+    { id: 'c', title: 'C', content: 'c.md' },
   ],
   edges: [],
   paths: [
@@ -23,39 +18,39 @@ const manifest: Manifest = {
   ],
 };
 
-describe('buildNodeHandles', () => {
-  const handles = buildNodeHandles(manifest);
+describe('buildCardHandles', () => {
+  const handles = buildCardHandles(manifest);
 
-  it('gives the first node only outbound ports, one per path leaving it', () => {
+  it('gives the first card only outbound ports, one per path leaving it', () => {
     const a = handles.get('a')!;
     expect(a.targetHandles).toEqual([]);
     expect(a.sourceHandles.map((h) => h.id)).toEqual(['main::out', 'quick::out']);
   });
 
-  it('gives an interior node both in and out ports for its path', () => {
+  it('gives an interior card both in and out ports for its path', () => {
     const b = handles.get('b')!;
     expect(b.targetHandles.map((h) => h.id)).toEqual(['main::in']);
     expect(b.sourceHandles.map((h) => h.id)).toEqual(['main::out']);
   });
 
-  it('gives a shared terminal node one inbound port per path arriving', () => {
+  it('gives a shared terminal card one inbound port per path arriving', () => {
     const c = handles.get('c')!;
     expect(c.sourceHandles).toEqual([]);
     expect(c.targetHandles.map((h) => h.id)).toEqual(['main::in', 'quick::in']);
   });
 });
 
-describe('pathNodeIds', () => {
-  it('lists a path’s distinct nodes in first-visit order', () => {
-    expect(pathNodeIds(manifest, 'main')).toEqual(['a', 'b', 'c']);
-    expect(pathNodeIds(manifest, 'quick')).toEqual(['a', 'c']);
-    expect(pathNodeIds(manifest, 'nope')).toEqual([]);
+describe('pathCardIds', () => {
+  it('lists a path’s distinct cards in first-visit order', () => {
+    expect(pathCardIds(manifest, 'main')).toEqual(['a', 'b', 'c']);
+    expect(pathCardIds(manifest, 'quick')).toEqual(['a', 'c']);
+    expect(pathCardIds(manifest, 'nope')).toEqual([]);
   });
 });
 
 describe('filterHandlesByPath', () => {
   it('keeps only the selected path’s handles', () => {
-    const quick = filterHandlesByPath(buildNodeHandles(manifest), 'quick');
+    const quick = filterHandlesByPath(buildCardHandles(manifest), 'quick');
     // c is shared, but only its quick inbound port survives the filter.
     expect(quick.get('c')!.targetHandles.map((h) => h.id)).toEqual(['quick::in']);
     expect(quick.get('b')).toBeUndefined(); // b is only on main
