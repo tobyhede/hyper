@@ -12,6 +12,9 @@ export default tseslint.config(
       '**/playwright-report/**',
       '**/test-results/**',
       '**/.tanstack/**',
+      // Throwaway local working dirs — spikes, issue tracker, tool state.
+      '**/.scratch/**',
+      '**/.serena/**',
     ],
   },
   js.configs.recommended,
