@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.DS_Store
+playwright-report/
+test-results/
+.tanstack/
+*.log
+
+# Agent tooling (installed skills / session dirs), not project source
+.agents/
+.claude/
+skills-lock.json

@@ -1,0 +1,11 @@
+@import 'tailwindcss';
+
+/*
+ * Monorepo content detection: Tailwind only scans the app package by default.
+ * The shadcn-style primitives live in `@project/ui`, so their utility classes
+ * would be purged without an explicit source. Paths are relative to this file:
+ *   ../          -> packages/app  (this app's own sources)
+ *   ../../ui/src -> packages/ui/src
+ */
+@source '../';
+@source '../../ui/src';

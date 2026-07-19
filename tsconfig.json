@@ -1,0 +1,14 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "types": ["node", "vite/client", "vitest/globals", "@testing-library/jest-dom"],
+    "noEmit": true
+  },
+  "include": [
+    "packages/*/src",
+    "packages/*/test",
+    "packages/app/e2e",
+    "*.config.ts",
+    "vitest.setup.ts"
+  ]
+}

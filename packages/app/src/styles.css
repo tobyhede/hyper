@@ -1,0 +1,450 @@
+:root {
+  --bg: #0f1115;
+  --panel: #181b22;
+  --panel-2: #20242e;
+  --border: #2b303b;
+  --text: #e6e9ef;
+  --muted: #98a2b3;
+  --accent: #6ea8fe;
+  --accent-strong: #3b82f6;
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family:
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    Roboto,
+    Helvetica,
+    Arial,
+    sans-serif;
+  background: var(--bg);
+  color: var(--text);
+}
+
+/* ---- App shell ---- */
+.shell {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.shell__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.6rem 1rem;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+}
+
+.shell__title {
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+.shell__toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.shell__main {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+
+/* ---- Toolbar controls ---- */
+.path-selector {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.path-selector__select {
+  background: var(--panel-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.35rem 0.5rem;
+  font-size: 0.85rem;
+}
+
+.btn {
+  background: var(--panel-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.4rem 0.8rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.btn:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn--primary {
+  background: var(--accent-strong);
+  border-color: var(--accent-strong);
+  color: white;
+}
+
+/* ---- Path legend ---- */
+.legend {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.legend__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.legend__swatch {
+  width: 0.8rem;
+  height: 0.8rem;
+  border-radius: 3px;
+  display: inline-block;
+}
+
+/* ---- Graph area ---- */
+.graph-area {
+  position: absolute;
+  inset: 0;
+}
+
+.errors {
+  position: absolute;
+  z-index: 20;
+  top: 0.75rem;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: 560px;
+  background: #3a1d1d;
+  border: 1px solid #7f1d1d;
+  border-radius: 8px;
+  padding: 0.6rem 0.9rem;
+  font-size: 0.85rem;
+}
+
+.errors ul {
+  margin: 0.4rem 0 0;
+  padding-left: 1.1rem;
+  list-style: disc;
+}
+
+/* ---- Card node ---- */
+.rf-card-node {
+  border-radius: 10px;
+}
+
+.rf-card-node__inner {
+  position: relative;
+  width: 260px;
+}
+
+/* Per-path ports, positioned by ELK's computed offset (inline `top`). React
+   Flow handles the left/right edge placement and vertical centering. */
+.rf-card-node__port.react-flow__handle {
+  width: 11px;
+  height: 11px;
+  border: 1px solid #0b0d11;
+}
+
+.card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.85rem 1rem;
+  overflow: hidden;
+}
+
+.rf-card-node--active .card {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-strong);
+}
+
+.card--node {
+  height: 300px;
+  overflow: hidden;
+}
+
+.card--node .card__body {
+  font-size: 0.8rem;
+  max-height: 232px;
+  overflow: hidden;
+}
+
+.card__title {
+  margin: 0 0 0.4rem;
+  font-size: 0.95rem;
+}
+
+.card__body :first-child {
+  margin-top: 0;
+}
+
+.card__body :last-child {
+  margin-bottom: 0;
+}
+
+.card__body table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.card__body th,
+.card__body td {
+  border: 1px solid var(--border);
+  padding: 0.2rem 0.4rem;
+  text-align: left;
+}
+
+.card__body pre {
+  background: #0b0d11;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.5rem;
+  overflow-x: auto;
+  font-size: 0.78rem;
+}
+
+.card__body code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.card__body a {
+  color: var(--accent);
+  text-decoration: underline;
+}
+
+/* ---- Preflight restoration ----
+   Tailwind's preflight (imported before styles.css via tailwind.css) resets the
+   margins of headings/paragraphs/blockquotes and strips list markers/indent.
+   The card bodies render user Markdown and rely on browser defaults, so restore
+   them here, scoped to `.card__body` only. */
+.card__body p,
+.card__body blockquote,
+.card__body pre {
+  margin: 1em 0;
+}
+
+.card__body blockquote {
+  margin-left: 2.5rem;
+  margin-right: 2.5rem;
+}
+
+.card__body ul,
+.card__body ol {
+  margin: 1em 0;
+  padding-left: 2.5rem;
+}
+
+.card__body ul {
+  list-style: disc;
+}
+
+.card__body ol {
+  list-style: decimal;
+}
+
+.card__body h1,
+.card__body h2,
+.card__body h3,
+.card__body h4,
+.card__body h5,
+.card__body h6 {
+  font-weight: 700;
+  margin: 0.83em 0;
+}
+
+.card__body h1 {
+  font-size: 2em;
+  margin: 0.67em 0;
+}
+
+.card__body h2 {
+  font-size: 1.5em;
+}
+
+.card__body h3 {
+  font-size: 1.17em;
+  margin: 1em 0;
+}
+
+/* ---- React Flow edges ---- */
+.rf-edge--reference .react-flow__edge-path {
+  stroke-dasharray: 6 4;
+}
+
+/* ---- Presentation overlay ---- */
+.presentation {
+  position: absolute;
+  z-index: 30;
+  left: 50%;
+  bottom: 1.25rem;
+  transform: translateX(-50%);
+  width: min(720px, calc(100% - 2rem));
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.presentation__slide {
+  background: var(--panel);
+  border: 1px solid var(--accent);
+  border-radius: 12px;
+  padding: 0.5rem 1rem;
+  max-height: 45vh;
+  overflow-y: auto;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+}
+
+.card--slide {
+  background: transparent;
+  border: none;
+  padding: 0.5rem 0;
+}
+
+.card--slide .card__title {
+  font-size: 1.3rem;
+}
+
+.controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.45rem 0.7rem;
+}
+
+.controls__btn {
+  background: var(--panel-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.35rem 0.8rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.controls__btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.controls__btn--exit {
+  margin-left: 0.5rem;
+  border-color: #7f1d1d;
+}
+
+.controls__counter {
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  min-width: 3.5rem;
+  text-align: center;
+}
+
+/* ---- ELK multiple-handles demo ---- */
+.elk-demo {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.elk-demo__bar {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.6rem 1rem;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+}
+
+.elk-demo__caption {
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.elk-demo__canvas {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+
+.react-flow__node-elk {
+  width: 150px;
+  padding: 0.6rem 0.75rem;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font-size: 0.85rem;
+  text-align: center;
+}
+
+.react-flow__node-elk .label {
+  pointer-events: none;
+}
+
+.react-flow__node-elk .handles {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-around;
+}
+
+.react-flow__node-elk .handles.sources {
+  right: 0;
+  top: 0;
+  height: 100%;
+  transform: translate(50%, 0);
+}
+
+.react-flow__node-elk .handles.targets {
+  left: 0;
+  top: 0;
+  height: 100%;
+  transform: translate(-50%, 0);
+}
+
+.react-flow__node-elk .handles .react-flow__handle {
+  position: relative;
+  top: 0;
+  left: 0;
+  transform: none;
+}

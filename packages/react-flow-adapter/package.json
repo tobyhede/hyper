@@ -1,0 +1,25 @@
+{
+  "name": "@project/react-flow-adapter",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@project/core": "workspace:*",
+    "@project/graph": "workspace:*",
+    "@project/ui": "workspace:*",
+    "elkjs": "^0.12.0"
+  },
+  "peerDependencies": {
+    "@xyflow/react": "^12.3.5",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  }
+}

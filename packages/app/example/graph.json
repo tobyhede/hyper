@@ -1,0 +1,72 @@
+{
+  "version": 1,
+  "title": "Graph-Native Technical Presentations",
+  "cards": [
+    { "id": "intro", "title": "Graph-native presentations", "content": "cards/intro.md" },
+    { "id": "problem", "title": "The problem with linear decks", "content": "cards/problem.md" },
+    { "id": "model", "title": "The data model", "content": "cards/model.md" },
+    { "id": "rendering", "title": "Rendering the graph", "content": "cards/rendering.md" },
+    { "id": "paths", "title": "Paths as slide decks", "content": "cards/paths.md" },
+    { "id": "demo", "title": "Try it", "content": "cards/demo.md" }
+  ],
+  "nodes": [
+    { "id": "intro-node", "cardId": "intro", "position": { "x": 0, "y": 0 } },
+    { "id": "problem-node", "cardId": "problem", "position": { "x": 420, "y": -160 } },
+    { "id": "model-node", "cardId": "model", "position": { "x": 420, "y": 200 } },
+    { "id": "rendering-node", "cardId": "rendering", "position": { "x": 860, "y": 200 } },
+    { "id": "paths-node", "cardId": "paths", "position": { "x": 860, "y": -160 } },
+    { "id": "demo-node", "cardId": "demo", "position": { "x": 1280, "y": 0 } }
+  ],
+  "edges": [
+    {
+      "id": "intro-to-problem",
+      "source": "intro-node",
+      "target": "problem-node",
+      "kind": "sequence"
+    },
+    {
+      "id": "problem-to-model",
+      "source": "problem-node",
+      "target": "model-node",
+      "kind": "sequence"
+    },
+    {
+      "id": "model-to-rendering",
+      "source": "model-node",
+      "target": "rendering-node",
+      "kind": "sequence"
+    },
+    {
+      "id": "rendering-to-paths",
+      "source": "rendering-node",
+      "target": "paths-node",
+      "kind": "sequence"
+    },
+    { "id": "paths-to-demo", "source": "paths-node", "target": "demo-node", "kind": "sequence" },
+    {
+      "id": "model-references-paths",
+      "source": "model-node",
+      "target": "paths-node",
+      "kind": "reference"
+    }
+  ],
+  "paths": [
+    {
+      "id": "main",
+      "title": "Main walkthrough",
+      "steps": [
+        { "target": "intro-node" },
+        { "target": "problem-node" },
+        { "target": "model-node" },
+        { "target": "rendering-node" },
+        { "target": "paths-node" },
+        { "target": "demo-node" }
+      ]
+    },
+    {
+      "id": "quick",
+      "title": "Quick tour",
+      "steps": [{ "target": "intro-node" }, { "target": "model-node" }, { "target": "demo-node" }]
+    }
+  ]
+}

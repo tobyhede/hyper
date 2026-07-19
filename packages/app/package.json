@@ -1,0 +1,28 @@
+{
+  "name": "@project/app",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@project/core": "workspace:*",
+    "@project/graph": "workspace:*",
+    "@project/react-flow-adapter": "workspace:*",
+    "@project/ui": "workspace:*",
+    "@tanstack/react-router": "^1.87.0",
+    "@xyflow/react": "^12.3.5",
+    "elkjs": "^0.12.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "zustand": "^5.0.2"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.3.3",
+    "tailwindcss": "^4.3.3"
+  }
+}
