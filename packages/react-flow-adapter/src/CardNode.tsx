@@ -1,12 +1,15 @@
 import { Handle, Position, type NodeProps } from '@xyflow/react';
 import { CardRenderer } from '@project/ui';
 import type { CardFlowNode, CardHandle } from './projection';
+import { OTHER_ROUTE_OPACITY } from './projection';
 
 /** React Flow custom node: a markdown card with one colored handle per route,
  *  each positioned at the vertical offset ELK computed for its port. */
 export function CardNode({ data }: NodeProps<CardFlowNode>) {
+  // Handles fade by the same amount as their route's edges, so a receding route
+  // recedes as a whole rather than leaving bright dots on the cards.
   const dim = (handle: CardHandle): number =>
-    data.activeRouteId && handle.routeId !== data.activeRouteId ? 0.15 : 1;
+    handle.routeId === data.activeRouteId ? 1 : OTHER_ROUTE_OPACITY[data.emphasis];
 
   const renderHandle = (handle: CardHandle, type: 'source' | 'target') => (
     <Handle

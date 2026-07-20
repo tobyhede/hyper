@@ -1,7 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ReactFlowProvider } from '@xyflow/react';
 import { AppShell, Button, RouteLegend, RouteSelector } from '@project/ui';
-import { elkLayout, projectCardNodes, projectRouteEdges } from '@project/react-flow-adapter';
+import {
+  elkLayout,
+  projectCardNodes,
+  projectRouteEdges,
+  type RouteEmphasis,
+} from '@project/react-flow-adapter';
 import {
   buildCardHandles,
   buildLayoutGraph,
@@ -90,29 +95,30 @@ export function App() {
     };
   }, [graph]);
 
-  // Overview draws every route equally; presenting emphasises the one being
-  // walked. Whether selection alone should emphasise is multi-route/02.
-  const emphasisedRouteId = presenting ? selectedRouteId : null;
+  // Selecting a route emphasises it; it never hides the rest of the space.
+  // Presenting pushes the others further back so the walked route stands alone.
+  const emphasis: RouteEmphasis = presenting ? 'strong' : selectedRouteId ? 'subtle' : 'equal';
 
   const nodes = useMemo(
     () =>
       projectCardNodes(manifest, markdownByCardId, visibleHandles, colors, {
         activeCardId,
-        activeRouteId: emphasisedRouteId,
+        activeRouteId: selectedRouteId,
+        emphasis,
         layoutGraph: laidOut ?? undefined,
         nodeHeight: CARD_HEIGHT,
         cardIds: visibleCardIds,
       }),
-    [activeCardId, emphasisedRouteId, laidOut, visibleHandles, visibleCardIds],
+    [activeCardId, selectedRouteId, emphasis, laidOut, visibleHandles, visibleCardIds],
   );
 
   const edges = useMemo(
     () =>
       projectRouteEdges(visibleEdges, colors, {
-        activeRouteId: emphasisedRouteId,
-        presenting,
+        activeRouteId: selectedRouteId,
+        emphasis,
       }),
-    [visibleEdges, emphasisedRouteId, presenting],
+    [visibleEdges, selectedRouteId, emphasis],
   );
 
   const route = selectedRouteId ? getRoute(manifest, selectedRouteId) : undefined;

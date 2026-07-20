@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Manifest } from '@project/core';
 import { buildCardHandles, buildRouteEdges } from '@project/graph';
-import { projectCardNodes, projectRouteEdges } from '../src/index';
+import { projectCardNodes, projectRouteEdges, type RouteEmphasis } from '../src/index';
 
 const manifest: Manifest = {
   version: 1,
@@ -90,16 +90,34 @@ describe('projectRouteEdges', () => {
     expect(mainEdge.style?.stroke).toBe('#111111');
   });
 
-  it('dims non-active routes while presenting', () => {
-    const edges = projectRouteEdges(routeEdges, colors, {
-      presenting: true,
-      activeRouteId: 'main',
-    });
-    const mainEdge = edges.find((e) => e.id === 'main::0')!;
-    const altEdge = edges.find((e) => e.id === 'alt::0')!;
-    expect(mainEdge.style?.opacity).toBe(1);
-    expect(mainEdge.animated).toBe(true);
-    expect(altEdge.style?.opacity).toBeLessThan(1);
-    expect(altEdge.animated).toBe(false);
+  it('draws every route the same when nothing is emphasised', () => {
+    const edges = projectRouteEdges(routeEdges, colors, { emphasis: 'equal' });
+    expect(edges.every((e) => e.style?.opacity === 1)).toBe(true);
+    expect(edges.every((e) => e.animated)).toBe(true);
+  });
+
+  it('recedes the other routes by the level asked for, never hiding them', () => {
+    const at = (emphasis: RouteEmphasis) => {
+      const edges = projectRouteEdges(routeEdges, colors, { emphasis, activeRouteId: 'main' });
+      return {
+        main: edges.find((e) => e.id === 'main::0')!,
+        alt: edges.find((e) => e.id === 'alt::0')!,
+        count: edges.length,
+      };
+    };
+
+    const subtle = at('subtle');
+    const strong = at('strong');
+
+    // The emphasised route is untouched at either level.
+    expect(subtle.main.style?.opacity).toBe(1);
+    expect(strong.main.style?.opacity).toBe(1);
+    expect(subtle.main.animated).toBe(true);
+
+    // Others recede, further while presenting — but are still drawn.
+    expect(Number(subtle.alt.style?.opacity)).toBeLessThan(1);
+    expect(Number(strong.alt.style?.opacity)).toBeLessThan(Number(subtle.alt.style?.opacity));
+    expect(Number(strong.alt.style?.opacity)).toBeGreaterThan(0);
+    expect(subtle.count).toBe(strong.count);
   });
 });

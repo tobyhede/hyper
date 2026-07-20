@@ -12,6 +12,22 @@ import type {
 const FALLBACK_COLOR = '#8a94a6';
 const DEFAULT_NODE_HEIGHT = 300;
 
+/**
+ * How strongly routes other than the active one recede.
+ *
+ * Three states, not a boolean: nothing is selected, something is selected while
+ * the whole space is on screen, or one route is being walked and the rest should
+ * nearly vanish. A view picks the level; the adapter knows nothing about modes.
+ */
+export type RouteEmphasis = 'equal' | 'subtle' | 'strong';
+
+/** Opacity applied to routes that are not the active one. */
+export const OTHER_ROUTE_OPACITY: Record<RouteEmphasis, number> = {
+  equal: 1,
+  subtle: 0.35,
+  strong: 0.12,
+};
+
 /** A route handle resolved for rendering: a color and a vertical offset (px from
  *  the node's top) matching where ELK placed the port. */
 export type CardHandle = {
@@ -29,8 +45,9 @@ export type CardNodeData = {
   title: string;
   markdown: string;
   active: boolean;
-  /** The route being presented, or null in overview mode. Drives handle dimming. */
+  /** The route being emphasised, if any. Drives handle dimming. */
   activeRouteId: string | null;
+  emphasis: RouteEmphasis;
   sourceHandles: CardHandle[];
   targetHandles: CardHandle[];
 };
@@ -45,8 +62,9 @@ const EMPTY_HANDLES: CardHandleSet = { sourceHandles: [], targetHandles: [] };
 export interface ProjectCardNodesOptions {
   /** Card id of the current presentation step, if any, to flag as active. */
   activeCardId?: string | null;
-  /** The route being presented, if any. */
+  /** The route to emphasise, if any. */
   activeRouteId?: string | null;
+  emphasis?: RouteEmphasis;
   /** The laid-out graph; positions and port offsets come from here when present. */
   layoutGraph?: LayoutGraph;
   /** Node height used to evenly distribute handles before the layout resolves. */
@@ -90,6 +108,7 @@ export function projectCardNodes(
 ): CardFlowNode[] {
   const activeCardId = options.activeCardId ?? null;
   const activeRouteId = options.activeRouteId ?? null;
+  const emphasis = options.emphasis ?? 'equal';
   const nodeHeight = options.nodeHeight ?? DEFAULT_NODE_HEIGHT;
   const visible = options.cardIds ? new Set(options.cardIds) : null;
   const laidOut = new Map((options.layoutGraph?.cards ?? []).map((c) => [c.id, c]));
@@ -111,6 +130,7 @@ export function projectCardNodes(
         markdown: markdownByCardId[card.id] ?? '',
         active,
         activeRouteId,
+        emphasis,
         sourceHandles: resolveHandles(handles.sourceHandles, colors, cardLayout, nodeHeight),
         targetHandles: resolveHandles(handles.targetHandles, colors, cardLayout, nodeHeight),
       },
@@ -120,9 +140,10 @@ export function projectCardNodes(
 }
 
 export interface ProjectRouteEdgesOptions {
-  /** In presentation mode, only the active route's edges stay fully opaque. */
+  /** The route to emphasise, if any. */
   activeRouteId?: string | null;
-  presenting?: boolean;
+  /** How strongly the other routes recede. */
+  emphasis?: RouteEmphasis;
 }
 
 /** Map route-derived edges → colored React Flow edges connected port-to-port. */
@@ -132,12 +153,12 @@ export function projectRouteEdges(
   options: ProjectRouteEdgesOptions = {},
 ): Edge[] {
   const activeRouteId = options.activeRouteId ?? null;
-  const presenting = options.presenting ?? false;
+  const emphasis = options.emphasis ?? 'equal';
 
   return routeEdges.map((edge) => {
     const color = colors[edge.routeId] ?? FALLBACK_COLOR;
     const isActiveRoute = edge.routeId === activeRouteId;
-    const emphasized = !presenting || isActiveRoute;
+    const emphasized = isActiveRoute || emphasis === 'equal';
 
     return {
       id: edge.id,
@@ -151,7 +172,7 @@ export function projectRouteEdges(
       style: {
         stroke: color,
         strokeWidth: isActiveRoute ? 3 : 2,
-        opacity: emphasized ? 1 : 0.12,
+        opacity: emphasized ? 1 : OTHER_ROUTE_OPACITY[emphasis],
       },
       markerEnd: { type: MarkerType.ArrowClosed, color },
       data: { routeId: edge.routeId },

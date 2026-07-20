@@ -78,25 +78,26 @@ test('selecting a route keeps the others on screen', async ({ page }) => {
   await expect(page.locator('.react-flow__edge')).toHaveCount(7);
 });
 
-test('presenting dims the routes not being walked', async ({ page }) => {
+test('selecting emphasises a route; presenting pushes the rest further back', async ({ page }) => {
   await page.goto('/');
+  await expect(page.locator('.react-flow__edge')).toHaveCount(7);
 
   const opacities = async () =>
     page
       .locator('.react-flow__edge-path')
       .evaluateAll((els) => els.map((el) => Number(getComputedStyle(el).opacity)));
 
-  // In overview every route is drawn at full strength.
-  await expect(page.locator('.react-flow__edge')).toHaveCount(7);
-  const overview = await opacities();
-  expect(overview).toHaveLength(7);
-  expect(overview.every((o) => o === 1)).toBe(true);
+  // "main" is selected on load, so "quick"'s two edges already recede. The
+  // selector does something without having to press Present.
+  const faded = (await opacities()).filter((o) => o < 1);
+  expect(faded).toHaveLength(2);
+  const subtle = faded[0]!;
+  expect(subtle).toBeGreaterThan(0);
 
-  await page.getByTestId('route-selector').click();
-  await page.getByRole('option', { name: 'Main walkthrough' }).click();
   await page.getByTestId('present-button').click();
   await expect(page.getByTestId('presentation-layer')).toBeVisible();
 
-  // "quick"'s two edges fade; "main"'s five stay opaque.
-  await expect.poll(async () => (await opacities()).filter((o) => o < 0.5).length).toBe(2);
+  // Presenting fades them further, and never removes them.
+  await expect.poll(async () => (await opacities()).filter((o) => o < subtle).length).toBe(2);
+  await expect(page.locator('.react-flow__edge')).toHaveCount(7);
 });
