@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import {
-  getPath,
+  getRoute,
   nextStepIndex,
   cardIdAtStep,
   prevStepIndex,
@@ -12,9 +12,9 @@ export type Mode = 'overview' | 'presenting';
 
 export interface PresentationState {
   mode: Mode;
-  selectedPathId: string | null;
+  selectedRouteId: string | null;
   stepIndex: number;
-  selectPath: (pathId: string) => void;
+  selectRoute: (routeId: string) => void;
   enterPresentation: () => void;
   exitPresentation: () => void;
   next: () => void;
@@ -22,48 +22,48 @@ export interface PresentationState {
   goToStep: (index: number) => void;
 }
 
-const firstPathId = manifest.paths[0]?.id ?? null;
+const firstRouteId = manifest.routes[0]?.id ?? null;
 
 export const usePresentationStore = create<PresentationState>((set, get) => ({
   mode: 'overview',
-  selectedPathId: firstPathId,
+  selectedRouteId: firstRouteId,
   stepIndex: 0,
 
-  selectPath: (pathId) => set({ selectedPathId: pathId, stepIndex: 0 }),
+  selectRoute: (routeId) => set({ selectedRouteId: routeId, stepIndex: 0 }),
 
   enterPresentation: () => {
-    if (!get().selectedPathId) return;
+    if (!get().selectedRouteId) return;
     set({ mode: 'presenting', stepIndex: 0 });
   },
 
   exitPresentation: () => set({ mode: 'overview' }),
 
   next: () => {
-    const { selectedPathId, stepIndex } = get();
-    const path = selectedPathId ? getPath(manifest, selectedPathId) : undefined;
-    if (!path) return;
-    set({ stepIndex: nextStepIndex(path, stepIndex) });
+    const { selectedRouteId, stepIndex } = get();
+    const route = selectedRouteId ? getRoute(manifest, selectedRouteId) : undefined;
+    if (!route) return;
+    set({ stepIndex: nextStepIndex(route, stepIndex) });
   },
 
   prev: () => {
-    const { selectedPathId, stepIndex } = get();
-    const path = selectedPathId ? getPath(manifest, selectedPathId) : undefined;
-    if (!path) return;
-    set({ stepIndex: prevStepIndex(path, stepIndex) });
+    const { selectedRouteId, stepIndex } = get();
+    const route = selectedRouteId ? getRoute(manifest, selectedRouteId) : undefined;
+    if (!route) return;
+    set({ stepIndex: prevStepIndex(route, stepIndex) });
   },
 
   goToStep: (index) => {
-    const { selectedPathId } = get();
-    const path = selectedPathId ? getPath(manifest, selectedPathId) : undefined;
-    if (!path) return;
-    set({ stepIndex: clampStepIndex(path, index) });
+    const { selectedRouteId } = get();
+    const route = selectedRouteId ? getRoute(manifest, selectedRouteId) : undefined;
+    if (!route) return;
+    set({ stepIndex: clampStepIndex(route, index) });
   },
 }));
 
 /** Card id of the current presentation step, or `null` outside presentation. */
 export function selectActiveCardId(state: PresentationState): string | null {
-  if (state.mode !== 'presenting' || !state.selectedPathId) return null;
-  const path = getPath(manifest, state.selectedPathId);
-  if (!path) return null;
-  return cardIdAtStep(path, state.stepIndex) ?? null;
+  if (state.mode !== 'presenting' || !state.selectedRouteId) return null;
+  const route = getRoute(manifest, state.selectedRouteId);
+  if (!route) return null;
+  return cardIdAtStep(route, state.stepIndex) ?? null;
 }

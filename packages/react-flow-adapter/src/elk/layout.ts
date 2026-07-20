@@ -10,7 +10,7 @@ import type { ElkLayoutResult, ElkPortData } from './types';
 /**
  * ELK "layered" options for a left→right graph. `NETWORK_SIMPLEX` node placement
  * aligns connected nodes vertically so their ports line up, which keeps the
- * path rails close to horizontal.
+ * route rails close to horizontal.
  * Reference: https://www.eclipse.org/elk/reference/algorithms/org-eclipse-elk-layered.html
  */
 export const DEFAULT_ELK_LAYOUT_OPTIONS: LayoutOptions = {
@@ -31,10 +31,10 @@ const PORT_ID_SEPARATOR = '##';
 
 /**
  * ELK port ids must be unique across the whole graph, but a handle id
- * (`<pathId>::out`) is the *same* on every card the path passes through.
+ * (`<routeId>::out`) is the *same* on every card the route passes through.
  * Handing ELK the bare handle id leaves it unable to tell which card an edge
  * attaches to, so it resolves arbitrarily and the layout collapses — badly
- * enough to mislay even a single path. Namespacing by card id is what makes the
+ * enough to mislay even a single route. Namespacing by card id is what makes the
  * endpoint unambiguous. The render layer never sees these; `getElkLayout`
  * strips the prefix back off, so handles keep their bare ids.
  */

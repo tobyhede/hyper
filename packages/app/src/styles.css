@@ -71,7 +71,7 @@ body {
 }
 
 /* ---- Toolbar controls ---- */
-.path-selector {
+.route-selector {
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
@@ -79,7 +79,7 @@ body {
   color: var(--muted);
 }
 
-.path-selector__select {
+.route-selector__select {
   background: var(--panel-2);
   color: var(--text);
   border: 1px solid var(--border);
@@ -113,7 +113,7 @@ body {
   color: white;
 }
 
-/* ---- Path legend ---- */
+/* ---- Route legend ---- */
 .legend {
   display: flex;
   align-items: center;
@@ -174,7 +174,7 @@ body {
   width: 260px;
 }
 
-/* Per-path ports, positioned by ELK's computed offset (inline `top`). React
+/* Per-route ports, positioned by ELK's computed offset (inline `top`). React
    Flow handles the left/right edge placement and vertical centering. */
 .rf-card-node__port.react-flow__handle {
   width: 11px;

@@ -1,9 +1,9 @@
-import type { Card, Manifest, PresentationPath } from '@project/core';
+import type { Card, Manifest, Route } from '@project/core';
 
 export function getCard(manifest: Manifest, cardId: string): Card | undefined {
   return manifest.cards.find((c) => c.id === cardId);
 }
 
-export function getPath(manifest: Manifest, pathId: string): PresentationPath | undefined {
-  return manifest.paths.find((p) => p.id === pathId);
+export function getRoute(manifest: Manifest, routeId: string): Route | undefined {
+  return manifest.routes.find((r) => r.id === routeId);
 }

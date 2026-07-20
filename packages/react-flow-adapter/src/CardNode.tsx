@@ -2,11 +2,11 @@ import { Handle, Position, type NodeProps } from '@xyflow/react';
 import { CardRenderer } from '@project/ui';
 import type { CardFlowNode, CardHandle } from './projection';
 
-/** React Flow custom node: a markdown card with one colored handle per path,
+/** React Flow custom node: a markdown card with one colored handle per route,
  *  each positioned at the vertical offset ELK computed for its port. */
 export function CardNode({ data }: NodeProps<CardFlowNode>) {
   const dim = (handle: CardHandle): number =>
-    data.activePathId && handle.pathId !== data.activePathId ? 0.15 : 1;
+    data.activeRouteId && handle.routeId !== data.activeRouteId ? 0.15 : 1;
 
   const renderHandle = (handle: CardHandle, type: 'source' | 'target') => (
     <Handle

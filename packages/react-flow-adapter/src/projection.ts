@@ -1,17 +1,17 @@
 import type { Edge, Node } from '@xyflow/react';
 import { MarkerType } from '@xyflow/react';
 import type { Manifest } from '@project/core';
-import type { CardHandleSet, PathEdge, PathHandleRef } from '@project/graph';
+import type { CardHandleSet, RouteEdge, RouteHandleRef } from '@project/graph';
 import type { ElkLayoutResult, ElkNodeLayout } from './elk/types';
 
 const FALLBACK_COLOR = '#8a94a6';
 const DEFAULT_NODE_HEIGHT = 300;
 
-/** A path handle resolved for rendering: a color and a vertical offset (px from
+/** A route handle resolved for rendering: a color and a vertical offset (px from
  *  the node's top) matching where ELK placed the port. */
 export type CardHandle = {
   id: string;
-  pathId: string;
+  routeId: string;
   color: string;
   offsetY: number;
 };
@@ -24,8 +24,8 @@ export type CardNodeData = {
   title: string;
   markdown: string;
   active: boolean;
-  /** The path being presented, or null in overview mode. Drives handle dimming. */
-  activePathId: string | null;
+  /** The route being presented, or null in overview mode. Drives handle dimming. */
+  activeRouteId: string | null;
   sourceHandles: CardHandle[];
   targetHandles: CardHandle[];
 };
@@ -33,26 +33,26 @@ export type CardNodeData = {
 export type CardFlowNode = Node<CardNodeData, 'card'>;
 
 export type MarkdownByCardId = Readonly<Record<string, string>>;
-export type ColorByPathId = Readonly<Record<string, string>>;
+export type ColorByRouteId = Readonly<Record<string, string>>;
 
 const EMPTY_HANDLES: CardHandleSet = { sourceHandles: [], targetHandles: [] };
 
 export interface ProjectCardNodesOptions {
   /** Card id of the current presentation step, if any, to flag as active. */
   activeCardId?: string | null;
-  /** The path being presented, if any. */
-  activePathId?: string | null;
+  /** The route being presented, if any. */
+  activeRouteId?: string | null;
   /** ELK layout result; positions and port offsets come from here when present. */
   layout?: ElkLayoutResult;
   /** Node height used to evenly distribute handles before the layout resolves. */
   nodeHeight?: number;
-  /** Restrict the projection to these card ids (e.g. one path's cards). */
+  /** Restrict the projection to these card ids (e.g. one route's cards). */
   cardIds?: readonly string[];
 }
 
 function resolveHandles(
-  refs: PathHandleRef[],
-  colors: ColorByPathId,
+  refs: RouteHandleRef[],
+  colors: ColorByRouteId,
   nodeLayout: ElkNodeLayout | undefined,
   nodeHeight: number,
 ): CardHandle[] {
@@ -63,15 +63,15 @@ function resolveHandles(
     const offsetY = port?.y ?? ((index + 1) / (count + 1)) * nodeHeight;
     return {
       id: ref.id,
-      pathId: ref.pathId,
-      color: colors[ref.pathId] ?? FALLBACK_COLOR,
+      routeId: ref.routeId,
+      color: colors[ref.routeId] ?? FALLBACK_COLOR,
       offsetY,
     };
   });
 }
 
 /**
- * Map cards → React Flow card nodes, attaching per-path handles positioned at
+ * Map cards → React Flow card nodes, attaching per-route handles positioned at
  * their ELK port offsets and each card's markdown body. The card id is the React
  * Flow node id.
  */
@@ -79,11 +79,11 @@ export function projectCardNodes(
   manifest: Manifest,
   markdownByCardId: MarkdownByCardId,
   handlesByCard: ReadonlyMap<string, CardHandleSet>,
-  colors: ColorByPathId,
+  colors: ColorByRouteId,
   options: ProjectCardNodesOptions = {},
 ): CardFlowNode[] {
   const activeCardId = options.activeCardId ?? null;
-  const activePathId = options.activePathId ?? null;
+  const activeRouteId = options.activeRouteId ?? null;
   const layout = options.layout;
   const nodeHeight = options.nodeHeight ?? DEFAULT_NODE_HEIGHT;
   const visible = options.cardIds ? new Set(options.cardIds) : null;
@@ -105,7 +105,7 @@ export function projectCardNodes(
         title: card.title,
         markdown: markdownByCardId[card.id] ?? '',
         active,
-        activePathId,
+        activeRouteId,
         sourceHandles: resolveHandles(handles.sourceHandles, colors, cardLayout, nodeHeight),
         targetHandles: resolveHandles(handles.targetHandles, colors, cardLayout, nodeHeight),
       },
@@ -114,25 +114,25 @@ export function projectCardNodes(
   });
 }
 
-export interface ProjectPathEdgesOptions {
-  /** In presentation mode, only the active path's rail stays fully opaque. */
-  activePathId?: string | null;
+export interface ProjectRouteEdgesOptions {
+  /** In presentation mode, only the active route's rail stays fully opaque. */
+  activeRouteId?: string | null;
   presenting?: boolean;
 }
 
-/** Map path-derived edges → colored React Flow edges connected port-to-port. */
-export function projectPathEdges(
-  pathEdges: readonly PathEdge[],
-  colors: ColorByPathId,
-  options: ProjectPathEdgesOptions = {},
+/** Map route-derived edges → colored React Flow edges connected port-to-port. */
+export function projectRouteEdges(
+  routeEdges: readonly RouteEdge[],
+  colors: ColorByRouteId,
+  options: ProjectRouteEdgesOptions = {},
 ): Edge[] {
-  const activePathId = options.activePathId ?? null;
+  const activeRouteId = options.activeRouteId ?? null;
   const presenting = options.presenting ?? false;
 
-  return pathEdges.map((edge) => {
-    const color = colors[edge.pathId] ?? FALLBACK_COLOR;
-    const isActivePath = edge.pathId === activePathId;
-    const emphasized = !presenting || isActivePath;
+  return routeEdges.map((edge) => {
+    const color = colors[edge.routeId] ?? FALLBACK_COLOR;
+    const isActiveRoute = edge.routeId === activeRouteId;
+    const emphasized = !presenting || isActiveRoute;
 
     return {
       id: edge.id,
@@ -141,15 +141,15 @@ export function projectPathEdges(
       sourceHandle: edge.sourceHandle,
       targetHandle: edge.targetHandle,
       // Default (bezier) curves, matching the upstream example.
-      className: `rf-path-edge rf-path-edge--${edge.pathId}`,
+      className: `rf-route-edge rf-route-edge--${edge.routeId}`,
       animated: emphasized,
       style: {
         stroke: color,
-        strokeWidth: isActivePath ? 3 : 2,
+        strokeWidth: isActiveRoute ? 3 : 2,
         opacity: emphasized ? 1 : 0.12,
       },
       markerEnd: { type: MarkerType.ArrowClosed, color },
-      data: { pathId: edge.pathId },
+      data: { routeId: edge.routeId },
     };
   });
 }

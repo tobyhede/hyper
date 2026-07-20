@@ -11,7 +11,7 @@ function baseManifest(): Manifest {
       { id: 'b', title: 'B', content: 'cards/b.md' },
     ],
     edges: [{ id: 'a-b', source: 'a', target: 'b', kind: 'sequence' }],
-    paths: [{ id: 'main', title: 'Main', steps: [{ target: 'a' }, { target: 'b' }] }],
+    routes: [{ id: 'main', title: 'Main', steps: [{ target: 'a' }, { target: 'b' }] }],
   };
 }
 
@@ -37,11 +37,13 @@ describe('validateReferences', () => {
     expect(errors.some((e) => e.kind === 'unresolved-edge-target')).toBe(true);
   });
 
-  it('detects an unresolved path step target', () => {
+  it('detects an unresolved route step target', () => {
     const m = baseManifest();
-    m.paths[0]!.steps[1]!.target = 'nowhere';
+    m.routes[0]!.steps[1]!.target = 'nowhere';
     const errors = validateReferences(m);
-    expect(errors.some((e) => e.kind === 'unresolved-path-step' && e.ref === 'nowhere')).toBe(true);
+    expect(errors.some((e) => e.kind === 'unresolved-route-step' && e.ref === 'nowhere')).toBe(
+      true,
+    );
   });
 
   it('detects duplicate card ids', () => {

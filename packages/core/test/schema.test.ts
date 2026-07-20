@@ -9,7 +9,7 @@ const validManifest = {
     { id: 'b', title: 'B', content: 'cards/b.md' },
   ],
   edges: [],
-  paths: [{ id: 'main', title: 'Main', steps: [{ target: 'a' }] }],
+  routes: [{ id: 'main', title: 'Main', steps: [{ target: 'a' }] }],
 };
 
 describe('manifest schema', () => {
@@ -32,15 +32,15 @@ describe('manifest schema', () => {
     expect(result.success).toBe(false);
   });
 
-  it('rejects a manifest with no paths', () => {
-    const result = safeParseManifest({ ...validManifest, paths: [] });
+  it('rejects a manifest with no routes', () => {
+    const result = safeParseManifest({ ...validManifest, routes: [] });
     expect(result.success).toBe(false);
   });
 
-  it('rejects a path with no steps', () => {
+  it('rejects a route with no steps', () => {
     const result = safeParseManifest({
       ...validManifest,
-      paths: [{ id: 'main', title: 'Main', steps: [] }],
+      routes: [{ id: 'main', title: 'Main', steps: [] }],
     });
     expect(result.success).toBe(false);
   });

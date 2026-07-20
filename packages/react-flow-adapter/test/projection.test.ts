@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Manifest } from '@project/core';
-import { buildCardHandles, buildPathEdges } from '@project/graph';
-import { projectCardNodes, projectPathEdges } from '../src/index';
+import { buildCardHandles, buildRouteEdges } from '@project/graph';
+import { projectCardNodes, projectRouteEdges } from '../src/index';
 
 const manifest: Manifest = {
   version: 1,
@@ -11,7 +11,7 @@ const manifest: Manifest = {
     { id: 'b', title: 'Card B', content: 'cards/b.md' },
   ],
   edges: [],
-  paths: [
+  routes: [
     { id: 'main', title: 'Main', steps: [{ target: 'a' }, { target: 'b' }] },
     { id: 'alt', title: 'Alt', steps: [{ target: 'b' }, { target: 'a' }] },
   ],
@@ -31,15 +31,15 @@ describe('projectCardNodes', () => {
     expect(a.data.active).toBe(false);
   });
 
-  it('attaches per-path handles colored by path', () => {
+  it('attaches per-route handles colored by route', () => {
     const nodes = projectCardNodes(manifest, markdown, handles, colors);
     const a = nodes.find((n) => n.id === 'a')!;
     // main leaves card a (out); alt ends at card a (in).
     expect(a.data.sourceHandles).toMatchObject([
-      { id: 'main::out', pathId: 'main', color: '#111111' },
+      { id: 'main::out', routeId: 'main', color: '#111111' },
     ]);
     expect(a.data.targetHandles).toMatchObject([
-      { id: 'alt::in', pathId: 'alt', color: '#222222' },
+      { id: 'alt::in', routeId: 'alt', color: '#222222' },
     ]);
     // A vertical offset is always assigned (even spread before ELK runs).
     expect(typeof a.data.sourceHandles[0]!.offsetY).toBe('number');
@@ -71,11 +71,11 @@ describe('projectCardNodes', () => {
   });
 });
 
-describe('projectPathEdges', () => {
-  const pathEdges = buildPathEdges(manifest);
+describe('projectRouteEdges', () => {
+  const routeEdges = buildRouteEdges(manifest);
 
-  it('maps path edges to colored, port-connected React Flow edges', () => {
-    const edges = projectPathEdges(pathEdges, colors);
+  it('maps route edges to colored, port-connected React Flow edges', () => {
+    const edges = projectRouteEdges(routeEdges, colors);
     expect(edges).toHaveLength(2);
     const mainEdge = edges.find((e) => e.id === 'main::0')!;
     expect(mainEdge).toMatchObject({
@@ -87,8 +87,11 @@ describe('projectPathEdges', () => {
     expect(mainEdge.style?.stroke).toBe('#111111');
   });
 
-  it('dims non-active paths while presenting', () => {
-    const edges = projectPathEdges(pathEdges, colors, { presenting: true, activePathId: 'main' });
+  it('dims non-active routes while presenting', () => {
+    const edges = projectRouteEdges(routeEdges, colors, {
+      presenting: true,
+      activeRouteId: 'main',
+    });
     const mainEdge = edges.find((e) => e.id === 'main::0')!;
     const altEdge = edges.find((e) => e.id === 'alt::0')!;
     expect(mainEdge.style?.opacity).toBe(1);

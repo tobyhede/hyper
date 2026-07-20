@@ -1,27 +1,27 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ReactFlowProvider, type Node } from '@xyflow/react';
-import { AppShell, Button, PathLegend, PathSelector } from '@project/ui';
+import { AppShell, Button, RouteLegend, RouteSelector } from '@project/ui';
 import {
   getElkLayout,
   projectCardNodes,
-  projectPathEdges,
+  projectRouteEdges,
   type ElkLayoutResult,
   type ElkPortData,
 } from '@project/react-flow-adapter';
 import {
   buildCardHandles,
-  buildPathEdges,
+  buildRouteEdges,
   canGoNext,
   canGoPrev,
-  filterHandlesByPath,
+  filterHandlesByRoute,
   getCard,
-  getPath,
-  pathCardIds,
+  getRoute,
+  routeCardIds,
   stepCount,
   type CardHandleSet,
 } from '@project/graph';
 import { manifest, markdownByCardId, referenceErrors } from './manifest';
-import { pathColorMap } from './colors';
+import { routeColorMap } from './colors';
 import { selectActiveCardId, usePresentationStore } from './store';
 import { GraphView } from './components/GraphView';
 import { PresentationLayer } from './components/PresentationLayer';
@@ -32,15 +32,15 @@ const CARD_WIDTH = 260;
 const CARD_HEIGHT = 300;
 
 // Derived once from the (static) manifest.
-const colors = pathColorMap(manifest);
+const colors = routeColorMap(manifest);
 const allHandles = buildCardHandles(manifest);
-const allPathEdges = buildPathEdges(manifest);
+const allRouteEdges = buildRouteEdges(manifest);
 
 export function App() {
   const mode = usePresentationStore((s) => s.mode);
-  const selectedPathId = usePresentationStore((s) => s.selectedPathId);
+  const selectedRouteId = usePresentationStore((s) => s.selectedRouteId);
   const stepIndex = usePresentationStore((s) => s.stepIndex);
-  const selectPath = usePresentationStore((s) => s.selectPath);
+  const selectRoute = usePresentationStore((s) => s.selectRoute);
   const enterPresentation = usePresentationStore((s) => s.enterPresentation);
   const exitPresentation = usePresentationStore((s) => s.exitPresentation);
   const next = usePresentationStore((s) => s.next);
@@ -49,27 +49,27 @@ export function App() {
   const activeCardId = usePresentationStore(selectActiveCardId);
   const presenting = mode === 'presenting';
 
-  // The graph shows one path at a time — a single linear flow ELK lays out cleanly.
+  // The graph shows one route at a time — a single linear flow ELK lays out cleanly.
   const visibleCardIds = useMemo(
-    () => (selectedPathId ? pathCardIds(manifest, selectedPathId) : []),
-    [selectedPathId],
+    () => (selectedRouteId ? routeCardIds(manifest, selectedRouteId) : []),
+    [selectedRouteId],
   );
-  const pathHandles = useMemo<ReadonlyMap<string, CardHandleSet>>(
+  const routeHandles = useMemo<ReadonlyMap<string, CardHandleSet>>(
     () =>
-      selectedPathId
-        ? filterHandlesByPath(allHandles, selectedPathId)
+      selectedRouteId
+        ? filterHandlesByRoute(allHandles, selectedRouteId)
         : new Map<string, CardHandleSet>(),
-    [selectedPathId],
+    [selectedRouteId],
   );
-  const pathEdges = useMemo(
-    () => allPathEdges.filter((edge) => edge.pathId === selectedPathId),
-    [selectedPathId],
+  const routeEdges = useMemo(
+    () => allRouteEdges.filter((edge) => edge.routeId === selectedRouteId),
+    [selectedRouteId],
   );
 
   const layoutNodes = useMemo<Node<ElkPortData>[]>(
     () =>
       visibleCardIds.map((id) => {
-        const handles = pathHandles.get(id) ?? { sourceHandles: [], targetHandles: [] };
+        const handles = routeHandles.get(id) ?? { sourceHandles: [], targetHandles: [] };
         return {
           id,
           position: { x: 0, y: 0 },
@@ -78,22 +78,22 @@ export function App() {
           data: { sourceHandles: handles.sourceHandles, targetHandles: handles.targetHandles },
         };
       }),
-    [visibleCardIds, pathHandles],
+    [visibleCardIds, routeHandles],
   );
 
   const layoutEdges = useMemo(
     () =>
-      pathEdges.map((edge) => ({
+      routeEdges.map((edge) => ({
         id: edge.id,
         source: edge.source,
         target: edge.target,
         sourceHandle: edge.sourceHandle,
         targetHandle: edge.targetHandle,
       })),
-    [pathEdges],
+    [routeEdges],
   );
 
-  // Re-run ELK whenever the selected path (and therefore the visible graph) changes.
+  // Re-run ELK whenever the selected route (and therefore the visible graph) changes.
   const [layout, setLayout] = useState<ElkLayoutResult | null>(null);
   useEffect(() => {
     let cancelled = false;
@@ -108,22 +108,22 @@ export function App() {
 
   const nodes = useMemo(
     () =>
-      projectCardNodes(manifest, markdownByCardId, pathHandles, colors, {
+      projectCardNodes(manifest, markdownByCardId, routeHandles, colors, {
         activeCardId,
-        activePathId: selectedPathId,
+        activeRouteId: selectedRouteId,
         layout: layout ?? undefined,
         nodeHeight: CARD_HEIGHT,
         cardIds: visibleCardIds,
       }),
-    [activeCardId, selectedPathId, layout, pathHandles, visibleCardIds],
+    [activeCardId, selectedRouteId, layout, routeHandles, visibleCardIds],
   );
 
   const edges = useMemo(
-    () => projectPathEdges(pathEdges, colors, { activePathId: selectedPathId }),
-    [pathEdges, selectedPathId],
+    () => projectRouteEdges(routeEdges, colors, { activeRouteId: selectedRouteId }),
+    [routeEdges, selectedRouteId],
   );
 
-  const path = selectedPathId ? getPath(manifest, selectedPathId) : undefined;
+  const route = selectedRouteId ? getRoute(manifest, selectedRouteId) : undefined;
   const activeCard = activeCardId ? getCard(manifest, activeCardId) : undefined;
 
   // Keyboard navigation while presenting.
@@ -146,8 +146,16 @@ export function App() {
 
   const toolbar = (
     <>
-      <PathSelector paths={manifest.paths} selectedPathId={selectedPathId} onSelect={selectPath} />
-      <PathLegend paths={manifest.paths} colorByPathId={colors} activePathId={selectedPathId} />
+      <RouteSelector
+        routes={manifest.routes}
+        selectedRouteId={selectedRouteId}
+        onSelect={selectRoute}
+      />
+      <RouteLegend
+        routes={manifest.routes}
+        colorByRouteId={colors}
+        activeRouteId={selectedRouteId}
+      />
       {presenting ? (
         <Button variant="secondary" onClick={exitPresentation}>
           Overview
@@ -157,7 +165,7 @@ export function App() {
           variant="default"
           data-testid="present-button"
           onClick={enterPresentation}
-          disabled={!selectedPathId}
+          disabled={!selectedRouteId}
         >
           Present
         </Button>
@@ -188,14 +196,14 @@ export function App() {
           />
         </ReactFlowProvider>
 
-        {presenting && path && activeCard && (
+        {presenting && route && activeCard && (
           <PresentationLayer
             title={activeCard.title}
             markdown={markdownByCardId[activeCard.id] ?? ''}
             stepIndex={stepIndex}
-            stepCount={stepCount(path)}
-            canPrev={canGoPrev(path, stepIndex)}
-            canNext={canGoNext(path, stepIndex)}
+            stepCount={stepCount(route)}
+            canPrev={canGoPrev(route, stepIndex)}
+            canNext={canGoNext(route, stepIndex)}
             onPrev={prev}
             onNext={next}
             onExit={exitPresentation}

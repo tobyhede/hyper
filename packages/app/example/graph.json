@@ -17,7 +17,7 @@
     { "id": "paths-to-demo", "source": "paths", "target": "demo", "kind": "sequence" },
     { "id": "model-references-paths", "source": "model", "target": "paths", "kind": "reference" }
   ],
-  "paths": [
+  "routes": [
     {
       "id": "main",
       "title": "Main walkthrough",

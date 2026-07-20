@@ -54,9 +54,9 @@ describe('buildElkGraph', () => {
 });
 
 describe('port id collision', () => {
-  // Every card on a path carries the *same* handle ids (`main::in`/`main::out`),
+  // Every card on a route carries the *same* handle ids (`main::in`/`main::out`),
   // so using bare handle ids as ELK port ids left ELK unable to tell which card
-  // an edge attached to — collapsing layers even for a single path.
+  // an edge attached to — collapsing layers even for a single route.
   const CHAIN = ['A', 'B', 'C', 'D', 'E'];
 
   const chainNodes: Node<ElkPortData>[] = CHAIN.map((id, i) => ({
@@ -84,7 +84,7 @@ describe('port id collision', () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 
-  it('lays a single path out as a strictly left-to-right chain', async () => {
+  it('lays a single route out as a strictly left-to-right chain', async () => {
     const layout = await getElkLayout(chainNodes, chainEdges);
     const xs = CHAIN.map((id) => layout[id]!.x);
     for (let i = 1; i < xs.length; i += 1) {

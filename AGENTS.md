@@ -18,8 +18,8 @@ A local, file-first prototype for **graph-native technical presentations**: Mark
 Five `@project/*` workspace packages under `packages/`:
 
 - `core` — domain model. Zod schemas (`schema.ts`) + types derived from them (`types.ts`); `parseManifest`/`safeParseManifest`. No React, no framework deps.
-- `graph` — pure graph logic over a manifest: lookups, path navigation (clamped step indexing), path→ports/edges derivation, reference validation. Depends only on `core`.
-- `react-flow-adapter` — the ONLY place React-Flow (`@xyflow/react`) and elkjs specifics live: projects a manifest+path into RF nodes/edges, runs ELK layout, renders `CardNode`.
+- `graph` — pure graph logic over a manifest: lookups, route navigation (clamped step indexing), route→ports/edges derivation, reference validation. Depends only on `core`.
+- `react-flow-adapter` — the ONLY place React-Flow (`@xyflow/react`) and elkjs specifics live: projects a manifest+route into RF nodes/edges, runs ELK layout, renders `CardNode`.
 - `ui` — reusable, presentation-agnostic React components + shadcn-style primitives (Tailwind v4, Radix Select, CVA). Depends on `core` only.
 - `app` — wiring/composition: Zustand store, TanStack Router, manifest loading, graph/presentation views, hand-rolled CSS.
 
@@ -35,8 +35,8 @@ Hard rules:
 - **Cross-package imports** use the `@project/*` path aliases (declared in `tsconfig.base.json` AND mirrored in `vitest.config.ts` `resolve.alias`; Vite resolves them via the workspace). Keep the two alias lists in sync when adding a package.
 - **Relative imports inside a package are EXTENSIONLESS** (`./foo`, not `./foo.ts`).
 - **ELK port offsets are applied to handles.** ELK computes each port's position; those exact offsets drive where `CardNode` handles render so the colored rails line up. Don't hardcode handle positions.
-- **ELK port ids are namespaced per card.** A handle id (`<pathId>::out`/`::in`) is the *same* on every card a route passes through, so `buildElkGraph` hands ELK `<cardId>##<handleId>` (`elkPortId`) and builds edge endpoints from the same key; `getElkLayout` strips the prefix on read-back, so handles keep their bare ids and `CardNode` is unaffected. Never hand ELK a bare handle id — it then can't tell which card an edge attaches to and mislays *even single-route* graphs. See `.scratch/layout-seam/issues/01-namespace-elk-port-ids.md`.
-- **"path" == Route.** The code and this file say `path`/`paths` (`buildPathEdges`, `pathCardIds`); CONTEXT.md's domain term is **Route** and lists "path" under _Avoid_. Same concept — the glossary is the naming target; the code hasn't been renamed yet.
+- **ELK port ids are namespaced per card.** A handle id (`<routeId>::out`/`::in`) is the *same* on every card a route passes through, so `buildElkGraph` hands ELK `<cardId>##<handleId>` (`elkPortId`) and builds edge endpoints from the same key; `getElkLayout` strips the prefix on read-back, so handles keep their bare ids and `CardNode` is unaffected. Never hand ELK a bare handle id — it then can't tell which card an edge attaches to and mislays *even single-route* graphs. See `.scratch/layout-seam/issues/01-namespace-elk-port-ids.md`.
+- **`path` now means a file path only.** The Route rename is done: the manifest key is `routes`, and the code says `Route`/`routeId`/`buildRouteEdges`. Remaining `path` identifiers are filesystem paths, TanStack Router URL paths, or React Flow's own SVG `edge-path` class — don't "fix" those.
 - **Styling is split:** `ui` uses Tailwind v4 + shadcn-style primitives; the graph/card CSS stays hand-rolled in `packages/app/src/styles.css`. Tailwind scans `app` + `ui/src` via `@source` in `tailwind.css`.
 - **Markdown is excluded from Prettier** (`.prettierignore`) — don't rely on `format` to touch `*.md`.
 

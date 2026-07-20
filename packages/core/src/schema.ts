@@ -3,7 +3,7 @@ import { z } from 'zod';
 /**
  * Zod schema for the presentation manifest (`graph.json`).
  *
- * This validates *shape* only. Referential integrity (do edge/step/path ids
+ * This validates *shape* only. Referential integrity (do edge/step/route ids
  * actually resolve to real cards) is validated separately in `@project/graph`,
  * because it needs the whole manifest in view.
  */
@@ -28,16 +28,16 @@ export const edgeSchema = z.object({
 });
 
 /** One position in a route, targeting a single card by id. */
-export const pathStepSchema = z.object({
+export const routeStepSchema = z.object({
   target: idSchema,
 });
 
-export const pathSchema = z.object({
+export const routeSchema = z.object({
   id: idSchema,
   title: z.string().min(1),
-  // Optional CSS color for this path's rail; falls back to a palette by order.
+  // Optional CSS color for this route's rail; falls back to a palette by order.
   color: z.string().min(1).optional(),
-  steps: z.array(pathStepSchema).min(1),
+  steps: z.array(routeStepSchema).min(1),
 });
 
 export const manifestSchema = z.object({
@@ -45,5 +45,5 @@ export const manifestSchema = z.object({
   title: z.string().min(1),
   cards: z.array(cardSchema),
   edges: z.array(edgeSchema),
-  paths: z.array(pathSchema).min(1),
+  routes: z.array(routeSchema).min(1),
 });
