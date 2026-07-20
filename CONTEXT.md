@@ -36,8 +36,16 @@ A named strategy for arranging a space's cards — how they are organised and po
 _Avoid_: view (a view renders a layout), placement, position, diagram, arrangement (a layout is the strategy; positions land on the cards themselves).
 
 **View**:
-The rendering of a layout for a viewer — which cards and routes are shown, and how they are drawn on screen and explored. The **Presentation** view renders a route-driven graph layout, one colour per route; other views render other layouts.
+The rendering of a layout for a viewer — which cards and routes are shown, and how they are drawn on screen and explored. The **Graph** view renders a route-driven layout, one colour per route; other views render other layouts.
 _Avoid_: mode, screen, page, layout.
+
+**Opening**:
+Showing a single card's content to a viewer in place, over whatever view they are in. A card of any kind can be opened: a markdown card shows its prose, a space card shows its nested graph to explore. Opening is not presenting — it is a reading gesture, and the view it happens over is still the thing being looked at.
+_Avoid_: expand, preview, popup, modal, drill-down.
+
+**Presenting**:
+Walking a route for an audience, one step at a time, with the space itself out of view. A presentation is a **deck** — the route's cards in order — and it is an output of a space rather than part of one.
+_Avoid_: slideshow, playback, present mode (that is a mode name, not the thing).
 
 ## At the render layer
 

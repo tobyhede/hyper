@@ -23,7 +23,8 @@ If any of these files don't exist, **proceed silently**. Don't flag their absenc
 │   ├── 0004-cards-are-the-graph.md
 │   ├── 0005-layout-is-a-strategy.md
 │   ├── 0006-cards-show-titles-in-the-graph.md
-│   └── 0007-routes-are-the-only-structure.md
+│   ├── 0007-routes-are-the-only-structure.md
+│   └── 0008-presentation-is-a-reveal-deck.md
 └── packages/
 ```
 

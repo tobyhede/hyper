@@ -8,8 +8,6 @@ export { RouteLegend } from './RouteLegend';
 export type { RouteLegendProps } from './RouteLegend';
 export { RouteSelector } from './RouteSelector';
 export type { RouteSelectorProps } from './RouteSelector';
-export { PresentationControls } from './PresentationControls';
-export type { PresentationControlsProps } from './PresentationControls';
 export {
   Select,
   SelectContent,

@@ -15,17 +15,17 @@ const DEFAULT_NODE_HEIGHT = 300;
 /**
  * How strongly routes other than the active one recede.
  *
- * Three states, not a boolean: nothing is selected, something is selected while
- * the whole space is on screen, or one route is being walked and the rest should
- * nearly vanish. A view picks the level; the adapter knows nothing about modes.
+ * A level rather than a boolean, because a view may want more than on/off — and
+ * because the adapter should not know that the app has modes. It once carried a
+ * third, 'strong', for dimming the graph while presenting; presenting no longer
+ * draws the graph at all (ADR 0008), so that level had no caller.
  */
-export type RouteEmphasis = 'equal' | 'subtle' | 'strong';
+export type RouteEmphasis = 'equal' | 'subtle';
 
 /** Opacity applied to routes that are not the active one. */
 export const OTHER_ROUTE_OPACITY: Record<RouteEmphasis, number> = {
   equal: 1,
   subtle: 0.35,
-  strong: 0.12,
 };
 
 /** A route handle resolved for rendering: a color and a vertical offset (px from

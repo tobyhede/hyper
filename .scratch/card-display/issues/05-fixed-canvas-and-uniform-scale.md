@@ -1,6 +1,6 @@
 # Scale the card frame from a fixed logical canvas
 
-Status: open
+Status: open — now applies to the reading surface only
 
 ## Context
 
@@ -69,3 +69,15 @@ Decide and record:
 - A card looks the same at every frame size — same line breaks, same proportions.
 - `04`'s overflow test no longer needs to shrink the viewport to provoke scrolling;
   it can assert against a card that overflows the canvas, full stop.
+
+
+## Narrowed by ADR 0008
+
+reveal.js solves this for the deck: `PresentationDeck` configures a 1280x720
+logical canvas and reveal scales it to the viewport. That was one of the reasons
+for adopting it.
+
+What remains is the **reading** surface (`.open-card__panel`), which is still ours
+and still has a fixed ratio without a fixed size — so whether a card overflows
+when *read* still depends on the window. Less serious than it was for presenting,
+but the same flaw.

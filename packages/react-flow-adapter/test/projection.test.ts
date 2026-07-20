@@ -96,7 +96,7 @@ describe('projectRouteEdges', () => {
     expect(edges.every((e) => e.animated)).toBe(true);
   });
 
-  it('recedes the other routes by the level asked for, never hiding them', () => {
+  it('recedes the other routes, never hiding them', () => {
     const at = (emphasis: RouteEmphasis) => {
       const edges = projectRouteEdges(routeEdges, colors, { emphasis, activeRouteId: 'main' });
       return {
@@ -106,18 +106,17 @@ describe('projectRouteEdges', () => {
       };
     };
 
+    const equal = at('equal');
     const subtle = at('subtle');
-    const strong = at('strong');
 
     // The emphasised route is untouched at either level.
+    expect(equal.main.style?.opacity).toBe(1);
     expect(subtle.main.style?.opacity).toBe(1);
-    expect(strong.main.style?.opacity).toBe(1);
     expect(subtle.main.animated).toBe(true);
 
-    // Others recede, further while presenting — but are still drawn.
-    expect(Number(subtle.alt.style?.opacity)).toBeLessThan(1);
-    expect(Number(strong.alt.style?.opacity)).toBeLessThan(Number(subtle.alt.style?.opacity));
-    expect(Number(strong.alt.style?.opacity)).toBeGreaterThan(0);
-    expect(subtle.count).toBe(strong.count);
+    // Others recede but are still drawn, and none are dropped.
+    expect(Number(subtle.alt.style?.opacity)).toBeLessThan(Number(equal.alt.style?.opacity));
+    expect(Number(subtle.alt.style?.opacity)).toBeGreaterThan(0);
+    expect(subtle.count).toBe(equal.count);
   });
 });

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ReactFlowProvider } from '@xyflow/react';
-import { AppShell, Button, PresentationControls, RouteLegend, RouteSelector } from '@project/ui';
+import { AppShell, Button, RouteLegend, RouteSelector } from '@project/ui';
 import {
   elkLayout,
   projectCardNodes,
@@ -11,13 +11,10 @@ import {
   buildCardHandles,
   buildLayoutGraph,
   buildRouteEdges,
-  canGoNext,
-  canGoPrev,
   cardIdsForRoutes,
   filterHandlesByRoutes,
   getCard,
   getRoute,
-  stepCount,
   type CardHandleSet,
   type LayoutGraph,
 } from '@project/graph';
@@ -27,6 +24,7 @@ import { CARD_HEIGHT, CARD_SIZE, cardSizeVars } from './card';
 import { selectActiveCardId, usePresentationStore } from './store';
 import { GraphView } from './components/GraphView';
 import { OpenCard } from './components/OpenCard';
+import { PresentationDeck, type DeckSlide } from './components/PresentationDeck';
 
 // Derived once from the (static) manifest.
 const colors = routeColorMap(manifest);
@@ -45,8 +43,7 @@ export function App() {
   const selectRoute = usePresentationStore((s) => s.selectRoute);
   const enterPresentation = usePresentationStore((s) => s.enterPresentation);
   const exitPresentation = usePresentationStore((s) => s.exitPresentation);
-  const next = usePresentationStore((s) => s.next);
-  const prev = usePresentationStore((s) => s.prev);
+  const goToStep = usePresentationStore((s) => s.goToStep);
   const openedCardId = usePresentationStore((s) => s.openedCardId);
   const openCard = usePresentationStore((s) => s.openCard);
   const closeCard = usePresentationStore((s) => s.closeCard);
@@ -91,8 +88,7 @@ export function App() {
   }, [graph]);
 
   // Selecting a route emphasises it; it never hides the rest of the space.
-  // Presenting pushes the others further back so the walked route stands alone.
-  const emphasis: RouteEmphasis = presenting ? 'strong' : selectedRouteId ? 'subtle' : 'equal';
+  const emphasis: RouteEmphasis = selectedRouteId ? 'subtle' : 'equal';
 
   const nodes = useMemo(
     () =>
@@ -117,10 +113,21 @@ export function App() {
   );
 
   const route = selectedRouteId ? getRoute(manifest, selectedRouteId) : undefined;
-  // Presenting *is* opening: it opens each card in turn, and the only difference
-  // is the footer. One surface, so the two can never drift apart visually.
-  const shownCardId = presenting ? activeCardId : openedCardId;
-  const shownCard = shownCardId ? getCard(manifest, shownCardId) : undefined;
+  const openedCard = openedCardId ? getCard(manifest, openedCardId) : undefined;
+
+  // Presenting is a deck, not an opened card (ADR 0008) — the route's steps in
+  // order, each carrying its card's content.
+  const deckSlides = useMemo<DeckSlide[]>(() => {
+    if (!route) return [];
+    return route.steps.map((step) => {
+      const card = getCard(manifest, step.target);
+      return {
+        id: step.target,
+        title: card?.title ?? step.target,
+        markdown: markdownByCardId[step.target] ?? '',
+      };
+    });
+  }, [route]);
 
   // Escape closes an opened card before it exits a presentation, so the two
   // never fight over the key.
@@ -135,24 +142,6 @@ export function App() {
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [openedCardId, closeCard]);
-
-  // Keyboard navigation while presenting.
-  useEffect(() => {
-    if (!presenting || openedCardId) return;
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'ArrowRight' || event.key === 'ArrowDown' || event.key === ' ') {
-        event.preventDefault();
-        next();
-      } else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
-        event.preventDefault();
-        prev();
-      } else if (event.key === 'Escape') {
-        exitPresentation();
-      }
-    };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [presenting, openedCardId, next, prev, exitPresentation]);
 
   const toolbar = (
     <>
@@ -183,6 +172,17 @@ export function App() {
     </>
   );
 
+  if (presenting && route) {
+    return (
+      <PresentationDeck
+        slides={deckSlides}
+        stepIndex={stepIndex}
+        onStepChange={goToStep}
+        onExit={exitPresentation}
+      />
+    );
+  }
+
   return (
     <AppShell title={manifest.title} toolbar={toolbar}>
       {referenceErrors.length > 0 && (
@@ -207,26 +207,14 @@ export function App() {
           />
         </ReactFlowProvider>
 
-        {shownCard && (
+        {openedCard && (
           <OpenCard
-            title={shownCard.title}
-            markdown={markdownByCardId[shownCard.id] ?? ''}
+            title={openedCard.title}
+            markdown={markdownByCardId[openedCard.id] ?? ''}
             footer={
-              presenting && route ? (
-                <PresentationControls
-                  stepIndex={stepIndex}
-                  stepCount={stepCount(route)}
-                  canPrev={canGoPrev(route, stepIndex)}
-                  canNext={canGoNext(route, stepIndex)}
-                  onPrev={prev}
-                  onNext={next}
-                  onExit={exitPresentation}
-                />
-              ) : (
-                <Button variant="secondary" data-testid="close-card" onClick={closeCard}>
-                  Close
-                </Button>
-              )
+              <Button variant="secondary" data-testid="close-card" onClick={closeCard}>
+                Close
+              </Button>
             }
           />
         )}

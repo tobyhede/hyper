@@ -124,3 +124,16 @@ fixed *size*, and type is fixed in `rem`, so how much content fits depends on th
 viewer's window — which is why the overflow test has to shrink the viewport to
 provoke scrolling. "Does this card fit?" therefore has no stable answer for an
 author. The fix is the established one: a fixed logical canvas scaled uniformly.
+
+
+## Superseded in part by ADR 0008
+
+Written when opening and presenting were one surface. They are not any more:
+presenting is a reveal.js deck that takes over the screen, and reveal owns its own
+canvas and scaling.
+
+Everything above still holds for the **reading** surface, which is what
+`.open-card__panel` now is exclusively — the 16:9 frame, the letterboxing, the
+content scrolling inside a fixed frame. The coupling `card.ts` asserts is now
+between the graph card and the reading frame; reveal's deck is configured to the
+same 1280x720 logical canvas, so all three agree.

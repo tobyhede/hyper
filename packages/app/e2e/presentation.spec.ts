@@ -18,27 +18,24 @@ test('walks a presentation route with keyboard navigation', async ({ page }) => 
   await page.getByRole('option', { name: 'Main walkthrough' }).click();
   await page.getByTestId('present-button').click();
 
-  // Presenting opens the active card — the same surface as clicking one.
-  const layer = page.getByTestId('open-card');
-  await expect(layer).toBeVisible();
-  await expect(page.getByTestId('step-counter')).toHaveText('1 / 6');
+  // Presenting is a deck (ADR 0008), not an opened card.
+  const deck = page.getByTestId('presentation-deck');
+  await expect(deck).toBeVisible();
 
-  const title = layer.locator('.card__title');
-  const firstTitle = await title.textContent();
+  const current = page.locator('.reveal .slides section.present');
+  await expect(current).toHaveAttribute('data-card-id', 'intro');
 
-  // Next changes the focused card.
+  // reveal owns stepping.
   await page.keyboard.press('ArrowRight');
-  await expect(page.getByTestId('step-counter')).toHaveText('2 / 6');
-  await expect(title).not.toHaveText(firstTitle ?? '');
+  await expect(current).toHaveAttribute('data-card-id', 'problem');
 
-  // Previous returns to the first card.
   await page.keyboard.press('ArrowLeft');
-  await expect(page.getByTestId('step-counter')).toHaveText('1 / 6');
-  await expect(title).toHaveText(firstTitle ?? '');
+  await expect(current).toHaveAttribute('data-card-id', 'intro');
 
-  // Escape exits presentation mode.
+  // Escape leaves the deck and returns to the space.
   await page.keyboard.press('Escape');
-  await expect(layer).toBeHidden();
+  await expect(deck).toBeHidden();
+  await expect(page.locator('.react-flow__node').first()).toBeVisible();
 });
 
 test('offers more than one named route', async ({ page }) => {
@@ -79,7 +76,7 @@ test('selecting a route keeps the others on screen', async ({ page }) => {
   await expect(page.locator('.react-flow__edge')).toHaveCount(7);
 });
 
-test('selecting emphasises a route; presenting pushes the rest further back', async ({ page }) => {
+test('selecting a route emphasises it without hiding the others', async ({ page }) => {
   await page.goto('/');
   await expect(page.locator('.react-flow__edge')).toHaveCount(7);
 
@@ -92,14 +89,9 @@ test('selecting emphasises a route; presenting pushes the rest further back', as
   // selector does something without having to press Present.
   const faded = (await opacities()).filter((o) => o < 1);
   expect(faded).toHaveLength(2);
-  const subtle = faded[0]!;
-  expect(subtle).toBeGreaterThan(0);
+  expect(faded[0]!).toBeGreaterThan(0);
 
-  await page.getByTestId('present-button').click();
-  await expect(page.getByTestId('open-card')).toBeVisible();
-
-  // Presenting fades them further, and never removes them.
-  await expect.poll(async () => (await opacities()).filter((o) => o < subtle).length).toBe(2);
+  // Every route stays drawn.
   await expect(page.locator('.react-flow__edge')).toHaveCount(7);
 });
 
@@ -173,28 +165,29 @@ test('cards are drawn at exactly the size the layout placed them at', async ({ p
   expect(parseFloat(drawn.w)).toBeGreaterThan(parseFloat(drawn.h));
 });
 
-test('presenting opens each card on the same surface as clicking one', async ({ page }) => {
+test('presenting is a deck, and opening a card is not (ADR 0008)', async ({ page }) => {
   await page.goto('/');
 
-  // Opening a card by hand: content, and a Close button.
+  // Opening reads a card in place: the space is still what you are looking at.
   await page.locator('.react-flow__node').first().click();
-  const surface = page.getByTestId('open-card');
-  await expect(surface).toBeVisible();
-  await expect(page.getByTestId('close-card')).toBeVisible();
-  await expect(page.getByTestId('presentation-controls')).toBeHidden();
-
-  const readingBox = await surface.locator('.open-card__panel').boundingBox();
+  await expect(page.getByTestId('open-card')).toBeVisible();
+  await expect(page.locator('.react-flow__node').first()).toBeVisible();
+  await expect(page.getByTestId('presentation-deck')).toBeHidden();
   await page.getByTestId('close-card').click();
 
-  // Presenting: the same surface in the same place, with step controls instead.
+  // Presenting takes over: the space goes away.
   await page.getByTestId('present-button').click();
-  await expect(surface).toBeVisible();
-  await expect(page.getByTestId('presentation-controls')).toBeVisible();
-  await expect(page.getByTestId('close-card')).toBeHidden();
+  await expect(page.getByTestId('presentation-deck')).toBeVisible();
+  await expect(page.locator('.react-flow__node')).toHaveCount(0);
+  await expect(page.getByTestId('open-card')).toBeHidden();
 
-  const presentingBox = await surface.locator('.open-card__panel').boundingBox();
-  expect(presentingBox?.x).toBeCloseTo(readingBox!.x, 0);
-  expect(presentingBox?.width).toBeCloseTo(readingBox!.width, 0);
+  // Every step of the route is a slide — including a card the route revisits.
+  await expect(page.locator('.reveal .slides section')).toHaveCount(6);
+
+  // Exiting returns to the space.
+  await page.getByTestId('exit-presentation').click();
+  await expect(page.getByTestId('presentation-deck')).toBeHidden();
+  await expect(page.locator('.react-flow__node').first()).toBeVisible();
 });
 
 test('the card frame is 16:9, and letterboxes rather than reshaping content', async ({ page }) => {

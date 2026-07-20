@@ -2,6 +2,7 @@
 
 Status: accepted
 Refines: 0002
+Refined by: 0008
 
 A card drawn in the graph renders its **title** — later, optionally, a short description. Its full content is not drawn there. Content is reached two ways: **opening** the card, which shows it in place, and the **Presentation** view, which steps through it fullscreen.
 
