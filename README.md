@@ -117,7 +117,7 @@ Design rules kept throughout: domain logic stays out of React components, React 
 - **Read-only.** No visual or Markdown editing, no drawing, no whiteboard shapes — the app only reads files.
 - **Single bundled presentation.** The example is imported at build time (`import.meta.glob`); there is no file picker or loader for arbitrary presentations.
 - **One route at a time.** The graph shows the selected route only, and there is no whole-graph overview. This is a *view* choice, not a limit of the model: multiple **compatible** routes (their combined step-order is acyclic) lay out cleanly. Routes whose combined order contains a cycle force an unavoidable backward edge. See [`.scratch/multiple-routes/findings.md`](.scratch/multiple-routes/findings.md).
-- **ELK runs on fixed-size cards.** The layout uses a uniform card size, not measured DOM dimensions, so cards are pinned to one height. Since a card draws only its title this is now correct rather than a limitation, but the size is still declared twice — in the app and in the stylesheet. A route that visits the same card twice reuses that card's handles (a visual overlap, not a crash).
+- **Cards are a fixed shape.** A card draws its title, so every card is the same size — declared once in `packages/app/src/card.ts` as a 16:10 ratio and consumed by both the layout and the stylesheet. Content adapts to the card, not the reverse, which is why measured DOM sizes are not fed into ELK. A route that visits the same card twice reuses that card's handles (a visual overlap, not a crash).
 - **No route branching.** A route is a linear list of steps; step transitions/annotations are not modelled.
 - **Client-only, no persistence.** Presentation state lives in memory; there is no routing per step or shareable deep links.
 - The production bundle ships React Flow and elkjs in a single chunk (~2.1 MB) — fine for a prototype, not tuned for size.
@@ -128,5 +128,4 @@ Design rules kept throughout: domain logic stays out of React components, React 
 - Encode the active route/step in the TanStack Router URL so a step is linkable and refresh-safe.
 - Per-step camera hints (zoom/pan/highlight several nodes) and step transitions in the manifest.
 - Speaker view: current + next card, notes, and elapsed time.
-- Feed measured card sizes into ELK (via `useNodesInitialized`) so cards can be variable-height, and re-run layout when a route set changes.
 - A tiny CLI to validate a presentation directory (`graph.json` + Markdown) in CI, reusing `@project/graph`.

@@ -141,3 +141,33 @@ test('a card can be opened even when it is not on the selected route', async ({ 
   await page.locator('.react-flow__node', { hasText: 'The problem with linear decks' }).click();
   await expect(page.getByTestId('open-card')).toContainText('Slides force');
 });
+
+test('cards are drawn at exactly the size the layout placed them at', async ({ page }) => {
+  await page.goto('/');
+  const inner = page.locator('.rf-card-node__inner').first();
+  await expect(inner).toBeVisible();
+
+  // The layout arranges cards at `card.ts`'s size and the stylesheet draws them
+  // from the same numbers. If these drift, handles land where the card isn't —
+  // silently, and looking like a layout bug.
+  const declared = await page.evaluate(() => {
+    const el = document.querySelector('.graph-area')!;
+    const s = getComputedStyle(el);
+    return {
+      w: s.getPropertyValue('--card-width').trim(),
+      h: s.getPropertyValue('--card-height').trim(),
+    };
+  });
+  expect(declared.w).toBe('260px');
+
+  const drawn = await inner.evaluate((el) => {
+    const s = getComputedStyle(el);
+    const card = el.querySelector('.card--node')!;
+    return { w: s.width, h: getComputedStyle(card).height };
+  });
+  expect(drawn.w).toBe(declared.w);
+  expect(drawn.h).toBe(declared.h);
+
+  // 16:10 landscape — wider than tall.
+  expect(parseFloat(drawn.w)).toBeGreaterThan(parseFloat(drawn.h));
+});

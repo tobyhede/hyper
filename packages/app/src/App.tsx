@@ -23,15 +23,11 @@ import {
 } from '@project/graph';
 import { manifest, markdownByCardId, referenceErrors } from './manifest';
 import { routeColorMap } from './colors';
+import { CARD_HEIGHT, CARD_SIZE, cardSizeVars } from './card';
 import { selectActiveCardId, usePresentationStore } from './store';
 import { GraphView } from './components/GraphView';
 import { PresentationLayer } from './components/PresentationLayer';
 import { OpenCard } from './components/OpenCard';
-
-// Card nodes are pinned to a uniform size (see styles.css) so a layout can place
-// them — and place ports — without measuring the DOM.
-const CARD_WIDTH = 260;
-const CARD_HEIGHT = 300;
 
 // Derived once from the (static) manifest.
 const colors = routeColorMap(manifest);
@@ -78,11 +74,7 @@ export function App() {
   );
 
   const graph = useMemo(
-    () =>
-      buildLayoutGraph(visibleCardIds, visibleHandles, visibleEdges, {
-        width: CARD_WIDTH,
-        height: CARD_HEIGHT,
-      }),
+    () => buildLayoutGraph(visibleCardIds, visibleHandles, visibleEdges, CARD_SIZE),
     [visibleCardIds, visibleHandles, visibleEdges],
   );
 
@@ -203,7 +195,7 @@ export function App() {
         </div>
       )}
 
-      <div className="graph-area">
+      <div className="graph-area" style={cardSizeVars}>
         <ReactFlowProvider>
           <GraphView
             nodes={nodes}

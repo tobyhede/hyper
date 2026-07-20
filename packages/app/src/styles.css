@@ -171,7 +171,7 @@ body {
 
 .rf-card-node__inner {
   position: relative;
-  width: 260px;
+  width: var(--card-width);
 }
 
 /* Per-route ports, positioned by ELK's computed offset (inline `top`). React
@@ -196,9 +196,8 @@ body {
 }
 
 .card--node {
-  /* Still 300px tall while a card renders only its title, so this change is
-     legible on its own. Sizing is card-display/02. */
-  height: 300px;
+  /* Size comes from `card.ts`, so the layout and the render agree. */
+  height: var(--card-height);
   overflow: hidden;
   display: flex;
   align-items: center;
