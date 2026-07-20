@@ -446,18 +446,31 @@ body {
   background: rgba(6, 8, 12, 0.6);
 }
 
+/* The card frame. 16:9, matching `card.ts` — a card in the graph and the same
+   card opened or presented share a silhouette. The width is clamped by the
+   viewport's height as well as its width, so the frame letterboxes on a viewport
+   that is not 16:9 rather than silently changing the shape of the content. */
 .open-card__panel {
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 12px;
   box-shadow: 0 18px 60px rgba(0, 0, 0, 0.6);
-  width: min(760px, 100%);
-  max-height: 80vh;
-  overflow-y: auto;
+  aspect-ratio: 16 / 9;
+  width: min(1100px, 100%, calc((100vh - 8rem) * 16 / 9));
   padding: 1rem 1.25rem;
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
+  /* The frame clips; the content region inside it is what scrolls. */
+  overflow: hidden;
+}
+
+/* Content scrolls within the frame, so the actions never scroll away — the step
+   controls have to stay reachable at any point in a long card. */
+.open-card__content {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .open-card__actions {
@@ -465,4 +478,5 @@ body {
   justify-content: flex-end;
   border-top: 1px solid var(--border);
   padding-top: 0.75rem;
+  flex-shrink: 0;
 }

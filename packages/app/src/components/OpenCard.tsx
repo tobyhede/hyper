@@ -23,7 +23,9 @@ export function OpenCard({ title, markdown, footer }: OpenCardProps) {
   return (
     <div className="open-card" data-testid="open-card">
       <div className="open-card__panel">
-        <CardRenderer title={title} markdown={markdown} variant="slide" />
+        <div className="open-card__content">
+          <CardRenderer title={title} markdown={markdown} variant="slide" />
+        </div>
         <div className="open-card__actions">{footer}</div>
       </div>
     </div>

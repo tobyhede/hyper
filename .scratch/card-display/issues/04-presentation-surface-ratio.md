@@ -1,6 +1,6 @@
 # Make the presentation surface match the card
 
-Status: partly resolved — see Answer; the 16:9 frame itself is still open
+Status: resolved
 
 ## Context
 
@@ -76,13 +76,45 @@ difference, which is an argument for sharing, not against it.
 E2E pins it: opening by hand and presenting produce a panel at the same position
 and width, with the footer being the only thing that changes.
 
-## Still open
+## Answer (part 2: the frame)
 
-The frame itself. Neither surface has a ratio — `.open-card__panel` is
-`min(760px, 100%)` wide, capped at `80vh`, scrolling. `card.ts` still asserts that
-the card ratio matches the presentation surface, and that remains one-sided.
+All three decisions, taken once, because there is one surface.
 
-The decisions listed above (fixed 16:9 frame or not, overflow behaviour,
-letterboxing on a non-16:9 viewport) are unchanged and still need answering — but
-they now apply to *one* surface rather than two, and whatever is decided applies
-to reading and presenting alike unless a reason emerges to split them.
+**Fixed 16:9 frame.** `.open-card__panel` is `aspect-ratio: 16 / 9`, matching
+`card.ts`. The coupling that file asserted is no longer one-sided, and it now
+names `.open-card__panel` so the two can be found from each other.
+
+**Letterbox, not fill.** The width is clamped by the viewport's *height* as well
+as its width:
+
+```css
+width: min(1100px, 100%, calc((100vh - 8rem) * 16 / 9));
+```
+
+On a tall narrow viewport the height clamp binds; on an ultrawide one the width
+clamp does. Either way the frame keeps its shape and the backdrop takes up the
+slack, so a viewport that is not 16:9 never silently reshapes the content.
+
+**Content scrolls; the frame does not grow.** This is what makes the ratio mean
+anything — a frame that grows to fit its content has no ratio in practice. The
+frame clips (`overflow: hidden`) and a `.open-card__content` region inside it
+scrolls.
+
+Scrolling was chosen over scaling content to fit (illegible at any useful zoom)
+and over paginating a card across several frames (a much larger feature that would
+change what a Step means — a card would no longer be one position in a route).
+
+**The actions never scroll.** They sit outside the scrolling region, so the step
+controls stay reachable at any point in a long card. This is the reason the panel
+needed an inner content element at all.
+
+## Consequence worth knowing
+
+A card longer than the frame now scrolls during a presentation, which is a poor
+way to present. That is a signal to authors that a card should fit, and it is
+visible rather than silent. Whether to make it *more* visible — an authoring
+warning, or a "this card overflows" affordance — is deliberately not built here.
+
+E2E covers all three: the frame holds 16:9 at 1440x900, 900x1200 and 2200x700; a
+small viewport makes the demo's longest card overflow and it scrolls rather than
+the frame growing; and the actions stay within the frame.

@@ -196,3 +196,46 @@ test('presenting opens each card on the same surface as clicking one', async ({ 
   expect(presentingBox?.x).toBeCloseTo(readingBox!.x, 0);
   expect(presentingBox?.width).toBeCloseTo(readingBox!.width, 0);
 });
+
+test('the card frame is 16:9, and letterboxes rather than reshaping content', async ({ page }) => {
+  const ratio = async () => {
+    const box = (await page.locator('.open-card__panel').boundingBox())!;
+    return box.width / box.height;
+  };
+
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/');
+  await page.locator('.react-flow__node').first().click();
+  await expect(page.getByTestId('open-card')).toBeVisible();
+  expect(await ratio()).toBeCloseTo(16 / 9, 1);
+
+  // A viewport that is not 16:9 must not change the shape of the frame.
+  await page.setViewportSize({ width: 900, height: 1200 });
+  expect(await ratio()).toBeCloseTo(16 / 9, 1);
+  await page.setViewportSize({ width: 2200, height: 700 });
+  expect(await ratio()).toBeCloseTo(16 / 9, 1);
+});
+
+test('content that exceeds the frame scrolls inside it, keeping controls reachable', async ({
+  page,
+}) => {
+  // A small viewport shrinks the 16:9 frame until the demo's longest card
+  // overflows it. The frame is fixed, so content scrolls rather than the frame
+  // growing — which is what makes the ratio mean anything.
+  await page.setViewportSize({ width: 760, height: 460 });
+  await page.goto('/');
+
+  await page.locator('.react-flow__node', { hasText: 'The problem with linear decks' }).click();
+  const content = page.locator('.open-card__content');
+  await expect(content).toBeVisible();
+
+  expect(await content.evaluate((el) => el.scrollHeight > el.clientHeight)).toBe(true);
+
+  // The frame kept its ratio rather than growing to fit.
+  const panel = (await page.locator('.open-card__panel').boundingBox())!;
+  expect(panel.width / panel.height).toBeCloseTo(16 / 9, 1);
+
+  // Actions stay inside the frame, so step controls never scroll away.
+  const actions = (await page.locator('.open-card__actions').boundingBox())!;
+  expect(actions.y + actions.height).toBeLessThanOrEqual(panel.y + panel.height + 1);
+});
