@@ -1,15 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ReactFlowProvider, type Node } from '@xyflow/react';
+import { ReactFlowProvider } from '@xyflow/react';
 import { AppShell, Button, RouteLegend, RouteSelector } from '@project/ui';
-import {
-  getElkLayout,
-  projectCardNodes,
-  projectRouteEdges,
-  type ElkLayoutResult,
-  type ElkPortData,
-} from '@project/react-flow-adapter';
+import { elkLayout, projectCardNodes, projectRouteEdges } from '@project/react-flow-adapter';
 import {
   buildCardHandles,
+  buildLayoutGraph,
   buildRouteEdges,
   canGoNext,
   canGoPrev,
@@ -19,6 +14,7 @@ import {
   routeCardIds,
   stepCount,
   type CardHandleSet,
+  type LayoutGraph,
 } from '@project/graph';
 import { manifest, markdownByCardId, referenceErrors } from './manifest';
 import { routeColorMap } from './colors';
@@ -26,8 +22,8 @@ import { selectActiveCardId, usePresentationStore } from './store';
 import { GraphView } from './components/GraphView';
 import { PresentationLayer } from './components/PresentationLayer';
 
-// Card nodes are pinned to a uniform size (see styles.css) so ELK can lay them
-// out — and place ports — without measuring the DOM.
+// Card nodes are pinned to a uniform size (see styles.css) so a layout can place
+// them — and place ports — without measuring the DOM.
 const CARD_WIDTH = 260;
 const CARD_HEIGHT = 300;
 
@@ -35,6 +31,11 @@ const CARD_HEIGHT = 300;
 const colors = routeColorMap(manifest);
 const allHandles = buildCardHandles(manifest);
 const allRouteEdges = buildRouteEdges(manifest);
+
+// The layout in use. A Layout is a named strategy, nothing more — swapping this
+// line for `gridLayout()` from `@project/graph` is the whole change, and it drops
+// the last ELK import out of this file.
+const layout = elkLayout();
 
 export function App() {
   const mode = usePresentationStore((s) => s.mode);
@@ -49,7 +50,7 @@ export function App() {
   const activeCardId = usePresentationStore(selectActiveCardId);
   const presenting = mode === 'presenting';
 
-  // The graph shows one route at a time — a single linear flow ELK lays out cleanly.
+  // The view chooses which cards are arranged; the layout never decides membership.
   const visibleCardIds = useMemo(
     () => (selectedRouteId ? routeCardIds(manifest, selectedRouteId) : []),
     [selectedRouteId],
@@ -66,56 +67,38 @@ export function App() {
     [selectedRouteId],
   );
 
-  const layoutNodes = useMemo<Node<ElkPortData>[]>(
+  const graph = useMemo(
     () =>
-      visibleCardIds.map((id) => {
-        const handles = routeHandles.get(id) ?? { sourceHandles: [], targetHandles: [] };
-        return {
-          id,
-          position: { x: 0, y: 0 },
-          width: CARD_WIDTH,
-          height: CARD_HEIGHT,
-          data: { sourceHandles: handles.sourceHandles, targetHandles: handles.targetHandles },
-        };
+      buildLayoutGraph(visibleCardIds, routeHandles, routeEdges, {
+        width: CARD_WIDTH,
+        height: CARD_HEIGHT,
       }),
-    [visibleCardIds, routeHandles],
+    [visibleCardIds, routeHandles, routeEdges],
   );
 
-  const layoutEdges = useMemo(
-    () =>
-      routeEdges.map((edge) => ({
-        id: edge.id,
-        source: edge.source,
-        target: edge.target,
-        sourceHandle: edge.sourceHandle,
-        targetHandle: edge.targetHandle,
-      })),
-    [routeEdges],
-  );
-
-  // Re-run ELK whenever the selected route (and therefore the visible graph) changes.
-  const [layout, setLayout] = useState<ElkLayoutResult | null>(null);
+  // Re-run the layout whenever the visible graph changes.
+  const [laidOut, setLaidOut] = useState<LayoutGraph | null>(null);
   useEffect(() => {
     let cancelled = false;
-    setLayout(null);
-    void getElkLayout(layoutNodes, layoutEdges).then((result) => {
-      if (!cancelled) setLayout(result);
+    setLaidOut(null);
+    void Promise.resolve(layout(graph)).then((result) => {
+      if (!cancelled) setLaidOut(result);
     });
     return () => {
       cancelled = true;
     };
-  }, [layoutNodes, layoutEdges]);
+  }, [graph]);
 
   const nodes = useMemo(
     () =>
       projectCardNodes(manifest, markdownByCardId, routeHandles, colors, {
         activeCardId,
         activeRouteId: selectedRouteId,
-        layout: layout ?? undefined,
+        layoutGraph: laidOut ?? undefined,
         nodeHeight: CARD_HEIGHT,
         cardIds: visibleCardIds,
       }),
-    [activeCardId, selectedRouteId, layout, routeHandles, visibleCardIds],
+    [activeCardId, selectedRouteId, laidOut, routeHandles, visibleCardIds],
   );
 
   const edges = useMemo(
@@ -192,7 +175,7 @@ export function App() {
             nodes={nodes}
             edges={edges}
             activeCardId={activeCardId}
-            layoutReady={layout !== null}
+            layoutReady={laidOut !== null}
           />
         </ReactFlowProvider>
 

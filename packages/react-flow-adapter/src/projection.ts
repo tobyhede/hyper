@@ -1,8 +1,13 @@
 import type { Edge, Node } from '@xyflow/react';
 import { MarkerType } from '@xyflow/react';
 import type { Manifest } from '@project/core';
-import type { CardHandleSet, RouteEdge, RouteHandleRef } from '@project/graph';
-import type { ElkLayoutResult, ElkNodeLayout } from './elk/types';
+import type {
+  CardHandleSet,
+  LayoutCard,
+  LayoutGraph,
+  RouteEdge,
+  RouteHandleRef,
+} from '@project/graph';
 
 const FALLBACK_COLOR = '#8a94a6';
 const DEFAULT_NODE_HEIGHT = 300;
@@ -42,8 +47,8 @@ export interface ProjectCardNodesOptions {
   activeCardId?: string | null;
   /** The route being presented, if any. */
   activeRouteId?: string | null;
-  /** ELK layout result; positions and port offsets come from here when present. */
-  layout?: ElkLayoutResult;
+  /** The laid-out graph; positions and port offsets come from here when present. */
+  layoutGraph?: LayoutGraph;
   /** Node height used to evenly distribute handles before the layout resolves. */
   nodeHeight?: number;
   /** Restrict the projection to these card ids (e.g. one route's cards). */
@@ -53,13 +58,14 @@ export interface ProjectCardNodesOptions {
 function resolveHandles(
   refs: RouteHandleRef[],
   colors: ColorByRouteId,
-  nodeLayout: ElkNodeLayout | undefined,
+  card: LayoutCard | undefined,
   nodeHeight: number,
 ): CardHandle[] {
   const count = refs.length;
   return refs.map((ref, index) => {
-    const port = nodeLayout?.ports[ref.id];
-    // Fall back to an even spread until ELK has run.
+    const port = card?.ports.find((p) => p.id === ref.id);
+    // Not every layout places ports — a grid has no opinion about them, and ELK
+    // has not run yet on first paint. Fall back to an even spread.
     const offsetY = port?.y ?? ((index + 1) / (count + 1)) * nodeHeight;
     return {
       id: ref.id,
@@ -84,22 +90,21 @@ export function projectCardNodes(
 ): CardFlowNode[] {
   const activeCardId = options.activeCardId ?? null;
   const activeRouteId = options.activeRouteId ?? null;
-  const layout = options.layout;
   const nodeHeight = options.nodeHeight ?? DEFAULT_NODE_HEIGHT;
   const visible = options.cardIds ? new Set(options.cardIds) : null;
+  const laidOut = new Map((options.layoutGraph?.cards ?? []).map((c) => [c.id, c]));
 
   const source = visible ? manifest.cards.filter((c) => visible.has(c.id)) : manifest.cards;
 
   return source.map((card) => {
     const handles = handlesByCard.get(card.id) ?? EMPTY_HANDLES;
-    const cardLayout = layout?.[card.id];
+    const cardLayout = laidOut.get(card.id);
     const active = card.id === activeCardId;
-    const position = cardLayout ?? { x: 0, y: 0 };
 
     return {
       id: card.id,
       type: 'card',
-      position: { x: position.x, y: position.y },
+      position: { x: cardLayout?.x ?? 0, y: cardLayout?.y ?? 0 },
       data: {
         cardId: card.id,
         title: card.title,

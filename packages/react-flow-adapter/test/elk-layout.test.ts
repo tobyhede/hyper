@@ -1,55 +1,88 @@
 import { describe, expect, it } from 'vitest';
-import type { Edge, Node } from '@xyflow/react';
-import { buildElkGraph, getElkLayout, type ElkPortData } from '../src/index';
+import type { ElkNode } from 'elkjs/lib/elk.bundled.js';
+import type { LayoutGraph } from '@project/graph';
+import { elkLayout, type ElkEngine } from '../src/index';
 
-const nodes: Node<ElkPortData>[] = [
-  {
-    id: 'a',
-    position: { x: 0, y: 0 },
-    width: 150,
-    height: 50,
-    data: { sourceHandles: [{ id: 'a-s-a' }, { id: 'a-s-b' }], targetHandles: [] },
-  },
-  {
-    id: 'b',
-    position: { x: 0, y: 0 },
-    width: 150,
-    height: 50,
-    data: { sourceHandles: [], targetHandles: [{ id: 'b-t-a' }] },
-  },
-];
+const graph: LayoutGraph = {
+  cards: [
+    {
+      id: 'a',
+      width: 150,
+      height: 50,
+      ports: [
+        { id: 'a-s-a', side: 'out' },
+        { id: 'a-s-b', side: 'out' },
+      ],
+    },
+    { id: 'b', width: 150, height: 50, ports: [{ id: 'b-t-a', side: 'in' }] },
+  ],
+  edges: [{ id: 'a-b', source: 'a', sourceHandle: 'a-s-a', target: 'b', targetHandle: 'b-t-a' }],
+};
 
-const edges: Edge[] = [
-  { id: 'a-b', source: 'a', sourceHandle: 'a-s-a', target: 'b', targetHandle: 'b-t-a' },
-  // An edge with no explicit handles falls back to the node ids.
-  { id: 'a-b-2', source: 'a', target: 'b' },
-];
+/** Captures the graph handed to ELK instead of laying it out. */
+function spyEngine(): { engine: ElkEngine; seen: () => ElkNode } {
+  let captured: ElkNode | undefined;
+  return {
+    engine: {
+      layout: (g) => {
+        captured = g;
+        return Promise.resolve(g);
+      },
+    },
+    seen: () => captured!,
+  };
+}
 
-describe('buildElkGraph', () => {
-  it('builds a layered root graph with default options', () => {
-    const graph = buildElkGraph(nodes, edges);
-    expect(graph.id).toBe('root');
-    expect(graph.layoutOptions?.['elk.algorithm']).toBe('layered');
-    expect(graph.children).toHaveLength(2);
+describe('elkLayout', () => {
+  it('hands ELK a layered root graph carrying the strategy', async () => {
+    const spy = spyEngine();
+    await elkLayout(undefined, spy.engine)(graph);
+
+    const root = spy.seen();
+    expect(root.id).toBe('root');
+    expect(root.layoutOptions?.['elk.algorithm']).toBe('layered');
+    expect(root.children).toHaveLength(2);
   });
 
-  it('fixes port order and assigns sides (targets WEST, sources EAST)', () => {
-    const graph = buildElkGraph(nodes, edges);
-    const a = graph.children!.find((c) => c.id === 'a')!;
+  it('fixes port order and assigns sides (in WEST, out EAST)', async () => {
+    const spy = spyEngine();
+    await elkLayout(undefined, spy.engine)(graph);
+
+    const a = spy.seen().children!.find((c) => c.id === 'a')!;
     expect(a.layoutOptions?.['org.eclipse.elk.portConstraints']).toBe('FIXED_ORDER');
     expect(a.ports!.map((p) => p.id)).toEqual(['a##a-s-a', 'a##a-s-b']);
     expect(a.ports![0]!.layoutOptions?.['org.eclipse.elk.port.side']).toBe('EAST');
 
-    const b = graph.children!.find((c) => c.id === 'b')!;
+    const b = spy.seen().children!.find((c) => c.id === 'b')!;
     expect(b.ports![0]!.layoutOptions?.['org.eclipse.elk.port.side']).toBe('WEST');
   });
 
-  it('namespaces edge endpoints by node id, falling back to node ids', () => {
-    const graph = buildElkGraph(nodes, edges);
-    expect(graph.edges).toEqual([
-      { id: 'a-b', sources: ['a##a-s-a'], targets: ['b##b-t-a'] },
-      { id: 'a-b-2', sources: ['a'], targets: ['b'] },
-    ]);
+  it('namespaces edge endpoints by card id', async () => {
+    const spy = spyEngine();
+    await elkLayout(undefined, spy.engine)(graph);
+    expect(spy.seen().edges).toEqual([{ id: 'a-b', sources: ['a##a-s-a'], targets: ['b##b-t-a'] }]);
+  });
+
+  it('puts positions and port offsets onto the cards it was given', async () => {
+    const laid = await elkLayout()(graph);
+
+    for (const card of laid.cards) {
+      expect(Number.isFinite(card.x)).toBe(true);
+      expect(Number.isFinite(card.y)).toBe(true);
+    }
+
+    const [a, b] = laid.cards;
+    // Direction RIGHT: b lands to the right of a.
+    expect(b!.x!).toBeGreaterThan(a!.x!);
+
+    // Ports keep the bare handle ids the render layer knows them by.
+    expect(a!.ports.map((p) => p.id)).toEqual(['a-s-a', 'a-s-b']);
+    expect(Number.isFinite(a!.ports[0]!.y)).toBe(true);
+  });
+
+  it('leaves the edges it was given untouched', async () => {
+    const laid = await elkLayout()(graph);
+    expect(laid.edges).toEqual(graph.edges);
   });
 });
 
@@ -59,61 +92,44 @@ describe('port id collision', () => {
   // an edge attached to — collapsing layers even for a single route.
   const CHAIN = ['A', 'B', 'C', 'D', 'E'];
 
-  const chainNodes: Node<ElkPortData>[] = CHAIN.map((id, i) => ({
-    id,
-    position: { x: 0, y: 0 },
-    width: 260,
-    height: 300,
-    data: {
-      sourceHandles: i < CHAIN.length - 1 ? [{ id: 'main::out' }] : [],
-      targetHandles: i > 0 ? [{ id: 'main::in' }] : [],
-    },
-  }));
+  const chain: LayoutGraph = {
+    cards: CHAIN.map((id, i) => ({
+      id,
+      width: 260,
+      height: 300,
+      ports: [
+        ...(i > 0 ? [{ id: 'main::in', side: 'in' as const }] : []),
+        ...(i < CHAIN.length - 1 ? [{ id: 'main::out', side: 'out' as const }] : []),
+      ],
+    })),
+    edges: CHAIN.slice(0, -1).map((id, i) => ({
+      id: `main::${i}`,
+      source: id,
+      sourceHandle: 'main::out',
+      target: CHAIN[i + 1]!,
+      targetHandle: 'main::in',
+    })),
+  };
 
-  const chainEdges: Edge[] = CHAIN.slice(0, -1).map((id, i) => ({
-    id: `main::${i}`,
-    source: id,
-    sourceHandle: 'main::out',
-    target: CHAIN[i + 1]!,
-    targetHandle: 'main::in',
-  }));
-
-  it('gives every card a distinct ELK port id', () => {
-    const graph = buildElkGraph(chainNodes, chainEdges);
-    const ids = graph.children!.flatMap((c) => c.ports!.map((p) => p.id));
+  it('gives every card a distinct ELK port id', async () => {
+    const spy = spyEngine();
+    await elkLayout(undefined, spy.engine)(chain);
+    const ids = spy.seen().children!.flatMap((c) => c.ports!.map((p) => p.id));
     expect(new Set(ids).size).toBe(ids.length);
   });
 
   it('lays a single route out as a strictly left-to-right chain', async () => {
-    const layout = await getElkLayout(chainNodes, chainEdges);
-    const xs = CHAIN.map((id) => layout[id]!.x);
+    const laid = await elkLayout()(chain);
+    const xs = laid.cards.map((c) => c.x!);
     for (let i = 1; i < xs.length; i += 1) {
       expect(xs[i]!).toBeGreaterThan(xs[i - 1]!);
     }
   });
 
   it('still exposes port offsets under the bare handle id', async () => {
-    const layout = await getElkLayout(chainNodes, chainEdges);
-    expect(Number.isFinite(layout.B!.ports['main::in']?.y)).toBe(true);
-    expect(Number.isFinite(layout.B!.ports['main::out']?.y)).toBe(true);
-  });
-});
-
-describe('getElkLayout', () => {
-  it('returns positions and per-port offsets for every node', async () => {
-    const layout = await getElkLayout(nodes, edges);
-    expect(Object.keys(layout).sort()).toEqual(['a', 'b']);
-
-    for (const geom of Object.values(layout)) {
-      expect(Number.isFinite(geom.x)).toBe(true);
-      expect(Number.isFinite(geom.y)).toBe(true);
-    }
-
-    // Direction RIGHT: b lands to the right of a.
-    expect(layout.b!.x).toBeGreaterThan(layout.a!.x);
-
-    // Port offsets are exposed for the handles we declared.
-    expect(Number.isFinite(layout.a!.ports['a-s-a']?.y)).toBe(true);
-    expect(Number.isFinite(layout.b!.ports['b-t-a']?.y)).toBe(true);
+    const laid = await elkLayout()(chain);
+    const b = laid.cards.find((c) => c.id === 'B')!;
+    expect(Number.isFinite(b.ports.find((p) => p.id === 'main::in')!.y)).toBe(true);
+    expect(Number.isFinite(b.ports.find((p) => p.id === 'main::out')!.y)).toBe(true);
   });
 });

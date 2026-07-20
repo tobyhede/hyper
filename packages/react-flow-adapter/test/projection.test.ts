@@ -45,16 +45,20 @@ describe('projectCardNodes', () => {
     expect(typeof a.data.sourceHandles[0]!.offsetY).toBe('number');
   });
 
-  it('uses ELK port offsets and positions when a layout is supplied', () => {
+  it('uses the port offsets and positions a layout put on the cards', () => {
     const nodes = projectCardNodes(manifest, markdown, handles, colors, {
-      layout: {
-        a: {
-          x: 500,
-          y: 600,
-          width: 260,
-          height: 300,
-          ports: { 'main::out': { x: 260, y: 42 } },
-        },
+      layoutGraph: {
+        cards: [
+          {
+            id: 'a',
+            x: 500,
+            y: 600,
+            width: 260,
+            height: 300,
+            ports: [{ id: 'main::out', side: 'out', x: 260, y: 42 }],
+          },
+        ],
+        edges: [],
       },
     });
     const a = nodes.find((n) => n.id === 'a')!;
