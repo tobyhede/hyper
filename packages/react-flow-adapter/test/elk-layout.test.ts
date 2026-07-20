@@ -44,12 +44,12 @@ describe('elkLayout', () => {
     expect(root.children).toHaveLength(2);
   });
 
-  it('fixes port order and assigns sides (in WEST, out EAST)', async () => {
+  it('assigns port sides (in WEST, out EAST) and lets ELK order them', async () => {
     const spy = spyEngine();
     await elkLayout(undefined, spy.engine)(graph);
 
     const a = spy.seen().children!.find((c) => c.id === 'a')!;
-    expect(a.layoutOptions?.['org.eclipse.elk.portConstraints']).toBe('FIXED_ORDER');
+    expect(a.layoutOptions?.['org.eclipse.elk.portConstraints']).toBe('FIXED_SIDE');
     expect(a.ports!.map((p) => p.id)).toEqual(['a##a-s-a', 'a##a-s-b']);
     expect(a.ports![0]!.layoutOptions?.['org.eclipse.elk.port.side']).toBe('EAST');
 
@@ -131,5 +131,63 @@ describe('port id collision', () => {
     const b = laid.cards.find((c) => c.id === 'B')!;
     expect(Number.isFinite(b.ports.find((p) => p.id === 'main::in')!.y)).toBe(true);
     expect(Number.isFinite(b.ports.find((p) => p.id === 'main::out')!.y)).toBe(true);
+  });
+});
+
+describe('shared cards keep each route on one line', () => {
+  // Two routes running through the same cards. Under FIXED_ORDER, ELK orders
+  // ports *clockwise* — EAST top-to-bottom but WEST bottom-to-top — so handing
+  // both sides the same list order put a route's outbound handle at the top of
+  // one card and its inbound handle at the bottom of the next, crossing the two
+  // routes at every shared card. FIXED_SIDE lets ELK order within each side.
+  const shared: LayoutGraph = {
+    cards: ['a', 'b', 'c'].map((id, i) => ({
+      id,
+      width: 260,
+      height: 300,
+      ports: [
+        ...(i > 0
+          ? [
+              { id: 'r1::in', side: 'in' as const },
+              { id: 'r2::in', side: 'in' as const },
+            ]
+          : []),
+        ...(i < 2
+          ? [
+              { id: 'r1::out', side: 'out' as const },
+              { id: 'r2::out', side: 'out' as const },
+            ]
+          : []),
+      ],
+    })),
+    edges: ['a', 'b'].flatMap((src, i) =>
+      ['r1', 'r2'].map((r) => ({
+        id: `${r}::${i}`,
+        source: src,
+        target: ['b', 'c'][i]!,
+        sourceHandle: `${r}::out`,
+        targetHandle: `${r}::in`,
+      })),
+    ),
+  };
+
+  it('puts a route at the same offset on both sides of every card', async () => {
+    const laid = await elkLayout()(shared);
+    const offset = (cardId: string, handleId: string) =>
+      laid.cards.find((c) => c.id === cardId)!.ports.find((p) => p.id === handleId)!.y;
+
+    for (const route of ['r1', 'r2']) {
+      // Leaving a card and arriving at the next must be the same height, or the
+      // two routes swap places between every pair of cards.
+      expect(offset('a', `${route}::out`)).toBe(offset('b', `${route}::in`));
+      expect(offset('b', `${route}::out`)).toBe(offset('c', `${route}::in`));
+    }
+  });
+
+  it('keeps the two routes apart', async () => {
+    const laid = await elkLayout()(shared);
+    const b = laid.cards.find((c) => c.id === 'b')!;
+    const at = (id: string) => b.ports.find((p) => p.id === id)!.y;
+    expect(at('r1::in')).not.toBe(at('r2::in'));
   });
 });

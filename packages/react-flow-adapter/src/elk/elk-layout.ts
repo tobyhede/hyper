@@ -32,7 +32,7 @@ export function elkLayout(
         id: card.id,
         width: card.width,
         height: card.height,
-        layoutOptions: { 'org.eclipse.elk.portConstraints': 'FIXED_ORDER' },
+        layoutOptions: { 'org.eclipse.elk.portConstraints': 'FIXED_SIDE' },
         ports: card.ports.map((port): ElkPort => ({
           id: elkPortId(card.id, port.id),
           layoutOptions: {
