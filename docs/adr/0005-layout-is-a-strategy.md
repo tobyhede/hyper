@@ -1,5 +1,8 @@
 # A layout is a strategy; there is no arranged-result type
 
+Status: accepted
+Refines: 0002
+
 A **Layout** is a named strategy for arranging a space's cards — how they are organised and positioned. It is not a stored arrangement, and applying one does not produce a separate entity: the result is the cards, ports and edges carrying positions.
 
 We checked this against the two libraries the renderer is built on, and both model it the same way. ELK keeps geometry as optional fields on the graph elements themselves — `ElkShape` has `x?`/`y?`/`width?`/`height?`, and `ElkNode` and `ElkPort` extend it — so `elk.layout(graph)` takes an `ElkNode` and returns the same `ElkNode` with those fields populated; the strategy is expressed as `LayoutOptions`, a plain string map attachable at any level of the hierarchy. React Flow's `NodeBase` carries `position` as a required field and has no layout concept at all. Neither library has a Layout entity, and inventing one would place a type between us and both of them.

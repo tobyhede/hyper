@@ -29,7 +29,27 @@ The most valuable ADRs capture a **negative** — the thing a future review will
 
 Skip ADRs for ephemeral reasons ("not worth it right now"), self-evident choices, and anything the glossary already implies.
 
-Format: a title that states the decision as a sentence, then a few paragraphs. Numbered `docs/adr/NNNN-<slug>.md`.
+Format: a title that states the decision as a sentence, a status block, then a few paragraphs. Numbered `docs/adr/NNNN-<slug>.md`.
+
+## ADRs are append-only
+
+An accepted ADR is **immutable**. It records why a decision looked right *at the time, with what was known then* — not what the design is now. That is why the log is worth keeping: the wrong turns are the most instructive part of it. The "overlaying routes turns to spaghetti" rule was believed and acted on for a while before measurement disproved it; a tidied document would show only the correction.
+
+So: **never merge, rewrite or consolidate ADRs.** When a decision changes, write a new one and amend the old one's status line — that line is the only edit an accepted ADR ever receives.
+
+```
+Status: accepted | superseded | proposed
+Supersedes: 0004          # this decision replaces that one
+Superseded by: 0009       # added to the old ADR when it is replaced
+Refines: 0002             # narrows or fixes a boundary without replacing
+Refined by: 0005, 0006    # the reverse link, so a reader sees it from either end
+```
+
+Relationships are recorded from both ends. A reader landing on ADR 0002 must be able to tell it has been refined without having read 0005.
+
+There is no periodic re-review. The review point is `proposed → accepted`; after that an ADR changes only by being superseded.
+
+Consolidation belongs in `CONTEXT.md`, which is the derived current-state view. Two layers: the glossary says what is true now, the ADR log says how it got that way.
 
 ## When to update CONTEXT.md
 

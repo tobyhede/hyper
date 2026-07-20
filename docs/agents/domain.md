@@ -21,7 +21,8 @@ If any of these files don't exist, **proceed silently**. Don't flag their absenc
 │   ├── 0002-layout-view-separation.md
 │   ├── 0003-routes-may-conflict.md
 │   ├── 0004-cards-are-the-graph.md
-│   └── 0005-layout-is-a-strategy.md
+│   ├── 0005-layout-is-a-strategy.md
+│   └── 0006-cards-show-titles-in-the-graph.md
 └── packages/
 ```
 
@@ -32,6 +33,8 @@ For *how* these get written — the grilling loop, when a decision earns an ADR,
 When your output names a domain concept (in an issue title, a refactor proposal, a hypothesis, a test name), use the term as defined in `CONTEXT.md`. Don't drift to synonyms the glossary explicitly avoids.
 
 If the concept you need isn't in the glossary yet, that's a signal — either you're inventing language the project doesn't use (reconsider) or there's a real gap (note it for `/domain-modeling`).
+
+Check an ADR's `Status:` before relying on it — a superseded one is history, not a rule. Its `Refines`/`Refined by` links point at the decisions that narrowed it. Never edit an accepted ADR; see `docs/agents/workflow.md`.
 
 ## Flag ADR conflicts
 

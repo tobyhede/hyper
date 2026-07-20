@@ -1,5 +1,7 @@
 # Cards are the graph; there is no placement layer
 
+Status: accepted
+
 Edges connect **cards** and route steps target **cards**, both by card id. There is no separate node or placement entity between a card and its position in the graph: a card occupies exactly one position, and the authored graph is cards, edges, and routes over those cards.
 
 We removed the earlier `nodes` layer (a 1:1 indirection of `{ id, cardId, position }` that edges and steps referenced instead of cards). It bought nothing — every card had exactly one node — and it contradicted the glossary, where **Node** sits under Card's _Avoid_. Authored positions went with it: arrangement is a **Layout** concern (ADR 0002), not a field on the content unit, and ELK computes positions anyway.
