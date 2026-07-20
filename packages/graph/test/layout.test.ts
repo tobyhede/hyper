@@ -11,7 +11,6 @@ const manifest: Manifest = {
     { id: 'b', title: 'B', content: 'b.md' },
     { id: 'c', title: 'C', content: 'c.md' },
   ],
-  edges: [],
   routes: [
     { id: 'main', title: 'Main', steps: [{ target: 'a' }, { target: 'b' }, { target: 'c' }] },
   ],

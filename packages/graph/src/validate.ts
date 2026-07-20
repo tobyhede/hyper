@@ -1,11 +1,7 @@
 import type { Manifest } from '@project/core';
 
 export type ReferenceErrorKind =
-  | 'duplicate-card-id'
-  | 'duplicate-route-id'
-  | 'unresolved-edge-source'
-  | 'unresolved-edge-target'
-  | 'unresolved-route-step';
+  'duplicate-card-id' | 'duplicate-route-id' | 'unresolved-route-step';
 
 export interface ReferenceError {
   kind: ReferenceErrorKind;
@@ -39,23 +35,6 @@ export function validateReferences(manifest: Manifest): ReferenceError[] {
   }
   for (const id of duplicates(manifest.routes.map((r) => r.id))) {
     errors.push({ kind: 'duplicate-route-id', ref: id, message: `Duplicate route id "${id}"` });
-  }
-
-  for (const edge of manifest.edges) {
-    if (!cardIds.has(edge.source)) {
-      errors.push({
-        kind: 'unresolved-edge-source',
-        ref: edge.source,
-        message: `Edge "${edge.id}" references missing source card "${edge.source}"`,
-      });
-    }
-    if (!cardIds.has(edge.target)) {
-      errors.push({
-        kind: 'unresolved-edge-target',
-        ref: edge.target,
-        message: `Edge "${edge.id}" references missing target card "${edge.target}"`,
-      });
-    }
   }
 
   for (const route of manifest.routes) {

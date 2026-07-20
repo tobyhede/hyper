@@ -9,7 +9,6 @@ function manifestFromIds(ids: string[]): Manifest {
     version: 1,
     title: 'Generated',
     cards: ids.map((id) => ({ id: `card-${id}`, title: id, content: `cards/${id}.md` })),
-    edges: [],
     routes: [
       {
         id: 'main',

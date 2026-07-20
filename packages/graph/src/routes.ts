@@ -6,7 +6,7 @@ import type { Manifest } from '@project/core';
  * The model: every route that steps through a card gives that card one inbound
  * port (`<routeId>::in`, on the left) and one outbound port (`<routeId>::out`, on
  * the right). Consecutive steps become a port-to-port edge belonging to that
- * route. This is what makes each route render as its own "rail" through the graph
+ * route. This is what lets each route render as its own colored line through the graph
  * and drives the ELK multiple-handles layout.
  */
 

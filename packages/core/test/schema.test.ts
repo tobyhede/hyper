@@ -8,28 +8,29 @@ const validManifest = {
     { id: 'a', title: 'A', content: 'cards/a.md' },
     { id: 'b', title: 'B', content: 'cards/b.md' },
   ],
-  edges: [],
   routes: [{ id: 'main', title: 'Main', steps: [{ target: 'a' }] }],
 };
 
 describe('manifest schema', () => {
   it('parses a valid manifest', () => {
-    const manifest = parseManifest(validManifest);
+    const manifest = parseManifest(validManifest) satisfies Manifest;
     expect(manifest.title).toBe('Test deck');
     expect(manifest.cards).toHaveLength(2);
-  });
-
-  it('defaults edge kind to "sequence"', () => {
-    const manifest = parseManifest({
-      ...validManifest,
-      edges: [{ id: 'e', source: 'a', target: 'b' }],
-    }) satisfies Manifest;
-    expect(manifest.edges[0]?.kind).toBe('sequence');
   });
 
   it('rejects a manifest with the wrong version literal', () => {
     const result = safeParseManifest({ ...validManifest, version: 2 });
     expect(result.success).toBe(false);
+  });
+
+  it('drops authored edges, which are no longer part of the model', () => {
+    // ADR 0007 deleted them. An older manifest still parses; the array is ignored.
+    const result = safeParseManifest({
+      ...validManifest,
+      edges: [{ id: 'e', source: 'a', target: 'b' }],
+    });
+    expect(result.success).toBe(true);
+    expect(result.success && 'edges' in result.data).toBe(false);
   });
 
   it('rejects a manifest with no routes', () => {
@@ -49,14 +50,6 @@ describe('manifest schema', () => {
     const result = safeParseManifest({
       ...validManifest,
       cards: [{ id: '', title: 'A', content: 'cards/a.md' }],
-    });
-    expect(result.success).toBe(false);
-  });
-
-  it('rejects an unknown edge kind', () => {
-    const result = safeParseManifest({
-      ...validManifest,
-      edges: [{ id: 'e', source: 'a', target: 'b', kind: 'wormhole' }],
     });
     expect(result.success).toBe(false);
   });

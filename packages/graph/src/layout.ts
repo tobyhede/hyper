@@ -54,7 +54,7 @@ export type Layout = (graph: LayoutGraph) => LayoutGraph | Promise<LayoutGraph>;
 
 /**
  * Assemble the graph to arrange, from cards the view has already chosen plus the
- * ports and rail edges derived from the routes running through them.
+ * handles and edges derived from the routes running through them.
  */
 export function buildLayoutGraph(
   cardIds: readonly string[],

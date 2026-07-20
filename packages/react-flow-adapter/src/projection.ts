@@ -120,7 +120,7 @@ export function projectCardNodes(
 }
 
 export interface ProjectRouteEdgesOptions {
-  /** In presentation mode, only the active route's rail stays fully opaque. */
+  /** In presentation mode, only the active route's edges stay fully opaque. */
   activeRouteId?: string | null;
   presenting?: boolean;
 }

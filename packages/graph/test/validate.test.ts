@@ -10,7 +10,6 @@ function baseManifest(): Manifest {
       { id: 'a', title: 'A', content: 'cards/a.md' },
       { id: 'b', title: 'B', content: 'cards/b.md' },
     ],
-    edges: [{ id: 'a-b', source: 'a', target: 'b', kind: 'sequence' }],
     routes: [{ id: 'main', title: 'Main', steps: [{ target: 'a' }, { target: 'b' }] }],
   };
 }
@@ -19,22 +18,6 @@ describe('validateReferences', () => {
   it('reports no errors for a consistent manifest', () => {
     expect(validateReferences(baseManifest())).toEqual([]);
     expect(isValidGraph(baseManifest())).toBe(true);
-  });
-
-  it('detects an unresolved edge source', () => {
-    const m = baseManifest();
-    m.edges[0]!.source = 'ghost-card';
-    const errors = validateReferences(m);
-    expect(errors.some((e) => e.kind === 'unresolved-edge-source' && e.ref === 'ghost-card')).toBe(
-      true,
-    );
-  });
-
-  it('detects an unresolved edge target', () => {
-    const m = baseManifest();
-    m.edges[0]!.target = 'ghost-card';
-    const errors = validateReferences(m);
-    expect(errors.some((e) => e.kind === 'unresolved-edge-target')).toBe(true);
   });
 
   it('detects an unresolved route step target', () => {

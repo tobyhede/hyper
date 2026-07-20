@@ -1,6 +1,6 @@
 import type { Manifest } from '@project/core';
 
-/** Distinct, reasonably accessible rail colors, assigned to routes by order. */
+/** Distinct, reasonably accessible edge colors, assigned to routes by order. */
 export const ROUTE_PALETTE = [
   '#6ea8fe', // blue
   '#f59e0b', // amber

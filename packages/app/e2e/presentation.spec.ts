@@ -53,14 +53,14 @@ test('shows the selected route as a single colored flow', async ({ page }) => {
   // A legend maps each route to a color.
   await expect(page.getByTestId('route-legend').locator('.legend__item')).toHaveCount(2);
 
-  // The default "main" route: 6 cards, 5 rail edges, 10 ports (in/out per step).
+  // The default "main" route: 6 cards, 5 edges, 10 handles (in/out per step).
   await page.getByTestId('route-selector').click();
   await page.getByRole('option', { name: 'Main walkthrough' }).click();
   await expect(page.locator('.react-flow__node')).toHaveCount(6);
   await expect(page.locator('.react-flow__edge')).toHaveCount(5);
   await expect(page.locator('.rf-card-node__port')).toHaveCount(10);
 
-  // Rails are colored (the SVG edge path carries a non-empty stroke color).
+  // Route edges are colored (the SVG edge path carries a non-empty stroke color).
   const strokes = await page
     .locator('.react-flow__edge-path')
     .evaluateAll((els) => els.map((el) => getComputedStyle(el).stroke));

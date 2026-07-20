@@ -10,7 +10,6 @@ const manifest: Manifest = {
     { id: 'a', title: 'Card A', content: 'cards/a.md' },
     { id: 'b', title: 'Card B', content: 'cards/b.md' },
   ],
-  edges: [],
   routes: [
     { id: 'main', title: 'Main', steps: [{ target: 'a' }, { target: 'b' }] },
     { id: 'alt', title: 'Alt', steps: [{ target: 'b' }, { target: 'a' }] },

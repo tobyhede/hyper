@@ -4,7 +4,7 @@ A local, file-first prototype that proves one idea:
 
 > A technical deck can be authored as Markdown cards on a spatial graph, then presented as a curated route through that graph.
 
-Content lives in version-controlled files. A JSON manifest defines cards, the edges between them, and named presentation routes. [React Flow](https://reactflow.dev) renders the **selected route** as a single colored flow and [elkjs](https://github.com/kieler/elkjs) lays it out automatically (layered, left→right). Each card exposes one inbound and one outbound port for the route (the "multiple handles" approach). Choosing a different route in the toolbar swaps the visible flow; presentation mode walks it like a slide deck, highlighting the current card and fitting the viewport to each step.
+Content lives in version-controlled files. A JSON manifest defines cards and the named routes laid across them. [React Flow](https://reactflow.dev) renders the **selected route** as a single colored flow and [elkjs](https://github.com/kieler/elkjs) lays it out automatically (layered, left→right). Each card exposes one inbound and one outbound handle per route (the "multiple handles" approach). Choosing a different route in the toolbar swaps the visible flow; presentation mode walks it like a slide deck, highlighting the current card and fitting the viewport to each step.
 
 ## Running it
 
@@ -22,7 +22,7 @@ Then:
 3. Use `→` / `←` (also `Space`, `↑` / `↓`) to move between steps. The current card is highlighted and centred.
 4. Press **Exit** or `Esc` to return to the overview.
 
-The graph uses React Flow's [elkjs multiple-handles technique](https://reactflow.dev/examples/layout/elkjs-multiple-handles): ELK lays out the nodes and computes each port's position, and those exact offsets are applied to the handles so connected ports line up and the colored rails stay legible.
+The graph uses React Flow's [elkjs multiple-handles technique](https://reactflow.dev/examples/layout/elkjs-multiple-handles): ELK lays out the nodes and computes each port's position, and those exact offsets are applied to the handles so connected handles line up and the colored route edges stay legible.
 
 ### Verify
 
@@ -44,14 +44,6 @@ A presentation is a directory containing a `graph.json` manifest plus the Markdo
   "version": 1,
   "title": "Graph-Native Technical Presentations",
   "cards": [{ "id": "intro", "title": "Graph-native presentations", "content": "cards/intro.md" }],
-  "edges": [
-    {
-      "id": "intro-to-problem",
-      "source": "intro",
-      "target": "problem",
-      "kind": "sequence"
-    }
-  ],
   "routes": [
     {
       "id": "main",
@@ -65,13 +57,12 @@ A presentation is a directory containing a `graph.json` manifest plus the Markdo
 
 | Key | Meaning |
 | --- | --- |
-| `cards` | Content units: an `id`, a `title`, and `content` (a relative path to a Markdown file). Cards **are** the graph — edges and steps reference them directly, and a card occupies exactly one position (see [ADR 0004](docs/adr/0004-cards-are-the-graph.md)). |
-| `edges` | Optional structural relationships between cards (`source`/`target`/`kind`). Still schema- and reference-validated, but **not drawn** in the current route-centric view (kept for a future structural layer). |
-| `routes` | Named walkthroughs, each an `id`, `title`, optional `color`, and ordered `steps` targeting card ids. The selected route becomes the visible flow; its connections and ports are derived from these. |
+| `cards` | Content units: an `id`, a `title`, and `content` (a relative path to a Markdown file). Cards **are** the graph — route steps reference them directly, and a card occupies exactly one position (see [ADR 0004](docs/adr/0004-cards-are-the-graph.md)). |
+| `routes` | Named walkthroughs, each an `id`, `title`, optional `color`, and ordered `steps` targeting card ids. Routes are a space's only structure ([ADR 0007](docs/adr/0007-routes-are-the-only-structure.md)); the selected route becomes the visible flow, and its edges and handles are derived from these. |
 
 ### Routes as color-coded flows
 
-The visible graph is the selected route. Each adjacent pair of steps becomes a colored edge, and each card it visits gains a `<routeId>::in` port (left) and `<routeId>::out` port (right). Those port ids are handed to ELK, which lays out the chain with fixed port order per side (the "multiple handles" technique) and returns each port's offset so the handles line up and the rail stays straight. `@project/graph` derives the ports (`buildCardHandles`), edges (`buildRouteEdges`), and the single-route view (`routeCardIds`, `filterHandlesByRoute`), then assembles the graph to arrange (`buildLayoutGraph`); `@project/react-flow-adapter` applies a **layout** to it and colors the projection. Switching routes re-runs the layout.
+The visible graph is the selected route. Each adjacent pair of steps becomes a colored edge, and each card it visits gains a `<routeId>::in` handle (left) and `<routeId>::out` handle (right). Those become ELK port ids, and ELK lays out the chain with fixed port order per side (the "multiple handles" technique), returning each one's offset so the handles line up and the edge runs straight. `@project/graph` derives the handles (`buildCardHandles`), edges (`buildRouteEdges`), and the single-route view (`routeCardIds`, `filterHandlesByRoute`), then assembles the graph to arrange (`buildLayoutGraph`); `@project/react-flow-adapter` applies a **layout** to it and colors the projection. Switching routes re-runs the layout.
 
 ### Markdown cards
 
@@ -82,9 +73,9 @@ A card occupies exactly one position in the graph; there is no placement layer l
 Validation happens in two layers:
 
 - **Shape** — a Zod schema (`@project/core`) validates the manifest structure.
-- **References** — `@project/graph` checks that every `edge.source`/`edge.target` and `route.step.target` resolves to a card, and flags duplicate ids. Unresolved references are surfaced as a banner in the app rather than crashing it.
+- **References** — `@project/graph` checks that every `route.step.target` resolves to a card, and flags duplicate ids. Unresolved references are surfaced as a banner in the app rather than crashing it.
 
-`@project/graph` also derives the route ports and rails (`buildCardHandles`, `buildRouteEdges`); `@project/react-flow-adapter` projects colored card nodes and edges (`projectCardNodes`, `projectRouteEdges`).
+`@project/graph` also derives the route handles and edges (`buildCardHandles`, `buildRouteEdges`); `@project/react-flow-adapter` projects colored card nodes and edges (`projectCardNodes`, `projectRouteEdges`).
 
 ### Layouts
 
@@ -94,7 +85,7 @@ A **layout** is a named strategy for arranging cards. It takes the graph to arra
 type Layout = (graph: LayoutGraph) => LayoutGraph | Promise<LayoutGraph>;
 ```
 
-Two ship. `elkLayout` (in `@project/react-flow-adapter`, the only package that may touch elkjs) runs ELK layered left→right and places every port. `gridLayout` (in `@project/graph`) is pure and synchronous, reads only the cards, and places no ports — the render layer spreads handles evenly when a layout has no opinion about them. Which cards a layout arranges is the view's choice, not the layout's.
+Two ship. `elkLayout` (in `@project/react-flow-adapter`, the only package that may touch elkjs) runs ELK layered left→right and places every handle. `gridLayout` (in `@project/graph`) is pure and synchronous, reads only the cards, and places no handles — the render layer spreads handles evenly when a layout has no opinion about them. Which cards a layout arranges is the view's choice, not the layout's.
 
 ## Architecture
 
@@ -103,7 +94,7 @@ A pnpm workspace with strict TypeScript and enforced package boundaries:
 | Package | Responsibility |
 | --- | --- |
 | `@project/core` | Domain types + Zod schema. No framework code. |
-| `@project/graph` | Pure graph/route logic: lookups, route navigation, referential validation, and the route→ports/rails derivation. Property-tested. |
+| `@project/graph` | Pure graph/route logic: lookups, route navigation, referential validation, the route→handles/edges derivation, and the `Layout` contract. Property-tested. |
 | `@project/react-flow-adapter` | The only package that imports `@xyflow/react` and `elkjs`. Runs the ELK layout and projects the domain model into colored React Flow card nodes/edges. |
 | `@project/ui` | Reusable, framework-agnostic React: card renderer, route selector, route legend, presentation controls, app shell. |
 | `@project/app` | Wiring: TanStack Router, a Zustand store for presentation state, the example presentation, and Vite. |
@@ -123,9 +114,8 @@ Design rules kept throughout: domain logic stays out of React components, React 
 
 - **Read-only.** No visual or Markdown editing, no drawing, no whiteboard shapes — the app only reads files.
 - **Single bundled presentation.** The example is imported at build time (`import.meta.glob`); there is no file picker or loader for arbitrary presentations.
-- **One route at a time.** The graph shows the selected route only, and there is no whole-graph overview. This is a *view* choice, not a limit of the model: multiple **compatible** routes (their combined step-order is acyclic) lay out cleanly. Routes whose combined order contains a cycle force an unavoidable backward rail. See [`.scratch/multiple-routes/findings.md`](.scratch/multiple-routes/findings.md).
-- **ELK runs on fixed-size cards.** The layout uses a uniform card size, not measured DOM dimensions, so cards are pinned to one height. A route that visits the same card twice reuses that card's ports (a visual overlap, not a crash).
-- **Structural `edges` aren't drawn.** Only the selected route's rail is rendered; manifest `edges` are validated but not shown.
+- **One route at a time.** The graph shows the selected route only, and there is no whole-graph overview. This is a *view* choice, not a limit of the model: multiple **compatible** routes (their combined step-order is acyclic) lay out cleanly. Routes whose combined order contains a cycle force an unavoidable backward edge. See [`.scratch/multiple-routes/findings.md`](.scratch/multiple-routes/findings.md).
+- **ELK runs on fixed-size cards.** The layout uses a uniform card size, not measured DOM dimensions, so cards are pinned to one height. A route that visits the same card twice reuses that card's handles (a visual overlap, not a crash).
 - **No route branching.** A route is a linear list of steps; step transitions/annotations are not modelled.
 - **Client-only, no persistence.** Presentation state lives in memory; there is no routing per step or shareable deep links.
 - The production bundle ships React Flow and elkjs in a single chunk (~2.1 MB) — fine for a prototype, not tuned for size.
@@ -137,5 +127,4 @@ Design rules kept throughout: domain logic stays out of React components, React 
 - Per-step camera hints (zoom/pan/highlight several nodes) and step transitions in the manifest.
 - Speaker view: current + next card, notes, and elapsed time.
 - Feed measured card sizes into ELK (via `useNodesInitialized`) so cards can be variable-height, and re-run layout when a route set changes.
-- Draw manifest `edges` as a faint structural layer beneath the colored route rails.
 - A tiny CLI to validate a presentation directory (`graph.json` + Markdown) in CI, reusing `@project/graph`.

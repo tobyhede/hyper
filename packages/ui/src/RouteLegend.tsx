@@ -7,7 +7,7 @@ export interface RouteLegendProps {
   activeRouteId?: string | null;
 }
 
-/** A color key mapping each route to its rail color. */
+/** A color key mapping each route to the color its edges are drawn in. */
 export function RouteLegend({ routes, colorByRouteId, activeRouteId = null }: RouteLegendProps) {
   return (
     <ul className="legend" data-testid="route-legend">

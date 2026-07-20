@@ -9,14 +9,6 @@
     { "id": "routes", "title": "Routes as slide decks", "content": "cards/routes.md" },
     { "id": "demo", "title": "Try it", "content": "cards/demo.md" }
   ],
-  "edges": [
-    { "id": "intro-to-problem", "source": "intro", "target": "problem", "kind": "sequence" },
-    { "id": "problem-to-model", "source": "problem", "target": "model", "kind": "sequence" },
-    { "id": "model-to-rendering", "source": "model", "target": "rendering", "kind": "sequence" },
-    { "id": "rendering-to-routes", "source": "rendering", "target": "routes", "kind": "sequence" },
-    { "id": "routes-to-demo", "source": "routes", "target": "demo", "kind": "sequence" },
-    { "id": "model-references-routes", "source": "model", "target": "routes", "kind": "reference" }
-  ],
   "routes": [
     {
       "id": "main",
