@@ -45,11 +45,32 @@ The layout takes `CARD_SIZE`; the stylesheet takes `cardSizeVars`, applied to th
 graph container as `--card-width` / `--card-height`. `styles.css` has no card
 pixel dimension left in it. Changing the ratio changes both, with no second edit.
 
-**Ratio: 16:10 landscape**, answering the question this ticket left open. The
-260x300 portrait box was inherited from when a card rendered a clipped page; a
-title-sized card reads as a label, so landscape fits it. It also roughly halves a
-card's height (300 to 163), so substantially more of a space fits on screen, which
-is what an overview is for.
+**Ratio: 16:9**, answering the question this ticket left open — after a false
+start at 16:10.
+
+The first pass picked 16:10 on the grounds that a title-sized card is a label and
+its ratio is a legibility question, since Markdown reflows and a card has no fixed
+canvas to preserve. That reasoning holds but asks the wrong question. The better
+one: *would matching the slide ratio be better UX?* A card in the graph and the
+same card presented are one object, so they should share a silhouette — and
+aligning them costs exactly one number.
+
+16:9 is the ratio of the medium a presentation lands on. Projectors and external
+displays are overwhelmingly 16:9; laptops are 16:9 or 16:10, and phones are far
+taller (19.5:9 to 20:9) and not a target for presenting. It also removes a future
+migration: if ADR 0006's "show full content" view arrives and a card becomes a
+live preview of a slide, a mismatched ratio would have to be fixed along with any
+content authored against it.
+
+Either way the card is now landscape rather than the inherited 260x300 portrait,
+so height drops from 300 to 146 and far more of a space fits on screen — which is
+the point of an overview.
+
+**The coupling is recorded, not implicit.** `card.ts` states that if the
+presentation surface's ratio changes, this must change with it. The other half —
+actually giving the presentation surface a 16:9 frame — is `04`, because it does
+not have one today: `PresentationLayer` is a bottom overlay whose height follows
+its content.
 
 The base width is arbitrary and the file says so. ELK lays out in its own
 coordinate space and React Flow's zoom maps it to the viewport, so only the

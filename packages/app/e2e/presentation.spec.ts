@@ -168,6 +168,6 @@ test('cards are drawn at exactly the size the layout placed them at', async ({ p
   expect(drawn.w).toBe(declared.w);
   expect(drawn.h).toBe(declared.h);
 
-  // 16:10 landscape — wider than tall.
+  // 16:9, matching the presentation surface — wider than tall.
   expect(parseFloat(drawn.w)).toBeGreaterThan(parseFloat(drawn.h));
 });

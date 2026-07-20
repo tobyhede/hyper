@@ -28,6 +28,7 @@ A title-sized card is bounded and uniform by construction, so its dimensions bec
 - `01-title-only-cards-and-open` — the change proper: title-only nodes, an open interaction, and content out of the projection.
 - `02-card-size-as-ratio` — one source of truth for card dimensions, expressed as a ratio.
 - `03-card-description` — the optional short description on a card.
+- `04-presentation-surface-ratio` — give the presented card the 16:9 frame the card ratio now assumes.
 
 ## Not in scope
 

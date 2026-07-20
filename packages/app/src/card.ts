@@ -12,15 +12,24 @@
  * width is arbitrary: ELK lays out in its own coordinate space, and React Flow's
  * zoom maps it to the viewport, so only the proportion is a design decision.
  *
- * 16:10 landscape. A title-sized card reads as a label, and the shipped 260x300
- * portrait box was inherited from when a card rendered a clipped page. Landscape
- * also roughly halves a card's height, so far more of a space fits on screen —
- * which is the point of an overview.
+ * **16:9, matching the presentation surface.** A card in the graph and the same
+ * card being presented are one object, so they share a silhouette — click a card,
+ * present it, and the shape does not change. The ratio is chosen for the medium a
+ * presentation actually lands on: projectors and external displays are
+ * overwhelmingly 16:9, and that is the worst case to letterbox.
+ *
+ * This couples the two surfaces deliberately. **If the presentation surface's
+ * ratio ever changes, change this with it** — a mismatch would make the graph
+ * misrepresent what an audience sees, and would break outright if the "show full
+ * content" view of ADR 0006 arrives and a card becomes a live preview of a slide.
+ *
+ * (The predecessor was 260x300 portrait, inherited from when a card rendered a
+ * clipped page rather than a title.)
  */
 
 import type { CSSProperties } from 'react';
 
-export const CARD_ASPECT_RATIO = 16 / 10;
+export const CARD_ASPECT_RATIO = 16 / 9;
 
 const BASE_WIDTH = 260;
 
