@@ -2,7 +2,7 @@
 
 Instructions for AI coding agents working in this repo.
 
-A local, file-first prototype for **graph-native technical presentations**: Markdown cards on a spatial graph, authored as a JSON manifest and presented as curated routes that elkjs lays out automatically. The app currently renders one route at a time, each drawn as a colored line of React Flow edges. pnpm + TypeScript (strict) monorepo.
+A local, file-first prototype for **graph-native technical presentations**: Markdown cards on a spatial graph, authored as a JSON manifest and presented as curated routes that elkjs lays out automatically. The overview draws every route at once, each as a colored line of React Flow edges, with the selected one emphasised. Cards in the graph show their title; **opening** a card reads it in place, and **presenting** a route is a separate reveal.js deck (ADR 0006, ADR 0008). pnpm + TypeScript (strict) monorepo.
 
 ## Commands
 
@@ -54,7 +54,9 @@ Hard rules:
 
 Keep to the MVP. Don't over-generalize the domain model and don't add features beyond what's asked.
 
-On multi-route rendering (the old "no overlay" rule, corrected): the app renders one route at a time — a gap, not a design choice. The dimming machinery in `projectRouteEdges` and `CardNode` was built for several routes at once and has never run. Overlaying **compatible** routes — their combined step-order (every route's `step[i] → step[i+1]`, unioned) is acyclic — lays out cleanly and is a legitimate direction. **Conflicting-order** routes (two routes disagreeing on the order of shared cards, a reverse route, or a route that revisits a card) always force a backward edge: renderable *legibly* only via ELK's own orthogonal edge routing, or by unrolling revisits into duplicate nodes sharing a card — never as a clean forward line while keeping one node per card. Don't build any multi-route rendering without reading `.scratch/multiple-routes/findings.md` first.
+On multi-route rendering (shipped 2026-07-20, `.scratch/multi-route/`): the overview draws every route, and **selection is emphasis, not filtering** — at all times, not only while presenting. The dimming in `projectRouteEdges`, `CardNode` and `RouteLegend` is now live; it was dead code from the initial commit until then. `filterHandlesByRoute` and `routeCardIds` still exist and are still right for a view that wants one route. Which routes a view shows is a View decision passed into the layout (ADR 0005) — don't let the layout or `graph` decide it.
+
+The overlay limit that remains: only **compatible** routes — their combined step-order (every route's `step[i] → step[i+1]`, unioned) is acyclic — lay out cleanly, and the bundled demo is compatible. **Conflicting-order** routes (two routes disagreeing on the order of shared cards, a reverse route, or a route that revisits a card) always force a backward edge: renderable *legibly* only via ELK's own orthogonal edge routing (`layout-seam/03`), or by unrolling revisits into duplicate nodes sharing a card — never as a clean forward line while keeping one node per card. ADR 0003 says routes may conflict, so a view must tolerate it. Read `.scratch/multiple-routes/findings.md` before extending any of this.
 
 ## Agent skills
 
