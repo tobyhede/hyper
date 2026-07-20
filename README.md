@@ -68,6 +68,8 @@ The visible graph is the selected route. Each adjacent pair of steps becomes a c
 
 Each card body is a standalone Markdown file (GitHub-flavoured Markdown via `remark-gfm`, so tables, code fences, and task lists work). A card can be visited by any number of routes — that reuse is the whole point, and a card shared by several routes carries one handle pair per route running through it.
 
+A card's title lives in the manifest, so a card's Markdown file is its **body only** — do not repeat the title as a heading in the file, or it will appear twice everywhere the card is drawn.
+
 The graph draws a card's **title**, not its body ([ADR 0006](docs/adr/0006-cards-show-titles-in-the-graph.md)). Click a card to open it and read its content; presentation mode steps through the same content full-width. Content is loaded when a card is opened, not embedded in every graph node.
 
 A card occupies exactly one position in the graph; there is no placement layer letting the same card sit in two places. Showing the same content at a second position is the job of an **alias** card, which is not yet implemented ([ADR 0004](docs/adr/0004-cards-are-the-graph.md)).

@@ -1,5 +1,3 @@
-## Routes as slide decks
-
 A **route** is an ordered list of card targets.
 
 ```json

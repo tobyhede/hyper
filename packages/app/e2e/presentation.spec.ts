@@ -215,7 +215,11 @@ test('content that exceeds the frame scrolls inside it, keeping controls reachab
   // A small viewport shrinks the 16:9 frame until the demo's longest card
   // overflows it. The frame is fixed, so content scrolls rather than the frame
   // growing — which is what makes the ratio mean anything.
-  await page.setViewportSize({ width: 760, height: 460 });
+  //
+  // Having to shrink the viewport at all is the flaw card-display/05 records:
+  // the frame has a fixed ratio but not a fixed size, so whether a card
+  // overflows depends on the window rather than on the card.
+  await page.setViewportSize({ width: 520, height: 380 });
   await page.goto('/');
 
   await page.locator('.react-flow__node', { hasText: 'The problem with linear decks' }).click();
@@ -231,4 +235,22 @@ test('content that exceeds the frame scrolls inside it, keeping controls reachab
   // Actions stay inside the frame, so step controls never scroll away.
   const actions = (await page.locator('.open-card__actions').boundingBox())!;
   expect(actions.y + actions.height).toBeLessThanOrEqual(panel.y + panel.height + 1);
+});
+
+test('a card title appears once, not twice', async ({ page }) => {
+  await page.goto('/');
+
+  // The manifest owns the title, so a card's Markdown is body-only. When a body
+  // repeated its title as a heading, every surface rendered it twice.
+  await page.locator('.react-flow__node', { hasText: 'The problem with linear decks' }).click();
+  const opened = page.getByTestId('open-card');
+  await expect(opened).toBeVisible();
+  expect(await opened.getByText('The problem with linear decks').count()).toBe(1);
+
+  await page.getByTestId('close-card').click();
+  await page.getByTestId('present-button').click();
+  await expect(page.getByTestId('presentation-deck')).toBeVisible();
+
+  const slide = page.locator('.reveal .slides section[data-card-id="problem"]');
+  expect(await slide.getByText('The problem with linear decks').count()).toBe(1);
 });
