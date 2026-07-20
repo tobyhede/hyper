@@ -3,6 +3,12 @@
 Throwaway spike. **Do not merge into the model or the shipped view.** This feeds the
 human/model decision; it does not pre-empt it.
 
+Written before the Route rename, so the identifiers here are the old ones —
+`buildPathEdges` is now `buildRouteEdges`, `buildNodeHandles` is `buildCardHandles`,
+`filterHandlesByPath` is `filterHandlesByRoute`, and `packages/graph/src/paths.ts` is
+`routes.ts`. Left as-is deliberately: this is a record of what was measured, against the
+code as it stood.
+
 Question: today the app renders one Route at a time and `AGENTS.md` bans overlay because
 it supposedly makes ELK "reconcile conflicting orderings and the graph turns to
 spaghetti." Is that true, and if not, where is the real boundary?
