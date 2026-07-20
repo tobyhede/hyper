@@ -41,9 +41,9 @@ _Avoid_: slide, stop, frame.
 ## Layout and views
 
 **Layout**:
-A defined arrangement of a space's cards — which cards are shown, and how they are organised and positioned. A space can hold several layouts (a route-driven graph, a grid, a cluster map).
-_Avoid_: view (a view renders a layout), placement, position, diagram.
+A named strategy for arranging a space's cards — how they are organised and positioned. A space has a default layout, a route-driven graph, and may offer others (a grid, a cluster map). Which cards a layout arranges is the view's choice, not the layout's.
+_Avoid_: view (a view renders a layout), placement, position, diagram, arrangement (a layout is the strategy; positions land on the cards themselves).
 
 **View**:
-The rendering of a layout for a viewer — how a layout is drawn on screen and explored. The **Presentation** view renders a route-driven graph layout, one colour per route; other views render other layouts.
+The rendering of a layout for a viewer — which cards and routes are shown, and how they are drawn on screen and explored. The **Presentation** view renders a route-driven graph layout, one colour per route; other views render other layouts.
 _Avoid_: mode, screen, page, layout.

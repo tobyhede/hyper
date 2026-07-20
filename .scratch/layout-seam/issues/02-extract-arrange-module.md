@@ -9,7 +9,9 @@ Blocked by: 01
 
 ## Task
 
-Introduce `arrange(space, selection) -> Layout` in `react-flow-adapter`, owning the port contract end to end: card-unique port ids (issue 01), the ELK run, and the resolved handle offsets. `GraphView` consumes a Layout and renders it; `App` stops constructing ELK input.
+Introduce an arrange module in `react-flow-adapter` owning the port contract end to end: card-unique port ids (issue 01), the ELK run, and the resolved handle offsets. `App` stops constructing ELK input.
+
+Follow the library alignment in `spec.md`: the **Layout** is the strategy (ELK's `layoutOptions`), and the result is the cards, ports and edges carrying positions — **not** a new `Layout`/`Arrangement` object. Which cards get arranged is passed in by the view; the module does not decide membership.
 
 Collapse the three parallel handle representations where the seam allows.
 
