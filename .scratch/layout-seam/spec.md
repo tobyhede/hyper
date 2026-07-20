@@ -40,3 +40,4 @@ Which cards are arranged is decided by the **View** before the layout runs — E
 - `04-elk-fixed-side-ports` — config fix for rail braiding.
 - `05-audit-default-layout-options` — strip the default layout to options that earn their place.
 - `06-revisit-async-optionality` — decide whether `Layout`'s sync/async union earns its place.
+- `07-demo-graph-that-discriminates` — a demo shape that actually exercises the layout.

@@ -1,7 +1,7 @@
 # Render ELK's edge routing instead of default beziers
 
 Status: open
-Blocked by: 02
+Blocked by: 02 (resolved), 07 (to see it in the app)
 
 ## Context
 
