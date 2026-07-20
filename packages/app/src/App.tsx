@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ReactFlowProvider } from '@xyflow/react';
-import { AppShell, Button, RouteLegend, RouteSelector } from '@project/ui';
+import { AppShell, Button, PresentationControls, RouteLegend, RouteSelector } from '@project/ui';
 import {
   elkLayout,
   projectCardNodes,
@@ -26,7 +26,6 @@ import { routeColorMap } from './colors';
 import { CARD_HEIGHT, CARD_SIZE, cardSizeVars } from './card';
 import { selectActiveCardId, usePresentationStore } from './store';
 import { GraphView } from './components/GraphView';
-import { PresentationLayer } from './components/PresentationLayer';
 import { OpenCard } from './components/OpenCard';
 
 // Derived once from the (static) manifest.
@@ -118,8 +117,10 @@ export function App() {
   );
 
   const route = selectedRouteId ? getRoute(manifest, selectedRouteId) : undefined;
-  const activeCard = activeCardId ? getCard(manifest, activeCardId) : undefined;
-  const openedCard = openedCardId ? getCard(manifest, openedCardId) : undefined;
+  // Presenting *is* opening: it opens each card in turn, and the only difference
+  // is the footer. One surface, so the two can never drift apart visually.
+  const shownCardId = presenting ? activeCardId : openedCardId;
+  const shownCard = shownCardId ? getCard(manifest, shownCardId) : undefined;
 
   // Escape closes an opened card before it exits a presentation, so the two
   // never fight over the key.
@@ -206,25 +207,27 @@ export function App() {
           />
         </ReactFlowProvider>
 
-        {openedCard && (
+        {shownCard && (
           <OpenCard
-            title={openedCard.title}
-            markdown={markdownByCardId[openedCard.id] ?? ''}
-            onClose={closeCard}
-          />
-        )}
-
-        {presenting && route && activeCard && (
-          <PresentationLayer
-            title={activeCard.title}
-            markdown={markdownByCardId[activeCard.id] ?? ''}
-            stepIndex={stepIndex}
-            stepCount={stepCount(route)}
-            canPrev={canGoPrev(route, stepIndex)}
-            canNext={canGoNext(route, stepIndex)}
-            onPrev={prev}
-            onNext={next}
-            onExit={exitPresentation}
+            title={shownCard.title}
+            markdown={markdownByCardId[shownCard.id] ?? ''}
+            footer={
+              presenting && route ? (
+                <PresentationControls
+                  stepIndex={stepIndex}
+                  stepCount={stepCount(route)}
+                  canPrev={canGoPrev(route, stepIndex)}
+                  canNext={canGoNext(route, stepIndex)}
+                  onPrev={prev}
+                  onNext={next}
+                  onExit={exitPresentation}
+                />
+              ) : (
+                <Button variant="secondary" data-testid="close-card" onClick={closeCard}>
+                  Close
+                </Button>
+              )
+            }
           />
         )}
       </div>

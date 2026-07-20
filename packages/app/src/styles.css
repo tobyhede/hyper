@@ -314,29 +314,6 @@ body {
   stroke-dasharray: 6 4;
 }
 
-/* ---- Presentation overlay ---- */
-.presentation {
-  position: absolute;
-  z-index: 30;
-  left: 50%;
-  bottom: 1.25rem;
-  transform: translateX(-50%);
-  width: min(720px, calc(100% - 2rem));
-  display: flex;
-  flex-direction: column;
-  gap: 0.6rem;
-}
-
-.presentation__slide {
-  background: var(--panel);
-  border: 1px solid var(--accent);
-  border-radius: 12px;
-  padding: 0.5rem 1rem;
-  max-height: 45vh;
-  overflow-y: auto;
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
-}
-
 .card--slide {
   background: transparent;
   border: none;
@@ -486,4 +463,6 @@ body {
 .open-card__actions {
   display: flex;
   justify-content: flex-end;
+  border-top: 1px solid var(--border);
+  padding-top: 0.75rem;
 }

@@ -18,7 +18,8 @@ test('walks a presentation route with keyboard navigation', async ({ page }) => 
   await page.getByRole('option', { name: 'Main walkthrough' }).click();
   await page.getByTestId('present-button').click();
 
-  const layer = page.getByTestId('presentation-layer');
+  // Presenting opens the active card — the same surface as clicking one.
+  const layer = page.getByTestId('open-card');
   await expect(layer).toBeVisible();
   await expect(page.getByTestId('step-counter')).toHaveText('1 / 6');
 
@@ -95,7 +96,7 @@ test('selecting emphasises a route; presenting pushes the rest further back', as
   expect(subtle).toBeGreaterThan(0);
 
   await page.getByTestId('present-button').click();
-  await expect(page.getByTestId('presentation-layer')).toBeVisible();
+  await expect(page.getByTestId('open-card')).toBeVisible();
 
   // Presenting fades them further, and never removes them.
   await expect.poll(async () => (await opacities()).filter((o) => o < subtle).length).toBe(2);
@@ -170,4 +171,28 @@ test('cards are drawn at exactly the size the layout placed them at', async ({ p
 
   // 16:9, matching the presentation surface — wider than tall.
   expect(parseFloat(drawn.w)).toBeGreaterThan(parseFloat(drawn.h));
+});
+
+test('presenting opens each card on the same surface as clicking one', async ({ page }) => {
+  await page.goto('/');
+
+  // Opening a card by hand: content, and a Close button.
+  await page.locator('.react-flow__node').first().click();
+  const surface = page.getByTestId('open-card');
+  await expect(surface).toBeVisible();
+  await expect(page.getByTestId('close-card')).toBeVisible();
+  await expect(page.getByTestId('presentation-controls')).toBeHidden();
+
+  const readingBox = await surface.locator('.open-card__panel').boundingBox();
+  await page.getByTestId('close-card').click();
+
+  // Presenting: the same surface in the same place, with step controls instead.
+  await page.getByTestId('present-button').click();
+  await expect(surface).toBeVisible();
+  await expect(page.getByTestId('presentation-controls')).toBeVisible();
+  await expect(page.getByTestId('close-card')).toBeHidden();
+
+  const presentingBox = await surface.locator('.open-card__panel').boundingBox();
+  expect(presentingBox?.x).toBeCloseTo(readingBox!.x, 0);
+  expect(presentingBox?.width).toBeCloseTo(readingBox!.width, 0);
 });

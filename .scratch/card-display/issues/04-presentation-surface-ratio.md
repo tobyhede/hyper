@@ -1,6 +1,6 @@
 # Make the presentation surface match the card
 
-Status: open
+Status: partly resolved — see Answer; the 16:9 frame itself is still open
 
 ## Context
 
@@ -48,3 +48,41 @@ Decide, and record:
 - The presented card occupies a 16:9 frame.
 - A viewport that is not 16:9 does not silently change the shape of the content.
 - The relationship between this and `card.ts` is recorded in both places.
+
+## Answer (part 1: open and presentation are one surface)
+
+The ticket was written around the wrong question. It asked what shape the
+presentation surface should be, treating it as a thing separate from the reading
+surface. It is not separate.
+
+**Opening shows a card. Presenting steps through cards and opens each one.** The
+only difference is the footer: a Close button, or the step controls.
+
+`PresentationLayer` is deleted. `OpenCard` takes a `footer` node, and `App` passes
+`PresentationControls` while presenting and a Close button otherwise. The card
+shown is derived rather than stored — `presenting ? activeCardId : openedCardId` —
+so there is no second piece of state that could disagree.
+
+The bottom-pinned `.presentation` / `.presentation__slide` styles are gone.
+Presenting now uses the centred `.open-card` overlay, so the two surfaces cannot
+drift apart visually because there is only one of them.
+
+This reverses a call made in `card-display/01`, which argued the two could not
+share a component because `PresentationLayer` was built around step controls that
+an opened card has no use for. That reasoned from the shapes that happened to
+exist rather than from what they should be — the step controls are the *only*
+difference, which is an argument for sharing, not against it.
+
+E2E pins it: opening by hand and presenting produce a panel at the same position
+and width, with the footer being the only thing that changes.
+
+## Still open
+
+The frame itself. Neither surface has a ratio — `.open-card__panel` is
+`min(760px, 100%)` wide, capped at `80vh`, scrolling. `card.ts` still asserts that
+the card ratio matches the presentation surface, and that remains one-sided.
+
+The decisions listed above (fixed 16:9 frame or not, overflow behaviour,
+letterboxing on a non-16:9 viewport) are unchanged and still need answering — but
+they now apply to *one* surface rather than two, and whatever is decided applies
+to reading and presenting alike unless a reason emerges to split them.
