@@ -1,7 +1,7 @@
 # Switch ELK port constraints to FIXED_SIDE
 
 Status: open
-Blocked by: multi-route rendering
+Blocked by: multi-route/01
 
 ## Context
 
@@ -11,7 +11,7 @@ Crossings are purely a configuration problem. Back-edges caused by genuine order
 
 ## Blocked
 
-Braiding needs several routes drawn together over a shared spine. The app renders one route at a time, so this cannot be observed — in the demo or in any other graph — until multi-route rendering exists. The measurement in `findings.md` came from a standalone harness, not the app. See issue 07.
+Braiding needs several routes drawn together over a shared spine. The app renders one route at a time, so this cannot be observed — in the demo or in any other graph — until multi-route rendering exists. The measurement in `findings.md` came from a standalone harness, not the app. `multi-route/01` unblocks this — the demo's two routes share a spine.
 
 ## Task
 

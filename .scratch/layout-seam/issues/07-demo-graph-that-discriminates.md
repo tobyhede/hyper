@@ -20,7 +20,7 @@ ADR 0003 explicitly permits a route to revisit a card, so this is legal content,
 
 One thing to look at while doing it: B already carries a `main::in` port from step 1, so both inbound edges land on the *same* port. README calls this "a visual overlap, not a crash". With ELK routing drawn properly it may read fine, or it may want two ports. Find out rather than assuming.
 
-**`04` (FIXED_SIDE port constraints) needs several routes drawn together**, sharing a spine, so their ports braid. The app renders one route at a time, so *no demo graph can exercise it* under the current view. `04` is blocked on multi-route rendering, not on this ticket. This corrects an earlier assumption that a richer demo would unblock both.
+**`04` (FIXED_SIDE port constraints) needs several routes drawn together**, sharing a spine, so their ports braid. The app renders one route at a time, so *no demo graph can exercise it* under the current view. `04` is blocked on `multi-route/01`, not on this ticket. This corrects an earlier assumption that a richer demo would unblock both.
 
 ## Task
 
