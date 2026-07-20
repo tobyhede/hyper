@@ -118,3 +118,9 @@ warning, or a "this card overflows" affordance — is deliberately not built her
 E2E covers all three: the frame holds 16:9 at 1440x900, 900x1200 and 2200x700; a
 small viewport makes the demo's longest card overflow and it scrolls rather than
 the frame growing; and the actions stay within the frame.
+
+**Known limitation, tracked as `05`.** The frame has a fixed *ratio* but not a
+fixed *size*, and type is fixed in `rem`, so how much content fits depends on the
+viewer's window — which is why the overflow test has to shrink the viewport to
+provoke scrolling. "Does this card fit?" therefore has no stable answer for an
+author. The fix is the established one: a fixed logical canvas scaled uniformly.
