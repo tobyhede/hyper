@@ -73,19 +73,52 @@ export function buildCardHandles(manifest: Manifest): Map<string, CardHandleSet>
   return map;
 }
 
-/** The distinct card ids a route visits, in first-visit order. */
-export function routeCardIds(manifest: Manifest, routeId: string): string[] {
-  const route = manifest.routes.find((r) => r.id === routeId);
-  if (!route) return [];
+/**
+ * The distinct card ids the given routes visit, in first-visit order — routes in
+ * the order supplied, steps in order within each.
+ *
+ * A card shared by several routes appears once. Which routes a view shows is the
+ * view's decision (ADR 0005); this only answers what cards that implies.
+ */
+export function cardIdsForRoutes(manifest: Manifest, routeIds: readonly string[]): string[] {
+  const wanted = new Set(routeIds);
   const seen = new Set<string>();
   const ids: string[] = [];
-  for (const step of route.steps) {
-    if (!seen.has(step.target)) {
-      seen.add(step.target);
-      ids.push(step.target);
+
+  for (const routeId of routeIds) {
+    const route = manifest.routes.find((r) => r.id === routeId);
+    if (!route || !wanted.has(route.id)) continue;
+    for (const step of route.steps) {
+      if (!seen.has(step.target)) {
+        seen.add(step.target);
+        ids.push(step.target);
+      }
     }
   }
+
   return ids;
+}
+
+/** The distinct card ids a single route visits, in first-visit order. */
+export function routeCardIds(manifest: Manifest, routeId: string): string[] {
+  return cardIdsForRoutes(manifest, [routeId]);
+}
+
+/** Keep only the handles belonging to the given routes. */
+export function filterHandlesByRoutes(
+  handlesByCard: ReadonlyMap<string, CardHandleSet>,
+  routeIds: readonly string[],
+): Map<string, CardHandleSet> {
+  const wanted = new Set(routeIds);
+  const filtered = new Map<string, CardHandleSet>();
+  for (const [cardId, set] of handlesByCard) {
+    const sourceHandles = set.sourceHandles.filter((h) => wanted.has(h.routeId));
+    const targetHandles = set.targetHandles.filter((h) => wanted.has(h.routeId));
+    if (sourceHandles.length || targetHandles.length) {
+      filtered.set(cardId, { sourceHandles, targetHandles });
+    }
+  }
+  return filtered;
 }
 
 /** Keep only the handles belonging to a single route. */
@@ -93,15 +126,7 @@ export function filterHandlesByRoute(
   handlesByCard: ReadonlyMap<string, CardHandleSet>,
   routeId: string,
 ): Map<string, CardHandleSet> {
-  const filtered = new Map<string, CardHandleSet>();
-  for (const [cardId, set] of handlesByCard) {
-    const sourceHandles = set.sourceHandles.filter((h) => h.routeId === routeId);
-    const targetHandles = set.targetHandles.filter((h) => h.routeId === routeId);
-    if (sourceHandles.length || targetHandles.length) {
-      filtered.set(cardId, { sourceHandles, targetHandles });
-    }
-  }
-  return filtered;
+  return filterHandlesByRoutes(handlesByCard, [routeId]);
 }
 
 /** Build the colored port-to-port edges implied by each route's step order. */

@@ -47,32 +47,54 @@ test('offers more than one named route', async ({ page }) => {
   await expect(page.getByRole('option')).toHaveCount(2);
 });
 
-test('shows the selected route as a single colored flow', async ({ page }) => {
+test('draws every route at once, each in its own color', async ({ page }) => {
   await page.goto('/');
 
   // A legend maps each route to a color.
   await expect(page.getByTestId('route-legend').locator('.legend__item')).toHaveCount(2);
 
-  // The default "main" route: 6 cards, 5 edges, 10 handles (in/out per step).
-  await page.getByTestId('route-selector').click();
-  await page.getByRole('option', { name: 'Main walkthrough' }).click();
+  // Both routes, overlaid. "main" visits all 6 cards, "quick" visits 3 of them,
+  // so the union is 6 cards; 5 main edges + 2 quick edges; and a shared card
+  // carries one handle pair per route running through it.
   await expect(page.locator('.react-flow__node')).toHaveCount(6);
-  await expect(page.locator('.react-flow__edge')).toHaveCount(5);
-  await expect(page.locator('.rf-card-node__port')).toHaveCount(10);
+  await expect(page.locator('.react-flow__edge')).toHaveCount(7);
+  await expect(page.locator('.rf-card-node__port')).toHaveCount(14);
 
-  // Route edges are colored (the SVG edge path carries a non-empty stroke color).
+  // Distinct colors, so the two routes can be told apart.
   const strokes = await page
     .locator('.react-flow__edge-path')
     .evaluateAll((els) => els.map((el) => getComputedStyle(el).stroke));
-  expect(strokes.some((s) => s && s !== 'none' && s !== 'rgb(0, 0, 0)')).toBe(true);
+  expect(strokes.every((s) => s && s !== 'none' && s !== 'rgb(0, 0, 0)')).toBe(true);
+  expect(new Set(strokes).size).toBe(2);
 });
 
-test('switching the route swaps the visible flow', async ({ page }) => {
+test('selecting a route keeps the others on screen', async ({ page }) => {
   await page.goto('/');
 
-  // "quick" tour visits three cards.
+  // Selection chooses what Present walks; it no longer hides the rest of the space.
   await page.getByTestId('route-selector').click();
   await page.getByRole('option', { name: 'Quick tour' }).click();
-  await expect(page.locator('.react-flow__node')).toHaveCount(3);
-  await expect(page.locator('.react-flow__edge')).toHaveCount(2);
+  await expect(page.locator('.react-flow__node')).toHaveCount(6);
+  await expect(page.locator('.react-flow__edge')).toHaveCount(7);
+});
+
+test('presenting dims the routes not being walked', async ({ page }) => {
+  await page.goto('/');
+
+  const opacities = async () =>
+    page
+      .locator('.react-flow__edge-path')
+      .evaluateAll((els) => els.map((el) => Number(getComputedStyle(el).opacity)));
+
+  // In overview every route is drawn at full strength.
+  expect((await opacities()).every((o) => o === 1)).toBe(true);
+
+  await page.getByTestId('route-selector').click();
+  await page.getByRole('option', { name: 'Main walkthrough' }).click();
+  await page.getByTestId('present-button').click();
+  await expect(page.getByTestId('presentation-layer')).toBeVisible();
+
+  // "quick"'s two edges fade; "main"'s five stay opaque.
+  const dimmed = (await opacities()).filter((o) => o < 0.5);
+  expect(dimmed).toHaveLength(2);
 });

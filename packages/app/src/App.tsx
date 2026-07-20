@@ -8,10 +8,10 @@ import {
   buildRouteEdges,
   canGoNext,
   canGoPrev,
-  filterHandlesByRoute,
+  cardIdsForRoutes,
+  filterHandlesByRoutes,
   getCard,
   getRoute,
-  routeCardIds,
   stepCount,
   type CardHandleSet,
   type LayoutGraph,
@@ -50,30 +50,31 @@ export function App() {
   const activeCardId = usePresentationStore(selectActiveCardId);
   const presenting = mode === 'presenting';
 
-  // The view chooses which cards are arranged; the layout never decides membership.
+  // Which routes the view shows. Every one, for now — but membership is the
+  // view's decision (ADR 0005), so route visibility controls attach here rather
+  // than inside the graph or layout packages.
+  const visibleRouteIds = useMemo(() => manifest.routes.map((r) => r.id), []);
+
   const visibleCardIds = useMemo(
-    () => (selectedRouteId ? routeCardIds(manifest, selectedRouteId) : []),
-    [selectedRouteId],
+    () => cardIdsForRoutes(manifest, visibleRouteIds),
+    [visibleRouteIds],
   );
-  const routeHandles = useMemo<ReadonlyMap<string, CardHandleSet>>(
-    () =>
-      selectedRouteId
-        ? filterHandlesByRoute(allHandles, selectedRouteId)
-        : new Map<string, CardHandleSet>(),
-    [selectedRouteId],
+  const visibleHandles = useMemo<ReadonlyMap<string, CardHandleSet>>(
+    () => filterHandlesByRoutes(allHandles, visibleRouteIds),
+    [visibleRouteIds],
   );
-  const routeEdges = useMemo(
-    () => allRouteEdges.filter((edge) => edge.routeId === selectedRouteId),
-    [selectedRouteId],
+  const visibleEdges = useMemo(
+    () => allRouteEdges.filter((edge) => visibleRouteIds.includes(edge.routeId)),
+    [visibleRouteIds],
   );
 
   const graph = useMemo(
     () =>
-      buildLayoutGraph(visibleCardIds, routeHandles, routeEdges, {
+      buildLayoutGraph(visibleCardIds, visibleHandles, visibleEdges, {
         width: CARD_WIDTH,
         height: CARD_HEIGHT,
       }),
-    [visibleCardIds, routeHandles, routeEdges],
+    [visibleCardIds, visibleHandles, visibleEdges],
   );
 
   // Re-run the layout whenever the visible graph changes.
@@ -89,21 +90,29 @@ export function App() {
     };
   }, [graph]);
 
+  // Overview draws every route equally; presenting emphasises the one being
+  // walked. Whether selection alone should emphasise is multi-route/02.
+  const emphasisedRouteId = presenting ? selectedRouteId : null;
+
   const nodes = useMemo(
     () =>
-      projectCardNodes(manifest, markdownByCardId, routeHandles, colors, {
+      projectCardNodes(manifest, markdownByCardId, visibleHandles, colors, {
         activeCardId,
-        activeRouteId: selectedRouteId,
+        activeRouteId: emphasisedRouteId,
         layoutGraph: laidOut ?? undefined,
         nodeHeight: CARD_HEIGHT,
         cardIds: visibleCardIds,
       }),
-    [activeCardId, selectedRouteId, laidOut, routeHandles, visibleCardIds],
+    [activeCardId, emphasisedRouteId, laidOut, visibleHandles, visibleCardIds],
   );
 
   const edges = useMemo(
-    () => projectRouteEdges(routeEdges, colors, { activeRouteId: selectedRouteId }),
-    [routeEdges, selectedRouteId],
+    () =>
+      projectRouteEdges(visibleEdges, colors, {
+        activeRouteId: emphasisedRouteId,
+        presenting,
+      }),
+    [visibleEdges, emphasisedRouteId, presenting],
   );
 
   const route = selectedRouteId ? getRoute(manifest, selectedRouteId) : undefined;

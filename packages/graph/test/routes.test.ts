@@ -3,7 +3,9 @@ import type { Manifest } from '@project/core';
 import {
   buildCardHandles,
   buildRouteEdges,
+  cardIdsForRoutes,
   filterHandlesByRoute,
+  filterHandlesByRoutes,
   routeCardIds,
 } from '../src/index';
 
@@ -52,12 +54,47 @@ describe('routeCardIds', () => {
   });
 });
 
+describe('cardIdsForRoutes', () => {
+  it('unions several routes, keeping each card once', () => {
+    expect(cardIdsForRoutes(manifest, ['main', 'quick'])).toEqual(['a', 'b', 'c']);
+  });
+
+  it('orders by the routes given, then by step order within each', () => {
+    // quick first, so c is reached before b.
+    expect(cardIdsForRoutes(manifest, ['quick', 'main'])).toEqual(['a', 'c', 'b']);
+  });
+
+  it('ignores unknown route ids', () => {
+    expect(cardIdsForRoutes(manifest, ['nope'])).toEqual([]);
+    expect(cardIdsForRoutes(manifest, ['quick', 'nope'])).toEqual(['a', 'c']);
+  });
+
+  it('returns nothing for no routes', () => {
+    expect(cardIdsForRoutes(manifest, [])).toEqual([]);
+  });
+});
+
 describe('filterHandlesByRoute', () => {
   it('keeps only the selected route’s handles', () => {
     const quick = filterHandlesByRoute(buildCardHandles(manifest), 'quick');
     // c is shared, but only its quick inbound port survives the filter.
     expect(quick.get('c')!.targetHandles.map((h) => h.id)).toEqual(['quick::in']);
     expect(quick.get('b')).toBeUndefined(); // b is only on main
+  });
+});
+
+describe('filterHandlesByRoutes', () => {
+  it('keeps a shared card’s handles for every route given', () => {
+    const both = filterHandlesByRoutes(buildCardHandles(manifest), ['main', 'quick']);
+    // The multi-route case: c carries one inbound handle per route arriving.
+    expect(both.get('c')!.targetHandles.map((h) => h.id)).toEqual(['main::in', 'quick::in']);
+    expect(both.get('a')!.sourceHandles.map((h) => h.id)).toEqual(['main::out', 'quick::out']);
+    expect(both.get('b')!.targetHandles.map((h) => h.id)).toEqual(['main::in']);
+  });
+
+  it('drops cards left with no handles at all', () => {
+    const quickOnly = filterHandlesByRoutes(buildCardHandles(manifest), ['quick']);
+    expect(quickOnly.get('b')).toBeUndefined();
   });
 });
 
