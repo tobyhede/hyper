@@ -71,7 +71,7 @@ A presentation is a directory containing a `graph.json` manifest plus the Markdo
 
 ### Routes as color-coded flows
 
-The visible graph is the selected route. Each adjacent pair of steps becomes a colored edge, and each card it visits gains a `<routeId>::in` port (left) and `<routeId>::out` port (right). Those port ids are handed to ELK, which lays out the chain with fixed port order per side (the "multiple handles" technique) and returns each port's offset so the handles line up and the rail stays straight. `@project/graph` derives the ports (`buildCardHandles`), edges (`buildRouteEdges`), and the single-route view (`routeCardIds`, `filterHandlesByRoute`); `@project/react-flow-adapter` runs ELK (`getElkLayout`, applying the computed port offsets) and colors the projection. Switching routes re-runs the layout.
+The visible graph is the selected route. Each adjacent pair of steps becomes a colored edge, and each card it visits gains a `<routeId>::in` port (left) and `<routeId>::out` port (right). Those port ids are handed to ELK, which lays out the chain with fixed port order per side (the "multiple handles" technique) and returns each port's offset so the handles line up and the rail stays straight. `@project/graph` derives the ports (`buildCardHandles`), edges (`buildRouteEdges`), and the single-route view (`routeCardIds`, `filterHandlesByRoute`), then assembles the graph to arrange (`buildLayoutGraph`); `@project/react-flow-adapter` applies a **layout** to it and colors the projection. Switching routes re-runs the layout.
 
 ### Markdown cards
 
@@ -84,7 +84,17 @@ Validation happens in two layers:
 - **Shape** — a Zod schema (`@project/core`) validates the manifest structure.
 - **References** — `@project/graph` checks that every `edge.source`/`edge.target` and `route.step.target` resolves to a card, and flags duplicate ids. Unresolved references are surfaced as a banner in the app rather than crashing it.
 
-`@project/graph` also derives the route ports and rails (`buildCardHandles`, `buildRouteEdges`); `@project/react-flow-adapter` runs the ELK layout (`getElkLayout`) and projects colored card nodes and edges (`projectCardNodes`, `projectRouteEdges`).
+`@project/graph` also derives the route ports and rails (`buildCardHandles`, `buildRouteEdges`); `@project/react-flow-adapter` projects colored card nodes and edges (`projectCardNodes`, `projectRouteEdges`).
+
+### Layouts
+
+A **layout** is a named strategy for arranging cards. It takes the graph to arrange and returns it with positions on the cards — the same shape both ways, as elkjs models it, with no separate result type ([ADR 0005](docs/adr/0005-layout-is-a-strategy.md)):
+
+```ts
+type Layout = (graph: LayoutGraph) => LayoutGraph | Promise<LayoutGraph>;
+```
+
+Two ship. `elkLayout` (in `@project/react-flow-adapter`, the only package that may touch elkjs) runs ELK layered left→right and places every port. `gridLayout` (in `@project/graph`) is pure and synchronous, reads only the cards, and places no ports — the render layer spreads handles evenly when a layout has no opinion about them. Which cards a layout arranges is the view's choice, not the layout's.
 
 ## Architecture
 
