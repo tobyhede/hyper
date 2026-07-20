@@ -37,19 +37,65 @@ describe('buildElkGraph', () => {
     const graph = buildElkGraph(nodes, edges);
     const a = graph.children!.find((c) => c.id === 'a')!;
     expect(a.layoutOptions?.['org.eclipse.elk.portConstraints']).toBe('FIXED_ORDER');
-    expect(a.ports!.map((p) => p.id)).toEqual(['a-s-a', 'a-s-b']);
+    expect(a.ports!.map((p) => p.id)).toEqual(['a##a-s-a', 'a##a-s-b']);
     expect(a.ports![0]!.layoutOptions?.['org.eclipse.elk.port.side']).toBe('EAST');
 
     const b = graph.children!.find((c) => c.id === 'b')!;
     expect(b.ports![0]!.layoutOptions?.['org.eclipse.elk.port.side']).toBe('WEST');
   });
 
-  it('maps edges to handle ids, falling back to node ids', () => {
+  it('namespaces edge endpoints by node id, falling back to node ids', () => {
     const graph = buildElkGraph(nodes, edges);
     expect(graph.edges).toEqual([
-      { id: 'a-b', sources: ['a-s-a'], targets: ['b-t-a'] },
+      { id: 'a-b', sources: ['a##a-s-a'], targets: ['b##b-t-a'] },
       { id: 'a-b-2', sources: ['a'], targets: ['b'] },
     ]);
+  });
+});
+
+describe('port id collision', () => {
+  // Every card on a path carries the *same* handle ids (`main::in`/`main::out`),
+  // so using bare handle ids as ELK port ids left ELK unable to tell which card
+  // an edge attached to — collapsing layers even for a single path.
+  const CHAIN = ['A', 'B', 'C', 'D', 'E'];
+
+  const chainNodes: Node<ElkPortData>[] = CHAIN.map((id, i) => ({
+    id,
+    position: { x: 0, y: 0 },
+    width: 260,
+    height: 300,
+    data: {
+      sourceHandles: i < CHAIN.length - 1 ? [{ id: 'main::out' }] : [],
+      targetHandles: i > 0 ? [{ id: 'main::in' }] : [],
+    },
+  }));
+
+  const chainEdges: Edge[] = CHAIN.slice(0, -1).map((id, i) => ({
+    id: `main::${i}`,
+    source: id,
+    sourceHandle: 'main::out',
+    target: CHAIN[i + 1]!,
+    targetHandle: 'main::in',
+  }));
+
+  it('gives every card a distinct ELK port id', () => {
+    const graph = buildElkGraph(chainNodes, chainEdges);
+    const ids = graph.children!.flatMap((c) => c.ports!.map((p) => p.id));
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it('lays a single path out as a strictly left-to-right chain', async () => {
+    const layout = await getElkLayout(chainNodes, chainEdges);
+    const xs = CHAIN.map((id) => layout[id]!.x);
+    for (let i = 1; i < xs.length; i += 1) {
+      expect(xs[i]!).toBeGreaterThan(xs[i - 1]!);
+    }
+  });
+
+  it('still exposes port offsets under the bare handle id', async () => {
+    const layout = await getElkLayout(chainNodes, chainEdges);
+    expect(Number.isFinite(layout.B!.ports['main::in']?.y)).toBe(true);
+    expect(Number.isFinite(layout.B!.ports['main::out']?.y)).toBe(true);
   });
 });
 

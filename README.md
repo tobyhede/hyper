@@ -114,7 +114,6 @@ Design rules kept throughout: domain logic stays out of React components, React 
 - **Read-only.** No visual or Markdown editing, no drawing, no whiteboard shapes — the app only reads files.
 - **Single bundled presentation.** The example is imported at build time (`import.meta.glob`); there is no file picker or loader for arbitrary presentations.
 - **One path at a time.** The graph shows the selected path only, and there is no whole-graph overview. This is a *view* choice, not a limit of the model: multiple **compatible** paths (their combined step-order is acyclic) lay out cleanly. Paths whose combined order contains a cycle force an unavoidable backward rail. See [`.scratch/multiple-routes/findings.md`](.scratch/multiple-routes/findings.md).
-- **Known bug: ELK port ids are not unique per card.** The port id (`<pathId>::out`) repeats on every card a path passes through, so ELK cannot tell which card an edge attaches to. This mislays *even the single-path view* — the bundled demo's `paths` card collapses a layer. Tracked in [`.scratch/layout-seam/`](.scratch/layout-seam/).
 - **ELK runs on fixed-size cards.** The layout uses a uniform card size, not measured DOM dimensions, so cards are pinned to one height. A path that visits the same card twice reuses that card's ports (a visual overlap, not a crash).
 - **Structural `edges` aren't drawn.** Only the selected path's rail is rendered; manifest `edges` are validated but not shown.
 - **No path branching.** A path is a linear list of steps; step transitions/annotations are not modelled.

@@ -27,6 +27,20 @@ const DEFAULT_NODE_HEIGHT = 50;
 
 const elk = new ELK();
 
+const PORT_ID_SEPARATOR = '##';
+
+/**
+ * ELK port ids must be unique across the whole graph, but a handle id
+ * (`<pathId>::out`) is the *same* on every card the path passes through.
+ * Handing ELK the bare handle id leaves it unable to tell which card an edge
+ * attaches to, so it resolves arbitrarily and the layout collapses — badly
+ * enough to mislay even a single path. Namespacing by card id is what makes the
+ * endpoint unambiguous. The render layer never sees these; `getElkLayout`
+ * strips the prefix back off, so handles keep their bare ids.
+ */
+export const elkPortId = (nodeId: string, handleId: string): string =>
+  `${nodeId}${PORT_ID_SEPARATOR}${handleId}`;
+
 /**
  * Translate React Flow nodes/edges into an ELK graph. Pure and deterministic, so
  * it can be unit-tested without running the layout engine.
@@ -45,11 +59,11 @@ export function buildElkGraph<N extends Node<ElkPortData>>(
     layoutOptions,
     children: nodes.map((node) => {
       const targetPorts: ElkPort[] = node.data.targetHandles.map((handle) => ({
-        id: handle.id,
+        id: elkPortId(node.id, handle.id),
         layoutOptions: { 'org.eclipse.elk.port.side': 'WEST' },
       }));
       const sourcePorts: ElkPort[] = node.data.sourceHandles.map((handle) => ({
-        id: handle.id,
+        id: elkPortId(node.id, handle.id),
         layoutOptions: { 'org.eclipse.elk.port.side': 'EAST' },
       }));
 
@@ -65,8 +79,9 @@ export function buildElkGraph<N extends Node<ElkPortData>>(
     }),
     edges: edges.map((edge): ElkExtendedEdge => ({
       id: edge.id,
-      sources: [edge.sourceHandle || edge.source],
-      targets: [edge.targetHandle || edge.target],
+      // An edge with no explicit handle attaches to the node itself.
+      sources: [edge.sourceHandle ? elkPortId(edge.source, edge.sourceHandle) : edge.source],
+      targets: [edge.targetHandle ? elkPortId(edge.target, edge.targetHandle) : edge.target],
     })),
   };
 }
@@ -87,8 +102,11 @@ export async function getElkLayout<N extends Node<ElkPortData>>(
   const result: ElkLayoutResult = {};
   for (const child of layouted.children ?? []) {
     const ports: Record<string, { x: number; y: number }> = {};
+    // Undo the per-node namespacing so callers look ports up by handle id.
+    const prefix = `${child.id}${PORT_ID_SEPARATOR}`;
     for (const port of child.ports ?? []) {
-      ports[port.id] = { x: port.x ?? 0, y: port.y ?? 0 };
+      const handleId = port.id.startsWith(prefix) ? port.id.slice(prefix.length) : port.id;
+      ports[handleId] = { x: port.x ?? 0, y: port.y ?? 0 };
     }
     result[child.id] = {
       x: child.x ?? 0,
