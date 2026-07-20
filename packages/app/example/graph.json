@@ -6,16 +6,16 @@
     { "id": "problem", "title": "The problem with linear decks", "content": "cards/problem.md" },
     { "id": "model", "title": "The data model", "content": "cards/model.md" },
     { "id": "rendering", "title": "Rendering the graph", "content": "cards/rendering.md" },
-    { "id": "paths", "title": "Paths as slide decks", "content": "cards/paths.md" },
+    { "id": "routes", "title": "Routes as slide decks", "content": "cards/routes.md" },
     { "id": "demo", "title": "Try it", "content": "cards/demo.md" }
   ],
   "edges": [
     { "id": "intro-to-problem", "source": "intro", "target": "problem", "kind": "sequence" },
     { "id": "problem-to-model", "source": "problem", "target": "model", "kind": "sequence" },
     { "id": "model-to-rendering", "source": "model", "target": "rendering", "kind": "sequence" },
-    { "id": "rendering-to-paths", "source": "rendering", "target": "paths", "kind": "sequence" },
-    { "id": "paths-to-demo", "source": "paths", "target": "demo", "kind": "sequence" },
-    { "id": "model-references-paths", "source": "model", "target": "paths", "kind": "reference" }
+    { "id": "rendering-to-routes", "source": "rendering", "target": "routes", "kind": "sequence" },
+    { "id": "routes-to-demo", "source": "routes", "target": "demo", "kind": "sequence" },
+    { "id": "model-references-routes", "source": "model", "target": "routes", "kind": "reference" }
   ],
   "routes": [
     {
@@ -26,7 +26,7 @@
         { "target": "problem" },
         { "target": "model" },
         { "target": "rendering" },
-        { "target": "paths" },
+        { "target": "routes" },
         { "target": "demo" }
       ]
     },

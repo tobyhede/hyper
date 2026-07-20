@@ -2,7 +2,7 @@
 
 [React Flow](https://reactflow.dev) draws the spatial layout.
 
-- Each graph node becomes a **custom card node**
+- Each card becomes a **custom card node**
 - Each edge becomes a rendered connection
 - Markdown is rendered inside every card
 

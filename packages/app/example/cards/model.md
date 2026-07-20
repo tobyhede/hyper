@@ -1,12 +1,13 @@
 ## The data model
 
-Four small pieces, defined in `graph.json`:
+Three small pieces, defined in `graph.json`:
 
 | Piece | Purpose |
 | ----- | ------- |
 | `cards` | Markdown content + title |
-| `nodes` | A card placed at a position |
-| `edges` | Relationships between nodes |
-| `paths` | Ordered walkthroughs |
+| `edges` | Relationships between cards |
+| `routes` | Ordered walkthroughs |
+
+Cards *are* the graph — edges and route steps reference them directly.
 
 A Zod schema validates shape; the `graph` package validates that every reference resolves.
