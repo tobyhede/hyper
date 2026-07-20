@@ -11,12 +11,12 @@ _Avoid_: presentation (that is one view of a space), manifest, deck, document, c
 ## Cards
 
 **Card**:
-A single unit of content in a space, and the element that routes step through. Named for HyperCard's card.
+A single addressable piece of a space, and the element that routes step through. Named for HyperCard's card.
 
-A card has a **title**, which names it wherever it is listed or drawn, and a **body**, which is the content itself. The two are distinct: a view may show one without the other, and the graph shows only titles.
+A card has a **title**, which names it wherever it is listed or drawn, and **content**, which is what it holds. The two are distinct: a view may show one without the other, and the graph shows only titles.
 
-A card is one of three kinds, which is what its body is: **Markdown** — a leaf, written directly by the author; a **space** — a nested graph the viewer opens and explores in place; or an **alias** — another card, shown again here.
-_Avoid_: node, slide, page, tile, subgraph. For the body: prose (a body may be a table, a diagram or code, not only writing), content (that is the card as a whole).
+A card is one of three kinds, and the kind is what its content is: **Markdown** — written directly by the author; a **space** — a nested graph the viewer opens and explores in place; or an **alias** — another card, shown again here.
+_Avoid_: node, slide, page, tile, subgraph. For the content: prose (it may be a table, a diagram or code, not only writing), body (works for markdown, but a space card's content is a graph).
 
 **Alias**:
 A card that shows another card: the same content appearing again elsewhere in the space, with a single source of truth, so editing the target changes every place it appears. An alias points to a different card, never itself.
@@ -44,7 +44,7 @@ The rendering of a layout for a viewer — which cards and routes are shown, and
 _Avoid_: mode, screen, page, layout.
 
 **Opening**:
-Showing a single card's body to a viewer in place, over whatever view they are in. A card of any kind can be opened, and what the viewer sees is that kind's body: a markdown card shows its text, a space card shows its nested graph to explore, an alias shows what its target would show. Opening is not presenting — it is a reading gesture, and the view it happens over is still the thing being looked at.
+Showing a single card's content to a viewer in place, over whatever view they are in. A card of any kind can be opened, and what the viewer sees is whatever its kind holds: a markdown card shows its text, a space card shows its nested graph to explore, an alias shows what its target would show. Opening is not presenting — it is a reading gesture, and the view it happens over is still the thing being looked at.
 _Avoid_: expand, preview, popup, modal, drill-down.
 
 **Presenting**:

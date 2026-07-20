@@ -96,7 +96,7 @@ function resolveHandles(
  * Map cards → React Flow card nodes, attaching per-route handles positioned at
  * their ELK port offsets. The card id is the React Flow node id.
  *
- * A node carries its card's *title*, not its content (ADR 0006) — the body is
+ * A node carries its card's *title*, not its content (ADR 0006) — the content is
  * loaded when a card is opened or presented, not embedded in every node.
  */
 export function projectCardNodes(

@@ -13,7 +13,7 @@ const idSchema = z.string().min(1);
 export const cardSchema = z.object({
   id: idSchema,
   title: z.string().min(1),
-  /** Relative path (from the manifest) to the markdown file with this card's body. */
+  /** Relative path (from the manifest) to the file holding this card's content. */
   content: z.string().min(1),
 });
 

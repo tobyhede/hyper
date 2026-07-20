@@ -9,7 +9,7 @@ export interface CardRendererProps {
 }
 
 /**
- * Renders a card's title and markdown body. Pure presentation — no knowledge of
+ * Renders a card's title and its markdown content. Pure presentation — no knowledge of
  * the graph, React Flow, or navigation.
  */
 export function CardRenderer({ title, markdown, variant = 'node' }: CardRendererProps) {

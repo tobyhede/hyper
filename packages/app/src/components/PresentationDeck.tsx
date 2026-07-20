@@ -56,7 +56,7 @@ export function PresentationDeck({
       ...slides.map((slide) => {
         const section = document.createElement('section');
         section.dataset.cardId = slide.id;
-        // reveal owns this subtree, so the body is handed over as HTML rather
+        // reveal owns this subtree, so the content is handed over as HTML rather
         // than diffed by React. `marked` is used here rather than the reading
         // surface's react-markdown because that renders to React nodes, not
         // markup — see `.scratch/reveal-presentation/` for the divergence risk.
