@@ -4,6 +4,6 @@
 
 - Each card becomes a **custom card node**
 - Each step transition becomes a colored edge
-- Markdown is rendered inside every card
+- A card shows its title; open it to read the Markdown
 
 The projection from domain model to React Flow lives in one isolated adapter package.

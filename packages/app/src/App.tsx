@@ -26,6 +26,7 @@ import { routeColorMap } from './colors';
 import { selectActiveCardId, usePresentationStore } from './store';
 import { GraphView } from './components/GraphView';
 import { PresentationLayer } from './components/PresentationLayer';
+import { OpenCard } from './components/OpenCard';
 
 // Card nodes are pinned to a uniform size (see styles.css) so a layout can place
 // them — and place ports — without measuring the DOM.
@@ -51,6 +52,9 @@ export function App() {
   const exitPresentation = usePresentationStore((s) => s.exitPresentation);
   const next = usePresentationStore((s) => s.next);
   const prev = usePresentationStore((s) => s.prev);
+  const openedCardId = usePresentationStore((s) => s.openedCardId);
+  const openCard = usePresentationStore((s) => s.openCard);
+  const closeCard = usePresentationStore((s) => s.closeCard);
 
   const activeCardId = usePresentationStore(selectActiveCardId);
   const presenting = mode === 'presenting';
@@ -101,7 +105,7 @@ export function App() {
 
   const nodes = useMemo(
     () =>
-      projectCardNodes(manifest, markdownByCardId, visibleHandles, colors, {
+      projectCardNodes(manifest, visibleHandles, colors, {
         activeCardId,
         activeRouteId: selectedRouteId,
         emphasis,
@@ -123,10 +127,25 @@ export function App() {
 
   const route = selectedRouteId ? getRoute(manifest, selectedRouteId) : undefined;
   const activeCard = activeCardId ? getCard(manifest, activeCardId) : undefined;
+  const openedCard = openedCardId ? getCard(manifest, openedCardId) : undefined;
+
+  // Escape closes an opened card before it exits a presentation, so the two
+  // never fight over the key.
+  useEffect(() => {
+    if (!openedCardId) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        closeCard();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [openedCardId, closeCard]);
 
   // Keyboard navigation while presenting.
   useEffect(() => {
-    if (!presenting) return;
+    if (!presenting || openedCardId) return;
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'ArrowRight' || event.key === 'ArrowDown' || event.key === ' ') {
         event.preventDefault();
@@ -140,7 +159,7 @@ export function App() {
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [presenting, next, prev, exitPresentation]);
+  }, [presenting, openedCardId, next, prev, exitPresentation]);
 
   const toolbar = (
     <>
@@ -191,8 +210,17 @@ export function App() {
             edges={edges}
             activeCardId={activeCardId}
             layoutReady={laidOut !== null}
+            onOpenCard={openCard}
           />
         </ReactFlowProvider>
+
+        {openedCard && (
+          <OpenCard
+            title={openedCard.title}
+            markdown={markdownByCardId[openedCard.id] ?? ''}
+            onClose={closeCard}
+          />
+        )}
 
         {presenting && route && activeCard && (
           <PresentationLayer

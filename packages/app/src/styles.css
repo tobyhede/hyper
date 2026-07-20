@@ -196,14 +196,21 @@ body {
 }
 
 .card--node {
+  /* Still 300px tall while a card renders only its title, so this change is
+     legible on its own. Sizing is card-display/02. */
   height: 300px;
   overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  cursor: pointer;
 }
 
-.card--node .card__body {
-  font-size: 0.8rem;
-  max-height: 232px;
-  overflow: hidden;
+.card--node .card__title {
+  margin: 0;
+  font-size: 1.05rem;
+  line-height: 1.35;
 }
 
 .card__title {
@@ -447,4 +454,37 @@ body {
   top: 0;
   left: 0;
   transform: none;
+}
+
+/* ---- Opened card ---- */
+/* A card opened for reading. The graph shows titles (ADR 0006); this is where a
+   card's content is actually read. */
+.open-card {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  background: rgba(6, 8, 12, 0.6);
+}
+
+.open-card__panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.6);
+  width: min(760px, 100%);
+  max-height: 80vh;
+  overflow-y: auto;
+  padding: 1rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.open-card__actions {
+  display: flex;
+  justify-content: flex-end;
 }

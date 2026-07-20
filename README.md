@@ -66,7 +66,9 @@ The visible graph is the selected route. Each adjacent pair of steps becomes a c
 
 ### Markdown cards
 
-Each card body is a standalone Markdown file (GitHub-flavoured Markdown via `remark-gfm`, so tables, code fences, and task lists work). A card can be visited by any number of routes — that reuse is the whole point. You see it by switching routes: a shared card shows up in more than one route's flow.
+Each card body is a standalone Markdown file (GitHub-flavoured Markdown via `remark-gfm`, so tables, code fences, and task lists work). A card can be visited by any number of routes — that reuse is the whole point, and a card shared by several routes carries one handle pair per route running through it.
+
+The graph draws a card's **title**, not its body ([ADR 0006](docs/adr/0006-cards-show-titles-in-the-graph.md)). Click a card to open it and read its content; presentation mode steps through the same content full-width. Content is loaded when a card is opened, not embedded in every graph node.
 
 A card occupies exactly one position in the graph; there is no placement layer letting the same card sit in two places. Showing the same content at a second position is the job of an **alias** card, which is not yet implemented ([ADR 0004](docs/adr/0004-cards-are-the-graph.md)).
 
@@ -115,7 +117,7 @@ Design rules kept throughout: domain logic stays out of React components, React 
 - **Read-only.** No visual or Markdown editing, no drawing, no whiteboard shapes — the app only reads files.
 - **Single bundled presentation.** The example is imported at build time (`import.meta.glob`); there is no file picker or loader for arbitrary presentations.
 - **One route at a time.** The graph shows the selected route only, and there is no whole-graph overview. This is a *view* choice, not a limit of the model: multiple **compatible** routes (their combined step-order is acyclic) lay out cleanly. Routes whose combined order contains a cycle force an unavoidable backward edge. See [`.scratch/multiple-routes/findings.md`](.scratch/multiple-routes/findings.md).
-- **ELK runs on fixed-size cards.** The layout uses a uniform card size, not measured DOM dimensions, so cards are pinned to one height. A route that visits the same card twice reuses that card's handles (a visual overlap, not a crash).
+- **ELK runs on fixed-size cards.** The layout uses a uniform card size, not measured DOM dimensions, so cards are pinned to one height. Since a card draws only its title this is now correct rather than a limitation, but the size is still declared twice — in the app and in the stylesheet. A route that visits the same card twice reuses that card's handles (a visual overlap, not a crash).
 - **No route branching.** A route is a linear list of steps; step transitions/annotations are not modelled.
 - **Client-only, no persistence.** Presentation state lives in memory; there is no routing per step or shareable deep links.
 - The production bundle ships React Flow and elkjs in a single chunk (~2.1 MB) — fine for a prototype, not tuned for size.

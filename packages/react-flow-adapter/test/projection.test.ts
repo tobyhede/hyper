@@ -16,22 +16,22 @@ const manifest: Manifest = {
   ],
 };
 
-const markdown = { a: '# A body', b: '# B body' };
 const colors = { main: '#111111', alt: '#222222' };
 const handles = buildCardHandles(manifest);
 
 describe('projectCardNodes', () => {
-  it('maps cards to card nodes with resolved markdown and title', () => {
-    const nodes = projectCardNodes(manifest, markdown, handles, colors);
+  it('maps cards to card nodes carrying the title, not the content', () => {
+    const nodes = projectCardNodes(manifest, handles, colors);
     const a = nodes.find((n) => n.id === 'a')!;
     expect(a.type).toBe('card');
     expect(a.data.title).toBe('Card A');
-    expect(a.data.markdown).toBe('# A body');
     expect(a.data.active).toBe(false);
+    // ADR 0006: content is loaded when a card is opened, not embedded per node.
+    expect('markdown' in a.data).toBe(false);
   });
 
   it('attaches per-route handles colored by route', () => {
-    const nodes = projectCardNodes(manifest, markdown, handles, colors);
+    const nodes = projectCardNodes(manifest, handles, colors);
     const a = nodes.find((n) => n.id === 'a')!;
     // main leaves card a (out); alt ends at card a (in).
     expect(a.data.sourceHandles).toMatchObject([
@@ -45,7 +45,7 @@ describe('projectCardNodes', () => {
   });
 
   it('uses the port offsets and positions a layout put on the cards', () => {
-    const nodes = projectCardNodes(manifest, markdown, handles, colors, {
+    const nodes = projectCardNodes(manifest, handles, colors, {
       layoutGraph: {
         cards: [
           {
@@ -68,7 +68,7 @@ describe('projectCardNodes', () => {
   });
 
   it('flags the active card', () => {
-    const nodes = projectCardNodes(manifest, markdown, handles, colors, { activeCardId: 'b' });
+    const nodes = projectCardNodes(manifest, handles, colors, { activeCardId: 'b' });
     expect(nodes.find((n) => n.id === 'b')!.data.active).toBe(true);
     expect(nodes.find((n) => n.id === 'b')!.className).toContain('rf-card-node--active');
   });

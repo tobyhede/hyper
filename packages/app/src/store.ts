@@ -14,7 +14,15 @@ export interface PresentationState {
   mode: Mode;
   selectedRouteId: string | null;
   stepIndex: number;
+  /**
+   * The card the viewer has opened to read, if any. Deliberately not named for a
+   * card kind: opening a *space* card to explore its nested graph (ADR 0001) is
+   * the same gesture on a different kind, and should reuse this.
+   */
+  openedCardId: string | null;
   selectRoute: (routeId: string) => void;
+  openCard: (cardId: string) => void;
+  closeCard: () => void;
   enterPresentation: () => void;
   exitPresentation: () => void;
   next: () => void;
@@ -28,12 +36,16 @@ export const usePresentationStore = create<PresentationState>((set, get) => ({
   mode: 'overview',
   selectedRouteId: firstRouteId,
   stepIndex: 0,
+  openedCardId: null,
 
   selectRoute: (routeId) => set({ selectedRouteId: routeId, stepIndex: 0 }),
 
+  openCard: (cardId) => set({ openedCardId: cardId }),
+  closeCard: () => set({ openedCardId: null }),
+
   enterPresentation: () => {
     if (!get().selectedRouteId) return;
-    set({ mode: 'presenting', stepIndex: 0 });
+    set({ mode: 'presenting', stepIndex: 0, openedCardId: null });
   },
 
   exitPresentation: () => set({ mode: 'overview' }),

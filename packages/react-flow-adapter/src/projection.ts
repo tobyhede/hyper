@@ -43,7 +43,6 @@ export type CardHandle = {
 export type CardNodeData = {
   cardId: string;
   title: string;
-  markdown: string;
   active: boolean;
   /** The route being emphasised, if any. Drives handle dimming. */
   activeRouteId: string | null;
@@ -54,7 +53,6 @@ export type CardNodeData = {
 
 export type CardFlowNode = Node<CardNodeData, 'card'>;
 
-export type MarkdownByCardId = Readonly<Record<string, string>>;
 export type ColorByRouteId = Readonly<Record<string, string>>;
 
 const EMPTY_HANDLES: CardHandleSet = { sourceHandles: [], targetHandles: [] };
@@ -96,12 +94,13 @@ function resolveHandles(
 
 /**
  * Map cards → React Flow card nodes, attaching per-route handles positioned at
- * their ELK port offsets and each card's markdown body. The card id is the React
- * Flow node id.
+ * their ELK port offsets. The card id is the React Flow node id.
+ *
+ * A node carries its card's *title*, not its content (ADR 0006) — the body is
+ * loaded when a card is opened or presented, not embedded in every node.
  */
 export function projectCardNodes(
   manifest: Manifest,
-  markdownByCardId: MarkdownByCardId,
   handlesByCard: ReadonlyMap<string, CardHandleSet>,
   colors: ColorByRouteId,
   options: ProjectCardNodesOptions = {},
@@ -127,7 +126,6 @@ export function projectCardNodes(
       data: {
         cardId: card.id,
         title: card.title,
-        markdown: markdownByCardId[card.id] ?? '',
         active,
         activeRouteId,
         emphasis,

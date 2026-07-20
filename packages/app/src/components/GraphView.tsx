@@ -31,14 +31,17 @@ export interface GraphViewProps {
   edges: Edge[];
   activeCardId: string | null;
   layoutReady: boolean;
+  /** Opening a card is a view gesture; the graph only reports which was picked. */
+  onOpenCard: (cardId: string) => void;
 }
 
-export function GraphView({ nodes, edges, activeCardId, layoutReady }: GraphViewProps) {
+export function GraphView({ nodes, edges, activeCardId, layoutReady, onOpenCard }: GraphViewProps) {
   return (
     <ReactFlow
       nodes={nodes}
       edges={edges}
       nodeTypes={nodeTypes}
+      onNodeClick={(_event, node) => onOpenCard(node.id)}
       fitView
       nodesDraggable={false}
       nodesConnectable={false}

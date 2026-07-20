@@ -1,10 +1,15 @@
 import { Handle, Position, type NodeProps } from '@xyflow/react';
-import { CardRenderer } from '@project/ui';
 import type { CardFlowNode, CardHandle } from './projection';
 import { OTHER_ROUTE_OPACITY } from './projection';
 
-/** React Flow custom node: a markdown card with one colored handle per route,
- *  each positioned at the vertical offset ELK computed for its port. */
+/**
+ * React Flow custom node: a card's title, with one colored handle per route at
+ * the vertical offset ELK computed for it.
+ *
+ * The card's content is deliberately not drawn here (ADR 0006) — a graph is for
+ * reading the shape of a space, and a wall of clipped markdown at graph zoom is
+ * unreadable anyway. Opening a card is how you read it.
+ */
 export function CardNode({ data }: NodeProps<CardFlowNode>) {
   // Handles fade by the same amount as their route's edges, so a receding route
   // recedes as a whole rather than leaving bright dots on the cards.
@@ -25,7 +30,9 @@ export function CardNode({ data }: NodeProps<CardFlowNode>) {
   return (
     <div className="rf-card-node__inner" data-active={data.active}>
       {data.targetHandles.map((handle) => renderHandle(handle, 'target'))}
-      <CardRenderer title={data.title} markdown={data.markdown} variant="node" />
+      <article className="card card--node" data-testid="card">
+        <h2 className="card__title">{data.title}</h2>
+      </article>
       {data.sourceHandles.map((handle) => renderHandle(handle, 'source'))}
     </div>
   );

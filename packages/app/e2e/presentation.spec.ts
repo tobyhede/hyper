@@ -101,3 +101,43 @@ test('selecting emphasises a route; presenting pushes the rest further back', as
   await expect.poll(async () => (await opacities()).filter((o) => o < subtle).length).toBe(2);
   await expect(page.locator('.react-flow__edge')).toHaveCount(7);
 });
+
+test('a card shows its title in the graph, and opens to reveal its content', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.locator('.react-flow__node').first()).toBeVisible();
+
+  // The graph draws titles only — no card body text (ADR 0006).
+  const intro = page.locator('.react-flow__node', { hasText: 'Graph-native presentations' });
+  await expect(intro).toBeVisible();
+  await expect(intro).not.toContainText('A technical deck authored as');
+  await expect(page.getByTestId('open-card')).toBeHidden();
+
+  // Opening one reveals the content.
+  await intro.click();
+  const opened = page.getByTestId('open-card');
+  await expect(opened).toBeVisible();
+  await expect(opened).toContainText('A technical deck authored as');
+
+  await page.getByTestId('close-card').click();
+  await expect(opened).toBeHidden();
+});
+
+test('escape closes an opened card', async ({ page }) => {
+  await page.goto('/');
+  await page.locator('.react-flow__node').first().click();
+  await expect(page.getByTestId('open-card')).toBeVisible();
+
+  await page.keyboard.press('Escape');
+  await expect(page.getByTestId('open-card')).toBeHidden();
+});
+
+test('a card can be opened even when it is not on the selected route', async ({ page }) => {
+  await page.goto('/');
+
+  // "problem" is on main only; select the quick tour, which skips it.
+  await page.getByTestId('route-selector').click();
+  await page.getByRole('option', { name: 'Quick tour' }).click();
+
+  await page.locator('.react-flow__node', { hasText: 'The problem with linear decks' }).click();
+  await expect(page.getByTestId('open-card')).toContainText('Slides force');
+});
