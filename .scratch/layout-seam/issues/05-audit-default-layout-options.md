@@ -1,6 +1,6 @@
 # Audit the default layout's ELK options
 
-Status: open
+Status: resolved
 
 ## Context
 
@@ -60,3 +60,19 @@ Specifically:
 
 - Every remaining option has a recorded reason, distinguishing "encodes a domain rule" from "cosmetic tuning" from "explicit statement of an ELK default."
 - No option is retained solely because it came from the upstream example.
+
+## Answer
+
+Closed by `08` plus a pass over the comment block.
+
+`DEFAULT_ELK_LAYOUT_OPTIONS` now labels every option as one of three things: the
+strategy itself, an explicit statement of an ELK default, or cosmetic tuning. The
+acceptance bar — no option retained solely because it came from the upstream
+example — is met, and `elk.spacing.nodeNode: 80` now records that it came from the
+*plain* elkjs example rather than the multiple-handles one the README cites.
+
+`elk.direction: RIGHT` is kept and labelled inert-but-intentional, as this issue
+recommended.
+
+The `NETWORK_SIMPLEX` question turned out to be a design decision rather than the
+cleanup this issue assumed — see the correction above and `08` for the resolution.

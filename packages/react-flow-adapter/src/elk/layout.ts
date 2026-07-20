@@ -4,14 +4,28 @@ import type { LayoutOptions } from 'elkjs/lib/elk.bundled.js';
  * ELK "layered" options for a left→right graph.
  * Reference: https://www.eclipse.org/elk/reference/algorithms/org-eclipse-elk-layered.html
  *
- * These came from React Flow's elkjs multiple-handles example and have not yet
- * been audited — see `.scratch/layout-seam/issues/05-audit-default-layout-options.md`,
- * which measured most of them as inert on the shapes that ship today.
+ * Each option is here for one of three reasons — a rule the domain requires, an
+ * explicit statement of an ELK default, or cosmetic tuning. Say which when adding
+ * one. See `.scratch/layout-seam/issues/05-audit-default-layout-options.md`.
  */
 export const DEFAULT_ELK_LAYOUT_OPTIONS: LayoutOptions = {
+  // The strategy itself: a layered graph is what a route-driven space is.
   'elk.algorithm': 'layered',
+
+  // Explicit statement of ELK's default. Inert — removing it gives byte-identical
+  // geometry — but it states the left-to-right reading axis a route follows.
   'elk.direction': 'RIGHT',
-  'elk.layered.nodePlacement.strategy': 'NETWORK_SIMPLEX',
+
+  // Explicit statement of ELK's default, and a measured choice (issue 08).
+  // BRANDES_KOEPF lays a 2-route space out with *zero* vertical deviation in the
+  // rails; NETWORK_SIMPLEX introduces some. Above ~3 routes sharing a spine that
+  // reverses and NETWORK_SIMPLEX wins by 20-25%, but by then neither is straight,
+  // so the win is marginal where BRANDES_KOEPF's is qualitative. Revisit if real
+  // spaces routinely carry four or more routes.
+  'elk.layered.nodePlacement.strategy': 'BRANDES_KOEPF',
+
+  // Cosmetic, tuned to the 260x300 card. `nodeNode: 80` came from React Flow's
+  // *plain* elkjs example, not the multiple-handles one the README cites.
   'elk.layered.spacing.nodeNodeBetweenLayers': '160',
   'elk.spacing.nodeNode': '80',
   'elk.spacing.portPort': '18',
