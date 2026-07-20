@@ -1,0 +1,65 @@
+# Workflow
+
+How work moves from a question to committed code in this repo.
+
+The skills that drive this live in `.claude/skills/`, which is **gitignored** — so the process is written down here rather than only existing inside them.
+
+## The loop
+
+1. **Survey** — `/improve-codebase-architecture` reads `CONTEXT.md`, the ADRs and the code, and proposes candidate changes. Pick one.
+2. **Grill** — `/grilling` walks the decision tree on that candidate: one question at a time, each carrying a recommendation, until shared understanding is explicitly confirmed. **No code until it is.**
+3. **Record** — decisions that firm up language go into `CONTEXT.md`; decisions that lock a trade-off become an ADR. This is not a phase. It fires mid-conversation, the moment something settles.
+4. **Implement** — code and tests together.
+5. **Verify** — see the bar below.
+6. **Capture** — resolve the ticket with an `## Answer`, and fix any doc that described the old state. AGENTS.md and README both carried the ELK port-id collision as a known bug; both needed editing when it was fixed.
+
+Anything not being worked on right now is parked in the tracker (`docs/agents/issue-tracker.md`), never left in conversation. A session ends; the tracker doesn't.
+
+## When to write an ADR
+
+Only when the decision is all three:
+
+- **Hard to reverse** — undoing it means reworking code or authored content.
+- **Surprising** — someone who knows the domain would not guess it.
+- **A real trade-off** — a credible alternative was rejected, for a reason.
+
+Record the rejected alternative and the cost accepted, not just the decision.
+
+The most valuable ADRs capture a **negative** — the thing a future review will otherwise re-suggest. ADR 0005 exists mainly to say *don't introduce an Arrangement type*; ADR 0004 to say *don't reintroduce a placement layer*. Both are things that look like improvements until you know why they were rejected.
+
+Skip ADRs for ephemeral reasons ("not worth it right now"), self-evident choices, and anything the glossary already implies.
+
+Format: a title that states the decision as a sentence, then a few paragraphs. Numbered `docs/adr/NNNN-<slug>.md`.
+
+## When to update CONTEXT.md
+
+Whenever a term is coined, sharpened or retired — in the same conversation, not later.
+
+`CONTEXT.md` is a **glossary, not a design doc**. No file formats, storage, or rendering libraries. If a definition mentions JSON, ELK or React Flow, it belongs somewhere else.
+
+Use `_Avoid_` actively — it carries as much weight as the definition, because it is what stops the next session reintroducing a term that was deliberately rejected.
+
+## Renames
+
+Code should speak the glossary's vocabulary. Where it doesn't yet, AGENTS.md records the divergence as a gotcha and the tracker carries a ticket to close it.
+
+Never let a rename ride along with a structural change. Separate commits — otherwise the diff is unreadable and, when something breaks, you cannot tell which change did it. Retiring the authored Node and the pending `path` → `Route` rename were split for exactly this reason.
+
+A repo-wide rename conflicts with everything, so it should run alone, and early. Every ticket completed before it adds new surface in the old vocabulary.
+
+## Verification bar
+
+Also stated in AGENTS.md; repeated here because it is the easiest step to skip.
+
+- `pnpm verify` for every change.
+- `pnpm e2e` as well for any UI or graph change.
+- Report the real output. Never assert success without having run the command.
+- A behaviour-preserving refactor should leave e2e green **and unchanged**. That is the guard that proves it was behaviour-preserving.
+- Prove a bug fix against the defect, not only against a test written afterwards to pass. A test you wrote to match your fix will pass whether or not the fix addresses the real problem — reproduce the broken behaviour first, then show it gone.
+
+## Skills
+
+Installed under `.claude/skills/`. Gitignored, so not guaranteed to be present:
+
+- Used regularly: `improve-codebase-architecture`, `grilling`, `domain-modeling`, `codebase-design`.
+- Installed, not yet exercised: `to-spec`, `to-tickets`, `tdd`, `code-review`, `research`, `grill-me`, `grill-with-docs`.

@@ -54,6 +54,10 @@ On multi-route rendering (the old "no overlay" rule, corrected): the single-rout
 
 ## Agent skills
 
+### Workflow
+
+How work moves from a question to committed code: the grilling loop, when a decision earns an ADR, the rename rule, the verification bar. See `docs/agents/workflow.md`. The skills themselves live in `.claude/skills/`, which is gitignored — `workflow.md` is the copy that survives without them.
+
 ### Issue tracker
 
 Issues and specs live as local markdown under `.scratch/<feature>/` (no remote; this is a local prototype). See `docs/agents/issue-tracker.md`.
