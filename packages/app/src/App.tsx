@@ -22,13 +22,15 @@ import {
 import { space, markdownByCardId } from './space';
 import { routeColorMap } from './colors';
 import { CARD_HEIGHT, CARD_SIZE, cardSizeVars } from './card';
-import { selectActiveCardId, usePresentationStore } from './store';
+import { createPresentationStore } from './store';
 import { GraphView } from './components/GraphView';
 import { OpenCard } from './components/OpenCard';
 import { PresentationDeck, type DeckSlide } from './components/PresentationDeck';
 
-// Derived once from the (static) space.
+// Derived once from the (static) space. The store is bound to it here — the one
+// place the app's singleton space meets the store factory (ADR 0010).
 const colors = routeColorMap(space);
+const { useStore: usePresentationStore, selectActiveCardId } = createPresentationStore(space);
 
 // The markdown a card shows, resolving an alias to its target's content (ADR
 // 0009). A card keeps its own title; only content is inherited.

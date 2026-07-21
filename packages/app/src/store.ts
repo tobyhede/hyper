@@ -1,12 +1,12 @@
-import { create } from 'zustand';
+import { create, type StoreApi, type UseBoundStore } from 'zustand';
 import {
   getRoute,
   nextStepIndex,
   cardIdAtStep,
   prevStepIndex,
   clampStepIndex,
+  type Space,
 } from '@project/graph';
-import { space } from './space';
 
 export type Mode = 'overview' | 'presenting';
 
@@ -30,52 +30,66 @@ export interface PresentationState {
   goToStep: (index: number) => void;
 }
 
-const firstRouteId = space.routes[0]?.id ?? null;
+export interface PresentationStore {
+  useStore: UseBoundStore<StoreApi<PresentationState>>;
+  /** Card id of the current presentation step, or `null` outside presentation. */
+  selectActiveCardId: (state: PresentationState) => string | null;
+}
 
-export const usePresentationStore = create<PresentationState>((set, get) => ({
-  mode: 'overview',
-  selectedRouteId: firstRouteId,
-  stepIndex: 0,
-  openedCardId: null,
+/**
+ * Build a presentation store bound to a given Space. The Space is passed in
+ * rather than imported (ADR 0010), so the store is testable against fixture
+ * spaces and never reaches for a module singleton.
+ */
+export function createPresentationStore(space: Space): PresentationStore {
+  const firstRouteId = space.routes[0]?.id ?? null;
 
-  selectRoute: (routeId) => set({ selectedRouteId: routeId, stepIndex: 0 }),
+  const useStore = create<PresentationState>((set, get) => ({
+    mode: 'overview',
+    selectedRouteId: firstRouteId,
+    stepIndex: 0,
+    openedCardId: null,
 
-  openCard: (cardId) => set({ openedCardId: cardId }),
-  closeCard: () => set({ openedCardId: null }),
+    selectRoute: (routeId) => set({ selectedRouteId: routeId, stepIndex: 0 }),
 
-  enterPresentation: () => {
-    if (!get().selectedRouteId) return;
-    set({ mode: 'presenting', stepIndex: 0, openedCardId: null });
-  },
+    openCard: (cardId) => set({ openedCardId: cardId }),
+    closeCard: () => set({ openedCardId: null }),
 
-  exitPresentation: () => set({ mode: 'overview' }),
+    enterPresentation: () => {
+      if (!get().selectedRouteId) return;
+      set({ mode: 'presenting', stepIndex: 0, openedCardId: null });
+    },
 
-  next: () => {
-    const { selectedRouteId, stepIndex } = get();
-    const route = selectedRouteId ? getRoute(space, selectedRouteId) : undefined;
-    if (!route) return;
-    set({ stepIndex: nextStepIndex(route, stepIndex) });
-  },
+    exitPresentation: () => set({ mode: 'overview' }),
 
-  prev: () => {
-    const { selectedRouteId, stepIndex } = get();
-    const route = selectedRouteId ? getRoute(space, selectedRouteId) : undefined;
-    if (!route) return;
-    set({ stepIndex: prevStepIndex(route, stepIndex) });
-  },
+    next: () => {
+      const { selectedRouteId, stepIndex } = get();
+      const route = selectedRouteId ? getRoute(space, selectedRouteId) : undefined;
+      if (!route) return;
+      set({ stepIndex: nextStepIndex(route, stepIndex) });
+    },
 
-  goToStep: (index) => {
-    const { selectedRouteId } = get();
-    const route = selectedRouteId ? getRoute(space, selectedRouteId) : undefined;
-    if (!route) return;
-    set({ stepIndex: clampStepIndex(route, index) });
-  },
-}));
+    prev: () => {
+      const { selectedRouteId, stepIndex } = get();
+      const route = selectedRouteId ? getRoute(space, selectedRouteId) : undefined;
+      if (!route) return;
+      set({ stepIndex: prevStepIndex(route, stepIndex) });
+    },
 
-/** Card id of the current presentation step, or `null` outside presentation. */
-export function selectActiveCardId(state: PresentationState): string | null {
-  if (state.mode !== 'presenting' || !state.selectedRouteId) return null;
-  const route = getRoute(space, state.selectedRouteId);
-  if (!route) return null;
-  return cardIdAtStep(route, state.stepIndex) ?? null;
+    goToStep: (index) => {
+      const { selectedRouteId } = get();
+      const route = selectedRouteId ? getRoute(space, selectedRouteId) : undefined;
+      if (!route) return;
+      set({ stepIndex: clampStepIndex(route, index) });
+    },
+  }));
+
+  const selectActiveCardId = (state: PresentationState): string | null => {
+    if (state.mode !== 'presenting' || !state.selectedRouteId) return null;
+    const route = getRoute(space, state.selectedRouteId);
+    if (!route) return null;
+    return cardIdAtStep(route, state.stepIndex) ?? null;
+  };
+
+  return { useStore, selectActiveCardId };
 }
