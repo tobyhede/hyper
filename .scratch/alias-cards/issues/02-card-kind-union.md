@@ -1,6 +1,6 @@
 # Make Card a kind: Markdown | Alias
 
-Status: open
+Status: resolved
 
 ## Context
 
@@ -31,3 +31,13 @@ Keep the split intact: shape in `core`, referential integrity in `graph`.
 - Each of the three alias faults is reported as its own reference-error kind.
 - Existing markdown-only manifests still parse (the example manifest is unchanged by this issue).
 - `pnpm verify` green.
+
+## Answer
+
+Built test-first. `pnpm verify` green (64 tests, +7), `pnpm e2e` green (13).
+
+**Schema (`core`).** `cardSchema` is now `z.preprocess(fillKind, z.discriminatedUnion('kind', [markdownCardSchema, aliasCardSchema]))`. The preprocess injects `kind: 'markdown'` when a card object omits it, so pre-kind manifests parse unchanged and the parsed `Card` always carries a `kind`. Markdown keeps `content`; alias carries `target` and no `content`; both require their own `title`. `space` not added.
+
+**Validation (`graph`).** Three distinct kinds added to `ReferenceErrorKind`: `unresolved-alias-target`, `alias-self-reference`, `alias-targets-alias`. Self-reference is checked before unresolved (a self-pointer resolves to itself, so the missing-card check would miss it). `alias-targets-alias` looks the target card up and checks its `kind`. No cycle check — single-hop makes cycles unrepresentable.
+
+**Fallout.** `kind` becoming part of the parsed `Manifest` type broke typed fixture literals across `graph`/adapter tests and one consumer: `app/manifest.ts` read `card.content` for every card to build `markdownByCardId`. Narrowed it to markdown cards via `flatMap` — an alias owns no content file; it resolves through its target at draw time (issue 03). Behaviour is identical for the all-markdown demo. Fixtures gained `kind: 'markdown'`; this is the parsed vocabulary, not a workaround.

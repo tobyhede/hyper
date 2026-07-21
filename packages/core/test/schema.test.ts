@@ -53,4 +53,30 @@ describe('manifest schema', () => {
     });
     expect(result.success).toBe(false);
   });
+
+  it('defaults a card with no kind to markdown, so pre-kind manifests still parse', () => {
+    const manifest = parseManifest(validManifest) satisfies Manifest;
+    expect(manifest.cards[0]!.kind).toBe('markdown');
+  });
+
+  it('parses an alias card, which points at a target instead of holding content', () => {
+    const manifest = parseManifest({
+      ...validManifest,
+      cards: [
+        { id: 'a', title: 'A', content: 'cards/a.md' },
+        { id: 'a-again', title: 'A, again', kind: 'alias', target: 'a' },
+      ],
+    }) satisfies Manifest;
+    const alias = manifest.cards[1]!;
+    expect(alias.kind).toBe('alias');
+    expect(alias.kind === 'alias' && alias.target).toBe('a');
+  });
+
+  it('rejects an alias card that carries content instead of a target', () => {
+    const result = safeParseManifest({
+      ...validManifest,
+      cards: [{ id: 'a', title: 'A', kind: 'alias', content: 'cards/a.md' }],
+    });
+    expect(result.success).toBe(false);
+  });
 });

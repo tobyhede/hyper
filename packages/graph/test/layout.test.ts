@@ -7,9 +7,9 @@ const manifest: Manifest = {
   version: 1,
   title: 'T',
   cards: [
-    { id: 'a', title: 'A', content: 'a.md' },
-    { id: 'b', title: 'B', content: 'b.md' },
-    { id: 'c', title: 'C', content: 'c.md' },
+    { id: 'a', title: 'A', kind: 'markdown', content: 'a.md' },
+    { id: 'b', title: 'B', kind: 'markdown', content: 'b.md' },
+    { id: 'c', title: 'C', kind: 'markdown', content: 'c.md' },
   ],
   routes: [
     { id: 'main', title: 'Main', steps: [{ target: 'a' }, { target: 'b' }, { target: 'c' }] },

@@ -7,8 +7,8 @@ const manifest: Manifest = {
   version: 1,
   title: 'Test',
   cards: [
-    { id: 'a', title: 'Card A', content: 'cards/a.md' },
-    { id: 'b', title: 'Card B', content: 'cards/b.md' },
+    { id: 'a', title: 'Card A', kind: 'markdown', content: 'cards/a.md' },
+    { id: 'b', title: 'Card B', kind: 'markdown', content: 'cards/b.md' },
   ],
   routes: [
     { id: 'main', title: 'Main', steps: [{ target: 'a' }, { target: 'b' }] },

@@ -18,8 +18,11 @@ export const manifest: Manifest = parseManifest(graphJson);
 export const referenceErrors: ReferenceError[] = validateReferences(manifest);
 
 export const markdownByCardId: Record<string, string> = Object.fromEntries(
-  manifest.cards.map((card) => {
+  // Only markdown cards own a content file. An alias resolves through its target
+  // at draw time (ADR 0009), so it contributes no entry of its own here.
+  manifest.cards.flatMap((card) => {
+    if (card.kind !== 'markdown') return [];
     const entry = Object.entries(rawCards).find(([path]) => path.endsWith(`/${card.content}`));
-    return [card.id, entry?.[1] ?? `*Missing content file: ${card.content}*`];
+    return [[card.id, entry?.[1] ?? `*Missing content file: ${card.content}*`]];
   }),
 );

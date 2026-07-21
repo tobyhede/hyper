@@ -1,7 +1,12 @@
 import type { Manifest } from '@project/core';
 
 export type ReferenceErrorKind =
-  'duplicate-card-id' | 'duplicate-route-id' | 'unresolved-route-step';
+  | 'duplicate-card-id'
+  | 'duplicate-route-id'
+  | 'unresolved-route-step'
+  | 'unresolved-alias-target'
+  | 'alias-self-reference'
+  | 'alias-targets-alias';
 
 export interface ReferenceError {
   kind: ReferenceErrorKind;
@@ -28,6 +33,7 @@ function duplicates(ids: readonly string[]): string[] {
 export function validateReferences(manifest: Manifest): ReferenceError[] {
   const errors: ReferenceError[] = [];
 
+  const cardsById = new Map(manifest.cards.map((c) => [c.id, c]));
   const cardIds = new Set(manifest.cards.map((c) => c.id));
 
   for (const id of duplicates(manifest.cards.map((c) => c.id))) {
@@ -47,6 +53,34 @@ export function validateReferences(manifest: Manifest): ReferenceError[] {
         });
       }
     });
+  }
+
+  for (const card of manifest.cards) {
+    if (card.kind !== 'alias') continue;
+    if (card.target === card.id) {
+      errors.push({
+        kind: 'alias-self-reference',
+        ref: card.id,
+        message: `Alias "${card.id}" points at itself`,
+      });
+      continue;
+    }
+    const target = cardsById.get(card.target);
+    if (!target) {
+      errors.push({
+        kind: 'unresolved-alias-target',
+        ref: card.target,
+        message: `Alias "${card.id}" targets missing card "${card.target}"`,
+      });
+      continue;
+    }
+    if (target.kind === 'alias') {
+      errors.push({
+        kind: 'alias-targets-alias',
+        ref: card.target,
+        message: `Alias "${card.id}" targets alias "${card.target}"; aliasing is a single hop`,
+      });
+    }
   }
 
   return errors;
