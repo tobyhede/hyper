@@ -19,7 +19,7 @@ A card is one of three kinds, and the kind is what its content is: **Markdown** 
 _Avoid_: node, slide, page, tile, subgraph. For the content: prose (it may be a table, a diagram or code, not only writing), body (works for markdown, but a space card's content is a graph).
 
 **Alias**:
-A card that shows another card: the same content appearing again elsewhere in the space, with a single source of truth, so editing the target changes every place it appears. An alias points to a different card, never itself.
+A card that shows another card's **content**: the same content appearing again elsewhere in the space, with a single source of truth, so editing the target changes every place it appears. An alias carries its own title — only content is shared. An alias points to a different card, and that card is never itself an alias: aliasing is a single hop, so an alias never points at itself and alias chains cannot form.
 _Avoid_: reference, link (an alias shows content, it does not merely jump), copy, transclusion, mirror.
 
 ## Routing

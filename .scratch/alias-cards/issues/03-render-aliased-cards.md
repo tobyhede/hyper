@@ -9,7 +9,7 @@ An alias shows another card's content at a second position. The renderer needs t
 
 ## Task
 
-Resolve alias content in the projection and decide the visual treatment with the user.
+Call the `graph` alias resolver (ADR 0009 — resolution lives in `graph`, not the adapter) from the projection to draw the target's content, and decide the visual treatment with the user. The "same content again" signal is the on-screen decision issue 01 deferred to here; a differently-titled alias is already one such signal, so weigh whether more is needed once it's rendered.
 
 ## Acceptance
 

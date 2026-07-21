@@ -1,6 +1,7 @@
 # Cards are the graph; there is no placement layer
 
 Status: accepted
+Refined by: 0009
 
 Edges connect **cards** and route steps target **cards**, both by card id. There is no separate node or placement entity between a card and its position in the graph: a card occupies exactly one position, and the authored graph is cards, edges, and routes over those cards.
 

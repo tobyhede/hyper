@@ -20,14 +20,31 @@ Settled during grilling — do not re-litigate:
 - A route stepping `C … C'` where `C'` aliases `C` is the author explicitly asking for a **redraw** as a fresh forward-readable box.
 - The redraw-vs-loop-back choice therefore belongs to the **author**. The layout never silently unrolls a revisit into duplicate boxes.
 
-## Open — needs grilling
+## Settled by grilling (2026-07-21)
 
-- Shape of the Card kind union (`Markdown | Alias`, and later `Space` per ADR 0001).
-- How an alias resolves, and where that resolution lives.
-- Alias-of-alias chains: allowed, or flattened, or rejected?
-- Validation: self-reference, unresolved target, cycles through aliases.
-- How routes and edges treat alias cards versus their targets.
-- How the renderer signals "this is the same content shown again."
+Recorded in ADR 0009 and `CONTEXT.md`; full trail in `issues/01`.
+
+- **Card is a discriminated union on an explicit `kind`**, defaulted to `'markdown'`
+  so existing manifests parse unchanged. `markdown: { id, title, kind, content }`,
+  `alias: { id, title, kind, target }`. The `space` kind is deferred to the change
+  that builds recursive spaces (ADR 0001).
+- **Resolution is lazy, non-destructive, single-hop, and lives in `graph`** (ADR
+  0009). The manifest keeps aliases as aliases; a resolver walks to the target's
+  content on read. Not flattened at intake. An alias's target must be a non-alias
+  card, so chains are rejected and cycles are unrepresentable.
+- **`validateReferences` gains three distinct error kinds:**
+  `unresolved-alias-target`, `alias-self-reference`, `alias-targets-alias`. No
+  cycle check — single-hop makes cycles impossible by construction.
+- **Routes and edges target an alias exactly like any card.** A step names a card
+  id; an alias is a real node with its own id, handles and position; content
+  resolves only at draw time. This is what keeps `C…C'` a forward redraw.
+- **An alias carries its own required title; only content is inherited.**
+
+## Still open — decided on screen
+
+- The specific visual signal that a card is showing content already seen elsewhere
+  (badge, border, affordance). Issue 03, decided with it rendered. A
+  differently-titled alias is already one such signal.
 
 ## Issues
 
