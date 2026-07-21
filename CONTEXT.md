@@ -5,8 +5,8 @@ Graph-native technical content. Cards of content live in a spatial graph; author
 ## The space
 
 **Space**:
-A graph of cards — the world the cards live in, together with the routes and views laid over them. A card may itself be a space, so spaces nest arbitrarily deep.
-_Avoid_: presentation (that is one view of a space), manifest, deck, document, canvas, board, file, subgraph.
+The whole authored world, and the top-level of the domain model: a graph of cards together with the routes and views laid over them. Everything else — cards, routes, layouts, views — belongs to a space. A card may itself be a space, so spaces nest arbitrarily deep; the space you load is the root, and a nested space is reached by opening a space-card.
+_Avoid_: presentation (that is one view of a space), manifest (a shipping-ledger word, wrong for an authored, reshapeable thing — retired from the code, not merely avoided), deck, document, canvas, board, file, subgraph.
 
 ## Cards
 
