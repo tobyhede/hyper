@@ -72,6 +72,23 @@ describe('projectCardNodes', () => {
     expect(nodes.find((n) => n.id === 'b')!.data.active).toBe(true);
     expect(nodes.find((n) => n.id === 'b')!.className).toContain('rf-card-node--active');
   });
+
+  it('marks an alias node with the title of the card it shows', () => {
+    const withAlias: Manifest = {
+      version: 1,
+      title: 'Test',
+      cards: [
+        { id: 'a', title: 'Card A', kind: 'markdown', content: 'cards/a.md' },
+        { id: 'a-again', title: 'Card A, again', kind: 'alias', target: 'a' },
+      ],
+      routes: [{ id: 'main', title: 'Main', steps: [{ target: 'a' }, { target: 'a-again' }] }],
+    };
+    const nodes = projectCardNodes(withAlias, buildCardHandles(withAlias), colors);
+    // A markdown card is nobody's alias.
+    expect(nodes.find((n) => n.id === 'a')!.data.aliasOf).toBeUndefined();
+    // The alias carries its target's title, so the node can name what it redraws.
+    expect(nodes.find((n) => n.id === 'a-again')!.data.aliasOf).toBe('Card A');
+  });
 });
 
 describe('projectRouteEdges', () => {

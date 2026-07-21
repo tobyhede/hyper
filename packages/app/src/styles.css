@@ -200,8 +200,10 @@ body {
   height: var(--card-height);
   overflow: hidden;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 0.35rem;
   text-align: center;
   cursor: pointer;
 }
@@ -210,6 +212,22 @@ body {
   margin: 0;
   font-size: 1.05rem;
   line-height: 1.35;
+}
+
+/* An alias names the card it redraws, so a redraw reads as a deliberate return
+   rather than repetition — and stays legible even when titles match. */
+.card__alias-of {
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.8rem;
+  color: var(--muted, #8a94a6);
+}
+
+.card__alias-of svg {
+  flex: none;
+  opacity: 0.8;
 }
 
 .card__title {

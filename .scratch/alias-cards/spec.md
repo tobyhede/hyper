@@ -40,11 +40,16 @@ Recorded in ADR 0009 and `CONTEXT.md`; full trail in `issues/01`.
   resolves only at draw time. This is what keeps `C…C'` a forward redraw.
 - **An alias carries its own required title; only content is inherited.**
 
-## Still open — decided on screen
+## Decided on screen (issue 03)
 
-- The specific visual signal that a card is showing content already seen elsewhere
-  (badge, border, affordance). Issue 03, decided with it rendered. A
-  differently-titled alias is already one such signal.
+- The signal that a card is showing content already seen elsewhere: a muted
+  subtitle on the alias node naming the card it redraws, prefixed with a
+  `corner-down-right` glyph (`↳ The data model`). Chosen over title-only, which
+  goes invisible when an alias and its target share a title. Opened and deck
+  surfaces stay title-only.
+
+The feature is complete: schema and validation (02), resolution and rendering
+(03), all three issues resolved.
 
 ## Issues
 

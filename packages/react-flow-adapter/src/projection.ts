@@ -1,6 +1,7 @@
 import type { Edge, Node } from '@xyflow/react';
 import { MarkerType } from '@xyflow/react';
 import type { Manifest } from '@project/core';
+import { resolveContentCard } from '@project/graph';
 import type {
   CardHandleSet,
   LayoutCard,
@@ -43,6 +44,9 @@ export type CardHandle = {
 export type CardNodeData = {
   cardId: string;
   title: string;
+  /** For an alias, the title of the card it shows — so the node can name what it
+   *  redraws. Absent on non-alias cards. */
+  aliasOf?: string;
   active: boolean;
   /** The route being emphasised, if any. Drives handle dimming. */
   activeRouteId: string | null;
@@ -118,6 +122,9 @@ export function projectCardNodes(
     const handles = handlesByCard.get(card.id) ?? EMPTY_HANDLES;
     const cardLayout = laidOut.get(card.id);
     const active = card.id === activeCardId;
+    // An alias names the card it redraws; a markdown card names nothing (ADR 0009).
+    const aliasOf =
+      card.kind === 'alias' ? resolveContentCard(manifest, card.id)?.title : undefined;
 
     return {
       id: card.id,
@@ -126,6 +133,7 @@ export function projectCardNodes(
       data: {
         cardId: card.id,
         title: card.title,
+        aliasOf,
         active,
         activeRouteId,
         emphasis,

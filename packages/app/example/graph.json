@@ -7,7 +7,8 @@
     { "id": "model", "title": "The data model", "content": "cards/model.md" },
     { "id": "rendering", "title": "Rendering the graph", "content": "cards/rendering.md" },
     { "id": "routes", "title": "Routes as slide decks", "content": "cards/routes.md" },
-    { "id": "demo", "title": "Try it", "content": "cards/demo.md" }
+    { "id": "demo", "title": "Try it", "content": "cards/demo.md" },
+    { "id": "model-recap", "title": "Recap: the data model", "kind": "alias", "target": "model" }
   ],
   "routes": [
     {
@@ -26,6 +27,16 @@
       "id": "quick",
       "title": "Quick tour",
       "steps": [{ "target": "intro" }, { "target": "model" }, { "target": "demo" }]
+    },
+    {
+      "id": "deep",
+      "title": "Deep dive",
+      "steps": [
+        { "target": "intro" },
+        { "target": "model" },
+        { "target": "rendering" },
+        { "target": "model-recap" }
+      ]
     }
   ]
 }

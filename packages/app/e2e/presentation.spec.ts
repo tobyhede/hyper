@@ -42,28 +42,28 @@ test('offers more than one named route', async ({ page }) => {
   await page.goto('/');
   // Open the (Radix, non-native) select and count its listbox options.
   await page.getByTestId('route-selector').click();
-  await expect(page.getByRole('option')).toHaveCount(2);
+  await expect(page.getByRole('option')).toHaveCount(3);
 });
 
 test('draws every route at once, each in its own color', async ({ page }) => {
   await page.goto('/');
 
   // A legend maps each route to a color.
-  await expect(page.getByTestId('route-legend').locator('.legend__item')).toHaveCount(2);
+  await expect(page.getByTestId('route-legend').locator('.legend__item')).toHaveCount(3);
 
-  // Both routes, overlaid. "main" visits all 6 cards, "quick" visits 3 of them,
-  // so the union is 6 cards; 5 main edges + 2 quick edges; and a shared card
-  // carries one handle pair per route running through it.
-  await expect(page.locator('.react-flow__node')).toHaveCount(6);
-  await expect(page.locator('.react-flow__edge')).toHaveCount(7);
-  await expect(page.locator('.rf-card-node__port')).toHaveCount(14);
+  // Three routes, overlaid. "main" visits 6 cards, "quick" 3, "deep" 4 (ending
+  // on the model-recap alias). The union is 7 cards; 5 + 2 + 3 = 10 edges; and a
+  // shared card carries one handle pair per route running through it (10+4+6).
+  await expect(page.locator('.react-flow__node')).toHaveCount(7);
+  await expect(page.locator('.react-flow__edge')).toHaveCount(10);
+  await expect(page.locator('.rf-card-node__port')).toHaveCount(20);
 
-  // Distinct colors, so the two routes can be told apart.
+  // Distinct colors, so the routes can be told apart.
   const strokes = await page
     .locator('.react-flow__edge-path')
     .evaluateAll((els) => els.map((el) => getComputedStyle(el).stroke));
   expect(strokes.every((s) => s && s !== 'none' && s !== 'rgb(0, 0, 0)')).toBe(true);
-  expect(new Set(strokes).size).toBe(2);
+  expect(new Set(strokes).size).toBe(3);
 });
 
 test('selecting a route keeps the others on screen', async ({ page }) => {
@@ -72,27 +72,28 @@ test('selecting a route keeps the others on screen', async ({ page }) => {
   // Selection chooses what Present walks; it no longer hides the rest of the space.
   await page.getByTestId('route-selector').click();
   await page.getByRole('option', { name: 'Quick tour' }).click();
-  await expect(page.locator('.react-flow__node')).toHaveCount(6);
-  await expect(page.locator('.react-flow__edge')).toHaveCount(7);
+  await expect(page.locator('.react-flow__node')).toHaveCount(7);
+  await expect(page.locator('.react-flow__edge')).toHaveCount(10);
 });
 
 test('selecting a route emphasises it without hiding the others', async ({ page }) => {
   await page.goto('/');
-  await expect(page.locator('.react-flow__edge')).toHaveCount(7);
+  await expect(page.locator('.react-flow__edge')).toHaveCount(10);
 
   const opacities = async () =>
     page
       .locator('.react-flow__edge-path')
       .evaluateAll((els) => els.map((el) => Number(getComputedStyle(el).opacity)));
 
-  // "main" is selected on load, so "quick"'s two edges already recede. The
-  // selector does something without having to press Present.
+  // "main" is selected on load, so the other routes' edges already recede —
+  // "quick"'s 2 and "deep"'s 3, five in all. The selector does something without
+  // having to press Present.
   const faded = (await opacities()).filter((o) => o < 1);
-  expect(faded).toHaveLength(2);
+  expect(faded).toHaveLength(5);
   expect(faded[0]!).toBeGreaterThan(0);
 
   // Every route stays drawn.
-  await expect(page.locator('.react-flow__edge')).toHaveCount(7);
+  await expect(page.locator('.react-flow__edge')).toHaveCount(10);
 });
 
 test('a card shows its title in the graph, and opens to reveal its content', async ({ page }) => {
@@ -253,4 +254,22 @@ test('a card title appears once, not twice', async ({ page }) => {
 
   const slide = page.locator('.reveal .slides section[data-card-id="problem"]');
   expect(await slide.getByText('The problem with linear decks').count()).toBe(1);
+});
+
+test('an alias node names the card it redraws, and opens to that content', async ({ page }) => {
+  await page.goto('/');
+
+  // The alias is drawn as its own node, carrying its own title. A muted marker
+  // names the card it shows, so a redraw reads as a deliberate return (ADR 0009).
+  const recap = page.locator('.react-flow__node', { hasText: 'Recap: the data model' });
+  await expect(recap).toBeVisible();
+  await expect(recap.getByTestId('alias-marker')).toHaveText(/The data model/);
+
+  // Opening the alias resolves through to the target's content — single source of
+  // truth — under the alias's own title.
+  await recap.click();
+  const opened = page.getByTestId('open-card');
+  await expect(opened).toBeVisible();
+  await expect(opened.getByText('Recap: the data model')).toBeVisible();
+  await expect(opened.getByText('route steps reference cards directly')).toBeVisible();
 });

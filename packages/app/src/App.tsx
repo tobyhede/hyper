@@ -15,6 +15,7 @@ import {
   filterHandlesByRoutes,
   getCard,
   getRoute,
+  resolveContentCard,
   type CardHandleSet,
   type LayoutGraph,
 } from '@project/graph';
@@ -28,6 +29,13 @@ import { PresentationDeck, type DeckSlide } from './components/PresentationDeck'
 
 // Derived once from the (static) manifest.
 const colors = routeColorMap(manifest);
+
+// The markdown a card shows, resolving an alias to its target's content (ADR
+// 0009). A card keeps its own title; only content is inherited.
+function markdownForCard(cardId: string): string {
+  const contentId = resolveContentCard(manifest, cardId)?.id ?? cardId;
+  return markdownByCardId[contentId] ?? '';
+}
 const allHandles = buildCardHandles(manifest);
 const allRouteEdges = buildRouteEdges(manifest);
 
@@ -124,7 +132,7 @@ export function App() {
       return {
         id: step.target,
         title: card?.title ?? step.target,
-        markdown: markdownByCardId[step.target] ?? '',
+        markdown: markdownForCard(step.target),
       };
     });
   }, [route]);
@@ -210,7 +218,7 @@ export function App() {
         {openedCard && (
           <OpenCard
             title={openedCard.title}
-            markdown={markdownByCardId[openedCard.id] ?? ''}
+            markdown={markdownForCard(openedCard.id)}
             footer={
               <Button variant="secondary" data-testid="close-card" onClick={closeCard}>
                 Close
