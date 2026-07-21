@@ -144,26 +144,6 @@ body {
   inset: 0;
 }
 
-.errors {
-  position: absolute;
-  z-index: 20;
-  top: 0.75rem;
-  left: 50%;
-  transform: translateX(-50%);
-  max-width: 560px;
-  background: #3a1d1d;
-  border: 1px solid #7f1d1d;
-  border-radius: 8px;
-  padding: 0.6rem 0.9rem;
-  font-size: 0.85rem;
-}
-
-.errors ul {
-  margin: 0.4rem 0 0;
-  padding-left: 1.1rem;
-  list-style: disc;
-}
-
 /* ---- Card node ---- */
 .rf-card-node {
   border-radius: 10px;

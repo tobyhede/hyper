@@ -19,7 +19,7 @@ import {
   type CardHandleSet,
   type LayoutGraph,
 } from '@project/graph';
-import { manifest, markdownByCardId, referenceErrors } from './manifest';
+import { space, markdownByCardId } from './space';
 import { routeColorMap } from './colors';
 import { CARD_HEIGHT, CARD_SIZE, cardSizeVars } from './card';
 import { selectActiveCardId, usePresentationStore } from './store';
@@ -27,17 +27,17 @@ import { GraphView } from './components/GraphView';
 import { OpenCard } from './components/OpenCard';
 import { PresentationDeck, type DeckSlide } from './components/PresentationDeck';
 
-// Derived once from the (static) manifest.
-const colors = routeColorMap(manifest);
+// Derived once from the (static) space.
+const colors = routeColorMap(space);
 
 // The markdown a card shows, resolving an alias to its target's content (ADR
 // 0009). A card keeps its own title; only content is inherited.
 function markdownForCard(cardId: string): string {
-  const contentId = resolveContentCard(manifest, cardId)?.id ?? cardId;
+  const contentId = resolveContentCard(space, cardId)?.id ?? cardId;
   return markdownByCardId[contentId] ?? '';
 }
-const allHandles = buildCardHandles(manifest);
-const allRouteEdges = buildRouteEdges(manifest);
+const allHandles = buildCardHandles(space);
+const allRouteEdges = buildRouteEdges(space);
 
 // The layout in use. A Layout is a named strategy, nothing more — swapping this
 // line for `gridLayout()` from `@project/graph` is the whole change, and it drops
@@ -62,12 +62,9 @@ export function App() {
   // Which routes the view shows. Every one, for now — but membership is the
   // view's decision (ADR 0005), so route visibility controls attach here rather
   // than inside the graph or layout packages.
-  const visibleRouteIds = useMemo(() => manifest.routes.map((r) => r.id), []);
+  const visibleRouteIds = useMemo(() => space.routes.map((r) => r.id), []);
 
-  const visibleCardIds = useMemo(
-    () => cardIdsForRoutes(manifest, visibleRouteIds),
-    [visibleRouteIds],
-  );
+  const visibleCardIds = useMemo(() => cardIdsForRoutes(space, visibleRouteIds), [visibleRouteIds]);
   const visibleHandles = useMemo<ReadonlyMap<string, CardHandleSet>>(
     () => filterHandlesByRoutes(allHandles, visibleRouteIds),
     [visibleRouteIds],
@@ -100,7 +97,7 @@ export function App() {
 
   const nodes = useMemo(
     () =>
-      projectCardNodes(manifest, visibleHandles, colors, {
+      projectCardNodes(space, visibleHandles, colors, {
         activeCardId,
         activeRouteId: selectedRouteId,
         emphasis,
@@ -120,15 +117,15 @@ export function App() {
     [visibleEdges, selectedRouteId, emphasis],
   );
 
-  const route = selectedRouteId ? getRoute(manifest, selectedRouteId) : undefined;
-  const openedCard = openedCardId ? getCard(manifest, openedCardId) : undefined;
+  const route = selectedRouteId ? getRoute(space, selectedRouteId) : undefined;
+  const openedCard = openedCardId ? getCard(space, openedCardId) : undefined;
 
   // Presenting is a deck, not an opened card (ADR 0008) — the route's steps in
   // order, each carrying its card's content.
   const deckSlides = useMemo<DeckSlide[]>(() => {
     if (!route) return [];
     return route.steps.map((step) => {
-      const card = getCard(manifest, step.target);
+      const card = getCard(space, step.target);
       return {
         id: step.target,
         title: card?.title ?? step.target,
@@ -154,15 +151,11 @@ export function App() {
   const toolbar = (
     <>
       <RouteSelector
-        routes={manifest.routes}
+        routes={space.routes}
         selectedRouteId={selectedRouteId}
         onSelect={selectRoute}
       />
-      <RouteLegend
-        routes={manifest.routes}
-        colorByRouteId={colors}
-        activeRouteId={selectedRouteId}
-      />
+      <RouteLegend routes={space.routes} colorByRouteId={colors} activeRouteId={selectedRouteId} />
       {presenting ? (
         <Button variant="secondary" onClick={exitPresentation}>
           Overview
@@ -192,18 +185,7 @@ export function App() {
   }
 
   return (
-    <AppShell title={manifest.title} toolbar={toolbar}>
-      {referenceErrors.length > 0 && (
-        <div className="errors" role="alert">
-          <strong>{referenceErrors.length} unresolved reference(s):</strong>
-          <ul>
-            {referenceErrors.map((err) => (
-              <li key={`${err.kind}:${err.ref}`}>{err.message}</li>
-            ))}
-          </ul>
-        </div>
-      )}
-
+    <AppShell title={space.title} toolbar={toolbar}>
       <div className="graph-area" style={cardSizeVars}>
         <ReactFlowProvider>
           <GraphView

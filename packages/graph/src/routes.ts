@@ -1,4 +1,4 @@
-import type { Manifest } from '@project/core';
+import type { Space } from './space';
 
 /**
  * Derives the graph's ports and connections from its presentation routes.
@@ -38,7 +38,7 @@ export const outHandleId = (routeId: string): string => `${routeId}::out`;
 export const inHandleId = (routeId: string): string => `${routeId}::in`;
 
 /** Map each card id to the in/out ports contributed by the routes through it. */
-export function buildCardHandles(manifest: Manifest): Map<string, CardHandleSet> {
+export function buildCardHandles(space: Space): Map<string, CardHandleSet> {
   const map = new Map<string, CardHandleSet>();
   const ensure = (cardId: string): CardHandleSet => {
     let set = map.get(cardId);
@@ -49,7 +49,7 @@ export function buildCardHandles(manifest: Manifest): Map<string, CardHandleSet>
     return set;
   };
 
-  for (const route of manifest.routes) {
+  for (const route of space.routes) {
     route.steps.forEach((step, index) => {
       const set = ensure(step.target);
       const isFirst = index === 0;
@@ -80,13 +80,13 @@ export function buildCardHandles(manifest: Manifest): Map<string, CardHandleSet>
  * A card shared by several routes appears once. Which routes a view shows is the
  * view's decision (ADR 0005); this only answers what cards that implies.
  */
-export function cardIdsForRoutes(manifest: Manifest, routeIds: readonly string[]): string[] {
+export function cardIdsForRoutes(space: Space, routeIds: readonly string[]): string[] {
   const wanted = new Set(routeIds);
   const seen = new Set<string>();
   const ids: string[] = [];
 
   for (const routeId of routeIds) {
-    const route = manifest.routes.find((r) => r.id === routeId);
+    const route = space.routes.find((r) => r.id === routeId);
     if (!route || !wanted.has(route.id)) continue;
     for (const step of route.steps) {
       if (!seen.has(step.target)) {
@@ -100,8 +100,8 @@ export function cardIdsForRoutes(manifest: Manifest, routeIds: readonly string[]
 }
 
 /** The distinct card ids a single route visits, in first-visit order. */
-export function routeCardIds(manifest: Manifest, routeId: string): string[] {
-  return cardIdsForRoutes(manifest, [routeId]);
+export function routeCardIds(space: Space, routeId: string): string[] {
+  return cardIdsForRoutes(space, [routeId]);
 }
 
 /** Keep only the handles belonging to the given routes. */
@@ -130,10 +130,10 @@ export function filterHandlesByRoute(
 }
 
 /** Build the colored port-to-port edges implied by each route's step order. */
-export function buildRouteEdges(manifest: Manifest): RouteEdge[] {
+export function buildRouteEdges(space: Space): RouteEdge[] {
   const edges: RouteEdge[] = [];
 
-  for (const route of manifest.routes) {
+  for (const route of space.routes) {
     for (let i = 0; i < route.steps.length - 1; i += 1) {
       const from = route.steps[i];
       const to = route.steps[i + 1];

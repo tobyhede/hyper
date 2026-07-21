@@ -1,12 +1,11 @@
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
-import type { Manifest, Route } from '@project/core';
+import type { Route } from '@project/core';
 import { clampStepIndex, nextStepIndex, prevStepIndex, validateReferences } from '../src/index';
 
-/** Build a structurally-consistent manifest from a list of ids. */
-function manifestFromIds(ids: string[]): Manifest {
+/** Build a structurally-consistent space file from a list of ids. */
+function spaceFileFromIds(ids: string[]) {
   return {
-    version: 1,
     title: 'Generated',
     cards: ids.map((id) => ({
       id: `card-${id}`,
@@ -36,10 +35,10 @@ const idsArb = fc
   .map((xs) => xs.map((x, i) => `${i}-${x.replace(/\s/g, '_')}`));
 
 describe('graph validation properties', () => {
-  it('a consistently-built manifest always validates', () => {
+  it('a consistently-built space always validates', () => {
     fc.assert(
       fc.property(idsArb, (ids) => {
-        expect(validateReferences(manifestFromIds(ids))).toEqual([]);
+        expect(validateReferences(spaceFileFromIds(ids))).toEqual([]);
       }),
     );
   });
@@ -47,10 +46,10 @@ describe('graph validation properties', () => {
   it('breaking any single route step is always detected', () => {
     fc.assert(
       fc.property(idsArb, (ids) => {
-        const manifest = manifestFromIds(ids);
-        const route = manifest.routes[0]!;
+        const file = spaceFileFromIds(ids);
+        const route = file.routes[0]!;
         route.steps[0]!.target = '__does_not_exist__';
-        const errors = validateReferences(manifest);
+        const errors = validateReferences(file);
         expect(errors.some((e) => e.kind === 'unresolved-route-step')).toBe(true);
       }),
     );

@@ -1,31 +1,38 @@
 import { describe, expect, it } from 'vitest';
-import type { Manifest } from '@project/core';
 import {
   buildCardHandles,
   buildRouteEdges,
   cardIdsForRoutes,
   filterHandlesByRoute,
   filterHandlesByRoutes,
+  loadSpace,
   routeCardIds,
+  type Space,
 } from '../src/index';
 
 // a → b → c  (main),  a → c  (quick): c is shared, a fans out.
-const manifest: Manifest = {
-  version: 1,
-  title: 'Test',
-  cards: [
-    { id: 'a', title: 'A', kind: 'markdown', content: 'a.md' },
-    { id: 'b', title: 'B', kind: 'markdown', content: 'b.md' },
-    { id: 'c', title: 'C', kind: 'markdown', content: 'c.md' },
-  ],
-  routes: [
-    { id: 'main', title: 'Main', steps: [{ target: 'a' }, { target: 'b' }, { target: 'c' }] },
-    { id: 'quick', title: 'Quick', steps: [{ target: 'a' }, { target: 'c' }] },
-  ],
-};
+function loadFixture(): Space {
+  const result = loadSpace({
+    version: 1,
+    title: 'Test',
+    cards: [
+      { id: 'a', title: 'A', kind: 'markdown', content: 'a.md' },
+      { id: 'b', title: 'B', kind: 'markdown', content: 'b.md' },
+      { id: 'c', title: 'C', kind: 'markdown', content: 'c.md' },
+    ],
+    routes: [
+      { id: 'main', title: 'Main', steps: [{ target: 'a' }, { target: 'b' }, { target: 'c' }] },
+      { id: 'quick', title: 'Quick', steps: [{ target: 'a' }, { target: 'c' }] },
+    ],
+  });
+  if (!result.ok) throw new Error('fixture should load');
+  return result.space;
+}
+
+const space = loadFixture();
 
 describe('buildCardHandles', () => {
-  const handles = buildCardHandles(manifest);
+  const handles = buildCardHandles(space);
 
   it('gives the first card only outbound ports, one per route leaving it', () => {
     const a = handles.get('a')!;
@@ -48,35 +55,35 @@ describe('buildCardHandles', () => {
 
 describe('routeCardIds', () => {
   it('lists a route’s distinct cards in first-visit order', () => {
-    expect(routeCardIds(manifest, 'main')).toEqual(['a', 'b', 'c']);
-    expect(routeCardIds(manifest, 'quick')).toEqual(['a', 'c']);
-    expect(routeCardIds(manifest, 'nope')).toEqual([]);
+    expect(routeCardIds(space, 'main')).toEqual(['a', 'b', 'c']);
+    expect(routeCardIds(space, 'quick')).toEqual(['a', 'c']);
+    expect(routeCardIds(space, 'nope')).toEqual([]);
   });
 });
 
 describe('cardIdsForRoutes', () => {
   it('unions several routes, keeping each card once', () => {
-    expect(cardIdsForRoutes(manifest, ['main', 'quick'])).toEqual(['a', 'b', 'c']);
+    expect(cardIdsForRoutes(space, ['main', 'quick'])).toEqual(['a', 'b', 'c']);
   });
 
   it('orders by the routes given, then by step order within each', () => {
     // quick first, so c is reached before b.
-    expect(cardIdsForRoutes(manifest, ['quick', 'main'])).toEqual(['a', 'c', 'b']);
+    expect(cardIdsForRoutes(space, ['quick', 'main'])).toEqual(['a', 'c', 'b']);
   });
 
   it('ignores unknown route ids', () => {
-    expect(cardIdsForRoutes(manifest, ['nope'])).toEqual([]);
-    expect(cardIdsForRoutes(manifest, ['quick', 'nope'])).toEqual(['a', 'c']);
+    expect(cardIdsForRoutes(space, ['nope'])).toEqual([]);
+    expect(cardIdsForRoutes(space, ['quick', 'nope'])).toEqual(['a', 'c']);
   });
 
   it('returns nothing for no routes', () => {
-    expect(cardIdsForRoutes(manifest, [])).toEqual([]);
+    expect(cardIdsForRoutes(space, [])).toEqual([]);
   });
 });
 
 describe('filterHandlesByRoute', () => {
   it('keeps only the selected route’s handles', () => {
-    const quick = filterHandlesByRoute(buildCardHandles(manifest), 'quick');
+    const quick = filterHandlesByRoute(buildCardHandles(space), 'quick');
     // c is shared, but only its quick inbound port survives the filter.
     expect(quick.get('c')!.targetHandles.map((h) => h.id)).toEqual(['quick::in']);
     expect(quick.get('b')).toBeUndefined(); // b is only on main
@@ -85,7 +92,7 @@ describe('filterHandlesByRoute', () => {
 
 describe('filterHandlesByRoutes', () => {
   it('keeps a shared card’s handles for every route given', () => {
-    const both = filterHandlesByRoutes(buildCardHandles(manifest), ['main', 'quick']);
+    const both = filterHandlesByRoutes(buildCardHandles(space), ['main', 'quick']);
     // The multi-route case: c carries one inbound handle per route arriving.
     expect(both.get('c')!.targetHandles.map((h) => h.id)).toEqual(['main::in', 'quick::in']);
     expect(both.get('a')!.sourceHandles.map((h) => h.id)).toEqual(['main::out', 'quick::out']);
@@ -93,13 +100,13 @@ describe('filterHandlesByRoutes', () => {
   });
 
   it('drops cards left with no handles at all', () => {
-    const quickOnly = filterHandlesByRoutes(buildCardHandles(manifest), ['quick']);
+    const quickOnly = filterHandlesByRoutes(buildCardHandles(space), ['quick']);
     expect(quickOnly.get('b')).toBeUndefined();
   });
 });
 
 describe('buildRouteEdges', () => {
-  const edges = buildRouteEdges(manifest);
+  const edges = buildRouteEdges(space);
 
   it('produces one edge per adjacent step, connected via route ports', () => {
     expect(edges).toHaveLength(3);

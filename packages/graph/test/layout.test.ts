@@ -1,20 +1,31 @@
 import { describe, expect, it } from 'vitest';
-import { buildCardHandles, buildLayoutGraph, buildRouteEdges, gridLayout } from '../src/index';
-import type { LayoutGraph } from '../src/index';
-import type { Manifest } from '@project/core';
+import {
+  buildCardHandles,
+  buildLayoutGraph,
+  buildRouteEdges,
+  gridLayout,
+  loadSpace,
+} from '../src/index';
+import type { LayoutGraph, Space } from '../src/index';
 
-const manifest: Manifest = {
-  version: 1,
-  title: 'T',
-  cards: [
-    { id: 'a', title: 'A', kind: 'markdown', content: 'a.md' },
-    { id: 'b', title: 'B', kind: 'markdown', content: 'b.md' },
-    { id: 'c', title: 'C', kind: 'markdown', content: 'c.md' },
-  ],
-  routes: [
-    { id: 'main', title: 'Main', steps: [{ target: 'a' }, { target: 'b' }, { target: 'c' }] },
-  ],
-};
+function loadFixture(): Space {
+  const result = loadSpace({
+    version: 1,
+    title: 'T',
+    cards: [
+      { id: 'a', title: 'A', kind: 'markdown', content: 'a.md' },
+      { id: 'b', title: 'B', kind: 'markdown', content: 'b.md' },
+      { id: 'c', title: 'C', kind: 'markdown', content: 'c.md' },
+    ],
+    routes: [
+      { id: 'main', title: 'Main', steps: [{ target: 'a' }, { target: 'b' }, { target: 'c' }] },
+    ],
+  });
+  if (!result.ok) throw new Error('fixture should load');
+  return result.space;
+}
+
+const space = loadFixture();
 
 const SIZE = { width: 100, height: 50 };
 
@@ -22,8 +33,8 @@ describe('buildLayoutGraph', () => {
   it('carries each card’s size and its ports, inbound first', () => {
     const graph = buildLayoutGraph(
       ['a', 'b', 'c'],
-      buildCardHandles(manifest),
-      buildRouteEdges(manifest),
+      buildCardHandles(space),
+      buildRouteEdges(space),
       SIZE,
     );
 
@@ -40,8 +51,8 @@ describe('buildLayoutGraph', () => {
   it('drops edges whose endpoints the view is not showing', () => {
     const graph = buildLayoutGraph(
       ['a', 'b'],
-      buildCardHandles(manifest),
-      buildRouteEdges(manifest),
+      buildCardHandles(space),
+      buildRouteEdges(space),
       SIZE,
     );
     expect(graph.edges.map((e) => e.id)).toEqual(['main::0']);
@@ -51,8 +62,8 @@ describe('buildLayoutGraph', () => {
 describe('gridLayout', () => {
   const graph: LayoutGraph = buildLayoutGraph(
     ['a', 'b', 'c'],
-    buildCardHandles(manifest),
-    buildRouteEdges(manifest),
+    buildCardHandles(space),
+    buildRouteEdges(space),
     SIZE,
   );
 

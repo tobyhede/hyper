@@ -241,7 +241,7 @@ test('content that exceeds the frame scrolls inside it, keeping controls reachab
 test('a card title appears once, not twice', async ({ page }) => {
   await page.goto('/');
 
-  // The manifest owns the title, so a card's Markdown is body-only. When a body
+  // The space owns the title, so a card's Markdown is body-only. When a body
   // repeated its title as a heading, every surface rendered it twice.
   await page.locator('.react-flow__node', { hasText: 'The problem with linear decks' }).click();
   const opened = page.getByTestId('open-card');

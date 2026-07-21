@@ -1,11 +1,12 @@
 import { z } from 'zod';
 
 /**
- * Zod schema for the presentation manifest (`graph.json`).
+ * Zod schemas for the space file (`space.json`).
  *
- * This validates *shape* only. Referential integrity (do step/route ids
- * actually resolve to real cards) is validated separately in `@project/graph`,
- * because it needs the whole manifest in view.
+ * These validate *shape* only. Referential integrity (do step/route ids
+ * actually resolve to real cards) is checked separately in `@project/graph`,
+ * because it needs the whole space in view. A value that passes here is not yet
+ * a Space — `loadSpace` adds the reference check and the index (ADR 0010).
  */
 
 const idSchema = z.string().min(1);
@@ -15,7 +16,7 @@ export const markdownCardSchema = z.object({
   id: idSchema,
   title: z.string().min(1),
   kind: z.literal('markdown'),
-  /** Relative path (from the manifest) to the file holding this card's content. */
+  /** Relative path (from the space file) to the file holding this card's content. */
   content: z.string().min(1),
 });
 
@@ -30,8 +31,8 @@ export const aliasCardSchema = z.object({
 
 /**
  * A card is one of several kinds, discriminated by `kind`. `kind` defaults to
- * `'markdown'` when absent, so manifests authored before the kind existed still
- * parse unchanged.
+ * `'markdown'` when absent, so space files authored before the kind existed
+ * still parse unchanged.
  */
 export const cardSchema = z.preprocess(
   (value) =>
@@ -54,7 +55,13 @@ export const routeSchema = z.object({
   steps: z.array(routeStepSchema).min(1),
 });
 
-export const manifestSchema = z.object({
+/**
+ * The on-disk shape of a space — the serialized form `loadSpace` reads (ADR
+ * 0010). This validates *shape* only; a value that passes it is not yet a Space
+ * (references unchecked, no index). "manifest" is retired: this is the space
+ * file, not a manifest.
+ */
+export const spaceFileSchema = z.object({
   version: z.literal(1),
   title: z.string().min(1),
   cards: z.array(cardSchema),

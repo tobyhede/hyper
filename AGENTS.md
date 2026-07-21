@@ -17,11 +17,11 @@ A local, file-first prototype for **graph-native technical presentations**: Mark
 
 Five `@project/*` workspace packages under `packages/`:
 
-- `core` — domain model. Zod schemas (`schema.ts`) + types derived from them (`types.ts`); `parseManifest`/`safeParseManifest`. No React, no framework deps.
-- `graph` — pure graph logic over a manifest: lookups, route navigation (clamped step indexing), route→handles/edges derivation, reference validation, and the `Layout` contract (`LayoutGraph`, `buildLayoutGraph`, `gridLayout`). Depends only on `core`.
-- `react-flow-adapter` — the ONLY place React-Flow (`@xyflow/react`) and elkjs specifics live: projects a manifest+route into RF nodes/edges, implements `Layout` as `elkLayout`, renders `CardNode`.
+- `core` — domain model. Zod schemas (`schema.ts`, incl. `spaceFileSchema` — the space-file shape) + the `Card`/`Route`/`RouteStep` types derived from them (`types.ts`). No React, no framework deps.
+- `graph` — pure graph logic over a `Space`: `loadSpace` (the one intake — parse, validate references, index), the `Space` type, O(1) lookups, route navigation (clamped step indexing), route→handles/edges derivation, reference validation, and the `Layout` contract (`LayoutGraph`, `buildLayoutGraph`, `gridLayout`). Depends only on `core`.
+- `react-flow-adapter` — the ONLY place React-Flow (`@xyflow/react`) and elkjs specifics live: projects a space+route into RF nodes/edges, implements `Layout` as `elkLayout`, renders `CardNode`.
 - `ui` — reusable, presentation-agnostic React components + shadcn-style primitives (Tailwind v4, Radix Select, CVA). Depends on `core` only.
-- `app` — wiring/composition: Zustand store, TanStack Router, manifest loading, graph/presentation views, hand-rolled CSS.
+- `app` — wiring/composition: Zustand store, TanStack Router, space loading, graph/presentation views, hand-rolled CSS.
 
 Hard rules:
 - Domain logic stays out of React (keep it in `core`/`graph`).
@@ -41,7 +41,7 @@ Hard rules:
 - **A card's title lives in the manifest, not in its Markdown.** Card bodies are body-only; a leading heading that repeats `card.title` renders twice, on every surface. This was true of the bundled demo from the initial commit until 2026-07-20.
 - **Routes are a space's only structure.** There is no authored `edges` array; ADR 0007 deleted it along with the `sequence`/`reference` kinds. `Edge` is React Flow's word for the drawn line, one per route step transition, and `CONTEXT.md` lists it under a render-layer section rather than as a domain term. Don't reintroduce authored edges as a "structural layer".
 - **`path` now means a file path only.** The Route rename is done: the manifest key is `routes`, and the code says `Route`/`routeId`/`buildRouteEdges`. Remaining `path` identifiers are filesystem paths, TanStack Router URL paths, or React Flow's own SVG `edge-path` class — don't "fix" those.
-- **`Manifest` is retired vocabulary, not yet retired code.** The top-level domain value is a **Space** (ADR 0010, `CONTEXT.md`); `manifest` is a shipping-ledger word, wrong for an authored world. The code still says `Manifest`/`parseManifest`/`manifestSchema`/`app/manifest.ts` — that divergence is real and `space-intake/01` closes it, folding the rename into `loadSpace` (which parses + validates + indexes into a `Space`). Don't add new `manifest` surface, and don't reintroduce it later as the word for the *file* — the file is "the space file", and the future edit buffer (a `Draft`) is where a richer file vocabulary would go, not now.
+- **`manifest` is retired, in vocabulary and code (ADR 0010).** The top-level domain value is a **Space**, minted only by `loadSpace(input) → { ok, space } | { ok: false, errors }` in `@project/graph` — the one intake that parses, validates references, and indexes, so a `Space` is consistent and O(1)-indexable by construction. `getCard`/`getRoute` read that index; every `graph`/adapter/app signature takes a `Space`. The on-disk shape is the **space file** (`space.json`, validated by `core`'s `spaceFileSchema`); a value that only passes that schema is *not yet* a Space. Don't reintroduce `manifest` anywhere — not as a type, not as the word for the file. The future edit buffer (a `Draft`, not built) is where a mutable, possibly-invalid working copy would live; a Space is never that.
 - **Styling is split:** `ui` uses Tailwind v4 + shadcn-style primitives; the graph/card CSS stays hand-rolled in `packages/app/src/styles.css`. Tailwind scans `app` + `ui/src` via `@source` in `tailwind.css`.
 - **Markdown is excluded from Prettier** (`.prettierignore`) — don't rely on `format` to touch `*.md`.
 

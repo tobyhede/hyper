@@ -1,9 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import type { Manifest } from '@project/core';
-import { buildCardHandles, buildRouteEdges } from '@project/graph';
+import { buildCardHandles, buildRouteEdges, loadSpace, type Space } from '@project/graph';
 import { projectCardNodes, projectRouteEdges, type RouteEmphasis } from '../src/index';
 
-const manifest: Manifest = {
+function load(input: unknown): Space {
+  const result = loadSpace(input);
+  if (!result.ok) throw new Error('fixture should load');
+  return result.space;
+}
+
+const space = load({
   version: 1,
   title: 'Test',
   cards: [
@@ -14,14 +19,14 @@ const manifest: Manifest = {
     { id: 'main', title: 'Main', steps: [{ target: 'a' }, { target: 'b' }] },
     { id: 'alt', title: 'Alt', steps: [{ target: 'b' }, { target: 'a' }] },
   ],
-};
+});
 
 const colors = { main: '#111111', alt: '#222222' };
-const handles = buildCardHandles(manifest);
+const handles = buildCardHandles(space);
 
 describe('projectCardNodes', () => {
   it('maps cards to card nodes carrying the title, not the content', () => {
-    const nodes = projectCardNodes(manifest, handles, colors);
+    const nodes = projectCardNodes(space, handles, colors);
     const a = nodes.find((n) => n.id === 'a')!;
     expect(a.type).toBe('card');
     expect(a.data.title).toBe('Card A');
@@ -31,7 +36,7 @@ describe('projectCardNodes', () => {
   });
 
   it('attaches per-route handles colored by route', () => {
-    const nodes = projectCardNodes(manifest, handles, colors);
+    const nodes = projectCardNodes(space, handles, colors);
     const a = nodes.find((n) => n.id === 'a')!;
     // main leaves card a (out); alt ends at card a (in).
     expect(a.data.sourceHandles).toMatchObject([
@@ -45,7 +50,7 @@ describe('projectCardNodes', () => {
   });
 
   it('uses the port offsets and positions a layout put on the cards', () => {
-    const nodes = projectCardNodes(manifest, handles, colors, {
+    const nodes = projectCardNodes(space, handles, colors, {
       layoutGraph: {
         cards: [
           {
@@ -68,13 +73,13 @@ describe('projectCardNodes', () => {
   });
 
   it('flags the active card', () => {
-    const nodes = projectCardNodes(manifest, handles, colors, { activeCardId: 'b' });
+    const nodes = projectCardNodes(space, handles, colors, { activeCardId: 'b' });
     expect(nodes.find((n) => n.id === 'b')!.data.active).toBe(true);
     expect(nodes.find((n) => n.id === 'b')!.className).toContain('rf-card-node--active');
   });
 
   it('marks an alias node with the title of the card it shows', () => {
-    const withAlias: Manifest = {
+    const withAlias = load({
       version: 1,
       title: 'Test',
       cards: [
@@ -82,7 +87,7 @@ describe('projectCardNodes', () => {
         { id: 'a-again', title: 'Card A, again', kind: 'alias', target: 'a' },
       ],
       routes: [{ id: 'main', title: 'Main', steps: [{ target: 'a' }, { target: 'a-again' }] }],
-    };
+    });
     const nodes = projectCardNodes(withAlias, buildCardHandles(withAlias), colors);
     // A markdown card is nobody's alias.
     expect(nodes.find((n) => n.id === 'a')!.data.aliasOf).toBeUndefined();
@@ -92,7 +97,7 @@ describe('projectCardNodes', () => {
 });
 
 describe('projectRouteEdges', () => {
-  const routeEdges = buildRouteEdges(manifest);
+  const routeEdges = buildRouteEdges(space);
 
   it('maps route edges to colored, port-connected React Flow edges', () => {
     const edges = projectRouteEdges(routeEdges, colors);

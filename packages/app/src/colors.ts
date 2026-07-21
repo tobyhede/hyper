@@ -1,4 +1,4 @@
-import type { Manifest } from '@project/core';
+import type { Space } from '@project/graph';
 
 /** Distinct, reasonably accessible edge colors, assigned to routes by order. */
 export const ROUTE_PALETTE = [
@@ -10,10 +10,10 @@ export const ROUTE_PALETTE = [
   '#f87171', // red
 ] as const;
 
-/** Resolve each route's color: its manifest `color`, else a palette slot by order. */
-export function routeColorMap(manifest: Manifest): Record<string, string> {
+/** Resolve each route's color: its space `color`, else a palette slot by order. */
+export function routeColorMap(space: Space): Record<string, string> {
   const map: Record<string, string> = {};
-  manifest.routes.forEach((route, index) => {
+  space.routes.forEach((route, index) => {
     map[route.id] = route.color ?? ROUTE_PALETTE[index % ROUTE_PALETTE.length] ?? '#8a94a6';
   });
   return map;

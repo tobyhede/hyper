@@ -1,6 +1,5 @@
 import type { Edge, Node } from '@xyflow/react';
 import { MarkerType } from '@xyflow/react';
-import type { Manifest } from '@project/core';
 import { resolveContentCard } from '@project/graph';
 import type {
   CardHandleSet,
@@ -8,6 +7,7 @@ import type {
   LayoutGraph,
   RouteEdge,
   RouteHandleRef,
+  Space,
 } from '@project/graph';
 
 const FALLBACK_COLOR = '#8a94a6';
@@ -104,7 +104,7 @@ function resolveHandles(
  * loaded when a card is opened or presented, not embedded in every node.
  */
 export function projectCardNodes(
-  manifest: Manifest,
+  space: Space,
   handlesByCard: ReadonlyMap<string, CardHandleSet>,
   colors: ColorByRouteId,
   options: ProjectCardNodesOptions = {},
@@ -116,15 +116,14 @@ export function projectCardNodes(
   const visible = options.cardIds ? new Set(options.cardIds) : null;
   const laidOut = new Map((options.layoutGraph?.cards ?? []).map((c) => [c.id, c]));
 
-  const source = visible ? manifest.cards.filter((c) => visible.has(c.id)) : manifest.cards;
+  const source = visible ? space.cards.filter((c) => visible.has(c.id)) : space.cards;
 
   return source.map((card) => {
     const handles = handlesByCard.get(card.id) ?? EMPTY_HANDLES;
     const cardLayout = laidOut.get(card.id);
     const active = card.id === activeCardId;
     // An alias names the card it redraws; a markdown card names nothing (ADR 0009).
-    const aliasOf =
-      card.kind === 'alias' ? resolveContentCard(manifest, card.id)?.title : undefined;
+    const aliasOf = card.kind === 'alias' ? resolveContentCard(space, card.id)?.title : undefined;
 
     return {
       id: card.id,
