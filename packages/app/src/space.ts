@@ -22,11 +22,11 @@ if (!result.ok) {
 
 export const space: Space = result.space;
 
-const rawCards = import.meta.glob('../fixture/cards/*.md', {
+const rawCards = import.meta.glob<string>('../fixture/cards/*.md', {
   query: '?raw',
   import: 'default',
   eager: true,
-}) as Record<string, string>;
+});
 
 export const markdownByCardId: Record<string, string> = Object.fromEntries(
   // Only markdown cards own a content file. An alias resolves through its target

@@ -111,7 +111,7 @@ export function PresentationDeck({
   // Our store drives reveal.
   useEffect(() => {
     const deck = deckRef.current;
-    if (!deck?.isReady?.()) return;
+    if (!deck?.isReady()) return;
     if (deck.getIndices().h === stepIndex) return;
     drivingRef.current = true;
     deck.slide(stepIndex);

@@ -18,13 +18,22 @@ export default tseslint.config(
     ],
   },
   js.configs.recommended,
-  ...tseslint.configs.recommended,
+  // Type-aware linting: the strict + stylistic presets, which need type
+  // information from the project. `projectService` resolves each file to its
+  // owning tsconfig automatically (the monorepo's per-package configs and the
+  // root tsconfig.json that includes src/test/e2e).
+  ...tseslint.configs.strictTypeChecked,
+  ...tseslint.configs.stylisticTypeChecked,
   {
     files: ['**/*.{ts,tsx}'],
     languageOptions: {
       ecmaVersion: 2022,
       sourceType: 'module',
       globals: { ...globals.browser, ...globals.node },
+      parserOptions: {
+        projectService: true,
+        tsconfigRootDir: import.meta.dirname,
+      },
     },
     plugins: {
       'react-hooks': reactHooks,
@@ -37,6 +46,15 @@ export default tseslint.config(
         { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
       ],
       '@typescript-eslint/consistent-type-imports': 'error',
+      // Numbers stringify unambiguously; interpolating them is not a bug.
+      '@typescript-eslint/restrict-template-expressions': ['error', { allowNumber: true }],
+      // `() => set({...})` (Zustand actions, React handlers) is idiomatic; only
+      // flag confusing void returns in non-shorthand positions.
+      '@typescript-eslint/no-confusing-void-expression': ['error', { ignoreArrowShorthand: true }],
+      // The codebase deliberately mixes `type` (RF-data shapes needing an index
+      // signature to satisfy `Record<string, unknown>`) and `interface` (option
+      // bags). Enforcing one over the other would break that distinction.
+      '@typescript-eslint/consistent-type-definitions': 'off',
     },
   },
   {
@@ -44,5 +62,18 @@ export default tseslint.config(
     rules: {
       'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
     },
+  },
+  // Tests assert presence with `find(...)!`; a wrong assumption throws and fails
+  // the test anyway. Production code stays free of non-null assertions.
+  {
+    files: ['**/test/**', '**/e2e/**', '**/*.{test,spec}.{ts,tsx}'],
+    rules: {
+      '@typescript-eslint/no-non-null-assertion': 'off',
+    },
+  },
+  // Config files run as plain JS — no type information to check them against.
+  {
+    files: ['**/*.js'],
+    extends: [tseslint.configs.disableTypeChecked],
   },
 );

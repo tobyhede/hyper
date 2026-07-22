@@ -23,6 +23,9 @@ const DEFAULT_GAP = 80;
 export function gridLayout(options: GridLayoutOptions = {}): Layout {
   const gap = options.gap ?? DEFAULT_GAP;
 
+  // The Layout contract is uniformly async by design (ADR 0005); gridLayout has
+  // nothing to await but must still return a Promise to honour the seam.
+  // eslint-disable-next-line @typescript-eslint/require-await
   return async (graph: LayoutGraph): Promise<LayoutGraph> => {
     const count = graph.cards.length;
     if (count === 0) return { cards: [], edges: graph.edges };
