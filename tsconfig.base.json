@@ -25,12 +25,11 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-    "baseUrl": ".",
     "paths": {
-      "@project/core": ["packages/core/src/index.ts"],
-      "@project/graph": ["packages/graph/src/index.ts"],
-      "@project/react-flow-adapter": ["packages/react-flow-adapter/src/index.ts"],
-      "@project/ui": ["packages/ui/src/index.ts"]
+      "@project/core": ["./packages/core/src/index.ts"],
+      "@project/graph": ["./packages/graph/src/index.ts"],
+      "@project/react-flow-adapter": ["./packages/react-flow-adapter/src/index.ts"],
+      "@project/ui": ["./packages/ui/src/index.ts"]
     }
   }
 }
