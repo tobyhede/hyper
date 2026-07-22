@@ -215,96 +215,15 @@ body {
   font-size: 0.95rem;
 }
 
-.card__body :first-child {
-  margin-top: 0;
-}
-
-.card__body :last-child {
-  margin-bottom: 0;
-}
-
-.card__body table {
-  border-collapse: collapse;
-  width: 100%;
-}
-
-.card__body th,
-.card__body td {
-  border: 1px solid var(--border);
-  padding: 0.2rem 0.4rem;
-  text-align: left;
-}
-
-.card__body pre {
-  background: #0b0d11;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 0.5rem;
-  overflow-x: auto;
-  font-size: 0.78rem;
-}
-
-.card__body code {
+/* Opening a card shows its Markdown source, verbatim and read-only (ADR 0011):
+   monospace, whitespace preserved, wrapping long lines so nothing is clipped. */
+.card__source {
+  margin: 0;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-}
-
-.card__body a {
-  color: var(--accent);
-  text-decoration: underline;
-}
-
-/* ---- Preflight restoration ----
-   Tailwind's preflight (imported before styles.css via tailwind.css) resets the
-   margins of headings/paragraphs/blockquotes and strips list markers/indent.
-   The card bodies render user Markdown and rely on browser defaults, so restore
-   them here, scoped to `.card__body` only. */
-.card__body p,
-.card__body blockquote,
-.card__body pre {
-  margin: 1em 0;
-}
-
-.card__body blockquote {
-  margin-left: 2.5rem;
-  margin-right: 2.5rem;
-}
-
-.card__body ul,
-.card__body ol {
-  margin: 1em 0;
-  padding-left: 2.5rem;
-}
-
-.card__body ul {
-  list-style: disc;
-}
-
-.card__body ol {
-  list-style: decimal;
-}
-
-.card__body h1,
-.card__body h2,
-.card__body h3,
-.card__body h4,
-.card__body h5,
-.card__body h6 {
-  font-weight: 700;
-  margin: 0.83em 0;
-}
-
-.card__body h1 {
-  font-size: 2em;
-  margin: 0.67em 0;
-}
-
-.card__body h2 {
-  font-size: 1.5em;
-}
-
-.card__body h3 {
-  font-size: 1.17em;
-  margin: 1em 0;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 /* ---- React Flow edges ---- */
