@@ -143,8 +143,9 @@ describe('projectRouteEdges', () => {
         { x: 10, y: 4 },
       ],
     });
-    // An edge the layout did not route falls back to no points (bezier).
-    expect(edges.find((e) => e.id === 'alt::0')!.data).toMatchObject({ points: undefined });
+    // An edge the layout did not route carries no `points` key at all (bezier
+    // fallback). The key is omitted, not set to undefined (exactOptionalPropertyTypes).
+    expect(edges.find((e) => e.id === 'alt::0')!.data).not.toHaveProperty('points');
   });
 
   it('draws every route the same when nothing is emphasised', () => {

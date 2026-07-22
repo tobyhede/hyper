@@ -11,7 +11,10 @@ export function RouteSelector({ routes, selectedRouteId, onSelect }: RouteSelect
   return (
     <label className="route-selector">
       <span className="route-selector__label">Route</span>
-      <Select value={selectedRouteId ?? undefined} onValueChange={onSelect}>
+      <Select
+        {...(selectedRouteId !== null ? { value: selectedRouteId } : {})}
+        onValueChange={onSelect}
+      >
         <SelectTrigger
           className="route-selector__select"
           data-testid="route-selector"

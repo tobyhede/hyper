@@ -135,7 +135,8 @@ export function projectCardNodes(
       data: {
         cardId: card.id,
         title: card.title,
-        aliasOf,
+        // Omit rather than set undefined: absent means "not an alias" (ADR 0009).
+        ...(aliasOf !== undefined ? { aliasOf } : {}),
         active,
         activeRouteId,
         emphasis,
@@ -199,7 +200,10 @@ export function projectRouteEdges(
         opacity: emphasized ? 1 : OTHER_ROUTE_OPACITY[emphasis],
       },
       markerEnd: { type: MarkerType.ArrowClosed, color },
-      data: { routeId: edge.routeId, points } satisfies RoutedEdgeData,
+      data: {
+        routeId: edge.routeId,
+        ...(points !== undefined ? { points } : {}),
+      } satisfies RoutedEdgeData,
     };
   });
 }

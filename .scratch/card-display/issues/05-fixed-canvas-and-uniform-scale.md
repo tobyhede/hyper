@@ -1,6 +1,6 @@
 # Scale the card frame from a fixed logical canvas
 
-Status: open — now applies to the reading surface only
+Status: resolved — obsoleted by ADR 0011
 
 ## Context
 
@@ -81,3 +81,26 @@ What remains is the **reading** surface (`.open-card__panel`), which is still ou
 and still has a fixed ratio without a fixed size — so whether a card overflows
 when *read* still depends on the window. Less serious than it was for presenting,
 but the same flaw.
+
+## Answer
+
+Obsoleted by ADR 0011, not implemented. This ticket's premise was that opening a
+card is a *rendered reading/preview* surface, where uniform scaling buys fidelity —
+"a card looks the same at every frame size, same line breaks." ADR 0011 changed
+opening into a **view-source** gesture: raw Markdown in a `<pre>`. Source is not a
+preview of the slide, so "identical line breaks at every size" and "scale to a
+logical canvas" are the wrong goals for it. What a source/text view wants is a
+fixed, readable font and a scroll when long — which is exactly what the panel
+already does (`.open-card__content { overflow-y: auto }`, `.card__source` monospace
++ `pre-wrap`). The future editing direction reinforces this: an editor is a
+fixed-font, scrolling surface, never a scaled canvas. The presentation half of the
+concern was already reveal's job (ADR 0008).
+
+So **overflow on the reading surface is handled by scroll, by design.**
+
+Reviewed and kept as-is: the reading frame stays 16:9. It is not optimal for a
+text column (a taller shape would show more lines), but it is not broken, and
+keeping it preserves the graph-node / opened-card / presented-slide silhouette
+coupling `card.ts` documents. A change to the source view's *shape* (dropping 16:9
+for a document-style panel) would be its own narrow ticket, deliberately not
+opened.

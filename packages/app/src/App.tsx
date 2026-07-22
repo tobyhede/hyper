@@ -108,7 +108,7 @@ export function App() {
         activeCardId,
         activeRouteId: selectedRouteId,
         emphasis,
-        layoutGraph: laidOut ?? undefined,
+        ...(laidOut ? { layoutGraph: laidOut } : {}),
         nodeHeight: CARD_HEIGHT,
         cardIds: visibleCardIds,
       }),
@@ -120,7 +120,7 @@ export function App() {
       projectRouteEdges(visibleEdges, colors, {
         activeRouteId: selectedRouteId,
         emphasis,
-        layoutGraph: laidOut ?? undefined,
+        ...(laidOut ? { layoutGraph: laidOut } : {}),
       }),
     [visibleEdges, selectedRouteId, emphasis, laidOut],
   );

@@ -46,5 +46,12 @@ export function RoutedEdge({
       ? polyline(points)
       : getBezierPath({ sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition })[0];
 
-  return <BaseEdge id={id} path={path} markerEnd={markerEnd} style={style} />;
+  return (
+    <BaseEdge
+      id={id}
+      path={path}
+      {...(markerEnd !== undefined ? { markerEnd } : {})}
+      {...(style !== undefined ? { style } : {})}
+    />
+  );
 }
