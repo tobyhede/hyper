@@ -51,6 +51,11 @@ export function CardNode({ data }: NodeProps<CardFlowNode>) {
       {data.targetHandles.map((handle) => renderHandle(handle, 'target'))}
       <article className="card card--node" data-testid="card">
         <h2 className="card__title">{data.title}</h2>
+        {data.description && (
+          <p className="card__description" data-testid="card-description">
+            {data.description}
+          </p>
+        )}
         {data.aliasOf && (
           <p className="card__alias-of" data-testid="alias-marker">
             <AliasGlyph />

@@ -35,6 +35,28 @@ describe('projectCardNodes', () => {
     expect('markdown' in a.data).toBe(false);
   });
 
+  it("carries a card's description when it has one, and omits it otherwise", () => {
+    const described = load({
+      version: 1,
+      title: 'Test',
+      cards: [
+        {
+          id: 'a',
+          title: 'Card A',
+          description: 'What A is',
+          kind: 'markdown',
+          content: 'cards/a.md',
+        },
+        { id: 'b', title: 'Card B', kind: 'markdown', content: 'cards/b.md' },
+      ],
+      routes: [{ id: 'main', title: 'Main', steps: [{ target: 'a' }, { target: 'b' }] }],
+    });
+    const nodes = projectCardNodes(described, buildCardHandles(described), colors);
+    expect(nodes.find((n) => n.id === 'a')!.data.description).toBe('What A is');
+    // Absent, not undefined — a card with no description carries no key.
+    expect('description' in nodes.find((n) => n.id === 'b')!.data).toBe(false);
+  });
+
   it('attaches per-route handles colored by route', () => {
     const nodes = projectCardNodes(space, handles, colors);
     const a = nodes.find((n) => n.id === 'a')!;

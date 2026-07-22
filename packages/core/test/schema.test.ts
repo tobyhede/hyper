@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { spaceFileSchema } from '../src/index';
+import { CARD_DESCRIPTION_MAX_LENGTH, spaceFileSchema } from '../src/index';
 
 const validSpaceFile = {
   version: 1,
@@ -70,6 +70,37 @@ describe('space file schema', () => {
     const alias = file.cards[1]!;
     expect(alias.kind).toBe('alias');
     expect(alias.kind === 'alias' && alias.target).toBe('a');
+  });
+
+  it('accepts an optional single-line card description', () => {
+    const file = spaceFileSchema.parse({
+      ...validSpaceFile,
+      cards: [{ id: 'a', title: 'A', description: 'What A is', content: 'cards/a.md' }],
+    });
+    expect(file.cards[0]!.description).toBe('What A is');
+  });
+
+  it('rejects a description longer than the cap', () => {
+    const result = spaceFileSchema.safeParse({
+      ...validSpaceFile,
+      cards: [
+        {
+          id: 'a',
+          title: 'A',
+          description: 'x'.repeat(CARD_DESCRIPTION_MAX_LENGTH + 1),
+          content: 'cards/a.md',
+        },
+      ],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects a multi-line description — a caption, not a body', () => {
+    const result = spaceFileSchema.safeParse({
+      ...validSpaceFile,
+      cards: [{ id: 'a', title: 'A', description: 'line one\nline two', content: 'cards/a.md' }],
+    });
+    expect(result.success).toBe(false);
   });
 
   it('rejects an alias card that carries content instead of a target', () => {

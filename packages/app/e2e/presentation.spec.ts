@@ -136,10 +136,15 @@ test('a card shows its title in the graph, and opens to show its Markdown source
   await page.goto('/');
   await expect(page.locator('.react-flow__node').first()).toBeVisible();
 
-  // The graph draws titles only — no card body text (ADR 0006).
+  // The graph draws the title, plus a card's optional short description (ADR
+  // 0006, card-display/03) — but never the card's body. A carries a description;
+  // "entry point" is its body text, which must not appear.
   const a = nodeByTitle(page, 'A');
   await expect(a).toBeVisible();
+  await expect(a.getByTestId('card-description')).toHaveText('Where every route begins');
   await expect(a).not.toContainText('entry point');
+  // A card without a description renders no description element.
+  await expect(nodeByTitle(page, 'B').getByTestId('card-description')).toHaveCount(0);
   await expect(page.getByTestId('open-card')).toBeHidden();
 
   // Opening shows the Markdown source verbatim, not rendered (ADR 0011) — the

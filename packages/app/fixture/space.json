@@ -2,7 +2,7 @@
   "version": 1,
   "title": "Layout fixture",
   "cards": [
-    { "id": "a", "title": "A", "content": "cards/a.md" },
+    { "id": "a", "title": "A", "description": "Where every route begins", "content": "cards/a.md" },
     { "id": "b", "title": "B", "content": "cards/b.md" },
     { "id": "c", "title": "C", "content": "cards/c.md" },
     { "id": "d", "title": "D", "content": "cards/d.md" },

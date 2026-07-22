@@ -47,6 +47,9 @@ export type CardHandle = {
 export type CardNodeData = {
   cardId: string;
   title: string;
+  /** A short caption drawn under the title (ADR 0006). Absent when the card has
+   *  none — the card's own, never inherited through an alias. */
+  description?: string;
   /** For an alias, the title of the card it shows — so the node can name what it
    *  redraws. Absent on non-alias cards. */
   aliasOf?: string;
@@ -135,6 +138,9 @@ export function projectCardNodes(
       data: {
         cardId: card.id,
         title: card.title,
+        // The card's own description, drawn under the title (ADR 0006). Omit when
+        // absent; never inherited through an alias.
+        ...(card.description !== undefined ? { description: card.description } : {}),
         // Omit rather than set undefined: absent means "not an alias" (ADR 0009).
         ...(aliasOf !== undefined ? { aliasOf } : {}),
         active,

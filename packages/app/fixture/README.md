@@ -30,6 +30,9 @@ Between them the shape exercises every behaviour the e2e suite covers:
   between them.
 - **Alias as return (ADR 0009, 0012).** `A′` / `E′` show `A` / `E`'s content under
   their own titles, and are how a route "comes back" without a revisit.
+- **Card description (ADR 0006, card-display/03).** `A` carries a `description`
+  ("Where every route begins"), drawn under its title in the graph node; the other
+  cards have none, so the node renders with and without one.
 - **Open shows source (ADR 0011).** `A`'s body carries `**A**`, so opening it can
   prove the Markdown markers survive rather than rendering bold.
 - **Open off the selected route.** `E` is in the other collection, so selecting a
