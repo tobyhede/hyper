@@ -81,18 +81,23 @@ export function App() {
     [visibleCardIds, visibleHandles, visibleEdges],
   );
 
-  // Re-run the layout whenever the visible graph changes.
-  const [laidOut, setLaidOut] = useState<LayoutGraph | null>(null);
+  // Re-run the layout whenever the visible graph changes. The result is stored
+  // alongside the graph it was computed from, so a stale result is derived away
+  // during render rather than cleared by a synchronous setState in the effect.
+  const [layoutResult, setLayoutResult] = useState<{
+    graph: LayoutGraph;
+    result: LayoutGraph;
+  } | null>(null);
   useEffect(() => {
     let cancelled = false;
-    setLaidOut(null);
     void layout(graph).then((result) => {
-      if (!cancelled) setLaidOut(result);
+      if (!cancelled) setLayoutResult({ graph, result });
     });
     return () => {
       cancelled = true;
     };
   }, [graph]);
+  const laidOut = layoutResult?.graph === graph ? layoutResult.result : null;
 
   // Selecting a route emphasises it; it never hides the rest of the space.
   const emphasis: RouteEmphasis = selectedRouteId ? 'subtle' : 'equal';

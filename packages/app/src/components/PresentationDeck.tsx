@@ -45,7 +45,9 @@ export function PresentationDeck({
   /** Set while we are driving reveal, so its echo does not bounce back. */
   const drivingRef = useRef(false);
   const onStepChangeRef = useRef(onStepChange);
-  onStepChangeRef.current = onStepChange;
+  useEffect(() => {
+    onStepChangeRef.current = onStepChange;
+  });
 
   // Build the slide DOM. Not React's to own — reveal rewrites it.
   useEffect(() => {
