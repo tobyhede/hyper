@@ -80,9 +80,59 @@ describe('elkLayout', () => {
     expect(Number.isFinite(a!.ports[0]!.y)).toBe(true);
   });
 
-  it('leaves the edges it was given untouched', async () => {
+  it("returns ELK's routed geometry on the edges", async () => {
     const laid = await elkLayout()(graph);
-    expect(laid.edges).toEqual(graph.edges);
+    const edge = laid.edges.find((e) => e.id === 'a-b')!;
+    // The routing the app used to discard now comes back on the edge.
+    const [section] = edge.sections ?? [];
+    expect(section).toBeDefined();
+    expect(Number.isFinite(section!.startPoint.x)).toBe(true);
+    expect(Number.isFinite(section!.endPoint.x)).toBe(true);
+    // The edge keeps the identity it was given.
+    expect(edge).toMatchObject({ id: 'a-b', source: 'a', target: 'b' });
+  });
+});
+
+describe('routes a back-edge around the cards', () => {
+  // We hand the adapter a graph that contains a back-edge directly: it lays out a
+  // LayoutGraph and does not enforce domain rules, so this is the level to test
+  // back-edge *rendering*. In a real space a back-edge now comes only from two
+  // routes disagreeing on the order of shared cards (ADR 0003) — a single route
+  // may not revisit a card (ADR 0012). The steps below (`… → C → B`, target B
+  // laid left of source C) are just the simplest deterministic back-edge; ELK
+  // routes it around the cards and issue 03 draws that instead of a bezier stub.
+  const CARDS = ['A', 'B', 'C'];
+  const revisit: LayoutGraph = {
+    cards: CARDS.map((id) => ({
+      id,
+      width: 260,
+      height: 300,
+      ports: [
+        { id: 'loop::in', side: 'in' as const },
+        { id: 'loop::out', side: 'out' as const },
+      ],
+    })),
+    edges: [
+      ['loop::0', 'A', 'B'],
+      ['loop::1', 'B', 'C'],
+      ['loop::2', 'C', 'B'],
+    ].map(([id, source, target]) => ({
+      id: id!,
+      source: source!,
+      target: target!,
+      sourceHandle: 'loop::out',
+      targetHandle: 'loop::in',
+    })),
+  };
+
+  it('gives the back-edge bend points, so it channels around rather than cutting across', async () => {
+    const laid = await elkLayout()(revisit);
+    const back = laid.edges.find((e) => e.id === 'loop::2')!;
+    const [section] = back.sections ?? [];
+    expect(section).toBeDefined();
+    // A forward edge between adjacent layers is straight; a back-edge has to turn
+    // out, run past the cards and back in — which ELK expresses as bend points.
+    expect(section!.bendPoints?.length ?? 0).toBeGreaterThan(0);
   });
 });
 

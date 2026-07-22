@@ -1,6 +1,6 @@
 # A demo graph whose shape exercises the layout
 
-Status: open
+Status: resolved
 
 ## Context
 
@@ -39,3 +39,41 @@ Recommendation: keep the six real cards and add routes over them. The bundled de
 ## Also
 
 `.scratch/multiple-routes/findings.md` has the shared-spine and hub graphs already worked out, with measurements. Read it before inventing new shapes.
+
+## Answer
+
+Resolved differently from the ticket's recommendation. Rather than adding a route
+to the six real demo cards (which conflates the product showcase with a test
+fixture — the friction the ticket itself named), an **abstract fixture** was
+added at `packages/app/fixture/` and made the space `pnpm dev` loads. The
+narrative demo stays in `packages/app/example/`, dormant, for when real
+space-loading exists. This keeps test data abstract and behaviour-shaped, and
+decouples e2e from demo prose — a decision taken with the user, who was explicit
+that fixtures must not be content.
+
+Shape (settled after several rounds of review): two **disconnected collections**
+sharing no cards, which ELK lays out as separate bands —
+
+1. `Long A → B → C → D → A′`, `Mid A → B → C → D`, `Short A → B → C` — several
+   routes over one spine (the compatible-overlay case).
+2. `Echo E → F → G → H → E′` — a plain linear collection.
+
+Aliases `A′`/`E′` return each collection to its start and are named to match the
+`↳` marker. Documented in `fixture/README.md`, which maps each card and route to
+the behaviour it covers.
+
+The path here was iterative and worth recording, because it ended somewhere the
+ticket didn't anticipate. Early cuts tried to *show* `03`'s back-edge in the app
+by giving a collection a revisit (`Loop I → J → K → J`); reviewing the renders,
+the revisit was the only thing that ever tangled or crowded, and chasing it turned
+into a pile of global ELK spacing/alignment tuning. Stepping back, the real
+question was whether a route should revisit a card at all — and the answer was no
+(**ADR 0012**): a return is an alias, not a backward edge. So the revisit
+collection was removed, the ELK tuning reverted to baseline, and the fixture is the
+two clean bands above. `03`'s back-edge rendering is proven by the unit test, not
+the fixture.
+
+- No app-side space selector: one space is served, no query string.
+- `pnpm e2e` asserts behaviour against the fixture (15 tests, all content-agnostic).
+  Counts: 10 nodes / 13 edges / 26 handles / 4 routes; presenting Long is a 5-slide
+  deck.

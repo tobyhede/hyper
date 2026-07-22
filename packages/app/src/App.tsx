@@ -86,7 +86,7 @@ export function App() {
   useEffect(() => {
     let cancelled = false;
     setLaidOut(null);
-    void Promise.resolve(layout(graph)).then((result) => {
+    void layout(graph).then((result) => {
       if (!cancelled) setLaidOut(result);
     });
     return () => {
@@ -115,8 +115,9 @@ export function App() {
       projectRouteEdges(visibleEdges, colors, {
         activeRouteId: selectedRouteId,
         emphasis,
+        layoutGraph: laidOut ?? undefined,
       }),
-    [visibleEdges, selectedRouteId, emphasis],
+    [visibleEdges, selectedRouteId, emphasis, laidOut],
   );
 
   const route = selectedRouteId ? getRoute(space, selectedRouteId) : undefined;

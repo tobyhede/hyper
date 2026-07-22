@@ -1,0 +1,51 @@
+{
+  "version": 1,
+  "title": "Layout fixture",
+  "cards": [
+    { "id": "a", "title": "A", "content": "cards/a.md" },
+    { "id": "b", "title": "B", "content": "cards/b.md" },
+    { "id": "c", "title": "C", "content": "cards/c.md" },
+    { "id": "d", "title": "D", "content": "cards/d.md" },
+    { "id": "aa", "title": "A′", "kind": "alias", "target": "a" },
+
+    { "id": "e", "title": "E", "content": "cards/e.md" },
+    { "id": "f", "title": "F", "content": "cards/f.md" },
+    { "id": "g", "title": "G", "content": "cards/g.md" },
+    { "id": "h", "title": "H", "content": "cards/h.md" },
+    { "id": "ee", "title": "E′", "kind": "alias", "target": "e" }
+  ],
+  "routes": [
+    {
+      "id": "long",
+      "title": "Long",
+      "steps": [
+        { "target": "a" },
+        { "target": "b" },
+        { "target": "c" },
+        { "target": "d" },
+        { "target": "aa" }
+      ]
+    },
+    {
+      "id": "mid",
+      "title": "Mid",
+      "steps": [{ "target": "a" }, { "target": "b" }, { "target": "c" }, { "target": "d" }]
+    },
+    {
+      "id": "short",
+      "title": "Short",
+      "steps": [{ "target": "a" }, { "target": "b" }, { "target": "c" }]
+    },
+    {
+      "id": "echo",
+      "title": "Echo",
+      "steps": [
+        { "target": "e" },
+        { "target": "f" },
+        { "target": "g" },
+        { "target": "h" },
+        { "target": "ee" }
+      ]
+    }
+  ]
+}

@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { Background, Controls, MiniMap, ReactFlow, useReactFlow, type Edge } from '@xyflow/react';
-import { nodeTypes, type CardFlowNode } from '@project/react-flow-adapter';
+import { edgeTypes, nodeTypes, type CardFlowNode } from '@project/react-flow-adapter';
 
 /** Frames the graph: fits the active card while presenting, refits the whole
  *  graph in overview once the ELK layout resolves. */
@@ -41,6 +41,7 @@ export function GraphView({ nodes, edges, activeCardId, layoutReady, onOpenCard 
       nodes={nodes}
       edges={edges}
       nodeTypes={nodeTypes}
+      edgeTypes={edgeTypes}
       onNodeClick={(_event, node) => onOpenCard(node.id)}
       fitView
       nodesDraggable={false}

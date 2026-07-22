@@ -4,7 +4,7 @@ import ELK, {
   type ElkPort,
   type LayoutOptions,
 } from 'elkjs/lib/elk.bundled.js';
-import type { Layout, LayoutGraph } from '@project/graph';
+import type { Layout, LayoutEdgeSection, LayoutGraph } from '@project/graph';
 import { DEFAULT_ELK_LAYOUT_OPTIONS, elkPortId, PORT_ID_SEPARATOR } from './layout';
 
 /**
@@ -50,6 +50,24 @@ export function elkLayout(
     const laid = await engine.layout(elkGraph);
     const byId = new Map((laid.children ?? []).map((child) => [child.id, child]));
 
+    // ELK's routed geometry, keyed by edge id. Points are in the root graph's
+    // coordinate space — the same one the node positions come back in — so they
+    // map straight onto React Flow's flow coordinates without translation.
+    const sectionsByEdgeId = new Map<string, LayoutEdgeSection[]>();
+    for (const edge of laid.edges ?? []) {
+      if (!edge.sections?.length) continue;
+      sectionsByEdgeId.set(
+        edge.id,
+        edge.sections.map((section) => ({
+          startPoint: { x: section.startPoint.x, y: section.startPoint.y },
+          endPoint: { x: section.endPoint.x, y: section.endPoint.y },
+          ...(section.bendPoints
+            ? { bendPoints: section.bendPoints.map((point) => ({ x: point.x, y: point.y })) }
+            : {}),
+        })),
+      );
+    }
+
     return {
       cards: graph.cards.map((card) => {
         const child = byId.get(card.id);
@@ -73,7 +91,12 @@ export function elkLayout(
           ports: card.ports.map((port) => ({ ...port, ...offsets.get(port.id) })),
         };
       }),
-      edges: graph.edges,
+      // Carry ELK's routed geometry back onto the edges so the render layer can
+      // draw the channels ELK computed rather than its own bezier (issue 03).
+      edges: graph.edges.map((edge) => {
+        const sections = sectionsByEdgeId.get(edge.id);
+        return sections ? { ...edge, sections } : edge;
+      }),
     };
   };
 }

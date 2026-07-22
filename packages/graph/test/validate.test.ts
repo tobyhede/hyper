@@ -36,6 +36,20 @@ describe('validateReferences', () => {
     );
   });
 
+  it('rejects a route that revisits a card (ADR 0012)', () => {
+    const m = baseSpaceFile();
+    // A → B → A: a return to A. This must be an alias, not a revisit.
+    m.routes[0]!.steps.push({ target: 'a' });
+    const errors = validateReferences(m);
+    expect(errors.some((e) => e.kind === 'route-revisits-card' && e.ref === 'a')).toBe(true);
+  });
+
+  it('allows different routes to share a card', () => {
+    const m = baseSpaceFile();
+    m.routes.push({ id: 'alt', title: 'Alt', steps: [{ target: 'b' }, { target: 'a' }] });
+    expect(validateReferences(m)).toEqual([]);
+  });
+
   it('detects duplicate card ids', () => {
     const m = baseSpaceFile();
     m.cards.push({ id: 'a', title: 'A dup', kind: 'markdown', content: 'cards/a2.md' });

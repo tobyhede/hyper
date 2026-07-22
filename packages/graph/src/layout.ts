@@ -33,12 +33,36 @@ export interface LayoutCard {
   y?: number;
 }
 
+/** A point in the layout's coordinate space (same space as a card's `x`/`y`). */
+export interface LayoutPoint {
+  x: number;
+  y: number;
+}
+
+/**
+ * A routed span of an edge: where it starts, where it ends, and the corners it
+ * turns through in between. Mirrors ELK's `ElkEdgeSection` — an orthogonal
+ * back-edge routes *around* the cards as a channel rather than cutting straight
+ * across them, and the bend points are how it does that.
+ */
+export interface LayoutEdgeSection {
+  startPoint: LayoutPoint;
+  endPoint: LayoutPoint;
+  bendPoints?: LayoutPoint[];
+}
+
 export interface LayoutEdge {
   id: string;
   source: string;
   target: string;
   sourceHandle: string;
   targetHandle: string;
+  /**
+   * The routed geometry, once a routing layout has placed it. Optional like the
+   * cards' `x`/`y`: a routing layout (ELK) populates it; a placement-only one
+   * (grid) leaves it undefined and the render layer falls back to a plain curve.
+   */
+  sections?: LayoutEdgeSection[];
 }
 
 export interface LayoutGraph {
@@ -47,10 +71,16 @@ export interface LayoutGraph {
 }
 
 /**
- * A layout strategy. Synchronous ones (grid, hand-placed) return the graph
- * directly; ones that hand off to an engine return a promise.
+ * A layout strategy: takes a graph and returns it with geometry filled in.
+ *
+ * Always async. Engine-backed layouts (ELK) are inherently asynchronous; the
+ * arithmetic ones (grid, hand-placed) resolve immediately but still return a
+ * promise, so every caller handles a single shape. The type once carried a
+ * `LayoutGraph | Promise<LayoutGraph>` union, but nothing exercised the sync
+ * branch — `App` awaited every layout regardless — so it was collapsed to
+ * async-only (`.scratch/layout-seam/issues/06-revisit-async-optionality.md`).
  */
-export type Layout = (graph: LayoutGraph) => LayoutGraph | Promise<LayoutGraph>;
+export type Layout = (graph: LayoutGraph) => Promise<LayoutGraph>;
 
 /**
  * Assemble the graph to arrange, from cards the view has already chosen plus the

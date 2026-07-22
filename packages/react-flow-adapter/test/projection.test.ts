@@ -104,12 +104,47 @@ describe('projectRouteEdges', () => {
     expect(edges).toHaveLength(2);
     const mainEdge = edges.find((e) => e.id === 'main::0')!;
     expect(mainEdge).toMatchObject({
+      type: 'routed',
       source: 'a',
       target: 'b',
       sourceHandle: 'main::out',
       targetHandle: 'main::in',
     });
     expect(mainEdge.style?.stroke).toBe('#111111');
+  });
+
+  it("carries ELK's routed points when a layout has placed them", () => {
+    const edges = projectRouteEdges(routeEdges, colors, {
+      layoutGraph: {
+        cards: [],
+        edges: [
+          {
+            id: 'main::0',
+            source: 'a',
+            target: 'b',
+            sourceHandle: 'main::out',
+            targetHandle: 'main::in',
+            sections: [
+              {
+                startPoint: { x: 0, y: 0 },
+                endPoint: { x: 10, y: 4 },
+                bendPoints: [{ x: 5, y: 0 }],
+              },
+            ],
+          },
+        ],
+      },
+    });
+    // start → bends → end, flattened for the custom edge to draw.
+    expect(edges.find((e) => e.id === 'main::0')!.data).toMatchObject({
+      points: [
+        { x: 0, y: 0 },
+        { x: 5, y: 0 },
+        { x: 10, y: 4 },
+      ],
+    });
+    // An edge the layout did not route falls back to no points (bezier).
+    expect(edges.find((e) => e.id === 'alt::0')!.data).toMatchObject({ points: undefined });
   });
 
   it('draws every route the same when nothing is emphasised', () => {

@@ -5,8 +5,10 @@ import type { Layout, LayoutGraph } from './layout';
  *
  * The second Layout, and the one that makes the seam real. It consumes only the
  * cards — never the edges, never the routes — and it places no ports, leaving
- * their offsets undefined for the render layer to spread evenly. It is also
- * synchronous, which is what proves a layout need not be asynchronous.
+ * their offsets undefined for the render layer to spread evenly. That — placing
+ * no ports, ignoring the edges — is what keeps the seam honest, not any ELK
+ * specifics. The arithmetic is synchronous but the function is `async`, so it
+ * satisfies the uniformly-async `Layout` contract (layout-seam/06).
  */
 
 export interface GridLayoutOptions {
@@ -21,7 +23,7 @@ const DEFAULT_GAP = 80;
 export function gridLayout(options: GridLayoutOptions = {}): Layout {
   const gap = options.gap ?? DEFAULT_GAP;
 
-  return (graph: LayoutGraph): LayoutGraph => {
+  return async (graph: LayoutGraph): Promise<LayoutGraph> => {
     const count = graph.cards.length;
     if (count === 0) return { cards: [], edges: graph.edges };
 

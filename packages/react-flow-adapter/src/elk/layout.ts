@@ -12,6 +12,15 @@ export const DEFAULT_ELK_LAYOUT_OPTIONS: LayoutOptions = {
   // The strategy itself: a layered graph is what a route-driven space is.
   'elk.algorithm': 'layered',
 
+  // Explicit statement of ELK's default (layered routes orthogonally), now that
+  // the app actually *draws* ELK's routed geometry rather than discarding it and
+  // letting React Flow bezier between the handles. A route may not revisit a card
+  // (ADR 0012), so a single route never bends backward; a back-edge now only comes
+  // from two routes disagreeing on the order of shared cards (ADR 0003), and this
+  // is what routes it as a channel around the cards rather than a self-curling
+  // stub. See `.scratch/layout-seam/issues/03-render-elk-edge-routing.md`.
+  'elk.edgeRouting': 'ORTHOGONAL',
+
   // Explicit statement of ELK's default. Inert — removing it gives byte-identical
   // geometry — but it states the left-to-right reading axis a route follows.
   'elk.direction': 'RIGHT',
@@ -24,7 +33,7 @@ export const DEFAULT_ELK_LAYOUT_OPTIONS: LayoutOptions = {
   // spaces routinely carry four or more routes.
   'elk.layered.nodePlacement.strategy': 'BRANDES_KOEPF',
 
-  // Cosmetic, tuned to the 260x300 card. `nodeNode: 80` came from React Flow's
+  // Cosmetic, tuned to the 260x146 card. `nodeNode: 80` came from React Flow's
   // *plain* elkjs example, not the multiple-handles one the README cites.
   'elk.layered.spacing.nodeNodeBetweenLayers': '160',
   'elk.spacing.nodeNode': '80',

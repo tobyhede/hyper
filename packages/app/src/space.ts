@@ -1,11 +1,16 @@
 import { loadSpace, type Space } from '@project/graph';
-import spaceJson from '../example/space.json';
+import spaceJson from '../fixture/space.json';
 
 /**
- * Load the bundled example space. The app is file-first and read-only:
- * everything below is derived from `space.json` + the markdown files. The
- * bundled file is authored to be valid, so a failed load is a build-time bug —
- * we throw rather than render a half-space (ADR 0010).
+ * Load the abstract layout fixture. The app is file-first and read-only:
+ * everything below is derived from `space.json` + the markdown files.
+ *
+ * This is the abstract test bed (`fixture/`), not the narrative demo
+ * (`example/`, kept for when real space-loading exists) — it is deliberately the
+ * one space `pnpm dev` serves and the one Playwright drives, so tests assert
+ * behaviour against a purpose-shaped graph rather than demo prose. The file is
+ * authored to be valid, so a failed load is a build-time bug — we throw rather
+ * than render a half-space (ADR 0010).
  */
 
 const result = loadSpace(spaceJson);
@@ -17,7 +22,7 @@ if (!result.ok) {
 
 export const space: Space = result.space;
 
-const rawCards = import.meta.glob('../example/cards/*.md', {
+const rawCards = import.meta.glob('../fixture/cards/*.md', {
   query: '?raw',
   import: 'default',
   eager: true,

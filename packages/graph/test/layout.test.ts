@@ -67,13 +67,12 @@ describe('gridLayout', () => {
     SIZE,
   );
 
-  it('is synchronous — a layout need not be async', () => {
-    const laid = gridLayout()(graph);
-    expect(laid).not.toBeInstanceOf(Promise);
+  it('satisfies the uniformly-async Layout contract', () => {
+    expect(gridLayout()(graph)).toBeInstanceOf(Promise);
   });
 
-  it('places cards in reading order, wrapping at the column count', () => {
-    const laid = gridLayout({ columns: 2, gap: 10 })(graph) as LayoutGraph;
+  it('places cards in reading order, wrapping at the column count', async () => {
+    const laid = await gridLayout({ columns: 2, gap: 10 })(graph);
     expect(laid.cards.map((c) => [c.x, c.y])).toEqual([
       [0, 0],
       [110, 0],
@@ -81,8 +80,8 @@ describe('gridLayout', () => {
     ]);
   });
 
-  it('never places ports, leaving the render layer to spread them', () => {
-    const laid = gridLayout()(graph) as LayoutGraph;
+  it('never places ports, leaving the render layer to spread them', async () => {
+    const laid = await gridLayout()(graph);
     for (const card of laid.cards) {
       for (const port of card.ports) {
         expect(port.y).toBeUndefined();
@@ -90,13 +89,13 @@ describe('gridLayout', () => {
     }
   });
 
-  it('ignores the edges entirely', () => {
-    const withoutEdges = gridLayout()({ ...graph, edges: [] }) as LayoutGraph;
-    const withEdges = gridLayout()(graph) as LayoutGraph;
+  it('ignores the edges entirely', async () => {
+    const withoutEdges = await gridLayout()({ ...graph, edges: [] });
+    const withEdges = await gridLayout()(graph);
     expect(withoutEdges.cards).toEqual(withEdges.cards);
   });
 
-  it('handles an empty graph', () => {
-    expect((gridLayout()({ cards: [], edges: [] }) as LayoutGraph).cards).toEqual([]);
+  it('handles an empty graph', async () => {
+    expect((await gridLayout()({ cards: [], edges: [] })).cards).toEqual([]);
   });
 });

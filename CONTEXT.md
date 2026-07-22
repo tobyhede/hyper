@@ -30,7 +30,7 @@ A space can hold many routes; each has a name and a colour so they can be told a
 _Avoid_: path, track, tour, journey, sequence, rail.
 
 **Step**:
-One position in a route, targeting a single card. Steps are ordered, and a route may revisit the same card.
+One position in a route, targeting a single card. Steps are ordered, and a route visits each card at most once — to return to earlier content, a route steps to an **alias** of it, not back to the card itself (ADR 0012). A revisit would be a backward edge in the graph; an alias is a forward step to a distinct card showing the same content.
 _Avoid_: slide, stop, frame.
 
 ## Layout and views
@@ -44,7 +44,7 @@ The rendering of a layout for a viewer — which cards and routes are shown, and
 _Avoid_: mode, screen, page, layout.
 
 **Opening**:
-Showing a single card's content to a viewer in place, over whatever view they are in. A card of any kind can be opened, and what the viewer sees is whatever its kind holds: a markdown card shows its text, a space card shows its nested graph to explore, an alias shows what its target would show. Opening is not presenting — it is a reading gesture, and the view it happens over is still the thing being looked at.
+Showing a single card's content to a viewer in place, over whatever view they are in. A card of any kind can be opened, and what the viewer sees is whatever its kind holds: a markdown card shows its Markdown source, verbatim; a space card shows its nested graph to explore; an alias shows what its target would show. Opening is not presenting — it is a reading gesture, and the view it happens over is still the thing being looked at. A markdown card is only ever drawn *rendered* by presenting.
 _Avoid_: expand, preview, popup, modal, drill-down.
 
 **Presenting**:

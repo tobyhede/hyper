@@ -4,11 +4,14 @@ import { resolveContentCard } from '@project/graph';
 import type {
   CardHandleSet,
   LayoutCard,
+  LayoutEdge,
   LayoutGraph,
+  LayoutPoint,
   RouteEdge,
   RouteHandleRef,
   Space,
 } from '@project/graph';
+import type { RoutedEdgeData } from './RoutedEdge';
 
 const FALLBACK_COLOR = '#8a94a6';
 const DEFAULT_NODE_HEIGHT = 300;
@@ -149,9 +152,21 @@ export interface ProjectRouteEdgesOptions {
   activeRouteId?: string | null;
   /** How strongly the other routes recede. */
   emphasis?: RouteEmphasis;
+  /** The laid-out graph; ELK's routed edge geometry comes from here when present. */
+  layoutGraph?: LayoutGraph;
 }
 
-/** Map route-derived edges → colored React Flow edges connected port-to-port. */
+/** Flatten an edge's routed sections into one point list: start → bends → end. */
+function routedPoints(edge: LayoutEdge | undefined): LayoutPoint[] | undefined {
+  if (!edge?.sections?.length) return undefined;
+  const points: LayoutPoint[] = [];
+  for (const section of edge.sections) {
+    points.push(section.startPoint, ...(section.bendPoints ?? []), section.endPoint);
+  }
+  return points;
+}
+
+/** Map route-derived edges → colored React Flow edges drawn along ELK's routing. */
 export function projectRouteEdges(
   routeEdges: readonly RouteEdge[],
   colors: ColorByRouteId,
@@ -159,19 +174,23 @@ export function projectRouteEdges(
 ): Edge[] {
   const activeRouteId = options.activeRouteId ?? null;
   const emphasis = options.emphasis ?? 'equal';
+  const laidEdges = new Map((options.layoutGraph?.edges ?? []).map((e) => [e.id, e]));
 
   return routeEdges.map((edge) => {
     const color = colors[edge.routeId] ?? FALLBACK_COLOR;
     const isActiveRoute = edge.routeId === activeRouteId;
     const emphasized = isActiveRoute || emphasis === 'equal';
+    const points = routedPoints(laidEdges.get(edge.id));
 
     return {
       id: edge.id,
+      // A custom edge that draws ELK's routed polyline (issue 03); it falls back
+      // to a bezier between the handles when no routing has been placed yet.
+      type: 'routed',
       source: edge.source,
       target: edge.target,
       sourceHandle: edge.sourceHandle,
       targetHandle: edge.targetHandle,
-      // Default (bezier) curves, matching the upstream example.
       className: `rf-route-edge rf-route-edge--${edge.routeId}`,
       animated: emphasized,
       style: {
@@ -180,7 +199,7 @@ export function projectRouteEdges(
         opacity: emphasized ? 1 : OTHER_ROUTE_OPACITY[emphasis],
       },
       markerEnd: { type: MarkerType.ArrowClosed, color },
-      data: { routeId: edge.routeId },
+      data: { routeId: edge.routeId, points } satisfies RoutedEdgeData,
     };
   });
 }

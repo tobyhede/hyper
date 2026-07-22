@@ -13,6 +13,7 @@ export type ReferenceErrorKind =
   | 'duplicate-card-id'
   | 'duplicate-route-id'
   | 'unresolved-route-step'
+  | 'route-revisits-card'
   | 'unresolved-alias-target'
   | 'alias-self-reference'
   | 'alias-targets-alias';
@@ -62,6 +63,19 @@ export function validateReferences(space: Referenceable): ReferenceError[] {
         });
       }
     });
+
+    // A route may not visit the same card twice (ADR 0012). A revisit is a
+    // backward edge in the spatial graph — the one thing a single route can do
+    // that no left-to-right layout renders cleanly. "Return to earlier content"
+    // is expressed by an alias (ADR 0009): a distinct card showing the same
+    // content, which the route reaches as a forward step.
+    for (const target of duplicates(route.steps.map((s) => s.target))) {
+      errors.push({
+        kind: 'route-revisits-card',
+        ref: target,
+        message: `Route "${route.id}" visits card "${target}" more than once; use an alias to return to it (ADR 0012)`,
+      });
+    }
   }
 
   for (const card of space.cards) {
