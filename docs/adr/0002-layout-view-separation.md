@@ -1,6 +1,6 @@
 # Layout and view are separate entities
 
 Status: accepted
-Refined by: 0005, 0006
+Refined by: 0005, 0006, 0013
 
 A **layout** is a defined arrangement of a space's cards — which cards are shown and how they are organised and positioned. A **view** is the rendering of a layout for a viewer. A space can hold several layouts (a route-driven graph, a grid, a cluster map), and a view renders one of them. We keep these distinct rather than collapsing them into a single "view" that both arranges and draws, because the two vary independently: the same cards can be arranged many ways, and an arrangement is a thing an author can define and reason about separately from how it is drawn on screen. The current Presentation view — routes drawn on an ELK-computed graph — is then just *one* view of *one* layout, not the whole story, which leaves room for other layouts and views without reworking the model. The cost: two concepts where a smaller project might ship one, and the seam between "arrange" and "render" has to be honoured in the code.

@@ -1,17 +1,24 @@
-import type { Card, Route } from '@project/core';
+import { isBuiltInViewId, type Card, type Layout, type Route } from '@project/core';
 
 /**
- * The cards and routes a reference check reads. Structural so it accepts both a
- * freshly parsed space file (inside `loadSpace`) and an already-built `Space`.
+ * The cards, routes and layouts a reference check reads. Structural so it
+ * accepts both a freshly parsed space file (inside `loadSpace`) and an
+ * already-built `Space`. `layouts` and `defaultView` are optional: a space may
+ * declare neither and open in an automatic view (ADR 0013).
  */
 export interface Referenceable {
   readonly cards: readonly Card[];
   readonly routes: readonly Route[];
+  readonly layouts?: readonly Layout[] | undefined;
+  readonly defaultView?: string | undefined;
 }
 
 export type ReferenceErrorKind =
   | 'duplicate-card-id'
   | 'duplicate-route-id'
+  | 'duplicate-layout-id'
+  | 'layout-position-unknown-card'
+  | 'unresolved-default-view'
   | 'unresolved-route-step'
   | 'route-revisits-card'
   | 'unresolved-alias-target'
@@ -51,6 +58,39 @@ export function validateReferences(space: Referenceable): ReferenceError[] {
   }
   for (const id of duplicates(space.routes.map((r) => r.id))) {
     errors.push({ kind: 'duplicate-route-id', ref: id, message: `Duplicate route id "${id}"` });
+  }
+
+  const layouts = space.layouts ?? [];
+  for (const id of duplicates(layouts.map((l) => l.id))) {
+    errors.push({ kind: 'duplicate-layout-id', ref: id, message: `Duplicate layout id "${id}"` });
+  }
+
+  // Positions are sparse: a layout may omit cards, and whoever renders it places
+  // those itself. The asymmetry is that it may not name a card that does not
+  // exist — a position left behind by a deleted card (ADR 0013).
+  for (const layout of layouts) {
+    for (const cardId of Object.keys(layout.positions)) {
+      if (!cardIds.has(cardId)) {
+        errors.push({
+          kind: 'layout-position-unknown-card',
+          ref: cardId,
+          message: `Layout "${layout.id}" positions missing card "${cardId}"`,
+        });
+      }
+    }
+  }
+
+  // `defaultView` names a declared layout or a built-in automatic view, and
+  // nothing else — it records which view opens, never how to compute one.
+  if (space.defaultView !== undefined) {
+    const declared = new Set(layouts.map((l) => l.id));
+    if (!declared.has(space.defaultView) && !isBuiltInViewId(space.defaultView)) {
+      errors.push({
+        kind: 'unresolved-default-view',
+        ref: space.defaultView,
+        message: `defaultView "${space.defaultView}" names neither a declared layout nor a built-in view`,
+      });
+    }
   }
 
   for (const route of space.routes) {

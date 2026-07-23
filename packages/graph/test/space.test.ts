@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { getCard, getRoute, loadSpace } from '../src/index';
+import { getCard, getLayout, getRoute, loadSpace } from '../src/index';
 
 const validInput = {
   version: 1,
@@ -48,5 +48,57 @@ describe('loadSpace', () => {
     expect(getCard(result.space, 'missing')).toBeUndefined();
     expect(getRoute(result.space, 'main')?.title).toBe('Main');
     expect(getRoute(result.space, 'missing')).toBeUndefined();
+  });
+});
+
+describe('loadSpace: layouts', () => {
+  const working = {
+    id: 'working',
+    title: 'Working',
+    kind: 'positioned',
+    positions: { a: { x: 0, y: 0 }, b: { x: 320, y: 0 } },
+  };
+
+  it('gives a space with no declared layouts an empty list, never undefined', () => {
+    const result = loadSpace(validInput);
+    if (!result.ok) throw new Error('expected a valid space');
+    expect(result.space.layouts).toEqual([]);
+    expect(result.space.defaultView).toBeUndefined();
+  });
+
+  it('carries and indexes the layouts it was given', () => {
+    const result = loadSpace({ ...validInput, layouts: [working], defaultView: 'working' });
+    if (!result.ok) throw new Error('expected a valid space');
+    expect(result.space.layouts).toHaveLength(1);
+    expect(result.space.defaultView).toBe('working');
+    expect(getLayout(result.space, 'working')?.positions['b']).toEqual({ x: 320, y: 0 });
+    expect(getLayout(result.space, 'missing')).toBeUndefined();
+  });
+
+  it('resolves a built-in view name to no declared layout', () => {
+    const result = loadSpace({ ...validInput, defaultView: 'graph' });
+    if (!result.ok) throw new Error('expected a valid space');
+    expect(getLayout(result.space, 'graph')).toBeUndefined();
+  });
+
+  it('rejects a layout positioning a card that does not exist', () => {
+    const result = loadSpace({
+      ...validInput,
+      layouts: [{ ...working, positions: { ...working.positions, ghost: { x: 1, y: 1 } } }],
+    });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(
+      result.errors.some((e) => e.kind === 'layout-position-unknown-card' && e.ref === 'ghost'),
+    ).toBe(true);
+  });
+
+  it('rejects a defaultView that names nothing', () => {
+    const result = loadSpace({ ...validInput, layouts: [working], defaultView: 'nowhere' });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(
+      result.errors.some((e) => e.kind === 'unresolved-default-view' && e.ref === 'nowhere'),
+    ).toBe(true);
   });
 });

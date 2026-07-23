@@ -1,4 +1,4 @@
-import { spaceFileSchema, type Card, type Route } from '@project/core';
+import { spaceFileSchema, type Card, type Layout, type Route } from '@project/core';
 import { validateReferences, type ReferenceError } from './validate';
 
 /**
@@ -12,8 +12,17 @@ export interface Space {
   readonly title: string;
   readonly cards: readonly Card[];
   readonly routes: readonly Route[];
+  /**
+   * The positioned layouts the author wrote, if any. Empty is the normal state
+   * of a hand-authored space: automatic layouts carry no data, so they are
+   * declared nowhere (ADR 0013).
+   */
+  readonly layouts: readonly Layout[];
+  /** Which view this space opens in — a layout's id or a built-in view's. */
+  readonly defaultView: string | undefined;
   readonly cardsById: ReadonlyMap<string, Card>;
   readonly routesById: ReadonlyMap<string, Route>;
+  readonly layoutsById: ReadonlyMap<string, Layout>;
 }
 
 /** Why a load failed: a bad shape, or a reference that does not resolve. */
@@ -34,12 +43,16 @@ export function loadSpace(input: unknown): LoadSpaceResult {
   const file = parsed.data;
   const referenceErrors = validateReferences(file);
   if (referenceErrors.length > 0) return { ok: false, errors: referenceErrors };
+  const layouts = file.layouts ?? [];
   const space: Space = {
     title: file.title,
     cards: file.cards,
     routes: file.routes,
+    layouts,
+    defaultView: file.defaultView,
     cardsById: new Map(file.cards.map((c) => [c.id, c])),
     routesById: new Map(file.routes.map((r) => [r.id, r])),
+    layoutsById: new Map(layouts.map((l) => [l.id, l])),
   };
   return { ok: true, space };
 }

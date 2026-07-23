@@ -36,11 +36,23 @@ _Avoid_: slide, stop, frame.
 ## Layout and views
 
 **Layout**:
-A named strategy for arranging a space's cards — how they are organised and positioned. A space has a default layout, a route-driven graph, and may offer others (a grid, a cluster map, or a hand-placed one carrying its own card-to-position map). Which cards a layout arranges is the view's choice, not the layout's.
-_Avoid_: view (a view renders a layout), placement, position, diagram, arrangement (a layout is the strategy; positions land on the cards themselves).
+A card-to-position map the author wrote — where a space's cards sit. It belongs to the space and is part of what the space is. A space may hold several layouts, and may hold none. Positions are a property of the layout, never of the card: the same card sits at different coordinates in each. A layout may omit cards, and whoever renders it places those itself; it may not name cards the space does not have.
+
+A Layout is authored by definition. The computed kind is not a layout at all but an automatic **layout strategy**, which is why the two now have separate names (ADR 0014).
+_Avoid_: view (a view renders a layout), placement, diagram, manual and custom and free-form (a layout is authored, so the qualifiers say nothing).
+
+**Layout strategy**:
+A named strategy for arranging a space's cards — how they are organised and positioned. Which cards it arranges is the view's choice, not the strategy's.
+
+A strategy is either **automatic** or **positioned**. An automatic strategy computes placement from the cards and routes alone — a route-driven graph, a grid, a tree, a cluster map — so it needs nothing from the space and carries no authored data. The positioned strategy reads a **Layout**. Every Layout has a strategy that renders it; not every strategy has a Layout behind it.
+
+Editing placement requires a Layout, because an automatic strategy computes where cards go and so has nowhere to record where an author put one. Accepting an automatic strategy's result *into* a Layout is how computed placement becomes authored, and it is the only crossing between them.
+_Avoid_: arrangement (applying a strategy produces no separate entity — the cards themselves carry the positions), algorithm, engine.
 
 **View**:
-The rendering of a layout for a viewer — which cards and routes are shown, and how they are drawn on screen and explored. The **Graph** view renders a route-driven layout, one colour per route; other views render other layouts.
+The rendering of a layout for a viewer — which cards and routes are shown, and how they are drawn on screen and explored. The **Graph** view renders the route-driven strategy, one colour per route; other views render other strategies. A space may name the view it opens in; a viewer may have a default of their own; failing both, a space opens in its route-driven graph.
+
+A view of an automatic strategy is read-only, since it has nowhere to write a placement back to. Nothing tracks whether a viewer is editing: whether the view resolved to a Layout is what decides.
 _Avoid_: mode, screen, page, layout.
 
 **Opening**:

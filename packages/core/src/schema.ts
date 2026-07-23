@@ -63,6 +63,62 @@ export const cardSchema = z.preprocess(
   z.discriminatedUnion('kind', [markdownCardSchema, aliasCardSchema]),
 );
 
+/** Where a positioned layout puts a card, in the layout's own coordinate space. */
+export const layoutPositionSchema = z.object({
+  x: z.number(),
+  y: z.number(),
+});
+
+/**
+ * A layout the author wrote: a card-to-position map (ADR 0013).
+ *
+ * Positions are deliberately **sparse** — a layout may omit cards, and whoever
+ * renders it places those itself — but a position may not name a card that does
+ * not exist; that is a reference error, checked in `@project/graph` where the
+ * whole space is in view.
+ */
+export const positionedLayoutSchema = z.object({
+  id: idSchema,
+  title: z.string().min(1),
+  kind: z.literal('positioned'),
+  positions: z.record(idSchema, layoutPositionSchema),
+});
+
+/**
+ * A layout carried by the space file, discriminated by `kind`. Every Layout is
+ * authored: an automatic strategy computes placement from the cards and routes
+ * alone, so it has nothing to write down and appears here nowhere (ADR 0013).
+ * There is one kind today; the union is what makes a second one cost no
+ * migration.
+ *
+ * `kind` defaults to `'positioned'` when absent, the same shape `cardSchema`
+ * uses — here it is for hand-authoring rather than back-compat, so a layout can
+ * be written as just an id, a title, and its positions.
+ */
+export const layoutSchema = z.preprocess(
+  (value) =>
+    typeof value === 'object' && value !== null && !Array.isArray(value) && !('kind' in value)
+      ? { ...value, kind: 'positioned' }
+      : value,
+  z.discriminatedUnion('kind', [positionedLayoutSchema]),
+);
+
+/**
+ * The views a space can name without declaring anything: the route-driven graph
+ * and a plain grid. Both are automatic, so they are named, never configured —
+ * `defaultView` records intent ("open me like this") and carries no parameters,
+ * because parameters would put computed geometry back into authored content
+ * (ADR 0013). A `defaultView` naming none of these and no declared layout is a
+ * reference error.
+ */
+export const BUILT_IN_VIEW_IDS = ['graph', 'grid'] as const;
+
+export type BuiltInViewId = (typeof BUILT_IN_VIEW_IDS)[number];
+
+export function isBuiltInViewId(id: string): id is BuiltInViewId {
+  return (BUILT_IN_VIEW_IDS as readonly string[]).includes(id);
+}
+
 /** One position in a route, targeting a single card by id. */
 export const routeStepSchema = z.object({
   target: idSchema,
@@ -87,4 +143,8 @@ export const spaceFileSchema = z.object({
   title: z.string().min(1),
   cards: z.array(cardSchema),
   routes: z.array(routeSchema).min(1),
+  /** Optional: a space can be hand-authored with no coordinates at all. */
+  layouts: z.array(layoutSchema).optional(),
+  /** A declared layout's id, or a built-in view's. See {@link BUILT_IN_VIEW_IDS}. */
+  defaultView: z.string().min(1).optional(),
 });
