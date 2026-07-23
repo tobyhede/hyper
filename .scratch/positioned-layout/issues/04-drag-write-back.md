@@ -4,8 +4,8 @@ Status: open
 Type: task
 Blocked by: 03
 
-The first ticket that changes behaviour, and the one the spike is the reference
-for. `GraphView` currently gets away with no `onNodesChange` **because**
+The first ticket that changes behaviour. `GraphView` currently gets away with no
+`onNodesChange` **because**
 `nodesDraggable={false}` means nothing can move; flipping that owes React Flow
 the change handler.
 
@@ -18,9 +18,10 @@ the change handler.
   `useMemo` chain off `laidOut`, which will stamp on a drag if the map is not the
   source those positions come from.
 
-Read `packages/app/.scratch/spike/SpikeGraph.tsx` and
-`.scratch/graph-editing/README.md` §"Two runtime loops" first. Both bugs live in
-exactly this code and neither is in React Flow's docs:
+Two runtime loops the spike hit, both living in exactly this code and neither in
+React Flow's docs. The spike harness is gitignored and not kept, so they are
+written out here rather than pointed at — see also `.scratch/graph-editing/`
+§"Two runtime loops":
 
 1. A subscription returning a fresh object every render rebuilds the `nodes`
    array every render, and feeding a per-render-new array to a controlled

@@ -31,8 +31,8 @@ Unchanged, deliberately:
   name the *data*, which is what a Layout now is.
 - `layoutResult`/`laidOut`/`layoutGraph`/`layoutReady` in `App`/`GraphView` —
   all about resolved geometry.
-- `packages/app/.scratch/spike/SpikeGraph.tsx` still calls `elkLayout`. It is
-  frozen evidence, outside tsc and eslint, and never to be promoted (AGENTS.md).
+- The gitignored spike harness still calls `elkLayout`. It is outside tsc,
+  eslint and git, and is not kept.
 
 ## Answer
 
