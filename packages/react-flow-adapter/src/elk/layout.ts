@@ -48,7 +48,7 @@ export const PORT_ID_SEPARATOR = '##';
  * Handing ELK the bare handle id leaves it unable to tell which card an edge
  * attaches to, so it resolves arbitrarily and the layout collapses — badly
  * enough to mislay even a single route. Namespacing by card id is what makes the
- * endpoint unambiguous. The render layer never sees these; `elkLayout` strips the
+ * endpoint unambiguous. The render layer never sees these; `elkStrategy` strips the
  * prefix back off, so ports keep their bare ids.
  */
 export const elkPortId = (cardId: string, handleId: string): string =>

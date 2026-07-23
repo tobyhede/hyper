@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { ReactFlowProvider } from '@xyflow/react';
 import { AppShell, Button, RouteLegend, RouteSelector } from '@project/ui';
 import {
-  elkLayout,
+  elkStrategy,
   projectCardNodes,
   projectRouteEdges,
   type RouteEmphasis,
@@ -41,10 +41,10 @@ function markdownForCard(cardId: string): string {
 const allHandles = buildCardHandles(space);
 const allRouteEdges = buildRouteEdges(space);
 
-// The layout in use. A Layout is a named strategy, nothing more — swapping this
-// line for `gridLayout()` from `@project/graph` is the whole change, and it drops
-// the last ELK import out of this file.
-const layout = elkLayout();
+// The strategy in use. A LayoutStrategy is behaviour and nothing more — swapping
+// this line for `gridStrategy()` from `@project/graph` is the whole change, and
+// it drops the last ELK import out of this file.
+const layoutStrategy = elkStrategy();
 
 export function App() {
   const mode = usePresentationStore((s) => s.mode);
@@ -90,7 +90,7 @@ export function App() {
   } | null>(null);
   useEffect(() => {
     let cancelled = false;
-    void layout(graph).then((result) => {
+    void layoutStrategy(graph).then((result) => {
       if (!cancelled) setLayoutResult({ graph, result });
     });
     return () => {

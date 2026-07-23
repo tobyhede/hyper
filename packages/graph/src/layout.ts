@@ -1,15 +1,20 @@
 /**
- * The Layout contract: a named strategy for arranging a space's cards.
+ * The LayoutStrategy contract: a named strategy for arranging a space's cards.
+ *
+ * A strategy is behaviour; a **Layout** (`@project/core`) is the authored data
+ * one of them reads. ADR 0005 called the strategy itself a Layout, which ADR
+ * 0014 corrected once the authored kind became a value you can hold.
  *
  * Modelled on how ELK does it, deliberately. Geometry lives as *optional fields
  * on the elements* — a card carries `x`/`y`, a port carries its offset — and a
- * layout takes a graph and returns the same graph with those fields populated.
+ * strategy takes a graph and returns the same graph with those fields populated.
  * There is no separate arranged-result type; `CONTEXT.md` lists "arrangement"
  * under _Avoid_ and ADR 0005 records why.
  *
- * Which cards a layout arranges is decided by the view before it runs. A layout
- * is free to ignore parts of the graph it has no use for — a grid never looks at
- * the edges, exactly as ELK's own algorithms differ in what they consume.
+ * Which cards a strategy arranges is decided by the view before it runs. A
+ * strategy is free to ignore parts of the graph it has no use for — a grid never
+ * looks at the edges, exactly as ELK's own algorithms differ in what they
+ * consume.
  */
 
 import type { CardHandleSet, RouteEdge } from './routes';
@@ -73,14 +78,14 @@ export interface LayoutGraph {
 /**
  * A layout strategy: takes a graph and returns it with geometry filled in.
  *
- * Always async. Engine-backed layouts (ELK) are inherently asynchronous; the
- * arithmetic ones (grid, hand-placed) resolve immediately but still return a
+ * Always async. Engine-backed strategies (ELK) are inherently asynchronous; the
+ * arithmetic ones (grid, positioned) resolve immediately but still return a
  * promise, so every caller handles a single shape. The type once carried a
  * `LayoutGraph | Promise<LayoutGraph>` union, but nothing exercised the sync
- * branch — `App` awaited every layout regardless — so it was collapsed to
+ * branch — `App` awaited every strategy regardless — so it was collapsed to
  * async-only (`.scratch/layout-seam/issues/06-revisit-async-optionality.md`).
  */
-export type Layout = (graph: LayoutGraph) => Promise<LayoutGraph>;
+export type LayoutStrategy = (graph: LayoutGraph) => Promise<LayoutGraph>;
 
 /**
  * Assemble the graph to arrange, from cards the view has already chosen plus the

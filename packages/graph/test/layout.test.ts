@@ -3,7 +3,7 @@ import {
   buildCardHandles,
   buildLayoutGraph,
   buildRouteEdges,
-  gridLayout,
+  gridStrategy,
   loadSpace,
 } from '../src/index';
 import type { LayoutGraph, Space } from '../src/index';
@@ -59,7 +59,7 @@ describe('buildLayoutGraph', () => {
   });
 });
 
-describe('gridLayout', () => {
+describe('gridStrategy', () => {
   const graph: LayoutGraph = buildLayoutGraph(
     ['a', 'b', 'c'],
     buildCardHandles(space),
@@ -67,12 +67,12 @@ describe('gridLayout', () => {
     SIZE,
   );
 
-  it('satisfies the uniformly-async Layout contract', () => {
-    expect(gridLayout()(graph)).toBeInstanceOf(Promise);
+  it('satisfies the uniformly-async LayoutStrategy contract', () => {
+    expect(gridStrategy()(graph)).toBeInstanceOf(Promise);
   });
 
   it('places cards in reading order, wrapping at the column count', async () => {
-    const laid = await gridLayout({ columns: 2, gap: 10 })(graph);
+    const laid = await gridStrategy({ columns: 2, gap: 10 })(graph);
     expect(laid.cards.map((c) => [c.x, c.y])).toEqual([
       [0, 0],
       [110, 0],
@@ -81,7 +81,7 @@ describe('gridLayout', () => {
   });
 
   it('never places ports, leaving the render layer to spread them', async () => {
-    const laid = await gridLayout()(graph);
+    const laid = await gridStrategy()(graph);
     for (const card of laid.cards) {
       for (const port of card.ports) {
         expect(port.y).toBeUndefined();
@@ -90,12 +90,12 @@ describe('gridLayout', () => {
   });
 
   it('ignores the edges entirely', async () => {
-    const withoutEdges = await gridLayout()({ ...graph, edges: [] });
-    const withEdges = await gridLayout()(graph);
+    const withoutEdges = await gridStrategy()({ ...graph, edges: [] });
+    const withEdges = await gridStrategy()(graph);
     expect(withoutEdges.cards).toEqual(withEdges.cards);
   });
 
   it('handles an empty graph', async () => {
-    expect((await gridLayout()({ cards: [], edges: [] })).cards).toEqual([]);
+    expect((await gridStrategy()({ cards: [], edges: [] })).cards).toEqual([]);
   });
 });

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { ElkNode } from 'elkjs/lib/elk.bundled.js';
 import type { LayoutGraph } from '@project/graph';
-import { elkLayout, type ElkEngine } from '../src/index';
+import { elkStrategy, type ElkEngine } from '../src/index';
 
 const graph: LayoutGraph = {
   cards: [
@@ -33,10 +33,10 @@ function spyEngine(): { engine: ElkEngine; seen: () => ElkNode } {
   };
 }
 
-describe('elkLayout', () => {
+describe('elkStrategy', () => {
   it('hands ELK a layered root graph carrying the strategy', async () => {
     const spy = spyEngine();
-    await elkLayout(undefined, spy.engine)(graph);
+    await elkStrategy(undefined, spy.engine)(graph);
 
     const root = spy.seen();
     expect(root.id).toBe('root');
@@ -46,7 +46,7 @@ describe('elkLayout', () => {
 
   it('assigns port sides (in WEST, out EAST) and lets ELK order them', async () => {
     const spy = spyEngine();
-    await elkLayout(undefined, spy.engine)(graph);
+    await elkStrategy(undefined, spy.engine)(graph);
 
     const a = spy.seen().children!.find((c) => c.id === 'a')!;
     expect(a.layoutOptions?.['org.eclipse.elk.portConstraints']).toBe('FIXED_SIDE');
@@ -59,12 +59,12 @@ describe('elkLayout', () => {
 
   it('namespaces edge endpoints by card id', async () => {
     const spy = spyEngine();
-    await elkLayout(undefined, spy.engine)(graph);
+    await elkStrategy(undefined, spy.engine)(graph);
     expect(spy.seen().edges).toEqual([{ id: 'a-b', sources: ['a##a-s-a'], targets: ['b##b-t-a'] }]);
   });
 
   it('puts positions and port offsets onto the cards it was given', async () => {
-    const laid = await elkLayout()(graph);
+    const laid = await elkStrategy()(graph);
 
     for (const card of laid.cards) {
       expect(Number.isFinite(card.x)).toBe(true);
@@ -81,7 +81,7 @@ describe('elkLayout', () => {
   });
 
   it("returns ELK's routed geometry on the edges", async () => {
-    const laid = await elkLayout()(graph);
+    const laid = await elkStrategy()(graph);
     const edge = laid.edges.find((e) => e.id === 'a-b')!;
     // The routing the app used to discard now comes back on the edge.
     const [section] = edge.sections ?? [];
@@ -126,7 +126,7 @@ describe('routes a back-edge around the cards', () => {
   };
 
   it('gives the back-edge bend points, so it channels around rather than cutting across', async () => {
-    const laid = await elkLayout()(revisit);
+    const laid = await elkStrategy()(revisit);
     const back = laid.edges.find((e) => e.id === 'loop::2')!;
     const [section] = back.sections ?? [];
     expect(section).toBeDefined();
@@ -163,13 +163,13 @@ describe('port id collision', () => {
 
   it('gives every card a distinct ELK port id', async () => {
     const spy = spyEngine();
-    await elkLayout(undefined, spy.engine)(chain);
+    await elkStrategy(undefined, spy.engine)(chain);
     const ids = spy.seen().children!.flatMap((c) => c.ports!.map((p) => p.id));
     expect(new Set(ids).size).toBe(ids.length);
   });
 
   it('lays a single route out as a strictly left-to-right chain', async () => {
-    const laid = await elkLayout()(chain);
+    const laid = await elkStrategy()(chain);
     const xs = laid.cards.map((c) => c.x!);
     for (let i = 1; i < xs.length; i += 1) {
       expect(xs[i]!).toBeGreaterThan(xs[i - 1]!);
@@ -177,7 +177,7 @@ describe('port id collision', () => {
   });
 
   it('still exposes port offsets under the bare handle id', async () => {
-    const laid = await elkLayout()(chain);
+    const laid = await elkStrategy()(chain);
     const b = laid.cards.find((c) => c.id === 'B')!;
     expect(Number.isFinite(b.ports.find((p) => p.id === 'main::in')!.y)).toBe(true);
     expect(Number.isFinite(b.ports.find((p) => p.id === 'main::out')!.y)).toBe(true);
@@ -222,7 +222,7 @@ describe('shared cards keep each route on one line', () => {
   };
 
   it('puts a route at the same offset on both sides of every card', async () => {
-    const laid = await elkLayout()(shared);
+    const laid = await elkStrategy()(shared);
     const offset = (cardId: string, handleId: string) =>
       laid.cards.find((c) => c.id === cardId)!.ports.find((p) => p.id === handleId)!.y;
 
@@ -235,7 +235,7 @@ describe('shared cards keep each route on one line', () => {
   });
 
   it('keeps the two routes apart', async () => {
-    const laid = await elkLayout()(shared);
+    const laid = await elkStrategy()(shared);
     const b = laid.cards.find((c) => c.id === 'b')!;
     const at = (id: string) => b.ports.find((p) => p.id === id)!.y;
     expect(at('r1::in')).not.toBe(at('r2::in'));

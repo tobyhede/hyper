@@ -1,2 +1,2 @@
 export * from './layout';
-export * from './elk-layout';
+export * from './elk-strategy';

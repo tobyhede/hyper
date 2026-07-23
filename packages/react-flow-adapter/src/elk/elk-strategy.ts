@@ -4,13 +4,16 @@ import ELK, {
   type ElkPort,
   type LayoutOptions,
 } from 'elkjs/lib/elk.bundled.js';
-import type { Layout, LayoutEdgeSection, LayoutGraph } from '@project/graph';
+import type { LayoutEdgeSection, LayoutGraph, LayoutStrategy } from '@project/graph';
 import { DEFAULT_ELK_LAYOUT_OPTIONS, elkPortId, PORT_ID_SEPARATOR } from './layout';
 
 /**
- * The ELK layout, as a `Layout`. The strategy *is* the `layoutOptions` — that is
- * all a Layout is (ADR 0005) — and the engine is injectable so the seam can be
+ * ELK, as a `LayoutStrategy`. The strategy *is* the `layoutOptions` — that is
+ * all a strategy is (ADR 0005) — and the engine is injectable so the seam can be
  * tested without running elkjs.
+ *
+ * Automatic: it computes placement from the cards and routes, so no Layout
+ * stands behind it and a view of it is read-only (ADR 0013).
  */
 
 /** The slice of elkjs this module uses, so a fake can stand in for it. */
@@ -20,10 +23,10 @@ export interface ElkEngine {
 
 const defaultEngine: ElkEngine = new ELK();
 
-export function elkLayout(
+export function elkStrategy(
   layoutOptions: LayoutOptions = DEFAULT_ELK_LAYOUT_OPTIONS,
   engine: ElkEngine = defaultEngine,
-): Layout {
+): LayoutStrategy {
   return async (graph: LayoutGraph): Promise<LayoutGraph> => {
     const elkGraph: ElkGraphNode = {
       id: 'root',

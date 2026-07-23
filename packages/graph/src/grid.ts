@@ -1,17 +1,20 @@
-import type { Layout, LayoutGraph } from './layout';
+import type { LayoutGraph, LayoutStrategy } from './layout';
 
 /**
- * A grid layout: cards in reading order, left to right and wrapping down.
+ * A grid: cards in reading order, left to right and wrapping down.
  *
- * The second Layout, and the one that makes the seam real. It consumes only the
- * cards — never the edges, never the routes — and it places no ports, leaving
- * their offsets undefined for the render layer to spread evenly. That — placing
- * no ports, ignoring the edges — is what keeps the seam honest, not any ELK
- * specifics. The arithmetic is synchronous but the function is `async`, so it
- * satisfies the uniformly-async `Layout` contract (layout-seam/06).
+ * The second strategy, and the one that makes the seam real. It consumes only
+ * the cards — never the edges, never the routes — and it places no ports,
+ * leaving their offsets undefined for the render layer to spread evenly. That —
+ * placing no ports, ignoring the edges — is what keeps the seam honest, not any
+ * ELK specifics. The arithmetic is synchronous but the function is `async`, so
+ * it satisfies the uniformly-async `LayoutStrategy` contract (layout-seam/06).
+ *
+ * Automatic: it computes placement from the cards alone, so no Layout stands
+ * behind it and a view of it is read-only (ADR 0013).
  */
 
-export interface GridLayoutOptions {
+export interface GridStrategyOptions {
   /** Defaults to a square-ish grid: `ceil(sqrt(cardCount))`. */
   columns?: number;
   /** Space between cards, both axes. */
@@ -20,10 +23,10 @@ export interface GridLayoutOptions {
 
 const DEFAULT_GAP = 80;
 
-export function gridLayout(options: GridLayoutOptions = {}): Layout {
+export function gridStrategy(options: GridStrategyOptions = {}): LayoutStrategy {
   const gap = options.gap ?? DEFAULT_GAP;
 
-  // The Layout contract is uniformly async by design (ADR 0005); gridLayout has
+  // The contract is uniformly async by design (ADR 0005); gridStrategy has
   // nothing to await but must still return a Promise to honour the seam.
   // eslint-disable-next-line @typescript-eslint/require-await
   return async (graph: LayoutGraph): Promise<LayoutGraph> => {
