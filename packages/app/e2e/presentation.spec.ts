@@ -1,4 +1,6 @@
-import { expect, test, type Locator, type Page } from '@playwright/test';
+// `test` comes from ./fixtures, not @playwright/test — it carries the auto-use
+// gate that fails a test if React Flow logged a warning while it ran.
+import { expect, test, type Locator, type Page } from './fixtures';
 
 // The app loads the abstract layout fixture (packages/app/fixture) — two
 // disconnected collections sharing no cards, laid out by ELK as separate bands:
@@ -78,6 +80,31 @@ test('draws every route at once, each in its own color', async ({ page }) => {
     .evaluateAll((els) => els.map((el) => getComputedStyle(el).stroke));
   expect(strokes.every((s) => s && s !== 'none' && s !== 'rgb(0, 0, 0)')).toBe(true);
   expect(new Set(strokes).size).toBe(4);
+});
+
+test('handles stay measurable, so edges attach where the layout put them', async ({ page }) => {
+  await page.goto('/');
+
+  // React Flow measures every handle's box to work out where an edge attaches,
+  // so a handle hidden with `display: none` reports 0x0 and its edges land
+  // somewhere else — silently, with no warning to catch. `CardNode` dims
+  // receding routes with `opacity`, which keeps the box; that reads as an
+  // ordinary styling choice, and this is what stops a later CSS tidy-up from
+  // reaching for `display: none`. See react-flow-guidance/issues/03.
+  const ports = page.locator('.rf-card-node__port');
+  await expect(ports.first()).toBeAttached();
+
+  const boxes = await ports.evaluateAll((els) =>
+    els.map((el) => {
+      const rect = el.getBoundingClientRect();
+      return { width: rect.width, height: rect.height };
+    }),
+  );
+
+  // Asserted against whatever the fixture currently draws — its route/card
+  // shape is free to change (fixture/README.md).
+  expect(boxes.length).toBeGreaterThan(0);
+  expect(boxes.every((box) => box.width > 0 && box.height > 0)).toBe(true);
 });
 
 test("edges are drawn along ELK's routing, not default beziers", async ({ page }) => {
