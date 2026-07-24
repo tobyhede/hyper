@@ -104,6 +104,18 @@ export function routeCardIds(space: Space, routeId: string): string[] {
   return cardIdsForRoutes(space, [routeId]);
 }
 
+/**
+ * The last card a route visits — where it currently ends. `null` if the route is
+ * unknown or has no steps. A route step targets a card by id (`{ target }`), and
+ * routes may not revisit a card (ADR 0012), so "the last step's target" and "the
+ * last distinct card" coincide; this is the card an editing gesture would extend
+ * from.
+ */
+export function lastCardId(space: Space, routeId: string): string | null {
+  const steps = space.routesById.get(routeId)?.steps ?? [];
+  return steps[steps.length - 1]?.target ?? null;
+}
+
 /** Keep only the handles belonging to the given routes. */
 export function filterHandlesByRoutes(
   handlesByCard: ReadonlyMap<string, CardHandleSet>,

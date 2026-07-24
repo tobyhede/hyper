@@ -5,6 +5,7 @@ import {
   cardIdsForRoutes,
   filterHandlesByRoute,
   filterHandlesByRoutes,
+  lastCardId,
   loadSpace,
   routeCardIds,
   type Space,
@@ -128,5 +129,19 @@ describe('buildRouteEdges', () => {
       targetHandle: 'quick::in',
       stepIndex: 0,
     });
+  });
+});
+
+describe('lastCardId', () => {
+  // Regression: a route step is a `{ target }` object, not a bare id. Reading the
+  // last step without `.target` (e.g. keying a map on the step) silently yields
+  // the wrong card — the bug this guards. main visits a→b→c, quick a→c.
+  it('returns the id of the last card a route visits', () => {
+    expect(lastCardId(space, 'main')).toBe('c');
+    expect(lastCardId(space, 'quick')).toBe('c');
+  });
+
+  it('returns null for an unknown route', () => {
+    expect(lastCardId(space, 'nope')).toBeNull();
   });
 });
