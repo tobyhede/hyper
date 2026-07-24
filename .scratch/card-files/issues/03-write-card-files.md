@@ -1,6 +1,6 @@
 # 03 — Persist card files
 
-Status: split — the write-in-place half is done, the card writer waits for a consumer
+Status: done
 Type: task
 Blocked by: 02
 
@@ -110,3 +110,52 @@ warnings:
 - The written files load back through `loadSpace` unchanged.
 - No client-supplied path reaches the filesystem; assert it.
 - `pnpm verify` and `pnpm e2e` green.
+
+## Answer (the card writer)
+
+The round trip works: mint a space, drag its card, reload, and it is still
+there, where you left it. `pnpm e2e` is 24 green, the fixture untouched.
+
+**`SPACE_DIR` may name a directory that does not exist yet.** That is what
+unblocked this. A minted space had nowhere to live, and even saved it could not
+have reopened — with no `SPACE_DIR` a reload mints a *fresh* space rather than
+reopening the saved one. Pointing at a not-yet-existing directory says "a new
+space, here": the app mints, the first save brings the directory into being, and
+from then on it opens like any other. No new concept — `SPACE_DIR` still decides,
+and "missing" simply means "new". `pnpm dev:new` uses a gitignored
+`packages/app/.space`.
+
+**The endpoint takes a whole space, and still never takes a path.** Cards go as
+`{ id, text }`; the server derives every path from the id. A card already on disk
+is rewritten where it sits, so a card an author put beside the space file stays
+there rather than being duplicated into `cards/` — which would have been a
+`duplicate-card-id` load error rather than a cosmetic problem. Ids are bounded to
+a bare slug, because this is the one place a browser value reaches the
+filesystem. Only files whose bytes differ are written, so a drag rewrites no card
+body. A card missing from the payload is never deleted.
+
+### Two bugs found by building it
+
+**Vite cached the virtual module, so no save has ever been visible on reload.**
+The seam has always claimed a save is "picked up on the next full page load",
+and it was not: `load()` runs once, the result is cached, and a reload re-serves
+the space as it was at server start. The file on disk changed and the app never
+saw it. This is a **latent bug that predates this ticket** — it was invisible
+because the persistence round trip had no e2e coverage until now, which is
+exactly the gap noted when 03 was split. Fixed by invalidating the module after a
+write; deliberately not an HMR push, so a save still cannot remount the graph
+mid-drag.
+
+**`import { z } from 'zod'` in the plugin stopped the dev server from starting.**
+A bare specifier in a Vite *config* module is externalized and resolved by Node
+from `packages/app`, where zod is not a dependency. `spaceFileSchema` is fine
+because it arrives by relative import and esbuild bundles it — the documented
+rule, one step further out than the note that records it. The payload check is
+hand-written instead of adding a dependency to dodge it.
+
+### Still open
+
+Nothing in the app *creates a card* — the only card that exists is the one
+`newSpace()` mints. The writer is proven by that card being persisted, which is
+the honest available proof; a create-a-card affordance is a separate piece of
+work, and when it lands it needs no new writer.
