@@ -2,11 +2,12 @@ import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
+import { spaceFilePlugin } from './vite-space-file-plugin';
 
 const resolve = (p: string) => fileURLToPath(new URL(p, import.meta.url));
 
 export default defineConfig({
-  plugins: [react(), tailwindcss()],
+  plugins: [react(), tailwindcss(), spaceFilePlugin()],
   resolve: {
     alias: {
       '@project/core': resolve('../core/src/index.ts'),

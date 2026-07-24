@@ -24,3 +24,8 @@ skills-lock.json
 # re-demonstrate a negative. Also excluded from tsc, eslint and prettier.
 packages/*/.scratch/
 packages/app/spike.html
+
+# The dev-only saved arrangement (ticket 06). Deleting it is how you throw an
+# arrangement away and fall back to the authored base. Never committed — it is
+# per-machine working state, and e2e forces the base past it anyway.
+packages/app/fixture/space.local.json

@@ -37,6 +37,13 @@ export interface EditorState {
    * plain curves between wherever the cards now are.
    */
   moved: boolean;
+  /**
+   * Counts real edits — a settled drag that changed a position, or an arrange.
+   * The creation sync does not touch it, so it is the signal that distinguishes
+   * "the author moved something, persist it" from "the layout just resolved".
+   * `App` saves the space file on each increment (ticket 06).
+   */
+  revision: number;
   /** Fold a freshly projected node list into the live one. */
   syncNodes: (projected: readonly CardFlowNode[]) => void;
   /**
@@ -89,6 +96,7 @@ export function createEditorStore(): EditorStore {
     nodes: null,
     positions: new Map(),
     moved: false,
+    revision: 0,
 
     syncNodes: (projected) =>
       set((state) => {
@@ -117,7 +125,7 @@ export function createEditorStore(): EditorStore {
         // is not a merge sneaking back in: the strategy places every card it is
         // handed, and a card genuinely absent from a Layout is an unplaced one,
         // which is a state Layouts are allowed to be in.
-        return { nodes, positions: new Map(positions), moved: false };
+        return { nodes, positions: new Map(positions), moved: false, revision: state.revision + 1 };
       }),
 
     changeNodes: (changes) =>
@@ -145,6 +153,7 @@ export function createEditorStore(): EditorStore {
 
         const positions = new Map(state.positions);
         let moved = state.moved;
+        let changed = false;
         for (const change of settled) {
           const node = nodes.find((n) => n.id === change.id);
           if (!node) continue;
@@ -152,8 +161,12 @@ export function createEditorStore(): EditorStore {
           if (was?.x === node.position.x && was.y === node.position.y) continue;
           positions.set(node.id, { x: node.position.x, y: node.position.y });
           moved = true;
+          changed = true;
         }
-        return { nodes, positions, moved };
+        // A settled change that moved nothing — a click, or a drag returned to
+        // where it began — is not an edit and must not trigger a save.
+        if (!changed) return { nodes };
+        return { nodes, positions, moved, revision: state.revision + 1 };
       }),
   }));
 }

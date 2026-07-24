@@ -18,7 +18,8 @@ import {
   type CardHandleSet,
   type LayoutGraph,
 } from '@project/graph';
-import { space, markdownByCardId } from './space';
+import { space, spaceFile, markdownByCardId } from './space';
+import { CREATED_LAYOUT_ID, CREATED_LAYOUT_TITLE, saveSpaceFile, serializeLayout } from './persist';
 import { routeColorMap } from './colors';
 import { CARD_HEIGHT, CARD_SIZE, cardSizeVars } from './card';
 import { createPresentationStore } from './store';
@@ -51,6 +52,12 @@ const view = resolveView(space);
 // declared no Layout gets one from the first resolved layout (ADR 0017), so this
 // store is where placement lives from that moment on.
 const useEditorStore = createEditorStore();
+
+// Which Layout an edit writes to. An existing one keeps its authored id and
+// title; a Layout the app created on open (ADR 0017) takes a minted id, because
+// no author was there to type one.
+const persistLayoutId = view.layout?.id ?? CREATED_LAYOUT_ID;
+const persistLayoutTitle = view.layout?.title ?? CREATED_LAYOUT_TITLE;
 
 export function App() {
   const mode = usePresentationStore((s) => s.mode);
@@ -138,6 +145,8 @@ export function App() {
   const moved = useEditorStore((s) => s.moved);
   const changeNodes = useEditorStore((s) => s.changeNodes);
   const arrange = useEditorStore((s) => s.arrange);
+  const positions = useEditorStore((s) => s.positions);
+  const revision = useEditorStore((s) => s.revision);
   const nodes = liveNodes ?? projectedNodes;
   // Having a Layout *is* the permission to edit (ADR 0013), and the store holds
   // nodes exactly when it has one.
@@ -158,6 +167,18 @@ export function App() {
       arrange(layoutPositions(result));
     });
   }, [graph, arrange]);
+
+  // Persist on every real edit. `revision` counts only settled drags and
+  // arranges — never the creation sync — so this saves what the author did and
+  // stays silent on load. The write is debounced by nothing: a drag ends once,
+  // and `space.local.json` is picked up on the next full page load, not live
+  // (ticket 06). The saved file names this Layout as `defaultView`, so a reload
+  // reopens in it rather than recomputing.
+  useEffect(() => {
+    if (revision === 0) return;
+    const next = serializeLayout(spaceFile, persistLayoutId, persistLayoutTitle, positions);
+    void saveSpaceFile(next);
+  }, [revision, positions]);
 
   const edges = useMemo(
     () =>

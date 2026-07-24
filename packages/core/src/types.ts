@@ -6,6 +6,7 @@ import type {
   positionedLayoutSchema,
   routeSchema,
   routeStepSchema,
+  spaceFileSchema,
 } from './schema';
 
 /** Domain types are derived from the Zod schemas so they can never drift apart. */
@@ -27,3 +28,11 @@ export type Layout = z.infer<typeof layoutSchema>;
 
 export type CardId = Card['id'];
 export type RouteId = Route['id'];
+
+/**
+ * The on-disk shape of a space — what `loadSpace` reads and what a writer emits
+ * (ADR 0010). Distinct from a `Space`, which is the indexed, reference-checked
+ * value `loadSpace` produces: serializing goes back to *this*, because the Space
+ * is derived and reconstructing a file from it would mean un-deriving.
+ */
+export type SpaceFile = z.infer<typeof spaceFileSchema>;

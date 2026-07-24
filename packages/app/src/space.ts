@@ -1,11 +1,14 @@
+import { spaceFileSchema, type SpaceFile } from '@project/core';
 import { loadSpace, type Space } from '@project/graph';
-import spaceJson from '../fixture/space.json';
+import spaceFileInput from 'virtual:space-file';
 
 /**
- * Load the abstract layout fixture. The app is file-first and read-only:
- * everything below is derived from `space.json` + the markdown files.
+ * Load the space the dev server chose to serve. The `virtual:space-file` module
+ * reads `fixture/space.local.json` when it exists and falls back to
+ * `fixture/space.json` (see `vite-space-file-plugin.ts`), so an arrangement
+ * saved on the last drag is what opens on the next full page load.
  *
- * This is the abstract test bed (`fixture/`), not the narrative demo
+ * The base is the abstract test bed (`fixture/`), not the narrative demo
  * (`example/`, kept for when real space-loading exists) — it is deliberately the
  * one space `pnpm dev` serves and the one Playwright drives, so tests assert
  * behaviour against a purpose-shaped graph rather than demo prose. The file is
@@ -13,7 +16,7 @@ import spaceJson from '../fixture/space.json';
  * than render a half-space (ADR 0010).
  */
 
-const result = loadSpace(spaceJson);
+const result = loadSpace(spaceFileInput);
 if (!result.ok) {
   throw new Error(
     `The bundled space failed to load:\n${result.errors.map((e) => `  - ${e.message}`).join('\n')}`,
@@ -21,6 +24,15 @@ if (!result.ok) {
 }
 
 export const space: Space = result.space;
+
+/**
+ * The parsed space *file*, kept beside the `Space` it produced. A writer emits
+ * this shape, not the `Space` — the `Space` is indexed and derived, so rebuilding
+ * a file from it would mean un-deriving (ADR 0010). `loadSpace` already proved
+ * the input parses, so this second parse cannot fail; it is how we recover the
+ * typed file value without threading it out of `loadSpace`.
+ */
+export const spaceFile: SpaceFile = spaceFileSchema.parse(spaceFileInput);
 
 const rawCards = import.meta.glob<string>('../fixture/cards/*.md', {
   query: '?raw',

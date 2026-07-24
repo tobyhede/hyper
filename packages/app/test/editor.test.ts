@@ -185,4 +185,28 @@ describe('editor store', () => {
       .changeNodes([{ type: 'position', id: 'a', position: { x: 10, y: 20 }, dragging: false }]);
     expect(store.getState().moved).toBe(false);
   });
+
+  it('counts a real edit but not the creation sync (the save signal)', () => {
+    // `revision` is what `App` saves on. It must stay 0 through creation — a load
+    // is not an edit and must not write the file — and tick on a moving drag.
+    const store = createEditorStore();
+    store.getState().syncNodes(PROJECTED);
+    expect(store.getState().revision).toBe(0);
+
+    store.getState().changeNodes(drag('a', 500, 400));
+    expect(store.getState().revision).toBe(1);
+
+    store.getState().arrange(new Map([['a', { x: 0, y: 0 }]]));
+    expect(store.getState().revision).toBe(2);
+  });
+
+  it('does not count a settled change that moved nothing', () => {
+    // A click ends where it began; there is nothing to persist.
+    const store = createEditorStore();
+    store.getState().syncNodes(PROJECTED);
+    store
+      .getState()
+      .changeNodes([{ type: 'position', id: 'a', position: { x: 10, y: 20 }, dragging: false }]);
+    expect(store.getState().revision).toBe(0);
+  });
 });
