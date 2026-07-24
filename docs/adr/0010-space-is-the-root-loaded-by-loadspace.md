@@ -1,7 +1,7 @@
 # The domain model's root is a Space, loaded by `loadSpace`; "manifest" is retired
 
 Status: accepted
-Refined by: 0019
+Refined by: 0019, 0020
 
 The single top-level domain value is a **Space**. `loadSpace(input) → Result<Space, SpaceError[]>` is the only intake: it parses the shape, validates references, and builds an index, so a Space is consistent and O(1)-indexable *by construction*. Everything downstream — `getCard`, `buildCardHandles`, `buildRouteEdges`, the projection, the store — takes a Space, never a loosely-parsed value.
 

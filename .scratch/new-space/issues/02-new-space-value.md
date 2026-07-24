@@ -20,13 +20,18 @@ scaled to 2x and fill the screen. Padding does not help; padding reserves margin
 it does not cap zoom. Give the overview fit a `maxZoom` the way the presenting fit
 already has one, so a lone card renders at natural size with room around it.
 
-**Blocked on a real question: what content does a new card have?** A markdown
+**Answered by ADR 0020.** A card is one file with its body inside it, so a new
+card is a file with a title and an empty body — the question below is resolved
+and kept only because it explains why the ticket stalled. Persisting that file
+needs `card-files/03`.
+
+~~**Blocked on a real question: what content does a new card have?** A markdown
 card's `content` is a *required file path* to a `.md` file, and a space the app
 mints has no such file — the writer only ever touches `space.local.json`, by
 design. So the card points at nothing, and opening it renders `*Missing content
 file: ...*`, which is precisely the "looks broken on first run" outcome ADR 0018
 was written to avoid. The options are materially different and one of them is a
-schema change; do not guess this.
+schema change; do not guess this.~~
 
 - The card needs a title. It is the author's first card, so it should read as an
   invitation rather than a placeholder with instructions in it — and its title is
