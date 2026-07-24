@@ -56,6 +56,22 @@ describe('createPresentationStore', () => {
     expect(useStore.getState().mode).toBe('overview');
   });
 
+  it('cannot present a space with no routes, and selects none (ADR 0015)', () => {
+    const result = loadSpace({
+      version: 1,
+      title: 'New space',
+      cards: [{ id: 'a', title: 'Untitled', kind: 'markdown', content: 'a.md' }],
+      routes: [],
+    });
+    if (!result.ok) throw new Error('a route-less space should load');
+    const { useStore, selectActiveCardId } = createPresentationStore(result.space);
+
+    expect(useStore.getState().selectedRouteId).toBeNull();
+    useStore.getState().enterPresentation();
+    expect(useStore.getState().mode).toBe('overview');
+    expect(selectActiveCardId(useStore.getState())).toBeNull();
+  });
+
   it('reports the active card only while presenting, at the current step', () => {
     const { useStore, selectActiveCardId } = createPresentationStore(fixture());
     expect(selectActiveCardId(useStore.getState())).toBeNull(); // overview

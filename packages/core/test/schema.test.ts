@@ -38,9 +38,16 @@ describe('space file schema', () => {
     expect(result.success && 'edges' in result.data).toBe(false);
   });
 
-  it('rejects a space file with no routes', () => {
+  it('accepts a space file with no routes — a new space has no structure yet', () => {
+    // ADR 0015. It renders; it cannot be presented. The `min(1)` this replaces
+    // was inherited from `paths.min(1)` in the Route rename, never decided.
     const result = spaceFileSchema.safeParse({ ...validSpaceFile, routes: [] });
-    expect(result.success).toBe(false);
+    expect(result.success).toBe(true);
+  });
+
+  it('still requires the routes key itself, so a dropped array is a shape error', () => {
+    const { routes: _routes, ...withoutRoutes } = validSpaceFile;
+    expect(spaceFileSchema.safeParse(withoutRoutes).success).toBe(false);
   });
 
   it('rejects a route with no steps', () => {

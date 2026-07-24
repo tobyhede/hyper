@@ -11,7 +11,6 @@ import {
   buildCardHandles,
   buildLayoutGraph,
   buildRouteEdges,
-  cardIdsForRoutes,
   filterHandlesByRoutes,
   getCard,
   getRoute,
@@ -66,7 +65,11 @@ export function App() {
   // than inside the graph or layout packages.
   const visibleRouteIds = useMemo(() => space.routes.map((r) => r.id), []);
 
-  const visibleCardIds = useMemo(() => cardIdsForRoutes(space, visibleRouteIds), [visibleRouteIds]);
+  // Every card, not just the route-visited ones. A space may have cards and no
+  // routes at all (ADR 0015) — deriving the card set from the routes would render
+  // a new space as an empty canvas, which is the one thing it must not do. Which
+  // cards a view draws was always the View's call, not the layout's (ADR 0005).
+  const visibleCardIds = useMemo(() => space.cards.map((c) => c.id), []);
   const visibleHandles = useMemo<ReadonlyMap<string, CardHandleSet>>(
     () => filterHandlesByRoutes(allHandles, visibleRouteIds),
     [visibleRouteIds],
@@ -158,12 +161,23 @@ export function App() {
 
   const toolbar = (
     <>
-      <RouteSelector
-        routes={space.routes}
-        selectedRouteId={selectedRouteId}
-        onSelect={selectRoute}
-      />
-      <RouteLegend routes={space.routes} colorByRouteId={colors} activeRouteId={selectedRouteId} />
+      {/* A space with no routes has nothing to select or legend, and cannot be
+          presented (ADR 0015) — the Present button stays, disabled, so the
+          capability is visible rather than absent. */}
+      {space.routes.length > 0 && (
+        <>
+          <RouteSelector
+            routes={space.routes}
+            selectedRouteId={selectedRouteId}
+            onSelect={selectRoute}
+          />
+          <RouteLegend
+            routes={space.routes}
+            colorByRouteId={colors}
+            activeRouteId={selectedRouteId}
+          />
+        </>
+      )}
       {presenting ? (
         <Button variant="secondary" onClick={exitPresentation}>
           Overview

@@ -142,7 +142,11 @@ export const spaceFileSchema = z.object({
   version: z.literal(1),
   title: z.string().min(1),
   cards: z.array(cardSchema),
-  routes: z.array(routeSchema).min(1),
+  /**
+   * May be empty: a space with no routes has no structure yet, which is what a
+   * new space *is*. It renders and it cannot be presented (ADR 0015).
+   */
+  routes: z.array(routeSchema),
   /** Optional: a space can be hand-authored with no coordinates at all. */
   layouts: z.array(layoutSchema).optional(),
   /** A declared layout's id, or a built-in view's. See {@link BUILT_IN_VIEW_IDS}. */

@@ -3,6 +3,7 @@
 Status: accepted
 Supersedes: none
 Refines: 0003
+Refined by: 0015
 
 A space is **cards and routes**. There is no separately authored connection between two cards. The manifest's `edges` array — each entry `{ id, source, target, kind: 'sequence' | 'reference' }` — is removed from the schema, along with both kinds.
 

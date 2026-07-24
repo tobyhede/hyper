@@ -21,6 +21,15 @@ describe('loadSpace', () => {
     expect(result.space.routes).toHaveLength(1);
   });
 
+  it('loads a space with no routes — cards, no structure yet (ADR 0015)', () => {
+    const result = loadSpace({ ...validInput, routes: [] });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.space.routes).toEqual([]);
+    expect(result.space.cards).toHaveLength(2);
+    expect(getCard(result.space, 'a')?.title).toBe('A');
+  });
+
   it('reports a bad shape as errors rather than throwing', () => {
     const result = loadSpace({ version: 1, title: 'X' }); // cards and routes missing
     expect(result.ok).toBe(false);
