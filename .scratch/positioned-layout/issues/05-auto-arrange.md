@@ -1,25 +1,22 @@
-# 05 — Auto-arrange: command and on-ramp
+# 05 — Auto-arrange: the command
 
 Status: open
 Type: task
 Blocked by: 04
 
-The only crossing from computed to authored. It runs an automatic layout once and
-writes the result into a positioned layout's map — an edit, not a cache.
+The only crossing from computed to authored. It runs an automatic strategy once
+and writes the result into the active Layout's map — an edit, not a cache.
 
-Two entry points, one operation:
+**The on-ramp half of this ticket is gone (ADR 0017).** A space with no Layout
+gets one when it opens, so Auto-arrange no longer has to be pressed before a
+hand-authored space can be edited. What is left is what the name says: in a
+positioned view, "Auto-arrange" overwrites the active map with what the
+automatic strategy computes, and you keep editing from there.
 
-- **Command** — in a positioned view, "Auto-arrange" overwrites the active map
-  with what ELK computes. You keep editing from there.
-- **On-ramp** — in an automatic view (which is read-only), the same action writes
-  the space's *first* positioned layout from what is currently on screen and
-  switches to it. This is how a hand-authored space becomes editable, and it is
-  deliberate and visible rather than a stray drag silently minting a layout.
-
-The on-ramp needs an id and a title for the layout it creates. Simplest that
-isn't a lie: `working` / "Working". It also sets `defaultView` to the new layout,
-because an arrangement that does not reopen is the derived-placement failure
-wearing a different hat.
+It still sets `defaultView` to the active Layout when the space does not already
+name one — an arrangement that does not reopen is the derived-placement failure
+wearing a different hat. Ticket 04 creates the Layout; this is the first thing
+that gives the space a reason to *open* in it.
 
 ELK's coordinates land as-is: `projectCardNodes` already carries
 `LayoutCard.width`/`height` through and the adapter is on React Flow's native
@@ -28,8 +25,8 @@ yourself adding one, `nodeOrigin` has drifted.
 
 ## Acceptance
 
-- e2e: from the fixture (no `layouts`), Auto-arrange produces a positioned layout
-  and cards become draggable; drag, Auto-arrange again, cards move to ELK's
-  positions and stay draggable.
-- Unit test that the on-ramp writes both the layout and `defaultView`.
+- e2e: drag a card away, press Auto-arrange, the card returns to the strategy's
+  position and stays draggable.
+- Unit test that Auto-arrange replaces every position in the active map, rather
+  than merging into it — a card dragged out of the way must not survive.
 - `pnpm verify` and `pnpm e2e` green.
