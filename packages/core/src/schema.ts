@@ -30,39 +30,6 @@ const descriptionSchema = z
   .refine((value) => !value.includes('\n'), { message: 'description must be a single line' })
   .optional();
 
-/** A card written directly by the author; its content is a markdown file path. */
-export const markdownCardSchema = z.object({
-  id: idSchema,
-  title: z.string().min(1),
-  description: descriptionSchema,
-  kind: z.literal('markdown'),
-  /** Relative path (from the space file) to the file holding this card's content. */
-  content: z.string().min(1),
-});
-
-/** A card that shows another card's content at a second position (ADR 0009). */
-export const aliasCardSchema = z.object({
-  id: idSchema,
-  title: z.string().min(1),
-  description: descriptionSchema,
-  kind: z.literal('alias'),
-  /** The id of the card this alias shows. Referential checks live in `@project/graph`. */
-  target: idSchema,
-});
-
-/**
- * A card is one of several kinds, discriminated by `kind`. `kind` defaults to
- * `'markdown'` when absent, so space files authored before the kind existed
- * still parse unchanged.
- */
-export const cardSchema = z.preprocess(
-  (value) =>
-    typeof value === 'object' && value !== null && !Array.isArray(value) && !('kind' in value)
-      ? { ...value, kind: 'markdown' }
-      : value,
-  z.discriminatedUnion('kind', [markdownCardSchema, aliasCardSchema]),
-);
-
 /**
  * The frontmatter of a markdown card file (ADR 0020). No `content` key: the
  * body of the file *is* the content, so the card and its text are one artifact.
@@ -97,6 +64,23 @@ export const cardFrontmatterSchema = z.preprocess(
       : value,
   z.discriminatedUnion('kind', [markdownCardFrontmatterSchema, aliasCardFrontmatterSchema]),
 );
+
+/** A card written directly by the author; the body of its file is its content. */
+export const markdownCardSchema = markdownCardFrontmatterSchema.extend({ body: z.string() });
+
+/**
+ * A card that shows another card's content at a second position (ADR 0009). It
+ * carries a body like any other card, and that body is empty — the content it
+ * shows is its target's.
+ */
+export const aliasCardSchema = aliasCardFrontmatterSchema.extend({ body: z.string() });
+
+/**
+ * A card: its frontmatter and its body, which together are one file (ADR 0020).
+ * No default for `kind` here — by the time a card exists its frontmatter has
+ * been parsed, and that is where the default was applied.
+ */
+export const cardSchema = z.discriminatedUnion('kind', [markdownCardSchema, aliasCardSchema]);
 
 /** Where a positioned layout puts a card, in the layout's own coordinate space. */
 export const layoutPositionSchema = z.object({
@@ -172,6 +156,10 @@ export const routeSchema = z.object({
  * 0010). This validates *shape* only; a value that passes it is not yet a Space
  * (references unchecked, no index). "manifest" is retired: this is the space
  * file, not a manifest.
+ *
+ * It holds **structure and nothing else** (ADR 0020): cards are not listed here,
+ * because a card exists by virtue of its file existing. `loadSpace` takes the
+ * card files alongside this.
  */
 export const spaceFileSchema = z.object({
   version: z.literal(1),
@@ -185,7 +173,6 @@ export const spaceFileSchema = z.object({
    */
   id: idSchema,
   title: z.string().min(1),
-  cards: z.array(cardSchema),
   /**
    * May be empty: a space with no routes has no structure yet, which is what a
    * new space *is*. It renders and it cannot be presented (ADR 0015).

@@ -1,17 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import { loadSpace, resolveContentCard, type Space } from '../src/index';
+import { aliasFile, cardFile } from './card-files';
 
 function baseSpace(): Space {
-  const result = loadSpace({
-    version: 1,
-    id: 's',
-    title: 'Test',
-    cards: [
-      { id: 'model', title: 'The model', kind: 'markdown', content: 'cards/model.md' },
-      { id: 'model-again', title: 'The model, again', kind: 'alias', target: 'model' },
-    ],
-    routes: [{ id: 'main', title: 'Main', steps: [{ target: 'model' }] }],
-  });
+  const result = loadSpace(
+    {
+      version: 1,
+      id: 's',
+      title: 'Test',
+      routes: [{ id: 'main', title: 'Main', steps: [{ target: 'model' }] }],
+    },
+    [cardFile('model', 'The model'), aliasFile('model-again', 'The model, again', 'model')],
+  );
   if (!result.ok) throw new Error('fixture should load');
   return result.space;
 }

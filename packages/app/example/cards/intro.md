@@ -1,3 +1,8 @@
+---
+id: intro
+title: Graph-native presentations
+---
+
 A technical deck authored as **Markdown cards** on a spatial graph, then presented as a curated route through that graph.
 
 - Content lives in version-controlled files

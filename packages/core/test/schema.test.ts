@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   BUILT_IN_VIEW_IDS,
   CARD_DESCRIPTION_MAX_LENGTH,
+  cardFrontmatterSchema,
   isBuiltInViewId,
   spaceFileSchema,
 } from '../src/index';
@@ -10,10 +11,6 @@ const validSpaceFile = {
   version: 1,
   id: 's',
   title: 'Test deck',
-  cards: [
-    { id: 'a', title: 'A', content: 'cards/a.md' },
-    { id: 'b', title: 'B', content: 'cards/b.md' },
-  ],
   routes: [{ id: 'main', title: 'Main', steps: [{ target: 'a' }] }],
 };
 
@@ -34,7 +31,18 @@ describe('space file schema', () => {
   it('parses a valid space file', () => {
     const file = spaceFileSchema.parse(validSpaceFile);
     expect(file.title).toBe('Test deck');
-    expect(file.cards).toHaveLength(2);
+    expect(file.routes).toHaveLength(1);
+  });
+
+  it('holds no cards — a card exists because its file does (ADR 0020)', () => {
+    // The same treatment `edges` gets: an older file still parses, and the array
+    // is dropped rather than honoured, so nothing can half-load from it.
+    const result = spaceFileSchema.safeParse({
+      ...validSpaceFile,
+      cards: [{ id: 'a', title: 'A', content: 'cards/a.md' }],
+    });
+    expect(result.success).toBe(true);
+    expect(result.success && 'cards' in result.data).toBe(false);
   });
 
   it('rejects a wrong version literal', () => {
@@ -71,68 +79,59 @@ describe('space file schema', () => {
     });
     expect(result.success).toBe(false);
   });
+});
 
+describe('card frontmatter schema', () => {
   it('rejects an empty card id', () => {
-    const result = spaceFileSchema.safeParse({
-      ...validSpaceFile,
-      cards: [{ id: '', title: 'A', content: 'cards/a.md' }],
-    });
-    expect(result.success).toBe(false);
+    expect(cardFrontmatterSchema.safeParse({ id: '', title: 'A' }).success).toBe(false);
   });
 
-  it('defaults a card with no kind to markdown, so pre-kind files still parse', () => {
-    const file = spaceFileSchema.parse(validSpaceFile);
-    expect(file.cards[0]!.kind).toBe('markdown');
+  it('defaults a card with no kind to markdown, so the common card declares neither', () => {
+    const card = cardFrontmatterSchema.parse({ id: 'a', title: 'A' });
+    expect(card.kind).toBe('markdown');
+  });
+
+  it('holds no content key — the file the frontmatter sits in is the content', () => {
+    const card = cardFrontmatterSchema.parse({ id: 'a', title: 'A', content: 'cards/a.md' });
+    expect('content' in card).toBe(false);
   });
 
   it('parses an alias card, which points at a target instead of holding content', () => {
-    const file = spaceFileSchema.parse({
-      ...validSpaceFile,
-      cards: [
-        { id: 'a', title: 'A', content: 'cards/a.md' },
-        { id: 'a-again', title: 'A, again', kind: 'alias', target: 'a' },
-      ],
+    const alias = cardFrontmatterSchema.parse({
+      id: 'a-again',
+      title: 'A, again',
+      kind: 'alias',
+      target: 'a',
     });
-    const alias = file.cards[1]!;
     expect(alias.kind).toBe('alias');
     expect(alias.kind === 'alias' && alias.target).toBe('a');
   });
 
+  it('rejects an alias with no target', () => {
+    expect(cardFrontmatterSchema.safeParse({ id: 'a', title: 'A', kind: 'alias' }).success).toBe(
+      false,
+    );
+  });
+
   it('accepts an optional single-line card description', () => {
-    const file = spaceFileSchema.parse({
-      ...validSpaceFile,
-      cards: [{ id: 'a', title: 'A', description: 'What A is', content: 'cards/a.md' }],
-    });
-    expect(file.cards[0]!.description).toBe('What A is');
+    const card = cardFrontmatterSchema.parse({ id: 'a', title: 'A', description: 'What A is' });
+    expect(card.description).toBe('What A is');
   });
 
   it('rejects a description longer than the cap', () => {
-    const result = spaceFileSchema.safeParse({
-      ...validSpaceFile,
-      cards: [
-        {
-          id: 'a',
-          title: 'A',
-          description: 'x'.repeat(CARD_DESCRIPTION_MAX_LENGTH + 1),
-          content: 'cards/a.md',
-        },
-      ],
+    const result = cardFrontmatterSchema.safeParse({
+      id: 'a',
+      title: 'A',
+      description: 'x'.repeat(CARD_DESCRIPTION_MAX_LENGTH + 1),
     });
     expect(result.success).toBe(false);
   });
 
   it('rejects a multi-line description — a caption, not a body', () => {
-    const result = spaceFileSchema.safeParse({
-      ...validSpaceFile,
-      cards: [{ id: 'a', title: 'A', description: 'line one\nline two', content: 'cards/a.md' }],
-    });
-    expect(result.success).toBe(false);
-  });
-
-  it('rejects an alias card that carries content instead of a target', () => {
-    const result = spaceFileSchema.safeParse({
-      ...validSpaceFile,
-      cards: [{ id: 'a', title: 'A', kind: 'alias', content: 'cards/a.md' }],
+    const result = cardFrontmatterSchema.safeParse({
+      id: 'a',
+      title: 'A',
+      description: 'line one\nline two',
     });
     expect(result.success).toBe(false);
   });

@@ -1,3 +1,8 @@
+---
+id: d
+title: D
+---
+
 Card D is the last full card of the first collection, on Long and Mid but not Short.
 
 It is deliberately long, so that opening it in a small frame overflows the fixed

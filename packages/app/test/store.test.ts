@@ -1,22 +1,21 @@
 import { describe, expect, it } from 'vitest';
 import { loadSpace, type Space } from '@project/graph';
 import { createPresentationStore } from '../src/store';
+import { cardFile } from './card-files';
 
 function fixture(): Space {
-  const result = loadSpace({
-    version: 1,
-    id: 's',
-    title: 'Fixture',
-    cards: [
-      { id: 'a', title: 'A', kind: 'markdown', content: 'a.md' },
-      { id: 'b', title: 'B', kind: 'markdown', content: 'b.md' },
-      { id: 'c', title: 'C', kind: 'markdown', content: 'c.md' },
-    ],
-    routes: [
-      { id: 'r1', title: 'One', steps: [{ target: 'a' }, { target: 'b' }, { target: 'c' }] },
-      { id: 'r2', title: 'Two', steps: [{ target: 'b' }] },
-    ],
-  });
+  const result = loadSpace(
+    {
+      version: 1,
+      id: 's',
+      title: 'Fixture',
+      routes: [
+        { id: 'r1', title: 'One', steps: [{ target: 'a' }, { target: 'b' }, { target: 'c' }] },
+        { id: 'r2', title: 'Two', steps: [{ target: 'b' }] },
+      ],
+    },
+    [cardFile('a'), cardFile('b'), cardFile('c')],
+  );
   if (!result.ok) throw new Error('fixture should load');
   return result.space;
 }
@@ -58,13 +57,9 @@ describe('createPresentationStore', () => {
   });
 
   it('cannot present a space with no routes, and selects none (ADR 0015)', () => {
-    const result = loadSpace({
-      version: 1,
-      id: 's',
-      title: 'New space',
-      cards: [{ id: 'a', title: 'Untitled', kind: 'markdown', content: 'a.md' }],
-      routes: [],
-    });
+    const result = loadSpace({ version: 1, id: 's', title: 'New space', routes: [] }, [
+      cardFile('a', 'Untitled'),
+    ]);
     if (!result.ok) throw new Error('a route-less space should load');
     const { useStore, selectActiveCardId } = createPresentationStore(result.space);
 

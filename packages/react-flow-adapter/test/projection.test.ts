@@ -1,9 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { buildCardHandles, buildRouteEdges, loadSpace, type Space } from '@project/graph';
 import { projectCardNodes, projectRouteEdges, type RouteEmphasis } from '../src/index';
+import { aliasFile, cardFile } from './card-files';
 
-function load(input: unknown): Space {
-  const result = loadSpace(input);
+function load(
+  input: unknown,
+  cardFiles = [cardFile('a', 'Card A'), cardFile('b', 'Card B')],
+): Space {
+  const result = loadSpace(input, cardFiles);
   if (!result.ok) throw new Error('fixture should load');
   return result.space;
 }
@@ -12,10 +16,6 @@ const space = load({
   version: 1,
   id: 's',
   title: 'Test',
-  cards: [
-    { id: 'a', title: 'Card A', kind: 'markdown', content: 'cards/a.md' },
-    { id: 'b', title: 'Card B', kind: 'markdown', content: 'cards/b.md' },
-  ],
   routes: [
     { id: 'main', title: 'Main', steps: [{ target: 'a' }, { target: 'b' }] },
     { id: 'alt', title: 'Alt', steps: [{ target: 'b' }, { target: 'a' }] },
@@ -37,22 +37,21 @@ describe('projectCardNodes', () => {
   });
 
   it("carries a card's description when it has one, and omits it otherwise", () => {
-    const described = load({
-      version: 1,
-      id: 's',
-      title: 'Test',
-      cards: [
+    const described = load(
+      {
+        version: 1,
+        id: 's',
+        title: 'Test',
+        routes: [{ id: 'main', title: 'Main', steps: [{ target: 'a' }, { target: 'b' }] }],
+      },
+      [
         {
-          id: 'a',
-          title: 'Card A',
-          description: 'What A is',
-          kind: 'markdown',
-          content: 'cards/a.md',
+          path: 'cards/a.md',
+          text: '---\nid: a\ntitle: Card A\ndescription: What A is\n---\n',
         },
-        { id: 'b', title: 'Card B', kind: 'markdown', content: 'cards/b.md' },
+        cardFile('b', 'Card B'),
       ],
-      routes: [{ id: 'main', title: 'Main', steps: [{ target: 'a' }, { target: 'b' }] }],
-    });
+    );
     const nodes = projectCardNodes(described, buildCardHandles(described), colors);
     expect(nodes.find((n) => n.id === 'a')!.data.description).toBe('What A is');
     // Absent, not undefined — a card with no description carries no key.
@@ -103,16 +102,15 @@ describe('projectCardNodes', () => {
   });
 
   it('marks an alias node with the title of the card it shows', () => {
-    const withAlias = load({
-      version: 1,
-      id: 's',
-      title: 'Test',
-      cards: [
-        { id: 'a', title: 'Card A', kind: 'markdown', content: 'cards/a.md' },
-        { id: 'a-again', title: 'Card A, again', kind: 'alias', target: 'a' },
-      ],
-      routes: [{ id: 'main', title: 'Main', steps: [{ target: 'a' }, { target: 'a-again' }] }],
-    });
+    const withAlias = load(
+      {
+        version: 1,
+        id: 's',
+        title: 'Test',
+        routes: [{ id: 'main', title: 'Main', steps: [{ target: 'a' }, { target: 'a-again' }] }],
+      },
+      [cardFile('a', 'Card A'), aliasFile('a-again', 'Card A, again', 'a')],
+    );
     const nodes = projectCardNodes(withAlias, buildCardHandles(withAlias), colors);
     // A markdown card is nobody's alias.
     expect(nodes.find((n) => n.id === 'a')!.data.aliasOf).toBeUndefined();

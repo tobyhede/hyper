@@ -1,7 +1,8 @@
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
-import { buildCardHandles, buildRouteEdges, loadSpace } from '@project/graph';
+import { buildCardHandles, buildRouteEdges, loadSpace, type CardFile } from '@project/graph';
 import { projectCardNodes, projectRouteEdges } from '../src/index';
+import { cardFile } from './card-files';
 
 /**
  * The projection's handle invariants, as properties rather than examples.
@@ -37,28 +38,25 @@ const spaceFileArb = cardIdPool.chain((pool) =>
     .map((routes) => {
       const visited = [...new Set(routes.flat())];
       return {
-        version: 1,
-        id: 's',
-        title: 'Generated',
-        cards: visited.map((id) => ({
-          id,
-          title: id.toUpperCase(),
-          kind: 'markdown' as const,
-          content: `cards/${id}.md`,
-        })),
-        routes: routes.map((steps, index) => ({
-          id: `route-${index}`,
-          title: `Route ${index}`,
-          steps: steps.map((target) => ({ target })),
-        })),
+        file: {
+          version: 1,
+          id: 's',
+          title: 'Generated',
+          routes: routes.map((steps, index) => ({
+            id: `route-${index}`,
+            title: `Route ${index}`,
+            steps: steps.map((target) => ({ target })),
+          })),
+        },
+        cardFiles: visited.map((id) => cardFile(id)),
       };
     }),
 );
 
 /** Project a generated space to React Flow nodes and edges. Colors are
  *  irrelevant to these invariants, so the fallback is fine. */
-function project(spaceFile: unknown) {
-  const result = loadSpace(spaceFile);
+function project(generated: { file: unknown; cardFiles: CardFile[] }) {
+  const result = loadSpace(generated.file, generated.cardFiles);
   if (!result.ok) throw new Error(`generated space should load: ${JSON.stringify(result.errors)}`);
   const space = result.space;
 
@@ -71,8 +69,8 @@ function project(spaceFile: unknown) {
 describe('projection handle invariants', () => {
   it('every edge names handles that exist on the nodes it connects', () => {
     fc.assert(
-      fc.property(spaceFileArb, (spaceFile) => {
-        const { nodes, edges } = project(spaceFile);
+      fc.property(spaceFileArb, (generated) => {
+        const { nodes, edges } = project(generated);
 
         const handleIds = new Map(
           nodes.map((node) => [
@@ -101,8 +99,8 @@ describe('projection handle invariants', () => {
 
   it('a card never carries two handles of the same kind with the same id', () => {
     fc.assert(
-      fc.property(spaceFileArb, (spaceFile) => {
-        const { nodes } = project(spaceFile);
+      fc.property(spaceFileArb, (generated) => {
+        const { nodes } = project(generated);
 
         // React Flow can't tell two same-side handles apart otherwise, and picks
         // whichever it finds first. Holds here because a handle id is

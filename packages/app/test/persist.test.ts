@@ -2,17 +2,16 @@ import { describe, expect, it } from 'vitest';
 import { spaceFileSchema, type SpaceFile } from '@project/core';
 import { loadSpace } from '@project/graph';
 import { serializeLayout } from '../src/persist';
+import { cardFile } from './card-files';
 
 const BASE: SpaceFile = {
   version: 1,
   id: 's',
   title: 'T',
-  cards: [
-    { id: 'a', title: 'A', kind: 'markdown', content: 'a.md' },
-    { id: 'b', title: 'B', kind: 'markdown', content: 'b.md' },
-  ],
   routes: [{ id: 'main', title: 'Main', steps: [{ target: 'a' }, { target: 'b' }] }],
 };
+
+const CARDS = [cardFile('a'), cardFile('b')];
 
 const positions = (entries: Record<string, [number, number]>) =>
   new Map(Object.entries(entries).map(([id, [x, y]]) => [id, { x, y }]));
@@ -44,7 +43,7 @@ describe('serializeLayout', () => {
     const next = serializeLayout(BASE, 'layout', 'Layout', positions({ a: [10, 20] }));
 
     expect(spaceFileSchema.safeParse(next).success).toBe(true);
-    const loaded = loadSpace(next);
+    const loaded = loadSpace(next, CARDS);
     expect(loaded.ok).toBe(true);
     if (loaded.ok) expect(loaded.space.defaultView).toBe('layout');
   });
@@ -70,7 +69,7 @@ describe('serializeLayout', () => {
     const next = serializeLayout(BASE, 'layout', 'Layout', positions({ a: [1, 2] }));
     expect(next.id).toBe(BASE.id);
 
-    const reloaded = loadSpace(next);
+    const reloaded = loadSpace(next, CARDS);
     expect(reloaded.ok).toBe(true);
     if (reloaded.ok) expect(reloaded.space.id).toBe(BASE.id);
   });

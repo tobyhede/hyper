@@ -62,6 +62,24 @@ describe('parseCardFile', () => {
     expect(result.body).toBe('Above.\n\n---\n\nBelow.\n');
   });
 
+  it('reports an unquoted numeric id, which YAML reads as a number', () => {
+    // Frontmatter is YAML, so `id: 2024` is the number 2024 and not the string.
+    // Quoting fixes it; what matters is that the failure names the file and the
+    // field rather than loading a card whose id is not a string.
+    const result = parseCardFile({ path: 'cards/2024.md', text: '---\nid: 2024\ntitle: A\n---\n' });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.errors.map((e) => e.kind)).toEqual(['invalid-frontmatter']);
+    expect(result.errors[0]?.message).toContain('id');
+
+    const quoted = parseCardFile({
+      path: 'cards/2024.md',
+      text: "---\nid: '2024'\ntitle: A\n---\n",
+    });
+    expect(quoted.ok && quoted.frontmatter.id).toBe('2024');
+  });
+
   it('reports a file with no frontmatter rather than treating it as a body', () => {
     const result = parseCardFile({ path: 'cards/a.md', text: 'Just a body.\n' });
 

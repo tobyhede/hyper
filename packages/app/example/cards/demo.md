@@ -1,3 +1,8 @@
+---
+id: demo
+title: Try it
+---
+
 1. Pick a route in the toolbar (**Main walkthrough** or **Quick tour**)
 2. Press **Present**
 3. Use `←` / `→` to move through the steps

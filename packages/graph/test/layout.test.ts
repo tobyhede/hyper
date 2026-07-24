@@ -7,21 +7,20 @@ import {
   loadSpace,
 } from '../src/index';
 import type { LayoutGraph, Space } from '../src/index';
+import { cardFile } from './card-files';
 
 function loadFixture(): Space {
-  const result = loadSpace({
-    version: 1,
-    id: 's',
-    title: 'T',
-    cards: [
-      { id: 'a', title: 'A', kind: 'markdown', content: 'a.md' },
-      { id: 'b', title: 'B', kind: 'markdown', content: 'b.md' },
-      { id: 'c', title: 'C', kind: 'markdown', content: 'c.md' },
-    ],
-    routes: [
-      { id: 'main', title: 'Main', steps: [{ target: 'a' }, { target: 'b' }, { target: 'c' }] },
-    ],
-  });
+  const result = loadSpace(
+    {
+      version: 1,
+      id: 's',
+      title: 'T',
+      routes: [
+        { id: 'main', title: 'Main', steps: [{ target: 'a' }, { target: 'b' }, { target: 'c' }] },
+      ],
+    },
+    [cardFile('a'), cardFile('b'), cardFile('c')],
+  );
   if (!result.ok) throw new Error('fixture should load');
   return result.space;
 }

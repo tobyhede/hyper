@@ -2,17 +2,13 @@ import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import type { Route } from '@project/core';
 import { clampStepIndex, nextStepIndex, prevStepIndex, validateReferences } from '../src/index';
+import { card } from './card-files';
 
 /** Build a structurally-consistent space file from a list of ids. */
 function spaceFileFromIds(ids: string[]) {
   return {
     title: 'Generated',
-    cards: ids.map((id) => ({
-      id: `card-${id}`,
-      title: id,
-      kind: 'markdown' as const,
-      content: `cards/${id}.md`,
-    })),
+    cards: ids.map((id) => card(`card-${id}`, id)),
     routes: [
       {
         id: 'main',

@@ -10,23 +10,22 @@ import {
   routeCardIds,
   type Space,
 } from '../src/index';
+import { cardFile } from './card-files';
 
 // a → b → c  (main),  a → c  (quick): c is shared, a fans out.
 function loadFixture(): Space {
-  const result = loadSpace({
-    version: 1,
-    id: 's',
-    title: 'Test',
-    cards: [
-      { id: 'a', title: 'A', kind: 'markdown', content: 'a.md' },
-      { id: 'b', title: 'B', kind: 'markdown', content: 'b.md' },
-      { id: 'c', title: 'C', kind: 'markdown', content: 'c.md' },
-    ],
-    routes: [
-      { id: 'main', title: 'Main', steps: [{ target: 'a' }, { target: 'b' }, { target: 'c' }] },
-      { id: 'quick', title: 'Quick', steps: [{ target: 'a' }, { target: 'c' }] },
-    ],
-  });
+  const result = loadSpace(
+    {
+      version: 1,
+      id: 's',
+      title: 'Test',
+      routes: [
+        { id: 'main', title: 'Main', steps: [{ target: 'a' }, { target: 'b' }, { target: 'c' }] },
+        { id: 'quick', title: 'Quick', steps: [{ target: 'a' }, { target: 'c' }] },
+      ],
+    },
+    [cardFile('a'), cardFile('b'), cardFile('c')],
+  );
   if (!result.ok) throw new Error('fixture should load');
   return result.space;
 }

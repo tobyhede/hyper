@@ -1,3 +1,8 @@
+---
+id: model
+title: The data model
+---
+
 Two small pieces, defined in `graph.json`:
 
 | Piece | Purpose |

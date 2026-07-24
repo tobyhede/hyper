@@ -2,11 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { buildLayoutGraph, loadSpace, type Space } from '@project/graph';
 import { CARD_SIZE } from '../src/card';
 import { resolveView } from '../src/view';
+import { cardFile } from './card-files';
 
-const CARDS = [
-  { id: 'a', title: 'A', kind: 'markdown', content: 'a.md' },
-  { id: 'b', title: 'B', kind: 'markdown', content: 'b.md' },
-];
+const CARDS = [cardFile('a'), cardFile('b')];
 const ROUTES = [{ id: 'main', title: 'Main', steps: [{ target: 'a' }, { target: 'b' }] }];
 
 const WORKING = {
@@ -17,14 +15,16 @@ const WORKING = {
 };
 
 function spaceWith(extra: Record<string, unknown> = {}): Space {
-  const result = loadSpace({
-    version: 1,
-    id: 's',
-    title: 'T',
-    cards: CARDS,
-    routes: ROUTES,
-    ...extra,
-  });
+  const result = loadSpace(
+    {
+      version: 1,
+      id: 's',
+      title: 'T',
+      routes: ROUTES,
+      ...extra,
+    },
+    CARDS,
+  );
   if (!result.ok) throw new Error(result.errors.map((e) => e.message).join(', '));
   return result.space;
 }

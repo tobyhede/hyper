@@ -18,7 +18,7 @@ import {
   type CardHandleSet,
   type LayoutGraph,
 } from '@project/graph';
-import { space, spaceFile, markdownByCardId } from './space';
+import { space, spaceFile } from './space';
 import { CREATED_LAYOUT_ID, CREATED_LAYOUT_TITLE, saveSpaceFile, serializeLayout } from './persist';
 import { routeColorMap } from './colors';
 import { CARD_HEIGHT, CARD_SIZE, cardSizeVars } from './card';
@@ -34,11 +34,10 @@ import { PresentationDeck, type DeckSlide } from './components/PresentationDeck'
 const colors = routeColorMap(space);
 const { useStore: usePresentationStore, selectActiveCardId } = createPresentationStore(space);
 
-// The markdown a card shows, resolving an alias to its target's content (ADR
-// 0009). A card keeps its own title; only content is inherited.
+// The markdown a card shows, resolving an alias to its target's body (ADR 0009).
+// A card keeps its own title; only content is inherited.
 function markdownForCard(cardId: string): string {
-  const contentId = resolveContentCard(space, cardId)?.id ?? cardId;
-  return markdownByCardId[contentId] ?? '';
+  return resolveContentCard(space, cardId)?.body ?? '';
 }
 const allHandles = buildCardHandles(space);
 const allRouteEdges = buildRouteEdges(space);

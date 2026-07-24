@@ -1,9 +1,20 @@
-# Layout fixture
+# The app's two spaces
 
-The abstract space `pnpm dev` loads, and the one Playwright drives. It is a
-**test bed**, not the product demo — the narrative demo lives in `../example/`
-and is kept for when real space-loading exists. Tests here assert *behaviour*
-against this shape; nothing asserts on card prose.
+`fixture/` is the abstract space `pnpm dev` loads, and the one Playwright drives.
+It is a **test bed**, not the product demo — the narrative demo lives in
+`example/` and is kept for when real space-loading exists. Tests assert
+*behaviour* against this shape; nothing asserts on card prose beyond the few
+markers listed below.
+
+This file sits here rather than in `fixture/` on purpose. A space is a directory
+(ADR 0020) and every `.md` beside its space file is a card, so a `README.md` in
+there would be scanned as one and fail to parse for want of frontmatter.
+
+Each space is a directory: `space.json` holding structure — `version`, `id`,
+`title`, `routes` — and one markdown file per card, either beside it or under
+`cards/`. The fixture uses both locations (`a.md` at the top, the rest in
+`cards/`) so the two-location scan is exercised by the space the app actually
+loads.
 
 Two **disconnected collections** in one space, sharing no cards, which ELK lays
 out as separate bands:
@@ -35,6 +46,11 @@ Between them the shape exercises every behaviour the e2e suite covers:
   cards have none, so the node renders with and without one.
 - **Open shows source (ADR 0011).** `A`'s body carries `**A**`, so opening it can
   prove the Markdown markers survive rather than rendering bold.
+- **A heading in a body is just a heading (ADR 0020).** `C`'s body opens with
+  `# Where Short ends`. Under the old split — title in the space file, body in a
+  separate markdown file — a leading heading repeated the title and rendered
+  twice, and a rule forbade it. Now that both live in one file, the deck renders
+  the card's title and the body's heading once each.
 - **Open off the selected route.** `E` is in the other collection, so selecting a
   collection-1 route and opening `E` proves any card opens regardless of the
   selection.

@@ -1,3 +1,8 @@
+---
+id: rendering
+title: Rendering the graph
+---
+
 [React Flow](https://reactflow.dev) draws the spatial layout.
 
 - Each card becomes a **custom card node**

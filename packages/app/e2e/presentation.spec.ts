@@ -311,26 +311,24 @@ test('content that exceeds the frame scrolls inside it, keeping controls reachab
   expect(actions.y + actions.height).toBeLessThanOrEqual(panel.y + panel.height + 1);
 });
 
-test('a card title appears once, not twice', async ({ page }) => {
+test('a heading in a card body is just a heading', async ({ page }) => {
   await page.goto('/');
 
-  // The space owns the title, so a card's Markdown is body-only. When a body
-  // repeated its title as a heading, every surface rendered it twice.
-  await nodeByTitle(page, 'C').click();
-  const opened = page.getByTestId('open-card');
-  await expect(opened).toBeVisible();
-  expect(await opened.getByText('C', { exact: true }).count()).toBe(1);
-
-  await page.getByTestId('close-card').click();
-
-  // Present Long (which visits C) and check the slide carries its title once.
+  // A card is one file, so its title and its body live together and a leading
+  // heading cannot repeat a title held elsewhere (ADR 0020). C's body opens with
+  // one. This replaces the rule that a body must not start with a heading, and
+  // the test that policed it.
   await page.getByTestId('route-selector').click();
   await page.getByRole('option', { name: 'Long' }).click();
   await page.getByTestId('present-button').click();
   await expect(page.getByTestId('presentation-deck')).toBeVisible();
 
+  // The slide carries the card's title once, and the body's heading once, as a
+  // heading rather than as literal text.
   const slide = page.locator('.reveal .slides section[data-card-id="c"]');
   expect(await slide.getByText('C', { exact: true }).count()).toBe(1);
+  await expect(slide.locator('h1')).toHaveText('Where Short ends');
+  await expect(slide.locator('h1')).toHaveCount(1);
 });
 
 test('an alias node names the card it redraws, and opens to that content', async ({ page }) => {

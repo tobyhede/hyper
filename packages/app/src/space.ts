@@ -1,12 +1,14 @@
 import { spaceFileSchema, type SpaceFile } from '@project/core';
 import { loadSpace, type Space } from '@project/graph';
-import spaceFileInput from 'virtual:space-file';
+import { cardFiles, spaceFile as spaceFileInput } from 'virtual:space-file';
 
 /**
- * Load the space the dev server chose to serve. The `virtual:space-file` module
- * reads `fixture/space.local.json` when it exists and falls back to
- * `fixture/space.json` (see `vite-space-file-plugin.ts`), so an arrangement
- * saved on the last drag is what opens on the next full page load.
+ * Load the space the dev server chose to serve — its space file and its card
+ * files, because a card is a file and the space file holds only structure (ADR
+ * 0020). The `virtual:space-file` module reads `fixture/space.local.json` when it
+ * exists and falls back to `fixture/space.json` (see `vite-space-file-plugin.ts`),
+ * so an arrangement saved on the last drag is what opens on the next full page
+ * load.
  *
  * The base is the abstract test bed (`fixture/`), not the narrative demo
  * (`example/`, kept for when real space-loading exists) — it is deliberately the
@@ -16,7 +18,7 @@ import spaceFileInput from 'virtual:space-file';
  * than render a half-space (ADR 0010).
  */
 
-const result = loadSpace(spaceFileInput);
+const result = loadSpace(spaceFileInput, cardFiles);
 if (!result.ok) {
   throw new Error(
     `The bundled space failed to load:\n${result.errors.map((e) => `  - ${e.message}`).join('\n')}`,
@@ -33,19 +35,3 @@ export const space: Space = result.space;
  * typed file value without threading it out of `loadSpace`.
  */
 export const spaceFile: SpaceFile = spaceFileSchema.parse(spaceFileInput);
-
-const rawCards = import.meta.glob<string>('../fixture/cards/*.md', {
-  query: '?raw',
-  import: 'default',
-  eager: true,
-});
-
-export const markdownByCardId: Record<string, string> = Object.fromEntries(
-  // Only markdown cards own a content file. An alias resolves through its target
-  // at draw time (ADR 0009), so it contributes no entry of its own here.
-  space.cards.flatMap((card) => {
-    if (card.kind !== 'markdown') return [];
-    const entry = Object.entries(rawCards).find(([path]) => path.endsWith(`/${card.content}`));
-    return [[card.id, entry?.[1] ?? `*Missing content file: ${card.content}*`]];
-  }),
-);
