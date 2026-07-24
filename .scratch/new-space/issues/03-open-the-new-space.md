@@ -6,19 +6,17 @@ Blocked by: 02
 
 The behaviour change, and the one carrying a real design question.
 
-**Decide first: how does the fixture stay what e2e drives?** Today the app always
-has a space file, so "nothing to open" does not exist as a state. Making a fresh
-run get a one-card space means "which space opens" grows a third answer, and
-`SPACE_BASE_ONLY` — currently "read the base, not the local override" — is not
-that answer. Restate the flag deliberately or add a separate one; do not let it
-drift into meaning "load the fixture" by accident.
+**Decided: the app opens a new empty space unless it is given a path to a space
+file.** So `SPACE_BASE_ONLY` does not grow a third meaning — "which space opens"
+turns on whether a path was supplied, and e2e supplies one pointing at the
+fixture.
 
-Options worth weighing rather than assuming:
-
-- The fixture stops being what `pnpm dev` serves and becomes an e2e-only input,
-  selected by the same switch Playwright already sets.
-- `space.local.json` remains the "your work" file, and its *absence* is what
-  "nothing to open" means — the fixture then has to be reachable some other way.
+What is left to settle here is how the path reaches the app. It is a dev-server
+input, because the server is the only thing that can read a file, and the client
+must not send one (an endpoint taking a path from the browser is an
+arbitrary-file-write primitive — the same reason the save endpoint fixes its
+target in config). The plugin already resolves a fixed pair of paths; this
+generalises that to one supplied path.
 
 Whichever wins, the human's own saved arrangement must keep opening. Someone who
 dragged cards yesterday must not be handed a blank new space today.

@@ -2,7 +2,7 @@
 
 Status: open
 Type: task
-Blocked by: 01
+Blocked by: 04
 
 ADR 0018, as a value. No intake change yet — this is the thing 03 goes on to
 open.
@@ -19,7 +19,8 @@ from the first frame.
 - The card needs a title and empty content. It is the author's first card, so it
   should read as an invitation rather than a placeholder with instructions in it
   — and its title is what the graph draws (ADR 0006).
-- Relies on 01: the app mints this card without an authored id.
+- Relies on 04: the space itself needs an id, and this one is minted rather
+  than authored. Its card can carry a written id for now — generation is 01.
 
 ## Acceptance
 

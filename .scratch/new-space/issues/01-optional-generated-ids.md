@@ -5,6 +5,12 @@ Type: task
 
 ADR 0019. Pure, lands green on its own, no app change.
 
+**Deferred, and no longer blocking.** The immediate path gives the fixture
+explicit ids instead (ticket 04), so nothing waits on this. It is the harder half
+— a derivation rule, a collision strategy, and a definition of "stable" that
+survives insertion — and it is hard to reverse once ids are generated and saved,
+which is exactly why it should not gate a schema field.
+
 `spaceFileSchema` makes `id` optional on cards, routes and layouts; `loadSpace`
 fills in what is missing before it validates references and indexes — so
 everything downstream of intake still sees a total `id`, which is what ADR 0010's
