@@ -11,6 +11,7 @@ import type { LayoutGraph, Space } from '../src/index';
 function loadFixture(): Space {
   const result = loadSpace({
     version: 1,
+    id: 's',
     title: 'T',
     cards: [
       { id: 'a', title: 'A', kind: 'markdown', content: 'a.md' },

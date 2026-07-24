@@ -9,6 +9,8 @@ import { validateReferences, type ReferenceError } from './validate';
  * unvalidated one.
  */
 export interface Space {
+  /** What names this space (ADR 0019). Not its title, and not its file path. */
+  readonly id: string;
   readonly title: string;
   readonly cards: readonly Card[];
   readonly routes: readonly Route[];
@@ -45,6 +47,7 @@ export function loadSpace(input: unknown): LoadSpaceResult {
   if (referenceErrors.length > 0) return { ok: false, errors: referenceErrors };
   const layouts = file.layouts ?? [];
   const space: Space = {
+    id: file.id,
     title: file.title,
     cards: file.cards,
     routes: file.routes,

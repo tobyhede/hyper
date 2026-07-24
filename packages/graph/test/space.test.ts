@@ -3,6 +3,7 @@ import { getCard, getLayout, getRoute, loadSpace } from '../src/index';
 
 const validInput = {
   version: 1,
+  id: 's',
   title: 'Test space',
   cards: [
     { id: 'a', title: 'A', kind: 'markdown', content: 'a.md' },
@@ -12,6 +13,12 @@ const validInput = {
 };
 
 describe('loadSpace', () => {
+  it('carries the space id through to the Space', () => {
+    const result = loadSpace(validInput);
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.space.id).toBe('s');
+  });
+
   it('turns valid input into a Space', () => {
     const result = loadSpace(validInput);
     expect(result.ok).toBe(true);

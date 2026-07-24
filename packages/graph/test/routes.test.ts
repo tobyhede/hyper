@@ -15,6 +15,7 @@ import {
 function loadFixture(): Space {
   const result = loadSpace({
     version: 1,
+    id: 's',
     title: 'Test',
     cards: [
       { id: 'a', title: 'A', kind: 'markdown', content: 'a.md' },

@@ -140,6 +140,15 @@ export const routeSchema = z.object({
  */
 export const spaceFileSchema = z.object({
   version: z.literal(1),
+  /**
+   * What names this space. Required today; ADR 0019 makes ids optional and
+   * generated on load, and this is the field that becomes optional — the other
+   * direction would strand every file already carrying one.
+   *
+   * A space's id is not its title and not its file name: a title is prose the
+   * author may reword, and a path is where the file happens to sit.
+   */
+  id: idSchema,
   title: z.string().min(1),
   cards: z.array(cardSchema),
   /**

@@ -38,6 +38,7 @@ const spaceFileArb = cardIdPool.chain((pool) =>
       const visited = [...new Set(routes.flat())];
       return {
         version: 1,
+        id: 's',
         title: 'Generated',
         cards: visited.map((id) => ({
           id,

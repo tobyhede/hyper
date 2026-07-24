@@ -4,6 +4,7 @@ import { loadSpace, resolveContentCard, type Space } from '../src/index';
 function baseSpace(): Space {
   const result = loadSpace({
     version: 1,
+    id: 's',
     title: 'Test',
     cards: [
       { id: 'model', title: 'The model', kind: 'markdown', content: 'cards/model.md' },

@@ -8,6 +8,7 @@ import {
 
 const validSpaceFile = {
   version: 1,
+  id: 's',
   title: 'Test deck',
   cards: [
     { id: 'a', title: 'A', content: 'cards/a.md' },
@@ -17,6 +18,19 @@ const validSpaceFile = {
 };
 
 describe('space file schema', () => {
+  it('requires the space to name itself', () => {
+    // Required today; ADR 0019 makes ids optional and generated on load, and
+    // this is the assertion that will change when it does.
+    const { id: _id, ...withoutId } = validSpaceFile;
+    const result = spaceFileSchema.safeParse(withoutId);
+    expect(result.success).toBe(false);
+    if (!result.success) expect(result.error.issues[0]?.path).toEqual(['id']);
+  });
+
+  it('rejects an empty space id', () => {
+    expect(spaceFileSchema.safeParse({ ...validSpaceFile, id: '' }).success).toBe(false);
+  });
+
   it('parses a valid space file', () => {
     const file = spaceFileSchema.parse(validSpaceFile);
     expect(file.title).toBe('Test deck');

@@ -1,5 +1,6 @@
 {
   "version": 1,
+  "id": "layout-fixture",
   "title": "Layout fixture",
   "cards": [
     { "id": "a", "title": "A", "description": "Where every route begins", "content": "cards/a.md" },

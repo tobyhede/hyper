@@ -5,6 +5,7 @@ import { serializeLayout } from '../src/persist';
 
 const BASE: SpaceFile = {
   version: 1,
+  id: 's',
   title: 'T',
   cards: [
     { id: 'a', title: 'A', kind: 'markdown', content: 'a.md' },
@@ -60,6 +61,18 @@ describe('serializeLayout', () => {
 
     expect(next.layouts).toHaveLength(1);
     expect(next.layouts?.[0]?.positions).toEqual({ a: { x: 99, y: 99 } });
+  });
+
+  it('keeps the space id through a save and reload', () => {
+    // `serializeLayout` spreads the base file, so the id rides along — worth an
+    // assertion rather than an assumption, since losing it on save would make a
+    // saved space anonymous.
+    const next = serializeLayout(BASE, 'layout', 'Layout', positions({ a: [1, 2] }));
+    expect(next.id).toBe(BASE.id);
+
+    const reloaded = loadSpace(next);
+    expect(reloaded.ok).toBe(true);
+    if (reloaded.ok) expect(reloaded.space.id).toBe(BASE.id);
   });
 
   it('keeps other layouts a space already had', () => {

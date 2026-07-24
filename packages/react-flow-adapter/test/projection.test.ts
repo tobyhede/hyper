@@ -10,6 +10,7 @@ function load(input: unknown): Space {
 
 const space = load({
   version: 1,
+  id: 's',
   title: 'Test',
   cards: [
     { id: 'a', title: 'Card A', kind: 'markdown', content: 'cards/a.md' },
@@ -38,6 +39,7 @@ describe('projectCardNodes', () => {
   it("carries a card's description when it has one, and omits it otherwise", () => {
     const described = load({
       version: 1,
+      id: 's',
       title: 'Test',
       cards: [
         {
@@ -103,6 +105,7 @@ describe('projectCardNodes', () => {
   it('marks an alias node with the title of the card it shows', () => {
     const withAlias = load({
       version: 1,
+      id: 's',
       title: 'Test',
       cards: [
         { id: 'a', title: 'Card A', kind: 'markdown', content: 'cards/a.md' },

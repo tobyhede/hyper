@@ -5,6 +5,7 @@ import { createPresentationStore } from '../src/store';
 function fixture(): Space {
   const result = loadSpace({
     version: 1,
+    id: 's',
     title: 'Fixture',
     cards: [
       { id: 'a', title: 'A', kind: 'markdown', content: 'a.md' },
@@ -59,6 +60,7 @@ describe('createPresentationStore', () => {
   it('cannot present a space with no routes, and selects none (ADR 0015)', () => {
     const result = loadSpace({
       version: 1,
+      id: 's',
       title: 'New space',
       cards: [{ id: 'a', title: 'Untitled', kind: 'markdown', content: 'a.md' }],
       routes: [],

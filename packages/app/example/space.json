@@ -1,5 +1,6 @@
 {
   "version": 1,
+  "id": "demo",
   "title": "Graph-Native Technical Presentations",
   "cards": [
     { "id": "intro", "title": "Graph-native presentations", "content": "cards/intro.md" },

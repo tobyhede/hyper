@@ -17,7 +17,14 @@ const WORKING = {
 };
 
 function spaceWith(extra: Record<string, unknown> = {}): Space {
-  const result = loadSpace({ version: 1, title: 'T', cards: CARDS, routes: ROUTES, ...extra });
+  const result = loadSpace({
+    version: 1,
+    id: 's',
+    title: 'T',
+    cards: CARDS,
+    routes: ROUTES,
+    ...extra,
+  });
   if (!result.ok) throw new Error(result.errors.map((e) => e.message).join(', '));
   return result.space;
 }
