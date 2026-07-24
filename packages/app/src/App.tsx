@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from 'react';
 import { ReactFlowProvider } from '@xyflow/react';
 import { AppShell, Button, RouteLegend, RouteSelector } from '@project/ui';
 import {
-  elkStrategy,
   projectCardNodes,
   projectRouteEdges,
   type RouteEmphasis,
@@ -22,6 +21,7 @@ import { space, markdownByCardId } from './space';
 import { routeColorMap } from './colors';
 import { CARD_HEIGHT, CARD_SIZE, cardSizeVars } from './card';
 import { createPresentationStore } from './store';
+import { resolveView } from './view';
 import { GraphView } from './components/GraphView';
 import { OpenCard } from './components/OpenCard';
 import { PresentationDeck, type DeckSlide } from './components/PresentationDeck';
@@ -40,10 +40,10 @@ function markdownForCard(cardId: string): string {
 const allHandles = buildCardHandles(space);
 const allRouteEdges = buildRouteEdges(space);
 
-// The strategy in use. A LayoutStrategy is behaviour and nothing more — swapping
-// this line for `gridStrategy()` from `@project/graph` is the whole change, and
-// it drops the last ELK import out of this file.
-const layoutStrategy = elkStrategy();
+// Which view this space opens in, and the strategy that arranges it. The fixture
+// declares no view, so this resolves to the route-driven ELK graph — exactly
+// what the hardcoded `elkStrategy()` here used to do.
+const view = resolveView(space);
 
 export function App() {
   const mode = usePresentationStore((s) => s.mode);
@@ -93,7 +93,7 @@ export function App() {
   } | null>(null);
   useEffect(() => {
     let cancelled = false;
-    void layoutStrategy(graph).then((result) => {
+    void view.strategy(graph).then((result) => {
       if (!cancelled) setLayoutResult({ graph, result });
     });
     return () => {
