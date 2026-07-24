@@ -170,7 +170,7 @@ export function App() {
   // Persist on every real edit. `revision` counts only settled drags and
   // arranges — never the creation sync — so this saves what the author did and
   // stays silent on load. The write is debounced by nothing: a drag ends once,
-  // and `space.local.json` is picked up on the next full page load, not live
+  // and the saved space file is picked up on the next full page load, not live
   // (ticket 06). The saved file names this Layout as `defaultView`, so a reload
   // reopens in it rather than recomputing.
   useEffect(() => {

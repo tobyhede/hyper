@@ -1,5 +1,5 @@
-import { cardFrontmatterSchema, type CardFrontmatter } from '@project/core';
-import { parse as parseYaml } from 'yaml';
+import { cardFrontmatterSchema, type Card, type CardFrontmatter } from '@project/core';
+import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
 
 /** A card file as read from disk: where it was found, and its bytes as text. */
 export interface CardFile {
@@ -71,6 +71,25 @@ export function parseCardFile(file: CardFile): ParseCardFileResult {
   // one newline is dropped — anything further is the author's own blank line.
   const body = file.text.slice(close + closing[0].length).replace(/^\n/, '');
   return { ok: true, frontmatter: parsed.data, body };
+}
+
+/**
+ * Write a card back out as one file: frontmatter, fence, body (ADR 0020). The
+ * inverse of {@link parseCardFile}, and held to that by a round-trip property.
+ *
+ * The YAML goes through `stringify` rather than a template, so a title carrying
+ * a colon — `Recap: the data model`, which the example space really has — is
+ * quoted rather than written as a nested mapping. Hand-rolling the emitting side
+ * is the same mistake as hand-rolling the reading side, in the direction where
+ * it silently produces a file that no longer parses.
+ *
+ * `kind` is written even though the reader defaults it. A file this produced is
+ * one a human then edits, and a card that says what kind it is can be read
+ * without knowing the default.
+ */
+export function serializeCardFile(card: Card): string {
+  const { body, ...frontmatter } = card;
+  return `${FENCE}${stringifyYaml(frontmatter)}${FENCE}\n${body}`;
 }
 
 /** YAML's own errors are multi-line and end in a source excerpt; the first line says what broke. */

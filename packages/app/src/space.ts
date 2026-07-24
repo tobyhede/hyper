@@ -5,10 +5,10 @@ import { cardFiles, spaceFile as spaceFileInput } from 'virtual:space-file';
 /**
  * Load the space the dev server chose to serve — its space file and its card
  * files, because a card is a file and the space file holds only structure (ADR
- * 0020). The `virtual:space-file` module reads `fixture/space.local.json` when it
- * exists and falls back to `fixture/space.json` (see `vite-space-file-plugin.ts`),
- * so an arrangement saved on the last drag is what opens on the next full page
- * load.
+ * 0020). The `virtual:space-file` module reads the authored space directory (see
+ * `vite-space-file-plugin.ts`), which is also what a save writes back to — so an
+ * arrangement saved on the last drag is what opens on the next full page load,
+ * and throwing one away is `git checkout` rather than deleting a shadow file.
  *
  * The base is the abstract test bed (`fixture/`), not the narrative demo
  * (`example/`, kept for when real space-loading exists) — it is deliberately the

@@ -47,8 +47,13 @@ export function serializeLayout(
 
 /**
  * PUT the space file to the dev-only `/__space` endpoint, which validates it and
- * writes `space.local.json`. Dev-only by construction: the plugin behind this
- * endpoint is `apply: 'serve'`, so in a build there is nothing to talk to.
+ * writes the authored `space.json` **in place** — there is no local shadow copy
+ * any more, so a save dirties the worktree and `git checkout` is the undo.
+ *
+ * Dev-only by the `import.meta.env.DEV` guard here and by the endpoint living in
+ * the plugin's `configureServer`, a hook Vite calls only for the dev server. The
+ * plugin itself is *not* `apply: 'serve'` — reading has to work in a build, since
+ * `space.ts` imports the virtual module unconditionally.
  */
 export async function saveSpaceFile(next: SpaceFile): Promise<void> {
   if (!import.meta.env.DEV) return;

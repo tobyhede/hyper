@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import type { Plugin } from 'vite';
 // Imported by *relative* path, not as `@project/core`. Vite loads this config in
@@ -18,31 +18,56 @@ import { spaceFileSchema } from '../core/src/index';
  * will want subdirectories, and a recursive scan would make every one of them
  * ambiguous with card discovery.
  *
- * Read prefers `space.local.json` and falls back to `space.json`; write only
- * ever touches `space.local.json`. `SPACE_BASE_ONLY` pins reads to the base and
- * makes writes a no-op — the switch e2e throws so a stale local file left from
- * manual play can neither retarget the suite nor be clobbered by it. Only the
- * space file has a local variant; a card file is read where it is authored.
+ * **A save writes the authored space, in place.** There is no shadow copy: the
+ * `space.local.json` that used to shadow the space file died with the move to a
+ * directory, because shadowing a directory needs per-file merge rules and a
+ * tombstone for every deletion. Git is the undo — `git checkout` on the space
+ * directory throws an arrangement away. A drag therefore dirties the worktree,
+ * deliberately: ADR 0013 makes placement authored, so a drag is an edit to
+ * authored content and a visible diff is the honest rendering of it.
+ *
+ * `SPACE_READ_ONLY` makes writes a no-op. e2e sets it, and it is what stops a
+ * suite that drags cards from editing the committed fixture out from under
+ * itself — with no shadow file left to absorb those writes, it is the only thing
+ * standing between a test run and the authored space.
  *
  * **Saving is dev-only, but reading is not.** The write endpoint lives in
  * `configureServer`, a hook Vite calls only for the dev server, so a build
  * carries no file endpoint however the plugin is applied. The virtual module,
  * though, has to resolve in a build too — `space.ts` imports it unconditionally
- * — so this plugin cannot be `apply: 'serve'`. A build always reads the authored
- * base: baking one machine's saved arrangement into a bundle would ship local
- * working state as if it were content.
+ * — so this plugin cannot be `apply: 'serve'`.
+ *
+ * A build no longer has to *choose* the authored file over a local one: there is
+ * only the authored file. The flip side is that a build now bundles whatever the
+ * last save left there, because that is what "authored" means once saves write in
+ * place. Committing an arrangement you did not mean to keep is a git problem now,
+ * which is where it belongs.
  */
 
 const VIRTUAL_ID = 'virtual:space-file';
 const RESOLVED_ID = '\0' + VIRTUAL_ID;
 
 const SPACE_DIR = fileURLToPath(new URL('fixture', import.meta.url));
-const BASE = `${SPACE_DIR}/space.json`;
-const LOCAL = `${SPACE_DIR}/space.local.json`;
+const SPACE_FILE = `${SPACE_DIR}/space.json`;
 
-function readSpaceFile(baseOnly: boolean): string {
-  const useLocal = !baseOnly && !process.env['SPACE_BASE_ONLY'] && existsSync(LOCAL);
-  return readFileSync(useLocal ? LOCAL : BASE, 'utf8');
+/** Whether this server may write. e2e clears it; a build never gets here. */
+const readOnly = (): boolean => Boolean(process.env['SPACE_READ_ONLY']);
+
+/**
+ * Write via a temp file in the same directory, then rename over the target.
+ * `rename(2)` is atomic within a filesystem, so a crash or a partial write
+ * leaves the previous file intact rather than a truncated one.
+ *
+ * This did not matter while the target was a throwaway `space.local.json` — a
+ * corrupt one cost nothing and was deleted to recover. It matters now that the
+ * target is the authored space file, where a truncated write destroys content
+ * that only git can get back. Same directory on purpose: renaming across
+ * filesystems is not atomic.
+ */
+function writeSafely(target: string, contents: string): void {
+  const temp = `${target}.tmp`;
+  writeFileSync(temp, contents);
+  renameSync(temp, target);
 }
 
 /** Markdown files in one directory, never below it. */
@@ -67,14 +92,8 @@ function readCardFiles(): { path: string; text: string }[] {
 }
 
 export function spaceFilePlugin(): Plugin {
-  let isBuild = false;
-
   return {
     name: 'space-file',
-
-    config(_config, { command }) {
-      isBuild = command === 'build';
-    },
 
     resolveId(id) {
       if (id === VIRTUAL_ID) return RESOLVED_ID;
@@ -82,13 +101,13 @@ export function spaceFilePlugin(): Plugin {
     },
 
     load(id) {
-      // Resolved in `load()`, not at config time: creating the local file for the
-      // first time then needs no dev-server restart — and that server is the
+      // Read in `load()`, not at config time, so a save is picked up on the next
+      // full page load with no dev-server restart — and that server is the
       // human's, not ours to bounce. No `addWatchFile` either, so writing the
-      // file the app just saved does not trigger an HMR remount mid-drag.
+      // files the app just saved does not trigger an HMR remount mid-drag.
       if (id === RESOLVED_ID) {
         return [
-          `export const spaceFile = ${readSpaceFile(isBuild)};`,
+          `export const spaceFile = ${readFileSync(SPACE_FILE, 'utf8')};`,
           `export const cardFiles = ${JSON.stringify(readCardFiles())};`,
         ].join('\n');
       }
@@ -101,10 +120,10 @@ export function spaceFilePlugin(): Plugin {
           next();
           return;
         }
-        // e2e forces the base and must not mutate disk. Gating the write on the
-        // same switch that pins reads keeps parallel drag tests from racing on
-        // the file or overwriting the guard's decoy.
-        if (process.env['SPACE_BASE_ONLY']) {
+        // e2e must not mutate disk. With no shadow file left to absorb writes,
+        // this is the only thing between a suite that drags cards and the
+        // authored space it is testing against.
+        if (readOnly()) {
           res.statusCode = 204;
           res.end();
           return;
@@ -122,16 +141,23 @@ export function spaceFilePlugin(): Plugin {
             return;
           }
           // Validate server-side, so a client bug cannot write a corrupt space
-          // file over authored content. The target path is fixed above and never
-          // read from the request — an endpoint taking a path from the browser is
-          // an arbitrary-file-write primitive for any page the human has open.
+          // file over authored content — which is now the *authored* file, not a
+          // local copy of it, so this is the only thing guarding it. The target
+          // path is fixed above and never read from the request: an endpoint
+          // taking a path from the browser is an arbitrary-file-write primitive
+          // for any page the human has open.
+          //
+          // Card files are not written here yet. Nothing in the app creates or
+          // edits one, so the endpoint stays a space-file writer until something
+          // does — `serializeCardFile` in `@project/graph` is the half that
+          // exists, waiting for a consumer.
           const result = spaceFileSchema.safeParse(parsed);
           if (!result.success) {
             res.statusCode = 400;
             res.end('does not satisfy spaceFileSchema');
             return;
           }
-          writeFileSync(LOCAL, JSON.stringify(parsed, null, 2) + '\n');
+          writeSafely(SPACE_FILE, JSON.stringify(parsed, null, 2) + '\n');
           res.statusCode = 204;
           res.end();
         });
