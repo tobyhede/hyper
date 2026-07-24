@@ -68,8 +68,9 @@ none. ADR 0017 moved the ground under that: the Layout is now created when the
 space *opens*, not when Auto-arrange is pressed, so the question "what is this
 Layout called, and does the space open in it" belongs to the moment of creation
 and not to a button that may never be pressed. Answering it needs an id for a
-Layout nobody authored, which is ADR 0016 territory (proposed, unaccepted), and
-the only thing that makes the answer observable is serialization. So it moves to
+Layout nobody authored — a short authored-style one, since ADR 0016's second
+identifier was rejected — and the only thing that makes the answer observable is
+serialization. So it moves to
 06, which is where the space file gets written and where `{ ...spaceFile,
 layouts, defaultView }` already appears in the plan. Nothing about the current
 behaviour depends on it: the arrangement is ephemeral either way until 06 lands.

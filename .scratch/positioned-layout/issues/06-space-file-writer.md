@@ -42,6 +42,20 @@ a different hat. 05 was originally to do this and could not: it now happens at
 creation rather than at Auto-arrange, and only serialization makes the answer
 observable.
 
+That is a **short authored-style id**, minted here because no author was present
+to type one — the same kind of id a card or route has, since an entity has
+exactly one (ADR 0016, rejected; `CONTEXT.md` §Id). No uuid, no second field, no
+derivation from the file path. A layout is optional in a space file and hand
+authoring skips it, so this is the ordinary case rather than a special one: the
+app is the only thing that ever creates a Layout unprompted, and naming it is
+part of creating it.
+
+Do not name it `graph`. It would work — a declared Layout shadows a built-in of
+the same name, so the space would reopen positioned with no `defaultView` written
+— but it spends the only name the automatic view has, and ADR 0017 says you reach
+a reading view by switching to one deliberately. Give it its own id and write
+`defaultView`.
+
 Serialize from the **space file**, not from the `Space` — the `Space` is indexed
 and derived, so reconstructing a file from it means un-deriving. Keep the parsed
 space-file value alongside it in `space.ts` and write `{ ...spaceFile, layouts,

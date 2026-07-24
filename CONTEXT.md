@@ -8,6 +8,12 @@ Graph-native technical content. Cards of content live in a spatial graph; author
 The whole authored world, and the top-level of the domain model: a graph of cards together with the routes and views laid over them. Everything else — cards, routes, layouts, views — belongs to a space. A card may itself be a space, so spaces nest arbitrarily deep; the space you load is the root, and a nested space is reached by opening a space-card.
 _Avoid_: presentation (that is one view of a space), manifest (a shipping-ledger word, wrong for an authored, reshapeable thing — retired from the code, not merely avoided), deck, document, canvas, board, file, subgraph.
 
+**Id**:
+What names a card, route or layout within its space, and the *only* identifier any of them has. An id is short, readable and written by whoever created the thing — an author typing it, or the app minting one when it creates something an author never named. References use it, and so do addresses; there is no second, machine-facing identifier sitting behind it (ADR 0016, rejected). An id is scoped to its space, so two spaces may each have a card called `intro`.
+
+Renaming an id is therefore a real edit and not a cosmetic one: it moves everything that pointed at the old name. That is the accepted cost of one identifier.
+_Avoid_: uuid, guid, key, slug (a slug is a readable form derived from a name; here the name already is the identifier), and any pairing of a "human" id with a "durable" one.
+
 ## Cards
 
 **Card**:
