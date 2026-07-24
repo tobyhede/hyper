@@ -9,6 +9,7 @@
   },
   "scripts": {
     "dev": "pnpm --filter @project/app dev",
+    "dev:new": "pnpm --filter @project/app dev:new",
     "build": "pnpm --filter @project/app build",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "eslint .",

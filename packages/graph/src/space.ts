@@ -84,7 +84,13 @@ export function loadSpace(input: unknown, cardFiles: readonly CardFile[]): LoadS
 
   // Array order is read only by automatic strategies, so title order is the one
   // default that is stable against renaming a file or reordering a scan.
-  cards.sort((a, b) => a.title.localeCompare(b.title));
+  //
+  // Ties break on id, which is unique by construction. Without that the sort is
+  // only *stable*, not total: two cards sharing a title keep the order they
+  // arrived in, which is the directory's order — so the arrangement would depend
+  // on the very thing this sort exists to stop it depending on. Found by the
+  // order-indifference property, which failed roughly one run in seven.
+  cards.sort((a, b) => a.title.localeCompare(b.title) || a.id.localeCompare(b.id));
 
   const referenceErrors = validateReferences({ ...file, cards });
   if (referenceErrors.length > 0) return { ok: false, errors: referenceErrors };

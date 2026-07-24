@@ -1,5 +1,5 @@
 import { existsSync, readdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
+import { resolve } from 'node:path';
 import type { Plugin } from 'vite';
 // Imported by *relative* path, not as `@project/core`. Vite loads this config in
 // Node and externalizes bare specifiers, so the package specifier would hand
@@ -47,8 +47,21 @@ import { spaceFileSchema } from '../core/src/index';
 const VIRTUAL_ID = 'virtual:space-file';
 const RESOLVED_ID = '\0' + VIRTUAL_ID;
 
-const SPACE_DIR = fileURLToPath(new URL('fixture', import.meta.url));
-const SPACE_FILE = `${SPACE_DIR}/space.json`;
+/**
+ * The space directory to open, or `null` for none — in which case the app mints
+ * a new one (ADR 0018). "Which space opens" turns on whether a path was
+ * supplied, so no other switch grows a second meaning.
+ *
+ * A server-side input, read once at config load: the server is the only thing
+ * that can read a directory, and the client must never name one. Resolved
+ * against the server's own working directory, so `SPACE_DIR=fixture` means what
+ * it looks like when run from `packages/app`.
+ */
+const SPACE_DIR: string | null = process.env['SPACE_DIR']
+  ? resolve(process.cwd(), process.env['SPACE_DIR'])
+  : null;
+
+const spaceFilePath = (dir: string): string => `${dir}/space.json`;
 
 /** Whether this server may write. e2e clears it; a build never gets here. */
 const readOnly = (): boolean => Boolean(process.env['SPACE_READ_ONLY']);
@@ -87,8 +100,32 @@ function markdownIn(dir: string, prefix: string): { path: string; text: string }
  * so the module's contents do not depend on directory order; the order cards end
  * up in is `loadSpace`'s decision, not this one's.
  */
-function readCardFiles(): { path: string; text: string }[] {
-  return [...markdownIn(SPACE_DIR, ''), ...markdownIn(`${SPACE_DIR}/cards`, 'cards/')];
+function readCardFiles(dir: string): { path: string; text: string }[] {
+  return [...markdownIn(dir, ''), ...markdownIn(`${dir}/cards`, 'cards/')];
+}
+
+/**
+ * The virtual module's source.
+ *
+ * With a directory, the space is read off disk here. Without one, the module
+ * defers to `newSpace()` in the *client* bundle rather than importing it in
+ * Node: this file is a Vite config module, where a bare `@project/*` specifier
+ * would be externalized and hand Node the workspace TypeScript source. The text
+ * below is browser code, so the app's own alias resolves it.
+ */
+function spaceModule(dir: string | null): string {
+  if (!dir) {
+    return [
+      `import { newSpace } from '@project/graph';`,
+      `const minted = newSpace();`,
+      `export const spaceFile = minted.file;`,
+      `export const cardFiles = minted.cardFiles;`,
+    ].join('\n');
+  }
+  return [
+    `export const spaceFile = ${readFileSync(spaceFilePath(dir), 'utf8')};`,
+    `export const cardFiles = ${JSON.stringify(readCardFiles(dir))};`,
+  ].join('\n');
 }
 
 export function spaceFilePlugin(): Plugin {
@@ -105,12 +142,7 @@ export function spaceFilePlugin(): Plugin {
       // full page load with no dev-server restart — and that server is the
       // human's, not ours to bounce. No `addWatchFile` either, so writing the
       // files the app just saved does not trigger an HMR remount mid-drag.
-      if (id === RESOLVED_ID) {
-        return [
-          `export const spaceFile = ${readFileSync(SPACE_FILE, 'utf8')};`,
-          `export const cardFiles = ${JSON.stringify(readCardFiles())};`,
-        ].join('\n');
-      }
+      if (id === RESOLVED_ID) return spaceModule(SPACE_DIR);
       return undefined;
     },
 
@@ -126,6 +158,15 @@ export function spaceFilePlugin(): Plugin {
         if (readOnly()) {
           res.statusCode = 204;
           res.end();
+          return;
+        }
+        // A minted space has no directory, so there is nowhere to write it. It
+        // survives only as long as the tab does, which is ADR 0020's stated cost
+        // — a space the app mints has a card no file describes, and it cannot
+        // survive a reload until the writer grows to persist card files.
+        if (!SPACE_DIR) {
+          res.statusCode = 501;
+          res.end('a minted space has no directory to write to yet');
           return;
         }
 
@@ -157,7 +198,7 @@ export function spaceFilePlugin(): Plugin {
             res.end('does not satisfy spaceFileSchema');
             return;
           }
-          writeSafely(SPACE_FILE, JSON.stringify(parsed, null, 2) + '\n');
+          writeSafely(spaceFilePath(SPACE_DIR), JSON.stringify(parsed, null, 2) + '\n');
           res.statusCode = 204;
           res.end();
         });

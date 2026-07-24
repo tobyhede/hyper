@@ -46,6 +46,20 @@ describe('loadSpace over card files', () => {
     );
   });
 
+  it('breaks a title tie on id, so two cards sharing a title still order totally', () => {
+    // Sorting by title alone is *stable*, not total: cards with equal titles keep
+    // the order they arrived in, which is the directory's. That would make the
+    // arrangement depend on scan order — the thing the sort exists to prevent.
+    const same = (id: string) => cardFile(id, 'Same title');
+    const forwards = loadSpace(emptySpaceFile, [same('c'), same('a'), same('b')]);
+    const backwards = loadSpace(emptySpaceFile, [same('b'), same('a'), same('c')]);
+
+    expect(forwards.ok && backwards.ok).toBe(true);
+    if (!forwards.ok || !backwards.ok) return;
+    expect(forwards.space.cards.map((c) => c.id)).toEqual(['a', 'b', 'c']);
+    expect(backwards.space.cards.map((c) => c.id)).toEqual(['a', 'b', 'c']);
+  });
+
   it('is indifferent to the order the files arrive in', () => {
     fc.assert(
       fc.property(cardsArb, ({ files }) => {

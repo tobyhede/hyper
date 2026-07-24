@@ -10,12 +10,14 @@ import { cardFiles, spaceFile as spaceFileInput } from 'virtual:space-file';
  * arrangement saved on the last drag is what opens on the next full page load,
  * and throwing one away is `git checkout` rather than deleting a shadow file.
  *
- * The base is the abstract test bed (`fixture/`), not the narrative demo
- * (`example/`, kept for when real space-loading exists) — it is deliberately the
- * one space `pnpm dev` serves and the one Playwright drives, so tests assert
- * behaviour against a purpose-shaped graph rather than demo prose. The file is
- * authored to be valid, so a failed load is a build-time bug — we throw rather
- * than render a half-space (ADR 0010).
+ * Which space that is turns on `SPACE_DIR`: `pnpm dev` sets it to the abstract
+ * test bed (`fixture/`), not the narrative demo (`example/`, kept for when real
+ * space-loading exists), so tests assert behaviour against a purpose-shaped
+ * graph rather than demo prose. With no `SPACE_DIR` the module hands back a
+ * space the app minted — one card, no routes (ADR 0018) — which is what the app
+ * does with nothing to open. Either way the value is authored to be valid or
+ * built to be, so a failed load is a bug rather than a state to render: we throw
+ * rather than show a half-space (ADR 0010).
  */
 
 const result = loadSpace(spaceFileInput, cardFiles);
