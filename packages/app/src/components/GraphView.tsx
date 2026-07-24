@@ -28,7 +28,11 @@ function ViewController({
 
   useEffect(() => {
     if (activeCardId) return;
-    void fitView({ duration: 400, padding: 0.2 });
+    // `maxZoom` caps the fit at natural size. Without it React Flow's default max
+    // of 2 applies, and a space with a single card — which is what a new space is
+    // (ADR 0018) — gets scaled to 2x and fills the screen. Padding does not help:
+    // it reserves margin, it does not cap zoom.
+    void fitView({ duration: 400, padding: 0.2, maxZoom: 1 });
   }, [layoutReady, activeCardId, fitView]);
 
   return null;
