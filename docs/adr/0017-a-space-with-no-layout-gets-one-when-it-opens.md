@@ -2,6 +2,7 @@
 
 Status: accepted
 Refines: 0013
+Refined by: 0018
 
 Opening a space that carries no Layout creates one from the resolved strategy's output, so the space is editable from the moment it is on screen. The working surface is always positioned; an automatic strategy computes where the cards start and is then done. ADR 0013 put this behind Auto-arrange, as "an explicit act with a visible result" — that is what changes.
 

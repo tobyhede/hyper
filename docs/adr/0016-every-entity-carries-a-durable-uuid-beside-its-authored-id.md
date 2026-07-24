@@ -2,8 +2,11 @@
 
 Status: rejected
 Refines: 0010
+Partly carried by: 0019
 
 **Rejected, 2026-07-24.** An entity has one id — which is what the model already had; this proposed adding a second, and it is not worth it. The body below is unchanged, because it is the argument a future review will make again.
+
+**Only the second identifier was rejected.** This ADR bundled two decisions: a uuid beside the authored id, and ids being optional in the file and filled in on load. The second is a real and separate decision, it stands, and rejecting this document initially discarded it by accident. ADR 0019 carries it — including the argument below for why generation must be deterministic rather than random, which applies unchanged to a single authored id.
 
 The reason it fails is internal. Its third paragraph derives an unsaved space's identity from the file path; its sixth says an unsaved space has no durable identity at all; and the first contradicts this same document's rejection of file-name-as-identity. Since a card's namespace was to be its space's uuid, a `git mv` would have moved every card's uuid with it, and the stated defence — that saving freezes the derivation — never reaches a file authored by hand and never saved through the UI.
 
