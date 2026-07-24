@@ -21,6 +21,7 @@ import { space, markdownByCardId } from './space';
 import { routeColorMap } from './colors';
 import { CARD_HEIGHT, CARD_SIZE, cardSizeVars } from './card';
 import { createPresentationStore } from './store';
+import { createEditorStore } from './editor';
 import { resolveView } from './view';
 import { GraphView } from './components/GraphView';
 import { OpenCard } from './components/OpenCard';
@@ -44,6 +45,11 @@ const allRouteEdges = buildRouteEdges(space);
 // declares no view, so this resolves to the route-driven ELK graph — exactly
 // what the hardcoded `elkStrategy()` here used to do.
 const view = resolveView(space);
+
+// Owns React Flow's node array and the Layout being edited. A space that
+// declared no Layout gets one from the first resolved layout (ADR 0017), so this
+// store is where placement lives from that moment on.
+const useEditorStore = createEditorStore();
 
 export function App() {
   const mode = usePresentationStore((s) => s.mode);
@@ -105,7 +111,7 @@ export function App() {
   // Selecting a route emphasises it; it never hides the rest of the space.
   const emphasis: RouteEmphasis = selectedRouteId ? 'subtle' : 'equal';
 
-  const nodes = useMemo(
+  const projectedNodes = useMemo(
     () =>
       projectCardNodes(space, visibleHandles, colors, {
         activeCardId,
@@ -118,14 +124,33 @@ export function App() {
     [activeCardId, selectedRouteId, emphasis, laidOut, visibleHandles, visibleCardIds],
   );
 
+  // Hand the projection to the store, which folds it into the live array so a
+  // card keeps its position, measured size and drag state across a re-render.
+  // Only once the layout has resolved: before that every card sits at the origin
+  // and there is nothing worth preserving.
+  const syncNodes = useEditorStore((s) => s.syncNodes);
+  useEffect(() => {
+    if (laidOut) syncNodes(projectedNodes);
+  }, [laidOut, projectedNodes, syncNodes]);
+
+  const liveNodes = useEditorStore((s) => s.nodes);
+  const moved = useEditorStore((s) => s.moved);
+  const changeNodes = useEditorStore((s) => s.changeNodes);
+  const nodes = liveNodes ?? projectedNodes;
+
   const edges = useMemo(
     () =>
       projectRouteEdges(visibleEdges, colors, {
         activeRouteId: selectedRouteId,
         emphasis,
-        ...(laidOut ? { layoutGraph: laidOut } : {}),
+        // A layout's routed edge geometry describes the arrangement it computed,
+        // so it stops being true once a card is dragged out of it. From then on
+        // the edges fall back to plain curves between wherever the cards now are
+        // — which is what a positioned view draws anyway, since it routes
+        // nothing.
+        ...(laidOut && !moved ? { layoutGraph: laidOut } : {}),
       }),
-    [visibleEdges, selectedRouteId, emphasis, laidOut],
+    [visibleEdges, selectedRouteId, emphasis, laidOut, moved],
   );
 
   const route = selectedRouteId ? getRoute(space, selectedRouteId) : undefined;
@@ -215,6 +240,8 @@ export function App() {
             edges={edges}
             activeCardId={activeCardId}
             layoutReady={laidOut !== null}
+            editable={liveNodes !== null}
+            onNodesChange={changeNodes}
             onOpenCard={openCard}
           />
         </ReactFlowProvider>

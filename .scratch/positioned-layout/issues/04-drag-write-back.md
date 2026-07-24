@@ -1,6 +1,6 @@
 # 04 — Controlled `GraphView` + drag write-back
 
-Status: open
+Status: resolved
 Type: task
 Blocked by: 03
 
@@ -58,3 +58,49 @@ editing wakes it; this ticket does not.
 - No console errors during or after a drag — assert it, since both spike bugs
   surfaced only as runtime errors.
 - `pnpm verify` and `pnpm e2e` green.
+
+## Answer
+
+`packages/app/src/editor.ts` — a Zustand store owning React Flow's `nodes` array
+and the Layout's placement map, with `reconcile` and the owned-id filter promoted
+from the spike.
+
+Two representations of position, deliberately. The node array is React Flow's
+runtime and has to absorb every intermediate frame or the card will not follow
+the cursor in a controlled flow; the map is the domain value, written only on the
+change carrying `dragging: false`. So what persists is a placement, not a
+gesture.
+
+The Layout is created in `syncNodes` on the first call, from the resolved
+layout's own positions (ADR 0017). That is why `nodes` starts `null` rather than
+`[]` — the null is what distinguishes "no layout yet" from "a space with no
+cards", and `editable` reads it directly.
+
+One thing the ticket did not anticipate: **ELK's routed edge geometry goes stale
+the moment a card moves.** It describes the arrangement ELK computed, so a card
+dragged out of it leaves edges anchored to where it used to be. A `moved` flag
+now drops `layoutGraph` from `projectRouteEdges` after the first real move, and
+edges fall back to plain curves between wherever the cards are — which is what a
+positioned view draws anyway, since it routes nothing. Before the first move the
+fixture keeps ELK's routing exactly as it had it, so the existing e2e assertion
+is untouched.
+
+Three mutations confirmed the unit tests bite, one test each: dropping
+`reconcile`'s preservation of the live node kills the re-sync test; dropping the
+stable-reference early return kills the unowned-change test; recording every
+position change instead of only settled ones kills the mid-drag test.
+
+The e2e needed a `settled()` helper, and the first version of it was wrong in a
+way worth recording: it compared two reads of the viewport transform sampled in
+the same tick, so it reported "stable" immediately, every time, mid-`fitView`.
+The drag then began before the animation finished, `boundingBox()` was stale, and
+mousedown landed beside the card — which fails looking exactly like dragging
+being broken. The reads have to straddle a real gap.
+
+`pnpm verify` green — 144 tests (10 new). `pnpm e2e` green — 18, the original 16
+unchanged plus 2. No React Flow warnings: the auto-use gate in `e2e/fixtures.ts`
+fails a test on any, so "no console errors during or after a drag" is asserted
+rather than observed.
+
+Not done here, and honest about it: the created Layout is **ephemeral**. Nothing
+writes it, so a reload loses the arrangement until ticket 06.
