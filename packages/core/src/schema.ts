@@ -63,6 +63,41 @@ export const cardSchema = z.preprocess(
   z.discriminatedUnion('kind', [markdownCardSchema, aliasCardSchema]),
 );
 
+/**
+ * The frontmatter of a markdown card file (ADR 0020). No `content` key: the
+ * body of the file *is* the content, so the card and its text are one artifact.
+ */
+export const markdownCardFrontmatterSchema = z.object({
+  id: idSchema,
+  title: z.string().min(1),
+  description: descriptionSchema,
+  kind: z.literal('markdown'),
+});
+
+/** The frontmatter of an alias card file — a target, and a body left empty. */
+export const aliasCardFrontmatterSchema = z.object({
+  id: idSchema,
+  title: z.string().min(1),
+  description: descriptionSchema,
+  kind: z.literal('alias'),
+  /** The id of the card this alias shows. Referential checks live in `@project/graph`. */
+  target: idSchema,
+});
+
+/**
+ * What a card file's frontmatter must contain (ADR 0020). A card's identity
+ * lives here and never in its filename, so renaming the file is not an identity
+ * change. `kind` defaults to `'markdown'` exactly as {@link cardSchema} does —
+ * the common card declares an id and a title and nothing else.
+ */
+export const cardFrontmatterSchema = z.preprocess(
+  (value) =>
+    typeof value === 'object' && value !== null && !Array.isArray(value) && !('kind' in value)
+      ? { ...value, kind: 'markdown' }
+      : value,
+  z.discriminatedUnion('kind', [markdownCardFrontmatterSchema, aliasCardFrontmatterSchema]),
+);
+
 /** Where a positioned layout puts a card, in the layout's own coordinate space. */
 export const layoutPositionSchema = z.object({
   x: z.number(),

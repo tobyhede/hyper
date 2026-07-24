@@ -1,5 +1,6 @@
 import type { z } from 'zod';
 import type {
+  cardFrontmatterSchema,
   cardSchema,
   layoutPositionSchema,
   layoutSchema,
@@ -12,6 +13,13 @@ import type {
 /** Domain types are derived from the Zod schemas so they can never drift apart. */
 
 export type Card = z.infer<typeof cardSchema>;
+
+/**
+ * A card file's frontmatter: everything a card is except its body (ADR 0020).
+ * Distinct from `Card` while the space file still carries a `cards` array —
+ * the two converge when intake moves to the files.
+ */
+export type CardFrontmatter = z.infer<typeof cardFrontmatterSchema>;
 export type RouteStep = z.infer<typeof routeStepSchema>;
 export type Route = z.infer<typeof routeSchema>;
 export type LayoutPosition = z.infer<typeof layoutPositionSchema>;
