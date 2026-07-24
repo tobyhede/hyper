@@ -135,6 +135,13 @@ export function projectCardNodes(
       id: card.id,
       type: 'card',
       position: { x: cardLayout?.x ?? 0, y: cardLayout?.y ?? 0 },
+      // Carry the layout's dimensions through when it has placed the card. ELK
+      // (and the grid) work at a fixed `CARD_SIZE`, so declaring width/height
+      // here means React Flow renders the node at exactly the size the layout
+      // reasoned about — no measure-then-reflow, and a centred `nodeOrigin` (if a
+      // view chooses one) resolves correctly on first paint. Absent before the
+      // layout resolves, so React Flow falls back to measuring, as before.
+      ...(cardLayout ? { width: cardLayout.width, height: cardLayout.height } : {}),
       data: {
         cardId: card.id,
         title: card.title,
