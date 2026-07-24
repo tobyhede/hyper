@@ -1,6 +1,6 @@
 # 02 — Serve the card files, convert the fixture
 
-Status: open
+Status: done
 Type: task
 Blocked by: 01
 
@@ -54,3 +54,51 @@ thing.
 - A property test: for any set of card files with distinct ids, the loaded cards
   are the same set, ordered by title.
 - `pnpm verify` green.
+
+## Answer
+
+`pnpm verify` green (185, from 182), `pnpm e2e` green at 19 — the same 19, with
+the title-duplication test replaced rather than merely deleted. `pnpm build`
+green too, which matters because the plugin is not `apply: 'serve'` and a build
+reads the card files the same way.
+
+**The e2e suite was run twice on purpose.** Once before touching the tests, with
+the title-duplication test still in place: 19 passed, identical set. That is the
+guard the ticket asked for — the storage changed and no behaviour did. Only then
+was the test replaced.
+
+**A README beside a space file is a card.** ADR 0020 says every `*.md` beside the
+space file is a card, and `fixture/README.md` was one. It has moved to
+`packages/app/README.md`, outside the space, and AGENTS.md now says why. This is
+the ADR's "nowhere to leave a draft" cost showing up on day one, in the one
+place nobody thought to look.
+
+**The plugin reads the card files with `fs`, not `import.meta.glob`.** The ticket
+suggested the glob, but read scope had to be decided in the plugin and the glob
+runs client-side — so `virtual:space-file` now exports `spaceFile` and
+`cardFiles`, both read server-side, non-recursively, from the two locations. It
+also keeps the existing deliberate property that nothing watches the space: a
+card edit lands on the next full page load, not mid-drag. Only the space file has
+a `.local` variant; a card file is read where it is authored.
+
+**A numeric id is a load error, and that is now pinned.** The ordering property
+failed on a generated `id: 0` — frontmatter is YAML, so that is the *number* zero
+and zod rejects it. Quoting fixes it. Left as-is rather than coerced (the error
+names the file and the field, and ids here are slugs), but there is now a unit
+test saying so, so the behaviour is decided rather than accidental.
+
+**The test helper emits YAML through `stringify`.** First cut built frontmatter
+with a template string, and the property test immediately started failing on
+titles like `,` and `-` — the helper's escaping under test instead of
+`loadSpace`. `graph`'s helper now uses the real serializer. The `app` and
+`react-flow-adapter` helpers still use templates, deliberately: their inputs are
+fixed literals, and neither package declares `yaml`.
+
+**Both properties were mutation-checked** by deleting the sort from `loadSpace`
+and watching them fail; likewise the new e2e test, by removing the heading from
+`c.md`.
+
+Left for 03: a card still cannot be written. `space.local.json` shadows the space
+file, and a space is now a directory — whether "unsaved work versus authored
+base" survives that is the open question, and it is the one most likely to be
+worse than it looks.
