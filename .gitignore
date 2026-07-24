@@ -22,8 +22,13 @@ skills-lock.json
 # never meant to ship. What they proved belongs in a finding or an ADR, in
 # words — a local prototype does not carry a second copy of the app around to
 # re-demonstrate a negative. Also excluded from tsc, eslint and prettier.
+#
+# Ignoring one is not the same as being rid of it: the graph-editing harness sat
+# here ignored, went stale against a rename, and broke the dev server, because
+# Vite's dependency scanner reads every `.html` in the root and does not consult
+# this file. Delete a harness when it has been written up — this pattern is for
+# one that is still being used.
 packages/*/.scratch/
-packages/app/spike.html
 
 # The dev-only saved arrangement (ticket 06). Deleting it is how you throw an
 # arrangement away and fall back to the authored base. Never committed — it is
