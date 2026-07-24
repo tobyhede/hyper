@@ -1,5 +1,12 @@
-import { existsSync, readdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import {
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  renameSync,
+  writeFileSync,
+} from 'node:fs';
+import { dirname, resolve } from 'node:path';
 import type { Plugin } from 'vite';
 // Imported by *relative* path, not as `@project/core`. Vite loads this config in
 // Node and externalizes bare specifiers, so the package specifier would hand
@@ -7,6 +14,44 @@ import type { Plugin } from 'vite';
 // (`export * from './schema'`) Node's ESM resolver rejects. A relative import is
 // bundled by esbuild instead, which resolves them.
 import { spaceFileSchema } from '../core/src/index';
+/**
+ * What a save sends: the space file, and every card as text keyed by its id.
+ *
+ * Hand-checked rather than built with zod, because a bare `zod` specifier in a
+ * Vite *config* module is externalized and resolved by Node from `packages/app`,
+ * where it is not a dependency — the config then fails to load and the dev
+ * server will not start. `spaceFileSchema` arrives by relative import, so
+ * esbuild bundles it and its own zod along with it. Same rule as everything else
+ * in this file's import list, one step further out.
+ *
+ * Ids are constrained because an id becomes a *filename*: this is the one place
+ * a value from the browser reaches the filesystem, so it is bounded to a bare
+ * slug rather than merely screened for `..`. The card text is not parsed here —
+ * `loadSpace` is what validates a card, on the way back in.
+ */
+interface SavedCard {
+  id: string;
+  text: string;
+}
+
+const CARD_ID = /^[a-zA-Z0-9][a-zA-Z0-9_-]*$/;
+
+function parseSavedSpace(value: unknown): { spaceFile: unknown; cards: SavedCard[] } | null {
+  if (typeof value !== 'object' || value === null) return null;
+  const { spaceFile, cards } = value as { spaceFile?: unknown; cards?: unknown };
+  if (!spaceFileSchema.safeParse(spaceFile).success) return null;
+  if (!Array.isArray(cards)) return null;
+
+  const parsed: SavedCard[] = [];
+  for (const card of cards as unknown[]) {
+    if (typeof card !== 'object' || card === null) return null;
+    const { id, text } = card as { id?: unknown; text?: unknown };
+    if (typeof id !== 'string' || !CARD_ID.test(id)) return null;
+    if (typeof text !== 'string') return null;
+    parsed.push({ id, text });
+  }
+  return { spaceFile, cards: parsed };
+}
 
 /**
  * The space seam: read through a virtual module, write through a middleware.
@@ -48,18 +93,27 @@ const VIRTUAL_ID = 'virtual:space-file';
 const RESOLVED_ID = '\0' + VIRTUAL_ID;
 
 /**
- * The space directory to open, or `null` for none — in which case the app mints
- * a new one (ADR 0018). "Which space opens" turns on whether a path was
- * supplied, so no other switch grows a second meaning.
+ * The space directory to open, or `null` for none. "Which space opens" turns on
+ * whether a path was supplied, so no other switch grows a second meaning.
  *
  * A server-side input, read once at config load: the server is the only thing
  * that can read a directory, and the client must never name one. Resolved
  * against the server's own working directory, so `SPACE_DIR=fixture` means what
  * it looks like when run from `packages/app`.
+ *
+ * **The directory need not exist.** Pointing at one that does not yet is how you
+ * ask for a new space *somewhere* — the app mints one (ADR 0018) and the first
+ * save brings the directory into being, after which it opens like any other. A
+ * space with nowhere to live could never survive a reload, which is what made
+ * "create a card and reload" impossible to deliver until now.
  */
 const SPACE_DIR: string | null = process.env['SPACE_DIR']
   ? resolve(process.cwd(), process.env['SPACE_DIR'])
   : null;
+
+/** Whether a directory holds a space yet, as opposed to naming where one will go. */
+const holdsSpace = (dir: string | null): dir is string =>
+  dir !== null && existsSync(spaceFilePath(dir));
 
 const spaceFilePath = (dir: string): string => `${dir}/space.json`;
 
@@ -78,9 +132,22 @@ const readOnly = (): boolean => Boolean(process.env['SPACE_READ_ONLY']);
  * filesystems is not atomic.
  */
 function writeSafely(target: string, contents: string): void {
+  mkdirSync(dirname(target), { recursive: true });
   const temp = `${target}.tmp`;
   writeFileSync(temp, contents);
   renameSync(temp, target);
+}
+
+/**
+ * Write only if the bytes differ. A drag changes no card body, so without this
+ * every save would rewrite every card file — the write amplification the prior
+ * art warns about, and the reason Logseq's own docs graph carries churn nobody
+ * asked for. Returns whether anything was written, for the response.
+ */
+function writeIfChanged(target: string, contents: string): boolean {
+  if (existsSync(target) && readFileSync(target, 'utf8') === contents) return false;
+  writeSafely(target, contents);
+  return true;
 }
 
 /** Markdown files in one directory, never below it. */
@@ -114,7 +181,7 @@ function readCardFiles(dir: string): { path: string; text: string }[] {
  * below is browser code, so the app's own alias resolves it.
  */
 function spaceModule(dir: string | null): string {
-  if (!dir) {
+  if (!holdsSpace(dir)) {
     return [
       `import { newSpace } from '@project/graph';`,
       `const minted = newSpace();`,
@@ -160,15 +227,15 @@ export function spaceFilePlugin(): Plugin {
           res.end();
           return;
         }
-        // A minted space has no directory, so there is nowhere to write it. It
-        // survives only as long as the tab does, which is ADR 0020's stated cost
-        // — a space the app mints has a card no file describes, and it cannot
-        // survive a reload until the writer grows to persist card files.
+        // With no `SPACE_DIR` at all there is nowhere to write — a build, or a
+        // server started to look rather than to author. Naming a directory that
+        // does not exist yet is different, and is how a minted space gets a home.
         if (!SPACE_DIR) {
           res.statusCode = 501;
-          res.end('a minted space has no directory to write to yet');
+          res.end('no SPACE_DIR: this space has nowhere to be written');
           return;
         }
+        const dir = SPACE_DIR;
 
         const chunks: Buffer[] = [];
         req.on('data', (chunk: Buffer) => chunks.push(chunk));
@@ -192,14 +259,53 @@ export function spaceFilePlugin(): Plugin {
           // edits one, so the endpoint stays a space-file writer until something
           // does — `serializeCardFile` in `@project/graph` is the half that
           // exists, waiting for a consumer.
-          const result = spaceFileSchema.safeParse(parsed);
-          if (!result.success) {
+          const payload = parseSavedSpace(parsed);
+          if (!payload) {
             res.statusCode = 400;
-            res.end('does not satisfy spaceFileSchema');
+            res.end('does not satisfy the saved-space shape');
             return;
           }
-          writeSafely(spaceFilePath(SPACE_DIR), JSON.stringify(parsed, null, 2) + '\n');
+          const { spaceFile, cards } = payload;
+
+          // Every path is derived here, from an id this server has just
+          // validated as a bare slug — never taken from the request. An endpoint
+          // that accepts a path is an arbitrary-file-write primitive for any page
+          // the human has open, and that stays true however the payload grows.
+          //
+          // A card already on disk is rewritten where it sits, so an author who
+          // put `intro.md` beside the space file keeps it there. Only a card this
+          // server has never seen is placed, and it goes in `cards/`.
+          const pathById = new Map(
+            readCardFiles(dir).flatMap((file) => {
+              const id = /^---\r?\n(?:.*\r?\n)*?id:\s*(\S+)\s*\r?\n/.exec(file.text)?.[1];
+              return id ? [[id.replace(/^['"]|['"]$/g, ''), file.path] as const] : [];
+            }),
+          );
+
+          let written = 0;
+          for (const card of cards) {
+            const target = `${dir}/${pathById.get(card.id) ?? `cards/${card.id}.md`}`;
+            if (writeIfChanged(target, card.text)) written += 1;
+          }
+          // A card missing from the payload is never deleted. Deletion by absence
+          // turns any client bug into data loss, and nothing in the app deletes a
+          // card yet — when something does, it can say so explicitly.
+          if (writeIfChanged(spaceFilePath(dir), JSON.stringify(spaceFile, null, 2) + '\n')) {
+            written += 1;
+          }
+
+          // Drop the virtual module from Vite's graph so the next full page load
+          // re-runs `load()` and reads what was just written. Without this the
+          // module is transformed once and cached, and a reload re-serves the
+          // space as it was at server start — the file on disk changes and the
+          // app never sees it. Deliberately *not* an HMR push: invalidating
+          // leaves the open page alone, so a save cannot remount the graph
+          // mid-drag, which is the feedback loop this seam has always avoided.
+          const cached = server.moduleGraph.getModuleById(RESOLVED_ID);
+          if (cached) server.moduleGraph.invalidateModule(cached);
+
           res.statusCode = 204;
+          res.setHeader('x-space-files-written', String(written));
           res.end();
         });
       });

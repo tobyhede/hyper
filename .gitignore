@@ -29,3 +29,8 @@ skills-lock.json
 # this file. Delete a harness when it has been written up — this pattern is for
 # one that is still being used.
 packages/*/.scratch/
+
+# Where `pnpm dev:new` and the new-space e2e project put a space the app minted.
+# `SPACE_DIR` may name a directory that does not exist yet — that is how a new
+# space gets a home — and this is the throwaway one. Delete it to start over.
+packages/app/.space/

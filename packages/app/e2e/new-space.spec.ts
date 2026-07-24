@@ -62,3 +62,37 @@ test('renders at natural size rather than filling the screen', async ({ page }) 
   });
   expect(zoom).toBeLessThanOrEqual(1);
 });
+
+test('is saved and reopens where you left it — the round trip', async ({ page }) => {
+  await page.goto('/');
+
+  const card = nodeByTitle(page, 'Start here');
+  await expect(card).toBeVisible();
+  await settled(page);
+  const saved = page.waitForResponse(
+    (response) => response.url().endsWith('/__space') && response.status() === 204,
+  );
+  await dragBy(page, card, 0, 220);
+
+  // The save is fire-and-forget, so wait for the response rather than a promise —
+  // and read the position *after* it, so what is compared is the placement the
+  // store committed at drag-end rather than wherever the last mouse move left the
+  // node mid-gesture.
+  await saved;
+  const moved = await positionOf(card);
+
+  await page.reload();
+
+  // The card is still here at all only because its *file* was written: a minted
+  // space's card is described by nothing until the first save (ADR 0020).
+  const reopened = nodeByTitle(page, 'Start here');
+  await expect(reopened).toBeVisible();
+  await settled(page);
+
+  // And it is where it was left, because the space file now names a Layout that
+  // positions it — an arrangement that does not reopen is the derived-placement
+  // failure wearing a different hat.
+  const after = await positionOf(reopened);
+  expect(Math.abs(after.x - moved.x)).toBeLessThan(2);
+  expect(Math.abs(after.y - moved.y)).toBeLessThan(2);
+});

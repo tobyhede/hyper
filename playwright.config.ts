@@ -24,6 +24,7 @@ const NEW_SPACE_SPEC = /new-space\.spec\.ts/;
 
 export default defineConfig({
   testDir: './packages/app/e2e',
+  globalSetup: './packages/app/e2e/global-setup.ts',
   fullyParallel: true,
   forbidOnly: !!process.env['CI'],
   retries: process.env['CI'] ? 2 : 0,
@@ -42,6 +43,10 @@ export default defineConfig({
       name: 'new-space',
       use: { ...devices['Desktop Chrome'], baseURL: 'http://localhost:5174' },
       testMatch: NEW_SPACE_SPEC,
+      // Serial: these tests share one space directory and write to it. The
+      // point of the project is the round trip, and a round trip cannot be
+      // parallelised against itself.
+      fullyParallel: false,
     },
   ],
   webServer: [
@@ -57,9 +62,10 @@ export default defineConfig({
       url: 'http://localhost:5174',
       reuseExistingServer: !process.env['CI'],
       timeout: 120_000,
-      // Belt and braces: a minted space has no directory, so the endpoint
-      // refuses the write anyway. This says so at the config level too.
-      env: READ_ONLY,
+      // Deliberately *not* read-only. This server writes, because proving a
+      // minted space survives a reload means letting it be saved. It is safe to
+      // let it: `SPACE_DIR` points at a gitignored throwaway directory that
+      // `globalSetup` deletes before every run, not at authored content.
     },
   ],
 });

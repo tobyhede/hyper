@@ -19,7 +19,7 @@ import {
   type LayoutGraph,
 } from '@project/graph';
 import { space, spaceFile } from './space';
-import { CREATED_LAYOUT_ID, CREATED_LAYOUT_TITLE, saveSpaceFile, serializeLayout } from './persist';
+import { CREATED_LAYOUT_ID, CREATED_LAYOUT_TITLE, saveSpace, serializeLayout } from './persist';
 import { routeColorMap } from './colors';
 import { CARD_HEIGHT, CARD_SIZE, cardSizeVars } from './card';
 import { createPresentationStore } from './store';
@@ -176,7 +176,10 @@ export function App() {
   useEffect(() => {
     if (revision === 0) return;
     const next = serializeLayout(spaceFile, persistLayoutId, persistLayoutTitle, positions);
-    void saveSpaceFile(next);
+    // The cards go too. A drag changes none of them, and the server writes only
+    // what differs — but a space the app minted has cards no file describes yet,
+    // and this is the save that gives them one.
+    void saveSpace(next, space.cards);
   }, [revision, positions]);
 
   const edges = useMemo(

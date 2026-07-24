@@ -1,5 +1,5 @@
-import type { SpaceFile } from '@project/core';
-import type { LayoutPoint } from '@project/graph';
+import type { Card, SpaceFile } from '@project/core';
+import { serializeCardFile, type LayoutPoint } from '@project/graph';
 
 /**
  * Turning a live arrangement back into a space file, and sending it to the dev
@@ -55,11 +55,18 @@ export function serializeLayout(
  * plugin itself is *not* `apply: 'serve'` — reading has to work in a build, since
  * `space.ts` imports the virtual module unconditionally.
  */
-export async function saveSpaceFile(next: SpaceFile): Promise<void> {
+export async function saveSpace(spaceFile: SpaceFile, cards: readonly Card[]): Promise<void> {
   if (!import.meta.env.DEV) return;
   await fetch('/__space', {
     method: 'PUT',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(next),
+    // Cards go as id and text, never as a path. The server derives every path
+    // from the id, which is what keeps the endpoint from being an
+    // arbitrary-file-write primitive. `serializeCardFile` is the same function
+    // `parseCardFile` inverts, so what is written is what will load.
+    body: JSON.stringify({
+      spaceFile,
+      cards: cards.map((card) => ({ id: card.id, text: serializeCardFile(card) })),
+    }),
   });
 }
