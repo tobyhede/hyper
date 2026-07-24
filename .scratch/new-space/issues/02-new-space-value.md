@@ -1,6 +1,6 @@
 # 02 — `newSpace()`: one card, centered
 
-Status: open
+Status: done
 Type: task
 Blocked by: 04
 
@@ -44,3 +44,31 @@ schema change; do not guess this.~~
 - Unit tests: the value passes `spaceFileSchema` and loads through `loadSpace`;
   it has exactly one card and no routes.
 - `pnpm verify` green.
+
+## Answer
+
+`newSpace()` in `@project/graph`, returning the **on-disk shape** — `{ file,
+cardFiles }` — rather than a `Space`. That is what a writer emits and what
+`loadSpace` takes, so a minted space goes down exactly the path an authored one
+does. Returning a `Space` would have been a second route into the domain, and
+ADR 0010's whole claim is that there is one.
+
+The card is `cards/start.md`, titled **Start here**, with an empty body — the
+shape ADR 0020 made possible and the reason this ticket had stalled. Ids are
+written constants; ADR 0019's generation is `new-space/01`, and the space id
+being a constant is correct for a one-space-at-a-time app and wrong the moment
+two exist side by side. Said so in the code rather than leaving it to be
+discovered.
+
+**The `maxZoom` catch landed with it**, as the ticket required: the overview fit
+is now `fitView({ duration: 400, padding: 0.2, maxZoom: 1 })`. One caveat worth
+being straight about — **this is not exercised yet**. The fixture has ten cards,
+so the overview fit never approaches the cap, and the failure it prevents (a
+lone card scaled to 2x) is only observable once a single-card space can be
+opened. That is `03`, and the e2e for it belongs there. `pnpm e2e` was run to
+prove no regression, not to prove the fix.
+
+One process note: a `pnpm verify` run reported 1 failure that did not reproduce.
+Prettier and vitest were invoked in the same command, so vitest collected a file
+prettier was rewriting. Two clean full runs afterwards. Don't chain a formatter
+and the test run in one command.
