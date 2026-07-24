@@ -76,6 +76,25 @@ describe('resolveView', () => {
     expect(view.layout?.id).toBe('grid');
   });
 
+  it('gives a positioned view an automatic strategy to Auto-arrange with', async () => {
+    // A Layout says where the cards are, not how they got there — so recomputing
+    // falls back to the view a space opens in when it names none.
+    const view = resolveView(spaceWith({ layouts: [WORKING], defaultView: 'working' }));
+    const graph = buildLayoutGraph(['a', 'b'], new Map(), [], CARD_SIZE);
+
+    const laid = await view.automatic(graph);
+    expect(laid.cards.map((c) => ({ x: c.x, y: c.y }))).not.toEqual([
+      { x: 40, y: 10 },
+      { x: 400, y: 250 },
+    ]);
+  });
+
+  it('re-arranges an automatic view by the strategy it already uses', () => {
+    // A grid view Auto-arranges by the grid, not by ELK.
+    const view = resolveView(spaceWith({ defaultView: 'grid' }));
+    expect(view.automatic).toBe(view.strategy);
+  });
+
   it('opens a space with no routes, which is where editing starts (ADR 0015)', async () => {
     const space = spaceWith({
       routes: [],

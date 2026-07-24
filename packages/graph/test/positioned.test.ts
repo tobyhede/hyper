@@ -1,6 +1,6 @@
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
-import { positionedStrategy } from '../src/index';
+import { layoutPositions, positionedStrategy } from '../src/index';
 import type { LayoutCard, LayoutGraph } from '../src/index';
 
 const SIZE = { width: 100, height: 50 };
@@ -114,13 +114,13 @@ describe('positionedStrategy', () => {
   });
 });
 
-describe('positionedStrategy properties', () => {
-  const idsArb = fc.uniqueArray(fc.string({ minLength: 1, maxLength: 4 }), {
-    minLength: 1,
-    maxLength: 8,
-  });
-  const coordArb = fc.integer({ min: -1000, max: 1000 });
+const idsArb = fc.uniqueArray(fc.string({ minLength: 1, maxLength: 4 }), {
+  minLength: 1,
+  maxLength: 8,
+});
+const coordArb = fc.integer({ min: -1000, max: 1000 });
 
+describe('positionedStrategy properties', () => {
   it('positions every card, whether or not the map mentions it', async () => {
     await fc.assert(
       fc.asyncProperty(idsArb, fc.array(coordArb), async (ids, coords) => {
@@ -158,6 +158,43 @@ describe('positionedStrategy properties', () => {
             expect(overlaps(card, other)).toBe(false);
           }
         }
+      }),
+    );
+  });
+});
+
+describe('layoutPositions', () => {
+  it('reads back what a strategy placed', async () => {
+    const laid = await positionedStrategy(at({ a: [10, 20], b: [300, 20], c: [600, 20] }))(graph);
+    expect(Object.fromEntries(layoutPositions(laid))).toEqual({
+      a: { x: 10, y: 20 },
+      b: { x: 300, y: 20 },
+      c: { x: 600, y: 20 },
+    });
+  });
+
+  it('omits a card no strategy placed, rather than calling it the origin', () => {
+    expect([...layoutPositions({ cards: cardsOf('a', 'b'), edges: [] }).keys()]).toEqual([]);
+  });
+
+  it('round-trips: replaying a laid-out graph reproduces its placement', async () => {
+    // The property that makes Auto-arrange a conversion rather than a
+    // reinterpretation — what the automatic strategy computed is exactly what the
+    // Layout goes on to mean.
+    await fc.assert(
+      fc.asyncProperty(idsArb, fc.array(coordArb, { minLength: 60 }), async (ids, coords) => {
+        const positions = new Map(
+          ids.map((id, i) => [id, { x: coords[i * 2] ?? 0, y: coords[i * 2 + 1] ?? 0 }]),
+        );
+        const laid = await positionedStrategy(positions)({ cards: cardsOf(...ids), edges: [] });
+        const replayed = await positionedStrategy(layoutPositions(laid))({
+          cards: cardsOf(...ids),
+          edges: [],
+        });
+
+        expect(replayed.cards.map((c) => ({ x: c.x, y: c.y }))).toEqual(
+          laid.cards.map((c) => ({ x: c.x, y: c.y })),
+        );
       }),
     );
   });

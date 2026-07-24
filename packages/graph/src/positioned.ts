@@ -39,6 +39,24 @@ function boundsOf(cards: readonly LayoutCard[]): Bounds | null {
   return minX === Infinity ? null : { minX, maxY };
 }
 
+/**
+ * The card→position map a laid-out graph describes: `positionedStrategy` run
+ * backwards, and the crossing from computed placement to authored placement that
+ * Auto-arrange is.
+ *
+ * Cards a strategy left unplaced are **omitted**, not defaulted to the origin —
+ * absence in a Layout means *unplaced*, and collapsing that to `(0, 0)` would
+ * assert a placement no strategy made.
+ */
+export function layoutPositions(graph: LayoutGraph): ReadonlyMap<string, LayoutPoint> {
+  const positions = new Map<string, LayoutPoint>();
+  for (const card of graph.cards) {
+    if (card.x === undefined || card.y === undefined) continue;
+    positions.set(card.id, { x: card.x, y: card.y });
+  }
+  return positions;
+}
+
 export function positionedStrategy(positions: ReadonlyMap<string, LayoutPoint>): LayoutStrategy {
   // Uniformly-async contract (ADR 0005); there is nothing to await.
   // eslint-disable-next-line @typescript-eslint/require-await

@@ -34,6 +34,14 @@ exist in a build:
   loop the spike spent two rounds killing. The saved arrangement is picked up on
   the next full page load, which is all it needs to do.
 
+**Inherited from 05: the created Layout's identity.** A Layout created on open
+(ADR 0017) has no id and the space names no `defaultView`, so serializing one
+means deciding both. Whatever it is called, the written space file must open in
+it — an arrangement that does not reopen is the derived-placement failure wearing
+a different hat. 05 was originally to do this and could not: it now happens at
+creation rather than at Auto-arrange, and only serialization makes the answer
+observable.
+
 Serialize from the **space file**, not from the `Space` — the `Space` is indexed
 and derived, so reconstructing a file from it means un-deriving. Keep the parsed
 space-file value alongside it in `space.ts` and write `{ ...spaceFile, layouts,

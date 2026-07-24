@@ -126,6 +126,55 @@ describe('editor store', () => {
     expect(store.getState().moved).toBe(false);
   });
 
+  it('replaces the whole map when arranging, rather than merging into it', () => {
+    // The point of pressing Auto-arrange is that a card dragged out of the way
+    // comes back. A merge would leave it exactly where it was.
+    const store = createEditorStore();
+    store.getState().syncNodes(PROJECTED);
+    store.getState().changeNodes(drag('a', 900, 900));
+
+    store.getState().arrange(
+      new Map([
+        ['a', { x: 0, y: 0 }],
+        ['b', { x: 400, y: 0 }],
+      ]),
+    );
+
+    expect(store.getState().positions.get('a')).toEqual({ x: 0, y: 0 });
+    expect(store.getState().nodes?.find((n) => n.id === 'a')?.position).toEqual({ x: 0, y: 0 });
+    expect(store.getState().positions.get('b')).toEqual({ x: 400, y: 0 });
+  });
+
+  it('drops a position the arrangement does not name', () => {
+    // A Layout's map is sparse, and arranging replaces it wholesale — so a card
+    // the strategy left unplaced is unplaced, not left holding a stale entry.
+    const store = createEditorStore();
+    store.getState().syncNodes(PROJECTED);
+    store.getState().arrange(new Map([['a', { x: 0, y: 0 }]]));
+
+    expect(store.getState().positions.has('b')).toBe(false);
+    expect([...store.getState().positions.keys()]).toEqual(['a']);
+  });
+
+  it('trusts the layout again after arranging', () => {
+    // The routing that arrives with an arrangement describes that arrangement, so
+    // the cards are back where it assumed they were.
+    const store = createEditorStore();
+    store.getState().syncNodes(PROJECTED);
+    store.getState().changeNodes(drag('a', 900, 900));
+    expect(store.getState().moved).toBe(true);
+
+    store.getState().arrange(new Map([['a', { x: 10, y: 20 }]]));
+    expect(store.getState().moved).toBe(false);
+  });
+
+  it('ignores an arrangement that arrives before the first layout', () => {
+    const store = createEditorStore();
+    store.getState().arrange(new Map([['a', { x: 0, y: 0 }]]));
+    expect(store.getState().nodes).toBeNull();
+    expect(store.getState().positions.size).toBe(0);
+  });
+
   it('does not call a drag that ends where it started a move', () => {
     // A click registers as a position change; it must not invalidate the
     // layout's routed edge geometry.

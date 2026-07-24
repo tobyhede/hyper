@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ReactFlowProvider } from '@xyflow/react';
 import { AppShell, Button, RouteLegend, RouteSelector } from '@project/ui';
 import {
@@ -13,6 +13,7 @@ import {
   filterHandlesByRoutes,
   getCard,
   getRoute,
+  layoutPositions,
   resolveContentCard,
   type CardHandleSet,
   type LayoutGraph,
@@ -136,7 +137,27 @@ export function App() {
   const liveNodes = useEditorStore((s) => s.nodes);
   const moved = useEditorStore((s) => s.moved);
   const changeNodes = useEditorStore((s) => s.changeNodes);
+  const arrange = useEditorStore((s) => s.arrange);
   const nodes = liveNodes ?? projectedNodes;
+  // Having a Layout *is* the permission to edit (ADR 0013), and the store holds
+  // nodes exactly when it has one.
+  const editable = liveNodes !== null;
+
+  // Auto-arrange: the one crossing from computed placement to authored placement.
+  // Run the automatic strategy and take its result as the Layout — an edit, not a
+  // cache, which is why it goes through the store rather than replacing what the
+  // view arranges with.
+  //
+  // The result is also installed as the layout result, so the edges get the
+  // routing that belongs to this arrangement back. Both updates land in one
+  // batch, so the sync effect that follows reconciles onto positions the store
+  // has already taken.
+  const autoArrange = useCallback(() => {
+    void view.automatic(graph).then((result) => {
+      setLayoutResult({ graph, result });
+      arrange(layoutPositions(result));
+    });
+  }, [graph, arrange]);
 
   const edges = useMemo(
     () =>
@@ -203,6 +224,17 @@ export function App() {
           />
         </>
       )}
+      {/* Disabled until the layout resolves, which is also when there is a
+          Layout to arrange (ADR 0017) — the same one-frame window `editable`
+          gates dragging on. */}
+      <Button
+        variant="secondary"
+        data-testid="auto-arrange-button"
+        onClick={autoArrange}
+        disabled={!editable}
+      >
+        Auto-arrange
+      </Button>
       {presenting ? (
         <Button variant="secondary" onClick={exitPresentation}>
           Overview
@@ -240,7 +272,7 @@ export function App() {
             edges={edges}
             activeCardId={activeCardId}
             layoutReady={laidOut !== null}
-            editable={liveNodes !== null}
+            editable={editable}
             onNodesChange={changeNodes}
             onOpenCard={openCard}
           />

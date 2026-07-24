@@ -116,6 +116,32 @@ test('a dragged card stays where it is dropped, and nothing else moves', async (
   }
 });
 
+test('auto-arrange puts a dragged card back, and it stays draggable', async ({ page }) => {
+  await page.goto('/');
+  const a = nodeByTitle(page, 'A').first();
+  await expect(a).toBeVisible();
+  await expect(page.locator('.react-flow__edge-path').first()).toHaveAttribute('d', /L/);
+
+  await settled(page);
+  const arranged = await positionOf(a);
+
+  await dragBy(page, a, 0, 260);
+  const dragged = await positionOf(a);
+  expect(dragged.y).toBeGreaterThan(arranged.y + 100);
+
+  await page.getByTestId('auto-arrange-button').click();
+
+  // Back where the strategy puts it. ELK is deterministic over the same graph, so
+  // this is an equality rather than a "somewhere near".
+  await expect.poll(async () => (await positionOf(a)).y).toBe(arranged.y);
+  expect((await positionOf(a)).x).toBe(arranged.x);
+
+  // Auto-arrange is an edit, not a switch to a computed view — so the card is
+  // still yours to move afterwards.
+  await dragBy(page, a, 0, 260);
+  expect((await positionOf(a)).y).toBeGreaterThan(arranged.y + 100);
+});
+
 test('edges follow a card that has been dragged', async ({ page }) => {
   await page.goto('/');
   const a = nodeByTitle(page, 'A').first();
