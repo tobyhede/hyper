@@ -3,13 +3,9 @@
 Status: rejected
 Refines: 0010
 
-**Rejected, 2026-07-24.** Two identifiers per entity is too much model for what it buys. An entity has one id: short, readable, authored, scoped to its space — the thing below, unchanged, describes a design that was not adopted, and is kept because it is the argument a future review will make again.
+**Rejected, 2026-07-24.** An entity has one id — which is what the model already had; this proposed adding a second, and it is not worth it. The body below is unchanged, because it is the argument a future review will make again.
 
-The proposal's own reasoning is where it comes apart. Its third paragraph derives an unsaved space's identity from the file path; its sixth says an unsaved space has no durable identity and is not addressable. Both cannot hold, and the first contradicts the same document's rejection of file-name-as-identity. Because a card's namespace was to be its space's uuid, a `git mv` would have moved every card's uuid with it — invalidating every address into the space — and the stated defence, that saving freezes the derivation, does not reach the file-first case, where nobody has saved through the UI at all.
-
-What it was reaching for is real: a rename should not silently break links. That is now a known and accepted cost of one identifier rather than something the model spends a second field on. The cost is also smaller than it looked, because a **Layout is optional and hand-authoring skips it** — an author writes cards and routes, the app creates the Layout, so the entity most likely to need a minted id is one no human ever names.
-
-Also wrong in the costs, worth correcting for whoever revisits: `core` would not have gained a uuid dependency. `loadSpace` lives in `graph` and the store lives in `app`; `core` only declares the field, and zod validates a uuid natively.
+The reason it fails is internal. Its third paragraph derives an unsaved space's identity from the file path; its sixth says an unsaved space has no durable identity at all; and the first contradicts this same document's rejection of file-name-as-identity. Since a card's namespace was to be its space's uuid, a `git mv` would have moved every card's uuid with it, and the stated defence — that saving freezes the derivation — never reaches a file authored by hand and never saved through the UI.
 
 Every space, card and route carries a `uuid` in addition to the short `id` its author wrote. The two are not redundant, because they do different jobs: the authored id is **scoped to the document** and is what in-file references use, while the uuid is **globally stable** and is what addresses, bookmarks and cross-document references use. `uuid` is optional in a space file, filled in when the file is loaded, minted fresh when the UI creates something, and written out on save.
 
