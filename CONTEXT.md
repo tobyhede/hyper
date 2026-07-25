@@ -19,7 +19,7 @@ _Avoid_: uuid, guid, key, slug (a slug is a readable form derived from a name; h
 ## Cards
 
 **Card**:
-A single addressable piece of a space, and the element that routes step through. Named for HyperCard's card.
+A single addressable piece of a space, and the thing a route's edges run between. Named for HyperCard's card.
 
 A card has a **title**, which names it wherever it is listed or drawn, and **content**, which is what it holds. The two are distinct: a view may show one without the other, and the graph draws the title, not the content. A card may also carry a short optional **description** — a caption saying what it is when the title alone is too terse — which the graph draws under the title; it is not a second body (it is capped and single-line), and the content still lives in the card.
 
@@ -33,34 +33,45 @@ _Avoid_: reference, link (an alias shows content, it does not merely jump), copy
 ## Routing
 
 **Route**:
-A curated, ordered way through the cards — a narrative an author wants a viewer to follow. Routes are the space's structure: a space's shape is the routes laid across its cards, and there is no separately authored connection between cards.
-A space can hold many routes; each has a name and a colour so they can be told apart when a view shows several at once.
-_Avoid_: path, track, tour, journey, sequence, rail.
+A curated way through the cards — a narrative an author wants a viewer to follow. Routes are the space's structure: a space's shape is the routes laid across its cards, and there is no separately authored connection between cards.
 
-**Step**:
-One position in a route, targeting a single card. Steps are ordered, and a route visits each card at most once — to return to earlier content, a route steps to an **alias** of it, not back to the card itself (ADR 0012). A revisit would be a backward edge in the graph; an alias is a forward step to a distinct card showing the same content.
-_Avoid_: slide, stop, frame.
+A route is a set of directed **edges** between cards, and it is acyclic. A card may have several edges out — a **fork** — and several in — a **merge**. What a route may not do is close a cycle, so returning to earlier content is done with an edge to an **alias** of a card rather than back to the card itself. A route is not a line; a line is the shape a route takes when every card has one edge out.
+
+A space can hold many routes; each has a name and a colour so they can be told apart when a view shows several at once. One is **active** at a time.
+_Avoid_: path, track, tour, journey, sequence, rail, step (a route stores edges, not positions in a list).
+
+**Edge**:
+A directed connection from one card to another, and the element a route is made of. An author draws one and the route records it. An edge belongs to one route, so two routes crossing the same pair of cards are two edges.
+_Avoid_: link, connection, transition, arrow, step, relationship.
+
+**Active route**:
+The one route a space has selected at a time — drawn emphasized, and the route an author's new edges join. There is one concept here, not two: a route is active, and highlighting is how that is shown. A layout may name which route opens active; failing that it is the first route the layout shows. Changing it is a deliberate act, never a side effect of drawing or reading.
+_Avoid_: selected route and current route as a second concept alongside this one, focus, mode.
 
 ## Layout and views
 
 **Layout**:
 A card-to-position map the author wrote — where a space's cards sit. It belongs to the space and is part of what the space is. A space may hold several layouts, and may hold none. Positions are a property of the layout, never of the card: the same card sits at different coordinates in each. A layout may omit cards, and whoever renders it places those itself; it may not name cards the space does not have.
 
-A Layout is authored by definition. The computed kind is not a layout at all but an automatic **layout strategy**, which is why the two now have separate names (ADR 0014).
+A Layout is authored by definition; the computed kind is not a layout at all but an automatic **layout strategy** (ADR 0014). A space with no Layout is arranged by an automatic strategy the application supplies, and **editing turns that into a Layout**: the arrangement already on screen is copied as the new layout's positions, so nothing moves at the moment it happens.
+
+A layout also names which routes it shows — a filter, absent meaning all of them — and may name which of those opens active.
 _Avoid_: view (a view renders a layout), placement, diagram, manual and custom and free-form (a layout is authored, so the qualifiers say nothing).
 
 **Layout strategy**:
 A named strategy for arranging a space's cards — how they are organised and positioned. Which cards it arranges is the view's choice, not the strategy's.
 
-A strategy is either **automatic** or **positioned**. An automatic strategy computes placement from the cards and routes alone — a route-driven graph, a grid, a tree, a cluster map — so it needs nothing from the space and carries no authored data. The positioned strategy reads a **Layout**. Every Layout has a strategy that renders it; not every strategy has a Layout behind it.
+A strategy is either **automatic** or **positioned**. An automatic strategy computes placement from the cards and routes alone — a grid, cards ordered by name, a tree, a cluster map, a route-driven graph — so it needs nothing from the space and carries no authored data. The positioned strategy reads a **Layout**. Every Layout has a strategy that renders it; not every strategy has a Layout behind it.
 
-Editing placement requires a Layout, because an automatic strategy computes where cards go and so has nowhere to record where an author put one. Accepting an automatic strategy's result *into* a Layout is how computed placement becomes authored, and it is the only crossing between them.
+No strategy is the primary one. A space is arranged by whichever the author or the application chose, the set of them grows, and any particular graph-layout engine is one member of it rather than the thing layout means.
+
+An automatic strategy has nowhere to record where an author put a card, so editing one **converts** it: the strategy's arrangement is accepted into a new Layout and the edit is written there. That crossing — computed placement becoming authored — is the only one between them, and an edit is what triggers it.
 _Avoid_: arrangement (applying a strategy produces no separate entity — the cards themselves carry the positions), algorithm, engine.
 
 **View**:
-The rendering of a layout for a viewer — which cards and routes are shown, and how they are drawn on screen and explored. The **Graph** view renders the route-driven strategy, one colour per route; other views render other strategies. A space may name the view it opens in; a viewer may have a default of their own; failing both, a space opens in its route-driven graph.
+The rendering of a layout for a viewer — which cards and routes are shown, and how they are drawn on screen and explored. The **Graph** view draws cards and the routes across them, one colour per route. A space may name the view it opens in; a viewer may have a default of their own; failing both, a space opens in the one the application supplies.
 
-A view of an automatic strategy is read-only, since it has nowhere to write a placement back to. Nothing tracks whether a viewer is editing: whether the view resolved to a Layout is what decides.
+Nothing tracks whether a viewer is editing, and there is no edit mode. Editing a view of an automatic strategy converts its arrangement into a Layout and writes there; editing a view of a Layout writes to it directly. Either way the write has somewhere to go. What is worth showing is not that editing began but that the space is unsaved.
 _Avoid_: mode, screen, page, layout.
 
 **Opening**:
@@ -68,16 +79,20 @@ Showing a single card's content to a viewer in place, over whatever view they ar
 _Avoid_: expand, preview, popup, modal, drill-down.
 
 **Presenting**:
-Walking a route for an audience, one step at a time, with the space itself out of view. A presentation is a **deck** — the route's cards in order — and it is an output of a space rather than part of one.
-_Avoid_: slideshow, playback, present mode (that is a mode name, not the thing).
+Walking a route for an audience, on the space itself, drawn close enough that one card fills the screen. Presenting **traverses** the route: at the active card, the presenter follows one of its outgoing edges. A route that is a line walks as a line; a route that forks offers a choice. There is no separate artefact and no second surface — a presentation is not a thing a route is turned into, it is a way of moving through one.
+_Avoid_: deck, slide, step, slideshow, playback, present mode (that is a mode name, not the thing).
+
+**Active card**:
+Where a walk currently is — the card a presenter has reached, whose outgoing edges are the moves available. It pairs with the **active route**: the route names the walk, the card names the position in it. Going back reads the walk rather than the graph, because a card reached by a merge has several edges in and only the path taken says which one was used.
+_Avoid_: current slide, cursor, position, step.
 
 ## At the render layer
 
 Terms below are **React Flow's**, not ours. They are listed because we build against them directly and need to speak them precisely — not because the domain contains them. Nothing in the domain should be named after one, and no bridging term should be invented between the two.
 
-**Edge**:
-React Flow's drawn line between two nodes. A route renders as one edge per step transition, so a route of six steps draws as five edges. The domain concept is the Route; an edge is how a segment of one appears on screen.
+**Edge (React Flow's)**:
+React Flow's drawn line between two nodes, and the gesture that draws one. It shares its name with the domain's **Edge** because it is the same thing seen twice — the one place a render-layer word and a domain word coincide, deliberately, rather than a bridging term.
 
 **Handle**:
-React Flow's attachment point on a node, where an edge meets it. Distinct handles per route are what keep several routes legible when a view shows them together. Where a route attaches to a card is a drawing concern with no domain meaning.
-_Avoid_: port (that is ELK's word for the same thing, and the layout engine is an implementation choice).
+React Flow's attachment point on a node, where an edge meets it. A card carries one neutral handle, because where a route attaches is a drawing concern with no domain meaning. Distinct handles per route belong to the **overview** — the view that draws every route at once and needs them to stay legible — and are that view's rendering, never a rule the model obeys.
+_Avoid_: port (that is the word a graph-layout engine uses for the same thing, and any such engine is one implementation choice among several).

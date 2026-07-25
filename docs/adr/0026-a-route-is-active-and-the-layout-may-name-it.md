@@ -2,7 +2,7 @@
 
 Status: accepted
 Supersedes: 0022
-Related: 0003, 0021, 0024
+Related: 0003, 0021, 0024, 0027
 
 A space has one **active route** at a time. It is the route drawn emphasized in the view and the route an author's edges are written into (ADR 0021). There is one concept, not two — "selected" and "active" are the same thing, and the highlight is how it is shown, nothing more.
 

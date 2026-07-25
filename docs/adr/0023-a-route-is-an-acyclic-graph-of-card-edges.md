@@ -2,7 +2,7 @@
 
 Status: accepted
 Refines: 0012
-Related: 0007, 0009, 0021, 0024
+Related: 0007, 0009, 0021, 0024, 0027
 
 A route's structure is a set of directed **edges** between cards, and it must be
 acyclic. An author draws an edge from one card to another (ADR 0021) and the route

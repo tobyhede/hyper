@@ -2,6 +2,14 @@
 
 Status: open
 Decision: ADR 0013 — editing requires a positioned layout
+**Superseded by ADR 0025.** This spec and issues `01`–`07` were written against
+ADR 0013 and ADR 0017, both now superseded. They describe a model where an
+automatic view is read-only and a Layout is created when a space opens. Under
+0025 there is no read-only view: a Layout is optional, an app-configured
+algorithmic strategy renders a space that has none, and *editing* converts that
+arrangement into a positioned Layout by copying what is already on screen.
+Re-read each ticket against 0025 before implementing it — the mechanics of
+writing a Layout largely survive; what triggers its creation does not.
 
 ## Why
 

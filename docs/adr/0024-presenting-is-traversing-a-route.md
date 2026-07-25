@@ -2,6 +2,7 @@
 
 Status: accepted
 Supersedes: 0008
+Refined by: 0027
 Related: 0011, 0023
 
 Presenting a route is walking its edge graph. At a card, the presenter follows one of that card's outgoing edges to the next card. That is the whole of it. There is no deck artefact, no slide sequence, and no presentation framework: reveal.js is removed.
