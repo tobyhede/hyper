@@ -2,7 +2,7 @@
 
 Status: accepted
 Refines: 0013
-Related: 0022, 0023
+Related: 0022, 0023, 0025, 0026
 
 On a positioned layout, an author connects two cards by dragging an edge between
 them — React Flow's native connect gesture — and creates a card by dragging an

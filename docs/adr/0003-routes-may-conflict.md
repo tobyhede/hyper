@@ -2,7 +2,7 @@
 
 Status: accepted
 Refined by: 0012
-Related: 0022
+Related: 0022, 0026
 
 **Routes** are independent narratives over the same cards. Two routes may visit the same pair of cards in opposite orders. (This ADR originally also allowed a single route to revisit a card; ADR 0012 removed that — a route now visits each card at most once, and a return is expressed with an alias. The cross-route conflict below is unchanged.) This means the combined step-order across all of a space's routes can contain a **cycle**, and that is legal — a space is not required to have a consistent global ordering of its cards.
 

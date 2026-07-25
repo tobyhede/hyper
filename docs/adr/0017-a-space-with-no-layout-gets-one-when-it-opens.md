@@ -1,6 +1,7 @@
 # A space with no Layout gets one when it opens
 
-Status: accepted
+Status: superseded
+Superseded by: 0025
 Refines: 0013
 Refined by: 0018
 

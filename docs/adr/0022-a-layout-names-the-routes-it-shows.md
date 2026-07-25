@@ -1,6 +1,7 @@
 # A Layout filters its routes and marks one active; a Route does not belong to it
 
-Status: accepted
+Status: superseded
+Superseded by: 0026
 Refines: 0002, 0005, 0013
 Related: 0003
 

@@ -1,6 +1,7 @@
 # Presenting is a reveal.js deck; opening a card is not presenting
 
-Status: accepted
+Status: superseded
+Superseded by: 0024
 Refines: 0006
 Refined by: 0011
 

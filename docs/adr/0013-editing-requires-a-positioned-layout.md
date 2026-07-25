@@ -1,6 +1,7 @@
 # Editing requires a positioned layout
 
-Status: accepted
+Status: superseded
+Superseded by: 0025
 Refines: 0002, 0005
 Refined by: 0014, 0017, 0021, 0022
 
