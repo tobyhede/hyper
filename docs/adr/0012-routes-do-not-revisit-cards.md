@@ -2,6 +2,7 @@
 
 Status: accepted
 Refines: 0003
+Refined by: 0023
 Related: 0009
 
 A **route** visits each card at most once. Its steps must target distinct cards; a space whose routes repeat a card fails to load (`loadSpace` → `route-revisits-card`).

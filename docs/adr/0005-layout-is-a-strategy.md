@@ -2,7 +2,7 @@
 
 Status: accepted
 Refines: 0002
-Refined by: 0013, 0014
+Refined by: 0013, 0014, 0022
 
 A **Layout** is a named strategy for arranging a space's cards — how they are organised and positioned. It is not a stored arrangement, and applying one does not produce a separate entity: the result is the cards, ports and edges carrying positions.
 

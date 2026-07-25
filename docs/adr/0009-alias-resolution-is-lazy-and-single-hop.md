@@ -2,7 +2,7 @@
 
 Status: accepted
 Refines: 0004
-Related: 0012
+Related: 0012, 0023
 
 An **alias** is a card that shows another card's content at a second position (`CONTEXT.md`; the gap ADR 0004 left open when it retired the authored Node). This records how an alias resolves to its target, and two things we deliberately do *not* do.
 

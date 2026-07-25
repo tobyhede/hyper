@@ -2,7 +2,7 @@
 
 Status: accepted
 Refines: 0002, 0005
-Refined by: 0014, 0017
+Refined by: 0014, 0017, 0021, 0022
 
 A **positioned layout** is a named, authored card-to-position map — the "hand-placed" kind `CONTEXT.md` has always listed. An **automatic** layout (the route-driven ELK graph, a grid, a tree) computes placement from the graph alone and needs nothing from the space. Editing writes placement, and only a positioned layout has anywhere to write it. So the layout kind alone decides whether a view can be edited: there is no edit mode, no flag, and no state to keep in sync — a positioned layout is draggable and an automatic one is not. Because creating a card *is* placing it (the drop point is the position), this makes automatic views read-only outright, not merely undraggable.
 
