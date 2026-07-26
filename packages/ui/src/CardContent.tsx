@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { marked } from 'marked';
+import DOMPurify from 'dompurify';
 
 export interface CardContentProps {
   title: string;
@@ -15,13 +16,26 @@ export interface CardContentProps {
  * went (ADR 0024), the distinction did not. This is now the only Markdown parser
  * in the app; do not add a second, which is the divergence ADR 0011 removed.
  *
- * The HTML is inserted directly. A card's content is a local file the author
- * wrote and the app never loads a space it was not pointed at (ADR 0018), so the
- * markdown is as trusted as the code around it. That stops being true the day a
- * space can be fetched from somewhere, and this is the line that has to change.
+ * **Sanitised before insertion.** This used to go in raw, on the reasoning that
+ * a card is a local file the author wrote and the app never loads a space it was
+ * not pointed at (ADR 0018). The reasoning was sound; the premise was not. The
+ * save endpoint was reachable by DNS rebinding, so a page the author merely had
+ * open could write a card into the space they *were* pointed at — and `marked`
+ * has had no `sanitize` option since v5, so `<img src=x onerror=…>`, a
+ * `javascript:` href and `<iframe src=javascript:>` all passed through intact
+ * and ran in the dev server's origin.
+ *
+ * That hole is closed too (`vite-space-file-plugin.ts`), which is what makes
+ * this defence in depth rather than the only thing holding. Keep both: the
+ * trust argument recovers its premise only for as long as nothing else can
+ * write a card, and "nothing else can write" is not a property to bet the
+ * origin on.
  */
 export function CardContent({ title, markdown }: CardContentProps) {
-  const html = useMemo(() => marked.parse(markdown, { async: false }), [markdown]);
+  const html = useMemo(
+    () => DOMPurify.sanitize(marked.parse(markdown, { async: false })),
+    [markdown],
+  );
 
   return (
     <article className="card card--full" data-testid="card-content">
