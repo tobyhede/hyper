@@ -11,3 +11,4 @@
 **/.agents/**
 pnpm-lock.yaml
 **/*.md
+**/coverage/**

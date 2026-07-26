@@ -56,6 +56,7 @@ export default tseslint.config(
       '**/node_modules/**',
       '**/playwright-report/**',
       '**/test-results/**',
+      '**/coverage/**',
       '**/.tanstack/**',
       // Throwaway local working dirs — spikes, issue tracker, tool state.
       '**/.scratch/**',
