@@ -4,7 +4,7 @@ import { isBuiltInViewId, type Card, type Layout, type Route, type RouteEdge } f
  * The cards, routes and layouts a reference check reads. Structural so it
  * accepts both a freshly parsed space file (inside `loadSpace`) and an
  * already-built `Space`. `layouts` and `defaultView` are optional: a space may
- * declare neither and open in an automatic view (ADR 0013).
+ * declare neither and open in an automatic view (ADR 0025).
  */
 export interface Referenceable {
   readonly cards: readonly Card[];
@@ -129,7 +129,7 @@ export function validateReferences(space: Referenceable): ReferenceError[] {
 
   // Positions are sparse: a layout may omit cards, and whoever renders it places
   // those itself. The asymmetry is that it may not name a card that does not
-  // exist — a position left behind by a deleted card (ADR 0013).
+  // exist — a position left behind by a deleted card (ADR 0025).
   const routeIds = new Set(space.routes.map((r) => r.id));
 
   for (const layout of layouts) {

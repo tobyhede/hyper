@@ -13,7 +13,8 @@ import { DEFAULT_ELK_LAYOUT_OPTIONS, elkPortId, PORT_ID_SEPARATOR } from './layo
  * tested without running elkjs.
  *
  * Automatic: it computes placement from the cards and routes, so no Layout
- * stands behind it and a view of it is read-only (ADR 0013).
+ * stands behind it. A view of it is still editable — the edit **converts** the
+ * arrangement into a Layout and is written there (ADR 0025).
  */
 
 /** The slice of elkjs this module uses, so a fake can stand in for it. */

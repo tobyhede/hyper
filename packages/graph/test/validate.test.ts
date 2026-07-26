@@ -135,7 +135,7 @@ describe('validateReferences', () => {
   });
 });
 
-describe('validateReferences: layouts (ADR 0013)', () => {
+describe('validateReferences: layouts (ADR 0025)', () => {
   it('accepts a space that declares no layouts at all', () => {
     expect(validateReferences(baseSpaceFile())).toEqual([]);
   });

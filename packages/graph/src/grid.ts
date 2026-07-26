@@ -11,7 +11,9 @@ import type { LayoutGraph, LayoutStrategy } from './layout';
  * it satisfies the uniformly-async `LayoutStrategy` contract (layout-seam/06).
  *
  * Automatic: it computes placement from the cards alone, so no Layout stands
- * behind it and a view of it is read-only (ADR 0013).
+ * behind it. That does not make a view of it read-only — editing one is legal
+ * and **converts** it, copying this arrangement into the Layout the edit is
+ * written to (ADR 0025).
  */
 
 export interface GridStrategyOptions {

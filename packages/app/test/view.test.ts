@@ -62,7 +62,7 @@ describe('resolveView', () => {
     });
   });
 
-  it('resolves the built-in grid, which is automatic and so read-only', async () => {
+  it('resolves the built-in grid, which is automatic and so carries no Layout', async () => {
     const space = spaceWith({ defaultView: 'grid' });
     expect(resolveView(space).layout).toBeNull();
     // The grid's own arithmetic, not ELK's: first card at the origin.

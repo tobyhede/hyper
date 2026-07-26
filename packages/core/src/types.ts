@@ -35,7 +35,7 @@ export type PositionedLayout = z.infer<typeof positionedLayoutSchema>;
  * It is data, not behaviour — the thing that arranges cards is a
  * `LayoutStrategy` in `@project/graph`, and `positionedStrategy` is the one that
  * reads this. Only authored layouts exist as values; an automatic strategy has
- * no Layout behind it (ADR 0013).
+ * no Layout behind it (ADR 0025).
  */
 export type Layout = z.infer<typeof layoutSchema>;
 

@@ -89,7 +89,7 @@ export const layoutPositionSchema = z.object({
 });
 
 /**
- * A layout the author wrote: a card-to-position map (ADR 0013).
+ * A layout the author wrote: a card-to-position map (ADR 0025).
  *
  * Positions are deliberately **sparse** — a layout may omit cards, and whoever
  * renders it places those itself — but a position may not name a card that does
@@ -130,7 +130,7 @@ export const positionedLayoutSchema = z.object({
 /**
  * A layout carried by the space file, discriminated by `kind`. Every Layout is
  * authored: an automatic strategy computes placement from the cards and routes
- * alone, so it has nothing to write down and appears here nowhere (ADR 0013).
+ * alone, so it has nothing to write down and appears here nowhere (ADR 0025).
  * There is one kind today; the union is what makes a second one cost no
  * migration.
  *
@@ -151,7 +151,7 @@ export const layoutSchema = z.preprocess(
  * and a plain grid. Both are automatic, so they are named, never configured —
  * `defaultView` records intent ("open me like this") and carries no parameters,
  * because parameters would put computed geometry back into authored content
- * (ADR 0013). A `defaultView` naming none of these and no declared layout is a
+ * (ADR 0025). A `defaultView` naming none of these and no declared layout is a
  * reference error.
  */
 export const BUILT_IN_VIEW_IDS = ['graph', 'grid'] as const;

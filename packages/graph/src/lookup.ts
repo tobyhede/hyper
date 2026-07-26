@@ -11,7 +11,7 @@ export function getRoute(space: Space, routeId: string): Route | undefined {
 
 /**
  * A layout the space declares, by id. Only positioned layouts are declared;
- * a built-in automatic view's name resolves to no layout here (ADR 0013).
+ * a built-in automatic view's name resolves to no layout here (ADR 0025).
  */
 export function getLayout(space: Space, layoutId: string): Layout | undefined {
   return space.layoutsById.get(layoutId);

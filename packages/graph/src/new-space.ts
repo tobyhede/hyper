@@ -40,7 +40,8 @@ export function newSpace(): NewSpace {
   // No `layouts` and no `defaultView`. A new space's card carries no position,
   // because centering is the view's job — `fitView` frames whatever is on
   // screen, and a position nobody wrote would be authored content nobody wrote.
-  // The Layout arrives when the space opens (ADR 0017), not here.
+  // The Layout arrives when the space is edited (ADR 0025), not here and not on
+  // open: a space that is only read keeps none.
   const file: SpaceFile = {
     version: 1,
     id: NEW_SPACE_ID,

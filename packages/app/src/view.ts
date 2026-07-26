@@ -48,10 +48,11 @@ export interface ResolvedView {
    */
   automatic: LayoutStrategy;
   /**
-   * The Layout this view writes placement into, or `null` for an automatic
-   * view. Its presence *is* the permission to edit (ADR 0013): an automatic view
-   * has nowhere to record where an author put a card, so it is read-only. There
-   * is no edit mode, and nothing to keep in sync with one.
+   * The Layout this view already has, or `null` for an automatic view. It is not
+   * a permission: every view is editable, and an automatic one gets a Layout by
+   * being edited (ADR 0025). What this answers is whether a save writes to a
+   * Layout the author named or to one the app has to mint, which is the only
+   * thing that reads it.
    */
   layout: Layout | null;
   /**

@@ -99,10 +99,11 @@ export interface GraphViewProps {
   activeCardId: string | null;
   presenting: boolean;
   /**
-   * Whether this view can be edited: true when it has a Layout to write a
-   * placement into (ADR 0013). Not an edit mode — there is nothing to toggle and
-   * nothing to keep in sync; a view either has somewhere to record where a card
-   * was put, or it does not.
+   * Whether there is an arrangement to drag yet: false for the one frame before
+   * the layout resolves, true afterwards, for every view. Every view is editable
+   * (ADR 0025) — an automatic one gets its Layout by being edited — so this is a
+   * readiness gate and not a permission. Not an edit mode either: there is
+   * nothing to toggle and nothing to keep in sync.
    */
   editable: boolean;
   onNodesChange: OnNodesChange<CardFlowNode>;

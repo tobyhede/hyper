@@ -31,9 +31,10 @@ import {
  * `space.local.json` that used to shadow the space file died with the move to a
  * directory, because shadowing a directory needs per-file merge rules and a
  * tombstone for every deletion. Git is the undo — `git checkout` on the space
- * directory throws an arrangement away. A drag therefore dirties the worktree,
- * deliberately: ADR 0013 makes placement authored, so a drag is an edit to
- * authored content and a visible diff is the honest rendering of it.
+ * directory throws an arrangement away. A save therefore dirties the worktree,
+ * deliberately: ADR 0025 makes placement authored, so a saved arrangement is an
+ * edit to authored content and a visible diff is the honest rendering of it. A
+ * drag dirties nothing — an edit never writes (ADR 0029).
  *
  * `SPACE_READ_ONLY` makes writes a no-op. e2e sets it, and it is what stops a
  * suite that drags cards from editing the committed fixture out from under

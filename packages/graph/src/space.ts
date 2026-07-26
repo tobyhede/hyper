@@ -18,7 +18,7 @@ export interface Space {
   /**
    * The positioned layouts the author wrote, if any. Empty is the normal state
    * of a hand-authored space: automatic layouts carry no data, so they are
-   * declared nowhere (ADR 0013).
+   * declared nowhere (ADR 0025).
    */
   readonly layouts: readonly Layout[];
   /** Which view this space opens in — a layout's id or a built-in view's. */

@@ -5,7 +5,7 @@ import type { LayoutCard, LayoutGraph, LayoutPoint, LayoutStrategy } from './lay
  *
  * The third strategy, and the only one that *reads* geometry rather than
  * computing it — placement is authored content, not an artifact of an algorithm
- * (ADR 0013). It is the one strategy with a **Layout** behind it: the positions
+ * (ADR 0025). It is the one strategy with a **Layout** behind it: the positions
  * it takes are that Layout's, and Auto-arrange is the same conversion run
  * backwards. Like `gridStrategy` it consumes only the cards: it never looks at
  * the edges, places no ports, and populates no edge sections, leaving the render

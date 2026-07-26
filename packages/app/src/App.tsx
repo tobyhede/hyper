@@ -170,8 +170,10 @@ export function App() {
   // field to disagree with them. A primitive, so this selector is stable.
   const unsaved = useEditorStore((s) => s.revision !== s.savedRevision);
   const nodes = liveNodes ?? projectedNodes;
-  // Having a Layout *is* the permission to edit (ADR 0013), and the store holds
-  // nodes exactly when it has one.
+  // There is an arrangement to drag once the layout has resolved and the store
+  // has taken it. Not a permission — every view is editable (ADR 0025) — and not
+  // a state the space can go back to: nothing sets `nodes` back to null, so this
+  // is false for one frame and true from then on.
   const editable = liveNodes !== null;
 
   // Auto-arrange: the one crossing from computed placement to authored placement.
