@@ -1,73 +1,20 @@
-import {
-  existsSync,
-  mkdirSync,
-  readdirSync,
-  readFileSync,
-  renameSync,
-  writeFileSync,
-} from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import type { Plugin } from 'vite';
-// Imported by *relative* path, not as `@project/core`. Vite loads this config in
-// Node and externalizes bare specifiers, so the package specifier would hand
-// Node the workspace TypeScript source — whose extensionless relative imports
-// (`export * from './schema'`) Node's ESM resolver rejects. A relative import is
-// bundled by esbuild instead, which resolves them.
-import { spaceFileSchema } from '../core/src/index';
-/**
- * What a save sends: the space file, and every card as text keyed by its id.
- *
- * Hand-checked rather than built with zod, because a bare `zod` specifier in a
- * Vite *config* module is externalized and resolved by Node from `packages/app`,
- * where it is not a dependency — the config then fails to load and the dev
- * server will not start. `spaceFileSchema` arrives by relative import, so
- * esbuild bundles it and its own zod along with it. Same rule as everything else
- * in this file's import list, one step further out.
- *
- * Ids are constrained because an id becomes a *filename*: this is the one place
- * a value from the browser reaches the filesystem, so it is bounded to a bare
- * slug rather than merely screened for `..`. The card text is not parsed here —
- * `loadSpace` is what validates a card, on the way back in.
- */
-interface SavedCard {
-  id: string;
-  text: string;
-}
-
-/**
- * Bounded, not merely screened. An id becomes a *filename*, and the anchored
- * character class already rules out `..`, separators, null bytes and newlines —
- * but length is a separate axis: an id of 300 characters passes every character
- * test and then fails the write with `ENAMETOOLONG` on any filesystem with a
- * 255-byte `NAME_MAX`. 64 is well beyond anything an author would type and well
- * inside every limit.
- */
-const CARD_ID = /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$/;
-
-/** The space file as zod hands it back — unknown keys stripped. */
-type SpaceFile = ReturnType<typeof spaceFileSchema.parse>;
-
-function parseSavedSpace(value: unknown): { spaceFile: SpaceFile; cards: SavedCard[] } | null {
-  if (typeof value !== 'object' || value === null) return null;
-  const { spaceFile, cards } = value as { spaceFile?: unknown; cards?: unknown };
-  // Keep what zod returns, not what arrived. `z.object` strips unknown keys, and
-  // discarding `.data` in favour of the original threw that away — every
-  // attacker-chosen key in the request survived into the authored `space.json`.
-  // Validating and then writing the unvalidated value is not validation.
-  const validated = spaceFileSchema.safeParse(spaceFile);
-  if (!validated.success) return null;
-  if (!Array.isArray(cards)) return null;
-
-  const parsed: SavedCard[] = [];
-  for (const card of cards as unknown[]) {
-    if (typeof card !== 'object' || card === null) return null;
-    const { id, text } = card as { id?: unknown; text?: unknown };
-    if (typeof id !== 'string' || !CARD_ID.test(id)) return null;
-    if (typeof text !== 'string') return null;
-    parsed.push({ id, text });
-  }
-  return { spaceFile: validated.data, cards: parsed };
-}
+// Imported by *relative* path, not as `@project/*`. Vite loads this config in
+// Node and externalizes bare specifiers, so a package specifier would hand Node
+// the workspace TypeScript source — whose extensionless relative imports
+// (`export * from './schema'`) Node's ESM resolver rejects, and the dev server
+// would not start. A relative import is bundled by esbuild instead.
+import {
+  fromLoopback,
+  holdsSpace,
+  MAX_BODY_BYTES,
+  parseSavedSpace,
+  readCardFiles,
+  spaceFilePath,
+  writeSpace,
+} from './space-file-io';
 
 /**
  * The space seam: read through a virtual module, write through a middleware.
@@ -127,92 +74,8 @@ const SPACE_DIR: string | null = process.env['SPACE_DIR']
   ? resolve(process.cwd(), process.env['SPACE_DIR'])
   : null;
 
-/** Whether a directory holds a space yet, as opposed to naming where one will go. */
-const holdsSpace = (dir: string | null): dir is string =>
-  dir !== null && existsSync(spaceFilePath(dir));
-
-const spaceFilePath = (dir: string): string => `${dir}/space.json`;
-
 /** Whether this server may write. e2e clears it; a build never gets here. */
 const readOnly = (): boolean => Boolean(process.env['SPACE_READ_ONLY']);
-
-/** Enough for any hand-authored space, small enough that a runaway or hostile
- *  PUT cannot balloon the dev server's memory — the body is buffered whole. */
-const MAX_BODY_BYTES = 10 * 1024 * 1024;
-
-/**
- * Whether a request's `Origin` names this machine.
- *
- * Absent means no browser sent it — `curl`, a test runner's request context —
- * and is allowed: the threat this guards against is a *web page*, and browsers
- * always send `Origin` on a PUT. `'null'` (a sandboxed iframe, a `file://`
- * document) is not absent and is refused.
- *
- * Compared against the origin because that is the one thing a rebinding attack
- * cannot forge. Rebinding changes what a name resolves to, not what the page
- * calls itself, so the attacker's document stays `http://evil.example:5273`
- * while its `Host` header — the value the attack does control — reads the same.
- */
-function fromLoopback(origin: string | undefined): boolean {
-  if (origin === undefined) return true;
-  try {
-    const { hostname } = new URL(origin);
-    return hostname === 'localhost' || hostname === '[::1]' || hostname.startsWith('127.');
-  } catch {
-    return false;
-  }
-}
-
-/**
- * Write via a temp file in the same directory, then rename over the target.
- * `rename(2)` is atomic within a filesystem, so a crash or a partial write
- * leaves the previous file intact rather than a truncated one.
- *
- * This did not matter while the target was a throwaway `space.local.json` — a
- * corrupt one cost nothing and was deleted to recover. It matters now that the
- * target is the authored space file, where a truncated write destroys content
- * that only git can get back. Same directory on purpose: renaming across
- * filesystems is not atomic.
- */
-function writeSafely(target: string, contents: string): void {
-  mkdirSync(dirname(target), { recursive: true });
-  const temp = `${target}.tmp`;
-  writeFileSync(temp, contents);
-  renameSync(temp, target);
-}
-
-/**
- * Write only if the bytes differ. A drag changes no card body, so without this
- * every save would rewrite every card file — the write amplification the prior
- * art warns about, and the reason Logseq's own docs graph carries churn nobody
- * asked for. Returns whether anything was written, for the response.
- */
-function writeIfChanged(target: string, contents: string): boolean {
-  if (existsSync(target) && readFileSync(target, 'utf8') === contents) return false;
-  writeSafely(target, contents);
-  return true;
-}
-
-/** Markdown files in one directory, never below it. */
-function markdownIn(dir: string, prefix: string): { path: string; text: string }[] {
-  if (!existsSync(dir)) return [];
-  return readdirSync(dir, { withFileTypes: true })
-    .filter((entry) => entry.isFile() && entry.name.endsWith('.md'))
-    .map((entry) => ({
-      path: `${prefix}${entry.name}`,
-      text: readFileSync(`${dir}/${entry.name}`, 'utf8'),
-    }))
-    .sort((a, b) => a.path.localeCompare(b.path));
-}
-
-/**
- * Every card file of the space, from the two scanned locations. Sorted by path
- * so the module's contents do not depend on directory order; the order cards end
- * up in is `loadSpace`'s decision, not this one's.
- */
-function readCardFiles(dir: string): { path: string; text: string }[] {
-  return [...markdownIn(dir, ''), ...markdownIn(`${dir}/cards`, 'cards/')];
-}
 
 /**
  * The virtual module's source.
@@ -350,35 +213,9 @@ export function spaceFilePlugin(): Plugin {
             }
             const { spaceFile, cards } = payload;
 
-            // Every path is derived here, from an id this server has just
-            // validated as a bare slug — never taken from the request. An
-            // endpoint that accepts a path is an arbitrary-file-write primitive
-            // for any page the human has open, and that stays true however the
-            // payload grows.
-            //
-            // A card already on disk is rewritten where it sits, so an author
-            // who put `intro.md` beside the space file keeps it there. Only a
-            // card this server has never seen is placed, and it goes in `cards/`.
-            let written = 0;
+            let written: number;
             try {
-              const pathById = new Map(
-                readCardFiles(dir).flatMap((file) => {
-                  const id = /^---\r?\n(?:.*\r?\n)*?id:\s*(\S+)\s*\r?\n/.exec(file.text)?.[1];
-                  return id ? [[id.replace(/^['"]|['"]$/g, ''), file.path] as const] : [];
-                }),
-              );
-
-              for (const card of cards) {
-                const target = `${dir}/${pathById.get(card.id) ?? `cards/${card.id}.md`}`;
-                if (writeIfChanged(target, card.text)) written += 1;
-              }
-              // A card missing from the payload is never deleted. Deletion by
-              // absence turns any client bug into data loss, and nothing in the
-              // app deletes a card yet — when something does, it can say so
-              // explicitly.
-              if (writeIfChanged(spaceFilePath(dir), JSON.stringify(spaceFile, null, 2) + '\n')) {
-                written += 1;
-              }
+              written = writeSpace(dir, spaceFile, cards);
             } catch (error) {
               // These writes run inside an emitter callback, where an uncaught
               // throw takes the whole dev server down rather than failing one
