@@ -131,7 +131,7 @@ Design rules kept throughout: domain logic stays out of React components, React 
 
 ## Current limitations
 
-- **Read-only.** No visual or Markdown editing, no drawing, no whiteboard shapes — the app only reads files.
+- **Content is read-only.** No visual or Markdown editing, no drawing, no whiteboard shapes. Placement is the one thing the app writes: drag a card and press Save, and the arrangement goes back to the space directory ([ADR 0029](docs/adr/0029-saving-is-an-explicit-act.md)).
 - **Single bundled presentation.** The example is imported at build time (`import.meta.glob`); there is no file picker or loader for arbitrary presentations.
 - **Overlay legibility.** The graph draws every route at once. Only **compatible** routes — the union of their edges is acyclic — lay out cleanly as parallel forward paths; two routes disagreeing about the order of cards they share force a backward edge, drawn as a routed channel. See [`.scratch/multiple-routes/findings.md`](.scratch/multiple-routes/findings.md).
 - **Cards are a fixed shape.** A card draws its title, so every card is the same size — declared once in `packages/app/src/card.ts` as a 16:9 ratio and consumed by both the layout and the stylesheet. Content adapts to the card, not the reverse, which is why measured DOM sizes are not fed into ELK.

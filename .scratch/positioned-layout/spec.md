@@ -1,6 +1,6 @@
 # Positioned layout
 
-Status: resolved — `01`–`07` all shipped. Live work is `08` and `12`–`15`.
+Status: resolved — `01`–`07` all shipped. Live work is `08`, `11` (the rename half) and `12`–`15`.
 Decision: ADR 0013 — editing requires a positioned layout
 **Superseded by ADR 0025.** This spec and issues `01`–`07` were written against
 ADR 0013 and ADR 0017, both now superseded. They describe a model where an

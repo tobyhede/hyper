@@ -34,13 +34,22 @@ test('the endpoint answers a save without writing, and says so by omission', asy
   const before = readFixture();
 
   // A payload that *would* write: the fixture's own space file plus a Layout,
-  // which is what a drag-save adds. Sending something the server would reject
-  // anyway would prove nothing about the read-only branch.
+  // which is what a save adds. It has to satisfy `spaceFileSchema` — `title`,
+  // `kind`, `positions`, not a `cards` map — or the server would answer 400 and
+  // this would prove nothing about the read-only branch, which is reached
+  // *before* the body is even read.
   const response = await request.put('/__space', {
     data: {
       spaceFile: {
         ...(JSON.parse(before) as Record<string, unknown>),
-        layouts: [{ id: 'probe', cards: { a: { x: 999, y: 999 } } }],
+        layouts: [
+          {
+            id: 'probe',
+            title: 'Probe',
+            kind: 'positioned',
+            positions: { aa: { x: 999, y: 999 } },
+          },
+        ],
       },
       cards: [],
     },

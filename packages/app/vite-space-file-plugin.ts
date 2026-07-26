@@ -194,7 +194,12 @@ export function spaceFilePlugin(): Plugin {
           req.on('error', () => {
             oversized = true;
             chunks.length = 0;
-            res.destroy();
+            // Only if nothing has been sent. The oversize branch above answers
+            // 413 and then calls `req.destroy()`, which lands here — destroying
+            // the response at that point can tear the socket down before the 413
+            // has flushed, so the client sees a reset instead of the status that
+            // explains it.
+            if (!res.writableEnded) res.destroy();
           });
           req.on('end', () => {
             if (oversized) {
@@ -219,10 +224,10 @@ export function spaceFilePlugin(): Plugin {
             // endpoint taking a path from the browser is an arbitrary-file-write
             // primitive for any page the human has open.
             //
-            // Card files are not written here yet. Nothing in the app creates or
-            // edits one, so the endpoint stays a space-file writer until
-            // something does — `serializeCardFile` in `@project/graph` is the
-            // half that exists, waiting for a consumer.
+            // Card files go the same way, through `writeSpace`: a space the app
+            // minted has cards no file describes yet, and a save is what gives
+            // them one. Only bytes that differ are written, so a save that moved
+            // a card rewrites no card body.
             const payload = parseSavedSpace(parsed);
             if (!payload) {
               res.statusCode = 400;
