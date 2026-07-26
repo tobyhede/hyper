@@ -27,19 +27,30 @@ export const CREATED_LAYOUT_TITLE = 'Layout';
  * not reopen is the derived-placement failure wearing a different hat.
  *
  * An existing Layout of this id is replaced, not merged — the map the store holds
- * is the whole truth of where the cards are.
+ * is the whole truth of where the cards are. That holds for the *positions*, and
+ * for the active route, and for nothing else: the route filter is authored, the
+ * app has no surface for writing one, so it is carried through untouched rather
+ * than deleted by a save that never knew about it.
  */
 export function serializeLayout(
   base: SpaceFile,
   layoutId: string,
   title: string,
   positions: ReadonlyMap<string, LayoutPoint>,
+  activeRouteId: string | null,
 ): SpaceFile {
+  const existing = (base.layouts ?? []).find((l) => l.id === layoutId);
   const layout = {
     id: layoutId,
     title,
     kind: 'positioned' as const,
     positions: Object.fromEntries([...positions].map(([id, p]) => [id, { x: p.x, y: p.y }])),
+    ...(existing?.routes ? { routes: existing.routes } : {}),
+    // ADR 0028: resolving an absent `activeRoute` to the first visible route is a
+    // read, never a write. A file the app wrote names the active route outright,
+    // so reopening it does not depend on the order the routes happen to sit in —
+    // and a route minted by editing is recorded as active by the same rule.
+    ...(activeRouteId !== null ? { activeRoute: activeRouteId } : {}),
   };
   const others = (base.layouts ?? []).filter((l) => l.id !== layoutId);
   return { ...base, layouts: [...others, layout], defaultView: layoutId };

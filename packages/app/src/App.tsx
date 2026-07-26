@@ -196,7 +196,18 @@ export function App() {
   // reopens in it rather than recomputing.
   useEffect(() => {
     if (revision === 0) return;
-    const next = serializeLayout(spaceFile, persistLayoutId, persistLayoutTitle, positions);
+    const next = serializeLayout(
+      spaceFile,
+      persistLayoutId,
+      persistLayoutTitle,
+      positions,
+      // Sampled here rather than watched. Activating a route is not an edit and
+      // must not fire this effect (ADR 0028) — it reaches the file only by
+      // riding along with a save something else asked for. Reading it out of the
+      // store keeps it out of the dependency array, which is what makes that
+      // true rather than merely intended.
+      useSpaceStore.getState().activeRouteId,
+    );
     // The cards go too. A drag changes none of them, and the server writes only
     // what differs — but a space the app minted has cards no file describes yet,
     // and this is the save that gives them one.
