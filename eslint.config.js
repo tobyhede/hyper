@@ -15,6 +15,17 @@ export default tseslint.config(
       // Throwaway local working dirs — spikes, issue tracker, tool state.
       '**/.scratch/**',
       '**/.serena/**',
+      // Agent tooling, gitignored alongside the two above. `.claude/worktrees/`
+      // holds *real git worktrees on other branches*, so without this `eslint .`
+      // walks into them and `pnpm verify` fails here on code you are not
+      // working on — and every warning is reported twice, once per checkout.
+      //
+      // Flat config does not read `.gitignore`; this is the same class of bug
+      // as the `spike.html` incident, where a gitignored file broke a tool that
+      // does not consult `.gitignore` either. Prettier honours it, hence the
+      // separate entry in `.prettierignore`.
+      '**/.claude/**',
+      '**/.agents/**',
     ],
   },
   js.configs.recommended,

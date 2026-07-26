@@ -19,7 +19,11 @@ const indexRoute = createRoute({
 
 const routeTree = rootRoute.addChildren([indexRoute]);
 
-export const router = createRouter({ routeTree });
+// Not exported: `AppRouter` below is the only consumer, and `typeof router` in
+// the module augmentation reads the local binding. Exporting it made this file
+// export both a component and a value, which costs Fast Refresh — the module
+// stops hot-reloading and full-reloads instead.
+const router = createRouter({ routeTree });
 
 declare module '@tanstack/react-router' {
   interface Register {

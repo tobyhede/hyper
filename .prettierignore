@@ -4,5 +4,10 @@
 **/test-results/**
 **/.scratch/**
 **/.serena/**
+# Agent tooling. Prettier does honour `.gitignore`, so this is belt and braces
+# — but `.claude/worktrees/` holds real git worktrees on other branches, and
+# a formatter reaching into those is the same mistake ESLint was making.
+**/.claude/**
+**/.agents/**
 pnpm-lock.yaml
 **/*.md
