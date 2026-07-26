@@ -112,11 +112,21 @@ export function fromLoopback(origin: string | undefined): boolean {
   if (origin === undefined) return true;
   try {
     const { hostname } = new URL(origin);
-    return hostname === 'localhost' || hostname === '[::1]' || hostname.startsWith('127.');
+    return hostname === 'localhost' || hostname === '[::1]' || LOOPBACK_IPV4.test(hostname);
   } catch {
     return false;
   }
 }
+
+/**
+ * The whole of 127.0.0.0/8, and nothing that merely starts like it.
+ *
+ * A `startsWith('127.')` test reads as equivalent and is not: `127.evil.example`
+ * is a hostname an attacker can register and point at 127.0.0.1, so the guard
+ * above would have accepted the very page it exists to refuse. Anchored, and
+ * each octet must actually be a number.
+ */
+const LOOPBACK_IPV4 = /^127(?:\.\d{1,3}){3}$/;
 
 /**
  * Write via a temp file in the same directory, then rename over the target.
@@ -169,11 +179,22 @@ export function readCardFiles(dir: string): { path: string; text: string }[] {
   return [...markdownIn(dir, ''), ...markdownIn(`${dir}/cards`, 'cards/')];
 }
 
-/** A card file's frontmatter `id`, which is its identity — never its filename
- *  (ADR 0020). Quotes stripped, because YAML permits them and the id does not
- *  include them. */
+/**
+ * A card file's frontmatter `id`, which is its identity — never its filename
+ * (ADR 0020). Quotes stripped, because YAML permits them and the id does not
+ * include them.
+ *
+ * The frontmatter block is isolated *first*, then searched. Scanning from the
+ * opening fence for the first `id:` instead — which is what this used to do —
+ * never stopped at the closing fence, so a card with no id in its frontmatter
+ * and `id: something` anywhere in its **body** reported that as its identity.
+ * This decides which file a card is written back to, so a body line winning
+ * silently redirects a write.
+ */
 export function frontmatterId(text: string): string | undefined {
-  const id = /^---\r?\n(?:.*\r?\n)*?id:\s*(\S+)\s*\r?\n/.exec(text)?.[1];
+  const frontmatter = /^---\r?\n([\s\S]*?)\r?\n---/.exec(text)?.[1];
+  if (frontmatter === undefined) return undefined;
+  const id = /^id:\s*(\S+)\s*$/m.exec(frontmatter)?.[1];
   return id?.replace(/^['"]|['"]$/g, '');
 }
 

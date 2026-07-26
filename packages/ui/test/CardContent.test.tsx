@@ -43,6 +43,13 @@ describe('CardContent', () => {
         <CardContent title="T" markdown="[click](javascript:alert(1))" />,
       );
 
+      // Assert the anchor survives, not just that the scheme is gone: deleting
+      // the whole element would satisfy the second check and quietly turn
+      // sanitising into censoring.
+      const link = container.querySelector('a');
+      expect(link).not.toBeNull();
+      expect(link?.textContent).toBe('click');
+      expect(link?.getAttribute('href')).toBeNull();
       expect(container.innerHTML).not.toContain('javascript:');
     });
 

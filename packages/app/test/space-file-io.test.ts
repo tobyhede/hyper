@@ -130,6 +130,11 @@ describe('fromLoopback', () => {
   it.each([
     ['a rebinding attacker\u2019s own origin', 'http://evil.example:5173'],
     ['a lookalike hostname', 'http://localhost.evil.example'],
+    // An attacker registers this under a domain they control and points it at
+    // 127.0.0.1. A `startsWith('127.')` test accepted it, which defeated the
+    // guard entirely \u2014 the one page it exists to refuse looked local.
+    ['a hostname that merely begins 127.', 'http://127.evil.example:5273'],
+    ['a subdomain of a loopback-looking name', 'http://127.0.0.1.evil.example'],
     ['a public address', 'http://203.0.113.4'],
     ['a sandboxed iframe', 'null'],
     ['an unparseable origin', 'not a url'],
@@ -186,8 +191,20 @@ describe('frontmatterId', () => {
   it.each([
     ['no frontmatter', '# Just a heading\n'],
     ['frontmatter without an id', '---\ntitle: T\n---\n'],
+    ['an unterminated frontmatter block', '---\nid: x\n'],
   ])('returns undefined for %s', (_label, text) => {
     expect(frontmatterId(text)).toBeUndefined();
+  });
+
+  it('ignores an id in the body', () => {
+    // The id decides which file a card is written back to, so a body line
+    // winning here silently redirects a write. Scanning from the opening fence
+    // for the first `id:` never stopped at the closing one.
+    expect(frontmatterId('---\ntitle: T\n---\n\nid: injected\n')).toBeUndefined();
+  });
+
+  it('prefers the frontmatter id over one in the body', () => {
+    expect(frontmatterId('---\nid: real\n---\n\nid: injected\n')).toBe('real');
   });
 });
 

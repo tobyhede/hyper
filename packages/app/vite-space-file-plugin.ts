@@ -174,16 +174,32 @@ export function spaceFilePlugin(): Plugin {
           req.on('data', (chunk: Buffer) => {
             size += chunk.length;
             if (size > MAX_BODY_BYTES) {
+              // Answer and hang up rather than draining the rest: the point of
+              // the cap is not to hold the body in memory.
               oversized = true;
               chunks.length = 0;
+              res.statusCode = 413;
+              res.end('space too large');
+              req.destroy();
               return;
             }
             chunks.push(chunk);
           });
+          // A client that vanishes mid-upload emits `error`, and an unhandled
+          // `error` on a stream throws out of the emitter — taking the dev
+          // server down, which is the same failure the write `catch` exists to
+          // prevent, one step earlier.
+          req.on('error', () => {
+            oversized = true;
+            chunks.length = 0;
+            res.destroy();
+          });
           req.on('end', () => {
             if (oversized) {
-              res.statusCode = 413;
-              res.end('space too large');
+              if (!res.writableEnded) {
+                res.statusCode = 413;
+                res.end('space too large');
+              }
               return;
             }
             let parsed: unknown;
