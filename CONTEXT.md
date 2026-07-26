@@ -46,6 +46,8 @@ _Avoid_: link, connection, transition, arrow, step, relationship.
 
 **Active route**:
 The one route a space has selected at a time — drawn emphasized, and the route an author's new edges join. There is one concept here, not two: a route is active, and highlighting is how that is shown. A layout may name which route opens active; failing that it is the first route the layout shows. Changing it is a deliberate act, never a side effect of drawing or reading.
+
+Activating is not itself an edit — it touches no card and no route, so it converts nothing and leaves the space clean. Which route is active is recorded whenever the space is next saved for some other reason.
 _Avoid_: selected route and current route as a second concept alongside this one, focus, mode.
 
 ## Layout and views
