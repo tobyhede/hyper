@@ -35,17 +35,19 @@ pnpm e2e            # Playwright flow (boots the dev server automatically)
 
 `pnpm e2e` needs the Chromium browser once: `pnpm exec playwright install chromium`.
 
-## The presentation format
+## The space format
 
-A presentation is a directory containing a `graph.json` manifest plus the Markdown files it references. The bundled example lives in [`packages/app/example`](packages/app/example).
+A space is a **space directory**: a space file (`space.json`) plus one Markdown file per card. Cards are not listed anywhere — a card exists because its file does ([ADR 0020](docs/adr/0020-a-card-is-a-markdown-file-with-frontmatter.md)), and they are discovered by scanning two locations **non-recursively**: `*.md` beside the space file, and `cards/*.md`. The bundled example lives in [`packages/app/example`](packages/app/example).
 
-### `graph.json`
+"Manifest" is retired, as a word and as a type ([ADR 0010](docs/adr/0010-space-is-the-root-loaded-by-loadspace.md)): the top-level value is a **Space**, and it is minted only by `loadSpace`.
+
+### `space.json`
 
 ```json
 {
   "version": 1,
+  "id": "graph-native",
   "title": "Graph-Native Technical Presentations",
-  "cards": [{ "id": "intro", "title": "Graph-native presentations", "content": "cards/intro.md" }],
   "routes": [
     {
       "id": "main",
@@ -53,14 +55,25 @@ A presentation is a directory containing a `graph.json` manifest plus the Markdo
       "color": "#6ea8fe",
       "edges": [{ "from": "intro", "to": "problem" }]
     }
-  ]
+  ],
+  "layouts": [
+    {
+      "id": "working",
+      "title": "Working",
+      "positions": { "intro": { "x": 0, "y": 0 } },
+      "activeRoute": "main"
+    }
+  ],
+  "defaultView": "working"
 }
 ```
 
 | Key | Meaning |
 | --- | --- |
-| `cards` | Content units: an `id`, a `title`, and `content` (a relative path to a Markdown file). Cards **are** the graph — route steps reference them directly, and a card occupies exactly one position (see [ADR 0004](docs/adr/0004-cards-are-the-graph.md)). |
-| `routes` | Named walkthroughs, each an `id`, `title`, optional `color`, and a set of `{ from, to }` **edges** between card ids ([ADR 0023](docs/adr/0023-a-route-is-an-acyclic-graph-of-card-edges.md)). A card may have several edges out (a fork) and several in (a merge); what a route may not do is close a cycle. Routes are a space's only structure ([ADR 0007](docs/adr/0007-routes-are-the-only-structure.md)), and the drawn edges and handles are derived from these. |
+| `id`, `title` | What names the space. The id is not the title and not the file name. |
+| `routes` | Named walkthroughs, each an `id`, `title`, optional `color`, and a set of `{ from, to }` **edges** between card ids ([ADR 0023](docs/adr/0023-a-route-is-an-acyclic-graph-of-card-edges.md)). A card may have several edges out (a fork) and several in (a merge); what a route may not do is close a cycle. Routes are a space's only structure ([ADR 0007](docs/adr/0007-routes-are-the-only-structure.md)), and the drawn edges and handles are derived from these. May be empty — a space with no routes renders and cannot be presented ([ADR 0015](docs/adr/0015-a-space-may-have-no-routes.md)). |
+| `layouts` | Optional authored card-to-position maps ([ADR 0014](docs/adr/0014-layout-is-the-authored-data-strategy-is-the-behaviour.md)). Positions are sparse — a layout may omit cards but may not name one the space lacks. A layout also names the routes it shows (`routes`, a filter; absent means all) and which of them opens **active** (`activeRoute`; absent means the first visible one) — [ADR 0026](docs/adr/0026-a-route-is-active-and-the-layout-may-name-it.md). |
+| `defaultView` | Which view the space opens in: a declared layout's id, or a built-in automatic one (`graph`, `grid`). A declared layout wins a name collision. |
 
 ### Routes as color-coded flows
 
@@ -68,9 +81,9 @@ Each authored edge becomes a colored drawn edge, and each card a route leaves ga
 
 ### Markdown cards
 
-Each card body is a standalone Markdown file (GitHub-flavoured Markdown via `remark-gfm`, so tables, code fences, and task lists work). A card can be visited by any number of routes — that reuse is the whole point, and a card shared by several routes carries one handle pair per route running through it.
+A card is **one file**: frontmatter, then body ([ADR 0020](docs/adr/0020-a-card-is-a-markdown-file-with-frontmatter.md)). The frontmatter carries `id`, `title`, an optional `description`, and for an alias its `kind` and `target`; everything under it is the content, GitHub-flavoured Markdown. A card can be visited by any number of routes — that reuse is the whole point, and a card shared by several routes carries one handle pair per route running through it.
 
-A card's title lives in the manifest, so a card's Markdown file is its **body only** — do not repeat the title as a heading in the file, or it will appear twice everywhere the card is drawn.
+A card's identity is its frontmatter `id`, never its filename, so renaming the file is not a data migration. Since the title lives in the same file as the body, a body may open with a heading — it is just a heading, not a repeat of a title held somewhere else.
 
 The graph draws a card's **title**, not its body ([ADR 0006](docs/adr/0006-cards-show-titles-in-the-graph.md)). Click a card to open it and read its Markdown **source**, verbatim; the one place a card is drawn *rendered* is presenting ([ADR 0011](docs/adr/0011-opening-shows-markdown-source.md)). Content reaches a node only when that node is the card a walk has reached, so it is not embedded in every node.
 
@@ -78,8 +91,8 @@ A card occupies exactly one position in the graph; there is no placement layer l
 
 Validation happens in two layers:
 
-- **Shape** — a Zod schema (`@project/core`) validates the manifest structure.
-- **References** — `@project/graph` checks that both ends of every route edge resolve to a card, that no route closes a cycle, and flags duplicate ids. Unresolved references are surfaced as a banner in the app rather than crashing it.
+- **Shape** — Zod schemas (`@project/core`) validate the space file and each card file's frontmatter.
+- **References** — `@project/graph` checks that both ends of every route edge resolve to a card, that no route closes a cycle, that a layout positions and shows only things the space has, and flags duplicate ids. Unresolved references are surfaced as a banner in the app rather than crashing it.
 
 `@project/graph` also derives the route handles and edges (`buildCardHandles`, `buildRouteEdges`); `@project/react-flow-adapter` projects colored card nodes and edges (`projectCardNodes`, `projectRouteEdges`).
 
@@ -131,6 +144,6 @@ Design rules kept throughout: domain logic stays out of React components, React 
 
 - Load an arbitrary presentation directory (drag-and-drop a folder or a `?src=` URL) instead of the bundled example.
 - Encode the active route and card in the TanStack Router URL so a position is linkable and refresh-safe.
-- Per-step camera hints (zoom/pan/highlight several nodes) and step transitions in the manifest.
+- Authored camera hints (zoom/pan/highlight several nodes) and move transitions in the space file.
 - Speaker view: current + next card, notes, and elapsed time.
-- A tiny CLI to validate a presentation directory (`graph.json` + Markdown) in CI, reusing `@project/graph`.
+- A tiny CLI to validate a space directory (`space.json` + Markdown) in CI, reusing `@project/graph`.

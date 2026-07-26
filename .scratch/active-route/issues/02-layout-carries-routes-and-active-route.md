@@ -1,6 +1,6 @@
 # A Layout carries `routes` and `activeRoute`
 
-Status: open
+Status: resolved
 Blocked by: 01
 
 `positionedLayoutSchema` gains two optional fields (ADR 0026):
@@ -13,3 +13,9 @@ Shape only, as everywhere in `core/src/schema.ts`. That both name real routes, a
 The `Layout` type in `types.ts` picks them up derived. Note `exactOptionalPropertyTypes` — anything constructing a Layout spreads these conditionally rather than passing `undefined`.
 
 Both are independent: a Layout may filter without naming an active route, or name one without filtering.
+
+## Answer
+
+`2d524e4`. Both added to `positionedLayoutSchema`, both optional, with the tests covering each alone, both together, and neither.
+
+One distinction the tests pin down and the ADR does not spell out: **an empty `routes` is not an absent one**. Absent means every route; `[]` means this layout draws none. Shape allows both, and they must not collapse — `03` and `04` both turn on the difference.
