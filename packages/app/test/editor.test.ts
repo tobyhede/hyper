@@ -15,6 +15,7 @@ function node(id: string, x: number, y: number, title = id): CardFlowNode {
       sourceHandles: [],
       targetHandles: [],
       active: false,
+      showContent: false,
       activeRouteId: null,
       emphasis: 'equal',
     },

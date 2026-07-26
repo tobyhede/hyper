@@ -82,8 +82,12 @@ _Avoid_: expand, preview, popup, modal, drill-down.
 Walking a route for an audience, on the space itself, drawn close enough that one card fills the screen. Presenting **traverses** the route: at the active card, the presenter follows one of its outgoing edges. A route that is a line walks as a line; a route that forks offers a choice. There is no separate artefact and no second surface — a presentation is not a thing a route is turned into, it is a way of moving through one.
 _Avoid_: deck, slide, step, slideshow, playback, present mode (that is a mode name, not the thing).
 
+**Walk**:
+The cards a presenter has actually passed through, in order — one path taken through a route, of the several a route may permit. It belongs to the presenting, not to the space: a route is a graph and holds every path at once; a walk is the one being taken, and it is gone when the presenting ends. It is not itself a route, and recording one would be a second structure beside routes.
+_Avoid_: history, trail, session, playthrough, and route (a route is what is walked).
+
 **Active card**:
-Where a walk currently is — the card a presenter has reached, whose outgoing edges are the moves available. It pairs with the **active route**: the route names the walk, the card names the position in it. Going back reads the walk rather than the graph, because a card reached by a merge has several edges in and only the path taken says which one was used.
+Where a walk currently is — the card a presenter has reached, whose outgoing edges are the moves available. It pairs with the **active route**: the route names what is being walked, the card names the position in it. Going back reads the walk rather than the graph, because a card reached by a merge has several edges in and only the path taken says which one was used.
 _Avoid_: current slide, cursor, position, step.
 
 ## At the render layer

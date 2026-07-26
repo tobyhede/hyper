@@ -54,6 +54,16 @@ export type CardNodeData = {
    *  redraws. Absent on non-alias cards. */
   aliasOf?: string;
   active: boolean;
+  /**
+   * Draw the card's content rather than its title. ADR 0006 deferred a "show
+   * full content" view and left it a View's choice; presenting is that view (ADR
+   * 0027). Set on the active card alone, never on the whole graph.
+   */
+  showContent: boolean;
+  /** The Markdown to draw when `showContent`, resolved through an alias to its
+   *  target's body. Absent otherwise — content is not embedded in every node
+   *  (ADR 0006), which is the constraint that made this per-card. */
+  body?: string;
   /** The route being emphasised, if any. Drives handle dimming. */
   activeRouteId: string | null;
   emphasis: RouteEmphasis;
@@ -68,8 +78,14 @@ export type ColorByRouteId = Readonly<Record<string, string>>;
 const EMPTY_HANDLES: CardHandleSet = { sourceHandles: [], targetHandles: [] };
 
 export interface ProjectCardNodesOptions {
-  /** Card id of the current presentation step, if any, to flag as active. */
+  /** Card id the walk has reached, if any, to flag as active. */
   activeCardId?: string | null;
+  /**
+   * Draw the active card's content instead of its title — what presenting does
+   * (ADR 0027). Only the active card is affected, so this costs one card's body
+   * in the projection rather than every card's.
+   */
+  showActiveCardContent?: boolean;
   /** The route to emphasise, if any. */
   activeRouteId?: string | null;
   emphasis?: RouteEmphasis;
@@ -116,6 +132,7 @@ export function projectCardNodes(
   options: ProjectCardNodesOptions = {},
 ): CardFlowNode[] {
   const activeCardId = options.activeCardId ?? null;
+  const showActiveCardContent = options.showActiveCardContent ?? false;
   const activeRouteId = options.activeRouteId ?? null;
   const emphasis = options.emphasis ?? 'equal';
   const nodeHeight = options.nodeHeight ?? DEFAULT_NODE_HEIGHT;
@@ -128,8 +145,11 @@ export function projectCardNodes(
     const handles = handlesByCard.get(card.id) ?? EMPTY_HANDLES;
     const cardLayout = laidOut.get(card.id);
     const active = card.id === activeCardId;
+    const showContent = active && showActiveCardContent;
     // An alias names the card it redraws; a markdown card names nothing (ADR 0009).
     const aliasOf = card.kind === 'alias' ? resolveContentCard(space, card.id)?.title : undefined;
+    // An alias shows its target's content under its own title (ADR 0009).
+    const body = showContent ? (resolveContentCard(space, card.id)?.body ?? '') : undefined;
 
     return {
       id: card.id,
@@ -151,6 +171,8 @@ export function projectCardNodes(
         // Omit rather than set undefined: absent means "not an alias" (ADR 0009).
         ...(aliasOf !== undefined ? { aliasOf } : {}),
         active,
+        showContent,
+        ...(body !== undefined ? { body } : {}),
         activeRouteId,
         emphasis,
         sourceHandles: resolveHandles(handles.sourceHandles, colors, cardLayout, nodeHeight),

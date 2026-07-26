@@ -26,11 +26,12 @@ import { createEditorStore } from './editor';
 import { resolveView } from './view';
 import { GraphView } from './components/GraphView';
 import { OpenCard } from './components/OpenCard';
+import { PresentingChrome } from './components/PresentingChrome';
 
 // Derived once from the (static) space. The store is bound to it here — the one
 // place the app's singleton space meets the store factory (ADR 0010).
 const colors = routeColorMap(space);
-const { useStore: useSpaceStore } = createSpaceStore(space);
+const { useStore: useSpaceStore, selectActiveCardId, movesFrom } = createSpaceStore(space);
 
 // The markdown a card shows, resolving an alias to its target's body (ADR 0009).
 // A card keeps its own title; only content is inherited.
@@ -62,6 +63,23 @@ export function App() {
   const openedCardId = useSpaceStore((s) => s.openedCardId);
   const openCard = useSpaceStore((s) => s.openCard);
   const closeCard = useSpaceStore((s) => s.closeCard);
+
+  const presenting = useSpaceStore((s) => s.mode === 'presenting');
+  const canRetreat = useSpaceStore((s) => s.walk.length > 1);
+  const present = useSpaceStore((s) => s.present);
+  const exitPresenting = useSpaceStore((s) => s.exitPresenting);
+  const advance = useSpaceStore((s) => s.advance);
+  const retreat = useSpaceStore((s) => s.retreat);
+  const selectBranch = useSpaceStore((s) => s.selectBranch);
+  const activeCardId = useSpaceStore(selectActiveCardId);
+  const branchIndex = useSpaceStore((s) => s.branchIndex);
+  // Derived here rather than in a store selector: the array is rebuilt on every
+  // call, so a selector would hand Zustand a new identity each render — a
+  // re-render producing a new value producing a re-render, until React gives up.
+  const moves = useMemo(
+    () => movesFrom(selectedRouteId, activeCardId, branchIndex),
+    [selectedRouteId, activeCardId, branchIndex],
+  );
 
   // Which routes the view shows. Every one, for now — but membership is the
   // view's decision (ADR 0005), so route visibility controls attach here rather
@@ -111,13 +129,15 @@ export function App() {
   const projectedNodes = useMemo(
     () =>
       projectCardNodes(space, visibleHandles, colors, {
+        activeCardId,
+        showActiveCardContent: presenting,
         activeRouteId: selectedRouteId,
         emphasis,
         ...(laidOut ? { layoutGraph: laidOut } : {}),
         nodeHeight: CARD_HEIGHT,
         cardIds: visibleCardIds,
       }),
-    [selectedRouteId, emphasis, laidOut, visibleHandles, visibleCardIds],
+    [activeCardId, presenting, selectedRouteId, emphasis, laidOut, visibleHandles, visibleCardIds],
   );
 
   // Hand the projection to the store, which folds it into the live array so a
@@ -188,7 +208,8 @@ export function App() {
 
   const openedCard = openedCardId ? getCard(space, openedCardId) : undefined;
 
-  // Escape closes an opened card.
+  // Escape closes an opened card. Registered ahead of the walk's keys and
+  // returning early while a card is open, so the two never fight over Escape.
   useEffect(() => {
     if (!openedCardId) return;
     const onKeyDown = (event: KeyboardEvent) => {
@@ -200,6 +221,29 @@ export function App() {
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [openedCardId, closeCard]);
+
+  // Walking the route (ADR 0027). Right commits the selected edge, Left walks
+  // back, Up and Down move the selection among a fork's outgoing edges without
+  // moving the camera — the move a deck framework's per-key redirect cannot
+  // express, and the reason there is no framework here.
+  useEffect(() => {
+    if (!presenting || openedCardId) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      const handler = {
+        ArrowRight: advance,
+        ' ': advance,
+        ArrowLeft: retreat,
+        ArrowUp: () => selectBranch(-1),
+        ArrowDown: () => selectBranch(1),
+        Escape: exitPresenting,
+      }[event.key];
+      if (!handler) return;
+      event.preventDefault();
+      handler();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [presenting, openedCardId, advance, retreat, selectBranch, exitPresenting]);
 
   const toolbar = (
     <>
@@ -229,10 +273,24 @@ export function App() {
       >
         Auto-arrange
       </Button>
-      {/* No Present button. Presenting was a deck over a route's steps, and a
-          route stopped being a sequence (ADR 0023); it returns as a traversal on
-          this same canvas (ADR 0027), which is the next change rather than
-          something to stub here. */}
+      {/* Presenting is this same canvas drawn closer in (ADR 0027), so this
+          changes the camera rather than the surface. A space with no routes has
+          nothing to walk (ADR 0015) — the button stays, disabled, so the
+          capability is visible rather than absent. */}
+      {presenting ? (
+        <Button variant="secondary" data-testid="exit-presenting-button" onClick={exitPresenting}>
+          Overview
+        </Button>
+      ) : (
+        <Button
+          variant="default"
+          data-testid="present-button"
+          onClick={present}
+          disabled={!selectedRouteId}
+        >
+          Present
+        </Button>
+      )}
     </>
   );
 
@@ -244,11 +302,23 @@ export function App() {
             nodes={nodes}
             edges={edges}
             layoutReady={laidOut !== null}
+            activeCardId={activeCardId}
+            presenting={presenting}
             editable={editable}
             onNodesChange={changeNodes}
             onOpenCard={openCard}
           />
         </ReactFlowProvider>
+
+        {presenting && (
+          <PresentingChrome
+            moves={moves}
+            canRetreat={canRetreat}
+            onSelect={(index) => selectBranch(index - moves.findIndex((m) => m.selected))}
+            onAdvance={advance}
+            onExit={exitPresenting}
+          />
+        )}
 
         {openedCard && (
           <OpenCard

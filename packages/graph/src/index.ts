@@ -6,4 +6,5 @@ export * from './new-space';
 export * from './positioned';
 export * from './routes';
 export * from './space';
+export * from './traversal';
 export * from './validate';

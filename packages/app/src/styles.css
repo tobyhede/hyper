@@ -241,18 +241,153 @@ body {
   overflow-wrap: anywhere;
 }
 
+/* ---- The card a walk has reached ---- */
+/* Presenting draws the active card's content instead of its title (ADR 0027).
+   Same box as every other card — the layout's 16:9 frame, which the camera then
+   fills the screen with — so the type is sized in *container* units and scales
+   with the frame. Setting it in pixels would size it against a box that is about
+   to be magnified by an arbitrary factor. Content that still overflows is
+   clipped: the frame is fixed and a card that does not fit it is an authoring
+   problem, exactly as a slide would be. */
+.rf-card-node__content {
+  container-type: size;
+  width: var(--card-width);
+  height: var(--card-height);
+}
+
+.rf-card-node__content .card--full {
+  width: 100%;
+  height: 100%;
+  padding: 4cqw 5cqw;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  text-align: left;
+  font-size: 3.4cqw;
+  line-height: 1.5;
+}
+
+.rf-card-node__content .card__title {
+  margin: 0 0 2cqw;
+  font-size: 5cqw;
+  line-height: 1.2;
+}
+
+.rf-card-node__content .card__body > * {
+  margin: 0 0 2cqw;
+}
+
+.rf-card-node__content .card__body :is(h1, h2, h3, h4) {
+  margin: 0 0 1.6cqw;
+  font-size: 4.2cqw;
+  line-height: 1.25;
+}
+
+.rf-card-node__content .card__body :is(ul, ol) {
+  padding-left: 4cqw;
+}
+
+.rf-card-node__content .card__body :is(code, pre) {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.9em;
+}
+
+.rf-card-node__content .card__body pre {
+  overflow-x: auto;
+  padding: 2cqw;
+  border-radius: 4px;
+  background: var(--panel-2);
+}
+
+/* ---- Presenting chrome ---- */
+/* Screen-fixed, not canvas content: at a zoom where the active card is legible a
+   fork's branch cards are off frame, so the presenter's options are enumerated
+   here instead (ADR 0027). Unaffected by the camera by construction. */
+.presenting {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.7rem 1rem;
+  background: rgba(11, 13, 17, 0.9);
+  border-top: 1px solid var(--border);
+}
+
+.presenting__moves {
+  flex: 1;
+  min-width: 0;
+}
+
+.presenting__list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.presenting__move {
+  background: var(--panel-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.3rem 0.7rem;
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.presenting__move[data-selected='true'] {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-strong);
+}
+
+.presenting__end {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--muted, #8a94a6);
+}
+
+.presenting__keys {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--muted, #8a94a6);
+  white-space: nowrap;
+}
+
+.presenting__exit {
+  background: var(--panel-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.35rem 0.8rem;
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.presenting__exit:hover {
+  border-color: var(--accent);
+}
+
 /* ---- React Flow edges ---- */
 .rf-edge--reference .react-flow__edge-path {
   stroke-dasharray: 6 4;
 }
 
-.card--slide {
+.card--full {
   background: transparent;
   border: none;
   padding: 0.5rem 0;
 }
 
-.card--slide .card__title {
+.card--full .card__title {
   font-size: 1.3rem;
 }
 

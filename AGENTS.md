@@ -8,7 +8,6 @@ A local, file-first prototype for **graph-native technical presentations**: Mark
 
 Accepted ADRs run ahead of the code. Read them before touching the areas they govern, and do not read the current code as the design.
 
-- **ADR 0024 / 0027 — presenting traverses a route, on the graph canvas under React Flow's camera.** The deck is removed and **nothing has replaced it**: there is no Present button and no traversal state. `setCenter`/`fitBounds` are the camera; `CardNode` needs a presenting render mode showing full content.
 - **ADR 0025 — a Layout is optional, and editing converts an automatic arrangement into one.** The app still runs `elkStrategy()` on every boot and has no positioned layout. The spec is `.scratch/positioned-layout/`, whose issues `01`–`07` predate this ADR and describe the superseded 0013/0017 model — don't implement them as written.
 - **ADR 0026 — one active route, which a Layout may name.** The store has `selectedRouteId` and no notion of active; a Layout carries neither `routes` nor `activeRoute`.
 - **ADR 0021 — authoring is drag-to-connect with a single neutral handle.** The per-route handle machinery still in `react-flow-adapter` serves the overview; it is not the authoring model.
@@ -30,7 +29,7 @@ Five `@project/*` workspace packages under `packages/`:
 - `graph` — pure graph logic over a `Space`: `loadSpace` (the one intake — parse, validate references incl. the per-route cycle check, index), the `Space` type, O(1) lookups, route→handles/edges derivation, and the `LayoutStrategy` contract (`LayoutGraph`, `buildLayoutGraph`, `gridStrategy`, `positionedStrategy`). Depends only on `core`.
 - `react-flow-adapter` — the ONLY place React-Flow (`@xyflow/react`) and elkjs specifics live: projects a space+route into RF nodes/edges, implements `LayoutStrategy` as `elkStrategy`, renders `CardNode`.
 - `ui` — reusable, presentation-agnostic React components + shadcn-style primitives (Tailwind v4, Radix Select, CVA). Depends on `core` only.
-- `app` — wiring/composition: Zustand store, TanStack Router, space loading, graph/presentation views, hand-rolled CSS.
+- `app` — wiring/composition: Zustand store (selection + the walk), TanStack Router, space loading, the graph view and its cameras, presenting chrome, hand-rolled CSS.
 
 Hard rules:
 - Domain logic stays out of React (keep it in `core`/`graph`).
@@ -78,6 +77,8 @@ Hard rules:
 Keep to the MVP. Don't over-generalize the domain model and don't add features beyond what's asked.
 
 On multi-route rendering (`.scratch/multi-route/`): the overview draws every route, and **selection is emphasis, not filtering** — at all times, not only while presenting. A Layout carries the filter (which routes it shows at all) and the **active** route is the emphasis; activating a route never changes what is visible. There is one active route, not a selection plus an emphasis (ADR 0026). The dimming lives in `projectRouteEdges`, `CardNode` and `RouteLegend`. `filterHandlesByRoute` and `routeCardIds` are right for a view that wants one route. Which routes a view shows is a View decision passed into the strategy (ADR 0005) — don't let the strategy or `graph` decide it.
+
+**Presenting is this canvas, closer in (ADR 0027).** There is no second surface and nothing a Card is turned into. `PresentingCamera` in `GraphView` is the whole mechanism: `setCenter` to the active card, and a **split** move when the zoom changes by more than a tenth — pan at the wider scale, then close in — because one combined move whips. The chrome (`PresentingChrome`) is screen-fixed and enumerates the active card's outgoing edges, because at a zoom where the card is legible its neighbours are provably off frame. **Don't add an `isLinear` branch**: one outgoing edge is a one-member selection and the degenerate case falls out (ADR 0024). **Don't put a derived array in a Zustand selector** — `movesFrom` takes its three inputs and is memoized in `App` for exactly this reason; as a selector it re-rendered until React gave up.
 
 **A route may not close a cycle (ADR 0023).** `loadSpace` rejects one (`route-has-cycle`). Forks and merges are legal and expected; only cycles are not. Don't add cycles to get "return to earlier content" — that has a better word, an **alias** (ADR 0009), a distinct card showing the same content reached by a forward edge. A cycle renders cleanly only as a channel looping around the cards or by unrolling into duplicate nodes.
 

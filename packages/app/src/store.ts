@@ -1,20 +1,43 @@
 import { create, type StoreApi, type UseBoundStore } from 'zustand';
-import type { Space } from '@project/graph';
+import { getCard, getRoute, outgoingEdges, routeStartCard, type Space } from '@project/graph';
+
+export type Mode = 'overview' | 'presenting';
+
+/** One move available from the active card: an outgoing edge, named. */
+export interface Move {
+  /** The card the edge leads to. */
+  cardId: string;
+  /** That card's title, for the chrome that lists the choice. */
+  title: string;
+  selected: boolean;
+}
 
 /**
- * What the viewer has selected in the space: which route is emphasized, and
- * which card — if any — they have opened to read.
+ * What the viewer has selected in the space, and — while presenting — where
+ * their walk has got to.
  *
- * Presenting is not here. It was a deck driven by a step index into a route
- * (`next`/`prev`/`goToStep`), and a route stopped being a sequence (ADR 0023),
- * so the deck and the index went with it (ADR 0024). What replaces it is a
- * traversal of the route's edges on the graph canvas (ADR 0027), which holds a
- * position in a *walk* rather than an index into a list — a different piece of
- * state, added when that surface is built rather than kept warm here.
+ * Presenting is a **traversal** (ADR 0024): at the active card the presenter
+ * follows one of its outgoing edges. It is not an index into a sequence, because
+ * a route is a graph. Two pieces of state express it:
+ *
+ * - `walk` — the cards visited, in the order visited, the last being the active
+ *   card. The whole path rather than just the position, because **back reads the
+ *   walk, not the graph** (ADR 0027): a card reached by a merge has several
+ *   incoming edges and only the path taken says which one was used.
+ * - `branchIndex` — which of the active card's outgoing edges is selected.
+ *
+ * A line is not a special case. One outgoing edge is a one-member selection, so
+ * advancing is unambiguous and there is nothing for Up/Down to move through;
+ * nothing here tests whether a route is linear (ADR 0024).
  */
 export interface SpaceState {
+  mode: Mode;
   /** The route drawn emphasized. ADR 0026 renames this to the *active* route. */
   selectedRouteId: string | null;
+  /** The cards walked, in order; the last is the active card. Empty in overview. */
+  walk: readonly string[];
+  /** Which outgoing edge of the active card is selected. */
+  branchIndex: number;
   /**
    * The card the viewer has opened to read, if any. Deliberately not named for a
    * card kind: opening a *space* card to explore its nested graph (ADR 0001) is
@@ -24,10 +47,29 @@ export interface SpaceState {
   selectRoute: (routeId: string) => void;
   openCard: (cardId: string) => void;
   closeCard: () => void;
+  present: () => void;
+  exitPresenting: () => void;
+  /** Follow the selected edge. */
+  advance: () => void;
+  /** Undo the last move, re-selecting the edge just walked back over. */
+  retreat: () => void;
+  /** Move the selection through the active card's outgoing edges. */
+  selectBranch: (delta: number) => void;
 }
 
 export interface SpaceStore {
   useStore: UseBoundStore<StoreApi<SpaceState>>;
+  /** The card the walk has reached, or `null` outside presenting. */
+  selectActiveCardId: (state: SpaceState) => string | null;
+  /**
+   * A card's outgoing edges, with the selected one marked.
+   *
+   * Takes the three values it depends on rather than the whole state, so it can
+   * be memoized on them. As a store selector it would return a fresh array on
+   * every render, which Zustand compares by identity — a re-render that produces
+   * a new value that causes a re-render, until React gives up.
+   */
+  movesFrom: (routeId: string | null, cardId: string | null, branchIndex: number) => Move[];
 }
 
 /**
@@ -38,15 +80,94 @@ export interface SpaceStore {
 export function createSpaceStore(space: Space): SpaceStore {
   const firstRouteId = space.routes[0]?.id ?? null;
 
-  const useStore = create<SpaceState>((set) => ({
+  const routeOf = (routeId: string | null) =>
+    routeId !== null ? getRoute(space, routeId) : undefined;
+
+  /** The active card's outgoing edges, or none when the walk is not on one. */
+  const edgesFrom = (routeId: string | null, cardId: string | null) => {
+    const route = routeOf(routeId);
+    if (!route || cardId === null) return [];
+    return outgoingEdges(route, cardId);
+  };
+
+  /** The same, for a state the store is holding. */
+  const edgesFromState = (state: SpaceState) =>
+    state.mode === 'presenting'
+      ? edgesFrom(state.selectedRouteId, state.walk[state.walk.length - 1] ?? null)
+      : [];
+
+  const useStore = create<SpaceState>((set, get) => ({
+    mode: 'overview',
     selectedRouteId: firstRouteId,
+    walk: [],
+    branchIndex: 0,
     openedCardId: null,
 
-    selectRoute: (routeId) => set({ selectedRouteId: routeId }),
+    // Selecting a route while presenting would strand the walk on a card the new
+    // route may not touch, so it ends the walk. Selecting is a deliberate act
+    // either way (ADR 0026).
+    selectRoute: (routeId) =>
+      set({ selectedRouteId: routeId, mode: 'overview', walk: [], branchIndex: 0 }),
 
     openCard: (cardId) => set({ openedCardId: cardId }),
     closeCard: () => set({ openedCardId: null }),
+
+    present: () => {
+      const route = routeOf(get().selectedRouteId);
+      const start = route ? routeStartCard(route) : undefined;
+      // A space with no routes cannot be presented (ADR 0015), and neither can a
+      // route with no entry — which acyclicity rules out, so this is a guard
+      // against a Route built by hand rather than a case to design for.
+      if (start === undefined) return;
+      set({ mode: 'presenting', walk: [start], branchIndex: 0, openedCardId: null });
+    },
+
+    exitPresenting: () => set({ mode: 'overview', walk: [], branchIndex: 0 }),
+
+    advance: () => {
+      const state = get();
+      const edge = edgesFromState(state)[state.branchIndex];
+      // No outgoing edges: the walk has reached a sink and stays there.
+      if (!edge) return;
+      set({ walk: [...state.walk, edge.to], branchIndex: 0 });
+    },
+
+    retreat: () => {
+      const { mode, selectedRouteId, walk } = get();
+      if (mode !== 'presenting' || walk.length < 2) return;
+      const back = walk.slice(0, -1);
+      const from = back[back.length - 1];
+      const to = walk[walk.length - 1];
+      const route = routeOf(selectedRouteId);
+      // Re-select the edge just walked back over, so going forward again returns
+      // where you were rather than to whichever branch happens to be first.
+      const taken =
+        route && from !== undefined
+          ? outgoingEdges(route, from).findIndex((edge) => edge.to === to)
+          : -1;
+      set({ walk: back, branchIndex: taken < 0 ? 0 : taken });
+    },
+
+    selectBranch: (delta) => {
+      const state = get();
+      const count = edgesFromState(state).length;
+      // Nothing to move through at a sink or where the route does not branch.
+      if (count < 2) return;
+      set({ branchIndex: (((state.branchIndex + delta) % count) + count) % count });
+    },
   }));
 
-  return { useStore };
+  const selectActiveCardId = (state: SpaceState): string | null => {
+    if (state.mode !== 'presenting') return null;
+    return state.walk[state.walk.length - 1] ?? null;
+  };
+
+  const movesFrom = (routeId: string | null, cardId: string | null, branchIndex: number): Move[] =>
+    edgesFrom(routeId, cardId).map((edge, index) => ({
+      cardId: edge.to,
+      title: getCard(space, edge.to)?.title ?? edge.to,
+      selected: index === branchIndex,
+    }));
+
+  return { useStore, selectActiveCardId, movesFrom };
 }

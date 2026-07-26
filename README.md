@@ -6,7 +6,7 @@ A local, file-first prototype that proves one idea:
 
 Content lives in version-controlled files. A space directory holds a space file naming the routes, plus one Markdown file per card. [React Flow](https://reactflow.dev) draws **every** route at once, each in its own colour, and [elkjs](https://github.com/kieler/elkjs) lays them out automatically (layered, left→right). Each card exposes one inbound and one outbound handle per route (the "multiple handles" approach). Choosing a route in the toolbar emphasises it without hiding the others.
 
-**Presenting is being rebuilt.** It was a reveal.js deck over a route's steps; a route is now an acyclic graph of edges ([ADR 0023](docs/adr/0023-a-route-is-an-acyclic-graph-of-card-edges.md)), so the deck went with the sequence ([ADR 0024](docs/adr/0024-presenting-is-traversing-a-route.md)) and returns as a **traversal** on this same canvas under React Flow's camera ([ADR 0027](docs/adr/0027-presenting-is-the-graph-canvas-under-camera-control.md)).
+**Presenting is the same canvas, closer in.** There is no deck and no second surface ([ADR 0024](docs/adr/0024-presenting-is-traversing-a-route.md)): pressing Present moves React Flow's camera to the route's first card and draws that card's content rendered. Arrow keys walk the route's edges — Right follows the selected one, Left goes back along the path taken, Up and Down choose among a fork's branches without moving the camera ([ADR 0027](docs/adr/0027-presenting-is-the-graph-canvas-under-camera-control.md)).
 
 ## Running it
 
@@ -22,6 +22,7 @@ Then:
 1. Pick a route in the toolbar. Every route stays drawn; the one you pick is emphasised.
 2. Click a card to open it and read its Markdown source. `Esc` closes it.
 3. Drag a card to move it. The arrangement is saved back to the space directory.
+4. Press **Present** to walk the route: `→` follows an edge, `←` goes back, `↑` / `↓` choose at a fork, `Esc` returns to the overview.
 
 The graph uses React Flow's [elkjs multiple-handles technique](https://reactflow.dev/examples/layout/elkjs-multiple-handles): ELK lays out the nodes and computes each port's position, and those exact offsets are applied to the handles so connected handles line up and the colored route edges stay legible.
 
@@ -71,7 +72,7 @@ Each card body is a standalone Markdown file (GitHub-flavoured Markdown via `rem
 
 A card's title lives in the manifest, so a card's Markdown file is its **body only** — do not repeat the title as a heading in the file, or it will appear twice everywhere the card is drawn.
 
-The graph draws a card's **title**, not its body ([ADR 0006](docs/adr/0006-cards-show-titles-in-the-graph.md)). Click a card to open it and read its content. Content is loaded when a card is opened, not embedded in every graph node.
+The graph draws a card's **title**, not its body ([ADR 0006](docs/adr/0006-cards-show-titles-in-the-graph.md)). Click a card to open it and read its Markdown **source**, verbatim; the one place a card is drawn *rendered* is presenting ([ADR 0011](docs/adr/0011-opening-shows-markdown-source.md)). Content reaches a node only when that node is the card a walk has reached, so it is not embedded in every node.
 
 A card occupies exactly one position in the graph; there is no placement layer letting the same card sit in two places. Showing the same content at a second position is the job of an **alias** card, which is not yet implemented ([ADR 0004](docs/adr/0004-cards-are-the-graph.md)).
 
@@ -113,7 +114,7 @@ Design rules kept throughout: domain logic stays out of React components, React 
 - Route navigation behaviour, with fast-check property tests for clamping/monotonicity and validation invariants.
 - React Flow projection correctness (`@project/react-flow-adapter`).
 - Card rendering smoke test (`@project/ui`).
-- A Playwright flow: app loads, the graph is visible, a route is selected, cards open, and a drag is persisted.
+- A Playwright flow: app loads, the graph is visible, a route is selected, cards open, a drag is persisted, and a route is walked under the camera.
 
 ## Current limitations
 
@@ -121,8 +122,9 @@ Design rules kept throughout: domain logic stays out of React components, React 
 - **Single bundled presentation.** The example is imported at build time (`import.meta.glob`); there is no file picker or loader for arbitrary presentations.
 - **Overlay legibility.** The graph draws every route at once. Only **compatible** routes — the union of their edges is acyclic — lay out cleanly as parallel forward paths; two routes disagreeing about the order of cards they share force a backward edge, drawn as a routed channel. See [`.scratch/multiple-routes/findings.md`](.scratch/multiple-routes/findings.md).
 - **Cards are a fixed shape.** A card draws its title, so every card is the same size — declared once in `packages/app/src/card.ts` as a 16:9 ratio and consumed by both the layout and the stylesheet. Content adapts to the card, not the reverse, which is why measured DOM sizes are not fed into ELK.
-- **No presenting.** See above: the deck is gone and the traversal is not built yet.
 - **No authoring of structure.** Routes and cards are edited in the files; the drag-to-connect surface ([ADR 0021](docs/adr/0021-routes-are-drawn-as-react-flow-edges.md)) is not built.
+- **No speaker view, timer, transitions or export.** They went with the deck framework and return, if wanted, as their own decisions designed against a traversal ([ADR 0024](docs/adr/0024-presenting-is-traversing-a-route.md)).
+- **The presented card is scaled by the camera**, so its text is rasterised rather than laid out at its final size — a property of wanting a spatial camera at all.
 - The production bundle ships React Flow and elkjs in a single chunk (~2.1 MB) — fine for a prototype, not tuned for size.
 
 ## Next likely improvements

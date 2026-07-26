@@ -55,9 +55,8 @@ Between them the shape exercises every behaviour the e2e suite covers:
   `# Where Short ends`. Under the old split — title in the space file, body in a
   separate markdown file — a leading heading repeated the title and rendered
   twice, and a rule forbade it. Now that both live in one file, a title and a
-  body heading are two different things and both are drawn once. Asserting it
-  needs a surface that draws markdown *rendered*, which is presenting (ADR 0011),
-  so the e2e for it waits on ADR 0027's traversal.
+  body heading are two different things and both are drawn once. Asserted while
+  presenting, which is the one surface that draws markdown *rendered* (ADR 0011).
 - **Open off the selected route.** `E` is in the other collection, so selecting a
   collection-1 route and opening `E` proves any card opens regardless of the
   selection.

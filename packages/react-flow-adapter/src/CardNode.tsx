@@ -1,4 +1,5 @@
 import { Handle, Position, type NodeProps } from '@xyflow/react';
+import { CardContent } from '@project/ui';
 import type { CardFlowNode, CardHandle } from './projection';
 import { OTHER_ROUTE_OPACITY } from './projection';
 
@@ -9,6 +10,12 @@ import { OTHER_ROUTE_OPACITY } from './projection';
  * The card's content is deliberately not drawn here (ADR 0006) — a graph is for
  * reading the shape of a space, and a wall of clipped markdown at graph zoom is
  * unreadable anyway. Opening a card is how you read it.
+ *
+ * The one exception is the card a walk has reached while presenting, which draws
+ * its content instead: presenting is the graph seen close enough that one card
+ * fills the screen (ADR 0027), so at that zoom the content is exactly what is
+ * legible. It is still the same node — nothing is transformed into anything, and
+ * there is no second artefact (ADR 0024).
  */
 /** Inlined lucide `corner-down-right` — the house pattern is a hand-inlined SVG
  *  path, not an icon dependency (see the Select chevron in `@project/ui`). */
@@ -49,20 +56,26 @@ export function CardNode({ data }: NodeProps<CardFlowNode>) {
   return (
     <div className="rf-card-node__inner" data-active={data.active}>
       {data.targetHandles.map((handle) => renderHandle(handle, 'target'))}
-      <article className="card card--node" data-testid="card">
-        <h2 className="card__title">{data.title}</h2>
-        {data.description && (
-          <p className="card__description" data-testid="card-description">
-            {data.description}
-          </p>
-        )}
-        {data.aliasOf && (
-          <p className="card__alias-of" data-testid="alias-marker">
-            <AliasGlyph />
-            <span>{data.aliasOf}</span>
-          </p>
-        )}
-      </article>
+      {data.showContent ? (
+        <div className="rf-card-node__content">
+          <CardContent title={data.title} markdown={data.body ?? ''} />
+        </div>
+      ) : (
+        <article className="card card--node" data-testid="card">
+          <h2 className="card__title">{data.title}</h2>
+          {data.description && (
+            <p className="card__description" data-testid="card-description">
+              {data.description}
+            </p>
+          )}
+          {data.aliasOf && (
+            <p className="card__alias-of" data-testid="alias-marker">
+              <AliasGlyph />
+              <span>{data.aliasOf}</span>
+            </p>
+          )}
+        </article>
+      )}
       {data.sourceHandles.map((handle) => renderHandle(handle, 'source'))}
     </div>
   );
