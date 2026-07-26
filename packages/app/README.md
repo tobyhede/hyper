@@ -27,9 +27,14 @@ Collection 2   Echo   E → F → G → H → E′
 ```
 
 Each collection returns to its start via an **alias** (`A′` of `A`, `E′` of `E`).
-That is deliberate: a route may not revisit a card (ADR 0012) — a return is a
-forward step to an alias, never a backward edge — so this fixture is acyclic by
-construction and lays out as clean forward paths, no loops.
+That is deliberate: a route may not close a cycle (ADR 0023) — a return is a
+forward edge to an alias, never an edge back to the card itself — so this fixture
+is acyclic and lays out as clean forward paths, no loops.
+
+Every route here is a **line**: each card has one edge out. That is the
+degenerate graph, not a separate kind (ADR 0024), and it keeps the fixture's
+overlay counts easy to read. Forks and merges are legal and are covered by unit
+and property tests rather than here.
 
 Between them the shape exercises every behaviour the e2e suite covers:
 
@@ -39,8 +44,8 @@ Between them the shape exercises every behaviour the e2e suite covers:
   case.
 - **Independent collections / disconnected components.** Two bands, no edge
   between them.
-- **Alias as return (ADR 0009, 0012).** `A′` / `E′` show `A` / `E`'s content under
-  their own titles, and are how a route "comes back" without a revisit.
+- **Alias as return (ADR 0009, 0023).** `A′` / `E′` show `A` / `E`'s content under
+  their own titles, and are how a route "comes back" without closing a cycle.
 - **Card description (ADR 0006, card-display/03).** `A` carries a `description`
   ("Where every route begins"), drawn under its title in the graph node; the other
   cards have none, so the node renders with and without one.
@@ -49,8 +54,10 @@ Between them the shape exercises every behaviour the e2e suite covers:
 - **A heading in a body is just a heading (ADR 0020).** `C`'s body opens with
   `# Where Short ends`. Under the old split — title in the space file, body in a
   separate markdown file — a leading heading repeated the title and rendered
-  twice, and a rule forbade it. Now that both live in one file, the deck renders
-  the card's title and the body's heading once each.
+  twice, and a rule forbade it. Now that both live in one file, a title and a
+  body heading are two different things and both are drawn once. Asserting it
+  needs a surface that draws markdown *rendered*, which is presenting (ADR 0011),
+  so the e2e for it waits on ADR 0027's traversal.
 - **Open off the selected route.** `E` is in the other collection, so selecting a
   collection-1 route and opening `E` proves any card opens regardless of the
   selection.

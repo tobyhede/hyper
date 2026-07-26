@@ -21,16 +21,15 @@ test('shows one card, and it is the only thing on screen', async ({ page }) => {
   await expect(page.locator('.react-flow__edge')).toHaveCount(0);
 });
 
-test('cannot be presented, and says so rather than hiding it (ADR 0015)', async ({ page }) => {
+test('offers no route controls, having no routes (ADR 0015)', async ({ page }) => {
   await page.goto('/');
   await expect(nodeByTitle(page, 'Start here')).toBeVisible();
 
-  // A space with no routes has nothing to select or legend...
+  // A space with no routes has nothing to select or legend. Whether it can be
+  // *presented* is not asserted here: presenting is being rebuilt as a traversal
+  // (ADR 0024, 0027) and there is no affordance to point at until it lands.
   await expect(page.getByTestId('route-selector')).toHaveCount(0);
-  // ...and cannot be presented. The button stays, disabled, so the capability is
-  // visible rather than absent.
-  await expect(page.getByTestId('present-button')).toBeVisible();
-  await expect(page.getByTestId('present-button')).toBeDisabled();
+  await expect(page.getByTestId('route-legend')).toHaveCount(0);
 });
 
 test('its one card is draggable from the first frame (ADR 0017)', async ({ page }) => {

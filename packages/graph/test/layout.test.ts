@@ -16,7 +16,14 @@ function loadFixture(): Space {
       id: 's',
       title: 'T',
       routes: [
-        { id: 'main', title: 'Main', steps: [{ target: 'a' }, { target: 'b' }, { target: 'c' }] },
+        {
+          id: 'main',
+          title: 'Main',
+          edges: [
+            { from: 'a', to: 'b' },
+            { from: 'b', to: 'c' },
+          ],
+        },
       ],
     },
     [cardFile('a'), cardFile('b'), cardFile('c')],

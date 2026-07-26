@@ -10,30 +10,17 @@ import {
 } from '@xyflow/react';
 import { edgeTypes, nodeTypes, type CardFlowNode } from '@project/react-flow-adapter';
 
-/** Frames the graph: fits the active card while presenting, refits the whole
- *  graph in overview once the ELK layout resolves. */
-function ViewController({
-  activeCardId,
-  layoutReady,
-}: {
-  activeCardId: string | null;
-  layoutReady: boolean;
-}) {
+/** Frames the whole graph once the layout resolves. */
+function ViewController({ layoutReady }: { layoutReady: boolean }) {
   const { fitView } = useReactFlow();
 
   useEffect(() => {
-    if (!activeCardId) return;
-    void fitView({ nodes: [{ id: activeCardId }], duration: 600, padding: 0.4, maxZoom: 1.3 });
-  }, [activeCardId, fitView]);
-
-  useEffect(() => {
-    if (activeCardId) return;
     // `maxZoom` caps the fit at natural size. Without it React Flow's default max
     // of 2 applies, and a space with a single card — which is what a new space is
     // (ADR 0018) — gets scaled to 2x and fills the screen. Padding does not help:
     // it reserves margin, it does not cap zoom.
     void fitView({ duration: 400, padding: 0.2, maxZoom: 1 });
-  }, [layoutReady, activeCardId, fitView]);
+  }, [layoutReady, fitView]);
 
   return null;
 }
@@ -41,7 +28,6 @@ function ViewController({
 export interface GraphViewProps {
   nodes: CardFlowNode[];
   edges: Edge[];
-  activeCardId: string | null;
   layoutReady: boolean;
   /**
    * Whether this view can be edited: true when it has a Layout to write a
@@ -58,7 +44,6 @@ export interface GraphViewProps {
 export function GraphView({
   nodes,
   edges,
-  activeCardId,
   layoutReady,
   editable,
   onNodesChange,
@@ -82,7 +67,7 @@ export function GraphView({
       <Background gap={24} />
       <Controls showInteractive={false} />
       <MiniMap pannable zoomable />
-      <ViewController activeCardId={activeCardId} layoutReady={layoutReady} />
+      <ViewController layoutReady={layoutReady} />
     </ReactFlow>
   );
 }

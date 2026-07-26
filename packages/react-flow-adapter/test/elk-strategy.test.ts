@@ -98,11 +98,11 @@ describe('routes a back-edge around the cards', () => {
   // LayoutGraph and does not enforce domain rules, so this is the level to test
   // back-edge *rendering*. In a real space a back-edge now comes only from two
   // routes disagreeing on the order of shared cards (ADR 0003) — a single route
-  // may not revisit a card (ADR 0012). The steps below (`… → C → B`, target B
-  // laid left of source C) are just the simplest deterministic back-edge; ELK
-  // routes it around the cards and issue 03 draws that instead of a bezier stub.
+  // may not close a cycle (ADR 0023). The edges below (`… → C → B`, target B laid
+  // left of source C) are just the simplest deterministic back-edge; ELK routes
+  // it around the cards and issue 03 draws that instead of a bezier stub.
   const CARDS = ['A', 'B', 'C'];
-  const revisit: LayoutGraph = {
+  const backEdge: LayoutGraph = {
     cards: CARDS.map((id) => ({
       id,
       width: 260,
@@ -126,7 +126,7 @@ describe('routes a back-edge around the cards', () => {
   };
 
   it('gives the back-edge bend points, so it channels around rather than cutting across', async () => {
-    const laid = await elkStrategy()(revisit);
+    const laid = await elkStrategy()(backEdge);
     const back = laid.edges.find((e) => e.id === 'loop::2')!;
     const [section] = back.sections ?? [];
     expect(section).toBeDefined();

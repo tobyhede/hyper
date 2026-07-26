@@ -5,7 +5,7 @@ import { resolveView } from '../src/view';
 import { cardFile } from './card-files';
 
 const CARDS = [cardFile('a'), cardFile('b')];
-const ROUTES = [{ id: 'main', title: 'Main', steps: [{ target: 'a' }, { target: 'b' }] }];
+const ROUTES = [{ id: 'main', title: 'Main', edges: [{ from: 'a', to: 'b' }] }];
 
 const WORKING = {
   id: 'working',

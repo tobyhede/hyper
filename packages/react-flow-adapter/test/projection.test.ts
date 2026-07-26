@@ -17,8 +17,8 @@ const space = load({
   id: 's',
   title: 'Test',
   routes: [
-    { id: 'main', title: 'Main', steps: [{ target: 'a' }, { target: 'b' }] },
-    { id: 'alt', title: 'Alt', steps: [{ target: 'b' }, { target: 'a' }] },
+    { id: 'main', title: 'Main', edges: [{ from: 'a', to: 'b' }] },
+    { id: 'alt', title: 'Alt', edges: [{ from: 'b', to: 'a' }] },
   ],
 });
 
@@ -42,7 +42,7 @@ describe('projectCardNodes', () => {
         version: 1,
         id: 's',
         title: 'Test',
-        routes: [{ id: 'main', title: 'Main', steps: [{ target: 'a' }, { target: 'b' }] }],
+        routes: [{ id: 'main', title: 'Main', edges: [{ from: 'a', to: 'b' }] }],
       },
       [
         {
@@ -107,7 +107,7 @@ describe('projectCardNodes', () => {
         version: 1,
         id: 's',
         title: 'Test',
-        routes: [{ id: 'main', title: 'Main', steps: [{ target: 'a' }, { target: 'a-again' }] }],
+        routes: [{ id: 'main', title: 'Main', edges: [{ from: 'a', to: 'a-again' }] }],
       },
       [cardFile('a', 'Card A'), aliasFile('a-again', 'Card A, again', 'a')],
     );

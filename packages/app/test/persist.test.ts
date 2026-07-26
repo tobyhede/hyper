@@ -8,7 +8,7 @@ const BASE: SpaceFile = {
   version: 1,
   id: 's',
   title: 'T',
-  routes: [{ id: 'main', title: 'Main', steps: [{ target: 'a' }, { target: 'b' }] }],
+  routes: [{ id: 'main', title: 'Main', edges: [{ from: 'a', to: 'b' }] }],
 };
 
 const CARDS = [cardFile('a'), cardFile('b')];

@@ -5,8 +5,8 @@ import type {
   layoutPositionSchema,
   layoutSchema,
   positionedLayoutSchema,
+  routeEdgeSchema,
   routeSchema,
-  routeStepSchema,
   spaceFileSchema,
 } from './schema';
 
@@ -20,7 +20,12 @@ export type Card = z.infer<typeof cardSchema>;
  * the two converge when intake moves to the files.
  */
 export type CardFrontmatter = z.infer<typeof cardFrontmatterSchema>;
-export type RouteStep = z.infer<typeof routeStepSchema>;
+/**
+ * One `{ from, to }` connection a route is made of (ADR 0023). The authored
+ * element — distinct from `@project/graph`'s `GraphEdge`, which is this plus the
+ * handles it attaches to, and from `LayoutEdge`, which is that plus geometry.
+ */
+export type RouteEdge = z.infer<typeof routeEdgeSchema>;
 export type Route = z.infer<typeof routeSchema>;
 export type LayoutPosition = z.infer<typeof layoutPositionSchema>;
 export type PositionedLayout = z.infer<typeof positionedLayoutSchema>;

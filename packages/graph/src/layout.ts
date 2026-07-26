@@ -17,7 +17,7 @@
  * consume.
  */
 
-import type { CardHandleSet, RouteEdge } from './routes';
+import type { CardHandleSet, GraphEdge } from './routes';
 
 /** A port on a card, by the handle id the render layer knows it by. */
 export interface LayoutPort {
@@ -94,7 +94,7 @@ export type LayoutStrategy = (graph: LayoutGraph) => Promise<LayoutGraph>;
 export function buildLayoutGraph(
   cardIds: readonly string[],
   handlesByCard: ReadonlyMap<string, CardHandleSet>,
-  edges: readonly RouteEdge[],
+  edges: readonly GraphEdge[],
   size: { width: number; height: number },
 ): LayoutGraph {
   const visible = new Set(cardIds);

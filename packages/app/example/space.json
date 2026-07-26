@@ -6,28 +6,29 @@
     {
       "id": "main",
       "title": "Main walkthrough",
-      "steps": [
-        { "target": "intro" },
-        { "target": "problem" },
-        { "target": "model" },
-        { "target": "rendering" },
-        { "target": "routes" },
-        { "target": "demo" }
+      "edges": [
+        { "from": "intro", "to": "problem" },
+        { "from": "problem", "to": "model" },
+        { "from": "model", "to": "rendering" },
+        { "from": "rendering", "to": "routes" },
+        { "from": "routes", "to": "demo" }
       ]
     },
     {
       "id": "quick",
       "title": "Quick tour",
-      "steps": [{ "target": "intro" }, { "target": "model" }, { "target": "demo" }]
+      "edges": [
+        { "from": "intro", "to": "model" },
+        { "from": "model", "to": "demo" }
+      ]
     },
     {
       "id": "deep",
       "title": "Deep dive",
-      "steps": [
-        { "target": "intro" },
-        { "target": "model" },
-        { "target": "rendering" },
-        { "target": "model-recap" }
+      "edges": [
+        { "from": "intro", "to": "model" },
+        { "from": "model", "to": "rendering" },
+        { "from": "rendering", "to": "model-recap" }
       ]
     }
   ]

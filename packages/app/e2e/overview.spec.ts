@@ -6,10 +6,16 @@ import { expect, test, type Locator, type Page } from './fixtures';
 // disconnected collections sharing no cards, laid out by ELK as separate bands:
 //   1. Long (A→B→C→D→A′), Mid (A→B→C→D), Short (A→B→C) — routes over one spine
 //   2. Echo (E→F→G→H→E′) — a plain linear collection
-// Each returns to its start via an alias; a route may not revisit a card (ADR
-// 0012), so the fixture is acyclic and lays out as clean forward paths. These
+// Each returns to its start via an alias; a route may not close a cycle (ADR
+// 0023), so the fixture is acyclic and lays out as clean forward paths. These
 // tests assert *behaviour* against that shape; none read card prose. See
 // fixture/README.md for why each case is there.
+//
+// This file is the **overview**: the space drawn whole, every route at once.
+// Presenting is absent — the deck it used to be went with the step sequence (ADR
+// 0023, 0024) and returns as a traversal on this same canvas (ADR 0027), with
+// its own spec. The deck's tests are not adapted here; they asserted against a
+// surface that no longer exists.
 
 /** A graph node located by its exact card title, so single-letter titles don't
  *  collide (an alias node names its target, so "A" appears on more than one). */
@@ -18,41 +24,6 @@ function nodeByTitle(page: Page, title: string): Locator {
     .locator('.react-flow__node')
     .filter({ has: page.getByRole('heading', { name: title, exact: true }) });
 }
-
-test('walks a presentation route with keyboard navigation', async ({ page }) => {
-  await page.goto('/');
-
-  // App loads.
-  await expect(page.getByRole('heading', { name: 'Layout fixture' })).toBeVisible();
-
-  // Graph is visible.
-  await expect(page.locator('.react-flow__node').first()).toBeVisible();
-  expect(await page.locator('.react-flow__node').count()).toBeGreaterThan(1);
-
-  // Select a route and enter presentation mode.
-  await page.getByTestId('route-selector').click();
-  await page.getByRole('option', { name: 'Long' }).click();
-  await page.getByTestId('present-button').click();
-
-  // Presenting is a deck (ADR 0008), not an opened card.
-  const deck = page.getByTestId('presentation-deck');
-  await expect(deck).toBeVisible();
-
-  const current = page.locator('.reveal .slides section.present');
-  await expect(current).toHaveAttribute('data-card-id', 'a');
-
-  // reveal owns stepping.
-  await page.keyboard.press('ArrowRight');
-  await expect(current).toHaveAttribute('data-card-id', 'b');
-
-  await page.keyboard.press('ArrowLeft');
-  await expect(current).toHaveAttribute('data-card-id', 'a');
-
-  // Escape leaves the deck and returns to the space.
-  await page.keyboard.press('Escape');
-  await expect(deck).toBeHidden();
-  await expect(page.locator('.react-flow__node').first()).toBeVisible();
-});
 
 test('offers more than one named route', async ({ page }) => {
   await page.goto('/');
@@ -67,7 +38,7 @@ test('draws every route at once, each in its own color', async ({ page }) => {
   // A legend maps each route to a color.
   await expect(page.getByTestId('route-legend').locator('.legend__item')).toHaveCount(4);
 
-  // Two collections: 5 + 5 = 10 cards. Edges are one per step transition:
+  // Two collections: 5 + 5 = 10 cards, and one drawn edge per authored edge:
   // Long 4 + Mid 3 + Short 2 + Echo 4 = 13. Handles per (route, direction)
   // through a card sum to 18 (collection 1) + 8 (collection 2) = 26.
   await expect(page.locator('.react-flow__node')).toHaveCount(10);
@@ -130,7 +101,7 @@ test("edges are drawn along ELK's routing, not default beziers", async ({ page }
 test('selecting a route keeps the others on screen', async ({ page }) => {
   await page.goto('/');
 
-  // Selection chooses what Present walks; it no longer hides the rest of the space.
+  // Selection is emphasis: it never hides the rest of the space.
   await page.getByTestId('route-selector').click();
   await page.getByRole('option', { name: 'Echo' }).click();
   await expect(page.locator('.react-flow__node')).toHaveCount(10);
@@ -147,8 +118,7 @@ test('selecting a route emphasises it without hiding the others', async ({ page 
       .evaluateAll((els) => els.map((el) => Number(getComputedStyle(el).opacity)));
 
   // "Long" is the first route, so it is selected on load and every other route
-  // recedes — Mid 3 + Short 2 + Echo 4 = 9 edges. The selector does something
-  // without having to press Present.
+  // recedes — Mid 3 + Short 2 + Echo 4 = 9 edges.
   const faded = (await opacities()).filter((o) => o < 1);
   expect(faded).toHaveLength(9);
   expect(faded[0]!).toBeGreaterThan(0);
@@ -235,31 +205,6 @@ test('cards are drawn at exactly the size the layout placed them at', async ({ p
   expect(parseFloat(drawn.w)).toBeGreaterThan(parseFloat(drawn.h));
 });
 
-test('presenting is a deck, and opening a card is not (ADR 0008)', async ({ page }) => {
-  await page.goto('/');
-
-  // Opening reads a card in place: the space is still what you are looking at.
-  await page.locator('.react-flow__node').first().click();
-  await expect(page.getByTestId('open-card')).toBeVisible();
-  await expect(page.locator('.react-flow__node').first()).toBeVisible();
-  await expect(page.getByTestId('presentation-deck')).toBeHidden();
-  await page.getByTestId('close-card').click();
-
-  // Presenting takes over: the space goes away. Long is selected on load.
-  await page.getByTestId('present-button').click();
-  await expect(page.getByTestId('presentation-deck')).toBeVisible();
-  await expect(page.locator('.react-flow__node')).toHaveCount(0);
-  await expect(page.getByTestId('open-card')).toBeHidden();
-
-  // Every step of the route is a slide — Long has five (A B C D A′).
-  await expect(page.locator('.reveal .slides section')).toHaveCount(5);
-
-  // Exiting returns to the space.
-  await page.getByTestId('exit-presentation').click();
-  await expect(page.getByTestId('presentation-deck')).toBeHidden();
-  await expect(page.locator('.react-flow__node').first()).toBeVisible();
-});
-
 test('the card frame is 16:9, and letterboxes rather than reshaping content', async ({ page }) => {
   const ratio = async () => {
     const box = (await page.locator('.open-card__panel').boundingBox())!;
@@ -309,26 +254,6 @@ test('content that exceeds the frame scrolls inside it, keeping controls reachab
   // Actions stay inside the frame, so step controls never scroll away.
   const actions = (await page.locator('.open-card__actions').boundingBox())!;
   expect(actions.y + actions.height).toBeLessThanOrEqual(panel.y + panel.height + 1);
-});
-
-test('a heading in a card body is just a heading', async ({ page }) => {
-  await page.goto('/');
-
-  // A card is one file, so its title and its body live together and a leading
-  // heading cannot repeat a title held elsewhere (ADR 0020). C's body opens with
-  // one. This replaces the rule that a body must not start with a heading, and
-  // the test that policed it.
-  await page.getByTestId('route-selector').click();
-  await page.getByRole('option', { name: 'Long' }).click();
-  await page.getByTestId('present-button').click();
-  await expect(page.getByTestId('presentation-deck')).toBeVisible();
-
-  // The slide carries the card's title once, and the body's heading once, as a
-  // heading rather than as literal text.
-  const slide = page.locator('.reveal .slides section[data-card-id="c"]');
-  expect(await slide.getByText('C', { exact: true }).count()).toBe(1);
-  await expect(slide.locator('h1')).toHaveText('Where Short ends');
-  await expect(slide.locator('h1')).toHaveCount(1);
 });
 
 test('an alias node names the card it redraws, and opens to that content', async ({ page }) => {

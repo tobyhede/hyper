@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import type { Card, Layout, Route } from '@project/core';
-import { isValidGraph, validateReferences } from '../src/index';
+import { isValidGraph, validateReferences, type ReferenceError } from '../src/index';
 import { alias, card } from './card-files';
+
+const errorKinds = (errors: readonly ReferenceError[]): string[] => errors.map((e) => e.kind);
 
 // A mutable space-file shape: these tests deliberately construct broken graphs
 // (which loadSpace would reject) and hand them straight to validateReferences.
@@ -15,7 +17,7 @@ function baseSpaceFile(): {
   return {
     title: 'Test',
     cards: [card('a'), card('b')],
-    routes: [{ id: 'main', title: 'Main', steps: [{ target: 'a' }, { target: 'b' }] }],
+    routes: [{ id: 'main', title: 'Main', edges: [{ from: 'a', to: 'b' }] }],
   };
 }
 
@@ -35,27 +37,70 @@ describe('validateReferences', () => {
     expect(validateReferences(m)).toEqual([]);
   });
 
-  it('detects an unresolved route step target', () => {
+  it('detects an unresolved edge endpoint, naming which end it was', () => {
     const m = baseSpaceFile();
-    m.routes[0]!.steps[1]!.target = 'nowhere';
+    m.routes[0]!.edges[0]!.to = 'nowhere';
     const errors = validateReferences(m);
-    expect(errors.some((e) => e.kind === 'unresolved-route-step' && e.ref === 'nowhere')).toBe(
-      true,
-    );
+    const error = errors.find((e) => e.kind === 'unresolved-route-edge');
+    expect(error?.ref).toBe('nowhere');
+    expect(error?.message).toContain('as its to');
   });
 
-  it('rejects a route that revisits a card (ADR 0012)', () => {
+  it('rejects a route that closes a cycle, and names the loop (ADR 0023)', () => {
     const m = baseSpaceFile();
-    // A → B → A: a return to A. This must be an alias, not a revisit.
-    m.routes[0]!.steps.push({ target: 'a' });
+    // A → B → A: a return to A. This must be an alias, not a loop.
+    m.routes[0]!.edges.push({ from: 'b', to: 'a' });
     const errors = validateReferences(m);
-    expect(errors.some((e) => e.kind === 'route-revisits-card' && e.ref === 'a')).toBe(true);
+    const error = errors.find((e) => e.kind === 'route-has-cycle');
+    expect(error?.ref).toBe('a');
+    expect(error?.message).toContain('a → b → a');
+  });
+
+  it('rejects a self-loop', () => {
+    const m = baseSpaceFile();
+    m.routes[0]!.edges.push({ from: 'b', to: 'b' });
+    const errors = validateReferences(m);
+    expect(errors.some((e) => e.kind === 'route-has-cycle' && e.ref === 'b')).toBe(true);
+  });
+
+  it('rejects a cycle that no card outside it reaches', () => {
+    // The loop is a disconnected component, so a search rooted only at the
+    // route's first card would never enter it. A route need not be connected
+    // (ADR 0023), so every card has to be a candidate root.
+    const m = baseSpaceFile();
+    m.cards.push(card('c'), card('d'));
+    m.routes[0]!.edges.push({ from: 'c', to: 'd' }, { from: 'd', to: 'c' });
+    const errors = validateReferences(m);
+    expect(errors.some((e) => e.kind === 'route-has-cycle')).toBe(true);
+  });
+
+  it('accepts a fork and a merge — only cycles are forbidden (ADR 0023)', () => {
+    const m = baseSpaceFile();
+    m.cards.push(card('c'), card('d'));
+    // a forks to b and c, which merge back into d. Acyclic, and `d` is reachable
+    // two ways, which is exactly what a merge is.
+    m.routes[0]!.edges = [
+      { from: 'a', to: 'b' },
+      { from: 'a', to: 'c' },
+      { from: 'b', to: 'd' },
+      { from: 'c', to: 'd' },
+    ];
+    expect(validateReferences(m)).toEqual([]);
   });
 
   it('allows different routes to share a card', () => {
     const m = baseSpaceFile();
-    m.routes.push({ id: 'alt', title: 'Alt', steps: [{ target: 'b' }, { target: 'a' }] });
+    m.routes.push({ id: 'alt', title: 'Alt', edges: [{ from: 'b', to: 'a' }] });
     expect(validateReferences(m)).toEqual([]);
+  });
+
+  it('checks each route on its own: two routes may disagree about order', () => {
+    // main goes a → b and alt goes b → a. Their union has a cycle; neither route
+    // does, and a route is what acyclicity is a property of (ADR 0003 permits
+    // routes to disagree).
+    const m = baseSpaceFile();
+    m.routes.push({ id: 'alt', title: 'Alt', edges: [{ from: 'b', to: 'a' }] });
+    expect(errorKinds(validateReferences(m))).not.toContain('route-has-cycle');
   });
 
   it('detects duplicate card ids', () => {

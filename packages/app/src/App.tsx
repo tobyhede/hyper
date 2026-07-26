@@ -12,7 +12,6 @@ import {
   buildRouteEdges,
   filterHandlesByRoutes,
   getCard,
-  getRoute,
   layoutPositions,
   resolveContentCard,
   type CardHandleSet,
@@ -22,17 +21,16 @@ import { space, spaceFile } from './space';
 import { CREATED_LAYOUT_ID, CREATED_LAYOUT_TITLE, saveSpace, serializeLayout } from './persist';
 import { routeColorMap } from './colors';
 import { CARD_HEIGHT, CARD_SIZE, cardSizeVars } from './card';
-import { createPresentationStore } from './store';
+import { createSpaceStore } from './store';
 import { createEditorStore } from './editor';
 import { resolveView } from './view';
 import { GraphView } from './components/GraphView';
 import { OpenCard } from './components/OpenCard';
-import { PresentationDeck, type DeckSlide } from './components/PresentationDeck';
 
 // Derived once from the (static) space. The store is bound to it here — the one
 // place the app's singleton space meets the store factory (ADR 0010).
 const colors = routeColorMap(space);
-const { useStore: usePresentationStore, selectActiveCardId } = createPresentationStore(space);
+const { useStore: useSpaceStore } = createSpaceStore(space);
 
 // The markdown a card shows, resolving an alias to its target's body (ADR 0009).
 // A card keeps its own title; only content is inherited.
@@ -59,19 +57,11 @@ const persistLayoutId = view.layout?.id ?? CREATED_LAYOUT_ID;
 const persistLayoutTitle = view.layout?.title ?? CREATED_LAYOUT_TITLE;
 
 export function App() {
-  const mode = usePresentationStore((s) => s.mode);
-  const selectedRouteId = usePresentationStore((s) => s.selectedRouteId);
-  const stepIndex = usePresentationStore((s) => s.stepIndex);
-  const selectRoute = usePresentationStore((s) => s.selectRoute);
-  const enterPresentation = usePresentationStore((s) => s.enterPresentation);
-  const exitPresentation = usePresentationStore((s) => s.exitPresentation);
-  const goToStep = usePresentationStore((s) => s.goToStep);
-  const openedCardId = usePresentationStore((s) => s.openedCardId);
-  const openCard = usePresentationStore((s) => s.openCard);
-  const closeCard = usePresentationStore((s) => s.closeCard);
-
-  const activeCardId = usePresentationStore(selectActiveCardId);
-  const presenting = mode === 'presenting';
+  const selectedRouteId = useSpaceStore((s) => s.selectedRouteId);
+  const selectRoute = useSpaceStore((s) => s.selectRoute);
+  const openedCardId = useSpaceStore((s) => s.openedCardId);
+  const openCard = useSpaceStore((s) => s.openCard);
+  const closeCard = useSpaceStore((s) => s.closeCard);
 
   // Which routes the view shows. Every one, for now — but membership is the
   // view's decision (ADR 0005), so route visibility controls attach here rather
@@ -121,14 +111,13 @@ export function App() {
   const projectedNodes = useMemo(
     () =>
       projectCardNodes(space, visibleHandles, colors, {
-        activeCardId,
         activeRouteId: selectedRouteId,
         emphasis,
         ...(laidOut ? { layoutGraph: laidOut } : {}),
         nodeHeight: CARD_HEIGHT,
         cardIds: visibleCardIds,
       }),
-    [activeCardId, selectedRouteId, emphasis, laidOut, visibleHandles, visibleCardIds],
+    [selectedRouteId, emphasis, laidOut, visibleHandles, visibleCardIds],
   );
 
   // Hand the projection to the store, which folds it into the live array so a
@@ -197,25 +186,9 @@ export function App() {
     [visibleEdges, selectedRouteId, emphasis, laidOut, moved],
   );
 
-  const route = selectedRouteId ? getRoute(space, selectedRouteId) : undefined;
   const openedCard = openedCardId ? getCard(space, openedCardId) : undefined;
 
-  // Presenting is a deck, not an opened card (ADR 0008) — the route's steps in
-  // order, each carrying its card's content.
-  const deckSlides = useMemo<DeckSlide[]>(() => {
-    if (!route) return [];
-    return route.steps.map((step) => {
-      const card = getCard(space, step.target);
-      return {
-        id: step.target,
-        title: card?.title ?? step.target,
-        markdown: markdownForCard(step.target),
-      };
-    });
-  }, [route]);
-
-  // Escape closes an opened card before it exits a presentation, so the two
-  // never fight over the key.
+  // Escape closes an opened card.
   useEffect(() => {
     if (!openedCardId) return;
     const onKeyDown = (event: KeyboardEvent) => {
@@ -230,9 +203,7 @@ export function App() {
 
   const toolbar = (
     <>
-      {/* A space with no routes has nothing to select or legend, and cannot be
-          presented (ADR 0015) — the Present button stays, disabled, so the
-          capability is visible rather than absent. */}
+      {/* A space with no routes has nothing to select or legend (ADR 0015). */}
       {space.routes.length > 0 && (
         <>
           <RouteSelector
@@ -258,33 +229,12 @@ export function App() {
       >
         Auto-arrange
       </Button>
-      {presenting ? (
-        <Button variant="secondary" onClick={exitPresentation}>
-          Overview
-        </Button>
-      ) : (
-        <Button
-          variant="default"
-          data-testid="present-button"
-          onClick={enterPresentation}
-          disabled={!selectedRouteId}
-        >
-          Present
-        </Button>
-      )}
+      {/* No Present button. Presenting was a deck over a route's steps, and a
+          route stopped being a sequence (ADR 0023); it returns as a traversal on
+          this same canvas (ADR 0027), which is the next change rather than
+          something to stub here. */}
     </>
   );
-
-  if (presenting && route) {
-    return (
-      <PresentationDeck
-        slides={deckSlides}
-        stepIndex={stepIndex}
-        onStepChange={goToStep}
-        onExit={exitPresentation}
-      />
-    );
-  }
 
   return (
     <AppShell title={space.title} toolbar={toolbar}>
@@ -293,7 +243,6 @@ export function App() {
           <GraphView
             nodes={nodes}
             edges={edges}
-            activeCardId={activeCardId}
             layoutReady={laidOut !== null}
             editable={editable}
             onNodesChange={changeNodes}

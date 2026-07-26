@@ -5,7 +5,6 @@ import {
   cardIdsForRoutes,
   filterHandlesByRoute,
   filterHandlesByRoutes,
-  lastCardId,
   loadSpace,
   routeCardIds,
   type Space,
@@ -20,8 +19,15 @@ function loadFixture(): Space {
       id: 's',
       title: 'Test',
       routes: [
-        { id: 'main', title: 'Main', steps: [{ target: 'a' }, { target: 'b' }, { target: 'c' }] },
-        { id: 'quick', title: 'Quick', steps: [{ target: 'a' }, { target: 'c' }] },
+        {
+          id: 'main',
+          title: 'Main',
+          edges: [
+            { from: 'a', to: 'b' },
+            { from: 'b', to: 'c' },
+          ],
+        },
+        { id: 'quick', title: 'Quick', edges: [{ from: 'a', to: 'c' }] },
       ],
     },
     [cardFile('a'), cardFile('b'), cardFile('c')],
@@ -35,7 +41,7 @@ const space = loadFixture();
 describe('buildCardHandles', () => {
   const handles = buildCardHandles(space);
 
-  it('gives the first card only outbound ports, one per route leaving it', () => {
+  it('gives a card nothing arrives at only outbound ports, one per route leaving it', () => {
     const a = handles.get('a')!;
     expect(a.targetHandles).toEqual([]);
     expect(a.sourceHandles.map((h) => h.id)).toEqual(['main::out', 'quick::out']);
@@ -47,15 +53,44 @@ describe('buildCardHandles', () => {
     expect(b.sourceHandles.map((h) => h.id)).toEqual(['main::out']);
   });
 
-  it('gives a shared terminal card one inbound port per route arriving', () => {
+  it('gives a shared sink one inbound port per route arriving', () => {
     const c = handles.get('c')!;
     expect(c.sourceHandles).toEqual([]);
     expect(c.targetHandles.map((h) => h.id)).toEqual(['main::in', 'quick::in']);
   });
+
+  it('gives a fork one outbound port, not one per outgoing edge', () => {
+    // The handle is per route per side, so several edges leaving a card by the
+    // same route share it — which is why the scheme survives branching at all.
+    const forked = loadSpace(
+      {
+        version: 1,
+        id: 's',
+        title: 'Fork',
+        routes: [
+          {
+            id: 'main',
+            title: 'Main',
+            edges: [
+              { from: 'a', to: 'b' },
+              { from: 'a', to: 'c' },
+            ],
+          },
+        ],
+      },
+      [cardFile('a'), cardFile('b'), cardFile('c')],
+    );
+    if (!forked.ok) throw new Error('fixture should load');
+    expect(
+      buildCardHandles(forked.space)
+        .get('a')!
+        .sourceHandles.map((h) => h.id),
+    ).toEqual(['main::out']);
+  });
 });
 
 describe('routeCardIds', () => {
-  it('lists a route’s distinct cards in first-visit order', () => {
+  it('lists a route’s distinct cards', () => {
     expect(routeCardIds(space, 'main')).toEqual(['a', 'b', 'c']);
     expect(routeCardIds(space, 'quick')).toEqual(['a', 'c']);
     expect(routeCardIds(space, 'nope')).toEqual([]);
@@ -67,8 +102,8 @@ describe('cardIdsForRoutes', () => {
     expect(cardIdsForRoutes(space, ['main', 'quick'])).toEqual(['a', 'b', 'c']);
   });
 
-  it('orders by the routes given, then by step order within each', () => {
-    // quick first, so c is reached before b.
+  it('orders by the routes given, then by authored edge order within each', () => {
+    // quick first, so c is listed before b.
     expect(cardIdsForRoutes(space, ['quick', 'main'])).toEqual(['a', 'c', 'b']);
   });
 
@@ -109,7 +144,7 @@ describe('filterHandlesByRoutes', () => {
 describe('buildRouteEdges', () => {
   const edges = buildRouteEdges(space);
 
-  it('produces one edge per adjacent step, connected via route ports', () => {
+  it('produces one edge per authored edge, connected via route ports', () => {
     expect(edges).toHaveLength(3);
     expect(edges).toContainEqual({
       id: 'main::0',
@@ -118,7 +153,6 @@ describe('buildRouteEdges', () => {
       target: 'b',
       sourceHandle: 'main::out',
       targetHandle: 'main::in',
-      stepIndex: 0,
     });
     expect(edges).toContainEqual({
       id: 'quick::0',
@@ -127,21 +161,32 @@ describe('buildRouteEdges', () => {
       target: 'c',
       sourceHandle: 'quick::out',
       targetHandle: 'quick::in',
-      stepIndex: 0,
     });
   });
-});
 
-describe('lastCardId', () => {
-  // Regression: a route step is a `{ target }` object, not a bare id. Reading the
-  // last step without `.target` (e.g. keying a map on the step) silently yields
-  // the wrong card — the bug this guards. main visits a→b→c, quick a→c.
-  it('returns the id of the last card a route visits', () => {
-    expect(lastCardId(space, 'main')).toBe('c');
-    expect(lastCardId(space, 'quick')).toBe('c');
-  });
-
-  it('returns null for an unknown route', () => {
-    expect(lastCardId(space, 'nope')).toBeNull();
+  it('gives each of a fork’s edges its own id, sharing one outbound port', () => {
+    const forked = loadSpace(
+      {
+        version: 1,
+        id: 's',
+        title: 'Fork',
+        routes: [
+          {
+            id: 'main',
+            title: 'Main',
+            edges: [
+              { from: 'a', to: 'b' },
+              { from: 'a', to: 'c' },
+            ],
+          },
+        ],
+      },
+      [cardFile('a'), cardFile('b'), cardFile('c')],
+    );
+    if (!forked.ok) throw new Error('fixture should load');
+    const forkEdges = buildRouteEdges(forked.space);
+    expect(forkEdges.map((e) => e.id)).toEqual(['main::0', 'main::1']);
+    expect(forkEdges.map((e) => e.sourceHandle)).toEqual(['main::out', 'main::out']);
+    expect(forkEdges.map((e) => e.target)).toEqual(['b', 'c']);
   });
 });

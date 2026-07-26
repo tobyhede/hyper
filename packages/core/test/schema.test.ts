@@ -11,7 +11,7 @@ const validSpaceFile = {
   version: 1,
   id: 's',
   title: 'Test deck',
-  routes: [{ id: 'main', title: 'Main', steps: [{ target: 'a' }] }],
+  routes: [{ id: 'main', title: 'Main', edges: [{ from: 'a', to: 'b' }] }],
 };
 
 describe('space file schema', () => {
@@ -35,8 +35,9 @@ describe('space file schema', () => {
   });
 
   it('holds no cards — a card exists because its file does (ADR 0020)', () => {
-    // The same treatment `edges` gets: an older file still parses, and the array
-    // is dropped rather than honoured, so nothing can half-load from it.
+    // The same treatment a top-level `edges` array gets: an older file still
+    // parses, and the array is dropped rather than honoured, so nothing can
+    // half-load from it.
     const result = spaceFileSchema.safeParse({
       ...validSpaceFile,
       cards: [{ id: 'a', title: 'A', content: 'cards/a.md' }],
@@ -50,8 +51,10 @@ describe('space file schema', () => {
     expect(result.success).toBe(false);
   });
 
-  it('drops authored edges, which are no longer part of the model', () => {
-    // ADR 0007 deleted them. An older file still parses; the array is ignored.
+  it('drops a top-level edges array, which routes replaced', () => {
+    // ADR 0007 deleted the structural layer beside routes; a route's own `edges`
+    // (ADR 0023) are a different thing that happens to share the word. An older
+    // file carrying the old array still parses, and the array is ignored.
     const result = spaceFileSchema.safeParse({
       ...validSpaceFile,
       edges: [{ id: 'e', source: 'a', target: 'b' }],
@@ -72,12 +75,43 @@ describe('space file schema', () => {
     expect(spaceFileSchema.safeParse(withoutRoutes).success).toBe(false);
   });
 
-  it('rejects a route with no steps', () => {
+  it('rejects a route with no edges — a route is its connections (ADR 0023)', () => {
     const result = spaceFileSchema.safeParse({
       ...validSpaceFile,
-      routes: [{ id: 'main', title: 'Main', steps: [] }],
+      routes: [{ id: 'main', title: 'Main', edges: [] }],
     });
     expect(result.success).toBe(false);
+  });
+
+  it('accepts a route that forks and merges — shape puts no limit on either', () => {
+    // Acyclicity is the only structural rule and it needs the whole route in
+    // view, so it lives in `@project/graph`; nothing here should reject a graph.
+    const result = spaceFileSchema.safeParse({
+      ...validSpaceFile,
+      routes: [
+        {
+          id: 'main',
+          title: 'Main',
+          edges: [
+            { from: 'a', to: 'b' },
+            { from: 'a', to: 'c' },
+            { from: 'b', to: 'd' },
+            { from: 'c', to: 'd' },
+          ],
+        },
+      ],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects an edge missing an endpoint', () => {
+    for (const edge of [{ from: 'a' }, { to: 'b' }, { from: 'a', to: '' }]) {
+      const result = spaceFileSchema.safeParse({
+        ...validSpaceFile,
+        routes: [{ id: 'main', title: 'Main', edges: [edge] }],
+      });
+      expect(result.success).toBe(false);
+    }
   });
 });
 

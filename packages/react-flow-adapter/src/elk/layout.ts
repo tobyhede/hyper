@@ -14,8 +14,8 @@ export const DEFAULT_ELK_LAYOUT_OPTIONS: LayoutOptions = {
 
   // Explicit statement of ELK's default (layered routes orthogonally), now that
   // the app actually *draws* ELK's routed geometry rather than discarding it and
-  // letting React Flow bezier between the handles. A route may not revisit a card
-  // (ADR 0012), so a single route never bends backward; a back-edge now only comes
+  // letting React Flow bezier between the handles. A route may not close a cycle
+  // (ADR 0023), so a single route never bends backward; a back-edge comes only
   // from two routes disagreeing on the order of shared cards (ADR 0003), and this
   // is what routes it as a channel around the cards rather than a self-curling
   // stub. See `.scratch/layout-seam/issues/03-render-elk-edge-routing.md`.

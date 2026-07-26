@@ -1,10 +1,9 @@
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
-import type { Route } from '@project/core';
-import { clampStepIndex, nextStepIndex, prevStepIndex, validateReferences } from '../src/index';
+import { validateReferences } from '../src/index';
 import { card } from './card-files';
 
-/** Build a structurally-consistent space file from a list of ids. */
+/** Build a structurally-consistent space file: one route chaining every card. */
 function spaceFileFromIds(ids: string[]) {
   return {
     title: 'Generated',
@@ -13,18 +12,19 @@ function spaceFileFromIds(ids: string[]) {
       {
         id: 'main',
         title: 'Main',
-        steps: ids.map((id) => ({ target: `card-${id}` })),
+        edges: ids.slice(0, -1).map((id, i) => ({ from: `card-${id}`, to: `card-${ids[i + 1]}` })),
       },
     ],
   };
 }
 
-// Distinct, non-empty ids keep the generated graph structurally valid.
+// Distinct, non-empty ids keep the generated graph structurally valid. At least
+// two, so the chain has an edge to break.
 const idsArb = fc
   .uniqueArray(
     fc.string({ minLength: 1, maxLength: 6 }).filter((s) => s.trim().length > 0),
     {
-      minLength: 1,
+      minLength: 2,
       maxLength: 12,
     },
   )
@@ -39,48 +39,67 @@ describe('graph validation properties', () => {
     );
   });
 
-  it('breaking any single route step is always detected', () => {
+  it('breaking any single edge endpoint is always detected', () => {
     fc.assert(
-      fc.property(idsArb, (ids) => {
+      fc.property(idsArb, fc.nat(), (ids, raw) => {
         const file = spaceFileFromIds(ids);
-        const route = file.routes[0]!;
-        route.steps[0]!.target = '__does_not_exist__';
+        const edges = file.routes[0]!.edges;
+        edges[raw % edges.length]!.to = '__does_not_exist__';
         const errors = validateReferences(file);
-        expect(errors.some((e) => e.kind === 'unresolved-route-step')).toBe(true);
+        expect(errors.some((e) => e.kind === 'unresolved-route-edge')).toBe(true);
       }),
     );
   });
 });
 
-describe('navigation properties', () => {
-  const routeArb: fc.Arbitrary<Route> = fc.integer({ min: 1, max: 30 }).map((n) => ({
-    id: 'p',
-    title: 'p',
-    steps: Array.from({ length: n }, (_, i) => ({ target: `n${i}` })),
-  }));
-
-  it('clamp always yields an in-range index', () => {
+describe('acyclicity properties (ADR 0023)', () => {
+  it('a chain of distinct cards is always acyclic', () => {
     fc.assert(
-      fc.property(routeArb, fc.integer(), (route, index) => {
-        const clamped = clampStepIndex(route, index);
-        expect(clamped).toBeGreaterThanOrEqual(0);
-        expect(clamped).toBeLessThan(route.steps.length);
+      fc.property(idsArb, (ids) => {
+        const errors = validateReferences(spaceFileFromIds(ids));
+        expect(errors.some((e) => e.kind === 'route-has-cycle')).toBe(false);
       }),
     );
   });
 
-  it('next/prev never leave the range and are inverse at the interior', () => {
+  it('an edge back to any earlier card always closes a cycle', () => {
+    // The check has to catch a loop wherever it closes, not only one that
+    // returns to the route's first card — which is what a duplicate scan over a
+    // step list used to do for free and an edge list does not.
     fc.assert(
-      fc.property(routeArb, fc.nat(), (route, raw) => {
-        const index = clampStepIndex(route, raw);
-        const forward = nextStepIndex(route, index);
-        const back = prevStepIndex(route, index);
-        expect(forward).toBeGreaterThanOrEqual(0);
-        expect(forward).toBeLessThan(route.steps.length);
-        expect(back).toBeGreaterThanOrEqual(0);
-        expect(back).toBeLessThan(route.steps.length);
-        expect(forward).toBeGreaterThanOrEqual(index);
-        expect(back).toBeLessThanOrEqual(index);
+      fc.property(idsArb, fc.nat(), fc.nat(), (ids, rawFrom, rawTo) => {
+        const to = rawTo % ids.length;
+        const from = to + (rawFrom % (ids.length - to));
+        const file = spaceFileFromIds(ids);
+        file.routes[0]!.edges.push({ from: `card-${ids[from]}`, to: `card-${ids[to]}` });
+        const errors = validateReferences(file);
+        expect(errors.some((e) => e.kind === 'route-has-cycle')).toBe(true);
+      }),
+    );
+  });
+
+  it('a fork that merges again is never a cycle, however wide', () => {
+    // Every branch runs forward from one card to one card, so the union is a
+    // diamond: many paths, no loop. Forks and merges are legal (ADR 0023) and
+    // this is what stops the check reading "reached twice" as "cycle".
+    fc.assert(
+      fc.property(fc.integer({ min: 1, max: 8 }), (branches) => {
+        const middles = Array.from({ length: branches }, (_, i) => `m${i}`);
+        const file = {
+          title: 'Diamond',
+          cards: [card('start'), card('end'), ...middles.map((id) => card(id))],
+          routes: [
+            {
+              id: 'main',
+              title: 'Main',
+              edges: middles.flatMap((id) => [
+                { from: 'start', to: id },
+                { from: id, to: 'end' },
+              ]),
+            },
+          ],
+        };
+        expect(validateReferences(file)).toEqual([]);
       }),
     );
   });

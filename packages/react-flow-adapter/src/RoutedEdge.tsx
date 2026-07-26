@@ -7,7 +7,8 @@ import type { LayoutPoint } from '@project/graph';
  * ELK computes where each edge runs — around the cards, as a channel — and the
  * app used to throw that away and let React Flow draw its own curve between the
  * two handles. A forward edge looks fine either way; a back-edge (target left of
- * source, e.g. a route that revisits a card) does not: the bezier leaves
+ * source, e.g. two routes disagreeing on the order of cards they share) does not:
+ * the bezier leaves
  * rightward and hooks back on itself, reading as a broken stub. Drawing ELK's
  * routed points instead makes it a clean channel. See
  * `.scratch/layout-seam/issues/03-render-elk-edge-routing.md`.

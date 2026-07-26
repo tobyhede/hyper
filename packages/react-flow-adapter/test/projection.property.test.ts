@@ -27,30 +27,49 @@ const cardIdPool = fc
   .map((ns) => ns.map((n) => `card-${n}`));
 
 /**
- * A space file whose routes each visit distinct cards in some order. Sampling
- * without replacement is ADR 0012 (a route may not revisit a card) for free, so
- * `loadSpace` always accepts what we generate; cards are the union of what the
- * routes actually visit, so there are no orphans either.
+ * A space file whose routes each run over distinct cards in some order: a chain
+ * through all of them, plus up to three **shortcuts** skipping ahead. Every edge
+ * points forward in that order, so each route is acyclic by construction (ADR
+ * 0023) and `loadSpace` always accepts what we generate; cards are the union of
+ * what the routes touch, so there are no orphans either.
+ *
+ * The shortcuts are the point. They fork a card and merge into a later one,
+ * which is the shape a step list could not express and the one that puts several
+ * edges on a single handle.
  */
-const spaceFileArb = cardIdPool.chain((pool) =>
+const routeArb = (pool: string[]) =>
   fc
-    .array(fc.shuffledSubarray(pool, { minLength: 2 }), { minLength: 1, maxLength: 4 })
-    .map((routes) => {
-      const visited = [...new Set(routes.flat())];
-      return {
-        file: {
-          version: 1,
-          id: 's',
-          title: 'Generated',
-          routes: routes.map((steps, index) => ({
-            id: `route-${index}`,
-            title: `Route ${index}`,
-            steps: steps.map((target) => ({ target })),
-          })),
-        },
-        cardFiles: visited.map((id) => cardFile(id)),
-      };
-    }),
+    .tuple(
+      fc.shuffledSubarray(pool, { minLength: 2 }),
+      fc.array(fc.tuple(fc.nat(), fc.nat()), { maxLength: 3 }),
+    )
+    .map(([cards, shortcuts]) => {
+      const edges = cards.slice(0, -1).map((from, i) => ({ from, to: cards[i + 1]! }));
+      for (const [rawFrom, rawSkip] of shortcuts) {
+        const from = rawFrom % cards.length;
+        const to = from + 2 + (rawSkip % cards.length);
+        if (to < cards.length) edges.push({ from: cards[from]!, to: cards[to]! });
+      }
+      return { cards, edges };
+    });
+
+const spaceFileArb = cardIdPool.chain((pool) =>
+  fc.array(routeArb(pool), { minLength: 1, maxLength: 4 }).map((routes) => {
+    const visited = [...new Set(routes.flatMap((r) => r.cards))];
+    return {
+      file: {
+        version: 1,
+        id: 's',
+        title: 'Generated',
+        routes: routes.map((route, index) => ({
+          id: `route-${index}`,
+          title: `Route ${index}`,
+          edges: route.edges,
+        })),
+      },
+      cardFiles: visited.map((id) => cardFile(id)),
+    };
+  }),
 );
 
 /** Project a generated space to React Flow nodes and edges. Colors are
@@ -82,7 +101,7 @@ describe('projection handle invariants', () => {
           ]),
         );
 
-        // Not vacuous: routes of two-plus steps always produce edges.
+        // Not vacuous: every generated route carries at least one edge.
         expect(edges.length).toBeGreaterThan(0);
 
         for (const edge of edges) {
@@ -104,8 +123,9 @@ describe('projection handle invariants', () => {
 
         // React Flow can't tell two same-side handles apart otherwise, and picks
         // whichever it finds first. Holds here because a handle id is
-        // `<routeId>::out`/`::in` and a route may not revisit a card (ADR 0012) —
-        // an invariant that leans on a domain rule, which is why it is pinned.
+        // `<routeId>::out`/`::in` — one per route per side, so a card a route
+        // forks at still carries exactly one outbound handle however many edges
+        // leave it. The scheme, not a domain rule, is what makes this true.
         for (const node of nodes) {
           const sourceIds = node.data.sourceHandles.map((handle) => handle.id);
           const targetIds = node.data.targetHandles.map((handle) => handle.id);

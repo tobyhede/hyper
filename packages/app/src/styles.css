@@ -394,38 +394,3 @@ body {
   padding-top: 0.75rem;
   flex-shrink: 0;
 }
-
-/* ---- Presentation deck ---- */
-/* Presenting takes over the screen (ADR 0008): the space is out of view and
-   reveal.js owns everything inside `.reveal`. Only the frame and the exit
-   affordance are ours. */
-.deck {
-  position: fixed;
-  inset: 0;
-  z-index: 50;
-  background: #000;
-}
-
-.deck .reveal {
-  width: 100%;
-  height: 100%;
-}
-
-.deck__exit {
-  position: fixed;
-  top: 1rem;
-  right: 1rem;
-  z-index: 60;
-  background: rgba(20, 24, 32, 0.85);
-  color: var(--text);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 0.35rem 0.8rem;
-  font: inherit;
-  font-size: 0.85rem;
-  cursor: pointer;
-}
-
-.deck__exit:hover {
-  border-color: var(--accent);
-}

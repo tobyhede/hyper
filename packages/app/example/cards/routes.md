@@ -1,17 +1,18 @@
 ---
 id: routes
-title: Routes as slide decks
+title: Routes are graphs
 ---
 
-A **route** is an ordered list of card targets.
+A **route** is a set of directed edges between cards.
 
 ```json
 { "id": "quick", "title": "Quick tour",
-  "steps": [{ "target": "intro" }, { "target": "demo" }] }
+  "edges": [{ "from": "intro", "to": "demo" }] }
 ```
 
-Presentation mode walks the steps:
+A card may have several edges out — a **fork** — and several in — a **merge**.
+What a route may not do is close a cycle: returning to earlier content is an edge
+to an **alias**, a distinct card showing the same content.
 
-- `→` next step
-- `←` previous step
-- the viewport fits the current card
+A route that gives every card one edge out is a **line**. That is the degenerate
+graph, not a second kind of route.

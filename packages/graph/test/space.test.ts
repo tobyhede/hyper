@@ -6,7 +6,7 @@ const validInput = {
   version: 1,
   id: 's',
   title: 'Test space',
-  routes: [{ id: 'main', title: 'Main', steps: [{ target: 'a' }, { target: 'b' }] }],
+  routes: [{ id: 'main', title: 'Main', edges: [{ from: 'a', to: 'b' }] }],
 };
 
 const validCards = [cardFile('a', 'A', 'Body of A.\n'), cardFile('b', 'B', 'Body of B.\n')];
@@ -95,12 +95,15 @@ describe('loadSpace', () => {
 
   it('reports an unresolved reference, though the shape is valid', () => {
     const result = loadSpace(
-      { ...validInput, routes: [{ id: 'main', title: 'Main', steps: [{ target: 'ghost' }] }] },
+      {
+        ...validInput,
+        routes: [{ id: 'main', title: 'Main', edges: [{ from: 'a', to: 'ghost' }] }],
+      },
       validCards,
     );
     expect(result.ok).toBe(false);
     if (result.ok) return;
-    expect(result.errors.some((e) => e.kind === 'unresolved-route-step' && e.ref === 'ghost')).toBe(
+    expect(result.errors.some((e) => e.kind === 'unresolved-route-edge' && e.ref === 'ghost')).toBe(
       true,
     );
   });

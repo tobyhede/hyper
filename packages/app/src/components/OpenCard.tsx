@@ -4,7 +4,7 @@ import { CardRenderer } from '@project/ui';
 export interface OpenCardProps {
   title: string;
   markdown: string;
-  /** Actions for this card: a close button, or the presentation step controls. */
+  /** Actions for this card — a close button, say. */
   footer: ReactNode;
 }
 
@@ -13,11 +13,12 @@ export interface OpenCardProps {
  *
  * The graph draws titles (ADR 0006); this is where a card is opened. Opening is
  * a view-source gesture — `CardRenderer` shows the Markdown verbatim, not
- * rendered (ADR 0011). Presenting is a separate surface, a reveal.js deck, and
- * the only place a card is drawn rendered (ADR 0008).
+ * rendered (ADR 0011). Presenting is the other half of that distinction and is
+ * where a card is drawn *rendered*; it walks the route on the graph canvas
+ * rather than on a surface of its own (ADR 0024, 0027).
  *
- * Kept free of route and step concepts, so a space card opened to explore its
- * nested graph (ADR 0001) can reuse the shell.
+ * Kept free of route concepts, so a space card opened to explore its nested
+ * graph (ADR 0001) can reuse the shell.
  */
 export function OpenCard({ title, markdown, footer }: OpenCardProps) {
   return (

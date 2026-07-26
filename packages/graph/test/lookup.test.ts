@@ -8,7 +8,7 @@ function baseSpace(): Space {
       version: 1,
       id: 's',
       title: 'Test',
-      routes: [{ id: 'main', title: 'Main', steps: [{ target: 'model' }] }],
+      routes: [{ id: 'main', title: 'Main', edges: [{ from: 'model', to: 'model-again' }] }],
     },
     [cardFile('model', 'The model'), aliasFile('model-again', 'The model, again', 'model')],
   );

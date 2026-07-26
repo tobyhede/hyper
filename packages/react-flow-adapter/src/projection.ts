@@ -7,7 +7,7 @@ import type {
   LayoutEdge,
   LayoutGraph,
   LayoutPoint,
-  RouteEdge,
+  GraphEdge,
   RouteHandleRef,
   Space,
 } from '@project/graph';
@@ -182,7 +182,7 @@ function routedPoints(edge: LayoutEdge | undefined): LayoutPoint[] | undefined {
 
 /** Map route-derived edges → colored React Flow edges drawn along ELK's routing. */
 export function projectRouteEdges(
-  routeEdges: readonly RouteEdge[],
+  routeEdges: readonly GraphEdge[],
   colors: ColorByRouteId,
   options: ProjectRouteEdgesOptions = {},
 ): Edge[] {

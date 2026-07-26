@@ -3,8 +3,8 @@ import { z } from 'zod';
 /**
  * Zod schemas for the space file (`space.json`).
  *
- * These validate *shape* only. Referential integrity (do step/route ids
- * actually resolve to real cards) is checked separately in `@project/graph`,
+ * These validate *shape* only. Referential integrity (do a route's edge
+ * endpoints actually resolve to real cards) is checked separately in `@project/graph`,
  * because it needs the whole space in view. A value that passes here is not yet
  * a Space — `loadSpace` adds the reference check and the index (ADR 0010).
  */
@@ -138,9 +138,17 @@ export function isBuiltInViewId(id: string): id is BuiltInViewId {
   return (BUILT_IN_VIEW_IDS as readonly string[]).includes(id);
 }
 
-/** One position in a route, targeting a single card by id. */
-export const routeStepSchema = z.object({
-  target: idSchema,
+/**
+ * One edge of a route: a directed connection from one card to another (ADR
+ * 0023). This is the element an author draws, and the route is the set of them.
+ *
+ * Shape only, as everywhere in this file. That both ids name real cards, and
+ * that the edges do not close a cycle, need the whole space in view and are
+ * checked in `@project/graph`.
+ */
+export const routeEdgeSchema = z.object({
+  from: idSchema,
+  to: idSchema,
 });
 
 export const routeSchema = z.object({
@@ -148,7 +156,14 @@ export const routeSchema = z.object({
   title: z.string().min(1),
   // Optional CSS color for this route's edges; falls back to a palette by order.
   color: z.string().min(1).optional(),
-  steps: z.array(routeStepSchema).min(1),
+  /**
+   * At least one. A route is a set of edges, so a route with none connects
+   * nothing and draws nothing — and drawing an edge is the gesture that mints a
+   * route in the first place (ADR 0021), so one is the fewest a route is ever
+   * created with. A card may appear as the `from` of several edges (a fork) and
+   * the `to` of several (a merge); nothing here constrains that.
+   */
+  edges: z.array(routeEdgeSchema).min(1),
 });
 
 /**

@@ -6,33 +6,38 @@
     {
       "id": "long",
       "title": "Long",
-      "steps": [
-        { "target": "a" },
-        { "target": "b" },
-        { "target": "c" },
-        { "target": "d" },
-        { "target": "aa" }
+      "edges": [
+        { "from": "a", "to": "b" },
+        { "from": "b", "to": "c" },
+        { "from": "c", "to": "d" },
+        { "from": "d", "to": "aa" }
       ]
     },
     {
       "id": "mid",
       "title": "Mid",
-      "steps": [{ "target": "a" }, { "target": "b" }, { "target": "c" }, { "target": "d" }]
+      "edges": [
+        { "from": "a", "to": "b" },
+        { "from": "b", "to": "c" },
+        { "from": "c", "to": "d" }
+      ]
     },
     {
       "id": "short",
       "title": "Short",
-      "steps": [{ "target": "a" }, { "target": "b" }, { "target": "c" }]
+      "edges": [
+        { "from": "a", "to": "b" },
+        { "from": "b", "to": "c" }
+      ]
     },
     {
       "id": "echo",
       "title": "Echo",
-      "steps": [
-        { "target": "e" },
-        { "target": "f" },
-        { "target": "g" },
-        { "target": "h" },
-        { "target": "ee" }
+      "edges": [
+        { "from": "e", "to": "f" },
+        { "from": "f", "to": "g" },
+        { "from": "g", "to": "h" },
+        { "from": "h", "to": "ee" }
       ]
     }
   ]

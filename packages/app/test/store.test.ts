@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { loadSpace, type Space } from '@project/graph';
-import { createPresentationStore } from '../src/store';
+import { createSpaceStore } from '../src/store';
 import { cardFile } from './card-files';
 
 function fixture(): Space {
@@ -10,8 +10,15 @@ function fixture(): Space {
       id: 's',
       title: 'Fixture',
       routes: [
-        { id: 'r1', title: 'One', steps: [{ target: 'a' }, { target: 'b' }, { target: 'c' }] },
-        { id: 'r2', title: 'Two', steps: [{ target: 'b' }] },
+        {
+          id: 'r1',
+          title: 'One',
+          edges: [
+            { from: 'a', to: 'b' },
+            { from: 'b', to: 'c' },
+          ],
+        },
+        { id: 'r2', title: 'Two', edges: [{ from: 'b', to: 'c' }] },
       ],
     },
     [cardFile('a'), cardFile('b'), cardFile('c')],
@@ -20,61 +27,32 @@ function fixture(): Space {
   return result.space;
 }
 
-describe('createPresentationStore', () => {
+describe('createSpaceStore', () => {
   it('starts with the space’s first route selected', () => {
-    const { useStore } = createPresentationStore(fixture());
+    const { useStore } = createSpaceStore(fixture());
     expect(useStore.getState().selectedRouteId).toBe('r1');
   });
 
-  it('resets the step when a different route is selected', () => {
-    const { useStore } = createPresentationStore(fixture());
-    useStore.getState().next(); // step 0 → 1 on r1
-    expect(useStore.getState().stepIndex).toBe(1);
+  it('selects a different route', () => {
+    const { useStore } = createSpaceStore(fixture());
     useStore.getState().selectRoute('r2');
-    expect(useStore.getState()).toMatchObject({ selectedRouteId: 'r2', stepIndex: 0 });
+    expect(useStore.getState().selectedRouteId).toBe('r2');
   });
 
-  it('clamps stepping to the selected route’s length, read from the space', () => {
-    const { useStore } = createPresentationStore(fixture());
-    // r1 has 3 steps: next never runs past the last, prev never before the first.
-    const { next, prev } = useStore.getState();
-    next();
-    next();
-    next();
-    next();
-    expect(useStore.getState().stepIndex).toBe(2);
-    prev();
-    prev();
-    prev();
-    expect(useStore.getState().stepIndex).toBe(0);
-  });
-
-  it('will not enter presentation without a selected route', () => {
-    const { useStore } = createPresentationStore(fixture());
-    useStore.setState({ selectedRouteId: null });
-    useStore.getState().enterPresentation();
-    expect(useStore.getState().mode).toBe('overview');
-  });
-
-  it('cannot present a space with no routes, and selects none (ADR 0015)', () => {
+  it('selects no route in a space that has none (ADR 0015)', () => {
     const result = loadSpace({ version: 1, id: 's', title: 'New space', routes: [] }, [
       cardFile('a', 'Untitled'),
     ]);
     if (!result.ok) throw new Error('a route-less space should load');
-    const { useStore, selectActiveCardId } = createPresentationStore(result.space);
-
+    const { useStore } = createSpaceStore(result.space);
     expect(useStore.getState().selectedRouteId).toBeNull();
-    useStore.getState().enterPresentation();
-    expect(useStore.getState().mode).toBe('overview');
-    expect(selectActiveCardId(useStore.getState())).toBeNull();
   });
 
-  it('reports the active card only while presenting, at the current step', () => {
-    const { useStore, selectActiveCardId } = createPresentationStore(fixture());
-    expect(selectActiveCardId(useStore.getState())).toBeNull(); // overview
-    useStore.getState().enterPresentation();
-    expect(selectActiveCardId(useStore.getState())).toBe('a'); // r1 step 0
-    useStore.getState().next();
-    expect(selectActiveCardId(useStore.getState())).toBe('b'); // r1 step 1
+  it('opens and closes a card independently of the selected route', () => {
+    const { useStore } = createSpaceStore(fixture());
+    useStore.getState().openCard('c');
+    expect(useStore.getState()).toMatchObject({ openedCardId: 'c', selectedRouteId: 'r1' });
+    useStore.getState().closeCard();
+    expect(useStore.getState().openedCardId).toBeNull();
   });
 });
