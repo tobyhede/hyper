@@ -1,5 +1,5 @@
 import { spaceFileSchema, type SpaceFile } from '@project/core';
-import { loadSpace, type Space } from '@project/graph';
+import { cardFileId, loadSpace, type Space } from '@project/graph';
 import { cardFiles, spaceFile as spaceFileInput } from 'virtual:space-file';
 
 /**
@@ -37,3 +37,25 @@ export const space: Space = result.space;
  * typed file value without threading it out of `loadSpace`.
  */
 export const spaceFile: SpaceFile = spaceFileSchema.parse(spaceFileInput);
+
+/**
+ * Each card's file exactly as it was read, keyed by the card's id.
+ *
+ * A save sends every card, and what it sends for a card nobody edited has to be
+ * the bytes that are already there — not a reconstruction of them. Rebuilding a
+ * card from its parse is lossy in ways that look like nothing and are not: a
+ * frontmatter comment is gone, a `kind` the author left to the default is
+ * written out, quoting and key order are normalised. The server writes only what
+ * differs, so every one of those turns a save that moved a card into a rewrite
+ * of every hand-authored card file in the space.
+ *
+ * Keyed with the same reader intake used, so the id here is the id the `Space`
+ * knows the card by. When a card's *content* becomes editable, an edited card is
+ * the one that gets serialized and the rest keep coming from here.
+ */
+export const cardSource: ReadonlyMap<string, string> = new Map(
+  cardFiles.flatMap((file) => {
+    const id = cardFileId(file.text);
+    return id === undefined ? [] : [[id, file.text] as const];
+  }),
+);

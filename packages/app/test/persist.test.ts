@@ -1,7 +1,7 @@
-import { describe, expect, it } from 'vitest';
-import { spaceFileSchema, type SpaceFile } from '@project/core';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { spaceFileSchema, type Card, type SpaceFile } from '@project/core';
 import { loadSpace } from '@project/graph';
-import { serializeLayout } from '../src/persist';
+import { saveSpace, serializeLayout } from '../src/persist';
 import { cardFile } from './card-files';
 
 const BASE: SpaceFile = {
@@ -132,5 +132,56 @@ describe('serializeLayout', () => {
     const next = serializeLayout(withOther, 'layout', 'Layout', positions({ a: [1, 2] }), 'main');
 
     expect(next.layouts?.map((l) => l.id).sort()).toEqual(['layout', 'other']);
+  });
+});
+
+describe('saveSpace: what it sends for each card', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  /** The payload the endpoint would receive, without an endpoint. */
+  function capture(): { body: () => { cards: { id: string; text: string }[] } } {
+    const fetch = vi.fn().mockResolvedValue({ ok: true });
+    vi.stubGlobal('fetch', fetch);
+    return {
+      body: () =>
+        JSON.parse((fetch.mock.calls[0]?.[1] as { body: string }).body) as {
+          cards: { id: string; text: string }[];
+        },
+    };
+  }
+
+  const card = (id: string): Card => ({ id, title: id.toUpperCase(), kind: 'markdown', body: 'B' });
+
+  it('sends a card that came from a file as that file, byte for byte', async () => {
+    // The whole point. A hand-authored card is not what `serializeCardFile`
+    // would produce from its parse — this one carries a frontmatter comment and
+    // leaves `kind` to the default — and the server writes whatever differs, so
+    // reconstructing it would turn a save that moved a card into a rewrite of
+    // every hand-authored card file in the space, comments and all.
+    const authored = '---\nid: a # stable identifier\ntitle: A\n---\n\nB\n';
+    const sent = capture();
+
+    await saveSpace(BASE, [card('a')], new Map([['a', authored]]));
+
+    expect(sent.body().cards).toEqual([{ id: 'a', text: authored }]);
+  });
+
+  it('serializes a card that has no file yet', async () => {
+    // A space the app minted: its cards are described by nothing until this
+    // save, so there are no bytes to preserve and serializing is the only
+    // option.
+    const sent = capture();
+
+    await saveSpace(BASE, [card('a')], new Map());
+
+    const [only] = sent.body().cards;
+    expect(only?.id).toBe('a');
+    expect(only?.text).toContain('id: a');
+    // And what it writes is what will load. Routeless, so the one card is the
+    // whole space and nothing references the `b` this case does not send.
+    const routeless: SpaceFile = { ...BASE, routes: [] };
+    expect(loadSpace(routeless, [{ path: 'cards/a.md', text: only?.text ?? '' }]).ok).toBe(true);
   });
 });

@@ -232,6 +232,22 @@ describe('frontmatterId', () => {
   it('prefers the frontmatter id over one in the body', () => {
     expect(frontmatterId('---\nid: real\n---\n\nid: injected\n')).toBe('real');
   });
+
+  it('reads a YAML comment as a comment, the way intake does', () => {
+    // The reason this delegates to `@project/graph` rather than matching a
+    // pattern. Intake parses the frontmatter with a YAML parser, so this id is
+    // `intro`; a regex taking the rest of the line makes it
+    // `intro # stable identifier`. The two disagreeing means the writer cannot
+    // find `intro`'s existing file, writes a second copy under `cards/`, and
+    // the next load fails on a duplicate id.
+    expect(frontmatterId('---\nid: intro # stable identifier\ntitle: T\n---\n')).toBe('intro');
+  });
+
+  it('returns undefined for an id that is not a string', () => {
+    // `cardFrontmatterSchema` rejects it on the way in, so there is no file to
+    // find and nothing useful to answer.
+    expect(frontmatterId('---\nid: 42\ntitle: T\n---\n')).toBeUndefined();
+  });
 });
 
 describe('readCardFiles', () => {

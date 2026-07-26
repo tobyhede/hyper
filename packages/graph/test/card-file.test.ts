@@ -1,6 +1,26 @@
 import { describe, expect, it } from 'vitest';
 import { parseCardFile } from '../src/index';
 
+describe('parseCardFile: CRLF', () => {
+  it('leaves no carriage return on the last frontmatter field', () => {
+    // The closing-fence match consumes the `\n` of the final CRLF pair, so
+    // slicing one past its `\r` handed YAML a dangling carriage return and YAML
+    // — correctly — read it as part of the value. Every card in a CRLF checkout
+    // parsed with a trailing `\r` on whichever field came last, which for the
+    // usual card is its title.
+    const parsed = parseCardFile({
+      path: 'a.md',
+      text: '---\r\nid: a\r\ntitle: A\r\n---\r\n\r\nBody\r\n',
+    });
+
+    expect(parsed.ok).toBe(true);
+    if (parsed.ok) {
+      expect(parsed.frontmatter.id).toBe('a');
+      expect(parsed.frontmatter.title).toBe('A');
+    }
+  });
+});
+
 describe('parseCardFile', () => {
   it('reads a card from its frontmatter and keeps the body', () => {
     const result = parseCardFile({

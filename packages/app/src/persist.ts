@@ -75,18 +75,34 @@ export function serializeLayout(
  * large), 500 (the disk) and 501 (nowhere to write, ADR 0018), and a build has
  * no endpoint at all.
  */
-export async function saveSpace(spaceFile: SpaceFile, cards: readonly Card[]): Promise<boolean> {
+export async function saveSpace(
+  spaceFile: SpaceFile,
+  cards: readonly Card[],
+  sourceById: ReadonlyMap<string, string>,
+): Promise<boolean> {
   if (!import.meta.env.DEV) return false;
   const response = await fetch('/__space', {
     method: 'PUT',
     headers: { 'content-type': 'application/json' },
     // Cards go as id and text, never as a path. The server derives every path
     // from the id, which is what keeps the endpoint from being an
-    // arbitrary-file-write primitive. `serializeCardFile` is the same function
-    // `parseCardFile` inverts, so what is written is what will load.
+    // arbitrary-file-write primitive.
+    //
+    // A card that came from a file is sent **as that file**. Serializing it back
+    // from its parse is lossy in ways that read as nothing — a dropped
+    // frontmatter comment, a `kind` the author left to the default now written
+    // out, normalised quoting and key order — and the server writes whatever
+    // differs, so a save that moved one card would rewrite every hand-authored
+    // card in the space. `serializeCardFile` is for a card with no file yet: the
+    // cards of a space the app minted, which this save is what brings into
+    // being. It is the same function `parseCardFile` inverts, so what it writes
+    // is what will load.
     body: JSON.stringify({
       spaceFile,
-      cards: cards.map((card) => ({ id: card.id, text: serializeCardFile(card) })),
+      cards: cards.map((card) => ({
+        id: card.id,
+        text: sourceById.get(card.id) ?? serializeCardFile(card),
+      })),
     }),
   });
 

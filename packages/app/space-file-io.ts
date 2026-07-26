@@ -14,6 +14,7 @@ import { dirname } from 'node:path';
 // ESM resolver rejects, and the dev server would not start. Same rule as the
 // plugin that imports this.
 import { spaceFileSchema } from '../core/src/index';
+import { cardFileId } from '../graph/src/frontmatter';
 
 /**
  * The save endpoint's actual work: validating a payload from the browser, and
@@ -203,26 +204,18 @@ export function readCardFiles(dir: string): { path: string; text: string }[] {
 
 /**
  * A card file's frontmatter `id`, which is its identity — never its filename
- * (ADR 0020). Quotes stripped, because YAML permits them and the id does not
- * include them.
+ * (ADR 0020).
  *
- * The frontmatter block is isolated *first*, then searched. Scanning from the
- * opening fence for the first `id:` instead — which is what this used to do —
- * never stopped at the closing fence, so a card with no id in its frontmatter
- * and `id: something` anywhere in its **body** reported that as its identity.
- * This decides which file a card is written back to, so a body line winning
- * silently redirects a write.
+ * Delegated to `@project/graph`, which is where intake reads the same field out
+ * of the same bytes. It was a regex here, twice: the first read `id:` anywhere
+ * in the file, so a body line could redirect a write; the second isolated the
+ * frontmatter and took the rest of the line, which is right for `id: section
+ * one` and wrong for `id: intro # note` — `intro` to YAML, `intro # note` to a
+ * pattern. **A regex is a different reader**, and when the two disagree the
+ * writer cannot find the card's existing file, drops a second copy in `cards/`,
+ * and the next load fails on a duplicate id. There is one reader now.
  */
-export function frontmatterId(text: string): string | undefined {
-  const frontmatter = /^---\r?\n([\s\S]*?)\r?\n---/.exec(text)?.[1];
-  if (frontmatter === undefined) return undefined;
-  // The rest of the line, not the first run of non-space. `idSchema` is
-  // `z.string().min(1)` and YAML's unquoted scalars carry spaces, so `\S+` read
-  // `section one` as `section` — and once the envelope id has to match this,
-  // reading it wrong rejects a card that loads perfectly well.
-  const id = /^id:[ \t]*(.+?)[ \t\r]*$/m.exec(frontmatter)?.[1];
-  return id?.replace(/^['"]|['"]$/g, '');
-}
+export const frontmatterId = cardFileId;
 
 /**
  * Where each card already on disk lives, keyed by its frontmatter id.

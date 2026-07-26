@@ -1,4 +1,5 @@
 export * from './card-file';
+export * from './frontmatter';
 export * from './grid';
 export * from './layout';
 export * from './lookup';

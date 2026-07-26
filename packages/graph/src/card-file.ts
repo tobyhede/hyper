@@ -1,5 +1,6 @@
 import { cardFrontmatterSchema, type Card, type CardFrontmatter } from '@project/core';
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
+import { splitFrontmatter } from './frontmatter';
 
 /** A card file as read from disk: where it was found, and its bytes as text. */
 export interface CardFile {
@@ -22,23 +23,13 @@ export type ParseCardFileResult =
 
 const FENCE = '---\n';
 
-/** The opening fence, either line ending. Written out as LF (see
- *  {@link serializeCardFile}); accepted as CRLF, because a Windows checkout or
- *  a `core.autocrlf` config makes every card in the repository start `---\r\n`
- *  and reading is not the place to have an opinion about that. */
-const OPENING_FENCE = /^---\r?\n/;
-
 /**
  * Split a card file into its frontmatter and its body (ADR 0020).
  *
- * The fence is hand-rolled and the YAML is not: a file opens with `---`, and
- * the *first* subsequent line that is exactly `---` closes it. Only the first
- * closes, which is what makes a horizontal rule in the body an ordinary
- * horizontal rule rather than a parse error.
- *
- * Both fences tolerate CRLF. They did not, and `startsWith('---\n')` rejected
- * every card in a CRLF checkout as having no frontmatter at all — so the
- * bundled space failed to load rather than failing to look right.
+ * The fence is hand-rolled and the YAML is not, and both live in
+ * `./frontmatter` — shared with the save endpoint, which has to decide which
+ * file a card goes back to and must not answer that with a second reader of the
+ * same bytes.
  */
 export function parseCardFile(file: CardFile): ParseCardFileResult {
   const fail = (kind: CardFileErrorKind, message: string): ParseCardFileResult => ({
@@ -46,24 +37,17 @@ export function parseCardFile(file: CardFile): ParseCardFileResult {
     errors: [{ kind, path: file.path, message: `${file.path}: ${message}` }],
   });
 
-  const opening = OPENING_FENCE.exec(file.text);
-  if (!opening) {
+  const split = splitFrontmatter(file.text);
+  if (split === 'missing-frontmatter') {
     return fail('missing-frontmatter', 'does not open with a "---" frontmatter fence');
   }
-  const openLength = opening[0].length;
-
-  // The closing fence is a line of exactly `---`, and the file may end on it
-  // with no trailing newline. Matching from the opening fence's own newline
-  // means the opener can never also be read as the closer.
-  const closing = /\r?\n---[ \t]*(?:\r?\n|$)/.exec(file.text.slice(openLength - 1));
-  if (!closing) {
+  if (split === 'unterminated-frontmatter') {
     return fail('unterminated-frontmatter', 'opens a "---" frontmatter fence that never closes');
   }
-  const close = openLength - 1 + closing.index;
 
   let yaml: unknown;
   try {
-    yaml = parseYaml(file.text.slice(openLength, close + 1));
+    yaml = parseYaml(split.yaml);
   } catch (error) {
     return fail('invalid-yaml', `frontmatter is not valid YAML — ${describe(error)}`);
   }
@@ -80,10 +64,7 @@ export function parseCardFile(file: CardFile): ParseCardFileResult {
     };
   }
 
-  // The body starts on the line after the fence. One newline separates them, so
-  // one newline is dropped — anything further is the author's own blank line.
-  const body = file.text.slice(close + closing[0].length).replace(/^\r?\n/, '');
-  return { ok: true, frontmatter: parsed.data, body };
+  return { ok: true, frontmatter: parsed.data, body: split.body };
 }
 
 /**

@@ -17,7 +17,7 @@ import {
   type CardHandleSet,
   type LayoutGraph,
 } from '@project/graph';
-import { space, spaceFile } from './space';
+import { cardSource, space, spaceFile } from './space';
 import { CREATED_LAYOUT_ID, CREATED_LAYOUT_TITLE, saveSpace, serializeLayout } from './persist';
 import { routeColorMap } from './colors';
 import { CARD_HEIGHT, CARD_SIZE, cardSizeVars } from './card';
@@ -217,8 +217,9 @@ export function App() {
       // for, and this is where it does.
       useSpaceStore.getState().activeRouteId,
     );
-    // The cards go too. A drag changes none of them, and the server writes only
-    // what differs — but a space the app minted has cards no file describes yet,
+    // The cards go too, each as the bytes it was read from. A drag changes none
+    // of them and the server writes only what differs, so this rewrites no card
+    // file at all — but a space the app minted has cards no file describes yet,
     // and this is the save that gives them one.
     //
     // A refused save is *reported*, and the Save control is where. It is only
@@ -226,7 +227,7 @@ export function App() {
     // lit and the space unsaved — which is the surface the console.error that
     // used to sit here was standing in for ("the honest minimum until there is
     // somewhere on screen for unsaved state to live"). There now is.
-    if (await saveSpace(next, space.cards)) markSaved(revision);
+    if (await saveSpace(next, space.cards, cardSource)) markSaved(revision);
   }, [markSaved]);
 
   // The second trigger. Always `preventDefault`, including when there is nothing
