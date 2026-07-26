@@ -196,3 +196,79 @@ describe('validateReferences: layouts (ADR 0013)', () => {
     expect(isValidGraph(m)).toBe(false);
   });
 });
+
+describe('validateReferences: the routes a Layout names (ADR 0026)', () => {
+  /** Two routes, so a filter has something to leave out. */
+  function twoRoutes() {
+    const m = baseSpaceFile();
+    m.routes.push({ id: 'aside', title: 'Aside', edges: [{ from: 'b', to: 'a' }] });
+    return m;
+  }
+
+  it('accepts a layout that names neither — every route shown, the first active', () => {
+    const m = twoRoutes();
+    m.layouts = [layout('working', {})];
+    expect(validateReferences(m)).toEqual([]);
+  });
+
+  it('accepts a filter and an active route inside it', () => {
+    const m = twoRoutes();
+    m.layouts = [{ ...layout('working', {}), routes: ['main'], activeRoute: 'main' }];
+    expect(validateReferences(m)).toEqual([]);
+  });
+
+  it('accepts an active route with no filter — every route is visible', () => {
+    const m = twoRoutes();
+    m.layouts = [{ ...layout('working', {}), activeRoute: 'aside' }];
+    expect(validateReferences(m)).toEqual([]);
+  });
+
+  it('reports a filter naming a route the space does not have', () => {
+    const m = twoRoutes();
+    m.layouts = [{ ...layout('working', {}), routes: ['main', 'ghost'] }];
+    const errors = validateReferences(m);
+    expect(errors.some((e) => e.kind === 'layout-unknown-route' && e.ref === 'ghost')).toBe(true);
+    expect(isValidGraph(m)).toBe(false);
+  });
+
+  it('reports an activeRoute the space does not have', () => {
+    const m = twoRoutes();
+    m.layouts = [{ ...layout('working', {}), activeRoute: 'ghost' }];
+    const errors = validateReferences(m);
+    expect(errors.some((e) => e.kind === 'layout-unknown-route' && e.ref === 'ghost')).toBe(true);
+  });
+
+  it('reports an activeRoute the layout filters out, though both ids resolve', () => {
+    // The one check that relates the two fields rather than resolving either
+    // against the space. Activating moves emphasis within the visible set, so a
+    // layout opening active on a route it hides has asked for an unreachable
+    // state — and it is an error even though "aside" is a perfectly real route.
+    const m = twoRoutes();
+    m.layouts = [{ ...layout('working', {}), routes: ['main'], activeRoute: 'aside' }];
+    const errors = validateReferences(m);
+    expect(
+      errors.some((e) => e.kind === 'layout-active-route-not-shown' && e.ref === 'aside'),
+    ).toBe(true);
+    // Not also reported as unknown: it resolves, it is just not shown.
+    expect(errorKinds(errors)).not.toContain('layout-unknown-route');
+  });
+
+  it('reports an empty filter with an active route, rather than treating it as absent', () => {
+    // A layout showing no routes is legal shape; naming an active one is not,
+    // because the visible set it must belong to is empty. Absent means all —
+    // empty means none, and the two must not collapse.
+    const m = twoRoutes();
+    m.layouts = [{ ...layout('working', {}), routes: [], activeRoute: 'main' }];
+    const errors = validateReferences(m);
+    expect(errors.some((e) => e.kind === 'layout-active-route-not-shown' && e.ref === 'main')).toBe(
+      true,
+    );
+  });
+
+  it('names the layout in the message, since the id alone does not say where', () => {
+    const m = twoRoutes();
+    m.layouts = [{ ...layout('working', {}), routes: ['ghost'] }];
+    const [error] = validateReferences(m);
+    expect(error?.message).toContain('"working"');
+  });
+});

@@ -18,6 +18,8 @@ export type ReferenceErrorKind =
   | 'duplicate-route-id'
   | 'duplicate-layout-id'
   | 'layout-position-unknown-card'
+  | 'layout-unknown-route'
+  | 'layout-active-route-not-shown'
   | 'unresolved-default-view'
   | 'unresolved-route-edge'
   | 'route-has-cycle'
@@ -128,6 +130,8 @@ export function validateReferences(space: Referenceable): ReferenceError[] {
   // Positions are sparse: a layout may omit cards, and whoever renders it places
   // those itself. The asymmetry is that it may not name a card that does not
   // exist — a position left behind by a deleted card (ADR 0013).
+  const routeIds = new Set(space.routes.map((r) => r.id));
+
   for (const layout of layouts) {
     for (const cardId of Object.keys(layout.positions)) {
       if (!cardIds.has(cardId)) {
@@ -135,6 +139,41 @@ export function validateReferences(space: Referenceable): ReferenceError[] {
           kind: 'layout-position-unknown-card',
           ref: cardId,
           message: `Layout "${layout.id}" positions missing card "${cardId}"`,
+        });
+      }
+    }
+
+    // A Layout also points at routes — which it shows, and which of those opens
+    // active (ADR 0026). Both are references into the space's own routes, and
+    // the dependency runs one way: geometry references topology, never back.
+    for (const routeId of layout.routes ?? []) {
+      if (!routeIds.has(routeId)) {
+        errors.push({
+          kind: 'layout-unknown-route',
+          ref: routeId,
+          message: `Layout "${layout.id}" shows missing route "${routeId}"`,
+        });
+      }
+    }
+
+    if (layout.activeRoute !== undefined) {
+      if (!routeIds.has(layout.activeRoute)) {
+        errors.push({
+          kind: 'layout-unknown-route',
+          ref: layout.activeRoute,
+          message: `Layout "${layout.id}" opens active on missing route "${layout.activeRoute}"`,
+        });
+      } else if (layout.routes && !layout.routes.includes(layout.activeRoute)) {
+        // The one check here that relates two fields rather than resolving one
+        // against the space: both ids are real and it is still an error, because
+        // the active route must be one the Layout shows. Activating only ever
+        // moves emphasis within the visible set, so a Layout opening active on a
+        // route it filters out has asked for a state nothing can reach. Absent a
+        // filter every route is visible and there is nothing left to check.
+        errors.push({
+          kind: 'layout-active-route-not-shown',
+          ref: layout.activeRoute,
+          message: `Layout "${layout.id}" opens active on route "${layout.activeRoute}", which it does not show`,
         });
       }
     }
