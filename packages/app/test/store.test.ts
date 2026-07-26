@@ -28,30 +28,30 @@ function fixture(): Space {
 }
 
 describe('createSpaceStore', () => {
-  it('starts with the space’s first route selected', () => {
+  it('starts with the space’s first route active', () => {
     const { useStore } = createSpaceStore(fixture());
-    expect(useStore.getState().selectedRouteId).toBe('r1');
+    expect(useStore.getState().activeRouteId).toBe('r1');
   });
 
-  it('selects a different route', () => {
+  it('activates a different route', () => {
     const { useStore } = createSpaceStore(fixture());
-    useStore.getState().selectRoute('r2');
-    expect(useStore.getState().selectedRouteId).toBe('r2');
+    useStore.getState().activateRoute('r2');
+    expect(useStore.getState().activeRouteId).toBe('r2');
   });
 
-  it('selects no route in a space that has none (ADR 0015)', () => {
+  it('has no active route in a space with none (ADR 0015)', () => {
     const result = loadSpace({ version: 1, id: 's', title: 'New space', routes: [] }, [
       cardFile('a', 'Untitled'),
     ]);
     if (!result.ok) throw new Error('a route-less space should load');
     const { useStore } = createSpaceStore(result.space);
-    expect(useStore.getState().selectedRouteId).toBeNull();
+    expect(useStore.getState().activeRouteId).toBeNull();
   });
 
-  it('opens and closes a card independently of the selected route', () => {
+  it('opens and closes a card independently of the active route', () => {
     const { useStore } = createSpaceStore(fixture());
     useStore.getState().openCard('c');
-    expect(useStore.getState()).toMatchObject({ openedCardId: 'c', selectedRouteId: 'r1' });
+    expect(useStore.getState()).toMatchObject({ openedCardId: 'c', activeRouteId: 'r1' });
     useStore.getState().closeCard();
     expect(useStore.getState().openedCardId).toBeNull();
   });
@@ -94,7 +94,7 @@ function moves(
   movesFrom: SpaceStore['movesFrom'],
 ): Move[] {
   const state = useStore.getState();
-  return movesFrom(state.selectedRouteId, selectActiveCardId(state), state.branchIndex);
+  return movesFrom(state.activeRouteId, selectActiveCardId(state), state.branchIndex);
 }
 
 describe('walking a route (ADR 0027)', () => {
@@ -212,7 +212,7 @@ describe('walking a route (ADR 0027)', () => {
     const { useStore, selectActiveCardId } = createSpaceStore(fixture());
     useStore.getState().present();
     useStore.getState().advance();
-    useStore.getState().selectRoute('r2');
+    useStore.getState().activateRoute('r2');
     expect(useStore.getState().mode).toBe('overview');
     expect(selectActiveCardId(useStore.getState())).toBeNull();
   });

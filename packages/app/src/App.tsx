@@ -58,8 +58,8 @@ const persistLayoutId = view.layout?.id ?? CREATED_LAYOUT_ID;
 const persistLayoutTitle = view.layout?.title ?? CREATED_LAYOUT_TITLE;
 
 export function App() {
-  const selectedRouteId = useSpaceStore((s) => s.selectedRouteId);
-  const selectRoute = useSpaceStore((s) => s.selectRoute);
+  const activeRouteId = useSpaceStore((s) => s.activeRouteId);
+  const activateRoute = useSpaceStore((s) => s.activateRoute);
   const openedCardId = useSpaceStore((s) => s.openedCardId);
   const openCard = useSpaceStore((s) => s.openCard);
   const closeCard = useSpaceStore((s) => s.closeCard);
@@ -77,8 +77,8 @@ export function App() {
   // call, so a selector would hand Zustand a new identity each render — a
   // re-render producing a new value producing a re-render, until React gives up.
   const moves = useMemo(
-    () => movesFrom(selectedRouteId, activeCardId, branchIndex),
-    [selectedRouteId, activeCardId, branchIndex],
+    () => movesFrom(activeRouteId, activeCardId, branchIndex),
+    [activeRouteId, activeCardId, branchIndex],
   );
 
   // Which routes the view shows. Every one, for now — but membership is the
@@ -124,20 +124,20 @@ export function App() {
   const laidOut = layoutResult?.graph === graph ? layoutResult.result : null;
 
   // Selecting a route emphasises it; it never hides the rest of the space.
-  const emphasis: RouteEmphasis = selectedRouteId ? 'subtle' : 'equal';
+  const emphasis: RouteEmphasis = activeRouteId ? 'subtle' : 'equal';
 
   const projectedNodes = useMemo(
     () =>
       projectCardNodes(space, visibleHandles, colors, {
         activeCardId,
         showActiveCardContent: presenting,
-        activeRouteId: selectedRouteId,
+        activeRouteId,
         emphasis,
         ...(laidOut ? { layoutGraph: laidOut } : {}),
         nodeHeight: CARD_HEIGHT,
         cardIds: visibleCardIds,
       }),
-    [activeCardId, presenting, selectedRouteId, emphasis, laidOut, visibleHandles, visibleCardIds],
+    [activeCardId, presenting, activeRouteId, emphasis, laidOut, visibleHandles, visibleCardIds],
   );
 
   // Hand the projection to the store, which folds it into the live array so a
@@ -194,7 +194,7 @@ export function App() {
   const edges = useMemo(
     () =>
       projectRouteEdges(visibleEdges, colors, {
-        activeRouteId: selectedRouteId,
+        activeRouteId,
         emphasis,
         // A layout's routed edge geometry describes the arrangement it computed,
         // so it stops being true once a card is dragged out of it. From then on
@@ -203,7 +203,7 @@ export function App() {
         // nothing.
         ...(laidOut && !moved ? { layoutGraph: laidOut } : {}),
       }),
-    [visibleEdges, selectedRouteId, emphasis, laidOut, moved],
+    [visibleEdges, activeRouteId, emphasis, laidOut, moved],
   );
 
   const openedCard = openedCardId ? getCard(space, openedCardId) : undefined;
@@ -252,13 +252,13 @@ export function App() {
         <>
           <RouteSelector
             routes={space.routes}
-            selectedRouteId={selectedRouteId}
-            onSelect={selectRoute}
+            activeRouteId={activeRouteId}
+            onActivate={activateRoute}
           />
           <RouteLegend
             routes={space.routes}
             colorByRouteId={colors}
-            activeRouteId={selectedRouteId}
+            activeRouteId={activeRouteId}
           />
         </>
       )}
@@ -286,7 +286,7 @@ export function App() {
           variant="default"
           data-testid="present-button"
           onClick={present}
-          disabled={!selectedRouteId}
+          disabled={!activeRouteId}
         >
           Present
         </Button>

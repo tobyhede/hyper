@@ -32,8 +32,12 @@ export interface Move {
  */
 export interface SpaceState {
   mode: Mode;
-  /** The route drawn emphasized. ADR 0026 renames this to the *active* route. */
-  selectedRouteId: string | null;
+  /**
+   * The active route: the one drawn emphasized, and the one an author's edges
+   * join (ADR 0021). One concept, not two — the highlight is how active is
+   * shown, and carries no separate meaning of its own (ADR 0026).
+   */
+  activeRouteId: string | null;
   /** The cards walked, in order; the last is the active card. Empty in overview. */
   walk: readonly string[];
   /** Which outgoing edge of the active card is selected. */
@@ -44,7 +48,7 @@ export interface SpaceState {
    * the same gesture on a different kind, and should reuse this.
    */
   openedCardId: string | null;
-  selectRoute: (routeId: string) => void;
+  activateRoute: (routeId: string) => void;
   openCard: (cardId: string) => void;
   closeCard: () => void;
   present: () => void;
@@ -93,27 +97,28 @@ export function createSpaceStore(space: Space): SpaceStore {
   /** The same, for a state the store is holding. */
   const edgesFromState = (state: SpaceState) =>
     state.mode === 'presenting'
-      ? edgesFrom(state.selectedRouteId, state.walk[state.walk.length - 1] ?? null)
+      ? edgesFrom(state.activeRouteId, state.walk[state.walk.length - 1] ?? null)
       : [];
 
   const useStore = create<SpaceState>((set, get) => ({
     mode: 'overview',
-    selectedRouteId: firstRouteId,
+    activeRouteId: firstRouteId,
     walk: [],
     branchIndex: 0,
     openedCardId: null,
 
-    // Selecting a route while presenting would strand the walk on a card the new
-    // route may not touch, so it ends the walk. Selecting is a deliberate act
-    // either way (ADR 0026).
-    selectRoute: (routeId) =>
-      set({ selectedRouteId: routeId, mode: 'overview', walk: [], branchIndex: 0 }),
+    // Activating a route while presenting would strand the walk on a card the
+    // new route may not touch, so it ends the walk. Activating is a deliberate
+    // act either way, and never an edit — it converts nothing and leaves the
+    // space clean (ADR 0026, ADR 0028).
+    activateRoute: (routeId) =>
+      set({ activeRouteId: routeId, mode: 'overview', walk: [], branchIndex: 0 }),
 
     openCard: (cardId) => set({ openedCardId: cardId }),
     closeCard: () => set({ openedCardId: null }),
 
     present: () => {
-      const route = routeOf(get().selectedRouteId);
+      const route = routeOf(get().activeRouteId);
       const start = route ? routeStartCard(route) : undefined;
       // A space with no routes cannot be presented (ADR 0015), and neither can a
       // route with no entry — which acyclicity rules out, so this is a guard
@@ -133,12 +138,12 @@ export function createSpaceStore(space: Space): SpaceStore {
     },
 
     retreat: () => {
-      const { mode, selectedRouteId, walk } = get();
+      const { mode, activeRouteId, walk } = get();
       if (mode !== 'presenting' || walk.length < 2) return;
       const back = walk.slice(0, -1);
       const from = back[back.length - 1];
       const to = walk[walk.length - 1];
-      const route = routeOf(selectedRouteId);
+      const route = routeOf(activeRouteId);
       // Re-select the edge just walked back over, so going forward again returns
       // where you were rather than to whichever branch happens to be first.
       const taken =

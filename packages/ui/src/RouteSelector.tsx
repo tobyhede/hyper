@@ -3,17 +3,17 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 
 export interface RouteSelectorProps {
   routes: readonly Route[];
-  selectedRouteId: string | null;
-  onSelect: (routeId: string) => void;
+  activeRouteId: string | null;
+  onActivate: (routeId: string) => void;
 }
 
-export function RouteSelector({ routes, selectedRouteId, onSelect }: RouteSelectorProps) {
+export function RouteSelector({ routes, activeRouteId, onActivate }: RouteSelectorProps) {
   return (
     <label className="route-selector">
       <span className="route-selector__label">Route</span>
       <Select
-        {...(selectedRouteId !== null ? { value: selectedRouteId } : {})}
-        onValueChange={onSelect}
+        {...(activeRouteId !== null ? { value: activeRouteId } : {})}
+        onValueChange={onActivate}
       >
         <SelectTrigger
           className="route-selector__select"

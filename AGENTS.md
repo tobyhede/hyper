@@ -9,7 +9,7 @@ A local, file-first prototype for **graph-native technical presentations**: Mark
 Accepted ADRs run ahead of the code. Read them before touching the areas they govern, and do not read the current code as the design.
 
 - **ADR 0025 — a Layout is optional, and editing converts an automatic arrangement into one.** The app still runs `elkStrategy()` on every boot and has no positioned layout. The spec is `.scratch/positioned-layout/`, whose issues `01`–`07` predate this ADR and describe the superseded 0013/0017 model — don't implement them as written.
-- **ADR 0026 — one active route, which a Layout may name.** The store has `selectedRouteId` and no notion of active; a Layout carries neither `routes` nor `activeRoute`.
+- **ADR 0026 — one active route, which a Layout may name.** The store speaks of an active route, but a Layout carries neither `routes` nor `activeRoute`, so nothing resolves either and the app shows every route with the first active. Tickets: `.scratch/active-route/`.
 - **ADR 0021 — authoring is drag-to-connect with a single neutral handle.** The per-route handle machinery still in `react-flow-adapter` serves the overview; it is not the authoring model.
 
 ## Commands
