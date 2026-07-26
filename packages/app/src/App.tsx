@@ -165,8 +165,10 @@ export function App() {
   const moved = useEditorStore((s) => s.moved);
   const changeNodes = useEditorStore((s) => s.changeNodes);
   const arrange = useEditorStore((s) => s.arrange);
-  const positions = useEditorStore((s) => s.positions);
-  const revision = useEditorStore((s) => s.revision);
+  const markSaved = useEditorStore((s) => s.markSaved);
+  // Derived from the two counters rather than stored, so there is no third
+  // field to disagree with them. A primitive, so this selector is stable.
+  const unsaved = useEditorStore((s) => s.revision !== s.savedRevision);
   const nodes = liveNodes ?? projectedNodes;
   // Having a Layout *is* the permission to edit (ADR 0013), and the store holds
   // nodes exactly when it has one.
@@ -188,31 +190,48 @@ export function App() {
     });
   }, [graph, arrange]);
 
-  // Persist on every real edit. `revision` counts only settled drags and
-  // arranges — never the creation sync — so this saves what the author did and
-  // stays silent on load. The write is debounced by nothing: a drag ends once,
-  // and the saved space file is picked up on the next full page load, not live
-  // (ticket 06). The saved file names this Layout as `defaultView`, so a reload
-  // reopens in it rather than recomputing.
-  useEffect(() => {
-    if (revision === 0) return;
+  // Save, because the author asked (ADR 0029). An edit writes nothing — it makes
+  // the space unsaved, and this is the only thing that resolves that. The saved
+  // file names this Layout as `defaultView`, so a reload reopens in it rather
+  // than recomputing.
+  //
+  // Everything it needs is sampled from the stores, not subscribed to, so the
+  // callback keeps one identity for the life of the app and both triggers hold
+  // the same one. It also fixes what is being acknowledged: `revision` is read
+  // once, beside the positions it describes, so an edit landing while the
+  // request is in flight leaves the space unsaved rather than being marked saved
+  // without having been sent.
+  const save = useCallback(async () => {
+    const { revision, savedRevision, positions } = useEditorStore.getState();
+    if (revision === savedRevision) return;
     const next = serializeLayout(
       spaceFile,
       persistLayoutId,
       persistLayoutTitle,
       positions,
-      // Sampled here rather than watched. Activating a route is not an edit and
-      // must not fire this effect (ADR 0028) — it reaches the file only by
-      // riding along with a save something else asked for. Reading it out of the
-      // store keeps it out of the dependency array, which is what makes that
-      // true rather than merely intended.
+      // Sampled for a second reason (ADR 0028): activating a route is not an
+      // edit, so it never makes the space unsaved and never asks for a write. It
+      // reaches the file only by riding along with a save something else asked
+      // for, and this is where it does.
       useSpaceStore.getState().activeRouteId,
     );
     // The cards go too. A drag changes none of them, and the server writes only
     // what differs — but a space the app minted has cards no file describes yet,
     // and this is the save that gives them one.
-    void saveSpace(next, space.cards);
-  }, [revision, positions]);
+    if (await saveSpace(next, space.cards)) markSaved(revision);
+  }, [markSaved]);
+
+  // The second trigger. Always `preventDefault`, including when there is nothing
+  // to save: the browser's own save-page dialog is a worse answer than a no-op.
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 's' || !(event.metaKey || event.ctrlKey)) return;
+      event.preventDefault();
+      void save();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [save]);
 
   const edges = useMemo(
     () =>
@@ -297,6 +316,20 @@ export function App() {
         disabled={!editable}
       >
         Auto-arrange
+      </Button>
+      {/* An edit writes nothing; this is what writes (ADR 0029). It is also the
+          save-state indicator ADR 0025 asks for — accent and enabled when the
+          space is unsaved, neutral and disabled when there is nothing to write
+          — because what is worth surfacing is unsaved state, not that editing
+          began. `Cmd-S`/`Ctrl-S` is the same action. */}
+      <Button
+        variant={unsaved ? 'default' : 'secondary'}
+        data-testid="save-button"
+        onClick={() => void save()}
+        disabled={!unsaved}
+        title={unsaved ? 'Unsaved changes' : 'Saved'}
+      >
+        Save
       </Button>
       {/* Presenting is this same canvas drawn closer in (ADR 0027), so this
           changes the camera rather than the surface. A space with no routes has

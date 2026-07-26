@@ -21,7 +21,7 @@ Then:
 
 1. Pick a route in the toolbar. Every route stays drawn; the one you pick is emphasised.
 2. Click a card to open it and read its Markdown source. `Esc` closes it.
-3. Drag a card to move it. The arrangement is saved back to the space directory.
+3. Drag a card to move it. Nothing is written until you ask: **Save** (or `⌘S` / `Ctrl-S`) writes the arrangement back to the space directory, and until then the space is unsaved.
 4. Press **Present** to walk the route: `→` follows an edge, `←` goes back, `↑` / `↓` choose at a fork, `Esc` returns to the overview.
 
 The graph uses React Flow's [elkjs multiple-handles technique](https://reactflow.dev/examples/layout/elkjs-multiple-handles): ELK lays out the nodes and computes each port's position, and those exact offsets are applied to the handles so connected handles line up and the colored route edges stay legible.

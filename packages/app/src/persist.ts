@@ -3,7 +3,8 @@ import { serializeCardFile, type LayoutPoint } from '@project/graph';
 
 /**
  * Turning a live arrangement back into a space file, and sending it to the dev
- * server to be saved (ticket 06).
+ * server to be saved — when the author asks, never as a consequence of an edit
+ * (ADR 0029).
  *
  * Serialize from the space *file*, never from the `Space`: the `Space` is indexed
  * and derived, so rebuilding a file from it would mean un-deriving (ADR 0010).
@@ -65,10 +66,15 @@ export function serializeLayout(
  * the plugin's `configureServer`, a hook Vite calls only for the dev server. The
  * plugin itself is *not* `apply: 'serve'` — reading has to work in a build, since
  * `space.ts` imports the virtual module unconditionally.
+ *
+ * Reports whether it wrote (ADR 0029). The caller marks the space saved on that
+ * answer and on nothing else, so a refusal — a build with no endpoint, a server
+ * with nowhere to write (ADR 0018), a rejected payload — leaves the space
+ * unsaved, which is what it is.
  */
-export async function saveSpace(spaceFile: SpaceFile, cards: readonly Card[]): Promise<void> {
-  if (!import.meta.env.DEV) return;
-  await fetch('/__space', {
+export async function saveSpace(spaceFile: SpaceFile, cards: readonly Card[]): Promise<boolean> {
+  if (!import.meta.env.DEV) return false;
+  const response = await fetch('/__space', {
     method: 'PUT',
     headers: { 'content-type': 'application/json' },
     // Cards go as id and text, never as a path. The server derives every path
@@ -80,4 +86,5 @@ export async function saveSpace(spaceFile: SpaceFile, cards: readonly Card[]): P
       cards: cards.map((card) => ({ id: card.id, text: serializeCardFile(card) })),
     }),
   });
+  return response.ok;
 }

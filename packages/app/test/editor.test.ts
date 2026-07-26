@@ -187,9 +187,9 @@ describe('editor store', () => {
     expect(store.getState().moved).toBe(false);
   });
 
-  it('counts a real edit but not the creation sync (the save signal)', () => {
-    // `revision` is what `App` saves on. It must stay 0 through creation — a load
-    // is not an edit and must not write the file — and tick on a moving drag.
+  it('counts a real edit but not the creation sync (the unsaved signal)', () => {
+    // `revision` is what makes a space unsaved. It must stay 0 through creation
+    // — a load is not an edit — and tick on a moving drag.
     const store = createEditorStore();
     store.getState().syncNodes(PROJECTED);
     expect(store.getState().revision).toBe(0);
@@ -209,5 +209,62 @@ describe('editor store', () => {
       .getState()
       .changeNodes([{ type: 'position', id: 'a', position: { x: 10, y: 20 }, dragging: false }]);
     expect(store.getState().revision).toBe(0);
+  });
+});
+
+/** Unsaved is derived, exactly as `App` derives it. */
+const unsaved = (store: ReturnType<typeof createEditorStore>): boolean =>
+  store.getState().revision !== store.getState().savedRevision;
+
+describe('editor store: what has reached disk (ADR 0029)', () => {
+  it('opens saved, and stays saved through the creation sync', () => {
+    // An opened space has nothing to write. That holds for a minted one too,
+    // whose cards are described by no file yet — writing it unasked is the same
+    // failure as saving a stray drag, one step earlier.
+    const store = createEditorStore();
+    expect(unsaved(store)).toBe(false);
+
+    store.getState().syncNodes(PROJECTED);
+    expect(unsaved(store)).toBe(false);
+  });
+
+  it('is unsaved after an edit, and saved once that edit is acknowledged', () => {
+    const store = createEditorStore();
+    store.getState().syncNodes(PROJECTED);
+
+    store.getState().changeNodes(drag('a', 500, 400));
+    expect(unsaved(store)).toBe(true);
+
+    store.getState().markSaved(store.getState().revision);
+    expect(unsaved(store)).toBe(false);
+  });
+
+  it('stays unsaved when an edit lands while the save is in flight', () => {
+    // The whole reason `markSaved` takes a revision. Drag, ask, drag again
+    // before the response — the second drag was never sent, so acknowledging
+    // the first must not claim it.
+    const store = createEditorStore();
+    store.getState().syncNodes(PROJECTED);
+
+    store.getState().changeNodes(drag('a', 500, 400));
+    const sent = store.getState().revision;
+    store.getState().changeNodes(drag('b', 700, 100));
+
+    store.getState().markSaved(sent);
+    expect(unsaved(store)).toBe(true);
+  });
+
+  it('never un-acknowledges a newer save with an older response', () => {
+    // Two saves in flight, the slower one older. Its response arriving last must
+    // not walk the acknowledgement backwards.
+    const store = createEditorStore();
+    store.getState().syncNodes(PROJECTED);
+    store.getState().changeNodes(drag('a', 500, 400));
+    const first = store.getState().revision;
+    store.getState().changeNodes(drag('b', 700, 100));
+
+    store.getState().markSaved(store.getState().revision);
+    store.getState().markSaved(first);
+    expect(unsaved(store)).toBe(false);
   });
 });

@@ -91,3 +91,50 @@ test('edges follow a card that has been dragged', async ({ page }) => {
   // cards now are.
   await expect.poll(edgePath).not.toBe(before);
 });
+
+/**
+ * Saving is asked for, never a consequence of an edit (ADR 0029).
+ *
+ * This server is read-only, so the endpoint answers without writing: what these
+ * assert is the control and the request, not the file. That a save survives a
+ * reload — and that an unsaved one does not — is proven in `new-space.spec`,
+ * against the one server in the suite that genuinely writes.
+ */
+
+test('a drag leaves the space unsaved, and saving clears it', async ({ page }) => {
+  await page.goto('/');
+  const a = nodeByTitle(page, 'A').first();
+  await expect(a).toBeVisible();
+  await expect(page.locator('.react-flow__edge-path').first()).toHaveAttribute('d', /L/);
+  await settled(page);
+
+  // Opening a space is not editing it, so there is nothing to write. The
+  // disabled control is the save-state indicator ADR 0025 asks for.
+  const save = page.getByTestId('save-button');
+  await expect(save).toBeDisabled();
+
+  await dragBy(page, a, 0, 260);
+  await expect(save).toBeEnabled();
+
+  const responded = page.waitForResponse((response) => response.url().endsWith('/__space'));
+  await save.click();
+  await responded;
+  await expect(save).toBeDisabled();
+});
+
+test('Cmd-S saves, and is the same act as the button', async ({ page }) => {
+  await page.goto('/');
+  const a = nodeByTitle(page, 'A').first();
+  await expect(a).toBeVisible();
+  await expect(page.locator('.react-flow__edge-path').first()).toHaveAttribute('d', /L/);
+  await settled(page);
+
+  await dragBy(page, a, 0, 260);
+  const save = page.getByTestId('save-button');
+  await expect(save).toBeEnabled();
+
+  const responded = page.waitForResponse((response) => response.url().endsWith('/__space'));
+  await page.keyboard.press('ControlOrMeta+s');
+  await responded;
+  await expect(save).toBeDisabled();
+});

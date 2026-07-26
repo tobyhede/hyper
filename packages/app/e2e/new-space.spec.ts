@@ -68,17 +68,16 @@ test('is saved and reopens where you left it — the round trip', async ({ page 
   const card = nodeByTitle(page, 'Start here');
   await expect(card).toBeVisible();
   await settled(page);
+  await dragBy(page, card, 0, 220);
+  const moved = await positionOf(card);
+
+  // The drag itself writes nothing (ADR 0029). Asking is what writes — and the
+  // request is fire-and-forget, so wait for the response rather than the click.
   const saved = page.waitForResponse(
     (response) => response.url().endsWith('/__space') && response.status() === 204,
   );
-  await dragBy(page, card, 0, 220);
-
-  // The save is fire-and-forget, so wait for the response rather than a promise —
-  // and read the position *after* it, so what is compared is the placement the
-  // store committed at drag-end rather than wherever the last mouse move left the
-  // node mid-gesture.
+  await page.getByTestId('save-button').click();
   await saved;
-  const moved = await positionOf(card);
 
   await page.reload();
 
@@ -94,4 +93,33 @@ test('is saved and reopens where you left it — the round trip', async ({ page 
   const after = await positionOf(reopened);
   expect(Math.abs(after.x - moved.x)).toBeLessThan(2);
   expect(Math.abs(after.y - moved.y)).toBeLessThan(2);
+});
+
+test('a move nobody saved does not survive a reload (ADR 0029)', async ({ page }) => {
+  await page.goto('/');
+
+  const card = nodeByTitle(page, 'Start here');
+  await expect(card).toBeVisible();
+  await settled(page);
+  // Wherever the last save left it — this project is serial and shares one space
+  // directory, so the baseline is read rather than assumed.
+  const before = await positionOf(card);
+
+  await dragBy(page, card, 0, 240);
+  const moved = await positionOf(card);
+  expect(moved.y).toBeGreaterThan(before.y + 80);
+
+  // No save. This is the half of ADR 0029 the round trip cannot show: reloading
+  // must lose the move, or the drag wrote something behind the author's back.
+  // Only this server actually writes, so it is the only place the claim is real
+  // — under the read-only fixture server every reload would lose it regardless.
+  await page.reload();
+
+  const reopened = nodeByTitle(page, 'Start here');
+  await expect(reopened).toBeVisible();
+  await settled(page);
+
+  const after = await positionOf(reopened);
+  expect(Math.abs(after.x - before.x)).toBeLessThan(2);
+  expect(Math.abs(after.y - before.y)).toBeLessThan(2);
 });
