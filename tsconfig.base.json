@@ -4,8 +4,15 @@
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "module": "ESNext",
     "moduleResolution": "Bundler",
+    // Every file is a module. Left on `auto`, a file with no import or export is
+    // a global script and leaks its declarations repo-wide. No file is one
+    // today, which is exactly when this is free to turn on.
+    "moduleDetection": "force",
     "jsx": "react-jsx",
     "types": [],
+    // Nothing here emits — `tsc` is a checker in this repo and Vite does the
+    // building. Was repeated in all six configs that extend this one.
+    "noEmit": true,
     "strict": true,
     "noImplicitOverride": true,
     "noUncheckedIndexedAccess": true,

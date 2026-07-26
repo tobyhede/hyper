@@ -68,9 +68,12 @@ export function serializeLayout(
  * `space.ts` imports the virtual module unconditionally.
  *
  * Reports whether it wrote (ADR 0029). The caller marks the space saved on that
- * answer and on nothing else, so a refusal — a build with no endpoint, a server
- * with nowhere to write (ADR 0018), a rejected payload — leaves the space
- * unsaved, which is what it is.
+ * answer and on nothing else, so a refusal leaves the space unsaved, which is
+ * what it is — and the Save control stays lit, which is the author's report.
+ * There are more ways to be refused than there look: the endpoint answers 400
+ * (invalid payload, or an id it cannot write), 403 (cross-origin), 413 (too
+ * large), 500 (the disk) and 501 (nowhere to write, ADR 0018), and a build has
+ * no endpoint at all.
  */
 export async function saveSpace(spaceFile: SpaceFile, cards: readonly Card[]): Promise<boolean> {
   if (!import.meta.env.DEV) return false;
@@ -86,5 +89,16 @@ export async function saveSpace(spaceFile: SpaceFile, cards: readonly Card[]): P
       cards: cards.map((card) => ({ id: card.id, text: serializeCardFile(card) })),
     }),
   });
+
+  // `fetch` resolves for 400 and 500 alike, so the status is the only thing that
+  // says whether this wrote. Reading it is what makes the unsaved indicator
+  // honest: without it a rejection looks exactly like a save, the Save control
+  // goes dark, and the arrangement vanishes on the next reload with nothing
+  // having said so.
+  //
+  // A read-only server is the one case this reads as saved when nothing reached
+  // disk — it answers 204 having done nothing, deliberately, so an e2e drag
+  // cannot edit the fixture the suite asserts against. `read-only.spec.ts` is
+  // where that is pinned, by the header rather than the status.
   return response.ok;
 }

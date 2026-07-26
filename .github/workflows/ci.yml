@@ -1,0 +1,83 @@
+# The bar `docs/agents/workflow.md` already sets, run by something other than a
+# human remembering. Until now every gate in this repo — typecheck, lint,
+# format, tests, e2e — was opt-in, which is why `playwright.config.ts` has
+# carried `forbidOnly` and `retries` for a CI that did not exist.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Nothing here writes to the repository, comments on a PR, or publishes.
+permissions:
+  contents: read
+
+# A new push supersedes the run in flight for the same ref.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        # Keeps the job's token out of `.git/config`, where any dependency's
+        # install script could read it.
+        with: { persist-credentials: false }
+      # No `version:` input on purpose — the action then reads `packageManager`
+      # from package.json, so the pin cannot drift between here and a laptop.
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      # `--frozen-lockfile` is what turns the committed lockfile into a gate
+      # rather than documentation.
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm verify
+
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with: { persist-credentials: false }
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      - name: Resolve Playwright version
+        id: pw
+        run: |
+          version=$(node -p "require('./node_modules/@playwright/test/package.json').version")
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/cache@v4
+        id: pw-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: pw-${{ runner.os }}-${{ steps.pw.outputs.version }}
+
+      - if: steps.pw-cache.outputs.cache-hit != 'true'
+        run: pnpm exec playwright install --with-deps chromium
+      # The browser binaries are cached; the apt libraries they need are not,
+      # since those live outside ~/.cache/ms-playwright.
+      - if: steps.pw-cache.outputs.cache-hit == 'true'
+        run: pnpm exec playwright install-deps chromium
+
+      - run: pnpm e2e
+
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7

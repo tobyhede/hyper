@@ -5,10 +5,12 @@
   "type": "module",
   "scripts": {
     "dev": "SPACE_DIR=fixture vite",
-    "build": "vite build",
+    "build": "tsc -p tsconfig.json --noEmit && vite build",
     "preview": "vite preview",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "dev:new": "SPACE_DIR=.space vite --port 5174 --strictPort"
+    "dev:new": "SPACE_DIR=.space vite --port 5174 --strictPort",
+    "e2e:server": "SPACE_DIR=fixture SPACE_READ_ONLY=1 vite --port 5273 --strictPort",
+    "e2e:server:new": "SPACE_DIR=.space vite --port 5274 --strictPort"
   },
   "dependencies": {
     "@project/core": "workspace:*",
@@ -17,7 +19,6 @@
     "@project/ui": "workspace:*",
     "@tanstack/react-router": "^1.87.0",
     "@xyflow/react": "^12.3.5",
-    "elkjs": "^0.12.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "zustand": "^5.0.2"

@@ -77,7 +77,13 @@ test('is saved and reopens where you left it — the round trip', async ({ page 
     (response) => response.url().endsWith('/__space') && response.status() === 204,
   );
   await page.getByTestId('save-button').click();
-  await saved;
+  const response = await saved;
+
+  // 204 alone does not mean it wrote: a read-only server answers 204 too, having
+  // done nothing. This project's whole point is that this server *does* write, so
+  // assert the file count rather than the status. Two files — the minted card and
+  // the space file that now names a Layout positioning it.
+  expect(Number(response.headers()['x-space-files-written'])).toBeGreaterThan(0);
 
   await page.reload();
 

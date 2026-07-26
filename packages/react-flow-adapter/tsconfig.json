@@ -2,7 +2,15 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "types": ["react", "react-dom"],
-    "noEmit": true
+    // The boundary: see `packages/core/tsconfig.json`. This is the one package
+    // allowed React Flow and elkjs, and it may read the domain and the UI
+    // vocabulary — but not `app`, which composes it. (No `rootDir` — see
+    // `graph`.)
+    "paths": {
+      "@project/core": ["../core/src/index.ts"],
+      "@project/graph": ["../graph/src/index.ts"],
+      "@project/ui": ["../ui/src/index.ts"]
+    }
   },
   "include": ["src"]
 }

@@ -218,6 +218,12 @@ export function App() {
     // The cards go too. A drag changes none of them, and the server writes only
     // what differs — but a space the app minted has cards no file describes yet,
     // and this is the save that gives them one.
+    //
+    // A refused save is *reported*, and the Save control is where. It is only
+    // marked saved if the server says it wrote, so a refusal leaves the button
+    // lit and the space unsaved — which is the surface the console.error that
+    // used to sit here was standing in for ("the honest minimum until there is
+    // somewhere on screen for unsaved state to live"). There now is.
     if (await saveSpace(next, space.cards)) markSaved(revision);
   }, [markSaved]);
 

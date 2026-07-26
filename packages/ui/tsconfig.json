@@ -2,7 +2,13 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "types": ["react", "react-dom"],
-    "noEmit": true
+    // The boundary: see `packages/core/tsconfig.json`. `ui` is reusable,
+    // presentation-agnostic React over the domain vocabulary — `core` only. Not
+    // `graph`, which would put domain logic behind a component; not the render
+    // libraries, which belong to the adapter. (No `rootDir` — see `graph`.)
+    "paths": {
+      "@project/core": ["../core/src/index.ts"]
+    }
   },
   "include": ["src"]
 }

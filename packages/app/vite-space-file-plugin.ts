@@ -1,57 +1,21 @@
-import {
-  existsSync,
-  mkdirSync,
-  readdirSync,
-  readFileSync,
-  renameSync,
-  writeFileSync,
-} from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import type { Plugin } from 'vite';
-// Imported by *relative* path, not as `@project/core`. Vite loads this config in
-// Node and externalizes bare specifiers, so the package specifier would hand
-// Node the workspace TypeScript source — whose extensionless relative imports
-// (`export * from './schema'`) Node's ESM resolver rejects. A relative import is
-// bundled by esbuild instead, which resolves them.
-import { spaceFileSchema } from '../core/src/index';
-/**
- * What a save sends: the space file, and every card as text keyed by its id.
- *
- * Hand-checked rather than built with zod, because a bare `zod` specifier in a
- * Vite *config* module is externalized and resolved by Node from `packages/app`,
- * where it is not a dependency — the config then fails to load and the dev
- * server will not start. `spaceFileSchema` arrives by relative import, so
- * esbuild bundles it and its own zod along with it. Same rule as everything else
- * in this file's import list, one step further out.
- *
- * Ids are constrained because an id becomes a *filename*: this is the one place
- * a value from the browser reaches the filesystem, so it is bounded to a bare
- * slug rather than merely screened for `..`. The card text is not parsed here —
- * `loadSpace` is what validates a card, on the way back in.
- */
-interface SavedCard {
-  id: string;
-  text: string;
-}
-
-const CARD_ID = /^[a-zA-Z0-9][a-zA-Z0-9_-]*$/;
-
-function parseSavedSpace(value: unknown): { spaceFile: unknown; cards: SavedCard[] } | null {
-  if (typeof value !== 'object' || value === null) return null;
-  const { spaceFile, cards } = value as { spaceFile?: unknown; cards?: unknown };
-  if (!spaceFileSchema.safeParse(spaceFile).success) return null;
-  if (!Array.isArray(cards)) return null;
-
-  const parsed: SavedCard[] = [];
-  for (const card of cards as unknown[]) {
-    if (typeof card !== 'object' || card === null) return null;
-    const { id, text } = card as { id?: unknown; text?: unknown };
-    if (typeof id !== 'string' || !CARD_ID.test(id)) return null;
-    if (typeof text !== 'string') return null;
-    parsed.push({ id, text });
-  }
-  return { spaceFile, cards: parsed };
-}
+// Imported by *relative* path, not as `@project/*`. Vite loads this config in
+// Node and externalizes bare specifiers, so a package specifier would hand Node
+// the workspace TypeScript source — whose extensionless relative imports
+// (`export * from './schema'`) Node's ESM resolver rejects, and the dev server
+// would not start. A relative import is bundled by esbuild instead.
+import {
+  fromLoopback,
+  holdsSpace,
+  MAX_BODY_BYTES,
+  parseSavedSpace,
+  readCardFiles,
+  spaceFilePath,
+  UnwritableCardError,
+  writeSpace,
+} from './space-file-io';
 
 /**
  * The space seam: read through a virtual module, write through a middleware.
@@ -111,65 +75,8 @@ const SPACE_DIR: string | null = process.env['SPACE_DIR']
   ? resolve(process.cwd(), process.env['SPACE_DIR'])
   : null;
 
-/** Whether a directory holds a space yet, as opposed to naming where one will go. */
-const holdsSpace = (dir: string | null): dir is string =>
-  dir !== null && existsSync(spaceFilePath(dir));
-
-const spaceFilePath = (dir: string): string => `${dir}/space.json`;
-
 /** Whether this server may write. e2e clears it; a build never gets here. */
 const readOnly = (): boolean => Boolean(process.env['SPACE_READ_ONLY']);
-
-/**
- * Write via a temp file in the same directory, then rename over the target.
- * `rename(2)` is atomic within a filesystem, so a crash or a partial write
- * leaves the previous file intact rather than a truncated one.
- *
- * This did not matter while the target was a throwaway `space.local.json` — a
- * corrupt one cost nothing and was deleted to recover. It matters now that the
- * target is the authored space file, where a truncated write destroys content
- * that only git can get back. Same directory on purpose: renaming across
- * filesystems is not atomic.
- */
-function writeSafely(target: string, contents: string): void {
-  mkdirSync(dirname(target), { recursive: true });
-  const temp = `${target}.tmp`;
-  writeFileSync(temp, contents);
-  renameSync(temp, target);
-}
-
-/**
- * Write only if the bytes differ. A drag changes no card body, so without this
- * every save would rewrite every card file — the write amplification the prior
- * art warns about, and the reason Logseq's own docs graph carries churn nobody
- * asked for. Returns whether anything was written, for the response.
- */
-function writeIfChanged(target: string, contents: string): boolean {
-  if (existsSync(target) && readFileSync(target, 'utf8') === contents) return false;
-  writeSafely(target, contents);
-  return true;
-}
-
-/** Markdown files in one directory, never below it. */
-function markdownIn(dir: string, prefix: string): { path: string; text: string }[] {
-  if (!existsSync(dir)) return [];
-  return readdirSync(dir, { withFileTypes: true })
-    .filter((entry) => entry.isFile() && entry.name.endsWith('.md'))
-    .map((entry) => ({
-      path: `${prefix}${entry.name}`,
-      text: readFileSync(`${dir}/${entry.name}`, 'utf8'),
-    }))
-    .sort((a, b) => a.path.localeCompare(b.path));
-}
-
-/**
- * Every card file of the space, from the two scanned locations. Sorted by path
- * so the module's contents do not depend on directory order; the order cards end
- * up in is `loadSpace`'s decision, not this one's.
- */
-function readCardFiles(dir: string): { path: string; text: string }[] {
-  return [...markdownIn(dir, ''), ...markdownIn(`${dir}/cards`, 'cards/')];
-}
 
 /**
  * The virtual module's source.
@@ -213,102 +120,150 @@ export function spaceFilePlugin(): Plugin {
       return undefined;
     },
 
+    // Returned, not registered inline. Vite calls `configureServer` hooks
+    // *before* it installs its own middlewares and collects what they return as
+    // post-hooks, run after. Registering here directly put `/__space` at
+    // position 0 of the connect stack — ahead of `hostCheckMiddleware`, the
+    // defence added for CVE-2025-24010, which never ran for this route.
+    //
+    // That is the DNS-rebinding hole: a page on `http://evil.example:5273/`
+    // whose name is re-pointed at 127.0.0.1 issues a *same-origin* PUT here, so
+    // no CORS preflight applies, and the `Host: evil.example` header that Vite
+    // would reject on any other route was never inspected. Returning the
+    // registration puts this route behind the host check like everything else.
     configureServer(server) {
-      server.middlewares.use('/__space', (req, res, next) => {
-        if (req.method !== 'PUT') {
-          next();
-          return;
-        }
-        // e2e must not mutate disk. With no shadow file left to absorb writes,
-        // this is the only thing between a suite that drags cards and the
-        // authored space it is testing against.
-        if (readOnly()) {
-          res.statusCode = 204;
-          res.end();
-          return;
-        }
-        // With no `SPACE_DIR` at all there is nowhere to write — a build, or a
-        // server started to look rather than to author. Naming a directory that
-        // does not exist yet is different, and is how a minted space gets a home.
-        if (!SPACE_DIR) {
-          res.statusCode = 501;
-          res.end('no SPACE_DIR: this space has nowhere to be written');
-          return;
-        }
-        const dir = SPACE_DIR;
-
-        const chunks: Buffer[] = [];
-        req.on('data', (chunk: Buffer) => chunks.push(chunk));
-        req.on('end', () => {
-          let parsed: unknown;
-          try {
-            parsed = JSON.parse(Buffer.concat(chunks).toString('utf8'));
-          } catch {
-            res.statusCode = 400;
-            res.end('invalid json');
+      return () => {
+        server.middlewares.use('/__space', (req, res, next) => {
+          if (req.method !== 'PUT') {
+            next();
             return;
           }
-          // Validate server-side, so a client bug cannot write a corrupt space
-          // file over authored content — which is now the *authored* file, not a
-          // local copy of it, so this is the only thing guarding it. The target
-          // path is fixed above and never read from the request: an endpoint
-          // taking a path from the browser is an arbitrary-file-write primitive
-          // for any page the human has open.
-          //
-          // Card files are not written here yet. Nothing in the app creates or
-          // edits one, so the endpoint stays a space-file writer until something
-          // does — `serializeCardFile` in `@project/graph` is the half that
-          // exists, waiting for a consumer.
-          const payload = parseSavedSpace(parsed);
-          if (!payload) {
-            res.statusCode = 400;
-            res.end('does not satisfy the saved-space shape');
+          // Belt and braces behind the host check above: the request must come
+          // from a loopback origin, or from no browser at all. Under rebinding
+          // the attacker's page still carries its own origin — `evil.example` —
+          // because rebinding changes what the name *resolves to*, not what the
+          // page is called. Deliberately not compared against `Host`, which is
+          // the header the attack controls.
+          if (!fromLoopback(req.headers.origin)) {
+            res.statusCode = 403;
+            res.end('cross-origin save refused');
             return;
           }
-          const { spaceFile, cards } = payload;
-
-          // Every path is derived here, from an id this server has just
-          // validated as a bare slug — never taken from the request. An endpoint
-          // that accepts a path is an arbitrary-file-write primitive for any page
-          // the human has open, and that stays true however the payload grows.
-          //
-          // A card already on disk is rewritten where it sits, so an author who
-          // put `intro.md` beside the space file keeps it there. Only a card this
-          // server has never seen is placed, and it goes in `cards/`.
-          const pathById = new Map(
-            readCardFiles(dir).flatMap((file) => {
-              const id = /^---\r?\n(?:.*\r?\n)*?id:\s*(\S+)\s*\r?\n/.exec(file.text)?.[1];
-              return id ? [[id.replace(/^['"]|['"]$/g, ''), file.path] as const] : [];
-            }),
-          );
-
-          let written = 0;
-          for (const card of cards) {
-            const target = `${dir}/${pathById.get(card.id) ?? `cards/${card.id}.md`}`;
-            if (writeIfChanged(target, card.text)) written += 1;
+          // e2e must not mutate disk. With no shadow file left to absorb writes,
+          // this is the only thing between a suite that drags cards and the
+          // authored space it is testing against.
+          if (readOnly()) {
+            res.statusCode = 204;
+            res.end();
+            return;
           }
-          // A card missing from the payload is never deleted. Deletion by absence
-          // turns any client bug into data loss, and nothing in the app deletes a
-          // card yet — when something does, it can say so explicitly.
-          if (writeIfChanged(spaceFilePath(dir), JSON.stringify(spaceFile, null, 2) + '\n')) {
-            written += 1;
+          // With no `SPACE_DIR` at all there is nowhere to write — a build, or a
+          // server started to look rather than to author. Naming a directory that
+          // does not exist yet is different, and is how a minted space gets a home.
+          if (!SPACE_DIR) {
+            res.statusCode = 501;
+            res.end('no SPACE_DIR: this space has nowhere to be written');
+            return;
           }
+          const dir = SPACE_DIR;
 
-          // Drop the virtual module from Vite's graph so the next full page load
-          // re-runs `load()` and reads what was just written. Without this the
-          // module is transformed once and cached, and a reload re-serves the
-          // space as it was at server start — the file on disk changes and the
-          // app never sees it. Deliberately *not* an HMR push: invalidating
-          // leaves the open page alone, so a save cannot remount the graph
-          // mid-drag, which is the feedback loop this seam has always avoided.
-          const cached = server.moduleGraph.getModuleById(RESOLVED_ID);
-          if (cached) server.moduleGraph.invalidateModule(cached);
+          // Bounded. Without a cap a single PUT can balloon the dev server's
+          // memory, and the body is buffered whole before it is parsed.
+          const chunks: Buffer[] = [];
+          let size = 0;
+          let oversized = false;
+          req.on('data', (chunk: Buffer) => {
+            size += chunk.length;
+            if (size > MAX_BODY_BYTES) {
+              // Answer and hang up rather than draining the rest: the point of
+              // the cap is not to hold the body in memory.
+              oversized = true;
+              chunks.length = 0;
+              res.statusCode = 413;
+              res.end('space too large');
+              req.destroy();
+              return;
+            }
+            chunks.push(chunk);
+          });
+          // A client that vanishes mid-upload emits `error`, and an unhandled
+          // `error` on a stream throws out of the emitter — taking the dev
+          // server down, which is the same failure the write `catch` exists to
+          // prevent, one step earlier.
+          req.on('error', () => {
+            oversized = true;
+            chunks.length = 0;
+            res.destroy();
+          });
+          req.on('end', () => {
+            if (oversized) {
+              if (!res.writableEnded) {
+                res.statusCode = 413;
+                res.end('space too large');
+              }
+              return;
+            }
+            let parsed: unknown;
+            try {
+              parsed = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+            } catch {
+              res.statusCode = 400;
+              res.end('invalid json');
+              return;
+            }
+            // Validate server-side, so a client bug cannot write a corrupt space
+            // file over authored content — which is now the *authored* file, not
+            // a local copy of it, so this is the only thing guarding it. The
+            // target path is fixed above and never read from the request: an
+            // endpoint taking a path from the browser is an arbitrary-file-write
+            // primitive for any page the human has open.
+            //
+            // Card files are not written here yet. Nothing in the app creates or
+            // edits one, so the endpoint stays a space-file writer until
+            // something does — `serializeCardFile` in `@project/graph` is the
+            // half that exists, waiting for a consumer.
+            const payload = parseSavedSpace(parsed);
+            if (!payload) {
+              res.statusCode = 400;
+              res.end('does not satisfy the saved-space shape');
+              return;
+            }
+            const { spaceFile, cards } = payload;
 
-          res.statusCode = 204;
-          res.setHeader('x-space-files-written', String(written));
-          res.end();
+            let written: number;
+            try {
+              written = writeSpace(dir, spaceFile, cards);
+            } catch (error) {
+              // These writes run inside an emitter callback, where an uncaught
+              // throw takes the whole dev server down rather than failing one
+              // request — and that server is the human's. `EACCES`, `ENOSPC` and
+              // a read-only volume are all reachable without anyone doing
+              // anything wrong.
+              //
+              // A payload the server cannot write is the client's fault, not the
+              // disk's, so it answers 400 and says which card.
+              res.statusCode = error instanceof UnwritableCardError ? 400 : 500;
+              res.end(`save failed: ${error instanceof Error ? error.message : 'unknown'}`);
+              return;
+            }
+
+            // Drop the virtual module from Vite's graph so the next full page
+            // load re-runs `load()` and reads what was just written. Without
+            // this the module is transformed once and cached, and a reload
+            // re-serves the space as it was at server start — the file on disk
+            // changes and the app never sees it. Deliberately *not* an HMR push:
+            // invalidating leaves the open page alone, so a save cannot remount
+            // the graph mid-drag, which is the feedback loop this seam has
+            // always avoided.
+            const cached = server.moduleGraph.getModuleById(RESOLVED_ID);
+            if (cached) server.moduleGraph.invalidateModule(cached);
+
+            res.statusCode = 204;
+            res.setHeader('x-space-files-written', String(written));
+            res.end();
+          });
         });
-      });
+      };
     },
   };
 }

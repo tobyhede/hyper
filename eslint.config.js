@@ -4,6 +4,51 @@ import reactHooks from 'eslint-plugin-react-hooks';
 import reactRefresh from 'eslint-plugin-react-refresh';
 import globals from 'globals';
 
+/** Render-layer libraries: they live in `react-flow-adapter` and nowhere below
+ *  it. ELK's presence here is the point of ADR 0014 — it is one strategy among
+ *  several, not the thing "layout" means, so `graph` must not reach for it. */
+const RENDER_ONLY = [
+  { name: '@xyflow/react', message: 'React Flow lives in @project/react-flow-adapter only.' },
+  { name: 'elkjs', message: 'elkjs lives in @project/react-flow-adapter only.' },
+];
+
+/** React itself, barred from the domain packages. `ui` is exempt: it is React
+ *  components by definition. */
+const REACT = [
+  { name: 'react', message: 'Domain logic stays out of React (AGENTS.md).' },
+  { name: 'react-dom', message: 'Domain logic stays out of React (AGENTS.md).' },
+];
+
+/**
+ * Climbing out of a package by relative path, which is how a boundary gets
+ * crossed without ever naming `@project/*` — `packages/core/src/x.ts` reaching
+ * `../../app/src/store` typechecked and linted clean, and dragged in a
+ * dependency `core` does not declare.
+ *
+ * `../../` from `packages/<pkg>/src` lands in `packages/`, and nothing legal is
+ * up there: a package's own files are all at or below `src`. One `../` is left
+ * alone so a file in a subdirectory can still reach its sibling.
+ */
+const ESCAPE_PATTERN = {
+  group: ['../../*', '../../**'],
+  message:
+    'Relative import climbs out of the package. Depend on it properly via @project/* — or do not depend on it (AGENTS.md).',
+};
+
+/** `paths` and `patterns` must each be homogeneous — all strings or all objects
+ *  — so the render-layer bans are restated as groups to sit beside the escape
+ *  pattern. Both spellings are needed: a `paths` entry for `elkjs` does not
+ *  match `elkjs/lib/elk.bundled.js`, which is how it is actually imported. */
+const RENDER_ONLY_PATTERN = {
+  group: ['elkjs/*', '@xyflow/*'],
+  message: 'React Flow and elkjs live in @project/react-flow-adapter only.',
+};
+
+const REACT_DOM_PATTERN = {
+  group: ['react-dom/*'],
+  message: 'Domain logic stays out of React (AGENTS.md).',
+};
+
 export default tseslint.config(
   {
     ignores: [
@@ -11,10 +56,22 @@ export default tseslint.config(
       '**/node_modules/**',
       '**/playwright-report/**',
       '**/test-results/**',
+      '**/coverage/**',
       '**/.tanstack/**',
       // Throwaway local working dirs — spikes, issue tracker, tool state.
       '**/.scratch/**',
       '**/.serena/**',
+      // Agent tooling, gitignored alongside the two above. `.claude/worktrees/`
+      // holds *real git worktrees on other branches*, so without this `eslint .`
+      // walks into them and `pnpm verify` fails here on code you are not
+      // working on — and every warning is reported twice, once per checkout.
+      //
+      // Flat config does not read `.gitignore`; this is the same class of bug
+      // as the `spike.html` incident, where a gitignored file broke a tool that
+      // does not consult `.gitignore` either. Prettier honours it, hence the
+      // separate entry in `.prettierignore`.
+      '**/.claude/**',
+      '**/.agents/**',
     ],
   },
   js.configs.recommended,
@@ -69,6 +126,84 @@ export default tseslint.config(
     files: ['**/test/**', '**/e2e/**', '**/*.{test,spec}.{ts,tsx}'],
     rules: {
       '@typescript-eslint/no-non-null-assertion': 'off',
+    },
+  },
+  // The package boundaries AGENTS.md calls "hard rules", enforced rather than
+  // described. They held by habit until now: `packages/core` could import
+  // `@xyflow/react`, or React, and every check stayed green.
+  //
+  // Stated as *which packages may not*, deliberately. The repo-wide reading —
+  // "nothing outside react-flow-adapter imports React Flow" — is already false:
+  // `packages/app` imports `@xyflow/react` in five files and legitimately so,
+  // being the composition layer. What is actually true is that the domain and
+  // the reusable UI stay clear of it.
+  //
+  // `patterns` is load-bearing next to `paths`: a `paths` entry for `elkjs`
+  // does not match `elkjs/lib/elk.bundled.js`, which is how it is really
+  // imported. The type layer (`rootDir` + narrowed `paths` in each package's
+  // tsconfig) catches what this cannot — relative escapes like `../../app/src`.
+  //
+  // Every package gets the escape pattern; the domain packages get the library
+  // bans on top. A later `files` block wins outright for a given rule, so each
+  // zone restates what it inherits rather than adding to it.
+  {
+    files: ['packages/*/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': ['error', { patterns: [ESCAPE_PATTERN] }],
+    },
+  },
+  {
+    files: ['packages/ui/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        { paths: RENDER_ONLY, patterns: [ESCAPE_PATTERN, RENDER_ONLY_PATTERN] },
+      ],
+    },
+  },
+  {
+    files: ['packages/{core,graph}/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [...RENDER_ONLY, ...REACT],
+          patterns: [ESCAPE_PATTERN, RENDER_ONLY_PATTERN, REACT_DOM_PATTERN],
+        },
+      ],
+    },
+  },
+  // Vite loads these in Node and externalizes bare specifiers, so a `@project/*`
+  // import hands *Node* the workspace TypeScript — whose extensionless relative
+  // imports its ESM resolver rejects. The config then fails to load at all and
+  // the dev server will not start, which is why this is worth a rule: the
+  // symptom is a broken server, not a type error.
+  {
+    // `space-file-io.ts` is not a config, but it is bundled into one, so the
+    // same resolution rule binds it.
+    files: [
+      'packages/*/vite*.ts',
+      'packages/app/space-file-io.ts',
+      '*.config.ts',
+      'packages/*/*.config.ts',
+    ],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['@project/*'],
+              message:
+                'Vite externalizes bare specifiers and hands Node raw TS — import by relative path (AGENTS.md).',
+            },
+          ],
+        },
+      ],
+      // These files sit at a package root and reach a sibling package by
+      // relative path on purpose, which is the one legitimate escape.
+      // `vite-space-file-plugin.ts` imports `../core/src/index` for exactly the
+      // reason the rule above exists.
     },
   },
   // Config files run as plain JS — no type information to check them against.
