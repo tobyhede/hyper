@@ -12,13 +12,14 @@
     "dev:new": "pnpm --filter @project/app dev:new",
     "build": "pnpm --filter @project/app build",
     "typecheck": "tsc -p tsconfig.json --noEmit",
+    "typecheck:packages": "pnpm -r typecheck",
     "lint": "eslint . --max-warnings=0",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "vitest run",
     "test:watch": "vitest",
     "e2e": "playwright test",
-    "verify": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm test"
+    "verify": "pnpm typecheck && pnpm typecheck:packages && pnpm lint && pnpm format:check && pnpm test"
   },
   "pnpm": {
     "overrides": {

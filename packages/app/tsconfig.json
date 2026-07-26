@@ -2,7 +2,19 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "types": ["react", "react-dom", "vite/client"],
-    "noEmit": true
+    // `app` is the composition layer, so it may reach everything — the `paths`
+    // below are the full set, restated rather than inherited so that adding a
+    // package forces a deliberate decision here about who may see it.
+    //
+    // No `rootDir`: unlike the others this config's `include` spans `src`,
+    // `e2e`, `example` and the two Vite files at the package root, which have no
+    // common root but the package itself. Nothing is above `app` to escape to.
+    "paths": {
+      "@project/core": ["../core/src/index.ts"],
+      "@project/graph": ["../graph/src/index.ts"],
+      "@project/react-flow-adapter": ["../react-flow-adapter/src/index.ts"],
+      "@project/ui": ["../ui/src/index.ts"]
+    }
   },
   "include": ["src", "example", "e2e", "vite.config.ts", "vite-space-file-plugin.ts"]
 }

@@ -1,7 +1,16 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "noEmit": true
+    // The boundary: see `packages/core/tsconfig.json`. `graph` is pure logic
+    // over a Space — `core` and nothing else, no React, no render library.
+    //
+    // No `rootDir` here: it would reject the legitimate `@project/core` import
+    // too, since the aliased file resolves outside this package. `rootDir` only
+    // works for a package with no dependencies. The relative-escape half of the
+    // boundary is an ESLint pattern instead.
+    "paths": {
+      "@project/core": ["../core/src/index.ts"]
+    }
   },
   "include": ["src"]
 }

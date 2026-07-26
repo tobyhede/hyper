@@ -12,7 +12,6 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@project/core": "workspace:*",
     "@project/graph": "workspace:*",
     "@project/ui": "workspace:*",
     "elkjs": "^0.12.0"

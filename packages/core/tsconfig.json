@@ -1,7 +1,24 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "noEmit": true
+    /*
+     * `rootDir` and `paths` together are the package boundary.
+     *
+     * The base config aliases all four `@project/*` packages and every package
+     * extends it, so without an override each package can import any other —
+     * including a cycle back into its own dependent. And with no `rootDir`, a
+     * relative escape (`../../app/src/store`) typechecks too, pulling in a
+     * dependency the package never declared.
+     *
+     * ESLint's `no-restricted-imports` zones catch both halves — the package
+     * specifier and the relative escape. `rootDir` is the type-level backstop,
+     * and it is set *only here*: elsewhere it would reject the legitimate
+     * `@project/*` import too, because the aliased file resolves outside the
+     * package. It works for `core` precisely because `core` depends on none of
+     * ours. See AGENTS.md, "Package layout & boundaries".
+     */
+    "rootDir": "src",
+    "paths": {}
   },
   "include": ["src"]
 }
