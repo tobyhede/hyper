@@ -80,10 +80,14 @@ export interface SpaceStore {
  * Build a store bound to a given Space. The Space is passed in rather than
  * imported (ADR 0010), so the store is testable against fixture spaces and never
  * reaches for a module singleton.
+ *
+ * The route to open active comes in too, resolved from the Layout that named it
+ * or from the first route the view shows (ADR 0026). The store does not work it
+ * out: which routes are visible is the View's decision, and a store reaching for
+ * `space.routes[0]` would answer it a second time and disagree the moment a
+ * Layout filters.
  */
-export function createSpaceStore(space: Space): SpaceStore {
-  const firstRouteId = space.routes[0]?.id ?? null;
-
+export function createSpaceStore(space: Space, initialActiveRouteId: string | null): SpaceStore {
   const routeOf = (routeId: string | null) =>
     routeId !== null ? getRoute(space, routeId) : undefined;
 
@@ -102,7 +106,7 @@ export function createSpaceStore(space: Space): SpaceStore {
 
   const useStore = create<SpaceState>((set, get) => ({
     mode: 'overview',
-    activeRouteId: firstRouteId,
+    activeRouteId: initialActiveRouteId,
     walk: [],
     branchIndex: 0,
     openedCardId: null,

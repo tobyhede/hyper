@@ -28,10 +28,26 @@ import { GraphView } from './components/GraphView';
 import { OpenCard } from './components/OpenCard';
 import { PresentingChrome } from './components/PresentingChrome';
 
+// Which view this space opens in, and the strategy that arranges it. The fixture
+// declares no view, so this resolves to the route-driven ELK graph — exactly
+// what the hardcoded `elkStrategy()` here used to do. It also answers which
+// routes are shown and which of them opens active (ADR 0026), so it has to
+// resolve before the store is built.
+const view = resolveView(space);
+
+// The routes this view draws. A Layout's filter is authored view scope, so the
+// legend and the route control list these and not every route in the space —
+// activating only ever moves emphasis within what is visible.
+const visibleRoutes = space.routes.filter((route) => view.visibleRouteIds.includes(route.id));
+
 // Derived once from the (static) space. The store is bound to it here — the one
 // place the app's singleton space meets the store factory (ADR 0010).
 const colors = routeColorMap(space);
-const { useStore: useSpaceStore, selectActiveCardId, movesFrom } = createSpaceStore(space);
+const {
+  useStore: useSpaceStore,
+  selectActiveCardId,
+  movesFrom,
+} = createSpaceStore(space, view.activeRouteId);
 
 // The markdown a card shows, resolving an alias to its target's body (ADR 0009).
 // A card keeps its own title; only content is inherited.
@@ -40,11 +56,6 @@ function markdownForCard(cardId: string): string {
 }
 const allHandles = buildCardHandles(space);
 const allRouteEdges = buildRouteEdges(space);
-
-// Which view this space opens in, and the strategy that arranges it. The fixture
-// declares no view, so this resolves to the route-driven ELK graph — exactly
-// what the hardcoded `elkStrategy()` here used to do.
-const view = resolveView(space);
 
 // Owns React Flow's node array and the Layout being edited. A space that
 // declared no Layout gets one from the first resolved layout (ADR 0017), so this
@@ -81,10 +92,11 @@ export function App() {
     [activeRouteId, activeCardId, branchIndex],
   );
 
-  // Which routes the view shows. Every one, for now — but membership is the
-  // view's decision (ADR 0005), so route visibility controls attach here rather
-  // than inside the graph or layout packages.
-  const visibleRouteIds = useMemo(() => space.routes.map((r) => r.id), []);
+  // Which routes the view shows, resolved from the Layout that filtered them
+  // (ADR 0026). Membership is the view's decision (ADR 0005), which is why it
+  // arrives from `resolveView` rather than being decided in the graph or layout
+  // packages.
+  const visibleRouteIds = view.visibleRouteIds;
 
   // Every card, not just the route-visited ones. A space may have cards and no
   // routes at all (ADR 0015) — deriving the card set from the routes would render
@@ -247,16 +259,18 @@ export function App() {
 
   const toolbar = (
     <>
-      {/* A space with no routes has nothing to select or legend (ADR 0015). */}
-      {space.routes.length > 0 && (
+      {/* A space with no routes has nothing to activate or legend (ADR 0015),
+          and neither has a view that shows none. Both list the *visible* routes:
+          activating moves emphasis within that set and never widens it. */}
+      {visibleRoutes.length > 0 && (
         <>
           <RouteSelector
-            routes={space.routes}
+            routes={visibleRoutes}
             activeRouteId={activeRouteId}
             onActivate={activateRoute}
           />
           <RouteLegend
-            routes={space.routes}
+            routes={visibleRoutes}
             colorByRouteId={colors}
             activeRouteId={activeRouteId}
           />

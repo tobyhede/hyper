@@ -102,6 +102,63 @@ describe('resolveView', () => {
     expect(view.automatic).toBe(view.strategy);
   });
 
+  it('shows every route and opens on the first when no Layout filters', () => {
+    const space = spaceWith({
+      routes: [...ROUTES, { id: 'aside', title: 'Aside', edges: [{ from: 'b', to: 'a' }] }],
+    });
+    const view = resolveView(space);
+    expect(view.visibleRouteIds).toEqual(['main', 'aside']);
+    expect(view.activeRouteId).toBe('main');
+  });
+
+  it('shows only the routes its Layout names', () => {
+    const space = spaceWith({
+      routes: [...ROUTES, { id: 'aside', title: 'Aside', edges: [{ from: 'b', to: 'a' }] }],
+      layouts: [{ ...WORKING, routes: ['aside'] }],
+      defaultView: 'working',
+    });
+    const view = resolveView(space);
+    expect(view.visibleRouteIds).toEqual(['aside']);
+  });
+
+  it('opens on the first *visible* route, not the space’s first', () => {
+    // The filter is what the fallback runs over. Reading it off the space would
+    // open active on a route the Layout does not draw.
+    const space = spaceWith({
+      routes: [...ROUTES, { id: 'aside', title: 'Aside', edges: [{ from: 'b', to: 'a' }] }],
+      layouts: [{ ...WORKING, routes: ['aside'] }],
+      defaultView: 'working',
+    });
+    expect(resolveView(space).activeRouteId).toBe('aside');
+  });
+
+  it('honours a Layout’s named activeRoute over the first', () => {
+    const space = spaceWith({
+      routes: [...ROUTES, { id: 'aside', title: 'Aside', edges: [{ from: 'b', to: 'a' }] }],
+      layouts: [{ ...WORKING, activeRoute: 'aside' }],
+      defaultView: 'working',
+    });
+    const view = resolveView(space);
+    expect(view.visibleRouteIds).toEqual(['main', 'aside']);
+    expect(view.activeRouteId).toBe('aside');
+  });
+
+  it('has no active route in a space with none (ADR 0015)', () => {
+    const view = resolveView(spaceWith({ routes: [] }));
+    expect(view.visibleRouteIds).toEqual([]);
+    expect(view.activeRouteId).toBeNull();
+  });
+
+  it('has no active route when a Layout shows none', () => {
+    // Empty is not absent: absent means every route, empty means this layout
+    // draws no routes at all, and there is then nothing to be active.
+    const space = spaceWith({
+      layouts: [{ ...WORKING, routes: [] }],
+      defaultView: 'working',
+    });
+    expect(resolveView(space).activeRouteId).toBeNull();
+  });
+
   it('opens a space with no routes, which is where editing starts (ADR 0015)', async () => {
     const space = spaceWith({
       routes: [],
