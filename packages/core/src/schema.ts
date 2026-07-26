@@ -95,12 +95,36 @@ export const layoutPositionSchema = z.object({
  * renders it places those itself — but a position may not name a card that does
  * not exist; that is a reference error, checked in `@project/graph` where the
  * whole space is in view.
+ *
+ * It also points at routes: which it shows, and which of those is active (ADR
+ * 0026). Both are optional and independent, and the dependency runs one way —
+ * geometry references topology, never the reverse. A Route stays a peer of
+ * Layout under the Space and knows nothing about where it is drawn.
  */
 export const positionedLayoutSchema = z.object({
   id: idSchema,
   title: z.string().min(1),
   kind: z.literal('positioned'),
   positions: z.record(idSchema, layoutPositionSchema),
+  /**
+   * The routes this layout *shows* — a filter, absent meaning every route (ADR
+   * 0026). Authored view scope: one arrangement does not suit every route, and
+   * a layout arranged for some should not draw the ones it was not arranged
+   * for. Activating a route moves emphasis within this set and never changes
+   * it — *selection is emphasis, not filtering, and the filter is the Layout's*.
+   */
+  routes: z.array(idSchema).optional(),
+  /**
+   * Which visible route is active when this layout opens. Absent, the **first
+   * visible route** is (ADR 0026) — resolved on read, so a hand-authored space
+   * needs nothing here, while a file the app wrote names it outright rather
+   * than depending on route order (ADR 0028).
+   *
+   * Independent of `routes`: a layout may filter without naming an active
+   * route, or name one without filtering. That it names a *visible* route is a
+   * relation between the two fields and is checked in `@project/graph`.
+   */
+  activeRoute: idSchema.optional(),
 });
 
 /**

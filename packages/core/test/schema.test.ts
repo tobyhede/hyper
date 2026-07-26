@@ -233,6 +233,69 @@ describe('space file layouts', () => {
     expect(result.success).toBe(false);
   });
 
+  it('parses the routes a layout shows and the one it opens active', () => {
+    const file = spaceFileSchema.parse({
+      ...validSpaceFile,
+      layouts: [{ ...working, routes: ['long', 'short'], activeRoute: 'short' }],
+    });
+    expect(file.layouts?.[0]?.routes).toEqual(['long', 'short']);
+    expect(file.layouts?.[0]?.activeRoute).toBe('short');
+  });
+
+  it('leaves both absent — every route shown, the first of them active', () => {
+    // Absent is the meaningful case, not a missing field to be filled in: it is
+    // how a layout says "all of them" and defers the active one (ADR 0026).
+    const file = spaceFileSchema.parse({ ...validSpaceFile, layouts: [working] });
+    expect(file.layouts?.[0]?.routes).toBeUndefined();
+    expect(file.layouts?.[0]?.activeRoute).toBeUndefined();
+  });
+
+  it('takes either without the other — the two are independent', () => {
+    const filtered = spaceFileSchema.parse({
+      ...validSpaceFile,
+      layouts: [{ ...working, routes: ['long'] }],
+    });
+    expect(filtered.layouts?.[0]?.activeRoute).toBeUndefined();
+
+    const named = spaceFileSchema.parse({
+      ...validSpaceFile,
+      layouts: [{ ...working, activeRoute: 'long' }],
+    });
+    expect(named.layouts?.[0]?.routes).toBeUndefined();
+  });
+
+  it('accepts an empty routes list — a layout that shows none', () => {
+    // Not the same as absent, which means all. Shape allows it; whether it is
+    // sensible is the author's business.
+    const file = spaceFileSchema.parse({
+      ...validSpaceFile,
+      layouts: [{ ...working, routes: [] }],
+    });
+    expect(file.layouts?.[0]?.routes).toEqual([]);
+  });
+
+  it('rejects route references that are not ids', () => {
+    for (const layout of [
+      { ...working, routes: [''] },
+      { ...working, routes: 'long' },
+      { ...working, activeRoute: '' },
+    ]) {
+      expect(spaceFileSchema.safeParse({ ...validSpaceFile, layouts: [layout] }).success).toBe(
+        false,
+      );
+    }
+  });
+
+  it('accepts an activeRoute no route has — resolution is a reference check', () => {
+    // Shape only, as everywhere here. That it names a real route, and one this
+    // layout shows, needs the whole space in view (@project/graph).
+    const file = spaceFileSchema.parse({
+      ...validSpaceFile,
+      layouts: [{ ...working, routes: ['long'], activeRoute: 'nope' }],
+    });
+    expect(file.layouts?.[0]?.activeRoute).toBe('nope');
+  });
+
   it('accepts defaultView as a plain name, resolved elsewhere', () => {
     // Shape only: whether the name resolves is a reference check, since it needs
     // the declared layouts in view.
