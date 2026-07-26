@@ -57,7 +57,7 @@ export function serializeLayout(
  */
 export async function saveSpace(spaceFile: SpaceFile, cards: readonly Card[]): Promise<void> {
   if (!import.meta.env.DEV) return;
-  await fetch('/__space', {
+  const response = await fetch('/__space', {
     method: 'PUT',
     headers: { 'content-type': 'application/json' },
     // Cards go as id and text, never as a path. The server derives every path
@@ -69,4 +69,30 @@ export async function saveSpace(spaceFile: SpaceFile, cards: readonly Card[]): P
       cards: cards.map((card) => ({ id: card.id, text: serializeCardFile(card) })),
     }),
   });
+
+  // `fetch` resolves for 400 and 500 alike, so not reading the status made every
+  // rejection look like a save. The endpoint answers 400 (invalid payload or an
+  // id it cannot write), 403 (cross-origin), 413 (too large), 500 (the disk) and
+  // 501 (nowhere to write) — and a read-only server answers 204 having done
+  // nothing. An arrangement the author watched land would then vanish on reload
+  // with nothing having said so.
+  if (!response.ok) {
+    throw new SaveFailedError(response.status, (await response.text()).trim());
+  }
+}
+
+/** A save the server refused. Carries the status so a caller can tell "nowhere
+ *  to write" (501, expected in a look-only server) from a real failure. */
+export class SaveFailedError extends Error {
+  // Declared rather than parameter properties: `erasableSyntaxOnly` is on, and
+  // a parameter property is syntax that has to be *emitted*, not erased.
+  readonly status: number;
+  readonly detail: string;
+
+  constructor(status: number, detail: string) {
+    super(`save refused (${String(status)})${detail ? `: ${detail}` : ''}`);
+    this.name = 'SaveFailedError';
+    this.status = status;
+    this.detail = detail;
+  }
 }

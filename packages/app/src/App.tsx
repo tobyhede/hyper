@@ -188,7 +188,17 @@ export function App() {
     // The cards go too. A drag changes none of them, and the server writes only
     // what differs — but a space the app minted has cards no file describes yet,
     // and this is the save that gives them one.
-    void saveSpace(next, space.cards);
+    //
+    // A refused save is *reported*, not swallowed. It used to be neither: the
+    // promise was discarded and `saveSpace` never read the status, so a 400 or a
+    // 500 looked exactly like a save and the arrangement vanished on the next
+    // reload with nothing having said so. The console is the honest minimum
+    // until there is somewhere on screen for unsaved state to live — which is a
+    // real surface to design (what it says, whether it retries), not a line to
+    // sneak in here.
+    saveSpace(next, space.cards).catch((error: unknown) => {
+      console.error('[space] the arrangement was not saved and will be lost on reload:', error);
+    });
   }, [revision, positions]);
 
   const edges = useMemo(

@@ -52,6 +52,18 @@ export type SpaceFile = ReturnType<typeof spaceFileSchema.parse>;
 export const CARD_ID = /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$/;
 
 /**
+ * Whether a card's id is safe to turn into a filename.
+ *
+ * Only asked of a card this server has **never seen**. A card already on disk
+ * has its path read from disk (`cardPathById`), so its id is a `Map` key and
+ * never touches the filesystem — and requiring the slug of it anyway rejected
+ * ids the domain accepts. `idSchema` is `z.string().min(1)`, so `intro.v2`,
+ * `section one` and non-ASCII ids all load happily and then failed every
+ * subsequent save with a 400 the author never saw.
+ */
+export const canDeriveFilename = (id: string): boolean => CARD_ID.test(id);
+
+/**
  * Enough for any hand-authored space, small enough that a runaway or hostile
  * PUT cannot balloon the dev server's memory — the body is buffered whole
  * before it can be parsed.
@@ -88,8 +100,18 @@ export function parseSavedSpace(
   for (const card of cards as unknown[]) {
     if (typeof card !== 'object' || card === null) return null;
     const { id, text } = card as { id?: unknown; text?: unknown };
-    if (typeof id !== 'string' || !CARD_ID.test(id)) return null;
+    if (typeof id !== 'string' || id.length === 0) return null;
     if (typeof text !== 'string') return null;
+    // The card must say who it is, and agree with the envelope.
+    //
+    // Without this, an envelope id was enough to overwrite the file it names
+    // with anything at all: the id chose the target and the text was written
+    // unread, so a client bug or a hostile page could replace an authored card
+    // with content that fails intake on the next load, or that quietly claims a
+    // different identity. Checking identity — not full validity — is what stops
+    // the *target* and the *content* disagreeing. `loadSpace` still owns whether
+    // a card is well-formed, on the way back in.
+    if (frontmatterId(text) !== id) return null;
     parsed.push({ id, text });
   }
   return { spaceFile: validated.data, cards: parsed };
@@ -194,7 +216,11 @@ export function readCardFiles(dir: string): { path: string; text: string }[] {
 export function frontmatterId(text: string): string | undefined {
   const frontmatter = /^---\r?\n([\s\S]*?)\r?\n---/.exec(text)?.[1];
   if (frontmatter === undefined) return undefined;
-  const id = /^id:\s*(\S+)\s*$/m.exec(frontmatter)?.[1];
+  // The rest of the line, not the first run of non-space. `idSchema` is
+  // `z.string().min(1)` and YAML's unquoted scalars carry spaces, so `\S+` read
+  // `section one` as `section` — and once the envelope id has to match this,
+  // reading it wrong rejects a card that loads perfectly well.
+  const id = /^id:[ \t]*(.+?)[ \t\r]*$/m.exec(frontmatter)?.[1];
   return id?.replace(/^['"]|['"]$/g, '');
 }
 
@@ -212,6 +238,23 @@ export function cardPathById(dir: string): Map<string, string> {
       return id ? [[id, file.path] as const] : [];
     }),
   );
+}
+
+/**
+ * A card the server has never seen whose id cannot become a filename. Distinct
+ * from a filesystem failure so the endpoint can answer 400 (the payload is
+ * unwritable) rather than 500 (the disk refused).
+ */
+export class UnwritableCardError extends Error {
+  // Declared rather than a parameter property: `erasableSyntaxOnly` is on, and
+  // a parameter property is syntax that has to be *emitted*, not erased.
+  readonly cardId: string;
+
+  constructor(cardId: string) {
+    super(`card "${cardId}" is new and its id cannot be used as a filename`);
+    this.name = 'UnwritableCardError';
+    this.cardId = cardId;
+  }
 }
 
 /**
@@ -235,7 +278,14 @@ export function writeSpace(dir: string, spaceFile: SpaceFile, cards: SavedCard[]
 
   let written = 0;
   for (const card of cards) {
-    const target = `${dir}/${pathById.get(card.id) ?? `cards/${card.id}.md`}`;
+    const known = pathById.get(card.id);
+    // The slug is required only to *invent* a path. A card already on disk is
+    // written back where it sits, so its id never reaches the filesystem and
+    // any id the domain accepts is fine here.
+    if (known === undefined && !canDeriveFilename(card.id)) {
+      throw new UnwritableCardError(card.id);
+    }
+    const target = `${dir}/${known ?? `cards/${card.id}.md`}`;
     if (writeIfChanged(target, card.text)) written += 1;
   }
   if (writeIfChanged(spaceFilePath(dir), JSON.stringify(spaceFile, null, 2) + '\n')) {

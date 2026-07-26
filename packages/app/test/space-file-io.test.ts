@@ -9,6 +9,7 @@ import {
   fromLoopback,
   parseSavedSpace,
   readCardFiles,
+  UnwritableCardError,
   writeIfChanged,
   writeSpace,
 } from '../space-file-io';
@@ -92,8 +93,25 @@ describe('parseSavedSpace', () => {
     expect(parsed?.spaceFile).toMatchObject({ id: 'a-space', title: 'A space' });
   });
 
-  it('rejects a payload whose card id is not a slug', () => {
-    expect(parseSavedSpace({ spaceFile, cards: [{ id: '../evil', text: 'x' }] })).toBeNull();
+  it('rejects a card whose text does not claim the envelope’s id', () => {
+    // The envelope id chooses the file; the text is what lands in it. Letting
+    // them disagree meant an id was enough to overwrite a card with anything.
+    expect(
+      parseSavedSpace({ spaceFile, cards: [{ id: 'intro', text: cardFile('other') }] }),
+    ).toBeNull();
+  });
+
+  it('rejects a card whose text is not a card file at all', () => {
+    expect(parseSavedSpace({ spaceFile, cards: [{ id: 'intro', text: 'garbage' }] })).toBeNull();
+  });
+
+  it('accepts an id the domain accepts but a filename could not hold', () => {
+    // `idSchema` is `z.string().min(1)`, so these load. Requiring the filename
+    // slug of *every* payload card rejected them here, and every drag-save on
+    // such a space failed with a 400 the author never saw.
+    for (const id of ['intro.v2', 'section one', 'ünicode', 'a'.repeat(120)]) {
+      expect(parseSavedSpace({ spaceFile, cards: [{ id, text: cardFile(id) }] })).not.toBeNull();
+    }
   });
 
   it('rejects a space file that fails the schema', () => {
@@ -111,8 +129,9 @@ describe('parseSavedSpace', () => {
   });
 
   it('accepts a well-formed payload', () => {
-    const parsed = parseSavedSpace({ spaceFile, cards: [{ id: 'intro', text: 'hello' }] });
-    expect(parsed?.cards).toEqual([{ id: 'intro', text: 'hello' }]);
+    const text = cardFile('intro', 'hello');
+    const parsed = parseSavedSpace({ spaceFile, cards: [{ id: 'intro', text }] });
+    expect(parsed?.cards).toEqual([{ id: 'intro', text }]);
   });
 });
 
@@ -184,8 +203,15 @@ describe('frontmatterId', () => {
     ['double quotes', '---\nid: "intro"\n---\n'],
     ['CRLF line endings', '---\r\nid: intro\r\n---\r\n'],
     ['a later position in the block', '---\ntitle: T\nid: intro\n---\n'],
+    ['trailing spaces', '---\nid: intro   \n---\n'],
   ])('handles %s', (_label, text) => {
     expect(frontmatterId(text)).toBe('intro');
+  });
+
+  it('reads an unquoted id containing spaces', () => {
+    // YAML's unquoted scalars carry spaces and `idSchema` permits them, so
+    // stopping at the first run of non-space read `section one` as `section`.
+    expect(frontmatterId('---\nid: section one\ntitle: T\n---\n')).toBe('section one');
   });
 
   it.each([
@@ -292,6 +318,26 @@ describe('writeSpace', () => {
     };
     expect(writeSpace(dir, moved, [{ id: 'intro', text }])).toBe(1);
     expect(statSync(join(dir, 'intro.md')).mtimeMs).toBe(before);
+  });
+
+  it('writes a card whose id no filename could hold, where it already sits', () => {
+    // The path comes from disk, so the id is a Map key and never reaches the
+    // filesystem. This is the save that used to fail with a 400.
+    writeFileSync(join(dir, 'dotted.md'), cardFile('intro.v2'));
+
+    expect(
+      writeSpace(dir, spaceFile, [{ id: 'intro.v2', text: cardFile('intro.v2', 'Edited.') }]),
+    ).toBe(2);
+    expect(readFileSync(join(dir, 'dotted.md'), 'utf8')).toContain('Edited.');
+  });
+
+  it('refuses to invent a filename for an id that cannot be one', () => {
+    // Only reachable for a card the server has never seen — there is no path to
+    // reuse, so the id would have to become one.
+    expect(() =>
+      writeSpace(dir, spaceFile, [{ id: '../escape', text: cardFile('../escape') }]),
+    ).toThrow(UnwritableCardError);
+    expect(readCardFiles(dir)).toEqual([]);
   });
 
   it('writes the space file as formatted JSON with a trailing newline', () => {

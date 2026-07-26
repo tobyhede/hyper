@@ -113,4 +113,18 @@ describe('parseCardFile', () => {
     expect(result.errors.map((e) => e.kind)).toEqual(['invalid-frontmatter']);
     expect(result.errors[0]?.message).toContain('title');
   });
+
+  it('accepts CRLF fences, as a Windows checkout produces', () => {
+    // `core.autocrlf` makes every card in the repository start `---\r\n`, and a
+    // LF-only fence check called all of them frontmatter-less — so the space
+    // failed to load at all rather than failing to look right.
+    const lf = '---\nid: intro\ntitle: T\n---\n\nBody line.\n';
+    const crlf = lf.replace(/\n/g, '\r\n');
+
+    const result = parseCardFile({ path: 'a.md', text: crlf });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.frontmatter.id).toBe('intro');
+    expect(result.body.trim()).toBe('Body line.');
+  });
 });

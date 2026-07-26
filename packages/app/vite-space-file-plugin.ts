@@ -13,6 +13,7 @@ import {
   parseSavedSpace,
   readCardFiles,
   spaceFilePath,
+  UnwritableCardError,
   writeSpace,
 } from './space-file-io';
 
@@ -238,7 +239,10 @@ export function spaceFilePlugin(): Plugin {
               // request — and that server is the human's. `EACCES`, `ENOSPC` and
               // a read-only volume are all reachable without anyone doing
               // anything wrong.
-              res.statusCode = 500;
+              //
+              // A payload the server cannot write is the client's fault, not the
+              // disk's, so it answers 400 and says which card.
+              res.statusCode = error instanceof UnwritableCardError ? 400 : 500;
               res.end(`save failed: ${error instanceof Error ? error.message : 'unknown'}`);
               return;
             }
