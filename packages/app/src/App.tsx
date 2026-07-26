@@ -239,6 +239,28 @@ export function App() {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [save]);
 
+  // Leaving with unsaved work asks first. ADR 0029 accepts that an arrangement
+  // can be lost — nothing was written, so there is nothing to recover — and this
+  // is what turns that from a surprise into a question. It is a mitigation and
+  // not what makes the decision safe; the thing at risk is an arrangement the
+  // author can redo, never content they typed.
+  //
+  // Registered with the unsaved state rather than attached once and made
+  // conditional inside: a handler that is always there asks the browser to treat
+  // every navigation as interesting, and costs the page its back/forward cache.
+  useEffect(() => {
+    if (!unsaved) return;
+    const onBeforeUnload = (event: BeforeUnloadEvent) => {
+      // `preventDefault` alone. The old pairing with `event.returnValue = ''` is
+      // deprecated — lint rejects it outright — and current Chromium, Firefox
+      // and Safari all honour the spec'd call. Don't add it back for the sake of
+      // a browser this prototype does not run in.
+      event.preventDefault();
+    };
+    window.addEventListener('beforeunload', onBeforeUnload);
+    return () => window.removeEventListener('beforeunload', onBeforeUnload);
+  }, [unsaved]);
+
   const edges = useMemo(
     () =>
       projectRouteEdges(visibleEdges, colors, {

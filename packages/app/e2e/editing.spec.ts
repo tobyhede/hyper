@@ -122,6 +122,36 @@ test('a drag leaves the space unsaved, and saving clears it', async ({ page }) =
   await expect(save).toBeDisabled();
 });
 
+test('leaving with unsaved work asks first, and leaving with none does not', async ({ page }) => {
+  await page.goto('/');
+  await expect(nodeByTitle(page, 'A').first()).toBeVisible();
+  await expect(page.locator('.react-flow__edge-path').first()).toHaveAttribute('d', /L/);
+  await settled(page);
+
+  // Accepting a `beforeunload` dialog is "leave the page", so the reloads below
+  // still happen. Without a listener Playwright dismisses dialogs, which for
+  // this one means *stay* — the reload would be cancelled and the test would
+  // fail somewhere far from the cause.
+  const asked: string[] = [];
+  page.on('dialog', (dialog) => {
+    asked.push(dialog.type());
+    void dialog.accept();
+  });
+
+  // Nothing has been edited, so there is nothing to lose and nothing to ask.
+  // The handler is not merely inert here — it is not registered at all.
+  await page.reload();
+  await expect(nodeByTitle(page, 'A').first()).toBeVisible();
+  expect(asked).toEqual([]);
+
+  await settled(page);
+  await dragBy(page, nodeByTitle(page, 'A').first(), 0, 240);
+  await expect(page.getByTestId('save-button')).toBeEnabled();
+
+  await page.reload();
+  expect(asked).toEqual(['beforeunload']);
+});
+
 test('Cmd-S saves, and is the same act as the button', async ({ page }) => {
   await page.goto('/');
   const a = nodeByTitle(page, 'A').first();

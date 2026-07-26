@@ -53,7 +53,9 @@ test('the endpoint answers a save without writing, and says so by omission', asy
   expect(readFixture()).toBe(before);
 });
 
-test('a saved drag through the app leaves the authored fixture byte-identical', async ({ page }) => {
+test('a saved drag through the app leaves the authored fixture byte-identical', async ({
+  page,
+}) => {
   const before = readFixture();
 
   await page.goto('/');
