@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ReactFlowProvider } from '@xyflow/react';
 import { AppShell, Button, RouteLegend, RouteSelector } from '@project/ui';
 import {
@@ -175,6 +175,7 @@ export function App() {
   // a state the space can go back to: nothing sets `nodes` back to null, so this
   // is false for one frame and true from then on.
   const editable = liveNodes !== null;
+  const saveQueue = useRef<Promise<void>>(Promise.resolve());
 
   // Auto-arrange: the one crossing from computed placement to authored placement.
   // Run the automatic strategy and take its result as the Layout — an edit, not a
@@ -227,7 +228,14 @@ export function App() {
     // lit and the space unsaved — which is the surface the console.error that
     // used to sit here was standing in for ("the honest minimum until there is
     // somewhere on screen for unsaved state to live"). There now is.
-    if (await saveSpace(next, space.cards, cardSource)) markSaved(revision);
+    const write = saveQueue.current.then(async () => {
+      if (await saveSpace(next, space.cards, cardSource)) markSaved(revision);
+    });
+    // Keep later saves moving even if a network failure rejects this caller's
+    // request. What matters for disk ordering is that every write starts after
+    // the preceding attempt has settled.
+    saveQueue.current = write.catch(() => undefined);
+    await write;
   }, [markSaved]);
 
   // The second trigger. Always `preventDefault`, including when there is nothing

@@ -168,3 +168,44 @@ test('Cmd-S saves, and is the same act as the button', async ({ page }) => {
   await responded;
   await expect(save).toBeDisabled();
 });
+
+test('a newer save waits for an older save to finish', async ({ page }) => {
+  let finishFirst: () => void = () => undefined;
+  const firstMayFinish = new Promise<void>((resolve) => {
+    finishFirst = resolve;
+  });
+  let announceFirst: () => void = () => undefined;
+  const firstStarted = new Promise<void>((resolve) => {
+    announceFirst = resolve;
+  });
+  const requests: string[] = [];
+
+  await page.route('**/__space', async (route) => {
+    requests.push(route.request().postData() ?? '');
+    if (requests.length === 1) {
+      announceFirst();
+      await firstMayFinish;
+    }
+    await route.fulfill({ status: 204 });
+  });
+
+  await page.goto('/');
+  await expect(nodeByTitle(page, 'A').first()).toBeVisible();
+  await expect(page.locator('.react-flow__edge-path').first()).toHaveAttribute('d', /L/);
+  await settled(page);
+
+  const save = page.getByTestId('save-button');
+  await dragBy(page, nodeByTitle(page, 'A').first(), 0, 260);
+  await save.click();
+  await firstStarted;
+
+  await dragBy(page, nodeByTitle(page, 'B').first(), 0, 260);
+  await save.click();
+
+  await page.waitForTimeout(200);
+  expect(requests).toHaveLength(1);
+
+  finishFirst();
+  await expect.poll(() => requests.length).toBe(2);
+  await expect(save).toBeDisabled();
+});
