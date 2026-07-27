@@ -3,6 +3,7 @@ import {
   BUILT_IN_VIEW_IDS,
   CARD_DESCRIPTION_MAX_LENGTH,
   cardFrontmatterSchema,
+  cardSchema,
   isBuiltInViewId,
   spaceFileSchema,
 } from '../src/index';
@@ -139,6 +140,17 @@ describe('card frontmatter schema', () => {
     });
     expect(alias.kind).toBe('alias');
     expect(alias.kind === 'alias' && alias.target).toBe('a');
+  });
+
+  it('gives an alias no body field at all', () => {
+    const alias = cardSchema.parse({
+      id: 'a-again',
+      title: 'A, again',
+      kind: 'alias',
+      target: 'a',
+    });
+
+    expect('body' in alias).toBe(false);
   });
 
   it('rejects an alias with no target', () => {

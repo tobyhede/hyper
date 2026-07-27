@@ -1,67 +1,98 @@
 # An alias has no body field at all
 
-Status: open
+Status: resolved
 Type: task
 
-`aliasCardSchema` gives an alias a `body` constrained to `z.literal('')`. That models absence as a sentinel: the field exists, and one particular value is agreed to mean "not applicable". It should not exist.
+`aliasCardSchema` gives an alias a `body` constrained to `z.literal('')`. That models absence as a sentinel: the field exists, and one particular value is agreed to mean "not applicable". It should not exist on the domain value.
 
-## Nothing reads it
+## Decision evidence
 
-Every read of a card's content in the app goes through `resolveContentCard` first:
+ADR 0009 is explicit about the shape: an alias is `{ id, title, kind: 'alias', target }`, it "holds a pointer, not content", and exactly one card owns the content. `CONTEXT.md` says the same thing in domain language: Markdown content is written directly by the author, while an alias shows its target's content and carries only its own title. The original discriminated union in `4b56914` followed that decision and gave the alias no content field.
+
+The sentinel is later and accidental. ADR 0020's card-file cutover (`8397e36`) extended both union members with `body: z.string()` because every card is stored in a Markdown file. Commit `7d09f5c` tightened the alias member to `z.literal('')` so prose after an alias's frontmatter could no longer be accepted and silently discarded. Neither change superseded ADR 0009's domain decision; they coupled the physical post-frontmatter region of a card file to the in-memory `Card` shape.
+
+ADR 0020 creates a wording wrinkle, not a contrary model: every card is physically one Markdown file, but only a Markdown card owns the file body's content. For an alias the post-frontmatter region must be empty and must not become a domain field.
+
+## Content readers already resolve first
+
+The two production display reads are:
 
 ```
-App.tsx:55          resolveContentCard(space, cardId)?.body ?? ''
-projection.ts:152   resolveContentCard(space, card.id)?.body ?? ''
+packages/app/src/App.tsx
+packages/react-flow-adapter/src/projection.ts
 ```
 
-That function resolves an alias to its target, and ADR 0009 makes aliasing a single hop — a target is never itself an alias. So every `.body` read in the codebase is a read of a **markdown** card's body. The empty string on an alias is a field no reader touches.
+Both call `resolveContentCard` before reading `.body`. ADR 0009's single-hop validation guarantees a valid alias target is not itself an alias, so neither display read needs or uses an alias's sentinel body.
+
+"Nothing reads it" is true of content semantics, not literally of all code. `parseCardFile`, `loadSpace`, `serializeCardFile`, test helpers, and tests currently manipulate or assert the sentinel as structure. Those are precisely the seams this task must remove.
 
 ## The value already means something else
 
-`''` is a legitimate markdown body. `new-space.ts` mints exactly one: a new space's card, empty because nobody has written anything into it yet (ADR 0018). So the same value now carries two unrelated meanings — *this document is empty*, and *this kind of card does not have documents*. A reader cannot tell them apart, and neither can a type.
+`''` is a legitimate Markdown body. `newSpace()` mints exactly one (`packages/graph/src/new-space.ts`), empty because nobody has written it yet (ADR 0018). The same value therefore carries two unrelated meanings today: *this Markdown document is empty* and *this kind of card has no document body*. The discriminant can express that distinction directly; a sentinel cannot.
 
-## The glossary already ruled on this
+The distinction also keeps the union extensible. `CONTEXT.md` and ADR 0001 reserve a space-card whose content is a graph, not a Markdown body. A union whose kinds carry only their own payload makes that third member cheap; another `body: ''` would repeat the storage/domain confusion.
 
-AGENTS.md: *"`body` is the field, `content` is the domain word, and they are not synonyms to be reconciled... `Card.body` is what a **markdown** card's content is stored as."* CONTEXT.md makes content kind-specific — markdown's content is its body, an alias's is its target's, a space card's is a graph.
+## Important trap: the one-line schema change is not sufficient
 
-Which is also why the sentinel does not scale. When ADR 0001's space cards land, their content is a graph, so `body: ''` on one would be the same nonsense a second time. A discriminated union member that simply lacks the field extends to three kinds; a sentinel needs a new excuse for each.
-
-## What to change
+The desired domain schema is still:
 
 ```ts
 export const aliasCardSchema = aliasCardFrontmatterSchema;
 ```
 
-No `.extend({ body })`. Asking an alias for its body then becomes a compile error, which is what it is.
+But applying only that line would regress `7d09f5c`. The current parser constructs `{ ...parsed.data, body: split.body }` and passes it to `cardSchema.safeParse`. Zod 3 object schemas strip unknown keys by default: once `body` is absent from the alias schema, an alias file containing prose parses successfully and the prose disappears again. The existing load error must remain, enforced explicitly at the card-file boundary.
 
-Two consequences worth expecting rather than discovering:
+This is the central correction to the issue's prior proposal. "The load error stays" does not follow from removing `z.literal('')`; it requires its own check.
 
-`resolveContentCard` currently returns `Card | undefined`, and both callers assume the result has a `.body`. It should return the content-bearing card type, which by the single-hop rule it always does. That is the change that converts this from "a field disappeared" into actual type safety — today the assumption is load-bearing and unstated.
+## Implementation plan
 
-`serializeCardFile` destructures `body` off the card. An alias writes as frontmatter and a fence with nothing after it. The round-trip property covers this once the arbitrary stops generating a body for aliases.
+1. **Make the domain union honest in `packages/core`.** Define `aliasCardSchema` directly from `aliasCardFrontmatterSchema`, update the comments on `cardSchema`/`CardFrontmatter`, and keep `Card` derived from the schema. Add a schema assertion that the parsed alias domain value has no `body`; Markdown cards continue to require a string body.
 
-`CardNode.tsx` reads `data.body`, which is projection data rather than a `Card`, and is unaffected.
+2. **Keep the file invariant at intake in `packages/graph/src/card-file.ts`.** After parsing frontmatter, reject `split.body !== ''` when `kind === 'alias'`, preserving the `invalid-frontmatter` result, file path, and the regression test introduced by `7d09f5c`. Do this before constructing the domain card so Zod cannot strip the evidence.
 
-## What this also removes
+3. **Deepen the successful parser result to `{ card: Card }`.** `parseCardFile` already validates enough to produce the domain value; returning `{ frontmatter, body }` immediately tears it apart and widens the alias case back to `body: string`. Its only production caller is `loadSpace`; the remaining callers are tests. Return the validated Markdown card with its body, or the validated alias frontmatter as the bodyless alias. Then `loadSpace` can push `card` directly and the typechecker-only reconstruction ternary disappears.
 
-`loadSpace` currently rebuilds a `Card` with a ternary:
+4. **Serialize by kind.** In `serializeCardFile`, destructure and emit `body` only for a Markdown card. Emit an alias's own frontmatter plus the same empty post-fence region the parser accepts. Keep the exact-byte examples for both kinds and the parser/serializer inverse property.
 
-```ts
-card.frontmatter.kind === 'alias'
-  ? { ...card.frontmatter, body: '' }
-  : { ...card.frontmatter, body: card.body }
-```
+5. **Narrow content resolution.** Change `resolveContentCard` from `Card | undefined` to an exported resolved-content type that excludes the alias member (for example `Exclude<Card, { kind: 'alias' }> | undefined`), and defensively return `undefined` if an impossible alias target reaches it. This states the single-hop guarantee without baking in "Markdown forever": when ADR 0001 adds a non-alias space card, it naturally joins the return union and `.body` consumers must handle the content kind.
 
-At runtime both branches produce the same value, because `cardSchema` has already validated an alias's body as `''`. It is there for the typechecker: `ParseCardFileResult` declares `body: string`, widening the literal away, so the alias branch's `''` is what supplies the type back. Removing it fails `tsc` — verified, not assumed.
+6. **Update the affected tests and fixtures-as-tests.** The exact test-side blast radius from current references is:
 
-With no `z.literal('')` in the union there is no literal to widen, and the ternary goes away on its own rather than needing a comment explaining why it looks redundant and is not.
+   - `packages/core/test/schema.test.ts`: assert the alias member parses without and produces no `body`.
+   - `packages/graph/test/card-files.ts`: remove `body: ''` from the alias domain helper (the card-file helper remains an empty physical body).
+   - `packages/graph/test/card-file.test.ts` and `card-file.property.test.ts`: assert the successful `{ card }` result, with a bodyless alias card.
+   - `packages/graph/test/card-file-round-trip.property.test.ts`: remove the alias-body arbitrary and compare the parsed `Card` directly.
+   - `packages/graph/test/serialize-card-file.test.ts`: construct the alias without `body` while retaining the exact empty-file output assertion.
+   - `packages/graph/test/space.test.ts`: preserve the explicit non-empty-alias-body rejection introduced by `7d09f5c`; no relaxation to the error is acceptable.
+   - `packages/graph/test/lookup.test.ts`: retain the value assertion and add a type assertion, if useful, that resolved content excludes aliases.
+   - `packages/app/test/space-files.test.ts`: assert aliases lack a `body` property rather than carry an empty one.
 
-`parseCardFile` returning the `Card` it already validated — rather than splitting it into `frontmatter` + `body`, which is strictly lossier than what it holds — would fix the same seam from the other end, and is worth considering while here. It is a wider change: the property tests and `serializeCardFile` are written against the split shape.
+   The production files expected to change are exactly `packages/core/src/schema.ts`, the stale `CardFrontmatter` commentary in `packages/core/src/types.ts`, and `packages/graph/src/card-file.ts`, `space.ts`, and `lookup.ts`. `packages/app/src/App.tsx`, `packages/react-flow-adapter/src/projection.ts`, and `CardNode.tsx` should compile unchanged; their reads are already behind resolution or use projection data.
 
-## Not in scope
+`CardNode.tsx` is unaffected: `data.body` is projection data containing already-resolved Markdown, not a `Card` field.
 
-Whether a space card carries a body. It does not, for the same reason, but space cards are ADR 0001 and unbuilt — this ticket is the alias case and the union shape that makes the third kind cheap when it arrives.
+## Risks and guardrails
 
-## Prior state
+- **Silent data loss is the material regression risk.** The explicit alias-file body check and the existing `7d09f5c` regression test are non-negotiable.
+- **A file body and a domain field are different things.** The fence parser may still expose the raw post-frontmatter string internally; it must not put that string on an alias `Card`.
+- **Do not type the resolver as permanently Markdown-only.** That would make this task pass today but recreate the same invalid `.body` assumption when space cards arrive.
+- **Serialization byte shape matters.** Saving must not manufacture prose for an alias or change the accepted empty-body convention, and the round-trip property should cover the bodyless alias arbitrary.
+- **No adapter projection change is required.** Its optional `CardNodeData.body` belongs to a render projection and remains valid.
 
-`aliasCardSchema` had `body: z.string()` until the current working-tree change tightened it to `z.literal('')`, alongside a `cardSchema` pass in `parseCardFile` that rejects an alias file carrying prose instead of silently discarding it. That was the right direction and this finishes it: the load error stays, the field goes.
+## Scope
+
+Whether a future space card carries a `body` is not part of this task. It should not, for the same domain reason, but ADR 0001 is unbuilt. This task removes the alias sentinel, preserves rejection of authored alias prose, and leaves a union/resolver seam that makes the third kind visible to the typechecker.
+
+## Conclusion
+
+The issue's central claim remains accurate and is directly supported by ADR 0009, `CONTEXT.md`, and the original alias union. Its earlier implementation sketch was incomplete: removing the schema field alone silently accepts and strips alias prose under Zod's default object behaviour. The safe change is bodyless domain data plus an explicit empty-file-body invariant at intake, preferably with `parseCardFile` returning the `Card` it has already validated.
+
+## Answer
+
+Built test-first. `pnpm verify` is green (27 test files, 365 tests), and `pnpm e2e` is green (35 tests).
+
+**Domain shape.** `aliasCardSchema` is now exactly `aliasCardFrontmatterSchema`, so an alias carries its own metadata and `target` but no `body`. A Markdown card still carries `body: string`, including the legitimate empty document. The schema test and the authored fixture test assert that an alias has no body property at runtime, while typed alias fixtures make the same distinction compile-time visible.
+
+**File intake.** `parseCardFile` explicitly rejects a non-empty post-frontmatter region for an alias before constructing the domain value. That preserves `7d09f5c`'s data-loss guard rather than relying on Zod, which would strip an alias's now-unknown `body` key. Its successful result is `{ card: Card }`; `loadSpace` pushes that value directly, deleting the reconstruction ternary and its sentinel.
+
+**Round trip and resolution.** `serializeCardFile` branches by kind: Markdown emits its body, while an alias emits only its frontmatter and the accepted empty region. The fast-check inverse property now compares the parsed card directly with the card serialized. `resolveContentCard` returns `ResolvedContentCard`, the non-alias portion of `Card`, and defensively refuses an impossible alias target; the app and adapter's body reads therefore follow a type-level content-resolution guarantee.

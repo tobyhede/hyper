@@ -1,4 +1,4 @@
-import { cardFrontmatterSchema, cardSchema, type Card, type CardFrontmatter } from '@project/core';
+import { cardFrontmatterSchema, cardSchema, type Card } from '@project/core';
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
 import { splitFrontmatter } from './frontmatter';
 
@@ -18,8 +18,7 @@ export interface CardFileError {
   message: string;
 }
 
-export type ParseCardFileResult =
-  { ok: true; frontmatter: CardFrontmatter; body: string } | { ok: false; errors: CardFileError[] };
+export type ParseCardFileResult = { ok: true; card: Card } | { ok: false; errors: CardFileError[] };
 
 const FENCE = '---\n';
 
@@ -64,7 +63,17 @@ export function parseCardFile(file: CardFile): ParseCardFileResult {
     };
   }
 
-  const card = cardSchema.safeParse({ ...parsed.data, body: split.body });
+  // An alias is physically stored in a markdown file, but it owns no markdown
+  // content (ADR 0009). Check the post-frontmatter bytes before constructing
+  // the domain value: once `body` is absent from the alias schema, Zod would
+  // otherwise strip it as an unknown key and silently discard authored prose.
+  if (parsed.data.kind === 'alias' && split.body !== '') {
+    return fail('invalid-frontmatter', 'body: alias cards may not have a body');
+  }
+
+  const candidate =
+    parsed.data.kind === 'markdown' ? { ...parsed.data, body: split.body } : parsed.data;
+  const card = cardSchema.safeParse(candidate);
   if (!card.success) {
     return {
       ok: false,
@@ -76,8 +85,7 @@ export function parseCardFile(file: CardFile): ParseCardFileResult {
     };
   }
 
-  const { body, ...frontmatter } = card.data;
-  return { ok: true, frontmatter, body };
+  return { ok: true, card: card.data };
 }
 
 /**
@@ -95,6 +103,10 @@ export function parseCardFile(file: CardFile): ParseCardFileResult {
  * without knowing the default.
  */
 export function serializeCardFile(card: Card): string {
+  if (card.kind === 'alias') {
+    return `${FENCE}${stringifyYaml(card)}${FENCE}\n`;
+  }
+
   const { body, ...frontmatter } = card;
   return `${FENCE}${stringifyYaml(frontmatter)}${FENCE}\n${body}`;
 }

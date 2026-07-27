@@ -15,9 +15,9 @@ import type {
 export type Card = z.infer<typeof cardSchema>;
 
 /**
- * A card file's frontmatter: everything a card is except its body (ADR 0020).
- * Distinct from `Card` while the space file still carries a `cards` array —
- * the two converge when intake moves to the files.
+ * The kind-specific fields stored before a card file's closing frontmatter
+ * fence (ADR 0020). A markdown `Card` adds its body; an alias `Card` is already
+ * complete because its content resolves through `target` (ADR 0009).
  */
 export type CardFrontmatter = z.infer<typeof cardFrontmatterSchema>;
 /**

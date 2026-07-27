@@ -36,5 +36,5 @@ export function card(id: string, title = id.toUpperCase(), body = ''): Card {
 }
 
 export function alias(id: string, title: string, target: string): Card {
-  return { id, title, kind: 'alias', target, body: '' };
+  return { id, title, kind: 'alias', target };
 }

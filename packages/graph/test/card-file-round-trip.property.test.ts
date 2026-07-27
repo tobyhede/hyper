@@ -44,7 +44,6 @@ const cardArb: fc.Arbitrary<Card> = fc.oneof(
     title: line,
     kind: fc.constant('alias' as const),
     target: line,
-    body: fc.constant('' as const),
   }),
 );
 
@@ -59,9 +58,7 @@ describe('card file round-trip', () => {
 
         expect(parsed.ok).toBe(true);
         if (!parsed.ok) return;
-        const { body, ...frontmatter } = card;
-        expect(parsed.frontmatter).toEqual(frontmatter);
-        expect(parsed.body).toBe(body);
+        expect(parsed.card).toEqual(card);
       }),
     );
   });

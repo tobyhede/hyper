@@ -43,14 +43,14 @@ describe.each([
     expect(result.space.defaultView).toBeUndefined();
   });
 
-  it('finds every card, each carrying its own body', () => {
+  it('finds every card with kind-appropriate content', () => {
     const result = loadSpace(json, cardFiles(name));
     if (!result.ok) throw new Error(result.errors.map((e) => e.message).join('\n'));
     expect(result.space.cards).toHaveLength(cardCount);
-    // An alias shows its target's content, so its own body is empty (ADR 0009);
-    // every other card carries one.
+    // An alias shows its target's content, so it has no body of its own (ADR
+    // 0009); every markdown card carries one.
     for (const card of result.space.cards) {
-      if (card.kind === 'alias') expect(card.body).toBe('');
+      if (card.kind === 'alias') expect('body' in card).toBe(false);
       else expect(card.body.trim().length).toBeGreaterThan(0);
     }
   });

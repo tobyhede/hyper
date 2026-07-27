@@ -25,7 +25,7 @@ describe('newSpace', () => {
     const card = result.space.cards[0]!;
     expect(card.kind).toBe('markdown');
     expect(card.title.length).toBeGreaterThan(0);
-    expect(card.body).toBe('');
+    expect(card.kind === 'markdown' && card.body).toBe('');
   });
 
   it("authors no position — centering is the view's job, not content", () => {

@@ -41,7 +41,7 @@ export const markdownCardFrontmatterSchema = z.object({
   kind: z.literal('markdown'),
 });
 
-/** The frontmatter of an alias card file — a target, and a body left empty. */
+/** The frontmatter of an alias card file — a pointer to the card whose content it shows. */
 export const aliasCardFrontmatterSchema = z.object({
   id: idSchema,
   title: z.string().min(1),
@@ -68,17 +68,14 @@ export const cardFrontmatterSchema = z.preprocess(
 /** A card written directly by the author; the body of its file is its content. */
 export const markdownCardSchema = markdownCardFrontmatterSchema.extend({ body: z.string() });
 
-/**
- * A card that shows another card's content at a second position (ADR 0009). It
- * carries a body like any other card, and that body is empty — the content it
- * shows is its target's.
- */
-export const aliasCardSchema = aliasCardFrontmatterSchema.extend({ body: z.literal('') });
+/** A card that shows its target's content at a second position (ADR 0009). */
+export const aliasCardSchema = aliasCardFrontmatterSchema;
 
 /**
- * A card: its frontmatter and its body, which together are one file (ADR 0020).
- * No default for `kind` here — by the time a card exists its frontmatter has
- * been parsed, and that is where the default was applied.
+ * A card parsed from its file (ADR 0020). A markdown card carries the file body
+ * that stores its content; an alias carries only the pointer to its target's
+ * content (ADR 0009). No default for `kind` here — by the time a card exists
+ * its frontmatter has been parsed, and that is where the default was applied.
  */
 export const cardSchema = z.discriminatedUnion('kind', [markdownCardSchema, aliasCardSchema]);
 

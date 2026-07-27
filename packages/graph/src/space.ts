@@ -60,29 +60,25 @@ export function loadSpace(input: unknown, cardFiles: readonly CardFile[]): LoadS
   const pathById = new Map<string, string>();
   const cardErrors: SpaceError[] = [];
   for (const cardFile of cardFiles) {
-    const card = parseCardFile(cardFile);
-    if (!card.ok) {
-      cardErrors.push(...card.errors);
+    const parsedCard = parseCardFile(cardFile);
+    if (!parsedCard.ok) {
+      cardErrors.push(...parsedCard.errors);
       continue;
     }
     // Which file you are editing must not depend on scan order, so a repeated
     // id is an error and not a silent winner. The message names both files —
     // "which two" is the only useful part of it.
-    const seen = pathById.get(card.frontmatter.id);
+    const seen = pathById.get(parsedCard.card.id);
     if (seen !== undefined) {
       cardErrors.push({
         kind: 'duplicate-card-id',
-        ref: card.frontmatter.id,
-        message: `Duplicate card id "${card.frontmatter.id}" in ${seen} and ${cardFile.path}`,
+        ref: parsedCard.card.id,
+        message: `Duplicate card id "${parsedCard.card.id}" in ${seen} and ${cardFile.path}`,
       });
       continue;
     }
-    pathById.set(card.frontmatter.id, cardFile.path);
-    cards.push(
-      card.frontmatter.kind === 'alias'
-        ? { ...card.frontmatter, body: '' }
-        : { ...card.frontmatter, body: card.body },
-    );
+    pathById.set(parsedCard.card.id, cardFile.path);
+    cards.push(parsedCard.card);
   }
   if (cardErrors.length > 0) return { ok: false, errors: cardErrors };
 

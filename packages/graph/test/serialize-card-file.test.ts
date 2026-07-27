@@ -19,11 +19,11 @@ describe('serializeCardFile', () => {
 
     expect(parsed.ok).toBe(true);
     if (!parsed.ok) return;
-    expect(parsed.frontmatter.title).toBe('Recap: the data model');
+    expect(parsed.card.title).toBe('Recap: the data model');
   });
 
   it('writes an alias with its target, and no body', () => {
-    const card: Card = { id: 'aa', title: 'A′', kind: 'alias', target: 'a', body: '' };
+    const card: Card = { id: 'aa', title: 'A′', kind: 'alias', target: 'a' };
 
     expect(serializeCardFile(card)).toBe('---\nid: aa\ntitle: A′\nkind: alias\ntarget: a\n---\n\n');
   });

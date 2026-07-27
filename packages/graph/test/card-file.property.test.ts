@@ -69,8 +69,9 @@ describe('card file round-trip', () => {
 
         expect(result.ok).toBe(true);
         if (!result.ok) return;
-        expect(result.frontmatter).toEqual(frontmatter);
-        expect(result.body).toBe(body);
+        expect(result.card).toEqual(
+          frontmatter.kind === 'markdown' ? { ...frontmatter, body } : frontmatter,
+        );
       }),
     );
   });
