@@ -44,7 +44,7 @@ const cardArb: fc.Arbitrary<Card> = fc.oneof(
     title: line,
     kind: fc.constant('alias' as const),
     target: line,
-    body: bodyArb,
+    body: fc.constant('' as const),
   }),
 );
 

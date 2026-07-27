@@ -78,7 +78,11 @@ export function loadSpace(input: unknown, cardFiles: readonly CardFile[]): LoadS
       continue;
     }
     pathById.set(card.frontmatter.id, cardFile.path);
-    cards.push({ ...card.frontmatter, body: card.body });
+    cards.push(
+      card.frontmatter.kind === 'alias'
+        ? { ...card.frontmatter, body: '' }
+        : { ...card.frontmatter, body: card.body },
+    );
   }
   if (cardErrors.length > 0) return { ok: false, errors: cardErrors };
 

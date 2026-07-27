@@ -1,4 +1,4 @@
-import { cardFrontmatterSchema, type Card, type CardFrontmatter } from '@project/core';
+import { cardFrontmatterSchema, cardSchema, type Card, type CardFrontmatter } from '@project/core';
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
 import { splitFrontmatter } from './frontmatter';
 
@@ -64,7 +64,20 @@ export function parseCardFile(file: CardFile): ParseCardFileResult {
     };
   }
 
-  return { ok: true, frontmatter: parsed.data, body: split.body };
+  const card = cardSchema.safeParse({ ...parsed.data, body: split.body });
+  if (!card.success) {
+    return {
+      ok: false,
+      errors: card.error.issues.map((issue) => ({
+        kind: 'invalid-frontmatter',
+        path: file.path,
+        message: `${file.path}: ${issue.path.join('.') || '(card)'}: ${issue.message}`,
+      })),
+    };
+  }
+
+  const { body, ...frontmatter } = card.data;
+  return { ok: true, frontmatter, body };
 }
 
 /**

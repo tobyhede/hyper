@@ -38,6 +38,22 @@ describe('loadSpace', () => {
     });
   });
 
+  it('rejects an alias file with a body, because its content comes from its target', () => {
+    const result = loadSpace({ ...validInput, routes: [] }, [
+      cardFile('a', 'A', 'The source.\n'),
+      {
+        path: 'cards/a-again.md',
+        text: '---\nid: a-again\ntitle: A again\nkind: alias\ntarget: a\n---\n\nThis would be discarded.\n',
+      },
+    ]);
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.errors).toEqual([
+      expect.objectContaining({ kind: 'invalid-frontmatter', path: 'cards/a-again.md' }),
+    ]);
+  });
+
   it('orders cards by title, whatever order the files arrived in', () => {
     const result = loadSpace({ ...validInput, routes: [] }, [
       cardFile('c', 'Carla'),

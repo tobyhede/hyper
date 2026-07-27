@@ -19,23 +19,22 @@ const lineArb = fc
   .string({ minLength: 1, maxLength: 40 })
   .filter((s) => s.trim().length > 0 && !s.includes('\n'));
 
-const frontmatterArb: fc.Arbitrary<CardFrontmatter> = fc.oneof(
-  fc.record(
-    {
-      id: lineArb,
-      title: lineArb,
-      description: fc.option(lineArb, { nil: undefined }),
-      kind: fc.constant('markdown' as const),
-    },
-    { requiredKeys: ['id', 'title', 'kind'] },
-  ),
-  fc.record({
+const markdownFrontmatterArb: fc.Arbitrary<CardFrontmatter> = fc.record(
+  {
     id: lineArb,
     title: lineArb,
-    kind: fc.constant('alias' as const),
-    target: lineArb,
-  }),
+    description: fc.option(lineArb, { nil: undefined }),
+    kind: fc.constant('markdown' as const),
+  },
+  { requiredKeys: ['id', 'title', 'kind'] },
 );
+
+const aliasFrontmatterArb: fc.Arbitrary<CardFrontmatter> = fc.record({
+  id: lineArb,
+  title: lineArb,
+  kind: fc.constant('alias' as const),
+  target: lineArb,
+});
 
 /**
  * Bodies built from the lines that make a fence parser wrong: a `---` rule, a
@@ -57,8 +56,12 @@ const bodyArb = fc
 
 describe('card file round-trip', () => {
   it('gives back the frontmatter it was written with, and the body verbatim', () => {
+    const cardFileArb = fc.oneof(
+      fc.tuple(markdownFrontmatterArb, bodyArb),
+      fc.tuple(aliasFrontmatterArb, fc.constant('')),
+    );
     fc.assert(
-      fc.property(frontmatterArb, bodyArb, (frontmatter, body) => {
+      fc.property(cardFileArb, ([frontmatter, body]) => {
         const result = parseCardFile({
           path: 'cards/generated.md',
           text: writeCardFile(frontmatter, body),

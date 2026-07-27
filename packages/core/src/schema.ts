@@ -73,7 +73,7 @@ export const markdownCardSchema = markdownCardFrontmatterSchema.extend({ body: z
  * carries a body like any other card, and that body is empty — the content it
  * shows is its target's.
  */
-export const aliasCardSchema = aliasCardFrontmatterSchema.extend({ body: z.string() });
+export const aliasCardSchema = aliasCardFrontmatterSchema.extend({ body: z.literal('') });
 
 /**
  * A card: its frontmatter and its body, which together are one file (ADR 0020).
