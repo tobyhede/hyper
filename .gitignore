@@ -12,6 +12,7 @@ test-results/
 .claude/
 skills-lock.json
 .serena/
+.worktrees/
 
 # The markdown issue tracker under .scratch/ is tracked; spike harnesses,
 # renders and generated data living alongside it are working files.
