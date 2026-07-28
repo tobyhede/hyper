@@ -25,10 +25,8 @@ const FENCE = '---\n';
 /**
  * Split a card file into its frontmatter and its body (ADR 0020).
  *
- * The fence is hand-rolled and the YAML is not, and both live in
- * `./frontmatter` — shared with the save endpoint, which has to decide which
- * file a card goes back to and must not answer that with a second reader of the
- * same bytes.
+ * The fence is hand-rolled and the YAML is not. The byte-level split lives in
+ * `./frontmatter`; schema validation and domain construction stay here.
  */
 export function parseCardFile(file: CardFile): ParseCardFileResult {
   const fail = (kind: CardFileErrorKind, message: string): ParseCardFileResult => ({

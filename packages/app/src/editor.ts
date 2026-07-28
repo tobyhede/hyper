@@ -43,16 +43,6 @@ export interface EditorState {
    * "the author moved something" from "the layout just resolved".
    */
   revision: number;
-  /**
-   * The revision that reached disk. Unsaved is `revision !== savedRevision`,
-   * derived rather than stored, so there is no third field to disagree with the
-   * two it is computed from.
-   *
-   * Both start at 0, so an opened space is saved — including a minted one whose
-   * cards are described by no file yet (ADR 0018). Writing that to disk unasked
-   * would be the same failure as saving a stray drag, one step earlier.
-   */
-  savedRevision: number;
   /** Fold a freshly projected node list into the live one. */
   syncNodes: (projected: readonly CardFlowNode[]) => void;
   /**
@@ -65,17 +55,6 @@ export interface EditorState {
   arrange: (positions: ReadonlyMap<string, LayoutPoint>) => void;
   /** Apply React Flow's own changes (drag, measure, select). */
   changeNodes: (changes: NodeChange<CardFlowNode>[]) => void;
-  /**
-   * Record that a revision reached disk (ADR 0029).
-   *
-   * It takes the revision it acknowledges rather than reading the current one,
-   * because a save is a round trip: drag, ask, drag again while the request is
-   * in flight, and reading `revision` at response time would mark the second
-   * drag saved when only the first was sent. Never moving backwards is the same
-   * argument from the other side — a slow response for an older save cannot
-   * un-acknowledge a newer one.
-   */
-  markSaved: (revision: number) => void;
 }
 
 export type EditorStore = UseBoundStore<StoreApi<EditorState>>;
@@ -117,7 +96,6 @@ export function createEditorStore(): EditorStore {
     positions: new Map(),
     moved: false,
     revision: 0,
-    savedRevision: 0,
 
     syncNodes: (projected) =>
       set((state) => {
@@ -189,8 +167,5 @@ export function createEditorStore(): EditorStore {
         if (!changed) return { nodes };
         return { nodes, positions, moved, revision: state.revision + 1 };
       }),
-
-    markSaved: (revision) =>
-      set((state) => ({ savedRevision: Math.max(state.savedRevision, revision) })),
   }));
 }

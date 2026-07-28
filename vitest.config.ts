@@ -10,6 +10,7 @@ export default defineConfig({
     alias: {
       '@project/core': resolve('./packages/core/src/index.ts'),
       '@project/graph': resolve('./packages/graph/src/index.ts'),
+      '@project/persistence': resolve('./packages/persistence/src/index.ts'),
       '@project/react-flow-adapter': resolve('./packages/react-flow-adapter/src/index.ts'),
       '@project/ui': resolve('./packages/ui/src/index.ts'),
     },
@@ -39,7 +40,7 @@ export default defineConfig({
       provider: 'v8',
       // Source only. Tests, fixtures and config would otherwise inflate every
       // number and hide exactly the gaps this is here to show.
-      include: ['packages/*/src/**/*.{ts,tsx}', 'packages/app/space-file-io.ts'],
+      include: ['packages/*/src/**/*.{ts,tsx}'],
       reporter: ['text', 'html'],
       /*
        * Per-package, pinned at what already holds — a ratchet, not an ambition.
@@ -53,7 +54,7 @@ export default defineConfig({
       thresholds: {
         'packages/core/src/**': { statements: 96, branches: 88, functions: 95 },
         'packages/graph/src/**': { statements: 95, branches: 90, functions: 95 },
-        'packages/app/space-file-io.ts': { statements: 95, branches: 93, functions: 90 },
+        'packages/persistence/src/**': { statements: 95, branches: 90, functions: 95 },
       },
     },
   },

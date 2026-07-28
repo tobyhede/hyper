@@ -100,12 +100,17 @@ test("edges are drawn along ELK's routing, not default beziers", async ({ page }
 
 test('selecting a route keeps the others on screen', async ({ page }) => {
   await page.goto('/');
+  const persistence = page.getByTestId('persistence-status');
+  await expect(persistence).toHaveAttribute('data-revision', '0');
 
   // Selection is emphasis: it never hides the rest of the space.
   await page.getByTestId('route-selector').click();
   await page.getByRole('option', { name: 'Echo' }).click();
   await expect(page.locator('.react-flow__node')).toHaveCount(10);
   await expect(page.locator('.react-flow__edge')).toHaveCount(13);
+  // Activating a route changes emphasis, not the persisted document.
+  await page.waitForTimeout(50);
+  await expect(persistence).toHaveAttribute('data-revision', '0');
 });
 
 test('selecting a route emphasises it without hiding the others', async ({ page }) => {

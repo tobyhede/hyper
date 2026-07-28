@@ -12,6 +12,7 @@
     "paths": {
       "@project/core": ["../core/src/index.ts"],
       "@project/graph": ["../graph/src/index.ts"],
+      "@project/persistence": ["../persistence/src/index.ts"],
       "@project/react-flow-adapter": ["../react-flow-adapter/src/index.ts"],
       "@project/ui": ["../ui/src/index.ts"]
     }

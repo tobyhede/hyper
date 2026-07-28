@@ -92,6 +92,9 @@ importers:
       '@project/graph':
         specifier: workspace:*
         version: link:../graph
+      '@project/persistence':
+        specifier: workspace:*
+        version: link:../persistence
       '@project/react-flow-adapter':
         specifier: workspace:*
         version: link:../react-flow-adapter
@@ -135,6 +138,12 @@ importers:
       yaml:
         specifier: ^2.9.0
         version: 2.9.0
+
+  packages/persistence:
+    dependencies:
+      '@project/core':
+        specifier: workspace:*
+        version: link:../core
 
   packages/react-flow-adapter:
     dependencies:

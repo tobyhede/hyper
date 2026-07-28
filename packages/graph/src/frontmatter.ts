@@ -1,18 +1,8 @@
-import { parse as parseYaml } from 'yaml';
-
 /**
  * Reading a card file's frontmatter: the fence, and the YAML inside it.
  *
- * Its own module, and deliberately **free of `@project/*` imports**. The save
- * endpoint has to answer "which file is this card?" with the same reader intake
- * used, and that endpoint is bundled into `vite.config.ts` — where Vite
- * externalizes bare specifiers, so a module reached from there that imports
- * `@project/core` hands *Node* the workspace TypeScript and the dev server does
- * not start at all. `card-file.ts` cannot be imported from there for exactly
- * that reason. This can, because the only thing it needs is a YAML parser.
- *
- * So the split is not decorative: it is what lets there be one reader of these
- * bytes instead of a parser on one side and a regex on the other.
+ * Kept separate from YAML/schema validation so the byte-level fence behavior is
+ * explicit and independently testable.
  */
 
 /** The opening fence, either line ending. Written out as LF (see
@@ -56,33 +46,4 @@ export function splitFrontmatter(text: string): FrontmatterSplit {
     // line.
     body: text.slice(close + closing[0].length).replace(/^\r?\n/, ''),
   };
-}
-
-/**
- * A card file's frontmatter `id`, which is its identity and never its filename
- * (ADR 0020) — read without the schema, because a card missing a title still
- * has an identity, and a caller asking "which file is this card?" needs an
- * answer rather than a judgement.
- *
- * **A regex is a different reader**, which is why this exists at all.
- * `id: intro # stable identifier` is `intro` to YAML and `intro # stable
- * identifier` to a pattern; when the reader that decides where a card is written
- * disagrees with the one that decided what the card is, the writer cannot find
- * the card's existing file, drops a second copy under `cards/`, and the next
- * load fails on a duplicate id.
- */
-export function cardFileId(text: string): string | undefined {
-  const split = splitFrontmatter(text);
-  if (typeof split === 'string') return undefined;
-  let yaml: unknown;
-  try {
-    yaml = parseYaml(split.yaml);
-  } catch {
-    return undefined;
-  }
-  if (typeof yaml !== 'object' || yaml === null) return undefined;
-  const id = (yaml as { id?: unknown }).id;
-  // A non-string id is not one. `cardFrontmatterSchema` rejects it on the way
-  // in, so there is no file to find and nothing this could usefully return.
-  return typeof id === 'string' ? id : undefined;
 }

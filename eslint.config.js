@@ -162,7 +162,7 @@ export default tseslint.config(
     },
   },
   {
-    files: ['packages/{core,graph}/**/*.{ts,tsx}'],
+    files: ['packages/{core,graph,persistence}/**/*.{ts,tsx}'],
     rules: {
       'no-restricted-imports': [
         'error',
@@ -179,14 +179,7 @@ export default tseslint.config(
   // the dev server will not start, which is why this is worth a rule: the
   // symptom is a broken server, not a type error.
   {
-    // `space-file-io.ts` is not a config, but it is bundled into one, so the
-    // same resolution rule binds it.
-    files: [
-      'packages/*/vite*.ts',
-      'packages/app/space-file-io.ts',
-      '*.config.ts',
-      'packages/*/*.config.ts',
-    ],
+    files: ['packages/*/vite*.ts', '*.config.ts', 'packages/*/*.config.ts'],
     rules: {
       'no-restricted-imports': [
         'error',

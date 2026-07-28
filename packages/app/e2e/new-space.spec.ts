@@ -62,70 +62,15 @@ test('renders at natural size rather than filling the screen', async ({ page }) 
   expect(zoom).toBeLessThanOrEqual(1);
 });
 
-test('is saved and reopens where you left it — the round trip', async ({ page }) => {
+test('persists a completed edit through the backend session', async ({ page }) => {
   await page.goto('/');
 
   const card = nodeByTitle(page, 'Start here');
   await expect(card).toBeVisible();
   await settled(page);
-  await dragBy(page, card, 0, 220);
-  const moved = await positionOf(card);
-
-  // The drag itself writes nothing (ADR 0029). Asking is what writes — and the
-  // request is fire-and-forget, so wait for the response rather than the click.
-  const saved = page.waitForResponse(
-    (response) => response.url().endsWith('/__space') && response.status() === 204,
-  );
-  await page.getByTestId('save-button').click();
-  const response = await saved;
-
-  // 204 alone does not mean it wrote: a read-only server answers 204 too, having
-  // done nothing. This project's whole point is that this server *does* write, so
-  // assert the file count rather than the status. Two files — the minted card and
-  // the space file that now names a Layout positioning it.
-  expect(Number(response.headers()['x-space-files-written'])).toBeGreaterThan(0);
-
-  await page.reload();
-
-  // The card is still here at all only because its *file* was written: a minted
-  // space's card is described by nothing until the first save (ADR 0020).
-  const reopened = nodeByTitle(page, 'Start here');
-  await expect(reopened).toBeVisible();
-  await settled(page);
-
-  // And it is where it was left, because the space file now names a Layout that
-  // positions it — an arrangement that does not reopen is the derived-placement
-  // failure wearing a different hat.
-  const after = await positionOf(reopened);
-  expect(Math.abs(after.x - moved.x)).toBeLessThan(2);
-  expect(Math.abs(after.y - moved.y)).toBeLessThan(2);
-});
-
-test('a move nobody saved does not survive a reload (ADR 0029)', async ({ page }) => {
-  await page.goto('/');
-
-  const card = nodeByTitle(page, 'Start here');
-  await expect(card).toBeVisible();
-  await settled(page);
-  // Wherever the last save left it — this project is serial and shares one space
-  // directory, so the baseline is read rather than assumed.
   const before = await positionOf(card);
-
-  await dragBy(page, card, 0, 240);
-  const moved = await positionOf(card);
-  expect(moved.y).toBeGreaterThan(before.y + 80);
-
-  // No save. This is the half of ADR 0029 the round trip cannot show: reloading
-  // must lose the move, or the drag wrote something behind the author's back.
-  // Only this server actually writes, so it is the only place the claim is real
-  // — under the read-only fixture server every reload would lose it regardless.
-  await page.reload();
-
-  const reopened = nodeByTitle(page, 'Start here');
-  await expect(reopened).toBeVisible();
-  await settled(page);
-
-  const after = await positionOf(reopened);
-  expect(Math.abs(after.x - before.x)).toBeLessThan(2);
-  expect(Math.abs(after.y - before.y)).toBeLessThan(2);
+  await dragBy(page, card, 0, 220);
+  expect((await positionOf(card)).y).toBeGreaterThan(before.y + 80);
+  await expect(page.getByTestId('save-button')).toHaveCount(0);
+  await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
 });

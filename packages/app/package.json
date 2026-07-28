@@ -9,12 +9,13 @@
     "preview": "vite preview",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "dev:new": "SPACE_DIR=.space vite --port 5174 --strictPort",
-    "e2e:server": "SPACE_DIR=fixture SPACE_READ_ONLY=1 vite --port 5273 --strictPort",
+    "e2e:server": "SPACE_DIR=fixture vite --port 5273 --strictPort",
     "e2e:server:new": "SPACE_DIR=.space vite --port 5274 --strictPort"
   },
   "dependencies": {
     "@project/core": "workspace:*",
     "@project/graph": "workspace:*",
+    "@project/persistence": "workspace:*",
     "@project/react-flow-adapter": "workspace:*",
     "@project/ui": "workspace:*",
     "@tanstack/react-router": "^1.87.0",
