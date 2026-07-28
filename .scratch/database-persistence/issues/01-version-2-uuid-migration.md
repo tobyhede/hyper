@@ -1,4 +1,4 @@
-# 04 — Version 2 UUID migration
+# 01 — Version 2 UUID migration
 
 **What to build:** Advance the authored interchange format and in-memory domain to UUID identity, while preserving the existing space-directory structure and creating a distinct import shape in which every entity id may be absent.
 
@@ -14,4 +14,3 @@
 - [ ] Version 1 and unconstrained string identity are removed after all call sites migrate; there is no indefinite dual-format compatibility layer.
 - [ ] Card filenames remain irrelevant to identity, and the physical `space.json` plus Markdown-card structure is unchanged.
 - [ ] The migration is isolated from unrelated behavior changes and leaves the full verification and end-to-end suites green.
-

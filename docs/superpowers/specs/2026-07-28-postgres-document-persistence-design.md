@@ -141,12 +141,13 @@ import may leave database cards that were absent from the imported directory.
 ```text
 Browser
   App
-   -> SpaceBackend
-      -> MemorySpaceBackend
-      -> HttpSpaceBackend
-           -> HTTP handlers
-              -> SpaceRepository
-                 -> PostgresSpaceRepository
+   -> SpaceSession
+      -> SpaceBackend
+         -> MemorySpaceBackend
+         -> HttpSpaceBackend
+              -> HTTP handlers
+                 -> SpaceRepository
+                    -> PostgresSpaceRepository
 
 CLI
   file discovery -> parser -> importSpaces -> SpaceRepository
@@ -158,17 +159,45 @@ Export
 ### Browser seam
 
 ```ts
+interface LoadedSpace {
+  snapshot: SpaceSnapshot;
+  revision: bigint;
+  exportedRevision: bigint | null;
+}
+
 interface SpaceBackend {
   listSpaces(): Promise<readonly SpaceSummary[]>;
-  loadSpace(id: UUID): Promise<SpaceSnapshot | undefined>;
+  loadSpace(id: UUID): Promise<LoadedSpace | undefined>;
   commitSpace(snapshot: SpaceSnapshot, expectedRevision: bigint): Promise<CommitResult>;
 }
 ```
 
-`MemorySpaceBackend` lands first. It retains session state, returns promises like
-the eventual network adapter, and allows UX development to proceed without the
-old Save flow or a working database. `HttpSpaceBackend` later satisfies the same
-interface against the server.
+The load result includes the acknowledged database revision because the first
+commit cannot supply an honest `expectedRevision` without it.
+
+`SpaceSession` is the module the UX uses. It owns the loaded snapshot, the
+acknowledged revision, one in-flight commit, the latest snapshot waiting behind
+it, and the `settled`/`pending`/`failed`/`conflicted` persistence state. A domain
+edit hands the session a complete valid snapshot; it does not add a new method
+to the interface for each editing gesture. Pending edits may coalesce to the
+latest snapshot, but commits never run concurrently for one space. A transient
+failure is retryable. A revision conflict is visible and never retried as a
+blind overwrite; recovery reloads current database state, with any destructive
+choice made explicitly by the UX.
+
+`MemorySpaceBackend` lands first and remains a supported development and test
+adapter after PostgreSQL arrives. It returns promises like the eventual network
+adapter and allows UX development without the old Save flow, Docker, or a
+working database. Test-only construction options may inject latency and
+failures without enlarging the production `SpaceBackend` interface.
+`HttpSpaceBackend` later satisfies the same interface against the server.
+
+The browser-safe modules live in `@project/persistence`: the backend interface,
+session coordinator, memory adapter, and shared behavioral tests. The fully
+identified `SpaceSnapshot` shape lives in `@project/core`, so `@project/graph`
+can validate and index it without depending upward on persistence. PostgreSQL,
+HTTP-server, CLI, and filesystem implementations remain outside the
+browser-safe package.
 
 ### Server seam
 
@@ -244,18 +273,22 @@ dangerous truncation was requested.
 
 ## Runtime editing
 
-The browser loads a snapshot and derives the indexed `Space`. Each domain edit:
+The browser loads a snapshot and derives the indexed `Space`. Each completed
+domain edit:
 
 1. updates the in-memory view immediately;
-2. captures the fully identified snapshot and expected revision;
-3. joins a per-space ordered commit queue;
+2. hands the fully identified snapshot to `SpaceSession`;
+3. becomes the latest waiting snapshot behind any in-flight commit;
 4. commits through `SpaceBackend`;
 5. installs the returned revision.
 
-The repository rejects stale expected revisions, so a late request cannot
-overwrite a newer state. A failed request stays visible with retry; it is never
-reported as durable. Navigation protection is needed only while persistence is
-pending or failed, not after a successful commit.
+The session supplies the latest acknowledged revision when each queued commit
+actually begins. The repository rejects stale expected revisions, so a late
+request cannot overwrite a newer state. A transient failure stays visible with
+retry; a conflict stays visible and requires explicit recovery rather than a
+blind retry. Neither is reported as durable. Navigation protection is needed
+only while persistence is pending, failed, or conflicted, not after a successful
+commit.
 
 Activating a route remains a reading choice rather than an edit. It writes
 nothing by itself.
@@ -352,6 +385,8 @@ Prisma Next commands, so starting a container cannot silently change the schema.
 
 - A shared behavioral suite runs against `MemorySpaceBackend` and
   `HttpSpaceBackend`.
+- Session tests cover one in-flight commit, coalescing to the latest waiting
+  snapshot, revision hand-off, transient retry, and non-overwriting conflicts.
 - Repository integration tests run against Docker PostgreSQL.
 - Import tests cover explicit-id upsert, id-less insertion, UUID allocation,
   cross-space ownership conflicts, duplicate ids, complete rollback, and
@@ -369,19 +404,24 @@ Prisma Next commands, so starting a container cannot silently change the schema.
 
 ## Delivery sequence
 
-1. Add `SpaceSnapshot`, `SpaceBackend`, and `MemorySpaceBackend`; move app boot
-   behind the interface and remove Save while retaining session-only UX.
-2. Pin Prisma Next, install its matching skill cluster, add Docker Compose, and
+1. Land the repository-wide version 2 UUID migration before parallel feature
+   branches begin; its blast radius otherwise conflicts with every stream.
+2. Add `SpaceSnapshot`, `SpaceBackend`, `SpaceSession`, and
+   `MemorySpaceBackend`; move app boot behind the session and remove Save while
+   retaining session-only UX.
+3. Pin Prisma Next, install its matching skill cluster, add Docker Compose, and
    establish the contract/migration/runtime skeleton with one write/read proof.
-3. Add `PostgresSpaceRepository` and its integration contract tests.
-4. Add version 2 UUID schemas and migrate repository fixtures/examples.
+4. Add `PostgresSpaceRepository` and its integration contract tests.
 5. Add the shared import core and CLI startup behavior.
 6. Add HTTP handlers and `HttpSpaceBackend`; switch normal runtime persistence
    to PostgreSQL.
 7. Add canonical CLI export and changed-since-export status.
 
-Each increment leaves the application runnable. The memory seam lands before
-database work so UX and persistence can proceed independently.
+Each increment leaves the application runnable. After steps 1 and 2, UX owns
+app stores, gestures, views, and components through `SpaceSession`; persistence
+work owns Prisma Next, PostgreSQL, HTTP, CLI, and filesystem adapters. Their
+only final join is the composition root choosing `HttpSpaceBackend` instead of
+`MemorySpaceBackend`.
 
 ## Superseded decisions
 

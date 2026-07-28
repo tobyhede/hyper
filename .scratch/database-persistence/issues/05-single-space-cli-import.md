@@ -2,7 +2,7 @@
 
 **What to build:** Let `hyper` import one existing space file or space directory into PostgreSQL, resolving every missing identity through the database and then opening the imported space.
 
-**Blocked by:** 03 — PostgreSQL space repository; 04 — Version 2 UUID migration.
+**Blocked by:** 01 — Version 2 UUID migration; 04 — PostgreSQL space repository.
 
 **Status:** ready-for-agent
 
@@ -16,4 +16,3 @@
 - [ ] The file adapter and programmatic seeds/test fixtures share the same core import mechanism.
 - [ ] Successful import opens the imported space; any failure exits non-zero with paths and entity ids where relevant.
 - [ ] Tests cover explicit-id updates, id-less insertion, complete UUID allocation, reference remapping, validation errors, and transaction rollback.
-

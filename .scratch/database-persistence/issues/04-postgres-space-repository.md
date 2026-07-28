@@ -1,8 +1,8 @@
-# 03 — PostgreSQL space repository
+# 04 — PostgreSQL space repository
 
 **What to build:** Implement the server-side `SpaceRepository` so a completely identified space can be stored and reloaded as one revisioned aggregate using the PostgreSQL relational spine and JSONB documents.
 
-**Blocked by:** 02 — Prisma Next PostgreSQL foundation.
+**Blocked by:** 01 — Version 2 UUID migration; 03 — Prisma Next PostgreSQL foundation.
 
 **Status:** ready-for-agent
 
@@ -16,4 +16,3 @@
 - [ ] Card UUIDs already owned by another space are rejected rather than moved implicitly.
 - [ ] Deleting by omission is not part of the repository commit contract.
 - [ ] Integration tests against Docker PostgreSQL cover atomic commits, rollback, stale revisions, listing, loading, and ownership conflicts.
-

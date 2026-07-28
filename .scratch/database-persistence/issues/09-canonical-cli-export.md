@@ -2,7 +2,7 @@
 
 **What to build:** Add a CLI-only export that projects one consistent database revision into the existing repository-friendly space-directory structure and records exactly which revision was exported.
 
-**Blocked by:** 03 — PostgreSQL space repository; 04 — Version 2 UUID migration; 05 — Single-space CLI import.
+**Blocked by:** 01 — Version 2 UUID migration; 04 — PostgreSQL space repository; 05 — Single-space CLI import.
 
 **Status:** ready-for-agent
 

@@ -1,4 +1,4 @@
-# 02 — Prisma Next PostgreSQL foundation
+# 03 — Prisma Next PostgreSQL foundation
 
 **What to build:** Establish a reproducible local PostgreSQL and Prisma Next foundation that can create, migrate, and exercise Hyper's document-oriented database without changing the app's runtime persistence yet.
 
@@ -16,4 +16,3 @@
 - [ ] Application code imports database capabilities only through the `@prisma-next/postgres` facade and one adjacent database entry point.
 - [ ] A repeatable smoke test proves a migrated Docker PostgreSQL accepts a typed write and read.
 - [ ] The normal verification workflow remains runnable when PostgreSQL is not required by a test.
-
