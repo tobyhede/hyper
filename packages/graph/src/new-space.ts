@@ -26,31 +26,23 @@ export interface NewSpace {
  */
 const FIRST_CARD_TITLE = 'Start here';
 
-const FIRST_CARD_ID = 'start';
-
-/**
- * Ids are written here rather than generated. ADR 0019 makes them optional and
- * derived on load, and `new-space/01` is that work; until then a minted space
- * carries a constant, which is correct for the one-space-at-a-time app this is
- * and wrong the moment two of them exist side by side.
- */
-const NEW_SPACE_ID = 'space';
-
 export function newSpace(): NewSpace {
+  const spaceId = crypto.randomUUID();
+  const cardId = crypto.randomUUID();
   // No `layouts` and no `defaultView`. A new space's card carries no position,
   // because centering is the view's job — `fitView` frames whatever is on
   // screen, and a position nobody wrote would be authored content nobody wrote.
   // The Layout arrives when the space is edited (ADR 0025), not here and not on
   // open: a space that is only read keeps none.
   const file: SpaceFile = {
-    version: 1,
-    id: NEW_SPACE_ID,
+    version: 2,
+    id: spaceId,
     title: 'New space',
     routes: [],
   };
 
   const card: Card = {
-    id: FIRST_CARD_ID,
+    id: cardId,
     title: FIRST_CARD_TITLE,
     kind: 'markdown',
     body: '',

@@ -1,6 +1,6 @@
 ---
-id: model-recap
+id: 00000000-0000-4000-8000-000000000044
 title: 'Recap: the data model'
 kind: alias
-target: model
+target: 00000000-0000-4000-8000-000000000045
 ---

@@ -10,28 +10,32 @@ function cardsOf(...ids: string[]): LayoutCard[] {
     id,
     ...SIZE,
     ports: [
-      { id: 'main::in', side: 'in' as const },
-      { id: 'main::out', side: 'out' as const },
+      { id: '00000000-0000-4000-8000-000000000004::in', side: 'in' as const },
+      { id: '00000000-0000-4000-8000-000000000004::out', side: 'out' as const },
     ],
   }));
 }
 
 const graph: LayoutGraph = {
-  cards: cardsOf('a', 'b', 'c'),
+  cards: cardsOf(
+    '00000000-0000-4000-8000-000000000002',
+    '00000000-0000-4000-8000-000000000003',
+    '00000000-0000-4000-8000-000000000005',
+  ),
   edges: [
     {
-      id: 'main::0',
-      source: 'a',
-      target: 'b',
-      sourceHandle: 'main::out',
-      targetHandle: 'main::in',
+      id: '00000000-0000-4000-8000-000000000004::0',
+      source: '00000000-0000-4000-8000-000000000002',
+      target: '00000000-0000-4000-8000-000000000003',
+      sourceHandle: '00000000-0000-4000-8000-000000000004::out',
+      targetHandle: '00000000-0000-4000-8000-000000000004::in',
     },
     {
-      id: 'main::1',
-      source: 'b',
-      target: 'c',
-      sourceHandle: 'main::out',
-      targetHandle: 'main::in',
+      id: '00000000-0000-4000-8000-000000000004::1',
+      source: '00000000-0000-4000-8000-000000000003',
+      target: '00000000-0000-4000-8000-000000000005',
+      sourceHandle: '00000000-0000-4000-8000-000000000004::out',
+      targetHandle: '00000000-0000-4000-8000-000000000004::in',
     },
   ],
 };
@@ -55,17 +59,28 @@ describe('positionedStrategy', () => {
   });
 
   it('puts every card exactly where the map says', async () => {
-    const laid = await positionedStrategy(at({ a: [10, 20], b: [300, 20], c: [-40, 500] }))(graph);
+    const laid = await positionedStrategy(
+      at({
+        '00000000-0000-4000-8000-000000000002': [10, 20],
+        '00000000-0000-4000-8000-000000000003': [300, 20],
+        '00000000-0000-4000-8000-000000000005': [-40, 500],
+      }),
+    )(graph);
     expect(laid.cards.map((c) => [c.id, c.x, c.y])).toEqual([
-      ['a', 10, 20],
-      ['b', 300, 20],
-      ['c', -40, 500],
+      ['00000000-0000-4000-8000-000000000002', 10, 20],
+      ['00000000-0000-4000-8000-000000000003', 300, 20],
+      ['00000000-0000-4000-8000-000000000005', -40, 500],
     ]);
   });
 
   it('lays cards the map omits below everything it places', async () => {
-    const laid = await positionedStrategy(at({ a: [0, 0], b: [200, 400] }))(graph);
-    const c = laid.cards.find((card) => card.id === 'c')!;
+    const laid = await positionedStrategy(
+      at({
+        '00000000-0000-4000-8000-000000000002': [0, 0],
+        '00000000-0000-4000-8000-000000000003': [200, 400],
+      }),
+    )(graph);
+    const c = laid.cards.find((card) => card.id === '00000000-0000-4000-8000-000000000005')!;
     // Below the lowest authored card (b, whose box ends at 450), so an omitted
     // card reads as unplaced and cannot overlap an authored one.
     expect(c.y!).toBeGreaterThan(450);
@@ -82,7 +97,9 @@ describe('positionedStrategy', () => {
   });
 
   it('never places ports, leaving the render layer to spread them', async () => {
-    const laid = await positionedStrategy(at({ a: [0, 0] }))(graph);
+    const laid = await positionedStrategy(at({ '00000000-0000-4000-8000-000000000002': [0, 0] }))(
+      graph,
+    );
     for (const card of laid.cards) {
       for (const port of card.ports) {
         expect(port.y).toBeUndefined();
@@ -91,26 +108,39 @@ describe('positionedStrategy', () => {
   });
 
   it('ignores the edges and passes them through untouched', async () => {
-    const laid = await positionedStrategy(at({ a: [0, 0] }))(graph);
+    const laid = await positionedStrategy(at({ '00000000-0000-4000-8000-000000000002': [0, 0] }))(
+      graph,
+    );
     expect(laid.edges).toEqual(graph.edges);
     expect(laid.edges.every((e) => e.sections === undefined)).toBe(true);
 
-    const withoutEdges = await positionedStrategy(at({ a: [0, 0] }))({ ...graph, edges: [] });
+    const withoutEdges = await positionedStrategy(
+      at({ '00000000-0000-4000-8000-000000000002': [0, 0] }),
+    )({ ...graph, edges: [] });
     expect(withoutEdges.cards).toEqual(laid.cards);
   });
 
   it('ignores positions for cards the view is not showing', async () => {
-    const laid = await positionedStrategy(at({ a: [5, 5], zz: [999, 999] }))({
-      cards: cardsOf('a'),
+    const laid = await positionedStrategy(
+      at({ '00000000-0000-4000-8000-000000000002': [5, 5], zz: [999, 999] }),
+    )({
+      cards: cardsOf('00000000-0000-4000-8000-000000000002'),
       edges: [],
     });
-    expect(laid.cards.map((c) => [c.id, c.x, c.y])).toEqual([['a', 5, 5]]);
+    expect(laid.cards.map((c) => [c.id, c.x, c.y])).toEqual([
+      ['00000000-0000-4000-8000-000000000002', 5, 5],
+    ]);
   });
 
   it('handles an empty graph', async () => {
-    expect((await positionedStrategy(at({ a: [0, 0] }))({ cards: [], edges: [] })).cards).toEqual(
-      [],
-    );
+    expect(
+      (
+        await positionedStrategy(at({ '00000000-0000-4000-8000-000000000002': [0, 0] }))({
+          cards: [],
+          edges: [],
+        })
+      ).cards,
+    ).toEqual([]);
   });
 });
 
@@ -165,16 +195,30 @@ describe('positionedStrategy properties', () => {
 
 describe('layoutPositions', () => {
   it('reads back what a strategy placed', async () => {
-    const laid = await positionedStrategy(at({ a: [10, 20], b: [300, 20], c: [600, 20] }))(graph);
+    const laid = await positionedStrategy(
+      at({
+        '00000000-0000-4000-8000-000000000002': [10, 20],
+        '00000000-0000-4000-8000-000000000003': [300, 20],
+        '00000000-0000-4000-8000-000000000005': [600, 20],
+      }),
+    )(graph);
     expect(Object.fromEntries(layoutPositions(laid))).toEqual({
-      a: { x: 10, y: 20 },
-      b: { x: 300, y: 20 },
-      c: { x: 600, y: 20 },
+      '00000000-0000-4000-8000-000000000002': { x: 10, y: 20 },
+      '00000000-0000-4000-8000-000000000003': { x: 300, y: 20 },
+      '00000000-0000-4000-8000-000000000005': { x: 600, y: 20 },
     });
   });
 
   it('omits a card no strategy placed, rather than calling it the origin', () => {
-    expect([...layoutPositions({ cards: cardsOf('a', 'b'), edges: [] }).keys()]).toEqual([]);
+    expect([
+      ...layoutPositions({
+        cards: cardsOf(
+          '00000000-0000-4000-8000-000000000002',
+          '00000000-0000-4000-8000-000000000003',
+        ),
+        edges: [],
+      }).keys(),
+    ]).toEqual([]);
   });
 
   it('round-trips: replaying a laid-out graph reproduces its placement', async () => {

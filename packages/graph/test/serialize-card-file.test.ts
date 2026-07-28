@@ -4,17 +4,27 @@ import { parseCardFile, serializeCardFile } from '../src/index';
 
 describe('serializeCardFile', () => {
   it('writes frontmatter, a fence, then the body', () => {
-    const card: Card = { id: 'a', title: 'A', kind: 'markdown', body: 'Card **A**.\n' };
+    const card: Card = {
+      id: '00000000-0000-4000-8000-000000000002',
+      title: 'A',
+      kind: 'markdown',
+      body: 'Card **A**.\n',
+    };
 
     expect(serializeCardFile(card)).toBe(
-      '---\nid: a\ntitle: A\nkind: markdown\n---\n\nCard **A**.\n',
+      '---\nid: 00000000-0000-4000-8000-000000000002\ntitle: A\nkind: markdown\n---\n\nCard **A**.\n',
     );
   });
 
   it('quotes a title YAML would otherwise misread', () => {
     // `Recap: the data model` unquoted is a nested mapping, not a string — the
     // one authoring mistake the example space actually hit.
-    const card: Card = { id: 'r', title: 'Recap: the data model', kind: 'markdown', body: '' };
+    const card: Card = {
+      id: '00000000-0000-4000-8000-000000000034',
+      title: 'Recap: the data model',
+      kind: 'markdown',
+      body: '',
+    };
     const parsed = parseCardFile({ path: 'cards/r.md', text: serializeCardFile(card) });
 
     expect(parsed.ok).toBe(true);
@@ -23,13 +33,25 @@ describe('serializeCardFile', () => {
   });
 
   it('writes an alias with its target, and no body', () => {
-    const card: Card = { id: 'aa', title: 'A′', kind: 'alias', target: 'a' };
+    const card: Card = {
+      id: '00000000-0000-4000-8000-00000000000c',
+      title: 'A′',
+      kind: 'alias',
+      target: '00000000-0000-4000-8000-000000000002',
+    };
 
-    expect(serializeCardFile(card)).toBe('---\nid: aa\ntitle: A′\nkind: alias\ntarget: a\n---\n\n');
+    expect(serializeCardFile(card)).toBe(
+      '---\nid: 00000000-0000-4000-8000-00000000000c\ntitle: A′\nkind: alias\ntarget: 00000000-0000-4000-8000-000000000002\n---\n\n',
+    );
   });
 
   it('omits a description the card does not have', () => {
-    const card: Card = { id: 'a', title: 'A', kind: 'markdown', body: '' };
+    const card: Card = {
+      id: '00000000-0000-4000-8000-000000000002',
+      title: 'A',
+      kind: 'markdown',
+      body: '',
+    };
     expect(serializeCardFile(card)).not.toContain('description');
   });
 });

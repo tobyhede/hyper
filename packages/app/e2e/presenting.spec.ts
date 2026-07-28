@@ -40,13 +40,13 @@ test('walks the route, and the space is still what you are looking at', async ({
   await expect(page.locator('.react-flow__edge')).toHaveCount(13);
 
   // Long starts at A — the card no edge arrives at, not the first in any list.
-  await expect(activeCard(page)).toHaveAttribute('data-id', 'a');
+  await expect(activeCard(page)).toHaveAttribute('data-id', '00000000-0000-4000-8000-000000000002');
 
   await page.keyboard.press('ArrowRight');
-  await expect(activeCard(page)).toHaveAttribute('data-id', 'b');
+  await expect(activeCard(page)).toHaveAttribute('data-id', '00000000-0000-4000-8000-000000000003');
 
   await page.keyboard.press('ArrowLeft');
-  await expect(activeCard(page)).toHaveAttribute('data-id', 'a');
+  await expect(activeCard(page)).toHaveAttribute('data-id', '00000000-0000-4000-8000-000000000002');
 });
 
 test('the active card draws its content rendered, and only that card does', async ({ page }) => {
@@ -75,7 +75,7 @@ test('a body heading is just a heading, drawn once alongside the title (ADR 0020
   // elsewhere. Walk A → B → C.
   await page.keyboard.press('ArrowRight');
   await page.keyboard.press('ArrowRight');
-  await expect(activeCard(page)).toHaveAttribute('data-id', 'c');
+  await expect(activeCard(page)).toHaveAttribute('data-id', '00000000-0000-4000-8000-000000000005');
 
   const content = page.getByTestId('card-content');
   await expect(content.locator('.card__title')).toHaveText('C');
@@ -122,13 +122,13 @@ test('the chrome names the moves available, and says when the route ends', async
 
   // Long is A → B → C → D → A′: four moves, then a sink.
   for (const _ of [0, 1, 2, 3]) await page.keyboard.press('ArrowRight');
-  await expect(activeCard(page)).toHaveAttribute('data-id', 'aa');
+  await expect(activeCard(page)).toHaveAttribute('data-id', '00000000-0000-4000-8000-00000000000c');
   await expect(page.getByTestId('presenting-end')).toBeVisible();
 
   // Advancing past the end stays put rather than wrapping to the start, which is
   // what a sequence would do.
   await page.keyboard.press('ArrowRight');
-  await expect(activeCard(page)).toHaveAttribute('data-id', 'aa');
+  await expect(activeCard(page)).toHaveAttribute('data-id', '00000000-0000-4000-8000-00000000000c');
 });
 
 test('clicking a card while presenting does not open a reading panel', async ({ page }) => {

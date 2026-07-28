@@ -19,7 +19,7 @@ import { serializeCardFile, type LayoutPoint } from '@project/graph';
  * Not `graph`: that would shadow the built-in view, spending the only name the
  * automatic view has, when this Layout wants its own.
  */
-export const CREATED_LAYOUT_ID = 'layout';
+export const CREATED_LAYOUT_ID = '00000000-0000-4000-8000-000000000021';
 export const CREATED_LAYOUT_TITLE = 'Layout';
 
 /**

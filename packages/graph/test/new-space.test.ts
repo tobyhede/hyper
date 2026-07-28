@@ -18,8 +18,8 @@ describe('newSpace', () => {
   });
 
   it('carries one card with a title and an empty body (ADR 0018, ADR 0020)', () => {
-    const { cardFiles } = newSpace();
-    const result = loadSpace(newSpace().file, cardFiles);
+    const { file, cardFiles } = newSpace();
+    const result = loadSpace(file, cardFiles);
     if (!result.ok) throw new Error('should load');
 
     const card = result.space.cards[0]!;
@@ -36,14 +36,19 @@ describe('newSpace', () => {
     expect(file.defaultView).toBeUndefined();
   });
 
-  it('names itself, so a space minted by the app is not anonymous (ADR 0019)', () => {
-    expect(newSpace().file.id.length).toBeGreaterThan(0);
+  it('mints fresh UUID identity for each new space and its first card', () => {
+    const first = newSpace();
+    const second = newSpace();
+
+    expect(first.file.id).not.toBe(second.file.id);
+    expect(first.cardFiles[0]?.text).not.toBe(second.cardFiles[0]?.text);
+    expect(spaceFileSchema.safeParse(first.file).success).toBe(true);
   });
 
   it('puts the card in `cards/`, named for its id', () => {
     const { cardFiles } = newSpace();
     expect(cardFiles).toHaveLength(1);
-    expect(cardFiles[0]!.path).toBe('cards/start.md');
+    expect(cardFiles[0]!.path).toMatch(/^cards\/[0-9a-f-]{36}\.md$/);
   });
 
   it('is a fresh value each time, so one space cannot mutate another', () => {

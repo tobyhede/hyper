@@ -21,7 +21,7 @@ const lineArb = fc
 
 const markdownFrontmatterArb: fc.Arbitrary<CardFrontmatter> = fc.record(
   {
-    id: lineArb,
+    id: fc.uuid({ version: 4 }),
     title: lineArb,
     description: fc.option(lineArb, { nil: undefined }),
     kind: fc.constant('markdown' as const),
@@ -30,10 +30,10 @@ const markdownFrontmatterArb: fc.Arbitrary<CardFrontmatter> = fc.record(
 );
 
 const aliasFrontmatterArb: fc.Arbitrary<CardFrontmatter> = fc.record({
-  id: lineArb,
+  id: fc.uuid({ version: 4 }),
   title: lineArb,
   kind: fc.constant('alias' as const),
-  target: lineArb,
+  target: fc.uuid({ version: 4 }),
 });
 
 /**

@@ -11,60 +11,66 @@ const route = (edges: [string, string][]): Route => ({
 // a forks to b and c, which merge back into d. Every move a walk can make is in
 // here: a choice, a single step, and an arrival by two paths.
 const diamond = route([
-  ['a', 'b'],
-  ['a', 'c'],
-  ['b', 'd'],
-  ['c', 'd'],
+  ['00000000-0000-4000-8000-000000000002', '00000000-0000-4000-8000-000000000003'],
+  ['00000000-0000-4000-8000-000000000002', '00000000-0000-4000-8000-000000000005'],
+  ['00000000-0000-4000-8000-000000000003', '00000000-0000-4000-8000-000000000006'],
+  ['00000000-0000-4000-8000-000000000005', '00000000-0000-4000-8000-000000000006'],
 ]);
 
 describe('outgoingEdges', () => {
   it('lists a fork’s edges in the order they were authored', () => {
-    expect(outgoingEdges(diamond, 'a').map((e) => e.to)).toEqual(['b', 'c']);
+    expect(outgoingEdges(diamond, '00000000-0000-4000-8000-000000000002').map((e) => e.to)).toEqual(
+      ['00000000-0000-4000-8000-000000000003', '00000000-0000-4000-8000-000000000005'],
+    );
   });
 
   it('gives a card on a line exactly one — the degenerate fork', () => {
-    expect(outgoingEdges(diamond, 'b').map((e) => e.to)).toEqual(['d']);
+    expect(outgoingEdges(diamond, '00000000-0000-4000-8000-000000000003').map((e) => e.to)).toEqual(
+      ['00000000-0000-4000-8000-000000000006'],
+    );
   });
 
   it('gives a sink none, which is how a walk ends', () => {
-    expect(outgoingEdges(diamond, 'd')).toEqual([]);
+    expect(outgoingEdges(diamond, '00000000-0000-4000-8000-000000000006')).toEqual([]);
   });
 
   it('gives a card the route does not touch none', () => {
-    expect(outgoingEdges(diamond, 'nowhere')).toEqual([]);
+    expect(outgoingEdges(diamond, '00000000-0000-4000-8000-000000000098')).toEqual([]);
   });
 });
 
 describe('incomingEdges', () => {
   it('lists every edge arriving at a merge', () => {
-    expect(incomingEdges(diamond, 'd').map((e) => e.from)).toEqual(['b', 'c']);
+    expect(
+      incomingEdges(diamond, '00000000-0000-4000-8000-000000000006').map((e) => e.from),
+    ).toEqual(['00000000-0000-4000-8000-000000000003', '00000000-0000-4000-8000-000000000005']);
   });
 });
 
 describe('routeEntryCards', () => {
   it('finds the card nothing arrives at', () => {
-    expect(routeEntryCards(diamond)).toEqual(['a']);
+    expect(routeEntryCards(diamond)).toEqual(['00000000-0000-4000-8000-000000000002']);
   });
 
   it('finds one per component — a route need not be connected (ADR 0023)', () => {
     expect(
       routeEntryCards(
         route([
-          ['a', 'b'],
+          ['00000000-0000-4000-8000-000000000002', '00000000-0000-4000-8000-000000000003'],
           ['x', 'y'],
         ]),
       ),
-    ).toEqual(['a', 'x']);
+    ).toEqual(['00000000-0000-4000-8000-000000000002', 'x']);
   });
 
   it('lists each entry once however many edges leave it', () => {
-    expect(routeEntryCards(diamond)).toEqual(['a']);
+    expect(routeEntryCards(diamond)).toEqual(['00000000-0000-4000-8000-000000000002']);
   });
 });
 
 describe('routeStartCard', () => {
   it('starts a walk at the first entry', () => {
-    expect(routeStartCard(diamond)).toBe('a');
+    expect(routeStartCard(diamond)).toBe('00000000-0000-4000-8000-000000000002');
   });
 
   it('is undefined only for a route with no edges, which the schema forbids', () => {
@@ -77,10 +83,10 @@ describe('routeStartCard', () => {
     expect(
       routeStartCard(
         route([
-          ['b', 'c'],
-          ['a', 'b'],
+          ['00000000-0000-4000-8000-000000000003', '00000000-0000-4000-8000-000000000005'],
+          ['00000000-0000-4000-8000-000000000002', '00000000-0000-4000-8000-000000000003'],
         ]),
       ),
-    ).toBe('a');
+    ).toBe('00000000-0000-4000-8000-000000000002');
   });
 });

@@ -5,13 +5,27 @@ import { saveSpace, serializeLayout } from '../src/persist';
 import { cardFile } from './card-files';
 
 const BASE: SpaceFile = {
-  version: 1,
-  id: 's',
+  version: 2,
+  id: '00000000-0000-4000-8000-000000000001',
   title: 'T',
-  routes: [{ id: 'main', title: 'Main', edges: [{ from: 'a', to: 'b' }] }],
+  routes: [
+    {
+      id: '00000000-0000-4000-8000-000000000004',
+      title: 'Main',
+      edges: [
+        {
+          from: '00000000-0000-4000-8000-000000000002',
+          to: '00000000-0000-4000-8000-000000000003',
+        },
+      ],
+    },
+  ],
 };
 
-const CARDS = [cardFile('a'), cardFile('b')];
+const CARDS = [
+  cardFile('00000000-0000-4000-8000-000000000002'),
+  cardFile('00000000-0000-4000-8000-000000000003'),
+];
 
 const positions = (entries: Record<string, [number, number]>) =>
   new Map(Object.entries(entries).map(([id, [x, y]]) => [id, { x, y }]));
@@ -20,61 +34,86 @@ describe('serializeLayout', () => {
   it('writes the positions as the active Layout and opens the space in it', () => {
     const next = serializeLayout(
       BASE,
-      'layout',
+      '00000000-0000-4000-8000-000000000021',
       'Layout',
-      positions({ a: [10, 20], b: [300, 40] }),
-      'main',
+      positions({
+        '00000000-0000-4000-8000-000000000002': [10, 20],
+        '00000000-0000-4000-8000-000000000003': [300, 40],
+      }),
+      '00000000-0000-4000-8000-000000000004',
     );
 
     expect(next.layouts).toEqual([
       {
-        id: 'layout',
+        id: '00000000-0000-4000-8000-000000000021',
         title: 'Layout',
         kind: 'positioned',
-        positions: { a: { x: 10, y: 20 }, b: { x: 300, y: 40 } },
-        activeRoute: 'main',
+        positions: {
+          '00000000-0000-4000-8000-000000000002': { x: 10, y: 20 },
+          '00000000-0000-4000-8000-000000000003': { x: 300, y: 40 },
+        },
+        activeRoute: '00000000-0000-4000-8000-000000000004',
       },
     ]);
     // The point of writing it: the space reopens in this Layout rather than
     // recomputing an automatic one.
-    expect(next.defaultView).toBe('layout');
+    expect(next.defaultView).toBe('00000000-0000-4000-8000-000000000021');
   });
 
   it('produces a file that passes the schema and re-parses through loadSpace', () => {
     // Acceptance: what the writer emits is a real space file, not a lookalike.
-    const next = serializeLayout(BASE, 'layout', 'Layout', positions({ a: [10, 20] }), 'main');
+    const next = serializeLayout(
+      BASE,
+      '00000000-0000-4000-8000-000000000021',
+      'Layout',
+      positions({ '00000000-0000-4000-8000-000000000002': [10, 20] }),
+      '00000000-0000-4000-8000-000000000004',
+    );
 
     expect(spaceFileSchema.safeParse(next).success).toBe(true);
     const loaded = loadSpace(next, CARDS);
     expect(loaded.ok).toBe(true);
-    if (loaded.ok) expect(loaded.space.defaultView).toBe('layout');
+    if (loaded.ok) expect(loaded.space.defaultView).toBe('00000000-0000-4000-8000-000000000021');
   });
 
   it('replaces a Layout of the same id rather than appending a second', () => {
     const withLayout: SpaceFile = {
       ...BASE,
       layouts: [
-        { id: 'layout', title: 'Layout', kind: 'positioned', positions: { a: { x: 0, y: 0 } } },
+        {
+          id: '00000000-0000-4000-8000-000000000021',
+          title: 'Layout',
+          kind: 'positioned',
+          positions: { '00000000-0000-4000-8000-000000000002': { x: 0, y: 0 } },
+        },
       ],
-      defaultView: 'layout',
+      defaultView: '00000000-0000-4000-8000-000000000021',
     };
     const next = serializeLayout(
       withLayout,
-      'layout',
+      '00000000-0000-4000-8000-000000000021',
       'Layout',
-      positions({ a: [99, 99] }),
-      'main',
+      positions({ '00000000-0000-4000-8000-000000000002': [99, 99] }),
+      '00000000-0000-4000-8000-000000000004',
     );
 
     expect(next.layouts).toHaveLength(1);
-    expect(next.layouts?.[0]?.positions).toEqual({ a: { x: 99, y: 99 } });
+    expect(next.layouts?.[0]?.positions).toEqual({
+      '00000000-0000-4000-8000-000000000002': { x: 99, y: 99 },
+    });
   });
 
   it('keeps the space id through a save and reload', () => {
     // `serializeLayout` spreads the base file, so the id rides along — worth an
     // assertion rather than an assumption, since losing it on save would make a
     // saved space anonymous.
-    const next = serializeLayout(BASE, 'layout', 'Layout', positions({ a: [1, 2] }), 'main');
+    const next = serializeLayout(
+      BASE,
+      '00000000-0000-4000-8000-000000000021',
+      'Layout',
+      positions({ '00000000-0000-4000-8000-000000000002': [1, 2] }),
+      '00000000-0000-4000-8000-000000000004',
+    );
     expect(next.id).toBe(BASE.id);
 
     const reloaded = loadSpace(next, CARDS);
@@ -88,16 +127,40 @@ describe('serializeLayout', () => {
     // routes afterwards cannot change what reopens active.
     const twoRoutes: SpaceFile = {
       ...BASE,
-      routes: [...BASE.routes, { id: 'aside', title: 'Aside', edges: [{ from: 'b', to: 'a' }] }],
+      routes: [
+        ...BASE.routes,
+        {
+          id: '00000000-0000-4000-8000-000000000020',
+          title: 'Aside',
+          edges: [
+            {
+              from: '00000000-0000-4000-8000-000000000003',
+              to: '00000000-0000-4000-8000-000000000002',
+            },
+          ],
+        },
+      ],
     };
-    const next = serializeLayout(twoRoutes, 'layout', 'Layout', positions({ a: [1, 2] }), 'aside');
-    expect(next.layouts?.[0]?.activeRoute).toBe('aside');
+    const next = serializeLayout(
+      twoRoutes,
+      '00000000-0000-4000-8000-000000000021',
+      'Layout',
+      positions({ '00000000-0000-4000-8000-000000000002': [1, 2] }),
+      '00000000-0000-4000-8000-000000000020',
+    );
+    expect(next.layouts?.[0]?.activeRoute).toBe('00000000-0000-4000-8000-000000000020');
     expect(loadSpace(next, CARDS).ok).toBe(true);
   });
 
   it('writes no active route for a space that has none (ADR 0015)', () => {
     const routeless: SpaceFile = { ...BASE, routes: [] };
-    const next = serializeLayout(routeless, 'layout', 'Layout', positions({ a: [1, 2] }), null);
+    const next = serializeLayout(
+      routeless,
+      '00000000-0000-4000-8000-000000000021',
+      'Layout',
+      positions({ '00000000-0000-4000-8000-000000000002': [1, 2] }),
+      null,
+    );
     expect(next.layouts?.[0]).not.toHaveProperty('activeRoute');
     expect(spaceFileSchema.safeParse(next).success).toBe(true);
   });
@@ -111,27 +174,51 @@ describe('serializeLayout', () => {
       ...BASE,
       layouts: [
         {
-          id: 'layout',
+          id: '00000000-0000-4000-8000-000000000021',
           title: 'Layout',
           kind: 'positioned',
-          positions: { a: { x: 0, y: 0 } },
-          routes: ['main'],
+          positions: { '00000000-0000-4000-8000-000000000002': { x: 0, y: 0 } },
+          routes: ['00000000-0000-4000-8000-000000000004'],
         },
       ],
     };
-    const next = serializeLayout(filtered, 'layout', 'Layout', positions({ a: [5, 5] }), 'main');
-    expect(next.layouts?.[0]?.routes).toEqual(['main']);
-    expect(next.layouts?.[0]?.positions).toEqual({ a: { x: 5, y: 5 } });
+    const next = serializeLayout(
+      filtered,
+      '00000000-0000-4000-8000-000000000021',
+      'Layout',
+      positions({ '00000000-0000-4000-8000-000000000002': [5, 5] }),
+      '00000000-0000-4000-8000-000000000004',
+    );
+    expect(next.layouts?.[0]?.routes).toEqual(['00000000-0000-4000-8000-000000000004']);
+    expect(next.layouts?.[0]?.positions).toEqual({
+      '00000000-0000-4000-8000-000000000002': { x: 5, y: 5 },
+    });
   });
 
   it('keeps other layouts a space already had', () => {
     const withOther: SpaceFile = {
       ...BASE,
-      layouts: [{ id: 'other', title: 'Other', kind: 'positioned', positions: {} }],
+      layouts: [
+        {
+          id: '00000000-0000-4000-8000-000000000036',
+          title: 'Other',
+          kind: 'positioned',
+          positions: {},
+        },
+      ],
     };
-    const next = serializeLayout(withOther, 'layout', 'Layout', positions({ a: [1, 2] }), 'main');
+    const next = serializeLayout(
+      withOther,
+      '00000000-0000-4000-8000-000000000021',
+      'Layout',
+      positions({ '00000000-0000-4000-8000-000000000002': [1, 2] }),
+      '00000000-0000-4000-8000-000000000004',
+    );
 
-    expect(next.layouts?.map((l) => l.id).sort()).toEqual(['layout', 'other']);
+    expect(next.layouts?.map((l) => l.id).sort()).toEqual([
+      '00000000-0000-4000-8000-000000000021',
+      '00000000-0000-4000-8000-000000000036',
+    ]);
   });
 });
 
@@ -160,12 +247,19 @@ describe('saveSpace: what it sends for each card', () => {
     // leaves `kind` to the default — and the server writes whatever differs, so
     // reconstructing it would turn a save that moved a card into a rewrite of
     // every hand-authored card file in the space, comments and all.
-    const authored = '---\nid: a # stable identifier\ntitle: A\n---\n\nB\n';
+    const authored =
+      '---\nid: 00000000-0000-4000-8000-000000000002 # stable identifier\ntitle: A\n---\n\nB\n';
     const sent = capture();
 
-    await saveSpace(BASE, [card('a')], new Map([['a', authored]]));
+    await saveSpace(
+      BASE,
+      [card('00000000-0000-4000-8000-000000000002')],
+      new Map([['00000000-0000-4000-8000-000000000002', authored]]),
+    );
 
-    expect(sent.body().cards).toEqual([{ id: 'a', text: authored }]);
+    expect(sent.body().cards).toEqual([
+      { id: '00000000-0000-4000-8000-000000000002', text: authored },
+    ]);
   });
 
   it('serializes a card that has no file yet', async () => {
@@ -174,11 +268,11 @@ describe('saveSpace: what it sends for each card', () => {
     // option.
     const sent = capture();
 
-    await saveSpace(BASE, [card('a')], new Map());
+    await saveSpace(BASE, [card('00000000-0000-4000-8000-000000000002')], new Map());
 
     const [only] = sent.body().cards;
-    expect(only?.id).toBe('a');
-    expect(only?.text).toContain('id: a');
+    expect(only?.id).toBe('00000000-0000-4000-8000-000000000002');
+    expect(only?.text).toContain('id: 00000000-0000-4000-8000-000000000002');
     // And what it writes is what will load. Routeless, so the one card is the
     // whole space and nothing references the `b` this case does not send.
     const routeless: SpaceFile = { ...BASE, routes: [] };

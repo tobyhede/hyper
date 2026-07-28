@@ -17,7 +17,7 @@ function file(id: string, frontmatter: Record<string, string>, body: string): Ca
   return { path: `cards/${id}.md`, text: `---\n${stringifyYaml(frontmatter)}---\n\n${body}` };
 }
 
-export function cardFile(id: string, title = id.toUpperCase(), body = ''): CardFile {
+export function cardFile(id: string, title = defaultTitle(id), body = ''): CardFile {
   return file(id, { id, title }, body);
 }
 
@@ -31,8 +31,21 @@ export function aliasFile(id: string, title: string, target: string): CardFile {
  * ever reached it.
  */
 
-export function card(id: string, title = id.toUpperCase(), body = ''): Card {
+export function card(id: string, title = defaultTitle(id), body = ''): Card {
   return { id, title, kind: 'markdown', body };
+}
+
+function defaultTitle(id: string): string {
+  return (
+    (
+      {
+        '00000000-0000-4000-8000-000000000002': 'A',
+        '00000000-0000-4000-8000-000000000003': 'B',
+        '00000000-0000-4000-8000-000000000005': 'C',
+        '00000000-0000-4000-8000-000000000006': 'D',
+      } as Record<string, string>
+    )[id] ?? id.toUpperCase()
+  );
 }
 
 export function alias(id: string, title: string, target: string): Card {

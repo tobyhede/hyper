@@ -1,18 +1,28 @@
 import type { z } from 'zod';
 import type {
   cardFrontmatterSchema,
+  cardDocumentSchema,
   cardSchema,
+  importSpaceSchema,
   layoutPositionSchema,
   layoutSchema,
   positionedLayoutSchema,
   routeEdgeSchema,
   routeSchema,
   spaceFileSchema,
+  spaceDocumentSchema,
+  spaceSnapshotSchema,
+  uuidSchema,
 } from './schema';
 
 /** Domain types are derived from the Zod schemas so they can never drift apart. */
 
 export type Card = z.infer<typeof cardSchema>;
+export type UUID = z.infer<typeof uuidSchema>;
+export type CardDocument = z.infer<typeof cardDocumentSchema>;
+export type SpaceDocument = z.infer<typeof spaceDocumentSchema>;
+export type SpaceSnapshot = z.infer<typeof spaceSnapshotSchema>;
+export type ImportSpace = z.infer<typeof importSpaceSchema>;
 
 /**
  * The kind-specific fields stored before a card file's closing frontmatter

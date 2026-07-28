@@ -24,8 +24,8 @@ import {
  */
 
 const spaceFile = {
-  version: 1 as const,
-  id: 'a-space',
+  version: 2 as const,
+  id: '00000000-0000-4000-8000-000000000037',
   title: 'A space',
   routes: [],
 };
@@ -62,18 +62,16 @@ describe('CARD_ID', () => {
     ['leading dash', '-leading'],
     ['extension', 'x.md'],
     ['dot', 'a.b'],
-    ['space', 'a b'],
-    ['over length (65)', 'a'.repeat(65)],
+    ['00000000-0000-4000-8000-000000000001', 'a b'],
+    ['over length', `${'0'.repeat(52)}-0000-4000-8000-000000000002`],
+    ['old slug identity', 'intro'],
   ])('rejects %s', (_label, id) => {
     expect(CARD_ID.test(id)).toBe(false);
   });
 
   it.each([
-    ['a bare slug', 'intro'],
-    ['digits and dashes', 'card-2'],
-    ['underscores', 'Card_1-x'],
-    ['a single character', 'a'],
-    ['exactly 64 characters', 'a'.repeat(64)],
+    ['lowercase UUID', '00000000-0000-4000-8000-000000000027'],
+    ['uppercase UUID', 'AAAAAAAA-AAAA-4AAA-8AAA-AAAAAAAAAAAA'],
   ])('accepts %s', (_label, id) => {
     expect(CARD_ID.test(id)).toBe(true);
   });
@@ -90,26 +88,47 @@ describe('parseSavedSpace', () => {
     // The whole point of validating: keys nobody declared do not reach disk.
     expect(parsed?.spaceFile).not.toHaveProperty('evil');
     expect(parsed?.spaceFile).not.toHaveProperty('scripts');
-    expect(parsed?.spaceFile).toMatchObject({ id: 'a-space', title: 'A space' });
+    expect(parsed?.spaceFile).toMatchObject({
+      id: '00000000-0000-4000-8000-000000000037',
+      title: 'A space',
+    });
   });
 
   it('rejects a card whose text does not claim the envelope’s id', () => {
     // The envelope id chooses the file; the text is what lands in it. Letting
     // them disagree meant an id was enough to overwrite a card with anything.
     expect(
-      parseSavedSpace({ spaceFile, cards: [{ id: 'intro', text: cardFile('other') }] }),
+      parseSavedSpace({
+        spaceFile,
+        cards: [
+          {
+            id: '00000000-0000-4000-8000-000000000027',
+            text: cardFile('00000000-0000-4000-8000-000000000036'),
+          },
+        ],
+      }),
     ).toBeNull();
   });
 
   it('rejects a card whose text is not a card file at all', () => {
-    expect(parseSavedSpace({ spaceFile, cards: [{ id: 'intro', text: 'garbage' }] })).toBeNull();
+    expect(
+      parseSavedSpace({
+        spaceFile,
+        cards: [{ id: '00000000-0000-4000-8000-000000000027', text: 'garbage' }],
+      }),
+    ).toBeNull();
   });
 
   it('accepts an id the domain accepts but a filename could not hold', () => {
     // `idSchema` is `z.string().min(1)`, so these load. Requiring the filename
     // slug of *every* payload card rejected them here, and every drag-save on
     // such a space failed with a 400 the author never saw.
-    for (const id of ['intro.v2', 'section one', 'ünicode', 'a'.repeat(120)]) {
+    for (const id of [
+      'intro.v2',
+      'section one',
+      'ünicode',
+      '00000000-0000-4000-8000-000000000002'.repeat(120),
+    ]) {
       expect(parseSavedSpace({ spaceFile, cards: [{ id, text: cardFile(id) }] })).not.toBeNull();
     }
   });
@@ -123,15 +142,21 @@ describe('parseSavedSpace', () => {
     ['null', null],
     ['a missing cards array', { spaceFile }],
     ['cards that are not objects', { spaceFile, cards: ['x'] }],
-    ['a card whose text is not a string', { spaceFile, cards: [{ id: 'a', text: 1 }] }],
+    [
+      'a card whose text is not a string',
+      { spaceFile, cards: [{ id: '00000000-0000-4000-8000-000000000002', text: 1 }] },
+    ],
   ])('rejects %s', (_label, value) => {
     expect(parseSavedSpace(value)).toBeNull();
   });
 
   it('accepts a well-formed payload', () => {
-    const text = cardFile('intro', 'hello');
-    const parsed = parseSavedSpace({ spaceFile, cards: [{ id: 'intro', text }] });
-    expect(parsed?.cards).toEqual([{ id: 'intro', text }]);
+    const text = cardFile('00000000-0000-4000-8000-000000000027', 'hello');
+    const parsed = parseSavedSpace({
+      spaceFile,
+      cards: [{ id: '00000000-0000-4000-8000-000000000027', text }],
+    });
+    expect(parsed?.cards).toEqual([{ id: '00000000-0000-4000-8000-000000000027', text }]);
   });
 });
 
@@ -195,17 +220,22 @@ describe('writeIfChanged', () => {
 
 describe('frontmatterId', () => {
   it('reads the id, which is a card\u2019s identity and not its filename', () => {
-    expect(frontmatterId(cardFile('intro'))).toBe('intro');
+    expect(frontmatterId(cardFile('00000000-0000-4000-8000-000000000027'))).toBe(
+      '00000000-0000-4000-8000-000000000027',
+    );
   });
 
   it.each([
-    ['single quotes', "---\nid: 'intro'\n---\n"],
-    ['double quotes', '---\nid: "intro"\n---\n'],
-    ['CRLF line endings', '---\r\nid: intro\r\n---\r\n'],
-    ['a later position in the block', '---\ntitle: T\nid: intro\n---\n'],
-    ['trailing spaces', '---\nid: intro   \n---\n'],
+    ['single quotes', "---\nid: '00000000-0000-4000-8000-000000000027'\n---\n"],
+    ['double quotes', '---\nid: "00000000-0000-4000-8000-000000000027"\n---\n'],
+    ['CRLF line endings', '---\r\nid: 00000000-0000-4000-8000-000000000027\r\n---\r\n'],
+    [
+      'a later position in the block',
+      '---\ntitle: T\nid: 00000000-0000-4000-8000-000000000027\n---\n',
+    ],
+    ['trailing spaces', '---\nid: 00000000-0000-4000-8000-000000000027   \n---\n'],
   ])('handles %s', (_label, text) => {
-    expect(frontmatterId(text)).toBe('intro');
+    expect(frontmatterId(text)).toBe('00000000-0000-4000-8000-000000000027');
   });
 
   it('reads an unquoted id containing spaces', () => {
@@ -240,7 +270,11 @@ describe('frontmatterId', () => {
     // `intro # stable identifier`. The two disagreeing means the writer cannot
     // find `intro`'s existing file, writes a second copy under `cards/`, and
     // the next load fails on a duplicate id.
-    expect(frontmatterId('---\nid: intro # stable identifier\ntitle: T\n---\n')).toBe('intro');
+    expect(
+      frontmatterId(
+        '---\nid: 00000000-0000-4000-8000-000000000027 # stable identifier\ntitle: T\n---\n',
+      ),
+    ).toBe('00000000-0000-4000-8000-000000000027');
   });
 
   it('returns undefined for an id that is not a string', () => {
@@ -272,22 +306,27 @@ describe('readCardFiles', () => {
   });
 
   it('returns nothing for a directory that does not exist yet', () => {
-    expect(readCardFiles(join(dir, 'nowhere'))).toEqual([]);
+    expect(readCardFiles(join(dir, '00000000-0000-4000-8000-000000000098'))).toEqual([]);
   });
 });
 
 describe('cardPathById', () => {
   it('keys a card by its frontmatter id, not its filename', () => {
-    writeFileSync(join(dir, 'whatever.md'), cardFile('intro'));
-    expect(cardPathById(dir).get('intro')).toBe('whatever.md');
+    writeFileSync(join(dir, 'whatever.md'), cardFile('00000000-0000-4000-8000-000000000027'));
+    expect(cardPathById(dir).get('00000000-0000-4000-8000-000000000027')).toBe('whatever.md');
   });
 });
 
 describe('writeSpace', () => {
   it('keeps a card where its author put it', () => {
-    writeFileSync(join(dir, 'intro.md'), cardFile('intro'));
+    writeFileSync(join(dir, 'intro.md'), cardFile('00000000-0000-4000-8000-000000000027'));
 
-    writeSpace(dir, spaceFile, [{ id: 'intro', text: cardFile('intro', 'Edited.') }]);
+    writeSpace(dir, spaceFile, [
+      {
+        id: '00000000-0000-4000-8000-000000000027',
+        text: cardFile('00000000-0000-4000-8000-000000000027', 'Edited.'),
+      },
+    ]);
 
     // Rewritten beside the space file, where it already sat — not duplicated
     // into `cards/`.
@@ -296,43 +335,54 @@ describe('writeSpace', () => {
   });
 
   it('places a card it has never seen in cards/', () => {
-    writeSpace(dir, spaceFile, [{ id: 'fresh', text: cardFile('fresh') }]);
-    expect(readCardFiles(dir).map((f) => f.path)).toEqual(['cards/fresh.md']);
+    const id = '00000000-0000-4000-8000-000000000038';
+    writeSpace(dir, spaceFile, [{ id, text: cardFile(id) }]);
+    expect(readCardFiles(dir).map((f) => f.path)).toEqual([`cards/${id}.md`]);
   });
 
   it('never deletes a card missing from the payload', () => {
-    writeFileSync(join(dir, 'keep.md'), cardFile('keep'));
+    const id = '00000000-0000-4000-8000-000000000039';
+    writeFileSync(join(dir, 'keep.md'), cardFile(id));
 
     // Deletion by absence turns any client bug into data loss.
     writeSpace(dir, spaceFile, []);
 
-    expect(readFileSync(join(dir, 'keep.md'), 'utf8')).toContain('id: keep');
+    expect(readFileSync(join(dir, 'keep.md'), 'utf8')).toContain(`id: ${id}`);
   });
 
   it('reports only the files whose bytes changed', () => {
-    const text = cardFile('intro');
+    const text = cardFile('00000000-0000-4000-8000-000000000027');
     writeFileSync(join(dir, 'intro.md'), text);
 
     // First save writes the space file only: the card is byte-identical.
-    expect(writeSpace(dir, spaceFile, [{ id: 'intro', text }])).toBe(1);
+    expect(writeSpace(dir, spaceFile, [{ id: '00000000-0000-4000-8000-000000000027', text }])).toBe(
+      1,
+    );
     // Second save writes nothing at all.
-    expect(writeSpace(dir, spaceFile, [{ id: 'intro', text }])).toBe(0);
+    expect(writeSpace(dir, spaceFile, [{ id: '00000000-0000-4000-8000-000000000027', text }])).toBe(
+      0,
+    );
   });
 
   it('does not rewrite card bodies when only the arrangement changed', () => {
-    const text = cardFile('intro');
+    const text = cardFile('00000000-0000-4000-8000-000000000027');
     writeFileSync(join(dir, 'intro.md'), text);
-    writeSpace(dir, spaceFile, [{ id: 'intro', text }]);
+    writeSpace(dir, spaceFile, [{ id: '00000000-0000-4000-8000-000000000027', text }]);
     const before = statSync(join(dir, 'intro.md')).mtimeMs;
 
     // This is what a drag does: the space file gains a Layout, no body moves.
     const moved = {
       ...spaceFile,
       layouts: [
-        { id: 'l', title: 'L', kind: 'positioned' as const, positions: { intro: { x: 1, y: 2 } } },
+        {
+          id: 'l',
+          title: 'L',
+          kind: 'positioned' as const,
+          positions: { '00000000-0000-4000-8000-000000000027': { x: 1, y: 2 } },
+        },
       ],
     };
-    expect(writeSpace(dir, moved, [{ id: 'intro', text }])).toBe(1);
+    expect(writeSpace(dir, moved, [{ id: '00000000-0000-4000-8000-000000000027', text }])).toBe(1);
     expect(statSync(join(dir, 'intro.md')).mtimeMs).toBe(before);
   });
 

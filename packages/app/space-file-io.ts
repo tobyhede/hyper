@@ -50,7 +50,7 @@ export type SpaceFile = ReturnType<typeof spaceFileSchema.parse>;
  * throw takes the dev server down rather than failing one request. 64 is well
  * beyond anything an author would type and well inside every limit.
  */
-export const CARD_ID = /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$/;
+export const CARD_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 /**
  * Whether a card's id is safe to turn into a filename.

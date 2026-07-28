@@ -1,3 +1,4 @@
+/* v8 ignore next -- V8 attributes ESM module initialization to this import as a function. */
 import { z } from 'zod';
 
 /**
@@ -9,7 +10,10 @@ import { z } from 'zod';
  * a Space — `loadSpace` adds the reference check and the index (ADR 0010).
  */
 
-const idSchema = z.string().min(1);
+/** The single durable identity used by every referenceable Hyper entity. */
+export const uuidSchema = z.string().uuid();
+
+const idSchema = uuidSchema;
 
 /**
  * Upper bound on a card's description. A description is a caption — what a card
@@ -198,7 +202,7 @@ export const routeSchema = z.object({
  * card files alongside this.
  */
 export const spaceFileSchema = z.object({
-  version: z.literal(1),
+  version: z.literal(2),
   /**
    * What names this space. Required today; ADR 0019 makes ids optional and
    * generated on load, and this is the field that becomes optional — the other
@@ -217,5 +221,39 @@ export const spaceFileSchema = z.object({
   /** Optional: a space can be hand-authored with no coordinates at all. */
   layouts: z.array(layoutSchema).optional(),
   /** A declared layout's id, or a built-in view's. See {@link BUILT_IN_VIEW_IDS}. */
-  defaultView: z.string().min(1).optional(),
+  defaultView: z.union([z.enum(BUILT_IN_VIEW_IDS), uuidSchema]).optional(),
+});
+
+/** The JSONB document stored beside a space's relational UUID. */
+export const spaceDocumentSchema = spaceFileSchema.omit({ id: true });
+
+/** The JSONB document stored beside a card's relational UUID. */
+export const markdownCardDocumentSchema = markdownCardSchema.omit({ id: true });
+export const aliasCardDocumentSchema = aliasCardSchema.omit({ id: true });
+export const cardDocumentSchema = z.discriminatedUnion('kind', [
+  markdownCardDocumentSchema,
+  aliasCardDocumentSchema,
+]);
+
+/** A complete, fully identified aggregate exchanged at persistence seams. */
+export const spaceSnapshotSchema = z.object({
+  id: uuidSchema,
+  document: spaceDocumentSchema,
+  cards: z.array(z.object({ id: uuidSchema, document: cardDocumentSchema })),
+});
+
+const importRouteSchema = routeSchema.extend({ id: uuidSchema.optional() });
+const importPositionedLayoutSchema = positionedLayoutSchema.extend({ id: uuidSchema.optional() });
+
+/**
+ * The only shape in which entity ids may be absent. References remain UUIDs:
+ * identity allocation precedes normal domain validation during import.
+ */
+export const importSpaceSchema = z.object({
+  id: uuidSchema.optional(),
+  document: spaceDocumentSchema.extend({
+    routes: z.array(importRouteSchema),
+    layouts: z.array(importPositionedLayoutSchema).optional(),
+  }),
+  cards: z.array(z.object({ id: uuidSchema.optional(), document: cardDocumentSchema })),
 });

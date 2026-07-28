@@ -30,7 +30,10 @@ function drag(id: string, x: number, y: number): NodeChange<CardFlowNode>[] {
   ];
 }
 
-const PROJECTED = [node('a', 10, 20), node('b', 300, 20)];
+const PROJECTED = [
+  node('00000000-0000-4000-8000-000000000002', 10, 20),
+  node('00000000-0000-4000-8000-000000000003', 300, 20),
+];
 
 describe('editor store', () => {
   it('owns no nodes until the first layout resolves', () => {
@@ -43,9 +46,18 @@ describe('editor store', () => {
     const store = createEditorStore();
     store.getState().syncNodes(PROJECTED);
 
-    expect(store.getState().nodes?.map((n) => n.id)).toEqual(['a', 'b']);
-    expect(store.getState().positions.get('a')).toEqual({ x: 10, y: 20 });
-    expect(store.getState().positions.get('b')).toEqual({ x: 300, y: 20 });
+    expect(store.getState().nodes?.map((n) => n.id)).toEqual([
+      '00000000-0000-4000-8000-000000000002',
+      '00000000-0000-4000-8000-000000000003',
+    ]);
+    expect(store.getState().positions.get('00000000-0000-4000-8000-000000000002')).toEqual({
+      x: 10,
+      y: 20,
+    });
+    expect(store.getState().positions.get('00000000-0000-4000-8000-000000000003')).toEqual({
+      x: 300,
+      y: 20,
+    });
     // Created on open, before any gesture — nothing has moved yet.
     expect(store.getState().moved).toBe(false);
   });
@@ -53,25 +65,45 @@ describe('editor store', () => {
   it('records where a drag ends, and moves nothing else', () => {
     const store = createEditorStore();
     store.getState().syncNodes(PROJECTED);
-    store.getState().changeNodes(drag('a', 500, 400));
+    store.getState().changeNodes(drag('00000000-0000-4000-8000-000000000002', 500, 400));
 
-    expect(store.getState().positions.get('a')).toEqual({ x: 500, y: 400 });
-    expect(store.getState().positions.get('b')).toEqual({ x: 300, y: 20 });
-    expect(store.getState().nodes?.find((n) => n.id === 'a')?.position).toEqual({ x: 500, y: 400 });
+    expect(store.getState().positions.get('00000000-0000-4000-8000-000000000002')).toEqual({
+      x: 500,
+      y: 400,
+    });
+    expect(store.getState().positions.get('00000000-0000-4000-8000-000000000003')).toEqual({
+      x: 300,
+      y: 20,
+    });
+    expect(
+      store.getState().nodes?.find((n) => n.id === '00000000-0000-4000-8000-000000000002')
+        ?.position,
+    ).toEqual({ x: 500, y: 400 });
     expect(store.getState().moved).toBe(true);
   });
 
   it('follows the cursor mid-drag without recording it', () => {
     const store = createEditorStore();
     store.getState().syncNodes(PROJECTED);
-    store
-      .getState()
-      .changeNodes([{ type: 'position', id: 'a', position: { x: 77, y: 88 }, dragging: true }]);
+    store.getState().changeNodes([
+      {
+        type: 'position',
+        id: '00000000-0000-4000-8000-000000000002',
+        position: { x: 77, y: 88 },
+        dragging: true,
+      },
+    ]);
 
     // The node moves, so the card tracks the pointer in a controlled flow...
-    expect(store.getState().nodes?.find((n) => n.id === 'a')?.position).toEqual({ x: 77, y: 88 });
+    expect(
+      store.getState().nodes?.find((n) => n.id === '00000000-0000-4000-8000-000000000002')
+        ?.position,
+    ).toEqual({ x: 77, y: 88 });
     // ...but a gesture in flight is not a placement.
-    expect(store.getState().positions.get('a')).toEqual({ x: 10, y: 20 });
+    expect(store.getState().positions.get('00000000-0000-4000-8000-000000000002')).toEqual({
+      x: 10,
+      y: 20,
+    });
     expect(store.getState().moved).toBe(false);
   });
 
@@ -80,17 +112,28 @@ describe('editor store', () => {
     // emphasis change, and a naive assignment would stamp the drag away.
     const store = createEditorStore();
     store.getState().syncNodes(PROJECTED);
-    store.getState().changeNodes(drag('a', 500, 400));
+    store.getState().changeNodes(drag('00000000-0000-4000-8000-000000000002', 500, 400));
     store.getState().syncNodes(PROJECTED);
 
-    expect(store.getState().nodes?.find((n) => n.id === 'a')?.position).toEqual({ x: 500, y: 400 });
-    expect(store.getState().positions.get('a')).toEqual({ x: 500, y: 400 });
+    expect(
+      store.getState().nodes?.find((n) => n.id === '00000000-0000-4000-8000-000000000002')
+        ?.position,
+    ).toEqual({ x: 500, y: 400 });
+    expect(store.getState().positions.get('00000000-0000-4000-8000-000000000002')).toEqual({
+      x: 500,
+      y: 400,
+    });
   });
 
   it('takes fresh data and styling from the projection', () => {
     const store = createEditorStore();
     store.getState().syncNodes(PROJECTED);
-    const restyled = [{ ...node('a', 10, 20, 'A renamed'), className: 'rf-card-node--active' }];
+    const restyled = [
+      {
+        ...node('00000000-0000-4000-8000-000000000002', 10, 20, 'A renamed'),
+        className: 'rf-card-node--active',
+      },
+    ];
     store.getState().syncNodes(restyled);
 
     const a = store.getState().nodes?.[0];
@@ -101,8 +144,10 @@ describe('editor store', () => {
   it('drops a node whose card the projection no longer has', () => {
     const store = createEditorStore();
     store.getState().syncNodes(PROJECTED);
-    store.getState().syncNodes([node('a', 10, 20)]);
-    expect(store.getState().nodes?.map((n) => n.id)).toEqual(['a']);
+    store.getState().syncNodes([node('00000000-0000-4000-8000-000000000002', 10, 20)]);
+    expect(store.getState().nodes?.map((n) => n.id)).toEqual([
+      '00000000-0000-4000-8000-000000000002',
+    ]);
   });
 
   it('ignores changes for nodes it does not own, and keeps the array stable', () => {
@@ -113,16 +158,20 @@ describe('editor store', () => {
     store.getState().syncNodes(PROJECTED);
     const before = store.getState().nodes;
 
-    store
-      .getState()
-      .changeNodes([{ type: 'dimensions', id: 'ghost', dimensions: { width: 10, height: 10 } }]);
+    store.getState().changeNodes([
+      {
+        type: 'dimensions',
+        id: '00000000-0000-4000-8000-000000000099',
+        dimensions: { width: 10, height: 10 },
+      },
+    ]);
 
     expect(store.getState().nodes).toBe(before);
   });
 
   it('ignores changes that arrive before the first layout', () => {
     const store = createEditorStore();
-    store.getState().changeNodes(drag('a', 500, 400));
+    store.getState().changeNodes(drag('00000000-0000-4000-8000-000000000002', 500, 400));
     expect(store.getState().nodes).toBeNull();
     expect(store.getState().moved).toBe(false);
   });
@@ -132,18 +181,27 @@ describe('editor store', () => {
     // comes back. A merge would leave it exactly where it was.
     const store = createEditorStore();
     store.getState().syncNodes(PROJECTED);
-    store.getState().changeNodes(drag('a', 900, 900));
+    store.getState().changeNodes(drag('00000000-0000-4000-8000-000000000002', 900, 900));
 
     store.getState().arrange(
       new Map([
-        ['a', { x: 0, y: 0 }],
-        ['b', { x: 400, y: 0 }],
+        ['00000000-0000-4000-8000-000000000002', { x: 0, y: 0 }],
+        ['00000000-0000-4000-8000-000000000003', { x: 400, y: 0 }],
       ]),
     );
 
-    expect(store.getState().positions.get('a')).toEqual({ x: 0, y: 0 });
-    expect(store.getState().nodes?.find((n) => n.id === 'a')?.position).toEqual({ x: 0, y: 0 });
-    expect(store.getState().positions.get('b')).toEqual({ x: 400, y: 0 });
+    expect(store.getState().positions.get('00000000-0000-4000-8000-000000000002')).toEqual({
+      x: 0,
+      y: 0,
+    });
+    expect(
+      store.getState().nodes?.find((n) => n.id === '00000000-0000-4000-8000-000000000002')
+        ?.position,
+    ).toEqual({ x: 0, y: 0 });
+    expect(store.getState().positions.get('00000000-0000-4000-8000-000000000003')).toEqual({
+      x: 400,
+      y: 0,
+    });
   });
 
   it('drops a position the arrangement does not name', () => {
@@ -151,10 +209,12 @@ describe('editor store', () => {
     // the strategy left unplaced is unplaced, not left holding a stale entry.
     const store = createEditorStore();
     store.getState().syncNodes(PROJECTED);
-    store.getState().arrange(new Map([['a', { x: 0, y: 0 }]]));
+    store.getState().arrange(new Map([['00000000-0000-4000-8000-000000000002', { x: 0, y: 0 }]]));
 
-    expect(store.getState().positions.has('b')).toBe(false);
-    expect([...store.getState().positions.keys()]).toEqual(['a']);
+    expect(store.getState().positions.has('00000000-0000-4000-8000-000000000003')).toBe(false);
+    expect([...store.getState().positions.keys()]).toEqual([
+      '00000000-0000-4000-8000-000000000002',
+    ]);
   });
 
   it('trusts the layout again after arranging', () => {
@@ -162,16 +222,16 @@ describe('editor store', () => {
     // the cards are back where it assumed they were.
     const store = createEditorStore();
     store.getState().syncNodes(PROJECTED);
-    store.getState().changeNodes(drag('a', 900, 900));
+    store.getState().changeNodes(drag('00000000-0000-4000-8000-000000000002', 900, 900));
     expect(store.getState().moved).toBe(true);
 
-    store.getState().arrange(new Map([['a', { x: 10, y: 20 }]]));
+    store.getState().arrange(new Map([['00000000-0000-4000-8000-000000000002', { x: 10, y: 20 }]]));
     expect(store.getState().moved).toBe(false);
   });
 
   it('ignores an arrangement that arrives before the first layout', () => {
     const store = createEditorStore();
-    store.getState().arrange(new Map([['a', { x: 0, y: 0 }]]));
+    store.getState().arrange(new Map([['00000000-0000-4000-8000-000000000002', { x: 0, y: 0 }]]));
     expect(store.getState().nodes).toBeNull();
     expect(store.getState().positions.size).toBe(0);
   });
@@ -181,9 +241,14 @@ describe('editor store', () => {
     // layout's routed edge geometry.
     const store = createEditorStore();
     store.getState().syncNodes(PROJECTED);
-    store
-      .getState()
-      .changeNodes([{ type: 'position', id: 'a', position: { x: 10, y: 20 }, dragging: false }]);
+    store.getState().changeNodes([
+      {
+        type: 'position',
+        id: '00000000-0000-4000-8000-000000000002',
+        position: { x: 10, y: 20 },
+        dragging: false,
+      },
+    ]);
     expect(store.getState().moved).toBe(false);
   });
 
@@ -194,10 +259,10 @@ describe('editor store', () => {
     store.getState().syncNodes(PROJECTED);
     expect(store.getState().revision).toBe(0);
 
-    store.getState().changeNodes(drag('a', 500, 400));
+    store.getState().changeNodes(drag('00000000-0000-4000-8000-000000000002', 500, 400));
     expect(store.getState().revision).toBe(1);
 
-    store.getState().arrange(new Map([['a', { x: 0, y: 0 }]]));
+    store.getState().arrange(new Map([['00000000-0000-4000-8000-000000000002', { x: 0, y: 0 }]]));
     expect(store.getState().revision).toBe(2);
   });
 
@@ -205,9 +270,14 @@ describe('editor store', () => {
     // A click ends where it began; there is nothing to persist.
     const store = createEditorStore();
     store.getState().syncNodes(PROJECTED);
-    store
-      .getState()
-      .changeNodes([{ type: 'position', id: 'a', position: { x: 10, y: 20 }, dragging: false }]);
+    store.getState().changeNodes([
+      {
+        type: 'position',
+        id: '00000000-0000-4000-8000-000000000002',
+        position: { x: 10, y: 20 },
+        dragging: false,
+      },
+    ]);
     expect(store.getState().revision).toBe(0);
   });
 });
@@ -232,7 +302,7 @@ describe('editor store: what has reached disk (ADR 0029)', () => {
     const store = createEditorStore();
     store.getState().syncNodes(PROJECTED);
 
-    store.getState().changeNodes(drag('a', 500, 400));
+    store.getState().changeNodes(drag('00000000-0000-4000-8000-000000000002', 500, 400));
     expect(unsaved(store)).toBe(true);
 
     store.getState().markSaved(store.getState().revision);
@@ -246,9 +316,9 @@ describe('editor store: what has reached disk (ADR 0029)', () => {
     const store = createEditorStore();
     store.getState().syncNodes(PROJECTED);
 
-    store.getState().changeNodes(drag('a', 500, 400));
+    store.getState().changeNodes(drag('00000000-0000-4000-8000-000000000002', 500, 400));
     const sent = store.getState().revision;
-    store.getState().changeNodes(drag('b', 700, 100));
+    store.getState().changeNodes(drag('00000000-0000-4000-8000-000000000003', 700, 100));
 
     store.getState().markSaved(sent);
     expect(unsaved(store)).toBe(true);
@@ -259,9 +329,9 @@ describe('editor store: what has reached disk (ADR 0029)', () => {
     // not walk the acknowledgement backwards.
     const store = createEditorStore();
     store.getState().syncNodes(PROJECTED);
-    store.getState().changeNodes(drag('a', 500, 400));
+    store.getState().changeNodes(drag('00000000-0000-4000-8000-000000000002', 500, 400));
     const first = store.getState().revision;
-    store.getState().changeNodes(drag('b', 700, 100));
+    store.getState().changeNodes(drag('00000000-0000-4000-8000-000000000003', 700, 100));
 
     store.getState().markSaved(store.getState().revision);
     store.getState().markSaved(first);

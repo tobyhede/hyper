@@ -9,10 +9,21 @@ import {
 } from '../src/index';
 
 const validSpaceFile = {
-  version: 1,
-  id: 's',
+  version: 2,
+  id: '00000000-0000-4000-8000-000000000001',
   title: 'Test deck',
-  routes: [{ id: 'main', title: 'Main', edges: [{ from: 'a', to: 'b' }] }],
+  routes: [
+    {
+      id: '00000000-0000-4000-8000-000000000004',
+      title: 'Main',
+      edges: [
+        {
+          from: '00000000-0000-4000-8000-000000000002',
+          to: '00000000-0000-4000-8000-000000000003',
+        },
+      ],
+    },
+  ],
 };
 
 describe('space file schema', () => {
@@ -41,14 +52,29 @@ describe('space file schema', () => {
     // half-load from it.
     const result = spaceFileSchema.safeParse({
       ...validSpaceFile,
-      cards: [{ id: 'a', title: 'A', content: 'cards/a.md' }],
+      cards: [{ id: '00000000-0000-4000-8000-000000000002', title: 'A', content: 'cards/a.md' }],
     });
     expect(result.success).toBe(true);
     expect(result.success && 'cards' in result.data).toBe(false);
   });
 
-  it('rejects a wrong version literal', () => {
-    const result = spaceFileSchema.safeParse({ ...validSpaceFile, version: 2 });
+  it('rejects version 1 and slug identity throughout the version 2 format', () => {
+    const result = spaceFileSchema.safeParse({
+      version: 1,
+      id: 'space',
+      title: 'Old space',
+      routes: [{ id: 'main', title: 'Main', edges: [{ from: 'a', to: 'b' }] }],
+      layouts: [
+        {
+          id: '00000000-0000-4000-8000-000000000010',
+          title: 'Working',
+          positions: { '00000000-0000-4000-8000-000000000002': { x: 0, y: 0 } },
+          routes: ['00000000-0000-4000-8000-000000000004'],
+          activeRoute: '00000000-0000-4000-8000-000000000004',
+        },
+      ],
+      defaultView: '00000000-0000-4000-8000-000000000010',
+    });
     expect(result.success).toBe(false);
   });
 
@@ -58,7 +84,13 @@ describe('space file schema', () => {
     // file carrying the old array still parses, and the array is ignored.
     const result = spaceFileSchema.safeParse({
       ...validSpaceFile,
-      edges: [{ id: 'e', source: 'a', target: 'b' }],
+      edges: [
+        {
+          id: '00000000-0000-4000-8000-000000000008',
+          source: '00000000-0000-4000-8000-000000000002',
+          target: '00000000-0000-4000-8000-000000000003',
+        },
+      ],
     });
     expect(result.success).toBe(true);
     expect(result.success && 'edges' in result.data).toBe(false);
@@ -79,7 +111,7 @@ describe('space file schema', () => {
   it('rejects a route with no edges — a route is its connections (ADR 0023)', () => {
     const result = spaceFileSchema.safeParse({
       ...validSpaceFile,
-      routes: [{ id: 'main', title: 'Main', edges: [] }],
+      routes: [{ id: '00000000-0000-4000-8000-000000000004', title: 'Main', edges: [] }],
     });
     expect(result.success).toBe(false);
   });
@@ -91,13 +123,25 @@ describe('space file schema', () => {
       ...validSpaceFile,
       routes: [
         {
-          id: 'main',
+          id: '00000000-0000-4000-8000-000000000004',
           title: 'Main',
           edges: [
-            { from: 'a', to: 'b' },
-            { from: 'a', to: 'c' },
-            { from: 'b', to: 'd' },
-            { from: 'c', to: 'd' },
+            {
+              from: '00000000-0000-4000-8000-000000000002',
+              to: '00000000-0000-4000-8000-000000000003',
+            },
+            {
+              from: '00000000-0000-4000-8000-000000000002',
+              to: '00000000-0000-4000-8000-000000000005',
+            },
+            {
+              from: '00000000-0000-4000-8000-000000000003',
+              to: '00000000-0000-4000-8000-000000000006',
+            },
+            {
+              from: '00000000-0000-4000-8000-000000000005',
+              to: '00000000-0000-4000-8000-000000000006',
+            },
           ],
         },
       ],
@@ -106,10 +150,14 @@ describe('space file schema', () => {
   });
 
   it('rejects an edge missing an endpoint', () => {
-    for (const edge of [{ from: 'a' }, { to: 'b' }, { from: 'a', to: '' }]) {
+    for (const edge of [
+      { from: '00000000-0000-4000-8000-000000000002' },
+      { to: '00000000-0000-4000-8000-000000000003' },
+      { from: '00000000-0000-4000-8000-000000000002', to: '' },
+    ]) {
       const result = spaceFileSchema.safeParse({
         ...validSpaceFile,
-        routes: [{ id: 'main', title: 'Main', edges: [edge] }],
+        routes: [{ id: '00000000-0000-4000-8000-000000000004', title: 'Main', edges: [edge] }],
       });
       expect(result.success).toBe(false);
     }
@@ -122,51 +170,66 @@ describe('card frontmatter schema', () => {
   });
 
   it('defaults a card with no kind to markdown, so the common card declares neither', () => {
-    const card = cardFrontmatterSchema.parse({ id: 'a', title: 'A' });
+    const card = cardFrontmatterSchema.parse({
+      id: '00000000-0000-4000-8000-000000000002',
+      title: 'A',
+    });
     expect(card.kind).toBe('markdown');
   });
 
   it('holds no content key — the file the frontmatter sits in is the content', () => {
-    const card = cardFrontmatterSchema.parse({ id: 'a', title: 'A', content: 'cards/a.md' });
+    const card = cardFrontmatterSchema.parse({
+      id: '00000000-0000-4000-8000-000000000002',
+      title: 'A',
+      content: 'cards/a.md',
+    });
     expect('content' in card).toBe(false);
   });
 
   it('parses an alias card, which points at a target instead of holding content', () => {
     const alias = cardFrontmatterSchema.parse({
-      id: 'a-again',
+      id: '00000000-0000-4000-8000-000000000007',
       title: 'A, again',
       kind: 'alias',
-      target: 'a',
+      target: '00000000-0000-4000-8000-000000000002',
     });
     expect(alias.kind).toBe('alias');
-    expect(alias.kind === 'alias' && alias.target).toBe('a');
+    expect(alias.kind === 'alias' && alias.target).toBe('00000000-0000-4000-8000-000000000002');
   });
 
   it('gives an alias no body field at all', () => {
     const alias = cardSchema.parse({
-      id: 'a-again',
+      id: '00000000-0000-4000-8000-000000000007',
       title: 'A, again',
       kind: 'alias',
-      target: 'a',
+      target: '00000000-0000-4000-8000-000000000002',
     });
 
     expect('body' in alias).toBe(false);
   });
 
   it('rejects an alias with no target', () => {
-    expect(cardFrontmatterSchema.safeParse({ id: 'a', title: 'A', kind: 'alias' }).success).toBe(
-      false,
-    );
+    expect(
+      cardFrontmatterSchema.safeParse({
+        id: '00000000-0000-4000-8000-000000000002',
+        title: 'A',
+        kind: 'alias',
+      }).success,
+    ).toBe(false);
   });
 
   it('accepts an optional single-line card description', () => {
-    const card = cardFrontmatterSchema.parse({ id: 'a', title: 'A', description: 'What A is' });
+    const card = cardFrontmatterSchema.parse({
+      id: '00000000-0000-4000-8000-000000000002',
+      title: 'A',
+      description: 'What A is',
+    });
     expect(card.description).toBe('What A is');
   });
 
   it('rejects a description longer than the cap', () => {
     const result = cardFrontmatterSchema.safeParse({
-      id: 'a',
+      id: '00000000-0000-4000-8000-000000000002',
       title: 'A',
       description: 'x'.repeat(CARD_DESCRIPTION_MAX_LENGTH + 1),
     });
@@ -175,7 +238,7 @@ describe('card frontmatter schema', () => {
 
   it('rejects a multi-line description — a caption, not a body', () => {
     const result = cardFrontmatterSchema.safeParse({
-      id: 'a',
+      id: '00000000-0000-4000-8000-000000000002',
       title: 'A',
       description: 'line one\nline two',
     });
@@ -185,10 +248,13 @@ describe('card frontmatter schema', () => {
 
 describe('space file layouts', () => {
   const working = {
-    id: 'working',
+    id: '00000000-0000-4000-8000-000000000010',
     title: 'Working',
     kind: 'positioned',
-    positions: { a: { x: 0, y: 0 }, b: { x: 320, y: -40 } },
+    positions: {
+      '00000000-0000-4000-8000-000000000002': { x: 0, y: 0 },
+      '00000000-0000-4000-8000-000000000003': { x: 320, y: -40 },
+    },
   };
 
   it('parses a file that declares no layouts — the hand-authored case', () => {
@@ -201,13 +267,16 @@ describe('space file layouts', () => {
     const file = spaceFileSchema.parse({ ...validSpaceFile, layouts: [working] });
     const layout = file.layouts?.[0];
     expect(layout?.kind).toBe('positioned');
-    expect(layout?.positions).toEqual({ a: { x: 0, y: 0 }, b: { x: 320, y: -40 } });
+    expect(layout?.positions).toEqual({
+      '00000000-0000-4000-8000-000000000002': { x: 0, y: 0 },
+      '00000000-0000-4000-8000-000000000003': { x: 320, y: -40 },
+    });
   });
 
   it('defaults a layout with no kind to positioned, so one can be hand-written', () => {
     const file = spaceFileSchema.parse({
       ...validSpaceFile,
-      layouts: [{ id: 'working', title: 'Working', positions: {} }],
+      layouts: [{ id: '00000000-0000-4000-8000-000000000010', title: 'Working', positions: {} }],
     });
     expect(file.layouts?.[0]?.kind).toBe('positioned');
   });
@@ -221,7 +290,11 @@ describe('space file layouts', () => {
   });
 
   it('rejects a position that is not a point', () => {
-    for (const positions of [{ a: { x: 0 } }, { a: [0, 0] }, { a: { x: '0', y: '0' } }]) {
+    for (const positions of [
+      { '00000000-0000-4000-8000-000000000002': { x: 0 } },
+      { '00000000-0000-4000-8000-000000000002': [0, 0] },
+      { '00000000-0000-4000-8000-000000000002': { x: '0', y: '0' } },
+    ]) {
       expect(
         spaceFileSchema.safeParse({ ...validSpaceFile, layouts: [{ ...working, positions }] })
           .success,
@@ -240,7 +313,9 @@ describe('space file layouts', () => {
   it('rejects a layout kind it does not know', () => {
     const result = spaceFileSchema.safeParse({
       ...validSpaceFile,
-      layouts: [{ id: 'auto', title: 'Auto', kind: 'elk', positions: {} }],
+      layouts: [
+        { id: '00000000-0000-4000-8000-000000000098', title: 'Auto', kind: 'elk', positions: {} },
+      ],
     });
     expect(result.success).toBe(false);
   });
@@ -248,10 +323,19 @@ describe('space file layouts', () => {
   it('parses the routes a layout shows and the one it opens active', () => {
     const file = spaceFileSchema.parse({
       ...validSpaceFile,
-      layouts: [{ ...working, routes: ['long', 'short'], activeRoute: 'short' }],
+      layouts: [
+        {
+          ...working,
+          routes: ['00000000-0000-4000-8000-000000000011', '00000000-0000-4000-8000-000000000012'],
+          activeRoute: '00000000-0000-4000-8000-000000000012',
+        },
+      ],
     });
-    expect(file.layouts?.[0]?.routes).toEqual(['long', 'short']);
-    expect(file.layouts?.[0]?.activeRoute).toBe('short');
+    expect(file.layouts?.[0]?.routes).toEqual([
+      '00000000-0000-4000-8000-000000000011',
+      '00000000-0000-4000-8000-000000000012',
+    ]);
+    expect(file.layouts?.[0]?.activeRoute).toBe('00000000-0000-4000-8000-000000000012');
   });
 
   it('leaves both absent — every route shown, the first of them active', () => {
@@ -265,13 +349,13 @@ describe('space file layouts', () => {
   it('takes either without the other — the two are independent', () => {
     const filtered = spaceFileSchema.parse({
       ...validSpaceFile,
-      layouts: [{ ...working, routes: ['long'] }],
+      layouts: [{ ...working, routes: ['00000000-0000-4000-8000-000000000011'] }],
     });
     expect(filtered.layouts?.[0]?.activeRoute).toBeUndefined();
 
     const named = spaceFileSchema.parse({
       ...validSpaceFile,
-      layouts: [{ ...working, activeRoute: 'long' }],
+      layouts: [{ ...working, activeRoute: '00000000-0000-4000-8000-000000000011' }],
     });
     expect(named.layouts?.[0]?.routes).toBeUndefined();
   });
@@ -289,7 +373,7 @@ describe('space file layouts', () => {
   it('rejects route references that are not ids', () => {
     for (const layout of [
       { ...working, routes: [''] },
-      { ...working, routes: 'long' },
+      { ...working, routes: '00000000-0000-4000-8000-000000000011' },
       { ...working, activeRoute: '' },
     ]) {
       expect(spaceFileSchema.safeParse({ ...validSpaceFile, layouts: [layout] }).success).toBe(
@@ -303,16 +387,25 @@ describe('space file layouts', () => {
     // layout shows, needs the whole space in view (@project/graph).
     const file = spaceFileSchema.parse({
       ...validSpaceFile,
-      layouts: [{ ...working, routes: ['long'], activeRoute: 'nope' }],
+      layouts: [
+        {
+          ...working,
+          routes: ['00000000-0000-4000-8000-000000000011'],
+          activeRoute: '00000000-0000-4000-8000-000000000099',
+        },
+      ],
     });
-    expect(file.layouts?.[0]?.activeRoute).toBe('nope');
+    expect(file.layouts?.[0]?.activeRoute).toBe('00000000-0000-4000-8000-000000000099');
   });
 
   it('accepts defaultView as a plain name, resolved elsewhere', () => {
     // Shape only: whether the name resolves is a reference check, since it needs
     // the declared layouts in view.
-    const file = spaceFileSchema.parse({ ...validSpaceFile, defaultView: 'working' });
-    expect(file.defaultView).toBe('working');
+    const file = spaceFileSchema.parse({
+      ...validSpaceFile,
+      defaultView: '00000000-0000-4000-8000-000000000010',
+    });
+    expect(file.defaultView).toBe('00000000-0000-4000-8000-000000000010');
     expect(spaceFileSchema.safeParse({ ...validSpaceFile, defaultView: '' }).success).toBe(false);
   });
 });
@@ -325,7 +418,7 @@ describe('built-in view ids', () => {
   it('recognises exactly those names', () => {
     expect(isBuiltInViewId('graph')).toBe(true);
     expect(isBuiltInViewId('grid')).toBe(true);
-    expect(isBuiltInViewId('working')).toBe(false);
+    expect(isBuiltInViewId('00000000-0000-4000-8000-000000000010')).toBe(false);
     expect(isBuiltInViewId('')).toBe(false);
   });
 });

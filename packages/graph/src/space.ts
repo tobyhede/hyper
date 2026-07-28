@@ -1,4 +1,10 @@
-import { spaceFileSchema, type Card, type Layout, type Route } from '@project/core';
+import {
+  spaceFileSchema,
+  spaceSnapshotSchema,
+  type Card,
+  type Layout,
+  type Route,
+} from '@project/core';
 import { parseCardFile, type CardFile, type CardFileError } from './card-file';
 import { validateReferences, type ReferenceError } from './validate';
 
@@ -92,18 +98,64 @@ export function loadSpace(input: unknown, cardFiles: readonly CardFile[]): LoadS
   // order-indifference property, which failed roughly one run in seven.
   cards.sort((a, b) => a.title.localeCompare(b.title) || a.id.localeCompare(b.id));
 
-  const referenceErrors = validateReferences({ ...file, cards });
-  if (referenceErrors.length > 0) return { ok: false, errors: referenceErrors };
-  const layouts = file.layouts ?? [];
-  const space: Space = {
+  return buildSpace({
     id: file.id,
     title: file.title,
     cards,
     routes: file.routes,
-    layouts,
+    layouts: file.layouts,
     defaultView: file.defaultView,
-    cardsById: new Map(cards.map((c) => [c.id, c])),
-    routesById: new Map(file.routes.map((r) => [r.id, r])),
+  });
+}
+
+/** Validate and index a fully identified persistence aggregate. */
+export function loadSpaceSnapshot(input: unknown): LoadSpaceResult {
+  const parsed = spaceSnapshotSchema.safeParse(input);
+  if (!parsed.success) {
+    return {
+      ok: false,
+      errors: parsed.error.issues.map((issue) => ({
+        kind: 'invalid-shape',
+        message: `${issue.path.join('.') || '(root)'}: ${issue.message}`,
+      })),
+    };
+  }
+
+  const { id, document, cards: storedCards } = parsed.data;
+  const cards = storedCards.map(({ id: cardId, document: cardDocument }) => ({
+    id: cardId,
+    ...cardDocument,
+  })) as Card[];
+  return buildSpace({
+    id,
+    title: document.title,
+    cards,
+    routes: document.routes,
+    layouts: document.layouts,
+    defaultView: document.defaultView,
+  });
+}
+
+function buildSpace(input: {
+  id: string;
+  title: string;
+  cards: Card[];
+  routes: Route[];
+  layouts: Layout[] | undefined;
+  defaultView: string | undefined;
+}): LoadSpaceResult {
+  const referenceErrors = validateReferences(input);
+  if (referenceErrors.length > 0) return { ok: false, errors: referenceErrors };
+  const layouts = input.layouts ?? [];
+  const space: Space = {
+    id: input.id,
+    title: input.title,
+    cards: input.cards,
+    routes: input.routes,
+    layouts,
+    defaultView: input.defaultView,
+    cardsById: new Map(input.cards.map((c) => [c.id, c])),
+    routesById: new Map(input.routes.map((r) => [r.id, r])),
     layoutsById: new Map(layouts.map((l) => [l.id, l])),
   };
   return { ok: true, space };

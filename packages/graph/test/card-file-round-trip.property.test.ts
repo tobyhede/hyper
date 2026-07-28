@@ -31,7 +31,7 @@ const bodyArb = fc
 const cardArb: fc.Arbitrary<Card> = fc.oneof(
   fc.record(
     {
-      id: line,
+      id: fc.uuid({ version: 4 }),
       title: line,
       description: fc.option(line, { nil: undefined }),
       kind: fc.constant('markdown' as const),
@@ -40,10 +40,10 @@ const cardArb: fc.Arbitrary<Card> = fc.oneof(
     { requiredKeys: ['id', 'title', 'kind', 'body'] },
   ),
   fc.record({
-    id: line,
+    id: fc.uuid({ version: 4 }),
     title: line,
     kind: fc.constant('alias' as const),
-    target: line,
+    target: fc.uuid({ version: 4 }),
   }),
 );
 

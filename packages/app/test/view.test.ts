@@ -4,21 +4,35 @@ import { CARD_SIZE } from '../src/card';
 import { resolveView } from '../src/view';
 import { cardFile } from './card-files';
 
-const CARDS = [cardFile('a'), cardFile('b')];
-const ROUTES = [{ id: 'main', title: 'Main', edges: [{ from: 'a', to: 'b' }] }];
+const CARDS = [
+  cardFile('00000000-0000-4000-8000-000000000002'),
+  cardFile('00000000-0000-4000-8000-000000000003'),
+];
+const ROUTES = [
+  {
+    id: '00000000-0000-4000-8000-000000000004',
+    title: 'Main',
+    edges: [
+      { from: '00000000-0000-4000-8000-000000000002', to: '00000000-0000-4000-8000-000000000003' },
+    ],
+  },
+];
 
 const WORKING = {
-  id: 'working',
+  id: '00000000-0000-4000-8000-000000000022',
   title: 'Working',
   kind: 'positioned',
-  positions: { a: { x: 40, y: 10 }, b: { x: 400, y: 250 } },
+  positions: {
+    '00000000-0000-4000-8000-000000000002': { x: 40, y: 10 },
+    '00000000-0000-4000-8000-000000000003': { x: 400, y: 250 },
+  },
 };
 
 function spaceWith(extra: Record<string, unknown> = {}): Space {
   const result = loadSpace(
     {
-      version: 1,
-      id: 's',
+      version: 2,
+      id: '00000000-0000-4000-8000-000000000001',
       title: 'T',
       routes: ROUTES,
       ...extra,
@@ -50,15 +64,21 @@ describe('resolveView', () => {
   });
 
   it('resolves a declared Layout, and carries it as the permission to edit', () => {
-    const view = resolveView(spaceWith({ layouts: [WORKING], defaultView: 'working' }));
-    expect(view.id).toBe('working');
+    const view = resolveView(
+      spaceWith({ layouts: [WORKING], defaultView: '00000000-0000-4000-8000-000000000022' }),
+    );
+    expect(view.id).toBe('00000000-0000-4000-8000-000000000022');
     expect(view.layout?.positions).toEqual(WORKING.positions);
   });
 
   it('places cards where a resolved Layout says', async () => {
-    expect(await arrange(spaceWith({ layouts: [WORKING], defaultView: 'working' }))).toEqual({
-      a: { x: 40, y: 10 },
-      b: { x: 400, y: 250 },
+    expect(
+      await arrange(
+        spaceWith({ layouts: [WORKING], defaultView: '00000000-0000-4000-8000-000000000022' }),
+      ),
+    ).toEqual({
+      '00000000-0000-4000-8000-000000000002': { x: 40, y: 10 },
+      '00000000-0000-4000-8000-000000000003': { x: 400, y: 250 },
     });
   });
 
@@ -66,7 +86,7 @@ describe('resolveView', () => {
     const space = spaceWith({ defaultView: 'grid' });
     expect(resolveView(space).layout).toBeNull();
     // The grid's own arithmetic, not ELK's: first card at the origin.
-    expect((await arrange(space))['a']).toEqual({ x: 0, y: 0 });
+    expect((await arrange(space))['00000000-0000-4000-8000-000000000002']).toEqual({ x: 0, y: 0 });
   });
 
   it('ignores a declared Layout the space does not open in', () => {
@@ -75,19 +95,18 @@ describe('resolveView', () => {
     expect(view.layout).toBeNull();
   });
 
-  it('lets a declared Layout shadow a built-in of the same name', () => {
-    // `loadSpace` permits the collision; which one wins is a resolution
-    // decision, and the space's own data outranks a reserved word.
-    const shadow = { ...WORKING, id: 'grid' };
-    const view = resolveView(spaceWith({ layouts: [shadow], defaultView: 'grid' }));
-    expect(view.layout?.id).toBe('grid');
-  });
-
   it('gives a positioned view an automatic strategy to Auto-arrange with', async () => {
     // A Layout says where the cards are, not how they got there — so recomputing
     // falls back to the view a space opens in when it names none.
-    const view = resolveView(spaceWith({ layouts: [WORKING], defaultView: 'working' }));
-    const graph = buildLayoutGraph(['a', 'b'], new Map(), [], CARD_SIZE);
+    const view = resolveView(
+      spaceWith({ layouts: [WORKING], defaultView: '00000000-0000-4000-8000-000000000022' }),
+    );
+    const graph = buildLayoutGraph(
+      ['00000000-0000-4000-8000-000000000002', '00000000-0000-4000-8000-000000000003'],
+      new Map(),
+      [],
+      CARD_SIZE,
+    );
 
     const laid = await view.automatic(graph);
     expect(laid.cards.map((c) => ({ x: c.x, y: c.y }))).not.toEqual([
@@ -104,43 +123,97 @@ describe('resolveView', () => {
 
   it('shows every route and opens on the first when no Layout filters', () => {
     const space = spaceWith({
-      routes: [...ROUTES, { id: 'aside', title: 'Aside', edges: [{ from: 'b', to: 'a' }] }],
+      routes: [
+        ...ROUTES,
+        {
+          id: '00000000-0000-4000-8000-000000000020',
+          title: 'Aside',
+          edges: [
+            {
+              from: '00000000-0000-4000-8000-000000000003',
+              to: '00000000-0000-4000-8000-000000000002',
+            },
+          ],
+        },
+      ],
     });
     const view = resolveView(space);
-    expect(view.visibleRouteIds).toEqual(['main', 'aside']);
-    expect(view.activeRouteId).toBe('main');
+    expect(view.visibleRouteIds).toEqual([
+      '00000000-0000-4000-8000-000000000004',
+      '00000000-0000-4000-8000-000000000020',
+    ]);
+    expect(view.activeRouteId).toBe('00000000-0000-4000-8000-000000000004');
   });
 
   it('shows only the routes its Layout names', () => {
     const space = spaceWith({
-      routes: [...ROUTES, { id: 'aside', title: 'Aside', edges: [{ from: 'b', to: 'a' }] }],
-      layouts: [{ ...WORKING, routes: ['aside'] }],
-      defaultView: 'working',
+      routes: [
+        ...ROUTES,
+        {
+          id: '00000000-0000-4000-8000-000000000020',
+          title: 'Aside',
+          edges: [
+            {
+              from: '00000000-0000-4000-8000-000000000003',
+              to: '00000000-0000-4000-8000-000000000002',
+            },
+          ],
+        },
+      ],
+      layouts: [{ ...WORKING, routes: ['00000000-0000-4000-8000-000000000020'] }],
+      defaultView: '00000000-0000-4000-8000-000000000022',
     });
     const view = resolveView(space);
-    expect(view.visibleRouteIds).toEqual(['aside']);
+    expect(view.visibleRouteIds).toEqual(['00000000-0000-4000-8000-000000000020']);
   });
 
   it('opens on the first *visible* route, not the space’s first', () => {
     // The filter is what the fallback runs over. Reading it off the space would
     // open active on a route the Layout does not draw.
     const space = spaceWith({
-      routes: [...ROUTES, { id: 'aside', title: 'Aside', edges: [{ from: 'b', to: 'a' }] }],
-      layouts: [{ ...WORKING, routes: ['aside'] }],
-      defaultView: 'working',
+      routes: [
+        ...ROUTES,
+        {
+          id: '00000000-0000-4000-8000-000000000020',
+          title: 'Aside',
+          edges: [
+            {
+              from: '00000000-0000-4000-8000-000000000003',
+              to: '00000000-0000-4000-8000-000000000002',
+            },
+          ],
+        },
+      ],
+      layouts: [{ ...WORKING, routes: ['00000000-0000-4000-8000-000000000020'] }],
+      defaultView: '00000000-0000-4000-8000-000000000022',
     });
-    expect(resolveView(space).activeRouteId).toBe('aside');
+    expect(resolveView(space).activeRouteId).toBe('00000000-0000-4000-8000-000000000020');
   });
 
   it('honours a Layout’s named activeRoute over the first', () => {
     const space = spaceWith({
-      routes: [...ROUTES, { id: 'aside', title: 'Aside', edges: [{ from: 'b', to: 'a' }] }],
-      layouts: [{ ...WORKING, activeRoute: 'aside' }],
-      defaultView: 'working',
+      routes: [
+        ...ROUTES,
+        {
+          id: '00000000-0000-4000-8000-000000000020',
+          title: 'Aside',
+          edges: [
+            {
+              from: '00000000-0000-4000-8000-000000000003',
+              to: '00000000-0000-4000-8000-000000000002',
+            },
+          ],
+        },
+      ],
+      layouts: [{ ...WORKING, activeRoute: '00000000-0000-4000-8000-000000000020' }],
+      defaultView: '00000000-0000-4000-8000-000000000022',
     });
     const view = resolveView(space);
-    expect(view.visibleRouteIds).toEqual(['main', 'aside']);
-    expect(view.activeRouteId).toBe('aside');
+    expect(view.visibleRouteIds).toEqual([
+      '00000000-0000-4000-8000-000000000004',
+      '00000000-0000-4000-8000-000000000020',
+    ]);
+    expect(view.activeRouteId).toBe('00000000-0000-4000-8000-000000000020');
   });
 
   it('has no active route in a space with none (ADR 0015)', () => {
@@ -154,7 +227,7 @@ describe('resolveView', () => {
     // draws no routes at all, and there is then nothing to be active.
     const space = spaceWith({
       layouts: [{ ...WORKING, routes: [] }],
-      defaultView: 'working',
+      defaultView: '00000000-0000-4000-8000-000000000022',
     });
     expect(resolveView(space).activeRouteId).toBeNull();
   });
@@ -162,10 +235,17 @@ describe('resolveView', () => {
   it('opens a space with no routes, which is where editing starts (ADR 0015)', async () => {
     const space = spaceWith({
       routes: [],
-      layouts: [{ id: 'w', title: 'W', kind: 'positioned', positions: { a: { x: 7, y: 9 } } }],
-      defaultView: 'w',
+      layouts: [
+        {
+          id: '00000000-0000-4000-8000-000000000035',
+          title: 'W',
+          kind: 'positioned',
+          positions: { '00000000-0000-4000-8000-000000000002': { x: 7, y: 9 } },
+        },
+      ],
+      defaultView: '00000000-0000-4000-8000-000000000035',
     });
-    expect(resolveView(space).layout?.id).toBe('w');
-    expect((await arrange(space))['a']).toEqual({ x: 7, y: 9 });
+    expect(resolveView(space).layout?.id).toBe('00000000-0000-4000-8000-000000000035');
+    expect((await arrange(space))['00000000-0000-4000-8000-000000000002']).toEqual({ x: 7, y: 9 });
   });
 });

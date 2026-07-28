@@ -11,10 +11,7 @@ import { cardFile } from './card-files';
 const cardsArb = fc
   .uniqueArray(
     fc.record({
-      // Ids as they are actually written: a leading letter, then slug
-      // characters. Unconstrained, the generator emits `0` and `-`, which YAML
-      // reads as a number and as null — pinned in `card-file.test.ts`.
-      id: fc.string({ minLength: 1, maxLength: 8 }).filter((s) => /^[a-z][a-z0-9-]*$/.test(s)),
+      id: fc.uuid({ version: 4 }),
       // `cardFile` quotes what it emits, so a title needs no constraint beyond
       // being single-line and non-blank.
       title: fc
@@ -25,7 +22,12 @@ const cardsArb = fc
   )
   .map((cards) => ({ cards, files: cards.map((c) => cardFile(c.id, c.title)) }));
 
-const emptySpaceFile = { version: 1, id: 's', title: 'Generated', routes: [] };
+const emptySpaceFile = {
+  version: 2,
+  id: '00000000-0000-4000-8000-000000000001',
+  title: 'Generated',
+  routes: [],
+};
 
 describe('loadSpace over card files', () => {
   it('loads exactly the cards it was handed, ordered by title', () => {
@@ -51,13 +53,29 @@ describe('loadSpace over card files', () => {
     // the order they arrived in, which is the directory's. That would make the
     // arrangement depend on scan order — the thing the sort exists to prevent.
     const same = (id: string) => cardFile(id, 'Same title');
-    const forwards = loadSpace(emptySpaceFile, [same('c'), same('a'), same('b')]);
-    const backwards = loadSpace(emptySpaceFile, [same('b'), same('a'), same('c')]);
+    const forwards = loadSpace(emptySpaceFile, [
+      same('00000000-0000-4000-8000-000000000005'),
+      same('00000000-0000-4000-8000-000000000002'),
+      same('00000000-0000-4000-8000-000000000003'),
+    ]);
+    const backwards = loadSpace(emptySpaceFile, [
+      same('00000000-0000-4000-8000-000000000003'),
+      same('00000000-0000-4000-8000-000000000002'),
+      same('00000000-0000-4000-8000-000000000005'),
+    ]);
 
     expect(forwards.ok && backwards.ok).toBe(true);
     if (!forwards.ok || !backwards.ok) return;
-    expect(forwards.space.cards.map((c) => c.id)).toEqual(['a', 'b', 'c']);
-    expect(backwards.space.cards.map((c) => c.id)).toEqual(['a', 'b', 'c']);
+    expect(forwards.space.cards.map((c) => c.id)).toEqual([
+      '00000000-0000-4000-8000-000000000002',
+      '00000000-0000-4000-8000-000000000003',
+      '00000000-0000-4000-8000-000000000005',
+    ]);
+    expect(backwards.space.cards.map((c) => c.id)).toEqual([
+      '00000000-0000-4000-8000-000000000002',
+      '00000000-0000-4000-8000-000000000003',
+      '00000000-0000-4000-8000-000000000005',
+    ]);
   });
 
   it('is indifferent to the order the files arrive in', () => {

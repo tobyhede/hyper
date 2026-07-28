@@ -10,12 +10,12 @@ describe('parseCardFile: CRLF', () => {
     // usual card is its title.
     const parsed = parseCardFile({
       path: 'a.md',
-      text: '---\r\nid: a\r\ntitle: A\r\n---\r\n\r\nBody\r\n',
+      text: '---\r\nid: 00000000-0000-4000-8000-000000000002\r\ntitle: A\r\n---\r\n\r\nBody\r\n',
     });
 
     expect(parsed.ok).toBe(true);
     if (parsed.ok) {
-      expect(parsed.card.id).toBe('a');
+      expect(parsed.card.id).toBe('00000000-0000-4000-8000-000000000002');
       expect(parsed.card.title).toBe('A');
     }
   });
@@ -25,13 +25,13 @@ describe('parseCardFile', () => {
   it('reads a card from its frontmatter and keeps the body', () => {
     const result = parseCardFile({
       path: 'cards/a.md',
-      text: '---\nid: a\ntitle: A\ndescription: Where every route begins\n---\n\nCard **A** is the entry point.\n',
+      text: '---\nid: 00000000-0000-4000-8000-000000000002\ntitle: A\ndescription: Where every route begins\n---\n\nCard **A** is the entry point.\n',
     });
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.card).toEqual({
-      id: 'a',
+      id: '00000000-0000-4000-8000-000000000002',
       title: 'A',
       description: 'Where every route begins',
       kind: 'markdown',
@@ -42,26 +42,39 @@ describe('parseCardFile', () => {
   it('reads an alias, which has no body (ADR 0009)', () => {
     const result = parseCardFile({
       path: 'cards/a-prime.md',
-      text: '---\nid: a-prime\ntitle: A′\nkind: alias\ntarget: a\n---\n',
+      text: '---\nid: 00000000-0000-4000-8000-000000000007\ntitle: A′\nkind: alias\ntarget: 00000000-0000-4000-8000-000000000002\n---\n',
     });
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.card).toEqual({ id: 'a-prime', title: 'A′', kind: 'alias', target: 'a' });
+    expect(result.card).toEqual({
+      id: '00000000-0000-4000-8000-000000000007',
+      title: 'A′',
+      kind: 'alias',
+      target: '00000000-0000-4000-8000-000000000002',
+    });
   });
 
   it('reads a card whose file ends at the closing fence, with no trailing newline', () => {
-    const result = parseCardFile({ path: 'cards/a.md', text: '---\nid: a\ntitle: A\n---' });
+    const result = parseCardFile({
+      path: 'cards/a.md',
+      text: '---\nid: 00000000-0000-4000-8000-000000000002\ntitle: A\n---',
+    });
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.card).toEqual({ id: 'a', title: 'A', kind: 'markdown', body: '' });
+    expect(result.card).toEqual({
+      id: '00000000-0000-4000-8000-000000000002',
+      title: 'A',
+      kind: 'markdown',
+      body: '',
+    });
   });
 
   it('keeps a body that opens with a heading, which is now just a heading (ADR 0020)', () => {
     const result = parseCardFile({
       path: 'cards/a.md',
-      text: '---\nid: a\ntitle: A\n---\n\n# A\n\nProse under the heading.\n',
+      text: '---\nid: 00000000-0000-4000-8000-000000000002\ntitle: A\n---\n\n# A\n\nProse under the heading.\n',
     });
 
     expect(result.ok).toBe(true);
@@ -74,19 +87,18 @@ describe('parseCardFile', () => {
   it('keeps a horizontal rule in the body, because only the first fence closes', () => {
     const result = parseCardFile({
       path: 'cards/a.md',
-      text: '---\nid: a\ntitle: A\n---\n\nAbove.\n\n---\n\nBelow.\n',
+      text: '---\nid: 00000000-0000-4000-8000-000000000002\ntitle: A\n---\n\nAbove.\n\n---\n\nBelow.\n',
     });
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.card.id).toBe('a');
+    expect(result.card.id).toBe('00000000-0000-4000-8000-000000000002');
     expect(result.card.kind === 'markdown' && result.card.body).toBe('Above.\n\n---\n\nBelow.\n');
   });
 
   it('reports an unquoted numeric id, which YAML reads as a number', () => {
     // Frontmatter is YAML, so `id: 2024` is the number 2024 and not the string.
-    // Quoting fixes it; what matters is that the failure names the file and the
-    // field rather than loading a card whose id is not a string.
+    // Quoting changes the YAML type but does not turn a number into UUID identity.
     const result = parseCardFile({ path: 'cards/2024.md', text: '---\nid: 2024\ntitle: A\n---\n' });
 
     expect(result.ok).toBe(false);
@@ -98,7 +110,7 @@ describe('parseCardFile', () => {
       path: 'cards/2024.md',
       text: "---\nid: '2024'\ntitle: A\n---\n",
     });
-    expect(quoted.ok && quoted.card.id).toBe('2024');
+    expect(quoted.ok).toBe(false);
   });
 
   it('reports a file with no frontmatter rather than treating it as a body', () => {
@@ -111,7 +123,10 @@ describe('parseCardFile', () => {
   });
 
   it('reports frontmatter that never closes', () => {
-    const result = parseCardFile({ path: 'cards/a.md', text: '---\nid: a\ntitle: A\n' });
+    const result = parseCardFile({
+      path: 'cards/a.md',
+      text: '---\nid: 00000000-0000-4000-8000-000000000002\ntitle: A\n',
+    });
 
     expect(result.ok).toBe(false);
     if (result.ok) return;
@@ -127,7 +142,10 @@ describe('parseCardFile', () => {
   });
 
   it('reports frontmatter that parses but is not a card', () => {
-    const result = parseCardFile({ path: 'cards/a.md', text: '---\nid: a\n---\n\nBody\n' });
+    const result = parseCardFile({
+      path: 'cards/a.md',
+      text: '---\nid: 00000000-0000-4000-8000-000000000002\n---\n\nBody\n',
+    });
 
     expect(result.ok).toBe(false);
     if (result.ok) return;
@@ -139,13 +157,13 @@ describe('parseCardFile', () => {
     // `core.autocrlf` makes every card in the repository start `---\r\n`, and a
     // LF-only fence check called all of them frontmatter-less — so the space
     // failed to load at all rather than failing to look right.
-    const lf = '---\nid: intro\ntitle: T\n---\n\nBody line.\n';
+    const lf = '---\nid: 00000000-0000-4000-8000-000000000027\ntitle: T\n---\n\nBody line.\n';
     const crlf = lf.replace(/\n/g, '\r\n');
 
     const result = parseCardFile({ path: 'a.md', text: crlf });
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.card.id).toBe('intro');
+    expect(result.card.id).toBe('00000000-0000-4000-8000-000000000027');
     expect(result.card.kind === 'markdown' && result.card.body.trim()).toBe('Body line.');
   });
 });

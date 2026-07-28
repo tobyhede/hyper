@@ -24,7 +24,11 @@ import { cardFile } from './card-files';
  *  puts several same-side handles on one node. */
 const cardIdPool = fc
   .uniqueArray(fc.integer({ min: 0, max: 25 }), { minLength: 2, maxLength: 8 })
-  .map((ns) => ns.map((n) => `card-${n}`));
+  .map((ns) => ns.map(uuidFrom));
+
+function uuidFrom(value: number): string {
+  return `00000000-0000-4000-8000-${value.toString(16).padStart(12, '0')}`;
+}
 
 /**
  * A space file whose routes each run over distinct cards in some order: a chain
@@ -58,11 +62,11 @@ const spaceFileArb = cardIdPool.chain((pool) =>
     const visited = [...new Set(routes.flatMap((r) => r.cards))];
     return {
       file: {
-        version: 1,
-        id: 's',
+        version: 2,
+        id: '00000000-0000-4000-8000-000000000001',
         title: 'Generated',
         routes: routes.map((route, index) => ({
-          id: `route-${index}`,
+          id: uuidFrom(index + 100),
           title: `Route ${index}`,
           edges: route.edges,
         })),

@@ -12,21 +12,31 @@ import { cardFile } from './card-files';
 function loadFixture(): Space {
   const result = loadSpace(
     {
-      version: 1,
-      id: 's',
+      version: 2,
+      id: '00000000-0000-4000-8000-000000000001',
       title: 'T',
       routes: [
         {
-          id: 'main',
+          id: '00000000-0000-4000-8000-000000000004',
           title: 'Main',
           edges: [
-            { from: 'a', to: 'b' },
-            { from: 'b', to: 'c' },
+            {
+              from: '00000000-0000-4000-8000-000000000002',
+              to: '00000000-0000-4000-8000-000000000003',
+            },
+            {
+              from: '00000000-0000-4000-8000-000000000003',
+              to: '00000000-0000-4000-8000-000000000005',
+            },
           ],
         },
       ],
     },
-    [cardFile('a'), cardFile('b'), cardFile('c')],
+    [
+      cardFile('00000000-0000-4000-8000-000000000002'),
+      cardFile('00000000-0000-4000-8000-000000000003'),
+      cardFile('00000000-0000-4000-8000-000000000005'),
+    ],
   );
   if (!result.ok) throw new Error('fixture should load');
   return result.space;
@@ -39,17 +49,21 @@ const SIZE = { width: 100, height: 50 };
 describe('buildLayoutGraph', () => {
   it('carries each card’s size and its ports, inbound first', () => {
     const graph = buildLayoutGraph(
-      ['a', 'b', 'c'],
+      [
+        '00000000-0000-4000-8000-000000000002',
+        '00000000-0000-4000-8000-000000000003',
+        '00000000-0000-4000-8000-000000000005',
+      ],
       buildCardHandles(space),
       buildRouteEdges(space),
       SIZE,
     );
 
-    const b = graph.cards.find((c) => c.id === 'b')!;
+    const b = graph.cards.find((c) => c.id === '00000000-0000-4000-8000-000000000003')!;
     expect(b).toMatchObject({ width: 100, height: 50 });
     expect(b.ports).toEqual([
-      { id: 'main::in', side: 'in' },
-      { id: 'main::out', side: 'out' },
+      { id: '00000000-0000-4000-8000-000000000004::in', side: 'in' },
+      { id: '00000000-0000-4000-8000-000000000004::out', side: 'out' },
     ]);
     // Nothing is positioned yet — that is the layout's job.
     expect(b.x).toBeUndefined();
@@ -57,18 +71,22 @@ describe('buildLayoutGraph', () => {
 
   it('drops edges whose endpoints the view is not showing', () => {
     const graph = buildLayoutGraph(
-      ['a', 'b'],
+      ['00000000-0000-4000-8000-000000000002', '00000000-0000-4000-8000-000000000003'],
       buildCardHandles(space),
       buildRouteEdges(space),
       SIZE,
     );
-    expect(graph.edges.map((e) => e.id)).toEqual(['main::0']);
+    expect(graph.edges.map((e) => e.id)).toEqual(['00000000-0000-4000-8000-000000000004::0']);
   });
 });
 
 describe('gridStrategy', () => {
   const graph: LayoutGraph = buildLayoutGraph(
-    ['a', 'b', 'c'],
+    [
+      '00000000-0000-4000-8000-000000000002',
+      '00000000-0000-4000-8000-000000000003',
+      '00000000-0000-4000-8000-000000000005',
+    ],
     buildCardHandles(space),
     buildRouteEdges(space),
     SIZE,
