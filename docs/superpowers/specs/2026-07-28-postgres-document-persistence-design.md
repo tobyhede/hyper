@@ -1,7 +1,7 @@
 # PostgreSQL document persistence
 
 Date: 2026-07-28
-Status: review
+Status: approved
 
 ## Outcome
 
