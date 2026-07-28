@@ -21,11 +21,15 @@ In that model the database, not the open files, is the live editable authority. 
 
 This would remove the particular provenance-map problem in `card-files/04` only if exports are canonical regeneration. If Hyper still promises byte-preserving round trips for comments, YAML quoting, key order, and filenames, the importer must store raw source/provenance in the database and the same concern returns in a different form.
 
+### Prisma Next 0.16.0 pnpm packaging caveat
+
+The published `0.16.0` emitter writes `contract.d.ts` imports for `@prisma-next/adapter-postgres`, `@prisma-next/target-postgres`, `@prisma-next/sql-contract`, and `@prisma-next/contract` directly. The tagged initializer installs only the target facade, CLI, dotenv, and Node types, so those imports do not resolve from a project-owned generated file under pnpm's strict dependency layout. Hyper carries those four packages as exact `0.16.0` **devDependencies solely for generated type resolution**. Authored code continues to import only the `@prisma-next/postgres` facade, and no hoisting or generated-artifact patch is used. Recheck and remove this workaround on the next Prisma Next upgrade.
+
 ## What Prisma Next actually is
 
 Prisma Next describes itself as a TypeScript rewrite of Prisma ORM. Its architecture is **contract-first**: an authored schema emits deterministic contract JSON and TypeScript types; application queries are compiled and executed against a configured database. The contract hash ties generated artifacts and runtime plans to a schema version. The contract is schema metadata, not application content and not a file/row synchronisation format. ([Architecture](https://github.com/prisma/prisma-next/blob/e0e739ca6a0e076c97733ef30ec3bf7b1f43a27b/ARCHITECTURE.md))
 
-It is also presently an early-access system that requires Node 24 or newer. PostgreSQL is its primary target; SQLite is explicitly called a proof of concept. Hyper currently declares Node 20 or newer, so adopting it now would also raise Hyper's runtime floor. ([README](https://github.com/prisma/prisma-next/blob/e0e739ca6a0e076c97733ef30ec3bf7b1f43a27b/README.md))
+It is also presently an early-access system that requires Node 24 or newer. PostgreSQL is its primary target; SQLite is explicitly called a proof of concept. Hyper declared Node 20 or newer before this adoption, so the foundation increment raises Hyper's runtime floor to Node 24. ([README](https://github.com/prisma/prisma-next/blob/e0e739ca6a0e076c97733ef30ec3bf7b1f43a27b/README.md))
 
 Nothing in the documented architecture supplies offline replication, peer sync, change logs for content, conflict resolution, or browser storage. "Local" here can mean a local SQLite file; it should not be confused with a local-first sync architecture.
 

@@ -10,7 +10,7 @@ Content lives in version-controlled files. A space directory holds a space file 
 
 ## Running it
 
-Requirements: Node ≥ 20 and pnpm 9.
+Requirements: Node ≥ 24 and pnpm 9.
 
 ```sh
 pnpm install

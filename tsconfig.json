@@ -8,6 +8,9 @@
     "packages/*/src",
     "packages/*/test",
     "packages/app/e2e",
+    "migrations/**/*.ts",
+    "src",
+    "test/integration",
     "*.config.ts",
     "vitest.setup.ts"
   ]
