@@ -165,10 +165,45 @@ interface LoadedSpace {
   exportedRevision: bigint | null;
 }
 
+type CommitResult =
+  | { kind: 'committed'; revision: bigint }
+  | { kind: 'conflict'; current: LoadedSpace }
+  | {
+      kind: 'retryable-failure';
+      code: 'network' | 'timeout' | 'unavailable' | 'rate-limited';
+      message: string;
+      retryAfterMs?: number;
+    }
+  | {
+      kind: 'permanent-failure';
+      code: 'invalid-snapshot' | 'not-found' | 'forbidden' | 'protocol';
+      message: string;
+    };
+
 interface SpaceBackend {
   listSpaces(): Promise<readonly SpaceSummary[]>;
   loadSpace(id: UUID): Promise<LoadedSpace | undefined>;
   commitSpace(snapshot: SpaceSnapshot, expectedRevision: bigint): Promise<CommitResult>;
+}
+
+interface SpaceSession {
+  getState(): SpaceSessionState;
+  subscribe(listener: () => void): () => void;
+  submit(snapshot: SpaceSnapshot): void;
+  retry(): void;
+  acceptRemote(): void;
+  resolveConflict(snapshot: SpaceSnapshot): void;
+}
+
+interface SpaceSessionState {
+  working: SpaceSnapshot;
+  acknowledgedRevision: bigint;
+  persistence:
+    | { kind: 'settled' }
+    | { kind: 'pending' }
+    | { kind: 'failed'; failure: Extract<CommitResult, { kind: 'retryable-failure' }> }
+    | { kind: 'rejected'; failure: Extract<CommitResult, { kind: 'permanent-failure' }> }
+    | { kind: 'conflicted'; current: LoadedSpace };
 }
 ```
 
@@ -177,13 +212,33 @@ commit cannot supply an honest `expectedRevision` without it.
 
 `SpaceSession` is the module the UX uses. It owns the loaded snapshot, the
 acknowledged revision, one in-flight commit, the latest snapshot waiting behind
-it, and the `settled`/`pending`/`failed`/`conflicted` persistence state. A domain
-edit hands the session a complete valid snapshot; it does not add a new method
-to the interface for each editing gesture. Pending edits may coalesce to the
-latest snapshot, but commits never run concurrently for one space. A transient
-failure is retryable. A revision conflict is visible and never retried as a
-blind overwrite; recovery reloads current database state, with any destructive
-choice made explicitly by the UX.
+it, and the persistence state. A domain edit hands the session a complete valid
+snapshot; it does not add a new method to the interface for each editing
+gesture.
+
+Its transitions are fixed:
+
+- `submit` updates `working` immediately. With no request in flight it starts a
+  commit; otherwise it replaces the waiting snapshot, coalescing intermediate
+  edits without losing the latest state.
+- A successful commit installs its returned revision. If a snapshot is waiting,
+  that latest snapshot commits next against the new revision; otherwise the
+  session settles.
+- A retryable failure stops the queue and retains the latest `working` snapshot.
+  Later edits continue to update `working`; `retry` submits that latest snapshot
+  against the last acknowledged revision, not the older failed payload.
+- A permanent failure retains `working` but disables `retry`. A later valid
+  `submit` may attempt persistence again.
+- A conflict stops automatic commits and retains both local `working` and the
+  returned current database snapshot. Edits may continue changing `working` but
+  do not write while the session is conflicted.
+- `acceptRemote` explicitly discards local work and adopts the returned current
+  snapshot. `resolveConflict` accepts a complete snapshot the UX has explicitly
+  reconciled and commits it against the returned current revision. Neither path
+  silently overwrites concurrent work.
+
+There is no automatic retry loop. `retryable-failure` means the UX may offer
+retry; it does not mean every failure is retried indefinitely.
 
 `MemorySpaceBackend` lands first and remains a supported development and test
 adapter after PostgreSQL arrives. It returns promises like the eventual network
@@ -215,9 +270,33 @@ The repository interface owns atomicity and identity allocation. The HTTP layer
 only translates transport values into calls; it does not reimplement domain
 validation or transaction rules.
 
+`commitSpace` treats its snapshot as the authoritative current aggregate. In the
+same revision-checked transaction it replaces the space document, upserts every
+card in the snapshot, deletes stored cards owned by that space but absent from
+the snapshot, and increments the space revision. That is how a runtime card
+deletion becomes durable. Ordinary import has different semantics: it is an
+additive contribution to existing state, so absence from an upsert import never
+deletes database content. Dangerous truncation remains the only import mode
+that deletes by absence of the old database as a whole.
+
 `ImportMode` is `upsert` or `truncate`. The latter name is internal; the only
 public way to select it is the deliberately alarming
 `--dangerous-truncate` flag.
+
+### HTTP commit mapping
+
+`HttpSpaceBackend` maps transport outcomes into the same `CommitResult` used by
+the memory adapter:
+
+| HTTP outcome | Commit result |
+| --- | --- |
+| `200` with the committed revision | `committed` |
+| `409` with the current stored space | `conflict` |
+| `400` or a malformed response | permanent `protocol` |
+| `401` or `403` | permanent `forbidden` |
+| `404` | permanent `not-found` |
+| `422` | permanent `invalid-snapshot` |
+| `408`, `429`, `5xx`, timeout, or network failure | `retryable-failure` |
 
 ## Import flow
 
@@ -286,9 +365,10 @@ The session supplies the latest acknowledged revision when each queued commit
 actually begins. The repository rejects stale expected revisions, so a late
 request cannot overwrite a newer state. A transient failure stays visible with
 retry; a conflict stays visible and requires explicit recovery rather than a
-blind retry. Neither is reported as durable. Navigation protection is needed
-only while persistence is pending, failed, or conflicted, not after a successful
-commit.
+blind retry. A permanent rejection also retains the local working snapshot but
+offers no retry until another valid edit is submitted. None is reported as
+durable. Navigation protection is needed while persistence is pending, failed,
+rejected, or conflicted, not after a successful commit.
 
 Activating a route remains a reading choice rather than an edit. It writes
 nothing by itself.
@@ -388,6 +468,8 @@ Prisma Next commands, so starting a container cannot silently change the schema.
 - Session tests cover one in-flight commit, coalescing to the latest waiting
   snapshot, revision hand-off, transient retry, and non-overwriting conflicts.
 - Repository integration tests run against Docker PostgreSQL.
+- Repository tests prove authoritative runtime replacement deletes omitted
+  cards while ordinary upsert import preserves omitted database cards.
 - Import tests cover explicit-id upsert, id-less insertion, UUID allocation,
   cross-space ownership conflicts, duplicate ids, complete rollback, and
   dangerous truncation.
@@ -404,20 +486,24 @@ Prisma Next commands, so starting a container cannot silently change the schema.
 
 ## Delivery sequence
 
-1. Land the repository-wide version 2 UUID migration before parallel feature
-   branches begin; its blast radius otherwise conflicts with every stream.
-2. Add `SpaceSnapshot`, `SpaceBackend`, `SpaceSession`, and
-   `MemorySpaceBackend`; move app boot behind the session and remove Save while
-   retaining session-only UX.
-3. Pin Prisma Next, install its matching skill cluster, add Docker Compose, and
-   establish the contract/migration/runtime skeleton with one write/read proof.
-4. Add `PostgresSpaceRepository` and its integration contract tests.
-5. Add the shared import core and CLI startup behavior.
-6. Add HTTP handlers and `HttpSpaceBackend`; switch normal runtime persistence
-   to PostgreSQL.
-7. Add canonical CLI export and changed-since-export status.
+The initial frontier contains two independent tickets:
 
-Each increment leaves the application runnable. After steps 1 and 2, UX owns
+- `01` — land the repository-wide version 2 UUID migration. Its blast radius
+  otherwise conflicts with every UX feature branch.
+- `03` — pin Prisma Next, install its matching skill cluster, add Docker
+  Compose, and establish the contract/migration/runtime skeleton.
+
+The next frontier is dependency-driven:
+
+- `02` follows `01`: add `SpaceSnapshot`, `SpaceBackend`, `SpaceSession`, and
+  `MemorySpaceBackend`; move app boot behind the session and remove Save.
+- `04` follows both `01` and `03`: add `PostgresSpaceRepository` and its
+  integration contract tests.
+- UX work may branch after `02`; database, import, and export work continue from
+  `04`; `08` joins `02` and `04` through `HttpSpaceBackend` at the composition
+  root.
+
+Each increment leaves the application runnable. After `01` and `02`, UX owns
 app stores, gestures, views, and components through `SpaceSession`; persistence
 work owns Prisma Next, PostgreSQL, HTTP, CLI, and filesystem adapters. Their
 only final join is the composition root choosing `HttpSpaceBackend` instead of

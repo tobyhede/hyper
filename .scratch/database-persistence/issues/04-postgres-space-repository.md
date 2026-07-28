@@ -14,5 +14,6 @@
 - [ ] Loading reconstructs a complete snapshot and its revision/export metadata, then passes through the normal domain validation intake.
 - [ ] Listing derives stable space summaries without introducing speculative duplicated columns or JSONB indexes.
 - [ ] Card UUIDs already owned by another space are rejected rather than moved implicitly.
-- [ ] Deleting by omission is not part of the repository commit contract.
-- [ ] Integration tests against Docker PostgreSQL cover atomic commits, rollback, stale revisions, listing, loading, and ownership conflicts.
+- [ ] A runtime commit treats its complete snapshot as authoritative and deletes cards owned by the space but absent from that snapshot in the same transaction.
+- [ ] Ordinary upsert import remains additive and never deletes database cards merely because they are absent from the import input.
+- [ ] Integration tests against Docker PostgreSQL cover atomic commits, rollback, stale revisions, listing, loading, ownership conflicts, authoritative runtime deletion, and non-deleting upsert import.

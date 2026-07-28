@@ -12,10 +12,12 @@
 - [ ] The memory adapter remains a supported development and test mode after PostgreSQL integration, with test-only latency and failure controls kept outside the production interface.
 - [ ] A completed edit updates the UI optimistically and enters a per-space session with at most one commit in flight.
 - [ ] Multiple edits behind an in-flight commit coalesce to the latest complete valid snapshot, which commits against the newly acknowledged revision.
-- [ ] A successful commit advances the acknowledged revision; a transient failure remains visible and retryable.
-- [ ] A revision conflict remains visible and cannot blindly overwrite current database state.
+- [ ] A successful commit advances the acknowledged revision; a transient failure retains the latest working snapshot and retry submits that snapshot against the last acknowledged revision.
+- [ ] A permanent failure retains local work, disables retry, and allows a later valid edit to submit again.
+- [ ] A revision conflict retains both the latest local snapshot and the returned current database snapshot, stops automatic commits, and cannot blindly overwrite current database state.
+- [ ] Conflict recovery either explicitly accepts the remote snapshot or submits a complete snapshot explicitly reconciled by the UX against the returned current revision.
 - [ ] The Save button, Save keyboard shortcut, and file-save request are removed.
 - [ ] Route activation remains a reading choice and does not commit by itself.
-- [ ] Navigation protection applies only while a commit is pending or failed.
-- [ ] Behavioral tests pin both the backend interface and session coordination, including ordered commits, coalescing, retry, and conflict handling.
+- [ ] Navigation protection applies while persistence is pending, failed, rejected, or conflicted, and is absent when persistence is settled.
+- [ ] Behavioral tests pin the discriminated commit results and every session transition, including ordered commits, coalescing, latest-snapshot retry, permanent rejection, and conflict recovery.
 - [ ] Existing graph and presentation behavior remains unchanged in Playwright.
