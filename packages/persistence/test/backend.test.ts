@@ -4,6 +4,10 @@ import { MemorySpaceBackend } from '../src/index';
 
 const SPACE_ID = '00000000-0000-4000-8000-000000000001';
 const CARD_ID = '00000000-0000-4000-8000-000000000002';
+const CARD_B = '00000000-0000-4000-8000-000000000003';
+const ROUTE_ID = '00000000-0000-4000-8000-000000000004';
+const LAYOUT_ID = '00000000-0000-4000-8000-000000000005';
+const MISSING_ID = '00000000-0000-4000-8000-000000000099';
 
 const loaded: LoadedSpace = {
   snapshot: {
@@ -57,5 +61,71 @@ describe('MemorySpaceBackend', () => {
       code: 'not-found',
       message: `Space ${missing.id} does not exist`,
     });
+  });
+
+  it('rejects shape-valid snapshots that fail normal domain intake', async () => {
+    const backend = new MemorySpaceBackend([loaded]);
+    const secondCard = {
+      id: CARD_B,
+      document: { title: 'B', kind: 'markdown' as const, body: 'B' },
+    };
+    const invalidSnapshots = [
+      {
+        ...loaded.snapshot,
+        document: {
+          ...loaded.snapshot.document,
+          routes: [{ id: ROUTE_ID, title: 'Dangling', edges: [{ from: CARD_ID, to: MISSING_ID }] }],
+        },
+      },
+      {
+        ...loaded.snapshot,
+        document: {
+          ...loaded.snapshot.document,
+          routes: [
+            {
+              id: ROUTE_ID,
+              title: 'Cycle',
+              edges: [
+                { from: CARD_ID, to: CARD_B },
+                { from: CARD_B, to: CARD_ID },
+              ],
+            },
+          ],
+        },
+        cards: [...loaded.snapshot.cards, secondCard],
+      },
+      {
+        ...loaded.snapshot,
+        cards: [
+          {
+            id: CARD_ID,
+            document: { title: 'Alias', kind: 'alias' as const, target: MISSING_ID },
+          },
+        ],
+      },
+      {
+        ...loaded.snapshot,
+        document: {
+          ...loaded.snapshot.document,
+          layouts: [
+            {
+              id: LAYOUT_ID,
+              title: 'Broken',
+              kind: 'positioned' as const,
+              positions: { [MISSING_ID]: { x: 0, y: 0 } },
+            },
+          ],
+          defaultView: MISSING_ID,
+        },
+      },
+    ];
+
+    for (const snapshot of invalidSnapshots) {
+      await expect(backend.commitSpace(snapshot, 3n)).resolves.toMatchObject({
+        kind: 'permanent-failure',
+        code: 'invalid-snapshot',
+      });
+    }
+    await expect(backend.loadSpace(SPACE_ID)).resolves.toEqual(loaded);
   });
 });

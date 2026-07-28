@@ -88,16 +88,6 @@ export function loadSpace(input: unknown, cardFiles: readonly CardFile[]): LoadS
   }
   if (cardErrors.length > 0) return { ok: false, errors: cardErrors };
 
-  // Array order is read only by automatic strategies, so title order is the one
-  // default that is stable against renaming a file or reordering a scan.
-  //
-  // Ties break on id, which is unique by construction. Without that the sort is
-  // only *stable*, not total: two cards sharing a title keep the order they
-  // arrived in, which is the directory's order — so the arrangement would depend
-  // on the very thing this sort exists to stop it depending on. Found by the
-  // order-indifference property, which failed roughly one run in seven.
-  cards.sort((a, b) => a.title.localeCompare(b.title) || a.id.localeCompare(b.id));
-
   return buildSpace({
     id: file.id,
     title: file.title,
@@ -144,17 +134,23 @@ function buildSpace(input: {
   layouts: Layout[] | undefined;
   defaultView: string | undefined;
 }): LoadSpaceResult {
-  const referenceErrors = validateReferences(input);
+  // Array order is read only by automatic strategies, so title order is the one
+  // default stable across filesystem scans and unordered relational reads. Ties
+  // break on id, making the order total rather than dependent on input order.
+  const cards = [...input.cards].sort(
+    (left, right) => left.title.localeCompare(right.title) || left.id.localeCompare(right.id),
+  );
+  const referenceErrors = validateReferences({ ...input, cards });
   if (referenceErrors.length > 0) return { ok: false, errors: referenceErrors };
   const layouts = input.layouts ?? [];
   const space: Space = {
     id: input.id,
     title: input.title,
-    cards: input.cards,
+    cards,
     routes: input.routes,
     layouts,
     defaultView: input.defaultView,
-    cardsById: new Map(input.cards.map((c) => [c.id, c])),
+    cardsById: new Map(cards.map((card) => [card.id, card])),
     routesById: new Map(input.routes.map((r) => [r.id, r])),
     layoutsById: new Map(layouts.map((l) => [l.id, l])),
   };

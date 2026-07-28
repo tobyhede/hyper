@@ -1,4 +1,5 @@
 import { spaceSnapshotSchema, type SpaceSnapshot, type UUID } from '@project/core';
+import { loadSpaceSnapshot } from '@project/graph';
 import type { CommitResult, LoadedSpace, SpaceBackend, SpaceSummary } from './backend';
 
 const clone = <T>(value: T): T => structuredClone(value);
@@ -77,6 +78,14 @@ export class MemorySpaceBackend implements SpaceBackend {
         kind: 'permanent-failure',
         code: 'invalid-snapshot',
         message: parsed.error.message,
+      };
+    }
+    const intake = loadSpaceSnapshot(parsed.data);
+    if (!intake.ok) {
+      return {
+        kind: 'permanent-failure',
+        code: 'invalid-snapshot',
+        message: intake.errors.map((error) => error.message).join('\n'),
       };
     }
 

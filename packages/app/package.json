@@ -10,7 +10,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "dev:new": "SPACE_DIR=.space vite --port 5174 --strictPort",
     "e2e:server": "SPACE_DIR=fixture vite --port 5273 --strictPort",
-    "e2e:server:new": "SPACE_DIR=.space vite --port 5274 --strictPort"
+    "e2e:server:new": "vite --port 5274 --strictPort"
   },
   "dependencies": {
     "@project/core": "workspace:*",

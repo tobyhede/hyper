@@ -6,8 +6,16 @@ title: Routes are graphs
 A **route** is a set of directed edges between cards.
 
 ```json
-{ "id": "quick", "title": "Quick tour",
-  "edges": [{ "from": "intro", "to": "demo" }] }
+{
+  "id": "00000000-0000-4000-8000-000000000031",
+  "title": "Quick tour",
+  "edges": [
+    {
+      "from": "00000000-0000-4000-8000-000000000027",
+      "to": "00000000-0000-4000-8000-000000000041"
+    }
+  ]
+}
 ```
 
 A card may have several edges out — a **fork** — and several in — a **merge**.

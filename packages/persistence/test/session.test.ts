@@ -83,14 +83,16 @@ describe('openSpaceSession', () => {
     session.submit(changedTitle('Latest'));
     release();
 
-    const settled = await waitFor(
+    const finished = await waitFor(
       session.getState,
       session.subscribe,
-      (state) => state.persistence.kind === 'settled',
+      (state) => state.persistence.kind === 'settled' || state.persistence.kind === 'conflicted',
     );
-    expect(settled.acknowledgedRevision).toBe(5n);
     expect(control.attempts).toHaveLength(2);
     expect(control.attempts[1]?.snapshot.document.title).toBe('Latest');
+    expect(control.attempts[1]?.expectedRevision).toBe(4n);
+    expect(finished.persistence.kind).toBe('settled');
+    expect(finished.acknowledgedRevision).toBe(5n);
     await expect(backend.loadSpace(SPACE_ID)).resolves.toMatchObject({
       snapshot: { document: { title: 'Latest' } },
       revision: 5n,

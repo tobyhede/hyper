@@ -12,6 +12,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@project/core": "workspace:*"
+    "@project/core": "workspace:*",
+    "@project/graph": "workspace:*"
   }
 }

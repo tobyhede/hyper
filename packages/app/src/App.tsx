@@ -28,7 +28,11 @@ import { GraphView } from './components/GraphView';
 import { OpenCard } from './components/OpenCard';
 import { PresentingChrome } from './components/PresentingChrome';
 
-export const createApp = ({ space, spaceSession }: OpenedSpace) => {
+export interface AppActions {
+  acceptRemote: () => void;
+}
+
+export const createApp = ({ space, spaceSession }: OpenedSpace, { acceptRemote }: AppActions) => {
   // Which view this space opens in, and the strategy that arranges it. The fixture
   // declares no view, so this resolves to the route-driven ELK graph — exactly
   // what the hardcoded `elkStrategy()` here used to do. It also answers which
@@ -318,11 +322,7 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
             Retry persistence
           </Button>
         ) : sessionState.persistence.kind === 'conflicted' ? (
-          <Button
-            variant="default"
-            data-testid="persistence-accept-remote"
-            onClick={spaceSession.acceptRemote}
-          >
+          <Button variant="default" data-testid="persistence-accept-remote" onClick={acceptRemote}>
             Accept remote
           </Button>
         ) : (

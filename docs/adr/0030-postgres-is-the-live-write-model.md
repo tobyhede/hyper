@@ -33,3 +33,14 @@ hand-edited files do not affect an open application until imported. In return,
 normal edits are durable without an explicit Save, multi-entity changes are
 atomic, and file provenance no longer leaks across the domain and persistence
 interfaces.
+
+## Implementation status
+
+The first increment is built: version 2 public schemas require UUIDs, import
+schemas allow persistence-owned ids to be omitted, and `SpaceBackend`,
+`SpaceSession` and the memory adapter drive automatic whole-snapshot commits.
+The Vite file integration is now a read-only import source; there is no browser
+Save action or file write-back endpoint.
+
+The Prisma Next/PostgreSQL adapter, transactional importer, database-backed app
+startup and CLI-only canonical exporter remain to be built.

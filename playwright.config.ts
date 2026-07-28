@@ -56,10 +56,8 @@ export default defineConfig({
       url: 'http://localhost:5274',
       reuseExistingServer: false,
       timeout: 120_000,
-      // Deliberately *not* read-only. This server writes, because proving a
-      // minted space survives a reload means letting it be saved. It is safe to
-      // let it: `SPACE_DIR` points at a gitignored throwaway directory that
-      // `globalSetup` deletes before every run, not at authored content.
+      // No `SPACE_DIR`: every full load mints a new workspace backed only by
+      // that page's in-memory backend. Residual files cannot affect this test.
     },
   ],
 });

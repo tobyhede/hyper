@@ -2,7 +2,8 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "paths": {
-      "@project/core": ["../core/src/index.ts"]
+      "@project/core": ["../core/src/index.ts"],
+      "@project/graph": ["../graph/src/index.ts"]
     }
   },
   "include": ["src"]

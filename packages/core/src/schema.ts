@@ -139,11 +139,13 @@ export const positionedLayoutSchema = z.object({
  * uses — here it is for hand-authoring rather than back-compat, so a layout can
  * be written as just an id, a title, and its positions.
  */
+const defaultPositionedKind = (value: unknown): unknown =>
+  typeof value === 'object' && value !== null && !Array.isArray(value) && !('kind' in value)
+    ? { ...value, kind: 'positioned' }
+    : value;
+
 export const layoutSchema = z.preprocess(
-  (value) =>
-    typeof value === 'object' && value !== null && !Array.isArray(value) && !('kind' in value)
-      ? { ...value, kind: 'positioned' }
-      : value,
+  defaultPositionedKind,
   z.discriminatedUnion('kind', [positionedLayoutSchema]),
 );
 
@@ -244,6 +246,10 @@ export const spaceSnapshotSchema = z.object({
 
 const importRouteSchema = routeSchema.extend({ id: uuidSchema.optional() });
 const importPositionedLayoutSchema = positionedLayoutSchema.extend({ id: uuidSchema.optional() });
+const importLayoutSchema = z.preprocess(
+  defaultPositionedKind,
+  z.discriminatedUnion('kind', [importPositionedLayoutSchema]),
+);
 
 /**
  * The only shape in which entity ids may be absent. References remain UUIDs:
@@ -253,7 +259,7 @@ export const importSpaceSchema = z.object({
   id: uuidSchema.optional(),
   document: spaceDocumentSchema.extend({
     routes: z.array(importRouteSchema),
-    layouts: z.array(importPositionedLayoutSchema).optional(),
+    layouts: z.array(importLayoutSchema).optional(),
   }),
   cards: z.array(z.object({ id: uuidSchema.optional(), document: cardDocumentSchema })),
 });

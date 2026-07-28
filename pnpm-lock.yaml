@@ -144,6 +144,9 @@ importers:
       '@project/core':
         specifier: workspace:*
         version: link:../core
+      '@project/graph':
+        specifier: workspace:*
+        version: link:../graph
 
   packages/react-flow-adapter:
     dependencies:

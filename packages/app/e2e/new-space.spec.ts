@@ -74,3 +74,16 @@ test('persists a completed edit through the backend session', async ({ page }) =
   await expect(page.getByTestId('save-button')).toHaveCount(0);
   await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
 });
+
+test('reload starts from a freshly minted memory workspace', async ({ page }) => {
+  await page.goto('/');
+  const first = nodeByTitle(page, 'Start here');
+  await expect(first).toBeVisible();
+  const firstId = await first.getAttribute('data-id');
+
+  await page.reload();
+
+  const second = nodeByTitle(page, 'Start here');
+  await expect(second).toBeVisible();
+  expect(await second.getAttribute('data-id')).not.toBe(firstId);
+});

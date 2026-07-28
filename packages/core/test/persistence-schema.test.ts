@@ -35,7 +35,12 @@ describe('import space schema', () => {
       document: {
         ...identified.document,
         routes: [{ ...identified.document.routes[0], id: undefined }],
-        layouts: [{ ...identified.document.layouts[0], id: undefined }],
+        layouts: [
+          {
+            title: 'Working',
+            positions: { [CARD_A]: { x: 0, y: 0 } },
+          },
+        ],
       },
       cards: [...identified.cards, { document: { title: 'New', kind: 'markdown', body: '' } }],
     };

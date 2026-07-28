@@ -38,4 +38,18 @@ describe('loadSpaceSnapshot', () => {
     expect(card?.kind === 'markdown' && card.body).toBe('Body A');
     expect(getRoute(result.space, ROUTE_ID)?.title).toBe('Main');
   });
+
+  it('canonicalizes backend card order by title and id', () => {
+    const reversed = { ...snapshot, cards: [...snapshot.cards].reverse() };
+    const fromOriginal = loadSpaceSnapshot(snapshot);
+    const fromReversed = loadSpaceSnapshot(reversed);
+    expect(fromOriginal.ok).toBe(true);
+    expect(fromReversed.ok).toBe(true);
+    if (!fromOriginal.ok || !fromReversed.ok) return;
+
+    expect(fromReversed.space.cards.map((card) => card.id)).toEqual(
+      fromOriginal.space.cards.map((card) => card.id),
+    );
+    expect(fromReversed.space.cards.map((card) => card.id)).toEqual([CARD_A, CARD_B]);
+  });
 });
