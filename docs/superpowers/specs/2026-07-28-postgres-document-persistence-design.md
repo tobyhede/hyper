@@ -34,7 +34,8 @@ sharing.
 
 There is no explicit Save action and no unsaved database state. An edit updates
 the UI optimistically, enters an ordered persistence queue, and becomes durable
-when its transaction commits. A failure remains visible and retryable.
+when its transaction commits. A failure remains visible; retry is offered only
+when the failure is classified as retryable.
 
 The UI may report that a space has changed since its last export. This compares
 database revisions; it says nothing about database durability.
@@ -140,14 +141,13 @@ import may leave database cards that were absent from the imported directory.
 
 ```text
 Browser
-  App
-   -> SpaceSession
-      -> SpaceBackend
-         -> MemorySpaceBackend
-         -> HttpSpaceBackend
-              -> HTTP handlers
-                 -> SpaceRepository
-                    -> PostgresSpaceRepository
+  App bootstrap -> SpaceBackend.listSpaces/loadSpace
+  Open workspace -> SpaceSession -> SpaceBackend.commitSpace
+                                  -> MemorySpaceBackend
+                                  -> HttpSpaceBackend
+                                       -> HTTP handlers
+                                          -> SpaceRepository
+                                             -> PostgresSpaceRepository
 
 CLI
   file discovery -> parser -> importSpaces -> SpaceRepository
@@ -198,6 +198,7 @@ interface SpaceSession {
 interface SpaceSessionState {
   working: SpaceSnapshot;
   acknowledgedRevision: bigint;
+  changedSinceExport: boolean;
   persistence:
     | { kind: 'settled' }
     | { kind: 'pending' }
@@ -205,10 +206,15 @@ interface SpaceSessionState {
     | { kind: 'rejected'; failure: Extract<CommitResult, { kind: 'permanent-failure' }> }
     | { kind: 'conflicted'; current: LoadedSpace };
 }
+
+function openSpaceSession(backend: SpaceBackend, loaded: LoadedSpace): SpaceSession;
 ```
 
 The load result includes the acknowledged database revision because the first
-commit cannot supply an honest `expectedRevision` without it.
+commit cannot supply an honest `expectedRevision` without it. App bootstrap
+uses `SpaceBackend` directly to list the catalog and load the selected space,
+then hands that result to `openSpaceSession`. The session owns an already-open
+workspace; listing and selection are deliberately not added to its interface.
 
 `SpaceSession` is the module the UX uses. It owns the loaded snapshot, the
 acknowledged revision, one in-flight commit, the latest snapshot waiting behind
@@ -240,6 +246,16 @@ Its transitions are fixed:
 There is no automatic retry loop. `retryable-failure` means the UX may offer
 retry; it does not mean every failure is retried indefinitely.
 
+`changedSinceExport` is derived by the session from the acknowledged database
+revision and the loaded `exportedRevision`; a null exported revision means the
+space has never been exported and therefore reports changed. Pending local work
+does not advance this comparison until its commit succeeds, because the status
+describes durable database state rather than unsaved UI state. The session keeps
+the raw export revision internal so UX callers do not duplicate the comparison.
+While conflicted, it derives the status from the returned current database state,
+which is the newest durable state the session knows; accepting or explicitly
+resolving that state carries its export revision forward.
+
 `MemorySpaceBackend` lands first and remains a supported development and test
 adapter after PostgreSQL arrives. It returns promises like the eventual network
 adapter and allows UX development without the old Save flow, Docker, or a
@@ -257,10 +273,22 @@ browser-safe package.
 ### Server seam
 
 ```ts
+type RepositoryCommitResult =
+  | { kind: 'committed'; revision: bigint }
+  | { kind: 'conflict'; current: StoredSpace }
+  | {
+      kind: 'rejected';
+      code: 'invalid-snapshot' | 'not-found';
+      message: string;
+    };
+
 interface SpaceRepository {
   listSpaces(): Promise<readonly SpaceSummary[]>;
   loadSpace(id: UUID): Promise<StoredSpace | undefined>;
-  commitSpace(snapshot: SpaceSnapshot, expectedRevision: bigint): Promise<CommitResult>;
+  commitSpace(
+    snapshot: SpaceSnapshot,
+    expectedRevision: bigint,
+  ): Promise<RepositoryCommitResult>;
   importSpaces(input: readonly ImportSpace[], mode: ImportMode): Promise<ImportResult>;
   markExported(id: UUID, revision: bigint): Promise<void>;
 }
@@ -268,7 +296,11 @@ interface SpaceRepository {
 
 The repository interface owns atomicity and identity allocation. The HTTP layer
 only translates transport values into calls; it does not reimplement domain
-validation or transaction rules.
+validation or transaction rules. Its result contains only domain and storage
+outcomes: committed, revision conflict, invalid snapshot, and missing space.
+Database availability failures throw to the handler. Network, timeout,
+rate-limit, authorization, and protocol classifications exist only at the HTTP
+handler and `HttpSpaceBackend` layers; they never cross the repository seam.
 
 `commitSpace` treats its snapshot as the authoritative current aggregate. In the
 same revision-checked transaction it replaces the space document, upserts every
@@ -285,7 +317,9 @@ public way to select it is the deliberately alarming
 
 ### HTTP commit mapping
 
-`HttpSpaceBackend` maps transport outcomes into the same `CommitResult` used by
+The HTTP handler maps `RepositoryCommitResult` to its domain statuses and maps
+authorization or operational failures at the transport seam. `HttpSpaceBackend`
+then maps those responses into the browser-facing `CommitResult` also used by
 the memory adapter:
 
 | HTTP outcome | Commit result |

@@ -11,6 +11,8 @@
 - [ ] Updating any part of the aggregate increments the owning space revision in the same transaction.
 - [ ] A commit succeeds only when its expected revision matches the stored revision.
 - [ ] A stale expected revision returns a typed conflict and changes no data.
+- [ ] The repository commit result contains only committed, revision-conflict, invalid-snapshot, and not-found outcomes; it contains no HTTP, browser, authorization, network, timeout, protocol, or rate-limit concepts.
+- [ ] Database availability and unexpected operational failures leave the transaction rolled back and propagate to the calling handler for transport classification.
 - [ ] Loading reconstructs a complete snapshot and its revision/export metadata, then passes through the normal domain validation intake.
 - [ ] Listing derives stable space summaries without introducing speculative duplicated columns or JSONB indexes.
 - [ ] Card UUIDs already owned by another space are rejected rather than moved implicitly.
