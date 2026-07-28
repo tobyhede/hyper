@@ -1,6 +1,6 @@
 # Ids are optional in the space file and generated on load
 
-Status: accepted
+Status: superseded by ADR 0030
 Refines: 0010
 
 Every referenceable thing in a space carries an **id** — one id, short and readable (ADR 0016 rejected a second, machine-facing one). Writing it is **optional**: a space file may omit any id, and `loadSpace` fills in what is missing, so a value that reaches the rest of the system always has one.

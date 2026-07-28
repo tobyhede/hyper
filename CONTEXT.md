@@ -11,10 +11,10 @@ _Avoid_: presentation (that is one view of a space), manifest (a shipping-ledger
 A **new space** is one card, centered — not an empty canvas (ADR 0018). It has no routes yet, so it can be read and edited but not presented.
 
 **Id**:
-What names a referenceable thing — a card, a route, a layout — within its space. Short and readable, and the only identifier any of them has: there is no second, machine-facing one behind it (ADR 0016, rejected). An id is scoped to its space, so two spaces may each have a card called `intro`.
+The durable UUID that names a referenceable thing — a space, card, route or layout. It is the entity's only identifier and is globally unique; references carry it directly rather than pairing it with a second authored or machine-facing name.
 
-An author need not write one. Ids are optional in what an author hands over and are filled in for anything missing, deterministically, so the same input always yields the same id (ADR 0019) — an id that changed between readings could not be referenced or bookmarked, which is the one thing ids are for. Renaming an id is therefore a real edit, not a cosmetic one: it moves everything that pointed at the old name.
-_Avoid_: uuid, guid, key, slug (a slug is a readable form derived from a name; here the name already is the identifier), and any pairing of a "human" id with a "durable" one.
+An author need not supply one when introducing an entity. Anything accepted into Hyper receives an id before it becomes part of a Space; once assigned, changing it is a real edit because every reference names it.
+_Avoid_: guid, key, slug, local id, authored id, and any pairing of a "human" id with a "durable" one.
 
 ## Cards
 
@@ -47,7 +47,7 @@ _Avoid_: link, connection, transition, arrow, step, relationship.
 **Active route**:
 The one route a space has selected at a time — drawn emphasized, and the route an author's new edges join. There is one concept here, not two: a route is active, and highlighting is how that is shown. A layout may name which route opens active; failing that it is the first route the layout shows. Changing it is a deliberate act, never a side effect of drawing or reading.
 
-Activating is not itself an edit — it touches no card and no route, so it converts nothing and leaves the space saved. Which route is active is recorded whenever the space is next saved for some other reason.
+Activating is not itself an edit — it touches no card and no route, so it converts nothing. Which route is active may become the authored default when another edit records the surrounding view.
 _Avoid_: selected route and current route as a second concept alongside this one, focus, mode.
 
 ## Layout and views
@@ -73,14 +73,12 @@ _Avoid_: arrangement (applying a strategy produces no separate entity — the ca
 **View**:
 The rendering of a layout for a viewer — which cards and routes are shown, and how they are drawn on screen and explored. The **Graph** view draws cards and the routes across them, one colour per route. A space may name the view it opens in; a viewer may have a default of their own; failing both, a space opens in the one the application supplies.
 
-Nothing tracks whether a viewer is editing, and there is no edit mode. Editing a view of an automatic strategy converts its arrangement into a Layout and writes there; editing a view of a Layout writes to it directly. Either way the write has somewhere to go. What is worth showing is not that editing began but that the space is unsaved.
+Nothing tracks whether a viewer is editing, and there is no edit mode. Editing a view of an automatic strategy converts its arrangement into a Layout; editing a view of a Layout changes it directly.
 _Avoid_: mode, screen, page, layout.
 
-**Saving**:
-Keeping the space as it now is. **An edit does not save**: it changes the space the author is working in and leaves it **unsaved** until they ask for it to be kept. Nothing else saves either — opening, reading, presenting and activating a route all leave a space as they found it.
-
-That an edit can be declined is what makes editing safe: a Layout that came into existence by accident goes away by not saving it. So *unsaved* is the one thing about editing worth showing an author, and it is a fact about the space rather than a mode they are in.
-_Avoid_: dirty (engineering's word for unsaved; say unsaved), autosave, persist, commit, publish.
+**Exporting**:
+Projecting a space into the repository-friendly form an author can review, commit and share. Exporting is not what makes an edit durable; it records the space outside Hyper at a chosen revision.
+_Avoid_: saving, publishing, syncing.
 
 **Opening**:
 Showing a single card's content to a viewer in place, over whatever view they are in. A card of any kind can be opened, and what the viewer sees is whatever its kind holds: a markdown card shows its Markdown source, verbatim; a space card shows its nested graph to explore; an alias shows what its target would show. Opening is not presenting — it is a reading gesture, and the view it happens over is still the thing being looked at. A markdown card is only ever drawn *rendered* by presenting.

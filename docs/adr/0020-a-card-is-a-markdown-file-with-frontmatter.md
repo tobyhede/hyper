@@ -2,6 +2,7 @@
 
 Status: accepted
 Refines: 0010
+Refined by: 0030
 
 A card is **one file**: YAML frontmatter carrying `id`, `title`, `description`, `kind` and `target`, and a markdown body carrying the content. Cards exist because their files exist, so the space file holds no `cards` array — it keeps `version`, `id`, `title`, `routes`, `layouts` and `defaultView`, which is structure and nothing else.
 
