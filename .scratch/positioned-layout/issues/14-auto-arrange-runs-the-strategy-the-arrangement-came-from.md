@@ -1,6 +1,6 @@
 # Auto-arrange runs the strategy the arrangement came from
 
-Status: open
+Status: resolved
 Type: task
 Blocked by: 08
 
@@ -13,3 +13,14 @@ This is `08`'s provenance question widened past sorting layouts: `08`'s option 4
 Worth noting for `08`: its premise is currently unbuildable. `BUILT_IN_STRATEGIES` offers `graph` and `grid`, and no sorting strategy exists to lose its rule.
 
 Reachability, stated honestly: no space in the repo sets `defaultView: "grid"` — neither the fixture nor `newSpace()` — so this takes hand-authoring to reach.
+
+## Answer
+
+Rejected. A converted Positioned Layout has no originating strategy: conversion
+ends the Algorithmic View's computed rule and retains no provenance. The generic
+Auto-arrange button and `ResolvedView.automatic` are prototype wiring to remove,
+not behavior to repair across persistence.
+
+Issue 16 replaces the button with an icon View selector. Choosing Graph, Grid,
+or another Algorithmic View is explicit navigation and leaves every existing
+Layout untouched. ADR 0031 records the decision.

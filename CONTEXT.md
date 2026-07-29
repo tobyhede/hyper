@@ -55,10 +55,10 @@ _Avoid_: selected route and current route as a second concept alongside this one
 **Layout**:
 A card-to-position map the author wrote — where a space's cards sit. It belongs to the space and is part of what the space is. A space may hold several layouts, and may hold none. Positions are a property of the layout, never of the card: the same card sits at different coordinates in each. A layout may omit cards, and whoever renders it places those itself; it may not name cards the space does not have.
 
-A Layout is authored by definition; the computed kind is not a layout at all but an automatic **layout strategy** (ADR 0014). A space with no Layout is arranged by an automatic strategy the application supplies, and **editing turns that into a Layout**: the arrangement already on screen is copied as the new layout's positions, so nothing moves at the moment it happens.
+A Layout is authored by definition; the computed kind is not a layout at all but an automatic **layout strategy** (ADR 0014). A space with no Layout is rendered through an **Algorithmic View** the application supplies, and **editing turns that into a Layout**: the card positions already on screen are copied into the new Layout, so nothing moves at the moment it happens.
 
 A layout also names which routes it shows — a filter, absent meaning all of them — and may name which of those opens active.
-_Avoid_: view (a view renders a layout), placement, diagram, manual and custom and free-form (a layout is authored, so the qualifiers say nothing).
+_Avoid_: view (a View is application-supplied and carries no authored positions), placement, diagram, manual and custom and free-form (a layout is authored, so the qualifiers say nothing).
 
 **Layout strategy**:
 A named strategy for arranging a space's cards — how they are organised and positioned. Which cards it arranges is the view's choice, not the strategy's.
@@ -67,13 +67,15 @@ A strategy is either **automatic** or **positioned**. An automatic strategy comp
 
 No strategy is the primary one. A space is arranged by whichever the author or the application chose, the set of them grows, and any particular graph-layout engine is one member of it rather than the thing layout means.
 
-An automatic strategy has nowhere to record where an author put a card, so editing one **converts** it: the strategy's arrangement is accepted into a new Layout and the edit is written there. That crossing — computed placement becoming authored — is the only one between them, and an edit is what triggers it.
+An automatic strategy has nowhere to record where an author put a card, so editing an Algorithmic View **converts** it: the positions the strategy computed are copied into a new Layout and the edit is written there. That crossing — computed positions becoming authored — is the only one between them, and an edit is what triggers it.
 _Avoid_: arrangement (applying a strategy produces no separate entity — the cards themselves carry the positions), algorithm, engine.
 
 **View**:
-The rendering of a layout for a viewer — which cards and routes are shown, and how they are drawn on screen and explored. The **Graph** view draws cards and the routes across them, one colour per route. A space may name the view it opens in; a viewer may have a default of their own; failing both, a space opens in the one the application supplies.
+An application-supplied way to render and explore a Space without authored card positions. An **Algorithmic View** uses an automatic **layout strategy** to compute those positions; the **Graph** View draws cards and routes across them, while the **Grid** View places cards on a grid. Views are named choices the application supplies, not authored things a Space owns.
 
-Nothing tracks whether a viewer is editing, and there is no edit mode. Editing a view of an automatic strategy converts its arrangement into a Layout; editing a view of a Layout changes it directly.
+A viewer chooses between the application's Views and the Space's Layouts. The Space may name either as its default renderer; a viewer may have a default View of their own; failing both, the application supplies a View. Choosing one is navigation, not an edit, and never changes the Space by itself.
+
+Nothing tracks whether a viewer is editing, and there is no edit mode. Editing an Algorithmic View creates a new Layout from the card positions already on screen; editing a Layout changes that Layout directly. Conversion retains no relationship to the View or layout strategy that produced those initial positions: selecting another View later is a fresh rendering choice, not undo or reversal.
 _Avoid_: mode, screen, page, layout.
 
 **Exporting**:

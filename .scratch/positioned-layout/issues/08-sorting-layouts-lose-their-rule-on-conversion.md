@@ -1,6 +1,6 @@
 # A sorting layout loses its rule when editing converts it
 
-Status: open
+Status: resolved
 Type: grilling
 Decision at stake: revisits a cost accepted in ADR 0025
 
@@ -75,3 +75,16 @@ meant to keep.
 
 Whether the app offers time-based sorts at all. Cards carry no created/updated
 timestamps today, and adding them is its own decision.
+
+## Answer
+
+The loss is intentional. Editing every Algorithmic View follows one rule: the
+card positions already on screen become a new Positioned Layout, and the
+computed rule ends. Sorting Views get no confirmation, special drag behavior,
+or retained strategy provenance.
+
+The missing affordance is View selection, not reversibility. An icon selector
+will distinguish application-supplied Algorithmic Views from Space-owned
+Positioned Layouts. Selecting a sorting View later is a fresh rendering choice;
+it does not undo or restore a converted Layout. ADR 0031 records the decision,
+and issue 16 carries the implementation.
