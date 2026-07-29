@@ -12,3 +12,9 @@
 pnpm-lock.yaml
 **/*.md
 **/coverage/**
+
+# Prisma Next owns these deterministic emitted artifacts.
+src/prisma/contract.json
+src/prisma/contract.d.ts
+migrations/**/*.json
+migrations/**/*.d.ts

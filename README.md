@@ -10,7 +10,8 @@ Content can be authored in version-controlled files and imported into the live p
 
 ## Running it
 
-Requirements: Node ≥ 20 and pnpm 9.
+Requirements: Node ≥ 24 and pnpm 9. Local PostgreSQL also requires Docker
+Engine or Docker Desktop with Compose v2.
 
 ```sh
 pnpm install
@@ -35,6 +36,44 @@ pnpm e2e            # Playwright flow (boots the dev server automatically)
 ```
 
 `pnpm e2e` needs the Chromium browser once: `pnpm exec playwright install chromium`.
+
+### Local PostgreSQL
+
+Local PostgreSQL is opt-in; `pnpm verify` and `pnpm e2e` do not require it.
+Copy the credential-free template:
+
+```sh
+cp .env.example .env
+```
+
+In `.env`, choose a URL-safe password and use it in both blank values:
+
+```dotenv
+POSTGRES_PASSWORD=<your-local-password>
+DATABASE_URL=postgresql://hyper:<your-local-password>@127.0.0.1:55432/hyper
+```
+
+Then start PostgreSQL 17.5, run the real database test, and stop the container:
+
+```sh
+pnpm postgres:up
+pnpm test:integration:postgres
+pnpm postgres:down
+```
+
+The integration command emits the Prisma Next contract, applies pending
+migrations, and performs a typed space/card JSONB write and read. To run only
+the schema steps:
+
+```sh
+pnpm contract:emit
+pnpm db:migrate
+```
+
+Compose and Hyper's Prisma config/runtime read the same ignored `.env`;
+deployed environments should inject `DATABASE_URL` through their secret
+manager. `pnpm postgres:down` keeps the named data volume. To delete local
+database state, run the destructive reset `docker compose down --volumes`.
 
 ## The space format
 

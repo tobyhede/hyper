@@ -7,6 +7,11 @@ test-results/
 .tanstack/
 *.log
 
+# Local environment and credentials. Commit only the credential-free template.
+.env
+.env.*
+!.env.example
+
 # Agent tooling (installed skills / session dirs), not project source
 .agents/
 .claude/

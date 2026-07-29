@@ -1,0 +1,29 @@
+// use prisma-next
+
+types {
+  Uuid = String @db.Uuid
+}
+
+model Space {
+  id               Uuid     @id @default(dbgenerated("gen_random_uuid()"))
+  document         Json
+  revision         BigInt   @default(0)
+  exportedRevision BigInt?  @map("exported_revision")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        temporal.updatedAt() @map("updated_at")
+  cards            Card[]
+
+  @@map("spaces")
+}
+
+model Card {
+  id        Uuid     @id @default(dbgenerated("gen_random_uuid()"))
+  spaceId   Uuid     @map("space_id")
+  document  Json
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt temporal.updatedAt() @map("updated_at")
+  space     Space    @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+
+  @@index([spaceId])
+  @@map("cards")
+}

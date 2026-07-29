@@ -72,6 +72,11 @@ export default tseslint.config(
       // separate entry in `.prettierignore`.
       '**/.claude/**',
       '**/.agents/**',
+      // Prisma Next owns these emitted declarations. They are consumed by
+      // typecheck but are not repository-authored lint targets.
+      '**/src/prisma/contract.d.ts',
+      '**/migrations/**/end-contract.d.ts',
+      '**/migrations/**/start-contract.d.ts',
     ],
   },
   js.configs.recommended,
@@ -118,6 +123,14 @@ export default tseslint.config(
     files: ['packages/app/src/**/*.tsx'],
     rules: {
       'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
+    },
+  },
+  {
+    files: ['migrations/**/migration.ts'],
+    rules: {
+      // Prisma Next renders this module-level self-emit bookend. It owns the
+      // call shape, and generated migration sources must not be patched.
+      '@typescript-eslint/no-floating-promises': 'off',
     },
   },
   // Tests assert presence with `find(...)!`; a wrong assumption throws and fails
