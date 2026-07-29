@@ -35,6 +35,61 @@ pnpm e2e            # Playwright flow (boots the dev server automatically)
 
 `pnpm e2e` needs the Chromium browser once: `pnpm exec playwright install chromium`.
 
+### Local PostgreSQL
+
+PostgreSQL is an opt-in development dependency; the ordinary `pnpm verify` and
+`pnpm e2e` suites do not require a database. Local connection values live in an
+ignored `.env`, while `.env.example` records the required variables without a
+usable credential:
+
+```sh
+cp .env.example .env
+```
+
+Choose a URL-safe local password, then set both blank values in `.env`. The URL
+must carry the same database, user, password and port as the `POSTGRES_*`
+variables:
+
+```dotenv
+POSTGRES_PASSWORD=<your-local-password>
+DATABASE_URL=postgresql://hyper:<your-local-password>@127.0.0.1:55432/hyper
+```
+
+Never commit `.env`. In deployed environments, inject `DATABASE_URL` through
+the platform's secret manager rather than shipping an environment file.
+
+Start the pinned PostgreSQL 17.5 container and wait for its health check:
+
+```sh
+pnpm postgres:up
+```
+
+The complete database test path emits the Prisma Next contract, applies pending
+migrations and performs a typed space/card JSONB write and read against the real
+database:
+
+```sh
+pnpm test:integration:postgres
+```
+
+The individual schema commands remain available when developing a contract or
+migration:
+
+```sh
+pnpm contract:emit
+pnpm db:migrate
+```
+
+Stop PostgreSQL without deleting the named data volume:
+
+```sh
+pnpm postgres:down
+```
+
+Compose reads the same `.env` for every lifecycle command, including teardown.
+Deleting the volume is a separate, destructive reset: `docker compose down
+--volumes`.
+
 ## The space format
 
 A space is a **space directory**: a space file (`space.json`) plus one Markdown file per card. Cards are not listed anywhere — a card exists because its file does ([ADR 0020](docs/adr/0020-a-card-is-a-markdown-file-with-frontmatter.md)), and they are discovered by scanning two locations **non-recursively**: `*.md` beside the space file, and `cards/*.md`. The bundled example lives in [`packages/app/example`](packages/app/example).
