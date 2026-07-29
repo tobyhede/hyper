@@ -10,7 +10,8 @@ Content lives in version-controlled files. A space directory holds a space file 
 
 ## Running it
 
-Requirements: Node ≥ 24 and pnpm 9.
+Requirements: Node ≥ 24 and pnpm 9. Local PostgreSQL also requires Docker
+Engine or Docker Desktop with Compose v2.
 
 ```sh
 pnpm install
@@ -37,58 +38,41 @@ pnpm e2e            # Playwright flow (boots the dev server automatically)
 
 ### Local PostgreSQL
 
-PostgreSQL is an opt-in development dependency; the ordinary `pnpm verify` and
-`pnpm e2e` suites do not require a database. Local connection values live in an
-ignored `.env`, while `.env.example` records the required variables without a
-usable credential:
+Local PostgreSQL is opt-in; `pnpm verify` and `pnpm e2e` do not require it.
+Copy the credential-free template:
 
 ```sh
 cp .env.example .env
 ```
 
-Choose a URL-safe local password, then set both blank values in `.env`. The URL
-must carry the same database, user, password and port as the `POSTGRES_*`
-variables:
+In `.env`, choose a URL-safe password and use it in both blank values:
 
 ```dotenv
 POSTGRES_PASSWORD=<your-local-password>
 DATABASE_URL=postgresql://hyper:<your-local-password>@127.0.0.1:55432/hyper
 ```
 
-Never commit `.env`. In deployed environments, inject `DATABASE_URL` through
-the platform's secret manager rather than shipping an environment file.
-
-Start the pinned PostgreSQL 17.5 container and wait for its health check:
+Then start PostgreSQL 17.5, run the real database test, and stop the container:
 
 ```sh
 pnpm postgres:up
-```
-
-The complete database test path emits the Prisma Next contract, applies pending
-migrations and performs a typed space/card JSONB write and read against the real
-database:
-
-```sh
 pnpm test:integration:postgres
+pnpm postgres:down
 ```
 
-The individual schema commands remain available when developing a contract or
-migration:
+The integration command emits the Prisma Next contract, applies pending
+migrations, and performs a typed space/card JSONB write and read. To run only
+the schema steps:
 
 ```sh
 pnpm contract:emit
 pnpm db:migrate
 ```
 
-Stop PostgreSQL without deleting the named data volume:
-
-```sh
-pnpm postgres:down
-```
-
-Compose reads the same `.env` for every lifecycle command, including teardown.
-Deleting the volume is a separate, destructive reset: `docker compose down
---volumes`.
+Compose and Hyper's Prisma config/runtime read the same ignored `.env`;
+deployed environments should inject `DATABASE_URL` through their secret
+manager. `pnpm postgres:down` keeps the named data volume. To delete local
+database state, run the destructive reset `docker compose down --volumes`.
 
 ## The space format
 

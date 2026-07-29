@@ -462,8 +462,8 @@ Adoption follows the project-shipped skills and is pinned as a coherent unit:
 2. select and pin one Prisma Next release;
 3. install the matching project-local Prisma Next skill cluster for Codex using
    the exact Git tag selected in the preceding step;
-4. install and import through the `@prisma-next/postgres` facade rather than
-   lower-level packages;
+4. import database capabilities in authored code through the
+   `@prisma-next/postgres` facade rather than lower-level packages;
 5. author one contract with emitted `contract.json` and `contract.d.ts` beside
    it;
 6. expose one adjacent `db.ts` runtime entry;
@@ -474,6 +474,11 @@ Adoption follows the project-shipped skills and is pinned as a coherent unit:
    allocation for nested ids;
 11. use versioned `migration plan`/`migrate` history for the durable database;
 12. run contract emission explicitly in development and builds initially.
+
+Prisma Next 0.16.0's emitted declaration names four lower-level packages, so
+Hyper pins them as root devDependencies solely to resolve generated types.
+Authored code still imports only from the facade; the workaround is removed
+when an upstream release emits facade-resolvable declarations.
 
 Hyper currently uses Vite 6, while Prisma Next's contract-emission plugin
 supports Vite 7 and 8. The initial integration does not install an unsupported
@@ -491,6 +496,10 @@ batch-array transactions, `skipDuplicates`, or typed SQL-builder
 Development uses Docker Compose with a pinned PostgreSQL image, a health check,
 a named data volume, and a loopback-published port. Hyper connects through
 `DATABASE_URL`.
+
+Locally, Compose and Prisma Next load the same ignored `.env`, copied from a
+credential-free `.env.example`. Deployed environments inject `DATABASE_URL`
+through their secret manager instead of shipping an environment file.
 
 Compose owns infrastructure only. Contract initialization and migrations remain
 Prisma Next commands, so starting a container cannot silently change the schema.
