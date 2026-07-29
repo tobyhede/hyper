@@ -15,6 +15,7 @@ Requirements: Node ≥ 20 and pnpm 9.
 ```sh
 pnpm install
 pnpm dev            # start the app at http://localhost:5173
+pnpm dev:new        # mint a fresh one-card memory workspace at http://localhost:5174
 ```
 
 Then:

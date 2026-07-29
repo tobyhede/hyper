@@ -35,6 +35,45 @@ body {
   color: var(--text);
 }
 
+/* ---- Startup failure ---- */
+.startup-error {
+  display: grid;
+  min-height: 100%;
+  place-items: center;
+  padding: 2rem;
+}
+
+.startup-error__panel {
+  width: min(48rem, 100%);
+  padding: 1.5rem;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.startup-error__panel h1 {
+  margin: 0 0 0.75rem;
+  font-size: 1.25rem;
+}
+
+.startup-error__panel p {
+  margin: 0 0 1rem;
+  color: var(--muted);
+}
+
+.startup-error__panel pre {
+  margin: 0;
+  padding: 1rem;
+  overflow: auto;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
 /* ---- App shell ---- */
 .shell {
   display: flex;
