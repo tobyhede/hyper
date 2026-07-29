@@ -39,7 +39,12 @@ export function strategyForRendering(
   automaticStrategy: LayoutStrategy,
   authoredPositions: ReadonlyMap<string, LayoutPoint> | null,
 ): LayoutStrategy {
-  return authoredPositions === null ? automaticStrategy : positionedStrategy(authoredPositions);
+  if (authoredPositions === null) return automaticStrategy;
+  const positions = new Map<CardId, LayoutPoint>();
+  for (const [cardId, point] of authoredPositions) {
+    positions.set(uuidSchema.parse(cardId), point);
+  }
+  return positionedStrategy(positions);
 }
 
 export function useLayoutRendering(

@@ -1,13 +1,14 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
+import { uuidSchema, type CardId } from '@project/core';
 import { gridStrategy, type LayoutGraph, type LayoutStrategy } from '@project/graph';
 import { strategyForRendering, useLayoutRendering } from '../src/App';
 
-const CARD_A = '00000000-0000-4000-8000-000000000002';
-const CARD_B = '00000000-0000-4000-8000-000000000003';
-const CARD_C = '00000000-0000-4000-8000-000000000004';
+const CARD_A = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
+const CARD_B = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
+const CARD_C = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
 
-function graphWith(...cardIds: string[]): LayoutGraph {
+function graphWith(...cardIds: CardId[]): LayoutGraph {
   return {
     cards: cardIds.map((id) => ({ id, width: 240, height: 140, ports: [] })),
     edges: [],
