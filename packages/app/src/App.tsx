@@ -14,8 +14,11 @@ import {
   filterHandlesByRoutes,
   getCard,
   layoutPositions,
+  positionedStrategy,
   resolveContentCard,
   type LayoutGraph,
+  type LayoutPoint,
+  type LayoutStrategy,
 } from '@project/graph';
 import type { OpenedSpace } from './space';
 import { preparePlacementSubmission } from './completed-edit';
@@ -30,6 +33,13 @@ import { PresentingChrome } from './components/PresentingChrome';
 
 export interface AppActions {
   acceptRemote: () => void;
+}
+
+export function strategyForRendering(
+  algorithmicView: LayoutStrategy,
+  authoredPositions: ReadonlyMap<string, LayoutPoint> | null,
+): LayoutStrategy {
+  return authoredPositions === null ? algorithmicView : positionedStrategy(authoredPositions);
 }
 
 export const createApp = ({ space, spaceSession }: OpenedSpace, { acceptRemote }: AppActions) => {
@@ -123,24 +133,33 @@ export const createApp = ({ space, spaceSession }: OpenedSpace, { acceptRemote }
       () => buildLayoutGraph(visibleCardIds, visibleHandles, visibleEdges, CARD_SIZE),
       [visibleCardIds, visibleHandles, visibleEdges],
     );
+    const authoredPositions = useEditorStore((s) => s.positions);
+    const renderingStrategy = useMemo(
+      () => strategyForRendering(view.strategy, authoredPositions),
+      [authoredPositions],
+    );
 
     // Re-run the layout whenever the visible graph changes. The result is stored
-    // alongside the graph it was computed from, so a stale result is derived away
-    // during render rather than cleared by a synchronous setState in the effect.
+    // alongside the graph and strategy it was computed from, so a stale result is
+    // derived away during render rather than cleared by synchronous effect state.
     const [layoutResult, setLayoutResult] = useState<{
       graph: LayoutGraph;
+      strategy: LayoutStrategy;
       result: LayoutGraph;
     } | null>(null);
     useEffect(() => {
       let cancelled = false;
-      void view.strategy(graph).then((result) => {
-        if (!cancelled) setLayoutResult({ graph, result });
+      void renderingStrategy(graph).then((result) => {
+        if (!cancelled) setLayoutResult({ graph, strategy: renderingStrategy, result });
       });
       return () => {
         cancelled = true;
       };
-    }, [graph]);
-    const laidOut = layoutResult?.graph === graph ? layoutResult.result : null;
+    }, [graph, renderingStrategy]);
+    const laidOut =
+      layoutResult?.graph === graph && layoutResult.strategy === renderingStrategy
+        ? layoutResult.result
+        : null;
 
     // Selecting a route emphasises it; it never hides the rest of the space.
     const emphasis: RouteEmphasis = activeRouteId ? 'subtle' : 'equal';
@@ -187,13 +206,10 @@ export const createApp = ({ space, spaceSession }: OpenedSpace, { acceptRemote }
     // cache, which is why it goes through the store rather than replacing what the
     // view arranges with.
     //
-    // The result is also installed as the layout result, so the edges get the
-    // routing that belongs to this arrangement back. Both updates land in one
-    // batch, so the sync effect that follows reconciles onto positions the store
-    // has already taken.
+    // Taking the result creates authored positions. Their subscription above
+    // immediately switches subsequent rendering to the positioned strategy.
     const autoArrange = useCallback(() => {
       void view.automatic(graph).then((result) => {
-        setLayoutResult({ graph, result });
         arrange(layoutPositions(result));
       });
     }, [graph, arrange]);
