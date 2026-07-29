@@ -36,10 +36,60 @@ export interface AppActions {
 }
 
 export function strategyForRendering(
-  algorithmicView: LayoutStrategy,
+  automaticStrategy: LayoutStrategy,
   authoredPositions: ReadonlyMap<string, LayoutPoint> | null,
 ): LayoutStrategy {
-  return authoredPositions === null ? algorithmicView : positionedStrategy(authoredPositions);
+  return authoredPositions === null ? automaticStrategy : positionedStrategy(authoredPositions);
+}
+
+export function useLayoutRendering(
+  graph: LayoutGraph,
+  renderingStrategy: LayoutStrategy,
+): { laidOut: LayoutGraph | null; adopt: (result: LayoutGraph) => void } {
+  const [layoutResult, setLayoutResult] = useState<
+    | {
+        graph: LayoutGraph;
+        source: 'computed';
+        strategy: LayoutStrategy;
+        result: LayoutGraph;
+      }
+    | {
+        graph: LayoutGraph;
+        source: 'adopted';
+        result: LayoutGraph;
+      }
+    | null
+  >(null);
+  const adopted = useRef<{ graph: LayoutGraph; result: LayoutGraph } | null>(null);
+
+  useEffect(() => {
+    if (adopted.current?.graph === graph) return;
+    adopted.current = null;
+    let cancelled = false;
+    void renderingStrategy(graph).then((result) => {
+      if (!cancelled) {
+        setLayoutResult({ graph, source: 'computed', strategy: renderingStrategy, result });
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [graph, renderingStrategy]);
+
+  const adopt = useCallback(
+    (result: LayoutGraph) => {
+      adopted.current = { graph, result };
+      setLayoutResult({ graph, source: 'adopted', result });
+    },
+    [graph],
+  );
+
+  const matchesCurrentRendering =
+    layoutResult?.source === 'adopted' || layoutResult?.strategy === renderingStrategy;
+  return {
+    laidOut: layoutResult?.graph === graph && matchesCurrentRendering ? layoutResult.result : null,
+    adopt,
+  };
 }
 
 export const createApp = ({ space, spaceSession }: OpenedSpace, { acceptRemote }: AppActions) => {
@@ -139,27 +189,7 @@ export const createApp = ({ space, spaceSession }: OpenedSpace, { acceptRemote }
       [authoredPositions],
     );
 
-    // Re-run the layout whenever the visible graph changes. The result is stored
-    // alongside the graph and strategy it was computed from, so a stale result is
-    // derived away during render rather than cleared by synchronous effect state.
-    const [layoutResult, setLayoutResult] = useState<{
-      graph: LayoutGraph;
-      strategy: LayoutStrategy;
-      result: LayoutGraph;
-    } | null>(null);
-    useEffect(() => {
-      let cancelled = false;
-      void renderingStrategy(graph).then((result) => {
-        if (!cancelled) setLayoutResult({ graph, strategy: renderingStrategy, result });
-      });
-      return () => {
-        cancelled = true;
-      };
-    }, [graph, renderingStrategy]);
-    const laidOut =
-      layoutResult?.graph === graph && layoutResult.strategy === renderingStrategy
-        ? layoutResult.result
-        : null;
+    const { laidOut, adopt: adoptLayoutResult } = useLayoutRendering(graph, renderingStrategy);
 
     // Selecting a route emphasises it; it never hides the rest of the space.
     const emphasis: RouteEmphasis = activeRouteId ? 'subtle' : 'equal';
@@ -206,13 +236,15 @@ export const createApp = ({ space, spaceSession }: OpenedSpace, { acceptRemote }
     // cache, which is why it goes through the store rather than replacing what the
     // view arranges with.
     //
-    // Taking the result creates authored positions. Their subscription above
-    // immediately switches subsequent rendering to the positioned strategy.
+    // Keep this result's routed geometry while this exact graph remains visible.
+    // Taking its positions authors the Layout, so any later graph identity renders
+    // through the positioned strategy instead of re-running the former View.
     const autoArrange = useCallback(() => {
       void view.automatic(graph).then((result) => {
+        adoptLayoutResult(result);
         arrange(layoutPositions(result));
       });
-    }, [graph, arrange]);
+    }, [graph, arrange, adoptLayoutResult]);
 
     // A completed edit prepares one complete snapshot. Preparation narrows nullable
     // authored placement before the local watermark advances; an invariant failure
