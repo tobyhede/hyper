@@ -62,14 +62,14 @@ export const createApp = ({ space, spaceSession }: OpenedSpace, { acceptRemote }
   const allHandles = buildCardHandles(space);
   const allRouteEdges = buildRouteEdges(space);
 
-  // Owns React Flow's node array and the Layout being edited. A space that
-  // declared no Layout gets one from the first resolved layout (ADR 0017), so this
-  // store is where placement lives from that moment on.
+  // Owns React Flow's node array and the placement an edit writes. For a space
+  // with no Layout, the first resolved arrangement supplies the positions copied
+  // when an edit converts it (ADR 0025).
   const useEditorStore = createEditorStore();
 
   // Which Layout an edit writes to. An existing one keeps its authored id and
-  // title; a Layout the app created on open (ADR 0017) takes a minted id, because
-  // no author was there to type one.
+  // title; converting an automatic arrangement mints both because no author was
+  // there to type them (ADR 0025).
   const persistLayoutId = view.layout?.id ?? crypto.randomUUID();
   const persistLayoutTitle = view.layout?.title ?? 'Layout';
 
@@ -301,9 +301,9 @@ export const createApp = ({ space, spaceSession }: OpenedSpace, { acceptRemote }
             />
           </>
         )}
-        {/* Disabled until the layout resolves, which is also when there is a
-          Layout to arrange (ADR 0017) — the same one-frame window `editable`
-          gates dragging on. */}
+        {/* Disabled until the arrangement resolves, which is also when there are
+          positions for conversion (ADR 0025) — the same one-frame window
+          `editable` gates dragging on. */}
         <Button
           variant="secondary"
           data-testid="auto-arrange-button"

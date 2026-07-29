@@ -42,7 +42,7 @@ describe('editor store', () => {
     expect(store.getState().positions.size).toBe(0);
   });
 
-  it('takes the first resolved layout as the Layout (ADR 0017)', () => {
+  it('stages the first resolved arrangement for conversion (ADR 0025)', () => {
     const store = createEditorStore();
     store.getState().syncNodes(PROJECTED);
 
@@ -58,7 +58,7 @@ describe('editor store', () => {
       x: 300,
       y: 20,
     });
-    // Created on open, before any gesture — nothing has moved yet.
+    // Staged before any gesture — nothing has moved or been edited yet.
     expect(store.getState().moved).toBe(false);
   });
 
@@ -252,9 +252,9 @@ describe('editor store', () => {
     expect(store.getState().moved).toBe(false);
   });
 
-  it('counts a real edit but not the creation sync (the unsaved signal)', () => {
-    // `revision` is what makes a space unsaved. It must stay 0 through creation
-    // — a load is not an edit — and tick on a moving drag.
+  it('counts a real edit but not the initial arrangement sync', () => {
+    // `revision` triggers persistence. It must stay 0 through the initial sync —
+    // a load is not an edit — and tick on a moving drag.
     const store = createEditorStore();
     store.getState().syncNodes(PROJECTED);
     expect(store.getState().revision).toBe(0);

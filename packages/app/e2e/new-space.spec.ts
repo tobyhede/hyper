@@ -32,7 +32,9 @@ test('offers no route controls, having no routes (ADR 0015)', async ({ page }) =
   await expect(page.getByTestId('route-legend')).toHaveCount(0);
 });
 
-test('its one card is draggable from the first frame (ADR 0017)', async ({ page }) => {
+test('its one card is draggable once its automatic arrangement resolves (ADR 0025)', async ({
+  page,
+}) => {
   await page.goto('/');
 
   const card = nodeByTitle(page, 'Start here');

@@ -25,7 +25,7 @@ export interface EditorState {
   /**
    * React Flow's node array, or `null` before the first layout resolves. Until
    * then there is nothing worth owning — every projected card sits at the origin
-   * — and a space is correspondingly not editable for that frame (ADR 0017).
+   * — and a space is correspondingly not editable for that frame.
    */
   nodes: CardFlowNode[] | null;
   /** The active Layout's placement map: card id → where the author put it. */
@@ -39,8 +39,8 @@ export interface EditorState {
   moved: boolean;
   /**
    * Counts real edits — a settled drag that changed a position, or an arrange.
-   * The creation sync does not touch it, so it is the signal that distinguishes
-   * "the author moved something" from "the layout just resolved".
+   * The initial arrangement sync does not touch it, so it is the signal that
+   * distinguishes "the author moved something" from "the layout just resolved".
    */
   revision: number;
   /** Fold a freshly projected node list into the live one. */
@@ -100,9 +100,9 @@ export function createEditorStore(): EditorStore {
     syncNodes: (projected) =>
       set((state) => {
         if (state.nodes === null) {
-          // First resolved layout. Its positions become the Layout a space that
-          // carried none now has (ADR 0017) — created on open, before any
-          // gesture, so no edit is ever what brings it into being.
+          // First resolved arrangement. Its positions are the source copied when
+          // an edit converts a space that carried no Layout (ADR 0025). This sync
+          // does not tick the revision, so opening alone remains unedited.
           const nodes = [...projected];
           return { nodes, positions: positionsOf(nodes) };
         }

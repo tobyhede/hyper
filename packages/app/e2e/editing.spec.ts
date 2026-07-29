@@ -4,9 +4,9 @@ import { allPositions, dragBy, nodeByTitle, positionOf, settled } from './graph'
 /**
  * Dragging a card writes its placement into the Layout.
  *
- * The fixture declares no Layout, so it gets one from its first resolved layout
- * (ADR 0017) and is editable on open. What this asserts is the point of the
- * whole pivot: a card goes where you put it and *nothing else moves*. Three
+ * The fixture declares no Layout, so its first edit converts the resolved
+ * automatic arrangement into one (ADR 0025). What this asserts is the point of
+ * the whole pivot: a card goes where you put it and *nothing else moves*. Three
  * spike increments failed exactly here — a global optimiser reshuffled the rest
  * of the graph on every edit, so a drop landed somewhere arbitrary.
  */
@@ -16,8 +16,8 @@ test('a dragged card stays where it is dropped, and nothing else moves', async (
   const a = nodeByTitle(page, 'A').first();
   await expect(a).toBeVisible();
 
-  // Wait for the layout to resolve — before it does, the space is not editable
-  // and every card sits at the origin (ADR 0017).
+  // Wait for the arrangement to resolve — before it does, the space is not yet
+  // draggable and every card sits at the origin.
   await expect(page.locator('.react-flow__edge-path').first()).toHaveAttribute('d', /L/);
 
   await settled(page);
