@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { importSpaceSchema, spaceSnapshotSchema } from '../src/index';
+import { importSpaceFileSchema, importSpaceSchema, spaceSnapshotSchema } from '../src/index';
 
 const SPACE_ID = '00000000-0000-4000-8000-000000000001';
 const CARD_A = '00000000-0000-4000-8000-000000000002';
@@ -30,6 +30,35 @@ const identified = {
 };
 
 describe('import space schema', () => {
+  it('keeps references UUID-only when import entity ids are absent', () => {
+    const parsed = importSpaceFileSchema.parse({
+      version: 2,
+      title: 'Import input',
+      routes: [
+        {
+          title: 'Generated route',
+          edges: [{ from: CARD_A, to: CARD_B }],
+        },
+      ],
+      layouts: [
+        {
+          title: 'Generated layout',
+          positions: { [CARD_A]: { x: 0, y: 0 } },
+        },
+      ],
+    });
+
+    expect(parsed.id).toBeUndefined();
+    expect(parsed.routes[0]?.id).toBeUndefined();
+    expect(parsed.layouts?.[0]?.id).toBeUndefined();
+    expect(
+      importSpaceFileSchema.safeParse({
+        ...parsed,
+        routes: [{ ...parsed.routes[0], edges: [{ from: 'card-a', to: CARD_B }] }],
+      }).success,
+    ).toBe(false);
+  });
+
   it('allows only entity ids to be absent before identity resolution', () => {
     const input = {
       document: {

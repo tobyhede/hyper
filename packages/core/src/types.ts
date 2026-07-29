@@ -3,6 +3,7 @@ import type {
   cardFrontmatterSchema,
   cardDocumentSchema,
   cardSchema,
+  importSpaceFileSchema,
   importSpaceSchema,
   layoutPositionSchema,
   layoutSchema,
@@ -22,6 +23,8 @@ export type UUID = z.infer<typeof uuidSchema>;
 export type CardDocument = z.infer<typeof cardDocumentSchema>;
 export type SpaceDocument = z.infer<typeof spaceDocumentSchema>;
 export type SpaceSnapshot = z.infer<typeof spaceSnapshotSchema>;
+export type ImportCard = z.infer<typeof importSpaceSchema>['cards'][number];
+export type ImportSpaceFile = z.infer<typeof importSpaceFileSchema>;
 export type ImportSpace = z.infer<typeof importSpaceSchema>;
 
 /**

@@ -1,4 +1,10 @@
-import { cardFrontmatterSchema, cardSchema, type Card } from '@project/core';
+import {
+  cardFrontmatterSchema,
+  cardSchema,
+  importCardFrontmatterSchema,
+  type Card,
+  type ImportCard,
+} from '@project/core';
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
 import { splitFrontmatter } from './frontmatter';
 
@@ -19,6 +25,23 @@ export interface CardFileError {
 }
 
 export type ParseCardFileResult = { ok: true; card: Card } | { ok: false; errors: CardFileError[] };
+export type ParseImportCardFileResult =
+  { ok: true; card: ImportCard } | { ok: false; errors: CardFileError[] };
+
+type CardFileFailure = { ok: false; errors: CardFileError[] };
+type Frontmatter = { kind: 'markdown' } | { kind: 'alias' };
+type DecodedCandidate<T extends Frontmatter> = T extends { kind: 'markdown' }
+  ? T & { body: string }
+  : T;
+
+interface FrontmatterSchema<T extends Frontmatter> {
+  safeParse(value: unknown):
+    | { success: true; data: T }
+    | {
+        success: false;
+        error: { issues: { path: PropertyKey[]; message: string }[] };
+      };
+}
 
 const FENCE = '---\n';
 
@@ -29,7 +52,40 @@ const FENCE = '---\n';
  * `./frontmatter`; schema validation and domain construction stay here.
  */
 export function parseCardFile(file: CardFile): ParseCardFileResult {
-  const fail = (kind: CardFileErrorKind, message: string): ParseCardFileResult => ({
+  const decoded = decodeCardFile(file, cardFrontmatterSchema);
+  if (!decoded.ok) return decoded;
+
+  const card = cardSchema.safeParse(decoded.candidate);
+  if (!card.success) {
+    return {
+      ok: false,
+      errors: card.error.issues.map((issue) => ({
+        kind: 'invalid-frontmatter',
+        path: file.path,
+        message: `${file.path}: ${issue.path.join('.') || '(card)'}: ${issue.message}`,
+      })),
+    };
+  }
+
+  return { ok: true, card: card.data };
+}
+
+export function parseImportCardFile(file: CardFile): ParseImportCardFileResult {
+  const decoded = decodeCardFile(file, importCardFrontmatterSchema);
+  if (!decoded.ok) return decoded;
+
+  const { id, ...document } = decoded.candidate;
+  return {
+    ok: true,
+    card: { ...(id === undefined ? {} : { id }), document },
+  };
+}
+
+function decodeCardFile<T extends Frontmatter>(
+  file: CardFile,
+  schema: FrontmatterSchema<T>,
+): { ok: true; candidate: DecodedCandidate<T> } | CardFileFailure {
+  const fail = (kind: CardFileErrorKind, message: string): CardFileFailure => ({
     ok: false,
     errors: [{ kind, path: file.path, message: `${file.path}: ${message}` }],
   });
@@ -49,7 +105,7 @@ export function parseCardFile(file: CardFile): ParseCardFileResult {
     return fail('invalid-yaml', `frontmatter is not valid YAML — ${describe(error)}`);
   }
 
-  const parsed = cardFrontmatterSchema.safeParse(yaml);
+  const parsed = schema.safeParse(yaml);
   if (!parsed.success) {
     return {
       ok: false,
@@ -71,19 +127,7 @@ export function parseCardFile(file: CardFile): ParseCardFileResult {
 
   const candidate =
     parsed.data.kind === 'markdown' ? { ...parsed.data, body: split.body } : parsed.data;
-  const card = cardSchema.safeParse(candidate);
-  if (!card.success) {
-    return {
-      ok: false,
-      errors: card.error.issues.map((issue) => ({
-        kind: 'invalid-frontmatter',
-        path: file.path,
-        message: `${file.path}: ${issue.path.join('.') || '(card)'}: ${issue.message}`,
-      })),
-    };
-  }
-
-  return { ok: true, card: card.data };
+  return { ok: true, candidate: candidate as DecodedCandidate<T> };
 }
 
 /**

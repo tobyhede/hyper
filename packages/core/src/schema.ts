@@ -55,6 +55,11 @@ export const aliasCardFrontmatterSchema = z.object({
   target: idSchema,
 });
 
+const defaultMarkdownKind = (value: unknown): unknown =>
+  typeof value === 'object' && value !== null && !Array.isArray(value) && !('kind' in value)
+    ? { ...value, kind: 'markdown' }
+    : value;
+
 /**
  * What a card file's frontmatter must contain (ADR 0020). A card's identity
  * lives here and never in its filename, so renaming the file is not an identity
@@ -62,11 +67,22 @@ export const aliasCardFrontmatterSchema = z.object({
  * the common card declares an id and a title and nothing else.
  */
 export const cardFrontmatterSchema = z.preprocess(
-  (value) =>
-    typeof value === 'object' && value !== null && !Array.isArray(value) && !('kind' in value)
-      ? { ...value, kind: 'markdown' }
-      : value,
+  defaultMarkdownKind,
   z.discriminatedUnion('kind', [markdownCardFrontmatterSchema, aliasCardFrontmatterSchema]),
+);
+
+export const importMarkdownCardFrontmatterSchema = markdownCardFrontmatterSchema.extend({
+  id: uuidSchema.optional(),
+});
+export const importAliasCardFrontmatterSchema = aliasCardFrontmatterSchema.extend({
+  id: uuidSchema.optional(),
+});
+export const importCardFrontmatterSchema = z.preprocess(
+  defaultMarkdownKind,
+  z.discriminatedUnion('kind', [
+    importMarkdownCardFrontmatterSchema,
+    importAliasCardFrontmatterSchema,
+  ]),
 );
 
 /** A card written directly by the author; the body of its file is its content. */
@@ -251,15 +267,18 @@ const importLayoutSchema = z.preprocess(
   z.discriminatedUnion('kind', [importPositionedLayoutSchema]),
 );
 
+export const importSpaceFileSchema = spaceFileSchema.extend({
+  id: uuidSchema.optional(),
+  routes: z.array(importRouteSchema),
+  layouts: z.array(importLayoutSchema).optional(),
+});
+
 /**
  * The only shape in which entity ids may be absent. References remain UUIDs:
  * identity allocation precedes normal domain validation during import.
  */
 export const importSpaceSchema = z.object({
   id: uuidSchema.optional(),
-  document: spaceDocumentSchema.extend({
-    routes: z.array(importRouteSchema),
-    layouts: z.array(importLayoutSchema).optional(),
-  }),
+  document: importSpaceFileSchema.omit({ id: true }),
   cards: z.array(z.object({ id: uuidSchema.optional(), document: cardDocumentSchema })),
 });
