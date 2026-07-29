@@ -1,19 +1,19 @@
 import { describe, expect, it } from 'vitest';
 import { getCard, getLayout, getRoute, loadSpace } from '../src/index';
-import { cardFile } from './card-files';
+import { cardFile, uuid } from './card-files';
 
 const validInput = {
   version: 2,
-  id: '00000000-0000-4000-8000-000000000001',
+  id: uuid('00000000-0000-4000-8000-000000000001'),
   title: 'Test space',
   routes: [
     {
-      id: '00000000-0000-4000-8000-000000000004',
+      id: uuid('00000000-0000-4000-8000-000000000004'),
       title: 'Main',
       edges: [
         {
-          from: '00000000-0000-4000-8000-000000000002',
-          to: '00000000-0000-4000-8000-000000000003',
+          from: uuid('00000000-0000-4000-8000-000000000002'),
+          to: uuid('00000000-0000-4000-8000-000000000003'),
         },
       ],
     },
@@ -21,15 +21,15 @@ const validInput = {
 };
 
 const validCards = [
-  cardFile('00000000-0000-4000-8000-000000000002', 'A', 'Body of A.\n'),
-  cardFile('00000000-0000-4000-8000-000000000003', 'B', 'Body of B.\n'),
+  cardFile(uuid('00000000-0000-4000-8000-000000000002'), 'A', 'Body of A.\n'),
+  cardFile(uuid('00000000-0000-4000-8000-000000000003'), 'B', 'Body of B.\n'),
 ];
 
 describe('loadSpace', () => {
   it('carries the space id through to the Space', () => {
     const result = loadSpace(validInput, validCards);
     expect(result.ok).toBe(true);
-    if (result.ok) expect(result.space.id).toBe('00000000-0000-4000-8000-000000000001');
+    if (result.ok) expect(result.space.id).toBe(uuid('00000000-0000-4000-8000-000000000001'));
   });
 
   it('turns valid input into a Space', () => {
@@ -44,8 +44,8 @@ describe('loadSpace', () => {
   it('builds each card from its file, body included', () => {
     const result = loadSpace(validInput, validCards);
     if (!result.ok) throw new Error('expected a valid space');
-    expect(getCard(result.space, '00000000-0000-4000-8000-000000000002')).toEqual({
-      id: '00000000-0000-4000-8000-000000000002',
+    expect(getCard(result.space, uuid('00000000-0000-4000-8000-000000000002'))).toEqual({
+      id: uuid('00000000-0000-4000-8000-000000000002'),
       title: 'A',
       kind: 'markdown',
       body: 'Body of A.\n',
@@ -54,7 +54,7 @@ describe('loadSpace', () => {
 
   it('rejects an alias file with a body, because its content comes from its target', () => {
     const result = loadSpace({ ...validInput, routes: [] }, [
-      cardFile('00000000-0000-4000-8000-000000000002', 'A', 'The source.\n'),
+      cardFile(uuid('00000000-0000-4000-8000-000000000002'), 'A', 'The source.\n'),
       {
         path: 'cards/a-again.md',
         text: '---\nid: 00000000-0000-4000-8000-000000000007\ntitle: A again\nkind: alias\ntarget: 00000000-0000-4000-8000-000000000002\n---\n\nThis would be discarded.\n',
@@ -70,9 +70,9 @@ describe('loadSpace', () => {
 
   it('orders cards by title, whatever order the files arrived in', () => {
     const result = loadSpace({ ...validInput, routes: [] }, [
-      cardFile('00000000-0000-4000-8000-000000000005', 'Carla'),
-      cardFile('00000000-0000-4000-8000-000000000002', 'Anders'),
-      cardFile('00000000-0000-4000-8000-000000000003', 'Bo'),
+      cardFile(uuid('00000000-0000-4000-8000-000000000005'), 'Carla'),
+      cardFile(uuid('00000000-0000-4000-8000-000000000002'), 'Anders'),
+      cardFile(uuid('00000000-0000-4000-8000-000000000003'), 'Bo'),
     ]);
     if (!result.ok) throw new Error('expected a valid space');
     expect(result.space.cards.map((c) => c.title)).toEqual(['Anders', 'Bo', 'Carla']);
@@ -115,7 +115,7 @@ describe('loadSpace', () => {
     if (!result.ok) return;
     expect(result.space.routes).toEqual([]);
     expect(result.space.cards).toHaveLength(2);
-    expect(getCard(result.space, '00000000-0000-4000-8000-000000000002')?.title).toBe('A');
+    expect(getCard(result.space, uuid('00000000-0000-4000-8000-000000000002'))?.title).toBe('A');
   });
 
   it('reports a bad shape as errors rather than throwing', () => {
@@ -132,12 +132,12 @@ describe('loadSpace', () => {
         ...validInput,
         routes: [
           {
-            id: '00000000-0000-4000-8000-000000000004',
+            id: uuid('00000000-0000-4000-8000-000000000004'),
             title: 'Main',
             edges: [
               {
-                from: '00000000-0000-4000-8000-000000000002',
-                to: '00000000-0000-4000-8000-000000000099',
+                from: uuid('00000000-0000-4000-8000-000000000002'),
+                to: uuid('00000000-0000-4000-8000-000000000099'),
               },
             ],
           },
@@ -150,7 +150,8 @@ describe('loadSpace', () => {
     expect(
       result.errors.some(
         (e) =>
-          e.kind === 'unresolved-route-edge' && e.ref === '00000000-0000-4000-8000-000000000099',
+          e.kind === 'unresolved-route-edge' &&
+          e.ref === uuid('00000000-0000-4000-8000-000000000099'),
       ),
     ).toBe(true);
   });
@@ -158,21 +159,23 @@ describe('loadSpace', () => {
   it('indexes the Space so lookups resolve by id', () => {
     const result = loadSpace(validInput, validCards);
     if (!result.ok) throw new Error('expected a valid space');
-    expect(getCard(result.space, '00000000-0000-4000-8000-000000000002')?.title).toBe('A');
-    expect(getCard(result.space, 'missing')).toBeUndefined();
-    expect(getRoute(result.space, '00000000-0000-4000-8000-000000000004')?.title).toBe('Main');
-    expect(getRoute(result.space, 'missing')).toBeUndefined();
+    expect(getCard(result.space, uuid('00000000-0000-4000-8000-000000000002'))?.title).toBe('A');
+    expect(getCard(result.space, uuid('00000000-0000-4000-8000-000000000098'))).toBeUndefined();
+    expect(getRoute(result.space, uuid('00000000-0000-4000-8000-000000000004'))?.title).toBe(
+      'Main',
+    );
+    expect(getRoute(result.space, uuid('00000000-0000-4000-8000-000000000099'))).toBeUndefined();
   });
 });
 
 describe('loadSpace: layouts', () => {
   const working = {
-    id: '00000000-0000-4000-8000-000000000022',
+    id: uuid('00000000-0000-4000-8000-000000000022'),
     title: 'Working',
     kind: 'positioned',
     positions: {
-      '00000000-0000-4000-8000-000000000002': { x: 0, y: 0 },
-      '00000000-0000-4000-8000-000000000003': { x: 320, y: 0 },
+      [uuid('00000000-0000-4000-8000-000000000002')]: { x: 0, y: 0 },
+      [uuid('00000000-0000-4000-8000-000000000003')]: { x: 320, y: 0 },
     },
   };
 
@@ -185,24 +188,28 @@ describe('loadSpace: layouts', () => {
 
   it('carries and indexes the layouts it was given', () => {
     const result = loadSpace(
-      { ...validInput, layouts: [working], defaultView: '00000000-0000-4000-8000-000000000022' },
+      {
+        ...validInput,
+        layouts: [working],
+        defaultView: uuid('00000000-0000-4000-8000-000000000022'),
+      },
       validCards,
     );
     if (!result.ok) throw new Error('expected a valid space');
     expect(result.space.layouts).toHaveLength(1);
-    expect(result.space.defaultView).toBe('00000000-0000-4000-8000-000000000022');
+    expect(result.space.defaultView).toBe(uuid('00000000-0000-4000-8000-000000000022'));
     expect(
-      getLayout(result.space, '00000000-0000-4000-8000-000000000022')?.positions[
-        '00000000-0000-4000-8000-000000000003'
+      getLayout(result.space, uuid('00000000-0000-4000-8000-000000000022'))?.positions[
+        uuid('00000000-0000-4000-8000-000000000003')
       ],
     ).toEqual({ x: 320, y: 0 });
-    expect(getLayout(result.space, 'missing')).toBeUndefined();
+    expect(getLayout(result.space, uuid('00000000-0000-4000-8000-000000000099'))).toBeUndefined();
   });
 
   it('resolves a built-in view name to no declared layout', () => {
     const result = loadSpace({ ...validInput, defaultView: 'graph' }, validCards);
     if (!result.ok) throw new Error('expected a valid space');
-    expect(getLayout(result.space, 'graph')).toBeUndefined();
+    expect(result.space.layouts).toEqual([]);
   });
 
   it('rejects a layout positioning a card that does not exist', () => {
@@ -214,7 +221,7 @@ describe('loadSpace: layouts', () => {
             ...working,
             positions: {
               ...working.positions,
-              '00000000-0000-4000-8000-000000000099': { x: 1, y: 1 },
+              [uuid('00000000-0000-4000-8000-000000000099')]: { x: 1, y: 1 },
             },
           },
         ],
@@ -227,14 +234,18 @@ describe('loadSpace: layouts', () => {
       result.errors.some(
         (e) =>
           e.kind === 'layout-position-unknown-card' &&
-          e.ref === '00000000-0000-4000-8000-000000000099',
+          e.ref === uuid('00000000-0000-4000-8000-000000000099'),
       ),
     ).toBe(true);
   });
 
   it('rejects a defaultView that names nothing', () => {
     const result = loadSpace(
-      { ...validInput, layouts: [working], defaultView: '00000000-0000-4000-8000-000000000098' },
+      {
+        ...validInput,
+        layouts: [working],
+        defaultView: uuid('00000000-0000-4000-8000-000000000098'),
+      },
       validCards,
     );
     expect(result.ok).toBe(false);
@@ -242,7 +253,8 @@ describe('loadSpace: layouts', () => {
     expect(
       result.errors.some(
         (e) =>
-          e.kind === 'unresolved-default-view' && e.ref === '00000000-0000-4000-8000-000000000098',
+          e.kind === 'unresolved-default-view' &&
+          e.ref === uuid('00000000-0000-4000-8000-000000000098'),
       ),
     ).toBe(true);
   });

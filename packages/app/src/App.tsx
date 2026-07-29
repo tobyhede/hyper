@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { ReactFlowProvider } from '@xyflow/react';
 import { AppShell, Button, RouteLegend, RouteSelector } from '@project/ui';
+import { uuidSchema, type CardId } from '@project/core';
 import {
   projectCardNodes,
   projectRouteEdges,
@@ -14,7 +15,6 @@ import {
   getCard,
   layoutPositions,
   resolveContentCard,
-  type CardHandleSet,
   type LayoutGraph,
 } from '@project/graph';
 import type { OpenedSpace } from './space';
@@ -56,7 +56,7 @@ export const createApp = ({ space, spaceSession }: OpenedSpace, { acceptRemote }
 
   // The markdown a card shows, resolving an alias to its target's body (ADR 0009).
   // A card keeps its own title; only content is inherited.
-  function markdownForCard(cardId: string): string {
+  function markdownForCard(cardId: CardId): string {
     return resolveContentCard(space, cardId)?.body ?? '';
   }
   const allHandles = buildCardHandles(space);
@@ -70,7 +70,7 @@ export const createApp = ({ space, spaceSession }: OpenedSpace, { acceptRemote }
   // Which Layout an edit writes to. An existing one keeps its authored id and
   // title; converting an automatic arrangement mints both because no author was
   // there to type them (ADR 0025).
-  const persistLayoutId = view.layout?.id ?? crypto.randomUUID();
+  const persistLayoutId = view.layout?.id ?? uuidSchema.parse(crypto.randomUUID());
   const persistLayoutTitle = view.layout?.title ?? 'Layout';
 
   function App() {
@@ -102,19 +102,20 @@ export const createApp = ({ space, spaceSession }: OpenedSpace, { acceptRemote }
     // arrives from `resolveView` rather than being decided in the graph or layout
     // packages.
     const visibleRouteIds = view.visibleRouteIds;
+    const visibleRouteIdSet = useMemo(() => new Set(visibleRouteIds), [visibleRouteIds]);
 
     // Every card, not just the route-visited ones. A space may have cards and no
     // routes at all (ADR 0015) — deriving the card set from the routes would render
     // a new space as an empty canvas, which is the one thing it must not do. Which
     // cards a view draws was always the View's call, not the layout's (ADR 0005).
     const visibleCardIds = useMemo(() => space.cards.map((c) => c.id), []);
-    const visibleHandles = useMemo<ReadonlyMap<string, CardHandleSet>>(
+    const visibleHandles = useMemo(
       () => filterHandlesByRoutes(allHandles, visibleRouteIds),
       [visibleRouteIds],
     );
     const visibleEdges = useMemo(
-      () => allRouteEdges.filter((edge) => visibleRouteIds.includes(edge.routeId)),
-      [visibleRouteIds],
+      () => allRouteEdges.filter((edge) => visibleRouteIdSet.has(edge.routeId)),
+      [visibleRouteIdSet],
     );
 
     const graph = useMemo(
@@ -292,7 +293,7 @@ export const createApp = ({ space, spaceSession }: OpenedSpace, { acceptRemote }
             <RouteSelector
               routes={visibleRoutes}
               activeRouteId={activeRouteId}
-              onActivate={activateRoute}
+              onActivate={(routeId) => activateRoute(uuidSchema.parse(routeId))}
             />
             <RouteLegend
               routes={visibleRoutes}
@@ -371,7 +372,7 @@ export const createApp = ({ space, spaceSession }: OpenedSpace, { acceptRemote }
               presenting={presenting}
               editable={editable}
               onNodesChange={changeNodes}
-              onOpenCard={openCard}
+              onOpenCard={(cardId) => openCard(uuidSchema.parse(cardId))}
             />
           </ReactFlowProvider>
 

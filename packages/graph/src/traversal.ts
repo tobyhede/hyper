@@ -1,4 +1,4 @@
-import type { Route, RouteEdge } from '@project/core';
+import type { CardId, Route, RouteEdge } from '@project/core';
 
 /**
  * Reading a route as something to walk (ADR 0024, 0027).
@@ -14,12 +14,12 @@ import type { Route, RouteEdge } from '@project/core';
  */
 
 /** The edges leaving a card, in the order the author wrote them. A card's moves. */
-export function outgoingEdges(route: Route, cardId: string): RouteEdge[] {
+export function outgoingEdges(route: Route, cardId: CardId): RouteEdge[] {
   return route.edges.filter((edge) => edge.from === cardId);
 }
 
 /** The edges arriving at a card. */
-export function incomingEdges(route: Route, cardId: string): RouteEdge[] {
+export function incomingEdges(route: Route, cardId: CardId): RouteEdge[] {
   return route.edges.filter((edge) => edge.to === cardId);
 }
 
@@ -32,9 +32,9 @@ export function incomingEdges(route: Route, cardId: string): RouteEdge[] {
  * There may be several: a route need not be connected, and nothing requires a
  * single entry.
  */
-export function routeEntryCards(route: Route): string[] {
+export function routeEntryCards(route: Route): CardId[] {
   const arrivedAt = new Set(route.edges.map((edge) => edge.to));
-  const entries: string[] = [];
+  const entries: CardId[] = [];
   for (const edge of route.edges) {
     if (!arrivedAt.has(edge.from) && !entries.includes(edge.from)) entries.push(edge.from);
   }
@@ -49,6 +49,6 @@ export function routeEntryCards(route: Route): string[] {
  * ADR 0026's "absent an `activeRoute`, the first visible route". If a route ever
  * wants to name its own start, that is a field on the route and a change here.
  */
-export function routeStartCard(route: Route): string | undefined {
+export function routeStartCard(route: Route): CardId | undefined {
   return routeEntryCards(route)[0];
 }

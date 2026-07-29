@@ -1,6 +1,6 @@
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
-import type { Card } from '@project/core';
+import { uuidSchema, type Card } from '@project/core';
 import { parseCardFile, serializeCardFile } from '../src/index';
 
 /**
@@ -31,7 +31,7 @@ const bodyArb = fc
 const cardArb: fc.Arbitrary<Card> = fc.oneof(
   fc.record(
     {
-      id: fc.uuid({ version: 4 }),
+      id: fc.uuid({ version: 4 }).map((value) => uuidSchema.parse(value)),
       title: line,
       description: fc.option(line, { nil: undefined }),
       kind: fc.constant('markdown' as const),
@@ -40,10 +40,10 @@ const cardArb: fc.Arbitrary<Card> = fc.oneof(
     { requiredKeys: ['id', 'title', 'kind', 'body'] },
   ),
   fc.record({
-    id: fc.uuid({ version: 4 }),
+    id: fc.uuid({ version: 4 }).map((value) => uuidSchema.parse(value)),
     title: line,
     kind: fc.constant('alias' as const),
-    target: fc.uuid({ version: 4 }),
+    target: fc.uuid({ version: 4 }).map((value) => uuidSchema.parse(value)),
   }),
 );
 

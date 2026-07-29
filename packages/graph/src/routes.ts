@@ -1,3 +1,4 @@
+import type { CardId, RouteId } from '@project/core';
 import type { Space } from './space';
 
 /**
@@ -19,7 +20,7 @@ import type { Space } from './space';
 export interface RouteHandleRef {
   /** Handle id, also used as the ELK port id. */
   id: string;
-  routeId: string;
+  routeId: RouteId;
 }
 
 export interface CardHandleSet {
@@ -38,20 +39,20 @@ export interface CardHandleSet {
  */
 export interface GraphEdge {
   id: string;
-  routeId: string;
-  source: string;
-  target: string;
+  routeId: RouteId;
+  source: CardId;
+  target: CardId;
   sourceHandle: string;
   targetHandle: string;
 }
 
-export const outHandleId = (routeId: string): string => `${routeId}::out`;
-export const inHandleId = (routeId: string): string => `${routeId}::in`;
+export const outHandleId = (routeId: RouteId): string => `${routeId}::out`;
+export const inHandleId = (routeId: RouteId): string => `${routeId}::in`;
 
 /** Map each card id to the in/out ports contributed by the routes through it. */
-export function buildCardHandles(space: Space): Map<string, CardHandleSet> {
-  const map = new Map<string, CardHandleSet>();
-  const ensure = (cardId: string): CardHandleSet => {
+export function buildCardHandles(space: Space): Map<CardId, CardHandleSet> {
+  const map = new Map<CardId, CardHandleSet>();
+  const ensure = (cardId: CardId): CardHandleSet => {
     let set = map.get(cardId);
     if (!set) {
       set = { sourceHandles: [], targetHandles: [] };
@@ -94,10 +95,10 @@ export function buildCardHandles(space: Space): Map<string, CardHandleSet> {
  * A card shared by several routes appears once. Which routes a view shows is the
  * view's decision (ADR 0005); this only answers what cards that implies.
  */
-export function cardIdsForRoutes(space: Space, routeIds: readonly string[]): string[] {
-  const seen = new Set<string>();
-  const ids: string[] = [];
-  const add = (cardId: string): void => {
+export function cardIdsForRoutes(space: Space, routeIds: readonly RouteId[]): CardId[] {
+  const seen = new Set<CardId>();
+  const ids: CardId[] = [];
+  const add = (cardId: CardId): void => {
     if (seen.has(cardId)) return;
     seen.add(cardId);
     ids.push(cardId);
@@ -116,17 +117,17 @@ export function cardIdsForRoutes(space: Space, routeIds: readonly string[]): str
 }
 
 /** The distinct cards a single route touches. See {@link cardIdsForRoutes}. */
-export function routeCardIds(space: Space, routeId: string): string[] {
+export function routeCardIds(space: Space, routeId: RouteId): CardId[] {
   return cardIdsForRoutes(space, [routeId]);
 }
 
 /** Keep only the handles belonging to the given routes. */
 export function filterHandlesByRoutes(
-  handlesByCard: ReadonlyMap<string, CardHandleSet>,
-  routeIds: readonly string[],
-): Map<string, CardHandleSet> {
+  handlesByCard: ReadonlyMap<CardId, CardHandleSet>,
+  routeIds: readonly RouteId[],
+): Map<CardId, CardHandleSet> {
   const wanted = new Set(routeIds);
-  const filtered = new Map<string, CardHandleSet>();
+  const filtered = new Map<CardId, CardHandleSet>();
   for (const [cardId, set] of handlesByCard) {
     const sourceHandles = set.sourceHandles.filter((h) => wanted.has(h.routeId));
     const targetHandles = set.targetHandles.filter((h) => wanted.has(h.routeId));
@@ -139,9 +140,9 @@ export function filterHandlesByRoutes(
 
 /** Keep only the handles belonging to a single route. */
 export function filterHandlesByRoute(
-  handlesByCard: ReadonlyMap<string, CardHandleSet>,
-  routeId: string,
-): Map<string, CardHandleSet> {
+  handlesByCard: ReadonlyMap<CardId, CardHandleSet>,
+  routeId: RouteId,
+): Map<CardId, CardHandleSet> {
   return filterHandlesByRoutes(handlesByCard, [routeId]);
 }
 

@@ -1,4 +1,4 @@
-import type { Card, SpaceFile } from '@project/core';
+import { uuidSchema, type Card, type SpaceFile } from '@project/core';
 import { serializeCardFile, type CardFile } from './card-file';
 
 /**
@@ -27,8 +27,8 @@ export interface NewSpace {
 const FIRST_CARD_TITLE = 'Start here';
 
 export function newSpace(): NewSpace {
-  const spaceId = crypto.randomUUID();
-  const cardId = crypto.randomUUID();
+  const spaceId = uuidSchema.parse(crypto.randomUUID());
+  const cardId = uuidSchema.parse(crypto.randomUUID());
   // No `layouts` and no `defaultView`. A new space's card carries no position,
   // because centering is the view's job — `fitView` frames whatever is on
   // screen, and a position nobody wrote would be authored content nobody wrote.

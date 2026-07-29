@@ -1,4 +1,5 @@
 import type { LayoutOptions } from 'elkjs/lib/elk.bundled.js';
+import type { CardId } from '@project/core';
 
 /**
  * ELK "layered" options for a left→right graph.
@@ -51,5 +52,5 @@ export const PORT_ID_SEPARATOR = '##';
  * endpoint unambiguous. The render layer never sees these; `elkStrategy` strips the
  * prefix back off, so ports keep their bare ids.
  */
-export const elkPortId = (cardId: string, handleId: string): string =>
+export const elkPortId = (cardId: CardId, handleId: string): string =>
   `${cardId}${PORT_ID_SEPARATOR}${handleId}`;

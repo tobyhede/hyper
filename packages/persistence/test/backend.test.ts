@@ -1,13 +1,14 @@
 import { describe, expect, it } from 'vitest';
+import { uuidSchema } from '@project/core';
 import type { LoadedSpace } from '../src/index';
 import { MemorySpaceBackend } from '../src/index';
 
-const SPACE_ID = '00000000-0000-4000-8000-000000000001';
-const CARD_ID = '00000000-0000-4000-8000-000000000002';
-const CARD_B = '00000000-0000-4000-8000-000000000003';
-const ROUTE_ID = '00000000-0000-4000-8000-000000000004';
-const LAYOUT_ID = '00000000-0000-4000-8000-000000000005';
-const MISSING_ID = '00000000-0000-4000-8000-000000000099';
+const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
+const CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
+const CARD_B = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
+const ROUTE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
+const LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
+const MISSING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000099');
 
 const loaded: LoadedSpace = {
   snapshot: {
@@ -54,7 +55,7 @@ describe('MemorySpaceBackend', () => {
     });
 
     const missing = structuredClone(loaded.snapshot);
-    missing.id = '00000000-0000-4000-8000-000000000099';
+    missing.id = MISSING_ID;
     await expect(backend.loadSpace(missing.id)).resolves.toBeUndefined();
     await expect(backend.commitSpace(missing, 0n)).resolves.toEqual({
       kind: 'permanent-failure',

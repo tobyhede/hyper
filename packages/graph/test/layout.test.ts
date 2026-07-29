@@ -7,7 +7,7 @@ import {
   loadSpace,
 } from '../src/index';
 import type { LayoutGraph, Space } from '../src/index';
-import { cardFile } from './card-files';
+import { cardFile, uuid } from './card-files';
 
 function loadFixture(): Space {
   const result = loadSpace(
@@ -50,9 +50,9 @@ describe('buildLayoutGraph', () => {
   it('carries each card’s size and its ports, inbound first', () => {
     const graph = buildLayoutGraph(
       [
-        '00000000-0000-4000-8000-000000000002',
-        '00000000-0000-4000-8000-000000000003',
-        '00000000-0000-4000-8000-000000000005',
+        uuid('00000000-0000-4000-8000-000000000002'),
+        uuid('00000000-0000-4000-8000-000000000003'),
+        uuid('00000000-0000-4000-8000-000000000005'),
       ],
       buildCardHandles(space),
       buildRouteEdges(space),
@@ -71,7 +71,7 @@ describe('buildLayoutGraph', () => {
 
   it('drops edges whose endpoints the view is not showing', () => {
     const graph = buildLayoutGraph(
-      ['00000000-0000-4000-8000-000000000002', '00000000-0000-4000-8000-000000000003'],
+      [uuid('00000000-0000-4000-8000-000000000002'), uuid('00000000-0000-4000-8000-000000000003')],
       buildCardHandles(space),
       buildRouteEdges(space),
       SIZE,
@@ -83,9 +83,9 @@ describe('buildLayoutGraph', () => {
 describe('gridStrategy', () => {
   const graph: LayoutGraph = buildLayoutGraph(
     [
-      '00000000-0000-4000-8000-000000000002',
-      '00000000-0000-4000-8000-000000000003',
-      '00000000-0000-4000-8000-000000000005',
+      uuid('00000000-0000-4000-8000-000000000002'),
+      uuid('00000000-0000-4000-8000-000000000003'),
+      uuid('00000000-0000-4000-8000-000000000005'),
     ],
     buildCardHandles(space),
     buildRouteEdges(space),

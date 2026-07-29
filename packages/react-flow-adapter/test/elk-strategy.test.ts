@@ -2,11 +2,12 @@ import { describe, expect, it } from 'vitest';
 import type { ElkNode } from 'elkjs/lib/elk.bundled.js';
 import type { LayoutGraph } from '@project/graph';
 import { elkStrategy, type ElkEngine } from '../src/index';
+import { uuid } from './uuid';
 
 const graph: LayoutGraph = {
   cards: [
     {
-      id: '00000000-0000-4000-8000-000000000002',
+      id: uuid('00000000-0000-4000-8000-000000000002'),
       width: 150,
       height: 50,
       ports: [
@@ -15,7 +16,7 @@ const graph: LayoutGraph = {
       ],
     },
     {
-      id: '00000000-0000-4000-8000-000000000003',
+      id: uuid('00000000-0000-4000-8000-000000000003'),
       width: 150,
       height: 50,
       ports: [{ id: 'b-t-a', side: 'in' }],
@@ -24,9 +25,9 @@ const graph: LayoutGraph = {
   edges: [
     {
       id: 'a-b',
-      source: '00000000-0000-4000-8000-000000000002',
+      source: uuid('00000000-0000-4000-8000-000000000002'),
       sourceHandle: 'a-s-a',
-      target: '00000000-0000-4000-8000-000000000003',
+      target: uuid('00000000-0000-4000-8000-000000000003'),
       targetHandle: 'b-t-a',
     },
   ],
@@ -127,7 +128,16 @@ describe('routes a back-edge around the cards', () => {
   // may not close a cycle (ADR 0023). The edges below (`… → C → B`, target B laid
   // left of source C) are just the simplest deterministic back-edge; ELK routes
   // it around the cards and issue 03 draws that instead of a bezier stub.
-  const CARDS = ['A', 'B', 'C'];
+  const CARDS = [
+    uuid('00000000-0000-4000-8000-00000000000a'),
+    uuid('00000000-0000-4000-8000-00000000000b'),
+    uuid('00000000-0000-4000-8000-00000000000c'),
+  ];
+  const backConnections = [
+    ['loop::0', CARDS[0]!, CARDS[1]!],
+    ['loop::1', CARDS[1]!, CARDS[2]!],
+    ['loop::2', CARDS[2]!, CARDS[1]!],
+  ] as const;
   const backEdge: LayoutGraph = {
     cards: CARDS.map((id) => ({
       id,
@@ -138,14 +148,10 @@ describe('routes a back-edge around the cards', () => {
         { id: 'loop::out', side: 'out' as const },
       ],
     })),
-    edges: [
-      ['loop::0', 'A', 'B'],
-      ['loop::1', 'B', 'C'],
-      ['loop::2', 'C', 'B'],
-    ].map(([id, source, target]) => ({
-      id: id!,
-      source: source!,
-      target: target!,
+    edges: backConnections.map(([id, source, target]) => ({
+      id,
+      source,
+      target,
       sourceHandle: 'loop::out',
       targetHandle: 'loop::in',
     })),
@@ -166,7 +172,13 @@ describe('port id collision', () => {
   // Every card on a route carries the *same* handle ids (`00000000-0000-4000-8000-000000000004::in`/`00000000-0000-4000-8000-000000000004::out`),
   // so using bare handle ids as ELK port ids left ELK unable to tell which card
   // an edge attached to — collapsing layers even for a single route.
-  const CHAIN = ['A', 'B', 'C', 'D', 'E'];
+  const CHAIN = [
+    uuid('00000000-0000-4000-8000-00000000000a'),
+    uuid('00000000-0000-4000-8000-00000000000b'),
+    uuid('00000000-0000-4000-8000-00000000000c'),
+    uuid('00000000-0000-4000-8000-00000000000d'),
+    uuid('00000000-0000-4000-8000-00000000000e'),
+  ];
 
   const chain: LayoutGraph = {
     cards: CHAIN.map((id, i) => ({
@@ -206,7 +218,7 @@ describe('port id collision', () => {
 
   it('still exposes port offsets under the bare handle id', async () => {
     const laid = await elkStrategy()(chain);
-    const b = laid.cards.find((c) => c.id === 'B')!;
+    const b = laid.cards.find((c) => c.id === CHAIN[1])!;
     expect(
       Number.isFinite(b.ports.find((p) => p.id === '00000000-0000-4000-8000-000000000004::in')!.y),
     ).toBe(true);
@@ -227,39 +239,41 @@ describe('shared cards keep each route on one line', () => {
       '00000000-0000-4000-8000-000000000002',
       '00000000-0000-4000-8000-000000000003',
       '00000000-0000-4000-8000-000000000005',
-    ].map((id, i) => ({
-      id,
-      width: 260,
-      height: 300,
-      ports: [
-        ...(i > 0
-          ? [
-              { id: '00000000-0000-4000-8000-000000000032::in', side: 'in' as const },
-              { id: '00000000-0000-4000-8000-000000000033::in', side: 'in' as const },
-            ]
-          : []),
-        ...(i < 2
-          ? [
-              { id: '00000000-0000-4000-8000-000000000032::out', side: 'out' as const },
-              { id: '00000000-0000-4000-8000-000000000033::out', side: 'out' as const },
-            ]
-          : []),
-      ],
-    })),
-    edges: ['00000000-0000-4000-8000-000000000002', '00000000-0000-4000-8000-000000000003'].flatMap(
-      (src, i) =>
-        ['00000000-0000-4000-8000-000000000032', '00000000-0000-4000-8000-000000000033'].map(
-          (r) => ({
-            id: `${r}::${i}`,
-            source: src,
-            target: [
-              '00000000-0000-4000-8000-000000000003',
-              '00000000-0000-4000-8000-000000000005',
-            ][i]!,
-            sourceHandle: `${r}::out`,
-            targetHandle: `${r}::in`,
-          }),
-        ),
+    ]
+      .map(uuid)
+      .map((id, i) => ({
+        id,
+        width: 260,
+        height: 300,
+        ports: [
+          ...(i > 0
+            ? [
+                { id: '00000000-0000-4000-8000-000000000032::in', side: 'in' as const },
+                { id: '00000000-0000-4000-8000-000000000033::in', side: 'in' as const },
+              ]
+            : []),
+          ...(i < 2
+            ? [
+                { id: '00000000-0000-4000-8000-000000000032::out', side: 'out' as const },
+                { id: '00000000-0000-4000-8000-000000000033::out', side: 'out' as const },
+              ]
+            : []),
+        ],
+      })),
+    edges: [
+      uuid('00000000-0000-4000-8000-000000000002'),
+      uuid('00000000-0000-4000-8000-000000000003'),
+    ].flatMap((src, i) =>
+      ['00000000-0000-4000-8000-000000000032', '00000000-0000-4000-8000-000000000033'].map((r) => ({
+        id: `${r}::${i}`,
+        source: src,
+        target: [
+          uuid('00000000-0000-4000-8000-000000000003'),
+          uuid('00000000-0000-4000-8000-000000000005'),
+        ][i]!,
+        sourceHandle: `${r}::out`,
+        targetHandle: `${r}::in`,
+      })),
     ),
   };
 

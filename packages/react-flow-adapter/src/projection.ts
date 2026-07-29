@@ -1,5 +1,6 @@
 import type { Edge, Node } from '@xyflow/react';
 import { MarkerType } from '@xyflow/react';
+import type { CardId, RouteId } from '@project/core';
 import { resolveContentCard } from '@project/graph';
 import type {
   CardHandleSet,
@@ -36,7 +37,7 @@ export const OTHER_ROUTE_OPACITY: Record<RouteEmphasis, number> = {
  *  the node's top) matching where ELK placed the port. */
 export type CardHandle = {
   id: string;
-  routeId: string;
+  routeId: RouteId;
   color: string;
   offsetY: number;
 };
@@ -45,7 +46,7 @@ export type CardHandle = {
  *  React Flow's `Record<string, unknown>` data constraint, and it includes the
  *  handle arrays the ELK layout needs. */
 export type CardNodeData = {
-  cardId: string;
+  cardId: CardId;
   title: string;
   /** A short caption drawn under the title (ADR 0006). Absent when the card has
    *  none — the card's own, never inherited through an alias. */
@@ -65,7 +66,7 @@ export type CardNodeData = {
    *  (ADR 0006), which is the constraint that made this per-card. */
   body?: string;
   /** The route being emphasised, if any. Drives handle dimming. */
-  activeRouteId: string | null;
+  activeRouteId: RouteId | null;
   emphasis: RouteEmphasis;
   sourceHandles: CardHandle[];
   targetHandles: CardHandle[];
@@ -73,13 +74,13 @@ export type CardNodeData = {
 
 export type CardFlowNode = Node<CardNodeData, 'card'>;
 
-export type ColorByRouteId = Readonly<Record<string, string>>;
+export type ColorByRouteId = Readonly<Partial<Record<RouteId, string>>>;
 
 const EMPTY_HANDLES: CardHandleSet = { sourceHandles: [], targetHandles: [] };
 
 export interface ProjectCardNodesOptions {
   /** Card id the walk has reached, if any, to flag as active. */
-  activeCardId?: string | null;
+  activeCardId?: CardId | null;
   /**
    * Draw the active card's content instead of its title — what presenting does
    * (ADR 0027). Only the active card is affected, so this costs one card's body
@@ -87,14 +88,14 @@ export interface ProjectCardNodesOptions {
    */
   showActiveCardContent?: boolean;
   /** The route to emphasise, if any. */
-  activeRouteId?: string | null;
+  activeRouteId?: RouteId | null;
   emphasis?: RouteEmphasis;
   /** The laid-out graph; positions and port offsets come from here when present. */
   layoutGraph?: LayoutGraph;
   /** Node height used to evenly distribute handles before the layout resolves. */
   nodeHeight?: number;
   /** Restrict the projection to these card ids (e.g. one route's cards). */
-  cardIds?: readonly string[];
+  cardIds?: readonly CardId[];
 }
 
 function resolveHandles(
@@ -127,7 +128,7 @@ function resolveHandles(
  */
 export function projectCardNodes(
   space: Space,
-  handlesByCard: ReadonlyMap<string, CardHandleSet>,
+  handlesByCard: ReadonlyMap<CardId, CardHandleSet>,
   colors: ColorByRouteId,
   options: ProjectCardNodesOptions = {},
 ): CardFlowNode[] {
@@ -185,7 +186,7 @@ export function projectCardNodes(
 
 export interface ProjectRouteEdgesOptions {
   /** The route to emphasise, if any. */
-  activeRouteId?: string | null;
+  activeRouteId?: RouteId | null;
   /** How strongly the other routes recede. */
   emphasis?: RouteEmphasis;
   /** The laid-out graph; ELK's routed edge geometry comes from here when present. */

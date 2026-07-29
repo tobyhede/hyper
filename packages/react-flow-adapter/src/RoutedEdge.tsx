@@ -1,4 +1,5 @@
 import { BaseEdge, getBezierPath, type EdgeProps } from '@xyflow/react';
+import type { RouteId } from '@project/core';
 import type { LayoutPoint } from '@project/graph';
 
 /**
@@ -19,7 +20,7 @@ import type { LayoutPoint } from '@project/graph';
  * we fall back to a bezier between the handles React Flow already knows.
  */
 export type RoutedEdgeData = {
-  routeId: string;
+  routeId: RouteId;
   /** ELK's routed path, start → bends → end. Absent until a routing layout runs. */
   points?: LayoutPoint[];
 };

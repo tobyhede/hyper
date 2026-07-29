@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import type { CardId, RouteId } from '@project/core';
 import {
   buildLayoutGraph,
   gridStrategy,
@@ -10,6 +11,7 @@ import {
   type LayoutStrategy,
 } from '@project/graph';
 import { elkStrategy } from '../src/index';
+import { uuid } from './uuid';
 
 /**
  * The `LayoutStrategy` contract, asserted against every implementation.
@@ -31,7 +33,7 @@ const SIZE = { width: 320, height: 180 };
 
 /** A card with one inbound and one outbound handle, as `buildLayoutGraph` makes
  *  them from a route's edges. */
-const handles = (routeId: string): CardHandleSet => ({
+const handles = (routeId: RouteId): CardHandleSet => ({
   targetHandles: [{ id: `${routeId}::in`, routeId }],
   sourceHandles: [{ id: `${routeId}::out`, routeId }],
 });
@@ -53,34 +55,36 @@ function sampleGraph(): LayoutGraph {
     '00000000-0000-4000-8000-000000000005',
     '00000000-0000-4000-8000-000000000006',
     '00000000-0000-4000-8000-000000000008',
+  ].map(uuid);
+  const routeId = uuid('00000000-0000-4000-8000-000000000004');
+  const handlesByCard = new Map(cardIds.map((id) => [id, handles(routeId)]));
+  const connections: readonly [CardId, CardId][] = [
+    [uuid('00000000-0000-4000-8000-000000000002'), uuid('00000000-0000-4000-8000-000000000003')],
+    [uuid('00000000-0000-4000-8000-000000000002'), uuid('00000000-0000-4000-8000-000000000005')],
+    [uuid('00000000-0000-4000-8000-000000000003'), uuid('00000000-0000-4000-8000-000000000006')],
+    [uuid('00000000-0000-4000-8000-000000000005'), uuid('00000000-0000-4000-8000-000000000006')],
+    [uuid('00000000-0000-4000-8000-000000000006'), uuid('00000000-0000-4000-8000-000000000008')],
   ];
-  const handlesByCard = new Map(cardIds.map((id) => [id, handles('r')]));
-  const edges: GraphEdge[] = [
-    ['00000000-0000-4000-8000-000000000002', '00000000-0000-4000-8000-000000000003'],
-    ['00000000-0000-4000-8000-000000000002', '00000000-0000-4000-8000-000000000005'],
-    ['00000000-0000-4000-8000-000000000003', '00000000-0000-4000-8000-000000000006'],
-    ['00000000-0000-4000-8000-000000000005', '00000000-0000-4000-8000-000000000006'],
-    ['00000000-0000-4000-8000-000000000006', '00000000-0000-4000-8000-000000000008'],
-  ].map(([from, to]) => ({
-    id: `r:${from ?? ''}->${to ?? ''}`,
-    routeId: 'r',
-    source: from ?? '',
-    target: to ?? '',
-    sourceHandle: 'r::out',
-    targetHandle: 'r::in',
+  const edges: GraphEdge[] = connections.map(([from, to]) => ({
+    id: `${routeId}:${from}->${to}`,
+    routeId,
+    source: from,
+    target: to,
+    sourceHandle: `${routeId}::out`,
+    targetHandle: `${routeId}::in`,
   }));
 
   return buildLayoutGraph(cardIds, handlesByCard, edges, SIZE);
 }
 
 /** Positions for `positionedStrategy`, which reads an authored Layout. */
-const authored = (): ReadonlyMap<string, LayoutPoint> =>
+const authored = (): ReadonlyMap<CardId, LayoutPoint> =>
   new Map([
-    ['00000000-0000-4000-8000-000000000002', { x: 0, y: 100 }],
-    ['00000000-0000-4000-8000-000000000003', { x: 400, y: 0 }],
-    ['00000000-0000-4000-8000-000000000005', { x: 400, y: 200 }],
-    ['00000000-0000-4000-8000-000000000006', { x: 800, y: 100 }],
-    ['00000000-0000-4000-8000-000000000008', { x: 1200, y: 100 }],
+    [uuid('00000000-0000-4000-8000-000000000002'), { x: 0, y: 100 }],
+    [uuid('00000000-0000-4000-8000-000000000003'), { x: 400, y: 0 }],
+    [uuid('00000000-0000-4000-8000-000000000005'), { x: 400, y: 200 }],
+    [uuid('00000000-0000-4000-8000-000000000006'), { x: 800, y: 100 }],
+    [uuid('00000000-0000-4000-8000-000000000008'), { x: 1200, y: 100 }],
   ]);
 
 const STRATEGIES: [name: string, make: () => LayoutStrategy][] = [
@@ -174,7 +178,12 @@ describe.each(STRATEGIES)('LayoutStrategy contract: %s', (_name, make) => {
   });
 
   it('arranges a single card with no edges', async () => {
-    const only = buildLayoutGraph(['solo'], new Map(), [], SIZE);
+    const only = buildLayoutGraph(
+      [uuid('00000000-0000-4000-8000-000000000099')],
+      new Map(),
+      [],
+      SIZE,
+    );
     const output = await make()(only);
 
     expect(output.cards).toHaveLength(1);
