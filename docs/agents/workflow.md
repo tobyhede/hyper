@@ -2,7 +2,7 @@
 
 How work moves from a question to committed code in this repo.
 
-The skills that drive this live in `.claude/skills/`, which is **gitignored** — so the process is written down here rather than only existing inside them.
+The skills that drive this are **tracked** (see _Skills_ below), so a fresh clone or worktree has them. The process is still written down here rather than only existing inside them: they are a vendored third-party set, and the loop is ours whether or not a given skill is installed or has drifted upstream.
 
 ## The loop
 
@@ -79,7 +79,11 @@ Also stated in AGENTS.md; repeated here because it is the easiest step to skip.
 
 ## Skills
 
-Installed under `.claude/skills/`. Gitignored, so not guaranteed to be present:
+Vendored from [`mattpocock/skills`](https://github.com/mattpocock/skills) and tracked, so every clone and worktree has them. The files live under `.agents/skills/` — the repo-wide location Codex reads — and `.claude/skills/` holds a symlink per skill, which is where Claude Code reads. `skills-lock.json` records the upstream path and content hash of each, and is tracked with them; without it the vendored copies have no recorded revision and the installer can't tell what's drifted.
+
+Tracking both paths is deliberate. An ordinary `git worktree add` populates only tracked files, so while these were ignored every worktree ran agents with no skills at all — and tracking just one of the two locations fixes just one of the two harnesses.
+
+The set:
 
 - Used regularly: `improve-codebase-architecture`, `grilling`, `domain-modeling`, `codebase-design`.
 - Installed, not yet exercised: `to-spec`, `to-tickets`, `tdd`, `code-review`, `research`, `grill-me`, `grill-with-docs`.

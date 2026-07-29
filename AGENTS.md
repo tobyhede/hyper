@@ -107,7 +107,7 @@ The app loads the **abstract layout fixture** (`packages/app/fixture/`), not the
 
 ### Workflow
 
-How work moves from a question to committed code: the grilling loop, when a decision earns an ADR, the rename rule, the verification bar. See `docs/agents/workflow.md`. The skills themselves live in `.claude/skills/`, which is gitignored — `workflow.md` is the copy that survives without them.
+How work moves from a question to committed code: the grilling loop, when a decision earns an ADR, the rename rule, the verification bar. See `docs/agents/workflow.md`. The skills themselves are **tracked**: the files under `.agents/skills/` (where Codex looks), symlinked from `.claude/skills/` (where Claude Code looks), pinned by `skills-lock.json`. Both harnesses' paths are tracked deliberately — tracking one fixes only one. `workflow.md` remains the prose copy of the process, because a vendored third-party skill set can be updated out from under the repo and the loop is ours either way.
 
 ### Issue tracker
 

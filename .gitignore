@@ -12,10 +12,19 @@ test-results/
 .env.*
 !.env.example
 
-# Agent tooling (installed skills / session dirs), not project source
-.agents/
-.claude/
-skills-lock.json
+# Agent tooling. Session dirs and local settings are not project source, but the
+# installed skills ARE: an ordinary `git worktree add` populates only tracked
+# files, so ignoring them left every worktree running agents without the
+# grilling loop, tdd, domain-modeling and the rest. `.agents/skills/` is where
+# Codex looks and holds the real files; `.claude/skills/` is where Claude Code
+# looks and holds symlinks into it — tracking only one fixes only one harness.
+# `skills-lock.json` rides along or the vendored copies have no recorded
+# upstream revision. The parents are `/*` rather than `/` because git will not
+# descend into an excluded directory, so a trailing-slash form cannot be negated.
+.agents/*
+!.agents/skills/
+.claude/*
+!.claude/skills/
 .serena/
 .worktrees/
 
