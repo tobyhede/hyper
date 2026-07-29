@@ -1,4 +1,4 @@
-import type { SpaceSnapshot, UUID } from '@project/core';
+import type { ImportSpace, SpaceSnapshot, UUID } from '@project/core';
 
 export interface SpaceSummary {
   id: UUID;
@@ -25,7 +25,7 @@ export type RepositoryImportResult =
   | { kind: 'conflict'; current: StoredSpace }
   | {
       kind: 'rejected';
-      code: 'invalid-snapshot';
+      code: 'invalid-snapshot' | 'duplicate-identity' | 'card-ownership';
       message: string;
     };
 
@@ -33,5 +33,5 @@ export interface SpaceRepository {
   listSpaces(): Promise<readonly SpaceSummary[]>;
   loadSpace(id: UUID): Promise<StoredSpace | undefined>;
   commitSpace(snapshot: SpaceSnapshot, expectedRevision: bigint): Promise<RepositoryCommitResult>;
-  importSpaces(snapshots: readonly SpaceSnapshot[]): Promise<RepositoryImportResult>;
+  importSpaces(input: readonly ImportSpace[]): Promise<RepositoryImportResult>;
 }
