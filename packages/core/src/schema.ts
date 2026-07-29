@@ -11,7 +11,7 @@ import { z } from 'zod';
  */
 
 /** The single durable identity used by every referenceable Hyper entity. */
-export const uuidSchema = z.string().uuid();
+export const uuidSchema = z.string().uuid().brand<'UUID'>();
 
 const idSchema = uuidSchema;
 

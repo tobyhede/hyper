@@ -2,8 +2,12 @@ import {
   spaceFileSchema,
   spaceSnapshotSchema,
   type Card,
+  type BuiltInViewId,
+  type CardId,
   type Layout,
   type Route,
+  type RouteId,
+  type UUID,
 } from '@project/core';
 import { parseCardFile, type CardFile, type CardFileError } from './card-file';
 import { validateReferences, type ReferenceError } from './validate';
@@ -17,7 +21,7 @@ import { validateReferences, type ReferenceError } from './validate';
  */
 export interface Space {
   /** What names this space (ADR 0019). Not its title, and not its file path. */
-  readonly id: string;
+  readonly id: UUID;
   readonly title: string;
   readonly cards: readonly Card[];
   readonly routes: readonly Route[];
@@ -28,10 +32,10 @@ export interface Space {
    */
   readonly layouts: readonly Layout[];
   /** Which view this space opens in — a layout's id or a built-in view's. */
-  readonly defaultView: string | undefined;
-  readonly cardsById: ReadonlyMap<string, Card>;
-  readonly routesById: ReadonlyMap<string, Route>;
-  readonly layoutsById: ReadonlyMap<string, Layout>;
+  readonly defaultView: BuiltInViewId | UUID | undefined;
+  readonly cardsById: ReadonlyMap<CardId, Card>;
+  readonly routesById: ReadonlyMap<RouteId, Route>;
+  readonly layoutsById: ReadonlyMap<UUID, Layout>;
 }
 
 /**
@@ -127,12 +131,12 @@ export function loadSpaceSnapshot(input: unknown): LoadSpaceResult {
 }
 
 function buildSpace(input: {
-  id: string;
+  id: UUID;
   title: string;
   cards: Card[];
   routes: Route[];
   layouts: Layout[] | undefined;
-  defaultView: string | undefined;
+  defaultView: BuiltInViewId | UUID | undefined;
 }): LoadSpaceResult {
   // Array order is read only by automatic strategies, so title order is the one
   // default stable across filesystem scans and unordered relational reads. Ties

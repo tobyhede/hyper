@@ -1,7 +1,7 @@
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import { stringify as stringifyYaml } from 'yaml';
-import type { CardFrontmatter } from '@project/core';
+import { uuidSchema, type CardFrontmatter } from '@project/core';
 import { parseCardFile } from '../src/index';
 
 /**
@@ -21,7 +21,7 @@ const lineArb = fc
 
 const markdownFrontmatterArb: fc.Arbitrary<CardFrontmatter> = fc.record(
   {
-    id: fc.uuid({ version: 4 }),
+    id: fc.uuid({ version: 4 }).map((value) => uuidSchema.parse(value)),
     title: lineArb,
     description: fc.option(lineArb, { nil: undefined }),
     kind: fc.constant('markdown' as const),
@@ -30,10 +30,10 @@ const markdownFrontmatterArb: fc.Arbitrary<CardFrontmatter> = fc.record(
 );
 
 const aliasFrontmatterArb: fc.Arbitrary<CardFrontmatter> = fc.record({
-  id: fc.uuid({ version: 4 }),
+  id: fc.uuid({ version: 4 }).map((value) => uuidSchema.parse(value)),
   title: lineArb,
   kind: fc.constant('alias' as const),
-  target: fc.uuid({ version: 4 }),
+  target: fc.uuid({ version: 4 }).map((value) => uuidSchema.parse(value)),
 });
 
 /**

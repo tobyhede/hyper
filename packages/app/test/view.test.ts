@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { uuidSchema } from '@project/core';
 import { buildLayoutGraph, loadSpace, type Space } from '@project/graph';
 import { CARD_SIZE } from '../src/card';
 import { resolveView } from '../src/view';
@@ -102,7 +103,10 @@ describe('resolveView', () => {
       spaceWith({ layouts: [WORKING], defaultView: '00000000-0000-4000-8000-000000000022' }),
     );
     const graph = buildLayoutGraph(
-      ['00000000-0000-4000-8000-000000000002', '00000000-0000-4000-8000-000000000003'],
+      [
+        uuidSchema.parse('00000000-0000-4000-8000-000000000002'),
+        uuidSchema.parse('00000000-0000-4000-8000-000000000003'),
+      ],
       new Map(),
       [],
       CARD_SIZE,

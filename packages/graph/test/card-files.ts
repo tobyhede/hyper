@@ -1,5 +1,5 @@
 import { stringify as stringifyYaml } from 'yaml';
-import type { Card } from '@project/core';
+import { uuidSchema, type Card, type UUID } from '@project/core';
 import type { CardFile } from '../src/index';
 
 /**
@@ -32,8 +32,10 @@ export function aliasFile(id: string, title: string, target: string): CardFile {
  */
 
 export function card(id: string, title = defaultTitle(id), body = ''): Card {
-  return { id, title, kind: 'markdown', body };
+  return { id: uuid(id), title, kind: 'markdown', body };
 }
+
+export const uuid = (value: string): UUID => uuidSchema.parse(value);
 
 function defaultTitle(id: string): string {
   return (
@@ -49,5 +51,5 @@ function defaultTitle(id: string): string {
 }
 
 export function alias(id: string, title: string, target: string): Card {
-  return { id, title, kind: 'alias', target };
+  return { id: uuid(id), title, kind: 'alias', target: uuid(target) };
 }

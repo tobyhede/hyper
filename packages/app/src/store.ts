@@ -1,4 +1,5 @@
 import { create, type StoreApi, type UseBoundStore } from 'zustand';
+import type { CardId, RouteId } from '@project/core';
 import { getCard, getRoute, outgoingEdges, routeStartCard, type Space } from '@project/graph';
 
 export type Mode = 'overview' | 'presenting';
@@ -6,7 +7,7 @@ export type Mode = 'overview' | 'presenting';
 /** One move available from the active card: an outgoing edge, named. */
 export interface Move {
   /** The card the edge leads to. */
-  cardId: string;
+  cardId: CardId;
   /** That card's title, for the chrome that lists the choice. */
   title: string;
   selected: boolean;
@@ -37,9 +38,9 @@ export interface SpaceState {
    * join (ADR 0021). One concept, not two — the highlight is how active is
    * shown, and carries no separate meaning of its own (ADR 0026).
    */
-  activeRouteId: string | null;
+  activeRouteId: RouteId | null;
   /** The cards walked, in order; the last is the active card. Empty in overview. */
-  walk: readonly string[];
+  walk: readonly CardId[];
   /** Which outgoing edge of the active card is selected. */
   branchIndex: number;
   /**
@@ -47,9 +48,9 @@ export interface SpaceState {
    * card kind: opening a *space* card to explore its nested graph (ADR 0001) is
    * the same gesture on a different kind, and should reuse this.
    */
-  openedCardId: string | null;
-  activateRoute: (routeId: string) => void;
-  openCard: (cardId: string) => void;
+  openedCardId: CardId | null;
+  activateRoute: (routeId: RouteId) => void;
+  openCard: (cardId: CardId) => void;
   closeCard: () => void;
   present: () => void;
   exitPresenting: () => void;
@@ -64,7 +65,7 @@ export interface SpaceState {
 export interface SpaceStore {
   useStore: UseBoundStore<StoreApi<SpaceState>>;
   /** The card the walk has reached, or `null` outside presenting. */
-  selectActiveCardId: (state: SpaceState) => string | null;
+  selectActiveCardId: (state: SpaceState) => CardId | null;
   /**
    * A card's outgoing edges, with the selected one marked.
    *
@@ -73,7 +74,7 @@ export interface SpaceStore {
    * every render, which Zustand compares by identity — a re-render that produces
    * a new value that causes a re-render, until React gives up.
    */
-  movesFrom: (routeId: string | null, cardId: string | null, branchIndex: number) => Move[];
+  movesFrom: (routeId: RouteId | null, cardId: CardId | null, branchIndex: number) => Move[];
 }
 
 /**
@@ -87,12 +88,12 @@ export interface SpaceStore {
  * `space.routes[0]` would answer it a second time and disagree the moment a
  * Layout filters.
  */
-export function createSpaceStore(space: Space, initialActiveRouteId: string | null): SpaceStore {
-  const routeOf = (routeId: string | null) =>
+export function createSpaceStore(space: Space, initialActiveRouteId: RouteId | null): SpaceStore {
+  const routeOf = (routeId: RouteId | null) =>
     routeId !== null ? getRoute(space, routeId) : undefined;
 
   /** The active card's outgoing edges, or none when the walk is not on one. */
-  const edgesFrom = (routeId: string | null, cardId: string | null) => {
+  const edgesFrom = (routeId: RouteId | null, cardId: CardId | null) => {
     const route = routeOf(routeId);
     if (!route || cardId === null) return [];
     return outgoingEdges(route, cardId);
@@ -166,12 +167,12 @@ export function createSpaceStore(space: Space, initialActiveRouteId: string | nu
     },
   }));
 
-  const selectActiveCardId = (state: SpaceState): string | null => {
+  const selectActiveCardId = (state: SpaceState): CardId | null => {
     if (state.mode !== 'presenting') return null;
     return state.walk[state.walk.length - 1] ?? null;
   };
 
-  const movesFrom = (routeId: string | null, cardId: string | null, branchIndex: number): Move[] =>
+  const movesFrom = (routeId: RouteId | null, cardId: CardId | null, branchIndex: number): Move[] =>
     edgesFrom(routeId, cardId).map((edge, index) => ({
       cardId: edge.to,
       title: getCard(space, edge.to)?.title ?? edge.to,

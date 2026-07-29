@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import type { Card } from '@project/core';
 import { parseCardFile, serializeCardFile } from '../src/index';
+import { uuid } from './card-files';
 
 describe('serializeCardFile', () => {
   it('writes frontmatter, a fence, then the body', () => {
     const card: Card = {
-      id: '00000000-0000-4000-8000-000000000002',
+      id: uuid('00000000-0000-4000-8000-000000000002'),
       title: 'A',
       kind: 'markdown',
       body: 'Card **A**.\n',
@@ -20,7 +21,7 @@ describe('serializeCardFile', () => {
     // `Recap: the data model` unquoted is a nested mapping, not a string — the
     // one authoring mistake the example space actually hit.
     const card: Card = {
-      id: '00000000-0000-4000-8000-000000000034',
+      id: uuid('00000000-0000-4000-8000-000000000034'),
       title: 'Recap: the data model',
       kind: 'markdown',
       body: '',
@@ -34,10 +35,10 @@ describe('serializeCardFile', () => {
 
   it('writes an alias with its target, and no body', () => {
     const card: Card = {
-      id: '00000000-0000-4000-8000-00000000000c',
+      id: uuid('00000000-0000-4000-8000-00000000000c'),
       title: 'A′',
       kind: 'alias',
-      target: '00000000-0000-4000-8000-000000000002',
+      target: uuid('00000000-0000-4000-8000-000000000002'),
     };
 
     expect(serializeCardFile(card)).toBe(
@@ -47,7 +48,7 @@ describe('serializeCardFile', () => {
 
   it('omits a description the card does not have', () => {
     const card: Card = {
-      id: '00000000-0000-4000-8000-000000000002',
+      id: uuid('00000000-0000-4000-8000-000000000002'),
       title: 'A',
       kind: 'markdown',
       body: '',

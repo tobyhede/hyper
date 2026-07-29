@@ -1,4 +1,13 @@
-import { isBuiltInViewId, type Card, type Layout, type Route, type RouteEdge } from '@project/core';
+import {
+  isBuiltInViewId,
+  uuidSchema,
+  type BuiltInViewId,
+  type Card,
+  type Layout,
+  type Route,
+  type RouteEdge,
+  type UUID,
+} from '@project/core';
 
 /**
  * The cards, routes and layouts a reference check reads. Structural so it
@@ -10,7 +19,7 @@ export interface Referenceable {
   readonly cards: readonly Card[];
   readonly routes: readonly Route[];
   readonly layouts?: readonly Layout[] | undefined;
-  readonly defaultView?: string | undefined;
+  readonly defaultView?: BuiltInViewId | UUID | undefined;
 }
 
 export type ReferenceErrorKind =
@@ -133,7 +142,8 @@ export function validateReferences(space: Referenceable): ReferenceError[] {
   const routeIds = new Set(space.routes.map((r) => r.id));
 
   for (const layout of layouts) {
-    for (const cardId of Object.keys(layout.positions)) {
+    for (const key of Object.keys(layout.positions)) {
+      const cardId = uuidSchema.parse(key);
       if (!cardIds.has(cardId)) {
         errors.push({
           kind: 'layout-position-unknown-card',
@@ -183,7 +193,7 @@ export function validateReferences(space: Referenceable): ReferenceError[] {
   // nothing else — it records which view opens, never how to compute one.
   if (space.defaultView !== undefined) {
     const declared = new Set(layouts.map((l) => l.id));
-    if (!declared.has(space.defaultView) && !isBuiltInViewId(space.defaultView)) {
+    if (!isBuiltInViewId(space.defaultView) && !declared.has(space.defaultView)) {
       errors.push({
         kind: 'unresolved-default-view',
         ref: space.defaultView,

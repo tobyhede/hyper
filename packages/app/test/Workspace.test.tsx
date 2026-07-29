@@ -1,37 +1,38 @@
 import { fireEvent, render, screen, type RenderResult } from '@testing-library/react';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
-import type { SpaceSnapshot } from '@project/core';
+import { spaceSnapshotSchema, uuidSchema, type SpaceSnapshot } from '@project/core';
 import { loadSpaceSnapshot } from '@project/graph';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
 import { mountWorkspace } from '../src/Workspace';
 
-const SPACE_ID = '00000000-0000-4000-8000-000000000001';
-const CARD_ID = '00000000-0000-4000-8000-000000000002';
-const LAYOUT_ID = '00000000-0000-4000-8000-000000000003';
+const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
+const CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
+const LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
 
-const snapshot = (title: string, cardTitle: string, x: number, y: number): SpaceSnapshot => ({
-  id: SPACE_ID,
-  document: {
-    version: 2,
-    title,
-    routes: [],
-    layouts: [
+const snapshot = (title: string, cardTitle: string, x: number, y: number): SpaceSnapshot =>
+  spaceSnapshotSchema.parse({
+    id: SPACE_ID,
+    document: {
+      version: 2,
+      title,
+      routes: [],
+      layouts: [
+        {
+          id: LAYOUT_ID,
+          title: 'Layout',
+          kind: 'positioned',
+          positions: { [CARD_ID]: { x, y } },
+        },
+      ],
+      defaultView: LAYOUT_ID,
+    },
+    cards: [
       {
-        id: LAYOUT_ID,
-        title: 'Layout',
-        kind: 'positioned',
-        positions: { [CARD_ID]: { x, y } },
+        id: CARD_ID,
+        document: { title: cardTitle, kind: 'markdown', body: cardTitle },
       },
     ],
-    defaultView: LAYOUT_ID,
-  },
-  cards: [
-    {
-      id: CARD_ID,
-      document: { title: cardTitle, kind: 'markdown', body: cardTitle },
-    },
-  ],
-});
+  });
 
 const runtime = (value: SpaceSnapshot) => {
   const loaded = loadSpaceSnapshot(value);

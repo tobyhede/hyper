@@ -1,9 +1,9 @@
 import { expect, it } from 'vitest';
-import type { SpaceSnapshot } from '@project/core';
+import { spaceSnapshotSchema, uuidSchema } from '@project/core';
 import { loadSpaceSnapshot } from '@project/graph';
 import { snapshotFromSpace, updatePositionedLayout } from '../src/snapshot';
 
-const snapshot: SpaceSnapshot = {
+const snapshot = spaceSnapshotSchema.parse({
   id: '00000000-0000-4000-8000-000000000001',
   document: {
     version: 2,
@@ -31,15 +31,15 @@ const snapshot: SpaceSnapshot = {
       document: { title: 'Next', kind: 'markdown', body: 'More' },
     },
   ],
-};
+});
 
 it('updates placement as a complete valid persistence snapshot', () => {
   const changed = updatePositionedLayout(
     snapshot,
-    '00000000-0000-4000-8000-000000000021',
+    uuidSchema.parse('00000000-0000-4000-8000-000000000021'),
     'Layout',
     new Map([['00000000-0000-4000-8000-000000000002', { x: 10, y: 20 }]]),
-    '00000000-0000-4000-8000-000000000004',
+    uuidSchema.parse('00000000-0000-4000-8000-000000000004'),
   );
 
   expect(changed.cards).toEqual(snapshot.cards);
@@ -65,7 +65,7 @@ it('converts the validated runtime aggregate back to the persistence seam', () =
 });
 
 it('preserves authored view scope and unrelated layouts while replacing placement', () => {
-  const withLayouts: SpaceSnapshot = {
+  const withLayouts = spaceSnapshotSchema.parse({
     ...snapshot,
     document: {
       ...snapshot.document,
@@ -85,14 +85,14 @@ it('preserves authored view scope and unrelated layouts while replacing placemen
         },
       ],
     },
-  };
+  });
 
   const changed = updatePositionedLayout(
     withLayouts,
-    '00000000-0000-4000-8000-000000000021',
+    uuidSchema.parse('00000000-0000-4000-8000-000000000021'),
     'Layout',
     new Map([['00000000-0000-4000-8000-000000000002', { x: 5, y: 6 }]]),
-    '00000000-0000-4000-8000-000000000004',
+    uuidSchema.parse('00000000-0000-4000-8000-000000000004'),
   );
 
   expect(changed.document.layouts).toHaveLength(2);

@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import type { Route } from '@project/core';
+import type { Route, UUID } from '@project/core';
 import { incomingEdges, outgoingEdges, routeEntryCards, routeStartCard } from '../src/index';
+import { uuid } from './card-files';
 
-const route = (edges: [string, string][]): Route => ({
-  id: 'r',
+const route = (edges: [UUID, UUID][]): Route => ({
+  id: uuid('00000000-0000-4000-8000-000000000001'),
   title: 'R',
   edges: edges.map(([from, to]) => ({ from, to })),
 });
@@ -11,38 +12,38 @@ const route = (edges: [string, string][]): Route => ({
 // a forks to b and c, which merge back into d. Every move a walk can make is in
 // here: a choice, a single step, and an arrival by two paths.
 const diamond = route([
-  ['00000000-0000-4000-8000-000000000002', '00000000-0000-4000-8000-000000000003'],
-  ['00000000-0000-4000-8000-000000000002', '00000000-0000-4000-8000-000000000005'],
-  ['00000000-0000-4000-8000-000000000003', '00000000-0000-4000-8000-000000000006'],
-  ['00000000-0000-4000-8000-000000000005', '00000000-0000-4000-8000-000000000006'],
+  [uuid('00000000-0000-4000-8000-000000000002'), uuid('00000000-0000-4000-8000-000000000003')],
+  [uuid('00000000-0000-4000-8000-000000000002'), uuid('00000000-0000-4000-8000-000000000005')],
+  [uuid('00000000-0000-4000-8000-000000000003'), uuid('00000000-0000-4000-8000-000000000006')],
+  [uuid('00000000-0000-4000-8000-000000000005'), uuid('00000000-0000-4000-8000-000000000006')],
 ]);
 
 describe('outgoingEdges', () => {
   it('lists a fork’s edges in the order they were authored', () => {
-    expect(outgoingEdges(diamond, '00000000-0000-4000-8000-000000000002').map((e) => e.to)).toEqual(
-      ['00000000-0000-4000-8000-000000000003', '00000000-0000-4000-8000-000000000005'],
-    );
+    expect(
+      outgoingEdges(diamond, uuid('00000000-0000-4000-8000-000000000002')).map((e) => e.to),
+    ).toEqual(['00000000-0000-4000-8000-000000000003', '00000000-0000-4000-8000-000000000005']);
   });
 
   it('gives a card on a line exactly one — the degenerate fork', () => {
-    expect(outgoingEdges(diamond, '00000000-0000-4000-8000-000000000003').map((e) => e.to)).toEqual(
-      ['00000000-0000-4000-8000-000000000006'],
-    );
+    expect(
+      outgoingEdges(diamond, uuid('00000000-0000-4000-8000-000000000003')).map((e) => e.to),
+    ).toEqual(['00000000-0000-4000-8000-000000000006']);
   });
 
   it('gives a sink none, which is how a walk ends', () => {
-    expect(outgoingEdges(diamond, '00000000-0000-4000-8000-000000000006')).toEqual([]);
+    expect(outgoingEdges(diamond, uuid('00000000-0000-4000-8000-000000000006'))).toEqual([]);
   });
 
   it('gives a card the route does not touch none', () => {
-    expect(outgoingEdges(diamond, '00000000-0000-4000-8000-000000000098')).toEqual([]);
+    expect(outgoingEdges(diamond, uuid('00000000-0000-4000-8000-000000000098'))).toEqual([]);
   });
 });
 
 describe('incomingEdges', () => {
   it('lists every edge arriving at a merge', () => {
     expect(
-      incomingEdges(diamond, '00000000-0000-4000-8000-000000000006').map((e) => e.from),
+      incomingEdges(diamond, uuid('00000000-0000-4000-8000-000000000006')).map((e) => e.from),
     ).toEqual(['00000000-0000-4000-8000-000000000003', '00000000-0000-4000-8000-000000000005']);
   });
 });
@@ -56,11 +57,17 @@ describe('routeEntryCards', () => {
     expect(
       routeEntryCards(
         route([
-          ['00000000-0000-4000-8000-000000000002', '00000000-0000-4000-8000-000000000003'],
-          ['x', 'y'],
+          [
+            uuid('00000000-0000-4000-8000-000000000002'),
+            uuid('00000000-0000-4000-8000-000000000003'),
+          ],
+          [
+            uuid('00000000-0000-4000-8000-000000000010'),
+            uuid('00000000-0000-4000-8000-000000000011'),
+          ],
         ]),
       ),
-    ).toEqual(['00000000-0000-4000-8000-000000000002', 'x']);
+    ).toEqual(['00000000-0000-4000-8000-000000000002', '00000000-0000-4000-8000-000000000010']);
   });
 
   it('lists each entry once however many edges leave it', () => {
@@ -83,8 +90,14 @@ describe('routeStartCard', () => {
     expect(
       routeStartCard(
         route([
-          ['00000000-0000-4000-8000-000000000003', '00000000-0000-4000-8000-000000000005'],
-          ['00000000-0000-4000-8000-000000000002', '00000000-0000-4000-8000-000000000003'],
+          [
+            uuid('00000000-0000-4000-8000-000000000003'),
+            uuid('00000000-0000-4000-8000-000000000005'),
+          ],
+          [
+            uuid('00000000-0000-4000-8000-000000000002'),
+            uuid('00000000-0000-4000-8000-000000000003'),
+          ],
         ]),
       ),
     ).toBe('00000000-0000-4000-8000-000000000002');

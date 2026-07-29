@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { buildCardHandles, buildRouteEdges, loadSpace, type Space } from '@project/graph';
 import { projectCardNodes, projectRouteEdges, type RouteEmphasis } from '../src/index';
 import { aliasFile, cardFile } from './card-files';
+import { uuid } from './uuid';
 
 function load(
   input: unknown,
@@ -124,7 +125,7 @@ describe('projectCardNodes', () => {
       layoutGraph: {
         cards: [
           {
-            id: '00000000-0000-4000-8000-000000000002',
+            id: uuid('00000000-0000-4000-8000-000000000002'),
             x: 500,
             y: 600,
             width: 260,
@@ -149,7 +150,7 @@ describe('projectCardNodes', () => {
 
   it('flags the active card', () => {
     const nodes = projectCardNodes(space, handles, colors, {
-      activeCardId: '00000000-0000-4000-8000-000000000003',
+      activeCardId: uuid('00000000-0000-4000-8000-000000000003'),
     });
     expect(nodes.find((n) => n.id === '00000000-0000-4000-8000-000000000003')!.data.active).toBe(
       true,
@@ -223,8 +224,8 @@ describe('projectRouteEdges', () => {
         edges: [
           {
             id: '00000000-0000-4000-8000-000000000004::0',
-            source: '00000000-0000-4000-8000-000000000002',
-            target: '00000000-0000-4000-8000-000000000003',
+            source: uuid('00000000-0000-4000-8000-000000000002'),
+            target: uuid('00000000-0000-4000-8000-000000000003'),
             sourceHandle: '00000000-0000-4000-8000-000000000004::out',
             targetHandle: '00000000-0000-4000-8000-000000000004::in',
             sections: [
@@ -265,7 +266,7 @@ describe('projectRouteEdges', () => {
     const at = (emphasis: RouteEmphasis) => {
       const edges = projectRouteEdges(routeEdges, colors, {
         emphasis,
-        activeRouteId: '00000000-0000-4000-8000-000000000004',
+        activeRouteId: uuid('00000000-0000-4000-8000-000000000004'),
       });
       return {
         '00000000-0000-4000-8000-000000000004': edges.find(

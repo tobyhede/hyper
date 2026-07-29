@@ -1,4 +1,4 @@
-import type { SpaceSnapshot, UUID } from '@project/core';
+import { uuidSchema, type RouteId, type SpaceSnapshot, type UUID } from '@project/core';
 import type { LayoutPoint, Space } from '@project/graph';
 
 /** Convert the validated runtime aggregate into the complete persistence seam. */
@@ -23,7 +23,7 @@ export const updatePositionedLayout = (
   layoutId: UUID,
   title: string,
   positions: ReadonlyMap<string, LayoutPoint>,
-  activeRouteId: string | null,
+  activeRouteId: RouteId | null,
 ): SpaceSnapshot => {
   const existing = (base.document.layouts ?? []).find((layout) => layout.id === layoutId);
   const layout = {
@@ -31,7 +31,7 @@ export const updatePositionedLayout = (
     title,
     kind: 'positioned' as const,
     positions: Object.fromEntries(
-      [...positions].map(([id, point]) => [id, { x: point.x, y: point.y }]),
+      [...positions].map(([id, point]) => [uuidSchema.parse(id), { x: point.x, y: point.y }]),
     ),
     ...(existing?.routes ? { routes: existing.routes } : {}),
     ...(activeRouteId !== null ? { activeRoute: activeRouteId } : {}),

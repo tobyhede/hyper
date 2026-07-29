@@ -1,4 +1,11 @@
-import { isBuiltInViewId, type BuiltInViewId, type Layout } from '@project/core';
+import {
+  isBuiltInViewId,
+  uuidSchema,
+  type BuiltInViewId,
+  type CardId,
+  type Layout,
+  type RouteId,
+} from '@project/core';
 import {
   getLayout,
   gridStrategy,
@@ -61,13 +68,13 @@ export interface ResolvedView {
    * touched by activating a route. Which routes a view shows is the View's call
    * (ADR 0005), and this is the View making it.
    */
-  visibleRouteIds: readonly string[];
+  visibleRouteIds: readonly RouteId[];
   /**
    * Which visible route opens active, or `null` in a space with no routes
    * (ADR 0015). The fallback to the first visible route lives here rather than
    * in the store, so there is one place that answers it (ADR 0026).
    */
-  activeRouteId: string | null;
+  activeRouteId: RouteId | null;
 }
 
 /**
@@ -91,17 +98,20 @@ function resolveRoutes(
   };
 }
 
-function positionMap(layout: Layout): ReadonlyMap<string, LayoutPoint> {
-  return new Map(Object.entries(layout.positions));
+function positionMap(layout: Layout): ReadonlyMap<CardId, LayoutPoint> {
+  const positions = new Map<CardId, LayoutPoint>();
+  for (const [cardId, point] of Object.entries(layout.positions)) {
+    if (point !== undefined) positions.set(uuidSchema.parse(cardId), point);
+  }
+  return positions;
 }
 
 export function resolveView(space: Space): ResolvedView {
   const requested = space.defaultView ?? DEFAULT_VIEW_ID;
 
-  // A declared Layout wins over a built-in of the same name. The space's own
-  // data outranks a reserved word, and `loadSpace` permits the collision because
-  // which one wins is a resolution decision — this is where it is made.
-  const layout = getLayout(space, requested);
+  // UUID Layout ids and built-in names are disjoint, so this is an ordinary
+  // narrowing rather than a precedence rule between overlapping namespaces.
+  const layout = isBuiltInViewId(requested) ? undefined : getLayout(space, requested);
   if (layout) {
     return {
       id: layout.id,

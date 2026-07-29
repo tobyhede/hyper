@@ -1,3 +1,4 @@
+import type { CardId } from '@project/core';
 import type { LayoutCard, LayoutGraph, LayoutPoint, LayoutStrategy } from './layout';
 
 /**
@@ -48,8 +49,8 @@ function boundsOf(cards: readonly LayoutCard[]): Bounds | null {
  * absence in a Layout means *unplaced*, and collapsing that to `(0, 0)` would
  * assert a placement no strategy made.
  */
-export function layoutPositions(graph: LayoutGraph): ReadonlyMap<string, LayoutPoint> {
-  const positions = new Map<string, LayoutPoint>();
+export function layoutPositions(graph: LayoutGraph): ReadonlyMap<CardId, LayoutPoint> {
+  const positions = new Map<CardId, LayoutPoint>();
   for (const card of graph.cards) {
     if (card.x === undefined || card.y === undefined) continue;
     positions.set(card.id, { x: card.x, y: card.y });
@@ -57,7 +58,7 @@ export function layoutPositions(graph: LayoutGraph): ReadonlyMap<string, LayoutP
   return positions;
 }
 
-export function positionedStrategy(positions: ReadonlyMap<string, LayoutPoint>): LayoutStrategy {
+export function positionedStrategy(positions: ReadonlyMap<CardId, LayoutPoint>): LayoutStrategy {
   // Uniformly-async contract (ADR 0005); there is nothing to await.
   // eslint-disable-next-line @typescript-eslint/require-await
   return async (graph: LayoutGraph): Promise<LayoutGraph> => {

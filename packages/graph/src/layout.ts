@@ -17,6 +17,7 @@
  * consume.
  */
 
+import type { CardId } from '@project/core';
 import type { CardHandleSet, GraphEdge } from './routes';
 
 /** A port on a card, by the handle id the render layer knows it by. */
@@ -30,7 +31,7 @@ export interface LayoutPort {
 }
 
 export interface LayoutCard {
-  id: string;
+  id: CardId;
   width: number;
   height: number;
   ports: LayoutPort[];
@@ -58,8 +59,8 @@ export interface LayoutEdgeSection {
 
 export interface LayoutEdge {
   id: string;
-  source: string;
-  target: string;
+  source: CardId;
+  target: CardId;
   sourceHandle: string;
   targetHandle: string;
   /**
@@ -92,8 +93,8 @@ export type LayoutStrategy = (graph: LayoutGraph) => Promise<LayoutGraph>;
  * handles and edges derived from the routes running through them.
  */
 export function buildLayoutGraph(
-  cardIds: readonly string[],
-  handlesByCard: ReadonlyMap<string, CardHandleSet>,
+  cardIds: readonly CardId[],
+  handlesByCard: ReadonlyMap<CardId, CardHandleSet>,
   edges: readonly GraphEdge[],
   size: { width: number; height: number },
 ): LayoutGraph {

@@ -1,13 +1,15 @@
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
+import type { CardId } from '@project/core';
 import { layoutPositions, positionedStrategy } from '../src/index';
 import type { LayoutCard, LayoutGraph } from '../src/index';
+import { uuid } from './card-files';
 
 const SIZE = { width: 100, height: 50 };
 
 function cardsOf(...ids: string[]): LayoutCard[] {
   return ids.map((id) => ({
-    id,
+    id: uuid(id),
     ...SIZE,
     ports: [
       { id: '00000000-0000-4000-8000-000000000004::in', side: 'in' as const },
@@ -25,15 +27,15 @@ const graph: LayoutGraph = {
   edges: [
     {
       id: '00000000-0000-4000-8000-000000000004::0',
-      source: '00000000-0000-4000-8000-000000000002',
-      target: '00000000-0000-4000-8000-000000000003',
+      source: uuid('00000000-0000-4000-8000-000000000002'),
+      target: uuid('00000000-0000-4000-8000-000000000003'),
       sourceHandle: '00000000-0000-4000-8000-000000000004::out',
       targetHandle: '00000000-0000-4000-8000-000000000004::in',
     },
     {
       id: '00000000-0000-4000-8000-000000000004::1',
-      source: '00000000-0000-4000-8000-000000000003',
-      target: '00000000-0000-4000-8000-000000000005',
+      source: uuid('00000000-0000-4000-8000-000000000003'),
+      target: uuid('00000000-0000-4000-8000-000000000005'),
       sourceHandle: '00000000-0000-4000-8000-000000000004::out',
       targetHandle: '00000000-0000-4000-8000-000000000004::in',
     },
@@ -41,7 +43,7 @@ const graph: LayoutGraph = {
 };
 
 const at = (entries: Record<string, [number, number]>) =>
-  new Map(Object.entries(entries).map(([id, [x, y]]) => [id, { x, y }]));
+  new Map(Object.entries(entries).map(([id, [x, y]]) => [uuid(id), { x, y }]));
 
 /** Do two placed cards' boxes intersect? Touching edges do not count. */
 function overlaps(a: LayoutCard, b: LayoutCard): boolean {
@@ -122,7 +124,10 @@ describe('positionedStrategy', () => {
 
   it('ignores positions for cards the view is not showing', async () => {
     const laid = await positionedStrategy(
-      at({ '00000000-0000-4000-8000-000000000002': [5, 5], zz: [999, 999] }),
+      at({
+        '00000000-0000-4000-8000-000000000002': [5, 5],
+        '00000000-0000-4000-8000-000000000099': [999, 999],
+      }),
     )({
       cards: cardsOf('00000000-0000-4000-8000-000000000002'),
       edges: [],
@@ -144,10 +149,12 @@ describe('positionedStrategy', () => {
   });
 });
 
-const idsArb = fc.uniqueArray(fc.string({ minLength: 1, maxLength: 4 }), {
-  minLength: 1,
-  maxLength: 8,
-});
+const idsArb = fc
+  .uniqueArray(fc.uuid(), {
+    minLength: 1,
+    maxLength: 8,
+  })
+  .map((ids): CardId[] => ids.map(uuid));
 const coordArb = fc.integer({ min: -1000, max: 1000 });
 
 describe('positionedStrategy properties', () => {

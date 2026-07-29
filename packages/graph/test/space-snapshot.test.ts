@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import type { SpaceSnapshot } from '@project/core';
 import { getCard, getRoute, loadSpaceSnapshot } from '../src/index';
+import { uuid } from './card-files';
 
-const SPACE_ID = '00000000-0000-4000-8000-000000000001';
-const CARD_A = '00000000-0000-4000-8000-000000000002';
-const CARD_B = '00000000-0000-4000-8000-000000000003';
-const ROUTE_ID = '00000000-0000-4000-8000-000000000004';
+const SPACE_ID = uuid('00000000-0000-4000-8000-000000000001');
+const CARD_A = uuid('00000000-0000-4000-8000-000000000002');
+const CARD_B = uuid('00000000-0000-4000-8000-000000000003');
+const ROUTE_ID = uuid('00000000-0000-4000-8000-000000000004');
 
 const snapshot: SpaceSnapshot = {
   id: SPACE_ID,

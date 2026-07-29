@@ -1,9 +1,10 @@
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import { validateReferences } from '../src/index';
-import { card } from './card-files';
+import { card, uuid } from './card-files';
 
-const cardId = (value: number) => `00000000-0000-4000-8000-${value.toString(16).padStart(12, '0')}`;
+const cardId = (value: number) =>
+  uuid(`00000000-0000-4000-8000-${value.toString(16).padStart(12, '0')}`);
 
 /** Build a structurally-consistent space file: one route chaining every card. */
 function spaceFileFromIds(ids: number[]) {
@@ -12,7 +13,7 @@ function spaceFileFromIds(ids: number[]) {
     cards: ids.map((id) => card(cardId(id), String(id))),
     routes: [
       {
-        id: '00000000-0000-4000-8000-000000000004',
+        id: uuid('00000000-0000-4000-8000-000000000004'),
         title: 'Main',
         edges: ids.slice(0, -1).map((id, i) => ({ from: cardId(id), to: cardId(ids[i + 1]!) })),
       },
@@ -41,7 +42,7 @@ describe('graph validation properties', () => {
       fc.property(idsArb, fc.nat(), (ids, raw) => {
         const file = spaceFileFromIds(ids);
         const edges = file.routes[0]!.edges;
-        edges[raw % edges.length]!.to = '__does_not_exist__';
+        edges[raw % edges.length]!.to = uuid('00000000-0000-4000-8000-ffffffffffff');
         const errors = validateReferences(file);
         expect(errors.some((e) => e.kind === 'unresolved-route-edge')).toBe(true);
       }),
@@ -81,17 +82,17 @@ describe('acyclicity properties (ADR 0023)', () => {
     // this is what stops the check reading "reached twice" as "cycle".
     fc.assert(
       fc.property(fc.integer({ min: 1, max: 8 }), (branches) => {
-        const middles = Array.from({ length: branches }, (_, i) => `m${i}`);
+        const middles = Array.from({ length: branches }, (_, i) => cardId(i + 10));
         const file = {
           title: 'Diamond',
-          cards: [card('start'), card('end'), ...middles.map((id) => card(id))],
+          cards: [card(cardId(1)), card(cardId(2)), ...middles.map((id) => card(id))],
           routes: [
             {
-              id: '00000000-0000-4000-8000-000000000004',
+              id: uuid('00000000-0000-4000-8000-000000000004'),
               title: 'Main',
               edges: middles.flatMap((id) => [
-                { from: 'start', to: id },
-                { from: id, to: 'end' },
+                { from: cardId(1), to: id },
+                { from: id, to: cardId(2) },
               ]),
             },
           ],

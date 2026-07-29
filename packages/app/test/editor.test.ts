@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { NodeChange } from '@xyflow/react';
+import { uuidSchema } from '@project/core';
 import type { CardFlowNode } from '@project/react-flow-adapter';
 import { createEditorStore } from '../src/editor';
 
@@ -10,7 +11,7 @@ function node(id: string, x: number, y: number, title = id): CardFlowNode {
     position: { x, y },
     className: 'rf-card-node',
     data: {
-      cardId: id,
+      cardId: uuidSchema.parse(id),
       title,
       sourceHandles: [],
       targetHandles: [],
