@@ -48,8 +48,9 @@ test('a dragged card stays where it is dropped, and nothing else moves', async (
 test('auto-arrange puts a dragged card back, and it stays draggable', async ({ page }) => {
   await page.goto('/');
   const a = nodeByTitle(page, 'A').first();
+  const routedEdge = page.locator('.react-flow__edge-path').first();
   await expect(a).toBeVisible();
-  await expect(page.locator('.react-flow__edge-path').first()).toHaveAttribute('d', /L/);
+  await expect(routedEdge).toHaveAttribute('d', /L/);
 
   await settled(page);
   const arranged = await positionOf(a);
@@ -60,6 +61,7 @@ test('auto-arrange puts a dragged card back, and it stays draggable', async ({ p
   await expect(persistence).toHaveAttribute('data-revision', '1');
   const dragged = await positionOf(a);
   expect(dragged.y).toBeGreaterThan(arranged.y + 100);
+  await expect(routedEdge).toHaveAttribute('d', /C/);
 
   await page.getByTestId('auto-arrange-button').click();
   await expect(persistence).toHaveAttribute('data-revision', '2');
@@ -69,11 +71,13 @@ test('auto-arrange puts a dragged card back, and it stays draggable', async ({ p
   // this is an equality rather than a "somewhere near".
   await expect.poll(async () => (await positionOf(a)).y).toBe(arranged.y);
   expect((await positionOf(a)).x).toBe(arranged.x);
+  await expect(routedEdge).toHaveAttribute('d', /L/);
 
   // Auto-arrange is an edit, not a switch to a computed view — so the card is
   // still yours to move afterwards.
   await dragBy(page, a, 0, 260);
   expect((await positionOf(a)).y).toBeGreaterThan(arranged.y + 100);
+  await expect(routedEdge).toHaveAttribute('d', /C/);
 });
 
 test('edges follow a card that has been dragged', async ({ page }) => {

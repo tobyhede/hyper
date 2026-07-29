@@ -26,7 +26,7 @@ function cardPositions(graph: LayoutGraph): Record<string, { x: number; y: numbe
 }
 
 describe('strategyForRendering', () => {
-  it('uses the Algorithmic View until conversion, then renders a changed graph from the Layout', async () => {
+  it('uses the automatic strategy until conversion, then renders a changed graph from the Layout', async () => {
     const automaticStrategy = gridStrategy({ columns: 1, gap: 10 });
 
     const beforeConversion = await strategyForRendering(
@@ -192,5 +192,20 @@ describe('useLayoutRendering', () => {
       [CARD_A]: { x: 40, y: 70 },
       [CARD_B]: { x: 510, y: 260 },
     });
+  });
+
+  it('hides a rendered result immediately while its replacement strategy is pending', async () => {
+    const graph = graphWith(CARD_A, CARD_B);
+    const automaticStrategy = gridStrategy();
+    const pendingStrategy: LayoutStrategy = () => new Promise(() => undefined);
+
+    const { result, rerender } = renderHook(({ strategy }) => useLayoutRendering(graph, strategy), {
+      initialProps: { strategy: automaticStrategy },
+    });
+    await waitFor(() => expect(result.current.laidOut).not.toBeNull());
+
+    rerender({ strategy: pendingStrategy });
+
+    expect(result.current.laidOut).toBeNull();
   });
 });
