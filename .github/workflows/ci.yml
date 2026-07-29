@@ -37,6 +37,7 @@ jobs:
       # `--frozen-lockfile` is what turns the committed lockfile into a gate
       # rather than documentation.
       - run: pnpm install --frozen-lockfile
+      - run: pnpm contract:check
       - run: pnpm verify
 
   e2e:

@@ -13,6 +13,7 @@
     "prebuild": "pnpm contract:emit",
     "build": "pnpm --filter @project/app build",
     "contract:emit": "prisma-next contract emit",
+    "contract:check": "pnpm contract:emit && git diff --exit-code -- src/prisma/contract.json src/prisma/contract.d.ts && prisma-next migration check --format json",
     "db:migrate": "prisma-next migrate",
     "postgres:up": "docker compose up -d --wait",
     "postgres:down": "docker compose down",

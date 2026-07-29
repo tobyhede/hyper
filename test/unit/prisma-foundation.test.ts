@@ -82,10 +82,11 @@ describe('Prisma Next foundation', () => {
         '--format',
         'json',
       ],
-      { cwd: repositoryRoot, encoding: 'utf8' },
+      { cwd: repositoryRoot, encoding: 'utf8', timeout: 30_000 },
     );
     const diagnostic = [
       `status: ${command.status ?? 'not launched'}`,
+      `signal: ${command.signal ?? 'none'}`,
       `error: ${command.error?.message ?? 'none'}`,
       `stdout: ${command.stdout || '<empty>'}`,
       `stderr: ${command.stderr || '<empty>'}`,
