@@ -141,30 +141,40 @@ describe('PostgresSpaceRepository', () => {
     });
   });
 
-  it('preserves export metadata while advancing the aggregate revision', async () => {
-    await repository.importSpaces([snapshot]);
-    await db.orm.public.Space.where({ id: SPACE_ID }).update({ exportedRevision: 0 });
-    const changed: SpaceSnapshot = {
+  it('loads the space document and cards from one aggregate revision', async () => {
+    const atRevision = (revision: number): SpaceSnapshot => ({
       ...snapshot,
+      document: { ...snapshot.document, title: `Revision ${revision}` },
       cards: [
         {
           ...snapshot.cards[0]!,
-          document: {
-            ...snapshot.cards[0]!.document,
-            title: 'Changed after export',
-          },
+          document: { ...snapshot.cards[0]!.document, title: `Revision ${revision}` },
         },
-        snapshot.cards[1]!,
       ],
+    });
+    await repository.importSpaces([atRevision(0)]);
+
+    const writeRevisions = async () => {
+      for (let revision = 1; revision <= 50; revision += 1) {
+        await expect(
+          repository.commitSpace(atRevision(revision), BigInt(revision - 1)),
+        ).resolves.toMatchObject({ kind: 'committed', revision: BigInt(revision) });
+      }
+    };
+    const readRevisions = async () => {
+      for (let read = 0; read < 75; read += 1) {
+        const loaded = await repository.loadSpace(SPACE_ID);
+        expect(loaded).toBeDefined();
+        if (loaded === undefined) throw new Error('Imported space disappeared');
+
+        const marker = `Revision ${loaded.revision}`;
+        expect(loaded.snapshot.document.title).toBe(marker);
+        expect(loaded.snapshot.cards).toHaveLength(1);
+        expect(loaded.snapshot.cards[0]?.document.title).toBe(marker);
+      }
     };
 
-    await repository.commitSpace(changed, 0n);
-
-    await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual({
-      snapshot: changed,
-      revision: 1n,
-      exportedRevision: 0n,
-    });
+    await Promise.all([writeRevisions(), ...Array.from({ length: 4 }, readRevisions)]);
   });
 
   it('rejects a commit for an unknown space', async () => {
@@ -264,6 +274,19 @@ describe('PostgresSpaceRepository', () => {
     await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual(expected);
   });
 
+  it('rejects duplicate durable identities across an import batch', async () => {
+    const duplicate = {
+      ...snapshot,
+      document: { ...snapshot.document, title: 'Duplicate identity' },
+    };
+
+    await expect(repository.importSpaces([snapshot, duplicate])).resolves.toMatchObject({
+      kind: 'rejected',
+      code: 'invalid-snapshot',
+    });
+    await expect(repository.loadSpace(SPACE_ID)).resolves.toBeUndefined();
+  });
+
   it('rejects a cross-space card in an import and rolls back the whole batch', async () => {
     await repository.importSpaces([snapshot, otherSnapshot]);
     const changedFirst: SpaceSnapshot = {
@@ -291,17 +314,17 @@ describe('PostgresSpaceRepository', () => {
     });
   });
 
-  it('does not narrow an unsafe bigint revision to a JavaScript number', async () => {
+  it('passes expected revisions beyond the safe integer range without narrowing', async () => {
     await repository.importSpaces([snapshot]);
     const unsafeRevision = BigInt(Number.MAX_SAFE_INTEGER) + 1n;
 
-    await expect(repository.commitSpace(snapshot, unsafeRevision)).rejects.toThrow(
-      `Revision ${unsafeRevision} cannot be represented safely by Prisma Next 0.16.0`,
-    );
-    await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual({
-      snapshot,
-      revision: 0n,
-      exportedRevision: null,
+    await expect(repository.commitSpace(snapshot, unsafeRevision)).resolves.toEqual({
+      kind: 'conflict',
+      current: {
+        snapshot,
+        revision: 0n,
+        exportedRevision: null,
+      },
     });
   });
 });

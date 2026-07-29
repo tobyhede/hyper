@@ -24,19 +24,22 @@ class SnapshotValidationError extends Error {}
 
 class CardOwnershipError extends Error {}
 
-const toRevision = (value: number | string | bigint): bigint =>
-  typeof value === 'bigint' ? value : BigInt(value);
+const toRevision = (value: number | string | bigint): bigint => {
+  if (typeof value === 'number' && !Number.isSafeInteger(value)) {
+    throw new RangeError(`Database revision ${value} is not a safe integer`);
+  }
+  return typeof value === 'bigint' ? value : BigInt(value);
+};
 
 const toOptionalRevision = (value: number | string | bigint | null): bigint | null =>
   value === null ? null : toRevision(value);
 
-const toDatabaseRevision = (value: bigint): number => {
-  const number = Number(value);
-  if (!Number.isSafeInteger(number) || BigInt(number) !== value) {
-    throw new RangeError(`Revision ${value} cannot be represented safely by Prisma Next 0.16.0`);
-  }
-  return number;
-};
+/**
+ * Prisma Next 0.16.0 emits `int8` inputs as `number`, although its codec passes
+ * values through unchanged and node-postgres supports bigint parameters. Keep
+ * the upstream type workaround isolated here so revisions are never narrowed.
+ */
+const toDatabaseRevision = (value: bigint): number => value as unknown as number;
 
 const toJsonValue = (value: unknown): JsonValue => {
   if (value === null || typeof value === 'string' || typeof value === 'boolean') {
@@ -71,27 +74,87 @@ const parseSnapshot = (input: unknown): SpaceSnapshot => {
   return parsed.data;
 };
 
-const loadWith = async (orm: Orm, id: UUID): Promise<StoredSpace | undefined> => {
-  const space = await orm.public.Space.first({ id });
-  if (space === null) return undefined;
+const duplicateIdentity = (snapshots: readonly SpaceSnapshot[]): UUID | undefined => {
+  const seen = new Set<UUID>();
 
-  const cards = await orm.public.Card.where({ spaceId: id })
-    .orderBy((card) => card.id.asc())
-    .all();
-  const snapshot = parseSnapshot({
-    id: space.id,
-    document: spaceDocumentSchema.parse(space.document),
-    cards: cards.map((card) => ({
-      id: card.id,
-      document: cardDocumentSchema.parse(card.document),
-    })),
-  });
+  for (const snapshot of snapshots) {
+    const identities = [
+      snapshot.id,
+      ...snapshot.cards.map(({ id }) => id),
+      ...snapshot.document.routes.map(({ id }) => id),
+      ...(snapshot.document.layouts ?? []).map(({ id }) => id),
+    ];
+    for (const id of identities) {
+      if (seen.has(id)) return id;
+      seen.add(id);
+    }
+  }
 
-  return {
-    snapshot,
-    revision: toRevision(space.revision),
-    exportedRevision: toOptionalRevision(space.exportedRevision),
-  };
+  return undefined;
+};
+
+const rejectInvalidSnapshot = (error: SnapshotValidationError) => ({
+  kind: 'rejected' as const,
+  code: 'invalid-snapshot' as const,
+  message: error.message,
+});
+
+const validateIdentities = (snapshots: readonly SpaceSnapshot[]): void => {
+  const duplicate = duplicateIdentity(snapshots);
+  if (duplicate !== undefined) {
+    throw new SnapshotValidationError(`Duplicate durable identity "${duplicate}"`);
+  }
+};
+
+const loadStoredSpace = async (orm: Orm, id: UUID): Promise<StoredSpace | undefined> => {
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const before = await orm.public.Space.first({ id });
+    if (before === null) return undefined;
+
+    const cards = await orm.public.Card.where({ spaceId: id })
+      .orderBy((card) => card.id.asc())
+      .all();
+    const after = await orm.public.Space.first({ id });
+    if (after === null) continue;
+    if (toRevision(before.revision) !== toRevision(after.revision)) continue;
+
+    const snapshot = parseSnapshot({
+      id: after.id,
+      document: spaceDocumentSchema.parse(after.document),
+      cards: cards.map((card) => ({
+        id: card.id,
+        document: cardDocumentSchema.parse(card.document),
+      })),
+    });
+
+    return {
+      snapshot,
+      revision: toRevision(after.revision),
+      exportedRevision: toOptionalRevision(after.exportedRevision),
+    };
+  }
+
+  throw new Error(`Space ${id} changed repeatedly while loading`);
+};
+
+const upsertCards = async (orm: Orm, snapshot: SpaceSnapshot): Promise<void> => {
+  for (const card of snapshot.cards) {
+    const stored = await orm.public.Card.upsert({
+      create: {
+        id: card.id,
+        spaceId: snapshot.id,
+        document: toJsonValue(card.document),
+      },
+      update: {
+        document: toJsonValue(card.document),
+      },
+    });
+    if (stored.spaceId !== snapshot.id) {
+      throw new CardOwnershipError(
+        `Card ${card.id} belongs to space ${stored.spaceId}, not ${snapshot.id}`,
+      );
+    }
+  }
 };
 
 export class PostgresSpaceRepository implements SpaceRepository {
@@ -111,7 +174,7 @@ export class PostgresSpaceRepository implements SpaceRepository {
   }
 
   loadSpace(id: UUID): Promise<StoredSpace | undefined> {
-    return loadWith(this.#database.orm, id);
+    return loadStoredSpace(this.#database.orm, id);
   }
 
   async commitSpace(
@@ -121,13 +184,10 @@ export class PostgresSpaceRepository implements SpaceRepository {
     let accepted: SpaceSnapshot;
     try {
       accepted = parseSnapshot(snapshot);
+      validateIdentities([accepted]);
     } catch (error) {
       if (error instanceof SnapshotValidationError) {
-        return {
-          kind: 'rejected',
-          code: 'invalid-snapshot',
-          message: error.message,
-        };
+        return rejectInvalidSnapshot(error);
       }
       throw error;
     }
@@ -144,7 +204,7 @@ export class PostgresSpaceRepository implements SpaceRepository {
             revision: databaseRevision,
           });
         if (updated === null) {
-          const current = await loadWith(orm, accepted.id);
+          const current = await loadStoredSpace(orm, accepted.id);
           if (current === undefined) {
             return {
               kind: 'rejected',
@@ -155,23 +215,7 @@ export class PostgresSpaceRepository implements SpaceRepository {
           return { kind: 'conflict', current };
         }
 
-        for (const card of accepted.cards) {
-          const stored = await orm.public.Card.upsert({
-            create: {
-              id: card.id,
-              spaceId: accepted.id,
-              document: toJsonValue(card.document),
-            },
-            update: {
-              document: toJsonValue(card.document),
-            },
-          });
-          if (stored.spaceId !== accepted.id) {
-            throw new CardOwnershipError(
-              `Card ${card.id} belongs to space ${stored.spaceId}, not ${accepted.id}`,
-            );
-          }
-        }
+        await upsertCards(orm, accepted);
 
         const ownedCards = orm.public.Card.where({ spaceId: accepted.id });
         if (accepted.cards.length === 0) {
@@ -200,13 +244,10 @@ export class PostgresSpaceRepository implements SpaceRepository {
     let accepted: SpaceSnapshot[];
     try {
       accepted = snapshots.map(parseSnapshot);
+      validateIdentities(accepted);
     } catch (error) {
       if (error instanceof SnapshotValidationError) {
-        return {
-          kind: 'rejected',
-          code: 'invalid-snapshot',
-          message: error.message,
-        };
+        return rejectInvalidSnapshot(error);
       }
       throw error;
     }
@@ -234,25 +275,9 @@ export class PostgresSpaceRepository implements SpaceRepository {
             throw new Error(`Space ${snapshot.id} changed concurrently during import`);
           }
 
-          for (const card of snapshot.cards) {
-            const stored = await orm.public.Card.upsert({
-              create: {
-                id: card.id,
-                spaceId: snapshot.id,
-                document: toJsonValue(card.document),
-              },
-              update: {
-                document: toJsonValue(card.document),
-              },
-            });
-            if (stored.spaceId !== snapshot.id) {
-              throw new CardOwnershipError(
-                `Card ${card.id} belongs to space ${stored.spaceId}, not ${snapshot.id}`,
-              );
-            }
-          }
+          await upsertCards(orm, snapshot);
 
-          const stored = await loadWith(orm, snapshot.id);
+          const stored = await loadStoredSpace(orm, snapshot.id);
           if (stored === undefined) {
             throw new Error(`Space ${snapshot.id} disappeared during import`);
           }

@@ -20,11 +20,13 @@
 - [x] Ordinary upsert import remains additive and never deletes database cards merely because they are absent from the import input.
 - [x] Integration tests against Docker PostgreSQL cover atomic commits, rollback, stale revisions, listing, loading, ownership conflicts, authoritative runtime deletion, and non-deleting upsert import.
 
-## Resolution
+## Answer
 
 Implemented a server-only `SpaceRepository` and Prisma Next-backed
 `PostgresSpaceRepository`. Repository mutations validate complete snapshots,
-run in callback transactions, preserve card ownership, keep import additive,
-and expose only storage/domain outcomes. The integration suite covers ten
-repository behaviours against PostgreSQL; `pnpm test:integration:postgres`
-and `pnpm verify` pass on Node 24.18.0.
+reject duplicate durable identities, run in callback transactions, preserve
+card ownership, keep import additive, and expose only storage/domain outcomes.
+Revision-stabilised reads prevent a concurrent commit from producing a torn
+space/card aggregate. PostgreSQL revisions remain lossless `bigint` values
+behind an isolated Prisma Next 0.16.0 compatibility cast. The integration suite
+covers eleven repository behaviours against PostgreSQL.
