@@ -1,4 +1,4 @@
-import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
+import { chmod, mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -13,6 +13,15 @@ const makeTemporaryDirectory = async (): Promise<string> => {
   const directory = await mkdtemp(join(tmpdir(), 'hyper-single-space-'));
   temporaryDirectories.push(directory);
   return directory;
+};
+
+const captureError = async (operation: () => Promise<unknown>): Promise<unknown> => {
+  try {
+    await operation();
+    return undefined;
+  } catch (error) {
+    return error;
+  }
 };
 
 afterEach(async () => {
@@ -65,6 +74,66 @@ describe('readSingleSpace', () => {
     await expect(readSingleSpace(spaceFile)).resolves.toEqual(expected);
   });
 
+  it('settles every file read and reports failures in deterministic path order', async () => {
+    const temporaryDirectory = await makeTemporaryDirectory();
+    const talkDirectory = join(temporaryDirectory, 'talk');
+    const cardsDirectory = join(talkDirectory, 'cards');
+    await mkdir(cardsDirectory, { recursive: true });
+
+    const rootCard = join(talkDirectory, 'a.md');
+    const nestedCard = join(cardsDirectory, 'z.md');
+    await writeFile(
+      join(talkDirectory, 'space.json'),
+      JSON.stringify({ version: 2, title: 'Talk', routes: [] }),
+    );
+    await writeFile(rootCard, '---\ntitle: A\n---\nA body\n');
+    await writeFile(nestedCard, '---\ntitle: Z\n---\nZ body\n');
+    await chmod(rootCard, 0o000);
+    await chmod(nestedCard, 0o000);
+
+    const thrown = await captureError(() => readSingleSpace(talkDirectory));
+
+    expect(thrown).toBeInstanceOf(SpaceImportFileError);
+    if (!(thrown instanceof SpaceImportFileError)) return;
+    expect(thrown.kind).toBe('discovery');
+    expect(thrown.diagnostics).toHaveLength(2);
+    expect(thrown.diagnostics[0]).toContain(rootCard);
+    expect(thrown.diagnostics[1]).toContain(nestedCard);
+  });
+
+  it('reports a missing input as an absolute discovery diagnostic', async () => {
+    const temporaryDirectory = await makeTemporaryDirectory();
+    const missingInput = join(temporaryDirectory, 'missing-talk');
+
+    const thrown = await captureError(() => readSingleSpace(relative(process.cwd(), missingInput)));
+
+    expect(thrown).toBeInstanceOf(SpaceImportFileError);
+    if (!(thrown instanceof SpaceImportFileError)) return;
+    expect(thrown.kind).toBe('discovery');
+    expect(thrown.diagnostics).toHaveLength(1);
+    expect(thrown.diagnostics[0]).toContain(missingInput);
+  });
+
+  it('reports an unreadable space file as an absolute discovery diagnostic', async () => {
+    const temporaryDirectory = await makeTemporaryDirectory();
+    const talkDirectory = join(temporaryDirectory, 'talk');
+    await mkdir(talkDirectory);
+
+    const spaceFile = join(talkDirectory, 'space.json');
+    await writeFile(spaceFile, JSON.stringify({ version: 2, title: 'Talk', routes: [] }));
+    await chmod(spaceFile, 0o000);
+
+    const thrown = await captureError(() =>
+      readSingleSpace(relative(process.cwd(), talkDirectory)),
+    );
+
+    expect(thrown).toBeInstanceOf(SpaceImportFileError);
+    if (!(thrown instanceof SpaceImportFileError)) return;
+    expect(thrown.kind).toBe('discovery');
+    expect(thrown.diagnostics).toHaveLength(1);
+    expect(thrown.diagnostics[0]).toContain(spaceFile);
+  });
+
   it('reports every malformed file by absolute path through a relative input', async () => {
     const temporaryDirectory = await makeTemporaryDirectory();
     const talkDirectory = join(temporaryDirectory, 'talk');
@@ -78,12 +147,9 @@ describe('readSingleSpace', () => {
     await writeFile(invalidYamlCard, '---\ntitle: [broken\n---\n');
     await writeFile(missingFrontmatterCard, 'No frontmatter here.\n');
 
-    let thrown: unknown;
-    try {
-      await readSingleSpace(relative(process.cwd(), talkDirectory));
-    } catch (error) {
-      thrown = error;
-    }
+    const thrown = await captureError(() =>
+      readSingleSpace(relative(process.cwd(), talkDirectory)),
+    );
 
     expect(thrown).toBeInstanceOf(SpaceImportFileError);
     if (!(thrown instanceof SpaceImportFileError)) return;
@@ -113,12 +179,7 @@ describe('readSingleSpace', () => {
       }),
     );
 
-    let thrown: unknown;
-    try {
-      await readSingleSpace(relative(process.cwd(), spaceFile));
-    } catch (error) {
-      thrown = error;
-    }
+    const thrown = await captureError(() => readSingleSpace(relative(process.cwd(), spaceFile)));
 
     expect(thrown).toBeInstanceOf(SpaceImportFileError);
     if (!(thrown instanceof SpaceImportFileError)) return;

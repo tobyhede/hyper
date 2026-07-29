@@ -55,18 +55,31 @@ const discoverCardFiles = async (spaceDirectory: string): Promise<string[]> => {
 export const readSingleSpace = async (inputPath: string): Promise<ImportSpace> => {
   let spaceFile: string;
   let cardPaths: string[];
-  let spaceText: string;
-  let cardTexts: string[];
   try {
     spaceFile = await resolveSpaceFile(inputPath);
     const spaceDirectory = dirname(spaceFile);
     cardPaths = await discoverCardFiles(spaceDirectory);
-    [spaceText, ...cardTexts] = await Promise.all([
-      readFile(spaceFile, 'utf8'),
-      ...cardPaths.map((path) => readFile(path, 'utf8')),
-    ]);
   } catch (error) {
     throw new SpaceImportFileError('discovery', [String(error)]);
+  }
+
+  const readPaths = [spaceFile, ...cardPaths];
+  const readResults = await Promise.allSettled(readPaths.map((path) => readFile(path, 'utf8')));
+  const readDiagnostics: string[] = [];
+  let spaceText: string | undefined;
+  const cardTexts: string[] = [];
+  readResults.forEach((result, index) => {
+    if (result.status === 'rejected') {
+      readDiagnostics.push(`${readPaths[index] ?? spaceFile}: ${String(result.reason)}`);
+    } else if (index === 0) {
+      spaceText = result.value;
+    } else {
+      cardTexts.push(result.value);
+    }
+  });
+
+  if (readDiagnostics.length > 0 || spaceText === undefined) {
+    throw new SpaceImportFileError('discovery', readDiagnostics);
   }
 
   const diagnostics: string[] = [];
