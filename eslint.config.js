@@ -76,6 +76,7 @@ export default tseslint.config(
       // typecheck but are not repository-authored lint targets.
       '**/src/prisma/contract.d.ts',
       '**/migrations/**/end-contract.d.ts',
+      '**/migrations/**/start-contract.d.ts',
     ],
   },
   js.configs.recommended,

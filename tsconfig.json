@@ -11,6 +11,7 @@
     "migrations/**/*.ts",
     "src",
     "test/integration",
+    "test/unit",
     "*.config.ts",
     "vitest.setup.ts"
   ]

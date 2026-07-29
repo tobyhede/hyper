@@ -10,7 +10,7 @@ model Space {
   revision         BigInt   @default(0)
   exportedRevision BigInt?  @map("exported_revision")
   createdAt        DateTime @default(now()) @map("created_at")
-  updatedAt        DateTime @default(now()) @map("updated_at")
+  updatedAt        temporal.updatedAt() @map("updated_at")
   cards            Card[]
 
   @@map("spaces")
@@ -21,7 +21,7 @@ model Card {
   spaceId   Uuid     @map("space_id")
   document  Json
   createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @default(now()) @map("updated_at")
+  updatedAt temporal.updatedAt() @map("updated_at")
   space     Space    @relation(fields: [spaceId], references: [id], onDelete: Cascade)
 
   @@index([spaceId])

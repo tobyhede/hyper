@@ -40,4 +40,25 @@ describe('Prisma Next PostgreSQL contract', () => {
       await spaces.where({ id: space.id }).delete();
     }
   });
+
+  it('advances updatedAt when a space is updated', async () => {
+    const space = await spaces.create({
+      document: { version: 2, title: 'Before update', routes: [], layouts: [] },
+      revision: 0,
+    });
+
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      const updated = await spaces.where({ id: space.id }).update({
+        document: { version: 2, title: 'After update', routes: [], layouts: [] },
+        revision: 1,
+      });
+
+      expect(updated).not.toBeNull();
+      expect(updated!.updatedAt.getTime()).toBeGreaterThan(space.updatedAt.getTime());
+    } finally {
+      await spaces.where({ id: space.id }).delete();
+    }
+  });
 });

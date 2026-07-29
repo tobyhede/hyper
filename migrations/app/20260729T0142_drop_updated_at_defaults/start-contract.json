@@ -224,6 +224,10 @@
                 },
                 "updated_at": {
                   "codecId": "pg/timestamptz@1",
+                  "default": {
+                    "expression": "now()",
+                    "kind": "function"
+                  },
                   "nativeType": "timestamptz",
                   "nullable": false
                 }
@@ -303,6 +307,10 @@
                 },
                 "updated_at": {
                   "codecId": "pg/timestamptz@1",
+                  "default": {
+                    "expression": "now()",
+                    "kind": "function"
+                  },
                   "nativeType": "timestamptz",
                   "nullable": false
                 }
@@ -322,50 +330,13 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "sha256:41e74cd99b0a96d4fd9d562c104e7bd36e32ce75726159782a8b744c390b6b55",
+    "storageHash": "sha256:d82f6ab6194e877af981f3a64e5a362d4d83cc525eb6702d0bebbed417f85bbe",
     "types": {
       "Uuid": {
         "codecId": "pg/uuid@1",
         "kind": "codec-instance",
         "nativeType": "uuid"
       }
-    }
-  },
-  "execution": {
-    "executionHash": "sha256:f9be1da4ef42827ebd2b1d6e35e7e84be1f6d78783f54d1796a2b34881777b70",
-    "mutations": {
-      "defaults": [
-        {
-          "onCreate": {
-            "id": "timestampNow",
-            "kind": "generator"
-          },
-          "onUpdate": {
-            "id": "timestampNow",
-            "kind": "generator"
-          },
-          "ref": {
-            "column": "updated_at",
-            "namespace": "public",
-            "table": "cards"
-          }
-        },
-        {
-          "onCreate": {
-            "id": "timestampNow",
-            "kind": "generator"
-          },
-          "onUpdate": {
-            "id": "timestampNow",
-            "kind": "generator"
-          },
-          "ref": {
-            "column": "updated_at",
-            "namespace": "public",
-            "table": "spaces"
-          }
-        }
-      ]
     }
   },
   "capabilities": {

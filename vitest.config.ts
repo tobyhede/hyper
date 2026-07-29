@@ -33,7 +33,7 @@ export default defineConfig({
     environment: 'node',
     environmentMatchGlobs: [['packages/*/test/**/*.tsx', 'jsdom']],
     setupFiles: ['./vitest.setup.ts'],
-    include: ['packages/*/test/**/*.{test,spec}.{ts,tsx}'],
+    include: ['packages/*/test/**/*.{test,spec}.{ts,tsx}', 'test/unit/**/*.{test,spec}.{ts,tsx}'],
     css: false,
     coverage: {
       provider: 'v8',

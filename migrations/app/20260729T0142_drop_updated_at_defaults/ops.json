@@ -1,0 +1,86 @@
+[
+  {
+    "id": "dropDefault.cards.updated_at",
+    "label": "Drop default on \"cards\".\"updated_at\"",
+    "operationClass": "destructive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "column",
+        "name": "updated_at",
+        "table": "cards"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"updated_at\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "cards",
+          "updated_at"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "drop default on \"updated_at\"",
+        "sql": "ALTER TABLE \"public\".\"cards\" ALTER COLUMN \"updated_at\" DROP DEFAULT"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"updated_at\" has no default",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3 AND \"column_default\" IS NULL)) AS \"result\"",
+        "params": [
+          "public",
+          "cards",
+          "updated_at"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "dropDefault.spaces.updated_at",
+    "label": "Drop default on \"spaces\".\"updated_at\"",
+    "operationClass": "destructive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "column",
+        "name": "updated_at",
+        "table": "spaces"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"updated_at\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "spaces",
+          "updated_at"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "drop default on \"updated_at\"",
+        "sql": "ALTER TABLE \"public\".\"spaces\" ALTER COLUMN \"updated_at\" DROP DEFAULT"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"updated_at\" has no default",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3 AND \"column_default\" IS NULL)) AS \"result\"",
+        "params": [
+          "public",
+          "spaces",
+          "updated_at"
+        ]
+      }
+    ]
+  }
+]
