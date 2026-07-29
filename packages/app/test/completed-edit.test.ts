@@ -1,8 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import type { Layout, SpaceSnapshot } from '@project/core';
-import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
-import { createEditorStore } from '../src/editor';
-import { preparePlacementSubmission } from '../src/completed-edit';
+import { MemorySpaceBackend, openSpaceSession, type SpaceSession } from '@project/persistence';
+import { createEditorStore, type EditorStore } from '../src/editor';
+import {
+  preparePlacementSubmission,
+  type PlacementTarget,
+  type PlacementSubmission,
+} from '../src/completed-edit';
 import { completeDrag, node } from './editor-fixtures';
 import { waitForSettled } from './session-fixtures';
 
@@ -50,6 +54,31 @@ const positionedSnapshot: SpaceSnapshot = {
 
 const projected = [node(CARD_A, 10, 20), node(CARD_B, 300, 20)];
 
+const automaticTarget: PlacementTarget = {
+  layoutId: DEFAULT_LAYOUT_ID,
+  layoutTitle: 'Layout',
+  activeRouteId: ROUTE_ID,
+};
+const positionedTarget: PlacementTarget = {
+  layoutId: defaultLayout.id,
+  layoutTitle: defaultLayout.title,
+  activeRouteId: ROUTE_ID,
+};
+
+function prepareEditorSubmission(
+  session: SpaceSession,
+  editor: EditorStore,
+  submittedRevision: number,
+  target: PlacementTarget,
+): PlacementSubmission | null {
+  return preparePlacementSubmission(
+    session.getState().working,
+    submittedRevision,
+    { revision: editor.getState().revision, positions: editor.getState().positions },
+    target,
+  );
+}
+
 describe('completed placement composition', () => {
   it('submits nothing on automatic load, then persists all visible cards on first edit', async () => {
     const loaded = { snapshot: automaticSnapshot, revision: 0n, exportedRevision: null };
@@ -58,31 +87,11 @@ describe('completed placement composition', () => {
     const editor = createEditorStore();
     editor.getState().syncNodes(projected);
 
-    expect(
-      preparePlacementSubmission(
-        session.getState().working,
-        0,
-        { revision: editor.getState().revision, positions: editor.getState().positions },
-        {
-          layoutId: DEFAULT_LAYOUT_ID,
-          layoutTitle: 'Layout',
-          activeRouteId: ROUTE_ID,
-        },
-      ),
-    ).toBeNull();
+    expect(prepareEditorSubmission(session, editor, 0, automaticTarget)).toBeNull();
     expect(session.getState().acknowledgedRevision).toBe(0n);
 
     completeDrag(editor, CARD_A, 500, 400);
-    const prepared = preparePlacementSubmission(
-      session.getState().working,
-      0,
-      { revision: editor.getState().revision, positions: editor.getState().positions },
-      {
-        layoutId: DEFAULT_LAYOUT_ID,
-        layoutTitle: 'Layout',
-        activeRouteId: ROUTE_ID,
-      },
-    );
+    const prepared = prepareEditorSubmission(session, editor, 0, automaticTarget);
     if (prepared === null) throw new Error('Expected a prepared submission');
     session.submit(prepared.snapshot);
     await waitForSettled(session.getState, session.subscribe);
@@ -115,42 +124,13 @@ describe('completed placement composition', () => {
     const editor = createEditorStore(new Map(Object.entries(defaultLayout.positions)));
     editor.getState().syncNodes(projected);
 
-    expect(
-      preparePlacementSubmission(
-        session.getState().working,
-        0,
-        { revision: editor.getState().revision, positions: editor.getState().positions },
-        {
-          layoutId: defaultLayout.id,
-          layoutTitle: defaultLayout.title,
-          activeRouteId: ROUTE_ID,
-        },
-      ),
-    ).toBeNull();
+    expect(prepareEditorSubmission(session, editor, 0, positionedTarget)).toBeNull();
 
     completeDrag(editor, CARD_A, 700, 500);
-    const prepared = preparePlacementSubmission(
-      session.getState().working,
-      0,
-      { revision: editor.getState().revision, positions: editor.getState().positions },
-      {
-        layoutId: defaultLayout.id,
-        layoutTitle: defaultLayout.title,
-        activeRouteId: ROUTE_ID,
-      },
-    );
+    const prepared = prepareEditorSubmission(session, editor, 0, positionedTarget);
     if (prepared === null) throw new Error('Expected a prepared submission');
     expect(
-      preparePlacementSubmission(
-        session.getState().working,
-        prepared.revision,
-        { revision: editor.getState().revision, positions: editor.getState().positions },
-        {
-          layoutId: defaultLayout.id,
-          layoutTitle: defaultLayout.title,
-          activeRouteId: ROUTE_ID,
-        },
-      ),
+      prepareEditorSubmission(session, editor, prepared.revision, positionedTarget),
     ).toBeNull();
     session.submit(prepared.snapshot);
     await waitForSettled(session.getState, session.subscribe);

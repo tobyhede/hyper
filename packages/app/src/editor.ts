@@ -74,7 +74,7 @@ function trackDragOrigins(
   }
 }
 
-function detectMovedIds(
+function consumeSettledMovedIds(
   settled: readonly NodePositionChange[],
   dragOrigins: Map<string, LayoutPoint>,
   beforeById: ReadonlyMap<string, LayoutPoint>,
@@ -191,7 +191,7 @@ export function createEditorStore(
         const settled = positionChanges.filter((change) => change.dragging === false);
         if (settled.length === 0) return { nodes, dragOrigins };
 
-        const movedIds = detectMovedIds(settled, dragOrigins, beforeById, afterById);
+        const movedIds = consumeSettledMovedIds(settled, dragOrigins, beforeById, afterById);
 
         if (movedIds.length === 0) return { nodes, dragOrigins };
 
