@@ -4,21 +4,15 @@ import type { LayoutPoint } from '@project/graph';
 import type { CardFlowNode } from '@project/react-flow-adapter';
 
 /**
- * The editor store: the single owner of React Flow's `nodes` array *and* of the
- * active Layout's placement map.
+ * The editor store is the single owner of React Flow's live node array and the
+ * authoritative authored placement, when one exists.
  *
- * Two representations of where a card is, deliberately. The node array is React
- * Flow's runtime — it also carries measured size, selection and drag state, and
- * it has to absorb every intermediate change during a drag or the card will not
- * follow the cursor in a controlled flow. The map is the domain value: the
- * Layout an author is editing (ADR 0013), written at the *end* of a drag rather
- * than on every frame, so the thing that persists is a placement rather than a
- * gesture.
- *
- * The pattern is the one React Flow's own state-management guide prescribes and
- * the layout-feel spike arrived at independently: one store, interaction in
- * through `changeNodes`, no second reconciled list, no effect copying one source
- * of positions to another.
+ * Live nodes absorb every intermediate React Flow change so controlled dragging
+ * follows the pointer. `positions` is different: it is null while an automatic
+ * arrangement remains runtime-only, or a possibly sparse Layout map after an
+ * existing Layout is opened or an edit authors one. `revision` advances only for
+ * completed edits. `dragOrigins` retains gesture starts across React Flow's
+ * separate moving and settled callbacks.
  */
 
 export interface EditorState {
@@ -28,8 +22,10 @@ export interface EditorState {
    * — and a space is correspondingly not editable for that frame.
    */
   nodes: CardFlowNode[] | null;
-  /** The active Layout's placement map: card id → where the author put it. */
-  positions: ReadonlyMap<string, LayoutPoint>;
+  /** Authoritative, possibly sparse Layout placement; null before conversion. */
+  positions: ReadonlyMap<string, LayoutPoint> | null;
+  /** Gesture starts retained until each node receives a settled callback. */
+  dragOrigins: ReadonlyMap<string, LayoutPoint>;
   /**
    * Set once a card has actually moved. A layout's routed edge geometry
    * describes the arrangement it computed, so it stops being true the moment a
@@ -37,11 +33,7 @@ export interface EditorState {
    * plain curves between wherever the cards now are.
    */
   moved: boolean;
-  /**
-   * Counts real edits — a settled drag that changed a position, or an arrange.
-   * The initial arrangement sync does not touch it, so it is the signal that
-   * distinguishes "the author moved something" from "the layout just resolved".
-   */
+  /** Number of completed placement edits; initial synchronization is not one. */
   revision: number;
   /** Fold a freshly projected node list into the live one. */
   syncNodes: (projected: readonly CardFlowNode[]) => void;
@@ -61,6 +53,13 @@ export type EditorStore = UseBoundStore<StoreApi<EditorState>>;
 
 function positionsOf(nodes: readonly CardFlowNode[]): ReadonlyMap<string, LayoutPoint> {
   return new Map(nodes.map((node) => [node.id, { x: node.position.x, y: node.position.y }]));
+}
+
+function positionsForEdit(
+  nodes: readonly CardFlowNode[],
+  positions: ReadonlyMap<string, LayoutPoint> | null,
+): Map<string, LayoutPoint> {
+  return new Map(positions ?? positionsOf(nodes));
 }
 
 /**
@@ -90,21 +89,20 @@ function reconcile(
   });
 }
 
-export function createEditorStore(): EditorStore {
+export function createEditorStore(
+  initialPositions: ReadonlyMap<string, LayoutPoint> | null = null,
+): EditorStore {
   return create<EditorState>((set) => ({
     nodes: null,
-    positions: new Map(),
+    positions: initialPositions === null ? null : new Map(initialPositions),
+    dragOrigins: new Map(),
     moved: false,
     revision: 0,
 
     syncNodes: (projected) =>
       set((state) => {
         if (state.nodes === null) {
-          // First resolved arrangement. Its positions are the source copied when
-          // an edit converts a space that carried no Layout (ADR 0025). This sync
-          // does not tick the revision, so opening alone remains unedited.
-          const nodes = [...projected];
-          return { nodes, positions: positionsOf(nodes) };
+          return { nodes: [...projected] };
         }
         return { nodes: reconcile(state.nodes, projected) };
       }),
@@ -124,7 +122,13 @@ export function createEditorStore(): EditorStore {
         // is not a merge sneaking back in: the strategy places every card it is
         // handed, and a card genuinely absent from a Layout is an unplaced one,
         // which is a state Layouts are allowed to be in.
-        return { nodes, positions: new Map(positions), moved: false, revision: state.revision + 1 };
+        return {
+          nodes,
+          positions: new Map(positions),
+          dragOrigins: new Map(),
+          moved: false,
+          revision: state.revision + 1,
+        };
       }),
 
     changeNodes: (changes) =>
@@ -141,31 +145,51 @@ export function createEditorStore(): EditorStore {
         const relevant = changes.filter((change) => !('id' in change) || owned.has(change.id));
         if (relevant.length === 0) return {};
 
+        const beforeById = new Map(state.nodes.map((node) => [node.id, node.position]));
         const nodes = applyNodeChanges(relevant, state.nodes);
-
-        // A drag ends with a position change carrying `dragging: false`. That is
-        // the placement worth recording; the frames before it are a gesture.
-        const settled = relevant.filter(
-          (c): c is NodePositionChange => c.type === 'position' && c.dragging === false,
+        const afterById = new Map(nodes.map((node) => [node.id, node.position]));
+        const positionChanges = relevant.filter(
+          (change): change is NodePositionChange => change.type === 'position',
         );
-        if (settled.length === 0) return { nodes };
+        const dragOrigins = new Map(state.dragOrigins);
 
-        const positions = new Map(state.positions);
-        let moved = state.moved;
-        let changed = false;
-        for (const change of settled) {
-          const node = nodes.find((n) => n.id === change.id);
-          if (!node) continue;
-          const was = positions.get(node.id);
-          if (was?.x === node.position.x && was.y === node.position.y) continue;
-          positions.set(node.id, { x: node.position.x, y: node.position.y });
-          moved = true;
-          changed = true;
+        for (const change of positionChanges) {
+          if (change.dragging !== true || dragOrigins.has(change.id)) continue;
+          const origin = beforeById.get(change.id);
+          if (origin !== undefined) dragOrigins.set(change.id, { x: origin.x, y: origin.y });
         }
-        // A settled change that moved nothing — a click, or a drag returned to
-        // where it began — is not an edit and must not trigger a save.
-        if (!changed) return { nodes };
-        return { nodes, positions, moved, revision: state.revision + 1 };
+
+        const settled = positionChanges.filter((change) => change.dragging === false);
+        if (settled.length === 0) return { nodes, dragOrigins };
+
+        const movedIds: string[] = [];
+        for (const change of settled) {
+          const origin = dragOrigins.get(change.id) ?? beforeById.get(change.id);
+          const after = afterById.get(change.id);
+          dragOrigins.delete(change.id);
+          if (
+            origin !== undefined &&
+            after !== undefined &&
+            (origin.x !== after.x || origin.y !== after.y)
+          ) {
+            movedIds.push(change.id);
+          }
+        }
+
+        if (movedIds.length === 0) return { nodes, dragOrigins };
+
+        const positions = positionsForEdit(nodes, state.positions);
+        for (const id of movedIds) {
+          const after = afterById.get(id);
+          if (after !== undefined) positions.set(id, { x: after.x, y: after.y });
+        }
+        return {
+          nodes,
+          positions,
+          dragOrigins,
+          moved: true,
+          revision: state.revision + 1,
+        };
       }),
   }));
 }

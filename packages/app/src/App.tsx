@@ -202,12 +202,14 @@ export const createApp = ({ space, spaceSession }: OpenedSpace, { acceptRemote }
     // revision, so emphasis changes remain outside persistence.
     useEffect(() => {
       if (revision === 0 || revision === submittedRevision.current) return;
+      const positions = useEditorStore.getState().positions;
+      if (positions === null) return;
       submittedRevision.current = revision;
       const next = updatePositionedLayout(
         spaceSession.getState().working,
         persistLayoutId,
         persistLayoutTitle,
-        useEditorStore.getState().positions,
+        positions,
         useSpaceStore.getState().activeRouteId,
       );
       spaceSession.submit(next);
