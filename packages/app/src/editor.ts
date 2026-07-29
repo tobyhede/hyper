@@ -62,6 +62,40 @@ function positionsForEdit(
   return new Map(positions ?? positionsOf(nodes));
 }
 
+function trackDragOrigins(
+  dragOrigins: Map<string, LayoutPoint>,
+  positionChanges: readonly NodePositionChange[],
+  beforeById: ReadonlyMap<string, LayoutPoint>,
+): void {
+  for (const change of positionChanges) {
+    if (change.dragging !== true || dragOrigins.has(change.id)) continue;
+    const origin = beforeById.get(change.id);
+    if (origin !== undefined) dragOrigins.set(change.id, { x: origin.x, y: origin.y });
+  }
+}
+
+function detectMovedIds(
+  settled: readonly NodePositionChange[],
+  dragOrigins: Map<string, LayoutPoint>,
+  beforeById: ReadonlyMap<string, LayoutPoint>,
+  afterById: ReadonlyMap<string, LayoutPoint>,
+): string[] {
+  const movedIds: string[] = [];
+  for (const change of settled) {
+    const origin = dragOrigins.get(change.id) ?? beforeById.get(change.id);
+    const after = afterById.get(change.id);
+    dragOrigins.delete(change.id);
+    if (
+      origin !== undefined &&
+      after !== undefined &&
+      (origin.x !== after.x || origin.y !== after.y)
+    ) {
+      movedIds.push(change.id);
+    }
+  }
+  return movedIds;
+}
+
 /**
  * Fold the freshly projected nodes into the live list. A card that survives
  * keeps its live node — position, measured size, drag, selection — and refreshes
@@ -152,29 +186,12 @@ export function createEditorStore(
           (change): change is NodePositionChange => change.type === 'position',
         );
         const dragOrigins = new Map(state.dragOrigins);
-
-        for (const change of positionChanges) {
-          if (change.dragging !== true || dragOrigins.has(change.id)) continue;
-          const origin = beforeById.get(change.id);
-          if (origin !== undefined) dragOrigins.set(change.id, { x: origin.x, y: origin.y });
-        }
+        trackDragOrigins(dragOrigins, positionChanges, beforeById);
 
         const settled = positionChanges.filter((change) => change.dragging === false);
         if (settled.length === 0) return { nodes, dragOrigins };
 
-        const movedIds: string[] = [];
-        for (const change of settled) {
-          const origin = dragOrigins.get(change.id) ?? beforeById.get(change.id);
-          const after = afterById.get(change.id);
-          dragOrigins.delete(change.id);
-          if (
-            origin !== undefined &&
-            after !== undefined &&
-            (origin.x !== after.x || origin.y !== after.y)
-          ) {
-            movedIds.push(change.id);
-          }
-        }
+        const movedIds = detectMovedIds(settled, dragOrigins, beforeById, afterById);
 
         if (movedIds.length === 0) return { nodes, dragOrigins };
 

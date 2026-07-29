@@ -1,46 +1,8 @@
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import type { LayoutPoint } from '@project/graph';
-import type { CardFlowNode } from '@project/react-flow-adapter';
-import type { NodeChange } from '@xyflow/react';
 import { createEditorStore } from '../src/editor';
-
-function node(id: string, x: number, y: number, title = id): CardFlowNode {
-  return {
-    id,
-    type: 'card',
-    position: { x, y },
-    className: 'rf-card-node',
-    data: {
-      cardId: id,
-      title,
-      sourceHandles: [],
-      targetHandles: [],
-      active: false,
-      showContent: false,
-      activeRouteId: null,
-      emphasis: 'equal',
-    },
-  };
-}
-
-function moving(id: string, x: number, y: number): NodeChange<CardFlowNode>[] {
-  return [{ type: 'position', id, position: { x, y }, dragging: true }];
-}
-
-function settled(id: string, x: number, y: number): NodeChange<CardFlowNode>[] {
-  return [{ type: 'position', id, position: { x, y }, dragging: false }];
-}
-
-function completeDrag(
-  store: ReturnType<typeof createEditorStore>,
-  id: string,
-  x: number,
-  y: number,
-): void {
-  store.getState().changeNodes(moving(id, x, y));
-  store.getState().changeNodes(settled(id, x, y));
-}
+import { completeDrag, moving, node, settled } from './editor-fixtures';
 
 function authoredPositions(
   store: ReturnType<typeof createEditorStore>,

@@ -28,8 +28,8 @@ test('a dragged card stays where it is dropped, and nothing else moves', async (
 
   await dragBy(page, a, 0, 260);
 
-  await expect(persistence).toHaveText('Persisted');
   await expect(persistence).toHaveAttribute('data-revision', '1');
+  await expect(persistence).toHaveText('Persisted');
 
   const to = await positionOf(a);
   expect(to.y).toBeGreaterThan(from.y + 100);
@@ -62,8 +62,8 @@ test('auto-arrange puts a dragged card back, and it stays draggable', async ({ p
   expect(dragged.y).toBeGreaterThan(arranged.y + 100);
 
   await page.getByTestId('auto-arrange-button').click();
-  await expect(persistence).toHaveText('Persisted');
   await expect(persistence).toHaveAttribute('data-revision', '2');
+  await expect(persistence).toHaveText('Persisted');
 
   // Back where the strategy puts it. ELK is deterministic over the same graph, so
   // this is an equality rather than a "somewhere near".
@@ -113,6 +113,6 @@ test('a completed drag persists automatically without a Save action', async ({ p
   await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
 
   await dragBy(page, a, 0, 260);
-  await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
+  await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
 });
