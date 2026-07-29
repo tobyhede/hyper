@@ -18,12 +18,12 @@ import {
   type LayoutGraph,
 } from '@project/graph';
 import type { OpenedSpace } from './space';
-import { updatePositionedLayout } from './snapshot';
+import { preparePlacementSubmission } from './completed-edit';
 import { routeColorMap } from './colors';
 import { CARD_HEIGHT, CARD_SIZE, cardSizeVars } from './card';
 import { createSpaceStore } from './store';
 import { createEditorStore } from './editor';
-import { resolveView } from './view';
+import { layoutPositionMap, resolveView } from './view';
 import { GraphView } from './components/GraphView';
 import { OpenCard } from './components/OpenCard';
 import { PresentingChrome } from './components/PresentingChrome';
@@ -62,10 +62,11 @@ export const createApp = ({ space, spaceSession }: OpenedSpace, { acceptRemote }
   const allHandles = buildCardHandles(space);
   const allRouteEdges = buildRouteEdges(space);
 
-  // Owns React Flow's node array and the placement an edit writes. For a space
-  // with no Layout, the first resolved arrangement supplies the positions copied
-  // when an edit converts it (ADR 0025).
-  const useEditorStore = createEditorStore();
+  // Live nodes hold whichever arrangement is on screen. A positioned view also
+  // supplies its already-authored, possibly sparse Layout map; an automatic view
+  // starts null and is promoted only by a completed edit (ADR 0025).
+  const initialPositions = view.layout === null ? null : layoutPositionMap(view.layout);
+  const useEditorStore = createEditorStore(initialPositions);
 
   // Which Layout an edit writes to. An existing one keeps its authored id and
   // title; converting an automatic arrangement mints both because no author was
@@ -197,21 +198,24 @@ export const createApp = ({ space, spaceSession }: OpenedSpace, { acceptRemote }
       });
     }, [graph, arrange]);
 
-    // A completed edit submits the complete current snapshot. The session owns
-    // ordering, coalescing, revisions, failure and conflict states; intermediate
-    // drag frames never reach it. Route activation does not increment this
-    // revision, so emphasis changes remain outside persistence.
+    // A completed edit prepares one complete snapshot. Preparation narrows nullable
+    // authored placement before the local watermark advances; an invariant failure
+    // therefore cannot mark an unsubmitted revision as submitted. Route activation
+    // does not increment the editor revision and remains outside persistence.
     useEffect(() => {
-      if (revision === 0 || revision === submittedRevision.current) return;
-      submittedRevision.current = revision;
-      const next = updatePositionedLayout(
+      const prepared = preparePlacementSubmission(
         spaceSession.getState().working,
-        persistLayoutId,
-        persistLayoutTitle,
-        useEditorStore.getState().positions,
-        useSpaceStore.getState().activeRouteId,
+        submittedRevision.current,
+        { revision, positions: useEditorStore.getState().positions },
+        {
+          layoutId: persistLayoutId,
+          layoutTitle: persistLayoutTitle,
+          activeRouteId: useSpaceStore.getState().activeRouteId,
+        },
       );
-      spaceSession.submit(next);
+      if (prepared === null) return;
+      submittedRevision.current = prepared.revision;
+      spaceSession.submit(prepared.snapshot);
     }, [revision]);
 
     // Leaving while persistence is not settled asks first. The handler is absent
@@ -302,9 +306,9 @@ export const createApp = ({ space, spaceSession }: OpenedSpace, { acceptRemote }
             />
           </>
         )}
-        {/* Disabled until the arrangement resolves, which is also when there are
-          positions for conversion (ADR 0025) — the same one-frame window
-          `editable` gates dragging on. */}
+        {/* Disabled until the live arrangement resolves. That is when runtime nodes
+          are available to drag or replace; an automatic view still has no authored
+          placement until either action completes (ADR 0025). */}
         <Button
           variant="secondary"
           data-testid="auto-arrange-button"

@@ -98,7 +98,7 @@ function resolveRoutes(
   };
 }
 
-function positionMap(layout: Layout): ReadonlyMap<CardId, LayoutPoint> {
+export function layoutPositionMap(layout: Layout): ReadonlyMap<CardId, LayoutPoint> {
   const positions = new Map<CardId, LayoutPoint>();
   for (const [cardId, point] of Object.entries(layout.positions)) {
     if (point !== undefined) positions.set(uuidSchema.parse(cardId), point);
@@ -115,7 +115,7 @@ export function resolveView(space: Space): ResolvedView {
   if (layout) {
     return {
       id: layout.id,
-      strategy: positionedStrategy(positionMap(layout)),
+      strategy: positionedStrategy(layoutPositionMap(layout)),
       automatic: BUILT_IN_STRATEGIES[DEFAULT_VIEW_ID](),
       layout,
       ...resolveRoutes(space, layout),

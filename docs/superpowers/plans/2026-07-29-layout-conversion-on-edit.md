@@ -49,7 +49,7 @@
 - Consumes: local `main` containing this exact plan.
 - Produces: clean worktree branch `positioned-layout-12-convert-on-edit` at local `main`.
 
-- [ ] **Step 1: Prove the plan is present on local `main` before branching**
+- [x] **Step 1: Prove the plan is present on local `main` before branching**
 
 From the source checkout, run:
 
@@ -70,7 +70,7 @@ git commit -m "Plan layout conversion on edit"
 
 Do not include any other tracked or untracked file in that commit. Repeat the `git ls-tree` check after committing.
 
-- [ ] **Step 2: Create the isolated worktree**
+- [x] **Step 2: Create the isolated worktree**
 
 Invoke `superpowers:using-git-worktrees`. Its native-git fallback is:
 
@@ -84,7 +84,7 @@ git merge-base --is-ancestor main HEAD
 
 Expected: the worktree is clean, checked out on `positioned-layout-12-convert-on-edit`, and the ancestry check exits zero. If the branch or worktree already exists, inspect it rather than deleting or overwriting it.
 
-- [ ] **Step 3: Install and verify the clean baseline**
+- [x] **Step 3: Install and verify the clean baseline**
 
 Run:
 
@@ -112,7 +112,7 @@ Expected: installation succeeds without changing `pnpm-lock.yaml`, and the exist
 - Preserves: `EditorState.changeNodes(changes): void`, `EditorState.arrange(positions): void`, `EditorState.moved`, and monotonically increasing `EditorState.revision`.
 - Guarantees: a positive revision always carries non-null authoritative positions; no in-flight gesture increments the revision.
 
-- [ ] **Step 1: Replace the test drag helper with separate callback helpers**
+- [x] **Step 1: Replace the test drag helper with separate callback helpers**
 
 In `packages/app/test/editor.test.ts`, import fast-check and `LayoutPoint`, then replace the batched `drag` helper with helpers that match React Flow's callback lifecycle:
 
@@ -151,7 +151,7 @@ function authoredPositions(
 
 The final settled callback deliberately repeats the moving callback's coordinates. Do not retain a helper that sends moving and settled changes in one `changeNodes` call; that shape masks the bug this task fixes.
 
-- [ ] **Step 2: Write failing examples for automatic-view conversion**
+- [x] **Step 2: Write failing examples for automatic-view conversion**
 
 Replace the initial and first-sync expectations with `positions === null`, `dragOrigins.size === 0`, and `revision === 0`. Add these focused tests:
 
@@ -214,7 +214,7 @@ it('uses the pre-callback position for a settled-only change', () => {
 });
 ```
 
-- [ ] **Step 3: Write failing examples for later edits, Auto-arrange and projection changes**
+- [x] **Step 3: Write failing examples for later edits, Auto-arrange and projection changes**
 
 Add these cases:
 
@@ -287,7 +287,7 @@ it('starts a positioned view from its existing sparse authored placement', () =>
 });
 ```
 
-- [ ] **Step 4: Migrate every old nullable assertion, then verify the migration is exhaustive**
+- [x] **Step 4: Migrate every old nullable assertion, then verify the migration is exhaustive**
 
 Update every existing editor test according to the state it exercises:
 
@@ -304,7 +304,7 @@ rg -n 'getState\(\)\.positions\.(size|get|has|keys)' packages/app/test/editor.te
 
 Expected: no output. A remaining direct dereference means a nullable-state migration was missed.
 
-- [ ] **Step 5: Add focused fast-check properties**
+- [x] **Step 5: Add focused fast-check properties**
 
 Add the following generators and properties to `packages/app/test/editor.test.ts`:
 
@@ -374,7 +374,7 @@ describe('editor conversion properties', () => {
 });
 ```
 
-- [ ] **Step 6: Run the focused suite and verify red**
+- [x] **Step 6: Run the focused suite and verify red**
 
 Run:
 
@@ -384,7 +384,7 @@ pnpm exec vitest run packages/app/test/editor.test.ts
 
 Expected: failures show that the current store seeds positions on first sync, has no drag-origin state, and misses a completed move when moving and settled callbacks carry the same final position.
 
-- [ ] **Step 7: Implement nullable authored placement and drag-origin tracking**
+- [x] **Step 7: Implement nullable authored placement and drag-origin tracking**
 
 In `packages/app/src/editor.ts`, replace the module and field comments with this contract:
 
@@ -458,7 +458,7 @@ return {
 };
 ```
 
-- [ ] **Step 8: Implement settlement against the gesture origin**
+- [x] **Step 8: Implement settlement against the gesture origin**
 
 In `changeNodes`, retain the current owned-change filter. Replace the settlement logic after `applyNodeChanges` with this map-based implementation; do not use repeated `nodes.find` scans:
 
@@ -516,7 +516,7 @@ Why `positionsForEdit(nodes, ...)` is deliberate:
 - For a positioned view or later edit, non-null positions are cloned rather than densified, preserving sparse authored semantics except for cards actually moved.
 - `dragOrigins` answers whether a gesture moved. The live node map answers what is on screen. These are separate questions.
 
-- [ ] **Step 9: Run focused tests, typechecks and mutation review**
+- [x] **Step 9: Run focused tests, typechecks and mutation review**
 
 Run:
 
@@ -536,7 +536,7 @@ Review these concrete mutations without committing them:
 - Building a null map from only moved ids makes the first-conversion property and projection add/remove test fail.
 - Merging Auto-arrange into existing positions makes the sparse replacement test fail.
 
-- [ ] **Step 10: Commit the independently green editor behavior**
+- [x] **Step 10: Commit the independently green editor behavior**
 
 ```bash
 git add packages/app/src/editor.ts packages/app/test/editor.test.ts
@@ -560,7 +560,7 @@ git commit -m "Convert automatic placement on completed drag"
 - Preserves: `updatePositionedLayout(base, layoutId, title, positions, activeRouteId)` as the non-nullable persistence transformation.
 - Preserves: `SpaceSession.submit(snapshot)` as the only persistence call.
 
-- [ ] **Step 1: Write failing automatic-view composition coverage**
+- [x] **Step 1: Write failing automatic-view composition coverage**
 
 Create `packages/app/test/completed-edit.test.ts` with these imports, fixtures and local helpers:
 
@@ -727,7 +727,7 @@ describe('completed placement composition', () => {
 
 This test proves loading submits nothing and the first completed edit sends one valid snapshot containing every visible card, the correct active route and the new default view. A revision of exactly `1n` is the one-commit assertion.
 
-- [ ] **Step 2: Write failing positioned-view composition coverage**
+- [x] **Step 2: Write failing positioned-view composition coverage**
 
 Add the positioned-view test at top level in the same file:
 
@@ -797,7 +797,7 @@ it('preserves an existing Layout and unrelated Layouts when its first edit persi
 });
 ```
 
-- [ ] **Step 3: Add the invariant test and verify the composition suite is red**
+- [x] **Step 3: Add the invariant test and verify the composition suite is red**
 
 Add this top-level test to `packages/app/test/completed-edit.test.ts`:
 
@@ -826,7 +826,7 @@ pnpm exec vitest run packages/app/test/completed-edit.test.ts
 
 Expected: the suite fails because `../src/completed-edit` does not exist. This is the red state before production implementation.
 
-- [ ] **Step 4: Write the pure preparation helper**
+- [x] **Step 4: Write the pure preparation helper**
 
 Create `packages/app/src/completed-edit.ts` with this complete interface and implementation:
 
@@ -876,7 +876,7 @@ export function preparePlacementSubmission(
 
 The invariant test from Step 3 keeps impossible editor state from advancing the caller's watermark.
 
-- [ ] **Step 5: Run the composition test and verify green**
+- [x] **Step 5: Run the composition test and verify green**
 
 Run:
 
@@ -886,7 +886,7 @@ pnpm exec vitest run packages/app/test/completed-edit.test.ts
 
 Expected: automatic and positioned composition cases persist one complete, valid snapshot apiece; load and duplicate-revision cases submit nothing; invariant coverage passes.
 
-- [ ] **Step 6: Initialize existing authored positions in App**
+- [x] **Step 6: Initialize existing authored positions in App**
 
 In `packages/app/src/App.tsx`, replace the editor creation comment and call with:
 
@@ -909,7 +909,7 @@ Replace the stale toolbar comment above the Auto-arrange button with:
   placement until either action completes (ADR 0025). */}
 ```
 
-- [ ] **Step 7: Prepare before advancing the submission watermark**
+- [x] **Step 7: Prepare before advancing the submission watermark**
 
 Replace the completed-edit comment and effect with:
 
@@ -937,7 +937,7 @@ useEffect(() => {
 
 The order of the final three lines is load-bearing: positions are narrowed and the snapshot is constructed first, the watermark advances second, and `submit` follows immediately. Do not assign `submittedRevision.current` before preparation.
 
-- [ ] **Step 8: Run focused integration, regression and type checks**
+- [x] **Step 8: Run focused integration, regression and type checks**
 
 Run:
 
@@ -953,7 +953,7 @@ pnpm typecheck:packages
 
 Expected: all focused tests and both TypeScript programs pass. The existing snapshot tests remain green, proving `updatePositionedLayout` stayed non-nullable and still preserves route scope and unrelated Layouts.
 
-- [ ] **Step 9: Commit the independently green composition change**
+- [x] **Step 9: Commit the independently green composition change**
 
 ```bash
 git add \
@@ -978,7 +978,7 @@ git commit -m "Persist completed layout conversions"
 - Produces: real-pointer coverage of first automatic conversion and browser evidence that Auto-arrange persists.
 - Produces: a resolved local issue with exact verification counts.
 
-- [ ] **Step 1: Preserve the real-pointer first-drag test and strengthen its persistence assertion**
+- [x] **Step 1: Preserve the real-pointer first-drag test and strengthen its persistence assertion**
 
 Keep `a dragged card stays where it is dropped, and nothing else moves` as a Playwright pointer interaction; do not replace it with programmatic node changes. Add these assertions around its existing drag:
 
@@ -994,7 +994,7 @@ await expect(persistence).toHaveAttribute('data-revision', '1');
 
 This proves loading alone does not persist and the real first gesture does.
 
-- [ ] **Step 2: Make Auto-arrange prove a second persistence revision**
+- [x] **Step 2: Make Auto-arrange prove a second persistence revision**
 
 In `auto-arrange puts a dragged card back, and it stays draggable`, bind the status element and assert the sequence:
 
@@ -1012,7 +1012,7 @@ await expect(persistence).toHaveAttribute('data-revision', '2');
 
 Retain the existing position equality and post-arrange draggability assertions. The later drag may advance persistence again; the required Auto-arrange assertion is revision `2` immediately after the button action settles.
 
-- [ ] **Step 3: Run focused browser verification**
+- [x] **Step 3: Run focused browser verification**
 
 Run only Playwright's isolated server, never the human's server:
 
@@ -1022,7 +1022,7 @@ pnpm exec playwright test packages/app/e2e/editing.spec.ts
 
 Expected: all editing scenarios pass on the Playwright-managed port 5273, including the real-pointer first conversion and Auto-arrange revision assertions.
 
-- [ ] **Step 4: Run the complete repository verification**
+- [x] **Step 4: Run the complete repository verification**
 
 Run:
 
@@ -1032,7 +1032,7 @@ pnpm verify
 
 Expected: root typecheck, all per-package typechecks, lint, format check and coverage tests pass. Record the exact test-file and test counts printed by Vitest.
 
-- [ ] **Step 5: Run the complete browser suite**
+- [x] **Step 5: Run the complete browser suite**
 
 Run:
 
@@ -1042,7 +1042,7 @@ pnpm e2e
 
 Expected: fixture, new-space and invalid-space projects pass on Playwright's ports 5273–5275. Record the exact passed-test count.
 
-- [ ] **Step 6: Resolve issue 12 with the verified answer**
+- [x] **Step 6: Resolve issue 12 with the verified answer**
 
 In `.scratch/positioned-layout/issues/12-conversion-fires-on-the-edit-not-on-the-first-frame.md`, change `Status: open` to `Status: resolved` and append an `## Answer` section containing these facts:
 
@@ -1055,7 +1055,7 @@ In `.scratch/positioned-layout/issues/12-conversion-fires-on-the-edit-not-on-the
 - Snapshot preparation narrows positions and builds the snapshot before `App` advances its submission watermark.
 - Include the exact `pnpm verify` and `pnpm e2e` counts recorded in Steps 4 and 5.
 
-- [ ] **Step 7: Review scope and commit browser plus issue capture**
+- [x] **Step 7: Review scope and commit browser plus issue capture**
 
 Run:
 
@@ -1077,7 +1077,7 @@ git diff --cached --check
 git commit -m "Verify layout conversion on edit"
 ```
 
-- [ ] **Step 8: Confirm final branch state**
+- [x] **Step 8: Confirm final branch state**
 
 Run:
 
