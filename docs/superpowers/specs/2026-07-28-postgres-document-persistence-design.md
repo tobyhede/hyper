@@ -66,6 +66,13 @@ Importing an id-less entity always inserts a new entity. Only an explicit UUID
 can address an existing entity for update. Re-importing the same id-less input
 before exporting it therefore creates another entity.
 
+Import has no second, temporary identity language. Every entity id and every
+UUID reference in import input remains a UUID; built-in view names remain
+`graph` or `grid`. A UUID reference must resolve to an explicitly identified
+entity. An id-less card, route, or layout therefore cannot be referenced by an
+edge, alias, layout position, route filter, active route, or default view until
+export writes its generated UUID.
+
 ## Domain shape
 
 The persistence-facing aggregate is:
@@ -357,7 +364,8 @@ Second, one repository transaction:
 1. truncates all Hyper content first when dangerous truncation was requested;
 2. asks PostgreSQL for UUIDs for every missing space, card, route, and layout id;
 3. constructs fully identified snapshots;
-4. validates all domain references and invariants;
+4. validates all domain references and invariants, including that every UUID
+   reference resolved to an explicitly identified input entity;
 5. upserts every explicitly identified space and card row;
 6. inserts space and card rows whose ids were absent in the input, while
    persisting generated route and layout ids inside their parent document;
@@ -369,7 +377,8 @@ implicit move. Duplicate explicit UUIDs within the batch are errors.
 
 The same `importSpaces` module accepts programmatic `ImportSpace` inputs for
 seeds and test fixtures. Only the file adapter performs filesystem discovery and
-frontmatter parsing.
+frontmatter parsing. It returns the imported stored aggregates; choosing or
+opening a database workspace is startup policy outside the importer.
 
 ## Startup behavior
 
