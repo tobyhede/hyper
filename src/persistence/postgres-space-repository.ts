@@ -24,6 +24,26 @@ class SnapshotValidationError extends Error {}
 
 class CardOwnershipError extends Error {}
 
+class ImportConflictError extends Error {
+  readonly spaceId: UUID;
+
+  constructor(spaceId: UUID) {
+    super(`Space ${spaceId} changed concurrently during import`);
+    this.spaceId = spaceId;
+  }
+}
+
+const isSpacePrimaryKeyConflict = (error: unknown): boolean => {
+  if (typeof error !== 'object' || error === null) return false;
+  const candidate = error as Record<string, unknown>;
+  return (
+    candidate['kind'] === 'sql_query' &&
+    candidate['sqlState'] === '23505' &&
+    candidate['table'] === 'spaces' &&
+    candidate['constraint'] === 'spaces_pkey'
+  );
+};
+
 const toRevision = (value: number | string | bigint): bigint => {
   if (typeof value === 'number' && !Number.isSafeInteger(value)) {
     throw new RangeError(`Database revision ${value} is not a safe integer`);
@@ -258,21 +278,30 @@ export class PostgresSpaceRepository implements SpaceRepository {
 
         for (const snapshot of accepted) {
           const current = await orm.public.Space.first({ id: snapshot.id });
-          const space =
-            current === null
-              ? await orm.public.Space.create({
-                  id: snapshot.id,
-                  document: toJsonValue(snapshot.document),
-                  revision: 0,
-                })
-              : await orm.public.Space.where({ id: snapshot.id })
-                  .where({ revision: current.revision })
-                  .update({
-                    document: toJsonValue(snapshot.document),
-                    revision: toDatabaseRevision(toRevision(current.revision) + 1n),
-                  });
+          let space;
+          if (current === null) {
+            try {
+              space = await orm.public.Space.create({
+                id: snapshot.id,
+                document: toJsonValue(snapshot.document),
+                revision: 0,
+              });
+            } catch (error) {
+              if (isSpacePrimaryKeyConflict(error)) {
+                throw new ImportConflictError(snapshot.id);
+              }
+              throw error;
+            }
+          } else {
+            space = await orm.public.Space.where({ id: snapshot.id })
+              .where({ revision: current.revision })
+              .update({
+                document: toJsonValue(snapshot.document),
+                revision: toDatabaseRevision(toRevision(current.revision) + 1n),
+              });
+          }
           if (space === null) {
-            throw new Error(`Space ${snapshot.id} changed concurrently during import`);
+            throw new ImportConflictError(snapshot.id);
           }
 
           await upsertCards(orm, snapshot);
@@ -287,6 +316,15 @@ export class PostgresSpaceRepository implements SpaceRepository {
         return { kind: 'imported', spaces: imported };
       });
     } catch (error) {
+      if (error instanceof ImportConflictError) {
+        const current = await loadStoredSpace(this.#database.orm, error.spaceId);
+        if (current === undefined) {
+          throw new Error(`Space ${error.spaceId} disappeared after an import conflict`, {
+            cause: error,
+          });
+        }
+        return { kind: 'conflict', current };
+      }
       if (error instanceof CardOwnershipError) {
         return {
           kind: 'rejected',

@@ -11,6 +11,100 @@ const ROUTE_ID = uuidSchema.parse('55555555-5555-4555-8555-555555555555');
 const MISSING_CARD_ID = uuidSchema.parse('66666666-6666-4666-8666-666666666666');
 const OTHER_SPACE_ID = uuidSchema.parse('77777777-7777-4777-8777-777777777777');
 const OTHER_CARD_ID = uuidSchema.parse('88888888-8888-4888-8888-888888888888');
+const CONCURRENT_SPACE_ID = uuidSchema.parse('99999999-9999-4999-8999-999999999999');
+
+const createReadBarrier = (parties: number) => {
+  let arrivals = 0;
+  let release: (() => void) | undefined;
+  const opened = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+
+  return async () => {
+    arrivals += 1;
+    if (arrivals === parties) release?.();
+    await opened;
+  };
+};
+
+const createGate = () => {
+  let release: (() => void) | undefined;
+  const opened = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+
+  return {
+    open: () => release?.(),
+    wait: () => opened,
+  };
+};
+
+const databasePausedAfterFirstSpaceRead = (
+  id: typeof SPACE_ID,
+  barrier: () => Promise<void>,
+  afterBarrier: () => Promise<void> = () => Promise.resolve(),
+): typeof db =>
+  new Proxy(db, {
+    get(target, property, receiver) {
+      if (property !== 'transaction') {
+        const value: unknown = Reflect.get(target, property, receiver);
+        return value;
+      }
+
+      const transaction: typeof db.transaction = (callback) =>
+        db.transaction((context) => {
+          let paused = false;
+          const space = new Proxy(context.orm.public.Space, {
+            get(spaceTarget, spaceProperty) {
+              if (spaceProperty === 'first') {
+                return async (...args: Parameters<typeof spaceTarget.first>) => {
+                  const result = await spaceTarget.first(...args);
+                  if (!paused && args[0].id === id) {
+                    paused = true;
+                    await barrier();
+                    await afterBarrier();
+                  }
+                  return result;
+                };
+              }
+
+              const value: unknown = Reflect.get(spaceTarget, spaceProperty, spaceTarget);
+              if (typeof value !== 'function') return value;
+              return (...args: unknown[]) => Reflect.apply(value, spaceTarget, args) as unknown;
+            },
+          });
+          const publicNamespace = new Proxy(context.orm.public, {
+            get(namespaceTarget, namespaceProperty, namespaceReceiver) {
+              if (namespaceProperty === 'Space') return space;
+              const value: unknown = Reflect.get(
+                namespaceTarget,
+                namespaceProperty,
+                namespaceReceiver,
+              );
+              return value;
+            },
+          });
+          const orm = new Proxy(context.orm, {
+            get(ormTarget, ormProperty, ormReceiver) {
+              if (ormProperty === 'public') return publicNamespace;
+              const value: unknown = Reflect.get(ormTarget, ormProperty, ormReceiver);
+              return value;
+            },
+          });
+          const wrappedContext = new Proxy(context, {
+            get(contextTarget, contextProperty, contextReceiver) {
+              if (contextProperty === 'orm') return orm;
+              const value: unknown = Reflect.get(contextTarget, contextProperty, contextReceiver);
+              return value;
+            },
+          });
+
+          return callback(wrappedContext);
+        });
+
+      return transaction;
+    },
+  });
 
 const snapshot: SpaceSnapshot = {
   id: SPACE_ID,
@@ -66,6 +160,7 @@ describe('PostgresSpaceRepository', () => {
     await db.orm.public.Card.where({ spaceId: OTHER_SPACE_ID }).delete();
     await db.orm.public.Space.where({ id: SPACE_ID }).delete();
     await db.orm.public.Space.where({ id: OTHER_SPACE_ID }).delete();
+    await db.orm.public.Space.where({ id: CONCURRENT_SPACE_ID }).delete();
   });
 
   afterAll(async () => {
@@ -79,7 +174,9 @@ describe('PostgresSpaceRepository', () => {
       kind: 'imported',
       spaces: [{ snapshot, revision: 0n, exportedRevision: null }],
     });
-    if (imported.kind !== 'imported') throw new Error(imported.message);
+    if (imported.kind !== 'imported') {
+      throw new Error(imported.kind === 'rejected' ? imported.message : 'Import conflicted');
+    }
     await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual(imported.spaces[0]);
     await expect(repository.listSpaces()).resolves.toEqual([
       { id: SPACE_ID, title: 'Repository space' },
@@ -325,6 +422,85 @@ describe('PostgresSpaceRepository', () => {
         revision: 0n,
         exportedRevision: null,
       },
+    });
+  });
+
+  it('returns a typed conflict and rolls back the losing batch after a concurrent update', async () => {
+    await repository.importSpaces([snapshot, otherSnapshot]);
+    const barrier = createReadBarrier(2);
+    const winnerCommitted = createGate();
+    const winner = new PostgresSpaceRepository(
+      databasePausedAfterFirstSpaceRead(SPACE_ID, barrier),
+    );
+    const loser = new PostgresSpaceRepository(
+      databasePausedAfterFirstSpaceRead(SPACE_ID, barrier, winnerCommitted.wait),
+    );
+    const winningSnapshot: SpaceSnapshot = {
+      ...snapshot,
+      document: { ...snapshot.document, title: 'Concurrent winner' },
+    };
+    const losingSnapshot: SpaceSnapshot = {
+      ...snapshot,
+      document: { ...snapshot.document, title: 'Concurrent loser' },
+    };
+    const earlierLosingWrite: SpaceSnapshot = {
+      ...otherSnapshot,
+      document: { ...otherSnapshot.document, title: 'Must roll back' },
+    };
+
+    const winningImport = winner.importSpaces([winningSnapshot]).finally(winnerCommitted.open);
+    const [winningResult, losingResult] = await Promise.all([
+      winningImport,
+      loser.importSpaces([earlierLosingWrite, losingSnapshot]),
+    ]);
+
+    expect(winningResult).toEqual({
+      kind: 'imported',
+      spaces: [{ snapshot: winningSnapshot, revision: 1n, exportedRevision: null }],
+    });
+    expect(losingResult).toEqual({
+      kind: 'conflict',
+      current: { snapshot: winningSnapshot, revision: 1n, exportedRevision: null },
+    });
+    await expect(repository.loadSpace(OTHER_SPACE_ID)).resolves.toEqual({
+      snapshot: otherSnapshot,
+      revision: 0n,
+      exportedRevision: null,
+    });
+  });
+
+  it('returns a typed conflict when another import creates the space first', async () => {
+    const barrier = createReadBarrier(2);
+    const winnerCommitted = createGate();
+    const winner = new PostgresSpaceRepository(
+      databasePausedAfterFirstSpaceRead(CONCURRENT_SPACE_ID, barrier),
+    );
+    const loser = new PostgresSpaceRepository(
+      databasePausedAfterFirstSpaceRead(CONCURRENT_SPACE_ID, barrier, winnerCommitted.wait),
+    );
+    const winningSnapshot: SpaceSnapshot = {
+      id: CONCURRENT_SPACE_ID,
+      document: { version: 2, title: 'Concurrent create winner', routes: [] },
+      cards: [],
+    };
+    const losingSnapshot: SpaceSnapshot = {
+      ...winningSnapshot,
+      document: { ...winningSnapshot.document, title: 'Concurrent create loser' },
+    };
+
+    const winningImport = winner.importSpaces([winningSnapshot]).finally(winnerCommitted.open);
+    const [winningResult, losingResult] = await Promise.all([
+      winningImport,
+      loser.importSpaces([losingSnapshot]),
+    ]);
+
+    expect(winningResult).toEqual({
+      kind: 'imported',
+      spaces: [{ snapshot: winningSnapshot, revision: 0n, exportedRevision: null }],
+    });
+    expect(losingResult).toEqual({
+      kind: 'conflict',
+      current: { snapshot: winningSnapshot, revision: 0n, exportedRevision: null },
     });
   });
 });

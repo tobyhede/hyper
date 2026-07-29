@@ -22,6 +22,7 @@ export type RepositoryCommitResult =
 
 export type RepositoryImportResult =
   | { kind: 'imported'; spaces: readonly StoredSpace[] }
+  | { kind: 'conflict'; current: StoredSpace }
   | {
       kind: 'rejected';
       code: 'invalid-snapshot';

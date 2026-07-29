@@ -566,7 +566,7 @@ Create `packages/app/test/completed-edit.test.ts` with these imports, fixtures a
 
 ```ts
 import { describe, expect, it } from 'vitest';
-import type { Layout, SpaceSnapshot } from '@project/core';
+import { uuidSchema, type Layout, type SpaceSnapshot } from '@project/core';
 import type { SpaceSessionState } from '@project/persistence';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
 import type { NodeChange } from '@xyflow/react';
@@ -574,12 +574,12 @@ import type { CardFlowNode } from '@project/react-flow-adapter';
 import { createEditorStore } from '../src/editor';
 import { preparePlacementSubmission } from '../src/completed-edit';
 
-const SPACE_ID = '00000000-0000-4000-8000-000000000001';
-const CARD_A = '00000000-0000-4000-8000-000000000002';
-const CARD_B = '00000000-0000-4000-8000-000000000003';
-const ROUTE_ID = '00000000-0000-4000-8000-000000000004';
-const DEFAULT_LAYOUT_ID = '00000000-0000-4000-8000-000000000021';
-const OTHER_LAYOUT_ID = '00000000-0000-4000-8000-000000000022';
+const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
+const CARD_A = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
+const CARD_B = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
+const ROUTE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
+const DEFAULT_LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000021');
+const OTHER_LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000022');
 
 const automaticSnapshot: SpaceSnapshot = {
   id: SPACE_ID,
@@ -831,7 +831,7 @@ Expected: the suite fails because `../src/completed-edit` does not exist. This i
 Create `packages/app/src/completed-edit.ts` with this complete interface and implementation:
 
 ```ts
-import type { SpaceSnapshot, UUID } from '@project/core';
+import type { RouteId, SpaceSnapshot, UUID } from '@project/core';
 import type { LayoutPoint } from '@project/graph';
 import { updatePositionedLayout } from './snapshot';
 
@@ -843,7 +843,7 @@ export interface CompletedPlacementEdit {
 export interface PlacementTarget {
   readonly layoutId: UUID;
   readonly layoutTitle: string;
-  readonly activeRouteId: string | null;
+  readonly activeRouteId: RouteId | null;
 }
 
 export interface PlacementSubmission {
