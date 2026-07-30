@@ -50,36 +50,35 @@ describe('graph validation properties', () => {
   });
 });
 
-describe('acyclicity properties (ADR 0023)', () => {
-  it('a chain of distinct cards is always acyclic', () => {
-    fc.assert(
-      fc.property(idsArb, (ids) => {
-        const errors = validateReferences(spaceFileFromIds(ids));
-        expect(errors.some((e) => e.kind === 'route-has-cycle')).toBe(false);
-      }),
-    );
-  });
-
-  it('an edge back to any earlier card always closes a cycle', () => {
-    // The check has to catch a loop wherever it closes, not only one that
-    // returns to the route's first card — which is what a duplicate scan over a
-    // step list used to do for free and an edge list does not.
+describe('Route shape properties (ADR 0032)', () => {
+  it('a cycle through any earlier card is accepted', () => {
     fc.assert(
       fc.property(idsArb, fc.nat(), fc.nat(), (ids, rawFrom, rawTo) => {
         const to = rawTo % ids.length;
         const from = to + (rawFrom % (ids.length - to));
         const file = spaceFileFromIds(ids);
         file.routes[0]!.edges.push({ from: cardId(ids[from]!), to: cardId(ids[to]!) });
-        const errors = validateReferences(file);
-        expect(errors.some((e) => e.kind === 'route-has-cycle')).toBe(true);
+        expect(validateReferences(file)).toEqual([]);
       }),
     );
   });
 
-  it('a fork that merges again is never a cycle, however wide', () => {
+  it('adding an exact duplicate Edge is always rejected', () => {
+    fc.assert(
+      fc.property(idsArb, fc.nat(), (ids, raw) => {
+        const file = spaceFileFromIds(ids);
+        const edges = file.routes[0]!.edges;
+        edges.push({ ...edges[raw % edges.length]! });
+        expect(
+          validateReferences(file).some((error) => error.kind === 'duplicate-route-edge'),
+        ).toBe(true);
+      }),
+    );
+  });
+
+  it('an arbitrary-width fork and merge is accepted', () => {
     // Every branch runs forward from one card to one card, so the union is a
-    // diamond: many paths, no loop. Forks and merges are legal (ADR 0023) and
-    // this is what stops the check reading "reached twice" as "cycle".
+    // diamond: many paths, no duplicate Edge. Forks and merges are legal.
     fc.assert(
       fc.property(fc.integer({ min: 1, max: 8 }), (branches) => {
         const middles = Array.from({ length: branches }, (_, i) => cardId(i + 10));

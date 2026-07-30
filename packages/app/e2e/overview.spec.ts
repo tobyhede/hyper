@@ -6,9 +6,9 @@ import { expect, test, type Locator, type Page } from './fixtures';
 // disconnected collections sharing no cards, laid out by ELK as separate bands:
 //   1. Long (A→B→C→D→A′), Mid (A→B→C→D), Short (A→B→C) — routes over one spine
 //   2. Echo (E→F→G→H→E′) — a plain linear collection
-// Each returns to its start via an alias; a route may not close a cycle (ADR
-// 0023), so the fixture is acyclic and lays out as clean forward paths. These
-// tests assert *behaviour* against that shape; none read card prose. See
+// Each returns to its start via an alias, so this particular fixture is acyclic
+// and lays out as clean forward paths even though Routes may contain cycles
+// (ADR 0032). These tests assert *behaviour* against that shape; none read card prose. See
 // fixture/README.md for why each case is there.
 //
 // This file is the **overview**: the space drawn whole, every route at once.

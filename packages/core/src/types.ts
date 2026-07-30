@@ -34,7 +34,7 @@ export type ImportSpace = z.infer<typeof importSpaceSchema>;
  */
 export type CardFrontmatter = z.infer<typeof cardFrontmatterSchema>;
 /**
- * One `{ from, to }` connection a route is made of (ADR 0023). The authored
+ * One `{ from, to }` connection a route is made of (ADR 0032). The authored
  * element — distinct from `@project/graph`'s `GraphEdge`, which is this plus the
  * handles it attaches to, and from `LayoutEdge`, which is that plus geometry.
  */

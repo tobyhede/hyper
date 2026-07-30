@@ -53,7 +53,7 @@ describe('routeEntryCards', () => {
     expect(routeEntryCards(diamond)).toEqual(['00000000-0000-4000-8000-000000000002']);
   });
 
-  it('finds one per component — a route need not be connected (ADR 0023)', () => {
+  it('finds one per component — a Route need not be connected (ADR 0032)', () => {
     expect(
       routeEntryCards(
         route([

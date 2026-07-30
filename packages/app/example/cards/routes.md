@@ -19,8 +19,9 @@ A **route** is a set of directed edges between cards.
 ```
 
 A card may have several edges out — a **fork** — and several in — a **merge**.
-What a route may not do is close a cycle: returning to earlier content is an edge
-to an **alias**, a distinct card showing the same content.
+A route may contain cycles and self-edges; presenting decides how to traverse
+them. An **alias** is a distinct card with its own title and position that shows
+another card's content, not a workaround for returning to an existing card.
 
 A route that gives every card one edge out is a **line**. That is the degenerate
 graph, not a second kind of route.

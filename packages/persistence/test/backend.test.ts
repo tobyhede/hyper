@@ -85,10 +85,10 @@ describe('MemorySpaceBackend', () => {
           routes: [
             {
               id: ROUTE_ID,
-              title: 'Cycle',
+              title: 'Duplicate Edge',
               edges: [
                 { from: CARD_ID, to: CARD_B },
-                { from: CARD_B, to: CARD_ID },
+                { from: CARD_ID, to: CARD_B },
               ],
             },
           ],

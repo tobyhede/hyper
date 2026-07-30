@@ -1,6 +1,7 @@
 # Routes are authored as React Flow edges; handles are neutral, not per-route
 
-Status: accepted
+Status: superseded
+Superseded by: 0033
 Refines: 0013
 Related: 0022, 0023, 0025, 0026
 

@@ -66,40 +66,38 @@ describe('validateReferences', () => {
     expect(error?.message).toContain('as its to');
   });
 
-  it('rejects a route that closes a cycle, and names the loop (ADR 0023)', () => {
+  it('accepts a route that closes a cycle (ADR 0032)', () => {
     const m = baseSpaceFile();
-    // A → B → A: a return to A. This must be an alias, not a loop.
+    // A → B → A: presenting decides how to traverse the authored loop.
     m.routes[0]!.edges.push({
       from: uuid('00000000-0000-4000-8000-000000000003'),
       to: uuid('00000000-0000-4000-8000-000000000002'),
     });
-    const errors = validateReferences(m);
-    const error = errors.find((e) => e.kind === 'route-has-cycle');
-    expect(error?.ref).toBe(uuid('00000000-0000-4000-8000-000000000002'));
-    expect(error?.message).toContain(
-      '00000000-0000-4000-8000-000000000002 → 00000000-0000-4000-8000-000000000003 → 00000000-0000-4000-8000-000000000002',
-    );
+    expect(validateReferences(m)).toEqual([]);
   });
 
-  it('rejects a self-loop', () => {
+  it('rejects an exact duplicate Edge within one Route', () => {
+    const m = baseSpaceFile();
+    m.routes[0]!.edges.push({ ...m.routes[0]!.edges[0]! });
+
+    expect(validateReferences(m)).toContainEqual({
+      kind: 'duplicate-route-edge',
+      ref: '00000000-0000-4000-8000-000000000002 → 00000000-0000-4000-8000-000000000003',
+      message:
+        'Route "00000000-0000-4000-8000-000000000004" repeats edge 00000000-0000-4000-8000-000000000002 → 00000000-0000-4000-8000-000000000003 at index 1 (first at index 0)',
+    });
+  });
+
+  it('accepts a self-edge', () => {
     const m = baseSpaceFile();
     m.routes[0]!.edges.push({
       from: uuid('00000000-0000-4000-8000-000000000003'),
       to: uuid('00000000-0000-4000-8000-000000000003'),
     });
-    const errors = validateReferences(m);
-    expect(
-      errors.some(
-        (e) =>
-          e.kind === 'route-has-cycle' && e.ref === uuid('00000000-0000-4000-8000-000000000003'),
-      ),
-    ).toBe(true);
+    expect(validateReferences(m)).toEqual([]);
   });
 
-  it('rejects a cycle that no card outside it reaches', () => {
-    // The loop is a disconnected component, so a search rooted only at the
-    // route's first card would never enter it. A route need not be connected
-    // (ADR 0023), so every card has to be a candidate root.
+  it('accepts a cycle in a disconnected component', () => {
     const m = baseSpaceFile();
     m.cards.push(
       card(uuid('00000000-0000-4000-8000-000000000005')),
@@ -115,18 +113,17 @@ describe('validateReferences', () => {
         to: uuid('00000000-0000-4000-8000-000000000005'),
       },
     );
-    const errors = validateReferences(m);
-    expect(errors.some((e) => e.kind === 'route-has-cycle')).toBe(true);
+    expect(validateReferences(m)).toEqual([]);
   });
 
-  it('accepts a fork and a merge — only cycles are forbidden (ADR 0023)', () => {
+  it('accepts a fork and a merge', () => {
     const m = baseSpaceFile();
     m.cards.push(
       card(uuid('00000000-0000-4000-8000-000000000005')),
       card(uuid('00000000-0000-4000-8000-000000000006')),
     );
-    // a forks to b and c, which merge back into d. Acyclic, and `d` is reachable
-    // two ways, which is exactly what a merge is.
+    // a forks to b and c, which merge back into d. `d` is reachable two ways,
+    // which is exactly what a merge is.
     m.routes[0]!.edges = [
       {
         from: uuid('00000000-0000-4000-8000-000000000002'),
@@ -148,7 +145,24 @@ describe('validateReferences', () => {
     expect(validateReferences(m)).toEqual([]);
   });
 
-  it('allows different routes to share a card', () => {
+  it('allows the same Edge in different Routes', () => {
+    const m = baseSpaceFile();
+    m.routes.push({
+      id: uuid('00000000-0000-4000-8000-000000000030'),
+      title: 'Alt',
+      edges: [
+        {
+          from: uuid('00000000-0000-4000-8000-000000000002'),
+          to: uuid('00000000-0000-4000-8000-000000000003'),
+        },
+      ],
+    });
+    expect(validateReferences(m)).toEqual([]);
+  });
+
+  it('allows two routes to disagree about order', () => {
+    // main goes a → b and alt goes b → a. Their union has a cycle, which a
+    // renderer must tolerate (ADR 0032).
     const m = baseSpaceFile();
     m.routes.push({
       id: uuid('00000000-0000-4000-8000-000000000030'),
@@ -161,24 +175,6 @@ describe('validateReferences', () => {
       ],
     });
     expect(validateReferences(m)).toEqual([]);
-  });
-
-  it('checks each route on its own: two routes may disagree about order', () => {
-    // main goes a → b and alt goes b → a. Their union has a cycle; neither route
-    // does, and a route is what acyclicity is a property of (ADR 0003 permits
-    // routes to disagree).
-    const m = baseSpaceFile();
-    m.routes.push({
-      id: uuid('00000000-0000-4000-8000-000000000030'),
-      title: 'Alt',
-      edges: [
-        {
-          from: uuid('00000000-0000-4000-8000-000000000003'),
-          to: uuid('00000000-0000-4000-8000-000000000002'),
-        },
-      ],
-    });
-    expect(errorKinds(validateReferences(m))).not.toContain('route-has-cycle');
   });
 
   it('detects duplicate card ids', () => {

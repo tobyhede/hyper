@@ -8,7 +8,7 @@ Two small pieces, imported from `space.json` and the card Markdown files:
 | Piece | Purpose |
 | ----- | ------- |
 | `cards` | Markdown content + frontmatter |
-| `routes` | Acyclic graphs of `{ from, to }` edges |
+| `routes` | Graphs of unique `{ from, to }` edges; cycles are allowed |
 
 Cards *are* the graph, and routes are its only structure — a route's edges reference cards directly.
 

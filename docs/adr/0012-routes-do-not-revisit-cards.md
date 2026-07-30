@@ -1,6 +1,7 @@
 # A route does not revisit a card; return via an alias
 
-Status: accepted
+Status: superseded
+Superseded by: 0032
 Refines: 0003
 Refined by: 0023
 Related: 0009

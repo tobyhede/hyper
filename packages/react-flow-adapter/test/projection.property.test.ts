@@ -33,9 +33,9 @@ function uuidFrom(value: number): string {
 /**
  * A space file whose routes each run over distinct cards in some order: a chain
  * through all of them, plus up to three **shortcuts** skipping ahead. Every edge
- * points forward in that order, so each route is acyclic by construction (ADR
- * 0023) and `loadSpace` always accepts what we generate; cards are the union of
- * what the routes touch, so there are no orphans either.
+ * points forward in that order and each exact Edge appears once, so `loadSpace`
+ * always accepts what we generate; cards are the union of what the routes
+ * touch, so there are no orphans either.
  *
  * The shortcuts are the point. They fork a card and merge into a later one,
  * which is the shape a step list could not express and the one that puts several
@@ -52,7 +52,13 @@ const routeArb = (pool: string[]) =>
       for (const [rawFrom, rawSkip] of shortcuts) {
         const from = rawFrom % cards.length;
         const to = from + 2 + (rawSkip % cards.length);
-        if (to < cards.length) edges.push({ from: cards[from]!, to: cards[to]! });
+        const edge = { from: cards[from]!, to: cards[to]! };
+        if (
+          to < cards.length &&
+          !edges.some((candidate) => candidate.from === edge.from && candidate.to === edge.to)
+        ) {
+          edges.push(edge);
+        }
       }
       return { cards, edges };
     });
