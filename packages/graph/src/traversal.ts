@@ -27,10 +27,8 @@ export function incomingEdges(route: Route, cardId: CardId): RouteEdge[] {
  * The cards a walk can start from: those an edge leaves but none arrives at, in
  * the order the author's edges first mention them.
  *
- * A route is acyclic (ADR 0023) and carries at least one edge, so there is
- * always at least one — following edges backwards from anywhere has to stop.
- * There may be several: a route need not be connected, and nothing requires a
- * single entry.
+ * There may be several because a route need not be connected, or none when
+ * every component is cyclic (ADR 0032). Nothing requires a single entry.
  */
 export function routeEntryCards(route: Route): CardId[] {
   const arrivedAt = new Set(route.edges.map((edge) => edge.to));
@@ -42,8 +40,8 @@ export function routeEntryCards(route: Route): CardId[] {
 }
 
 /**
- * Where a walk of this route begins: the first entry card. `undefined` only for
- * a route with no edges, which the schema does not permit.
+ * Where a walk of this route begins: the first entry card. A fully cyclic Route
+ * has no entry, so presentation must choose how starting it should work.
  *
  * Which entry is a policy choice and this is the plain one — the same shape as
  * ADR 0026's "absent an `activeRoute`, the first visible route". If a route ever

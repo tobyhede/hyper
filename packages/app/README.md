@@ -27,9 +27,10 @@ Collection 2   Echo   E → F → G → H → E′
 ```
 
 Each collection returns to its start via an **alias** (`A′` of `A`, `E′` of `E`).
-That is deliberate: a route may not close a cycle (ADR 0023) — a return is a
-forward edge to an alias, never an edge back to the card itself — so this fixture
-is acyclic and lays out as clean forward paths, no loops.
+That deliberately exercises alias rendering while keeping this fixture acyclic
+and laid out as clean forward paths. Routes themselves may contain cycles; an
+alias is useful when the author wants a separately titled and positioned Card
+showing the same content (ADR 0009, ADR 0032).
 
 Every route here is a **line**: each card has one edge out. That is the
 degenerate graph, not a separate kind (ADR 0024), and it keeps the fixture's
@@ -44,8 +45,8 @@ Between them the shape exercises every behaviour the e2e suite covers:
   case.
 - **Independent collections / disconnected components.** Two bands, no edge
   between them.
-- **Alias as return (ADR 0009, 0023).** `A′` / `E′` show `A` / `E`'s content under
-  their own titles, and are how a route "comes back" without closing a cycle.
+- **Aliases on a route (ADR 0009).** `A′` / `E′` show `A` / `E`'s content under
+  their own titles and at distinct positions.
 - **Card description (ADR 0006, card-display/03).** `A` carries a `description`
   ("Where every route begins"), drawn under its title in the graph node; the other
   cards have none, so the node renders with and without one.

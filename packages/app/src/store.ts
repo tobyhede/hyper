@@ -130,9 +130,9 @@ export function createSpaceStore(space: Space, initialActiveRouteId: RouteId | n
     present: () => {
       const route = routeOf(get().activeRouteId);
       const start = route ? routeStartCard(route) : undefined;
-      // A space with no routes cannot be presented (ADR 0015), and neither can a
-      // route with no entry — which acyclicity rules out, so this is a guard
-      // against a Route built by hand rather than a case to design for.
+      // A space with no routes cannot be presented (ADR 0015). A fully cyclic
+      // Route has no entry either; choosing how to start it remains presentation
+      // work (ADR 0032).
       if (start === undefined) return;
       set({ mode: 'presenting', walk: [start], branchIndex: 0, openedCardId: null });
     },

@@ -200,11 +200,11 @@ export function isBuiltInViewId(id: string): id is BuiltInViewId {
 
 /**
  * One edge of a route: a directed connection from one card to another (ADR
- * 0023). This is the element an author draws, and the route is the set of them.
+ * 0032). This is the element an author draws, and the route is the set of them.
  *
- * Shape only, as everywhere in this file. That both ids name real cards, and
- * that the edges do not close a cycle, need the whole space in view and are
- * checked in `@project/graph`.
+ * Shape only, as everywhere in this file. Whether both ids name real cards and
+ * whether an exact edge occurs more than once need the whole Route/Space in
+ * view and are checked in `@project/graph`.
  */
 export const routeEdgeSchema = z.object({
   from: idSchema,
@@ -219,7 +219,7 @@ export const routeSchema = z.object({
   /**
    * At least one. A route is a set of edges, so a route with none connects
    * nothing and draws nothing — and drawing an edge is the gesture that mints a
-   * route in the first place (ADR 0021), so one is the fewest a route is ever
+   * route in the first place (ADR 0033), so one is the fewest a route is ever
    * created with. A card may appear as the `from` of several edges (a fork) and
    * the `to` of several (a merge); nothing here constrains that.
    */

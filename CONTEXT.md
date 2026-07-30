@@ -35,13 +35,13 @@ _Avoid_: reference, link (an alias shows content, it does not merely jump), copy
 **Route**:
 A curated way through the cards — a narrative an author wants a viewer to follow. Routes are the space's structure: a space's shape is the routes laid across its cards, and there is no separately authored connection between cards.
 
-A route is a set of directed **edges** between cards, and it is acyclic. A card may have several edges out — a **fork** — and several in — a **merge**. What a route may not do is close a cycle, so returning to earlier content is done with an edge to an **alias** of a card rather than back to the card itself. A route is not a line; a line is the shape a route takes when every card has one edge out.
+A route is a set of directed **edges** between cards. A card may have several edges out — a **fork** — and several in — a **merge**; routes may also contain cycles and self-edges. Presentation decides how to traverse that graph. A route is not a line; a line is the shape a route takes when every card has one edge out.
 
 A space can hold many routes; each has a name and a colour so they can be told apart when a view shows several at once. One is **active** at a time.
 _Avoid_: path, track, tour, journey, sequence, rail, step (a route stores edges, not positions in a list).
 
 **Edge**:
-A directed connection from one card to another, and the element a route is made of. An author draws one and the route records it. An edge belongs to one route, so two routes crossing the same pair of cards are two edges.
+A directed connection from one card to another, and the element a route is made of. An author draws one and the route records it. An exact edge appears at most once in a route; drawing it again changes nothing. An edge belongs to one route, so two routes crossing the same pair of cards are two edges.
 _Avoid_: link, connection, transition, arrow, step, relationship.
 
 **Active route**:
@@ -106,5 +106,5 @@ Terms below are **React Flow's**, not ours. They are listed because we build aga
 React Flow's drawn line between two nodes, and the gesture that draws one. It shares its name with the domain's **Edge** because it is the same thing seen twice — the one place a render-layer word and a domain word coincide, deliberately, rather than a bridging term.
 
 **Handle**:
-React Flow's attachment point on a node, where an edge meets it. A card carries one neutral handle, because where a route attaches is a drawing concern with no domain meaning. Distinct handles per route belong to the **overview** — the view that draws every route at once and needs them to stay legible — and are that view's rendering, never a rule the model obeys.
+React Flow's attachment point on a node, where an edge meets it or an author begins or ends drawing one. Route authoring presents four route-independent handles on a card, one on each side, coloured as the active route; the side is interaction geometry and is not authored. A renderer may use other invisible attachment geometry to keep existing edges legible, but that remains rendering and never becomes a rule the model obeys.
 _Avoid_: port (that is the word a graph-layout engine uses for the same thing, and any such engine is one implementation choice among several).

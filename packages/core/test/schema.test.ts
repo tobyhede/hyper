@@ -80,7 +80,7 @@ describe('space file schema', () => {
 
   it('drops a top-level edges array, which routes replaced', () => {
     // ADR 0007 deleted the structural layer beside routes; a route's own `edges`
-    // (ADR 0023) are a different thing that happens to share the word. An older
+    // (ADR 0032) are a different thing that happens to share the word. An older
     // file carrying the old array still parses, and the array is ignored.
     const result = spaceFileSchema.safeParse({
       ...validSpaceFile,
@@ -108,7 +108,7 @@ describe('space file schema', () => {
     expect(spaceFileSchema.safeParse(withoutRoutes).success).toBe(false);
   });
 
-  it('rejects a route with no edges — a route is its connections (ADR 0023)', () => {
+  it('rejects a route with no edges — a Route is its Edges (ADR 0032)', () => {
     const result = spaceFileSchema.safeParse({
       ...validSpaceFile,
       routes: [{ id: '00000000-0000-4000-8000-000000000004', title: 'Main', edges: [] }],
@@ -117,7 +117,7 @@ describe('space file schema', () => {
   });
 
   it('accepts a route that forks and merges — shape puts no limit on either', () => {
-    // Acyclicity is the only structural rule and it needs the whole route in
+    // Edge-set uniqueness and resolved endpoints need the whole Route/Space in
     // view, so it lives in `@project/graph`; nothing here should reject a graph.
     const result = spaceFileSchema.safeParse({
       ...validSpaceFile,

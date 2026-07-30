@@ -1,6 +1,7 @@
 # A route is an acyclic graph of card edges, not a step sequence
 
-Status: accepted
+Status: superseded
+Superseded by: 0032
 Refines: 0012
 Related: 0007, 0009, 0021, 0024, 0027
 

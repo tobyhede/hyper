@@ -5,7 +5,6 @@ import {
   type Card,
   type Layout,
   type Route,
-  type RouteEdge,
   type UUID,
 } from '@project/core';
 
@@ -31,7 +30,7 @@ export type ReferenceErrorKind =
   | 'layout-active-route-not-shown'
   | 'unresolved-default-view'
   | 'unresolved-route-edge'
-  | 'route-has-cycle'
+  | 'duplicate-route-edge'
   | 'unresolved-alias-target'
   | 'alias-self-reference'
   | 'alias-targets-alias';
@@ -42,66 +41,6 @@ export interface ReferenceError {
   ref: string;
   /** Human-readable description, useful for surfacing in the UI or CLI. */
   message: string;
-}
-
-/**
- * The cards on a cycle in `edges`, or `null` if there is none.
- *
- * Depth-first with three states per card — unseen, on the current path, done —
- * where an edge back to a card still on the path is what closes a loop. The
- * cards from that one down are returned, closing on themselves, so the message
- * can name the loop rather than just assert one: a route of thirty edges has
- * three that matter and the author needs to be told which.
- *
- * Iterative rather than recursive because the edges arrive from a file and a
- * long enough chain would otherwise overflow the stack on input we did not
- * write.
- */
-function findCycle(edges: readonly RouteEdge[]): readonly [string, ...string[]] | null {
-  const successors = new Map<string, string[]>();
-  for (const edge of edges) {
-    const from = successors.get(edge.from);
-    if (from) from.push(edge.to);
-    else successors.set(edge.from, [edge.to]);
-    if (!successors.has(edge.to)) successors.set(edge.to, []);
-  }
-
-  // 1 = on the current path, 2 = fully explored. Absent = unseen.
-  const state = new Map<string, 1 | 2>();
-
-  // Every card is a candidate root, not just the first: a route need not be
-  // connected, so a loop in a component nothing else reaches would otherwise
-  // never be searched.
-  for (const root of successors.keys()) {
-    if (state.has(root)) continue;
-
-    // The DFS stack, carrying the path itself as well as how far through each
-    // card's successors we have got — so when a back edge turns up, the cards it
-    // closes over are right there.
-    const stack = [{ card: root, outgoing: successors.get(root) ?? [], next: 0 }];
-    state.set(root, 1);
-
-    let frame = stack[stack.length - 1];
-    while (frame !== undefined) {
-      const to = frame.outgoing[frame.next];
-      frame.next += 1;
-
-      if (to === undefined) {
-        state.set(frame.card, 2);
-        stack.pop();
-      } else if (state.get(to) === 1) {
-        const path = stack.map((f) => f.card);
-        return [to, ...path.slice(path.indexOf(to) + 1), to];
-      } else if (state.get(to) === undefined) {
-        state.set(to, 1);
-        stack.push({ card: to, outgoing: successors.get(to) ?? [], next: 0 });
-      }
-
-      frame = stack[stack.length - 1];
-    }
-  }
-
-  return null;
 }
 
 function duplicates(ids: readonly string[]): string[] {
@@ -203,6 +142,7 @@ export function validateReferences(space: Referenceable): ReferenceError[] {
   }
 
   for (const route of space.routes) {
+    const firstEdgeIndex = new Map<string, number>();
     route.edges.forEach((edge, index) => {
       for (const end of ['from', 'to'] as const) {
         if (!cardIds.has(edge[end])) {
@@ -213,25 +153,20 @@ export function validateReferences(space: Referenceable): ReferenceError[] {
           });
         }
       }
-    });
 
-    // A route may not close a cycle (ADR 0023). Forks and merges are expected;
-    // a loop is the one shape no left-to-right layout renders cleanly, and
-    // allowing it would take away the reason an alias exists. "Return to earlier
-    // content" is expressed by an edge to an **alias** (ADR 0009): a distinct
-    // card showing the same content, reached going forward.
-    //
-    // Under the step sequence this was a duplicate check and acyclicity held by
-    // construction — a list cannot repeat a card. An edge list can, so the
-    // guarantee moved from the representation to here.
-    const cycle = findCycle(route.edges);
-    if (cycle) {
-      errors.push({
-        kind: 'route-has-cycle',
-        ref: cycle[0],
-        message: `Route "${route.id}" closes a cycle: ${cycle.join(' → ')}; use an alias to return to earlier content (ADR 0023)`,
-      });
-    }
+      const edgeKey = `${edge.from}\0${edge.to}`;
+      const firstIndex = firstEdgeIndex.get(edgeKey);
+      if (firstIndex === undefined) {
+        firstEdgeIndex.set(edgeKey, index);
+      } else {
+        const ref = `${edge.from} → ${edge.to}`;
+        errors.push({
+          kind: 'duplicate-route-edge',
+          ref,
+          message: `Route "${route.id}" repeats edge ${ref} at index ${index} (first at index ${firstIndex})`,
+        });
+      }
+    });
   }
 
   for (const card of space.cards) {
