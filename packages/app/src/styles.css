@@ -74,6 +74,36 @@ body {
   white-space: pre-wrap;
 }
 
+/* ---- Workspace selection ---- */
+.workspace-selection {
+  display: grid;
+  min-height: 100%;
+  place-items: center;
+  padding: 2rem;
+}
+
+.workspace-selection__panel {
+  width: min(42rem, 100%);
+}
+
+.workspace-selection__choices {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.workspace-selection__choices button {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem;
+  color: var(--text);
+  text-align: left;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
 /* ---- App shell ---- */
 .shell {
   display: flex;

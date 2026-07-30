@@ -9,4 +9,4 @@ const rootElement = document.getElementById('root');
 if (!rootElement) throw new Error('Root element #root not found');
 
 const root = createRoot(rootElement);
-void startApplication(root, openWorkspace);
+void startApplication(root, async () => ({ kind: 'opened', opened: await openWorkspace() }));
