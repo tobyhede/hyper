@@ -1,5 +1,5 @@
-import { readSingleSpace } from './read-single-space';
-import type { SpaceRepository, StoredSpace } from '../persistence/space-repository';
+import { readImportBatch, readSingleSpace } from './read-single-space';
+import type { ImportMode, SpaceRepository, StoredSpace } from '../persistence/space-repository';
 
 type SingleSpaceImportErrorKind = 'identity' | 'domain-validation' | 'revision-conflict';
 
@@ -18,7 +18,7 @@ export const importSingleSpace = async (
   repository: SpaceRepository,
 ): Promise<StoredSpace> => {
   const input = await readSingleSpace(path);
-  const result = await repository.importSpaces([input]);
+  const result = await repository.importSpaces([input], 'upsert');
   if (result.kind === 'imported') {
     const [stored] = result.spaces;
     if (stored === undefined || result.spaces.length !== 1) {
@@ -26,6 +26,28 @@ export const importSingleSpace = async (
     }
     return stored;
   }
+
+  if (result.kind === 'conflict') {
+    throw new SingleSpaceImportError(
+      'revision-conflict',
+      `Revision conflict for space ${result.current.snapshot.id}`,
+    );
+  }
+
+  throw new SingleSpaceImportError(
+    result.code === 'invalid-snapshot' ? 'domain-validation' : 'identity',
+    result.message,
+  );
+};
+
+export const importSpaceBatch = async (
+  path: string,
+  repository: SpaceRepository,
+  mode: ImportMode = 'upsert',
+): Promise<readonly StoredSpace[]> => {
+  const input = await readImportBatch(path);
+  const result = await repository.importSpaces(input, mode);
+  if (result.kind === 'imported') return result.spaces;
 
   if (result.kind === 'conflict') {
     throw new SingleSpaceImportError(

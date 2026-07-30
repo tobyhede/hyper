@@ -29,9 +29,11 @@ export type RepositoryImportResult =
       message: string;
     };
 
+export type ImportMode = 'upsert' | 'truncate';
+
 export interface SpaceRepository {
   listSpaces(): Promise<readonly SpaceSummary[]>;
   loadSpace(id: UUID): Promise<StoredSpace | undefined>;
   commitSpace(snapshot: SpaceSnapshot, expectedRevision: bigint): Promise<RepositoryCommitResult>;
-  importSpaces(input: readonly ImportSpace[]): Promise<RepositoryImportResult>;
+  importSpaces(input: readonly ImportSpace[], mode: ImportMode): Promise<RepositoryImportResult>;
 }

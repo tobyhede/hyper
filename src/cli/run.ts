@@ -1,4 +1,4 @@
-import { importSingleSpace, SingleSpaceImportError } from '../import/import-single-space';
+import { importSpaceBatch, SingleSpaceImportError } from '../import/import-single-space';
 import { SpaceImportFileError } from '../import/read-single-space';
 import type { SpaceRepository } from '../persistence/space-repository';
 
@@ -39,17 +39,35 @@ export const runHyper = async (
   args: readonly string[],
   dependencies: RunHyperDependencies,
 ): Promise<number> => {
-  const path = args[0];
-  if (path === undefined || args.length !== 1) {
-    dependencies.io.stderr('Usage: hyper <space.json-or-directory>\n');
+  const truncateArguments = args.filter((argument) => argument === '--dangerous-truncate');
+  const paths = args.filter((argument) => argument !== '--dangerous-truncate');
+  const path = paths[0];
+  if (
+    path === undefined ||
+    paths.length !== 1 ||
+    truncateArguments.length > 1 ||
+    args.some((argument) => argument.startsWith('--') && argument !== '--dangerous-truncate')
+  ) {
+    dependencies.io.stderr('Usage: hyper <path> [--dangerous-truncate]\n');
     return 2;
   }
 
   try {
-    const stored = await importSingleSpace(path, dependencies.repository);
-    dependencies.io.stdout(
-      `Imported space ${stored.snapshot.id} at revision ${stored.revision.toString()}\n`,
-    );
+    const mode = truncateArguments.length === 1 ? 'truncate' : 'upsert';
+    const stored = await importSpaceBatch(path, dependencies.repository, mode);
+    if (stored.length === 1) {
+      const [space] = stored;
+      if (space === undefined) throw new Error('One-space import returned no space');
+      dependencies.io.stdout(
+        `Imported space ${space.snapshot.id} at revision ${space.revision.toString()}\n`,
+      );
+    } else {
+      dependencies.io.stdout(
+        `Imported ${stored.length} spaces:\n${stored
+          .map((space) => `${space.snapshot.id} at revision ${space.revision.toString()}`)
+          .join('\n')}\n`,
+      );
+    }
     return 0;
   } catch (error) {
     reportImportError(error, dependencies.io);

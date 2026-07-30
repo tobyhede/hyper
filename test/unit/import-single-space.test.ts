@@ -3,9 +3,14 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { uuidSchema, type ImportSpace, type SpaceSnapshot, type UUID } from '@project/core';
 import { afterEach, describe, expect, it } from 'vitest';
-import { SingleSpaceImportError, importSingleSpace } from '../../src/import/import-single-space';
+import {
+  SingleSpaceImportError,
+  importSingleSpace,
+  importSpaceBatch,
+} from '../../src/import/import-single-space';
 import { SpaceImportFileError } from '../../src/import/read-single-space';
 import type {
+  ImportMode,
   RepositoryCommitResult,
   RepositoryImportResult,
   SpaceRepository,
@@ -35,8 +40,19 @@ const storedSpace: StoredSpace = {
   exportedRevision: null,
 };
 
+const otherStoredSpace: StoredSpace = {
+  snapshot: {
+    id: OTHER_SPACE_ID,
+    document: { version: 2, title: 'Other stored talk', routes: [] },
+    cards: [],
+  },
+  revision: 0n,
+  exportedRevision: null,
+};
+
 class RecordingRepository implements SpaceRepository {
   readonly imports: ImportSpace[][] = [];
+  readonly modes: ImportMode[] = [];
   private readonly result: RepositoryImportResult;
 
   constructor(result: RepositoryImportResult) {
@@ -58,8 +74,9 @@ class RecordingRepository implements SpaceRepository {
     throw new Error('Unexpected commitSpace call');
   }
 
-  importSpaces(input: readonly ImportSpace[]): Promise<RepositoryImportResult> {
+  importSpaces(input: readonly ImportSpace[], mode: ImportMode): Promise<RepositoryImportResult> {
     this.imports.push([...input]);
+    this.modes.push(mode);
     return Promise.resolve(this.result);
   }
 }
@@ -190,5 +207,56 @@ describe('importSingleSpace', () => {
     await expect(importSingleSpace(directory, repository)).rejects.toThrow(
       `Single-space import returned ${count} spaces`,
     );
+  });
+});
+
+describe('importSpaceBatch', () => {
+  it('does not begin repository import when any child space fails parsing', async () => {
+    const collection = await makeTemporaryDirectory();
+    const valid = join(collection, 'valid');
+    const invalid = join(collection, 'invalid');
+    await mkdir(valid);
+    await mkdir(invalid);
+    await writeFile(
+      join(valid, 'space.json'),
+      JSON.stringify({ version: 2, id: SPACE_ID, title: 'Valid', routes: [] }),
+    );
+    await writeFile(join(invalid, 'space.json'), '{ invalid JSON');
+    const repository = new RecordingRepository({ kind: 'imported', spaces: [storedSpace] });
+
+    await expect(importSpaceBatch(collection, repository)).rejects.toBeInstanceOf(
+      SpaceImportFileError,
+    );
+    expect(repository.imports).toEqual([]);
+  });
+
+  it('parses every child space before importing the batch in one repository call', async () => {
+    const collection = await makeTemporaryDirectory();
+    const first = join(collection, 'first');
+    const second = join(collection, 'second');
+    await mkdir(first);
+    await mkdir(second);
+    await writeFile(
+      join(first, 'space.json'),
+      JSON.stringify({ version: 2, id: SPACE_ID, title: 'First', routes: [] }),
+    );
+    await writeFile(
+      join(second, 'space.json'),
+      JSON.stringify({ version: 2, id: OTHER_SPACE_ID, title: 'Second', routes: [] }),
+    );
+    const repository = new RecordingRepository({
+      kind: 'imported',
+      spaces: [storedSpace, otherStoredSpace],
+    });
+
+    const result = await importSpaceBatch(collection, repository);
+
+    expect(result).toEqual([storedSpace, otherStoredSpace]);
+    expect(repository.imports).toHaveLength(1);
+    expect(repository.modes).toEqual(['upsert']);
+    expect(repository.imports[0]?.map(({ document }) => document.title)).toEqual([
+      'First',
+      'Second',
+    ]);
   });
 });

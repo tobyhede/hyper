@@ -11,6 +11,7 @@ import {
 import { loadSpaceSnapshot } from '@project/graph';
 import { db } from '../prisma/db';
 import type {
+  ImportMode,
   RepositoryCommitResult,
   RepositoryImportResult,
   SpaceRepository,
@@ -269,6 +270,14 @@ const importCards = async (
   }
 };
 
+const truncateHyperContent = async (orm: Orm): Promise<void> => {
+  const spaces = await orm.public.Space.all();
+  for (const space of spaces) {
+    await orm.public.Card.where({ spaceId: space.id }).deleteAll();
+    await orm.public.Space.where({ id: space.id }).delete();
+  }
+};
+
 export class PostgresSpaceRepository implements SpaceRepository {
   readonly #database: typeof db;
 
@@ -352,7 +361,10 @@ export class PostgresSpaceRepository implements SpaceRepository {
     }
   }
 
-  async importSpaces(input: readonly ImportSpace[]): Promise<RepositoryImportResult> {
+  async importSpaces(
+    input: readonly ImportSpace[],
+    mode: ImportMode = 'upsert',
+  ): Promise<RepositoryImportResult> {
     let accepted: ImportSpace[];
     try {
       accepted = input.map(parseImport);
@@ -382,6 +394,8 @@ export class PostgresSpaceRepository implements SpaceRepository {
       return await this.#database.transaction(async (transaction) => {
         const { orm } = transaction;
         const imported: StoredSpace[] = [];
+
+        if (mode === 'truncate') await truncateHyperContent(orm);
 
         for (const importInput of accepted) {
           const current =

@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { runCliMain } from '../../src/cli/main';
 import { runHyper, type CliIo } from '../../src/cli/run';
 import type {
+  ImportMode,
   RepositoryCommitResult,
   RepositoryImportResult,
   SpaceRepository,
@@ -16,6 +17,7 @@ import type {
 const SPACE_ID = uuidSchema.parse('11111111-1111-4111-8111-111111111111');
 const CARD_ID = uuidSchema.parse('22222222-2222-4222-8222-222222222222');
 const ROUTE_ID = uuidSchema.parse('33333333-3333-4333-8333-333333333333');
+const OTHER_SPACE_ID = uuidSchema.parse('44444444-4444-4444-8444-444444444444');
 
 const storedSpace: StoredSpace = {
   snapshot: {
@@ -32,7 +34,18 @@ const storedSpace: StoredSpace = {
   exportedRevision: null,
 };
 
+const otherStoredSpace: StoredSpace = {
+  snapshot: {
+    id: OTHER_SPACE_ID,
+    document: { version: 2, title: 'Other stored talk', routes: [] },
+    cards: [],
+  },
+  revision: 2n,
+  exportedRevision: null,
+};
+
 class ImportRepository implements SpaceRepository {
+  readonly modes: ImportMode[] = [];
   private readonly outcome: RepositoryImportResult | Error;
 
   constructor(outcome: RepositoryImportResult | Error) {
@@ -54,7 +67,8 @@ class ImportRepository implements SpaceRepository {
     throw new Error('Unexpected commitSpace call');
   }
 
-  importSpaces(_input: readonly ImportSpace[]): Promise<RepositoryImportResult> {
+  importSpaces(_input: readonly ImportSpace[], mode: ImportMode): Promise<RepositoryImportResult> {
+    this.modes.push(mode);
     return this.outcome instanceof Error
       ? Promise.reject(this.outcome)
       : Promise.resolve(this.outcome);
@@ -100,8 +114,8 @@ afterEach(async () => {
 });
 
 describe('runHyper', () => {
-  it.each([{ args: [] }, { args: ['first', 'second'] }])(
-    'rejects a positional argument count of $args.length',
+  it.each([{ args: [] }, { args: ['first', 'second'] }, { args: ['--dangerous-truncate'] }])(
+    'rejects invalid arguments $args',
     async ({ args }) => {
       const output = captureIo();
 
@@ -112,7 +126,7 @@ describe('runHyper', () => {
 
       expect(exitCode).toBe(2);
       expect(output.stdout).toEqual([]);
-      expect(output.stderr).toEqual(['Usage: hyper <space.json-or-directory>\n']);
+      expect(output.stderr).toEqual(['Usage: hyper <path> [--dangerous-truncate]\n']);
     },
   );
 
@@ -127,6 +141,39 @@ describe('runHyper', () => {
 
     expect(exitCode).toBe(0);
     expect(output.stdout).toEqual([`Imported space ${SPACE_ID} at revision 0\n`]);
+    expect(output.stderr).toEqual([]);
+  });
+
+  it('imports a collection in truncate mode and reports every stored space', async () => {
+    const collection = await makeTemporaryDirectory();
+    const first = join(collection, 'first');
+    const second = join(collection, 'second');
+    await mkdir(first);
+    await mkdir(second);
+    await writeFile(
+      join(first, 'space.json'),
+      JSON.stringify({ version: 2, id: SPACE_ID, title: 'First', routes: [] }),
+    );
+    await writeFile(
+      join(second, 'space.json'),
+      JSON.stringify({ version: 2, id: OTHER_SPACE_ID, title: 'Second', routes: [] }),
+    );
+    const output = captureIo();
+    const repository = new ImportRepository({
+      kind: 'imported',
+      spaces: [storedSpace, otherStoredSpace],
+    });
+
+    const exitCode = await runHyper([collection, '--dangerous-truncate'], {
+      repository,
+      io: output.io,
+    });
+
+    expect(exitCode).toBe(0);
+    expect(repository.modes).toEqual(['truncate']);
+    expect(output.stdout).toEqual([
+      `Imported 2 spaces:\n${SPACE_ID} at revision 0\n${OTHER_SPACE_ID} at revision 2\n`,
+    ]);
     expect(output.stderr).toEqual([]);
   });
 

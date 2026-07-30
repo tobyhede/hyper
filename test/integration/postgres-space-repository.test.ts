@@ -2,6 +2,7 @@ import { uuidSchema, type ImportSpace, type SpaceSnapshot, type UUID } from '@pr
 import { afterAll, afterEach, describe, expect, expectTypeOf, it } from 'vitest';
 import { PostgresSpaceRepository } from '../../src/persistence/postgres-space-repository';
 import type {
+  ImportMode,
   RepositoryImportResult,
   SpaceRepository,
   StoredSpace,
@@ -11,6 +12,7 @@ import { db } from '../../src/prisma/db';
 expectTypeOf<Parameters<SpaceRepository['importSpaces']>[0]>().toEqualTypeOf<
   readonly ImportSpace[]
 >();
+expectTypeOf<Parameters<SpaceRepository['importSpaces']>[1]>().toEqualTypeOf<ImportMode>();
 
 const SPACE_ID = uuidSchema.parse('11111111-1111-4111-8111-111111111111');
 const CARD_ID = uuidSchema.parse('22222222-2222-4222-8222-222222222222');
@@ -417,7 +419,7 @@ describe('PostgresSpaceRepository', () => {
   });
 
   it('keeps omitted cards when an identified space is imported again', async () => {
-    await repository.importSpaces([snapshot]);
+    await repository.importSpaces([snapshot, otherSnapshot]);
     const suppliedCard = {
       ...snapshot.cards[0]!,
       document: {
@@ -440,11 +442,74 @@ describe('PostgresSpaceRepository', () => {
       exportedRevision: null,
     };
 
-    await expect(repository.importSpaces([reimported])).resolves.toEqual({
+    await expect(repository.importSpaces([reimported], 'upsert')).resolves.toEqual({
       kind: 'imported',
       spaces: [expected],
     });
     await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual(expected);
+    await expect(repository.loadSpace(OTHER_SPACE_ID)).resolves.toEqual({
+      snapshot: otherSnapshot,
+      revision: 0n,
+      exportedRevision: null,
+    });
+  });
+
+  it('replaces every stored space and card in truncate mode', async () => {
+    await repository.importSpaces([snapshot, otherSnapshot]);
+    const replacement: SpaceSnapshot = {
+      ...snapshot,
+      document: { ...snapshot.document, title: 'Only remaining space' },
+      cards: [snapshot.cards[0]!],
+    };
+
+    await expect(repository.importSpaces([replacement], 'truncate')).resolves.toEqual({
+      kind: 'imported',
+      spaces: [{ snapshot: replacement, revision: 0n, exportedRevision: null }],
+    });
+    await expect(repository.listSpaces()).resolves.toEqual([
+      { id: SPACE_ID, title: 'Only remaining space' },
+    ]);
+    await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual({
+      snapshot: replacement,
+      revision: 0n,
+      exportedRevision: null,
+    });
+    await expect(repository.loadSpace(OTHER_SPACE_ID)).resolves.toBeUndefined();
+  });
+
+  it('rolls back truncation and every earlier batch write when later validation fails', async () => {
+    await repository.importSpaces([snapshot, otherSnapshot]);
+    const replacement: SpaceSnapshot = {
+      ...snapshot,
+      document: { ...snapshot.document, title: 'Must roll back' },
+    };
+    const invalid: ImportSpace = {
+      document: {
+        version: 2,
+        title: 'Invalid later space',
+        routes: [
+          {
+            title: 'Dangling route',
+            edges: [{ from: UNRESOLVED_CARD_ID, to: MISSING_CARD_ID }],
+          },
+        ],
+      },
+      cards: [],
+    };
+
+    await expect(
+      repository.importSpaces([replacement, invalid], 'truncate'),
+    ).resolves.toMatchObject({ kind: 'rejected', code: 'invalid-snapshot' });
+    await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual({
+      snapshot,
+      revision: 0n,
+      exportedRevision: null,
+    });
+    await expect(repository.loadSpace(OTHER_SPACE_ID)).resolves.toEqual({
+      snapshot: otherSnapshot,
+      revision: 0n,
+      exportedRevision: null,
+    });
   });
 
   it('allocates every missing identity without rewriting explicit references', async () => {

@@ -4,13 +4,29 @@
 
 **Blocked by:** 05 — Single-space CLI import.
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] A directory without its own `space.json` imports each immediate child directory that contains one, without deeper recursion.
-- [ ] The entire batch is discovered, parsed, identity-checked, and validated as one operation.
-- [ ] Ordinary batch import upserts explicit identities, inserts id-less entities, and never deletes database content by absence.
-- [ ] `--dangerous-truncate` is rejected when no import path is supplied.
-- [ ] Dangerous truncation deletes every Hyper card and space before importing, inside the same transaction as the complete batch.
-- [ ] Any error rolls back both truncation and every import in the batch.
-- [ ] CLI output clearly distinguishes discovery, parsing, identity, domain-validation, database, and revision-conflict failures.
-- [ ] Integration tests prove preservation without the flag, total replacement with the flag, and complete rollback on failures after truncation begins.
+- [x] A directory without its own `space.json` imports each immediate child directory that contains one, without deeper recursion.
+- [x] The entire batch is discovered, parsed, identity-checked, and validated as one operation.
+- [x] Ordinary batch import upserts explicit identities, inserts id-less entities, and never deletes database content by absence.
+- [x] `--dangerous-truncate` is rejected when no import path is supplied.
+- [x] Dangerous truncation deletes every Hyper card and space before importing, inside the same transaction as the complete batch.
+- [x] Any error rolls back both truncation and every import in the batch.
+- [x] CLI output clearly distinguishes discovery, parsing, identity, domain-validation, database, and revision-conflict failures.
+- [x] Integration tests prove preservation without the flag, total replacement with the flag, and complete rollback on failures after truncation begins.
+
+## Answer
+
+Implemented deterministic, non-recursive collection discovery and complete
+batch parsing before the repository is called. Ordinary imports explicitly use
+additive `upsert` mode; the CLI exposes destructive replacement only through
+`--dangerous-truncate`, rejects that flag without an import path, and reports
+every imported stored identity and revision.
+
+`SpaceRepository.importSpaces` now accepts an `ImportMode`. PostgreSQL performs
+dangerous truncation, missing-id allocation, domain validation, and every batch
+write inside one callback transaction, so a later validation or database
+failure restores all prior Hyper content. Integration coverage proves additive
+preservation, total replacement, and rollback after truncation and earlier
+batch writes have already occurred. Actual workspace opening and selection are
+left at the startup seam owned by issue 07, as agreed for this increment.

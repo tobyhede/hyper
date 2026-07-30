@@ -37,6 +37,15 @@ const markdownFilesIn = async (directory: string): Promise<string[]> =>
 const isMissingFile = (error: unknown): boolean =>
   error instanceof Error && 'code' in error && error.code === 'ENOENT';
 
+const isRegularFile = async (path: string): Promise<boolean> => {
+  try {
+    return (await stat(path)).isFile();
+  } catch (error) {
+    if (isMissingFile(error)) return false;
+    throw error;
+  }
+};
+
 const discoverCardFiles = async (spaceDirectory: string): Promise<string[]> => {
   const rootFiles = await markdownFilesIn(spaceDirectory);
   let nestedFiles: string[];
@@ -119,4 +128,71 @@ export const readSingleSpace = async (inputPath: string): Promise<ImportSpace> =
     document,
     cards,
   });
+};
+
+export const readImportBatch = async (inputPath: string): Promise<readonly ImportSpace[]> => {
+  const absoluteInput = resolve(inputPath);
+  let input;
+  try {
+    input = await stat(absoluteInput);
+  } catch (error) {
+    throw new SpaceImportFileError('discovery', [String(error)]);
+  }
+
+  let containsSpace: boolean;
+  try {
+    containsSpace = input.isDirectory() && (await isRegularFile(join(absoluteInput, 'space.json')));
+  } catch (error) {
+    throw new SpaceImportFileError('discovery', [String(error)]);
+  }
+
+  if (!input.isDirectory() || containsSpace) {
+    return [await readSingleSpace(absoluteInput)];
+  }
+
+  let entries;
+  try {
+    entries = await readdir(absoluteInput, { withFileTypes: true });
+  } catch (error) {
+    throw new SpaceImportFileError('discovery', [String(error)]);
+  }
+
+  const childDirectories = entries
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => join(absoluteInput, entry.name))
+    .sort((left, right) =>
+      relative(absoluteInput, left).localeCompare(relative(absoluteInput, right)),
+    );
+  let spaceDirectories;
+  try {
+    spaceDirectories = (
+      await Promise.all(
+        childDirectories.map(async (directory) => ({
+          directory,
+          containsSpace: await isRegularFile(join(directory, 'space.json')),
+        })),
+      )
+    ).filter((candidate) => candidate.containsSpace);
+  } catch (error) {
+    throw new SpaceImportFileError('discovery', [String(error)]);
+  }
+
+  const results = await Promise.allSettled(
+    spaceDirectories.map(({ directory }) => readSingleSpace(directory)),
+  );
+  const failures: unknown[] = results.flatMap((result) =>
+    result.status === 'rejected' ? [result.reason as unknown] : [],
+  );
+  if (failures.length > 0) {
+    const fileFailures = failures.filter(
+      (error): error is SpaceImportFileError => error instanceof SpaceImportFileError,
+    );
+    if (fileFailures.length !== failures.length) throw failures[0];
+    throw new SpaceImportFileError(
+      fileFailures.some(({ kind }) => kind === 'discovery') ? 'discovery' : 'parsing',
+      fileFailures.flatMap(({ diagnostics }) => diagnostics),
+    );
+  }
+
+  return results.flatMap((result) => (result.status === 'fulfilled' ? [result.value] : []));
 };
