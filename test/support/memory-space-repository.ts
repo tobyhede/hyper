@@ -86,6 +86,20 @@ export class MemorySpaceRepository implements SpaceRepository {
     if (current.revision !== expectedRevision) {
       return Promise.resolve({ kind: 'conflict', current: clone(current) });
     }
+    for (const card of parsed.data.cards) {
+      const owner = [...this.#spaces.values()].find(
+        ({ snapshot }) =>
+          snapshot.id !== parsed.data.id &&
+          snapshot.cards.some((storedCard) => storedCard.id === card.id),
+      );
+      if (owner !== undefined) {
+        return Promise.resolve({
+          kind: 'rejected',
+          code: 'invalid-snapshot',
+          message: `Card ${card.id} belongs to space ${owner.snapshot.id}`,
+        });
+      }
+    }
 
     const revision = current.revision + 1n;
     this.#spaces.set(parsed.data.id, {
@@ -115,11 +129,42 @@ export class MemorySpaceRepository implements SpaceRepository {
           message: intake.errors.map(({ message }) => message).join('\n'),
         });
       }
+    }
+
+    const incomingSpaceIds = new Set<UUID>();
+    const cardOwner = new Map<UUID, UUID>();
+    if (mode === 'insert') {
+      for (const { snapshot } of this.#spaces.values()) {
+        for (const card of snapshot.cards) cardOwner.set(card.id, snapshot.id);
+      }
+    }
+    for (const snapshot of snapshots) {
+      if (incomingSpaceIds.has(snapshot.id)) {
+        return Promise.resolve({
+          kind: 'rejected',
+          code: 'duplicate-identity',
+          message: `Duplicate Space identity ${snapshot.id}`,
+        });
+      }
+      incomingSpaceIds.add(snapshot.id);
+
       if (mode === 'insert') {
-        const current = this.#spaces.get(parsed.data.id);
+        const current = this.#spaces.get(snapshot.id);
         if (current !== undefined) {
           return Promise.resolve({ kind: 'conflict', current: clone(current) });
         }
+      }
+
+      for (const card of snapshot.cards) {
+        const owner = cardOwner.get(card.id);
+        if (owner !== undefined && owner !== snapshot.id) {
+          return Promise.resolve({
+            kind: 'rejected',
+            code: 'card-ownership',
+            message: `Card ${card.id} belongs to space ${owner}`,
+          });
+        }
+        cardOwner.set(card.id, snapshot.id);
       }
     }
 
