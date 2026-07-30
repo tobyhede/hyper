@@ -1,6 +1,7 @@
 import { importSpaceBatch, SpaceImportError } from '../import/import-space';
 import { SpaceImportFileError } from '../import/read-single-space';
 import type { SpaceRepository } from '../persistence/space-repository';
+import { resolveDatabaseStartup, type DatabaseStartupResult } from '../startup/database-startup';
 
 export interface CliIo {
   stdout(message: string): void;
@@ -34,6 +35,19 @@ const reportImportError = (error: unknown, io: CliIo): void => {
   io.stderr(`Database import failed: ${describeError(error)}\n`);
 };
 
+const reportStartup = (startup: DatabaseStartupResult, io: CliIo): void => {
+  if (startup.kind === 'opened') {
+    io.stdout(
+      `Opened space ${startup.space.snapshot.id} at revision ${startup.space.revision.toString()}\n`,
+    );
+    return;
+  }
+
+  io.stdout(
+    `Choose a space:\n${startup.spaces.map((space) => `${space.title} (${space.id})`).join('\n')}\n`,
+  );
+};
+
 export const runHyper = async (
   args: readonly string[],
   dependencies: RunHyperDependencies,
@@ -42,34 +56,33 @@ export const runHyper = async (
   const paths = args.filter((argument) => argument !== '--dangerous-truncate');
   const path = paths[0];
   if (
-    path === undefined ||
-    paths.length !== 1 ||
+    paths.length > 1 ||
+    (path === undefined && truncateArguments.length > 0) ||
     truncateArguments.length > 1 ||
     args.some((argument) => argument.startsWith('--') && argument !== '--dangerous-truncate')
   ) {
-    dependencies.io.stderr('Usage: hyper <path> [--dangerous-truncate]\n');
+    dependencies.io.stderr('Usage: hyper [<path>] [--dangerous-truncate]\n');
     return 2;
   }
 
   try {
+    if (path === undefined) {
+      const startup = await resolveDatabaseStartup(dependencies.repository);
+      reportStartup(startup, dependencies.io);
+      return 0;
+    }
+
     const mode = truncateArguments.length === 1 ? 'truncate' : 'insert';
     const stored = await importSpaceBatch(path, dependencies.repository, mode);
-    if (stored.length === 1) {
-      const [space] = stored;
-      if (space === undefined) throw new Error('One-space import returned no space');
-      dependencies.io.stdout(
-        `Imported space ${space.snapshot.id} at revision ${space.revision.toString()}\n`,
-      );
-    } else {
-      dependencies.io.stdout(
-        `Imported ${stored.length} spaces:\n${stored
-          .map((space) => `${space.snapshot.id} at revision ${space.revision.toString()}`)
-          .join('\n')}\n`,
-      );
-    }
+    const startup = await resolveDatabaseStartup(dependencies.repository, stored);
+    reportStartup(startup, dependencies.io);
     return 0;
   } catch (error) {
-    reportImportError(error, dependencies.io);
+    if (path === undefined) {
+      dependencies.io.stderr(`Database startup failed: ${describeError(error)}\n`);
+    } else {
+      reportImportError(error, dependencies.io);
+    }
     return 1;
   }
 };
