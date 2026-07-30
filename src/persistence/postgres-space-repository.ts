@@ -1,6 +1,7 @@
 import {
   cardDocumentSchema,
   importSpaceSchema,
+  newUuid,
   spaceDocumentSchema,
   spaceSnapshotSchema,
   uuidSchema,
@@ -166,34 +167,32 @@ const validateSnapshotIdentities = (snapshot: SpaceSnapshot): void => {
   }
 };
 
-const resolveImport = async (
-  input: ImportSpace,
-  reservedSpaceId: UUID,
-  allocate: () => Promise<UUID>,
-): Promise<SpaceSnapshot> => {
-  const routes: SpaceSnapshot['document']['routes'][number][] = [];
-  for (const route of input.document.routes) {
-    routes.push({ ...route, id: route.id ?? (await allocate()) });
-  }
-
-  const layouts: NonNullable<SpaceSnapshot['document']['layouts']> = [];
-  for (const layout of input.document.layouts ?? []) {
-    layouts.push({ ...layout, id: layout.id ?? (await allocate()) });
-  }
-
-  const cards: SpaceSnapshot['cards'][number][] = [];
-  for (const card of input.cards) {
-    cards.push({ ...card, id: card.id ?? (await allocate()) });
-  }
+/**
+ * Fill in every id the import input left out, producing the fully identified
+ * aggregate that domain intake and the writes below both require.
+ *
+ * Ids are minted in process by `newUuid`. Only the space id comes from
+ * PostgreSQL, and by the ordinary route: the `spaces.id` column default fires
+ * when `Space.create` omits it, and the created row hands the value back as
+ * `reservedSpaceId`. Routes and layouts are not rows at all — they live inside
+ * the space document (ADR 0030) — so no column default can reach them, and
+ * cards are minted here too, so the whole snapshot can be validated before the
+ * first card is written.
+ */
+const resolveImport = (input: ImportSpace, reservedSpaceId: UUID): SpaceSnapshot => {
+  const layouts = input.document.layouts?.map((layout) => ({
+    ...layout,
+    id: layout.id ?? newUuid(),
+  }));
 
   return parseSnapshotShape({
     id: input.id ?? reservedSpaceId,
     document: {
       ...input.document,
-      routes,
-      ...(input.document.layouts === undefined ? {} : { layouts }),
+      routes: input.document.routes.map((route) => ({ ...route, id: route.id ?? newUuid() })),
+      ...(layouts === undefined ? {} : { layouts }),
     },
-    cards,
+    cards: input.cards.map((card) => ({ ...card, id: card.id ?? newUuid() })),
   });
 };
 
@@ -378,16 +377,8 @@ export class PostgresSpaceRepository implements SpaceRepository {
       throw error;
     }
 
-    const uuidAllocation = await this.#database.prepare({}, (sql) =>
-      sql.public.spaces
-        .select('id', () => this.#database.raw`gen_random_uuid()`.returns('pg/uuid@1'))
-        .limit(1)
-        .build(),
-    );
-
     try {
-      return await this.#database.transaction(async (transaction) => {
-        const { orm } = transaction;
+      return await this.#database.transaction(async ({ orm }) => {
         const imported: StoredSpace[] = [];
 
         if (mode === 'truncate') await truncateHyperContent(orm);
@@ -412,12 +403,8 @@ export class PostgresSpaceRepository implements SpaceRepository {
             throw error;
           }
 
-          const allocate = async (): Promise<UUID> => {
-            const row = await uuidAllocation.execute(transaction, {}).firstOrThrow();
-            return uuidSchema.parse(row.id);
-          };
           const reservedSpaceId = uuidSchema.parse(space.id);
-          const snapshot = await resolveImport(importInput, reservedSpaceId, allocate);
+          const snapshot = resolveImport(importInput, reservedSpaceId);
           const intake = loadSpaceSnapshot(snapshot);
           if (!intake.ok) {
             throw new SnapshotValidationError(

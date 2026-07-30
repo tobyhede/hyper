@@ -13,9 +13,16 @@ the application.
 
 Spaces and cards are UUID-keyed rows with JSONB documents. Routes and layouts
 remain nested in the space document. An id is optional only in import input: an
-explicit id must be a UUID and must not already exist, while PostgreSQL
-allocates every missing space, card, route and layout id. An id-less entity is
-therefore always new until export writes its generated UUID.
+explicit id must be a UUID and must not already exist, while every missing
+space, card, route and layout id is minted during the import transaction. An
+id-less entity is therefore always new until export writes its generated UUID.
+
+Minting is not allocation, and the database is not a source of identity. A
+space's id comes from the `spaces.id` column default, because that is what a
+primary key already does; every other id is generated in process. Routes and
+layouts are not rows — they are nested in the space document — so no column
+default can reach them, and the application mints layout ids the same way when
+editing converts an Algorithmic View (ADR 0025).
 
 Import, seed data and test fixtures share one transactional import mechanism.
 Ordinary import inserts complete new Spaces and rejects the whole batch on any
