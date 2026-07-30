@@ -44,10 +44,13 @@ export const resolveDatabaseStartup = async (
   repository: SpaceRepository,
   importedSpaces?: readonly StoredSpace[],
 ): Promise<DatabaseStartupResult> => {
-  if (importedSpaces?.length === 1) {
-    const [imported] = importedSpaces;
-    if (imported === undefined) throw new Error('The imported space changed unexpectedly');
-    return openDatabaseSelection(repository, imported.snapshot.id);
+  if (importedSpaces !== undefined) {
+    if (importedSpaces.length === 0) throw new Error('Database import returned no spaces');
+    if (importedSpaces.length === 1) {
+      const [imported] = importedSpaces;
+      if (imported === undefined) throw new Error('The imported space changed unexpectedly');
+      return openDatabaseSelection(repository, imported.snapshot.id);
+    }
   }
 
   const catalog = await repository.listSpaces();

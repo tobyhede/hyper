@@ -92,19 +92,32 @@ describe('resolveDatabaseStartup', () => {
     expect(result).toEqual({ kind: 'opened', space: existing });
   });
 
+  it('rejects an empty import without opening an unrelated stored space', async () => {
+    const unrelated = storedSpace(4n);
+    const repository = new MemorySpaceRepository([unrelated]);
+
+    await expect(resolveDatabaseStartup(repository, [])).rejects.toThrow(
+      'Database import returned no spaces',
+    );
+    await expect(repository.listSpaces()).resolves.toEqual([
+      { id: SPACE_ID, title: 'Existing space' },
+    ]);
+  });
+
   it('opens the one imported space by its UUID when unrelated spaces exist', async () => {
     const unrelated = storedSpace(4n);
-    const imported = storedSpace(
+    const stored = storedSpace(
       BigInt(Number.MAX_SAFE_INTEGER) + 1n,
       OTHER_SPACE_ID,
       OTHER_CARD_ID,
-      'Imported space',
+      'Fresh imported space',
     );
-    const repository = new MemorySpaceRepository([unrelated, imported]);
+    const imported = storedSpace(0n, OTHER_SPACE_ID, OTHER_CARD_ID, 'Stale imported space');
+    const repository = new MemorySpaceRepository([unrelated, stored]);
 
     const result = await resolveDatabaseStartup(repository, [imported]);
 
-    expect(result).toEqual({ kind: 'opened', space: imported });
+    expect(result).toEqual({ kind: 'opened', space: stored });
   });
 
   it('offers the complete catalog when several spaces are stored', async () => {
