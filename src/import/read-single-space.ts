@@ -29,6 +29,17 @@ const resolveSpaceFile = async (inputPath: string): Promise<string> => {
     : absoluteInput;
 };
 
+/**
+ * Order two relative paths by code unit, not by locale.
+ *
+ * `localeCompare` reads the host's collation, so the same space directory could
+ * import its cards in a different order on a different machine. Import order is
+ * observable — it is the order cards are inserted and the order a canonical
+ * export will emit — so it has to come from the bytes alone.
+ */
+const compareOrdinal = (left: string, right: string): number =>
+  left < right ? -1 : left > right ? 1 : 0;
+
 const markdownFilesIn = async (directory: string): Promise<string[]> =>
   (await readdir(directory, { withFileTypes: true }))
     .filter((entry) => entry.isFile() && entry.name.endsWith('.md'))
@@ -57,7 +68,7 @@ const discoverCardFiles = async (spaceDirectory: string): Promise<string[]> => {
   }
 
   return [...rootFiles, ...nestedFiles].sort((left, right) =>
-    relative(spaceDirectory, left).localeCompare(relative(spaceDirectory, right)),
+    compareOrdinal(relative(spaceDirectory, left), relative(spaceDirectory, right)),
   );
 };
 
@@ -161,7 +172,7 @@ export const readImportBatch = async (inputPath: string): Promise<readonly Impor
     .filter((entry) => entry.isDirectory())
     .map((entry) => join(absoluteInput, entry.name))
     .sort((left, right) =>
-      relative(absoluteInput, left).localeCompare(relative(absoluteInput, right)),
+      compareOrdinal(relative(absoluteInput, left), relative(absoluteInput, right)),
     );
   let spaceDirectories;
   try {
