@@ -62,9 +62,18 @@ export default tseslint.config(
       '**/.scratch/**',
       '**/.serena/**',
       // Agent tooling, gitignored alongside the two above. `.claude/worktrees/`
-      // holds *real git worktrees on other branches*, so without this `eslint .`
-      // walks into them and `pnpm verify` fails here on code you are not
-      // working on — and every warning is reported twice, once per checkout.
+      // and `.worktrees/` hold *real git worktrees on other branches*, so
+      // without this `eslint .` walks into them and `pnpm verify` fails here on
+      // code you are not working on — and every warning is reported twice, once
+      // per checkout. Worse, each checkout carries its own `tsconfig.json`, so
+      // `projectService` sees several candidate roots, fails to pick one, and
+      // reports a parse error for *every file in the repository*; the programs
+      // it holds open meanwhile exhaust the default 4GB heap first, so the
+      // symptom is an OOM crash rather than that error.
+      //
+      // Both paths are load-bearing: worktrees were created under `.claude/`
+      // and are now created under `.worktrees/`, and ignoring one fixes only
+      // that one.
       //
       // Flat config does not read `.gitignore`; this is the same class of bug
       // as the `spike.html` incident, where a gitignored file broke a tool that
@@ -72,6 +81,7 @@ export default tseslint.config(
       // separate entry in `.prettierignore`.
       '**/.claude/**',
       '**/.agents/**',
+      '**/.worktrees/**',
       // Prisma Next owns these emitted declarations. They are consumed by
       // typecheck but are not repository-authored lint targets.
       '**/src/prisma/contract.d.ts',
