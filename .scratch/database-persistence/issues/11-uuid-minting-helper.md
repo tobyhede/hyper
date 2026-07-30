@@ -13,14 +13,14 @@ Existing call sites:
 - `packages/graph/src/new-space.ts:30` — a new space's id
 - `packages/graph/src/new-space.ts:31` — its one card's id
 
-- [ ] The helper lives in `@project/core` beside `uuidSchema`, which owns the `UUID` type and is the one package every consumer already depends on — `graph`, `app`, and the CLI/repository code under `src/` all reach it without widening any dependency.
-- [ ] It is named for minting rather than allocating. `newUuid` matches the existing `newSpace` idiom and AGENTS.md's "minted" vocabulary; **allocate** is deliberately avoided, because it was the word that made the import path read as though PostgreSQL had to generate the value.
-- [ ] It returns `UUID` and derives that branding by parsing through `uuidSchema` rather than by type assertion — one regex check per minted id is not worth a cast that could drift from the schema.
-- [ ] It calls the `crypto` global, not `node:crypto`, so `core` and `graph` stay browser-safe. This is what `new-space.ts` already does.
-- [ ] The secure-context requirement (`crypto.randomUUID()` is unavailable over plain HTTP in browsers) is unchanged by this issue but now has exactly one place to grow a fallback if it ever needs one. Record it as a comment on the helper; do not add a fallback speculatively.
-- [ ] All four call sites above import the helper, and neither `packages/app` nor `packages/graph` retains a bare `crypto.randomUUID()`.
-- [ ] The import path in `src/persistence/postgres-space-repository.ts` uses the helper for missing route, layout and card ids. The space id continues to come from the `spaces.id` column default (`contract.prisma:8`), which needs no helper.
-- [ ] `pnpm verify` passes, and `pnpm e2e` passes for the `App.tsx` change.
+- [x] The helper lives in `@project/core` beside `uuidSchema`, which owns the `UUID` type and is the one package every consumer already depends on — `graph`, `app`, and the CLI/repository code under `src/` all reach it without widening any dependency.
+- [x] It is named for minting rather than allocating. `newUuid` matches the existing `newSpace` idiom and AGENTS.md's "minted" vocabulary; **allocate** is deliberately avoided, because it was the word that made the import path read as though PostgreSQL had to generate the value.
+- [x] It returns `UUID` and derives that branding by parsing through `uuidSchema` rather than by type assertion — one regex check per minted id is not worth a cast that could drift from the schema.
+- [x] It calls the `crypto` global, not `node:crypto`, so `core` and `graph` stay browser-safe. This is what `new-space.ts` already does.
+- [x] The secure-context requirement (`crypto.randomUUID()` is unavailable over plain HTTP in browsers) is unchanged by this issue but now has exactly one place to grow a fallback if it ever needs one. Record it as a comment on the helper; do not add a fallback speculatively.
+- [x] All four call sites above import the helper, and neither `packages/app` nor `packages/graph` retains a bare `crypto.randomUUID()`.
+- [x] The import path in `src/persistence/postgres-space-repository.ts` uses the helper for missing route, layout and card ids. The space id continues to come from the `spaces.id` column default (`contract.prisma:8`), which needs no helper.
+- [x] `pnpm verify` passes, and `pnpm e2e` passes for the `App.tsx` change.
 
 ## Comments
 

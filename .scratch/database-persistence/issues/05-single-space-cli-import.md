@@ -38,3 +38,22 @@ complete PostgreSQL integration suite ran 21 tests across three files, and
 `pnpm verify` passed both typechecks, lint with zero warnings, formatting, and
 360 coverage tests across 48 files. The PostgreSQL container was stopped after
 the integration run.
+
+## Comments
+
+**Superseded on 2026-07-30, after closure.** Two accepted criteria above no
+longer describe the code. They are left ticked because they were met when this
+issue closed; the changes came later.
+
+- "PostgreSQL allocates UUIDs for every missing space, card, route, and layout
+  id" and the closing note's "asks PostgreSQL to allocate" are both retired. A
+  space's id still comes from the `spaces.id` column default, but every card,
+  route and layout id is now minted in process through `newUuid`
+  (`@project/core`). The `SELECT gen_random_uuid() FROM spaces LIMIT 1` allocator
+  is gone — it depended on the `spaces` table being non-empty and cost one
+  round-trip per missing id inside the transaction. See issue `11` and ADR 0030.
+- The closing note's "covers allocation, insertion, **conflicts**, ownership" no
+  longer applies to import. `RepositoryImportResult` has no conflict variant:
+  insert-only import compares no revisions, so a taken identity is a
+  `duplicate-identity` rejection whether it was stored long ago or a moment
+  earlier by a rival transaction. See issue `13`.

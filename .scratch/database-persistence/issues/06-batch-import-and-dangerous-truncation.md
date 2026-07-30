@@ -33,3 +33,22 @@ identity-collision rollback, total replacement, and rollback after truncation
 and earlier batch writes have already occurred. Actual workspace opening and
 selection are left at the startup seam owned by issue 07, as agreed for this
 increment.
+
+## Comments
+
+**Superseded on 2026-07-30, after closure.** The criterion "CLI output clearly
+distinguishes discovery, parsing, identity, domain-validation, database, and
+revision-conflict failures" no longer holds in its last term, and is left ticked
+because it was met at closure.
+
+`hyper` can no longer report a revision conflict, because import cannot produce
+one. Insert-only import runs no optimistic revision check, so a space id that is
+already taken is an identity failure — it previously surfaced as a primary-key
+violation classified `conflict` and printed as "Revision conflict", which named a
+concurrency failure that cannot occur and hid the real cause. The remaining
+classifications (discovery, parsing, identity, domain-validation, database) are
+unchanged. See issue `13`.
+
+The closing note's "missing-id allocation" is also retired vocabulary: ids are
+**minted**, in process, and PostgreSQL is not a source of identity beyond the
+`spaces.id` column default. See issue `11`.
