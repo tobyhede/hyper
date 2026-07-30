@@ -16,6 +16,23 @@ export const uuidSchema = z.string().uuid().brand<'UUID'>();
 const idSchema = uuidSchema;
 
 /**
+ * Mint a durable identity. The one place a UUID is generated (issue `11`).
+ *
+ * **Mint, not allocate.** Nothing reserves an id from a registry, and in
+ * particular PostgreSQL does not hand them out: a space's id comes from its
+ * column default, and every other id — card, route, layout — is generated here,
+ * in whichever process is doing the work. Calling it allocation is what made the
+ * importer read as though the database had to be consulted for a random value.
+ *
+ * The `crypto` global rather than `node:crypto`, so `core` and the packages
+ * above it stay browser-safe. Browsers expose `randomUUID` only in a secure
+ * context (HTTPS or localhost); that has always been true of this codebase's
+ * generation sites, and centralizing them means a fallback, if one is ever
+ * needed, has exactly one home. Don't add one speculatively.
+ */
+export const newUuid = () => uuidSchema.parse(crypto.randomUUID());
+
+/**
  * Upper bound on a card's description. A description is a caption — what a card
  * *is* when the title is too terse (ADR 0006) — not a second body, so it is
  * capped and single-line. Past this, the content belongs in the card, opened.
