@@ -44,6 +44,10 @@ const identifyImport = (input: ImportSpace): SpaceSnapshot => {
 export class MemorySpaceRepository implements SpaceRepository {
   readonly #spaces = new Map<UUID, StoredSpace>();
 
+  constructor(spaces: readonly StoredSpace[] = []) {
+    for (const space of spaces) this.#spaces.set(space.snapshot.id, clone(space));
+  }
+
   listSpaces(): Promise<readonly SpaceSummary[]> {
     return Promise.resolve(
       [...this.#spaces.values()]

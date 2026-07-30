@@ -1,12 +1,29 @@
-import type { ImportSpace } from '@project/core';
+import type { ImportSpace, UUID } from '@project/core';
 import { newSpace, parseCardFile } from '@project/graph';
 import { requireImportedSpaces } from '../import/import-space';
-import type { SpaceRepository, StoredSpace } from '../persistence/space-repository';
+import type { SpaceRepository, SpaceSummary, StoredSpace } from '../persistence/space-repository';
 
 export interface OpenedDatabaseStartup {
   kind: 'opened';
   space: StoredSpace;
 }
+
+export interface DatabaseStartupSelection {
+  kind: 'selection';
+  spaces: readonly SpaceSummary[];
+}
+
+export type DatabaseStartupResult = OpenedDatabaseStartup | DatabaseStartupSelection;
+
+/** Open the durable workspace selected from the database catalog. */
+export const openDatabaseSelection = async (
+  repository: SpaceRepository,
+  id: UUID,
+): Promise<OpenedDatabaseStartup> => {
+  const loaded = await repository.loadSpace(id);
+  if (loaded === undefined) throw new Error(`The selected space ${id} could not be loaded`);
+  return { kind: 'opened', space: loaded };
+};
 
 const createNewSpaceImport = (): ImportSpace => {
   const minted = newSpace();
@@ -25,10 +42,15 @@ const createNewSpaceImport = (): ImportSpace => {
 /** Resolve the initial durable workspace from the database catalog. */
 export const resolveDatabaseStartup = async (
   repository: SpaceRepository,
-): Promise<OpenedDatabaseStartup> => {
+): Promise<DatabaseStartupResult> => {
   const catalog = await repository.listSpaces();
-  if (catalog.length !== 0) {
-    throw new Error('Database startup for an existing catalog is not implemented');
+  if (catalog.length === 1) {
+    const [summary] = catalog;
+    if (summary === undefined) throw new Error('The database catalog changed unexpectedly');
+    return openDatabaseSelection(repository, summary.id);
+  }
+  if (catalog.length > 1) {
+    return { kind: 'selection', spaces: catalog };
   }
 
   const imported = requireImportedSpaces(
