@@ -32,3 +32,9 @@ duplicate-identity failures roll back the batch, and the CLI reports the stored
 space identity and lossless revision. Unit coverage exercises parsing,
 composition, and CLI classification; the opt-in PostgreSQL suite covers
 allocation, additive import, conflicts, ownership, validation, and rollback.
+
+Final verification on Node 24 passed: the five focused files ran 42 tests, the
+complete PostgreSQL integration suite ran 21 tests across three files, and
+`pnpm verify` passed both typechecks, lint with zero warnings, formatting, and
+360 coverage tests across 48 files. The PostgreSQL container was stopped after
+the integration run.

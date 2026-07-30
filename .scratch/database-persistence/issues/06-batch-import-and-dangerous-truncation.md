@@ -12,7 +12,5 @@
 - [ ] `--dangerous-truncate` is rejected when no import path is supplied.
 - [ ] Dangerous truncation deletes every Hyper card and space before importing, inside the same transaction as the complete batch.
 - [ ] Any error rolls back both truncation and every import in the batch.
-- [ ] Successful single-space batches open that space; successful multi-space batches proceed to space selection.
 - [ ] CLI output clearly distinguishes discovery, parsing, identity, domain-validation, database, and revision-conflict failures.
 - [ ] Integration tests prove preservation without the flag, total replacement with the flag, and complete rollback on failures after truncation begins.
-
