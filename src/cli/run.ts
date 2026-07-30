@@ -1,4 +1,4 @@
-import { importSpaceBatch, SingleSpaceImportError } from '../import/import-single-space';
+import { importSpaceBatch, SpaceImportError } from '../import/import-space';
 import { SpaceImportFileError } from '../import/read-single-space';
 import type { SpaceRepository } from '../persistence/space-repository';
 
@@ -22,7 +22,7 @@ const reportImportError = (error: unknown, io: CliIo): void => {
     return;
   }
 
-  if (error instanceof SingleSpaceImportError) {
+  if (error instanceof SpaceImportError) {
     const labels = {
       identity: 'Identity import failed',
       'domain-validation': 'Domain validation failed',
@@ -53,7 +53,7 @@ export const runHyper = async (
   }
 
   try {
-    const mode = truncateArguments.length === 1 ? 'truncate' : 'upsert';
+    const mode = truncateArguments.length === 1 ? 'truncate' : 'insert';
     const stored = await importSpaceBatch(path, dependencies.repository, mode);
     if (stored.length === 1) {
       const [space] = stored;

@@ -4,7 +4,7 @@
 
 **Goal:** Store, load, list, import, and revision-check completely identified space aggregates through a server-side PostgreSQL repository.
 
-**Architecture:** A server-only SpaceRepository contract owns storage outcomes while PostgresSpaceRepository translates complete SpaceSnapshot aggregates into the existing relational UUID columns and JSONB documents. Every mutating operation uses Prisma Next's callback transaction; runtime commits replace the complete aggregate, while identified upsert imports remain additive.
+**Architecture:** A server-only SpaceRepository contract owns storage outcomes while PostgresSpaceRepository translates complete SpaceSnapshot aggregates into the existing relational UUID columns and JSONB documents. Every mutating operation uses Prisma Next's callback transaction; runtime commits replace the complete aggregate, while import inserts complete new Spaces and rejects existing identities.
 
 **Tech Stack:** TypeScript 6 strict mode, Zod domain intake, Prisma Next 0.16.0, PostgreSQL 17.5, Vitest integration tests.
 
@@ -21,7 +21,7 @@
 
 ---
 
-### Task 1: Repository contract and identified upsert import
+### Task 1: Repository contract and identified insert import
 
 **Files:**
 - Create: src/persistence/space-repository.ts
@@ -30,7 +30,7 @@
 
 **Interfaces:**
 - Produces: SpaceRepository, StoredSpace, RepositoryCommitResult, RepositoryImportResult, and PostgresSpaceRepository.
-- Produces: importSpaces(snapshots: readonly SpaceSnapshot[]): Promise<RepositoryImportResult> for additive, completely identified imports, with typed imported, rejected, and conflict outcomes.
+- Produces: importSpaces(snapshots: readonly SpaceSnapshot[]): Promise<RepositoryImportResult> for insert-only, completely identified imports, with typed imported, rejected, and conflict outcomes.
 
 - [x] **Step 1: Add import/load/list coverage**
 
@@ -49,9 +49,9 @@ await expect(repository.listSpaces()).resolves.toEqual([
 ]);
 ~~~
 
-- [x] **Step 2: Implement the minimal additive import, load, and list behavior**
+- [x] **Step 2: Implement the minimal insert-only import, load, and list behavior**
 
-Use db.transaction(async ({ orm }) => ...), upsert the identified space and cards, reconstruct snapshots with spaceDocumentSchema and cardDocumentSchema, and validate reconstructed aggregates with loadSpaceSnapshot.
+Use db.transaction(async ({ orm }) => ...), insert the identified space and cards, reject existing identities, reconstruct snapshots with spaceDocumentSchema and cardDocumentSchema, and validate reconstructed aggregates with loadSpaceSnapshot.
 
 ### Task 2: Valid authoritative runtime commit
 
@@ -122,17 +122,17 @@ Import two spaces, submit one space with the other's card UUID, expect rejection
 
 - [x] **Step 2: Reject ownership changes inside the transaction with a private rollback signal**
 
-### Task 6: Additive import and operational rollback
+### Task 6: Insert-only import and operational rollback
 
 **Files:**
 - Modify: src/persistence/postgres-space-repository.ts
 - Modify: test/integration/postgres-space-repository.test.ts
 
-- [x] **Step 1: Add additive re-import coverage**
+- [x] **Step 1: Add existing-identity rejection coverage**
 
-Import a two-card space, re-import the same space with one card, and assert through loadSpace that both stored cards remain while supplied documents update.
+Import a Space, import the same identity again with changed content, and assert a typed conflict while the stored aggregate remains unchanged.
 
-- [x] **Step 2: Implement the explicit additive import policy**
+- [x] **Step 2: Implement the explicit insert-only import policy**
 
 - [x] **Step 3: Add and satisfy an operational rollback test**
 

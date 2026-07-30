@@ -29,7 +29,7 @@ export type RepositoryImportResult =
       message: string;
     };
 
-export type ImportMode = 'upsert' | 'truncate';
+export type ImportMode = 'insert' | 'truncate';
 
 export interface SpaceRepository {
   listSpaces(): Promise<readonly SpaceSummary[]>;

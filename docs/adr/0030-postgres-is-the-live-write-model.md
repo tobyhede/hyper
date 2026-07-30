@@ -13,14 +13,17 @@ the application.
 
 Spaces and cards are UUID-keyed rows with JSONB documents. Routes and layouts
 remain nested in the space document. An id is optional only in import input: an
-explicit id must be a UUID and is used for upsert, while PostgreSQL allocates
-every missing space, card, route and layout id. An id-less entity is therefore
-always new until export writes its generated UUID.
+explicit id must be a UUID and must not already exist, while PostgreSQL
+allocates every missing space, card, route and layout id. An id-less entity is
+therefore always new until export writes its generated UUID.
 
 Import, seed data and test fixtures share one transactional import mechanism.
-Without deletion mode it inserts and upserts but never deletes by absence. The
-CLI's `--dangerous-truncate` mode deletes all Hyper content and imports the
-complete batch in one transaction. Export is CLI-only, canonical rather than
+Ordinary import inserts complete new Spaces and rejects the whole batch on any
+existing identity; it never updates, merges or deletes existing content. Each
+imported Space is a self-contained aggregate: stored state cannot supply an
+omitted card, route, layout or reference target. The CLI's
+`--dangerous-truncate` mode deletes all Hyper content and inserts the complete
+batch in one transaction. Export is CLI-only, canonical rather than
 byte-preserving, and records the database revision it projected.
 
 Prisma Next supplies the contract-first PostgreSQL runtime and migration model
@@ -42,5 +45,6 @@ schemas allow persistence-owned ids to be omitted, and `SpaceBackend`,
 The Vite file integration is now a read-only import source; there is no browser
 Save action or file write-back endpoint.
 
-The Prisma Next/PostgreSQL adapter, transactional importer, database-backed app
-startup and CLI-only canonical exporter remain to be built.
+The Prisma Next/PostgreSQL adapter and insert-only transactional importer are
+built. The HTTP backend, database-backed app startup, CLI-only canonical
+exporter and PostgreSQL CI integration remain to be built.

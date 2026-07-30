@@ -49,6 +49,17 @@ const isSpacePrimaryKeyConflict = (error: unknown): boolean => {
   );
 };
 
+const isCardPrimaryKeyConflict = (error: unknown): boolean => {
+  if (typeof error !== 'object' || error === null) return false;
+  const candidate = error as Record<string, unknown>;
+  return (
+    candidate['kind'] === 'sql_query' &&
+    candidate['sqlState'] === '23505' &&
+    candidate['table'] === 'cards' &&
+    candidate['constraint'] === 'cards_pkey'
+  );
+};
+
 const toRevision = (value: number | string | bigint): bigint => {
   if (typeof value === 'number' && !Number.isSafeInteger(value)) {
     throw new RangeError(`Database revision ${value} is not a safe integer`);
@@ -237,35 +248,19 @@ const upsertCards = async (orm: Orm, snapshot: SpaceSnapshot): Promise<void> => 
   }
 };
 
-const importCards = async (
-  orm: Orm,
-  input: ImportSpace,
-  snapshot: SpaceSnapshot,
-): Promise<void> => {
-  for (const [index, card] of snapshot.cards.entries()) {
-    if (input.cards[index]?.id === undefined) {
+const importCards = async (orm: Orm, snapshot: SpaceSnapshot): Promise<void> => {
+  for (const card of snapshot.cards) {
+    try {
       await orm.public.Card.create({
         id: card.id,
         spaceId: snapshot.id,
         document: toJsonValue(card.document),
       });
-      continue;
-    }
-
-    const stored = await orm.public.Card.upsert({
-      create: {
-        id: card.id,
-        spaceId: snapshot.id,
-        document: toJsonValue(card.document),
-      },
-      update: {
-        document: toJsonValue(card.document),
-      },
-    });
-    if (stored.spaceId !== snapshot.id) {
-      throw new CardOwnershipError(
-        `Card ${card.id} belongs to space ${stored.spaceId}, not ${snapshot.id}`,
-      );
+    } catch (error) {
+      if (isCardPrimaryKeyConflict(error)) {
+        throw new CardOwnershipError(`Card ${card.id} already belongs to another space`);
+      }
+      throw error;
     }
   }
 };
@@ -363,7 +358,7 @@ export class PostgresSpaceRepository implements SpaceRepository {
 
   async importSpaces(
     input: readonly ImportSpace[],
-    mode: ImportMode = 'upsert',
+    mode: ImportMode = 'insert',
   ): Promise<RepositoryImportResult> {
     let accepted: ImportSpace[];
     try {
@@ -398,38 +393,30 @@ export class PostgresSpaceRepository implements SpaceRepository {
         if (mode === 'truncate') await truncateHyperContent(orm);
 
         for (const importInput of accepted) {
-          const current =
-            importInput.id === undefined
-              ? null
-              : await orm.public.Space.first({ id: importInput.id });
           let space;
-          if (current === null) {
-            try {
-              space = await orm.public.Space.create({
-                ...(importInput.id === undefined ? {} : { id: importInput.id }),
-                document: toJsonValue({
-                  version: 2,
-                  title: importInput.document.title,
-                  routes: [],
-                }),
-                revision: 0,
-              });
-            } catch (error) {
-              if (isSpacePrimaryKeyConflict(error)) {
-                if (importInput.id === undefined) throw error;
-                throw new ImportConflictError(importInput.id);
-              }
-              throw error;
+          try {
+            space = await orm.public.Space.create({
+              ...(importInput.id === undefined ? {} : { id: importInput.id }),
+              document: toJsonValue({
+                version: 2,
+                title: importInput.document.title,
+                routes: [],
+              }),
+              revision: 0,
+            });
+          } catch (error) {
+            if (isSpacePrimaryKeyConflict(error)) {
+              if (importInput.id === undefined) throw error;
+              throw new ImportConflictError(importInput.id);
             }
-          } else {
-            space = current;
+            throw error;
           }
 
-          const reservedSpaceId = uuidSchema.parse(space.id);
           const allocate = async (): Promise<UUID> => {
             const row = await uuidAllocation.execute(transaction, {}).firstOrThrow();
             return uuidSchema.parse(row.id);
           };
+          const reservedSpaceId = uuidSchema.parse(space.id);
           const snapshot = await resolveImport(importInput, reservedSpaceId, allocate);
           const intake = loadSpaceSnapshot(snapshot);
           if (!intake.ok) {
@@ -438,23 +425,14 @@ export class PostgresSpaceRepository implements SpaceRepository {
             );
           }
 
-          if (current === null) {
-            space = await orm.public.Space.where({ id: snapshot.id })
-              .where({ revision: 0 })
-              .update({ document: toJsonValue(snapshot.document) });
-          } else {
-            space = await orm.public.Space.where({ id: snapshot.id })
-              .where({ revision: current.revision })
-              .update({
-                document: toJsonValue(snapshot.document),
-                revision: toDatabaseRevision(toRevision(current.revision) + 1n),
-              });
-          }
+          space = await orm.public.Space.where({ id: snapshot.id })
+            .where({ revision: 0 })
+            .update({ document: toJsonValue(snapshot.document) });
           if (space === null) {
-            throw new ImportConflictError(snapshot.id);
+            throw new Error(`Newly inserted space ${snapshot.id} disappeared during import`);
           }
 
-          await importCards(orm, importInput, snapshot);
+          await importCards(orm, snapshot);
 
           const stored = await loadStoredSpace(orm, snapshot.id);
           if (stored === undefined) {

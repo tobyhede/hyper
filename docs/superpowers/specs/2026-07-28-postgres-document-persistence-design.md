@@ -141,8 +141,8 @@ transaction. `exported_revision` is updated only after a successful filesystem
 export of that revision.
 
 Import never advances `exported_revision`. That column records projections made
-from database state, not files that happened to contribute to it; a merged
-import may leave database cards that were absent from the imported directory.
+from database state, and every imported Space begins at revision zero with no
+recorded export.
 
 ## Module architecture
 
@@ -313,12 +313,14 @@ handler and `HttpSpaceBackend` layers; they never cross the repository seam.
 same revision-checked transaction it replaces the space document, upserts every
 card in the snapshot, deletes stored cards owned by that space but absent from
 the snapshot, and increments the space revision. That is how a runtime card
-deletion becomes durable. Ordinary import has different semantics: it is an
-additive contribution to existing state, so absence from an upsert import never
-deletes database content. Dangerous truncation remains the only import mode
-that deletes by absence of the old database as a whole.
+deletion becomes durable. Ordinary import has different semantics: it inserts
+complete new Spaces, and an existing identity rejects the whole batch. It never
+updates, merges or deletes existing content. An import Space is a self-contained
+aggregate: its cards and space document are the complete input, and stored state
+cannot fill an omission or resolve a reference. Dangerous truncation remains
+the only import mode that deletes the old database content as a whole.
 
-`ImportMode` is `upsert` or `truncate`. The latter name is internal; the only
+`ImportMode` is `insert` or `truncate`. The latter name is internal; the only
 public way to select it is the deliberately alarming
 `--dangerous-truncate` flag.
 
@@ -357,7 +359,9 @@ Import proceeds in two phases.
 
 First, Hyper discovers and parses the complete input batch. Syntax, frontmatter,
 shape, file duplication, and explicit UUID errors are reported without opening
-a write transaction.
+a write transaction. Each discovered Space is complete in itself; neither
+another imported Space nor existing database state may contribute cards,
+routes, layouts, or reference targets to it.
 
 Second, one repository transaction:
 
@@ -366,14 +370,13 @@ Second, one repository transaction:
 3. constructs fully identified snapshots;
 4. validates all domain references and invariants, including that every UUID
    reference resolved to an explicitly identified input entity;
-5. upserts every explicitly identified space and card row;
-6. inserts space and card rows whose ids were absent in the input, while
-   persisting generated route and layout ids inside their parent document;
-7. commits the whole batch.
+5. inserts every space and card row, persisting generated route and layout ids
+   inside their parent document;
+6. commits the whole batch.
 
-Without dangerous truncation, absence never deletes database content. An
-explicit card UUID already owned by another space is a conflict rather than an
-implicit move. Duplicate explicit UUIDs within the batch are errors.
+Without dangerous truncation, existing database content is untouched. Any
+explicit identity already present in the database rejects the complete batch;
+duplicate explicit UUIDs within the batch are also errors.
 
 The same `importSpaces` module accepts programmatic `ImportSpace` inputs for
 seeds and test fixtures. Only the file adapter performs filesystem discovery and
@@ -521,10 +524,11 @@ Prisma Next commands, so starting a container cannot silently change the schema.
   snapshot, revision hand-off, transient retry, and non-overwriting conflicts.
 - Repository integration tests run against Docker PostgreSQL.
 - Repository tests prove authoritative runtime replacement deletes omitted
-  cards while ordinary upsert import preserves omitted database cards.
-- Import tests cover explicit-id upsert, id-less insertion, UUID allocation,
-  cross-space ownership conflicts, duplicate ids, complete rollback, and
-  dangerous truncation.
+  cards while ordinary import rejects existing identities without changing
+  stored content.
+- Import tests cover explicit-id insertion and collision, id-less insertion,
+  UUID allocation, cross-space ownership conflicts, duplicate ids, complete
+  rollback, concurrent insertion, and dangerous truncation.
 - Runtime tests cover ordered commits, stale-revision rejection, failure
   visibility, and retry.
 - Canonical round-trip properties assert files -> import -> export -> import

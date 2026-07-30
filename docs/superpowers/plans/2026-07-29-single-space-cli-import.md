@@ -4,7 +4,7 @@
 
 **Goal:** Import one `space.json` file or one space directory into PostgreSQL, allocate every missing durable identity transactionally, and report the imported stored space and UUID.
 
-**Architecture:** A Node-only file adapter discovers and parses the complete directory into `ImportSpace` before calling the repository. `PostgresSpaceRepository.importSpaces` remains the shared programmatic/file import core: inside one callback transaction it reserves the target space, asks PostgreSQL for missing UUIDs, constructs and domain-validates a complete `SpaceSnapshot`, then performs additive inserts/upserts. A thin CLI reports the returned `StoredSpace`; database workspace selection and opening remain issue 07.
+**Architecture:** A Node-only file adapter discovers and parses the complete directory into `ImportSpace` before calling the repository. `PostgresSpaceRepository.importSpaces` remains the shared programmatic/file import core: inside one callback transaction it reserves the target space, asks PostgreSQL for missing UUIDs, constructs and domain-validates a complete `SpaceSnapshot`, then inserts it or rejects an existing identity. A thin CLI reports the returned `StoredSpace`; database workspace selection and opening remain issue 07.
 
 **Tech Stack:** TypeScript 6 strict mode, Zod 3, YAML, Node 24 filesystem APIs, Prisma Next 0.16.0, PostgreSQL 17.5, tsx 4.20.6, Vitest.
 
@@ -15,7 +15,7 @@
 - Keep entity ids and UUID references UUID-only; built-in `defaultView` values remain `graph` or `grid`. There is no import-local key and filenames never become identity.
 - An id-less card, route, or layout must be unreferenced; normal domain validation rejects a UUID reference that has no explicitly identified target.
 - PostgreSQL allocates every missing space, card, route, and layout UUID inside the import transaction.
-- An explicit UUID upserts; an absent id inserts a new entity. Ordinary import never deletes by absence.
+- An explicit UUID must be unused; an absent id receives a new identity. Ordinary import never updates, merges or deletes stored content.
 - Keep `Space`, `SpaceSnapshot`, and every repository read fully identified.
 - Keep database, filesystem, and CLI modules outside browser-safe workspace packages.
 - Use callback transactions and authored database imports only through the `@prisma-next/postgres` facade.
@@ -36,9 +36,9 @@
 - `test/unit/read-single-space.test.ts` — exercises real temporary directories, non-recursive discovery, file/directory inputs, and parse diagnostics.
 - `src/persistence/space-repository.ts` — changes the shared import contract from identified snapshots to `ImportSpace` inputs.
 - `src/persistence/postgres-space-repository.ts` — allocates missing UUIDs, resolves one import into a snapshot, validates it, and writes it atomically.
-- `test/integration/postgres-space-repository.test.ts` — proves explicit upsert, id-less insertion, UUID allocation, invalid-reference rejection, ownership rejection, and rollback against PostgreSQL.
-- `src/import/import-single-space.ts` — composes the file adapter with the same repository import method used by programmatic callers.
-- `test/unit/import-single-space.test.ts` — proves discovery/parsing finishes before repository mutation and normalizes the one-space result.
+- `test/integration/postgres-space-repository.test.ts` — proves explicit insertion and collision, id-less insertion, UUID allocation, invalid-reference rejection, ownership rejection, and rollback against PostgreSQL.
+- `src/import/import-space.ts` — composes the file adapter with the same repository import method used by programmatic callers.
+- `test/unit/import-space.test.ts` — proves discovery/parsing finishes before repository mutation and normalizes the one-space result.
 - `src/cli/run.ts` — maps arguments and typed import outcomes to stable stdout/stderr text and exit codes.
 - `src/cli/main.ts` — classifies database shutdown failure around the pure CLI runner.
 - `src/cli/entry.ts` — constructs the real repository, invokes the classified main function, and sets `process.exitCode`.
@@ -316,7 +316,7 @@ git commit -m "feat: discover one import space"
 **Interfaces:**
 - Consumes: `ImportSpace`, `importSpaceSchema`, `loadSpaceSnapshot`, Prisma callback transactions, and PostgreSQL `gen_random_uuid()`.
 - Changes: `SpaceRepository.importSpaces(input: readonly ImportSpace[]): Promise<RepositoryImportResult>`.
-- Preserves: `RepositoryImportResult = imported | conflict | rejected`, additive omission semantics, explicit-id optimistic updates, and cross-space ownership rejection.
+- Preserves: `RepositoryImportResult = imported | conflict | rejected`, insert-only semantics, identity-collision rollback, and cross-space ownership rejection.
 - Produces privately: `resolveImport(input: ImportSpace, reservedSpaceId: UUID, allocate: () => Promise<UUID>): Promise<SpaceSnapshot>`.
 - Produces privately: a prepared PostgreSQL UUID query returning `{ id: string }`, executed on the active transaction.
 - Extends: import rejection codes to `'invalid-snapshot' | 'duplicate-identity' | 'card-ownership'`, so callers never classify failures by parsing message text.
@@ -450,13 +450,13 @@ const snapshot: SpaceSnapshot = {
 };
 ```
 
-Use the reserved row's generated id for an id-less space instead of allocating a second space id. At this GREEN stage validate only the resolved public shape with `spaceSnapshotSchema`; the next RED adds normal domain validation. Update an existing explicit space document and revision optimistically; finish a new reserved row at revision `0n`. `create` generated-id cards and `upsert` explicit-id cards. Keep omitted stored cards untouched.
+Use the reserved row's generated id for an id-less space instead of allocating a second space id. At this GREEN stage validate only the resolved public shape with `spaceSnapshotSchema`; the next RED adds normal domain validation. Reject an existing explicit Space identity; finish a new reserved row at revision `0n`, and `create` every card so any identity collision rolls back the batch.
 
-- [ ] **Step 8: Verify GREEN for allocation and additive import**
+- [ ] **Step 8: Verify GREEN for allocation and insert-only import**
 
 Run: `pnpm test:integration:postgres -- postgres-space-repository`
 
-Expected: PASS for four-id mixed allocation, two successful all-id-less imports, mixed reimport ownership rejection, existing identified upsert, and additive omitted-card coverage.
+Expected: PASS for four-id mixed allocation, two successful all-id-less imports, card ownership rejection, existing Space identity rejection, and complete rollback.
 
 - [ ] **Step 9: RED — reject UUID references that cannot name id-less entities**
 
@@ -508,13 +508,13 @@ git commit -m "feat: allocate identities during import"
 ### Task 4: Shared Single-Space Import Orchestration
 
 **Files:**
-- Create: `src/import/import-single-space.ts`
-- Create: `test/unit/import-single-space.test.ts`
+- Create: `src/import/import-space.ts`
+- Create: `test/unit/import-space.test.ts`
 
 **Interfaces:**
 - Consumes: `readSingleSpace`, `SpaceRepository.importSpaces`, and `RepositoryImportResult`.
 - Produces: `importSingleSpace(path: string, repository: SpaceRepository): Promise<StoredSpace>`.
-- Throws: `SpaceImportFileError` for filesystem/parsing failures and `SingleSpaceImportError` with `kind: 'identity' | 'domain-validation' | 'revision-conflict'` for typed repository failures.
+- Throws: `SpaceImportFileError` for filesystem/parsing failures and `SpaceImportError` with `kind: 'identity' | 'domain-validation' | 'revision-conflict'` for typed repository failures.
 
 - [ ] **Step 1: RED — prove invalid files never reach the repository**
 
@@ -522,7 +522,7 @@ Create a recording `SpaceRepository` test double whose `importSpaces` stores rec
 
 - [ ] **Step 2: Verify RED for orchestration**
 
-Run: `pnpm test test/unit/import-single-space.test.ts`
+Run: `pnpm test test/unit/import-space.test.ts`
 
 Expected: FAIL because `importSingleSpace` does not exist.
 
@@ -542,24 +542,24 @@ if (result.kind === 'imported') {
 }
 ```
 
-Map `conflict` to `SingleSpaceImportError('revision-conflict', ...)`; map `duplicate-identity` and `card-ownership` to `identity`; map `invalid-snapshot` to `domain-validation`. Include the relevant UUID/message unchanged.
+Map `conflict` to `SpaceImportError('revision-conflict', ...)`; map `duplicate-identity` and `card-ownership` to `identity`; map `invalid-snapshot` to `domain-validation`. Include the relevant UUID/message unchanged.
 
 - [ ] **Step 4: Verify GREEN for parse-before-write and successful return**
 
-Run: `pnpm test test/unit/import-single-space.test.ts`
+Run: `pnpm test test/unit/import-space.test.ts`
 
 Expected: PASS, including a valid directory case that asserts the returned `StoredSpace` is the repository's result.
 
 - [ ] **Step 5: Refactor and re-verify Task 4**
 
-Run: `pnpm test test/unit/import-single-space.test.ts test/unit/read-single-space.test.ts`
+Run: `pnpm test test/unit/import-space.test.ts test/unit/read-single-space.test.ts`
 
 Expected: PASS with no warnings.
 
 - [ ] **Step 6: Commit Task 4**
 
 ```bash
-git add src/import/import-single-space.ts test/unit/import-single-space.test.ts
+git add src/import/import-space.ts test/unit/import-space.test.ts
 git commit -m "feat: compose single-space import"
 ```
 
@@ -702,7 +702,7 @@ Expected: PASS for success durability and parse-failure rollback/reporting.
 
 - [ ] **Step 13: Refactor and re-verify Task 5**
 
-Run: `pnpm test test/unit/hyper-cli.test.ts test/unit/import-single-space.test.ts && pnpm test:integration:postgres -- hyper-cli`
+Run: `pnpm test test/unit/hyper-cli.test.ts test/unit/import-space.test.ts && pnpm test:integration:postgres -- hyper-cli`
 
 Expected: PASS with clean stdout/stderr.
 
@@ -727,7 +727,7 @@ git commit -m "feat: import one space from the CLI"
 Run:
 
 ```bash
-pnpm test packages/core/test/persistence-schema.test.ts packages/graph/test/card-file.test.ts test/unit/read-single-space.test.ts test/unit/import-single-space.test.ts test/unit/hyper-cli.test.ts
+pnpm test packages/core/test/persistence-schema.test.ts packages/graph/test/card-file.test.ts test/unit/read-single-space.test.ts test/unit/import-space.test.ts test/unit/hyper-cli.test.ts
 ```
 
 Expected: PASS.

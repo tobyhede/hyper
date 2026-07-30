@@ -66,7 +66,7 @@ Therefore "seed local database from files on load" is a Hyper importer built wit
 
 - **Bootstrap once:** import files only when creating/opening a fresh local database. Later page loads reuse the DB. This matches the ordinary meaning of seeding and cleanly establishes DB authority.
 - **Reconcile every load:** compare files to rows whenever the app opens. This is synchronization and requires ownership, conflict, deletion, identity, and timestamp/version rules. It reintroduces much of the complexity the database move is meant to avoid.
-- **Explicit import:** opening/importing a space is a user action distinct from reopening the current database. This makes replacement/merge policy visible and is the clearest fit with explicit export.
+- **Explicit import:** opening/importing a space is a user action distinct from reopening the current database. This makes identity-collision and dangerous-truncation policy visible and is the clearest fit with explicit export.
 
 Import should be a transaction so the database never contains a partially imported space. Missing source files must not silently imply row deletion unless the import operation explicitly has replacement semantics.
 
@@ -129,7 +129,7 @@ The important semantic distinction is where the default runs:
 - `@default(uuid())`, `@default(uuid(4))`, and `@default(uuid(7))` lower to Prisma Next **execution generators** (`uuidv4` or `uuidv7`). The application supplies the ID in its insert; the database column itself has no UUID default. This is directly visible in the demo's emitted contract. ([default lowering source](https://github.com/prisma/prisma-next/blob/e0e739ca6a0e076c97733ef30ec3bf7b1f43a27b/packages/3-targets/6-adapters/postgres/src/core/control-mutation-defaults.ts), [emitted demo contract](https://github.com/prisma/prisma-next/blob/e0e739ca6a0e076c97733ef30ec3bf7b1f43a27b/examples/prisma-next-demo/src/prisma/contract.json))
 - A database-side default uses `@default(dbgenerated("gen_random_uuid()"))`. Prisma Next preserves and renders `gen_random_uuid()` as a database function default, and PostgreSQL integration coverage proves a native UUID column accepts the function's result. ([default lowering tests](https://github.com/prisma/prisma-next/blob/e0e739ca6a0e076c97733ef30ec3bf7b1f43a27b/packages/3-targets/6-adapters/postgres/test/control-mutation-defaults.test.ts), [UUID integration test](https://github.com/prisma/prisma-next/blob/e0e739ca6a0e076c97733ef30ec3bf7b1f43a27b/packages/3-targets/6-adapters/postgres/test/migrations/planner.uuid.integration.test.ts))
 
-Hyper chose UUIDs as the single domain identity, not merely as surrogate row keys. Existing fixtures with short string ids must therefore migrate. Explicit import ids are UUIDs used for upsert; missing row ids use PostgreSQL defaults, and missing nested route/layout ids are allocated through PostgreSQL within the import transaction.
+Hyper chose UUIDs as the single domain identity, not merely as surrogate row keys. Existing fixtures with short string ids must therefore migrate. Explicit import ids are UUIDs that must be unused; missing row ids use PostgreSQL defaults, and missing nested route/layout ids are allocated through PostgreSQL within the import transaction.
 
 ### Transactions
 
@@ -185,7 +185,7 @@ The approved move changes Hyper's promise from **file-first persistence** to **d
 The smallest coherent version is:
 
 1. Docker PostgreSQL is the only live write model.
-2. Import is explicit and transactional: explicit UUIDs upsert, absent ids insert after PostgreSQL allocation, absence never deletes, and `--dangerous-truncate` replaces all content atomically.
+2. Import is explicit, insert-only and transactional: existing UUIDs reject the complete batch, absent ids insert after PostgreSQL allocation, and `--dangerous-truncate` replaces all content atomically.
 3. Every edit persists to PostgreSQL through the server adapter; the existing Save concept disappears.
 4. Export regenerates canonical files from a consistent snapshot, with deterministic naming and formatting.
 5. The UI separately shows whether the DB revision has been exported.

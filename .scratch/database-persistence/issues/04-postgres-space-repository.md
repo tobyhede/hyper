@@ -17,15 +17,15 @@
 - [x] Listing derives stable space summaries without introducing speculative duplicated columns or JSONB indexes.
 - [x] Card UUIDs already owned by another space are rejected rather than moved implicitly.
 - [x] A runtime commit treats its complete snapshot as authoritative and deletes cards owned by the space but absent from that snapshot in the same transaction.
-- [x] Ordinary upsert import remains additive and never deletes database cards merely because they are absent from the import input.
-- [x] Integration tests against Docker PostgreSQL cover atomic commits, rollback, stale revisions, listing, loading, ownership conflicts, authoritative runtime deletion, and non-deleting upsert import.
+- [x] Ordinary import inserts complete new Spaces and rejects existing identities without changing stored content.
+- [x] Integration tests against Docker PostgreSQL cover atomic commits, rollback, stale revisions, listing, loading, ownership conflicts, authoritative runtime deletion, and insert-only import.
 
 ## Answer
 
 Implemented a server-only `SpaceRepository` and Prisma Next-backed
 `PostgresSpaceRepository`. Repository mutations validate complete snapshots,
 reject duplicate durable identities, run in callback transactions, preserve
-card ownership, keep import additive, and expose only storage/domain outcomes.
+card ownership, keep import insert-only, and expose only storage/domain outcomes.
 Revision-stabilised reads prevent a concurrent commit from producing a torn
 space/card aggregate. PostgreSQL revisions remain lossless `bigint` values
 behind an isolated Prisma Next 0.16.0 compatibility cast. The integration suite

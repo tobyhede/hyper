@@ -10,7 +10,7 @@
 - [x] Card discovery remains non-recursive and limited to Markdown files beside `space.json` and immediately under `cards/`.
 - [x] The complete input is discovered and parsed before a write transaction begins.
 - [x] PostgreSQL allocates UUIDs for every missing space, card, route, and layout id.
-- [x] An entity with an explicit UUID upserts that entity; an entity without an id always inserts a new entity.
+- [x] An explicit UUID inserts that entity only when the identity is unused; an entity without an id receives a new identity and inserts.
 - [x] Import introduces no temporary identity or filename-based reference: every UUID reference must resolve to an explicitly identified entity, and an id-less entity cannot be referenced until export writes its generated UUID.
 - [x] Duplicate explicit UUIDs and cross-space card ownership conflicts fail the import without partial writes.
 - [x] The file adapter and programmatic seeds/test fixtures share the same core import mechanism.
@@ -26,12 +26,12 @@ id-optional `ImportSpace` to the shared repository seam before any write begins.
 
 `PostgresSpaceRepository` reserves the owning row, asks PostgreSQL to allocate
 every missing durable identity, validates the resulting complete snapshot
-through normal graph intake, and applies the additive import in one callback
-transaction. Explicit identities upsert, id-less entities insert, ownership and
-duplicate-identity failures roll back the batch, and the CLI reports the stored
-space identity and lossless revision. Unit coverage exercises parsing,
-composition, and CLI classification; the opt-in PostgreSQL suite covers
-allocation, additive import, conflicts, ownership, validation, and rollback.
+through normal graph intake, and inserts it in one callback transaction.
+Existing identities, ownership conflicts and duplicate identities roll back the
+batch, and the CLI reports the stored space identity and lossless revision.
+Unit coverage exercises parsing, composition, and CLI classification; the
+opt-in PostgreSQL suite covers allocation, insertion, conflicts, ownership,
+validation, and rollback.
 
 Final verification on Node 24 passed: the five focused files ran 42 tests, the
 complete PostgreSQL integration suite ran 21 tests across three files, and

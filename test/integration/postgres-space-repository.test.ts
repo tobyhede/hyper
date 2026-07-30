@@ -27,99 +27,6 @@ const MIXED_FIRST_CARD_ID = uuidSchema.parse('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaa
 const MIXED_SECOND_CARD_ID = uuidSchema.parse('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb');
 const UNRESOLVED_CARD_ID = uuidSchema.parse('cccccccc-cccc-4ccc-8ccc-cccccccccccc');
 
-const createReadBarrier = (parties: number) => {
-  let arrivals = 0;
-  let release: (() => void) | undefined;
-  const opened = new Promise<void>((resolve) => {
-    release = resolve;
-  });
-
-  return async () => {
-    arrivals += 1;
-    if (arrivals === parties) release?.();
-    await opened;
-  };
-};
-
-const createGate = () => {
-  let release: (() => void) | undefined;
-  const opened = new Promise<void>((resolve) => {
-    release = resolve;
-  });
-
-  return {
-    open: () => release?.(),
-    wait: () => opened,
-  };
-};
-
-const databasePausedAfterFirstSpaceRead = (
-  id: typeof SPACE_ID,
-  barrier: () => Promise<void>,
-  afterBarrier: () => Promise<void> = () => Promise.resolve(),
-): typeof db =>
-  new Proxy(db, {
-    get(target, property, receiver) {
-      if (property !== 'transaction') {
-        const value: unknown = Reflect.get(target, property, receiver);
-        return value;
-      }
-
-      const transaction: typeof db.transaction = (callback) =>
-        db.transaction((context) => {
-          let paused = false;
-          const space = new Proxy(context.orm.public.Space, {
-            get(spaceTarget, spaceProperty) {
-              if (spaceProperty === 'first') {
-                return async (...args: Parameters<typeof spaceTarget.first>) => {
-                  const result = await spaceTarget.first(...args);
-                  if (!paused && args[0].id === id) {
-                    paused = true;
-                    await barrier();
-                    await afterBarrier();
-                  }
-                  return result;
-                };
-              }
-
-              const value: unknown = Reflect.get(spaceTarget, spaceProperty, spaceTarget);
-              if (typeof value !== 'function') return value;
-              return (...args: unknown[]) => Reflect.apply(value, spaceTarget, args) as unknown;
-            },
-          });
-          const publicNamespace = new Proxy(context.orm.public, {
-            get(namespaceTarget, namespaceProperty, namespaceReceiver) {
-              if (namespaceProperty === 'Space') return space;
-              const value: unknown = Reflect.get(
-                namespaceTarget,
-                namespaceProperty,
-                namespaceReceiver,
-              );
-              return value;
-            },
-          });
-          const orm = new Proxy(context.orm, {
-            get(ormTarget, ormProperty, ormReceiver) {
-              if (ormProperty === 'public') return publicNamespace;
-              const value: unknown = Reflect.get(ormTarget, ormProperty, ormReceiver);
-              return value;
-            },
-          });
-          const wrappedContext = new Proxy(context, {
-            get(contextTarget, contextProperty, contextReceiver) {
-              if (contextProperty === 'orm') return orm;
-              const value: unknown = Reflect.get(contextTarget, contextProperty, contextReceiver);
-              return value;
-            },
-          });
-
-          return callback(wrappedContext);
-        });
-
-      return transaction;
-    },
-  });
-
 const snapshot: SpaceSnapshot = {
   id: SPACE_ID,
   document: {
@@ -418,7 +325,7 @@ describe('PostgresSpaceRepository', () => {
     });
   });
 
-  it('keeps omitted cards when an identified space is imported again', async () => {
+  it('rejects an existing space identity without changing stored content', async () => {
     await repository.importSpaces([snapshot, otherSnapshot]);
     const suppliedCard = {
       ...snapshot.cards[0]!,
@@ -433,20 +340,15 @@ describe('PostgresSpaceRepository', () => {
       cards: [suppliedCard],
     };
 
-    const expected = {
-      snapshot: {
-        ...reimported,
-        cards: [suppliedCard, snapshot.cards[1]!],
-      },
-      revision: 1n,
-      exportedRevision: null,
-    };
-
-    await expect(repository.importSpaces([reimported], 'upsert')).resolves.toEqual({
-      kind: 'imported',
-      spaces: [expected],
+    await expect(repository.importSpaces([reimported])).resolves.toEqual({
+      kind: 'conflict',
+      current: { snapshot, revision: 0n, exportedRevision: null },
     });
-    await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual(expected);
+    await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual({
+      snapshot,
+      revision: 0n,
+      exportedRevision: null,
+    });
     await expect(repository.loadSpace(OTHER_SPACE_ID)).resolves.toEqual({
       snapshot: otherSnapshot,
       revision: 0n,
@@ -582,18 +484,15 @@ describe('PostgresSpaceRepository', () => {
     }
     const firstStored = first.spaces[0]!;
     const catalogBefore = await repository.listSpaces();
-    const changedKnown: SpaceSnapshot = {
-      ...snapshot,
-      document: { ...snapshot.document, title: 'Must roll back before ownership rejection' },
-    };
 
-    const second = await repository.importSpaces([changedKnown, mixedImport]);
+    const second = await repository.importSpaces([otherSnapshot, mixedImport]);
     trackImported(second);
 
     expect(second).toMatchObject({ kind: 'rejected', code: 'card-ownership' });
     if (second.kind !== 'rejected') throw new Error('Conflicting import was not rejected');
     expect(second.message).toContain(MIXED_FIRST_CARD_ID);
     await expect(repository.listSpaces()).resolves.toEqual(catalogBefore);
+    await expect(repository.loadSpace(OTHER_SPACE_ID)).resolves.toBeUndefined();
     await expect(repository.loadSpace(firstStored.snapshot.id)).resolves.toEqual(firstStored);
     await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual({
       snapshot,
@@ -690,82 +589,48 @@ describe('PostgresSpaceRepository', () => {
     });
   });
 
-  it('returns a typed conflict and rolls back the losing batch after a concurrent update', async () => {
-    await repository.importSpaces([snapshot, otherSnapshot]);
-    const barrier = createReadBarrier(2);
-    const winnerCommitted = createGate();
-    const winner = new PostgresSpaceRepository(
-      databasePausedAfterFirstSpaceRead(SPACE_ID, barrier),
-    );
-    const loser = new PostgresSpaceRepository(
-      databasePausedAfterFirstSpaceRead(SPACE_ID, barrier, winnerCommitted.wait),
-    );
-    const winningSnapshot: SpaceSnapshot = {
+  it('rolls back earlier batch inserts when a later space identity already exists', async () => {
+    await repository.importSpaces([snapshot]);
+    const collidingSnapshot: SpaceSnapshot = {
       ...snapshot,
-      document: { ...snapshot.document, title: 'Concurrent winner' },
-    };
-    const losingSnapshot: SpaceSnapshot = {
-      ...snapshot,
-      document: { ...snapshot.document, title: 'Concurrent loser' },
-    };
-    const earlierLosingWrite: SpaceSnapshot = {
-      ...otherSnapshot,
-      document: { ...otherSnapshot.document, title: 'Must roll back' },
+      document: { ...snapshot.document, title: 'Must not replace stored content' },
     };
 
-    const winningImport = winner.importSpaces([winningSnapshot]).finally(winnerCommitted.open);
-    const [winningResult, losingResult] = await Promise.all([
-      winningImport,
-      loser.importSpaces([earlierLosingWrite, losingSnapshot]),
-    ]);
-
-    expect(winningResult).toEqual({
-      kind: 'imported',
-      spaces: [{ snapshot: winningSnapshot, revision: 1n, exportedRevision: null }],
-    });
-    expect(losingResult).toEqual({
+    await expect(repository.importSpaces([otherSnapshot, collidingSnapshot])).resolves.toEqual({
       kind: 'conflict',
-      current: { snapshot: winningSnapshot, revision: 1n, exportedRevision: null },
+      current: { snapshot, revision: 0n, exportedRevision: null },
     });
-    await expect(repository.loadSpace(OTHER_SPACE_ID)).resolves.toEqual({
-      snapshot: otherSnapshot,
+    await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual({
+      snapshot,
       revision: 0n,
       exportedRevision: null,
     });
+    await expect(repository.loadSpace(OTHER_SPACE_ID)).resolves.toBeUndefined();
   });
 
   it('returns a typed conflict when another import creates the space first', async () => {
-    const barrier = createReadBarrier(2);
-    const winnerCommitted = createGate();
-    const winner = new PostgresSpaceRepository(
-      databasePausedAfterFirstSpaceRead(CONCURRENT_SPACE_ID, barrier),
-    );
-    const loser = new PostgresSpaceRepository(
-      databasePausedAfterFirstSpaceRead(CONCURRENT_SPACE_ID, barrier, winnerCommitted.wait),
-    );
-    const winningSnapshot: SpaceSnapshot = {
+    const firstRepository = new PostgresSpaceRepository(db);
+    const secondRepository = new PostgresSpaceRepository(db);
+    const firstSnapshot: SpaceSnapshot = {
       id: CONCURRENT_SPACE_ID,
-      document: { version: 2, title: 'Concurrent create winner', routes: [] },
+      document: { version: 2, title: 'First concurrent insert', routes: [] },
       cards: [],
     };
-    const losingSnapshot: SpaceSnapshot = {
-      ...winningSnapshot,
-      document: { ...winningSnapshot.document, title: 'Concurrent create loser' },
+    const secondSnapshot: SpaceSnapshot = {
+      ...firstSnapshot,
+      document: { ...firstSnapshot.document, title: 'Second concurrent insert', routes: [] },
     };
 
-    const winningImport = winner.importSpaces([winningSnapshot]).finally(winnerCommitted.open);
-    const [winningResult, losingResult] = await Promise.all([
-      winningImport,
-      loser.importSpaces([losingSnapshot]),
+    const results = await Promise.all([
+      firstRepository.importSpaces([firstSnapshot]),
+      secondRepository.importSpaces([secondSnapshot]),
     ]);
+    const imported = results.find((result) => result.kind === 'imported');
+    const conflicted = results.find((result) => result.kind === 'conflict');
 
-    expect(winningResult).toEqual({
-      kind: 'imported',
-      spaces: [{ snapshot: winningSnapshot, revision: 0n, exportedRevision: null }],
-    });
-    expect(losingResult).toEqual({
-      kind: 'conflict',
-      current: { snapshot: winningSnapshot, revision: 0n, exportedRevision: null },
-    });
+    expect(imported?.kind).toBe('imported');
+    expect(conflicted?.kind).toBe('conflict');
+    if (imported?.kind !== 'imported' || conflicted?.kind !== 'conflict') return;
+    expect(conflicted.current).toEqual(imported.spaces[0]);
   });
 });

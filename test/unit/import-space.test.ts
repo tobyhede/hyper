@@ -4,10 +4,10 @@ import { join } from 'node:path';
 import { uuidSchema, type ImportSpace, type SpaceSnapshot, type UUID } from '@project/core';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
-  SingleSpaceImportError,
+  SpaceImportError,
   importSingleSpace,
   importSpaceBatch,
-} from '../../src/import/import-single-space';
+} from '../../src/import/import-space';
 import { SpaceImportFileError } from '../../src/import/read-single-space';
 import type {
   ImportMode,
@@ -84,7 +84,7 @@ class RecordingRepository implements SpaceRepository {
 const temporaryDirectories: string[] = [];
 
 const makeTemporaryDirectory = async (): Promise<string> => {
-  const directory = await mkdtemp(join(tmpdir(), 'hyper-import-single-space-'));
+  const directory = await mkdtemp(join(tmpdir(), 'hyper-import-space-'));
   temporaryDirectories.push(directory);
   return directory;
 };
@@ -190,8 +190,8 @@ describe('importSingleSpace', () => {
 
       const thrown = await captureError(() => importSingleSpace(directory, repository));
 
-      expect(thrown).toBeInstanceOf(SingleSpaceImportError);
-      if (!(thrown instanceof SingleSpaceImportError)) return;
+      expect(thrown).toBeInstanceOf(SpaceImportError);
+      if (!(thrown instanceof SpaceImportError)) return;
       expect(thrown.kind).toBe(expectedKind);
       expect(thrown.message).toBe(expectedMessage);
     },
@@ -253,10 +253,49 @@ describe('importSpaceBatch', () => {
 
     expect(result).toEqual([storedSpace, otherStoredSpace]);
     expect(repository.imports).toHaveLength(1);
-    expect(repository.modes).toEqual(['upsert']);
+    expect(repository.modes).toEqual(['insert']);
     expect(repository.imports[0]?.map(({ document }) => document.title)).toEqual([
       'First',
       'Second',
     ]);
   });
+
+  it.each([
+    {
+      result: { kind: 'conflict', current: storedSpace } satisfies RepositoryImportResult,
+      expectedKind: 'revision-conflict',
+      expectedMessage: `Revision conflict for space ${SPACE_ID}`,
+    },
+    {
+      result: {
+        kind: 'rejected',
+        code: 'duplicate-identity',
+        message: `Duplicate route ${ROUTE_ID}`,
+      } satisfies RepositoryImportResult,
+      expectedKind: 'identity',
+      expectedMessage: `Duplicate route ${ROUTE_ID}`,
+    },
+    {
+      result: {
+        kind: 'rejected',
+        code: 'invalid-snapshot',
+        message: `Route ${ROUTE_ID} has an unresolved card`,
+      } satisfies RepositoryImportResult,
+      expectedKind: 'domain-validation',
+      expectedMessage: `Route ${ROUTE_ID} has an unresolved card`,
+    },
+  ] as const)(
+    'maps a repository result to $expectedKind without changing its diagnostic',
+    async ({ result, expectedKind, expectedMessage }) => {
+      const directory = await writeValidSpace();
+      const repository = new RecordingRepository(result);
+
+      const thrown = await captureError(() => importSpaceBatch(directory, repository));
+
+      expect(thrown).toBeInstanceOf(SpaceImportError);
+      if (!(thrown instanceof SpaceImportError)) return;
+      expect(thrown.kind).toBe(expectedKind);
+      expect(thrown.message).toBe(expectedMessage);
+    },
+  );
 });
