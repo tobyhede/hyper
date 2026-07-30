@@ -1,3 +1,4 @@
+import type { UUID } from '@project/core';
 import type { CardFile, Space } from '@project/graph';
 import { loadSpace, loadSpaceSnapshot } from '@project/graph';
 import {
@@ -12,6 +13,26 @@ export interface OpenedSpace {
   space: Space;
   spaceSession: SpaceSession;
 }
+
+/** Open one exact workspace already stored by the configured backend. */
+export const openStoredWorkspace = async (
+  spaceBackend: SpaceBackend,
+  id: UUID,
+): Promise<OpenedSpace> => {
+  const loaded = await spaceBackend.loadSpace(id);
+  if (loaded === undefined) throw new Error(`The backend could not load space ${id}`);
+
+  const runtime = loadSpaceSnapshot(loaded.snapshot);
+  if (!runtime.ok) {
+    throw new Error(
+      `The backend returned an invalid space:\n${runtime.errors.map((error) => `  - ${error.message}`).join('\n')}`,
+    );
+  }
+  return {
+    space: runtime.space,
+    spaceSession: openSpaceSession(spaceBackend, loaded),
+  };
+};
 
 /** Import files into the configured backend, then open its first workspace. */
 export const openImportedWorkspace = async (
@@ -32,17 +53,5 @@ export const openImportedWorkspace = async (
     },
   ]);
 
-  const [first] = await spaceBackend.listSpaces();
-  if (first === undefined) throw new Error('The backend contains no spaces');
-  const loaded = await spaceBackend.loadSpace(first.id);
-  if (loaded === undefined) throw new Error(`The backend could not load space ${first.id}`);
-
-  const spaceSession = openSpaceSession(spaceBackend, loaded);
-  const runtime = loadSpaceSnapshot(loaded.snapshot);
-  if (!runtime.ok) {
-    throw new Error(
-      `The backend returned an invalid space:\n${runtime.errors.map((error) => `  - ${error.message}`).join('\n')}`,
-    );
-  }
-  return { space: runtime.space, spaceSession };
+  return openStoredWorkspace(spaceBackend, imported.space.id);
 };
