@@ -20,7 +20,7 @@ interface CommandResult {
   stderr: string;
 }
 
-const COMMAND_TIMEOUT_MS = 30_000;
+const CLI_PROCESS_TIMEOUT_MS = 10_000;
 
 const runHyperCommand = (args: readonly string[]): Promise<CommandResult> =>
   new Promise((resolve, reject) => {
@@ -34,33 +34,41 @@ const runHyperCommand = (args: readonly string[]): Promise<CommandResult> =>
       if (settled) return;
       settled = true;
       clearTimeout(timeout);
+      child.stdout.removeListener('data', captureStdout);
+      child.stderr.removeListener('data', captureStderr);
+      child.removeListener('error', handleError);
+      child.removeListener('close', handleClose);
       complete();
     };
     let stdout = '';
     let stderr = '';
+    let timedOut = false;
+    const timeoutError = new Error(`hyper CLI command timed out after ${CLI_PROCESS_TIMEOUT_MS}ms`);
+    const captureStdout = (chunk: string): void => {
+      stdout += chunk;
+    };
+    const captureStderr = (chunk: string): void => {
+      stderr += chunk;
+    };
+    const handleError = (error: Error): void => {
+      settle(() => reject(timedOut ? timeoutError : error));
+    };
+    const handleClose = (status: number | null): void => {
+      settle(() => {
+        if (timedOut) reject(timeoutError);
+        else resolve({ status, stdout, stderr });
+      });
+    };
     child.stdout.setEncoding('utf8');
     child.stderr.setEncoding('utf8');
-    child.stdout.on('data', (chunk: string) => {
-      stdout += chunk;
-    });
-    child.stderr.on('data', (chunk: string) => {
-      stderr += chunk;
-    });
-    child.once('error', (error) => {
-      settle(() => {
-        child.kill('SIGKILL');
-        reject(error);
-      });
-    });
-    child.once('close', (status) => {
-      settle(() => resolve({ status, stdout, stderr }));
-    });
+    child.stdout.on('data', captureStdout);
+    child.stderr.on('data', captureStderr);
+    child.once('error', handleError);
+    child.once('close', handleClose);
     const timeout = setTimeout(() => {
-      settle(() => {
-        child.kill('SIGKILL');
-        reject(new Error(`hyper CLI command timed out after ${COMMAND_TIMEOUT_MS}ms`));
-      });
-    }, COMMAND_TIMEOUT_MS);
+      timedOut = true;
+      child.kill('SIGKILL');
+    }, CLI_PROCESS_TIMEOUT_MS);
   });
 
 describe('hyper CLI', () => {
