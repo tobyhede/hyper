@@ -18,7 +18,7 @@ export class SpaceImportError extends Error {
   }
 }
 
-const requireImportedSpaces = (result: RepositoryImportResult): readonly StoredSpace[] => {
+export const requireImportedSpaces = (result: RepositoryImportResult): readonly StoredSpace[] => {
   if (result.kind === 'imported') return result.spaces;
 
   throw new SpaceImportError(
