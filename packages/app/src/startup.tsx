@@ -4,6 +4,7 @@ import type { SpaceSummary } from '@project/persistence';
 import { createAppRouter } from './router';
 import type { OpenedSpace } from './open-workspace';
 import { mountWorkspace } from './Workspace';
+import { WorkspaceSelection } from './WorkspaceSelection';
 
 export interface ApplicationRoot {
   render(children: ReactNode): void;
@@ -64,31 +65,16 @@ export const startApplication = async (
       }
       root.render(
         <StrictMode>
-          <main className="workspace-selection">
-            <section className="workspace-selection__panel">
-              <h1>Choose a space</h1>
-              <div className="workspace-selection__choices">
-                {startup.spaces.map((space) => (
-                  <button
-                    key={space.id}
-                    type="button"
-                    onClick={() => {
-                      void openSelected(space.id)
-                        .then((opened) => {
-                          renderOpenedWorkspace(root, opened);
-                        })
-                        .catch((error: unknown) => {
-                          renderStartupError(root, error);
-                        });
-                    }}
-                  >
-                    <span>{space.title}</span>
-                    <span>{space.id}</span>
-                  </button>
-                ))}
-              </div>
-            </section>
-          </main>
+          <WorkspaceSelection
+            spaces={startup.spaces}
+            openSelected={openSelected}
+            onOpened={(opened) => {
+              renderOpenedWorkspace(root, opened);
+            }}
+            onError={(error) => {
+              renderStartupError(root, error);
+            }}
+          />
         </StrictMode>,
       );
       return;

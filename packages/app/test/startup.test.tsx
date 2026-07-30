@@ -158,6 +158,68 @@ it('opens and mounts the exact workspace UUID chosen from the catalog', async ()
   }
 });
 
+it('allows only one workspace selection to open at a time', async () => {
+  const container = document.createElement('div');
+  document.body.append(container);
+  const root = createRoot(container);
+  const backend = new MemorySpaceBackend([
+    { snapshot, revision: 0n, exportedRevision: null },
+    { snapshot: otherSnapshot, revision: 0n, exportedRevision: null },
+  ]);
+  let releaseFirstOpen = (): void => undefined;
+  const firstOpenGate = new Promise<void>((resolve) => {
+    releaseFirstOpen = resolve;
+  });
+
+  try {
+    await act(async () => {
+      await startApplication(
+        root,
+        () =>
+          Promise.resolve({
+            kind: 'selection',
+            spaces: [
+              { id: SPACE_ID, title: 'Stored space' },
+              { id: OTHER_SPACE_ID, title: 'Exact selected space' },
+            ],
+          }),
+        async (id) => {
+          await firstOpenGate;
+          return openStoredWorkspace(backend, id);
+        },
+      );
+    });
+
+    const firstChoice = within(container).getByRole('button', {
+      name: `Stored space ${SPACE_ID}`,
+    });
+    const secondChoice = within(container).getByRole('button', {
+      name: `Exact selected space ${OTHER_SPACE_ID}`,
+    });
+
+    act(() => {
+      firstChoice.click();
+      secondChoice.click();
+    });
+
+    expect(firstChoice).toBeDisabled();
+    expect(secondChoice).toBeDisabled();
+
+    await act(async () => {
+      releaseFirstOpen();
+      await firstOpenGate;
+    });
+
+    expect(await within(container).findByRole('heading', { name: 'Stored space' })).toBeVisible();
+    expect(
+      within(container).queryByRole('heading', { name: 'Exact selected space' }),
+    ).not.toBeInTheDocument();
+  } finally {
+    act(() => root.unmount());
+    container.remove();
+  }
+});
+
 it('renders the complete startup error when the chosen UUID has disappeared', async () => {
   const container = document.createElement('div');
   document.body.append(container);
