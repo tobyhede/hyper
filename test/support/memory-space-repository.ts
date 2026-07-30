@@ -155,7 +155,11 @@ export class MemorySpaceRepository implements SpaceRepository {
       if (mode === 'insert') {
         const current = this.#spaces.get(snapshot.id);
         if (current !== undefined) {
-          return Promise.resolve({ kind: 'conflict', current: clone(current) });
+          return Promise.resolve({
+            kind: 'rejected',
+            code: 'duplicate-identity',
+            message: `Space ${snapshot.id} already exists`,
+          });
         }
       }
 

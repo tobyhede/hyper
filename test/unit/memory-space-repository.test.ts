@@ -45,6 +45,29 @@ describe('MemorySpaceRepository', () => {
     await expect(repository.listSpaces()).resolves.toEqual([]);
   });
 
+  it('rejects an explicitly identified Space already in the repository atomically', async () => {
+    const repository = new MemorySpaceRepository();
+    const existing = importSpace(SPACE_ID, CARD_ID, 'Existing');
+    await repository.importSpaces([existing], 'insert');
+    const before = await repository.loadSpace(SPACE_ID);
+
+    const result = await repository.importSpaces(
+      [
+        importSpace(OTHER_SPACE_ID, OTHER_CARD_ID, 'Must roll back'),
+        importSpace(SPACE_ID, CARD_ID, 'Duplicate'),
+      ],
+      'insert',
+    );
+
+    expect(result).toEqual({
+      kind: 'rejected',
+      code: 'duplicate-identity',
+      message: `Space ${SPACE_ID} already exists`,
+    });
+    await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual(before);
+    await expect(repository.loadSpace(OTHER_SPACE_ID)).resolves.toBeUndefined();
+  });
+
   it('rejects a commit that claims a Card owned by another Space', async () => {
     const repository = new MemorySpaceRepository();
     await repository.importSpaces(
