@@ -50,6 +50,9 @@ The one route a space has selected at a time — drawn emphasized, and the route
 Activating is not itself an edit — it touches no card and no route, so it converts nothing. Which route is active may become the authored default when another edit records the surrounding view.
 _Avoid_: selected route and current route as a second concept alongside this one, focus, mode.
 
+**Edit**:
+A completed change to a Space's authored cards, routes, or Layouts.
+
 ## Layout and views
 
 **Layout**:

@@ -50,9 +50,9 @@ export interface ResolvedView {
   /**
    * The Layout this view already has, or `null` for an automatic view. It is not
    * a permission: every view is editable, and an automatic one gets a Layout by
-   * being edited (ADR 0025). What this answers is whether a save writes to a
-   * Layout the author named or to one the app has to mint, which is the only
-   * thing that reads it.
+   * being edited (ADR 0025). What this answers is whether Edit completion
+   * updates a Layout the author named or creates one, which is the only thing
+   * that reads it.
    */
   layout: Layout | null;
   /**
@@ -74,6 +74,29 @@ export interface ResolvedView {
 export type RendererSelection =
   | { readonly kind: 'view'; readonly view: BuiltInViewId }
   | { readonly kind: 'layout'; readonly layoutId: UUID };
+
+/** Synchronous navigation state for the renderer currently selected by the viewer. */
+export interface ViewChoice {
+  readonly current: () => RendererSelection;
+  readonly select: (selection: RendererSelection) => void;
+  readonly subscribe: (listener: () => void) => () => void;
+}
+
+export function createViewChoice(initial: RendererSelection): ViewChoice {
+  let selected = initial;
+  const listeners = new Set<() => void>();
+  return {
+    current: () => selected,
+    select: (selection) => {
+      selected = selection;
+      for (const listener of listeners) listener();
+    },
+    subscribe: (listener) => {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    },
+  };
+}
 
 /**
  * Which routes a Layout shows and which of them opens active.

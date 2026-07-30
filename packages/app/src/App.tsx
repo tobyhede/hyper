@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { ReactFlowProvider } from '@xyflow/react';
 import { AppShell, Button, LayoutSelector, RouteSelector, ViewSelector } from '@project/ui';
-import { newUuid, uuidSchema, type BuiltInViewId, type CardId, type Layout } from '@project/core';
+import { uuidSchema, type BuiltInViewId, type CardId } from '@project/core';
 import {
   projectCardNodes,
   projectRouteEdges,
@@ -21,12 +21,17 @@ import {
   type LayoutStrategy,
 } from '@project/graph';
 import type { OpenedSpace } from './space';
-import { preparePlacementSubmission } from './completed-edit';
+import { createPlacementEditor } from './edit-completion';
 import { routeColorMap } from './colors';
 import { CARD_HEIGHT, CARD_SIZE, cardSizeVars } from './card';
 import { createSpaceStore } from './store';
-import { createEditorStore } from './editor';
-import { defaultRenderer, layoutPositionMap, resolveView, type RendererSelection } from './view';
+import {
+  createViewChoice,
+  defaultRenderer,
+  layoutPositionMap,
+  resolveView,
+  type RendererSelection,
+} from './view';
 import { GraphView } from './components/GraphView';
 import { OpenCard } from './components/OpenCard';
 import { PresentingChrome } from './components/PresentingChrome';
@@ -128,31 +133,24 @@ export const createApp = ({ space, spaceSession }: OpenedSpace, { acceptRemote }
   // starts null and is promoted only by a completed edit (ADR 0025).
   const initialPositions =
     initialView.layout === null ? null : layoutPositionMap(initialView.layout);
-  const useEditorStore = createEditorStore(initialPositions);
+  const viewChoice = createViewChoice(initialRenderer);
+  const useEditorStore = createPlacementEditor({
+    initialPositions,
+    viewChoice,
+    currentActiveRoute: () => useSpaceStore.getState().activeRouteId,
+    session: spaceSession,
+  });
 
   function App() {
     const sessionState = useSyncExternalStore(spaceSession.subscribe, spaceSession.getState);
-    const [rendererNavigation, setRendererNavigation] = useState<{
-      readonly layouts: readonly Layout[];
-      readonly selectedRenderer: RendererSelection;
-      readonly selectedView: BuiltInViewId;
-    }>({
-      layouts: space.layouts,
-      selectedRenderer: initialRenderer,
-      selectedView: initialRenderer.kind === 'view' ? initialRenderer.view : 'graph',
-    });
-    const { layouts, selectedRenderer, selectedView } = rendererNavigation;
-    // The id a converted Layout will take, minted ahead of the Layout existing.
-    //
-    // `useState(newUuid)` passes the function, so React calls it on the first
-    // render only — `useState(newUuid())` would mint and discard a UUID on every
-    // render. It is state rather than a ref because it must stay stable between
-    // the render that selects an Algorithmic View and the effect that converts
-    // it: two completed edits can reach that effect before the resulting
-    // `selectedRenderer` flip is processed, and a re-minted id would make the
-    // second edit create a *second* Layout instead of updating the first
-    // (ADR 0031 — one edit, one Layout).
-    const [nextLayoutId, setNextLayoutId] = useState(newUuid);
+    const selectedRenderer = useSyncExternalStore(viewChoice.subscribe, viewChoice.current);
+    const [selectedView, setSelectedView] = useState<BuiltInViewId>(
+      initialRenderer.kind === 'view' ? initialRenderer.view : 'graph',
+    );
+    const layouts = useMemo(
+      () => sessionState.working.document.layouts ?? [],
+      [sessionState.working.document.layouts],
+    );
     const rendererSpace = useMemo(
       () => ({
         ...space,
@@ -256,14 +254,12 @@ export const createApp = ({ space, spaceSession }: OpenedSpace, { acceptRemote }
     const liveNodes = useEditorStore((s) => s.nodes);
     const moved = useEditorStore((s) => s.moved);
     const changeNodes = useEditorStore((s) => s.changeNodes);
-    const revision = useEditorStore((s) => s.revision);
     const nodes = liveNodes ?? projectedNodes;
     // There is an arrangement to drag once the layout has resolved and the store
     // has taken it. Not a permission — every view is editable (ADR 0025) — and not
     // a state the space can go back to: nothing sets `nodes` back to null, so this
     // is false for one frame and true from then on.
     const editable = liveNodes !== null;
-    const submittedRevision = useRef(0);
 
     const chooseRenderer = useCallback(
       (selection: RendererSelection) => {
@@ -272,58 +268,11 @@ export const createApp = ({ space, spaceSession }: OpenedSpace, { acceptRemote }
           .getState()
           .selectRenderer(resolved.layout === null ? null : layoutPositionMap(resolved.layout));
         openRenderer(resolved.activeRouteId);
-        setRendererNavigation((current) => ({
-          ...current,
-          selectedRenderer: selection,
-          selectedView: selection.kind === 'view' ? selection.view : current.selectedView,
-        }));
-        // Batches with the `setRendererNavigation` above, so no extra render.
-        if (selection.kind === 'view') setNextLayoutId(newUuid());
+        viewChoice.select(selection);
+        if (selection.kind === 'view') setSelectedView(selection.view);
       },
       [openRenderer, rendererSpace],
     );
-
-    // A completed edit prepares one complete snapshot. Preparation narrows nullable
-    // authored placement before the local watermark advances; an invariant failure
-    // therefore cannot mark an unsubmitted revision as submitted. Route activation
-    // does not increment the editor revision and remains outside persistence.
-    useEffect(() => {
-      const prepared = preparePlacementSubmission(
-        spaceSession.getState().working,
-        submittedRevision.current,
-        { revision, positions: useEditorStore.getState().positions },
-        selectedRenderer.kind === 'layout'
-          ? {
-              kind: 'layout',
-              layoutId: selectedRenderer.layoutId,
-              activeRouteId: useSpaceStore.getState().activeRouteId,
-            }
-          : {
-              kind: 'view',
-              layoutId: nextLayoutId,
-              activeRouteId: useSpaceStore.getState().activeRouteId,
-            },
-      );
-      if (prepared === null) return;
-      submittedRevision.current = prepared.revision;
-      // Publish the new Layout before selecting it. Renderer resolution is
-      // deliberately strict, so a selection may never briefly name something
-      // absent from the current Space.
-      spaceSession.submit(prepared.snapshot);
-      setRendererNavigation((current) => ({
-        ...current,
-        layouts: prepared.snapshot.document.layouts ?? [],
-        selectedRenderer:
-          selectedRenderer.kind === 'view'
-            ? { kind: 'layout', layoutId: nextLayoutId }
-            : selectedRenderer,
-      }));
-      // `nextLayoutId` is listed because it is state and the effect reads it, not
-      // because it is an independent trigger: it is only ever re-minted in
-      // `chooseRenderer`, in the same batch that replaces `selectedRenderer` with
-      // a fresh object. It therefore never changes alone, and never causes a run
-      // this list did not already have.
-    }, [revision, selectedRenderer, nextLayoutId]);
 
     // Leaving while persistence is not settled asks first. The handler is absent
     // in the normal durable state, preserving the browser's back/forward cache.

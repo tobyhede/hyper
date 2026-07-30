@@ -18,12 +18,44 @@ const PROJECTED = [
 ];
 
 describe('editor store', () => {
+  it('notifies once after installing a completed Edit', () => {
+    const observed: (ReadonlyMap<string, LayoutPoint> | null)[] = [];
+    const store = createEditorStore(null, () => {
+      observed.push(store.getState().positions);
+    });
+    store.getState().syncNodes(PROJECTED);
+
+    completeDrag(store, '00000000-0000-4000-8000-000000000002', 500, 400);
+
+    expect(observed).toEqual([
+      new Map([
+        ['00000000-0000-4000-8000-000000000002', { x: 500, y: 400 }],
+        ['00000000-0000-4000-8000-000000000003', { x: 300, y: 20 }],
+      ]),
+    ]);
+  });
+
+  it('does not notify for intermediate frames, no-op settlement, or renderer navigation', () => {
+    let notifications = 0;
+    const store = createEditorStore(null, () => {
+      notifications += 1;
+    });
+    store.getState().syncNodes(PROJECTED);
+
+    store.getState().changeNodes(moving('00000000-0000-4000-8000-000000000002', 500, 400));
+    store.getState().changeNodes(settled('00000000-0000-4000-8000-000000000002', 10, 20));
+    store
+      .getState()
+      .selectRenderer(new Map([['00000000-0000-4000-8000-000000000002', { x: 700, y: 300 }]]));
+
+    expect(notifications).toBe(0);
+  });
+
   it('owns no nodes until the first layout resolves', () => {
     const store = createEditorStore();
     expect(store.getState().nodes).toBeNull();
     expect(store.getState().positions).toBeNull();
     expect(store.getState().dragOrigins.size).toBe(0);
-    expect(store.getState().revision).toBe(0);
   });
 
   it('keeps the first automatic arrangement runtime-only', () => {
@@ -36,7 +68,6 @@ describe('editor store', () => {
     ]);
     expect(store.getState().positions).toBeNull();
     expect(store.getState().dragOrigins.size).toBe(0);
-    expect(store.getState().revision).toBe(0);
     expect(store.getState().moved).toBe(false);
   });
 
@@ -46,7 +77,6 @@ describe('editor store', () => {
 
     store.getState().changeNodes(moving('00000000-0000-4000-8000-000000000002', 500, 400));
     expect(store.getState().positions).toBeNull();
-    expect(store.getState().revision).toBe(0);
     expect(store.getState().dragOrigins.get('00000000-0000-4000-8000-000000000002')).toEqual({
       x: 10,
       y: 20,
@@ -60,7 +90,6 @@ describe('editor store', () => {
       ]),
     );
     expect(store.getState().dragOrigins.size).toBe(0);
-    expect(store.getState().revision).toBe(1);
   });
 
   it('does not convert when a drag returns to its gesture origin', () => {
@@ -71,7 +100,6 @@ describe('editor store', () => {
 
     expect(store.getState().positions).toBeNull();
     expect(store.getState().dragOrigins.size).toBe(0);
-    expect(store.getState().revision).toBe(0);
     expect(store.getState().moved).toBe(false);
   });
 
@@ -84,7 +112,6 @@ describe('editor store', () => {
       x: 500,
       y: 400,
     });
-    expect(store.getState().revision).toBe(1);
   });
 
   it('records where a drag ends, and moves nothing else', () => {
@@ -132,7 +159,6 @@ describe('editor store', () => {
         ['00000000-0000-4000-8000-000000000003', { x: 700, y: 450 }],
       ]),
     );
-    expect(store.getState().revision).toBe(2);
   });
 
   it('keeps a dragged position when the projection is re-synced', () => {
@@ -203,7 +229,6 @@ describe('editor store', () => {
 
     expect(authoredPositions(store)).toEqual(initial);
     expect(authoredPositions(store).has('00000000-0000-4000-8000-000000000003')).toBe(false);
-    expect(store.getState().revision).toBe(0);
   });
 
   it('navigates to another renderer without recording an edit', () => {
@@ -218,11 +243,9 @@ describe('editor store', () => {
     expect(store.getState().positions).toEqual(positioned);
     expect(store.getState().dragOrigins.size).toBe(0);
     expect(store.getState().moved).toBe(false);
-    expect(store.getState().revision).toBe(0);
 
     store.getState().selectRenderer(null);
     expect(store.getState().positions).toBeNull();
-    expect(store.getState().revision).toBe(0);
   });
 
   it('ignores changes for nodes it does not own, and keeps the array stable', () => {
@@ -257,23 +280,6 @@ describe('editor store', () => {
     expect(store.getState().positions).toBeNull();
     expect(store.getState().moved).toBe(false);
   });
-
-  it('counts a real edit but not the initial arrangement sync', () => {
-    const store = createEditorStore();
-    store.getState().syncNodes(PROJECTED);
-    expect(store.getState().revision).toBe(0);
-
-    completeDrag(store, '00000000-0000-4000-8000-000000000002', 500, 400);
-    expect(store.getState().revision).toBe(1);
-  });
-
-  it('does not count a settled change that moved nothing', () => {
-    const store = createEditorStore();
-    store.getState().syncNodes(PROJECTED);
-    store.getState().changeNodes(settled('00000000-0000-4000-8000-000000000002', 10, 20));
-    expect(store.getState().positions).toBeNull();
-    expect(store.getState().revision).toBe(0);
-  });
 });
 
 const coordinateArb = fc.integer({ min: -10_000, max: 10_000 });
@@ -307,7 +313,6 @@ describe('editor conversion properties', () => {
             ]),
           );
           expect(authoredPositions(store)).toEqual(expected);
-          expect(store.getState().revision).toBe(1);
           expect(store.getState().dragOrigins.size).toBe(0);
         },
       ),
@@ -332,7 +337,6 @@ describe('editor conversion properties', () => {
           store.getState().changeNodes(settled(target.id, target.position.x, target.position.y));
 
           expect(store.getState().positions).toBeNull();
-          expect(store.getState().revision).toBe(0);
           expect(store.getState().dragOrigins.size).toBe(0);
         },
       ),
