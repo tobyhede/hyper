@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { ReactFlowProvider } from '@xyflow/react';
 import { AppShell, Button, LayoutSelector, RouteSelector, ViewSelector } from '@project/ui';
-import { uuidSchema, type BuiltInViewId, type CardId, type Layout } from '@project/core';
+import { newUuid, uuidSchema, type BuiltInViewId, type CardId, type Layout } from '@project/core';
 import {
   projectCardNodes,
   projectRouteEdges,
@@ -142,7 +142,17 @@ export const createApp = ({ space, spaceSession }: OpenedSpace, { acceptRemote }
       selectedView: initialRenderer.kind === 'view' ? initialRenderer.view : 'graph',
     });
     const { layouts, selectedRenderer, selectedView } = rendererNavigation;
-    const nextLayoutId = useRef(uuidSchema.parse(crypto.randomUUID()));
+    // The id a converted Layout will take, minted ahead of the Layout existing.
+    //
+    // `useState(newUuid)` passes the function, so React calls it on the first
+    // render only — `useState(newUuid())` would mint and discard a UUID on every
+    // render. It is state rather than a ref because it must stay stable between
+    // the render that selects an Algorithmic View and the effect that converts
+    // it: two completed edits can reach that effect before the resulting
+    // `selectedRenderer` flip is processed, and a re-minted id would make the
+    // second edit create a *second* Layout instead of updating the first
+    // (ADR 0031 — one edit, one Layout).
+    const [nextLayoutId, setNextLayoutId] = useState(newUuid);
     const rendererSpace = useMemo(
       () => ({
         ...space,
@@ -267,7 +277,8 @@ export const createApp = ({ space, spaceSession }: OpenedSpace, { acceptRemote }
           selectedRenderer: selection,
           selectedView: selection.kind === 'view' ? selection.view : current.selectedView,
         }));
-        if (selection.kind === 'view') nextLayoutId.current = uuidSchema.parse(crypto.randomUUID());
+        // Batches with the `setRendererNavigation` above, so no extra render.
+        if (selection.kind === 'view') setNextLayoutId(newUuid());
       },
       [openRenderer, rendererSpace],
     );
@@ -289,7 +300,7 @@ export const createApp = ({ space, spaceSession }: OpenedSpace, { acceptRemote }
             }
           : {
               kind: 'view',
-              layoutId: nextLayoutId.current,
+              layoutId: nextLayoutId,
               activeRouteId: useSpaceStore.getState().activeRouteId,
             },
       );
@@ -304,10 +315,15 @@ export const createApp = ({ space, spaceSession }: OpenedSpace, { acceptRemote }
         layouts: prepared.snapshot.document.layouts ?? [],
         selectedRenderer:
           selectedRenderer.kind === 'view'
-            ? { kind: 'layout', layoutId: nextLayoutId.current }
+            ? { kind: 'layout', layoutId: nextLayoutId }
             : selectedRenderer,
       }));
-    }, [revision, selectedRenderer]);
+      // `nextLayoutId` is listed because it is state and the effect reads it, not
+      // because it is an independent trigger: it is only ever re-minted in
+      // `chooseRenderer`, in the same batch that replaces `selectedRenderer` with
+      // a fresh object. It therefore never changes alone, and never causes a run
+      // this list did not already have.
+    }, [revision, selectedRenderer, nextLayoutId]);
 
     // Leaving while persistence is not settled asks first. The handler is absent
     // in the normal durable state, preserving the browser's back/forward cache.

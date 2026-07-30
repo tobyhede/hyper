@@ -158,6 +158,46 @@ describe('completed placement composition', () => {
     });
   });
 
+  it('converts once when a second edit arrives before the renderer selection flips', () => {
+    // The race `App`'s stable `nextLayoutId` exists to close. Converting submits
+    // the new Layout and *schedules* `selectedRenderer` to become
+    // `{kind: 'layout'}`; a second completed edit can reach the effect before
+    // React processes that flip, and so takes the view branch again. Holding the
+    // id steady makes that second edit update the Layout the first one created.
+    // Minting per effect run would append a second Layout for one conversion,
+    // against ADR 0031's one-edit-one-Layout reading.
+    const first = preparePlacementSubmission(
+      automaticSnapshot,
+      0,
+      { revision: 1, positions: new Map([[CARD_A, { x: 500, y: 400 }]]) },
+      automaticTarget,
+    );
+    if (first === null) throw new Error('Expected a prepared submission');
+
+    const second = preparePlacementSubmission(
+      first.snapshot,
+      first.revision,
+      { revision: 2, positions: new Map([[CARD_A, { x: 700, y: 600 }]]) },
+      automaticTarget,
+    );
+    if (second === null) throw new Error('Expected a second prepared submission');
+
+    const layouts = second.snapshot.document.layouts ?? [];
+    expect(layouts).toHaveLength(2);
+    expect(layouts.filter((layout) => layout.id === DEFAULT_LAYOUT_ID)).toHaveLength(1);
+    expect(layouts[0]).toEqual(automaticSnapshot.document.layouts?.[0]);
+    expect(layouts.at(-1)).toMatchObject({
+      id: DEFAULT_LAYOUT_ID,
+      positions: { [CARD_A]: { x: 700, y: 600 } },
+    });
+    expect(second.snapshot.document.defaultView).toBe(DEFAULT_LAYOUT_ID);
+    // A known wrinkle, asserted so a change to it is deliberate: the second pass
+    // still takes the view branch, so it recomputes a neutral title against a
+    // base that now contains `Layout 2`. The Layout keeps its identity and is
+    // renamed. Only reachable in this race.
+    expect(layouts.at(-1)?.title).toBe('Layout 3');
+  });
+
   it('preserves an existing Layout and unrelated Layouts when its first edit persists', async () => {
     const loaded = { snapshot: positionedSnapshot, revision: 0n, exportedRevision: null };
     const backend = new MemorySpaceBackend([loaded]);
