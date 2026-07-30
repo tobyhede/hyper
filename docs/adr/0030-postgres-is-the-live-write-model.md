@@ -13,9 +13,26 @@ the application.
 
 Spaces and cards are UUID-keyed rows with JSONB documents. Routes and layouts
 remain nested in the space document. An id is optional only in import input: an
-explicit id must be a UUID and must not already exist, while every missing
-space, card, route and layout id is minted during the import transaction. An
-id-less entity is therefore always new until export writes its generated UUID.
+explicit id must be a UUID and must name nothing that already exists, while
+every missing space, card, route and layout id is minted during the import
+transaction. An id-less entity is therefore always new until export writes its
+generated UUID.
+
+**Uniqueness is scoped to how an id is resolved.** Space and card ids are unique
+across the database, being primary keys; import additionally rejects a batch that
+repeats either, so a collision surfaces before any write rather than as a late
+constraint violation. Route and layout ids are unique only within the space
+document that carries them, per kind, which normal domain intake already checks.
+They may be reused in another space — stored or elsewhere in the same batch — and
+entities of different kinds may share a UUID.
+
+Nothing resolves a route or layout id outside its own space: there is no routes
+table and no layouts table, and every query is by space id or card id. So a
+reused nested id makes no lookup ambiguous, and rejecting one would mean reading
+every stored document on every import to defend an invariant no code depends on.
+Don't add that check, and don't widen the batch check to route or layout ids —
+doing so makes acceptance depend on how a batch was split, since importing two
+such spaces separately would still succeed.
 
 Minting is not allocation, and the database is not a source of identity. A
 space's id comes from the `spaces.id` column default, because that is what a

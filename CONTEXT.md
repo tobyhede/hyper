@@ -11,7 +11,7 @@ _Avoid_: presentation (that is one view of a space), manifest (a shipping-ledger
 A **new space** is one card, centered — not an empty canvas (ADR 0018). It has no routes yet, so it can be read and edited but not presented.
 
 **Id**:
-The durable UUID that names a referenceable thing — a space, card, route or layout. It is the entity's only identifier and is globally unique; references carry it directly rather than pairing it with a second authored or machine-facing name.
+The durable UUID that names a referenceable thing — a space, card, route or layout. It is the entity's only identifier and is unique within that entity's scope: space ids among Spaces, card ids among Cards, and route and layout ids within their owning Space. Different entity kinds may carry the same UUID, and route or layout ids may be reused in different Spaces; references carry the id directly in the scope that resolves it rather than pairing it with a second authored or machine-facing name.
 
 An author need not supply one when introducing an entity. Anything accepted into Hyper receives an id before it becomes part of a Space; once assigned, changing it is a real edit because every reference names it.
 _Avoid_: guid, key, slug, local id, authored id, and any pairing of a "human" id with a "durable" one.
