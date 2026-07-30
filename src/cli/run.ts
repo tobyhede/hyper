@@ -65,24 +65,32 @@ export const runHyper = async (
     return 2;
   }
 
-  try {
-    if (path === undefined) {
+  if (path === undefined) {
+    try {
       const startup = await resolveDatabaseStartup(dependencies.repository);
       reportStartup(startup, dependencies.io);
       return 0;
+    } catch (error) {
+      dependencies.io.stderr(`Database startup failed: ${describeError(error)}\n`);
+      return 1;
     }
+  }
 
+  let stored;
+  try {
     const mode = truncateArguments.length === 1 ? 'truncate' : 'insert';
-    const stored = await importSpaceBatch(path, dependencies.repository, mode);
+    stored = await importSpaceBatch(path, dependencies.repository, mode);
+  } catch (error) {
+    reportImportError(error, dependencies.io);
+    return 1;
+  }
+
+  try {
     const startup = await resolveDatabaseStartup(dependencies.repository, stored);
     reportStartup(startup, dependencies.io);
     return 0;
   } catch (error) {
-    if (path === undefined) {
-      dependencies.io.stderr(`Database startup failed: ${describeError(error)}\n`);
-    } else {
-      reportImportError(error, dependencies.io);
-    }
+    dependencies.io.stderr(`Database startup failed: ${describeError(error)}\n`);
     return 1;
   }
 };

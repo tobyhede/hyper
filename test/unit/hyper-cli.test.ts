@@ -336,6 +336,53 @@ describe('runHyper', () => {
     expect(output.stderr).toEqual(['Database import failed: connection lost\n']);
   });
 
+  it('classifies a failure opening a successfully imported space as database startup', async () => {
+    const directory = await writeValidSpace();
+    const output = captureIo();
+    const repository = new MemorySpaceRepository();
+    repository.loadSpace = () => Promise.reject(new Error('load unavailable'));
+
+    const exitCode = await runHyper([directory], { repository, io: output.io });
+
+    expect(exitCode).toBe(1);
+    expect(output.stdout).toEqual([]);
+    expect(output.stderr).toEqual(['Database startup failed: load unavailable\n']);
+    await expect(repository.listSpaces()).resolves.toEqual([
+      { id: SPACE_ID, title: 'Imported talk' },
+    ]);
+  });
+
+  it('classifies a failure listing the catalog after a successful batch import as database startup', async () => {
+    const collection = await makeTemporaryDirectory();
+    const first = join(collection, 'first');
+    const second = join(collection, 'second');
+    await mkdir(first);
+    await mkdir(second);
+    await writeFile(
+      join(first, 'space.json'),
+      JSON.stringify({ version: 2, id: SPACE_ID, title: 'First imported', routes: [] }),
+    );
+    await writeFile(
+      join(second, 'space.json'),
+      JSON.stringify({ version: 2, id: OTHER_SPACE_ID, title: 'Second imported', routes: [] }),
+    );
+    const output = captureIo();
+    const repository = new MemorySpaceRepository();
+    repository.listSpaces = () => Promise.reject(new Error('catalog unavailable'));
+
+    const exitCode = await runHyper([collection], { repository, io: output.io });
+
+    expect(exitCode).toBe(1);
+    expect(output.stdout).toEqual([]);
+    expect(output.stderr).toEqual(['Database startup failed: catalog unavailable\n']);
+    await expect(repository.loadSpace(SPACE_ID)).resolves.toMatchObject({
+      snapshot: { id: SPACE_ID },
+    });
+    await expect(repository.loadSpace(OTHER_SPACE_ID)).resolves.toMatchObject({
+      snapshot: { id: OTHER_SPACE_ID },
+    });
+  });
+
   it('classifies a no-path repository failure as database startup without a stack', async () => {
     const output = captureIo();
     const repository = new MemorySpaceRepository();
