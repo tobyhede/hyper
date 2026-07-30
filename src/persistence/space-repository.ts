@@ -20,9 +20,18 @@ export type RepositoryCommitResult =
       message: string;
     };
 
+/**
+ * No `conflict` variant, unlike {@link RepositoryCommitResult} above.
+ *
+ * Import is insert-only (ADR 0030) and takes no expected revision, so it runs no
+ * optimistic concurrency check and has no revision to disagree about. A taken id
+ * is `duplicate-identity` whether it was stored long ago or by a rival
+ * transaction a moment earlier — a distinction READ COMMITTED cannot make
+ * deterministically, and one no caller could act on, since import never updates
+ * or merges existing content.
+ */
 export type RepositoryImportResult =
   | { kind: 'imported'; spaces: readonly StoredSpace[] }
-  | { kind: 'conflict'; current: StoredSpace }
   | {
       kind: 'rejected';
       code: 'invalid-snapshot' | 'duplicate-identity' | 'card-ownership';

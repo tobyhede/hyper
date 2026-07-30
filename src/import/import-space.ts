@@ -6,7 +6,7 @@ import type {
   StoredSpace,
 } from '../persistence/space-repository';
 
-type SpaceImportErrorKind = 'identity' | 'domain-validation' | 'revision-conflict';
+type SpaceImportErrorKind = 'identity' | 'domain-validation';
 
 export class SpaceImportError extends Error {
   readonly kind: SpaceImportErrorKind;
@@ -20,13 +20,6 @@ export class SpaceImportError extends Error {
 
 const requireImportedSpaces = (result: RepositoryImportResult): readonly StoredSpace[] => {
   if (result.kind === 'imported') return result.spaces;
-
-  if (result.kind === 'conflict') {
-    throw new SpaceImportError(
-      'revision-conflict',
-      `Revision conflict for space ${result.current.snapshot.id}`,
-    );
-  }
 
   throw new SpaceImportError(
     result.code === 'invalid-snapshot' ? 'domain-validation' : 'identity',

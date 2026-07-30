@@ -160,7 +160,7 @@ describe('PostgresSpaceRepository', () => {
       spaces: [{ snapshot, revision: 0n, exportedRevision: null }],
     });
     if (imported.kind !== 'imported') {
-      throw new Error(imported.kind === 'rejected' ? imported.message : 'Import conflicted');
+      throw new Error(imported.message);
     }
     await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual(imported.spaces[0]);
     await expect(repository.listSpaces()).resolves.toEqual([
@@ -340,9 +340,14 @@ describe('PostgresSpaceRepository', () => {
       cards: [suppliedCard],
     };
 
+    // An identity rejection, not a conflict. Insert-only import runs no
+    // optimistic revision operation, so there is no revision to disagree
+    // about — the id was simply already taken. `conflict` is reserved for a
+    // genuine race, proven by the concurrent-import test below.
     await expect(repository.importSpaces([reimported])).resolves.toEqual({
-      kind: 'conflict',
-      current: { snapshot, revision: 0n, exportedRevision: null },
+      kind: 'rejected',
+      code: 'duplicate-identity',
+      message: `Space ${SPACE_ID} already exists`,
     });
     await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual({
       snapshot,
@@ -419,7 +424,7 @@ describe('PostgresSpaceRepository', () => {
     trackImported(result);
     expect(result.kind).toBe('imported');
     if (result.kind !== 'imported') {
-      throw new Error(result.kind === 'rejected' ? result.message : 'Import conflicted');
+      throw new Error(result.message);
     }
 
     const stored = result.spaces[0]!;
@@ -451,14 +456,14 @@ describe('PostgresSpaceRepository', () => {
     trackImported(first);
     expect(first.kind).toBe('imported');
     if (first.kind !== 'imported') {
-      throw new Error(first.kind === 'rejected' ? first.message : 'Import conflicted');
+      throw new Error(first.message);
     }
 
     const second = await repository.importSpaces([allIdlessImport]);
     trackImported(second);
     expect(second.kind).toBe('imported');
     if (second.kind !== 'imported') {
-      throw new Error(second.kind === 'rejected' ? second.message : 'Import conflicted');
+      throw new Error(second.message);
     }
 
     const identities = (stored: StoredSpace): UUID[] => [
@@ -480,7 +485,7 @@ describe('PostgresSpaceRepository', () => {
     trackImported(first);
     expect(first.kind).toBe('imported');
     if (first.kind !== 'imported') {
-      throw new Error(first.kind === 'rejected' ? first.message : 'Import conflicted');
+      throw new Error(first.message);
     }
     const firstStored = first.spaces[0]!;
     const catalogBefore = await repository.listSpaces();
@@ -597,8 +602,9 @@ describe('PostgresSpaceRepository', () => {
     };
 
     await expect(repository.importSpaces([otherSnapshot, collidingSnapshot])).resolves.toEqual({
-      kind: 'conflict',
-      current: { snapshot, revision: 0n, exportedRevision: null },
+      kind: 'rejected',
+      code: 'duplicate-identity',
+      message: `Space ${SPACE_ID} already exists`,
     });
     await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual({
       snapshot,
@@ -608,7 +614,182 @@ describe('PostgresSpaceRepository', () => {
     await expect(repository.loadSpace(OTHER_SPACE_ID)).resolves.toBeUndefined();
   });
 
-  it('returns a typed conflict when another import creates the space first', async () => {
+  it('imports a route id already nested in another stored space', async () => {
+    // Route and layout ids are scoped to the space document that carries them.
+    // There is no routes table and no layouts table (ADR 0030 keeps both nested),
+    // and every query in the repository is by space id or card id, so no lookup
+    // anywhere can be made ambiguous by the reuse below. Space and card ids are
+    // rows and stay globally unique — enforced by their primary keys, which the
+    // duplicate-identity and card-ownership tests cover.
+    //
+    // Guards a decision, not a bug: scanning every stored document to reject
+    // this would cost a full table read per import and protect nothing.
+    const first: SpaceSnapshot = {
+      id: SPACE_ID,
+      document: {
+        version: 2,
+        title: 'First space',
+        routes: [
+          {
+            id: ROUTE_ID,
+            title: 'Shared route id',
+            edges: [{ from: CARD_ID, to: OMITTED_CARD_ID }],
+          },
+        ],
+      },
+      cards: [
+        { id: CARD_ID, document: { title: 'From', kind: 'markdown', body: 'First.' } },
+        { id: OMITTED_CARD_ID, document: { title: 'To', kind: 'markdown', body: 'First.' } },
+      ],
+    };
+    const second: SpaceSnapshot = {
+      id: OTHER_SPACE_ID,
+      document: {
+        version: 2,
+        title: 'Second space',
+        routes: [
+          {
+            id: ROUTE_ID,
+            title: 'Same route id, other space',
+            edges: [{ from: OTHER_CARD_ID, to: MIXED_FIRST_CARD_ID }],
+          },
+        ],
+      },
+      cards: [
+        { id: OTHER_CARD_ID, document: { title: 'From', kind: 'markdown', body: 'Second.' } },
+        { id: MIXED_FIRST_CARD_ID, document: { title: 'To', kind: 'markdown', body: 'Second.' } },
+      ],
+    };
+
+    expect((await repository.importSpaces([first])).kind).toBe('imported');
+    expect((await repository.importSpaces([second])).kind).toBe('imported');
+
+    await expect(repository.loadSpace(SPACE_ID)).resolves.toMatchObject({
+      snapshot: { document: { routes: [{ id: ROUTE_ID, title: 'Shared route id' }] } },
+    });
+    await expect(repository.loadSpace(OTHER_SPACE_ID)).resolves.toMatchObject({
+      snapshot: { document: { routes: [{ id: ROUTE_ID, title: 'Same route id, other space' }] } },
+    });
+  });
+
+  it('imports one batch whose Spaces share a route id', async () => {
+    // The same two Spaces as the test above, in one batch instead of two.
+    // Splitting a batch must not change what is accepted: route ids resolve only
+    // within their owning Space, so the batch boundary is not a scope.
+    const first: SpaceSnapshot = {
+      id: SPACE_ID,
+      document: {
+        version: 2,
+        title: 'First space',
+        routes: [
+          {
+            id: ROUTE_ID,
+            title: 'Shared route id',
+            edges: [{ from: CARD_ID, to: OMITTED_CARD_ID }],
+          },
+        ],
+      },
+      cards: [
+        { id: CARD_ID, document: { title: 'From', kind: 'markdown', body: 'First.' } },
+        { id: OMITTED_CARD_ID, document: { title: 'To', kind: 'markdown', body: 'First.' } },
+      ],
+    };
+    const second: SpaceSnapshot = {
+      id: OTHER_SPACE_ID,
+      document: {
+        version: 2,
+        title: 'Second space',
+        routes: [
+          {
+            id: ROUTE_ID,
+            title: 'Same route id',
+            edges: [{ from: OTHER_CARD_ID, to: MIXED_FIRST_CARD_ID }],
+          },
+        ],
+      },
+      cards: [
+        { id: OTHER_CARD_ID, document: { title: 'From', kind: 'markdown', body: 'Second.' } },
+        { id: MIXED_FIRST_CARD_ID, document: { title: 'To', kind: 'markdown', body: 'Second.' } },
+      ],
+    };
+
+    expect((await repository.importSpaces([first, second])).kind).toBe('imported');
+  });
+
+  it('imports a Space whose route id equals one of its card ids', async () => {
+    // Entity kinds do not share an identity space. Intake checks each kind
+    // separately — cards among cards, routes among routes — so a UUID naming
+    // both a card and a route names two different things unambiguously.
+    const shared: SpaceSnapshot = {
+      id: SPACE_ID,
+      document: {
+        version: 2,
+        title: 'Route id equals card id',
+        routes: [
+          {
+            id: CARD_ID,
+            title: 'Route named like a card',
+            edges: [{ from: CARD_ID, to: OMITTED_CARD_ID }],
+          },
+        ],
+      },
+      cards: [
+        { id: CARD_ID, document: { title: 'From', kind: 'markdown', body: 'Shared.' } },
+        { id: OMITTED_CARD_ID, document: { title: 'To', kind: 'markdown', body: 'Shared.' } },
+      ],
+    };
+
+    expect((await repository.importSpaces([shared])).kind).toBe('imported');
+  });
+
+  it('rejects a batch whose Spaces claim the same card id', async () => {
+    // Cards are rows, so their ids must stay unique across the database. Caught
+    // before any write rather than as a late primary-key violation.
+    const claimant: SpaceSnapshot = {
+      id: OTHER_SPACE_ID,
+      document: { version: 2, title: 'Claims the first space card', routes: [] },
+      cards: [{ id: CARD_ID, document: { title: 'Taken', kind: 'markdown', body: 'Taken.' } }],
+    };
+
+    await expect(repository.importSpaces([snapshot, claimant])).resolves.toMatchObject({
+      kind: 'rejected',
+      code: 'duplicate-identity',
+    });
+    await expect(repository.loadSpace(SPACE_ID)).resolves.toBeUndefined();
+    await expect(repository.loadSpace(OTHER_SPACE_ID)).resolves.toBeUndefined();
+  });
+
+  it('rejects two routes sharing an id within one Space', async () => {
+    // Domain intake's job, not the batch check's — and the reason the batch check
+    // does not need to look at route ids at all.
+    const collidingRoutes: SpaceSnapshot = {
+      ...snapshot,
+      document: {
+        ...snapshot.document,
+        routes: [
+          { id: ROUTE_ID, title: 'First', edges: [{ from: CARD_ID, to: OMITTED_CARD_ID }] },
+          { id: ROUTE_ID, title: 'Second', edges: [{ from: OMITTED_CARD_ID, to: CARD_ID }] },
+        ],
+      },
+    };
+
+    await expect(repository.importSpaces([collidingRoutes])).resolves.toMatchObject({
+      kind: 'rejected',
+      code: 'invalid-snapshot',
+    });
+    await expect(repository.loadSpace(SPACE_ID)).resolves.toBeUndefined();
+  });
+
+  it('rejects the losing identity when another import creates the space first', async () => {
+    // Exactly one wins; the loser is an identity rejection, not a conflict.
+    //
+    // The distinction insert-only import might have drawn here — "the id existed
+    // before I began" versus "a rival created it while I ran" — is not
+    // well-defined under PostgreSQL's default READ COMMITTED isolation: whether
+    // the loser observes the winner's row depends purely on commit timing, so
+    // classifying on it produces a nondeterministic result for identical inputs.
+    // Both are the same fact anyway — the identity is taken — and insert-only
+    // import compares no revisions, so neither is a revision conflict.
     const firstRepository = new PostgresSpaceRepository(db);
     const secondRepository = new PostgresSpaceRepository(db);
     const firstSnapshot: SpaceSnapshot = {
@@ -625,12 +806,15 @@ describe('PostgresSpaceRepository', () => {
       firstRepository.importSpaces([firstSnapshot]),
       secondRepository.importSpaces([secondSnapshot]),
     ]);
-    const imported = results.find((result) => result.kind === 'imported');
-    const conflicted = results.find((result) => result.kind === 'conflict');
 
-    expect(imported?.kind).toBe('imported');
-    expect(conflicted?.kind).toBe('conflict');
-    if (imported?.kind !== 'imported' || conflicted?.kind !== 'conflict') return;
-    expect(conflicted.current).toEqual(imported.spaces[0]);
+    expect(results.filter((result) => result.kind === 'imported')).toHaveLength(1);
+    expect(results).toContainEqual({
+      kind: 'rejected',
+      code: 'duplicate-identity',
+      message: `Space ${CONCURRENT_SPACE_ID} already exists`,
+    });
+    await expect(repository.loadSpace(CONCURRENT_SPACE_ID)).resolves.toMatchObject({
+      revision: 0n,
+    });
   });
 });

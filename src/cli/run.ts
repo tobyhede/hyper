@@ -26,7 +26,6 @@ const reportImportError = (error: unknown, io: CliIo): void => {
     const labels = {
       identity: 'Identity import failed',
       'domain-validation': 'Domain validation failed',
-      'revision-conflict': 'Revision conflict',
     } as const;
     io.stderr(`${labels[error.kind]}: ${error.message}\n`);
     return;

@@ -151,11 +151,6 @@ describe('importSingleSpace', () => {
 
   it.each([
     {
-      result: { kind: 'conflict', current: storedSpace } satisfies RepositoryImportResult,
-      expectedKind: 'revision-conflict',
-      expectedMessage: `Revision conflict for space ${SPACE_ID}`,
-    },
-    {
       result: {
         kind: 'rejected',
         code: 'duplicate-identity',
@@ -261,11 +256,6 @@ describe('importSpaceBatch', () => {
   });
 
   it.each([
-    {
-      result: { kind: 'conflict', current: storedSpace } satisfies RepositoryImportResult,
-      expectedKind: 'revision-conflict',
-      expectedMessage: `Revision conflict for space ${SPACE_ID}`,
-    },
     {
       result: {
         kind: 'rejected',

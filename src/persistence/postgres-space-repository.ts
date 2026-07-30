@@ -30,15 +30,6 @@ class DuplicateIdentityError extends Error {}
 
 class CardOwnershipError extends Error {}
 
-class ImportConflictError extends Error {
-  readonly spaceId: UUID;
-
-  constructor(spaceId: UUID) {
-    super(`Space ${spaceId} changed concurrently during import`);
-    this.spaceId = spaceId;
-  }
-}
-
 const isSpacePrimaryKeyConflict = (error: unknown): boolean => {
   if (typeof error !== 'object' || error === null) return false;
   const candidate = error as Record<string, unknown>;
@@ -127,20 +118,38 @@ const parseImport = (input: unknown): ImportSpace => {
   return parsed.data;
 };
 
-const duplicateIdentity = (spaces: readonly ImportSpace[]): UUID | undefined => {
-  const seen = new Set<UUID>();
+/**
+ * The identities a batch may not repeat: space ids among spaces, card ids among
+ * cards. Both are rows, so both must stay unique across the database.
+ *
+ * Per kind, and no wider. An earlier version pooled space, card, route and
+ * layout ids into one set spanning the whole batch, which rejected two things
+ * the model allows (ADR 0030): a route id reused in a second Space, and one UUID
+ * naming entities of different kinds. It also made acceptance depend on how a
+ * batch was split — importing two such Spaces separately succeeded while
+ * importing them together failed, for identical stored results.
+ *
+ * Route and layout ids are absent here deliberately. They resolve only inside
+ * the space document that carries them, and normal domain intake already rejects
+ * duplicates of each kind within a Space (`duplicate-route-id`,
+ * `duplicate-layout-id`). Checking them here would either duplicate that or
+ * exceed it.
+ */
+const duplicateIdentity = (
+  spaces: readonly ImportSpace[],
+): { readonly kind: string; readonly id: UUID } | undefined => {
+  const spaceIds = new Set<UUID>();
+  const cardIds = new Set<UUID>();
 
-  for (const snapshot of spaces) {
-    const identities = [
-      snapshot.id,
-      ...snapshot.cards.map(({ id }) => id),
-      ...snapshot.document.routes.map(({ id }) => id),
-      ...(snapshot.document.layouts ?? []).map(({ id }) => id),
-    ];
-    for (const id of identities) {
+  for (const space of spaces) {
+    if (space.id !== undefined) {
+      if (spaceIds.has(space.id)) return { kind: 'space', id: space.id };
+      spaceIds.add(space.id);
+    }
+    for (const { id } of space.cards) {
       if (id === undefined) continue;
-      if (seen.has(id)) return id;
-      seen.add(id);
+      if (cardIds.has(id)) return { kind: 'card', id };
+      cardIds.add(id);
     }
   }
 
@@ -156,14 +165,14 @@ const rejectInvalidSnapshot = (error: SnapshotValidationError) => ({
 const validateImportIdentities = (spaces: readonly ImportSpace[]): void => {
   const duplicate = duplicateIdentity(spaces);
   if (duplicate !== undefined) {
-    throw new DuplicateIdentityError(`Duplicate durable identity "${duplicate}"`);
+    throw new DuplicateIdentityError(`Duplicate ${duplicate.kind} identity "${duplicate.id}"`);
   }
 };
 
 const validateSnapshotIdentities = (snapshot: SpaceSnapshot): void => {
   const duplicate = duplicateIdentity([snapshot]);
   if (duplicate !== undefined) {
-    throw new SnapshotValidationError(`Duplicate durable identity "${duplicate}"`);
+    throw new SnapshotValidationError(`Duplicate ${duplicate.kind} identity "${duplicate.id}"`);
   }
 };
 
@@ -396,9 +405,19 @@ export class PostgresSpaceRepository implements SpaceRepository {
               revision: 0,
             });
           } catch (error) {
+            // An explicit id that collides is an identity rejection, never a
+            // revision conflict: insert-only import compares no revisions, so
+            // there is nothing to disagree about — the id is simply taken.
+            //
+            // Deliberately classified off the violation rather than off a
+            // preceding existence check. Under READ COMMITTED a check would see
+            // a rival's row only if that rival had already committed, so
+            // "existed before I began" versus "created while I ran" would be
+            // decided by commit timing, giving identical inputs different
+            // outcomes. Both are the same fact, so draw no line between them.
             if (isSpacePrimaryKeyConflict(error)) {
               if (importInput.id === undefined) throw error;
-              throw new ImportConflictError(importInput.id);
+              throw new DuplicateIdentityError(`Space ${importInput.id} already exists`);
             }
             throw error;
           }
@@ -431,14 +450,12 @@ export class PostgresSpaceRepository implements SpaceRepository {
         return { kind: 'imported', spaces: imported };
       });
     } catch (error) {
-      if (error instanceof ImportConflictError) {
-        const current = await loadStoredSpace(this.#database.orm, error.spaceId);
-        if (current === undefined) {
-          throw new Error(`Space ${error.spaceId} disappeared after an import conflict`, {
-            cause: error,
-          });
-        }
-        return { kind: 'conflict', current };
+      if (error instanceof DuplicateIdentityError) {
+        return {
+          kind: 'rejected',
+          code: 'duplicate-identity',
+          message: error.message,
+        };
       }
       if (error instanceof CardOwnershipError) {
         return {

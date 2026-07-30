@@ -224,8 +224,12 @@ describe('runHyper', () => {
       entityId: ROUTE_ID,
     },
     {
-      outcome: { kind: 'conflict', current: storedSpace } satisfies RepositoryImportResult,
-      entityId: SPACE_ID,
+      outcome: {
+        kind: 'rejected',
+        code: 'card-ownership',
+        message: `Card ${CARD_ID} already belongs to another space`,
+      } satisfies RepositoryImportResult,
+      entityId: CARD_ID,
     },
   ] as const)(
     'reports a classified import failure naming $entityId',
@@ -243,6 +247,31 @@ describe('runHyper', () => {
       expect(output.stderr.join('')).toContain(entityId);
     },
   );
+
+  it('reports a taken space identity as an identity failure, never a revision conflict', async () => {
+    // The regression this guards: a taken id used to surface as a primary-key
+    // violation classified `conflict`, which the CLI printed as "Revision
+    // conflict". Insert-only import compares no revisions, so that named a
+    // concurrency failure that cannot occur and hid the real cause. There is no
+    // longer a conflict result to return — see issue `13` — and this asserts the
+    // wording stays gone rather than merely unreachable.
+    const directory = await writeValidSpace();
+    const output = captureIo();
+
+    const exitCode = await runHyper([directory], {
+      repository: new ImportRepository({
+        kind: 'rejected',
+        code: 'duplicate-identity',
+        message: `Space ${SPACE_ID} already exists`,
+      }),
+      io: output.io,
+    });
+
+    expect(exitCode).toBe(1);
+    expect(output.stderr.join('')).toContain('Identity import failed');
+    expect(output.stderr.join('')).toContain(`Space ${SPACE_ID} already exists`);
+    expect(output.stderr.join('')).not.toContain('Revision conflict');
+  });
 
   it('classifies an unexpected repository failure as a database failure without a stack', async () => {
     const directory = await writeValidSpace();
