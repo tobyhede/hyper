@@ -86,4 +86,4 @@ Tracking both paths is deliberate. An ordinary `git worktree add` populates only
 The set:
 
 - Used regularly: `improve-codebase-architecture`, `grilling`, `domain-modeling`, `codebase-design`.
-- Installed, not yet exercised: `to-spec`, `to-tickets`, `tdd`, `code-review`, `research`, `grill-me`, `grill-with-docs`.
+- Installed, not yet exercised: `to-spec`, `to-tickets`, `tdd`, `code-review`, `research`, `grill-me`, `grill-with-docs`, `diagnosing-bugs`, `handoff`, `implement`, `resolving-merge-conflicts`, `teach`, `triage`, `wayfinder`, `writing-great-skills`.
