@@ -10,9 +10,8 @@ import type { CardFlowNode } from '@project/react-flow-adapter';
  * Live nodes absorb every intermediate React Flow change so controlled dragging
  * follows the pointer. `positions` is different: it is null while an automatic
  * arrangement remains runtime-only, or a possibly sparse Layout map after an
- * existing Layout is opened or an edit authors one. `revision` advances only for
- * completed edits. `dragOrigins` retains gesture starts across React Flow's
- * separate moving and settled callbacks.
+ * existing Layout is opened or an edit authors one. `dragOrigins` retains
+ * gesture starts across React Flow's separate moving and settled callbacks.
  */
 
 export interface EditorState {
@@ -33,8 +32,6 @@ export interface EditorState {
    * plain curves between wherever the cards now are.
    */
   moved: boolean;
-  /** Number of completed placement edits; initial synchronization is not one. */
-  revision: number;
   /** Fold a freshly projected node list into the live one. */
   syncNodes: (projected: readonly CardFlowNode[]) => void;
   /**
@@ -122,13 +119,13 @@ function reconcile(
 
 export function createEditorStore(
   initialPositions: ReadonlyMap<string, LayoutPoint> | null = null,
+  editCompleted: () => void = () => undefined,
 ): EditorStore {
-  return create<EditorState>((set) => ({
+  return create<EditorState>((set, get) => ({
     nodes: null,
     positions: initialPositions === null ? null : new Map(initialPositions),
     dragOrigins: new Map(),
     moved: false,
-    revision: 0,
 
     syncNodes: (projected) =>
       set((state) => {
@@ -146,48 +143,54 @@ export function createEditorStore(
         moved: false,
       }),
 
-    changeNodes: (changes) =>
-      set((state) => {
-        if (state.nodes === null) return {};
+    changeNodes: (changes) => {
+      const state = get();
+      if (state.nodes === null) return;
 
-        // Drop changes aimed at nodes this store does not own. React Flow
-        // measures anything it renders and reports a `dimensions` change for it,
-        // and `applyNodeChanges` always returns a fresh array — so an unowned
-        // node's change round-trips into a re-sync and re-measures forever.
-        // Returning no update when nothing real changed keeps the array
-        // reference stable and is what breaks that loop.
-        const owned = new Set(state.nodes.map((node) => node.id));
-        const relevant = changes.filter((change) => !('id' in change) || owned.has(change.id));
-        if (relevant.length === 0) return {};
+      // Drop changes aimed at nodes this store does not own. React Flow
+      // measures anything it renders and reports a `dimensions` change for it,
+      // and `applyNodeChanges` always returns a fresh array — so an unowned
+      // node's change round-trips into a re-sync and re-measures forever.
+      // Returning no update when nothing real changed keeps the array
+      // reference stable and is what breaks that loop.
+      const owned = new Set(state.nodes.map((node) => node.id));
+      const relevant = changes.filter((change) => !('id' in change) || owned.has(change.id));
+      if (relevant.length === 0) return;
 
-        const beforeById = new Map(state.nodes.map((node) => [node.id, node.position]));
-        const nodes = applyNodeChanges(relevant, state.nodes);
-        const afterById = new Map(nodes.map((node) => [node.id, node.position]));
-        const positionChanges = relevant.filter(
-          (change): change is NodePositionChange => change.type === 'position',
-        );
-        const dragOrigins = new Map(state.dragOrigins);
-        trackDragOrigins(dragOrigins, positionChanges, beforeById);
+      const beforeById = new Map(state.nodes.map((node) => [node.id, node.position]));
+      const nodes = applyNodeChanges(relevant, state.nodes);
+      const afterById = new Map(nodes.map((node) => [node.id, node.position]));
+      const positionChanges = relevant.filter(
+        (change): change is NodePositionChange => change.type === 'position',
+      );
+      const dragOrigins = new Map(state.dragOrigins);
+      trackDragOrigins(dragOrigins, positionChanges, beforeById);
 
-        const settled = positionChanges.filter((change) => change.dragging === false);
-        if (settled.length === 0) return { nodes, dragOrigins };
+      const settled = positionChanges.filter((change) => change.dragging === false);
+      if (settled.length === 0) {
+        set({ nodes, dragOrigins });
+        return;
+      }
 
-        const movedIds = consumeSettledMovedIds(settled, dragOrigins, beforeById, afterById);
+      const movedIds = consumeSettledMovedIds(settled, dragOrigins, beforeById, afterById);
 
-        if (movedIds.length === 0) return { nodes, dragOrigins };
+      if (movedIds.length === 0) {
+        set({ nodes, dragOrigins });
+        return;
+      }
 
-        const positions = positionsForEdit(nodes, state.positions);
-        for (const id of movedIds) {
-          const after = afterById.get(id);
-          if (after !== undefined) positions.set(id, { x: after.x, y: after.y });
-        }
-        return {
-          nodes,
-          positions,
-          dragOrigins,
-          moved: true,
-          revision: state.revision + 1,
-        };
-      }),
+      const positions = positionsForEdit(nodes, state.positions);
+      for (const id of movedIds) {
+        const after = afterById.get(id);
+        if (after !== undefined) positions.set(id, { x: after.x, y: after.y });
+      }
+      set({
+        nodes,
+        positions,
+        dragOrigins,
+        moved: true,
+      });
+      editCompleted();
+    },
   }));
 }
