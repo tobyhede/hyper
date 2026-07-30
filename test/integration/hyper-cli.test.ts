@@ -16,6 +16,8 @@ interface CommandResult {
   stderr: string;
 }
 
+const COMMAND_TIMEOUT_MS = 30_000;
+
 const runHyperCommand = (path: string): Promise<CommandResult> =>
   new Promise((resolve, reject) => {
     const child = spawn('pnpm', ['--silent', 'hyper', '--', path], {
@@ -23,6 +25,13 @@ const runHyperCommand = (path: string): Promise<CommandResult> =>
       env: process.env,
       stdio: ['ignore', 'pipe', 'pipe'],
     });
+    let settled = false;
+    const settle = (complete: () => void): void => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      complete();
+    };
     let stdout = '';
     let stderr = '';
     child.stdout.setEncoding('utf8');
@@ -33,8 +42,21 @@ const runHyperCommand = (path: string): Promise<CommandResult> =>
     child.stderr.on('data', (chunk: string) => {
       stderr += chunk;
     });
-    child.on('error', reject);
-    child.on('close', (status) => resolve({ status, stdout, stderr }));
+    child.once('error', (error) => {
+      settle(() => {
+        child.kill('SIGKILL');
+        reject(error);
+      });
+    });
+    child.once('close', (status) => {
+      settle(() => resolve({ status, stdout, stderr }));
+    });
+    const timeout = setTimeout(() => {
+      settle(() => {
+        child.kill('SIGKILL');
+        reject(new Error(`hyper CLI command timed out after ${COMMAND_TIMEOUT_MS}ms`));
+      });
+    }, COMMAND_TIMEOUT_MS);
   });
 
 describe('hyper CLI', () => {
