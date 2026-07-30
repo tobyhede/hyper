@@ -229,9 +229,8 @@ describe('layoutPositions', () => {
   });
 
   it('round-trips: replaying a laid-out graph reproduces its placement', async () => {
-    // The property that makes Auto-arrange a conversion rather than a
-    // reinterpretation — what the automatic strategy computed is exactly what the
-    // Layout goes on to mean.
+    // The property that makes conversion a capture rather than a reinterpretation:
+    // what the automatic strategy computed is exactly what the Layout means.
     await fc.assert(
       fc.asyncProperty(idsArb, fc.array(coordArb, { minLength: 60 }), async (ids, coords) => {
         const positions = new Map(

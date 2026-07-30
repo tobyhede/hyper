@@ -1,3 +1,4 @@
+import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import { uuidSchema, type Layout, type SpaceSnapshot } from '@project/core';
 import { MemorySpaceBackend, openSpaceSession, type SpaceSession } from '@project/persistence';
@@ -24,6 +25,14 @@ const automaticSnapshot: SpaceSnapshot = {
     version: 2,
     title: 'Space',
     routes: [{ id: ROUTE_ID, title: 'Main', edges: [{ from: CARD_A, to: CARD_B }] }],
+    layouts: [
+      {
+        id: OTHER_LAYOUT_ID,
+        title: 'Layout 1',
+        kind: 'positioned',
+        positions: { [CARD_B]: { x: 900, y: 700 } },
+      },
+    ],
   },
   cards: [
     { id: CARD_A, document: { title: 'A', kind: 'markdown', body: 'A' } },
@@ -56,13 +65,13 @@ const positionedSnapshot: SpaceSnapshot = {
 const projected = [node(CARD_A, 10, 20), node(CARD_B, 300, 20)];
 
 const automaticTarget: PlacementTarget = {
+  kind: 'view',
   layoutId: DEFAULT_LAYOUT_ID,
-  layoutTitle: 'Layout',
   activeRouteId: ROUTE_ID,
 };
 const positionedTarget: PlacementTarget = {
+  kind: 'layout',
   layoutId: defaultLayout.id,
-  layoutTitle: defaultLayout.title,
   activeRouteId: ROUTE_ID,
 };
 
@@ -81,7 +90,36 @@ function prepareEditorSubmission(
 }
 
 describe('completed placement composition', () => {
-  it('submits nothing on automatic load, then persists all visible cards on first edit', async () => {
+  it('numbers a converted Layout after every existing neutral title', () => {
+    fc.assert(
+      fc.property(fc.uniqueArray(fc.integer({ min: 1, max: 50 }), { maxLength: 12 }), (numbers) => {
+        const layouts: Layout[] = numbers.map((number, index) => ({
+          id: uuidSchema.parse(`00000000-0000-4000-8000-${String(index + 100).padStart(12, '0')}`),
+          title: `Layout ${number}`,
+          kind: 'positioned',
+          positions: {},
+        }));
+        const base: SpaceSnapshot = {
+          ...automaticSnapshot,
+          document: { ...automaticSnapshot.document, layouts },
+        };
+
+        const prepared = preparePlacementSubmission(
+          base,
+          0,
+          { revision: 1, positions: new Map([[CARD_A, { x: 1, y: 2 }]]) },
+          automaticTarget,
+        );
+
+        expect(prepared?.snapshot.document.layouts?.slice(0, -1)).toEqual(layouts);
+        expect(prepared?.snapshot.document.layouts?.at(-1)?.title).toBe(
+          `Layout ${Math.max(0, ...numbers) + 1}`,
+        );
+      }),
+    );
+  });
+
+  it('converts an Algorithmic View into the next uniquely titled Layout on first edit', async () => {
     const loaded = { snapshot: automaticSnapshot, revision: 0n, exportedRevision: null };
     const backend = new MemorySpaceBackend([loaded]);
     const session = openSpaceSession(backend, loaded);
@@ -104,8 +142,10 @@ describe('completed placement composition', () => {
         document: {
           defaultView: DEFAULT_LAYOUT_ID,
           layouts: [
+            automaticSnapshot.document.layouts?.[0],
             {
               id: DEFAULT_LAYOUT_ID,
+              title: 'Layout 2',
               activeRoute: ROUTE_ID,
               positions: {
                 [CARD_A]: { x: 500, y: 400 },
@@ -140,7 +180,6 @@ describe('completed placement composition', () => {
     expect(persisted?.revision).toBe(1n);
     expect(persisted?.snapshot.document.defaultView).toBe(DEFAULT_LAYOUT_ID);
     expect(persisted?.snapshot.document.layouts).toEqual([
-      otherLayout,
       {
         id: defaultLayout.id,
         title: defaultLayout.title,
@@ -149,6 +188,7 @@ describe('completed placement composition', () => {
         routes: [ROUTE_ID],
         activeRoute: ROUTE_ID,
       },
+      otherLayout,
     ]);
   });
 
@@ -159,8 +199,8 @@ describe('completed placement composition', () => {
         0,
         { revision: 1, positions: null },
         {
+          kind: 'view',
           layoutId: DEFAULT_LAYOUT_ID,
-          layoutTitle: 'Layout',
           activeRouteId: ROUTE_ID,
         },
       ),

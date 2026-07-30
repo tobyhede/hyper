@@ -30,6 +30,8 @@ test('a dragged card stays where it is dropped, and nothing else moves', async (
 
   await expect(persistence).toHaveAttribute('data-revision', '1');
   await expect(persistence).toHaveText('Persisted');
+  await expect(page.getByTestId('layout-selector')).toContainText('Layout 1');
+  await expect(page.getByTestId('layout-live-indicator')).toBeVisible();
 
   const to = await positionOf(a);
   expect(to.y).toBeGreaterThan(from.y + 100);
@@ -45,39 +47,57 @@ test('a dragged card stays where it is dropped, and nothing else moves', async (
   }
 });
 
-test('auto-arrange puts a dragged card back, and it stays draggable', async ({ page }) => {
+test('selecting Graph or Grid is navigation and does not persist', async ({ page }) => {
   await page.goto('/');
   const a = nodeByTitle(page, 'A').first();
-  const routedEdge = page.locator('.react-flow__edge-path').first();
   await expect(a).toBeVisible();
-  await expect(routedEdge).toHaveAttribute('d', /L/);
-
   await settled(page);
-  const arranged = await positionOf(a);
   const persistence = page.getByTestId('persistence-status');
   await expect(persistence).toHaveAttribute('data-revision', '0');
 
-  await dragBy(page, a, 0, 260);
-  await expect(persistence).toHaveAttribute('data-revision', '1');
-  const dragged = await positionOf(a);
-  expect(dragged.y).toBeGreaterThan(arranged.y + 100);
-  await expect(routedEdge).toHaveAttribute('d', /C/);
+  await page.getByTestId('layout-selector').click();
+  await expect(page.getByText('Layouts · authored')).toBeVisible();
+  await page.keyboard.press('Escape');
 
-  await page.getByTestId('auto-arrange-button').click();
-  await expect(persistence).toHaveAttribute('data-revision', '2');
-  await expect(persistence).toHaveText('Persisted');
+  await page.getByTestId('route-selector').click();
+  await expect(page.getByText('Active route', { exact: true })).toBeVisible();
+  await page.keyboard.press('Escape');
 
-  // Back where the strategy puts it. ELK is deterministic over the same graph, so
-  // this is an equality rather than a "somewhere near".
-  await expect.poll(async () => (await positionOf(a)).y).toBe(arranged.y);
-  expect((await positionOf(a)).x).toBe(arranged.x);
-  await expect(routedEdge).toHaveAttribute('d', /L/);
+  await page.getByTestId('view-selector').click();
+  await page.getByRole('option', { name: 'Grid' }).click();
+  await expect(page.getByTestId('view-selector')).toContainText('Grid');
+  await expect(page.getByTestId('layout-selector')).toContainText('None');
+  await expect(page.getByTestId('layout-live-indicator')).toHaveCount(0);
+  await expect(persistence).toHaveAttribute('data-revision', '0');
 
-  // Auto-arrange is an edit, not a switch to a computed view — so the card is
-  // still yours to move afterwards.
-  await dragBy(page, a, 0, 260);
-  expect((await positionOf(a)).y).toBeGreaterThan(arranged.y + 100);
-  await expect(routedEdge).toHaveAttribute('d', /C/);
+  await page.getByTestId('view-selector').click();
+  await page.getByRole('option', { name: 'Graph' }).click();
+  await expect(page.getByTestId('view-selector')).toContainText('Graph');
+  await expect(persistence).toHaveAttribute('data-revision', '0');
+});
+
+test('editing an existing Layout updates it instead of creating another one', async ({ page }) => {
+  await page.goto('/');
+  const a = nodeByTitle(page, 'A').first();
+  await expect(a).toBeVisible();
+  await settled(page);
+
+  await dragBy(page, a, 0, 220);
+  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
+  await expect(page.getByTestId('layout-selector')).toContainText('Layout 1');
+
+  await page.getByTestId('view-selector').click();
+  await page.getByRole('option', { name: 'Grid' }).click();
+  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
+  await page.getByTestId('layout-selector').click();
+  await page.getByRole('option', { name: 'Layout 1' }).click();
+  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
+  await settled(page);
+
+  await dragBy(page, a, 0, 160);
+  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '2');
+  await page.getByTestId('layout-selector').click();
+  await expect(page.getByRole('option', { name: 'Layout 1' })).toHaveCount(1);
 });
 
 test('edges follow a card that has been dragged', async ({ page }) => {

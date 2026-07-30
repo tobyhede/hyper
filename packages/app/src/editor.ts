@@ -38,13 +38,10 @@ export interface EditorState {
   /** Fold a freshly projected node list into the live one. */
   syncNodes: (projected: readonly CardFlowNode[]) => void;
   /**
-   * Auto-arrange: take an automatic strategy's placement as the Layout's.
-   *
-   * A **replacement**, not a merge — the point of pressing it is that a card
-   * dragged out of the way comes back, so a position surviving the arrangement
-   * that was meant to supersede it is the bug this signature rules out.
+   * Navigate to another renderer. The replacement arrangement will arrive via
+   * `syncNodes`; renderer selection itself is not an edit.
    */
-  arrange: (positions: ReadonlyMap<string, LayoutPoint>) => void;
+  selectRenderer: (positions: ReadonlyMap<string, LayoutPoint> | null) => void;
   /** Apply React Flow's own changes (drag, measure, select). */
   changeNodes: (changes: NodeChange<CardFlowNode>[]) => void;
 }
@@ -141,28 +138,12 @@ export function createEditorStore(
         return { nodes: reconcile(state.nodes, projected) };
       }),
 
-    arrange: (positions) =>
-      set((state) => {
-        if (state.nodes === null) return {};
-        const nodes = state.nodes.map((node) => {
-          const at = positions.get(node.id);
-          return at ? { ...node, position: { x: at.x, y: at.y } } : node;
-        });
-        // `moved` goes back to false because the routed edge geometry that comes
-        // with this arrangement describes *this* arrangement — the cards are back
-        // where the routing assumed they were, so it is true again.
-        //
-        // A card the map omits keeps the node position it happens to have. That
-        // is not a merge sneaking back in: the strategy places every card it is
-        // handed, and a card genuinely absent from a Layout is an unplaced one,
-        // which is a state Layouts are allowed to be in.
-        return {
-          nodes,
-          positions: new Map(positions),
-          dragOrigins: new Map(),
-          moved: false,
-          revision: state.revision + 1,
-        };
+    selectRenderer: (positions) =>
+      set({
+        nodes: null,
+        positions: positions === null ? null : new Map(positions),
+        dragOrigins: new Map(),
+        moved: false,
       }),
 
     changeNodes: (changes) =>

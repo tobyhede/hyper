@@ -5,6 +5,7 @@ import {
   type CardId,
   type Layout,
   type RouteId,
+  type UUID,
 } from '@project/core';
 import {
   getLayout,
@@ -44,16 +45,8 @@ const BUILT_IN_STRATEGIES: Record<BuiltInViewId, () => LayoutStrategy> = {
 export interface ResolvedView {
   /** A declared Layout's id, or a built-in view's. */
   id: string;
-  /** Arranges the cards this view shows. */
+  /** Arranges the cards this renderer shows. */
   strategy: LayoutStrategy;
-  /**
-   * The automatic strategy Auto-arrange runs — the same function as `strategy`
-   * for an automatic view, and the default one for a positioned view. A Layout
-   * records where its cards are and not how they got there, so a positioned view
-   * has no automatic strategy of its own to re-run; recomputing means falling
-   * back to the view a space opens in when it names none.
-   */
-  automatic: LayoutStrategy;
   /**
    * The Layout this view already has, or `null` for an automatic view. It is not
    * a permission: every view is editable, and an automatic one gets a Layout by
@@ -76,6 +69,11 @@ export interface ResolvedView {
    */
   activeRouteId: RouteId | null;
 }
+
+/** The one renderer currently navigating a Space (ADR 0031). */
+export type RendererSelection =
+  | { readonly kind: 'view'; readonly view: BuiltInViewId }
+  | { readonly kind: 'layout'; readonly layoutId: UUID };
 
 /**
  * Which routes a Layout shows and which of them opens active.
@@ -106,35 +104,37 @@ export function layoutPositionMap(layout: Layout): ReadonlyMap<CardId, LayoutPoi
   return positions;
 }
 
-export function resolveView(space: Space): ResolvedView {
+/** Resolve the Space default into the initial renderer selection. */
+export function defaultRenderer(space: Space): RendererSelection {
   const requested = space.defaultView ?? DEFAULT_VIEW_ID;
+  return isBuiltInViewId(requested)
+    ? { kind: 'view', view: requested }
+    : { kind: 'layout', layoutId: requested };
+}
 
-  // UUID Layout ids and built-in names are disjoint, so this is an ordinary
-  // narrowing rather than a precedence rule between overlapping namespaces.
-  const layout = isBuiltInViewId(requested) ? undefined : getLayout(space, requested);
-  if (layout) {
+export function resolveView(
+  space: Space,
+  selection: RendererSelection = defaultRenderer(space),
+): ResolvedView {
+  if (selection.kind === 'layout') {
+    const layout = getLayout(space, selection.layoutId);
+    if (layout === undefined) {
+      throw new Error(`The selected Layout ${selection.layoutId} does not exist.`);
+    }
     return {
       id: layout.id,
       strategy: positionedStrategy(layoutPositionMap(layout)),
-      automatic: BUILT_IN_STRATEGIES[DEFAULT_VIEW_ID](),
       layout,
       ...resolveRoutes(space, layout),
     };
   }
 
-  // `loadSpace` rejects a `defaultView` naming neither a Layout nor a built-in,
-  // so this narrowing cannot fail for a loaded Space; it is a total function
-  // rather than a claim about reachability.
-  const builtIn = isBuiltInViewId(requested) ? requested : DEFAULT_VIEW_ID;
-  // One strategy, not two: an automatic view arranges and re-arranges by the
-  // same thing, so Auto-arrange on a grid view re-runs the grid.
-  const strategy = BUILT_IN_STRATEGIES[builtIn]();
+  const strategy = BUILT_IN_STRATEGIES[selection.view]();
   // A built-in view carries no Layout and so filters nothing: every route shows,
   // and the first is active.
   return {
-    id: builtIn,
+    id: selection.view,
     strategy,
-    automatic: strategy,
     layout: null,
     ...resolveRoutes(space, null),
   };

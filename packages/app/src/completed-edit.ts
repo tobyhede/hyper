@@ -7,15 +7,33 @@ export interface CompletedPlacementEdit {
   readonly positions: ReadonlyMap<string, LayoutPoint> | null;
 }
 
-export interface PlacementTarget {
-  readonly layoutId: UUID;
-  readonly layoutTitle: string;
-  readonly activeRouteId: RouteId | null;
-}
+export type PlacementTarget =
+  | {
+      readonly kind: 'view';
+      readonly layoutId: UUID;
+      readonly activeRouteId: RouteId | null;
+    }
+  | {
+      readonly kind: 'layout';
+      readonly layoutId: UUID;
+      readonly activeRouteId: RouteId | null;
+    };
 
 export interface PlacementSubmission {
   readonly revision: number;
   readonly snapshot: SpaceSnapshot;
+}
+
+function nextLayoutTitle(base: SpaceSnapshot): string {
+  let highest = 0n;
+  for (const layout of base.document.layouts ?? []) {
+    const match = /^Layout ([1-9]\d*)$/.exec(layout.title);
+    if (match?.[1] !== undefined) {
+      const number = BigInt(match[1]);
+      if (number > highest) highest = number;
+    }
+  }
+  return `Layout ${highest + 1n}`;
 }
 
 export function preparePlacementSubmission(
@@ -28,12 +46,22 @@ export function preparePlacementSubmission(
   if (edit.positions === null) {
     throw new Error('A completed editor revision must carry authored positions.');
   }
+  const existing = (base.document.layouts ?? []).find((layout) => layout.id === target.layoutId);
+  let layoutTitle: string;
+  if (target.kind === 'layout') {
+    if (existing === undefined) {
+      throw new Error(`The selected Layout ${target.layoutId} does not exist.`);
+    }
+    layoutTitle = existing.title;
+  } else {
+    layoutTitle = nextLayoutTitle(base);
+  }
   return {
     revision: edit.revision,
     snapshot: updatePositionedLayout(
       base,
       target.layoutId,
-      target.layoutTitle,
+      layoutTitle,
       edit.positions,
       target.activeRouteId,
     ),

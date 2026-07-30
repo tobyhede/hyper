@@ -206,6 +206,25 @@ describe('editor store', () => {
     expect(store.getState().revision).toBe(0);
   });
 
+  it('navigates to another renderer without recording an edit', () => {
+    const store = createEditorStore();
+    store.getState().syncNodes(PROJECTED);
+    store.getState().changeNodes(moving('00000000-0000-4000-8000-000000000002', 90, 80));
+    const positioned = new Map([['00000000-0000-4000-8000-000000000002', { x: 700, y: 300 }]]);
+
+    store.getState().selectRenderer(positioned);
+
+    expect(store.getState().nodes).toBeNull();
+    expect(store.getState().positions).toEqual(positioned);
+    expect(store.getState().dragOrigins.size).toBe(0);
+    expect(store.getState().moved).toBe(false);
+    expect(store.getState().revision).toBe(0);
+
+    store.getState().selectRenderer(null);
+    expect(store.getState().positions).toBeNull();
+    expect(store.getState().revision).toBe(0);
+  });
+
   it('ignores changes for nodes it does not own, and keeps the array stable', () => {
     const store = createEditorStore();
     store.getState().syncNodes(PROJECTED);
@@ -231,72 +250,6 @@ describe('editor store', () => {
     expect(store.getState().moved).toBe(false);
   });
 
-  it('makes direct Auto-arrange the first authored edit and clears gesture origins', () => {
-    const store = createEditorStore();
-    store.getState().syncNodes(PROJECTED);
-    store.getState().changeNodes(moving('00000000-0000-4000-8000-000000000002', 90, 80));
-    const arranged = new Map([['00000000-0000-4000-8000-000000000002', { x: 0, y: 0 }]]);
-
-    store.getState().arrange(arranged);
-
-    expect(authoredPositions(store)).toEqual(arranged);
-    expect(authoredPositions(store).has('00000000-0000-4000-8000-000000000003')).toBe(false);
-    expect(store.getState().dragOrigins.size).toBe(0);
-    expect(store.getState().revision).toBe(1);
-  });
-
-  it('replaces the whole map when arranging, rather than merging into it', () => {
-    const store = createEditorStore();
-    store.getState().syncNodes(PROJECTED);
-    completeDrag(store, '00000000-0000-4000-8000-000000000002', 900, 900);
-
-    store.getState().arrange(
-      new Map([
-        ['00000000-0000-4000-8000-000000000002', { x: 0, y: 0 }],
-        ['00000000-0000-4000-8000-000000000003', { x: 400, y: 0 }],
-      ]),
-    );
-
-    expect(authoredPositions(store).get('00000000-0000-4000-8000-000000000002')).toEqual({
-      x: 0,
-      y: 0,
-    });
-    expect(
-      store.getState().nodes?.find((n) => n.id === '00000000-0000-4000-8000-000000000002')
-        ?.position,
-    ).toEqual({ x: 0, y: 0 });
-    expect(authoredPositions(store).get('00000000-0000-4000-8000-000000000003')).toEqual({
-      x: 400,
-      y: 0,
-    });
-  });
-
-  it('drops a position the arrangement does not name', () => {
-    const store = createEditorStore();
-    store.getState().syncNodes(PROJECTED);
-    store.getState().arrange(new Map([['00000000-0000-4000-8000-000000000002', { x: 0, y: 0 }]]));
-
-    expect(authoredPositions(store).has('00000000-0000-4000-8000-000000000003')).toBe(false);
-    expect([...authoredPositions(store).keys()]).toEqual(['00000000-0000-4000-8000-000000000002']);
-  });
-
-  it('trusts the layout again after arranging', () => {
-    const store = createEditorStore();
-    store.getState().syncNodes(PROJECTED);
-    completeDrag(store, '00000000-0000-4000-8000-000000000002', 900, 900);
-    expect(store.getState().moved).toBe(true);
-
-    store.getState().arrange(new Map([['00000000-0000-4000-8000-000000000002', { x: 10, y: 20 }]]));
-    expect(store.getState().moved).toBe(false);
-  });
-
-  it('ignores an arrangement that arrives before the first layout', () => {
-    const store = createEditorStore();
-    store.getState().arrange(new Map([['00000000-0000-4000-8000-000000000002', { x: 0, y: 0 }]]));
-    expect(store.getState().nodes).toBeNull();
-    expect(store.getState().positions).toBeNull();
-  });
-
   it('does not call a drag that ends where it started a move', () => {
     const store = createEditorStore();
     store.getState().syncNodes(PROJECTED);
@@ -312,9 +265,6 @@ describe('editor store', () => {
 
     completeDrag(store, '00000000-0000-4000-8000-000000000002', 500, 400);
     expect(store.getState().revision).toBe(1);
-
-    store.getState().arrange(new Map([['00000000-0000-4000-8000-000000000002', { x: 0, y: 0 }]]));
-    expect(store.getState().revision).toBe(2);
   });
 
   it('does not count a settled change that moved nothing', () => {

@@ -6,6 +6,8 @@ export * from './projection';
 export * from './elk';
 export { CardNode } from './CardNode';
 export { RoutedEdge, type RoutedEdgeData } from './RoutedEdge';
+export { RouteHud } from './RouteHud';
+export type { RouteHudProps } from './RouteHud';
 
 /** Register the custom node type(s) with React Flow. */
 export const nodeTypes: NodeTypes = {

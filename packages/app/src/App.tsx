@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { ReactFlowProvider } from '@xyflow/react';
-import { AppShell, Button, RouteLegend, RouteSelector } from '@project/ui';
-import { uuidSchema, type CardId } from '@project/core';
+import { AppShell, Button, LayoutSelector, RouteSelector, ViewSelector } from '@project/ui';
+import { uuidSchema, type BuiltInViewId, type CardId, type Layout } from '@project/core';
 import {
   projectCardNodes,
   projectRouteEdges,
@@ -13,8 +13,8 @@ import {
   buildRouteEdges,
   filterHandlesByRoutes,
   getCard,
-  layoutPositions,
   positionedStrategy,
+  routeCardIds,
   resolveContentCard,
   type LayoutGraph,
   type LayoutPoint,
@@ -26,7 +26,7 @@ import { routeColorMap } from './colors';
 import { CARD_HEIGHT, CARD_SIZE, cardSizeVars } from './card';
 import { createSpaceStore } from './store';
 import { createEditorStore } from './editor';
-import { layoutPositionMap, resolveView } from './view';
+import { defaultRenderer, layoutPositionMap, resolveView, type RendererSelection } from './view';
 import { GraphView } from './components/GraphView';
 import { OpenCard } from './components/OpenCard';
 import { PresentingChrome } from './components/PresentingChrome';
@@ -103,12 +103,8 @@ export const createApp = ({ space, spaceSession }: OpenedSpace, { acceptRemote }
   // what the hardcoded `elkStrategy()` here used to do. It also answers which
   // routes are shown and which of them opens active (ADR 0026), so it has to
   // resolve before the store is built.
-  const view = resolveView(space);
-
-  // The routes this view draws. A Layout's filter is authored view scope, so the
-  // legend and the route control list these and not every route in the space —
-  // activating only ever moves emphasis within what is visible.
-  const visibleRoutes = space.routes.filter((route) => view.visibleRouteIds.includes(route.id));
+  const initialRenderer = defaultRenderer(space);
+  const initialView = resolveView(space, initialRenderer);
 
   // Derived once from the opened workspace. The store is bound to the validated
   // runtime aggregate at this composition boundary (ADR 0010).
@@ -117,7 +113,7 @@ export const createApp = ({ space, spaceSession }: OpenedSpace, { acceptRemote }
     useStore: useSpaceStore,
     selectActiveCardId,
     movesFrom,
-  } = createSpaceStore(space, view.activeRouteId);
+  } = createSpaceStore(space, initialView.activeRouteId);
 
   // The markdown a card shows, resolving an alias to its target's body (ADR 0009).
   // A card keeps its own title; only content is inherited.
@@ -130,18 +126,39 @@ export const createApp = ({ space, spaceSession }: OpenedSpace, { acceptRemote }
   // Live nodes hold whichever arrangement is on screen. A positioned view also
   // supplies its already-authored, possibly sparse Layout map; an automatic view
   // starts null and is promoted only by a completed edit (ADR 0025).
-  const initialPositions = view.layout === null ? null : layoutPositionMap(view.layout);
+  const initialPositions =
+    initialView.layout === null ? null : layoutPositionMap(initialView.layout);
   const useEditorStore = createEditorStore(initialPositions);
 
-  // Which Layout an edit writes to. An existing one keeps its authored id and
-  // title; converting an automatic arrangement mints both because no author was
-  // there to type them (ADR 0025).
-  const persistLayoutId = view.layout?.id ?? uuidSchema.parse(crypto.randomUUID());
-  const persistLayoutTitle = view.layout?.title ?? 'Layout';
-
   function App() {
+    const sessionState = useSyncExternalStore(spaceSession.subscribe, spaceSession.getState);
+    const [rendererNavigation, setRendererNavigation] = useState<{
+      readonly layouts: readonly Layout[];
+      readonly selectedRenderer: RendererSelection;
+      readonly selectedView: BuiltInViewId;
+    }>({
+      layouts: space.layouts,
+      selectedRenderer: initialRenderer,
+      selectedView: initialRenderer.kind === 'view' ? initialRenderer.view : 'graph',
+    });
+    const { layouts, selectedRenderer, selectedView } = rendererNavigation;
+    const nextLayoutId = useRef(uuidSchema.parse(crypto.randomUUID()));
+    const rendererSpace = useMemo(
+      () => ({
+        ...space,
+        layouts,
+        layoutsById: new Map(layouts.map((layout) => [layout.id, layout])),
+      }),
+      [layouts],
+    );
+    const view = useMemo(
+      () => resolveView(rendererSpace, selectedRenderer),
+      [rendererSpace, selectedRenderer],
+    );
+
     const activeRouteId = useSpaceStore((s) => s.activeRouteId);
     const activateRoute = useSpaceStore((s) => s.activateRoute);
+    const openRenderer = useSpaceStore((s) => s.openRenderer);
     const openedCardId = useSpaceStore((s) => s.openedCardId);
     const openCard = useSpaceStore((s) => s.openCard);
     const closeCard = useSpaceStore((s) => s.closeCard);
@@ -163,12 +180,16 @@ export const createApp = ({ space, spaceSession }: OpenedSpace, { acceptRemote }
       [activeRouteId, activeCardId, branchIndex],
     );
 
-    // Which routes the view shows, resolved from the Layout that filtered them
+    // Which routes the renderer shows, resolved from the Layout that filtered them
     // (ADR 0026). Membership is the view's decision (ADR 0005), which is why it
     // arrives from `resolveView` rather than being decided in the graph or layout
     // packages.
     const visibleRouteIds = view.visibleRouteIds;
     const visibleRouteIdSet = useMemo(() => new Set(visibleRouteIds), [visibleRouteIds]);
+    const visibleRoutes = useMemo(
+      () => space.routes.filter((route) => visibleRouteIdSet.has(route.id)),
+      [visibleRouteIdSet],
+    );
 
     // Every card, not just the route-visited ones. A space may have cards and no
     // routes at all (ADR 0015) — deriving the card set from the routes would render
@@ -191,10 +212,10 @@ export const createApp = ({ space, spaceSession }: OpenedSpace, { acceptRemote }
     const authoredPositions = useEditorStore((s) => s.positions);
     const renderingStrategy = useMemo(
       () => strategyForRendering(view.strategy, authoredPositions),
-      [authoredPositions],
+      [view.strategy, authoredPositions],
     );
 
-    const { laidOut, adopt: adoptLayoutResult } = useLayoutRendering(graph, renderingStrategy);
+    const { laidOut } = useLayoutRendering(graph, renderingStrategy);
 
     // Selecting a route emphasises it; it never hides the rest of the space.
     const emphasis: RouteEmphasis = activeRouteId ? 'subtle' : 'equal';
@@ -225,9 +246,7 @@ export const createApp = ({ space, spaceSession }: OpenedSpace, { acceptRemote }
     const liveNodes = useEditorStore((s) => s.nodes);
     const moved = useEditorStore((s) => s.moved);
     const changeNodes = useEditorStore((s) => s.changeNodes);
-    const arrange = useEditorStore((s) => s.arrange);
     const revision = useEditorStore((s) => s.revision);
-    const sessionState = useSyncExternalStore(spaceSession.subscribe, spaceSession.getState);
     const nodes = liveNodes ?? projectedNodes;
     // There is an arrangement to drag once the layout has resolved and the store
     // has taken it. Not a permission — every view is editable (ADR 0025) — and not
@@ -236,20 +255,22 @@ export const createApp = ({ space, spaceSession }: OpenedSpace, { acceptRemote }
     const editable = liveNodes !== null;
     const submittedRevision = useRef(0);
 
-    // Auto-arrange: the one crossing from computed placement to authored placement.
-    // Run the automatic strategy and take its result as the Layout — an edit, not a
-    // cache, which is why it goes through the store rather than replacing what the
-    // view arranges with.
-    //
-    // Keep this result's routed geometry while this exact graph remains visible.
-    // Taking its positions authors the Layout, so any later graph identity renders
-    // through the positioned strategy instead of re-running the former View.
-    const autoArrange = useCallback(() => {
-      void view.automatic(graph).then((result) => {
-        adoptLayoutResult(result);
-        arrange(layoutPositions(result));
-      });
-    }, [graph, arrange, adoptLayoutResult]);
+    const chooseRenderer = useCallback(
+      (selection: RendererSelection) => {
+        const resolved = resolveView(rendererSpace, selection);
+        useEditorStore
+          .getState()
+          .selectRenderer(resolved.layout === null ? null : layoutPositionMap(resolved.layout));
+        openRenderer(resolved.activeRouteId);
+        setRendererNavigation((current) => ({
+          ...current,
+          selectedRenderer: selection,
+          selectedView: selection.kind === 'view' ? selection.view : current.selectedView,
+        }));
+        if (selection.kind === 'view') nextLayoutId.current = uuidSchema.parse(crypto.randomUUID());
+      },
+      [openRenderer, rendererSpace],
+    );
 
     // A completed edit prepares one complete snapshot. Preparation narrows nullable
     // authored placement before the local watermark advances; an invariant failure
@@ -260,16 +281,33 @@ export const createApp = ({ space, spaceSession }: OpenedSpace, { acceptRemote }
         spaceSession.getState().working,
         submittedRevision.current,
         { revision, positions: useEditorStore.getState().positions },
-        {
-          layoutId: persistLayoutId,
-          layoutTitle: persistLayoutTitle,
-          activeRouteId: useSpaceStore.getState().activeRouteId,
-        },
+        selectedRenderer.kind === 'layout'
+          ? {
+              kind: 'layout',
+              layoutId: selectedRenderer.layoutId,
+              activeRouteId: useSpaceStore.getState().activeRouteId,
+            }
+          : {
+              kind: 'view',
+              layoutId: nextLayoutId.current,
+              activeRouteId: useSpaceStore.getState().activeRouteId,
+            },
       );
       if (prepared === null) return;
       submittedRevision.current = prepared.revision;
+      // Publish the new Layout before selecting it. Renderer resolution is
+      // deliberately strict, so a selection may never briefly name something
+      // absent from the current Space.
       spaceSession.submit(prepared.snapshot);
-    }, [revision]);
+      setRendererNavigation((current) => ({
+        ...current,
+        layouts: prepared.snapshot.document.layouts ?? [],
+        selectedRenderer:
+          selectedRenderer.kind === 'view'
+            ? { kind: 'layout', layoutId: nextLayoutId.current }
+            : selectedRenderer,
+      }));
+    }, [revision, selectedRenderer]);
 
     // Leaving while persistence is not settled asks first. The handler is absent
     // in the normal durable state, preserving the browser's back/forward cache.
@@ -299,6 +337,10 @@ export const createApp = ({ space, spaceSession }: OpenedSpace, { acceptRemote }
           ...(laidOut && !moved ? { layoutGraph: laidOut } : {}),
         }),
       [visibleEdges, activeRouteId, emphasis, laidOut, moved],
+    );
+    const activeRouteCardIds = useMemo(
+      () => new Set(activeRouteId === null ? [] : routeCardIds(space, activeRouteId)),
+      [activeRouteId],
     );
 
     const openedCard = openedCardId ? getCard(space, openedCardId) : undefined;
@@ -342,34 +384,27 @@ export const createApp = ({ space, spaceSession }: OpenedSpace, { acceptRemote }
 
     const toolbar = (
       <>
-        {/* A space with no routes has nothing to activate or legend (ADR 0015),
-          and neither has a view that shows none. Both list the *visible* routes:
-          activating moves emphasis within that set and never widens it. */}
-        {visibleRoutes.length > 0 && (
-          <>
-            <RouteSelector
-              routes={visibleRoutes}
-              activeRouteId={activeRouteId}
-              onActivate={(routeId) => activateRoute(uuidSchema.parse(routeId))}
-            />
-            <RouteLegend
-              routes={visibleRoutes}
-              colorByRouteId={colors}
-              activeRouteId={activeRouteId}
-            />
-          </>
-        )}
-        {/* Disabled until the live arrangement resolves. That is when runtime nodes
-          are available to drag or replace; an automatic view still has no authored
-          placement until either action completes (ADR 0025). */}
-        <Button
-          variant="secondary"
-          data-testid="auto-arrange-button"
-          onClick={autoArrange}
-          disabled={!editable}
-        >
-          Auto-arrange
-        </Button>
+        <ViewSelector
+          value={selectedView}
+          active={selectedRenderer.kind === 'view'}
+          onValueChange={(selected) => chooseRenderer({ kind: 'view', view: selected })}
+        />
+        <LayoutSelector
+          layouts={layouts}
+          value={selectedRenderer.kind === 'layout' ? selectedRenderer.layoutId : null}
+          active={selectedRenderer.kind === 'layout'}
+          onValueChange={(layoutId) =>
+            chooseRenderer({ kind: 'layout', layoutId: uuidSchema.parse(layoutId) })
+          }
+        />
+        <RouteSelector
+          routes={visibleRoutes}
+          activeRouteId={activeRouteId}
+          onActivate={(routeId) => activateRoute(uuidSchema.parse(routeId))}
+          onPresent={present}
+          presenting={presenting}
+          onExitPresenting={exitPresenting}
+        />
         {sessionState.persistence.kind === 'failed' ? (
           <Button
             variant="default"
@@ -396,24 +431,6 @@ export const createApp = ({ space, spaceSession }: OpenedSpace, { acceptRemote }
                 : 'Persisted'}
           </span>
         )}
-        {/* Presenting is this same canvas drawn closer in (ADR 0027), so this
-          changes the camera rather than the surface. A space with no routes has
-          nothing to walk (ADR 0015) — the button stays, disabled, so the
-          capability is visible rather than absent. */}
-        {presenting ? (
-          <Button variant="secondary" data-testid="exit-presenting-button" onClick={exitPresenting}>
-            Overview
-          </Button>
-        ) : (
-          <Button
-            variant="default"
-            data-testid="present-button"
-            onClick={present}
-            disabled={!activeRouteId}
-          >
-            Present
-          </Button>
-        )}
       </>
     );
 
@@ -430,6 +447,10 @@ export const createApp = ({ space, spaceSession }: OpenedSpace, { acceptRemote }
               editable={editable}
               onNodesChange={changeNodes}
               onOpenCard={(cardId) => openCard(uuidSchema.parse(cardId))}
+              routes={visibleRoutes}
+              colorByRouteId={colors}
+              activeRouteId={activeRouteId}
+              activeRouteCardIds={activeRouteCardIds}
             />
           </ReactFlowProvider>
 

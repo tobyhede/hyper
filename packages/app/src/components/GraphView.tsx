@@ -2,14 +2,14 @@ import { useEffect } from 'react';
 import {
   Background,
   Controls,
-  MiniMap,
   ReactFlow,
   useReactFlow,
   useStore,
   type Edge,
   type OnNodesChange,
 } from '@xyflow/react';
-import { edgeTypes, nodeTypes, type CardFlowNode } from '@project/react-flow-adapter';
+import type { Route } from '@project/core';
+import { edgeTypes, nodeTypes, RouteHud, type CardFlowNode } from '@project/react-flow-adapter';
 
 /**
  * How much of the shorter viewport axis the presented card leaves as margin.
@@ -109,6 +109,10 @@ export interface GraphViewProps {
   onNodesChange: OnNodesChange<CardFlowNode>;
   /** Opening a card is a view gesture; the graph only reports which was picked. */
   onOpenCard: (cardId: string) => void;
+  routes: readonly Route[];
+  colorByRouteId: Readonly<Record<string, string>>;
+  activeRouteId: string | null;
+  activeRouteCardIds: ReadonlySet<string>;
 }
 
 export function GraphView({
@@ -120,6 +124,10 @@ export function GraphView({
   editable,
   onNodesChange,
   onOpenCard,
+  routes,
+  colorByRouteId,
+  activeRouteId,
+  activeRouteCardIds,
 }: GraphViewProps) {
   return (
     <ReactFlow
@@ -147,10 +155,14 @@ export function GraphView({
     >
       <Background gap={24} />
       <Controls showInteractive={false} />
-      {/* Screen-fixed, so the camera does not touch it: at a zoom where the
-          active card is legible a fork's branch cards are off screen, and the
-          minimap is where the space stays visible (ADR 0027). */}
-      <MiniMap pannable zoomable />
+      {routes.length > 0 && (
+        <RouteHud
+          routes={routes}
+          colorByRouteId={colorByRouteId}
+          activeRouteId={activeRouteId}
+          activeRouteCardIds={activeRouteCardIds}
+        />
+      )}
       <OverviewCamera layoutReady={layoutReady} presenting={presenting} />
       <PresentingCamera activeCardId={activeCardId} />
     </ReactFlow>

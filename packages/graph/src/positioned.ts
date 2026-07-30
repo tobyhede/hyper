@@ -7,8 +7,8 @@ import type { LayoutCard, LayoutGraph, LayoutPoint, LayoutStrategy } from './lay
  * The third strategy, and the only one that *reads* geometry rather than
  * computing it — placement is authored content, not an artifact of an algorithm
  * (ADR 0025). It is the one strategy with a **Layout** behind it: the positions
- * it takes are that Layout's, and Auto-arrange is the same conversion run
- * backwards. Like `gridStrategy` it consumes only the cards: it never looks at
+ * it takes are that Layout's, and capturing on-screen positions is the same
+ * conversion run backwards. Like `gridStrategy` it consumes only the cards: it never looks at
  * the edges, places no ports, and populates no edge sections, leaving the render
  * layer to spread handles evenly and draw a plain curve. If this file ever needs
  * to know about ports or routing, the seam has leaked.
@@ -43,7 +43,7 @@ function boundsOf(cards: readonly LayoutCard[]): Bounds | null {
 /**
  * The card→position map a laid-out graph describes: `positionedStrategy` run
  * backwards, and the crossing from computed placement to authored placement that
- * Auto-arrange is.
+ * the first completed edit in an Algorithmic View performs.
  *
  * Cards a strategy left unplaced are **omitted**, not defaulted to the origin —
  * absence in a Layout means *unplaced*, and collapsing that to `(0, 0)` would

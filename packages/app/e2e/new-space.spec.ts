@@ -21,14 +21,12 @@ test('shows one card, and it is the only thing on screen', async ({ page }) => {
   await expect(page.locator('.react-flow__edge')).toHaveCount(0);
 });
 
-test('offers no route controls, having no routes (ADR 0015)', async ({ page }) => {
+test('shows an empty disabled route control and no route HUD (ADR 0015)', async ({ page }) => {
   await page.goto('/');
   await expect(nodeByTitle(page, 'Start here')).toBeVisible();
 
-  // A space with no routes has nothing to select or legend. Whether it can be
-  // *presented* is not asserted here: presenting is being rebuilt as a traversal
-  // (ADR 0024, 0027) and there is no affordance to point at until it lands.
-  await expect(page.getByTestId('route-selector')).toHaveCount(0);
+  await expect(page.getByTestId('route-selector')).toContainText('None');
+  await expect(page.getByTestId('present-button')).toBeDisabled();
   await expect(page.getByTestId('route-legend')).toHaveCount(0);
 });
 

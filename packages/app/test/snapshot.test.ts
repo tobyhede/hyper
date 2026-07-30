@@ -96,7 +96,10 @@ it('preserves authored view scope and unrelated layouts while replacing placemen
   );
 
   expect(changed.document.layouts).toHaveLength(2);
-  expect(changed.document.layouts?.[1]?.id).toBe('00000000-0000-4000-8000-000000000021');
-  expect(changed.document.layouts?.[1]?.routes).toEqual(['00000000-0000-4000-8000-000000000004']);
+  expect(changed.document.layouts?.map((layout) => layout.id)).toEqual([
+    '00000000-0000-4000-8000-000000000021',
+    '00000000-0000-4000-8000-000000000022',
+  ]);
+  expect(changed.document.layouts?.[0]?.routes).toEqual(['00000000-0000-4000-8000-000000000004']);
   expect(changed.cards).toEqual(snapshot.cards);
 });

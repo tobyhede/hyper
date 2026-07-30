@@ -36,12 +36,15 @@ export const updatePositionedLayout = (
     ...(existing?.routes ? { routes: existing.routes } : {}),
     ...(activeRouteId !== null ? { activeRoute: activeRouteId } : {}),
   };
-  const others = (base.document.layouts ?? []).filter((candidate) => candidate.id !== layoutId);
+  const layouts = [...(base.document.layouts ?? [])];
+  const existingIndex = layouts.findIndex((candidate) => candidate.id === layoutId);
+  if (existingIndex === -1) layouts.push(layout);
+  else layouts[existingIndex] = layout;
   return {
     ...base,
     document: {
       ...base.document,
-      layouts: [...others, layout],
+      layouts,
       defaultView: layoutId,
     },
   };

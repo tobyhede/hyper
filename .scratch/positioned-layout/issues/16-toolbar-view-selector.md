@@ -1,6 +1,6 @@
 # The toolbar selects Views and Layouts
 
-Status: open
+Status: resolved
 Type: task
 
 Replace the generic Auto-arrange prototype control with an icon View selector.
@@ -45,3 +45,11 @@ not undo or reversal.
   exist.
 - Unit/property tests cover resolution and conversion; Playwright covers the
   icon selector, navigation-only selection, and first-edit persistence.
+
+## Resolution
+
+Implemented as the accepted two-peer View and Layout selector refinement in the
+toolbar design handoff, alongside the joined Route/Present control and route
+HUD. Graph and Grid navigation remains runtime-only. A first completed edit in
+either View creates and selects the next `Layout N`; later edits update that
+Layout in place. `pnpm verify` and `pnpm e2e` are the release gates.

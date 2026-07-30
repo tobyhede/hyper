@@ -58,6 +58,61 @@ async function arrange(space: Space) {
 }
 
 describe('resolveView', () => {
+  it('resolves an explicitly selected Algorithmic View without changing the Space default', async () => {
+    const space = spaceWith({
+      layouts: [WORKING],
+      defaultView: '00000000-0000-4000-8000-000000000022',
+    });
+
+    const view = resolveView(space, { kind: 'view', view: 'grid' });
+
+    expect(view.id).toBe('grid');
+    expect(view.layout).toBeNull();
+    expect(view).not.toHaveProperty('automatic');
+    expect(space.defaultView).toBe('00000000-0000-4000-8000-000000000022');
+    const graph = buildLayoutGraph(
+      space.cards.map((card) => card.id),
+      new Map(),
+      [],
+      CARD_SIZE,
+    );
+    const laid = await view.strategy(graph);
+    expect(laid.cards[0]).toMatchObject({ x: 0, y: 0 });
+  });
+
+  it('resolves an explicitly selected Positioned Layout without changing the Space default', async () => {
+    const space = spaceWith({ layouts: [WORKING], defaultView: 'grid' });
+
+    const view = resolveView(space, {
+      kind: 'layout',
+      layoutId: uuidSchema.parse('00000000-0000-4000-8000-000000000022'),
+    });
+
+    expect(view.id).toBe('00000000-0000-4000-8000-000000000022');
+    expect(view.layout?.title).toBe('Working');
+    expect(space.defaultView).toBe('grid');
+    const graph = buildLayoutGraph(
+      space.cards.map((card) => card.id),
+      new Map(),
+      [],
+      CARD_SIZE,
+    );
+    const laid = await view.strategy(graph);
+    expect(laid.cards.map(({ x, y }) => ({ x, y }))).toEqual([
+      { x: 40, y: 10 },
+      { x: 400, y: 250 },
+    ]);
+  });
+
+  it('rejects a selected Layout that the Space does not own', () => {
+    expect(() =>
+      resolveView(spaceWith(), {
+        kind: 'layout',
+        layoutId: uuidSchema.parse('00000000-0000-4000-8000-000000000099'),
+      }),
+    ).toThrow('The selected Layout 00000000-0000-4000-8000-000000000099 does not exist.');
+  });
+
   it('falls back to the route-driven graph when a space names no view', () => {
     const view = resolveView(spaceWith());
     expect(view.id).toBe('graph');
@@ -94,35 +149,6 @@ describe('resolveView', () => {
     const view = resolveView(spaceWith({ layouts: [WORKING] }));
     expect(view.id).toBe('graph');
     expect(view.layout).toBeNull();
-  });
-
-  it('gives a positioned view an automatic strategy to Auto-arrange with', async () => {
-    // A Layout says where the cards are, not how they got there — so recomputing
-    // falls back to the view a space opens in when it names none.
-    const view = resolveView(
-      spaceWith({ layouts: [WORKING], defaultView: '00000000-0000-4000-8000-000000000022' }),
-    );
-    const graph = buildLayoutGraph(
-      [
-        uuidSchema.parse('00000000-0000-4000-8000-000000000002'),
-        uuidSchema.parse('00000000-0000-4000-8000-000000000003'),
-      ],
-      new Map(),
-      [],
-      CARD_SIZE,
-    );
-
-    const laid = await view.automatic(graph);
-    expect(laid.cards.map((c) => ({ x: c.x, y: c.y }))).not.toEqual([
-      { x: 40, y: 10 },
-      { x: 400, y: 250 },
-    ]);
-  });
-
-  it('re-arranges an automatic view by the strategy it already uses', () => {
-    // A grid view Auto-arranges by the grid, not by ELK.
-    const view = resolveView(spaceWith({ defaultView: 'grid' }));
-    expect(view.automatic).toBe(view.strategy);
   });
 
   it('shows every route and opens on the first when no Layout filters', () => {

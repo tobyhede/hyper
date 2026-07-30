@@ -64,6 +64,20 @@ describe('createSpaceStore', () => {
     expect(useStore.getState().activeRouteId).toBe(uuid('00000000-0000-4000-8000-000000000033'));
   });
 
+  it('opens another renderer on its resolved route without recording a walk', () => {
+    const { useStore } = createSpaceStore(fixture(), uuid('00000000-0000-4000-8000-000000000032'));
+    useStore.getState().present();
+
+    useStore.getState().openRenderer(null);
+
+    expect(useStore.getState()).toMatchObject({
+      activeRouteId: null,
+      mode: 'overview',
+      walk: [],
+      branchIndex: 0,
+    });
+  });
+
   it('carries no active route in a space with none (ADR 0015)', () => {
     const result = loadSpace(
       {

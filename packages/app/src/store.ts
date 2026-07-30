@@ -50,6 +50,8 @@ export interface SpaceState {
    */
   openedCardId: CardId | null;
   activateRoute: (routeId: RouteId) => void;
+  /** Navigate to a renderer and adopt the route that renderer resolves. */
+  openRenderer: (routeId: RouteId | null) => void;
   openCard: (cardId: CardId) => void;
   closeCard: () => void;
   present: () => void;
@@ -117,6 +119,9 @@ export function createSpaceStore(space: Space, initialActiveRouteId: RouteId | n
     // act either way, and never an edit — it converts nothing and leaves the
     // space clean (ADR 0026, ADR 0028).
     activateRoute: (routeId) =>
+      set({ activeRouteId: routeId, mode: 'overview', walk: [], branchIndex: 0 }),
+
+    openRenderer: (routeId) =>
       set({ activeRouteId: routeId, mode: 'overview', walk: [], branchIndex: 0 }),
 
     openCard: (cardId) => set({ openedCardId: cardId }),
