@@ -131,16 +131,24 @@ describe('runHyper', () => {
   );
 
   it('reports the stored space identity and lossless bigint revision', async () => {
+    // Past `Number.MAX_SAFE_INTEGER`, so a revision that went through `Number`
+    // anywhere would print 9007199254740992 and fail here. Revision 0 cannot
+    // catch that, and the `int8` workaround in `toDatabaseRevision` is exactly
+    // the kind of thing that would reintroduce it.
+    const revision = 9_007_199_254_740_993n;
     const directory = await writeValidSpace();
     const output = captureIo();
 
     const exitCode = await runHyper([directory], {
-      repository: new ImportRepository({ kind: 'imported', spaces: [storedSpace] }),
+      repository: new ImportRepository({
+        kind: 'imported',
+        spaces: [{ ...storedSpace, revision }],
+      }),
       io: output.io,
     });
 
     expect(exitCode).toBe(0);
-    expect(output.stdout).toEqual([`Imported space ${SPACE_ID} at revision 0\n`]);
+    expect(output.stdout).toEqual([`Imported space ${SPACE_ID} at revision 9007199254740993\n`]);
     expect(output.stderr).toEqual([]);
   });
 
