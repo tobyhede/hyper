@@ -1,7 +1,16 @@
-import { uuidSchema, type SpaceSnapshot } from '@project/core';
-import { afterAll, afterEach, describe, expect, it } from 'vitest';
+import { uuidSchema, type ImportSpace, type SpaceSnapshot, type UUID } from '@project/core';
+import { afterAll, afterEach, describe, expect, expectTypeOf, it } from 'vitest';
 import { PostgresSpaceRepository } from '../../src/persistence/postgres-space-repository';
+import type {
+  RepositoryImportResult,
+  SpaceRepository,
+  StoredSpace,
+} from '../../src/persistence/space-repository';
 import { db } from '../../src/prisma/db';
+
+expectTypeOf<Parameters<SpaceRepository['importSpaces']>[0]>().toEqualTypeOf<
+  readonly ImportSpace[]
+>();
 
 const SPACE_ID = uuidSchema.parse('11111111-1111-4111-8111-111111111111');
 const CARD_ID = uuidSchema.parse('22222222-2222-4222-8222-222222222222');
@@ -12,6 +21,9 @@ const MISSING_CARD_ID = uuidSchema.parse('66666666-6666-4666-8666-666666666666')
 const OTHER_SPACE_ID = uuidSchema.parse('77777777-7777-4777-8777-777777777777');
 const OTHER_CARD_ID = uuidSchema.parse('88888888-8888-4888-8888-888888888888');
 const CONCURRENT_SPACE_ID = uuidSchema.parse('99999999-9999-4999-8999-999999999999');
+const MIXED_FIRST_CARD_ID = uuidSchema.parse('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
+const MIXED_SECOND_CARD_ID = uuidSchema.parse('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb');
+const UNRESOLVED_CARD_ID = uuidSchema.parse('cccccccc-cccc-4ccc-8ccc-cccccccccccc');
 
 const createReadBarrier = (parties: number) => {
   let arrivals = 0;
@@ -152,10 +164,74 @@ const otherSnapshot: SpaceSnapshot = {
   ],
 };
 
+const mixedImport: ImportSpace = {
+  document: {
+    version: 2,
+    title: 'Mixed identity space',
+    routes: [
+      {
+        title: 'Explicit card route',
+        edges: [{ from: MIXED_FIRST_CARD_ID, to: MIXED_SECOND_CARD_ID }],
+      },
+    ],
+    layouts: [
+      {
+        title: 'Mixed layout',
+        kind: 'positioned',
+        positions: { [MIXED_FIRST_CARD_ID]: { x: 40, y: 80 } },
+      },
+    ],
+  },
+  cards: [
+    {
+      id: MIXED_FIRST_CARD_ID,
+      document: { title: 'First explicit card', kind: 'markdown', body: 'First.' },
+    },
+    {
+      id: MIXED_SECOND_CARD_ID,
+      document: { title: 'Second explicit card', kind: 'markdown', body: 'Second.' },
+    },
+    {
+      document: { title: 'Generated card', kind: 'markdown', body: 'Generated.' },
+    },
+  ],
+};
+
+const allIdlessImport: ImportSpace = {
+  document: {
+    version: 2,
+    title: 'All generated identities',
+    routes: [],
+    layouts: [
+      {
+        title: 'Generated empty layout',
+        kind: 'positioned',
+        positions: {},
+      },
+    ],
+  },
+  cards: [
+    {
+      document: { title: 'Generated only card', kind: 'markdown', body: 'Generated.' },
+    },
+  ],
+};
+
 describe('PostgresSpaceRepository', () => {
   const repository = new PostgresSpaceRepository(db);
+  const createdSpaceIds = new Set<UUID>();
+
+  const trackImported = (result: RepositoryImportResult): void => {
+    if (result.kind !== 'imported') return;
+    for (const stored of result.spaces) createdSpaceIds.add(stored.snapshot.id);
+  };
 
   afterEach(async () => {
+    for (const id of createdSpaceIds) {
+      await db.orm.public.Card.where({ spaceId: id }).delete();
+      await db.orm.public.Space.where({ id }).delete();
+    }
+    createdSpaceIds.clear();
     await db.orm.public.Card.where({ spaceId: SPACE_ID }).delete();
     await db.orm.public.Card.where({ spaceId: OTHER_SPACE_ID }).delete();
     await db.orm.public.Space.where({ id: SPACE_ID }).delete();
@@ -371,6 +447,130 @@ describe('PostgresSpaceRepository', () => {
     await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual(expected);
   });
 
+  it('allocates every missing identity without rewriting explicit references', async () => {
+    const result = await repository.importSpaces([mixedImport]);
+    trackImported(result);
+    expect(result.kind).toBe('imported');
+    if (result.kind !== 'imported') {
+      throw new Error(result.kind === 'rejected' ? result.message : 'Import conflicted');
+    }
+
+    const stored = result.spaces[0]!;
+    const route = stored.snapshot.document.routes[0]!;
+    const layout = stored.snapshot.document.layouts?.[0];
+    expect(layout).toBeDefined();
+    if (layout === undefined) throw new Error('Generated layout was not returned');
+    const generatedCard = stored.snapshot.cards.find(
+      ({ id }) => id !== MIXED_FIRST_CARD_ID && id !== MIXED_SECOND_CARD_ID,
+    );
+    expect(generatedCard).toBeDefined();
+    if (generatedCard === undefined) throw new Error('Generated card was not returned');
+    const generatedIds = [stored.snapshot.id, generatedCard.id, route.id, layout.id];
+
+    for (const id of generatedIds) expect(uuidSchema.safeParse(id).success).toBe(true);
+    expect(new Set(generatedIds).size).toBe(4);
+    expect(generatedIds).not.toContain(MIXED_FIRST_CARD_ID);
+    expect(generatedIds).not.toContain(MIXED_SECOND_CARD_ID);
+    expect(new Set(stored.snapshot.cards.map(({ id }) => id))).toEqual(
+      new Set([MIXED_FIRST_CARD_ID, MIXED_SECOND_CARD_ID, generatedCard.id]),
+    );
+    expect(route.edges).toEqual([{ from: MIXED_FIRST_CARD_ID, to: MIXED_SECOND_CARD_ID }]);
+    expect(layout.positions).toEqual({ [MIXED_FIRST_CARD_ID]: { x: 40, y: 80 } });
+    await expect(repository.loadSpace(stored.snapshot.id)).resolves.toEqual(stored);
+  });
+
+  it('allocates disjoint identities for repeated all-id-less imports', async () => {
+    const first = await repository.importSpaces([allIdlessImport]);
+    trackImported(first);
+    expect(first.kind).toBe('imported');
+    if (first.kind !== 'imported') {
+      throw new Error(first.kind === 'rejected' ? first.message : 'Import conflicted');
+    }
+
+    const second = await repository.importSpaces([allIdlessImport]);
+    trackImported(second);
+    expect(second.kind).toBe('imported');
+    if (second.kind !== 'imported') {
+      throw new Error(second.kind === 'rejected' ? second.message : 'Import conflicted');
+    }
+
+    const identities = (stored: StoredSpace): UUID[] => [
+      stored.snapshot.id,
+      stored.snapshot.cards[0]!.id,
+      stored.snapshot.document.layouts![0]!.id,
+    ];
+    const firstIds = identities(first.spaces[0]!);
+    const secondIds = identities(second.spaces[0]!);
+    for (const id of [...firstIds, ...secondIds]) {
+      expect(uuidSchema.safeParse(id).success).toBe(true);
+    }
+    expect(new Set([...firstIds, ...secondIds]).size).toBe(6);
+  });
+
+  it('rejects reuse of explicit cards by a generated space and rolls back the batch', async () => {
+    await repository.importSpaces([snapshot]);
+    const first = await repository.importSpaces([mixedImport]);
+    trackImported(first);
+    expect(first.kind).toBe('imported');
+    if (first.kind !== 'imported') {
+      throw new Error(first.kind === 'rejected' ? first.message : 'Import conflicted');
+    }
+    const firstStored = first.spaces[0]!;
+    const catalogBefore = await repository.listSpaces();
+    const changedKnown: SpaceSnapshot = {
+      ...snapshot,
+      document: { ...snapshot.document, title: 'Must roll back before ownership rejection' },
+    };
+
+    const second = await repository.importSpaces([changedKnown, mixedImport]);
+    trackImported(second);
+
+    expect(second).toMatchObject({ kind: 'rejected', code: 'card-ownership' });
+    if (second.kind !== 'rejected') throw new Error('Conflicting import was not rejected');
+    expect(second.message).toContain(MIXED_FIRST_CARD_ID);
+    await expect(repository.listSpaces()).resolves.toEqual(catalogBefore);
+    await expect(repository.loadSpace(firstStored.snapshot.id)).resolves.toEqual(firstStored);
+    await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual({
+      snapshot,
+      revision: 0n,
+      exportedRevision: null,
+    });
+  });
+
+  it('rejects unresolved UUID references after allocation and rolls back every generated row', async () => {
+    await repository.importSpaces([snapshot, otherSnapshot]);
+    const catalogBefore = await repository.listSpaces();
+    const knownSpaceBefore = await repository.loadSpace(SPACE_ID);
+    const otherSpaceBefore = await repository.loadSpace(OTHER_SPACE_ID);
+    const invalid: ImportSpace = {
+      document: {
+        version: 2,
+        title: 'Invalid generated space',
+        routes: [
+          {
+            title: 'Unresolved route',
+            edges: [{ from: UNRESOLVED_CARD_ID, to: MISSING_CARD_ID }],
+          },
+        ],
+      },
+      cards: [
+        {
+          document: { title: 'Id-less card', kind: 'markdown', body: 'Cannot be referenced.' },
+        },
+      ],
+    };
+
+    const result = await repository.importSpaces([invalid]);
+    trackImported(result);
+
+    expect(result).toMatchObject({ kind: 'rejected', code: 'invalid-snapshot' });
+    if (result.kind !== 'rejected') throw new Error('Invalid import was not rejected');
+    expect(result.message).toContain(UNRESOLVED_CARD_ID);
+    await expect(repository.listSpaces()).resolves.toEqual(catalogBefore);
+    await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual(knownSpaceBefore);
+    await expect(repository.loadSpace(OTHER_SPACE_ID)).resolves.toEqual(otherSpaceBefore);
+  });
+
   it('rejects duplicate durable identities across an import batch', async () => {
     const duplicate = {
       ...snapshot,
@@ -379,7 +579,7 @@ describe('PostgresSpaceRepository', () => {
 
     await expect(repository.importSpaces([snapshot, duplicate])).resolves.toMatchObject({
       kind: 'rejected',
-      code: 'invalid-snapshot',
+      code: 'duplicate-identity',
     });
     await expect(repository.loadSpace(SPACE_ID)).resolves.toBeUndefined();
   });
@@ -397,7 +597,7 @@ describe('PostgresSpaceRepository', () => {
 
     await expect(repository.importSpaces([changedFirst, claimedByOther])).resolves.toMatchObject({
       kind: 'rejected',
-      code: 'invalid-snapshot',
+      code: 'duplicate-identity',
     });
     await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual({
       snapshot,

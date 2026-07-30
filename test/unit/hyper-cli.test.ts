@@ -1,0 +1,242 @@
+import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { uuidSchema, type ImportSpace, type SpaceSnapshot, type UUID } from '@project/core';
+import { afterEach, describe, expect, it } from 'vitest';
+import { runCliMain } from '../../src/cli/main';
+import { runHyper, type CliIo } from '../../src/cli/run';
+import type {
+  RepositoryCommitResult,
+  RepositoryImportResult,
+  SpaceRepository,
+  SpaceSummary,
+  StoredSpace,
+} from '../../src/persistence/space-repository';
+
+const SPACE_ID = uuidSchema.parse('11111111-1111-4111-8111-111111111111');
+const CARD_ID = uuidSchema.parse('22222222-2222-4222-8222-222222222222');
+const ROUTE_ID = uuidSchema.parse('33333333-3333-4333-8333-333333333333');
+
+const storedSpace: StoredSpace = {
+  snapshot: {
+    id: SPACE_ID,
+    document: { version: 2, title: 'Stored talk', routes: [] },
+    cards: [
+      {
+        id: CARD_ID,
+        document: { title: 'Stored card', kind: 'markdown', body: 'Stored body.\n' },
+      },
+    ],
+  },
+  revision: 0n,
+  exportedRevision: null,
+};
+
+class ImportRepository implements SpaceRepository {
+  private readonly outcome: RepositoryImportResult | Error;
+
+  constructor(outcome: RepositoryImportResult | Error) {
+    this.outcome = outcome;
+  }
+
+  listSpaces(): Promise<readonly SpaceSummary[]> {
+    throw new Error('Unexpected listSpaces call');
+  }
+
+  loadSpace(_id: UUID): Promise<StoredSpace | undefined> {
+    throw new Error('Unexpected loadSpace call');
+  }
+
+  commitSpace(
+    _snapshot: SpaceSnapshot,
+    _expectedRevision: bigint,
+  ): Promise<RepositoryCommitResult> {
+    throw new Error('Unexpected commitSpace call');
+  }
+
+  importSpaces(_input: readonly ImportSpace[]): Promise<RepositoryImportResult> {
+    return this.outcome instanceof Error
+      ? Promise.reject(this.outcome)
+      : Promise.resolve(this.outcome);
+  }
+}
+
+const temporaryDirectories: string[] = [];
+
+const makeTemporaryDirectory = async (): Promise<string> => {
+  const directory = await mkdtemp(join(tmpdir(), 'hyper-cli-unit-'));
+  temporaryDirectories.push(directory);
+  return directory;
+};
+
+const writeValidSpace = async (): Promise<string> => {
+  const directory = await makeTemporaryDirectory();
+  await mkdir(join(directory, 'cards'));
+  await writeFile(
+    join(directory, 'space.json'),
+    JSON.stringify({ version: 2, id: SPACE_ID, title: 'Imported talk', routes: [] }),
+  );
+  await writeFile(join(directory, 'cards', 'opening.md'), '---\ntitle: Opening\n---\nHello.\n');
+  return directory;
+};
+
+const captureIo = (): { io: CliIo; stdout: string[]; stderr: string[] } => {
+  const stdout: string[] = [];
+  const stderr: string[] = [];
+  return {
+    io: {
+      stdout: (message) => stdout.push(message),
+      stderr: (message) => stderr.push(message),
+    },
+    stdout,
+    stderr,
+  };
+};
+
+afterEach(async () => {
+  await Promise.all(
+    temporaryDirectories.splice(0).map((directory) => rm(directory, { recursive: true })),
+  );
+});
+
+describe('runHyper', () => {
+  it.each([{ args: [] }, { args: ['first', 'second'] }])(
+    'rejects a positional argument count of $args.length',
+    async ({ args }) => {
+      const output = captureIo();
+
+      const exitCode = await runHyper(args, {
+        repository: new ImportRepository({ kind: 'imported', spaces: [storedSpace] }),
+        io: output.io,
+      });
+
+      expect(exitCode).toBe(2);
+      expect(output.stdout).toEqual([]);
+      expect(output.stderr).toEqual(['Usage: hyper <space.json-or-directory>\n']);
+    },
+  );
+
+  it('reports the stored space identity and lossless bigint revision', async () => {
+    const directory = await writeValidSpace();
+    const output = captureIo();
+
+    const exitCode = await runHyper([directory], {
+      repository: new ImportRepository({ kind: 'imported', spaces: [storedSpace] }),
+      io: output.io,
+    });
+
+    expect(exitCode).toBe(0);
+    expect(output.stdout).toEqual([`Imported space ${SPACE_ID} at revision 0\n`]);
+    expect(output.stderr).toEqual([]);
+  });
+
+  it('reports every file diagnostic with its path', async () => {
+    const directory = await makeTemporaryDirectory();
+    const firstCardPath = join(directory, 'first.md');
+    const secondCardPath = join(directory, 'second.md');
+    await writeFile(join(directory, 'space.json'), '{ invalid JSON');
+    await writeFile(firstCardPath, 'Missing frontmatter.\n');
+    await writeFile(secondCardPath, 'Also missing frontmatter.\n');
+    const output = captureIo();
+
+    const exitCode = await runHyper([directory], {
+      repository: new ImportRepository({ kind: 'imported', spaces: [storedSpace] }),
+      io: output.io,
+    });
+
+    expect(exitCode).toBe(1);
+    expect(output.stdout).toEqual([]);
+    expect(output.stderr.join('')).toContain(join(directory, 'space.json'));
+    expect(output.stderr.join('')).toContain(firstCardPath);
+    expect(output.stderr.join('')).toContain(secondCardPath);
+  });
+
+  it.each([
+    {
+      outcome: {
+        kind: 'rejected',
+        code: 'duplicate-identity',
+        message: `Duplicate route ${ROUTE_ID}`,
+      } satisfies RepositoryImportResult,
+      entityId: ROUTE_ID,
+    },
+    {
+      outcome: {
+        kind: 'rejected',
+        code: 'invalid-snapshot',
+        message: `Route ${ROUTE_ID} has an unresolved card`,
+      } satisfies RepositoryImportResult,
+      entityId: ROUTE_ID,
+    },
+    {
+      outcome: { kind: 'conflict', current: storedSpace } satisfies RepositoryImportResult,
+      entityId: SPACE_ID,
+    },
+  ] as const)(
+    'reports a classified import failure naming $entityId',
+    async ({ outcome, entityId }) => {
+      const directory = await writeValidSpace();
+      const output = captureIo();
+
+      const exitCode = await runHyper([directory], {
+        repository: new ImportRepository(outcome),
+        io: output.io,
+      });
+
+      expect(exitCode).toBe(1);
+      expect(output.stdout).toEqual([]);
+      expect(output.stderr.join('')).toContain(entityId);
+    },
+  );
+
+  it('classifies an unexpected repository failure as a database failure without a stack', async () => {
+    const directory = await writeValidSpace();
+    const output = captureIo();
+
+    const exitCode = await runHyper([directory], {
+      repository: new ImportRepository(new Error('connection lost')),
+      io: output.io,
+    });
+
+    expect(exitCode).toBe(1);
+    expect(output.stdout).toEqual([]);
+    expect(output.stderr).toEqual(['Database import failed: connection lost\n']);
+  });
+});
+
+describe('runCliMain', () => {
+  it('preserves the import result after awaiting a successful database close', async () => {
+    const directory = await writeValidSpace();
+    const output = captureIo();
+    let closed = false;
+
+    const exitCode = await runCliMain([directory], {
+      repository: new ImportRepository({ kind: 'imported', spaces: [storedSpace] }),
+      io: output.io,
+      close: () => {
+        closed = true;
+        return Promise.resolve();
+      },
+    });
+
+    expect(exitCode).toBe(0);
+    expect(closed).toBe(true);
+    expect(output.stdout).toEqual([`Imported space ${SPACE_ID} at revision 0\n`]);
+    expect(output.stderr).toEqual([]);
+  });
+
+  it('classifies database shutdown failure without leaking a stack trace', async () => {
+    const directory = await writeValidSpace();
+    const output = captureIo();
+
+    const exitCode = await runCliMain([directory], {
+      repository: new ImportRepository({ kind: 'imported', spaces: [storedSpace] }),
+      io: output.io,
+      close: () => Promise.reject(new Error('socket stuck')),
+    });
+
+    expect(exitCode).toBe(1);
+    expect(output.stdout).toEqual([`Imported space ${SPACE_ID} at revision 0\n`]);
+    expect(output.stderr).toEqual(['Database shutdown failed: socket stuck\n']);
+  });
+});

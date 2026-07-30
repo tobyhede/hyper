@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { parseCardFile } from '../src/index';
+import { parseCardFile, parseImportCardFile } from '../src/index';
+
+const CARD_A = '00000000-0000-4000-8000-000000000002';
 
 describe('parseCardFile: CRLF', () => {
   it('leaves no carriage return on the last frontmatter field', () => {
@@ -22,6 +24,39 @@ describe('parseCardFile: CRLF', () => {
 });
 
 describe('parseCardFile', () => {
+  it('parses an id-less Markdown file only through the import intake', () => {
+    const file = {
+      path: 'cards/new.md',
+      text: '---\ntitle: New card\nkind: markdown\n---\n\nNew body\n',
+    };
+
+    expect(parseCardFile(file).ok).toBe(false);
+    expect(parseImportCardFile(file)).toEqual({
+      ok: true,
+      card: {
+        document: { title: 'New card', kind: 'markdown', body: 'New body\n' },
+      },
+    });
+  });
+
+  it('keeps an id-less alias target UUID-only and bodyless', () => {
+    expect(
+      parseImportCardFile({
+        path: 'cards/alias.md',
+        text: `---\ntitle: Alias\nkind: alias\ntarget: ${CARD_A}\n---\n`,
+      }),
+    ).toEqual({
+      ok: true,
+      card: { document: { title: 'Alias', kind: 'alias', target: CARD_A } },
+    });
+    expect(
+      parseImportCardFile({
+        path: 'cards/alias.md',
+        text: '---\ntitle: Alias\nkind: alias\ntarget: card-a\n---\nBody',
+      }).ok,
+    ).toBe(false);
+  });
+
   it('reads a card from its frontmatter and keeps the body', () => {
     const result = parseCardFile({
       path: 'cards/a.md',
