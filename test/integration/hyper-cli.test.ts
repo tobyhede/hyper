@@ -9,6 +9,10 @@ import { db } from '../../src/prisma/db';
 
 const IMPORTED_SPACE_ID = uuidSchema.parse('d1111111-1111-4111-8111-111111111111');
 const MALFORMED_SPACE_ID = uuidSchema.parse('d2222222-2222-4222-8222-222222222222');
+const UNRELATED_SPACE_ID = uuidSchema.parse('d3333333-3333-4333-8333-333333333333');
+const EXACT_IMPORTED_SPACE_ID = uuidSchema.parse('d4444444-4444-4444-8444-444444444444');
+const FIRST_BATCH_SPACE_ID = uuidSchema.parse('d5555555-5555-4555-8555-555555555555');
+const SECOND_BATCH_SPACE_ID = uuidSchema.parse('d6666666-6666-4666-8666-666666666666');
 
 interface CommandResult {
   status: number | null;
@@ -18,9 +22,9 @@ interface CommandResult {
 
 const COMMAND_TIMEOUT_MS = 30_000;
 
-const runHyperCommand = (path: string): Promise<CommandResult> =>
+const runHyperCommand = (args: readonly string[]): Promise<CommandResult> =>
   new Promise((resolve, reject) => {
-    const child = spawn('pnpm', ['--silent', 'hyper', '--', path], {
+    const child = spawn('pnpm', ['--silent', 'hyper', '--', ...args], {
       cwd: process.cwd(),
       env: process.env,
       stdio: ['ignore', 'pipe', 'pipe'],
@@ -64,16 +68,41 @@ describe('hyper CLI', () => {
   const createdSpaceIds = new Set<UUID>();
   const temporaryDirectories = new Set<string>();
 
-  const makeSpaceDirectory = async (spaceId: UUID): Promise<string> => {
+  const makeSpaceDirectory = async (
+    spaceId: UUID,
+    title = 'CLI imported talk',
+  ): Promise<string> => {
     const directory = await mkdtemp(join(tmpdir(), 'hyper-cli-integration-'));
     temporaryDirectories.add(directory);
     createdSpaceIds.add(spaceId);
     await mkdir(join(directory, 'cards'));
     await writeFile(
       join(directory, 'space.json'),
-      JSON.stringify({ version: 2, id: spaceId, title: 'CLI imported talk', routes: [] }),
+      JSON.stringify({ version: 2, id: spaceId, title, routes: [] }),
     );
     return directory;
+  };
+
+  const seedSpace = async (spaceId: UUID, title: string): Promise<void> => {
+    const result = await repository.importSpaces(
+      [{ id: spaceId, document: { version: 2, title, routes: [] }, cards: [] }],
+      'insert',
+    );
+    if (result.kind !== 'imported') throw new Error(`Could not seed space ${spaceId}`);
+    createdSpaceIds.add(spaceId);
+  };
+
+  const writeSpaceDirectory = async (
+    directory: string,
+    spaceId: UUID,
+    title: string,
+  ): Promise<void> => {
+    createdSpaceIds.add(spaceId);
+    await mkdir(directory);
+    await writeFile(
+      join(directory, 'space.json'),
+      JSON.stringify({ version: 2, id: spaceId, title, routes: [] }),
+    );
   };
 
   afterEach(async () => {
@@ -99,10 +128,10 @@ describe('hyper CLI', () => {
       '---\ntitle: Opening\n---\nDurable CLI body.\n',
     );
 
-    const result = await runHyperCommand(directory);
+    const result = await runHyperCommand([directory]);
 
     expect(result.status).toBe(0);
-    expect(result.stdout).toBe(`Imported space ${IMPORTED_SPACE_ID} at revision 0\n`);
+    expect(result.stdout).toBe(`Opened space ${IMPORTED_SPACE_ID} at revision 0\n`);
     expect(result.stderr).toBe('');
     const stored = await repository.loadSpace(IMPORTED_SPACE_ID);
     expect(stored?.revision).toBe(0n);
@@ -120,12 +149,126 @@ describe('hyper CLI', () => {
     });
   });
 
+  it('creates and opens a fully identified new space when the database is empty', async () => {
+    const result = await runHyperCommand([]);
+
+    expect(result.status).toBe(0);
+    expect(result.stderr).toBe('');
+    const catalog = await repository.listSpaces();
+    expect(catalog).toHaveLength(1);
+    const created = catalog[0];
+    if (created === undefined) throw new Error('Expected the new space in the catalog');
+    createdSpaceIds.add(created.id);
+    expect(result.stdout).toBe(`Opened space ${created.id} at revision 0\n`);
+    expect(created.title).toBe('New space');
+    const stored = await repository.loadSpace(created.id);
+    expect(stored).toEqual({
+      snapshot: {
+        id: created.id,
+        document: { version: 2, title: 'New space', routes: [] },
+        cards: [
+          {
+            id: stored?.snapshot.cards[0]?.id,
+            document: { title: 'Start here', kind: 'markdown', body: '' },
+          },
+        ],
+      },
+      revision: 0n,
+      exportedRevision: null,
+    });
+    expect(uuidSchema.safeParse(stored?.snapshot.cards[0]?.id).success).toBe(true);
+  });
+
+  it('reopens the sole stored space without duplicating it', async () => {
+    const firstResult = await runHyperCommand([]);
+    expect(firstResult.status).toBe(0);
+    const firstCatalog = await repository.listSpaces();
+    const created = firstCatalog[0];
+    if (created === undefined) throw new Error('Expected the first command to create a space');
+    createdSpaceIds.add(created.id);
+    const firstStored = await repository.loadSpace(created.id);
+    expect(firstResult).toEqual({
+      status: 0,
+      stdout: `Opened space ${created.id} at revision 0\n`,
+      stderr: '',
+    });
+    expect(firstStored?.revision).toBe(0n);
+
+    const secondResult = await runHyperCommand([]);
+
+    expect(secondResult).toEqual({
+      status: 0,
+      stdout: `Opened space ${created.id} at revision 0\n`,
+      stderr: '',
+    });
+    await expect(repository.listSpaces()).resolves.toEqual([created]);
+    await expect(repository.loadSpace(created.id)).resolves.toEqual(firstStored);
+  });
+
+  it('opens the exact imported space when an unrelated space already exists', async () => {
+    await seedSpace(UNRELATED_SPACE_ID, 'Unrelated talk');
+    const directory = await makeSpaceDirectory(EXACT_IMPORTED_SPACE_ID, 'Fresh imported talk');
+
+    const result = await runHyperCommand([directory]);
+
+    expect(result).toEqual({
+      status: 0,
+      stdout: `Opened space ${EXACT_IMPORTED_SPACE_ID} at revision 0\n`,
+      stderr: '',
+    });
+    await expect(repository.listSpaces()).resolves.toEqual([
+      { id: UNRELATED_SPACE_ID, title: 'Unrelated talk' },
+      { id: EXACT_IMPORTED_SPACE_ID, title: 'Fresh imported talk' },
+    ]);
+    await expect(repository.loadSpace(EXACT_IMPORTED_SPACE_ID)).resolves.toMatchObject({
+      snapshot: {
+        id: EXACT_IMPORTED_SPACE_ID,
+        document: { title: 'Fresh imported talk' },
+      },
+      revision: 0n,
+    });
+  });
+
+  it('reports the complete catalog without paths after importing multiple spaces', async () => {
+    await seedSpace(UNRELATED_SPACE_ID, 'Unrelated talk');
+    const collection = await mkdtemp(join(tmpdir(), 'hyper-cli-collection-'));
+    temporaryDirectories.add(collection);
+    await writeSpaceDirectory(join(collection, 'first'), FIRST_BATCH_SPACE_ID, 'First imported');
+    await writeSpaceDirectory(join(collection, 'second'), SECOND_BATCH_SPACE_ID, 'Second imported');
+
+    const result = await runHyperCommand([collection]);
+
+    expect(result).toEqual({
+      status: 0,
+      stdout:
+        `Choose a space:\n` +
+        `Unrelated talk (${UNRELATED_SPACE_ID})\n` +
+        `First imported (${FIRST_BATCH_SPACE_ID})\n` +
+        `Second imported (${SECOND_BATCH_SPACE_ID})\n`,
+      stderr: '',
+    });
+    expect(result.stdout).not.toContain(collection);
+    await expect(repository.listSpaces()).resolves.toEqual([
+      { id: UNRELATED_SPACE_ID, title: 'Unrelated talk' },
+      { id: FIRST_BATCH_SPACE_ID, title: 'First imported' },
+      { id: SECOND_BATCH_SPACE_ID, title: 'Second imported' },
+    ]);
+    await expect(repository.loadSpace(FIRST_BATCH_SPACE_ID)).resolves.toMatchObject({
+      snapshot: { id: FIRST_BATCH_SPACE_ID },
+      revision: 0n,
+    });
+    await expect(repository.loadSpace(SECOND_BATCH_SPACE_ID)).resolves.toMatchObject({
+      snapshot: { id: SECOND_BATCH_SPACE_ID },
+      revision: 0n,
+    });
+  });
+
   it('reports a malformed card path and stores no partial space', async () => {
     const directory = await makeSpaceDirectory(MALFORMED_SPACE_ID);
     const cardPath = join(directory, 'cards', 'broken.md');
     await writeFile(cardPath, 'Missing frontmatter.\n');
 
-    const result = await runHyperCommand(directory);
+    const result = await runHyperCommand([directory]);
 
     expect(result.status).not.toBe(0);
     expect(result.stdout).toBe('');
