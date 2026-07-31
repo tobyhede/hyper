@@ -1,6 +1,7 @@
 import { test as base, expect } from '@playwright/test';
 import { fileURLToPath } from 'node:url';
 import { createServer, type ViteDevServer } from 'vite';
+import { NEW_SPACE_PROJECT } from './projects';
 
 /**
  * The Playwright `test` every spec in this directory imports, extended with a
@@ -47,7 +48,7 @@ export const test = base.extend<E2eFixtures>({
     const server = await createServer({
       root: appRoot,
       configFile,
-      mode: testInfo.project.name === 'new-space' ? 'e2e-empty' : 'e2e-fixture',
+      mode: testInfo.project.name === NEW_SPACE_PROJECT ? 'e2e-empty' : 'e2e-fixture',
       server: { host: '127.0.0.1', port: 5276 + testInfo.workerIndex, strictPort: true },
     });
     try {

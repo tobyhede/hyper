@@ -16,10 +16,18 @@ const startHost = async (): Promise<{ server: ViteDevServer; baseURL: string }> 
     mode: 'postgres-e2e',
     server: { host: '127.0.0.1', port: 5276, strictPort: true },
   });
-  await server.listen();
-  const baseURL = server.resolvedUrls?.local[0];
-  if (baseURL === undefined) throw new Error('Vite did not publish a loopback URL');
-  return { server, baseURL };
+  try {
+    await server.listen();
+    const baseURL = server.resolvedUrls?.local[0];
+    if (baseURL === undefined) throw new Error('Vite did not publish a loopback URL');
+    return { server, baseURL };
+  } catch (error) {
+    // The caller only learns of a server it can close on success, so a failure
+    // between here and the return would strand one holding the fixed port —
+    // and the retry of a `strictPort` host then fails for the wrong reason.
+    await server.close();
+    throw error;
+  }
 };
 
 const openImportedSpace = async (

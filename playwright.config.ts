@@ -1,4 +1,5 @@
 import { defineConfig, devices } from '@playwright/test';
+import { NEW_SPACE_PROJECT } from './packages/app/e2e/projects';
 
 /** Every test fixture starts its own ephemeral Vite host and HTTP repository. */
 
@@ -21,7 +22,7 @@ export default defineConfig({
       testIgnore: [NEW_SPACE_SPEC, POSTGRES_SPACE_SPEC],
     },
     {
-      name: 'new-space',
+      name: NEW_SPACE_PROJECT,
       use: { ...devices['Desktop Chrome'] },
       testMatch: NEW_SPACE_SPEC,
     },
