@@ -25,11 +25,12 @@ export interface CardContentProps {
  * `javascript:` href and `<iframe src=javascript:>` all passed through intact
  * and ran in the dev server's origin.
  *
- * That hole is closed too (`vite-space-file-plugin.ts`), which is what makes
- * this defence in depth rather than the only thing holding. Keep both: the
- * trust argument recovers its premise only for as long as nothing else can
- * write a card, and "nothing else can write" is not a property to bet the
- * origin on.
+ * That hole is closed too — the save endpoint and the whole Vite file
+ * integration are gone (ADR 0030) — which is what makes this defence in depth
+ * rather than the only thing holding. Keep both: the trust argument recovers
+ * its premise only for as long as nothing else can write a card, and card
+ * bodies now arrive from a database over HTTP, which is not a property to bet
+ * the origin on.
  */
 export function CardContent({ title, markdown }: CardContentProps) {
   const html = useMemo(

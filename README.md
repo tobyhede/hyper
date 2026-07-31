@@ -179,8 +179,8 @@ Design rules kept throughout: domain logic stays out of React components, React 
 
 ## Current limitations
 
-- **Content is read-only.** No visual or Markdown editing, no drawing, no whiteboard shapes. Placement edits commit to the live backend, but the current backend is in-memory and lasts only for the open page.
-- **Files are import-only in the app.** `SPACE_DIR` selects a directory for the Vite importer; there is no browser write-back or file picker. Canonical file export is reserved for the CLI described by [ADR 0030](docs/adr/0030-postgres-is-the-live-write-model.md).
+- **Content is read-only.** No visual or Markdown editing, no drawing, no whiteboard shapes. Placement edits commit to PostgreSQL over HTTP and outlive the page.
+- **The app never touches files.** The browser lists, opens and commits Spaces under `/api/spaces` and nothing else; file discovery and parsing are server-side CLI and import concerns. There is no write-back, no file picker, and canonical file export is reserved for the CLI described by [ADR 0030](docs/adr/0030-postgres-is-the-live-write-model.md).
 - **Overlay legibility.** The graph draws every route at once. Only **compatible** routes — the union of their edges is acyclic — lay out cleanly as parallel forward paths; two routes disagreeing about the order of cards they share force a backward edge, drawn as a routed channel. See [`.scratch/multiple-routes/findings.md`](.scratch/multiple-routes/findings.md).
 - **Cards are a fixed shape.** A card draws its title, so every card is the same size — declared once in `packages/app/src/card.ts` as a 16:9 ratio and consumed by both the layout and the stylesheet. Content adapts to the card, not the reverse, which is why measured DOM sizes are not fed into ELK.
 - **No authoring of structure.** Routes and cards are edited in the files; the drag-to-connect surface ([ADR 0021](docs/adr/0021-routes-are-drawn-as-react-flow-edges.md)) is not built.

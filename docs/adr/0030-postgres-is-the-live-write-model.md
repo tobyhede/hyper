@@ -66,8 +66,9 @@ interfaces.
 The first increment is built: version 2 public schemas require UUIDs, import
 schemas allow persistence-owned ids to be omitted, and `SpaceBackend`,
 `SpaceSession` and the memory adapter drive automatic whole-snapshot commits.
-The Vite file integration is now a read-only import source; there is no browser
-Save action or file write-back endpoint.
+There is no browser Save action or file write-back endpoint. The Vite file
+integration is gone entirely — file discovery and parsing are server-side CLI
+and import concerns, and the browser reaches persistence only over HTTP.
 
 The Prisma Next/PostgreSQL adapter and insert-only transactional importer are
 built, as is database-driven startup: server-side policy resolves the zero, one
