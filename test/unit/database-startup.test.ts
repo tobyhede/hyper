@@ -59,6 +59,10 @@ class PersistenceOwnedSpaceIdRepository implements SpaceRepository {
 
     return this.#memory.importSpaces([{ ...space, id: SPACE_ID }], mode);
   }
+
+  markExported(id: UUID, revision: bigint): Promise<void> {
+    return this.#memory.markExported(id, revision);
+  }
 }
 
 const storedSpace = (
