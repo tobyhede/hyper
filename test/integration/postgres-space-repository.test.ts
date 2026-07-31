@@ -196,6 +196,29 @@ describe('PostgresSpaceRepository', () => {
     });
   });
 
+  it('records the projected revision without hiding a concurrent edit', async () => {
+    await repository.importSpaces([snapshot]);
+    const exported = await repository.loadSpace(SPACE_ID);
+    expect(exported).toBeDefined();
+    if (exported === undefined) throw new Error('Imported space disappeared');
+    const changed: SpaceSnapshot = {
+      ...snapshot,
+      document: { ...snapshot.document, title: 'Edited during export' },
+    };
+
+    await expect(repository.commitSpace(changed, exported.revision)).resolves.toEqual({
+      kind: 'committed',
+      revision: 1n,
+    });
+    await repository.markExported(SPACE_ID, exported.revision);
+
+    await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual({
+      snapshot: changed,
+      revision: 1n,
+      exportedRevision: 0n,
+    });
+  });
+
   it('returns the current aggregate for a stale revision without changing it', async () => {
     await repository.importSpaces([snapshot]);
     const current: SpaceSnapshot = {

@@ -214,6 +214,63 @@ describe('runHyper', () => {
     });
   });
 
+  it('leaves the previous destination recoverable and metadata unchanged when staging fails', async () => {
+    const destination = join(await makeTemporaryDirectory(), 'exported');
+    await mkdir(destination);
+    await writeFile(join(destination, 'space.json'), 'previous space\n');
+    await writeFile(join(destination, 'cards'), 'not a directory\n');
+    const repository = new MemorySpaceRepository([storedSpace]);
+    const output = captureIo();
+
+    await expect(
+      runHyper(['export', SPACE_ID, destination], { repository, io: output.io }),
+    ).resolves.toBe(1);
+
+    expect(output.stderr[0]).toMatch(/^Export failed:/);
+    await expect(readFile(join(destination, 'space.json'), 'utf8')).resolves.toBe(
+      'previous space\n',
+    );
+    await expect(readFile(join(destination, 'cards'), 'utf8')).resolves.toBe(
+      'not a directory\n',
+    );
+    await expect(repository.loadSpace(SPACE_ID)).resolves.toMatchObject({
+      exportedRevision: null,
+    });
+  });
+
+  it('marks the projected revision when a newer edit commits during export', async () => {
+    const destination = join(await makeTemporaryDirectory(), 'exported');
+    const repository = new MemorySpaceRepository([storedSpace]);
+    const markExported = repository.markExported.bind(repository);
+    repository.markExported = async (id, revision) => {
+      const changed: SpaceSnapshot = {
+        ...storedSpace.snapshot,
+        document: { ...storedSpace.snapshot.document, title: 'Edited during export' },
+      };
+      await expect(repository.commitSpace(changed, 0n)).resolves.toEqual({
+        kind: 'committed',
+        revision: 1n,
+      });
+      await markExported(id, revision);
+    };
+
+    await expect(
+      runHyper(['export', SPACE_ID, destination], {
+        repository,
+        io: captureIo().io,
+      }),
+    ).resolves.toBe(0);
+
+    await expect(repository.loadSpace(SPACE_ID)).resolves.toMatchObject({
+      snapshot: { document: { title: 'Edited during export' } },
+      revision: 1n,
+      exportedRevision: 0n,
+    });
+    await expect(readFile(join(destination, 'space.json'), 'utf8')).resolves.toContain(
+      '"title": "Stored talk"',
+    );
+  });
+
   it('writes deterministic fully identified files that re-enter through version 2 intake', async () => {
     const destination = join(await makeTemporaryDirectory(), 'exported');
     const snapshot: SpaceSnapshot = {
