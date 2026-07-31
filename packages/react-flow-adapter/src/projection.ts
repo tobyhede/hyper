@@ -1,5 +1,5 @@
-import type { Edge, Node } from '@xyflow/react';
-import { MarkerType } from '@xyflow/react';
+import type { Edge, Node, NodeHandle } from '@xyflow/react';
+import { MarkerType, Position } from '@xyflow/react';
 import type { CardId, RouteId } from '@project/core';
 import { resolveContentCard } from '@project/graph';
 import type {
@@ -13,6 +13,7 @@ import type {
   Space,
 } from '@project/graph';
 import type { RoutedEdgeData } from './RoutedEdge';
+import { AUTHORING_HANDLE_DIAMETER } from './authoring-handle';
 
 const FALLBACK_COLOR = '#8a94a6';
 const DEFAULT_NODE_HEIGHT = 300;
@@ -55,6 +56,8 @@ export type CardNodeData = {
    *  redraws. Absent on non-alias cards. */
   aliasOf?: string;
   active: boolean;
+  /** Ordinary renderer selection, kept outside the authored Space. */
+  selectedForAuthoring: boolean;
   /**
    * Draw the card's content rather than its title. ADR 0006 deferred a "show
    * full content" view and left it a View's choice; presenting is that view (ADR
@@ -67,6 +70,8 @@ export type CardNodeData = {
   body?: string;
   /** The route being emphasised, if any. Drives handle dimming. */
   activeRouteId: RouteId | null;
+  /** The active Route's colour, used by route-independent authoring handles. */
+  activeRouteColor: string;
   emphasis: RouteEmphasis;
   sourceHandles: CardHandle[];
   targetHandles: CardHandle[];
@@ -81,6 +86,8 @@ const EMPTY_HANDLES: CardHandleSet = { sourceHandles: [], targetHandles: [] };
 export interface ProjectCardNodesOptions {
   /** Card id the walk has reached, if any, to flag as active. */
   activeCardId?: CardId | null;
+  /** Ordinary renderer selection used to expose continued-authoring handles. */
+  selectedCardId?: CardId | null;
   /**
    * Draw the active card's content instead of its title — what presenting does
    * (ADR 0027). Only the active card is affected, so this costs one card's body
@@ -89,6 +96,8 @@ export interface ProjectCardNodesOptions {
   showActiveCardContent?: boolean;
   /** The route to emphasise, if any. */
   activeRouteId?: RouteId | null;
+  /** The active Route's resolved colour for route authoring controls. */
+  activeRouteColor?: string;
   emphasis?: RouteEmphasis;
   /** The laid-out graph; positions and port offsets come from here when present. */
   layoutGraph?: LayoutGraph;
@@ -117,6 +126,75 @@ function resolveHandles(
       offsetY,
     };
   });
+}
+
+function declaredHandles(
+  sourceHandles: readonly CardHandle[],
+  targetHandles: readonly CardHandle[],
+  routeIds: readonly RouteId[],
+  card: LayoutCard,
+): NodeHandle[] {
+  const radius = AUTHORING_HANDLE_DIAMETER / 2;
+  const authoring = (
+    type: 'source' | 'target',
+    side: Position,
+    x: number,
+    y: number,
+  ): NodeHandle => ({
+    id: `authoring-${type}-${side}`,
+    type,
+    position: side,
+    x,
+    y,
+    width: AUTHORING_HANDLE_DIAMETER,
+    height: AUTHORING_HANDLE_DIAMETER,
+  });
+  const targetByRoute = new Map(targetHandles.map((handle) => [handle.routeId, handle]));
+  const sourceByRoute = new Map(sourceHandles.map((handle) => [handle.routeId, handle]));
+  const fallbackOffset = (index: number) => ((index + 1) / (routeIds.length + 1)) * card.height;
+  // The DOM renders only incident overview anchors. Declaring every existing
+  // Route id keeps a completed connection resolvable in the same render that
+  // first makes its target incident, without exposing another visible control.
+  //
+  // This is also why nothing may force a React Flow remeasure of a placed Card:
+  // `parseHandles` prefers what is declared here, but a forced update rebuilds
+  // the bounds from `getHandleBounds`, which sees only the anchors the DOM draws
+  // — and the not-yet-incident declarations, the whole point of the loop below,
+  // are gone. `CardNode` records the same rule from the other side.
+  return [
+    ...routeIds.map((routeId, index): NodeHandle => {
+      const handle = targetByRoute.get(routeId);
+      return {
+        id: handle?.id ?? `${routeId}::in`,
+        type: 'target',
+        position: Position.Left,
+        x: -5.5,
+        y: (handle?.offsetY ?? fallbackOffset(index)) - 5.5,
+        width: 11,
+        height: 11,
+      };
+    }),
+    ...routeIds.map((routeId, index): NodeHandle => {
+      const handle = sourceByRoute.get(routeId);
+      return {
+        id: handle?.id ?? `${routeId}::out`,
+        type: 'source',
+        position: Position.Right,
+        x: card.width - 5.5,
+        y: (handle?.offsetY ?? fallbackOffset(index)) - 5.5,
+        width: 11,
+        height: 11,
+      };
+    }),
+    authoring('source', Position.Top, card.width / 2 - radius, -radius),
+    authoring('source', Position.Right, card.width - radius, card.height / 2 - radius),
+    authoring('source', Position.Bottom, card.width / 2 - radius, card.height - radius),
+    authoring('source', Position.Left, -radius, card.height / 2 - radius),
+    authoring('target', Position.Top, card.width / 2 - radius, -radius),
+    authoring('target', Position.Right, card.width - radius, card.height / 2 - radius),
+    authoring('target', Position.Bottom, card.width / 2 - radius, card.height - radius),
+    authoring('target', Position.Left, -radius, card.height / 2 - radius),
+  ];
 }
 
 /**
@@ -151,6 +229,8 @@ export function projectCardNodes(
     const aliasOf = card.kind === 'alias' ? resolveContentCard(space, card.id)?.title : undefined;
     // An alias shows its target's content under its own title (ADR 0009).
     const body = showContent ? (resolveContentCard(space, card.id)?.body ?? '') : undefined;
+    const sourceHandles = resolveHandles(handles.sourceHandles, colors, cardLayout, nodeHeight);
+    const targetHandles = resolveHandles(handles.targetHandles, colors, cardLayout, nodeHeight);
 
     return {
       id: card.id,
@@ -162,7 +242,23 @@ export function projectCardNodes(
       // reasoned about — no measure-then-reflow, and a centred `nodeOrigin` (if a
       // view chooses one) resolves correctly on first paint. Absent before the
       // layout resolves, so React Flow falls back to measuring, as before.
-      ...(cardLayout ? { width: cardLayout.width, height: cardLayout.height } : {}),
+      ...(cardLayout
+        ? {
+            width: cardLayout.width,
+            height: cardLayout.height,
+            measured: { width: cardLayout.width, height: cardLayout.height },
+          }
+        : {}),
+      ...(cardLayout
+        ? {
+            handles: declaredHandles(
+              sourceHandles,
+              targetHandles,
+              Object.keys(colors) as RouteId[],
+              cardLayout,
+            ),
+          }
+        : {}),
       data: {
         cardId: card.id,
         title: card.title,
@@ -172,12 +268,14 @@ export function projectCardNodes(
         // Omit rather than set undefined: absent means "not an alias" (ADR 0009).
         ...(aliasOf !== undefined ? { aliasOf } : {}),
         active,
+        selectedForAuthoring: card.id === (options.selectedCardId ?? null),
         showContent,
         ...(body !== undefined ? { body } : {}),
         activeRouteId,
+        activeRouteColor: options.activeRouteColor ?? FALLBACK_COLOR,
         emphasis,
-        sourceHandles: resolveHandles(handles.sourceHandles, colors, cardLayout, nodeHeight),
-        targetHandles: resolveHandles(handles.targetHandles, colors, cardLayout, nodeHeight),
+        sourceHandles,
+        targetHandles,
       },
       className: active ? 'rf-card-node rf-card-node--active' : 'rf-card-node',
     } satisfies CardFlowNode;

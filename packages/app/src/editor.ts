@@ -1,5 +1,6 @@
 import { applyNodeChanges, type NodeChange, type NodePositionChange } from '@xyflow/react';
 import { create, type StoreApi, type UseBoundStore } from 'zustand';
+import { uuidSchema, type CardId } from '@project/core';
 import type { LayoutPoint } from '@project/graph';
 import type { CardFlowNode } from '@project/react-flow-adapter';
 
@@ -32,6 +33,8 @@ export interface EditorState {
    * plain curves between wherever the cards now are.
    */
   moved: boolean;
+  /** The ordinary React Flow selection used for continued Route authoring. */
+  selectedCardId: CardId | null;
   /** Fold a freshly projected node list into the live one. */
   syncNodes: (projected: readonly CardFlowNode[]) => void;
   /**
@@ -41,6 +44,8 @@ export interface EditorState {
   selectRenderer: (positions: ReadonlyMap<string, LayoutPoint> | null) => void;
   /** Apply React Flow's own changes (drag, measure, select). */
   changeNodes: (changes: NodeChange<CardFlowNode>[]) => void;
+  /** Select one Card after a completed connection. */
+  selectCard: (cardId: CardId) => void;
 }
 
 export type EditorStore = UseBoundStore<StoreApi<EditorState>>;
@@ -105,13 +110,18 @@ function reconcile(
   return projected.map((node) => {
     const live = byId.get(node.id);
     if (!live) return node;
-    // `data` and `className` are the projection's to own — they carry the title,
-    // the description and the active/emphasis styling. Everything else is React
-    // Flow's runtime and belongs to the live node. The conditional spread is for
+    // `data`, `className` and `handles` are the projection's to own — they carry
+    // the title, the description, the active/emphasis styling and the declared
+    // handle geometry. Everything else is React Flow's runtime and belongs to the
+    // live node. `handles` must come through: React Flow builds `handleBounds`
+    // from the declaration rather than measuring the DOM (AGENTS.md), so a live
+    // node that kept a stale set would resolve a new Edge against the handles the
+    // Card had before it gained one. The conditional spreads are for
     // `exactOptionalPropertyTypes`; the projection always sets a className.
     return {
       ...live,
       data: node.data,
+      ...(node.handles !== undefined ? { handles: node.handles } : {}),
       ...(node.className !== undefined ? { className: node.className } : {}),
     };
   });
@@ -126,6 +136,7 @@ export function createEditorStore(
     positions: initialPositions === null ? null : new Map(initialPositions),
     dragOrigins: new Map(),
     moved: false,
+    selectedCardId: null,
 
     syncNodes: (projected) =>
       set((state) => {
@@ -141,7 +152,15 @@ export function createEditorStore(
         positions: positions === null ? null : new Map(positions),
         dragOrigins: new Map(),
         moved: false,
+        selectedCardId: null,
       }),
+
+    selectCard: (cardId) =>
+      set((state) => ({
+        selectedCardId: cardId,
+        nodes:
+          state.nodes?.map((node) => ({ ...node, selected: node.id === cardId })) ?? state.nodes,
+      })),
 
     changeNodes: (changes) => {
       const state = get();
@@ -159,6 +178,8 @@ export function createEditorStore(
 
       const beforeById = new Map(state.nodes.map((node) => [node.id, node.position]));
       const nodes = applyNodeChanges(relevant, state.nodes);
+      const selectedNode = nodes.find((node) => node.selected);
+      const selectedCardId = selectedNode ? uuidSchema.parse(selectedNode.id) : null;
       const afterById = new Map(nodes.map((node) => [node.id, node.position]));
       const positionChanges = relevant.filter(
         (change): change is NodePositionChange => change.type === 'position',
@@ -168,14 +189,14 @@ export function createEditorStore(
 
       const settled = positionChanges.filter((change) => change.dragging === false);
       if (settled.length === 0) {
-        set({ nodes, dragOrigins });
+        set({ nodes, dragOrigins, selectedCardId });
         return;
       }
 
       const movedIds = consumeSettledMovedIds(settled, dragOrigins, beforeById, afterById);
 
       if (movedIds.length === 0) {
-        set({ nodes, dragOrigins });
+        set({ nodes, dragOrigins, selectedCardId });
         return;
       }
 
@@ -189,6 +210,7 @@ export function createEditorStore(
         positions,
         dragOrigins,
         moved: true,
+        selectedCardId,
       });
       editCompleted();
     },

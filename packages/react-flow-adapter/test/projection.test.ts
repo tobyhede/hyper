@@ -148,6 +148,115 @@ describe('projectCardNodes', () => {
     });
   });
 
+  it('declares an attachment point for every Route on a card the layout has placed', () => {
+    // A third Route that never touches card A, so "every Route" is distinguishable
+    // from "every Route this card is already on". A self-edge is authored structure
+    // (ADR 0032), which is the cheapest way to keep it away from A.
+    const withThirdRoute = load({
+      version: 2,
+      id: '00000000-0000-4000-8000-000000000001',
+      title: 'Test',
+      routes: [
+        {
+          id: '00000000-0000-4000-8000-000000000004',
+          title: 'Main',
+          edges: [
+            {
+              from: '00000000-0000-4000-8000-000000000002',
+              to: '00000000-0000-4000-8000-000000000003',
+            },
+          ],
+        },
+        {
+          id: '00000000-0000-4000-8000-000000000031',
+          title: 'Solo',
+          edges: [
+            {
+              from: '00000000-0000-4000-8000-000000000003',
+              to: '00000000-0000-4000-8000-000000000003',
+            },
+          ],
+        },
+      ],
+    });
+    const palette = {
+      '00000000-0000-4000-8000-000000000004': '#111111',
+      '00000000-0000-4000-8000-000000000031': '#333333',
+    };
+    const nodes = projectCardNodes(withThirdRoute, buildCardHandles(withThirdRoute), palette, {
+      layoutGraph: {
+        cards: [
+          {
+            id: uuid('00000000-0000-4000-8000-000000000002'),
+            x: 500,
+            y: 600,
+            width: 260,
+            height: 300,
+            ports: [
+              { id: '00000000-0000-4000-8000-000000000004::out', side: 'out', x: 260, y: 42 },
+            ],
+          },
+          {
+            id: uuid('00000000-0000-4000-8000-000000000003'),
+            x: 900,
+            y: 600,
+            width: 260,
+            height: 300,
+            ports: [{ id: '00000000-0000-4000-8000-000000000004::in', side: 'in', x: 0, y: 88 }],
+          },
+        ],
+        edges: [],
+      },
+    });
+    const a = nodes.find((n) => n.id === '00000000-0000-4000-8000-000000000002')!;
+    const declared = new Map((a.handles ?? []).map((handle) => [handle.id, handle]));
+
+    // Card A is only on Main, and only outbound. The rest are declared all the
+    // same: React Flow resolves an Edge against the geometry the node carries, so
+    // an Edge completed onto a card resolves in the render that first makes it
+    // incident — before the projection that draws its anchor has run.
+    expect(declared.get('00000000-0000-4000-8000-000000000004::out')?.type).toBe('source');
+    expect(declared.get('00000000-0000-4000-8000-000000000004::in')?.type).toBe('target');
+    expect(declared.get('00000000-0000-4000-8000-000000000031::out')?.type).toBe('source');
+    expect(declared.get('00000000-0000-4000-8000-000000000031::in')?.type).toBe('target');
+
+    // The ones the strategy placed sit at its port offsets, less half the 11px the
+    // CSS draws the handle at, because React Flow centres a handle on the border.
+    // Outbound on A, inbound on B — the two sides move independently.
+    expect(declared.get('00000000-0000-4000-8000-000000000004::out')?.y).toBe(36.5);
+    const b = nodes.find((n) => n.id === '00000000-0000-4000-8000-000000000003')!;
+    expect(
+      (b.handles ?? []).find((handle) => handle.id === '00000000-0000-4000-8000-000000000004::in')
+        ?.y,
+    ).toBe(82.5);
+  });
+
+  it('declares no geometry for a card the layout has not placed, leaving React Flow to measure it', () => {
+    const nodes = projectCardNodes(space, handles, colors, {
+      layoutGraph: {
+        cards: [
+          {
+            id: uuid('00000000-0000-4000-8000-000000000002'),
+            x: 500,
+            y: 600,
+            width: 260,
+            height: 300,
+            ports: [],
+          },
+        ],
+        edges: [],
+      },
+    });
+    const b = nodes.find((n) => n.id === '00000000-0000-4000-8000-000000000003')!;
+
+    // Both keys are absent together, and that pairing is load-bearing: React Flow
+    // reads declared handles only when they are there, and re-measures a node that
+    // carries no measured size. Declaring one without the other strands a card on
+    // whichever half it kept.
+    expect('handles' in b).toBe(false);
+    expect('measured' in b).toBe(false);
+  });
+
   it('flags the active card', () => {
     const nodes = projectCardNodes(space, handles, colors, {
       activeCardId: uuid('00000000-0000-4000-8000-000000000003'),

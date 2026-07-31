@@ -8,6 +8,7 @@
     "build": "tsc -p tsconfig.json --noEmit && vite build",
     "preview": "vite preview",
     "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run --root ../.. packages/app/test",
     "dev:new": "SPACE_DIR= vite --port 5174 --strictPort",
     "e2e:server": "SPACE_DIR=fixture vite --port 5273 --strictPort",
     "e2e:server:new": "SPACE_DIR= vite --port 5274 --strictPort",

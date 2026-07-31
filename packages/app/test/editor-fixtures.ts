@@ -15,8 +15,10 @@ export function node(id: string, x: number, y: number, title = id): CardFlowNode
       sourceHandles: [],
       targetHandles: [],
       active: false,
+      selectedForAuthoring: false,
       showContent: false,
       activeRouteId: null,
+      activeRouteColor: '#8a94a6',
       emphasis: 'equal',
     },
   };

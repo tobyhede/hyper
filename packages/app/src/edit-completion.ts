@@ -1,4 +1,4 @@
-import { newUuid, type RouteId, type SpaceSnapshot, type UUID } from '@project/core';
+import { newUuid, type CardId, type RouteId, type SpaceSnapshot, type UUID } from '@project/core';
 import { loadSpaceSnapshot, type LayoutPoint } from '@project/graph';
 import type { SpaceSession } from '@project/persistence';
 import { createEditorStore, type EditorStore } from './editor';
@@ -134,4 +134,65 @@ export function createPlacementEditor({
     }
   });
   return editor;
+}
+
+export interface PositionedConnection {
+  readonly layoutId: UUID;
+  readonly routeId: RouteId;
+  readonly from: CardId;
+  readonly to: CardId;
+}
+
+/**
+ * Compose one completed existing-Card connection into the complete next Space.
+ * The chosen React Flow handle sides deliberately do not cross this seam.
+ */
+export function completePositionedConnection(
+  base: SpaceSnapshot,
+  connection: PositionedConnection,
+): SpaceSnapshot | null {
+  const routeIndex = base.document.routes.findIndex((route) => route.id === connection.routeId);
+  if (routeIndex === -1) throw new Error(`The active Route ${connection.routeId} does not exist.`);
+
+  const layoutIndex = (base.document.layouts ?? []).findIndex(
+    (layout) => layout.id === connection.layoutId,
+  );
+  if (layoutIndex === -1) {
+    throw new Error(`The selected Layout ${connection.layoutId} does not exist.`);
+  }
+
+  const routes = [...base.document.routes];
+  const route = routes[routeIndex];
+  if (route === undefined) throw new Error('The active Route index became invalid.');
+  if (route.edges.some((edge) => edge.from === connection.from && edge.to === connection.to)) {
+    return null;
+  }
+  routes[routeIndex] = {
+    ...route,
+    edges: [...route.edges, { from: connection.from, to: connection.to }],
+  };
+
+  const layouts = [...(base.document.layouts ?? [])];
+  const layout = layouts[layoutIndex];
+  if (layout === undefined) throw new Error('The selected Layout index became invalid.');
+  layouts[layoutIndex] = { ...layout, activeRoute: connection.routeId };
+
+  const snapshot: SpaceSnapshot = {
+    ...base,
+    document: {
+      ...base.document,
+      routes,
+      layouts,
+      defaultView: connection.layoutId,
+    },
+  };
+  const accepted = loadSpaceSnapshot(snapshot);
+  if (!accepted.ok) {
+    throw new Error(
+      `Completed connection produced an invalid Space: ${accepted.errors
+        .map((error) => error.message)
+        .join('; ')}`,
+    );
+  }
+  return snapshot;
 }

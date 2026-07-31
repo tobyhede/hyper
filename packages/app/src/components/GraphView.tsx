@@ -1,15 +1,23 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import {
   Background,
+  ConnectionMode,
   Controls,
   ReactFlow,
   useReactFlow,
   useStore,
   type Edge,
+  type OnConnect,
   type OnNodesChange,
 } from '@xyflow/react';
 import type { Route } from '@project/core';
-import { edgeTypes, nodeTypes, RouteHud, type CardFlowNode } from '@project/react-flow-adapter';
+import {
+  edgeTypes,
+  nodeTypes,
+  RouteConnectionLine,
+  RouteHud,
+  type CardFlowNode,
+} from '@project/react-flow-adapter';
 
 /**
  * How much of the shorter viewport axis the presented card leaves as margin.
@@ -107,6 +115,10 @@ export interface GraphViewProps {
    */
   editable: boolean;
   onNodesChange: OnNodesChange<CardFlowNode>;
+  /** A completed React Flow gesture; incomplete connection state stays local. */
+  onConnect: OnConnect;
+  /** Runs before React Flow clears its transient connection state. */
+  onConnectEnd: () => void;
   /** Opening a card is a view gesture; the graph only reports which was picked. */
   onOpenCard: (cardId: string) => void;
   routes: readonly Route[];
@@ -123,12 +135,16 @@ export function GraphView({
   presenting,
   editable,
   onNodesChange,
+  onConnect,
+  onConnectEnd,
   onOpenCard,
   routes,
   colorByRouteId,
   activeRouteId,
   activeRouteCardIds,
 }: GraphViewProps) {
+  const connectionGesture = useRef(false);
+
   return (
     <ReactFlow
       nodes={nodes}
@@ -136,11 +152,23 @@ export function GraphView({
       nodeTypes={nodeTypes}
       edgeTypes={edgeTypes}
       onNodesChange={onNodesChange}
+      onConnect={onConnect}
+      onConnectStart={() => {
+        connectionGesture.current = true;
+      }}
+      onConnectEnd={() => {
+        onConnectEnd();
+        // React Flow dispatches the pointer-up node click after this callback.
+        // Keep the guard through that event, then restore ordinary card opening.
+        setTimeout(() => {
+          connectionGesture.current = false;
+        }, 0);
+      }}
       // Clicking a card opens it to read — a gesture that belongs to the
       // overview. While presenting the canvas is the presentation, so a click
       // must not drop a reading panel over it.
       onNodeClick={(_event, node) => {
-        if (!presenting) onOpenCard(node.id);
+        if (!presenting && !connectionGesture.current) onOpenCard(node.id);
       }}
       fitView
       // While presenting the arrow keys are the walk's, so React Flow must not
@@ -148,7 +176,13 @@ export function GraphView({
       nodesDraggable={editable && !presenting}
       nodesFocusable={!presenting}
       elementsSelectable={!presenting}
-      nodesConnectable={false}
+      nodesConnectable={editable && !presenting}
+      connectionMode={ConnectionMode.Loose}
+      connectionLineStyle={{
+        stroke: activeRouteId === null ? '#8a94a6' : colorByRouteId[activeRouteId],
+        strokeWidth: 3,
+      }}
+      connectionLineComponent={RouteConnectionLine}
       edgesFocusable={false}
       minZoom={0.2}
       proOptions={{ hideAttribution: true }}

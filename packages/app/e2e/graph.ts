@@ -1,13 +1,63 @@
+import { readdirSync, readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { expect, type Locator, type Page } from '@playwright/test';
 
 /**
  * Reading and driving the React Flow graph from e2e.
  *
- * Shared rather than duplicated because two specs now need it: `editing.spec`
- * drags cards around the fixture, and `new-space.spec` drags the single card of
- * a space the app minted. The `settled` gate below is the non-obvious part and
- * the one worth having in exactly one place.
+ * Shared rather than duplicated because several specs need it: `editing.spec`
+ * drags cards around the fixture and draws Edges between them, `read-only.spec`
+ * does the same to prove none of it reaches the imported files, and
+ * `new-space.spec` drags the single card of a space the app minted. The
+ * `settled` gate and the mid-connection waits in `connectHandles` are the
+ * non-obvious parts, and the ones worth having in exactly one place.
  */
+
+/* -------------------------------------------------------------------------- */
+/* The fixture's cardinalities                                                 */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * How many Cards and Edges `packages/app/fixture/` actually declares, read from
+ * the authored files at load.
+ *
+ * Four assertions used to spell these out as literals — `40` target handles,
+ * `14`/`13`/`13` edges — so a change to the fixture silently broke tests that
+ * are not about the fixture. Reading the files keeps them synchronised without
+ * weakening anything: the fixture is the independent source of truth the page is
+ * being checked against, and no count here is ever derived from the page under
+ * test.
+ */
+const fixtureDir = fileURLToPath(new URL('../fixture', import.meta.url));
+
+const markdownFileCount = (directory: string): number =>
+  readdirSync(directory, { withFileTypes: true }).filter(
+    (entry) => entry.isFile() && entry.name.endsWith('.md'),
+  ).length;
+
+/**
+ * Cards are discovered non-recursively in two places — beside the space file and
+ * in `cards/` — and every `.md` in scope *is* a card (ADR 0020), so counting
+ * those files counts the Cards.
+ */
+export const FIXTURE_CARD_COUNT =
+  markdownFileCount(fixtureDir) + markdownFileCount(`${fixtureDir}/cards`);
+
+/** Routes are a space's only structure, so every Edge the graph draws is one of
+ *  a Route's authored `{from, to}` pairs. */
+export const FIXTURE_EDGE_COUNT = (
+  JSON.parse(readFileSync(`${fixtureDir}/space.json`, 'utf8')) as {
+    routes: readonly { edges: readonly unknown[] }[];
+  }
+).routes.reduce((total, route) => total + route.edges.length, 0);
+
+/** Authoring presents one handle per side of a Card, source and target alike —
+ *  four sides, route-independent (ADR 0033). */
+export const AUTHORING_HANDLE_SIDES = 4;
+
+/* -------------------------------------------------------------------------- */
+/* Locating and driving                                                        */
+/* -------------------------------------------------------------------------- */
 
 export function nodeByTitle(page: Page, title: string): Locator {
   return page
@@ -83,5 +133,53 @@ export async function dragBy(page: Page, node: Locator, dx: number, dy: number):
     steps: 5,
   });
   await page.mouse.move(box.x + box.width / 2 + dx * zoom, box.y + 12 + dy * zoom, { steps: 5 });
+  await page.mouse.up();
+}
+
+/** Which side of a Card an authoring handle sits on. The side is interaction
+ *  geometry and is never authored (ADR 0033). */
+export type HandleSide = 'top' | 'right' | 'bottom' | 'left';
+
+/** A Card's route-independent authoring handle on one side. */
+export function authoringHandle(
+  node: Locator,
+  type: 'source' | 'target',
+  side: HandleSide,
+): Locator {
+  return node.locator(`.rf-card-node__authoring-handle--${type}.react-flow__handle-${side}`);
+}
+
+/**
+ * Draw a connection from one authoring handle to another.
+ *
+ * The two waits in the middle are load-bearing, not politeness. Target handles
+ * are invisible until React Flow has actually started a connection, so a
+ * `mouse.up` issued before `connectableend` lands ends a drag that never began —
+ * and the spec then reports "no Edge was recorded" for a connection nothing ever
+ * attempted. Anything a caller wants to assert *while* the connection is in
+ * progress goes in `whileConnecting`, which runs between the gate and the drop.
+ */
+export async function connectHandles(
+  page: Page,
+  sourceHandle: Locator,
+  targetHandle: Locator,
+  whileConnecting?: () => Promise<void>,
+): Promise<void> {
+  const from = (await sourceHandle.boundingBox())!;
+  await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
+  await page.mouse.down();
+  // React Flow starts the connection on the first move after mousedown, and a
+  // single jump can be swallowed — the same reason `dragBy` moves in steps.
+  await page.mouse.move(from.x + from.width / 2 + 30, from.y + from.height / 2, { steps: 4 });
+
+  await expect(targetHandle).toHaveCSS('opacity', '1');
+  await expect(targetHandle).toHaveClass(/connectableend/);
+
+  await whileConnecting?.();
+
+  await targetHandle.hover();
+  // `hover` moves the mouse; assert it landed, so a connection dropped on empty
+  // canvas fails here rather than as a mysteriously missing Edge later.
+  expect(await targetHandle.evaluate((element) => element.matches(':hover'))).toBe(true);
   await page.mouse.up();
 }

@@ -66,6 +66,8 @@ export interface SpaceState {
 
 export interface SpaceStore {
   useStore: UseBoundStore<StoreApi<SpaceState>>;
+  /** Replace the validated aggregate traversal reads without replacing its state. */
+  updateSpace: (nextSpace: Space) => void;
   /** The card the walk has reached, or `null` outside presenting. */
   selectActiveCardId: (state: SpaceState) => CardId | null;
   /**
@@ -91,8 +93,9 @@ export interface SpaceStore {
  * Layout filters.
  */
 export function createSpaceStore(space: Space, initialActiveRouteId: RouteId | null): SpaceStore {
+  let currentSpace = space;
   const routeOf = (routeId: RouteId | null) =>
-    routeId !== null ? getRoute(space, routeId) : undefined;
+    routeId !== null ? getRoute(currentSpace, routeId) : undefined;
 
   /** The active card's outgoing edges, or none when the walk is not on one. */
   const edgesFrom = (routeId: RouteId | null, cardId: CardId | null) => {
@@ -180,9 +183,13 @@ export function createSpaceStore(space: Space, initialActiveRouteId: RouteId | n
   const movesFrom = (routeId: RouteId | null, cardId: CardId | null, branchIndex: number): Move[] =>
     edgesFrom(routeId, cardId).map((edge, index) => ({
       cardId: edge.to,
-      title: getCard(space, edge.to)?.title ?? edge.to,
+      title: getCard(currentSpace, edge.to)?.title ?? edge.to,
       selected: index === branchIndex,
     }));
 
-  return { useStore, selectActiveCardId, movesFrom };
+  const updateSpace = (nextSpace: Space): void => {
+    currentSpace = nextSpace;
+  };
+
+  return { useStore, updateSpace, selectActiveCardId, movesFrom };
 }

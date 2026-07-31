@@ -190,6 +190,30 @@ body {
   border: 1px solid #0b0d11;
 }
 
+/* Existing Edge attachment geometry stays measurable for React Flow but is not
+   presented as an authoring control (ADR 0033). */
+.rf-card-node__port.react-flow__handle {
+  pointer-events: none;
+}
+
+.rf-card-node__authoring-handle.react-flow__handle {
+  border: 1px solid #0b0d11;
+  border-radius: 50%;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 100ms ease;
+}
+
+.react-flow__node:hover
+  .rf-card-node__inner[data-connection-in-progress='false']
+  .rf-card-node__authoring-handle--source,
+.rf-card-node__inner[data-selected='true'][data-connection-in-progress='false']
+  .rf-card-node__authoring-handle--source,
+.rf-card-node__inner[data-connection-in-progress='true'] .rf-card-node__authoring-handle--target {
+  opacity: 1;
+  pointer-events: auto;
+}
+
 .card {
   background: var(--panel);
   border: 1px solid var(--border);

@@ -13,6 +13,7 @@ import {
   buildRouteEdges,
   filterHandlesByRoutes,
   getCard,
+  loadSpaceSnapshot,
   positionedStrategy,
   routeCardIds,
   resolveContentCard,
@@ -21,7 +22,7 @@ import {
   type LayoutStrategy,
 } from '@project/graph';
 import type { OpenedSpace } from './space';
-import { createPlacementEditor } from './edit-completion';
+import { completePositionedConnection, createPlacementEditor } from './edit-completion';
 import { routeColorMap } from './colors';
 import { CARD_HEIGHT, CARD_SIZE, cardSizeVars } from './card';
 import { createSpaceStore } from './store';
@@ -113,9 +114,9 @@ export const createApp = ({ space, spaceSession }: OpenedSpace, { acceptRemote }
 
   // Derived once from the opened workspace. The store is bound to the validated
   // runtime aggregate at this composition boundary (ADR 0010).
-  const colors = routeColorMap(space);
   const {
     useStore: useSpaceStore,
+    updateSpace,
     selectActiveCardId,
     movesFrom,
   } = createSpaceStore(space, initialView.activeRouteId);
@@ -125,9 +126,6 @@ export const createApp = ({ space, spaceSession }: OpenedSpace, { acceptRemote }
   function markdownForCard(cardId: CardId): string {
     return resolveContentCard(space, cardId)?.body ?? '';
   }
-  const allHandles = buildCardHandles(space);
-  const allRouteEdges = buildRouteEdges(space);
-
   // Live nodes hold whichever arrangement is on screen. A positioned view also
   // supplies its already-authored, possibly sparse Layout map; an automatic view
   // starts null and is promoted only by a completed edit (ADR 0025).
@@ -151,14 +149,27 @@ export const createApp = ({ space, spaceSession }: OpenedSpace, { acceptRemote }
       () => sessionState.working.document.layouts ?? [],
       [sessionState.working.document.layouts],
     );
+    // Routes come from the same place Layouts do. Authoring an Edge submits the
+    // whole next snapshot synchronously, so the session's working document is
+    // already the authored truth by the time this renders — there is no second
+    // copy to keep in step.
+    const routes = useMemo(
+      () => sessionState.working.document.routes,
+      [sessionState.working.document.routes],
+    );
     const rendererSpace = useMemo(
       () => ({
         ...space,
+        routes,
+        routesById: new Map(routes.map((route) => [route.id, route])),
         layouts,
         layoutsById: new Map(layouts.map((layout) => [layout.id, layout])),
       }),
-      [layouts],
+      [routes, layouts],
     );
+    const colors = useMemo(() => routeColorMap(rendererSpace), [rendererSpace]);
+    const allHandles = useMemo(() => buildCardHandles(rendererSpace), [rendererSpace]);
+    const allRouteEdges = useMemo(() => buildRouteEdges(rendererSpace), [rendererSpace]);
     const view = useMemo(
       () => resolveView(rendererSpace, selectedRenderer),
       [rendererSpace, selectedRenderer],
@@ -183,10 +194,19 @@ export const createApp = ({ space, spaceSession }: OpenedSpace, { acceptRemote }
     // Derived here rather than in a store selector: the array is rebuilt on every
     // call, so a selector would hand Zustand a new identity each render — a
     // re-render producing a new value producing a re-render, until React gives up.
-    const moves = useMemo(
-      () => movesFrom(activeRouteId, activeCardId, branchIndex),
-      [activeRouteId, activeCardId, branchIndex],
-    );
+    // That is still the rule; what is deliberate is that this is a plain render
+    // computation and **not** memoized.
+    //
+    // `movesFrom` reads the aggregate the store holds, and `updateSpace` replaces
+    // that by assignment — a mutation no dependency array can name. Authoring an
+    // Edge from the Card being presented leaves all three arguments unchanged, so
+    // a `useMemo` over them kept listing the moves the Route had before the Edge
+    // was drawn. It also bought nothing: `moves` feeds no dependency array and no
+    // memoized child, and `PresentingChrome` re-renders with `App` regardless.
+    // A render-time call is not the selector case above — nothing subscribes to
+    // this identity, so a fresh array cannot feed a re-render — and the work is a
+    // filter and a map over one Route's edges, or nothing at all outside a walk.
+    const moves = movesFrom(activeRouteId, activeCardId, branchIndex);
 
     // Which routes the renderer shows, resolved from the Layout that filtered them
     // (ADR 0026). Membership is the view's decision (ADR 0005), which is why it
@@ -195,8 +215,8 @@ export const createApp = ({ space, spaceSession }: OpenedSpace, { acceptRemote }
     const visibleRouteIds = view.visibleRouteIds;
     const visibleRouteIdSet = useMemo(() => new Set(visibleRouteIds), [visibleRouteIds]);
     const visibleRoutes = useMemo(
-      () => space.routes.filter((route) => visibleRouteIdSet.has(route.id)),
-      [visibleRouteIdSet],
+      () => routes.filter((route) => visibleRouteIdSet.has(route.id)),
+      [routes, visibleRouteIdSet],
     );
 
     // Every card, not just the route-visited ones. A space may have cards and no
@@ -206,11 +226,11 @@ export const createApp = ({ space, spaceSession }: OpenedSpace, { acceptRemote }
     const visibleCardIds = useMemo(() => space.cards.map((c) => c.id), []);
     const visibleHandles = useMemo(
       () => filterHandlesByRoutes(allHandles, visibleRouteIds),
-      [visibleRouteIds],
+      [allHandles, visibleRouteIds],
     );
     const visibleEdges = useMemo(
       () => allRouteEdges.filter((edge) => visibleRouteIdSet.has(edge.routeId)),
-      [visibleRouteIdSet],
+      [allRouteEdges, visibleRouteIdSet],
     );
 
     const graph = useMemo(
@@ -218,6 +238,7 @@ export const createApp = ({ space, spaceSession }: OpenedSpace, { acceptRemote }
       [visibleCardIds, visibleHandles, visibleEdges],
     );
     const authoredPositions = useEditorStore((s) => s.positions);
+    const selectedCardId = useEditorStore((s) => s.selectedCardId);
     const renderingStrategy = useMemo(
       () => strategyForRendering(view.strategy, authoredPositions),
       [view.strategy, authoredPositions],
@@ -230,16 +251,31 @@ export const createApp = ({ space, spaceSession }: OpenedSpace, { acceptRemote }
 
     const projectedNodes = useMemo(
       () =>
-        projectCardNodes(space, visibleHandles, colors, {
+        projectCardNodes(rendererSpace, visibleHandles, colors, {
           activeCardId,
+          selectedCardId,
           showActiveCardContent: presenting,
           activeRouteId,
+          ...(activeRouteId !== null && colors[activeRouteId] !== undefined
+            ? { activeRouteColor: colors[activeRouteId] }
+            : {}),
           emphasis,
           ...(laidOut ? { layoutGraph: laidOut } : {}),
           nodeHeight: CARD_HEIGHT,
           cardIds: visibleCardIds,
         }),
-      [activeCardId, presenting, activeRouteId, emphasis, laidOut, visibleHandles, visibleCardIds],
+      [
+        rendererSpace,
+        colors,
+        activeCardId,
+        selectedCardId,
+        presenting,
+        activeRouteId,
+        emphasis,
+        laidOut,
+        visibleHandles,
+        visibleCardIds,
+      ],
     );
 
     // Hand the projection to the store, which folds it into the live array so a
@@ -260,6 +296,7 @@ export const createApp = ({ space, spaceSession }: OpenedSpace, { acceptRemote }
     // a state the space can go back to: nothing sets `nodes` back to null, so this
     // is false for one frame and true from then on.
     const editable = liveNodes !== null;
+    const completedConnectionTarget = useRef<string | null>(null);
 
     const chooseRenderer = useCallback(
       (selection: RendererSelection) => {
@@ -301,12 +338,49 @@ export const createApp = ({ space, spaceSession }: OpenedSpace, { acceptRemote }
           // nothing.
           ...(laidOut && !moved ? { layoutGraph: laidOut } : {}),
         }),
-      [visibleEdges, activeRouteId, emphasis, laidOut, moved],
+      [visibleEdges, colors, activeRouteId, emphasis, laidOut, moved],
     );
     const activeRouteCardIds = useMemo(
-      () => new Set(activeRouteId === null ? [] : routeCardIds(space, activeRouteId)),
-      [activeRouteId],
+      () => new Set(activeRouteId === null ? [] : routeCardIds(rendererSpace, activeRouteId)),
+      [rendererSpace, activeRouteId],
     );
+
+    const connectCards = useCallback(
+      (connection: { source: string; target: string }) => {
+        // Issues 03 and 04 own Algorithmic View conversion and Route minting.
+        // This increment completes only an existing Route in a selected Layout.
+        if (selectedRenderer.kind !== 'layout' || activeRouteId === null) return;
+        const completed = completePositionedConnection(spaceSession.getState().working, {
+          layoutId: selectedRenderer.layoutId,
+          routeId: activeRouteId,
+          from: uuidSchema.parse(connection.source),
+          to: uuidSchema.parse(connection.target),
+        });
+        if (completed === null) return;
+        const accepted = loadSpaceSnapshot(completed);
+        if (!accepted.ok) {
+          throw new Error('A completed connection must produce a valid Space.');
+        }
+        completedConnectionTarget.current = connection.target;
+        // `submit` installs the complete local working snapshot synchronously;
+        // persistence acknowledgement remains asynchronous (ADR 0030). Routes and
+        // Layouts are derived from that snapshot, so the render that follows is
+        // already the authored truth — only the traversal aggregate, which is a
+        // closure rather than React state, has to be told.
+        spaceSession.submit(completed);
+        updateSpace(accepted.space);
+      },
+      [activeRouteId, selectedRenderer],
+    );
+
+    const finishConnection = useCallback(() => {
+      const target = completedConnectionTarget.current;
+      completedConnectionTarget.current = null;
+      if (target === null) return;
+      requestAnimationFrame(() => {
+        useEditorStore.getState().selectCard(uuidSchema.parse(target));
+      });
+    }, []);
 
     const openedCard = openedCardId ? getCard(space, openedCardId) : undefined;
 
@@ -411,6 +485,8 @@ export const createApp = ({ space, spaceSession }: OpenedSpace, { acceptRemote }
               presenting={presenting}
               editable={editable}
               onNodesChange={changeNodes}
+              onConnect={connectCards}
+              onConnectEnd={finishConnection}
               onOpenCard={(cardId) => openCard(uuidSchema.parse(cardId))}
               routes={visibleRoutes}
               colorByRouteId={colors}
