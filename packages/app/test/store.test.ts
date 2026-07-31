@@ -199,12 +199,12 @@ describe('walking a route (ADR 0027)', () => {
       ],
     );
     if (!updated.ok) throw new Error('updated fixture should load');
-    const { useStore, selectActiveCardId, movesFrom, updateSpace } = createSpaceStore(
+    const { useStore, selectActiveCardId, movesFrom } = createSpaceStore(
       initial,
       uuid('00000000-0000-4000-8000-000000000032'),
     );
 
-    updateSpace(updated.space);
+    useStore.getState().installSpace(updated.space);
     useStore.getState().present();
     expect(moves(useStore, selectActiveCardId, movesFrom)).toEqual([
       { cardId: uuid('00000000-0000-4000-8000-000000000003'), title: 'B', selected: true },
@@ -253,9 +253,9 @@ describe('walking a route (ADR 0027)', () => {
       [cardFile(cardA), cardFile(cardB), cardFile(cardC)],
     );
     if (!initial.ok || !updated.ok) throw new Error('entry fixtures should load');
-    const { useStore, selectActiveCardId, updateSpace } = createSpaceStore(initial.space, routeId);
+    const { useStore, selectActiveCardId } = createSpaceStore(initial.space, routeId);
 
-    updateSpace(updated.space);
+    useStore.getState().installSpace(updated.space);
     useStore.getState().present();
 
     expect(selectActiveCardId(useStore.getState())).toBe(cardC);

@@ -32,6 +32,8 @@ export interface Move {
  * nothing here tests whether a route is linear (ADR 0024).
  */
 export interface SpaceState {
+  /** The current validated aggregate every runtime reader shares. */
+  space: Space;
   mode: Mode;
   /**
    * The active route: the one drawn emphasized, and the one an author's edges
@@ -49,6 +51,8 @@ export interface SpaceState {
    * the same gesture on a different kind, and should reuse this.
    */
   openedCardId: CardId | null;
+  /** Install a complete validated Space after a completed Edit. */
+  installSpace: (space: Space) => void;
   activateRoute: (routeId: RouteId) => void;
   /** Navigate to a renderer and adopt the route that renderer resolves. */
   openRenderer: (routeId: RouteId | null) => void;
@@ -66,8 +70,6 @@ export interface SpaceState {
 
 export interface SpaceStore {
   useStore: UseBoundStore<StoreApi<SpaceState>>;
-  /** Replace the validated aggregate traversal reads without replacing its state. */
-  updateSpace: (nextSpace: Space) => void;
   /** The card the walk has reached, or `null` outside presenting. */
   selectActiveCardId: (state: SpaceState) => CardId | null;
   /**
@@ -93,29 +95,15 @@ export interface SpaceStore {
  * Layout filters.
  */
 export function createSpaceStore(space: Space, initialActiveRouteId: RouteId | null): SpaceStore {
-  let currentSpace = space;
-  const routeOf = (routeId: RouteId | null) =>
-    routeId !== null ? getRoute(currentSpace, routeId) : undefined;
-
-  /** The active card's outgoing edges, or none when the walk is not on one. */
-  const edgesFrom = (routeId: RouteId | null, cardId: CardId | null) => {
-    const route = routeOf(routeId);
-    if (!route || cardId === null) return [];
-    return outgoingEdges(route, cardId);
-  };
-
-  /** The same, for a state the store is holding. */
-  const edgesFromState = (state: SpaceState) =>
-    state.mode === 'presenting'
-      ? edgesFrom(state.activeRouteId, state.walk[state.walk.length - 1] ?? null)
-      : [];
-
   const useStore = create<SpaceState>((set, get) => ({
+    space,
     mode: 'overview',
     activeRouteId: initialActiveRouteId,
     walk: [],
     branchIndex: 0,
     openedCardId: null,
+
+    installSpace: (nextSpace) => set({ space: nextSpace }),
 
     // Activating a route while presenting would strand the walk on a card the
     // new route may not touch, so it ends the walk. Activating is a deliberate
@@ -131,7 +119,9 @@ export function createSpaceStore(space: Space, initialActiveRouteId: RouteId | n
     closeCard: () => set({ openedCardId: null }),
 
     present: () => {
-      const route = routeOf(get().activeRouteId);
+      const state = get();
+      const route =
+        state.activeRouteId !== null ? getRoute(state.space, state.activeRouteId) : undefined;
       const start = route ? routeStartCard(route) : undefined;
       // A space with no routes cannot be presented (ADR 0015). A fully cyclic
       // Route has no entry either; choosing how to start it remains presentation
@@ -144,7 +134,11 @@ export function createSpaceStore(space: Space, initialActiveRouteId: RouteId | n
 
     advance: () => {
       const state = get();
-      const edge = edgesFromState(state)[state.branchIndex];
+      const route =
+        state.activeRouteId !== null ? getRoute(state.space, state.activeRouteId) : undefined;
+      const cardId = state.mode === 'presenting' ? state.walk[state.walk.length - 1] : undefined;
+      const edges = route && cardId !== undefined ? outgoingEdges(route, cardId) : [];
+      const edge = edges[state.branchIndex];
       // No outgoing edges: the walk has reached a sink and stays there.
       if (!edge) return;
       set({ walk: [...state.walk, edge.to], branchIndex: 0 });
@@ -156,7 +150,7 @@ export function createSpaceStore(space: Space, initialActiveRouteId: RouteId | n
       const back = walk.slice(0, -1);
       const from = back[back.length - 1];
       const to = walk[walk.length - 1];
-      const route = routeOf(activeRouteId);
+      const route = activeRouteId !== null ? getRoute(get().space, activeRouteId) : undefined;
       // Re-select the edge just walked back over, so going forward again returns
       // where you were rather than to whichever branch happens to be first.
       const taken =
@@ -168,7 +162,10 @@ export function createSpaceStore(space: Space, initialActiveRouteId: RouteId | n
 
     selectBranch: (delta) => {
       const state = get();
-      const count = edgesFromState(state).length;
+      const route =
+        state.activeRouteId !== null ? getRoute(state.space, state.activeRouteId) : undefined;
+      const cardId = state.mode === 'presenting' ? state.walk[state.walk.length - 1] : undefined;
+      const count = route && cardId !== undefined ? outgoingEdges(route, cardId).length : 0;
       // Nothing to move through at a sink or where the route does not branch.
       if (count < 2) return;
       set({ branchIndex: (((state.branchIndex + delta) % count) + count) % count });
@@ -180,16 +177,19 @@ export function createSpaceStore(space: Space, initialActiveRouteId: RouteId | n
     return state.walk[state.walk.length - 1] ?? null;
   };
 
-  const movesFrom = (routeId: RouteId | null, cardId: CardId | null, branchIndex: number): Move[] =>
-    edgesFrom(routeId, cardId).map((edge, index) => ({
+  const movesFrom = (
+    routeId: RouteId | null,
+    cardId: CardId | null,
+    branchIndex: number,
+  ): Move[] => {
+    const route = routeId !== null ? getRoute(useStore.getState().space, routeId) : undefined;
+    const edges = route !== undefined && cardId !== null ? outgoingEdges(route, cardId) : [];
+    return edges.map((edge, index) => ({
       cardId: edge.to,
-      title: getCard(currentSpace, edge.to)?.title ?? edge.to,
+      title: getCard(useStore.getState().space, edge.to)?.title ?? edge.to,
       selected: index === branchIndex,
     }));
-
-  const updateSpace = (nextSpace: Space): void => {
-    currentSpace = nextSpace;
   };
 
-  return { useStore, updateSpace, selectActiveCardId, movesFrom };
+  return { useStore, selectActiveCardId, movesFrom };
 }
