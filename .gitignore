@@ -1,5 +1,6 @@
 node_modules/
 dist/
+packages/app/dist-http/
 .DS_Store
 coverage/
 playwright-report/
