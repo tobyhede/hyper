@@ -1,4 +1,4 @@
-import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { access, mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { uuidSchema, type ImportSpace, type SpaceSnapshot, type UUID } from '@project/core';
@@ -160,6 +160,34 @@ describe('runHyper', () => {
     ).resolves.toBe(exitCode);
     expect(output.stdout).toEqual([]);
     expect(output.stderr).toEqual([error]);
+  });
+
+  it('replaces discovered files while preserving files outside space discovery', async () => {
+    const parent = await makeTemporaryDirectory();
+    const destination = join(parent, 'exported');
+    await mkdir(join(destination, 'cards', 'nested'), { recursive: true });
+    await writeFile(join(destination, 'space.json'), '{}\n');
+    await writeFile(join(destination, 'stale-root.md'), 'stale\n');
+    await writeFile(join(destination, 'cards', 'stale.md'), 'stale\n');
+    await writeFile(join(destination, 'notes.txt'), 'keep root\n');
+    await writeFile(join(destination, 'cards', 'nested', 'keep.md'), 'keep nested\n');
+
+    const exitCode = await runHyper(['export', SPACE_ID, destination], {
+      repository: new MemorySpaceRepository([storedSpace]),
+      io: captureIo().io,
+    });
+
+    expect(exitCode).toBe(0);
+    await expect(access(join(destination, 'stale-root.md'))).rejects.toMatchObject({
+      code: 'ENOENT',
+    });
+    await expect(access(join(destination, 'cards', 'stale.md'))).rejects.toMatchObject({
+      code: 'ENOENT',
+    });
+    await expect(readFile(join(destination, 'notes.txt'), 'utf8')).resolves.toBe('keep root\n');
+    await expect(
+      readFile(join(destination, 'cards', 'nested', 'keep.md'), 'utf8'),
+    ).resolves.toBe('keep nested\n');
   });
 
   it('opens the only database space without filesystem import and preserves its revision', async () => {
