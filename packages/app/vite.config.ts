@@ -29,7 +29,9 @@ export default defineConfig(({ mode }) => {
       spaceHttpPlugin({
         developmentModule,
         previewModule: resolve('dist-http/postgres-http-runtime.js'),
-        ...(e2eCatalog === undefined ? {} : { runtimeOptions: { catalog: e2eCatalog } }),
+        ...(e2eCatalog === undefined
+          ? {}
+          : { runtimeOptions: { catalog: e2eCatalog, startup: true } }),
       }),
     ],
     server: {

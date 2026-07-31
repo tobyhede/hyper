@@ -13,6 +13,12 @@ const startRuntime = async (catalog: 'fixture' | 'empty') => {
   return new HttpSpaceBackend(`${server.url}/api/spaces`);
 };
 
+const startStartupRuntime = async (catalog: 'fixture' | 'empty') => {
+  const server = await startHttpServer(await createHandler({ catalog, startup: true }));
+  servers.push(server);
+  return new HttpSpaceBackend(`${server.url}/api/spaces`);
+};
+
 afterEach(async () => {
   await Promise.all(servers.splice(0).map((server) => server.close()));
 });
@@ -48,5 +54,13 @@ describe('e2e HTTP runtime', () => {
     const backend = await startRuntime('empty');
 
     await expect(backend.listSpaces()).resolves.toEqual([]);
+  });
+
+  it('applies the database zero-space startup policy when hosting the browser', async () => {
+    const backend = await startStartupRuntime('empty');
+
+    const spaces = await backend.listSpaces();
+    expect(spaces).toHaveLength(1);
+    expect(spaces[0]?.title).toBe('New space');
   });
 });
