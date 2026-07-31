@@ -74,5 +74,11 @@ built, as is database-driven startup: server-side policy resolves the zero, one
 and many-space cases, the CLI applies it after an import or with no path, and the
 application opens an exact backend workspace or renders the UUID-only selector.
 
-The HTTP backend composition that carries those startup results into the browser,
-the CLI-only canonical exporter and PostgreSQL CI integration remain to be built.
+The HTTP composition is built: the normal browser runtime uses `HttpSpaceBackend`
+against bounded Vite-hosted handlers over `PostgresSpaceRepository`, while
+database-free browser tests exercise the same boundary over isolated memory
+repositories. Ordered rapid edits, explicit retry, stale conflicts, navigation
+protection and durability across both reload and a fresh PostgreSQL-backed Vite
+host are covered.
+
+The CLI-only canonical exporter and PostgreSQL CI integration remain to be built.
