@@ -364,6 +364,37 @@ describe('runHyper', () => {
     );
   });
 
+  it('normalizes exported Markdown line endings to LF', async () => {
+    const destination = join(await makeTemporaryDirectory(), 'exported');
+    const withMixedLineEndings: StoredSpace = {
+      ...storedSpace,
+      snapshot: {
+        ...storedSpace.snapshot,
+        cards: [
+          {
+            id: CARD_ID,
+            document: {
+              title: 'Stored card',
+              kind: 'markdown',
+              body: 'First\r\nSecond\rThird\n',
+            },
+          },
+        ],
+      },
+    };
+
+    await expect(
+      runHyper(['export', SPACE_ID, destination], {
+        repository: new MemorySpaceRepository([withMixedLineEndings]),
+        io: captureIo().io,
+      }),
+    ).resolves.toBe(0);
+
+    const cardFile = await readFile(join(destination, 'cards', `${CARD_ID}.md`), 'utf8');
+    expect(cardFile).not.toContain('\r');
+    expect(cardFile).toContain('\nFirst\nSecond\nThird\n');
+  });
+
   it('opens the only database space without filesystem import and preserves its revision', async () => {
     const revision = 9_007_199_254_740_993n;
     const output = captureIo();

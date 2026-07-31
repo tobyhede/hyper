@@ -47,7 +47,7 @@ const canonicalCard = (
   };
   return document.kind === 'alias'
     ? { ...common, kind: 'alias', target: document.target }
-    : { ...common, kind: 'markdown', body: document.body };
+    : { ...common, kind: 'markdown', body: document.body.replace(/\r\n?/g, '\n') };
 };
 
 const exists = async (path: string): Promise<boolean> => {
