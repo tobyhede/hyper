@@ -339,6 +339,37 @@ describe('runHyper', () => {
     });
   });
 
+  it('canonicalizes card frontmatter independently of document key insertion order', async () => {
+    const destination = join(await makeTemporaryDirectory(), 'exported');
+    const reordered: StoredSpace = {
+      ...storedSpace,
+      snapshot: {
+        ...storedSpace.snapshot,
+        cards: [
+          {
+            id: CARD_ID,
+            document: {
+              kind: 'markdown',
+              body: 'Stored body.\n',
+              title: 'Stored card',
+            },
+          },
+        ],
+      },
+    };
+
+    await expect(
+      runHyper(['export', SPACE_ID, destination], {
+        repository: new MemorySpaceRepository([reordered]),
+        io: captureIo().io,
+      }),
+    ).resolves.toBe(0);
+
+    await expect(readFile(join(destination, 'cards', `${CARD_ID}.md`), 'utf8')).resolves.toBe(
+      `---\nid: ${CARD_ID}\ntitle: Stored card\nkind: markdown\n---\n\nStored body.\n`,
+    );
+  });
+
   it('opens the only database space without filesystem import and preserves its revision', async () => {
     const revision = 9_007_199_254_740_993n;
     const output = captureIo();

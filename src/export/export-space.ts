@@ -36,6 +36,17 @@ const canonicalSpaceFile = ({ snapshot }: StoredSpace): SpaceFile => {
   };
 };
 
+const canonicalCard = (id: UUID, document: StoredSpace['snapshot']['cards'][number]['document']): Card => {
+  const common = {
+    id,
+    title: document.title,
+    ...(document.description === undefined ? {} : { description: document.description }),
+  };
+  return document.kind === 'alias'
+    ? { ...common, kind: 'alias', target: document.target }
+    : { ...common, kind: 'markdown', body: document.body };
+};
+
 const exists = async (path: string): Promise<boolean> => {
   try {
     await stat(path);
@@ -70,8 +81,10 @@ const prepareReplacement = async (stored: StoredSpace, directory: string): Promi
   for (const card of [...stored.snapshot.cards].sort((left, right) =>
     compareOrdinal(left.id, right.id),
   )) {
-    const value: Card = { id: card.id, ...card.document };
-    await writeFile(join(cardsDirectory, `${card.id}.md`), serializeCardFile(value));
+    await writeFile(
+      join(cardsDirectory, `${card.id}.md`),
+      serializeCardFile(canonicalCard(card.id, card.document)),
+    );
   }
 
   const imported = await readSingleSpace(directory);
