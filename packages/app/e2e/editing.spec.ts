@@ -90,16 +90,19 @@ test('selecting Graph or Grid is navigation and does not persist', async ({ page
 test('connecting from Graph and Grid converts atomically without moving Cards', async ({
   page,
 }) => {
-  for (const view of ['Graph', 'Grid'] as const) {
+  await page.goto('/');
+  for (const [index, view, targetTitle] of [
+    [0, 'Graph', 'E'],
+    [1, 'Grid', 'F'],
+  ] as const) {
     await test.step(view, async () => {
-      await page.goto('/');
       if (view === 'Grid') {
         await page.getByTestId('view-selector').click();
         await page.getByRole('option', { name: view }).click();
       }
 
       const source = nodeByTitle(page, 'A').first();
-      const target = nodeByTitle(page, 'E').first();
+      const target = nodeByTitle(page, targetTitle).first();
       await expect(source).toBeVisible();
       await source.hover();
       const sourceHandle = authoringHandle(source, 'source', 'right');
@@ -108,7 +111,7 @@ test('connecting from Graph and Grid converts atomically without moving Cards', 
       await settled(page);
       const before = await allPositions(page);
       const persistence = page.getByTestId('persistence-status');
-      await expect(persistence).toHaveAttribute('data-revision', '0');
+      await expect(persistence).toHaveAttribute('data-revision', String(index));
       await expect(page.getByTestId('layout-selector')).toContainText('None');
 
       await expect(sourceHandle).toHaveCSS('opacity', '1');
@@ -123,17 +126,17 @@ test('connecting from Graph and Grid converts atomically without moving Cards', 
       await page.mouse.move(pane.x + 16, pane.y + 16);
       await page.mouse.up();
 
-      await expect(persistence).toHaveAttribute('data-revision', '0');
+      await expect(persistence).toHaveAttribute('data-revision', String(index));
       await expect(page.getByTestId('layout-selector')).toContainText('None');
       expect(await allPositions(page)).toEqual(before);
 
       await source.hover();
       await connectHandles(page, sourceHandle, targetHandle);
 
-      await expect(page.locator('.react-flow__edge')).toHaveCount(FIXTURE_EDGE_COUNT + 1);
-      await expect(persistence).toHaveAttribute('data-revision', '1');
+      await expect(page.locator('.react-flow__edge')).toHaveCount(FIXTURE_EDGE_COUNT + index + 1);
+      await expect(persistence).toHaveAttribute('data-revision', String(index + 1));
       await expect(persistence).toHaveText('Persisted');
-      await expect(page.getByTestId('layout-selector')).toContainText('Layout 1');
+      await expect(page.getByTestId('layout-selector')).toContainText(`Layout ${index + 1}`);
       await expect(page.getByTestId('layout-live-indicator')).toBeVisible();
       await settled(page);
       expect(await allPositions(page)).toEqual(before);
@@ -371,15 +374,20 @@ test('an Edge drawn from the presented Card is a move the presenter can take now
   await expect(moves).toHaveText(['B', 'A']);
 });
 
-test('drawing an existing active-Route Edge is a persistence no-op', async ({ page }) => {
+test('drawing an existing Edge from an Algorithmic View does not convert or persist', async ({
+  page,
+}) => {
   await page.goto('/');
   const source = nodeByTitle(page, 'A').first();
   const target = nodeByTitle(page, 'B').first();
   await expect(page.locator('.react-flow__edge-path').first()).toHaveAttribute('d', /L/);
-  await dragBy(page, source, 0, -100);
-  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
   await settled(page);
+  const before = await allPositions(page);
+  const persistence = page.getByTestId('persistence-status');
+  await expect(persistence).toHaveAttribute('data-revision', '0');
+  await expect(page.getByTestId('layout-selector')).toContainText('None');
 
+  await source.hover();
   await connectHandles(
     page,
     authoringHandle(source, 'source', 'right'),
@@ -387,8 +395,10 @@ test('drawing an existing active-Route Edge is a persistence no-op', async ({ pa
   );
 
   await expect(page.locator('.react-flow__edge')).toHaveCount(FIXTURE_EDGE_COUNT);
-  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
-  await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
+  await expect(persistence).toHaveAttribute('data-revision', '0');
+  await expect(persistence).toHaveText('Persisted');
+  await expect(page.getByTestId('layout-selector')).toContainText('None');
+  expect(await allPositions(page)).toEqual(before);
 });
 
 /**

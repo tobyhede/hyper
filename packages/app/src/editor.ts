@@ -35,6 +35,8 @@ export interface EditorState {
   moved: boolean;
   /** The ordinary React Flow selection used for continued Route authoring. */
   selectedCardId: CardId | null;
+  /** The structural part of the completed Edit most recently notified. */
+  completedConnection: { readonly from: CardId; readonly to: CardId } | null;
   /** Fold a freshly projected node list into the live one. */
   syncNodes: (projected: readonly CardFlowNode[]) => void;
   /**
@@ -44,14 +46,8 @@ export interface EditorState {
   selectRenderer: (positions: ReadonlyMap<string, LayoutPoint> | null) => void;
   /** Apply React Flow's own changes (drag, measure, select). */
   changeNodes: (changes: NodeChange<CardFlowNode>[]) => void;
-  /**
-   * Freeze a resolved automatic arrangement after a completed structural Edit,
-   * reinstalling its declared handle geometry before the new Edges are exposed.
-   */
-  authorPositions: (
-    positions: ReadonlyMap<string, LayoutPoint>,
-    projected: readonly CardFlowNode[],
-  ) => void;
+  /** Install and notify one directed Edge between existing Cards, when it is a real Edit. */
+  connectCards: (from: CardId, to: CardId, projected: readonly CardFlowNode[]) => boolean;
   /** Select one Card after a completed connection. */
   selectCard: (cardId: CardId) => void;
 }
@@ -138,6 +134,7 @@ function reconcile(
 export function createEditorStore(
   initialPositions: ReadonlyMap<string, LayoutPoint> | null = null,
   editCompleted: () => void = () => undefined,
+  acceptsConnection: (from: CardId, to: CardId) => boolean = () => false,
 ): EditorStore {
   return create<EditorState>((set, get) => ({
     nodes: null,
@@ -145,6 +142,7 @@ export function createEditorStore(
     dragOrigins: new Map(),
     moved: false,
     selectedCardId: null,
+    completedConnection: null,
 
     syncNodes: (projected) =>
       set((state) => {
@@ -161,13 +159,8 @@ export function createEditorStore(
         dragOrigins: new Map(),
         moved: false,
         selectedCardId: null,
+        completedConnection: null,
       }),
-
-    authorPositions: (positions, projected) =>
-      set((state) => ({
-        positions: new Map(positions),
-        nodes: state.nodes === null ? [...projected] : reconcile(state.nodes, projected),
-      })),
 
     selectCard: (cardId) =>
       set((state) => ({
@@ -225,8 +218,21 @@ export function createEditorStore(
         dragOrigins,
         moved: true,
         selectedCardId,
+        completedConnection: null,
       });
       editCompleted();
+    },
+
+    connectCards: (from, to, projected) => {
+      const state = get();
+      if (state.nodes === null || !acceptsConnection(from, to)) return false;
+      set({
+        positions: positionsForEdit(state.nodes, state.positions),
+        nodes: reconcile(state.nodes, projected),
+        completedConnection: { from, to },
+      });
+      editCompleted();
+      return true;
     },
   }));
 }

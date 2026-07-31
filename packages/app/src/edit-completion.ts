@@ -1,5 +1,5 @@
 import { newUuid, type CardId, type RouteId, type SpaceSnapshot, type UUID } from '@project/core';
-import { loadSpaceSnapshot, type LayoutPoint } from '@project/graph';
+import { loadSpaceSnapshot, type LayoutPoint, type Space } from '@project/graph';
 import type { SpaceSession } from '@project/persistence';
 import { createEditorStore, type EditorStore } from './editor';
 import { updatePositionedLayout } from './snapshot';
@@ -10,6 +10,7 @@ interface PlacementEditorDependencies {
   readonly viewChoice: ViewChoice;
   readonly currentActiveRoute: () => RouteId | null;
   readonly session: SpaceSession;
+  readonly installSpace: (space: Space) => void;
 }
 
 interface CurrentEditState {
@@ -18,11 +19,13 @@ interface CurrentEditState {
   readonly renderer: RendererSelection;
   readonly newLayoutId: UUID | null;
   readonly activeRouteId: RouteId | null;
+  readonly connection: { readonly from: CardId; readonly to: CardId } | null;
 }
 
 interface DerivedEdit {
   readonly snapshot: SpaceSnapshot;
   readonly layoutId: UUID;
+  readonly space: Space;
 }
 
 function nextLayoutTitle(snapshot: SpaceSnapshot): string {
@@ -58,15 +61,62 @@ function targetForEdit(
 }
 
 /** Private functional core: derive and validate the whole next Space before effects. */
-function deriveCompletedEdit(current: CurrentEditState): DerivedEdit {
+function inspectRouteEdge(
+  snapshot: SpaceSnapshot,
+  routeId: RouteId,
+  from: CardId,
+  to: CardId,
+): {
+  readonly routeIndex: number;
+  readonly route: SpaceSnapshot['document']['routes'][number];
+  readonly exists: boolean;
+} {
+  const routeIndex = snapshot.document.routes.findIndex((route) => route.id === routeId);
+  if (routeIndex === -1) throw new Error(`The active Route ${routeId} does not exist.`);
+  const route = snapshot.document.routes[routeIndex];
+  if (route === undefined) throw new Error('The active Route index became invalid.');
+  return {
+    routeIndex,
+    route,
+    exists: route.edges.some((edge) => edge.from === from && edge.to === to),
+  };
+}
+
+function appendRouteEdge(
+  base: SpaceSnapshot,
+  routeId: RouteId,
+  from: CardId,
+  to: CardId,
+): SpaceSnapshot | null {
+  const inspected = inspectRouteEdge(base, routeId, from, to);
+  if (inspected.exists) return null;
+  const routes = [...base.document.routes];
+  routes[inspected.routeIndex] = {
+    ...inspected.route,
+    edges: [...inspected.route.edges, { from, to }],
+  };
+  return { ...base, document: { ...base.document, routes } };
+}
+
+function deriveCompletedEdit(current: CurrentEditState): DerivedEdit | null {
   const target = targetForEdit(current.snapshot, current.renderer, current.newLayoutId);
-  const snapshot = updatePositionedLayout(
+  const placed = updatePositionedLayout(
     current.snapshot,
     target.layoutId,
     target.title,
     current.positions,
     current.activeRouteId,
   );
+  const snapshot =
+    current.connection === null || current.activeRouteId === null
+      ? placed
+      : appendRouteEdge(
+          placed,
+          current.activeRouteId,
+          current.connection.from,
+          current.connection.to,
+        );
+  if (snapshot === null) return null;
   const loaded = loadSpaceSnapshot(snapshot);
   if (!loaded.ok) {
     throw new Error(
@@ -75,7 +125,7 @@ function deriveCompletedEdit(current: CurrentEditState): DerivedEdit {
         .join('; ')}`,
     );
   }
-  return { snapshot, layoutId: target.layoutId };
+  return { snapshot, layoutId: target.layoutId, space: loaded.space };
 }
 
 export function createPlacementEditor({
@@ -83,6 +133,7 @@ export function createPlacementEditor({
   viewChoice,
   currentActiveRoute,
   session,
+  installSpace,
 }: PlacementEditorDependencies): EditorStore {
   // Each completed Edit installs a fresh positions map before notifying. Record
   // that identity before effects so a synchronous listener cannot resubmit it.
@@ -94,45 +145,62 @@ export function createPlacementEditor({
     completionQueued = false;
     return queued;
   };
-  const editor = createEditorStore(initialPositions, () => {
-    if (completing) {
-      completionQueued = true;
-      return;
-    }
-    completing = true;
-    let firstEffectError: { readonly error: unknown } | null = null;
-    try {
-      do {
-        const positions = editor.getState().positions;
-        if (positions === null) {
-          throw new Error('EditCompleted was emitted without authored placement.');
-        }
-        if (positions === submittedPositions) continue;
-        const renderer = viewChoice.current();
-        const next = deriveCompletedEdit({
-          snapshot: session.getState().working,
-          positions,
-          renderer,
-          newLayoutId: renderer.kind === 'view' ? newUuid() : null,
-          activeRouteId: currentActiveRoute(),
-        });
-        submittedPositions = positions;
-        try {
-          session.submit(next.snapshot);
-        } catch (error) {
-          firstEffectError ??= { error };
-        }
-        try {
-          viewChoice.select({ kind: 'layout', layoutId: next.layoutId });
-        } catch (error) {
-          firstEffectError ??= { error };
-        }
-      } while (takeQueuedCompletion());
-      if (firstEffectError !== null) throw firstEffectError.error;
-    } finally {
-      completing = false;
-    }
-  });
+  const editor = createEditorStore(
+    initialPositions,
+    () => {
+      if (completing) {
+        completionQueued = true;
+        return;
+      }
+      completing = true;
+      let firstEffectError: { readonly error: unknown } | null = null;
+      try {
+        do {
+          const positions = editor.getState().positions;
+          if (positions === null) {
+            throw new Error('EditCompleted was emitted without authored placement.');
+          }
+          if (positions === submittedPositions) continue;
+          const renderer = viewChoice.current();
+          const connection = editor.getState().completedConnection;
+          const next = deriveCompletedEdit({
+            snapshot: session.getState().working,
+            positions,
+            renderer,
+            newLayoutId: renderer.kind === 'view' ? newUuid() : null,
+            activeRouteId: currentActiveRoute(),
+            connection,
+          });
+          editor.setState({ completedConnection: null });
+          if (next === null) continue;
+          submittedPositions = positions;
+          try {
+            session.submit(next.snapshot);
+          } catch (error) {
+            firstEffectError ??= { error };
+          }
+          try {
+            installSpace(next.space);
+          } catch (error) {
+            firstEffectError ??= { error };
+          }
+          try {
+            viewChoice.select({ kind: 'layout', layoutId: next.layoutId });
+          } catch (error) {
+            firstEffectError ??= { error };
+          }
+        } while (takeQueuedCompletion());
+        if (firstEffectError !== null) throw firstEffectError.error;
+      } finally {
+        completing = false;
+      }
+    },
+    (from, to) => {
+      const routeId = currentActiveRoute();
+      if (routeId === null) return false;
+      return !inspectRouteEdge(session.getState().working, routeId, from, to).exists;
+    },
+  );
   return editor;
 }
 
@@ -165,29 +233,16 @@ export function completeExistingCardConnection(
   base: SpaceSnapshot,
   connection: ExistingCardConnection,
 ): CompletedConnection | null {
-  const route = base.document.routes.find((candidate) => candidate.id === connection.routeId);
-  if (route === undefined) {
-    throw new Error(`The active Route ${connection.routeId} does not exist.`);
-  }
-  if (route.edges.some((edge) => edge.from === connection.from && edge.to === connection.to)) {
-    return null;
-  }
-
   const placed = deriveCompletedEdit({
     snapshot: base,
     positions: connection.positions,
     renderer: connection.renderer,
     newLayoutId: connection.newLayoutId,
     activeRouteId: connection.routeId,
+    connection: { from: connection.from, to: connection.to },
   });
-  const snapshot = completePositionedConnection(placed.snapshot, {
-    layoutId: placed.layoutId,
-    routeId: connection.routeId,
-    from: connection.from,
-    to: connection.to,
-  });
-  if (snapshot === null) throw new Error('A new Edge unexpectedly became a duplicate.');
-  return { snapshot, layoutId: placed.layoutId };
+  if (placed === null) return null;
+  return { snapshot: placed.snapshot, layoutId: placed.layoutId };
 }
 
 /**
@@ -198,9 +253,6 @@ export function completePositionedConnection(
   base: SpaceSnapshot,
   connection: PositionedConnection,
 ): SpaceSnapshot | null {
-  const routeIndex = base.document.routes.findIndex((route) => route.id === connection.routeId);
-  if (routeIndex === -1) throw new Error(`The active Route ${connection.routeId} does not exist.`);
-
   const layoutIndex = (base.document.layouts ?? []).findIndex(
     (layout) => layout.id === connection.layoutId,
   );
@@ -208,27 +260,18 @@ export function completePositionedConnection(
     throw new Error(`The selected Layout ${connection.layoutId} does not exist.`);
   }
 
-  const routes = [...base.document.routes];
-  const route = routes[routeIndex];
-  if (route === undefined) throw new Error('The active Route index became invalid.');
-  if (route.edges.some((edge) => edge.from === connection.from && edge.to === connection.to)) {
-    return null;
-  }
-  routes[routeIndex] = {
-    ...route,
-    edges: [...route.edges, { from: connection.from, to: connection.to }],
-  };
+  const connected = appendRouteEdge(base, connection.routeId, connection.from, connection.to);
+  if (connected === null) return null;
 
-  const layouts = [...(base.document.layouts ?? [])];
+  const layouts = [...(connected.document.layouts ?? [])];
   const layout = layouts[layoutIndex];
   if (layout === undefined) throw new Error('The selected Layout index became invalid.');
   layouts[layoutIndex] = { ...layout, activeRoute: connection.routeId };
 
   const snapshot: SpaceSnapshot = {
-    ...base,
+    ...connected,
     document: {
-      ...base.document,
-      routes,
+      ...connected.document,
       layouts,
       defaultView: connection.layoutId,
     },

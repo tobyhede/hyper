@@ -133,6 +133,28 @@ describe('completed connection composition', () => {
     },
   );
 
+  it.each(['graph', 'grid'] as const)(
+    'leaves the %s View unchanged when its active Route already has the Edge',
+    (view) => {
+      const before = structuredClone(automaticSnapshot);
+
+      const completed = completeExistingCardConnection(automaticSnapshot, {
+        renderer: { kind: 'view', view },
+        positions: new Map([
+          [CARD_A, { x: 120, y: 240 }],
+          [CARD_B, { x: 480, y: 360 }],
+        ]),
+        newLayoutId: DEFAULT_LAYOUT_ID,
+        routeId: ROUTE_ID,
+        from: CARD_A,
+        to: CARD_B,
+      });
+
+      expect(completed).toBeNull();
+      expect(automaticSnapshot).toEqual(before);
+    },
+  );
+
   it('adds A → B to the active Route in a positioned Layout', () => {
     const base: SpaceSnapshot = {
       ...positionedSnapshot,
