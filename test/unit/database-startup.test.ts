@@ -1,4 +1,4 @@
-import { uuidSchema } from '@project/core';
+import { uuidSchema, type ImportSpace } from '@project/core';
 import { describe, expect, it } from 'vitest';
 import { openDatabaseSelection, resolveDatabaseStartup } from '../../src/startup/database-startup';
 import type { StoredSpace } from '../../src/persistence/space-repository';
@@ -56,6 +56,24 @@ describe('openDatabaseSelection', () => {
 });
 
 describe('resolveDatabaseStartup', () => {
+  it('leaves the new Space identity for the repository to assign', async () => {
+    const repository = new MemorySpaceRepository();
+    const importSpaces = repository.importSpaces.bind(repository);
+    let submitted: readonly ImportSpace[] | undefined;
+    repository.importSpaces = (input, mode) => {
+      submitted = input;
+      return importSpaces(input, mode);
+    };
+
+    const result = await resolveDatabaseStartup(repository);
+
+    expect(submitted?.[0]).not.toHaveProperty('id');
+    expect(result.kind).toBe('opened');
+    if (result.kind !== 'opened') throw new Error('Expected the new space to open');
+    expect(uuidSchema.safeParse(result.space.snapshot.id).success).toBe(true);
+    expect(uuidSchema.safeParse(result.space.snapshot.cards[0]?.id).success).toBe(true);
+  });
+
   it('creates and opens the normal new space when the database is empty', async () => {
     const repository = new MemorySpaceRepository();
 

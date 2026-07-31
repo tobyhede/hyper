@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
-import { beforeAll, describe, expect, it, vi } from 'vitest';
+import { beforeAll, describe, expect, expectTypeOf, it, vi } from 'vitest';
 import { uuidSchema, type Route } from '@project/core';
-import { RouteSelector } from '../src/index';
+import { RouteSelector, type RouteSelectorProps } from '../src/index';
 
 beforeAll(() => {
   HTMLElement.prototype.hasPointerCapture = () => false;
@@ -26,6 +26,10 @@ const routes: readonly Route[] = [
 ];
 
 describe('RouteSelector', () => {
+  it('requires an exit action for every presenting state', () => {
+    expectTypeOf<RouteSelectorProps['onExitPresenting']>().toEqualTypeOf<() => void>();
+  });
+
   it('joins the active Route selector to the route-coloured Present action', () => {
     const onPresent = vi.fn();
     render(
@@ -34,6 +38,7 @@ describe('RouteSelector', () => {
         activeRouteId={routes[1]?.id ?? null}
         onActivate={() => undefined}
         onPresent={onPresent}
+        onExitPresenting={() => undefined}
       />,
     );
 
@@ -60,6 +65,7 @@ describe('RouteSelector', () => {
         activeRouteId={null}
         onActivate={() => undefined}
         onPresent={() => undefined}
+        onExitPresenting={() => undefined}
       />,
     );
 
@@ -75,6 +81,7 @@ describe('RouteSelector', () => {
         activeRouteId={routes[1]?.id ?? null}
         onActivate={onActivate}
         onPresent={() => undefined}
+        onExitPresenting={() => undefined}
       />,
     );
 

@@ -10,6 +10,14 @@ interface CliMainDependencies {
 const describeError = (error: unknown): string =>
   error instanceof Error ? error.message : String(error);
 
+const tryReport = (io: CliIo, message: string): void => {
+  try {
+    io.stderr(message);
+  } catch {
+    // A broken stderr must not prevent database cleanup or change the exit code.
+  }
+};
+
 export const runCliMain = async (
   args: readonly string[],
   dependencies: CliMainDependencies,
@@ -18,7 +26,7 @@ export const runCliMain = async (
   try {
     exitCode = await runHyper(args, dependencies);
   } catch (error) {
-    dependencies.io.stderr(`Command failed: ${describeError(error)}\n`);
+    tryReport(dependencies.io, `Command failed: ${describeError(error)}\n`);
     exitCode = 1;
   }
 
@@ -26,7 +34,7 @@ export const runCliMain = async (
     await dependencies.close();
     return exitCode;
   } catch (error) {
-    dependencies.io.stderr(`Database shutdown failed: ${describeError(error)}\n`);
+    tryReport(dependencies.io, `Database shutdown failed: ${describeError(error)}\n`);
     return 1;
   }
 };

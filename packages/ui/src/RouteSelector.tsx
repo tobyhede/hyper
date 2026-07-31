@@ -9,16 +9,8 @@ export interface RouteSelectorProps {
   activeRouteId: string | null;
   onActivate: (routeId: string) => void;
   onPresent: () => void;
-  /**
-   * While presenting, the action button *is* the exit, so `onExitPresenting`
-   * has to be supplied alongside a true `presenting` or the button does nothing.
-   * Deliberately not modelled as a discriminated union: `presenting` is computed
-   * at runtime by the composing app, so literal `true`/`false` branches would
-   * reject a plain `boolean` and force the caller to duplicate the whole element.
-   * `RouteSelector.test.tsx` covers the pairing behaviourally instead.
-   */
   presenting?: boolean;
-  onExitPresenting?: () => void;
+  onExitPresenting: () => void;
 }
 
 export function RouteSelector({

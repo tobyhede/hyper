@@ -35,8 +35,8 @@ const createNewSpaceImport = (): ImportSpace => {
     const { id, ...document } = parsed.card;
     return { id, document };
   });
-  const { id, ...document } = minted.file;
-  return { id, document, cards };
+  const { id: _persistenceOwnedId, ...document } = minted.file;
+  return { document, cards };
 };
 
 /** Resolve the initial durable workspace from the database catalog. */
@@ -71,9 +71,5 @@ export const resolveDatabaseStartup = async (
     throw new Error(`New-space import returned ${imported.length} spaces`);
   }
 
-  const loaded = await repository.loadSpace(created.snapshot.id);
-  if (loaded === undefined) {
-    throw new Error(`The repository could not load new space ${created.snapshot.id}`);
-  }
-  return { kind: 'opened', space: loaded };
+  return openDatabaseSelection(repository, created.snapshot.id);
 };

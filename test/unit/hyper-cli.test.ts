@@ -501,4 +501,25 @@ describe('runCliMain', () => {
     expect(output.stdout).toEqual([]);
     expect(output.stderr).toEqual(['Command failed: stderr unavailable\n']);
   });
+
+  it('closes the database when command failure cannot be reported', async () => {
+    let closed = false;
+
+    const exitCode = await runCliMain(['--bogus'], {
+      repository: new MemorySpaceRepository([storedSpace]),
+      io: {
+        stdout: () => undefined,
+        stderr: () => {
+          throw new Error('closed pipe');
+        },
+      },
+      close: () => {
+        closed = true;
+        return Promise.resolve();
+      },
+    });
+
+    expect(exitCode).toBe(1);
+    expect(closed).toBe(true);
+  });
 });
