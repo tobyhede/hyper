@@ -43,7 +43,7 @@ const configFile = fileURLToPath(new URL('../vite.config.ts', import.meta.url));
 const appRoot = fileURLToPath(new URL('..', import.meta.url));
 
 export const test = base.extend<E2eFixtures>({
-  e2eServer: async ({}, use, testInfo) => {
+  e2eServer: async ({ browserName: _browserName }, run, testInfo) => {
     const server = await createServer({
       root: appRoot,
       configFile,
@@ -52,17 +52,17 @@ export const test = base.extend<E2eFixtures>({
     });
     try {
       await server.listen();
-      await use(server);
+      await run(server);
     } finally {
       await server.close();
     }
   },
-  page: async ({ browser, e2eServer }, use) => {
+  page: async ({ browser, e2eServer }, run) => {
     const baseURL = e2eServer.resolvedUrls?.local[0];
     if (baseURL === undefined) throw new Error('Vite did not publish a loopback URL');
     const context = await browser.newContext({ baseURL });
     try {
-      await use(await context.newPage());
+      await run(await context.newPage());
     } finally {
       await context.close();
     }

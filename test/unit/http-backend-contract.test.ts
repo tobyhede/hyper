@@ -10,6 +10,6 @@ spaceBackendContract('HttpSpaceBackend', async (initial) => {
   );
   return {
     backend: new HttpSpaceBackend(`${server.url}/api/spaces`),
-    close: server.close,
+    close: () => server.close(),
   };
 });

@@ -3,7 +3,11 @@ import type { LoadedSpace, SpaceSummary } from './backend';
 
 const canonicalRevision = /^(0|[1-9]\d*)$/;
 
-const exactRecord = (value: unknown, keys: readonly string[], label: string): Record<string, unknown> => {
+const exactRecord = (
+  value: unknown,
+  keys: readonly string[],
+  label: string,
+): Record<string, unknown> => {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
     throw new Error(`${label} must be an object`);
   }
@@ -41,7 +45,10 @@ export const decodeLoadedSpace = (value: unknown): LoadedSpace => {
   };
 };
 
-export const encodeCommitRequest = (snapshot: SpaceSnapshot, expectedRevision: bigint): unknown => ({
+export const encodeCommitRequest = (
+  snapshot: SpaceSnapshot,
+  expectedRevision: bigint,
+): unknown => ({
   snapshot,
   expectedRevision: expectedRevision.toString(),
 });

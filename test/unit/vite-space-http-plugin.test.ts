@@ -24,10 +24,13 @@ describe('spaceHttpPlugin', () => {
 
     const configureServer = plugin.configureServer;
     if (typeof configureServer !== 'function') throw new Error('Expected configureServer hook');
-    configureServer.call({} as never, {
-      ssrLoadModule,
-      middlewares: { use: (installed: Middleware) => (middleware = installed) },
-    } as never);
+    void configureServer.call(
+      {} as never,
+      {
+        ssrLoadModule,
+        middlewares: { use: (installed: Middleware) => (middleware = installed) },
+      } as never,
+    );
     if (middleware === undefined) throw new Error('Expected HTTP middleware');
 
     const next = vi.fn();
@@ -48,10 +51,13 @@ describe('spaceHttpPlugin', () => {
     });
     const configureServer = plugin.configureServer;
     if (typeof configureServer !== 'function') throw new Error('Expected configureServer hook');
-    configureServer.call({} as never, {
-      ssrLoadModule: () => Promise.resolve({ createHandler: () => unhandled }),
-      middlewares: { use: (installed: Middleware) => (middleware = installed) },
-    } as never);
+    void configureServer.call(
+      {} as never,
+      {
+        ssrLoadModule: () => Promise.resolve({ createHandler: () => unhandled }),
+        middlewares: { use: (installed: Middleware) => (middleware = installed) },
+      } as never,
+    );
     if (middleware === undefined) throw new Error('Expected HTTP middleware');
 
     const next = vi.fn();
@@ -65,11 +71,15 @@ describe('spaceHttpPlugin', () => {
     });
     let failedMiddleware: Middleware | undefined;
     const failedConfigureServer = failedPlugin.configureServer;
-    if (typeof failedConfigureServer !== 'function') throw new Error('Expected configureServer hook');
-    failedConfigureServer.call({} as never, {
-      ssrLoadModule: () => Promise.reject(failure),
-      middlewares: { use: (installed: Middleware) => (failedMiddleware = installed) },
-    } as never);
+    if (typeof failedConfigureServer !== 'function')
+      throw new Error('Expected configureServer hook');
+    void failedConfigureServer.call(
+      {} as never,
+      {
+        ssrLoadModule: () => Promise.reject(failure),
+        middlewares: { use: (installed: Middleware) => (failedMiddleware = installed) },
+      } as never,
+    );
     if (failedMiddleware === undefined) throw new Error('Expected failed HTTP middleware');
     const failedNext = vi.fn();
     failedMiddleware(request, response, failedNext);
@@ -89,9 +99,12 @@ describe('spaceHttpPlugin', () => {
     if (typeof configurePreviewServer !== 'function') {
       throw new Error('Expected configurePreviewServer hook');
     }
-    configurePreviewServer.call({} as never, {
-      middlewares: { use: (installed: Middleware) => (middleware = installed) },
-    } as never);
+    void configurePreviewServer.call(
+      {} as never,
+      {
+        middlewares: { use: (installed: Middleware) => (middleware = installed) },
+      } as never,
+    );
     if (middleware === undefined) throw new Error('Expected preview HTTP middleware');
 
     const next = vi.fn();

@@ -6,7 +6,8 @@ import { spaceHttpPlugin } from './vite-space-http-plugin';
 
 export default defineConfig(({ mode }) => {
   const repositoryFile = (path: string): string => fileURLToPath(new URL(path, import.meta.url));
-  const e2eCatalog = mode === 'e2e-fixture' ? 'fixture' : mode === 'e2e-empty' ? 'empty' : undefined;
+  const e2eCatalog =
+    mode === 'e2e-fixture' ? 'fixture' : mode === 'e2e-empty' ? 'empty' : undefined;
   const developmentModule =
     e2eCatalog === undefined
       ? repositoryFile('../../src/http/postgres-http-runtime.ts')

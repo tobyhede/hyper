@@ -37,9 +37,10 @@ export const spaceBackendContract = (
 
       const changed = structuredClone(contractLoaded.snapshot);
       changed.document.title = 'Changed';
-      await expect(
-        harness.backend.commitSpace(changed, 9_007_199_254_740_993n),
-      ).resolves.toEqual({ kind: 'committed', revision: 9_007_199_254_740_994n });
+      await expect(harness.backend.commitSpace(changed, 9_007_199_254_740_993n)).resolves.toEqual({
+        kind: 'committed',
+        revision: 9_007_199_254_740_994n,
+      });
       await expect(harness.backend.loadSpace(SPACE_ID)).resolves.toEqual({
         snapshot: changed,
         revision: 9_007_199_254_740_994n,

@@ -44,7 +44,9 @@ describe('HttpSpaceBackend failure classification', () => {
   for (const [status, code, fallback] of retryable) {
     for (const body of malformedBodies) {
       it(`maps ${status} to retryable ${code} before parsing ${JSON.stringify(body)}`, async () => {
-        await expect(backendFor(new Response(body, { status })).commitSpace(snapshot, 0n)).resolves.toEqual({
+        await expect(
+          backendFor(new Response(body, { status })).commitSpace(snapshot, 0n),
+        ).resolves.toEqual({
           kind: 'retryable-failure',
           code,
           message: fallback,
@@ -72,7 +74,10 @@ describe('HttpSpaceBackend failure classification', () => {
   it('rejects malformed success and conflict bodies as permanent protocol failures', async () => {
     for (const status of [200, 409]) {
       await expect(
-        backendFor(new Response(JSON.stringify({ revision: 4 }), { status })).commitSpace(snapshot, 0n),
+        backendFor(new Response(JSON.stringify({ revision: 4 }), { status })).commitSpace(
+          snapshot,
+          0n,
+        ),
       ).resolves.toMatchObject({ kind: 'permanent-failure', code: 'protocol' });
     }
   });
@@ -102,7 +107,7 @@ describe('HttpSpaceBackend failure classification', () => {
       timeoutMs: 5,
       fetch: (_input, init) =>
         new Promise<Response>((_resolve, reject) => {
-          init?.signal?.addEventListener('abort', () => reject(init.signal?.reason));
+          init?.signal?.addEventListener('abort', () => reject(new Error('aborted')));
         }),
     });
     await expect(backend.commitSpace(snapshot, 0n)).resolves.toEqual({

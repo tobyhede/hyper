@@ -124,10 +124,7 @@ test('a stale browser reports conflict and accepts the remote workspace without 
     await expect(acceptedCard).toBeVisible();
     await settled(stalePage);
     expect(await positionOf(acceptedCard)).toEqual(remotePosition);
-    await expect(stalePage.getByTestId('persistence-status')).toHaveAttribute(
-      'data-revision',
-      '1',
-    );
+    await expect(stalePage.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
     expect(staleCommits).toBe(1);
     await expect.poll(() => navigationIsProtected(stalePage)).toBe(false);
   } finally {

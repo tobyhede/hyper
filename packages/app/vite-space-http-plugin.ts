@@ -1,10 +1,7 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { Plugin } from 'vite';
 
-type SpaceHttpHandler = (
-  request: IncomingMessage,
-  response: ServerResponse,
-) => Promise<boolean>;
+type SpaceHttpHandler = (request: IncomingMessage, response: ServerResponse) => Promise<boolean>;
 
 interface SpaceHttpRuntime {
   createHandler(options?: unknown): Promise<SpaceHttpHandler> | SpaceHttpHandler;
@@ -24,12 +21,14 @@ const defaultPreviewLoader = async (modulePath: string): Promise<SpaceHttpRuntim
 type Next = (error?: unknown) => void;
 
 const installMiddleware = (
-  use: (middleware: (request: IncomingMessage, response: ServerResponse, next: Next) => void) => void,
+  register: (
+    middleware: (request: IncomingMessage, response: ServerResponse, next: Next) => void,
+  ) => void,
   runtime: Promise<SpaceHttpRuntime>,
   runtimeOptions: unknown,
 ): void => {
   const handler = runtime.then((loaded) => loaded.createHandler(runtimeOptions));
-  use((request, response, next) => {
+  register((request, response, next) => {
     void handler
       .then((handle) => handle(request, response))
       .then((handled) => {

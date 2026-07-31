@@ -1,4 +1,4 @@
-import { Agent, request as httpRequest } from 'node:http';
+import { Agent, request as httpRequest, type IncomingHttpHeaders } from 'node:http';
 import { describe, expect, it } from 'vitest';
 import { uuidSchema, type SpaceSnapshot } from '@project/core';
 import { encodeCommitRequest } from '../../packages/persistence/src/http-protocol';
@@ -18,7 +18,7 @@ const stored = { snapshot, revision: 0n, exportedRevision: null };
 
 interface RawResponse {
   status: number;
-  headers: import('node:http').IncomingHttpHeaders;
+  headers: IncomingHttpHeaders;
   body: string;
 }
 
@@ -32,21 +32,17 @@ const send = (
 ): Promise<RawResponse> =>
   new Promise((resolve, reject) => {
     const url = new URL(path, baseUrl);
-    const request = httpRequest(
-      url,
-      { method, headers, agent },
-      (response) => {
-        const chunks: Buffer[] = [];
-        response.on('data', (chunk) => chunks.push(Buffer.from(chunk)));
-        response.on('end', () =>
-          resolve({
-            status: response.statusCode ?? 0,
-            headers: response.headers,
-            body: Buffer.concat(chunks).toString('utf8'),
-          }),
-        );
-      },
-    );
+    const request = httpRequest(url, { method, headers, agent }, (response) => {
+      const chunks: Buffer[] = [];
+      response.on('data', (chunk: Uint8Array) => chunks.push(Buffer.from(chunk)));
+      response.on('end', () =>
+        resolve({
+          status: response.statusCode ?? 0,
+          headers: response.headers,
+          body: Buffer.concat(chunks).toString('utf8'),
+        }),
+      );
+    });
     request.on('error', reject);
     request.end(body);
   });
@@ -60,9 +56,20 @@ describe('Space HTTP request validation', () => {
     ['wrong media type', validBody, { 'content-type': 'text/plain' }],
     ['malformed JSON', '{', validHeaders],
     ['array envelope', '[]', validHeaders],
-    ['extra envelope key', JSON.stringify({ ...encodeCommitRequest(snapshot, 0n) as object, extra: true }), validHeaders],
+    [
+      'extra envelope key',
+      JSON.stringify({ ...(encodeCommitRequest(snapshot, 0n) as object), extra: true }),
+      validHeaders,
+    ],
     ['invalid revision', JSON.stringify({ snapshot, expectedRevision: '01' }), validHeaders],
-    ['schema-invalid snapshot', JSON.stringify({ snapshot: { ...snapshot, document: { ...snapshot.document, title: '' } }, expectedRevision: '0' }), validHeaders],
+    [
+      'schema-invalid snapshot',
+      JSON.stringify({
+        snapshot: { ...snapshot, document: { ...snapshot.document, title: '' } },
+        expectedRevision: '0',
+      }),
+      validHeaders,
+    ],
   ];
 
   for (const [name, body, headers] of invalidBodies) {
@@ -83,8 +90,12 @@ describe('Space HTTP request validation', () => {
     const repository = new E2eMemorySpaceRepository([stored]);
     const server = await startHttpServer(createSpaceHttpHandler(repository));
     try {
-      expect((await send(server.url, '/api/spaces/not-a-uuid', validBody, validHeaders)).status).toBe(400);
-      expect((await send(server.url, `/api/spaces/${OTHER_ID}`, validBody, validHeaders)).status).toBe(400);
+      expect(
+        (await send(server.url, '/api/spaces/not-a-uuid', validBody, validHeaders)).status,
+      ).toBe(400);
+      expect(
+        (await send(server.url, `/api/spaces/${OTHER_ID}`, validBody, validHeaders)).status,
+      ).toBe(400);
       expect(repository.commitAttempts).toBe(0);
     } finally {
       await server.close();
@@ -122,8 +133,16 @@ describe('Space HTTP request validation', () => {
         agent,
       );
       expect(rejected.status).toBe(400);
-      expect(JSON.parse(rejected.body)).toEqual({ message: `Request body exceeds ${MAX_COMMIT_BODY_BYTES} bytes` });
-      const accepted = await send(server.url, `/api/spaces/${SPACE_ID}`, validBody, validHeaders, agent);
+      expect(JSON.parse(rejected.body)).toEqual({
+        message: `Request body exceeds ${MAX_COMMIT_BODY_BYTES} bytes`,
+      });
+      const accepted = await send(
+        server.url,
+        `/api/spaces/${SPACE_ID}`,
+        validBody,
+        validHeaders,
+        agent,
+      );
       expect(accepted.status).toBe(200);
       expect(repository.commitAttempts).toBe(1);
     } finally {
@@ -137,12 +156,24 @@ describe('Space HTTP request validation', () => {
     const server = await startHttpServer(createSpaceHttpHandler(repository));
     const agent = new Agent({ keepAlive: true, maxSockets: 1 });
     try {
-      const rejected = await send(server.url, `/api/spaces/${SPACE_ID}`, validBody, {
-        'content-type': 'text/plain',
-      }, agent);
+      const rejected = await send(
+        server.url,
+        `/api/spaces/${SPACE_ID}`,
+        validBody,
+        {
+          'content-type': 'text/plain',
+        },
+        agent,
+      );
       expect(rejected.status).toBe(400);
       expect(rejected.headers.connection).toBe('close');
-      const accepted = await send(server.url, `/api/spaces/${SPACE_ID}`, validBody, validHeaders, agent);
+      const accepted = await send(
+        server.url,
+        `/api/spaces/${SPACE_ID}`,
+        validBody,
+        validHeaders,
+        agent,
+      );
       expect(accepted.status).toBe(200);
       expect(repository.commitAttempts).toBe(1);
     } finally {
@@ -171,7 +202,9 @@ describe('Space HTTP request validation', () => {
         return Promise.reject(new Error('database unavailable'));
       }
     }
-    const server = await startHttpServer(createSpaceHttpHandler(new UnavailableRepository([stored])));
+    const server = await startHttpServer(
+      createSpaceHttpHandler(new UnavailableRepository([stored])),
+    );
     try {
       const response = await send(server.url, `/api/spaces/${SPACE_ID}`, validBody, validHeaders);
       expect(response.status).toBe(503);

@@ -29,15 +29,14 @@ const readBoundedJson = async (
   request: IncomingMessage,
 ): Promise<{ ok: true; value: unknown } | { ok: false }> => {
   const chunks: Buffer[] = [];
-  let size = 0;
-  let oversized = false;
+  const state: { size: number; oversized: boolean } = { size: 0, oversized: false };
   await new Promise<void>((resolve, reject) => {
     request.on('data', (chunk: Buffer | string) => {
-      if (oversized) return;
+      if (state.oversized) return;
       const buffer = Buffer.from(chunk);
-      size += buffer.byteLength;
-      if (size > MAX_COMMIT_BODY_BYTES) {
-        oversized = true;
+      state.size += buffer.byteLength;
+      if (state.size > MAX_COMMIT_BODY_BYTES) {
+        state.oversized = true;
         chunks.length = 0;
         request.resume();
       } else {
@@ -48,7 +47,7 @@ const readBoundedJson = async (
     request.on('error', reject);
     request.on('aborted', () => reject(new Error('Request aborted')));
   });
-  if (oversized) return { ok: false };
+  if (state.oversized) return { ok: false };
   return { ok: true, value: JSON.parse(Buffer.concat(chunks).toString('utf8')) as unknown };
 };
 
@@ -65,8 +64,8 @@ const declaredContentLength = (
   const values = request.headersDistinct['content-length'];
   if (values === undefined) return { ok: true };
   if (values.length !== 1) return { ok: false };
-  const value = values[0];
-  if (value === undefined || !/^(0|[1-9]\d*)$/.test(value)) return { ok: false };
+  const value = values[0] ?? '';
+  if (!/^(0|[1-9]\d*)$/.test(value)) return { ok: false };
   const parsed = BigInt(value);
   if (parsed > BigInt(MAX_COMMIT_BODY_BYTES)) return { ok: false };
   return { ok: true, value: Number(parsed) };
@@ -83,7 +82,8 @@ const unavailable = (response: ServerResponse): void => {
   json(response, 503, { message: 'Persistence service unavailable' });
 };
 
-export const createSpaceHttpHandler = (repository: SpaceRepository): SpaceHttpHandler =>
+export const createSpaceHttpHandler =
+  (repository: SpaceRepository): SpaceHttpHandler =>
   async (request, response) => {
     const url = new URL(request.url ?? '/', 'http://localhost');
     if (url.pathname === '/api/spaces') {
@@ -109,7 +109,8 @@ export const createSpaceHttpHandler = (repository: SpaceRepository): SpaceHttpHa
     if (request.method === 'GET') {
       try {
         const loaded = await repository.loadSpace(parsedId.data);
-        if (loaded === undefined) json(response, 404, { message: `Space ${parsedId.data} does not exist` });
+        if (loaded === undefined)
+          json(response, 404, { message: `Space ${parsedId.data} does not exist` });
         else json(response, 200, encodeLoadedSpace(loaded));
       } catch {
         unavailable(response);
@@ -126,7 +127,10 @@ export const createSpaceHttpHandler = (repository: SpaceRepository): SpaceHttpHa
     }
     const contentLength = declaredContentLength(request);
     if (!contentLength.ok) {
-      rejectBeforeBody(response, `Content-Length must be canonical and at most ${MAX_COMMIT_BODY_BYTES}`);
+      rejectBeforeBody(
+        response,
+        `Content-Length must be canonical and at most ${MAX_COMMIT_BODY_BYTES}`,
+      );
       return true;
     }
     let commit: ReturnType<typeof decodeCommitRequest>;
@@ -147,7 +151,8 @@ export const createSpaceHttpHandler = (repository: SpaceRepository): SpaceHttpHa
     }
     try {
       const result = await repository.commitSpace(commit.snapshot, commit.expectedRevision);
-      if (result.kind === 'committed') json(response, 200, { revision: result.revision.toString() });
+      if (result.kind === 'committed')
+        json(response, 200, { revision: result.revision.toString() });
       else if (result.kind === 'conflict') json(response, 409, encodeLoadedSpace(result.current));
       else json(response, result.code === 'not-found' ? 404 : 422, { message: result.message });
     } catch {

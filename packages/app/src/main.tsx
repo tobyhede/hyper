@@ -10,4 +10,8 @@ if (!rootElement) throw new Error('Root element #root not found');
 
 const root = createRoot(rootElement);
 const workspaceStartup = createWorkspaceStartup();
-void startApplication(root, workspaceStartup.resolve, workspaceStartup.openSelected);
+void startApplication(
+  root,
+  () => workspaceStartup.resolve(),
+  (id) => workspaceStartup.openSelected(id),
+);

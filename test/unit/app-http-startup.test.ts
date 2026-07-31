@@ -1,10 +1,10 @@
 import { uuidSchema, type SpaceSnapshot } from '@project/core';
 import { HttpSpaceBackend } from '@project/persistence';
 import { afterEach, describe, expect, it } from 'vitest';
-import { createSpaceHttpHandler } from '../../../src/http/space-http-handler';
-import { E2eMemorySpaceRepository } from '../../../test/support/e2e-memory-space-repository';
-import { startHttpServer, type TestHttpServer } from '../../../test/support/http-server';
-import { createWorkspaceStartup } from '../src/space';
+import { createSpaceHttpHandler } from '../../src/http/space-http-handler';
+import { E2eMemorySpaceRepository } from '../support/e2e-memory-space-repository';
+import { startHttpServer, type TestHttpServer } from '../support/http-server';
+import { createWorkspaceStartup } from '../../packages/app/src/space';
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const OTHER_SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
@@ -14,9 +14,7 @@ const OTHER_CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
 const snapshot = (id = SPACE_ID, cardId = CARD_ID, title = 'Stored space'): SpaceSnapshot => ({
   id,
   document: { version: 2, title, routes: [] },
-  cards: [
-    { id: cardId, document: { title: 'Start here', kind: 'markdown', body: 'Stored body' } },
-  ],
+  cards: [{ id: cardId, document: { title: 'Start here', kind: 'markdown', body: 'Stored body' } }],
 });
 
 const servers: TestHttpServer[] = [];

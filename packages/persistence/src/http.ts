@@ -34,15 +34,13 @@ export class HttpSpaceBackend implements SpaceBackend {
 
   async #timedFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
     const controller = new AbortController();
-    let timedOut = false;
     const timer = setTimeout(() => {
-      timedOut = true;
       controller.abort();
     }, this.#timeoutMs);
     try {
       return await this.#fetch(input, { ...init, signal: controller.signal });
     } catch (error) {
-      if (timedOut) throw new HttpTimeoutError();
+      if (controller.signal.aborted) throw new HttpTimeoutError();
       throw error;
     } finally {
       clearTimeout(timer);
@@ -84,7 +82,10 @@ export class HttpSpaceBackend implements SpaceBackend {
     if (retryable !== undefined) return retryable;
     try {
       if (response.status === 200) {
-        return { kind: 'committed', revision: decodeCommittedRevision(await responseJson(response)) };
+        return {
+          kind: 'committed',
+          revision: decodeCommittedRevision(await responseJson(response)),
+        };
       }
       if (response.status === 409) {
         return { kind: 'conflict', current: decodeLoadedSpace(await responseJson(response)) };

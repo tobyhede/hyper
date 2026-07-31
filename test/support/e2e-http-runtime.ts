@@ -9,9 +9,7 @@ export interface E2eHttpRuntimeOptions {
 }
 
 /** Create one isolated in-process catalog for one browser test. */
-export const createHandler = async (
-  options: E2eHttpRuntimeOptions,
-): Promise<SpaceHttpHandler> => {
+export const createHandler = async (options: E2eHttpRuntimeOptions): Promise<SpaceHttpHandler> => {
   const repository = new E2eMemorySpaceRepository();
   if (options.catalog === 'fixture') await importFixture(repository);
   if (options.startup === true) await resolveDatabaseStartup(repository);

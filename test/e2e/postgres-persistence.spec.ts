@@ -2,12 +2,12 @@ import { fileURLToPath } from 'node:url';
 import { expect, test, type Browser, type BrowserContext, type Page } from '@playwright/test';
 import { newUuid, type UUID } from '@project/core';
 import { createServer, type ViteDevServer } from 'vite';
-import { PostgresSpaceRepository } from '../../../src/persistence/postgres-space-repository';
-import { db } from '../../../src/prisma/db';
-import { dragBy, nodeByTitle, positionOf, settled } from './graph';
+import { PostgresSpaceRepository } from '../../src/persistence/postgres-space-repository';
+import { db } from '../../src/prisma/db';
+import { dragBy, nodeByTitle, positionOf, settled } from '../../packages/app/e2e/graph';
 
-const appRoot = fileURLToPath(new URL('..', import.meta.url));
-const configFile = fileURLToPath(new URL('../vite.config.ts', import.meta.url));
+const appRoot = fileURLToPath(new URL('../../packages/app', import.meta.url));
+const configFile = fileURLToPath(new URL('../../packages/app/vite.config.ts', import.meta.url));
 
 const startHost = async (): Promise<{ server: ViteDevServer; baseURL: string }> => {
   const server = await createServer({
