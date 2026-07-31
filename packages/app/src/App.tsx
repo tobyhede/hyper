@@ -14,15 +14,12 @@ import {
   filterHandlesByRoutes,
   getCard,
   loadSpaceSnapshot,
-  positionedStrategy,
   routeCardIds,
   resolveContentCard,
-  type LayoutGraph,
-  type LayoutPoint,
-  type LayoutStrategy,
 } from '@project/graph';
 import type { OpenedSpace } from './space';
 import { completePositionedConnection, createPlacementEditor } from './edit-completion';
+import { usePlacementRendering } from './placement-rendering';
 import { routeColorMap } from './colors';
 import { CARD_HEIGHT, CARD_SIZE, cardSizeVars } from './card';
 import { createSpaceStore } from './store';
@@ -39,68 +36,6 @@ import { PresentingChrome } from './components/PresentingChrome';
 
 export interface AppActions {
   acceptRemote: () => void;
-}
-
-export function strategyForRendering(
-  automaticStrategy: LayoutStrategy,
-  authoredPositions: ReadonlyMap<string, LayoutPoint> | null,
-): LayoutStrategy {
-  if (authoredPositions === null) return automaticStrategy;
-  const positions = new Map<CardId, LayoutPoint>();
-  for (const [cardId, point] of authoredPositions) {
-    positions.set(uuidSchema.parse(cardId), point);
-  }
-  return positionedStrategy(positions);
-}
-
-export function useLayoutRendering(
-  graph: LayoutGraph,
-  renderingStrategy: LayoutStrategy,
-): { laidOut: LayoutGraph | null; adopt: (result: LayoutGraph) => void } {
-  const [layoutResult, setLayoutResult] = useState<
-    | {
-        graph: LayoutGraph;
-        source: 'computed';
-        strategy: LayoutStrategy;
-        result: LayoutGraph;
-      }
-    | {
-        graph: LayoutGraph;
-        source: 'adopted';
-        result: LayoutGraph;
-      }
-    | null
-  >(null);
-  const adopted = useRef<{ graph: LayoutGraph; result: LayoutGraph } | null>(null);
-
-  useEffect(() => {
-    if (adopted.current?.graph === graph) return;
-    adopted.current = null;
-    let cancelled = false;
-    void renderingStrategy(graph).then((result) => {
-      if (!cancelled) {
-        setLayoutResult({ graph, source: 'computed', strategy: renderingStrategy, result });
-      }
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [graph, renderingStrategy]);
-
-  const adopt = useCallback(
-    (result: LayoutGraph) => {
-      adopted.current = { graph, result };
-      setLayoutResult({ graph, source: 'adopted', result });
-    },
-    [graph],
-  );
-
-  const matchesCurrentRendering =
-    layoutResult?.source === 'adopted' || layoutResult?.strategy === renderingStrategy;
-  return {
-    laidOut: layoutResult?.graph === graph && matchesCurrentRendering ? layoutResult.result : null,
-    adopt,
-  };
 }
 
 export const createApp = ({ space, spaceSession }: OpenedSpace, { acceptRemote }: AppActions) => {
@@ -239,12 +174,8 @@ export const createApp = ({ space, spaceSession }: OpenedSpace, { acceptRemote }
     );
     const authoredPositions = useEditorStore((s) => s.positions);
     const selectedCardId = useEditorStore((s) => s.selectedCardId);
-    const renderingStrategy = useMemo(
-      () => strategyForRendering(view.strategy, authoredPositions),
-      [view.strategy, authoredPositions],
-    );
-
-    const { laidOut } = useLayoutRendering(graph, renderingStrategy);
+    const placement = usePlacementRendering(graph, view.strategy, authoredPositions);
+    const laidOut = placement.kind === 'ready' ? placement.graph : null;
 
     // Selecting a route emphasises it; it never hides the rest of the space.
     const emphasis: RouteEmphasis = activeRouteId ? 'subtle' : 'equal';
@@ -291,6 +222,7 @@ export const createApp = ({ space, spaceSession }: OpenedSpace, { acceptRemote }
     const moved = useEditorStore((s) => s.moved);
     const changeNodes = useEditorStore((s) => s.changeNodes);
     const nodes = liveNodes ?? projectedNodes;
+    const placementReady = laidOut !== null || liveNodes !== null;
     // There is an arrangement to drag once the layout has resolved and the store
     // has taken it. Not a permission — every view is editable (ADR 0025) — and not
     // a state the space can go back to: nothing sets `nodes` back to null, so this
@@ -476,24 +408,37 @@ export const createApp = ({ space, spaceSession }: OpenedSpace, { acceptRemote }
     return (
       <AppShell title={space.title} toolbar={toolbar}>
         <div className="graph-area" style={cardSizeVars}>
-          <ReactFlowProvider>
-            <GraphView
-              nodes={nodes}
-              edges={edges}
-              layoutReady={laidOut !== null}
-              activeCardId={activeCardId}
-              presenting={presenting}
-              editable={editable}
-              onNodesChange={changeNodes}
-              onConnect={connectCards}
-              onConnectEnd={finishConnection}
-              onOpenCard={(cardId) => openCard(uuidSchema.parse(cardId))}
-              routes={visibleRoutes}
-              colorByRouteId={colors}
-              activeRouteId={activeRouteId}
-              activeRouteCardIds={activeRouteCardIds}
-            />
-          </ReactFlowProvider>
+          {placement.kind === 'failed' ? (
+            <div className="placement-status" role="alert" data-testid="placement-failure">
+              <div className="placement-status__panel">
+                <h2>Unable to arrange this view</h2>
+                <pre>{placement.error.message}</pre>
+              </div>
+            </div>
+          ) : placementReady ? (
+            <ReactFlowProvider>
+              <GraphView
+                nodes={nodes}
+                edges={edges}
+                layoutReady={placementReady}
+                activeCardId={activeCardId}
+                presenting={presenting}
+                editable={editable}
+                onNodesChange={changeNodes}
+                onConnect={connectCards}
+                onConnectEnd={finishConnection}
+                onOpenCard={(cardId) => openCard(uuidSchema.parse(cardId))}
+                routes={visibleRoutes}
+                colorByRouteId={colors}
+                activeRouteId={activeRouteId}
+                activeRouteCardIds={activeRouteCardIds}
+              />
+            </ReactFlowProvider>
+          ) : (
+            <div className="placement-status" role="status" data-testid="placement-pending">
+              Arranging…
+            </div>
+          )}
 
           {presenting && (
             <PresentingChrome

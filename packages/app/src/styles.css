@@ -172,6 +172,37 @@ body {
   inset: 0;
 }
 
+.placement-status {
+  display: grid;
+  height: 100%;
+  place-items: center;
+  padding: 2rem;
+  color: var(--muted);
+}
+
+.placement-status__panel {
+  width: min(36rem, 100%);
+  padding: 1.5rem;
+  color: var(--text);
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.placement-status__panel h2 {
+  margin: 0 0 1rem;
+  font-size: 1.1rem;
+}
+
+.placement-status__panel pre {
+  margin: 0;
+  overflow: auto;
+  color: var(--muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.8rem;
+  white-space: pre-wrap;
+}
+
 /* ---- Card node ---- */
 .rf-card-node {
   border-radius: 10px;
