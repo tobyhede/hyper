@@ -1,5 +1,11 @@
-import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vite';
+
+// Relative to this module, not to the working directory. `resolve()` would
+// anchor on cwd, which is the app package only because the one script that
+// loads this config is filtered to it — from the repo root the same strings
+// climb clear out of the checkout.
+const here = (path: string): string => fileURLToPath(new URL(path, import.meta.url));
 
 export default defineConfig({
   // The SSR entry lives above the app workspace, where pnpm deliberately has no
@@ -8,13 +14,13 @@ export default defineConfig({
   // config still resolves packages through the app's declared dependencies.
   resolve: {
     alias: {
-      '@project/core': resolve('../core/src/index.ts'),
-      '@project/graph': resolve('../graph/src/index.ts'),
-      '@project/persistence': resolve('../persistence/src/index.ts'),
+      '@project/core': here('../core/src/index.ts'),
+      '@project/graph': here('../graph/src/index.ts'),
+      '@project/persistence': here('../persistence/src/index.ts'),
     },
   },
   build: {
-    ssr: resolve('../../src/http/postgres-http-runtime.ts'),
+    ssr: here('../../src/http/postgres-http-runtime.ts'),
     outDir: 'dist-http',
     emptyOutDir: true,
     rollupOptions: {
