@@ -83,7 +83,7 @@ export class HttpSpaceBackend implements SpaceBackend {
           body: JSON.stringify(encodeCommitRequest(snapshot, expectedRevision)),
         },
         async (response, signal): Promise<CommitResult> => {
-          const retryable = await retryableForStatus(response);
+          const retryable = await retryableForStatus(response, signal);
           if (retryable !== undefined) return retryable;
           try {
             if (response.status === 200) {
@@ -150,7 +150,10 @@ const retryAfterMilliseconds = (response: Response): number | undefined => {
   return Number(seconds) * 1000;
 };
 
-const retryableForStatus = async (response: Response): Promise<CommitResult | undefined> => {
+const retryableForStatus = async (
+  response: Response,
+  signal: AbortSignal,
+): Promise<CommitResult | undefined> => {
   let code: 'timeout' | 'rate-limited' | 'unavailable';
   let fallback: string;
   // RFC 9110 defines Retry-After for 429 and 503; a 408 does not carry one.
@@ -169,10 +172,12 @@ const retryableForStatus = async (response: Response): Promise<CommitResult | un
     return undefined;
   }
   const retryAfterMs = honoursRetryAfter ? retryAfterMilliseconds(response) : undefined;
+  const message = await optionalErrorMessage(response);
+  if (signal.aborted) throw new HttpTimeoutError();
   return {
     kind: 'retryable-failure',
     code,
-    message: (await optionalErrorMessage(response)) ?? fallback,
+    message: message ?? fallback,
     ...(retryAfterMs === undefined ? {} : { retryAfterMs }),
   };
 };

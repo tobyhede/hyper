@@ -1,3 +1,4 @@
+import { createServer } from 'node:http';
 import { describe, expect, it } from 'vitest';
 import { uuidSchema, type SpaceSnapshot } from '@project/core';
 import { HttpSpaceBackend } from '../src/index';
@@ -12,6 +13,33 @@ const snapshot: SpaceSnapshot = {
 
 const backendFor = (response: Response): HttpSpaceBackend =>
   new HttpSpaceBackend('/api/spaces', { fetch: () => Promise.resolve(response) });
+
+const startStalledResponseServer = async (status: number, retryAfter: string) => {
+  let reportHeadersSent: (() => void) | undefined;
+  const headersSent = new Promise<void>((resolve) => {
+    reportHeadersSent = resolve;
+  });
+  const server = createServer((_request, response) => {
+    response.writeHead(status, {
+      'content-type': 'application/json',
+      'Retry-After': retryAfter,
+    });
+    response.write('{"message":"Still working"');
+    reportHeadersSent?.();
+  });
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const address = server.address();
+  if (address === null || typeof address === 'string') throw new Error('Expected TCP address');
+  return {
+    url: `http://127.0.0.1:${address.port}`,
+    headersSent,
+    close: () =>
+      new Promise<void>((resolve, reject) => {
+        server.close((error) => (error ? reject(error) : resolve()));
+        server.closeAllConnections();
+      }),
+  };
+};
 
 describe('HttpSpaceBackend failure classification', () => {
   const permanent = [
@@ -201,5 +229,37 @@ describe('HttpSpaceBackend failure classification', () => {
       code: 'timeout',
       message: 'Request timed out',
     });
+  }, 1000);
+
+  it('reports a rate-limited response whose body stalls as a timeout without Retry-After', async () => {
+    const server = await startStalledResponseServer(429, '60');
+    try {
+      const backend = new HttpSpaceBackend(`${server.url}/api/spaces`, { timeoutMs: 100 });
+      const result = backend.commitSpace(snapshot, 0n);
+      await server.headersSent;
+      await expect(result).resolves.toEqual({
+        kind: 'retryable-failure',
+        code: 'timeout',
+        message: 'Request timed out',
+      });
+    } finally {
+      await server.close();
+    }
+  }, 1000);
+
+  it('reports an unavailable response whose body stalls as a timeout without Retry-After', async () => {
+    const server = await startStalledResponseServer(503, '30');
+    try {
+      const backend = new HttpSpaceBackend(`${server.url}/api/spaces`, { timeoutMs: 100 });
+      const result = backend.commitSpace(snapshot, 0n);
+      await server.headersSent;
+      await expect(result).resolves.toEqual({
+        kind: 'retryable-failure',
+        code: 'timeout',
+        message: 'Request timed out',
+      });
+    } finally {
+      await server.close();
+    }
   }, 1000);
 });
