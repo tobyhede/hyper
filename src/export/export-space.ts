@@ -123,6 +123,7 @@ const replaceDestination = async (replacement: string, destination: string): Pro
         throw new AggregateError(
           [replacementError, restoreError],
           `Export replacement failed; the previous destination remains at ${backup}`,
+          { cause: restoreError },
         );
       }
       throw replacementError;
