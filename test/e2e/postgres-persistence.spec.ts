@@ -14,7 +14,10 @@ const startHost = async (): Promise<{ server: ViteDevServer; baseURL: string }> 
     root: appRoot,
     configFile,
     mode: 'postgres-e2e',
-    server: { host: '127.0.0.1', port: 5276, strictPort: true },
+    // Clear of the default suite's `5276 + workerIndex` range: this project is
+    // opt-in and may be running beside a normal `pnpm e2e`, and `strictPort`
+    // turns any overlap into a failure that blames the wrong thing.
+    server: { host: '127.0.0.1', port: 5376, strictPort: true },
   });
   try {
     await server.listen();
@@ -54,6 +57,7 @@ test('a PostgreSQL-backed edit survives a fresh Vite host', async ({ browser }) 
   let secondHost: ViteDevServer | undefined;
   let firstContext: BrowserContext | undefined;
   let secondContext: BrowserContext | undefined;
+  let spaceRemains: boolean | undefined;
 
   try {
     const imported = await repository.importSpaces([
@@ -108,9 +112,17 @@ test('a PostgreSQL-backed edit survives a fresh Vite host', async ({ browser }) 
     await firstContext?.close();
     await secondHost?.close();
     await firstHost?.close();
-    await db.orm.public.Card.where({ spaceId }).delete();
-    await db.orm.public.Space.where({ id: spaceId }).delete();
-    await expect(repository.loadSpace(spaceId)).resolves.toBeUndefined();
-    await db.close();
+    // Cleanup records what it observed rather than asserting it. An assertion
+    // here throws over whatever failure sent us into this block, and would also
+    // strand the connection below unclosed.
+    try {
+      await db.orm.public.Card.where({ spaceId }).delete();
+      await db.orm.public.Space.where({ id: spaceId }).delete();
+      spaceRemains = (await repository.loadSpace(spaceId)) !== undefined;
+    } finally {
+      await db.close();
+    }
   }
+
+  expect(spaceRemains).toBe(false);
 });

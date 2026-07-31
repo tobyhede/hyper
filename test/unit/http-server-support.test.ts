@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { startHttpServer } from '../support/http-server';
+import { startHttpServer, type TestHttpServer } from '../support/http-server';
 
 /**
  * The e2e and durability suites drive their handler through this helper. A
@@ -13,15 +13,18 @@ describe('test HTTP server', () => {
     const logged = vi.spyOn(console, 'error').mockImplementation((...args: unknown[]) => {
       surfaced.push(args);
     });
-    const server = await startHttpServer(() => Promise.reject(new Error('handler exploded')));
+    // Startup is inside the guard: a rejection there must still restore the
+    // console spy, or every later test in the run loses its own error output.
+    let server: TestHttpServer | undefined;
     try {
+      server = await startHttpServer(() => Promise.reject(new Error('handler exploded')));
       const response = await fetch(`${server.url}/api/spaces`);
       expect(response.status).toBe(500);
       expect(surfaced).toHaveLength(1);
       expect(String(surfaced[0])).toContain('handler exploded');
     } finally {
       logged.mockRestore();
-      await server.close();
+      await server?.close();
     }
   }, 5000);
 
@@ -33,4 +36,23 @@ describe('test HTTP server', () => {
       await server.close();
     }
   }, 5000);
+
+  /**
+   * `fetch` keeps its socket alive, and a bare `server.close()` only stops new
+   * connections — it waits for the idle ones to expire on the client's
+   * keep-alive timeout. Every suite closes a server per test, so that wait is
+   * paid over and over and reads as unexplained slowness rather than a bug.
+   */
+  it('closes while a keep-alive connection from a completed request is still open', async () => {
+    const server = await startHttpServer((_request, response) => {
+      response.statusCode = 204;
+      response.end();
+      return Promise.resolve(true);
+    });
+    expect((await fetch(`${server.url}/api/spaces`)).status).toBe(204);
+
+    const startedAt = performance.now();
+    await server.close();
+    expect(performance.now() - startedAt).toBeLessThan(1000);
+  }, 10000);
 });

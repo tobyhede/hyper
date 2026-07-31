@@ -76,6 +76,9 @@ test('a completed edit and workspace identity survive reload', async ({ page }) 
   const first = nodeByTitle(page, 'Start here');
   await expect(first).toBeVisible();
   const firstId = await first.getAttribute('data-id');
+  // Without this, two missing attributes compare equal after the reload and the
+  // identity assertion below passes while proving nothing.
+  expect(firstId).not.toBeNull();
   await settled(page);
   await dragBy(page, first, 0, 220);
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');

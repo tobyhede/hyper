@@ -28,31 +28,10 @@ const loaded: LoadedSpace = {
   exportedRevision: 2n,
 };
 
+// Listing, loading, committing and stale-conflict reporting are the shared
+// backend contract above, which exercises them over revisions past
+// Number.MAX_SAFE_INTEGER. Only what is specific to this adapter lives here.
 describe('MemorySpaceBackend', () => {
-  it('lists, loads, and revision-checks authoritative complete snapshots', async () => {
-    const backend = new MemorySpaceBackend([loaded]);
-
-    await expect(backend.listSpaces()).resolves.toEqual([{ id: SPACE_ID, title: 'One' }]);
-    await expect(backend.loadSpace(SPACE_ID)).resolves.toEqual(loaded);
-
-    const changed = structuredClone(loaded.snapshot);
-    changed.document.title = 'Changed';
-    await expect(backend.commitSpace(changed, 3n)).resolves.toEqual({
-      kind: 'committed',
-      revision: 4n,
-    });
-    await expect(backend.loadSpace(SPACE_ID)).resolves.toEqual({
-      snapshot: changed,
-      revision: 4n,
-      exportedRevision: 2n,
-    });
-
-    await expect(backend.commitSpace(loaded.snapshot, 3n)).resolves.toEqual({
-      kind: 'conflict',
-      current: { snapshot: changed, revision: 4n, exportedRevision: 2n },
-    });
-  });
-
   it('reports invalid complete snapshots and missing spaces as permanent failures', async () => {
     const backend = new MemorySpaceBackend([loaded]);
     const invalid = structuredClone(loaded.snapshot);
@@ -112,6 +91,9 @@ describe('MemorySpaceBackend', () => {
           },
         ],
       },
+      // One rule per snapshot: a layout placing a card that does not exist, and
+      // separately a defaultView naming a layout that does not exist. Breaking
+      // both at once would pass even if only one of the two were enforced.
       {
         ...loaded.snapshot,
         document: {
@@ -119,9 +101,24 @@ describe('MemorySpaceBackend', () => {
           layouts: [
             {
               id: LAYOUT_ID,
-              title: 'Broken',
+              title: 'Broken positions',
               kind: 'positioned' as const,
               positions: { [MISSING_ID]: { x: 0, y: 0 } },
+            },
+          ],
+          defaultView: LAYOUT_ID,
+        },
+      },
+      {
+        ...loaded.snapshot,
+        document: {
+          ...loaded.snapshot.document,
+          layouts: [
+            {
+              id: LAYOUT_ID,
+              title: 'Placed',
+              kind: 'positioned' as const,
+              positions: { [CARD_ID]: { x: 0, y: 0 } },
             },
           ],
           defaultView: MISSING_ID,

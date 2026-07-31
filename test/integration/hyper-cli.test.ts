@@ -14,6 +14,7 @@ const UNRELATED_SPACE_ID = uuidSchema.parse('d3333333-3333-4333-8333-33333333333
 const EXACT_IMPORTED_SPACE_ID = uuidSchema.parse('d4444444-4444-4444-8444-444444444444');
 const FIRST_BATCH_SPACE_ID = uuidSchema.parse('d5555555-5555-4555-8555-555555555555');
 const SECOND_BATCH_SPACE_ID = uuidSchema.parse('d6666666-6666-4666-8666-666666666666');
+const EXPORTED_CARD_ID = uuidSchema.parse('d7777777-7777-4777-8777-777777777777');
 
 interface CommandResult {
   status: number | null;
@@ -164,7 +165,7 @@ describe('hyper CLI', () => {
       document: { version: 2 as const, title: 'CLI exported talk', routes: [] },
       cards: [
         {
-          id: MALFORMED_SPACE_ID,
+          id: EXPORTED_CARD_ID,
           document: {
             title: 'Exported card',
             kind: 'markdown' as const,
@@ -192,8 +193,8 @@ describe('hyper CLI', () => {
       cards: snapshot.cards,
     });
     await expect(
-      readFile(join(destination, 'cards', `${MALFORMED_SPACE_ID}.md`), 'utf8'),
-    ).resolves.toContain(`id: ${MALFORMED_SPACE_ID}`);
+      readFile(join(destination, 'cards', `${EXPORTED_CARD_ID}.md`), 'utf8'),
+    ).resolves.toContain(`id: ${EXPORTED_CARD_ID}`);
     await expect(repository.loadSpace(IMPORTED_SPACE_ID)).resolves.toEqual({
       snapshot,
       revision: 0n,
