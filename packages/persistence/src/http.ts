@@ -28,7 +28,7 @@ export class HttpSpaceBackend implements SpaceBackend {
 
   constructor(baseUrl = '/api/spaces', options: HttpSpaceBackendOptions = {}) {
     this.#baseUrl = baseUrl.replace(/\/$/, '');
-    this.#fetch = options.fetch ?? globalThis.fetch;
+    this.#fetch = options.fetch ?? globalThis.fetch.bind(globalThis);
     this.#timeoutMs = options.timeoutMs ?? 10_000;
   }
 

@@ -4,11 +4,8 @@ import { dragBy, nodeByTitle, positionOf, settled } from './graph';
 /**
  * Opening the app with nothing to open gives a new space: one card (ADR 0018).
  *
- * This project drives a second dev server started with no `SPACE_DIR`, which is
- * the whole switch — "which space opens" turns on whether a path was supplied,
- * and the rest of the suite supplies one pointing at the fixture. That
- * separation is deliberate: it is what stops this ticket quietly retargeting
- * every other test.
+ * This project drives its own empty HTTP repository. Server-side database
+ * startup creates the one-card Space once, and reloads reopen that durable UUID.
  */
 
 test('shows one card, and it is the only thing on screen', async ({ page }) => {
@@ -75,15 +72,22 @@ test('persists a completed edit through the backend session', async ({ page }) =
   await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
 });
 
-test('reload starts from a freshly minted memory workspace', async ({ page }) => {
+test('a completed edit and workspace identity survive reload', async ({ page }) => {
   await page.goto('/');
   const first = nodeByTitle(page, 'Start here');
   await expect(first).toBeVisible();
   const firstId = await first.getAttribute('data-id');
+  await settled(page);
+  await dragBy(page, first, 0, 220);
+  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
+  const durablePosition = await positionOf(first);
 
   await page.reload();
 
   const second = nodeByTitle(page, 'Start here');
   await expect(second).toBeVisible();
-  expect(await second.getAttribute('data-id')).not.toBe(firstId);
+  await settled(page);
+  expect(await second.getAttribute('data-id')).toBe(firstId);
+  expect(await positionOf(second)).toEqual(durablePosition);
+  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
 });

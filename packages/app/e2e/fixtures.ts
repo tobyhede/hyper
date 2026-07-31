@@ -1,4 +1,6 @@
 import { test as base, expect } from '@playwright/test';
+import { fileURLToPath } from 'node:url';
+import { createServer, type ViteDevServer } from 'vite';
 
 /**
  * The Playwright `test` every spec in this directory imports, extended with a
@@ -32,7 +34,39 @@ function isReactFlowComplaint(text: string): boolean {
 
 /** The gate is auto-use, so no spec has to opt in; the collected messages are
  *  exposed as the fixture value for the rare test that wants to inspect them. */
-export const test = base.extend<{ reactFlowComplaints: string[] }>({
+interface E2eFixtures {
+  e2eServer: ViteDevServer;
+  reactFlowComplaints: string[];
+}
+
+const configFile = fileURLToPath(new URL('../vite.config.ts', import.meta.url));
+const appRoot = fileURLToPath(new URL('..', import.meta.url));
+
+export const test = base.extend<E2eFixtures>({
+  e2eServer: async ({}, use, testInfo) => {
+    const server = await createServer({
+      root: appRoot,
+      configFile,
+      mode: testInfo.project.name === 'new-space' ? 'e2e-empty' : 'e2e-fixture',
+      server: { host: '127.0.0.1', port: 5276 + testInfo.workerIndex, strictPort: true },
+    });
+    try {
+      await server.listen();
+      await use(server);
+    } finally {
+      await server.close();
+    }
+  },
+  page: async ({ browser, e2eServer }, use) => {
+    const baseURL = e2eServer.resolvedUrls?.local[0];
+    if (baseURL === undefined) throw new Error('Vite did not publish a loopback URL');
+    const context = await browser.newContext({ baseURL });
+    try {
+      await use(await context.newPage());
+    } finally {
+      await context.close();
+    }
+  },
   reactFlowComplaints: [
     async ({ page }, use) => {
       const complaints: string[] = [];
