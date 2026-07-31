@@ -138,6 +138,30 @@ describe('runHyper', () => {
     );
   });
 
+  it.each([
+    {
+      args: ['export', 'not-a-uuid', 'destination'],
+      exitCode: 2,
+      error: 'Invalid space UUID: not-a-uuid\n',
+    },
+    {
+      args: ['export', OTHER_SPACE_ID, 'destination'],
+      exitCode: 1,
+      error: `Space ${OTHER_SPACE_ID} does not exist\n`,
+    },
+  ])('rejects an invalid export target $args', async ({ args, exitCode, error }) => {
+    const output = captureIo();
+
+    await expect(
+      runHyper(args, {
+        repository: new MemorySpaceRepository([storedSpace]),
+        io: output.io,
+      }),
+    ).resolves.toBe(exitCode);
+    expect(output.stdout).toEqual([]);
+    expect(output.stderr).toEqual([error]);
+  });
+
   it('opens the only database space without filesystem import and preserves its revision', async () => {
     const revision = 9_007_199_254_740_993n;
     const output = captureIo();
