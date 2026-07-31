@@ -15,7 +15,7 @@ Engine or Docker Desktop with Compose v2.
 
 ```sh
 pnpm install
-pnpm dev            # start the app at http://localhost:5173
+pnpm dev            # PostgreSQL-backed app at http://localhost:5173 (needs the database up)
 pnpm dev:new        # mint a fresh one-card memory workspace at http://localhost:5174
 ```
 
@@ -23,7 +23,7 @@ Then:
 
 1. Pick a route in the toolbar. Every route stays drawn; the one you pick is emphasised.
 2. Click a card to open it and read its Markdown source. `Esc` closes it.
-3. Drag a card to move it. A completed edit is committed automatically through the persistence session; the toolbar reports `Persisting…` and then `Persisted`. The current prototype uses an in-memory backend, so a full reload imports the starting files again.
+3. Drag a card to move it. A completed edit is committed automatically through the persistence session; the toolbar reports `Persisting…` and then `Persisted`. Under `pnpm dev` the edit lands in PostgreSQL and outlives the page; under `pnpm dev:new` it lives in that server's memory repository, surviving browser reloads but not a restart.
 4. Press **Present** to walk the route: `→` follows an edge, `←` goes back, `↑` / `↓` choose at a fork, `Esc` returns to the overview.
 
 The graph uses React Flow's [elkjs multiple-handles technique](https://reactflow.dev/examples/layout/elkjs-multiple-handles): ELK lays out the nodes and computes each port's position, and those exact offsets are applied to the handles so connected handles line up and the colored route edges stay legible.
@@ -175,16 +175,16 @@ Design rules kept throughout: domain logic stays out of React components, React 
 - Route navigation behaviour, with fast-check property tests for clamping/monotonicity and validation invariants.
 - React Flow projection correctness (`@project/react-flow-adapter`).
 - Card rendering smoke test (`@project/ui`).
-- Playwright flows: app loads, the graph is visible, a route is selected, cards open, a completed drag reaches the backend, imported files stay byte-identical, and a route is walked under the camera.
+- Playwright flows: app loads, the graph is visible, a route is selected, cards open, a completed drag reaches the backend and survives a reload, and a route is walked under the camera.
 
 ## Current limitations
 
 - **Content is read-only.** No visual or Markdown editing, no drawing, no whiteboard shapes. Placement edits commit to PostgreSQL over HTTP and outlive the page.
-- **The app never touches files.** The browser lists, opens and commits Spaces under `/api/spaces` and nothing else; file discovery and parsing are server-side CLI and import concerns. There is no write-back, no file picker, and canonical file export is reserved for the CLI described by [ADR 0030](docs/adr/0030-postgres-is-the-live-write-model.md).
+- **The app never touches files.** The browser lists, opens and commits Spaces under `/api/spaces` and nothing else; file discovery and parsing are server-side CLI and import concerns. There is no write-back and no file picker. Canonical file export belongs to the `hyper` CLI ([ADR 0030](docs/adr/0030-postgres-is-the-live-write-model.md)), which regenerates a deterministic version 2 space directory from the database and records the revision it projected.
 - **Overlay legibility.** The graph draws every route at once. Only **compatible** routes — the union of their edges is acyclic — lay out cleanly as parallel forward paths; two routes disagreeing about the order of cards they share force a backward edge, drawn as a routed channel. See [`.scratch/multiple-routes/findings.md`](.scratch/multiple-routes/findings.md).
 - **Cards are a fixed shape.** A card draws its title, so every card is the same size — declared once in `packages/app/src/card.ts` as a 16:9 ratio and consumed by both the layout and the stylesheet. Content adapts to the card, not the reverse, which is why measured DOM sizes are not fed into ELK.
 - **No authoring of structure.** Routes and cards are edited in the files; the drag-to-connect surface ([ADR 0021](docs/adr/0021-routes-are-drawn-as-react-flow-edges.md)) is not built.
-- **No speaker view, timer, transitions or export.** They went with the deck framework and return, if wanted, as their own decisions designed against a traversal ([ADR 0024](docs/adr/0024-presenting-is-traversing-a-route.md)).
+- **No speaker view, timer, transitions or deck export.** They went with the deck framework and return, if wanted, as their own decisions designed against a traversal ([ADR 0024](docs/adr/0024-presenting-is-traversing-a-route.md)).
 - **The presented card is scaled by the camera**, so its text is rasterised rather than laid out at its final size — a property of wanting a spatial camera at all.
 - The production bundle ships React Flow and elkjs in a single chunk (~2.1 MB) — fine for a prototype, not tuned for size.
 
@@ -194,4 +194,4 @@ Design rules kept throughout: domain logic stays out of React components, React 
 - Encode the active route and card in the TanStack Router URL so a position is linkable and refresh-safe.
 - Authored camera hints (zoom/pan/highlight several nodes) and move transitions in the space file.
 - Speaker view: current + next card, notes, and elapsed time.
-- A tiny CLI to validate a space directory (`space.json` + Markdown) in CI, reusing `@project/graph`.
+- Run the `hyper` CLI's import and canonical export over a space directory in CI, so a round trip is proven on every push.
