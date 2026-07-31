@@ -1,4 +1,4 @@
-import { cp, mkdir, mkdtemp, readdir, rename, rm, stat, writeFile } from 'node:fs/promises';
+import { cp, lstat, mkdir, mkdtemp, readdir, rename, rm, stat, writeFile } from 'node:fs/promises';
 import { basename, dirname, join, resolve } from 'node:path';
 import { spaceSnapshotSchema, type Card, type SpaceFile, type UUID } from '@project/core';
 import { loadSpaceSnapshot, serializeCardFile } from '@project/graph';
@@ -56,6 +56,17 @@ const exists = async (path: string): Promise<boolean> => {
     return true;
   } catch (error) {
     if (error instanceof Error && 'code' in error && error.code === 'ENOENT') return false;
+    throw error;
+  }
+};
+
+const rejectSymbolicLink = async (path: string): Promise<void> => {
+  try {
+    if ((await lstat(path)).isSymbolicLink()) {
+      throw new Error(`Export destination contains a symbolic link: ${path}`);
+    }
+  } catch (error) {
+    if (error instanceof Error && 'code' in error && error.code === 'ENOENT') return;
     throw error;
   }
 };
@@ -146,6 +157,13 @@ export const exportSpace = async (
   const destination = resolve(destinationPath);
   const parent = dirname(destination);
   await mkdir(parent, { recursive: true });
+  await rejectSymbolicLink(destination);
+  await rejectSymbolicLink(join(destination, 'cards'));
+  await Promise.all(
+    stored.snapshot.cards.map(({ id: cardId }) =>
+      rejectSymbolicLink(join(destination, 'cards', `${cardId}.md`)),
+    ),
+  );
   const stagingRoot = await mkdtemp(join(parent, `.${basename(destination)}.hyper-export-`));
   const replacement = join(stagingRoot, 'replacement');
   try {

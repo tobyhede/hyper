@@ -1,4 +1,4 @@
-import { access, mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { access, lstat, mkdtemp, mkdir, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { uuidSchema, type ImportSpace, type SpaceSnapshot, type UUID } from '@project/core';
@@ -229,6 +229,92 @@ describe('runHyper', () => {
       'previous space\n',
     );
     await expect(readFile(join(destination, 'cards'), 'utf8')).resolves.toBe('not a directory\n');
+    await expect(repository.loadSpace(SPACE_ID)).resolves.toMatchObject({
+      exportedRevision: null,
+    });
+  });
+
+  it('rejects a symlinked destination without changing its external target', async () => {
+    const parent = await makeTemporaryDirectory();
+    const external = await makeTemporaryDirectory();
+    const destination = join(parent, 'exported');
+    await mkdir(join(external, 'cards'));
+    await writeFile(join(external, 'space.json'), 'external space\n');
+    await writeFile(join(external, 'cards', 'external.md'), 'external card\n');
+    await symlink(external, destination);
+    const repository = new MemorySpaceRepository([storedSpace]);
+    const output = captureIo();
+
+    await expect(
+      runHyper(['export', SPACE_ID, destination], { repository, io: output.io }),
+    ).resolves.toBe(1);
+
+    expect(output.stderr).toEqual([
+      `Export failed: Export destination contains a symbolic link: ${destination}\n`,
+    ]);
+    expect((await lstat(destination)).isSymbolicLink()).toBe(true);
+    await expect(readFile(join(external, 'space.json'), 'utf8')).resolves.toBe('external space\n');
+    await expect(readFile(join(external, 'cards', 'external.md'), 'utf8')).resolves.toBe(
+      'external card\n',
+    );
+    await expect(repository.loadSpace(SPACE_ID)).resolves.toMatchObject({
+      exportedRevision: null,
+    });
+  });
+
+  it('rejects a symlinked cards directory without changing the destination or external cards', async () => {
+    const destination = join(await makeTemporaryDirectory(), 'exported');
+    const externalCards = await makeTemporaryDirectory();
+    await mkdir(destination);
+    await writeFile(join(destination, 'space.json'), 'previous space\n');
+    await writeFile(join(destination, 'notes.txt'), 'keep root\n');
+    await writeFile(join(externalCards, 'external.md'), 'external card\n');
+    await symlink(externalCards, join(destination, 'cards'));
+    const repository = new MemorySpaceRepository([storedSpace]);
+    const output = captureIo();
+
+    await expect(
+      runHyper(['export', SPACE_ID, destination], { repository, io: output.io }),
+    ).resolves.toBe(1);
+
+    expect(output.stderr).toEqual([
+      `Export failed: Export destination contains a symbolic link: ${join(destination, 'cards')}\n`,
+    ]);
+    expect((await lstat(join(destination, 'cards'))).isSymbolicLink()).toBe(true);
+    await expect(readFile(join(destination, 'space.json'), 'utf8')).resolves.toBe(
+      'previous space\n',
+    );
+    await expect(readFile(join(destination, 'notes.txt'), 'utf8')).resolves.toBe('keep root\n');
+    await expect(readFile(join(externalCards, 'external.md'), 'utf8')).resolves.toBe(
+      'external card\n',
+    );
+    await expect(repository.loadSpace(SPACE_ID)).resolves.toMatchObject({
+      exportedRevision: null,
+    });
+  });
+
+  it('rejects a symlinked canonical card file without changing its external target', async () => {
+    const destination = join(await makeTemporaryDirectory(), 'exported');
+    const external = join(await makeTemporaryDirectory(), 'external.md');
+    await mkdir(join(destination, 'cards'), { recursive: true });
+    await writeFile(join(destination, 'space.json'), 'previous space\n');
+    await writeFile(external, 'external card\n');
+    await symlink(external, join(destination, 'cards', `${CARD_ID}.md`));
+    const repository = new MemorySpaceRepository([storedSpace]);
+    const output = captureIo();
+
+    await expect(
+      runHyper(['export', SPACE_ID, destination], { repository, io: output.io }),
+    ).resolves.toBe(1);
+
+    expect(output.stderr).toEqual([
+      `Export failed: Export destination contains a symbolic link: ${join(destination, 'cards', `${CARD_ID}.md`)}\n`,
+    ]);
+    expect((await lstat(join(destination, 'cards', `${CARD_ID}.md`))).isSymbolicLink()).toBe(true);
+    await expect(readFile(join(destination, 'space.json'), 'utf8')).resolves.toBe(
+      'previous space\n',
+    );
+    await expect(readFile(external, 'utf8')).resolves.toBe('external card\n');
     await expect(repository.loadSpace(SPACE_ID)).resolves.toMatchObject({
       exportedRevision: null,
     });
