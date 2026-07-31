@@ -87,6 +87,60 @@ test('selecting Graph or Grid is navigation and does not persist', async ({ page
   await expect(persistence).toHaveAttribute('data-revision', '0');
 });
 
+test('connecting from Graph and Grid converts atomically without moving Cards', async ({
+  page,
+}) => {
+  for (const view of ['Graph', 'Grid'] as const) {
+    await test.step(view, async () => {
+      await page.goto('/');
+      if (view === 'Grid') {
+        await page.getByTestId('view-selector').click();
+        await page.getByRole('option', { name: view }).click();
+      }
+
+      const source = nodeByTitle(page, 'A').first();
+      const target = nodeByTitle(page, 'E').first();
+      await expect(source).toBeVisible();
+      await source.hover();
+      const sourceHandle = authoringHandle(source, 'source', 'right');
+      const targetHandle = authoringHandle(target, 'target', 'top');
+      await expect(sourceHandle).toHaveClass(/connectable/);
+      await settled(page);
+      const before = await allPositions(page);
+      const persistence = page.getByTestId('persistence-status');
+      await expect(persistence).toHaveAttribute('data-revision', '0');
+      await expect(page.getByTestId('layout-selector')).toContainText('None');
+
+      await expect(sourceHandle).toHaveCSS('opacity', '1');
+      const from = (await sourceHandle.boundingBox())!;
+      await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
+      await page.mouse.down();
+      await page.mouse.move(from.x + from.width / 2 + 30, from.y + from.height / 2, {
+        steps: 4,
+      });
+      await expect(targetHandle).toHaveCSS('opacity', '1');
+      const pane = (await page.locator('.react-flow__pane').boundingBox())!;
+      await page.mouse.move(pane.x + 16, pane.y + 16);
+      await page.mouse.up();
+
+      await expect(persistence).toHaveAttribute('data-revision', '0');
+      await expect(page.getByTestId('layout-selector')).toContainText('None');
+      expect(await allPositions(page)).toEqual(before);
+
+      await source.hover();
+      await connectHandles(page, sourceHandle, targetHandle);
+
+      await expect(page.locator('.react-flow__edge')).toHaveCount(FIXTURE_EDGE_COUNT + 1);
+      await expect(persistence).toHaveAttribute('data-revision', '1');
+      await expect(persistence).toHaveText('Persisted');
+      await expect(page.getByTestId('layout-selector')).toContainText('Layout 1');
+      await expect(page.getByTestId('layout-live-indicator')).toBeVisible();
+      await settled(page);
+      expect(await allPositions(page)).toEqual(before);
+    });
+  }
+});
+
 test('editing an existing Layout updates it instead of creating another one', async ({ page }) => {
   await page.goto('/');
   const a = nodeByTitle(page, 'A').first();

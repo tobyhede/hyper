@@ -143,6 +143,53 @@ export interface PositionedConnection {
   readonly to: CardId;
 }
 
+export interface ExistingCardConnection {
+  readonly renderer: RendererSelection;
+  readonly positions: ReadonlyMap<string, LayoutPoint>;
+  readonly newLayoutId: UUID | null;
+  readonly routeId: RouteId;
+  readonly from: CardId;
+  readonly to: CardId;
+}
+
+export interface CompletedConnection {
+  readonly snapshot: SpaceSnapshot;
+  readonly layoutId: UUID;
+}
+
+/**
+ * Compose placement conversion and one existing-Card Edge as a single Space.
+ * A duplicate is detected before conversion because it is not a completed Edit.
+ */
+export function completeExistingCardConnection(
+  base: SpaceSnapshot,
+  connection: ExistingCardConnection,
+): CompletedConnection | null {
+  const route = base.document.routes.find((candidate) => candidate.id === connection.routeId);
+  if (route === undefined) {
+    throw new Error(`The active Route ${connection.routeId} does not exist.`);
+  }
+  if (route.edges.some((edge) => edge.from === connection.from && edge.to === connection.to)) {
+    return null;
+  }
+
+  const placed = deriveCompletedEdit({
+    snapshot: base,
+    positions: connection.positions,
+    renderer: connection.renderer,
+    newLayoutId: connection.newLayoutId,
+    activeRouteId: connection.routeId,
+  });
+  const snapshot = completePositionedConnection(placed.snapshot, {
+    layoutId: placed.layoutId,
+    routeId: connection.routeId,
+    from: connection.from,
+    to: connection.to,
+  });
+  if (snapshot === null) throw new Error('A new Edge unexpectedly became a duplicate.');
+  return { snapshot, layoutId: placed.layoutId };
+}
+
 /**
  * Compose one completed existing-Card connection into the complete next Space.
  * The chosen React Flow handle sides deliberately do not cross this seam.

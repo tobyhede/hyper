@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { ReactFlowProvider } from '@xyflow/react';
 import { AppShell, Button, LayoutSelector, RouteSelector, ViewSelector } from '@project/ui';
-import { uuidSchema, type BuiltInViewId, type CardId } from '@project/core';
+import { newUuid, uuidSchema, type BuiltInViewId, type CardId } from '@project/core';
 import {
   projectCardNodes,
   projectRouteEdges,
@@ -18,7 +18,7 @@ import {
   resolveContentCard,
 } from '@project/graph';
 import type { OpenedSpace } from './space';
-import { completePositionedConnection, createPlacementEditor } from './edit-completion';
+import { completeExistingCardConnection, createPlacementEditor } from './edit-completion';
 import { canvasContent, usePlacementRendering } from './placement-rendering';
 import { routeColorMap } from './colors';
 import { CARD_HEIGHT, CARD_SIZE, cardSizeVars } from './card';
@@ -279,30 +279,45 @@ export const createApp = ({ space, spaceSession }: OpenedSpace, { acceptRemote }
 
     const connectCards = useCallback(
       (connection: { source: string; target: string }) => {
-        // Issues 03 and 04 own Algorithmic View conversion and Route minting.
-        // This increment completes only an existing Route in a selected Layout.
-        if (selectedRenderer.kind !== 'layout' || activeRouteId === null) return;
-        const completed = completePositionedConnection(spaceSession.getState().working, {
-          layoutId: selectedRenderer.layoutId,
+        // Issue 04 owns Route minting. An existing Route can be edited from every
+        // resolved renderer; an Algorithmic View converts using exactly the live
+        // Card positions the author connected between (ADR 0025).
+        if (activeRouteId === null || liveNodes === null) return;
+        const resolvedPositions =
+          authoredPositions ??
+          new Map(liveNodes.map((node) => [node.id, { x: node.position.x, y: node.position.y }]));
+        const completed = completeExistingCardConnection(spaceSession.getState().working, {
+          renderer: selectedRenderer,
+          positions: resolvedPositions,
+          newLayoutId: selectedRenderer.kind === 'view' ? newUuid() : null,
           routeId: activeRouteId,
           from: uuidSchema.parse(connection.source),
           to: uuidSchema.parse(connection.target),
         });
         if (completed === null) return;
-        const accepted = loadSpaceSnapshot(completed);
+        const accepted = loadSpaceSnapshot(completed.snapshot);
         if (!accepted.ok) {
           throw new Error('A completed connection must produce a valid Space.');
         }
         completedConnectionTarget.current = connection.target;
+        if (selectedRenderer.kind === 'view') {
+          // Install the resolved placement and its declared handle geometry
+          // before the session exposes the new Edge. The following render can
+          // therefore resolve that Edge immediately, without a DOM remeasure.
+          useEditorStore.getState().authorPositions(resolvedPositions, projectedNodes);
+        }
         // `submit` installs the complete local working snapshot synchronously;
         // persistence acknowledgement remains asynchronous (ADR 0030). Routes and
         // Layouts are derived from that snapshot, so the render that follows is
         // already the authored truth — only the traversal aggregate, which is a
         // closure rather than React state, has to be told.
-        spaceSession.submit(completed);
+        spaceSession.submit(completed.snapshot);
         updateSpace(accepted.space);
+        if (selectedRenderer.kind === 'view') {
+          viewChoice.select({ kind: 'layout', layoutId: completed.layoutId });
+        }
       },
-      [activeRouteId, selectedRenderer],
+      [activeRouteId, authoredPositions, liveNodes, projectedNodes, selectedRenderer],
     );
 
     const finishConnection = useCallback(() => {

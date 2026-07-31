@@ -44,6 +44,14 @@ export interface EditorState {
   selectRenderer: (positions: ReadonlyMap<string, LayoutPoint> | null) => void;
   /** Apply React Flow's own changes (drag, measure, select). */
   changeNodes: (changes: NodeChange<CardFlowNode>[]) => void;
+  /**
+   * Freeze a resolved automatic arrangement after a completed structural Edit,
+   * reinstalling its declared handle geometry before the new Edges are exposed.
+   */
+  authorPositions: (
+    positions: ReadonlyMap<string, LayoutPoint>,
+    projected: readonly CardFlowNode[],
+  ) => void;
   /** Select one Card after a completed connection. */
   selectCard: (cardId: CardId) => void;
 }
@@ -154,6 +162,12 @@ export function createEditorStore(
         moved: false,
         selectedCardId: null,
       }),
+
+    authorPositions: (positions, projected) =>
+      set((state) => ({
+        positions: new Map(positions),
+        nodes: state.nodes === null ? [...projected] : reconcile(state.nodes, projected),
+      })),
 
     selectCard: (cardId) =>
       set((state) => ({

@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { uuidSchema, type Layout, type SpaceSnapshot } from '@project/core';
-import { completePositionedConnection } from '../src/edit-completion';
+import {
+  completeExistingCardConnection,
+  completePositionedConnection,
+} from '../src/edit-completion';
 
 /**
  * Composing one completed existing-Card connection into the next Space.
@@ -77,6 +80,59 @@ const unlaidSnapshot: SpaceSnapshot = {
 };
 
 describe('completed connection composition', () => {
+  it.each(['graph', 'grid'] as const)(
+    'converts the %s View and adds the Edge in one complete snapshot',
+    (view) => {
+      const positions = new Map([
+        [CARD_A, { x: 120, y: 240 }],
+        [CARD_B, { x: 480, y: 360 }],
+      ]);
+
+      const completed = completeExistingCardConnection(automaticSnapshot, {
+        renderer: { kind: 'view', view },
+        positions,
+        newLayoutId: DEFAULT_LAYOUT_ID,
+        routeId: ROUTE_ID,
+        from: CARD_B,
+        to: CARD_A,
+      });
+
+      expect(completed).toEqual({
+        layoutId: DEFAULT_LAYOUT_ID,
+        snapshot: {
+          ...automaticSnapshot,
+          document: {
+            ...automaticSnapshot.document,
+            routes: [
+              {
+                id: ROUTE_ID,
+                title: 'Main',
+                edges: [
+                  { from: CARD_A, to: CARD_B },
+                  { from: CARD_B, to: CARD_A },
+                ],
+              },
+            ],
+            layouts: [
+              automaticSnapshot.document.layouts?.[0],
+              {
+                id: DEFAULT_LAYOUT_ID,
+                title: 'Layout 2',
+                kind: 'positioned',
+                positions: {
+                  [CARD_A]: { x: 120, y: 240 },
+                  [CARD_B]: { x: 480, y: 360 },
+                },
+                activeRoute: ROUTE_ID,
+              },
+            ],
+            defaultView: DEFAULT_LAYOUT_ID,
+          },
+        },
+      });
+    },
+  );
+
   it('adds A → B to the active Route in a positioned Layout', () => {
     const base: SpaceSnapshot = {
       ...positionedSnapshot,
