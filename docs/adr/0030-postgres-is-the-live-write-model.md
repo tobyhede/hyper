@@ -82,4 +82,8 @@ repositories. Ordered rapid edits, explicit retry, stale conflicts, navigation
 protection and durability across both reload and a fresh PostgreSQL-backed Vite
 host are covered.
 
-The CLI-only canonical exporter and PostgreSQL CI integration remain to be built.
+The CLI-only canonical exporter is built: it writes deterministic, fully
+identified version 2 files through a validated staging directory, atomically
+replaces the destination's managed projection while preserving files outside
+discovery scope, and records the exact exported revision after replacement.
+PostgreSQL CI integration remains to be built.
