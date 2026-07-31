@@ -78,32 +78,41 @@ describe('readSingleSpace', () => {
     await expect(readSingleSpace(spaceFile)).resolves.toEqual(expected);
   });
 
-  it('settles every file read and reports failures in deterministic path order', async () => {
-    const temporaryDirectory = await makeTemporaryDirectory();
-    const talkDirectory = join(temporaryDirectory, 'talk');
-    const cardsDirectory = join(talkDirectory, 'cards');
-    await mkdir(cardsDirectory, { recursive: true });
+  // Unreadable-mode is the only way to fail a *discovered* card file's read:
+  // `markdownFilesIn` keeps `entry.isFile()` entries only, so a directory or a
+  // symlink named `x.md` is filtered out before any read and never produces the
+  // EISDIR/ELOOP a uid-independent version would need. Root ignores the mode bits
+  // and reads the files anyway, which would fail these assertions rather than
+  // exercise them, so the case is skipped there instead of reported as a defect.
+  it.skipIf(process.getuid?.() === 0)(
+    'settles every file read and reports failures in deterministic path order',
+    async () => {
+      const temporaryDirectory = await makeTemporaryDirectory();
+      const talkDirectory = join(temporaryDirectory, 'talk');
+      const cardsDirectory = join(talkDirectory, 'cards');
+      await mkdir(cardsDirectory, { recursive: true });
 
-    const rootCard = join(talkDirectory, 'a.md');
-    const nestedCard = join(cardsDirectory, 'z.md');
-    await writeFile(
-      join(talkDirectory, 'space.json'),
-      JSON.stringify({ version: 2, title: 'Talk', routes: [] }),
-    );
-    await writeFile(rootCard, '---\ntitle: A\n---\nA body\n');
-    await writeFile(nestedCard, '---\ntitle: Z\n---\nZ body\n');
-    await chmod(rootCard, 0o000);
-    await chmod(nestedCard, 0o000);
+      const rootCard = join(talkDirectory, 'a.md');
+      const nestedCard = join(cardsDirectory, 'z.md');
+      await writeFile(
+        join(talkDirectory, 'space.json'),
+        JSON.stringify({ version: 2, title: 'Talk', routes: [] }),
+      );
+      await writeFile(rootCard, '---\ntitle: A\n---\nA body\n');
+      await writeFile(nestedCard, '---\ntitle: Z\n---\nZ body\n');
+      await chmod(rootCard, 0o000);
+      await chmod(nestedCard, 0o000);
 
-    const thrown = await captureError(() => readSingleSpace(talkDirectory));
+      const thrown = await captureError(() => readSingleSpace(talkDirectory));
 
-    expect(thrown).toBeInstanceOf(SpaceImportFileError);
-    if (!(thrown instanceof SpaceImportFileError)) return;
-    expect(thrown.kind).toBe('discovery');
-    expect(thrown.diagnostics).toHaveLength(2);
-    expect(thrown.diagnostics[0]).toContain(rootCard);
-    expect(thrown.diagnostics[1]).toContain(nestedCard);
-  });
+      expect(thrown).toBeInstanceOf(SpaceImportFileError);
+      if (!(thrown instanceof SpaceImportFileError)) return;
+      expect(thrown.kind).toBe('discovery');
+      expect(thrown.diagnostics).toHaveLength(2);
+      expect(thrown.diagnostics[0]).toContain(rootCard);
+      expect(thrown.diagnostics[1]).toContain(nestedCard);
+    },
+  );
 
   it('reports a missing input as an absolute discovery diagnostic', async () => {
     const temporaryDirectory = await makeTemporaryDirectory();
@@ -118,14 +127,17 @@ describe('readSingleSpace', () => {
     expect(thrown.diagnostics[0]).toContain(missingInput);
   });
 
+  // A directory standing in for `space.json` fails its read as EISDIR for every
+  // uid, where an unreadable mode would let root through. Nothing filters the
+  // space file on type the way `markdownFilesIn` filters cards, so the resolved
+  // path is read as-is and this needs no root guard.
   it('reports an unreadable space file as an absolute discovery diagnostic', async () => {
     const temporaryDirectory = await makeTemporaryDirectory();
     const talkDirectory = join(temporaryDirectory, 'talk');
     await mkdir(talkDirectory);
 
     const spaceFile = join(talkDirectory, 'space.json');
-    await writeFile(spaceFile, JSON.stringify({ version: 2, title: 'Talk', routes: [] }));
-    await chmod(spaceFile, 0o000);
+    await mkdir(spaceFile);
 
     const thrown = await captureError(() =>
       readSingleSpace(relative(process.cwd(), talkDirectory)),

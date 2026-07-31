@@ -136,10 +136,18 @@ export class MemorySpaceRepository implements SpaceRepository {
     }
 
     const incomingSpaceIds = new Set<UUID>();
-    const cardOwner = new Map<UUID, UUID>();
+    // Two distinct facts, deliberately not merged. `batchCardIds` is what this
+    // batch already claims, and a repeat is `duplicate-identity`. `storedCardOwner`
+    // is what survives the call, and claiming one of those is `card-ownership`.
+    // `PostgresSpaceRepository` draws the same line — `duplicateIdentity` runs
+    // over the batch before its transaction opens — so folding them together
+    // makes this double reject valid input under a code the real backend
+    // never returns for it.
+    const batchCardIds = new Set<UUID>();
+    const storedCardOwner = new Map<UUID, UUID>();
     if (mode === 'insert') {
       for (const { snapshot } of this.#spaces.values()) {
-        for (const card of snapshot.cards) cardOwner.set(card.id, snapshot.id);
+        for (const card of snapshot.cards) storedCardOwner.set(card.id, snapshot.id);
       }
     }
     for (const snapshot of snapshots) {
@@ -164,7 +172,16 @@ export class MemorySpaceRepository implements SpaceRepository {
       }
 
       for (const card of snapshot.cards) {
-        const owner = cardOwner.get(card.id);
+        if (batchCardIds.has(card.id)) {
+          return Promise.resolve({
+            kind: 'rejected',
+            code: 'duplicate-identity',
+            message: `Duplicate card identity "${card.id}"`,
+          });
+        }
+        batchCardIds.add(card.id);
+
+        const owner = storedCardOwner.get(card.id);
         if (owner !== undefined && owner !== snapshot.id) {
           return Promise.resolve({
             kind: 'rejected',
@@ -172,7 +189,6 @@ export class MemorySpaceRepository implements SpaceRepository {
             message: `Card ${card.id} belongs to space ${owner}`,
           });
         }
-        cardOwner.set(card.id, snapshot.id);
       }
     }
 

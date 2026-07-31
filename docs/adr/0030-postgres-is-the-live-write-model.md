@@ -13,10 +13,10 @@ the application.
 
 Spaces and cards are UUID-keyed rows with JSONB documents. Routes and layouts
 remain nested in the space document. An id is optional only in import input: an
-explicit id must be a UUID and must name nothing that already exists, while
-every missing space, card, route and layout id is minted during the import
-transaction. An id-less entity is therefore always new until export writes its
-generated UUID.
+explicit id must be a UUID and must not collide within the scope that resolves
+it — set out below — while every missing space, card, route and layout id is
+minted during the import transaction. An id-less entity is therefore always new
+until export writes its generated UUID.
 
 **Uniqueness is scoped to how an id is resolved.** Space and card ids are unique
 across the database, being primary keys; import additionally rejects a batch that
@@ -70,5 +70,9 @@ The Vite file integration is now a read-only import source; there is no browser
 Save action or file write-back endpoint.
 
 The Prisma Next/PostgreSQL adapter and insert-only transactional importer are
-built. The HTTP backend, database-backed app startup, CLI-only canonical
-exporter and PostgreSQL CI integration remain to be built.
+built, as is database-driven startup: server-side policy resolves the zero, one
+and many-space cases, the CLI applies it after an import or with no path, and the
+application opens an exact backend workspace or renders the UUID-only selector.
+
+The HTTP backend composition that carries those startup results into the browser,
+the CLI-only canonical exporter and PostgreSQL CI integration remain to be built.

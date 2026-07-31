@@ -225,17 +225,21 @@ git commit -m "feat: classify HTTP persistence failures"
 **Responsibilities:**
 - Reject malformed transport before repository access.
 - Drain an over-limit stream without buffering further bytes, send one `400`, and leave the keep-alive server usable.
+- Leave the connection in a defined state for **every** pre-body `400`, not only streaming overflow.
 
 **Interfaces:**
 - Produces `MAX_COMMIT_BODY_BYTES = 1_048_576`.
 - `Content-Length` must be one canonical non-negative decimal integer and must not exceed the limit.
 - Streaming overflow returns `400 {message:'Request body exceeds 1048576 bytes'}` after draining through `request.resume()`/end; it does not destroy the socket.
+- A rejection decided from the headers alone — declared oversize, bad media type, noncanonical `Content-Length`, invalid path UUID — still has an undelivered body behind it. Each either drains through `request.resume()`/end before responding, or answers with `Connection: close`. Responding without doing one of the two leaves unread bytes in the socket, and the next request on a keep-alive agent is then parsed starting mid-body.
 
 - [ ] **Step 1: RED — enumerate transport rejection**
 
 Through a real Node server, test missing/wrong media type, malformed JSON, arrays, extra envelope keys, invalid revision, schema-invalid snapshot, invalid path UUID, path/snapshot mismatch, negative/noncanonical/conflicting `Content-Length`, declared oversize, and chunked streaming oversize. Every case expects `400` and zero repository calls. Unsupported method expects `405` plus `Allow`; an unrelated path returns `false` to a test fallback handler.
 
 For streaming overflow, send more than the limit on a keep-alive agent, receive exactly one `400`, then send a valid commit over the same agent and expect `200`. Assert the repository saw only the second request. This proves drain/termination and continued server usability.
+
+Run that same keep-alive reuse assertion over the header-decided rejections — declared oversize and malformed media type or `Content-Length` — each sent with a real body the server never reads. The follow-up commit must still return `200`, or the response must have carried `Connection: close` so the agent opens a fresh socket. Without this the suite passes while the server desynchronises, because a single-request-per-connection test can never observe an undrained body.
 
 - [ ] **Step 2: Verify RED**
 
@@ -245,7 +249,7 @@ Expected: FAIL on the first request that reaches the repository or makes the con
 
 - [ ] **Step 3: GREEN — implement bounded reading**
 
-Normalize the media type by splitting at `;`, trimming, and lowercasing. Reject invalid headers before reading. While streaming, count `Buffer.byteLength` of raw chunks; once over limit, stop appending, call `request.resume()`, wait for `end`, and then send the single `400`. Decode UTF-8/JSON only when bounded. Use the shared strict commit decoder and compare path UUID to `snapshot.id`. Do not call `loadSpaceSnapshot`.
+Normalize the media type by splitting at `;`, trimming, and lowercasing. Decide header rejections before reading, but drain through `request.resume()`/end before writing the `400` — or set `Connection: close` on it — so no rejection leaves unread bytes in the socket. While streaming, count `Buffer.byteLength` of raw chunks; once over limit, stop appending, call `request.resume()`, wait for `end`, and then send the single `400`. Decode UTF-8/JSON only when bounded. Use the shared strict commit decoder and compare path UUID to `snapshot.id`. Do not call `loadSpaceSnapshot`.
 
 - [ ] **Step 4: Verify GREEN, refactor, and commit**
 

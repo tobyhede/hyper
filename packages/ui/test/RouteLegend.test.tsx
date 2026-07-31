@@ -37,4 +37,20 @@ describe('RouteLegend', () => {
     expect(inactive).toHaveStyle({ opacity: '0.5' });
     expect(inactive?.querySelector('[aria-hidden="true"]')).toHaveStyle({ background: '#8a94a6' });
   });
+
+  // `list-none` sets `list-style: none`, which makes Safari/VoiceOver drop list
+  // semantics and stop announcing the route count. The explicit role restores it.
+  //
+  // Asserted as an attribute rather than through `getByRole('list')` on purpose:
+  // jsdom maps `<ul>` to the list role from the tag alone and never applies the
+  // Safari quirk, so a role query passes with or without the fix and would prove
+  // nothing. The attribute is the whole deliverable here.
+  it('keeps list semantics despite the unstyled list', () => {
+    render(<RouteLegend routes={routes} colorByRouteId={{}} />);
+
+    expect(within(screen.getByTestId('route-legend')).getByRole('list')).toHaveAttribute(
+      'role',
+      'list',
+    );
+  });
 });

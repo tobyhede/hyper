@@ -471,4 +471,34 @@ describe('runCliMain', () => {
     expect(output.stdout).toEqual([`Opened space ${SPACE_ID} at revision 0\n`]);
     expect(output.stderr).toEqual(['Database shutdown failed: socket stuck\n']);
   });
+
+  it('closes the database when the command itself throws', async () => {
+    const output = captureIo();
+    let closed = false;
+    let failNextStderr = true;
+    const io: CliIo = {
+      stdout: (message) => output.io.stdout(message),
+      stderr: (message) => {
+        if (failNextStderr) {
+          failNextStderr = false;
+          throw new Error('stderr unavailable');
+        }
+        output.io.stderr(message);
+      },
+    };
+
+    const exitCode = await runCliMain(['--bogus'], {
+      repository: new MemorySpaceRepository([storedSpace]),
+      io,
+      close: () => {
+        closed = true;
+        return Promise.resolve();
+      },
+    });
+
+    expect(exitCode).toBe(1);
+    expect(closed).toBe(true);
+    expect(output.stdout).toEqual([]);
+    expect(output.stderr).toEqual(['Command failed: stderr unavailable\n']);
+  });
 });

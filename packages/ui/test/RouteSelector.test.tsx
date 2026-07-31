@@ -1,7 +1,14 @@
 import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { uuidSchema, type Route } from '@project/core';
 import { RouteSelector } from '../src/index';
+
+beforeAll(() => {
+  HTMLElement.prototype.hasPointerCapture = () => false;
+  HTMLElement.prototype.setPointerCapture = () => undefined;
+  HTMLElement.prototype.releasePointerCapture = () => undefined;
+  HTMLElement.prototype.scrollIntoView = () => undefined;
+});
 
 const routes: readonly Route[] = [
   {
@@ -58,5 +65,43 @@ describe('RouteSelector', () => {
 
     expect(screen.getByRole('combobox', { name: 'Active route' })).toHaveTextContent('None');
     expect(screen.getByRole('button', { name: 'Present this route' })).toBeDisabled();
+  });
+
+  it('activates the chosen Route', () => {
+    const onActivate = vi.fn();
+    render(
+      <RouteSelector
+        routes={routes}
+        activeRouteId={routes[1]?.id ?? null}
+        onActivate={onActivate}
+        onPresent={() => undefined}
+      />,
+    );
+
+    fireEvent.keyDown(screen.getByRole('combobox', { name: 'Active route' }), { key: 'ArrowDown' });
+    fireEvent.click(screen.getByRole('option', { name: /Long route/ }));
+
+    expect(onActivate).toHaveBeenCalledOnce();
+    expect(onActivate).toHaveBeenCalledWith(routes[0]?.id);
+  });
+
+  it('exits presenting through the Overview action', () => {
+    const onExitPresenting = vi.fn();
+    const onPresent = vi.fn();
+    render(
+      <RouteSelector
+        routes={routes}
+        activeRouteId={routes[1]?.id ?? null}
+        onActivate={() => undefined}
+        onPresent={onPresent}
+        presenting
+        onExitPresenting={onExitPresenting}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Return to overview' }));
+
+    expect(onExitPresenting).toHaveBeenCalledOnce();
+    expect(onPresent).not.toHaveBeenCalled();
   });
 });

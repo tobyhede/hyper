@@ -14,7 +14,14 @@ export const runCliMain = async (
   args: readonly string[],
   dependencies: CliMainDependencies,
 ): Promise<number> => {
-  const exitCode = await runHyper(args, dependencies);
+  let exitCode: number;
+  try {
+    exitCode = await runHyper(args, dependencies);
+  } catch (error) {
+    dependencies.io.stderr(`Command failed: ${describeError(error)}\n`);
+    exitCode = 1;
+  }
+
   try {
     await dependencies.close();
     return exitCode;

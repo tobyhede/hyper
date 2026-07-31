@@ -18,7 +18,8 @@ export function RouteLegend({ routes, colorByRouteId, activeRouteId = null }: Ro
         <RouteIcon size={13} />
         <span>Routes</span>
       </div>
-      <ul className="m-0 flex list-none flex-col gap-[6px] p-0">
+      {/* `list-none` strips list semantics in Safari/VoiceOver; the role restores them. */}
+      <ul role="list" className="m-0 flex list-none flex-col gap-[6px] p-0">
         {routes.map((route) => {
           const dimmed = activeRouteId !== null && route.id !== activeRouteId;
           return (
