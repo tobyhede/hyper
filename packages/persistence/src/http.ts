@@ -32,13 +32,24 @@ export class HttpSpaceBackend implements SpaceBackend {
     this.#timeoutMs = options.timeoutMs ?? 10_000;
   }
 
-  async #timedFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+  /**
+   * Headers arriving is not the request completing. The timer stays armed until
+   * `consume` has decoded the body, because a peer that sends a prompt status
+   * line and then stalls the stream would otherwise hang the read forever — the
+   * abort has to be able to reach the response stream, not just the handshake.
+   */
+  async #timedFetch<T>(
+    input: RequestInfo | URL,
+    init: RequestInit | undefined,
+    consume: (response: Response, signal: AbortSignal) => Promise<T>,
+  ): Promise<T> {
     const controller = new AbortController();
     const timer = setTimeout(() => {
       controller.abort();
     }, this.#timeoutMs);
     try {
-      return await this.#fetch(input, { ...init, signal: controller.signal });
+      const response = await this.#fetch(input, { ...init, signal: controller.signal });
+      return await consume(response, controller.signal);
     } catch (error) {
       if (controller.signal.aborted) throw new HttpTimeoutError();
       throw error;
@@ -47,27 +58,63 @@ export class HttpSpaceBackend implements SpaceBackend {
     }
   }
 
-  async listSpaces(): Promise<readonly SpaceSummary[]> {
-    const response = await this.#timedFetch(this.#baseUrl);
-    if (!response.ok) throw new Error(`Unable to list spaces: HTTP ${response.status}`);
-    return decodeSpaceSummaries(await responseJson(response));
+  listSpaces(): Promise<readonly SpaceSummary[]> {
+    return this.#timedFetch(this.#baseUrl, undefined, async (response) => {
+      if (!response.ok) throw new Error(`Unable to list spaces: HTTP ${response.status}`);
+      return decodeSpaceSummaries(await responseJson(response));
+    });
   }
 
-  async loadSpace(id: UUID): Promise<LoadedSpace | undefined> {
-    const response = await this.#timedFetch(`${this.#baseUrl}/${id}`);
-    if (response.status === 404) return undefined;
-    if (!response.ok) throw new Error(`Unable to load space: HTTP ${response.status}`);
-    return decodeLoadedSpace(await responseJson(response));
+  loadSpace(id: UUID): Promise<LoadedSpace | undefined> {
+    return this.#timedFetch(`${this.#baseUrl}/${id}`, undefined, async (response) => {
+      if (response.status === 404) return undefined;
+      if (!response.ok) throw new Error(`Unable to load space: HTTP ${response.status}`);
+      return decodeLoadedSpace(await responseJson(response));
+    });
   }
 
   async commitSpace(snapshot: SpaceSnapshot, expectedRevision: bigint): Promise<CommitResult> {
-    let response: Response;
     try {
-      response = await this.#timedFetch(`${this.#baseUrl}/${snapshot.id}`, {
-        method: 'PUT',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify(encodeCommitRequest(snapshot, expectedRevision)),
-      });
+      return await this.#timedFetch(
+        `${this.#baseUrl}/${snapshot.id}`,
+        {
+          method: 'PUT',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify(encodeCommitRequest(snapshot, expectedRevision)),
+        },
+        async (response, signal): Promise<CommitResult> => {
+          const retryable = await retryableForStatus(response);
+          if (retryable !== undefined) return retryable;
+          try {
+            if (response.status === 200) {
+              return {
+                kind: 'committed',
+                revision: decodeCommittedRevision(await responseJson(response)),
+              };
+            }
+            if (response.status === 409) {
+              return { kind: 'conflict', current: decodeLoadedSpace(await responseJson(response)) };
+            }
+            const message = decodeErrorMessage(await responseJson(response));
+            if (response.status === 401 || response.status === 403) {
+              return { kind: 'permanent-failure', code: 'forbidden', message };
+            }
+            if (response.status === 404) {
+              return { kind: 'permanent-failure', code: 'not-found', message };
+            }
+            if (response.status === 422) {
+              return { kind: 'permanent-failure', code: 'invalid-snapshot', message };
+            }
+            return protocolFailure(message);
+          } catch (error) {
+            // A stalled body aborts mid-decode. That is the timeout, not a
+            // malformed payload, so it has to reach the mapping below rather
+            // than be reported as a protocol failure the session never retries.
+            if (signal.aborted) throw error;
+            return protocolFailure(error instanceof Error ? error.message : 'Malformed response');
+          }
+        },
+      );
     } catch (error) {
       if (error instanceof HttpTimeoutError) {
         return { kind: 'retryable-failure', code: 'timeout', message: error.message };
@@ -77,30 +124,6 @@ export class HttpSpaceBackend implements SpaceBackend {
         code: 'network',
         message: error instanceof Error ? error.message : 'Network request failed',
       };
-    }
-    const retryable = await retryableForStatus(response);
-    if (retryable !== undefined) return retryable;
-    try {
-      if (response.status === 200) {
-        return {
-          kind: 'committed',
-          revision: decodeCommittedRevision(await responseJson(response)),
-        };
-      }
-      if (response.status === 409) {
-        return { kind: 'conflict', current: decodeLoadedSpace(await responseJson(response)) };
-      }
-      const message = decodeErrorMessage(await responseJson(response));
-      if (response.status === 401 || response.status === 403) {
-        return { kind: 'permanent-failure', code: 'forbidden', message };
-      }
-      if (response.status === 404) return { kind: 'permanent-failure', code: 'not-found', message };
-      if (response.status === 422) {
-        return { kind: 'permanent-failure', code: 'invalid-snapshot', message };
-      }
-      return protocolFailure(message);
-    } catch (error) {
-      return protocolFailure(error instanceof Error ? error.message : 'Malformed response');
     }
   }
 }

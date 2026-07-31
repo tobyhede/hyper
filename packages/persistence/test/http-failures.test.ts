@@ -159,4 +159,47 @@ describe('HttpSpaceBackend failure classification', () => {
       message: 'Request timed out',
     });
   });
+
+  /**
+   * Headers arriving is not the request completing. A body that stalls after a
+   * prompt status line hangs the read for as long as the peer holds it open, so
+   * the timeout has to stay armed until the body has been decoded — exactly as
+   * a real Fetch ties its signal to the response stream.
+   */
+  const stalledBodyFetch =
+    (status: number): typeof globalThis.fetch =>
+    (_input, init) =>
+      Promise.resolve(
+        new Response(
+          new ReadableStream({
+            start(controller) {
+              init?.signal?.addEventListener('abort', () => {
+                controller.error(new Error('aborted'));
+              });
+            },
+          }),
+          { status, headers: { 'content-type': 'application/json' } },
+        ),
+      );
+
+  it('times out a read whose body stalls after the status line', async () => {
+    const backend = new HttpSpaceBackend('/api/spaces', {
+      timeoutMs: 5,
+      fetch: stalledBodyFetch(200),
+    });
+    await expect(backend.listSpaces()).rejects.toThrow('Request timed out');
+    await expect(backend.loadSpace(SPACE_ID)).rejects.toThrow('Request timed out');
+  }, 1000);
+
+  it('reports a commit whose body stalls after the status line as a retryable timeout', async () => {
+    const backend = new HttpSpaceBackend('/api/spaces', {
+      timeoutMs: 5,
+      fetch: stalledBodyFetch(200),
+    });
+    await expect(backend.commitSpace(snapshot, 0n)).resolves.toEqual({
+      kind: 'retryable-failure',
+      code: 'timeout',
+      message: 'Request timed out',
+    });
+  }, 1000);
 });
