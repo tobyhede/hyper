@@ -138,7 +138,7 @@ describe('resolveDatabaseStartup', () => {
         cards: [
           {
             id: cardId,
-            document: { title: 'Start here', kind: 'markdown', body: '' },
+            document: { title: 'Card 1', kind: 'markdown', body: '' },
           },
         ],
       },

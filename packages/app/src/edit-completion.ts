@@ -11,6 +11,8 @@ interface PlacementEditorDependencies {
   readonly currentActiveRoute: () => RouteId | null;
   readonly session: SpaceSession;
   readonly installSpace: (space: Space) => void;
+  readonly activateRoute?: (routeId: RouteId) => void;
+  readonly mintRouteId?: () => RouteId;
 }
 
 interface CurrentEditState {
@@ -19,6 +21,7 @@ interface CurrentEditState {
   readonly renderer: RendererSelection;
   readonly newLayoutId: UUID | null;
   readonly activeRouteId: RouteId | null;
+  readonly newRouteId?: RouteId | null;
   readonly connection: { readonly from: CardId; readonly to: CardId } | null;
 }
 
@@ -26,6 +29,7 @@ interface DerivedEdit {
   readonly snapshot: SpaceSnapshot;
   readonly layoutId: UUID;
   readonly space: Space;
+  readonly activeRouteId: RouteId | null;
 }
 
 function nextLayoutTitle(snapshot: SpaceSnapshot): string {
@@ -37,6 +41,17 @@ function nextLayoutTitle(snapshot: SpaceSnapshot): string {
     if (number > highest) highest = number;
   }
   return `Layout ${highest + 1n}`;
+}
+
+function nextRouteTitle(snapshot: SpaceSnapshot): string {
+  let highest = 0n;
+  for (const route of snapshot.document.routes) {
+    const match = /^Route ([1-9]\d*)$/.exec(route.title);
+    if (match?.[1] === undefined) continue;
+    const number = BigInt(match[1]);
+    if (number > highest) highest = number;
+  }
+  return `Route ${highest + 1n}`;
 }
 
 function targetForEdit(
@@ -99,23 +114,44 @@ function appendRouteEdge(
 }
 
 function deriveCompletedEdit(current: CurrentEditState): DerivedEdit | null {
-  const target = targetForEdit(current.snapshot, current.renderer, current.newLayoutId);
+  let base = current.snapshot;
+  let activeRouteId = current.activeRouteId;
+  let connectionAlreadyAdded = false;
+  if (current.connection !== null && activeRouteId === null) {
+    if (base.document.routes.length > 0) {
+      throw new Error('A Space with Routes must have an active Route before connecting Cards.');
+    }
+    if (current.newRouteId === null || current.newRouteId === undefined) {
+      throw new Error('The first connection requires a new Route id.');
+    }
+    activeRouteId = current.newRouteId;
+    connectionAlreadyAdded = true;
+    base = {
+      ...base,
+      document: {
+        ...base.document,
+        routes: [
+          {
+            id: activeRouteId,
+            title: nextRouteTitle(base),
+            edges: [{ from: current.connection.from, to: current.connection.to }],
+          },
+        ],
+      },
+    };
+  }
+  const target = targetForEdit(base, current.renderer, current.newLayoutId);
   const placed = updatePositionedLayout(
-    current.snapshot,
+    base,
     target.layoutId,
     target.title,
     current.positions,
-    current.activeRouteId,
+    activeRouteId,
   );
   const snapshot =
-    current.connection === null || current.activeRouteId === null
+    current.connection === null || activeRouteId === null || connectionAlreadyAdded
       ? placed
-      : appendRouteEdge(
-          placed,
-          current.activeRouteId,
-          current.connection.from,
-          current.connection.to,
-        );
+      : appendRouteEdge(placed, activeRouteId, current.connection.from, current.connection.to);
   if (snapshot === null) return null;
   const loaded = loadSpaceSnapshot(snapshot);
   if (!loaded.ok) {
@@ -125,7 +161,7 @@ function deriveCompletedEdit(current: CurrentEditState): DerivedEdit | null {
         .join('; ')}`,
     );
   }
-  return { snapshot, layoutId: target.layoutId, space: loaded.space };
+  return { snapshot, layoutId: target.layoutId, space: loaded.space, activeRouteId };
 }
 
 export function createPlacementEditor({
@@ -134,6 +170,8 @@ export function createPlacementEditor({
   currentActiveRoute,
   session,
   installSpace,
+  activateRoute,
+  mintRouteId,
 }: PlacementEditorDependencies): EditorStore {
   // Each completed Edit installs a fresh positions map before notifying. Record
   // that identity before effects so a synchronous listener cannot resubmit it.
@@ -163,12 +201,15 @@ export function createPlacementEditor({
           if (positions === submittedPositions) continue;
           const renderer = viewChoice.current();
           const connection = editor.getState().completedConnection;
+          const activeRouteId = currentActiveRoute();
           const next = deriveCompletedEdit({
             snapshot: session.getState().working,
             positions,
             renderer,
             newLayoutId: renderer.kind === 'view' ? newUuid() : null,
-            activeRouteId: currentActiveRoute(),
+            activeRouteId,
+            newRouteId:
+              connection !== null && activeRouteId === null ? (mintRouteId?.() ?? newUuid()) : null,
             connection,
           });
           editor.setState({ completedConnection: null });
@@ -184,6 +225,13 @@ export function createPlacementEditor({
           } catch (error) {
             firstEffectError ??= { error };
           }
+          if (activeRouteId === null && next.activeRouteId !== null) {
+            try {
+              activateRoute?.(next.activeRouteId);
+            } catch (error) {
+              firstEffectError ??= { error };
+            }
+          }
           try {
             viewChoice.select({ kind: 'layout', layoutId: next.layoutId });
           } catch (error) {
@@ -197,7 +245,7 @@ export function createPlacementEditor({
     },
     (from, to) => {
       const routeId = currentActiveRoute();
-      if (routeId === null) return false;
+      if (routeId === null) return session.getState().working.document.routes.length === 0;
       return !inspectRouteEdge(session.getState().working, routeId, from, to).exists;
     },
   );

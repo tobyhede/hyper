@@ -19,12 +19,8 @@ export interface NewSpace {
   readonly cardFiles: readonly CardFile[];
 }
 
-/**
- * The first card's title. An invitation rather than a placeholder: it is the
- * first word the app says to an author, and it is what the graph draws (ADR
- * 0006), so it should not read as an empty slot or as instructions.
- */
-const FIRST_CARD_TITLE = 'Start here';
+/** The first neutral Card title; later creation continues the same sequence. */
+const FIRST_CARD_TITLE = 'Card 1';
 
 export function newSpace(): NewSpace {
   const spaceId = newUuid();

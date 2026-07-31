@@ -222,7 +222,7 @@ describe('hyper CLI', () => {
         cards: [
           {
             id: stored?.snapshot.cards[0]?.id,
-            document: { title: 'Start here', kind: 'markdown', body: '' },
+            document: { title: 'Card 1', kind: 'markdown', body: '' },
           },
         ],
       },

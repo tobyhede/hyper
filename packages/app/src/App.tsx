@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { ReactFlowProvider } from '@xyflow/react';
 import { AppShell, Button, LayoutSelector, RouteSelector, ViewSelector } from '@project/ui';
-import { uuidSchema, type BuiltInViewId, type CardId } from '@project/core';
+import { newUuid, uuidSchema, type BuiltInViewId, type CardId } from '@project/core';
 import {
   projectCardNodes,
   projectRouteEdges,
@@ -19,7 +19,7 @@ import {
 import type { OpenedSpace } from './space';
 import { createPlacementEditor } from './edit-completion';
 import { canvasContent, usePlacementRendering } from './placement-rendering';
-import { routeColorMap } from './colors';
+import { ROUTE_PALETTE, routeColorMap } from './colors';
 import { CARD_HEIGHT, CARD_SIZE, cardSizeVars } from './card';
 import { createSpaceStore } from './store';
 import {
@@ -66,12 +66,18 @@ export const createApp = ({ space, spaceSession }: OpenedSpace, { acceptRemote }
   const initialPositions =
     initialView.layout === null ? null : layoutPositionMap(initialView.layout);
   const viewChoice = createViewChoice(initialRenderer);
+  // Reserve the identity whose hidden overview handles must already be declared
+  // when a route-less Space's first Edge and Route appear in the same render.
+  // Until a successful connection uses it, this is runtime-only identity.
+  const firstRouteId = space.routes.length === 0 ? newUuid() : null;
   const useEditorStore = createPlacementEditor({
     initialPositions,
     viewChoice,
     currentActiveRoute: () => useSpaceStore.getState().activeRouteId,
     session: spaceSession,
     installSpace: updateSpace,
+    activateRoute: (routeId) => useSpaceStore.getState().activateRoute(routeId),
+    ...(firstRouteId === null ? {} : { mintRouteId: () => firstRouteId }),
   });
 
   function App() {
@@ -103,6 +109,13 @@ export const createApp = ({ space, spaceSession }: OpenedSpace, { acceptRemote }
       [routes, layouts],
     );
     const colors = useMemo(() => routeColorMap(rendererSpace), [rendererSpace]);
+    const projectionColors = useMemo(
+      () =>
+        firstRouteId !== null && routes.length === 0
+          ? { ...colors, [firstRouteId]: ROUTE_PALETTE[0] }
+          : colors,
+      [colors, routes],
+    );
     const allHandles = useMemo(() => buildCardHandles(rendererSpace), [rendererSpace]);
     const allRouteEdges = useMemo(() => buildRouteEdges(rendererSpace), [rendererSpace]);
     const view = useMemo(
@@ -182,14 +195,13 @@ export const createApp = ({ space, spaceSession }: OpenedSpace, { acceptRemote }
 
     const projectedNodes = useMemo(
       () =>
-        projectCardNodes(rendererSpace, visibleHandles, colors, {
+        projectCardNodes(rendererSpace, visibleHandles, projectionColors, {
           activeCardId,
           selectedCardId,
           showActiveCardContent: presenting,
           activeRouteId,
-          ...(activeRouteId !== null && colors[activeRouteId] !== undefined
-            ? { activeRouteColor: colors[activeRouteId] }
-            : {}),
+          activeRouteColor:
+            activeRouteId === null ? ROUTE_PALETTE[0] : (colors[activeRouteId] ?? ROUTE_PALETTE[0]),
           emphasis,
           ...(laidOut ? { layoutGraph: laidOut } : {}),
           nodeHeight: CARD_HEIGHT,
@@ -197,6 +209,7 @@ export const createApp = ({ space, spaceSession }: OpenedSpace, { acceptRemote }
         }),
       [
         rendererSpace,
+        projectionColors,
         colors,
         activeCardId,
         selectedCardId,

@@ -1,5 +1,13 @@
 import { expect, test } from './fixtures';
-import { dragBy, nodeByTitle, positionOf, settled } from './graph';
+import {
+  AUTHORING_HANDLE_SIDES,
+  authoringHandle,
+  connectHandles,
+  dragBy,
+  nodeByTitle,
+  positionOf,
+  settled,
+} from './graph';
 
 /**
  * Opening the app with nothing to open gives a new space: one card (ADR 0018).
@@ -11,16 +19,70 @@ import { dragBy, nodeByTitle, positionOf, settled } from './graph';
 test('shows one card, and it is the only thing on screen', async ({ page }) => {
   await page.goto('/');
 
-  const card = nodeByTitle(page, 'Start here');
+  const card = nodeByTitle(page, 'Card 1');
   await expect(card).toBeVisible();
   await expect(page.locator('.react-flow__node')).toHaveCount(1);
   // No routes means no edges to draw.
   await expect(page.locator('.react-flow__edge')).toHaveCount(0);
 });
 
+test('route-less handles preview Route 1 and an empty drop cancels', async ({ page }) => {
+  await page.goto('/');
+  const card = nodeByTitle(page, 'Card 1');
+  await expect(card).toBeVisible();
+  await settled(page);
+  await card.hover();
+
+  const handles = card.locator('.rf-card-node__authoring-handle--source');
+  await expect(handles).toHaveCount(AUTHORING_HANDLE_SIDES);
+  await expect(handles.first()).toHaveCSS('background-color', 'rgb(110, 168, 254)');
+
+  const source = authoringHandle(card, 'source', 'right');
+  const from = (await source.boundingBox())!;
+  await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(from.x + from.width / 2 + 40, from.y + from.height / 2, { steps: 4 });
+  const preview = page.locator('.react-flow__connection-path');
+  await expect(preview).toBeVisible();
+  await expect(preview).toHaveCSS('stroke', 'rgb(110, 168, 254)');
+  await page.mouse.move(from.x + from.width / 2 + 180, from.y + from.height / 2 + 180);
+  await page.mouse.up();
+
+  await expect(page.locator('.react-flow__edge')).toHaveCount(0);
+  await expect(page.getByTestId('route-selector')).toContainText('None');
+  await expect(page.getByTestId('layout-selector')).toContainText('None');
+  await expect(page.getByTestId('view-selector')).toContainText('Graph');
+  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '0');
+});
+
+test('the first self-connection mints and activates Route 1 in one persisted Layout', async ({
+  page,
+}) => {
+  await page.goto('/');
+  const card = nodeByTitle(page, 'Card 1');
+  await expect(card).toBeVisible();
+  await settled(page);
+  const before = await positionOf(card);
+  await card.hover();
+
+  await connectHandles(
+    page,
+    authoringHandle(card, 'source', 'right'),
+    authoringHandle(card, 'target', 'left'),
+  );
+
+  await expect(page.locator('.react-flow__edge')).toHaveCount(1);
+  await expect(page.getByTestId('route-selector')).toContainText('Route 1');
+  await expect(page.getByTestId('route-legend')).toContainText('Route 1');
+  await expect(page.getByTestId('layout-selector')).toContainText('Layout 1');
+  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
+  await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
+  expect(await positionOf(card)).toEqual(before);
+});
+
 test('shows an empty disabled route control and no route HUD (ADR 0015)', async ({ page }) => {
   await page.goto('/');
-  await expect(nodeByTitle(page, 'Start here')).toBeVisible();
+  await expect(nodeByTitle(page, 'Card 1')).toBeVisible();
 
   await expect(page.getByTestId('route-selector')).toContainText('None');
   await expect(page.getByTestId('present-button')).toBeDisabled();
@@ -32,7 +94,7 @@ test('its one card is draggable once its automatic arrangement resolves (ADR 002
 }) => {
   await page.goto('/');
 
-  const card = nodeByTitle(page, 'Start here');
+  const card = nodeByTitle(page, 'Card 1');
   await expect(card).toBeVisible();
   await settled(page);
 
@@ -45,7 +107,7 @@ test('its one card is draggable once its automatic arrangement resolves (ADR 002
 
 test('renders at natural size rather than filling the screen', async ({ page }) => {
   await page.goto('/');
-  await expect(nodeByTitle(page, 'Start here')).toBeVisible();
+  await expect(nodeByTitle(page, 'Card 1')).toBeVisible();
   await settled(page);
 
   // The overview fit caps at `maxZoom: 1`. Without the cap React Flow's default
@@ -62,7 +124,7 @@ test('renders at natural size rather than filling the screen', async ({ page }) 
 test('persists a completed edit through the backend session', async ({ page }) => {
   await page.goto('/');
 
-  const card = nodeByTitle(page, 'Start here');
+  const card = nodeByTitle(page, 'Card 1');
   await expect(card).toBeVisible();
   await settled(page);
   const before = await positionOf(card);
@@ -73,7 +135,7 @@ test('persists a completed edit through the backend session', async ({ page }) =
 
 test('a completed edit and workspace identity survive reload', async ({ page }) => {
   await page.goto('/');
-  const first = nodeByTitle(page, 'Start here');
+  const first = nodeByTitle(page, 'Card 1');
   await expect(first).toBeVisible();
   const firstId = await first.getAttribute('data-id');
   // Without this, two missing attributes compare equal after the reload and the
@@ -86,7 +148,7 @@ test('a completed edit and workspace identity survive reload', async ({ page }) 
 
   await page.reload();
 
-  const second = nodeByTitle(page, 'Start here');
+  const second = nodeByTitle(page, 'Card 1');
   await expect(second).toBeVisible();
   await settled(page);
   expect(await second.getAttribute('data-id')).toBe(firstId);

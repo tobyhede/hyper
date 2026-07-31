@@ -17,14 +17,14 @@ describe('newSpace', () => {
     expect(result.space.routes).toEqual([]);
   });
 
-  it('carries one card with a title and an empty body (ADR 0018, ADR 0020)', () => {
+  it('begins neutral Card numbering at Card 1 with an empty body (ADR 0018, ADR 0020)', () => {
     const { file, cardFiles } = newSpace();
     const result = loadSpace(file, cardFiles);
     if (!result.ok) throw new Error('should load');
 
     const card = result.space.cards[0]!;
     expect(card.kind).toBe('markdown');
-    expect(card.title.length).toBeGreaterThan(0);
+    expect(card.title).toBe('Card 1');
     expect(card.kind === 'markdown' && card.body).toBe('');
   });
 

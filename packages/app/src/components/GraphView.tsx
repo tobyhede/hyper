@@ -18,6 +18,7 @@ import {
   RouteHud,
   type CardFlowNode,
 } from '@project/react-flow-adapter';
+import { ROUTE_PALETTE } from '../colors';
 
 /**
  * How much of the shorter viewport axis the presented card leaves as margin.
@@ -177,7 +178,10 @@ export function GraphView({
       nodesConnectable={editable && !presenting}
       connectionMode={ConnectionMode.Loose}
       connectionLineStyle={{
-        stroke: activeRouteId === null ? '#8a94a6' : colorByRouteId[activeRouteId],
+        stroke:
+          activeRouteId === null
+            ? ROUTE_PALETTE[0]
+            : (colorByRouteId[activeRouteId] ?? ROUTE_PALETTE[0]),
         strokeWidth: 3,
       }}
       connectionLineComponent={RouteConnectionLine}
