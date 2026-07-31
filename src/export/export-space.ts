@@ -36,7 +36,10 @@ const canonicalSpaceFile = ({ snapshot }: StoredSpace): SpaceFile => {
   };
 };
 
-const canonicalCard = (id: UUID, document: StoredSpace['snapshot']['cards'][number]['document']): Card => {
+const canonicalCard = (
+  id: UUID,
+  document: StoredSpace['snapshot']['cards'][number]['document'],
+): Card => {
   const common = {
     id,
     title: document.title,

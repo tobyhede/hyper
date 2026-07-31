@@ -58,23 +58,25 @@ export const runHyper = async (
   dependencies: RunHyperDependencies,
 ): Promise<number> => {
   if (args[0] === 'export') {
-    if (args.length !== 3) {
+    const rawId = args[1];
+    const destination = args[2];
+    if (args.length !== 3 || rawId === undefined || destination === undefined) {
       dependencies.io.stderr(USAGE);
       return 2;
     }
-    const id = uuidSchema.safeParse(args[1]);
+    const id = uuidSchema.safeParse(rawId);
     if (!id.success) {
-      dependencies.io.stderr(`Invalid space UUID: ${args[1]}\n`);
+      dependencies.io.stderr(`Invalid space UUID: ${rawId}\n`);
       return 2;
     }
     try {
-      const stored = await exportSpace(dependencies.repository, id.data, args[2]!);
+      const stored = await exportSpace(dependencies.repository, id.data, destination);
       if (stored === undefined) {
         dependencies.io.stderr(`Space ${id.data} does not exist\n`);
         return 1;
       }
       dependencies.io.stdout(
-        `Exported space ${id.data} at revision ${stored.revision.toString()} to ${args[2]}\n`,
+        `Exported space ${id.data} at revision ${stored.revision.toString()} to ${destination}\n`,
       );
       return 0;
     } catch (error) {

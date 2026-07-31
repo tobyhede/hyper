@@ -131,9 +131,7 @@ describe('runHyper', () => {
     });
 
     expect(exitCode).toBe(0);
-    expect(output.stdout).toEqual([
-      `Exported space ${SPACE_ID} at revision 0 to ${destination}\n`,
-    ]);
+    expect(output.stdout).toEqual([`Exported space ${SPACE_ID} at revision 0 to ${destination}\n`]);
     expect(output.stderr).toEqual([]);
     await expect(readFile(join(destination, 'space.json'), 'utf8')).resolves.toBe(
       `${JSON.stringify({ version: 2, id: SPACE_ID, title: 'Stored talk', routes: [] }, null, 2)}\n`,
@@ -190,9 +188,9 @@ describe('runHyper', () => {
       code: 'ENOENT',
     });
     await expect(readFile(join(destination, 'notes.txt'), 'utf8')).resolves.toBe('keep root\n');
-    await expect(
-      readFile(join(destination, 'cards', 'nested', 'keep.md'), 'utf8'),
-    ).resolves.toBe('keep nested\n');
+    await expect(readFile(join(destination, 'cards', 'nested', 'keep.md'), 'utf8')).resolves.toBe(
+      'keep nested\n',
+    );
   });
 
   it('records the exact revision only after the destination is replaced', async () => {
@@ -230,9 +228,7 @@ describe('runHyper', () => {
     await expect(readFile(join(destination, 'space.json'), 'utf8')).resolves.toBe(
       'previous space\n',
     );
-    await expect(readFile(join(destination, 'cards'), 'utf8')).resolves.toBe(
-      'not a directory\n',
-    );
+    await expect(readFile(join(destination, 'cards'), 'utf8')).resolves.toBe('not a directory\n');
     await expect(repository.loadSpace(SPACE_ID)).resolves.toMatchObject({
       exportedRevision: null,
     });
@@ -320,9 +316,7 @@ describe('runHyper', () => {
 
     await expect(
       runHyper(['export', SPACE_ID, destination], {
-        repository: new MemorySpaceRepository([
-          { snapshot, revision: 7n, exportedRevision: null },
-        ]),
+        repository: new MemorySpaceRepository([{ snapshot, revision: 7n, exportedRevision: null }]),
         io: captureIo().io,
       }),
     ).resolves.toBe(0);
