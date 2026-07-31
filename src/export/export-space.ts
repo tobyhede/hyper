@@ -139,7 +139,11 @@ const replaceDestination = async (replacement: string, destination: string): Pro
       }
       throw replacementError;
     }
-    await rm(backupRoot, { recursive: true });
+    // Both renames landed, so the export is complete and the recovery copy is
+    // now housekeeping. Letting its removal fail the call would report a
+    // finished export as a failure and skip `markExported`, leaving the
+    // projected revision behind the bytes already on disk.
+    await rm(backupRoot, { recursive: true, force: true }).catch(() => undefined);
   } catch (error) {
     if (!(await exists(backup))) await rm(backupRoot, { recursive: true, force: true });
     throw error;
