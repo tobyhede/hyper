@@ -49,10 +49,17 @@ describe('test HTTP server', () => {
       response.end();
       return Promise.resolve(true);
     });
-    expect((await fetch(`${server.url}/api/spaces`)).status).toBe(204);
-
-    const startedAt = performance.now();
-    await server.close();
-    expect(performance.now() - startedAt).toBeLessThan(1000);
+    // Closing in `finally` keeps a failed request from leaking a listening
+    // server into the rest of the run, and the duration is asserted afterwards
+    // so a slow close cannot mask whatever failed above it.
+    let closeMilliseconds: number | undefined;
+    try {
+      expect((await fetch(`${server.url}/api/spaces`)).status).toBe(204);
+    } finally {
+      const startedAt = performance.now();
+      await server.close();
+      closeMilliseconds = performance.now() - startedAt;
+    }
+    expect(closeMilliseconds).toBeLessThan(1000);
   }, 10000);
 });
