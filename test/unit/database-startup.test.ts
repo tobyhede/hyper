@@ -1,7 +1,14 @@
-import { uuidSchema, type ImportSpace } from '@project/core';
+import { uuidSchema, type ImportSpace, type SpaceSnapshot, type UUID } from '@project/core';
 import { describe, expect, it } from 'vitest';
 import { openDatabaseSelection, resolveDatabaseStartup } from '../../src/startup/database-startup';
-import type { StoredSpace } from '../../src/persistence/space-repository';
+import type {
+  ImportMode,
+  RepositoryCommitResult,
+  RepositoryImportResult,
+  SpaceRepository,
+  SpaceSummary,
+  StoredSpace,
+} from '../../src/persistence/space-repository';
 import { MemorySpaceRepository } from '../support/memory-space-repository';
 
 const SPACE_ID = uuidSchema.parse('11111111-1111-4111-8111-111111111111');
@@ -10,6 +17,49 @@ const CARD_ID = uuidSchema.parse('33333333-3333-4333-8333-333333333333');
 const OTHER_CARD_ID = uuidSchema.parse('44444444-4444-4444-8444-444444444444');
 const THIRD_SPACE_ID = uuidSchema.parse('55555555-5555-4555-8555-555555555555');
 const THIRD_CARD_ID = uuidSchema.parse('66666666-6666-4666-8666-666666666666');
+
+class PersistenceOwnedSpaceIdRepository implements SpaceRepository {
+  readonly #memory = new MemorySpaceRepository();
+
+  listSpaces(): Promise<readonly SpaceSummary[]> {
+    return this.#memory.listSpaces();
+  }
+
+  loadSpace(id: UUID): Promise<StoredSpace | undefined> {
+    return this.#memory.loadSpace(id);
+  }
+
+  commitSpace(snapshot: SpaceSnapshot, expectedRevision: bigint): Promise<RepositoryCommitResult> {
+    return this.#memory.commitSpace(snapshot, expectedRevision);
+  }
+
+  importSpaces(input: readonly ImportSpace[], mode: ImportMode): Promise<RepositoryImportResult> {
+    const [space] = input;
+    if (space === undefined || input.length !== 1) {
+      return Promise.resolve({
+        kind: 'rejected',
+        code: 'invalid-snapshot',
+        message: 'Expected exactly one new Space',
+      });
+    }
+    if (space.id !== undefined) {
+      return Promise.resolve({
+        kind: 'rejected',
+        code: 'invalid-snapshot',
+        message: 'The repository owns the new Space identity',
+      });
+    }
+    if (space.cards.some((card) => card.id === undefined)) {
+      return Promise.resolve({
+        kind: 'rejected',
+        code: 'invalid-snapshot',
+        message: 'Card identities must already be assigned',
+      });
+    }
+
+    return this.#memory.importSpaces([{ ...space, id: SPACE_ID }], mode);
+  }
+}
 
 const storedSpace = (
   revision: bigint,
@@ -57,20 +107,13 @@ describe('openDatabaseSelection', () => {
 
 describe('resolveDatabaseStartup', () => {
   it('leaves the new Space identity for the repository to assign', async () => {
-    const repository = new MemorySpaceRepository();
-    const importSpaces = repository.importSpaces.bind(repository);
-    let submitted: readonly ImportSpace[] | undefined;
-    repository.importSpaces = (input, mode) => {
-      submitted = input;
-      return importSpaces(input, mode);
-    };
+    const repository = new PersistenceOwnedSpaceIdRepository();
 
     const result = await resolveDatabaseStartup(repository);
 
-    expect(submitted?.[0]).not.toHaveProperty('id');
     expect(result.kind).toBe('opened');
     if (result.kind !== 'opened') throw new Error('Expected the new space to open');
-    expect(uuidSchema.safeParse(result.space.snapshot.id).success).toBe(true);
+    expect(result.space.snapshot.id).toBe(SPACE_ID);
     expect(uuidSchema.safeParse(result.space.snapshot.cards[0]?.id).success).toBe(true);
   });
 
