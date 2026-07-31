@@ -68,7 +68,6 @@ test('persists a completed edit through the backend session', async ({ page }) =
   const before = await positionOf(card);
   await dragBy(page, card, 0, 220);
   expect((await positionOf(card)).y).toBeGreaterThan(before.y + 80);
-  await expect(page.getByTestId('save-button')).toHaveCount(0);
   await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
 });
 

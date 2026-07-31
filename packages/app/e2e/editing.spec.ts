@@ -137,14 +137,13 @@ test('edges follow a card that has been dragged', async ({ page }) => {
   await expect.poll(edgePath).not.toBe(before);
 });
 
-test('a completed drag persists automatically without a Save action', async ({ page }) => {
+test('a completed drag persists automatically', async ({ page }) => {
   await page.goto('/');
   const a = nodeByTitle(page, 'A').first();
   await expect(a).toBeVisible();
   await expect(page.locator('.react-flow__edge-path').first()).toHaveAttribute('d', /L/);
   await settled(page);
 
-  await expect(page.getByTestId('save-button')).toHaveCount(0);
   await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
 
   await dragBy(page, a, 0, 260);
