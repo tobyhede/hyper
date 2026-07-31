@@ -71,6 +71,37 @@ describe('HttpSpaceBackend failure classification', () => {
     });
   });
 
+  it('honours Retry-After on an unavailable response', async () => {
+    for (const status of [500, 503]) {
+      await expect(
+        backendFor(
+          new Response(JSON.stringify({ message: 'Down for maintenance' }), {
+            status,
+            headers: { 'Retry-After': '30' },
+          }),
+        ).commitSpace(snapshot, 0n),
+      ).resolves.toEqual({
+        kind: 'retryable-failure',
+        code: 'unavailable',
+        message: 'Down for maintenance',
+        retryAfterMs: 30_000,
+      });
+    }
+  });
+
+  it('omits Retry-After when a retryable response does not send one', async () => {
+    await expect(
+      backendFor(new Response(JSON.stringify({ message: 'Down' }), { status: 503 })).commitSpace(
+        snapshot,
+        0n,
+      ),
+    ).resolves.toEqual({
+      kind: 'retryable-failure',
+      code: 'unavailable',
+      message: 'Down',
+    });
+  });
+
   it('rejects malformed success and conflict bodies as permanent protocol failures', async () => {
     for (const status of [200, 409]) {
       await expect(
@@ -100,6 +131,18 @@ describe('HttpSpaceBackend failure classification', () => {
       code: 'network',
       message: 'offline',
     });
+  });
+
+  it('reports a descriptive message when a read times out', async () => {
+    const backend = new HttpSpaceBackend('/api/spaces', {
+      timeoutMs: 5,
+      fetch: (_input, init) =>
+        new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener('abort', () => reject(new Error('aborted')));
+        }),
+    });
+    await expect(backend.listSpaces()).rejects.toThrow('Request timed out');
+    await expect(backend.loadSpace(SPACE_ID)).rejects.toThrow('Request timed out');
   });
 
   it('applies its timeout to a caller-provided Fetch', async () => {

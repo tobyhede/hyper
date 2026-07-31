@@ -1,7 +1,7 @@
 import { Agent, request as httpRequest, type IncomingHttpHeaders } from 'node:http';
 import { describe, expect, it } from 'vitest';
 import { uuidSchema, type SpaceSnapshot } from '@project/core';
-import { encodeCommitRequest } from '../../packages/persistence/src/http-protocol';
+import { encodeCommitRequest } from '@project/persistence';
 import { createSpaceHttpHandler, MAX_COMMIT_BODY_BYTES } from '../../src/http/space-http-handler';
 import { E2eMemorySpaceRepository } from '../support/e2e-memory-space-repository';
 import { startHttpServer } from '../support/http-server';
@@ -203,7 +203,7 @@ describe('Space HTTP request validation', () => {
       }
     }
     const server = await startHttpServer(
-      createSpaceHttpHandler(new UnavailableRepository([stored])),
+      createSpaceHttpHandler(new UnavailableRepository([stored]), { logError: () => undefined }),
     );
     try {
       const response = await send(server.url, `/api/spaces/${SPACE_ID}`, validBody, validHeaders);
@@ -212,5 +212,41 @@ describe('Space HTTP request validation', () => {
     } finally {
       await server.close();
     }
+  });
+
+  it('logs the underlying error behind every unavailable response', async () => {
+    class BrokenRepository extends E2eMemorySpaceRepository {
+      override listSpaces(): Promise<never> {
+        return Promise.reject(new Error('list failed'));
+      }
+      override loadSpace(): Promise<never> {
+        return Promise.reject(new Error('load failed'));
+      }
+      override commitSpace(): Promise<never> {
+        return Promise.reject(new Error('commit failed'));
+      }
+    }
+    const logged: unknown[] = [];
+    const server = await startHttpServer(
+      createSpaceHttpHandler(new BrokenRepository([stored]), {
+        logError: (_message, error) => logged.push(error),
+      }),
+    );
+    try {
+      expect((await send(server.url, '/api/spaces', '', {}, undefined, 'GET')).status).toBe(503);
+      expect(
+        (await send(server.url, `/api/spaces/${SPACE_ID}`, '', {}, undefined, 'GET')).status,
+      ).toBe(503);
+      expect(
+        (await send(server.url, `/api/spaces/${SPACE_ID}`, validBody, validHeaders)).status,
+      ).toBe(503);
+    } finally {
+      await server.close();
+    }
+    expect(logged.map((error) => (error as Error).message)).toEqual([
+      'list failed',
+      'load failed',
+      'commit failed',
+    ]);
   });
 });

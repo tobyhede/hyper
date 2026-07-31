@@ -1,9 +1,6 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { uuidSchema } from '@project/core';
-import {
-  decodeCommitRequest,
-  encodeLoadedSpace,
-} from '../../packages/persistence/src/http-protocol';
+import { decodeCommitRequest, encodeLoadedSpace } from '@project/persistence';
 import type { SpaceRepository } from '../persistence/space-repository';
 
 export type SpaceHttpHandler = (
@@ -82,9 +79,24 @@ const unavailable = (response: ServerResponse): void => {
   json(response, 503, { message: 'Persistence service unavailable' });
 };
 
+const defaultLogError = (message: string, error: unknown): void => {
+  console.error(message, error);
+};
+
+export interface SpaceHttpHandlerOptions {
+  /**
+   * Where a repository failure is reported before the request is answered with
+   * a 503. Defaults to `console.error`: the response deliberately says nothing
+   * about the cause, so swallowing it here would leave a database outage and a
+   * bug in this handler indistinguishable from the server side.
+   */
+  logError?: (message: string, error: unknown) => void;
+}
+
 export const createSpaceHttpHandler =
-  (repository: SpaceRepository): SpaceHttpHandler =>
+  (repository: SpaceRepository, options: SpaceHttpHandlerOptions = {}): SpaceHttpHandler =>
   async (request, response) => {
+    const logError = options.logError ?? defaultLogError;
     const url = new URL(request.url ?? '/', 'http://localhost');
     if (url.pathname === '/api/spaces') {
       if (request.method !== 'GET') {
@@ -93,7 +105,8 @@ export const createSpaceHttpHandler =
       }
       try {
         json(response, 200, await repository.listSpaces());
-      } catch {
+      } catch (error) {
+        logError('Failed to list spaces', error);
         unavailable(response);
       }
       return true;
@@ -112,7 +125,8 @@ export const createSpaceHttpHandler =
         if (loaded === undefined)
           json(response, 404, { message: `Space ${parsedId.data} does not exist` });
         else json(response, 200, encodeLoadedSpace(loaded));
-      } catch {
+      } catch (error) {
+        logError(`Failed to load space ${parsedId.data}`, error);
         unavailable(response);
       }
       return true;
@@ -155,7 +169,8 @@ export const createSpaceHttpHandler =
         json(response, 200, { revision: result.revision.toString() });
       else if (result.kind === 'conflict') json(response, 409, encodeLoadedSpace(result.current));
       else json(response, result.code === 'not-found' ? 404 : 422, { message: result.message });
-    } catch {
+    } catch (error) {
+      logError(`Failed to commit space ${parsedId.data}`, error);
       unavailable(response);
     }
     return true;

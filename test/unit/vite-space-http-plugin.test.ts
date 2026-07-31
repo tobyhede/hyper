@@ -40,6 +40,64 @@ describe('spaceHttpPlugin', () => {
     expect(ssrLoadModule).toHaveBeenCalledOnce();
     expect(ssrLoadModule).toHaveBeenCalledWith('/development-runtime.ts');
     expect(next).not.toHaveBeenCalled();
+
+    const secondNext = vi.fn();
+    middleware(request, response, secondNext);
+    await vi.waitFor(() => expect(handler).toHaveBeenCalledTimes(2));
+    expect(ssrLoadModule).toHaveBeenCalledOnce();
+    expect(secondNext).not.toHaveBeenCalled();
+  });
+
+  it('does not leave a failed runtime load unhandled before any request arrives', async () => {
+    const rejections: unknown[] = [];
+    const record = (reason: unknown): void => {
+      rejections.push(reason);
+    };
+    process.on('unhandledRejection', record);
+    try {
+      const plugin = spaceHttpPlugin({
+        developmentModule: '/failed-runtime.ts',
+        previewModule: '/preview-runtime.js',
+      });
+      const configureServer = plugin.configureServer;
+      if (typeof configureServer !== 'function') throw new Error('Expected configureServer hook');
+      void configureServer.call(
+        {} as never,
+        {
+          ssrLoadModule: () => Promise.reject(new Error('runtime failed')),
+          middlewares: { use: () => undefined },
+        } as never,
+      );
+      // Node classifies a rejection as unhandled at the end of the turn, so the
+      // assertion has to outlive one. No request is ever made: that is the point.
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(rejections).toEqual([]);
+    } finally {
+      process.off('unhandledRejection', record);
+    }
+  });
+
+  it('names the module when a runtime exposes no createHandler', async () => {
+    let middleware: Middleware | undefined;
+    const plugin = spaceHttpPlugin({
+      developmentModule: '/development-runtime.ts',
+      previewModule: '/preview-runtime.js',
+    });
+    const configureServer = plugin.configureServer;
+    if (typeof configureServer !== 'function') throw new Error('Expected configureServer hook');
+    void configureServer.call(
+      {} as never,
+      {
+        ssrLoadModule: () => Promise.resolve({ notAHandlerFactory: true }),
+        middlewares: { use: (installed: Middleware) => (middleware = installed) },
+      } as never,
+    );
+    if (middleware === undefined) throw new Error('Expected HTTP middleware');
+
+    const next = vi.fn();
+    middleware(request, response, next);
+    await vi.waitFor(() => expect(next).toHaveBeenCalled());
+    expect(String(next.mock.calls[0]?.[0])).toContain('/development-runtime.ts');
   });
 
   it('falls through unhandled assets and forwards runtime failures', async () => {

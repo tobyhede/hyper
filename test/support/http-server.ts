@@ -9,12 +9,20 @@ export const startHttpServer = async (
   handler: (request: IncomingMessage, response: ServerResponse) => Promise<boolean>,
 ): Promise<TestHttpServer> => {
   const server = createServer((request, response) => {
-    void handler(request, response).then((handled) => {
-      if (!handled) {
-        response.statusCode = 404;
+    void handler(request, response)
+      .then((handled) => {
+        if (!handled) {
+          response.statusCode = 404;
+          response.end();
+        }
+      })
+      .catch((error: unknown) => {
+        // Close the response, or a broken handler reads as a hung request and
+        // the suite that depends on it times out instead of failing.
+        console.error('Test HTTP handler failed', error);
+        if (!response.headersSent) response.statusCode = 500;
         response.end();
-      }
-    });
+      });
   });
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
   const address = server.address();

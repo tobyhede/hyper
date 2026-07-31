@@ -1,7 +1,10 @@
 import { spaceSnapshotSchema, uuidSchema, type SpaceSnapshot } from '@project/core';
 import type { LoadedSpace, SpaceSummary } from './backend';
 
-const canonicalRevision = /^(0|[1-9]\d*)$/;
+// Bounded at 19 digits, the width of a PostgreSQL `bigint`, so a hostile body
+// cannot hand `BigInt` an arbitrarily long digit string to parse. Range is the
+// repository's business; this is only a bound on the work decoding will do.
+const canonicalRevision = /^(0|[1-9]\d{0,18})$/;
 
 const exactRecord = (
   value: unknown,

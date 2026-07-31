@@ -70,7 +70,7 @@ export class HttpSpaceBackend implements SpaceBackend {
       });
     } catch (error) {
       if (error instanceof HttpTimeoutError) {
-        return { kind: 'retryable-failure', code: 'timeout', message: 'Request timed out' };
+        return { kind: 'retryable-failure', code: 'timeout', message: error.message };
       }
       return {
         kind: 'retryable-failure',
@@ -105,7 +105,11 @@ export class HttpSpaceBackend implements SpaceBackend {
   }
 }
 
-class HttpTimeoutError extends Error {}
+class HttpTimeoutError extends Error {
+  constructor() {
+    super('Request timed out');
+  }
+}
 
 const optionalErrorMessage = async (response: Response): Promise<string | undefined> => {
   try {
@@ -126,9 +130,12 @@ const retryAfterMilliseconds = (response: Response): number | undefined => {
 const retryableForStatus = async (response: Response): Promise<CommitResult | undefined> => {
   let code: 'timeout' | 'rate-limited' | 'unavailable';
   let fallback: string;
+  // RFC 9110 defines Retry-After for 429 and 503; a 408 does not carry one.
+  let honoursRetryAfter = true;
   if (response.status === 408) {
     code = 'timeout';
     fallback = 'Request timed out';
+    honoursRetryAfter = false;
   } else if (response.status === 429) {
     code = 'rate-limited';
     fallback = 'Rate limited';
@@ -138,7 +145,7 @@ const retryableForStatus = async (response: Response): Promise<CommitResult | un
   } else {
     return undefined;
   }
-  const retryAfterMs = response.status === 429 ? retryAfterMilliseconds(response) : undefined;
+  const retryAfterMs = honoursRetryAfter ? retryAfterMilliseconds(response) : undefined;
   return {
     kind: 'retryable-failure',
     code,

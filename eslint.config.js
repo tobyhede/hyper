@@ -49,6 +49,25 @@ const REACT_DOM_PATTERN = {
   message: 'Domain logic stays out of React (AGENTS.md).',
 };
 
+/**
+ * The mirror of ESCAPE_PATTERN, for code *outside* `packages/`. Server code and
+ * root-level tests reach a workspace package by `@project/*` like everything
+ * else; a relative path into its `src/` resolves a module the package never
+ * exported, so its public surface stops meaning anything. `src/http` reached
+ * `../../packages/persistence/src/http-protocol` and typecheck stayed green.
+ *
+ * `packages/app` is exempt: it is the composition layer and publishes no
+ * `@project/*` entry, so a root test reaching it has no other way in.
+ */
+const PACKAGE_INTERNALS_PATTERN = {
+  // `group` is matched with gitignore semantics (ESLint uses `ignore`, not
+  // minimatch), so `**` crosses the leading `../..` and `!` negates — but
+  // `{a,b}` brace expansion silently matches nothing. Don't write braces here.
+  group: ['**/packages/*/src/**', '!**/packages/app/src/**'],
+  message:
+    'Reaches past a package public surface. Import from @project/* — and export it from the package index if it is missing (AGENTS.md).',
+};
+
 export default tseslint.config(
   {
     ignores: [
@@ -186,6 +205,12 @@ export default tseslint.config(
     },
   },
   {
+    files: ['src/**/*.ts', 'test/**/*.ts'],
+    rules: {
+      'no-restricted-imports': ['error', { patterns: [PACKAGE_INTERNALS_PATTERN] }],
+    },
+  },
+  {
     files: ['packages/{core,graph,persistence}/**/*.{ts,tsx}'],
     rules: {
       'no-restricted-imports': [
@@ -219,8 +244,8 @@ export default tseslint.config(
       ],
       // These files sit at a package root and reach a sibling package by
       // relative path on purpose, which is the one legitimate escape.
-      // `vite-space-file-plugin.ts` imports `../core/src/index` for exactly the
-      // reason the rule above exists.
+      // `http-server-build.config.ts` aliases `../core/src/index.ts` for exactly
+      // the reason the rule above exists.
     },
   },
   // Config files run as plain JS — no type information to check them against.
