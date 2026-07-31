@@ -3,6 +3,7 @@ import { defineConfig, devices } from '@playwright/test';
 /** Every test fixture starts its own ephemeral Vite host and HTTP repository. */
 
 const NEW_SPACE_SPEC = /new-space\.spec\.ts/;
+const POSTGRES_SPACE_SPEC = /postgres-persistence\.spec\.ts/;
 
 export default defineConfig({
   testDir: './packages/app/e2e',
@@ -17,7 +18,7 @@ export default defineConfig({
     {
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
-      testIgnore: NEW_SPACE_SPEC,
+      testIgnore: [NEW_SPACE_SPEC, POSTGRES_SPACE_SPEC],
     },
     {
       name: 'new-space',
