@@ -108,12 +108,28 @@ const replaceDestination = async (replacement: string, destination: string): Pro
     return;
   }
 
-  const backup = join(dirname(replacement), 'previous');
-  await rename(destination, backup);
+  const backupRoot = await mkdtemp(
+    join(dirname(destination), `.${basename(destination)}.hyper-export-backup-`),
+  );
+  const backup = join(backupRoot, 'previous');
   try {
-    await rename(replacement, destination);
+    await rename(destination, backup);
+    try {
+      await rename(replacement, destination);
+    } catch (replacementError) {
+      try {
+        await rename(backup, destination);
+      } catch (restoreError) {
+        throw new AggregateError(
+          [replacementError, restoreError],
+          `Export replacement failed; the previous destination remains at ${backup}`,
+        );
+      }
+      throw replacementError;
+    }
+    await rm(backupRoot, { recursive: true });
   } catch (error) {
-    await rename(backup, destination);
+    if (!(await exists(backup))) await rm(backupRoot, { recursive: true, force: true });
     throw error;
   }
 };
