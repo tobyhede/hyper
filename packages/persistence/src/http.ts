@@ -24,20 +24,39 @@ const responseJson = async (response: Response): Promise<unknown> => response.js
 export class HttpSpaceBackend implements SpaceBackend {
   readonly #baseUrl: string;
   readonly #fetch: typeof globalThis.fetch;
+  readonly #timeoutMs: number;
 
   constructor(baseUrl = '/api/spaces', options: HttpSpaceBackendOptions = {}) {
     this.#baseUrl = baseUrl.replace(/\/$/, '');
     this.#fetch = options.fetch ?? globalThis.fetch;
+    this.#timeoutMs = options.timeoutMs ?? 10_000;
+  }
+
+  async #timedFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+    const controller = new AbortController();
+    let timedOut = false;
+    const timer = setTimeout(() => {
+      timedOut = true;
+      controller.abort();
+    }, this.#timeoutMs);
+    try {
+      return await this.#fetch(input, { ...init, signal: controller.signal });
+    } catch (error) {
+      if (timedOut) throw new HttpTimeoutError();
+      throw error;
+    } finally {
+      clearTimeout(timer);
+    }
   }
 
   async listSpaces(): Promise<readonly SpaceSummary[]> {
-    const response = await this.#fetch(this.#baseUrl);
+    const response = await this.#timedFetch(this.#baseUrl);
     if (!response.ok) throw new Error(`Unable to list spaces: HTTP ${response.status}`);
     return decodeSpaceSummaries(await responseJson(response));
   }
 
   async loadSpace(id: UUID): Promise<LoadedSpace | undefined> {
-    const response = await this.#fetch(`${this.#baseUrl}/${id}`);
+    const response = await this.#timedFetch(`${this.#baseUrl}/${id}`);
     if (response.status === 404) return undefined;
     if (!response.ok) throw new Error(`Unable to load space: HTTP ${response.status}`);
     return decodeLoadedSpace(await responseJson(response));
@@ -46,18 +65,23 @@ export class HttpSpaceBackend implements SpaceBackend {
   async commitSpace(snapshot: SpaceSnapshot, expectedRevision: bigint): Promise<CommitResult> {
     let response: Response;
     try {
-      response = await this.#fetch(`${this.#baseUrl}/${snapshot.id}`, {
+      response = await this.#timedFetch(`${this.#baseUrl}/${snapshot.id}`, {
         method: 'PUT',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify(encodeCommitRequest(snapshot, expectedRevision)),
       });
     } catch (error) {
+      if (error instanceof HttpTimeoutError) {
+        return { kind: 'retryable-failure', code: 'timeout', message: 'Request timed out' };
+      }
       return {
         kind: 'retryable-failure',
         code: 'network',
         message: error instanceof Error ? error.message : 'Network request failed',
       };
     }
+    const retryable = await retryableForStatus(response);
+    if (retryable !== undefined) return retryable;
     try {
       if (response.status === 200) {
         return { kind: 'committed', revision: decodeCommittedRevision(await responseJson(response)) };
@@ -66,6 +90,9 @@ export class HttpSpaceBackend implements SpaceBackend {
         return { kind: 'conflict', current: decodeLoadedSpace(await responseJson(response)) };
       }
       const message = decodeErrorMessage(await responseJson(response));
+      if (response.status === 401 || response.status === 403) {
+        return { kind: 'permanent-failure', code: 'forbidden', message };
+      }
       if (response.status === 404) return { kind: 'permanent-failure', code: 'not-found', message };
       if (response.status === 422) {
         return { kind: 'permanent-failure', code: 'invalid-snapshot', message };
@@ -76,3 +103,45 @@ export class HttpSpaceBackend implements SpaceBackend {
     }
   }
 }
+
+class HttpTimeoutError extends Error {}
+
+const optionalErrorMessage = async (response: Response): Promise<string | undefined> => {
+  try {
+    return decodeErrorMessage(JSON.parse(await response.text()) as unknown);
+  } catch {
+    return undefined;
+  }
+};
+
+const retryAfterMilliseconds = (response: Response): number | undefined => {
+  const value = response.headers.get('Retry-After');
+  if (value === null || !/^(0|[1-9]\d*)$/.test(value)) return undefined;
+  const seconds = BigInt(value);
+  if (seconds > BigInt(Number.MAX_SAFE_INTEGER) / 1000n) return undefined;
+  return Number(seconds) * 1000;
+};
+
+const retryableForStatus = async (response: Response): Promise<CommitResult | undefined> => {
+  let code: 'timeout' | 'rate-limited' | 'unavailable';
+  let fallback: string;
+  if (response.status === 408) {
+    code = 'timeout';
+    fallback = 'Request timed out';
+  } else if (response.status === 429) {
+    code = 'rate-limited';
+    fallback = 'Rate limited';
+  } else if (response.status >= 500) {
+    code = 'unavailable';
+    fallback = 'Persistence service unavailable';
+  } else {
+    return undefined;
+  }
+  const retryAfterMs = response.status === 429 ? retryAfterMilliseconds(response) : undefined;
+  return {
+    kind: 'retryable-failure',
+    code,
+    message: (await optionalErrorMessage(response)) ?? fallback,
+    ...(retryAfterMs === undefined ? {} : { retryAfterMs }),
+  };
+};
