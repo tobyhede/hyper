@@ -8,16 +8,33 @@ import type { SpaceRepository, StoredSpace } from '../persistence/space-reposito
 const compareOrdinal = (left: string, right: string): number =>
   left < right ? -1 : left > right ? 1 : 0;
 
-const canonicalSpaceFile = ({ snapshot }: StoredSpace): SpaceFile => ({
-  version: 2,
-  id: snapshot.id,
-  title: snapshot.document.title,
-  routes: snapshot.document.routes,
-  ...(snapshot.document.layouts === undefined ? {} : { layouts: snapshot.document.layouts }),
-  ...(snapshot.document.defaultView === undefined
-    ? {}
-    : { defaultView: snapshot.document.defaultView }),
-});
+const canonicalSpaceFile = ({ snapshot }: StoredSpace): SpaceFile => {
+  const layouts = snapshot.document.layouts?.map((layout) => ({
+    id: layout.id,
+    title: layout.title,
+    kind: layout.kind,
+    positions: Object.fromEntries(
+      Object.entries(layout.positions).sort(([left], [right]) => compareOrdinal(left, right)),
+    ),
+    ...(layout.routes === undefined ? {} : { routes: layout.routes }),
+    ...(layout.activeRoute === undefined ? {} : { activeRoute: layout.activeRoute }),
+  }));
+  return {
+    version: 2,
+    id: snapshot.id,
+    title: snapshot.document.title,
+    routes: snapshot.document.routes.map((route) => ({
+      id: route.id,
+      title: route.title,
+      ...(route.color === undefined ? {} : { color: route.color }),
+      edges: route.edges.map(({ from, to }) => ({ from, to })),
+    })),
+    ...(layouts === undefined ? {} : { layouts }),
+    ...(snapshot.document.defaultView === undefined
+      ? {}
+      : { defaultView: snapshot.document.defaultView }),
+  };
+};
 
 const exists = async (path: string): Promise<boolean> => {
   try {

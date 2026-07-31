@@ -5,6 +5,7 @@ import { uuidSchema, type ImportSpace, type SpaceSnapshot, type UUID } from '@pr
 import { afterEach, describe, expect, it } from 'vitest';
 import { runCliMain } from '../../src/cli/main';
 import { runHyper, type CliIo } from '../../src/cli/run';
+import { readSingleSpace } from '../../src/import/read-single-space';
 import type {
   ImportMode,
   RepositoryCommitResult,
@@ -210,6 +211,74 @@ describe('runHyper', () => {
     await expect(repository.loadSpace(SPACE_ID)).resolves.toMatchObject({
       revision,
       exportedRevision: revision,
+    });
+  });
+
+  it('writes deterministic fully identified files that re-enter through version 2 intake', async () => {
+    const destination = join(await makeTemporaryDirectory(), 'exported');
+    const snapshot: SpaceSnapshot = {
+      id: SPACE_ID,
+      document: {
+        version: 2,
+        title: 'Canonical: talk',
+        routes: [
+          {
+            id: ROUTE_ID,
+            title: 'Main route',
+            color: '#123456',
+            edges: [{ from: CARD_ID, to: THIRD_SPACE_ID }],
+          },
+        ],
+        layouts: [
+          {
+            id: OTHER_SPACE_ID,
+            title: 'Authored layout',
+            kind: 'positioned',
+            positions: {
+              [THIRD_SPACE_ID]: { x: 30, y: 40 },
+              [CARD_ID]: { x: 10, y: 20 },
+            },
+            routes: [ROUTE_ID],
+            activeRoute: ROUTE_ID,
+          },
+        ],
+        defaultView: OTHER_SPACE_ID,
+      },
+      cards: [
+        {
+          id: THIRD_SPACE_ID,
+          document: { title: 'Alias: opening', kind: 'alias', target: CARD_ID },
+        },
+        {
+          id: CARD_ID,
+          document: {
+            title: 'Opening: why',
+            description: 'A canonical card',
+            kind: 'markdown',
+            body: '# Opening\n\nHello.\n',
+          },
+        },
+      ],
+    };
+
+    await expect(
+      runHyper(['export', SPACE_ID, destination], {
+        repository: new MemorySpaceRepository([
+          { snapshot, revision: 7n, exportedRevision: null },
+        ]),
+        io: captureIo().io,
+      }),
+    ).resolves.toBe(0);
+
+    const exportedJson = await readFile(join(destination, 'space.json'), 'utf8');
+    const positionsJson = exportedJson.slice(exportedJson.indexOf('"positions"'));
+    expect(positionsJson.indexOf(`"${CARD_ID}"`)).toBeLessThan(
+      positionsJson.indexOf(`"${THIRD_SPACE_ID}"`),
+    );
+    await expect(readSingleSpace(destination)).resolves.toEqual({
+      id: snapshot.id,
+      document: snapshot.document,
+      cards: [...snapshot.cards].reverse(),
     });
   });
 
