@@ -25,7 +25,7 @@ Replacement starts from a copy of the destination, removes only discovered root/
 
 Verification on 2026-07-31:
 
-- `pnpm verify`: 63 files and 518 tests passed.
+- `pnpm verify`: 63 files and 519 tests passed.
 - `pnpm test:integration:postgres`: 3 files and 34 tests passed, including the real CLI export and concurrent-revision behavior.
 - `git diff --check`: passed.
 - UI/graph E2E was not run because this change is CLI, server-side filesystem, and repository-only; no browser, UI, or graph code changed.
