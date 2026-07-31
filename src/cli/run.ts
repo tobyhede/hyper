@@ -1,5 +1,7 @@
 import { importSpaceBatch, SpaceImportError } from '../import/import-space';
 import { SpaceImportFileError } from '../import/read-single-space';
+import { uuidSchema } from '@project/core';
+import { exportSpace } from '../export/export-space';
 import type { SpaceRepository } from '../persistence/space-repository';
 import { resolveDatabaseStartup, type DatabaseStartupResult } from '../startup/database-startup';
 
@@ -52,6 +54,34 @@ export const runHyper = async (
   args: readonly string[],
   dependencies: RunHyperDependencies,
 ): Promise<number> => {
+  if (args[0] === 'export') {
+    if (args.length !== 3) {
+      dependencies.io.stderr(
+        'Usage: hyper [<path>] [--dangerous-truncate]\n       hyper export <space-uuid> <destination-directory>\n',
+      );
+      return 2;
+    }
+    const id = uuidSchema.safeParse(args[1]);
+    if (!id.success) {
+      dependencies.io.stderr(`Invalid space UUID: ${args[1]}\n`);
+      return 2;
+    }
+    try {
+      const stored = await exportSpace(dependencies.repository, id.data, args[2]!);
+      if (stored === undefined) {
+        dependencies.io.stderr(`Space ${id.data} does not exist\n`);
+        return 1;
+      }
+      dependencies.io.stdout(
+        `Exported space ${id.data} at revision ${stored.revision.toString()} to ${args[2]}\n`,
+      );
+      return 0;
+    } catch (error) {
+      dependencies.io.stderr(`Export failed: ${describeError(error)}\n`);
+      return 1;
+    }
+  }
+
   const truncateArguments = args.filter((argument) => argument === '--dangerous-truncate');
   const paths = args.filter((argument) => argument !== '--dangerous-truncate');
   const path = paths[0];

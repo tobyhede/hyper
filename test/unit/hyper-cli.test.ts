@@ -1,4 +1,4 @@
-import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { uuidSchema, type ImportSpace, type SpaceSnapshot, type UUID } from '@project/core';
@@ -115,6 +115,29 @@ afterEach(async () => {
 });
 
 describe('runHyper', () => {
+  it('exports one stored space to the canonical version 2 directory', async () => {
+    const parent = await makeTemporaryDirectory();
+    const destination = join(parent, 'exported');
+    const output = captureIo();
+
+    const exitCode = await runHyper(['export', SPACE_ID, destination], {
+      repository: new MemorySpaceRepository([storedSpace]),
+      io: output.io,
+    });
+
+    expect(exitCode).toBe(0);
+    expect(output.stdout).toEqual([
+      `Exported space ${SPACE_ID} at revision 0 to ${destination}\n`,
+    ]);
+    expect(output.stderr).toEqual([]);
+    await expect(readFile(join(destination, 'space.json'), 'utf8')).resolves.toBe(
+      `${JSON.stringify({ version: 2, id: SPACE_ID, title: 'Stored talk', routes: [] }, null, 2)}\n`,
+    );
+    await expect(readFile(join(destination, 'cards', `${CARD_ID}.md`), 'utf8')).resolves.toBe(
+      `---\nid: ${CARD_ID}\ntitle: Stored card\nkind: markdown\n---\n\nStored body.\n`,
+    );
+  });
+
   it('opens the only database space without filesystem import and preserves its revision', async () => {
     const revision = 9_007_199_254_740_993n;
     const output = captureIo();
