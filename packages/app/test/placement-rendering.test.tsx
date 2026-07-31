@@ -2,7 +2,7 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { uuidSchema } from '@project/core';
 import { gridStrategy, type LayoutGraph, type LayoutStrategy } from '@project/graph';
-import { usePlacementRendering } from '../src/placement-rendering';
+import { canvasContent, usePlacementRendering } from '../src/placement-rendering';
 
 const CARD_A = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 
@@ -29,13 +29,20 @@ describe('usePlacementRendering', () => {
   });
 
   it('renders authored positions instead of running the selected automatic strategy', async () => {
-    const neverResolves: LayoutStrategy = () => new Promise(() => undefined);
+    let automaticCalls = 0;
+    const neverResolves: LayoutStrategy = () => {
+      automaticCalls += 1;
+      return new Promise(() => undefined);
+    };
     const authoredPositions = new Map([[CARD_A, { x: 80, y: 120 }]]);
     const { result } = renderHook(() =>
       usePlacementRendering(graph, neverResolves, authoredPositions),
     );
 
     await waitFor(() => expect(result.current.kind).toBe('ready'));
+    // Not implied by the ready state: a placement that ran the automatic strategy
+    // and then discarded its result would still arrive here.
+    expect(automaticCalls).toBe(0);
 
     expect(result.current).toEqual({
       kind: 'ready',
@@ -44,6 +51,14 @@ describe('usePlacementRendering', () => {
         edges: [],
       },
     });
+  });
+
+  it('reports an unusable authored placement as a visible failure rather than throwing', async () => {
+    const strategy = gridStrategy();
+    const authoredPositions = new Map([['not-a-card-id', { x: 80, y: 120 }]]);
+    const { result } = renderHook(() => usePlacementRendering(graph, strategy, authoredPositions));
+
+    await waitFor(() => expect(result.current.kind).toBe('failed'));
   });
 
   it('makes the previous placement unavailable while its replacement is pending', async () => {
@@ -83,11 +98,14 @@ describe('usePlacementRendering', () => {
   });
 
   it('ignores an obsolete result that resolves after a replacement', async () => {
+    let obsoleteCalls = 0;
     let resolveObsolete: (value: LayoutGraph) => void = () => undefined;
-    const obsolete: LayoutStrategy = () =>
-      new Promise((resolve) => {
+    const obsolete: LayoutStrategy = () => {
+      obsoleteCalls += 1;
+      return new Promise((resolve) => {
         resolveObsolete = resolve;
       });
+    };
     const replacement: LayoutStrategy = (input) =>
       Promise.resolve({
         ...input,
@@ -98,6 +116,10 @@ describe('usePlacementRendering', () => {
       { initialProps: { strategy: obsolete } },
     );
 
+    // The strategy is invoked from a microtask after the effect, so waiting for
+    // the call is what guarantees this test holds a real resolver. Without it the
+    // resolve below can be a no-op and the assertions pass vacuously.
+    await waitFor(() => expect(obsoleteCalls).toBe(1));
     rerender({ strategy: replacement });
     await waitFor(() => expect(result.current.kind).toBe('ready'));
     expect(result.current).toEqual({
@@ -131,5 +153,29 @@ describe('usePlacementRendering', () => {
     rerender({ strategy: replacement });
     expect(result.current).toEqual({ kind: 'pending' });
     await waitFor(() => expect(result.current.kind).toBe('ready'));
+  });
+});
+
+describe('canvasContent', () => {
+  const placed: LayoutGraph = { cards: [{ ...graph.cards[0]!, x: 0, y: 0 }], edges: [] };
+
+  it('draws the arrangement a ready placement produced', () => {
+    expect(canvasContent({ kind: 'ready', graph: placed }, false)).toEqual({ kind: 'arrangement' });
+  });
+
+  it('has nothing to draw before a first placement resolves', () => {
+    expect(canvasContent({ kind: 'pending' }, false)).toEqual({ kind: 'placeholder' });
+  });
+
+  it('keeps drawing the arrangement on screen while a replacement placement is pending', () => {
+    // The arrangement on screen belongs to the editor, which owns its positions
+    // outright — it is the current state and not a stale copy of the placement
+    // being recomputed. Blanking the canvas here would throw away a live drag.
+    expect(canvasContent({ kind: 'pending' }, true)).toEqual({ kind: 'arrangement' });
+  });
+
+  it('reports a failed placement even when an arrangement is on screen', () => {
+    const error = new Error('Placement failed');
+    expect(canvasContent({ kind: 'failed', error }, true)).toEqual({ kind: 'failure', error });
   });
 });

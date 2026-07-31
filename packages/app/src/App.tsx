@@ -19,7 +19,7 @@ import {
 } from '@project/graph';
 import type { OpenedSpace } from './space';
 import { completePositionedConnection, createPlacementEditor } from './edit-completion';
-import { usePlacementRendering } from './placement-rendering';
+import { canvasContent, usePlacementRendering } from './placement-rendering';
 import { routeColorMap } from './colors';
 import { CARD_HEIGHT, CARD_SIZE, cardSizeVars } from './card';
 import { createSpaceStore } from './store';
@@ -222,7 +222,7 @@ export const createApp = ({ space, spaceSession }: OpenedSpace, { acceptRemote }
     const moved = useEditorStore((s) => s.moved);
     const changeNodes = useEditorStore((s) => s.changeNodes);
     const nodes = liveNodes ?? projectedNodes;
-    const placementReady = laidOut !== null || liveNodes !== null;
+    const canvas = canvasContent(placement, liveNodes !== null);
     // There is an arrangement to drag once the layout has resolved and the store
     // has taken it. Not a permission — every view is editable (ADR 0025) — and not
     // a state the space can go back to: nothing sets `nodes` back to null, so this
@@ -408,19 +408,18 @@ export const createApp = ({ space, spaceSession }: OpenedSpace, { acceptRemote }
     return (
       <AppShell title={space.title} toolbar={toolbar}>
         <div className="graph-area" style={cardSizeVars}>
-          {placement.kind === 'failed' ? (
+          {canvas.kind === 'failure' ? (
             <div className="placement-status" role="alert" data-testid="placement-failure">
               <div className="placement-status__panel">
                 <h2>Unable to arrange this view</h2>
-                <pre>{placement.error.message}</pre>
+                <pre>{canvas.error.message}</pre>
               </div>
             </div>
-          ) : placementReady ? (
+          ) : canvas.kind === 'arrangement' ? (
             <ReactFlowProvider>
               <GraphView
                 nodes={nodes}
                 edges={edges}
-                layoutReady={placementReady}
                 activeCardId={activeCardId}
                 presenting={presenting}
                 editable={editable}

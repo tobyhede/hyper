@@ -25,14 +25,14 @@ import {
  */
 const PRESENTING_PADDING = 1.15;
 
-/** Frames the whole graph — the overview `fitBounds` gives (ADR 0027). */
-function OverviewCamera({
-  layoutReady,
-  presenting,
-}: {
-  layoutReady: boolean;
-  presenting: boolean;
-}) {
+/**
+ * Frames the whole graph — the overview `fitBounds` gives (ADR 0027).
+ *
+ * Fitting on mount is the whole of it: the graph area draws this canvas only
+ * once a placement has produced an arrangement, so there is no not-yet-arranged
+ * state to wait out here.
+ */
+function OverviewCamera({ presenting }: { presenting: boolean }) {
   const { fitView } = useReactFlow();
 
   useEffect(() => {
@@ -42,7 +42,7 @@ function OverviewCamera({
     // (ADR 0018) — gets scaled to 2x and fills the screen. Padding does not help:
     // it reserves margin, it does not cap zoom.
     void fitView({ duration: 400, padding: 0.2, maxZoom: 1 });
-  }, [layoutReady, presenting, fitView]);
+  }, [presenting, fitView]);
 
   return null;
 }
@@ -102,7 +102,6 @@ function PresentingCamera({ activeCardId }: { activeCardId: string | null }) {
 export interface GraphViewProps {
   nodes: CardFlowNode[];
   edges: Edge[];
-  layoutReady: boolean;
   /** The card a walk has reached, or `null` in overview. */
   activeCardId: string | null;
   presenting: boolean;
@@ -130,7 +129,6 @@ export interface GraphViewProps {
 export function GraphView({
   nodes,
   edges,
-  layoutReady,
   activeCardId,
   presenting,
   editable,
@@ -197,7 +195,7 @@ export function GraphView({
           activeRouteCardIds={activeRouteCardIds}
         />
       )}
-      <OverviewCamera layoutReady={layoutReady} presenting={presenting} />
+      <OverviewCamera presenting={presenting} />
       <PresentingCamera activeCardId={activeCardId} />
     </ReactFlow>
   );

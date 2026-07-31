@@ -1,4 +1,4 @@
-import { act, fireEvent, within } from '@testing-library/react';
+import { act, fireEvent, waitFor, within } from '@testing-library/react';
 import { createRoot } from 'react-dom/client';
 import { afterAll, beforeAll, expect, it } from 'vitest';
 import { spaceSnapshotSchema, uuidSchema, type SpaceSnapshot } from '@project/core';
@@ -66,7 +66,7 @@ it('mounts an opened startup result', async () => {
     });
 
     expect(within(container).getByRole('heading', { name: 'Stored space' })).toBeVisible();
-    expect(container.querySelector('.react-flow')).toBeInTheDocument();
+    await waitFor(() => expect(container.querySelector('.react-flow')).toBeInTheDocument());
   } finally {
     act(() => root.unmount());
     container.remove();
@@ -151,7 +151,7 @@ it('opens and mounts the exact workspace UUID chosen from the catalog', async ()
     expect(
       within(container).queryByRole('heading', { name: 'Stored space' }),
     ).not.toBeInTheDocument();
-    expect(container.querySelector('.react-flow')).toBeInTheDocument();
+    await waitFor(() => expect(container.querySelector('.react-flow')).toBeInTheDocument());
   } finally {
     act(() => root.unmount());
     container.remove();
