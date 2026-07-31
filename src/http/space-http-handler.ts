@@ -55,17 +55,18 @@ const hasJsonContentType = (request: IncomingMessage): boolean => {
   );
 };
 
-const declaredContentLength = (
-  request: IncomingMessage,
-): { ok: true; value?: number } | { ok: false } => {
+/**
+ * Whether a declared Content-Length is canonical and within the cap. The number
+ * itself is deliberately not returned: the body is bounded as it is read, so a
+ * declared length is a claim to reject early, never a budget to trust.
+ */
+const declaredContentLengthIsAcceptable = (request: IncomingMessage): boolean => {
   const values = request.headersDistinct['content-length'];
-  if (values === undefined) return { ok: true };
-  if (values.length !== 1) return { ok: false };
+  if (values === undefined) return true;
+  if (values.length !== 1) return false;
   const value = values[0] ?? '';
-  if (!/^(0|[1-9]\d*)$/.test(value)) return { ok: false };
-  const parsed = BigInt(value);
-  if (parsed > BigInt(MAX_COMMIT_BODY_BYTES)) return { ok: false };
-  return { ok: true, value: Number(parsed) };
+  if (!/^(0|[1-9]\d*)$/.test(value)) return false;
+  return BigInt(value) <= BigInt(MAX_COMMIT_BODY_BYTES);
 };
 
 const methodNotAllowed = (response: ServerResponse, allow: string): void => {
@@ -139,8 +140,7 @@ export const createSpaceHttpHandler =
       rejectBeforeBody(response, 'Content-Type must be application/json');
       return true;
     }
-    const contentLength = declaredContentLength(request);
-    if (!contentLength.ok) {
+    if (!declaredContentLengthIsAcceptable(request)) {
       rejectBeforeBody(
         response,
         `Content-Length must be canonical and at most ${MAX_COMMIT_BODY_BYTES}`,

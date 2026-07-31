@@ -189,6 +189,11 @@ describe('Space HTTP request validation', () => {
       const method = await send(server.url, `/api/spaces/${SPACE_ID}`, '', {}, undefined, 'POST');
       expect(method.status).toBe(405);
       expect(method.headers.allow).toBe('GET, PUT');
+      // The collection is read-only, so it advertises a narrower Allow than a
+      // resource does — a PUT belongs to one space, never to the catalog.
+      const collection = await send(server.url, '/api/spaces', '', {}, undefined, 'POST');
+      expect(collection.status).toBe(405);
+      expect(collection.headers.allow).toBe('GET');
       expect((await send(server.url, '/elsewhere', '', {}, undefined, 'GET')).status).toBe(404);
       expect(repository.commitAttempts).toBe(0);
     } finally {
