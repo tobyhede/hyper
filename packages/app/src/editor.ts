@@ -36,7 +36,11 @@ export interface EditorState {
   /** The ordinary React Flow selection used for continued Route authoring. */
   selectedCardId: CardId | null;
   /** The structural part of the completed Edit most recently notified. */
-  completedConnection: { readonly from: CardId; readonly to: CardId } | null;
+  completedConnection: {
+    readonly from: CardId;
+    readonly to: CardId;
+    readonly createdCardId?: CardId;
+  } | null;
   /** Fold a freshly projected node list into the live one. */
   syncNodes: (projected: readonly CardFlowNode[]) => void;
   /**
@@ -48,6 +52,8 @@ export interface EditorState {
   changeNodes: (changes: NodeChange<CardFlowNode>[]) => void;
   /** Install and notify one directed Edge between existing Cards, when it is a real Edit. */
   connectCards: (from: CardId, to: CardId, projected: readonly CardFlowNode[]) => boolean;
+  /** Install and notify an atomic create-and-connect Edit without adding a transient node. */
+  createConnectedCard: (from: CardId, cardId: CardId, position: LayoutPoint) => boolean;
   /** Select one Card after a completed connection. */
   selectCard: (cardId: CardId) => void;
 }
@@ -230,6 +236,19 @@ export function createEditorStore(
         positions: positionsForEdit(state.nodes, state.positions),
         nodes: reconcile(state.nodes, projected),
         completedConnection: { from, to },
+      });
+      editCompleted();
+      return true;
+    },
+
+    createConnectedCard: (from, cardId, position) => {
+      const state = get();
+      if (state.nodes === null) return false;
+      const positions = positionsForEdit(state.nodes, state.positions);
+      positions.set(cardId, position);
+      set({
+        positions,
+        completedConnection: { from, to: cardId, createdCardId: cardId },
       });
       editCompleted();
       return true;

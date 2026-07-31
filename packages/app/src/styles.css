@@ -213,6 +213,12 @@ body {
   width: var(--card-width);
 }
 
+.new-card-preview {
+  position: absolute;
+  opacity: 0.55;
+  pointer-events: none;
+}
+
 /* Per-route ports, positioned by ELK's computed offset (inline `top`). React
    Flow handles the left/right edge placement and vertical centering. */
 .rf-card-node__port.react-flow__handle {

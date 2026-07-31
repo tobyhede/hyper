@@ -5,6 +5,7 @@ import {
   authoringHandle,
   AUTHORING_HANDLE_SIDES,
   connectHandles,
+  connectToEmptyWithAlt,
   dragBy,
   FIXTURE_CARD_COUNT,
   FIXTURE_EDGE_COUNT,
@@ -162,6 +163,31 @@ test('connecting from Graph and Grid converts atomically without moving Cards', 
       expect(await allPositions(page)).toEqual(before);
     });
   }
+});
+
+test('creating from an Algorithmic View freezes existing Cards and places Card 1', async ({
+  page,
+}) => {
+  await page.goto('/');
+  const source = nodeByTitle(page, 'A').first();
+  await expect(source).toBeVisible();
+  await expect(page.locator('.react-flow__edge-path').first()).toHaveAttribute('d', /L/);
+  await settled(page);
+  const before = await allPositions(page);
+  await source.hover();
+
+  await connectToEmptyWithAlt(page, authoringHandle(source, 'source', 'right'));
+
+  const created = nodeByTitle(page, 'Card 1');
+  await expect(created).toBeVisible();
+  const after = await allPositions(page);
+  for (const [id, position] of Object.entries(before)) {
+    expect(after[id], `card ${id} moved`).toEqual(position);
+  }
+  await expect(page.locator('.react-flow__edge')).toHaveCount(FIXTURE_EDGE_COUNT + 1);
+  await expect(page.getByTestId('layout-selector')).toContainText('Layout 1');
+  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
+  await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
 });
 
 test('editing an existing Layout updates it instead of creating another one', async ({ page }) => {

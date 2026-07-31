@@ -55,6 +55,85 @@ test('route-less handles preview Route 1 and an empty drop cancels', async ({ pa
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '0');
 });
 
+test('Alt toggles a transient Card 2 preview during an empty connection drag', async ({ page }) => {
+  await page.goto('/');
+  const card = nodeByTitle(page, 'Card 1');
+  await expect(card).toBeVisible();
+  await settled(page);
+  await card.hover();
+
+  const source = authoringHandle(card, 'source', 'right');
+  const from = (await source.boundingBox())!;
+  await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(from.x + from.width / 2 + 180, from.y + from.height / 2 + 160, {
+    steps: 4,
+  });
+
+  await expect(page.getByTestId('new-card-preview')).toHaveCount(0);
+  await page.keyboard.down('Alt');
+  await expect(page.getByTestId('new-card-preview')).toContainText('Card 2');
+  await expect(page.locator('.react-flow__node')).toHaveCount(1);
+  await page.keyboard.up('Alt');
+  await expect(page.getByTestId('new-card-preview')).toHaveCount(0);
+  await page.keyboard.down('Alt');
+  await expect(page.getByTestId('new-card-preview')).toContainText('Card 2');
+  await page.keyboard.up('Alt');
+  await expect(page.getByTestId('new-card-preview')).toHaveCount(0);
+  await page.mouse.up();
+
+  await expect(page.locator('.react-flow__node')).toHaveCount(1);
+  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '0');
+});
+
+test('Alt empty-drop creates, connects and selects Card 2 at the previewed position', async ({
+  page,
+}) => {
+  await page.goto('/');
+  const sourceCard = nodeByTitle(page, 'Card 1');
+  await expect(sourceCard).toBeVisible();
+  await settled(page);
+  await sourceCard.hover();
+
+  const source = authoringHandle(sourceCard, 'source', 'right');
+  const from = (await source.boundingBox())!;
+  const dropPoint = {
+    x: Math.floor(from.x + from.width / 2 + 220),
+    y: Math.floor(from.y + from.height / 2 + 180),
+  };
+  await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(dropPoint.x, dropPoint.y, { steps: 4 });
+  await page.keyboard.down('Alt');
+  const preview = page.getByTestId('new-card-preview');
+  await expect(preview).toContainText('Card 2');
+  const previewBox = (await preview.boundingBox())!;
+  expect(previewBox.x + previewBox.width / 2).toBeCloseTo(dropPoint.x, 0);
+  expect(previewBox.y + previewBox.height / 2).toBeCloseTo(dropPoint.y, 0);
+  await page.mouse.up();
+  await page.keyboard.up('Alt');
+
+  const created = nodeByTitle(page, 'Card 2');
+  await expect(created).toBeVisible();
+  const createdBox = (await created.boundingBox())!;
+  expect(createdBox.x + createdBox.width / 2).toBeCloseTo(dropPoint.x, 0);
+  expect(createdBox.y + createdBox.height / 2).toBeCloseTo(dropPoint.y, 0);
+  await expect(page.locator('.react-flow__edge')).toHaveCount(1);
+  await expect(page.getByTestId('route-selector')).toContainText('Route 1');
+  await expect(page.getByTestId('layout-selector')).toContainText('Layout 1');
+  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
+  await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
+  await expect(authoringHandle(created, 'source', 'left')).toHaveCSS('opacity', '1');
+  await expect(page.getByTestId('close-card')).toHaveCount(0);
+
+  await settled(page);
+  await created.hover();
+  const continuedSource = authoringHandle(created, 'source', 'left');
+  await connectHandles(page, continuedSource, authoringHandle(sourceCard, 'target', 'right'));
+  await expect(page.locator('.react-flow__edge')).toHaveCount(2);
+  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '2');
+});
+
 test('the first self-connection mints and activates Route 1 in one persisted Layout', async ({
   page,
 }) => {

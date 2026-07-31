@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { uuidSchema, type Layout, type SpaceSnapshot, type RouteId } from '@project/core';
+import {
+  uuidSchema,
+  type CardId,
+  type Layout,
+  type RouteId,
+  type SpaceSnapshot,
+} from '@project/core';
 import { loadSpaceSnapshot } from '@project/graph';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
 import { ROUTE_PALETTE, routeColorMap } from '../src/colors';
@@ -29,6 +35,7 @@ const MINTED_ROUTE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000008')
 const OTHER_ROUTE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
 const MISSING_ROUTE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000006');
 const MISSING_CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000007');
+const CREATED_CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000009');
 const DEFAULT_LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000021');
 const OTHER_LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000022');
 const MISSING_LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000023');
@@ -99,10 +106,125 @@ function connectingIn(
   return {
     session,
     connect: (from = CARD_A, to = CARD_B) => editor.getState().connectCards(from, to, projected),
+    create: (from: CardId, cardId: CardId, x: number, y: number) =>
+      editor.getState().createConnectedCard(from, cardId, { x, y }),
   };
 }
 
 describe('completed connection composition', () => {
+  it('creates, places and connects the next neutral Card in the selected Layout only', () => {
+    const base: SpaceSnapshot = {
+      ...positionedSnapshot,
+      cards: [
+        { id: CARD_A, document: { title: 'Card 2', kind: 'markdown', body: 'A' } },
+        { id: CARD_B, document: { title: 'Card 7', kind: 'markdown', body: 'B' } },
+        {
+          id: MISSING_CARD_ID,
+          document: { title: 'Card 99 notes', kind: 'markdown', body: 'custom' },
+        },
+      ],
+    };
+
+    const { session, create } = connectingIn(base);
+
+    expect(create(CARD_A, CREATED_CARD_ID, 420, 360)).toBe(true);
+    expect(session.getState().working).toEqual({
+      ...base,
+      document: {
+        ...base.document,
+        routes: [
+          {
+            id: ROUTE_ID,
+            title: 'Main',
+            edges: [
+              { from: CARD_A, to: CARD_B },
+              { from: CARD_A, to: CREATED_CARD_ID },
+            ],
+          },
+        ],
+        layouts: [
+          {
+            ...defaultLayout,
+            positions: {
+              [CARD_A]: { x: 10, y: 20 },
+              [CREATED_CARD_ID]: { x: 420, y: 360 },
+            },
+            activeRoute: ROUTE_ID,
+          },
+          otherLayout,
+        ],
+        defaultView: DEFAULT_LAYOUT_ID,
+      },
+      cards: [
+        ...base.cards,
+        {
+          id: CREATED_CARD_ID,
+          document: { title: 'Card 8', kind: 'markdown', body: '' },
+        },
+      ],
+    });
+  });
+
+  it('creates Card 2 and Route 1 while converting a route-less Algorithmic View', () => {
+    const routeLess: SpaceSnapshot = {
+      id: SPACE_ID,
+      document: { version: 2, title: 'New space', routes: [] },
+      cards: [{ id: CARD_A, document: { title: 'Card 1', kind: 'markdown', body: '' } }],
+    };
+
+    const loaded = { snapshot: routeLess, revision: 0n, exportedRevision: null };
+    const session = openSpaceSession(new MemorySpaceBackend([loaded]), loaded);
+    const viewChoice = createViewChoice({ kind: 'view', view: 'graph' });
+    const editor = createPlacementEditor({
+      initialPositions: null,
+      viewChoice,
+      currentActiveRoute: () => null,
+      session,
+      installSpace: () => undefined,
+      mintRouteId: () => MINTED_ROUTE_ID,
+    });
+    editor.getState().syncNodes([node(CARD_A, 120, 240)]);
+
+    expect(editor.getState().createConnectedCard(CARD_A, CREATED_CARD_ID, { x: 420, y: 360 })).toBe(
+      true,
+    );
+    expect(session.getState().working).toMatchObject({
+      ...routeLess,
+      document: {
+        ...routeLess.document,
+        routes: [
+          {
+            id: MINTED_ROUTE_ID,
+            title: 'Route 1',
+            edges: [{ from: CARD_A, to: CREATED_CARD_ID }],
+          },
+        ],
+        layouts: [
+          {
+            title: 'Layout 1',
+            kind: 'positioned',
+            positions: {
+              [CARD_A]: { x: 120, y: 240 },
+              [CREATED_CARD_ID]: { x: 420, y: 360 },
+            },
+            activeRoute: MINTED_ROUTE_ID,
+          },
+        ],
+      },
+      cards: [
+        ...routeLess.cards,
+        {
+          id: CREATED_CARD_ID,
+          document: { title: 'Card 2', kind: 'markdown', body: '' },
+        },
+      ],
+    });
+    expect(viewChoice.current()).toEqual({
+      kind: 'layout',
+      layoutId: session.getState().working.document.defaultView,
+    });
+  });
+
   it('mints and activates Route 1 with the first Edge in one complete snapshot', () => {
     const routeLess: SpaceSnapshot = {
       id: SPACE_ID,
@@ -145,7 +267,10 @@ describe('completed connection composition', () => {
         activeRoute: MINTED_ROUTE_ID,
       }),
     ]);
-    expect(completed.document.defaultView).toBe(viewChoice.current().layoutId);
+    expect(viewChoice.current()).toEqual({
+      kind: 'layout',
+      layoutId: completed.document.defaultView,
+    });
     expect(activated).toBe(MINTED_ROUTE_ID);
     const accepted = loadSpaceSnapshot(completed);
     if (!accepted.ok) throw new Error(accepted.errors.map((error) => error.message).join('; '));

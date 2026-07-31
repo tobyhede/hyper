@@ -183,3 +183,23 @@ export async function connectHandles(
   expect(await targetHandle.evaluate((element) => element.matches(':hover'))).toBe(true);
   await page.mouse.up();
 }
+
+/** Explicitly create a connection target on empty canvas with Alt/Option. */
+export async function connectToEmptyWithAlt(
+  page: Page,
+  sourceHandle: Locator,
+): Promise<{ x: number; y: number }> {
+  const from = (await sourceHandle.boundingBox())!;
+  const pane = (await page.locator('.react-flow__pane').boundingBox())!;
+  await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(from.x + from.width / 2 + 30, from.y + from.height / 2, { steps: 4 });
+  await page.keyboard.down('Alt');
+  await page.mouse.move(pane.x + 36, pane.y + 36, { steps: 4 });
+  const preview = page.getByTestId('new-card-preview');
+  await expect(preview).toBeVisible();
+  const position = await positionOf(preview);
+  await page.mouse.up();
+  await page.keyboard.up('Alt');
+  return position;
+}

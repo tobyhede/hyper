@@ -22,7 +22,11 @@ interface CurrentEditState {
   readonly newLayoutId: UUID | null;
   readonly activeRouteId: RouteId | null;
   readonly newRouteId?: RouteId | null;
-  readonly connection: { readonly from: CardId; readonly to: CardId } | null;
+  readonly connection: {
+    readonly from: CardId;
+    readonly to: CardId;
+    readonly createdCardId?: CardId;
+  } | null;
 }
 
 interface DerivedEdit {
@@ -52,6 +56,17 @@ function nextRouteTitle(snapshot: SpaceSnapshot): string {
     if (number > highest) highest = number;
   }
   return `Route ${highest + 1n}`;
+}
+
+export function nextCardTitle(snapshot: SpaceSnapshot): string {
+  let highest = 0n;
+  for (const card of snapshot.cards) {
+    const match = /^Card ([1-9]\d*)$/.exec(card.document.title);
+    if (match?.[1] === undefined) continue;
+    const number = BigInt(match[1]);
+    if (number > highest) highest = number;
+  }
+  return `Card ${highest + 1n}`;
 }
 
 function targetForEdit(
@@ -115,6 +130,25 @@ function appendRouteEdge(
 
 function deriveCompletedEdit(current: CurrentEditState): DerivedEdit | null {
   let base = current.snapshot;
+  if (current.connection?.createdCardId !== undefined) {
+    if (current.connection.createdCardId !== current.connection.to) {
+      throw new Error('A created Card must be the completed connection target.');
+    }
+    base = {
+      ...base,
+      cards: [
+        ...base.cards,
+        {
+          id: current.connection.createdCardId,
+          document: {
+            title: nextCardTitle(base),
+            kind: 'markdown',
+            body: '',
+          },
+        },
+      ],
+    };
+  }
   let activeRouteId = current.activeRouteId;
   let connectionAlreadyAdded = false;
   if (current.connection !== null && activeRouteId === null) {

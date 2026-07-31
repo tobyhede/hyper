@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { ReactFlowProvider } from '@xyflow/react';
 import { AppShell, Button, LayoutSelector, RouteSelector, ViewSelector } from '@project/ui';
-import { newUuid, uuidSchema, type BuiltInViewId, type CardId } from '@project/core';
+import { newUuid, uuidSchema, type BuiltInViewId } from '@project/core';
 import {
   projectCardNodes,
   projectRouteEdges,
@@ -13,11 +13,13 @@ import {
   buildRouteEdges,
   filterHandlesByRoutes,
   getCard,
+  loadSpaceSnapshot,
   routeCardIds,
   resolveContentCard,
+  type LayoutPoint,
 } from '@project/graph';
 import type { OpenedSpace } from './space';
-import { createPlacementEditor } from './edit-completion';
+import { createPlacementEditor, nextCardTitle } from './edit-completion';
 import { canvasContent, usePlacementRendering } from './placement-rendering';
 import { activeRouteColor, ROUTE_PALETTE, routeColorMap } from './colors';
 import { CARD_HEIGHT, CARD_SIZE, cardSizeVars } from './card';
@@ -55,11 +57,6 @@ export const createApp = ({ space, spaceSession }: OpenedSpace, { acceptRemote }
     movesFrom,
   } = createSpaceStore(space, initialView.activeRouteId);
 
-  // The markdown a card shows, resolving an alias to its target's body (ADR 0009).
-  // A card keeps its own title; only content is inherited.
-  function markdownForCard(cardId: CardId): string {
-    return resolveContentCard(space, cardId)?.body ?? '';
-  }
   // Live nodes hold whichever arrangement is on screen. A positioned view also
   // supplies its already-authored, possibly sparse Layout map; an automatic view
   // starts null and is promoted only by a completed edit (ADR 0025).
@@ -86,28 +83,15 @@ export const createApp = ({ space, spaceSession }: OpenedSpace, { acceptRemote }
     const [selectedView, setSelectedView] = useState<BuiltInViewId>(
       initialRenderer.kind === 'view' ? initialRenderer.view : 'graph',
     );
-    const layouts = useMemo(
-      () => sessionState.working.document.layouts ?? [],
-      [sessionState.working.document.layouts],
-    );
-    // Routes come from the same place Layouts do. Authoring an Edge submits the
-    // whole next snapshot synchronously, so the session's working document is
-    // already the authored truth by the time this renders — there is no second
-    // copy to keep in step.
-    const routes = useMemo(
-      () => sessionState.working.document.routes,
-      [sessionState.working.document.routes],
-    );
-    const rendererSpace = useMemo(
-      () => ({
-        ...space,
-        routes,
-        routesById: new Map(routes.map((route) => [route.id, route])),
-        layouts,
-        layoutsById: new Map(layouts.map((layout) => [layout.id, layout])),
-      }),
-      [routes, layouts],
-    );
+    const rendererSpace = useMemo(() => {
+      const loaded = loadSpaceSnapshot(sessionState.working);
+      if (!loaded.ok) {
+        throw new Error(loaded.errors.map((error) => error.message).join('; '));
+      }
+      return loaded.space;
+    }, [sessionState.working]);
+    const layouts = rendererSpace.layouts;
+    const routes = rendererSpace.routes;
     const colors = useMemo(() => routeColorMap(rendererSpace), [rendererSpace]);
     const projectionColors = useMemo(
       () =>
@@ -171,7 +155,10 @@ export const createApp = ({ space, spaceSession }: OpenedSpace, { acceptRemote }
     // routes at all (ADR 0015) — deriving the card set from the routes would render
     // a new space as an empty canvas, which is the one thing it must not do. Which
     // cards a view draws was always the View's call, not the layout's (ADR 0005).
-    const visibleCardIds = useMemo(() => space.cards.map((c) => c.id), []);
+    const visibleCardIds = useMemo(
+      () => rendererSpace.cards.map((card) => card.id),
+      [rendererSpace.cards],
+    );
     const visibleHandles = useMemo(
       () => filterHandlesByRoutes(allHandles, visibleRouteIds),
       [allHandles, visibleRouteIds],
@@ -317,7 +304,15 @@ export const createApp = ({ space, spaceSession }: OpenedSpace, { acceptRemote }
       });
     }, []);
 
-    const openedCard = openedCardId ? getCard(space, openedCardId) : undefined;
+    const createConnectedCard = useCallback((sourceId: string, position: LayoutPoint) => {
+      const cardId = newUuid();
+      const completed = useEditorStore
+        .getState()
+        .createConnectedCard(uuidSchema.parse(sourceId), cardId, position);
+      if (completed) completedConnectionTarget.current = cardId;
+    }, []);
+
+    const openedCard = openedCardId ? getCard(rendererSpace, openedCardId) : undefined;
 
     // Escape closes an opened card. Registered ahead of the walk's keys and
     // returning early while a card is open, so the two never fight over Escape.
@@ -429,6 +424,8 @@ export const createApp = ({ space, spaceSession }: OpenedSpace, { acceptRemote }
                 onNodesChange={changeNodes}
                 onConnect={connectCards}
                 onConnectEnd={finishConnection}
+                onCreateConnectedCard={createConnectedCard}
+                newCardTitle={nextCardTitle(sessionState.working)}
                 onOpenCard={(cardId) => openCard(uuidSchema.parse(cardId))}
                 routes={visibleRoutes}
                 colorByRouteId={colors}
@@ -455,7 +452,7 @@ export const createApp = ({ space, spaceSession }: OpenedSpace, { acceptRemote }
           {openedCard && (
             <OpenCard
               title={openedCard.title}
-              markdown={markdownForCard(openedCard.id)}
+              markdown={resolveContentCard(rendererSpace, openedCard.id)?.body ?? ''}
               footer={
                 <Button variant="secondary" data-testid="close-card" onClick={closeCard}>
                   Close

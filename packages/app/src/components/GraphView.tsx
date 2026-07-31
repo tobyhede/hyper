@@ -1,16 +1,20 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Background,
   ConnectionMode,
   Controls,
   ReactFlow,
+  ViewportPortal,
+  useConnection,
   useReactFlow,
   useStore,
+  useViewport,
   type Edge,
   type OnConnect,
   type OnNodesChange,
 } from '@xyflow/react';
 import type { Route } from '@project/core';
+import type { LayoutPoint } from '@project/graph';
 import {
   edgeTypes,
   nodeTypes,
@@ -19,6 +23,7 @@ import {
   type CardFlowNode,
 } from '@project/react-flow-adapter';
 import { activeRouteColor } from '../colors';
+import { CARD_SIZE } from '../card';
 
 /**
  * How much of the shorter viewport axis the presented card leaves as margin.
@@ -100,6 +105,35 @@ function PresentingCamera({ activeCardId }: { activeCardId: string | null }) {
   return null;
 }
 
+function NewCardPreview({ title, pointer }: { title: string; pointer: LayoutPoint | null }) {
+  const connection = useConnection();
+  const { screenToFlowPosition } = useReactFlow();
+  useViewport();
+  if (pointer === null || !connection.inProgress || connection.toNode !== null) return null;
+  const flowPointer = screenToFlowPosition(pointer);
+  const position = {
+    x: flowPointer.x - CARD_SIZE.width / 2,
+    y: flowPointer.y - CARD_SIZE.height / 2,
+  };
+
+  return (
+    <ViewportPortal>
+      <div
+        className="new-card-preview"
+        data-testid="new-card-preview"
+        style={{
+          transform: `translate(${position.x}px, ${position.y}px)`,
+          width: CARD_SIZE.width,
+        }}
+      >
+        <article className="card card--node">
+          <h2 className="card__title">{title}</h2>
+        </article>
+      </div>
+    </ViewportPortal>
+  );
+}
+
 export interface GraphViewProps {
   nodes: CardFlowNode[];
   edges: Edge[];
@@ -119,6 +153,10 @@ export interface GraphViewProps {
   onConnect: OnConnect;
   /** Runs before React Flow clears its transient connection state. */
   onConnectEnd: () => void;
+  /** Complete an explicit modifier empty-drop at the preview's top-left position. */
+  onCreateConnectedCard: (sourceId: string, position: LayoutPoint) => void;
+  /** Exact neutral title shown by the transient empty-drop preview. */
+  newCardTitle: string;
   /** Opening a card is a view gesture; the graph only reports which was picked. */
   onOpenCard: (cardId: string) => void;
   routes: readonly Route[];
@@ -136,6 +174,8 @@ export function GraphView({
   onNodesChange,
   onConnect,
   onConnectEnd,
+  onCreateConnectedCard,
+  newCardTitle,
   onOpenCard,
   routes,
   colorByRouteId,
@@ -143,6 +183,23 @@ export function GraphView({
   activeRouteCardIds,
 }: GraphViewProps) {
   const connectionGesture = useRef(false);
+  const [modifierCreatesCard, setModifierCreatesCard] = useState(false);
+  const [previewPointer, setPreviewPointer] = useState<LayoutPoint | null>(null);
+  const { screenToFlowPosition } = useReactFlow();
+
+  useEffect(() => {
+    const updateModifier = (event: KeyboardEvent) => {
+      if (connectionGesture.current && event.key === 'Alt') {
+        setModifierCreatesCard(event.type === 'keydown');
+      }
+    };
+    window.addEventListener('keydown', updateModifier);
+    window.addEventListener('keyup', updateModifier);
+    return () => {
+      window.removeEventListener('keydown', updateModifier);
+      window.removeEventListener('keyup', updateModifier);
+    };
+  }, []);
 
   return (
     <ReactFlow
@@ -152,11 +209,33 @@ export function GraphView({
       edgeTypes={edgeTypes}
       onNodesChange={onNodesChange}
       onConnect={onConnect}
-      onConnectStart={() => {
+      onConnectStart={(event) => {
         connectionGesture.current = true;
+        setPreviewPointer(null);
+        setModifierCreatesCard('altKey' in event && event.altKey);
       }}
-      onConnectEnd={() => {
-        onConnectEnd();
+      onConnectEnd={(event, connection) => {
+        const createsCard =
+          connection.fromNode !== null &&
+          connection.toNode === null &&
+          previewPointer !== null &&
+          'altKey' in event &&
+          'clientX' in event &&
+          event.altKey;
+        if (createsCard) {
+          const sourceId = connection.fromNode.id;
+          const pointer = screenToFlowPosition({ x: event.clientX, y: event.clientY });
+          const position = {
+            x: pointer.x - CARD_SIZE.width / 2,
+            y: pointer.y - CARD_SIZE.height / 2,
+          };
+          onCreateConnectedCard(sourceId, position);
+          onConnectEnd();
+        } else {
+          onConnectEnd();
+        }
+        setModifierCreatesCard(false);
+        setPreviewPointer(null);
         // React Flow dispatches the pointer-up node click after this callback.
         // Keep the guard through that event, then restore ordinary card opening.
         setTimeout(() => {
@@ -182,6 +261,19 @@ export function GraphView({
         strokeWidth: 3,
       }}
       connectionLineComponent={RouteConnectionLine}
+      onMouseMove={(event) => {
+        if (!connectionGesture.current) return;
+        if (
+          !(event.target instanceof Element) ||
+          event.target.closest('.react-flow__renderer') === null ||
+          event.target.closest('.react-flow__node') !== null
+        ) {
+          setPreviewPointer(null);
+          return;
+        }
+        setPreviewPointer({ x: event.clientX, y: event.clientY });
+        setModifierCreatesCard(event.altKey);
+      }}
       edgesFocusable={false}
       minZoom={0.2}
       proOptions={{ hideAttribution: true }}
@@ -198,6 +290,7 @@ export function GraphView({
       )}
       <OverviewCamera presenting={presenting} />
       <PresentingCamera activeCardId={activeCardId} />
+      <NewCardPreview title={newCardTitle} pointer={modifierCreatesCard ? previewPointer : null} />
     </ReactFlow>
   );
 }

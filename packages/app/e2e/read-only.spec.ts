@@ -1,23 +1,30 @@
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { expect, test } from './fixtures';
 import {
   authoringHandle,
-  connectHandles,
-  dragBy,
+  connectToEmptyWithAlt,
   FIXTURE_EDGE_COUNT,
   nodeByTitle,
   settled,
 } from './graph';
 
-/** The fixture's A and E — the two Cards this test connects. React Flow labels
- *  each drawn Edge `Edge from <source> to <target>` using the Card ids. */
+/** The fixture's A, used as the source of the created Card's Edge. */
 const CARD_A = '00000000-0000-4000-8000-000000000002';
-const CARD_E = '00000000-0000-4000-8000-000000000008';
 
 const fixtureDir = fileURLToPath(new URL('../fixture', import.meta.url));
-const spaceFile = `${fixtureDir}/space.json`;
-const readFixture = (): string => readFileSync(spaceFile, 'utf8');
+const readFixture = (directory = fixtureDir, prefix = ''): Record<string, string> =>
+  Object.fromEntries(
+    readdirSync(directory, { withFileTypes: true })
+      .sort((left, right) => left.name.localeCompare(right.name))
+      .flatMap((entry) => {
+        const relative = `${prefix}${entry.name}`;
+        if (entry.isDirectory()) {
+          return Object.entries(readFixture(`${directory}/${entry.name}`, `${relative}/`));
+        }
+        return [[relative, readFileSync(`${directory}/${entry.name}`, 'utf8')]];
+      }),
+  );
 
 test('database persistence never writes structural edits back to imported authored files', async ({
   page,
@@ -29,24 +36,20 @@ test('database persistence never writes structural edits back to imported author
   await expect(page.locator('.react-flow__edge-path').first()).toHaveAttribute('d', /L/);
   await settled(page);
 
-  await dragBy(page, card, 0, -100);
-  await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
-  await settled(page);
-
-  const target = nodeByTitle(page, 'E').first();
-  await connectHandles(
-    page,
-    authoringHandle(card, 'source', 'right'),
-    authoringHandle(target, 'target', 'top'),
-  );
+  await card.hover();
+  await connectToEmptyWithAlt(page, authoringHandle(card, 'source', 'right'));
+  const created = nodeByTitle(page, 'Card 1');
+  await expect(created).toBeVisible();
+  const createdId = await created.getAttribute('data-id');
+  if (createdId === null) throw new Error('The created Card has no id.');
 
   // A revision bump only proves *something* committed. Name the connection that
   // was drawn, so a commit that recorded a placement and dropped the Edge fails
   // here rather than passing as "persisted".
-  await expect(page.getByLabel(`Edge from ${CARD_A} to ${CARD_E}`)).toBeVisible();
+  await expect(page.getByLabel(`Edge from ${CARD_A} to ${createdId}`)).toBeVisible();
   await expect(page.locator('.react-flow__edge')).toHaveCount(FIXTURE_EDGE_COUNT + 1);
-  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '2');
+  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
   await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
 
-  expect(readFixture()).toBe(before);
+  expect(readFixture()).toEqual(before);
 });
