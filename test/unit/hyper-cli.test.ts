@@ -367,7 +367,9 @@ describe('runHyper', () => {
 
     expect(exitCode).toBe(2);
     expect(output.stdout).toEqual([]);
-    expect(output.stderr).toEqual(['Usage: hyper [<path>] [--dangerous-truncate]\n']);
+    expect(output.stderr).toEqual([
+      'Usage: hyper [<path>] [--dangerous-truncate]\n       hyper export <space-uuid> <destination-directory>\n',
+    ]);
   });
 
   it('reports the stored space identity and lossless bigint revision', async () => {

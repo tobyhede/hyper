@@ -1,11 +1,12 @@
 import { spawn } from 'node:child_process';
-import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { uuidSchema, type UUID } from '@project/core';
 import { afterAll, afterEach, describe, expect, it } from 'vitest';
 import { PostgresSpaceRepository } from '../../src/persistence/postgres-space-repository';
 import { db } from '../../src/prisma/db';
+import { readSingleSpace } from '../../src/import/read-single-space';
 
 const IMPORTED_SPACE_ID = uuidSchema.parse('d1111111-1111-4111-8111-111111111111');
 const MALFORMED_SPACE_ID = uuidSchema.parse('d2222222-2222-4222-8222-222222222222');
@@ -154,6 +155,49 @@ describe('hyper CLI', () => {
       title: 'Opening',
       kind: 'markdown',
       body: 'Durable CLI body.\n',
+    });
+  });
+
+  it('exports through the real command and records the projected PostgreSQL revision', async () => {
+    const snapshot = {
+      id: IMPORTED_SPACE_ID,
+      document: { version: 2 as const, title: 'CLI exported talk', routes: [] },
+      cards: [
+        {
+          id: MALFORMED_SPACE_ID,
+          document: {
+            title: 'Exported card',
+            kind: 'markdown' as const,
+            body: 'Canonical export.\n',
+          },
+        },
+      ],
+    };
+    const imported = await repository.importSpaces([snapshot]);
+    if (imported.kind !== 'imported') throw new Error(imported.message);
+    createdSpaceIds.add(IMPORTED_SPACE_ID);
+    const destination = await mkdtemp(join(tmpdir(), 'hyper-cli-export-'));
+    temporaryDirectories.add(destination);
+
+    const result = await runHyperCommand(['export', IMPORTED_SPACE_ID, destination]);
+
+    expect(result).toEqual({
+      status: 0,
+      stdout: `Exported space ${IMPORTED_SPACE_ID} at revision 0 to ${destination}\n`,
+      stderr: '',
+    });
+    await expect(readSingleSpace(destination)).resolves.toEqual({
+      id: snapshot.id,
+      document: snapshot.document,
+      cards: snapshot.cards,
+    });
+    await expect(
+      readFile(join(destination, 'cards', `${MALFORMED_SPACE_ID}.md`), 'utf8'),
+    ).resolves.toContain(`id: ${MALFORMED_SPACE_ID}`);
+    await expect(repository.loadSpace(IMPORTED_SPACE_ID)).resolves.toEqual({
+      snapshot,
+      revision: 0n,
+      exportedRevision: 0n,
     });
   });
 

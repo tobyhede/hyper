@@ -15,6 +15,9 @@ interface RunHyperDependencies {
   io: CliIo;
 }
 
+const USAGE =
+  'Usage: hyper [<path>] [--dangerous-truncate]\n       hyper export <space-uuid> <destination-directory>\n';
+
 const describeError = (error: unknown): string =>
   error instanceof Error ? error.message : String(error);
 
@@ -56,9 +59,7 @@ export const runHyper = async (
 ): Promise<number> => {
   if (args[0] === 'export') {
     if (args.length !== 3) {
-      dependencies.io.stderr(
-        'Usage: hyper [<path>] [--dangerous-truncate]\n       hyper export <space-uuid> <destination-directory>\n',
-      );
+      dependencies.io.stderr(USAGE);
       return 2;
     }
     const id = uuidSchema.safeParse(args[1]);
@@ -91,7 +92,7 @@ export const runHyper = async (
     truncateArguments.length > 1 ||
     args.some((argument) => argument.startsWith('--') && argument !== '--dangerous-truncate')
   ) {
-    dependencies.io.stderr('Usage: hyper [<path>] [--dangerous-truncate]\n');
+    dependencies.io.stderr(USAGE);
     return 2;
   }
 
