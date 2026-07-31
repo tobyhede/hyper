@@ -301,6 +301,13 @@ export class PostgresSpaceRepository implements SpaceRepository {
     return loadStoredSpace(this.#database.orm, id);
   }
 
+  async markExported(id: UUID, revision: bigint): Promise<void> {
+    const updated = await this.#database.orm.public.Space.where({ id }).update({
+      exportedRevision: toDatabaseRevision(revision),
+    });
+    if (updated === null) throw new Error(`Space ${id} does not exist`);
+  }
+
   async commitSpace(
     snapshot: SpaceSnapshot,
     expectedRevision: bigint,

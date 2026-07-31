@@ -62,6 +62,10 @@ class ImportRepository implements SpaceRepository {
     return Promise.resolve(this.outcome.spaces.find(({ snapshot }) => snapshot.id === id));
   }
 
+  markExported(_id: UUID, _revision: bigint): Promise<void> {
+    throw new Error('Unexpected markExported call');
+  }
+
   commitSpace(
     _snapshot: SpaceSnapshot,
     _expectedRevision: bigint,
@@ -188,6 +192,25 @@ describe('runHyper', () => {
     await expect(
       readFile(join(destination, 'cards', 'nested', 'keep.md'), 'utf8'),
     ).resolves.toBe('keep nested\n');
+  });
+
+  it('records the exact revision only after the destination is replaced', async () => {
+    const parent = await makeTemporaryDirectory();
+    const destination = join(parent, 'exported');
+    const revision = 9_007_199_254_740_993n;
+    const repository = new MemorySpaceRepository([{ ...storedSpace, revision }]);
+
+    await expect(
+      runHyper(['export', SPACE_ID, destination], {
+        repository,
+        io: captureIo().io,
+      }),
+    ).resolves.toBe(0);
+
+    await expect(repository.loadSpace(SPACE_ID)).resolves.toMatchObject({
+      revision,
+      exportedRevision: revision,
+    });
   });
 
   it('opens the only database space without filesystem import and preserves its revision', async () => {

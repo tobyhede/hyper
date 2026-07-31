@@ -67,6 +67,10 @@ class RecordingRepository implements SpaceRepository {
     throw new Error('Unexpected loadSpace call');
   }
 
+  markExported(_id: UUID, _revision: bigint): Promise<void> {
+    throw new Error('Unexpected markExported call');
+  }
+
   commitSpace(
     _snapshot: SpaceSnapshot,
     _expectedRevision: bigint,

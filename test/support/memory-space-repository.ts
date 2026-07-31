@@ -61,6 +61,13 @@ export class MemorySpaceRepository implements SpaceRepository {
     return Promise.resolve(stored === undefined ? undefined : clone(stored));
   }
 
+  markExported(id: UUID, revision: bigint): Promise<void> {
+    const stored = this.#spaces.get(id);
+    if (stored === undefined) return Promise.reject(new Error(`Space ${id} does not exist`));
+    this.#spaces.set(id, { ...stored, exportedRevision: revision });
+    return Promise.resolve();
+  }
+
   commitSpace(snapshot: SpaceSnapshot, expectedRevision: bigint): Promise<RepositoryCommitResult> {
     const parsed = spaceSnapshotSchema.safeParse(snapshot);
     if (!parsed.success) {

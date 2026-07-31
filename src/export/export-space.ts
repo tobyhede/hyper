@@ -106,6 +106,7 @@ export const exportSpace = async (
     }
     await prepareReplacement(stored, replacement);
     await replaceDestination(replacement, destination);
+    await repository.markExported(id, stored.revision);
   } finally {
     await rm(stagingRoot, { recursive: true, force: true });
   }

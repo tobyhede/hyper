@@ -45,4 +45,5 @@ export interface SpaceRepository {
   loadSpace(id: UUID): Promise<StoredSpace | undefined>;
   commitSpace(snapshot: SpaceSnapshot, expectedRevision: bigint): Promise<RepositoryCommitResult>;
   importSpaces(input: readonly ImportSpace[], mode: ImportMode): Promise<RepositoryImportResult>;
+  markExported(id: UUID, revision: bigint): Promise<void>;
 }
