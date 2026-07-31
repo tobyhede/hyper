@@ -2,6 +2,12 @@ import { describe, expect, it } from 'vitest';
 import { uuidSchema } from '@project/core';
 import type { LoadedSpace } from '../src/index';
 import { MemorySpaceBackend } from '../src/index';
+import { spaceBackendContract } from './backend-contract';
+
+spaceBackendContract('MemorySpaceBackend', async (initial) => ({
+  backend: new MemorySpaceBackend(initial),
+  close: () => Promise.resolve(),
+}));
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
