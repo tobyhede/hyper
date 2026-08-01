@@ -206,10 +206,12 @@ const resolveImport = (input: ImportSpace, reservedSpaceId: UUID): SpaceSnapshot
 };
 
 /**
- * One statement, so one snapshot: PostgreSQL takes it at statement start, and
+ * One statement, so one snapshot: PostgreSQL fixes it at statement start, and
  * `include` compiles the child rows into a correlated aggregate rather than a
- * second round trip. Nothing can commit between the document and its cards, so
- * there is no torn read to detect and no revision comparison to make.
+ * second round trip. Other transactions still commit while this runs — they are
+ * simply not in the snapshot it reads from, so the document and its cards
+ * cannot come from either side of one. There is no torn read to detect and no
+ * revision comparison to make.
  */
 const loadStoredSpace = async (orm: Orm, id: UUID): Promise<StoredSpace | undefined> => {
   const stored = await orm.public.Space.where({ id })
