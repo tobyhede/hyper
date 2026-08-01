@@ -165,6 +165,41 @@ describe('Space HTTP application', () => {
     expect(logged).toEqual([`Failed to commit space ${SPACE_ID}`, failure]);
   });
 
+  it('returns service unavailable when failure logging itself throws a non-Error', async () => {
+    const failure = new Error('repository failure');
+    const options = {
+      logError: () => {
+        // JavaScript callers can violate the TypeScript convention; that is the regression case.
+        // eslint-disable-next-line @typescript-eslint/only-throw-error
+        throw 'logger failure';
+      },
+    };
+    const responses = await Promise.all([
+      createSpaceHttpApp(
+        repository({ listSpaces: () => Promise.reject(failure) }),
+        options,
+      ).request('/api/spaces'),
+      createSpaceHttpApp(repository({ loadSpace: () => Promise.reject(failure) }), options).request(
+        `/api/spaces/${SPACE_ID}`,
+      ),
+      createSpaceHttpApp(
+        repository({ commitSpace: () => Promise.reject(failure) }),
+        options,
+      ).request(`/api/spaces/${SPACE_ID}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(encodeCommitRequest(snapshot, 0n)),
+      }),
+    ]);
+
+    expect(responses.map(({ status }) => status)).toEqual([503, 503, 503]);
+    await Promise.all(
+      responses.map((response) =>
+        expect(response.json()).resolves.toEqual({ message: 'Persistence service unavailable' }),
+      ),
+    );
+  });
+
   it('rejects a commit without a JSON media type', async () => {
     const response = await createSpaceHttpApp(repository()).request(`/api/spaces/${SPACE_ID}`, {
       method: 'PUT',

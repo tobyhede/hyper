@@ -45,6 +45,21 @@ const defaultLogError = (message: string, error: unknown): void => {
   console.error(message, error);
 };
 
+const invokeLogError = (
+  logError: NonNullable<SpaceHttpAppOptions['logError']>,
+  message: string,
+  error: unknown,
+): void => {
+  try {
+    logError(message, error);
+  } catch (loggingFailure) {
+    if (loggingFailure instanceof Error) {
+      throw loggingFailure;
+    }
+    // Hono forwards Error instances to onError, but non-Error throws escape app.fetch().
+  }
+};
+
 const isOptionalWhitespace = (character: string): boolean =>
   character === ' ' || character === '\t';
 
@@ -285,7 +300,7 @@ export const createSpaceHttpApp = (
       try {
         return context.json(await repository.listSpaces(), 200);
       } catch (error) {
-        logError('Failed to list spaces', error);
+        invokeLogError(logError, 'Failed to list spaces', error);
         return context.json({ message: 'Persistence service unavailable' }, 503);
       }
     })
@@ -298,7 +313,7 @@ export const createSpaceHttpApp = (
         }
         return context.json(encodeLoadedSpace(loaded), 200);
       } catch (error) {
-        logError(`Failed to load space ${id}`, error);
+        invokeLogError(logError, `Failed to load space ${id}`, error);
         return context.json({ message: 'Persistence service unavailable' }, 503);
       }
     })
@@ -324,7 +339,7 @@ export const createSpaceHttpApp = (
           }
           return context.json({ message: result.message }, result.code === 'not-found' ? 404 : 422);
         } catch (error) {
-          logError(`Failed to commit space ${id}`, error);
+          invokeLogError(logError, `Failed to commit space ${id}`, error);
           return context.json({ message: 'Persistence service unavailable' }, 503);
         }
       },
