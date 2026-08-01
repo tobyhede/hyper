@@ -12,6 +12,8 @@ type ExpectedLoadedSpaceJson = {
   exportedRevision: string | null;
 };
 
+type PutInput = Parameters<SpaceHttpClient['api']['spaces'][':id']['$put']>[0];
+
 it('exposes concrete loaded-space JSON through the Hono RPC contract', () => {
   type LoadResponse = InferResponseType<SpaceResource['$get'], 200>;
   type ConflictResponse = InferResponseType<SpaceResource['$put'], 409>;
@@ -19,6 +21,7 @@ it('exposes concrete loaded-space JSON through the Hono RPC contract', () => {
   expectTypeOf<LoadedSpaceJson>().toEqualTypeOf<ExpectedLoadedSpaceJson>();
   expectTypeOf<LoadResponse>().toEqualTypeOf<LoadedSpaceJson>();
   expectTypeOf<ConflictResponse>().toEqualTypeOf<LoadedSpaceJson>();
+  expectTypeOf<PutInput['json']['expectedRevision']>().toEqualTypeOf<string>();
 });
 
 // Hono infers a json validator's *input* from its return type unless the wire

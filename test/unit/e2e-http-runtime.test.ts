@@ -1,6 +1,6 @@
 import { uuidSchema } from '@project/core';
 import { afterEach, describe, expect, it } from 'vitest';
-import { HttpSpaceBackend } from '@project/persistence';
+import { HttpSpaceBackend } from '@project/http';
 import { createHandler, type E2eHttpRuntimeOptions } from '../support/e2e-http-runtime';
 import { startHttpServer, type TestHttpServer } from '../support/http-server';
 
@@ -10,7 +10,7 @@ const servers: TestHttpServer[] = [];
 const startRuntime = async (options: E2eHttpRuntimeOptions) => {
   const server = await startHttpServer(await createHandler(options));
   servers.push(server);
-  return new HttpSpaceBackend(`${server.url}/api/spaces`);
+  return new HttpSpaceBackend(server.url);
 };
 
 afterEach(async () => {

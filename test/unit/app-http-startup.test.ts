@@ -1,5 +1,5 @@
 import { uuidSchema, type SpaceSnapshot } from '@project/core';
-import { HttpSpaceBackend } from '@project/persistence';
+import { HttpSpaceBackend } from '@project/http';
 import { afterEach, describe, expect, it } from 'vitest';
 import { createSpaceHttpHandler } from '../../src/http/space-http-handler';
 import { E2eMemorySpaceRepository } from '../support/e2e-memory-space-repository';
@@ -25,7 +25,7 @@ const startupFor = async (...snapshots: SpaceSnapshot[]) => {
   );
   const server = await startHttpServer(createSpaceHttpHandler(repository));
   servers.push(server);
-  return createWorkspaceStartup(new HttpSpaceBackend(`${server.url}/api/spaces`));
+  return createWorkspaceStartup(new HttpSpaceBackend(server.url));
 };
 
 afterEach(async () => {

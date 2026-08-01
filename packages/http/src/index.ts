@@ -13,6 +13,9 @@ import { createMiddleware } from 'hono/factory';
 import { HTTPException } from 'hono/http-exception';
 import { validator } from 'hono/validator';
 
+export { HttpSpaceBackend } from './backend';
+export type { HttpSpaceBackendOptions } from './backend';
+
 export const MAX_COMMIT_BODY_BYTES = 1_048_576;
 
 // Named so the route registration and the json validator's explicit path type

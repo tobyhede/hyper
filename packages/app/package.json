@@ -16,6 +16,7 @@
   "dependencies": {
     "@project/core": "workspace:*",
     "@project/graph": "workspace:*",
+    "@project/http": "workspace:*",
     "@project/persistence": "workspace:*",
     "@project/react-flow-adapter": "workspace:*",
     "@project/ui": "workspace:*",

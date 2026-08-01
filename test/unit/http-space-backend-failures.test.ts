@@ -1,7 +1,7 @@
 import { createServer } from 'node:http';
 import { describe, expect, it } from 'vitest';
 import { uuidSchema, type SpaceSnapshot } from '@project/core';
-import { HttpSpaceBackend } from '../src/index';
+import { HttpSpaceBackend } from '@project/http';
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
@@ -12,7 +12,7 @@ const snapshot: SpaceSnapshot = {
 };
 
 const backendFor = (response: Response): HttpSpaceBackend =>
-  new HttpSpaceBackend('/api/spaces', { fetch: () => Promise.resolve(response) });
+  new HttpSpaceBackend('/', { fetch: () => Promise.resolve(response) });
 
 const startStalledResponseServer = async (status: number, retryAfter: string) => {
   let reportHeadersSent: (() => void) | undefined;
@@ -41,7 +41,7 @@ const startStalledResponseServer = async (status: number, retryAfter: string) =>
   };
 };
 
-describe('HttpSpaceBackend failure classification', () => {
+describe('typed Hono HttpSpaceBackend failure classification', () => {
   const permanent = [
     [400, 'protocol'],
     [401, 'forbidden'],
@@ -158,6 +158,16 @@ describe('HttpSpaceBackend failure classification', () => {
     }
   });
 
+  it('rejects malformed list and load bodies at the runtime trust boundary', async () => {
+    const malformed = new Response(JSON.stringify({ inferred: 'but untrusted' }), { status: 200 });
+    await expect(backendFor(malformed.clone()).listSpaces()).rejects.toThrow(
+      'space summaries must be an array',
+    );
+    await expect(backendFor(malformed).loadSpace(SPACE_ID)).rejects.toThrow(
+      'loaded space has unexpected fields',
+    );
+  });
+
   it('maps unexpected client errors to permanent protocol failures', async () => {
     await expect(
       backendFor(new Response(JSON.stringify({ message: 'Teapot' }), { status: 418 })).commitSpace(
@@ -168,7 +178,7 @@ describe('HttpSpaceBackend failure classification', () => {
   });
 
   it('maps Fetch rejection to a retryable network failure', async () => {
-    const backend = new HttpSpaceBackend('/api/spaces', {
+    const backend = new HttpSpaceBackend('/', {
       fetch: () => Promise.reject(new Error('offline')),
     });
     await expect(backend.commitSpace(snapshot, 0n)).resolves.toEqual({
@@ -179,7 +189,7 @@ describe('HttpSpaceBackend failure classification', () => {
   });
 
   it('reports a descriptive message when a read times out', async () => {
-    const backend = new HttpSpaceBackend('/api/spaces', {
+    const backend = new HttpSpaceBackend('/', {
       timeoutMs: 5,
       fetch: (_input, init) =>
         new Promise<Response>((_resolve, reject) => {
@@ -191,7 +201,7 @@ describe('HttpSpaceBackend failure classification', () => {
   });
 
   it('applies its timeout to a caller-provided Fetch', async () => {
-    const backend = new HttpSpaceBackend('/api/spaces', {
+    const backend = new HttpSpaceBackend('/', {
       timeoutMs: 5,
       fetch: (_input, init) =>
         new Promise<Response>((_resolve, reject) => {
@@ -228,7 +238,7 @@ describe('HttpSpaceBackend failure classification', () => {
       );
 
   it('times out a read whose body stalls after the status line', async () => {
-    const backend = new HttpSpaceBackend('/api/spaces', {
+    const backend = new HttpSpaceBackend('/', {
       timeoutMs: 5,
       fetch: stalledBodyFetch(200),
     });
@@ -237,7 +247,7 @@ describe('HttpSpaceBackend failure classification', () => {
   }, 1000);
 
   it('reports a commit whose body stalls after the status line as a retryable timeout', async () => {
-    const backend = new HttpSpaceBackend('/api/spaces', {
+    const backend = new HttpSpaceBackend('/', {
       timeoutMs: 5,
       fetch: stalledBodyFetch(200),
     });
@@ -251,7 +261,7 @@ describe('HttpSpaceBackend failure classification', () => {
   it('reports a rate-limited response whose body stalls as a timeout without Retry-After', async () => {
     const server = await startStalledResponseServer(429, '60');
     try {
-      const backend = new HttpSpaceBackend(`${server.url}/api/spaces`, { timeoutMs: 100 });
+      const backend = new HttpSpaceBackend(server.url, { timeoutMs: 100 });
       const result = backend.commitSpace(snapshot, 0n);
       await server.headersSent;
       await expect(result).resolves.toEqual({
@@ -267,7 +277,7 @@ describe('HttpSpaceBackend failure classification', () => {
   it('reports an unavailable response whose body stalls as a timeout without Retry-After', async () => {
     const server = await startStalledResponseServer(503, '30');
     try {
-      const backend = new HttpSpaceBackend(`${server.url}/api/spaces`, { timeoutMs: 100 });
+      const backend = new HttpSpaceBackend(server.url, { timeoutMs: 100 });
       const result = backend.commitSpace(snapshot, 0n);
       await server.headersSent;
       await expect(result).resolves.toEqual({

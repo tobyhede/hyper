@@ -117,6 +117,9 @@ importers:
       '@project/graph':
         specifier: workspace:*
         version: link:../graph
+      '@project/http':
+        specifier: workspace:*
+        version: link:../http
       '@project/persistence':
         specifier: workspace:*
         version: link:../persistence

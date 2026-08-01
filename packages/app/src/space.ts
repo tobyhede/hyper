@@ -1,4 +1,5 @@
-import { HttpSpaceBackend, type SpaceBackend } from '@project/persistence';
+import { HttpSpaceBackend } from '@project/http';
+import type { SpaceBackend } from '@project/persistence';
 import { openStoredWorkspace, type OpenedSpace } from './open-workspace';
 import type { ApplicationStartupResult } from './startup';
 
@@ -11,7 +12,7 @@ export interface WorkspaceStartup {
 
 /** Compose browser startup around one fixed persistence backend. */
 export const createWorkspaceStartup = (
-  backend: SpaceBackend = new HttpSpaceBackend('/api/spaces'),
+  backend: SpaceBackend = new HttpSpaceBackend(),
 ): WorkspaceStartup => ({
   resolve: async () => {
     const spaces = await backend.listSpaces();

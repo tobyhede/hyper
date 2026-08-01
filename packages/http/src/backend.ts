@@ -1,18 +1,20 @@
 import type { SpaceSnapshot, UUID } from '@project/core';
-import type { CommitResult, LoadedSpace, SpaceBackend, SpaceSummary } from './backend';
 import {
   CANONICAL_DECIMAL,
   decodeCommittedRevision,
   decodeErrorMessage,
-  decodeLoadedSpace,
   decodeSpaceSummaries,
+  decodeLoadedSpace,
   encodeCommitRequest,
-} from './http-protocol';
+  type CommitResult,
+  type LoadedSpace,
+  type SpaceBackend,
+  type SpaceSummary,
+} from '@project/persistence';
+import { hc } from 'hono/client';
+import type { SpaceHttpApp } from './index';
 
-export interface HttpSpaceBackendOptions {
-  fetch?: typeof globalThis.fetch;
-  timeoutMs?: number;
-}
+type SpaceHttpClient = ReturnType<typeof hc<SpaceHttpApp>>;
 
 const protocolFailure = (message: string): CommitResult => ({
   kind: 'permanent-failure',
@@ -20,37 +22,35 @@ const protocolFailure = (message: string): CommitResult => ({
   message,
 });
 
-const responseJson = async (response: Response): Promise<unknown> => response.json();
+export interface HttpSpaceBackendOptions {
+  fetch?: typeof globalThis.fetch;
+  timeoutMs?: number;
+}
 
 export class HttpSpaceBackend implements SpaceBackend {
   readonly #baseUrl: string;
   readonly #fetch: typeof globalThis.fetch;
   readonly #timeoutMs: number;
 
-  constructor(baseUrl = '/api/spaces', options: HttpSpaceBackendOptions = {}) {
-    this.#baseUrl = baseUrl.replace(/\/$/, '');
+  constructor(baseUrl = '/', options: HttpSpaceBackendOptions = {}) {
+    this.#baseUrl = baseUrl;
     this.#fetch = options.fetch ?? globalThis.fetch.bind(globalThis);
     this.#timeoutMs = options.timeoutMs ?? 10_000;
   }
 
-  /**
-   * Headers arriving is not the request completing. The timer stays armed until
-   * `consume` has decoded the body, because a peer that sends a prompt status
-   * line and then stalls the stream would otherwise hang the read forever — the
-   * abort has to be able to reach the response stream, not just the handshake.
-   */
-  async #timedFetch<T>(
-    input: RequestInfo | URL,
-    init: RequestInit | undefined,
+  /** Keep the timeout armed until the untrusted response body is decoded. */
+  async #timedRequest<T>(
+    request: (client: SpaceHttpClient) => Promise<Response>,
     consume: (response: Response, signal: AbortSignal) => Promise<T>,
   ): Promise<T> {
     const controller = new AbortController();
-    const timer = setTimeout(() => {
-      controller.abort();
-    }, this.#timeoutMs);
+    const timer = setTimeout(() => controller.abort(), this.#timeoutMs);
     try {
-      const response = await this.#fetch(input, { ...init, signal: controller.signal });
-      return await consume(response, controller.signal);
+      const client = hc<SpaceHttpApp>(this.#baseUrl, {
+        fetch: (input: RequestInfo | URL, init?: RequestInit) =>
+          this.#fetch(input, { ...init, signal: controller.signal }),
+      });
+      return await consume(await request(client), controller.signal);
     } catch (error) {
       if (controller.signal.aborted) throw new HttpTimeoutError();
       throw error;
@@ -60,29 +60,34 @@ export class HttpSpaceBackend implements SpaceBackend {
   }
 
   listSpaces(): Promise<readonly SpaceSummary[]> {
-    return this.#timedFetch(this.#baseUrl, undefined, async (response) => {
-      if (!response.ok) throw new Error(`Unable to list spaces: HTTP ${response.status}`);
-      return decodeSpaceSummaries(await responseJson(response));
-    });
+    return this.#timedRequest(
+      (client) => client.api.spaces.$get(),
+      async (response) => {
+        if (!response.ok) throw new Error(`Unable to list spaces: HTTP ${response.status}`);
+        return decodeSpaceSummaries(await response.json());
+      },
+    );
   }
 
   loadSpace(id: UUID): Promise<LoadedSpace | undefined> {
-    return this.#timedFetch(`${this.#baseUrl}/${id}`, undefined, async (response) => {
-      if (response.status === 404) return undefined;
-      if (!response.ok) throw new Error(`Unable to load space: HTTP ${response.status}`);
-      return decodeLoadedSpace(await responseJson(response));
-    });
+    return this.#timedRequest(
+      (client) => client.api.spaces[':id'].$get({ param: { id } }),
+      async (response) => {
+        if (response.status === 404) return undefined;
+        if (!response.ok) throw new Error(`Unable to load space: HTTP ${response.status}`);
+        return decodeLoadedSpace(await response.json());
+      },
+    );
   }
 
   async commitSpace(snapshot: SpaceSnapshot, expectedRevision: bigint): Promise<CommitResult> {
     try {
-      return await this.#timedFetch(
-        `${this.#baseUrl}/${snapshot.id}`,
-        {
-          method: 'PUT',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify(encodeCommitRequest(snapshot, expectedRevision)),
-        },
+      return await this.#timedRequest(
+        (client) =>
+          client.api.spaces[':id'].$put({
+            param: { id: snapshot.id },
+            json: encodeCommitRequest(snapshot, expectedRevision),
+          }),
         async (response, signal): Promise<CommitResult> => {
           const retryable = await retryableForStatus(response, signal);
           if (retryable !== undefined) return retryable;
@@ -90,13 +95,13 @@ export class HttpSpaceBackend implements SpaceBackend {
             if (response.status === 200) {
               return {
                 kind: 'committed',
-                revision: decodeCommittedRevision(await responseJson(response)),
+                revision: decodeCommittedRevision(await response.json()),
               };
             }
             if (response.status === 409) {
-              return { kind: 'conflict', current: decodeLoadedSpace(await responseJson(response)) };
+              return { kind: 'conflict', current: decodeLoadedSpace(await response.json()) };
             }
-            const message = decodeErrorMessage(await responseJson(response));
+            const message = decodeErrorMessage(await response.json());
             if (response.status === 401 || response.status === 403) {
               return { kind: 'permanent-failure', code: 'forbidden', message };
             }
@@ -108,9 +113,6 @@ export class HttpSpaceBackend implements SpaceBackend {
             }
             return protocolFailure(message);
           } catch (error) {
-            // A stalled body aborts mid-decode. That is the timeout, not a
-            // malformed payload, so it has to reach the mapping below rather
-            // than be reported as a protocol failure the session never retries.
             if (signal.aborted) throw error;
             return protocolFailure(error instanceof Error ? error.message : 'Malformed response');
           }
@@ -118,7 +120,7 @@ export class HttpSpaceBackend implements SpaceBackend {
       );
     } catch (error) {
       if (error instanceof HttpTimeoutError) {
-        return { kind: 'retryable-failure', code: 'timeout', message: error.message };
+        return { kind: 'retryable-failure', code: 'timeout', message: 'Request timed out' };
       }
       return {
         kind: 'retryable-failure',
@@ -157,7 +159,6 @@ const retryableForStatus = async (
 ): Promise<CommitResult | undefined> => {
   let code: 'timeout' | 'rate-limited' | 'unavailable';
   let fallback: string;
-  // RFC 9110 defines Retry-After for 429 and 503; a 408 does not carry one.
   let honoursRetryAfter = true;
   if (response.status === 408) {
     code = 'timeout';

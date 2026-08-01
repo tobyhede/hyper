@@ -1,4 +1,4 @@
-import { HttpSpaceBackend } from '@project/persistence';
+import { HttpSpaceBackend } from '@project/http';
 import { spaceBackendContract } from '../../packages/persistence/test/backend-contract';
 import { createSpaceHttpHandler } from '../../src/http/space-http-handler';
 import { E2eMemorySpaceRepository } from '../support/e2e-memory-space-repository';
@@ -9,7 +9,7 @@ spaceBackendContract('HttpSpaceBackend', async (initial) => {
     createSpaceHttpHandler(new E2eMemorySpaceRepository(initial)),
   );
   return {
-    backend: new HttpSpaceBackend(`${server.url}/api/spaces`),
+    backend: new HttpSpaceBackend(server.url),
     close: () => server.close(),
   };
 });
