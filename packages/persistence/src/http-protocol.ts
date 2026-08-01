@@ -63,10 +63,15 @@ export const decodeLoadedSpace = (value: unknown): LoadedSpace => {
   };
 };
 
+export interface CommitRequestJson {
+  snapshot: SpaceSnapshot;
+  expectedRevision: string;
+}
+
 export const encodeCommitRequest = (
   snapshot: SpaceSnapshot,
   expectedRevision: bigint,
-): unknown => ({
+): CommitRequestJson => ({
   snapshot,
   expectedRevision: expectedRevision.toString(),
 });

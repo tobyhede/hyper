@@ -403,4 +403,61 @@ describe('Space HTTP application', () => {
     expect(response.status).toBe(405);
     expect(response.headers.get('allow')).toBe('GET');
   });
+
+  // `c.notFound()` inside the handler installed by `app.notFound()` calls that
+  // same handler — Hono seeds the Context's not-found handler from the app's —
+  // so it recurses until the stack blows. Every path off the declared contract
+  // reached it, including the trailing slash a browser address bar produces.
+  it.each(['/', '/api', '/api/spaces/', '/index.html', '/api/spaces/one/two'])(
+    'answers %s outside the declared contract without recursing',
+    async (path) => {
+      const response = await createSpaceHttpApp(repository()).request(path);
+
+      expect(response.status).toBe(404);
+      expect(response.headers.get('cache-control')).toBe('no-store');
+      await expect(response.json()).resolves.toEqual({ message: 'Not found' });
+    },
+  );
+
+  // Hono does not turn a rethrow from `onError` into a 500: it re-invokes the
+  // custom handler and lets the throw escape, so `app.fetch()` returns a
+  // rejected promise. A host without a `.catch` then has an unhandled rejection
+  // rather than a response, and Node 24 defaults to killing the process.
+  it('answers an unexpected failure with a response rather than a rejection', async () => {
+    const app = createSpaceHttpApp(
+      repository({ listSpaces: () => Promise.reject(new Error('database is down')) }),
+      {
+        logError: () => {
+          throw new Error('log sink is down');
+        },
+      },
+    );
+
+    const response = await app.request('/api/spaces');
+
+    expect(response.status).toBe(500);
+    expect(response.headers.get('cache-control')).toBe('no-store');
+    await expect(response.json()).resolves.toEqual({ message: 'Internal server error' });
+  });
+
+  // Hono's own json validator applies a stricter Content-Type regex than this
+  // module's media policy, and when it disagrees it does not parse the body and
+  // hands the validator `{}` — surfacing as a 400 about fields, for a body that
+  // was never read. One policy has to decide, so the media guard rewrites the
+  // header it has already validated.
+  it.each([
+    ['optional whitespace before the parameter separator', 'application/json ; charset=utf-8'],
+    ['whitespace around the parameter equals', 'application/json; charset = utf-8'],
+    ['an underscore in a parameter name', 'application/json; x_1=2'],
+    ['a quoted parameter containing a separator', 'application/json; foo="a;b"'],
+  ])('commits a request whose media type carries %s', async (_name, contentType) => {
+    const response = await createSpaceHttpApp(repository()).request(`/api/spaces/${SPACE_ID}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': contentType },
+      body: JSON.stringify(encodeCommitRequest(snapshot, 0n)),
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ revision: '1' });
+  });
 });
