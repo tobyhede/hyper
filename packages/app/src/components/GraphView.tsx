@@ -1,4 +1,12 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type MouseEvent,
+} from 'react';
 import {
   Background,
   Controls,
@@ -8,11 +16,13 @@ import {
   useReactFlow,
   useStore,
   type Edge,
+  type EdgeChange,
   type IsValidConnection,
   type NodeMouseHandler,
   type OnConnect,
   type OnConnectEnd,
   type OnConnectStart,
+  type OnEdgesChange,
   type OnNodesChange,
 } from '@xyflow/react';
 import type { Route } from '@project/core';
@@ -45,9 +55,6 @@ const PRESENTING_PADDING = 1.15;
  */
 const OVERVIEW_FIT = { padding: 0.2, maxZoom: 1 } as const;
 
-/** Constant, so React Flow is not handed a new object on every render. */
-const PRO_OPTIONS = { hideAttribution: true } as const;
-
 /**
  * What the graph tells assistive technology it can do — minus the delete.
  *
@@ -62,9 +69,9 @@ const PRO_OPTIONS = { hideAttribution: true } as const;
  */
 const ARIA_LABEL_CONFIG = {
   'node.a11yDescription.default':
-    'Press enter or space to select a Card, the arrow keys to move it, and escape to cancel.',
+    'Press enter or space to open a Card, the arrow keys to move it, and escape to cancel.',
   'node.a11yDescription.keyboardDisabled':
-    'Press enter or space to select a Card, the arrow keys to move it, and escape to cancel.',
+    'Press enter or space to open a Card, the arrow keys to move it, and escape to cancel.',
   'edge.a11yDescription.default': 'Press enter or space to select an Edge, and escape to cancel.',
 } as const;
 
@@ -171,12 +178,31 @@ function PresentingCamera({ activeCardId }: { activeCardId: string | null }) {
  * `GraphView`'s own state instead re-rendered the whole flow on every pointer
  * frame of a connection.
  */
-function NewCardPreview({ title, active }: { title: string; active: boolean }) {
+function NewCardPreview({
+  title,
+  active,
+  acceptsNewCardTarget,
+}: {
+  title: string;
+  active: boolean;
+  acceptsNewCardTarget: (from: string) => boolean;
+}) {
   const endpoint = useConnection((connection) => (connection.inProgress ? connection.to : null));
   const overNode = useConnection(
     (connection) => connection.inProgress && connection.toNode !== null,
   );
-  if (!active || endpoint === null || overNode) return null;
+  const sourceId = useConnection((connection) =>
+    connection.inProgress ? connection.fromNode.id : null,
+  );
+  if (
+    !active ||
+    endpoint === null ||
+    overNode ||
+    sourceId === null ||
+    !acceptsNewCardTarget(sourceId)
+  ) {
+    return null;
+  }
   const position = {
     x: endpoint.x - CARD_SIZE.width / 2,
     y: endpoint.y - CARD_SIZE.height / 2,
@@ -223,6 +249,8 @@ export interface GraphViewProps {
    * author lets go, and asked again by the editor on release.
    */
   acceptsConnection: (from: string, to: string) => boolean;
+  /** Whether this Card may create and connect a new Card on an Alt/Option empty-drop. */
+  acceptsNewCardTarget: (from: string) => boolean;
   /** Runs before React Flow clears its transient connection state. */
   onConnectEnd: () => void;
   /** Complete an explicit modifier empty-drop at the preview's top-left position. */
@@ -246,6 +274,7 @@ export function GraphView({
   onNodesChange,
   onConnect,
   acceptsConnection,
+  acceptsNewCardTarget,
   onConnectEnd,
   onCreateConnectedCard,
   newCardTitle,
@@ -257,6 +286,7 @@ export function GraphView({
 }: GraphViewProps) {
   const connectionGesture = useRef(false);
   const [modifierCreatesCard, setModifierCreatesCard] = useState(false);
+  const [selectedEdgeIds, setSelectedEdgeIds] = useState<ReadonlySet<string>>(() => new Set());
   // A boolean, not a point: React bails out of an unchanged state write, so a
   // pointer moving across empty canvas no longer re-renders the flow per frame.
   const [overEmptyCanvas, setOverEmptyCanvas] = useState(false);
@@ -296,6 +326,7 @@ export function GraphView({
       const createsCard =
         connection.fromNode !== null &&
         connection.toNode === null &&
+        acceptsNewCardTarget(connection.fromNode.id) &&
         'altKey' in event &&
         'clientX' in event &&
         event.altKey &&
@@ -321,7 +352,7 @@ export function GraphView({
         connectionGesture.current = false;
       }, 0);
     },
-    [screenToFlowPosition, onCreateConnectedCard, onConnectEnd],
+    [screenToFlowPosition, onCreateConnectedCard, onConnectEnd, acceptsNewCardTarget],
   );
 
   // Clicking a card opens it to read — a gesture that belongs to the overview.
@@ -341,6 +372,20 @@ export function GraphView({
     if (empty) setModifierCreatesCard(event.altKey);
   }, []);
 
+  const handleKeyDown = useCallback(
+    (event: ReactKeyboardEvent<HTMLDivElement>) => {
+      if (presenting || (event.key !== 'Enter' && event.key !== ' ')) return;
+      if (!(event.target instanceof Element)) return;
+      const card = event.target.closest<HTMLElement>('.react-flow__node[data-id]');
+      if (card === null || !event.currentTarget.contains(card)) return;
+      const cardId = card.dataset['id'];
+      if (cardId === undefined) return;
+      event.preventDefault();
+      onOpenCard(cardId);
+    },
+    [presenting, onOpenCard],
+  );
+
   const connectionLineStyle = useMemo(
     () => ({
       stroke: activeRouteColor(colorByRouteId, activeRouteId),
@@ -349,18 +394,44 @@ export function GraphView({
     [activeRouteId, colorByRouteId],
   );
 
+  const selectableEdges = useMemo(
+    () => edges.map((edge) => ({ ...edge, selected: selectedEdgeIds.has(edge.id) })),
+    [edges, selectedEdgeIds],
+  );
+  const handleEdgesChange = useCallback<OnEdgesChange>(
+    (changes) => {
+      const selections = changes.filter(
+        (change): change is Extract<EdgeChange<Edge>, { type: 'select' }> =>
+          change.type === 'select',
+      );
+      if (selections.length === 0) return;
+      setSelectedEdgeIds((selected) => {
+        const currentEdgeIds = new Set(edges.map((edge) => edge.id));
+        const next = new Set([...selected].filter((id) => currentEdgeIds.has(id)));
+        for (const change of selections) {
+          if (change.selected) next.add(change.id);
+          else next.delete(change.id);
+        }
+        return next;
+      });
+    },
+    [edges],
+  );
+
   return (
     <ReactFlow
       nodes={nodes}
-      edges={edges}
+      edges={selectableEdges}
       nodeTypes={nodeTypes}
       edgeTypes={edgeTypes}
       onNodesChange={onNodesChange}
+      onEdgesChange={handleEdgesChange}
       onConnect={onConnect}
       isValidConnection={isValidConnection}
       onConnectStart={handleConnectStart}
       onConnectEnd={handleConnectEnd}
       onNodeClick={handleNodeClick}
+      onKeyDown={handleKeyDown}
       fitView
       fitViewOptions={OVERVIEW_FIT}
       // While presenting the arrow keys are the walk's, so React Flow must not
@@ -383,7 +454,6 @@ export function GraphView({
       onMouseMove={handleMouseMove}
       edgesFocusable={false}
       minZoom={0.2}
-      proOptions={PRO_OPTIONS}
     >
       <Background gap={24} />
       <Controls showInteractive={false} />
@@ -397,7 +467,11 @@ export function GraphView({
       )}
       <OverviewCamera presenting={presenting} />
       <PresentingCamera activeCardId={activeCardId} />
-      <NewCardPreview title={newCardTitle} active={modifierCreatesCard && overEmptyCanvas} />
+      <NewCardPreview
+        title={newCardTitle}
+        active={modifierCreatesCard && overEmptyCanvas}
+        acceptsNewCardTarget={acceptsNewCardTarget}
+      />
     </ReactFlow>
   );
 }

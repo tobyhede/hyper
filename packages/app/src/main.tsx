@@ -1,6 +1,6 @@
 import { createRoot } from 'react-dom/client';
-import '@xyflow/react/dist/style.css';
 import './tailwind.css';
+import '@xyflow/react/dist/style.css';
 import './styles.css';
 import { createWorkspaceStartup } from './space';
 import { startApplication } from './startup';

@@ -7,23 +7,23 @@ entering a local, unpersisted deletion state.
 
 **Blocked by:** nothing.
 
-**Status:** open
+**Status:** resolved
 
-- [ ] `ReactFlow` receives `deleteKeyCode={null}` until structural deletion is
+- [x] `ReactFlow` receives `deleteKeyCode={null}` until structural deletion is
   implemented through the completed-Edit seam.
-- [ ] Pressing Backspace or Delete with a Card selected leaves the editor's live
+- [x] Pressing Backspace or Delete with a Card selected leaves the editor's live
   nodes, authoritative Space and persistence revision unchanged.
-- [ ] Pressing Backspace or Delete with an Edge selected leaves the rendered
+- [x] Pressing Backspace or Delete with an Edge selected leaves the rendered
   Edges, authoritative Space and persistence revision unchanged.
-- [ ] React Flow's accessibility instructions do not advertise Delete as a
+- [x] React Flow's accessibility instructions do not advertise Delete as a
   supported Card or Edge action.
-- [ ] Regression coverage exercises the keyboard interaction through the public
+- [x] Regression coverage exercises the keyboard interaction through the public
   graph/editor boundary rather than calling React Flow internals.
-- [ ] Future deletion work re-enables the shortcut only by translating it into
+- [x] Future deletion work re-enables the shortcut only by translating it into
   one atomic completed Edit that removes the Card or Edge, repairs every affected
   Route and Layout reference, validates the resulting Space and submits the
   complete snapshot.
-- [ ] `pnpm verify` and `pnpm e2e` pass.
+- [x] `pnpm verify` and `pnpm e2e` pass.
 
 ## Context
 
@@ -37,3 +37,14 @@ Deletion remains future structural-authoring scope in
 `.scratch/graph-editing/commands.md`; this issue does not implement that command.
 It only closes React Flow's unsupported default path until the domain operation
 exists.
+
+## Evidence
+
+- `packages/app/src/components/GraphView.tsx` disables React Flow's delete key,
+  retains controlled Edge selection without accepting structural Edge changes,
+  and supplies accurate Card and Edge keyboard descriptions.
+- `packages/app/e2e/editing.spec.ts` proves Backspace and Delete preserve Cards,
+  Edges, authoritative persistence and revision after selecting either kind of
+  element, and checks that assistive descriptions advertise no deletion.
+- Final verification on 2026-08-01: `pnpm verify` passed 63 test files and 532
+  tests; `pnpm e2e` passed all 59 tests; `pnpm build` completed successfully.

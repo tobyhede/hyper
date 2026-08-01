@@ -133,7 +133,7 @@ importers:
         specifier: ^1.87.0
         version: 1.170.18(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       '@xyflow/react':
-        specifier: ^12.3.5
+        specifier: 12.11.2
         version: 12.11.2(@types/react-dom@18.3.7(@types/react@18.3.31))(@types/react@18.3.31)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       react:
         specifier: ^18.3.1
@@ -200,7 +200,7 @@ importers:
         specifier: workspace:*
         version: link:../ui
       '@xyflow/react':
-        specifier: ^12.3.5
+        specifier: 12.11.2
         version: 12.11.2(@types/react-dom@18.3.7(@types/react@18.3.31))(@types/react@18.3.31)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       elkjs:
         specifier: ^0.12.0

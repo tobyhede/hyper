@@ -572,6 +572,38 @@ test('Backspace with a Card selected removes nothing', async ({ page }) => {
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '0');
 });
 
+test('Backspace with an Edge selected removes nothing', async ({ page }) => {
+  await page.goto('/');
+  await expect(nodeByTitle(page, 'A').first()).toBeVisible();
+  const edge = page.locator('.react-flow__edge').first();
+  await expect(edge.locator('.react-flow__edge-path')).toHaveAttribute('d', /L/);
+  await settled(page);
+
+  const edgePoint = await page.locator('.react-flow__edge-path').evaluateAll((paths) => {
+    for (const path of paths) {
+      const geometry = path as SVGPathElement;
+      const transform = geometry.getScreenCTM();
+      if (transform === null) continue;
+      const length = geometry.getTotalLength();
+      for (const fraction of [0.25, 0.5, 0.75]) {
+        const point = geometry.getPointAtLength(length * fraction).matrixTransform(transform);
+        if (document.elementFromPoint(point.x, point.y)?.closest('.react-flow__edge') !== null) {
+          return { x: point.x, y: point.y };
+        }
+      }
+    }
+    throw new Error('No rendered Edge has a clickable point.');
+  });
+  await page.mouse.click(edgePoint.x, edgePoint.y);
+  await expect(page.locator('.react-flow__edge.selected')).toHaveCount(1);
+  await page.keyboard.press('Backspace');
+  await page.keyboard.press('Delete');
+
+  await expect(page.locator('.react-flow__node')).toHaveCount(FIXTURE_CARD_COUNT);
+  await expect(page.locator('.react-flow__edge')).toHaveCount(FIXTURE_EDGE_COUNT);
+  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '0');
+});
+
 /**
  * React Flow's default assistive description offers a delete Hyper has not built.
  *
@@ -584,6 +616,7 @@ test('the graph does not advertise a delete action it does not implement', async
   await expect(nodeByTitle(page, 'A').first()).toBeVisible();
 
   await expect(page.locator('[id^="react-flow__node-desc"]')).not.toContainText(/delete/i);
+  await expect(page.locator('[id^="react-flow__node-desc"]')).toContainText(/open a Card/i);
   await expect(page.locator('[id^="react-flow__edge-desc"]')).not.toContainText(/delete/i);
 });
 
@@ -626,4 +659,6 @@ test('a duplicate Edge is marked invalid while the drag is still live', async ({
   await startDrag();
   await expect(await dragOnto('E')).toHaveClass(/valid/);
   await page.mouse.up();
+  await expect(page.locator('.react-flow__edge')).toHaveCount(FIXTURE_EDGE_COUNT + 1);
+  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
 });

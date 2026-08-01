@@ -1,7 +1,7 @@
 import { newUuid, type CardId, type RouteId, type SpaceSnapshot, type UUID } from '@project/core';
 import { loadSpaceSnapshot, type LayoutPoint, type Space } from '@project/graph';
 import type { SpaceSession } from '@project/persistence';
-import { createEditorStore, type EditorStore } from './editor';
+import { createEditorStore, type EditorConnectionEligibility, type EditorStore } from './editor';
 import { updatePositionedLayout } from './snapshot';
 import type { RendererSelection, ViewChoice } from './view';
 
@@ -227,20 +227,40 @@ function deriveCompletedEdit(current: CurrentEditState): DerivedEdit | null {
 /**
  * Whether the graph may accept this Edge as things currently stand.
  *
- * One predicate, asked in two places for two different reasons: React Flow asks
- * it *during* the drag to state the target's validity, and the editor asks it
- * again on release to decide whether a completed Edit happened at all. Deriving
- * both from the same function is what keeps a target that reads as valid from
- * quietly doing nothing when the author lets go.
+ * One policy answers both kinds of target. React Flow asks during the drag to
+ * state an existing target's validity or decide whether an empty drop may create
+ * a Card; the editor asks again on release before emitting a completed Edit.
+ * Sharing the policy keeps the preview, drop and completed Edit in agreement.
  */
-export function createConnectionPredicate(
+type ActiveConnectionRoute =
+  | { readonly kind: 'unavailable' }
+  | { readonly kind: 'new-route' }
+  | {
+      readonly kind: 'active-route';
+      readonly route: SpaceSnapshot['document']['routes'][number];
+    };
+
+export function createConnectionEligibility(
   currentActiveRoute: () => RouteId | null,
   session: SpaceSession,
-): (from: CardId, to: CardId) => boolean {
-  return (from, to) => {
+): EditorConnectionEligibility {
+  const activeRoute = (): ActiveConnectionRoute => {
+    const snapshot = session.getState().working;
     const routeId = currentActiveRoute();
-    if (routeId === null) return connectsWithoutActiveRoute(session.getState().working);
-    return !inspectRouteEdge(session.getState().working, routeId, from, to).exists;
+    if (routeId === null) {
+      return connectsWithoutActiveRoute(snapshot) ? { kind: 'new-route' } : { kind: 'unavailable' };
+    }
+    const route = snapshot.document.routes.find((candidate) => candidate.id === routeId);
+    return route === undefined ? { kind: 'unavailable' } : { kind: 'active-route', route };
+  };
+  return {
+    acceptsExistingTarget: (from, to) => {
+      const route = activeRoute();
+      if (route.kind === 'unavailable') return false;
+      if (route.kind === 'new-route') return true;
+      return !route.route.edges.some((edge) => edge.from === from && edge.to === to);
+    },
+    acceptsNewTarget: () => activeRoute().kind !== 'unavailable',
   };
 }
 
@@ -263,6 +283,7 @@ export function createPlacementEditor({
     completionQueued = false;
     return queued;
   };
+  const connectionEligibility = createConnectionEligibility(currentActiveRoute, session);
   const editor = createEditorStore(
     initialPositions,
     () => {
@@ -323,7 +344,7 @@ export function createPlacementEditor({
         completing = false;
       }
     },
-    createConnectionPredicate(currentActiveRoute, session),
+    connectionEligibility,
   );
   return editor;
 }

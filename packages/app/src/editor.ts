@@ -60,6 +60,16 @@ export interface EditorState {
 
 export type EditorStore = UseBoundStore<StoreApi<EditorState>>;
 
+export interface EditorConnectionEligibility {
+  readonly acceptsExistingTarget: (from: CardId, to: CardId) => boolean;
+  readonly acceptsNewTarget: (from: CardId) => boolean;
+}
+
+const rejectsConnections: EditorConnectionEligibility = {
+  acceptsExistingTarget: () => false,
+  acceptsNewTarget: () => false,
+};
+
 function positionsOf(nodes: readonly CardFlowNode[]): ReadonlyMap<string, LayoutPoint> {
   return new Map(nodes.map((node) => [node.id, { x: node.position.x, y: node.position.y }]));
 }
@@ -140,7 +150,7 @@ function reconcile(
 export function createEditorStore(
   initialPositions: ReadonlyMap<string, LayoutPoint> | null = null,
   editCompleted: () => void = () => undefined,
-  acceptsConnection: (from: CardId, to: CardId) => boolean = () => false,
+  connectionEligibility: EditorConnectionEligibility = rejectsConnections,
 ): EditorStore {
   return create<EditorState>((set, get) => ({
     nodes: null,
@@ -231,7 +241,9 @@ export function createEditorStore(
 
     connectCards: (from, to, projected) => {
       const state = get();
-      if (state.nodes === null || !acceptsConnection(from, to)) return false;
+      if (state.nodes === null || !connectionEligibility.acceptsExistingTarget(from, to)) {
+        return false;
+      }
       set({
         positions: positionsForEdit(state.nodes, state.positions),
         nodes: reconcile(state.nodes, projected),
@@ -243,7 +255,7 @@ export function createEditorStore(
 
     createConnectedCard: (from, cardId, position) => {
       const state = get();
-      if (state.nodes === null || !acceptsConnection(from, cardId)) return false;
+      if (state.nodes === null || !connectionEligibility.acceptsNewTarget(from)) return false;
       const positions = positionsForEdit(state.nodes, state.positions);
       positions.set(cardId, position);
       set({

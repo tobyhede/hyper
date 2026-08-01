@@ -346,9 +346,14 @@ describe('completed connection composition', () => {
   });
 
   it('rejects a connection on a Route the Space does not have', () => {
-    const { connect } = connectingIn(positionedSnapshot, DEFAULT_LAYOUT_ID, MISSING_ROUTE_ID);
+    const { session, connect } = connectingIn(
+      positionedSnapshot,
+      DEFAULT_LAYOUT_ID,
+      MISSING_ROUTE_ID,
+    );
 
-    expect(() => connect()).toThrow(`The active Route ${MISSING_ROUTE_ID} does not exist.`);
+    expect(connect()).toBe(false);
+    expect(session.getState().working).toEqual(positionedSnapshot);
   });
 
   it.each<[string, SpaceSnapshot]>([

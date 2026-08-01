@@ -19,7 +19,11 @@ import {
   type LayoutPoint,
 } from '@project/graph';
 import type { OpenedSpace } from './space';
-import { createConnectionPredicate, createPlacementEditor, nextCardTitle } from './edit-completion';
+import {
+  createConnectionEligibility,
+  createPlacementEditor,
+  nextCardTitle,
+} from './edit-completion';
 import { canvasContent, usePlacementRendering } from './placement-rendering';
 import { activeRouteColor, ROUTE_PALETTE, routeColorMap } from './colors';
 import { CARD_HEIGHT, CARD_SIZE, cardSizeVars } from './card';
@@ -70,14 +74,22 @@ export const createApp = ({ space, spaceSession }: OpenedSpace, { acceptRemote }
   const currentActiveRoute = () => useSpaceStore.getState().activeRouteId;
   // The same rule the editor applies on release, handed to React Flow so it can
   // state a target's validity while the drag is still live.
-  const acceptsConnection = createConnectionPredicate(currentActiveRoute, spaceSession);
+  const connectionEligibility = createConnectionEligibility(currentActiveRoute, spaceSession);
   // React Flow knows node ids as plain strings, and asks this per pointer frame.
   // An id that is not a Card identity is not a connection to accept — answering
   // false is the honest reading, and a throw mid-drag would be the wrong one.
   const acceptsGraphConnection = (from: string, to: string): boolean => {
     const source = uuidSchema.safeParse(from);
     const target = uuidSchema.safeParse(to);
-    return source.success && target.success && acceptsConnection(source.data, target.data);
+    return (
+      source.success &&
+      target.success &&
+      connectionEligibility.acceptsExistingTarget(source.data, target.data)
+    );
+  };
+  const acceptsNewCardTarget = (from: string): boolean => {
+    const source = uuidSchema.safeParse(from);
+    return source.success && connectionEligibility.acceptsNewTarget(source.data);
   };
   const useEditorStore = createPlacementEditor({
     initialPositions,
@@ -435,6 +447,7 @@ export const createApp = ({ space, spaceSession }: OpenedSpace, { acceptRemote }
                 onNodesChange={changeNodes}
                 onConnect={connectCards}
                 acceptsConnection={acceptsGraphConnection}
+                acceptsNewCardTarget={acceptsNewCardTarget}
                 onConnectEnd={finishConnection}
                 onCreateConnectedCard={createConnectedCard}
                 newCardTitle={nextCardTitle(sessionState.working)}
