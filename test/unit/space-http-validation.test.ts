@@ -78,21 +78,25 @@ describe('Space HTTP request validation', () => {
   });
 
   /**
-   * Node's own parser answers a negative `Content-Length` with
-   * `HPE_INVALID_CONTENT_LENGTH` and never dispatches, so sending one over a
-   * socket proves nothing about this handler — the 400 comes from the parser.
-   * The sign rejection is real code, so it is covered at the handler seam.
+   * Both length rejections below sit under Node's own parser, which answers a
+   * negative `Content-Length` with `HPE_INVALID_CONTENT_LENGTH` and a repeated
+   * one with `HPE_UNEXPECTED_CONTENT_LENGTH` (RFC 9112 §6.3), never dispatching
+   * either. Sending them over a socket therefore proves nothing about this
+   * handler — the 400 comes from the parser. The rejections are real code that
+   * a different transport would reach, so they are covered at the handler seam.
    */
-  it('rejects a negative declared length at the handler, below the parser', async () => {
-    const repository = new E2eMemorySpaceRepository([stored]);
-    const headers = { ...validHeaders, 'content-length': '-1' };
+  const handleHeaders = async (
+    repository: E2eMemorySpaceRepository,
+    headers: Record<string, string>,
+    headersDistinct: Record<string, string[]> = Object.fromEntries(
+      Object.entries(headers).map(([key, value]) => [key, [value]]),
+    ),
+  ) => {
     const request = {
       method: 'PUT',
       url: `/api/spaces/${SPACE_ID}`,
       headers,
-      headersDistinct: Object.fromEntries(
-        Object.entries(headers).map(([key, value]) => [key, [value]]),
-      ),
+      headersDistinct,
     } as unknown as IncomingMessage;
     const captured = { statusCode: 0, body: '', headers: {} as Record<string, string> };
     const response = {
@@ -107,8 +111,37 @@ describe('Space HTTP request validation', () => {
       },
     } as unknown as ServerResponse;
 
-    await expect(createSpaceHttpHandler(repository)(request, response)).resolves.toBe(true);
+    const handled = await createSpaceHttpHandler(repository)(request, response);
+    return { handled, captured };
+  };
 
+  it('rejects a negative declared length at the handler, below the parser', async () => {
+    const repository = new E2eMemorySpaceRepository([stored]);
+    const { handled, captured } = await handleHeaders(repository, {
+      ...validHeaders,
+      'content-length': '-1',
+    });
+
+    expect(handled).toBe(true);
+    expect(captured.statusCode).toBe(400);
+    expect(JSON.parse(captured.body)).toEqual({
+      message: `Content-Length must be canonical and at most ${MAX_COMMIT_BODY_BYTES}`,
+    });
+    expect(captured.headers['connection']).toBe('close');
+    expect(repository.commitAttempts).toBe(0);
+  });
+
+  it('refuses a repeated declared length rather than choosing one', async () => {
+    const repository = new E2eMemorySpaceRepository([stored]);
+    const headers = { ...validHeaders, 'content-length': String(validBody.length) };
+    const { handled, captured } = await handleHeaders(repository, headers, {
+      ...Object.fromEntries(Object.entries(headers).map(([key, value]) => [key, [value]])),
+      // Each value is individually canonical and in range, so only their
+      // multiplicity makes the framing ambiguous.
+      'content-length': [String(validBody.length), String(validBody.length)],
+    });
+
+    expect(handled).toBe(true);
     expect(captured.statusCode).toBe(400);
     expect(JSON.parse(captured.body)).toEqual({
       message: `Content-Length must be canonical and at most ${MAX_COMMIT_BODY_BYTES}`,
