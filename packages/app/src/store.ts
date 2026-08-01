@@ -83,6 +83,15 @@ export interface SpaceStore {
   movesFrom: (routeId: RouteId | null, cardId: CardId | null, branchIndex: number) => Move[];
 }
 
+function outgoingEdgesFrom(
+  space: Space,
+  routeId: RouteId | null,
+  cardId: CardId | null | undefined,
+) {
+  const route = routeId !== null ? getRoute(space, routeId) : undefined;
+  return route !== undefined && cardId != null ? outgoingEdges(route, cardId) : [];
+}
+
 /**
  * Build a store bound to a given Space. The Space is passed in rather than
  * imported (ADR 0010), so the store is testable against fixture spaces and never
@@ -134,10 +143,8 @@ export function createSpaceStore(space: Space, initialActiveRouteId: RouteId | n
 
     advance: () => {
       const state = get();
-      const route =
-        state.activeRouteId !== null ? getRoute(state.space, state.activeRouteId) : undefined;
       const cardId = state.mode === 'presenting' ? state.walk[state.walk.length - 1] : undefined;
-      const edges = route && cardId !== undefined ? outgoingEdges(route, cardId) : [];
+      const edges = outgoingEdgesFrom(state.space, state.activeRouteId, cardId);
       const edge = edges[state.branchIndex];
       // No outgoing edges: the walk has reached a sink and stays there.
       if (!edge) return;
@@ -150,22 +157,18 @@ export function createSpaceStore(space: Space, initialActiveRouteId: RouteId | n
       const back = walk.slice(0, -1);
       const from = back[back.length - 1];
       const to = walk[walk.length - 1];
-      const route = activeRouteId !== null ? getRoute(get().space, activeRouteId) : undefined;
       // Re-select the edge just walked back over, so going forward again returns
       // where you were rather than to whichever branch happens to be first.
-      const taken =
-        route && from !== undefined
-          ? outgoingEdges(route, from).findIndex((edge) => edge.to === to)
-          : -1;
+      const taken = outgoingEdgesFrom(get().space, activeRouteId, from).findIndex(
+        (edge) => edge.to === to,
+      );
       set({ walk: back, branchIndex: taken < 0 ? 0 : taken });
     },
 
     selectBranch: (delta) => {
       const state = get();
-      const route =
-        state.activeRouteId !== null ? getRoute(state.space, state.activeRouteId) : undefined;
       const cardId = state.mode === 'presenting' ? state.walk[state.walk.length - 1] : undefined;
-      const count = route && cardId !== undefined ? outgoingEdges(route, cardId).length : 0;
+      const count = outgoingEdgesFrom(state.space, state.activeRouteId, cardId).length;
       // Nothing to move through at a sink or where the route does not branch.
       if (count < 2) return;
       set({ branchIndex: (((state.branchIndex + delta) % count) + count) % count });
@@ -182,11 +185,11 @@ export function createSpaceStore(space: Space, initialActiveRouteId: RouteId | n
     cardId: CardId | null,
     branchIndex: number,
   ): Move[] => {
-    const route = routeId !== null ? getRoute(useStore.getState().space, routeId) : undefined;
-    const edges = route !== undefined && cardId !== null ? outgoingEdges(route, cardId) : [];
+    const { space } = useStore.getState();
+    const edges = outgoingEdgesFrom(space, routeId, cardId);
     return edges.map((edge, index) => ({
       cardId: edge.to,
-      title: getCard(useStore.getState().space, edge.to)?.title ?? edge.to,
+      title: getCard(space, edge.to)?.title ?? edge.to,
       selected: index === branchIndex,
     }));
   };
