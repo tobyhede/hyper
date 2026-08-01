@@ -175,9 +175,12 @@ function deriveCompletedEdit(current: CurrentEditState): DerivedEdit | null {
       throw new Error('The first connection requires a new Route id.');
     }
     const mintedRouteId = current.newRouteId;
-    const selectedLayoutId = current.renderer.kind === 'layout' ? current.renderer.layoutId : null;
     activeRouteId = mintedRouteId;
     connectionAlreadyAdded = true;
+    // Only the Route is minted here. Making it visible in an explicit filter is
+    // `updatePositionedLayout`'s, which already owns a Layout's `routes` and is
+    // reached below with this same id — writing the filter here as well would be
+    // a second derivation of one answer, agreeing only until the rule changed.
     base = {
       ...base,
       document: {
@@ -189,15 +192,6 @@ function deriveCompletedEdit(current: CurrentEditState): DerivedEdit | null {
             edges: [{ from: current.connection.from, to: current.connection.to }],
           },
         ],
-        ...(selectedLayoutId !== null && base.document.layouts !== undefined
-          ? {
-              layouts: base.document.layouts.map((layout) =>
-                layout.id === selectedLayoutId && layout.routes !== undefined
-                  ? { ...layout, routes: [...layout.routes, mintedRouteId] }
-                  : layout,
-              ),
-            }
-          : {}),
       },
     };
   }
