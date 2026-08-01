@@ -76,7 +76,10 @@ The existing resources remain fixed:
 The migration deliberately defines the request policy rather than inheriting
 parser accidents:
 
-- JSON request bodies are capped at 1 MiB for declared and streamed lengths.
+- JSON request bodies are capped at 1 MiB, counted as they arrive. A declared
+  `Content-Length` is never trusted, in either direction: an understated one
+  cannot smuggle a larger body past the count, and an over-declared one is
+  measured rather than rejected on the header.
 - `application/json` with no charset or an explicit UTF-8 charset is accepted.
 - Any other charset is rejected with 415 before JSON validation.
 - Compressed request bodies are not an MVP capability. A non-identity

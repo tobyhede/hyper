@@ -73,25 +73,25 @@ const countCommitBodyBytes = bodyLimit({
 });
 
 /**
- * The two halves are complementary, not redundant, and removing either one
- * silently loses a case. `bodyLimit` *trusts* `Content-Length` when it is
- * present — it compares and returns without reading a byte — so an understated
- * length would skip counting entirely. Deleting the header forces its streaming
- * path, which counts what actually arrives; checking the declared length first
- * still buys a cheap rejection for an honest over-declaration, which is why the
- * manual check is not simply replaced by the deletion.
+ * One size policy: count what actually arrives, and never trust the declared
+ * length. `bodyLimit` *trusts* `Content-Length` when it is present — it
+ * compares and returns without reading a byte — so an understated length would
+ * skip counting entirely. Deleting the header forces its streaming path, and
+ * that deletion is the whole of the bound.
  *
- * The cost is the fast path: every legitimate commit is now buffered and
- * re-read. On a real Node host the understated length is already impossible —
- * the HTTP parser bounds the body at `Content-Length` — so this is defence for
- * a future host rather than a live hole, which is what `spec.md` says too.
+ * A declared-length pre-check sat here and was dropped. It was never required
+ * for the bound — streaming catches an honest over-declaration too, only later
+ * — and trusting the header meant a client could be answered 413 for a body it
+ * had not sent. Measuring is the answer a lying header deserves, and one policy
+ * beats a fast path that disagrees with it. Do not reintroduce the pre-check
+ * without also deciding what a dishonest `Content-Length` should mean.
+ *
+ * The cost is the fast path: every legitimate commit is buffered and re-read.
+ * On a real Node host an understated length is already impossible — the HTTP
+ * parser bounds the body at `Content-Length` — so this is defence for a future
+ * host rather than a live hole, which is what `spec.md` says too.
  */
 const requireBoundedCommitBody = createMiddleware(async (context, next) => {
-  const declaredLength = context.req.header('Content-Length');
-  if (declaredLength !== undefined && Number.parseInt(declaredLength, 10) > MAX_COMMIT_BODY_BYTES) {
-    return rejectOversizedBody(context);
-  }
-
   const headers = new Headers(context.req.raw.headers);
   headers.delete('Content-Length');
   context.req.raw = new Request(context.req.raw, { headers });

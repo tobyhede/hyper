@@ -21,7 +21,9 @@ response construction inside the portable module.
       scanner is kept, not replaced: `content-type@2` validates nothing — its
       `parse` has no throw path — so the scanner remains the whole of this
       package's media validation.
-- [x] The 1 MiB cap covers declared and streamed bodies and returns 413.
+- [x] The 1 MiB cap counts the bytes that arrive and returns 413. It never
+      trusts `Content-Length`: the header is deleted so `bodyLimit` streams, and
+      an over-declared length is measured rather than believed.
 - [x] Only absent/UTF-8 JSON charset and identity/absent `Content-Encoding` are
       accepted; unsupported values return 415.
 - [x] Invalid JSON and path/body id mismatch return 400; invalid snapshots
@@ -44,7 +46,7 @@ the three-operation `SpaceResourceRepository` seam. Compile-time tests prove
 the existing PostgreSQL and E2E memory repositories satisfy that seam directly.
 
 The application uses Hono validation and body limiting with maintained
-`content-type` parsing. It enforces the 1 MiB declared and streamed body cap,
+`content-type` parsing. It enforces the 1 MiB cap on the bytes that arrive,
 UTF-8 JSON and identity encoding policies, explicit method metadata, stable
 repository result mappings, non-cacheable UTF-8 JSON responses and
 non-revealing logged 503s. Twenty-six `app.request()` cases cover every response

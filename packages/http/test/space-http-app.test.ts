@@ -16,6 +16,12 @@ const snapshot: SpaceSnapshot = {
   cards: [{ id: CARD_ID, document: { title: 'A', kind: 'markdown', body: '' } }],
 };
 
+/** A snapshot whose serialized commit request is comfortably over the 1 MiB cap. */
+const oversizedSnapshot: SpaceSnapshot = {
+  ...snapshot,
+  cards: [{ id: CARD_ID, document: { title: 'A', kind: 'markdown', body: 'x'.repeat(1_048_576) } }],
+};
+
 const repository = (overrides: Partial<SpaceResourceRepository> = {}): SpaceResourceRepository => ({
   listSpaces: () => Promise.resolve([{ id: SPACE_ID, title: 'One' }]),
   loadSpace: () => Promise.resolve({ snapshot, revision: 0n, exportedRevision: null }),
@@ -286,7 +292,14 @@ describe('Space HTTP application', () => {
     });
   });
 
-  it('rejects a declared body over 1 MiB', async () => {
+  /*
+   * One size policy: what arrives is counted, and `Content-Length` is never
+   * trusted. `bodyLimit` returns without reading a byte when it believes the
+   * header, so the header is deleted before it runs — that deletion is the
+   * load-bearing half. The three cases below are the same cap seen through
+   * every declaration a client might send.
+   */
+  it('measures the body rather than trusting an over-declared length', async () => {
     const response = await createSpaceHttpApp(repository()).request(`/api/spaces/${SPACE_ID}`, {
       method: 'PUT',
       headers: {
@@ -294,6 +307,23 @@ describe('Space HTTP application', () => {
         'Content-Length': '1048577',
       },
       body: '{}',
+    });
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      message: 'commit request has unexpected fields',
+    });
+  });
+
+  it('rejects an actual body over 1 MiB when its declared length is honest', async () => {
+    const body = JSON.stringify(encodeCommitRequest(oversizedSnapshot, 0n));
+    const response = await createSpaceHttpApp(repository()).request(`/api/spaces/${SPACE_ID}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Length': String(new TextEncoder().encode(body).byteLength),
+      },
+      body,
     });
 
     expect(response.status).toBe(413);
@@ -317,15 +347,6 @@ describe('Space HTTP application', () => {
 
   it('rejects an actual body over 1 MiB when its declared length is understated', async () => {
     let commitCalls = 0;
-    const oversizedSnapshot: SpaceSnapshot = {
-      ...snapshot,
-      cards: [
-        {
-          id: CARD_ID,
-          document: { title: 'A', kind: 'markdown', body: 'x'.repeat(1_048_576) },
-        },
-      ],
-    };
     const response = await createSpaceHttpApp(
       repository({
         commitSpace: () => {
@@ -386,14 +407,14 @@ describe('Space HTTP application', () => {
     await expect(streamed.json()).resolves.toEqual({ revision: '1' });
   });
 
+  // The body is genuinely oversized, so this fails as 400 only if the identity
+  // is settled before the body is measured. A small body with a lying length
+  // would pass whichever order the two ran in, and prove nothing.
   it('rejects an invalid path identity before inspecting the request body', async () => {
     const response = await createSpaceHttpApp(repository()).request('/api/spaces/not-a-uuid', {
       method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        'Content-Length': '1048577',
-      },
-      body: '{}',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(encodeCommitRequest(oversizedSnapshot, 0n)),
     });
 
     expect(response.status).toBe(400);

@@ -17,7 +17,13 @@ and explicit runtime compositions.
       removed or rewritten around the selected Hono host adapter.
 - [ ] The canonical `Content-Length` helper is removed unless a host-level test
       demonstrates behavior not already enforced by the runtime parser and
-      Hono body limit.
+      Hono body limit. **Settled: remove it.** The Hono application now trusts
+      no declared length at all — its own pre-check was dropped, the header is
+      deleted so `bodyLimit` counts what arrives, and `space-http-app.test.ts`
+      pins the understated, honest and over-declared cases. Node's parser
+      rejects negative and malformed lengths before dispatch, so nothing the
+      helper caught reaches the application. Deleting `space-http-validation.ts`
+      with the handler therefore loses no enforced behaviour.
 - [ ] Documentation and AGENTS instructions describe the portable Hono module,
       typed client and current runtime adapters without presenting Node or Vite
       as architecture.
