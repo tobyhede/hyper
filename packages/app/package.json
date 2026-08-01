@@ -14,6 +14,7 @@
     "dev:new": "vite --mode e2e-empty --port 5174 --strictPort"
   },
   "dependencies": {
+    "@hono/node-server": "2.0.12",
     "@project/core": "workspace:*",
     "@project/graph": "workspace:*",
     "@project/http": "workspace:*",

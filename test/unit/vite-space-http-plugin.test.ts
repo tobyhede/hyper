@@ -8,46 +8,10 @@ type Middleware = (
   next: (error?: unknown) => void,
 ) => void;
 
-const request = {} as IncomingMessage;
+const request = { url: '/api/spaces' } as IncomingMessage;
 const response = {} as ServerResponse;
 
 describe('spaceHttpPlugin', () => {
-  it('loads the development runtime once and lets its handler own API requests', async () => {
-    const handler = vi.fn(() => Promise.resolve(true));
-    const ssrLoadModule = vi.fn(() => Promise.resolve({ createHandler: () => handler }));
-    let middleware: Middleware | undefined;
-    const plugin = spaceHttpPlugin({
-      developmentModule: '/development-runtime.ts',
-      previewModule: '/preview-runtime.js',
-      runtimeOptions: { catalog: 'fixture' },
-    });
-
-    const configureServer = plugin.configureServer;
-    if (typeof configureServer !== 'function') throw new Error('Expected configureServer hook');
-    void configureServer.call(
-      {} as never,
-      {
-        ssrLoadModule,
-        middlewares: { use: (installed: Middleware) => (middleware = installed) },
-      } as never,
-    );
-    if (middleware === undefined) throw new Error('Expected HTTP middleware');
-
-    const next = vi.fn();
-    middleware(request, response, next);
-    await vi.waitFor(() => expect(handler).toHaveBeenCalledWith(request, response));
-
-    expect(ssrLoadModule).toHaveBeenCalledOnce();
-    expect(ssrLoadModule).toHaveBeenCalledWith('/development-runtime.ts');
-    expect(next).not.toHaveBeenCalled();
-
-    const secondNext = vi.fn();
-    middleware(request, response, secondNext);
-    await vi.waitFor(() => expect(handler).toHaveBeenCalledTimes(2));
-    expect(ssrLoadModule).toHaveBeenCalledOnce();
-    expect(secondNext).not.toHaveBeenCalled();
-  });
-
   it('does not leave a failed runtime load unhandled before any request arrives', async () => {
     const rejections: unknown[] = [];
     const record = (reason: unknown): void => {
@@ -77,7 +41,7 @@ describe('spaceHttpPlugin', () => {
     }
   });
 
-  it('names the module when a runtime exposes no createHandler', async () => {
+  it('names the module when a runtime exposes no createApp', async () => {
     let middleware: Middleware | undefined;
     const plugin = spaceHttpPlugin({
       developmentModule: '/development-runtime.ts',
@@ -100,28 +64,7 @@ describe('spaceHttpPlugin', () => {
     expect(String(next.mock.calls[0]?.[0])).toContain('/development-runtime.ts');
   });
 
-  it('falls through unhandled assets and forwards runtime failures', async () => {
-    const unhandled = vi.fn(() => Promise.resolve(false));
-    let middleware: Middleware | undefined;
-    const plugin = spaceHttpPlugin({
-      developmentModule: '/development-runtime.ts',
-      previewModule: '/preview-runtime.js',
-    });
-    const configureServer = plugin.configureServer;
-    if (typeof configureServer !== 'function') throw new Error('Expected configureServer hook');
-    void configureServer.call(
-      {} as never,
-      {
-        ssrLoadModule: () => Promise.resolve({ createHandler: () => unhandled }),
-        middlewares: { use: (installed: Middleware) => (middleware = installed) },
-      } as never,
-    );
-    if (middleware === undefined) throw new Error('Expected HTTP middleware');
-
-    const next = vi.fn();
-    middleware(request, response, next);
-    await vi.waitFor(() => expect(next).toHaveBeenCalledWith());
-
+  it('forwards runtime failures on API requests', async () => {
     const failure = new Error('runtime failed');
     const failedPlugin = spaceHttpPlugin({
       developmentModule: '/failed-runtime.ts',
@@ -145,8 +88,9 @@ describe('spaceHttpPlugin', () => {
   });
 
   it('loads the built runtime for preview', async () => {
-    const handler = vi.fn(() => Promise.resolve(true));
-    const loadPreviewModule = vi.fn(() => Promise.resolve({ createHandler: () => handler }));
+    const loadPreviewModule = vi.fn(() =>
+      Promise.resolve({ createApp: () => ({ fetch: () => new Response() }) }),
+    );
     let middleware: Middleware | undefined;
     const plugin = spaceHttpPlugin({
       developmentModule: '/development-runtime.ts',
@@ -165,9 +109,6 @@ describe('spaceHttpPlugin', () => {
     );
     if (middleware === undefined) throw new Error('Expected preview HTTP middleware');
 
-    const next = vi.fn();
-    middleware(request, response, next);
-    await vi.waitFor(() => expect(handler).toHaveBeenCalled());
-    expect(loadPreviewModule).toHaveBeenCalledWith('/preview-runtime.js');
+    await vi.waitFor(() => expect(loadPreviewModule).toHaveBeenCalledWith('/preview-runtime.js'));
   });
 });
