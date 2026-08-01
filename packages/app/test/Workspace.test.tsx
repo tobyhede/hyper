@@ -8,6 +8,8 @@ import { mountWorkspace } from '../src/Workspace';
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 const LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
+const ROUTE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
+const MISSING_CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
 
 const snapshot = (title: string, cardTitle: string, x: number, y: number): SpaceSnapshot =>
   spaceSnapshotSchema.parse({
@@ -100,5 +102,34 @@ describe('Workspace conflict recovery', () => {
       .getByRole('heading', { name: 'Remote card' })
       .closest('.react-flow__node');
     expect(cardNode).toHaveStyle({ transform: 'translate(900px,700px)' });
+  });
+});
+
+describe('Workspace failure reporting', () => {
+  it('names a working snapshot that stopped loading instead of blanking the page', () => {
+    const valid = snapshot('Workspace', 'Card', 10, 20);
+    const dangling: SpaceSnapshot = {
+      ...valid,
+      document: {
+        ...valid.document,
+        routes: [{ id: ROUTE_ID, title: 'Route', edges: [{ from: CARD_ID, to: MISSING_CARD_ID }] }],
+      },
+    };
+    const session = openSpaceSession(new MemorySpaceBackend(), {
+      snapshot: dangling,
+      revision: 0n,
+      exportedRevision: null,
+    });
+    // React reports a boundary-caught error to `console.error` as well as to the
+    // boundary. The report is the point; the duplicate is noise this test owns.
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    expect(() =>
+      mountWorkspace({ space: runtime(valid), spaceSession: session }, (app) => {
+        render(app);
+      }),
+    ).not.toThrow();
+
+    expect(screen.getByTestId('workspace-failure')).toHaveTextContent(MISSING_CARD_ID);
   });
 });

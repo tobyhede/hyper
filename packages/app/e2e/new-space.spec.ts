@@ -134,6 +134,37 @@ test('Alt empty-drop creates, connects and selects Card 2 at the previewed posit
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '2');
 });
 
+test('an Alt-drop released off the canvas creates no Card', async ({ page }) => {
+  await page.goto('/');
+  const card = nodeByTitle(page, 'Card 1');
+  await expect(card).toBeVisible();
+  await settled(page);
+  await card.hover();
+
+  const source = authoringHandle(card, 'source', 'right');
+  const from = (await source.boundingBox())!;
+  await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(from.x + from.width / 2 + 220, from.y + from.height / 2 + 180, {
+    steps: 4,
+  });
+  await page.keyboard.down('Alt');
+  await expect(page.getByTestId('new-card-preview')).toContainText('Card 2');
+
+  // Leaving the canvas fires no move the graph can see, so the preview's last
+  // eligible point survives the departure. Where the release *landed* is the
+  // only thing that may author a Card.
+  const offCanvas = (await page.getByTestId('persistence-status').boundingBox())!;
+  await page.mouse.move(offCanvas.x + offCanvas.width / 2, offCanvas.y + offCanvas.height / 2);
+  await page.mouse.up();
+  await page.keyboard.up('Alt');
+
+  await expect(nodeByTitle(page, 'Card 2')).toHaveCount(0);
+  await expect(page.locator('.react-flow__node')).toHaveCount(1);
+  await expect(page.locator('.react-flow__edge')).toHaveCount(0);
+  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '0');
+});
+
 test('the first self-connection mints and activates Route 1 in one persisted Layout', async ({
   page,
 }) => {
@@ -157,8 +188,9 @@ test('the first self-connection mints and activates Route 1 in one persisted Lay
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
   await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
   // Conversion must not move what is already on screen (ADR 0025), so the
-  // position is read once the graph has settled — sampling mid-render could
-  // agree with `before` before the converted Layout has actually rendered.
+  // position is read once the graph has settled: sampling mid-transition could
+  // report the unmoved position for the wrong reason, and would pass a card that
+  // settles somewhere else a frame later.
   await settled(page);
   expect(await positionOf(card)).toEqual(before);
 });

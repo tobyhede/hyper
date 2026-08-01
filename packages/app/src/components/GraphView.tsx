@@ -32,6 +32,30 @@ import { CARD_SIZE } from '../card';
 const PRESENTING_PADDING = 1.15;
 
 /**
+ * The empty canvas an Alt-drop may author a Card on: inside the renderer, clear
+ * of every node. Both class names are React Flow's published theming API.
+ *
+ * The live preview and the release must ask the same question. The preview's
+ * point is tracked from `onMouseMove`, which is bound to the React Flow element
+ * and therefore stops firing the moment the pointer leaves it — so a pointer
+ * that departs over the toolbar leaves the last eligible point standing. Judging
+ * the release by that stale point authored a Card wherever the pointer happened
+ * to be let go, off-canvas and far from the preview the author could see.
+ *
+ * React Flow's own `connectionState.isValid` does not answer this: it is `null`
+ * — falsy — whenever no handle is in range, which is exactly what a release over
+ * the toolbar produces. The canonical add-node-on-edge-drop example would author
+ * a Card there too.
+ */
+function isEmptyCanvasTarget(target: EventTarget | null): boolean {
+  return (
+    target instanceof Element &&
+    target.closest('.react-flow__renderer') !== null &&
+    target.closest('.react-flow__node') === null
+  );
+}
+
+/**
  * Frames the whole graph — the overview `fitBounds` gives (ADR 0027).
  *
  * Fitting on mount is the whole of it: the graph area draws this canvas only
@@ -221,7 +245,8 @@ export function GraphView({
           previewPointer !== null &&
           'altKey' in event &&
           'clientX' in event &&
-          event.altKey;
+          event.altKey &&
+          isEmptyCanvasTarget(event.target);
         if (createsCard) {
           const sourceId = connection.fromNode.id;
           const pointer = screenToFlowPosition({ x: event.clientX, y: event.clientY });
@@ -263,11 +288,7 @@ export function GraphView({
       connectionLineComponent={RouteConnectionLine}
       onMouseMove={(event) => {
         if (!connectionGesture.current) return;
-        if (
-          !(event.target instanceof Element) ||
-          event.target.closest('.react-flow__renderer') === null ||
-          event.target.closest('.react-flow__node') !== null
-        ) {
+        if (!isEmptyCanvasTarget(event.target)) {
           setPreviewPointer(null);
           return;
         }

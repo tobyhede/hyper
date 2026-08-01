@@ -517,3 +517,28 @@ test('changing the active Route recolours authoring handles without persisting o
   await expect(persistence).toHaveAttribute('data-revision', '1');
   await expect(persistence).toHaveText('Persisted');
 });
+
+/**
+ * The authoring handle is a drag affordance, and a click is not a drag.
+ *
+ * A press and release inside React Flow's drag threshold never starts a
+ * connection, so the click reached the Card underneath and opened it to read —
+ * from a control whose whole purpose is to begin an Edge.
+ */
+test('clicking a Card authoring handle neither opens the Card nor draws an Edge', async ({
+  page,
+}) => {
+  await page.goto('/');
+  const card = nodeByTitle(page, 'A').first();
+  await expect(card).toBeVisible();
+  await expect(page.locator('.react-flow__edge-path').first()).toHaveAttribute('d', /L/);
+  await settled(page);
+  await card.hover();
+
+  const handleBox = (await authoringHandle(card, 'source', 'right').boundingBox())!;
+  await page.mouse.click(handleBox.x + handleBox.width / 2, handleBox.y + handleBox.height / 2);
+
+  await expect(page.getByTestId('close-card')).toHaveCount(0);
+  await expect(page.locator('.react-flow__edge')).toHaveCount(FIXTURE_EDGE_COUNT);
+  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '0');
+});

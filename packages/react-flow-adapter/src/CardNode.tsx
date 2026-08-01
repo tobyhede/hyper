@@ -86,6 +86,12 @@ export function CardNode({ data, selected }: NodeProps<CardFlowNode>) {
       aria-label={`${role === 'source' ? 'Connect from' : 'Connect to'} ${side}`}
       isConnectableStart={role === 'source' && !connectionInProgress}
       isConnectableEnd={role === 'target' && connectionInProgress}
+      // A handle is a drag affordance, and a click is not a drag. A press and
+      // release inside React Flow's drag threshold starts no connection, so the
+      // click reached the Card underneath and opened it to read — from the one
+      // control whose whole purpose is to begin an Edge. React Flow spreads
+      // caller props after its own `onClick`, so this replaces it.
+      onClick={(event) => event.stopPropagation()}
       style={{
         width: AUTHORING_HANDLE_DIAMETER,
         height: AUTHORING_HANDLE_DIAMETER,
