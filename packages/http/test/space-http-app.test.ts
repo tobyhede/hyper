@@ -1,7 +1,11 @@
 import { uuidSchema, type SpaceSnapshot } from '@project/core';
 import { encodeCommitRequest } from '@project/persistence';
 import { describe, expect, it } from 'vitest';
-import { createSpaceHttpApp, type SpaceResourceRepository } from '@project/http';
+import {
+  createSpaceHttpApp,
+  MAX_COMMIT_BODY_BYTES,
+  type SpaceResourceRepository,
+} from '@project/http';
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
@@ -345,6 +349,43 @@ describe('Space HTTP application', () => {
     expect(commitCalls).toBe(0);
   });
 
+  // The limit is a maximum, not a threshold the body must stay under. Both size
+  // checks compare with `>`, and neither existing case would notice one of them
+  // becoming `>=` — the oversize tests would still pass while every commit of
+  // exactly the permitted size started failing.
+  it('accepts a body of exactly the 1 MiB limit through both size checks', async () => {
+    const padded = (length: number): SpaceSnapshot => ({
+      ...snapshot,
+      cards: [
+        { id: CARD_ID, document: { title: 'A', kind: 'markdown', body: 'x'.repeat(length) } },
+      ],
+    });
+    const overhead = JSON.stringify(encodeCommitRequest(padded(0), 0n)).length;
+    const body = JSON.stringify(encodeCommitRequest(padded(MAX_COMMIT_BODY_BYTES - overhead), 0n));
+    expect(new TextEncoder().encode(body).byteLength).toBe(MAX_COMMIT_BODY_BYTES);
+
+    const declared = await createSpaceHttpApp(repository()).request(`/api/spaces/${SPACE_ID}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Length': String(MAX_COMMIT_BODY_BYTES),
+      },
+      body,
+    });
+
+    expect(declared.status).toBe(200);
+    await expect(declared.json()).resolves.toEqual({ revision: '1' });
+
+    const streamed = await createSpaceHttpApp(repository()).request(`/api/spaces/${SPACE_ID}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body,
+    });
+
+    expect(streamed.status).toBe(200);
+    await expect(streamed.json()).resolves.toEqual({ revision: '1' });
+  });
+
   it('rejects an invalid path identity before inspecting the request body', async () => {
     const response = await createSpaceHttpApp(repository()).request('/api/spaces/not-a-uuid', {
       method: 'PUT',
@@ -354,6 +395,18 @@ describe('Space HTTP application', () => {
       },
       body: '{}',
     });
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({ message: 'Space id must be a UUID' });
+  });
+
+  // `validateSpaceId` guards both methods, but only the commit route proved it.
+  // A load route that dropped the validator would hand the repository an
+  // unvalidated path segment and answer 404 rather than 400.
+  it('rejects an invalid path identity before loading a space', async () => {
+    const response = await createSpaceHttpApp(
+      repository({ loadSpace: () => Promise.reject(new Error('must not be reached')) }),
+    ).request('/api/spaces/not-a-uuid');
 
     expect(response.status).toBe(400);
     await expect(response.json()).resolves.toEqual({ message: 'Space id must be a UUID' });

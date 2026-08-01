@@ -17,7 +17,10 @@ response construction inside the portable module.
 - [x] `GET /api/spaces`, `GET /api/spaces/:id` and
       `PUT /api/spaces/:id` preserve repository result mapping.
 - [x] Hono validation and maintained media parsing replace the raw Node body
-      reader and the hand-rolled `Content-Type` split.
+      reader and the hand-rolled `Content-Type` split. The RFC 9110 parameter
+      scanner is kept, not replaced: `content-type@2` validates nothing — its
+      `parse` has no throw path — so the scanner remains the whole of this
+      package's media validation.
 - [x] The 1 MiB cap covers declared and streamed bodies and returns 413.
 - [x] Only absent/UTF-8 JSON charset and identity/absent `Content-Encoding` are
       accepted; unsupported values return 415.

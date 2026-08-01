@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { uuidSchema, type SpaceSnapshot } from '@project/core';
-import { MemorySpaceBackend, type LoadedSpace } from '@project/persistence';
+import { encodeCommitRequest, MemorySpaceBackend, type LoadedSpace } from '@project/persistence';
 import { spaceBackendContract } from '../../packages/persistence/test/backend-contract';
 import { createSpaceHttpApp, HttpSpaceBackend, type SpaceResourceRepository } from '@project/http';
 
@@ -20,12 +20,23 @@ const repository = (overrides: Partial<SpaceResourceRepository> = {}): SpaceReso
   ...overrides,
 });
 
+/*
+ * Only the string form needs a base: a Request's URL is absolute by
+ * construction, so rebasing it is unnecessary, while `new Request(relative)`
+ * throws outright. Rebuilding a Request from its URL alone drops the method,
+ * headers and body with it, which is why the clone-with-init form is used
+ * instead of re-reading `input.url`.
+ */
 const appFetch =
   (app: ReturnType<typeof createSpaceHttpApp>): typeof globalThis.fetch =>
-  (input, init) => {
-    const target = input instanceof Request ? input.url : input;
-    return Promise.resolve(app.fetch(new Request(new URL(target, 'http://hyper.test'), init)));
-  };
+  (input, init) =>
+    Promise.resolve(
+      app.fetch(
+        input instanceof Request
+          ? new Request(input, init)
+          : new Request(new URL(String(input), 'http://hyper.test'), init),
+      ),
+    );
 
 spaceBackendContract('Hono HttpSpaceBackend', (initial) => {
   const memory = new MemorySpaceBackend(initial);
@@ -61,6 +72,28 @@ describe('HttpSpaceBackend', () => {
     const backend = new HttpSpaceBackend('http://hyper.test', { fetch: appFetch(app) });
 
     await expect(backend.loadSpace(SPACE_ID)).resolves.toEqual(loaded);
+  });
+
+  // The helper is declared `typeof globalThis.fetch`, so it promises to accept a
+  // Request. Reading only its URL would silently degrade every such call to a
+  // bodyless GET — the contract suite above would still pass while proving
+  // nothing about the commit path. Hono's client sends a URL and an init today;
+  // that is its choice to change, not a guarantee this harness may rely on.
+  it('preserves a Request input through the application boundary', async () => {
+    const app = createSpaceHttpApp(
+      repository({ commitSpace: () => Promise.resolve({ kind: 'committed', revision: 7n }) }),
+    );
+
+    const response = await appFetch(app)(
+      new Request(`http://hyper.test/api/spaces/${SPACE_ID}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(encodeCommitRequest(snapshot, 4n)),
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ revision: '7' });
   });
 
   it('commits through the typed Hono application contract', async () => {

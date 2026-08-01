@@ -1,3 +1,4 @@
+import { builtinModules } from 'node:module';
 import js from '@eslint/js';
 import tseslint from 'typescript-eslint';
 import reactHooks from 'eslint-plugin-react-hooks';
@@ -63,45 +64,18 @@ const REACT_DOM_PATTERN = {
  *
  * The browserify shims published under these same bare names (`path`, `crypto`,
  * `stream`, …) are Node's API surface too, so catching them is correct.
+ *
+ * Derived from Node's own list rather than hand-maintained. The hand-written
+ * version had drifted — `async_hooks`, `constants`, `domain`, `sea`, `sqlite`,
+ * `sys`, `test`, `trace_events`, `wasi` and every `_`-prefixed internal were
+ * absent, so the portable package could have imported any of them with lint
+ * green. `builtinModules` mixes bare names, `node:`-prefixed entries and
+ * subpaths, so each is reduced to its base name; the `${name}/*` groups below
+ * then re-cover the subpaths that were stripped.
  */
 const NODE_BUILTIN_NAMES = [
-  'assert',
-  'buffer',
-  'child_process',
-  'cluster',
-  'console',
-  'crypto',
-  'dgram',
-  'diagnostics_channel',
-  'dns',
-  'events',
-  'fs',
-  'http',
-  'http2',
-  'https',
-  'inspector',
-  'module',
-  'net',
-  'os',
-  'path',
-  'perf_hooks',
-  'process',
-  'punycode',
-  'querystring',
-  'readline',
-  'repl',
-  'stream',
-  'string_decoder',
-  'timers',
-  'tls',
-  'tty',
-  'url',
-  'util',
-  'v8',
-  'vm',
-  'worker_threads',
-  'zlib',
-];
+  ...new Set(builtinModules.map((name) => name.replace(/^node:/, '').split('/')[0])),
+].sort();
 
 const NODE_MESSAGE = '@project/http uses the portable Fetch interface, not Node APIs.';
 

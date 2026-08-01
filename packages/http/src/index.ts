@@ -12,6 +12,7 @@ import { bodyLimit } from 'hono/body-limit';
 import { createMiddleware } from 'hono/factory';
 import { HTTPException } from 'hono/http-exception';
 import { validator } from 'hono/validator';
+import { hasValidUniqueMediaTypeParameters } from './media-type';
 
 export { HttpSpaceBackend } from './backend';
 export type { HttpSpaceBackendOptions } from './backend';
@@ -61,104 +62,6 @@ const invokeLogError = (
     }
     // Hono forwards Error instances to onError, but non-Error throws escape app.fetch().
   }
-};
-
-const isOptionalWhitespace = (character: string): boolean =>
-  character === ' ' || character === '\t';
-
-const isTokenCharacter = (character: string): boolean =>
-  /^[!#$%&'*+.^_`|~0-9A-Za-z-]$/.test(character);
-
-const hasValidUniqueMediaTypeParameters = (value: string): boolean => {
-  let index = 0;
-  const skipWhitespace = (): void => {
-    while (index < value.length && isOptionalWhitespace(value.charAt(index))) {
-      index += 1;
-    }
-  };
-  const readToken = (): string => {
-    const start = index;
-    while (index < value.length && isTokenCharacter(value.charAt(index))) {
-      index += 1;
-    }
-    return value.slice(start, index);
-  };
-
-  skipWhitespace();
-  if (readToken() === '' || value[index] !== '/') {
-    return false;
-  }
-  index += 1;
-  if (readToken() === '') {
-    return false;
-  }
-  skipWhitespace();
-
-  const parameterNames = new Set<string>();
-  while (index < value.length) {
-    if (value[index] !== ';') {
-      return false;
-    }
-    index += 1;
-    skipWhitespace();
-    const parameterName = readToken().toLowerCase();
-    if (parameterName === '' || parameterNames.has(parameterName)) {
-      return false;
-    }
-    parameterNames.add(parameterName);
-    skipWhitespace();
-    if (value[index] !== '=') {
-      return false;
-    }
-    index += 1;
-    skipWhitespace();
-
-    if (value[index] === '"') {
-      index += 1;
-      let closed = false;
-      while (index < value.length) {
-        const code = value.charCodeAt(index);
-        if (code === 34) {
-          index += 1;
-          closed = true;
-          break;
-        }
-        if (code === 92) {
-          index += 1;
-          if (index >= value.length) {
-            return false;
-          }
-          const escapedCode = value.charCodeAt(index);
-          if (
-            escapedCode !== 9 &&
-            (escapedCode < 32 || (escapedCode > 126 && escapedCode < 128) || escapedCode > 255)
-          ) {
-            return false;
-          }
-          index += 1;
-          continue;
-        }
-        const isQuotedText =
-          code === 9 ||
-          code === 32 ||
-          code === 33 ||
-          (code >= 35 && code <= 91) ||
-          (code >= 93 && code <= 126) ||
-          (code >= 128 && code <= 255);
-        if (!isQuotedText) {
-          return false;
-        }
-        index += 1;
-      }
-      if (!closed) {
-        return false;
-      }
-    } else if (readToken() === '') {
-      return false;
-    }
-    skipWhitespace();
-  }
-  return true;
 };
 
 const rejectOversizedBody = (context: Context) =>
@@ -211,11 +114,8 @@ const requireSupportedRequestMedia = createMiddleware(async (context, next) => {
   if (contentType === undefined || !hasValidUniqueMediaTypeParameters(contentType)) {
     return context.json({ message: 'Content-Type must be application/json' }, 415);
   }
-  // `content-type@2` validates nothing: `parse` has no throw path at all and
-  // answers `parse('garbage')` with `{ type: 'garbage' }`, so the scanner above
-  // is the whole of this module's media validation and `parse` only splits and
-  // lowercases a value it has already accepted. Against `content-type@1`, which
-  // threw on malformed parameters, the scanner would have been near-redundant.
+  // `parse` only splits and lowercases a value `./media-type` has already
+  // accepted — `content-type@2` validates nothing itself. See that module.
   const parsed = parseContentType(contentType);
   if (parsed.type !== 'application/json') {
     return context.json({ message: 'Content-Type must be application/json' }, 415);

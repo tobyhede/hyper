@@ -12,6 +12,7 @@ import {
 } from '@project/http';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { spaceHttpPlugin } from '../../packages/app/vite-space-http-plugin';
+import { send } from '../support/raw-http-request';
 
 type Middleware = (
   request: IncomingMessage,
@@ -22,11 +23,6 @@ type Middleware = (
 interface RunningHost {
   url: string;
   close(): Promise<void>;
-}
-
-interface RawResponse {
-  status: number;
-  body: string;
 }
 
 const hosts: RunningHost[] = [];
@@ -87,26 +83,6 @@ const startHost = async (
   return { host, createApp, connections };
 };
 
-const send = (
-  baseUrl: string,
-  path: string,
-  body: string,
-  headers: Record<string, string>,
-  agent: Agent,
-  method = 'PUT',
-): Promise<RawResponse> =>
-  new Promise((resolve, reject) => {
-    const request = httpRequest(new URL(path, baseUrl), { method, headers, agent }, (response) => {
-      const chunks: Buffer[] = [];
-      response.on('data', (chunk: Uint8Array) => chunks.push(Buffer.from(chunk)));
-      response.on('end', () =>
-        resolve({ status: response.statusCode ?? 0, body: Buffer.concat(chunks).toString('utf8') }),
-      );
-    });
-    request.on('error', reject);
-    request.end(body);
-  });
-
 const abortChunkedRequest = (baseUrl: string, path: string): Promise<void> =>
   new Promise((resolve) => {
     const request = httpRequest(new URL(path, baseUrl), {
@@ -116,8 +92,10 @@ const abortChunkedRequest = (baseUrl: string, path: string): Promise<void> =>
     request.on('error', () => resolve());
     request.on('socket', (socket) => {
       socket.once('connect', () => {
-        request.write('{"snapshot":');
-        setTimeout(() => request.destroy(), 10);
+        // Destroy from the write callback, not a timer. A fixed delay races the
+        // flush: too early and the host never sees a partial body, too late and
+        // the test pays the wait on every run.
+        request.write('{"snapshot":', () => request.destroy());
       });
     });
   });

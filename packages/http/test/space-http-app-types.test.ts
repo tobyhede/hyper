@@ -12,7 +12,7 @@ type ExpectedLoadedSpaceJson = {
   exportedRevision: string | null;
 };
 
-type PutInput = Parameters<SpaceHttpClient['api']['spaces'][':id']['$put']>[0];
+type PutInput = Parameters<SpaceResource['$put']>[0];
 
 it('exposes concrete loaded-space JSON through the Hono RPC contract', () => {
   type LoadResponse = InferResponseType<SpaceResource['$get'], 200>;
@@ -40,6 +40,9 @@ it('asks the client for the revision in the form the wire carries', () => {
 // while the hand-written 415 survived, so a client could not compile the
 // oversized-commit branch at all.
 it('declares every status the commit resource answers with', () => {
+  expectTypeOf<InferResponseType<SpaceResource['$put'], 200>>().toEqualTypeOf<{
+    revision: string;
+  }>();
   expectTypeOf<InferResponseType<SpaceResource['$put'], 413>>().toEqualTypeOf<{
     message: string;
   }>();
