@@ -621,6 +621,28 @@ test('the graph does not advertise a delete action it does not implement', async
 });
 
 /**
+ * The Edge description must not offer a key an Edge cannot receive.
+ *
+ * `edgesFocusable={false}` keeps Edges out of the tab order, which is the right
+ * call — selecting one leads nowhere, so putting every Edge in the graph between
+ * a keyboard user and the next Card would be noise. So any "press …" instruction
+ * on an Edge names a key the only people who hear it can never deliver — the same
+ * defect as the delete claim above, answered the same way: correct the
+ * instruction rather than build the interaction it names.
+ *
+ * A Card is the opposite case — `nodesFocusable` is true and each key named there
+ * does something — so its description keeps its instructions.
+ */
+test('the graph does not advertise an Edge keyboard action it cannot receive', async ({ page }) => {
+  await page.goto('/');
+  await expect(nodeByTitle(page, 'A').first()).toBeVisible();
+  await expect(page.locator('.react-flow__edge').first()).toBeAttached();
+
+  await expect(page.locator('.react-flow__edge').first()).not.toHaveAttribute('tabindex');
+  await expect(page.locator('[id^="react-flow__edge-desc"]')).not.toContainText(/press/i);
+});
+
+/**
  * A duplicate Edge is refused before release, not silently after it.
  *
  * The rule already existed — Edit completion drops a duplicate — but it ran only

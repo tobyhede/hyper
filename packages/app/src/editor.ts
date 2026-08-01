@@ -15,6 +15,20 @@ import type { CardFlowNode } from '@project/react-flow-adapter';
  * gesture starts across React Flow's separate moving and settled callbacks.
  */
 
+/**
+ * The structural part of a completed Edit: one directed Edge, and the Card the
+ * same gesture created, when it created one.
+ *
+ * The editor installs it and Edit completion reads it back, so both sides name
+ * this one type — `createdCardId` in particular carries a rule (it must equal
+ * `to`) that only holds if there is a single shape to state it about.
+ */
+export interface CompletedConnectionEdit {
+  readonly from: CardId;
+  readonly to: CardId;
+  readonly createdCardId?: CardId;
+}
+
 export interface EditorState {
   /**
    * React Flow's node array, or `null` before the first layout resolves. Until
@@ -36,11 +50,7 @@ export interface EditorState {
   /** The ordinary React Flow selection used for continued Route authoring. */
   selectedCardId: CardId | null;
   /** The structural part of the completed Edit most recently notified. */
-  completedConnection: {
-    readonly from: CardId;
-    readonly to: CardId;
-    readonly createdCardId?: CardId;
-  } | null;
+  completedConnection: CompletedConnectionEdit | null;
   /** Fold a freshly projected node list into the live one. */
   syncNodes: (projected: readonly CardFlowNode[]) => void;
   /**

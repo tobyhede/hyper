@@ -66,13 +66,19 @@ const OVERVIEW_FIT = { padding: 0.2, maxZoom: 1 } as const;
  * Both node keys are set because React Flow picks between them on
  * `disableKeyboardA11y`, and the one it names `keyboardDisabled` is the one an
  * ordinary keyboard-enabled graph gets.
+ *
+ * The Edge description names no key, because `edgesFocusable` is false and an
+ * Edge therefore never reaches the tab order to receive one. Selecting an Edge
+ * leads nowhere — nothing acts on the selection — so opening the tab order to
+ * every Edge in the graph would put inert stops between a keyboard user and the
+ * next Card. A Card is the opposite case, and keeps its instructions.
  */
 const ARIA_LABEL_CONFIG = {
   'node.a11yDescription.default':
     'Press enter or space to open a Card, the arrow keys to move it, and escape to cancel.',
   'node.a11yDescription.keyboardDisabled':
     'Press enter or space to open a Card, the arrow keys to move it, and escape to cancel.',
-  'edge.a11yDescription.default': 'Press enter or space to select an Edge, and escape to cancel.',
+  'edge.a11yDescription.default': 'An Edge a Route draws from one Card to the next.',
 } as const;
 
 /**

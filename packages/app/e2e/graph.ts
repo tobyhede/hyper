@@ -117,6 +117,25 @@ export async function settled(page: Page): Promise<void> {
     .toBe(true);
 }
 
+/**
+ * The box of an element the test requires, waited for and named.
+ *
+ * `(await locator.boundingBox())!` is null whenever the element is absent or not
+ * yet laid out, and the assertion then fires on a later line as a null property
+ * read — reporting the arithmetic rather than the element that never arrived.
+ * Waiting for visibility first turns that into Playwright's own "not visible"
+ * timeout against `what`, which names the thing actually missing.
+ */
+export async function boxOf(
+  locator: Locator,
+  what: string,
+): Promise<{ x: number; y: number; width: number; height: number }> {
+  await expect(locator, `${what} is visible`).toBeVisible();
+  const box = await locator.boundingBox();
+  if (box === null) throw new Error(`${what} is visible but has no bounding box.`);
+  return box;
+}
+
 /** Drag by a flow-space delta, scaled through the current zoom. */
 export async function dragBy(page: Page, node: Locator, dx: number, dy: number): Promise<void> {
   await settled(page);

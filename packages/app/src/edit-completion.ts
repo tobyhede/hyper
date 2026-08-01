@@ -1,7 +1,12 @@
 import { newUuid, type CardId, type RouteId, type SpaceSnapshot, type UUID } from '@project/core';
 import { loadSpaceSnapshot, type LayoutPoint, type Space } from '@project/graph';
 import type { SpaceSession } from '@project/persistence';
-import { createEditorStore, type EditorConnectionEligibility, type EditorStore } from './editor';
+import {
+  createEditorStore,
+  type CompletedConnectionEdit,
+  type EditorConnectionEligibility,
+  type EditorStore,
+} from './editor';
 import { updatePositionedLayout } from './snapshot';
 import type { RendererSelection, ViewChoice } from './view';
 
@@ -22,11 +27,7 @@ interface CurrentEditState {
   readonly newLayoutId: UUID | null;
   readonly activeRouteId: RouteId | null;
   readonly newRouteId?: RouteId | null;
-  readonly connection: {
-    readonly from: CardId;
-    readonly to: CardId;
-    readonly createdCardId?: CardId;
-  } | null;
+  readonly connection: CompletedConnectionEdit | null;
 }
 
 interface DerivedEdit {

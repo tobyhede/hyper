@@ -1,6 +1,6 @@
 import { expect, test, type Page } from './fixtures';
 import type { SpaceSnapshot } from '@project/core';
-import { authoringHandle, nodeByTitle, settled } from './graph';
+import { authoringHandle, boxOf, nodeByTitle, settled } from './graph';
 
 test('a focused Card opens with Enter and Space', async ({ page }) => {
   await page.goto('/');
@@ -94,8 +94,8 @@ test('a Layout with no visible Route suppresses Alt empty-drop creation', async 
 
   await source.hover();
   const sourceHandle = authoringHandle(source, 'source', 'right');
-  const from = (await sourceHandle.boundingBox())!;
-  const pane = (await page.locator('.react-flow__pane').boundingBox())!;
+  const from = await boxOf(sourceHandle, "the hovered Card's right source handle");
+  const pane = await boxOf(page.locator('.react-flow__pane'), 'the React Flow pane');
   await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
   await page.mouse.down();
   await page.mouse.move(from.x + from.width / 2 + 30, from.y + from.height / 2, { steps: 4 });

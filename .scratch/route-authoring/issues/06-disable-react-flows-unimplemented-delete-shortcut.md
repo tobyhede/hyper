@@ -46,5 +46,10 @@ exists.
 - `packages/app/e2e/editing.spec.ts` proves Backspace and Delete preserve Cards,
   Edges, authoritative persistence and revision after selecting either kind of
   element, and checks that assistive descriptions advertise no deletion.
+- Follow-up after review: the replacement Edge description offered "Press enter or
+  space to select an Edge" while `edgesFocusable` is false, so it named a key no
+  Edge can receive — the same class of inaccuracy this issue set out to remove.
+  The description now claims no key, and a second test holds the two facts
+  together so neither can drift from the other.
 - Final verification on 2026-08-01: `pnpm verify` passed 63 test files and 532
   tests; `pnpm e2e` passed all 59 tests; `pnpm build` completed successfully.

@@ -61,6 +61,13 @@ Search surfaces `orkait/reactflow-mcp-server`, `@yeshsurya/react-flow-mcp-server
 
 Everything below is quoted or paraphrased from first-party docs, read via `llms-full.txt` as fetched 2026-07-23; canonical page URLs given alongside.
 
+> **Read §7 before acting on anything in §3.** The quotations are still what the
+> docs say. The `> Actionable here:` annotations underneath them were written on
+> 2026-07-23 against the code as it stood, and several have since been resolved or
+> **reversed** by measurement against a running app. Each stale one is marked in
+> place. The reversal that matters most is `useUpdateNodeInternals` in §3.2/§3.3:
+> following the docs' remedy here reintroduces the bug it claims to prevent.
+
 ### 3.1 Performance — <https://reactflow.dev/learn/advanced-use/performance>
 
 Four documented strategies:
@@ -70,7 +77,7 @@ Four documented strategies:
 3. **Never read `nodes`/`edges` wholesale in a component.** *"One of the most common performance pitfalls in React Flow is directly accessing the `nodes` or `edges` in the components or the viewport."* The documented fix is to derive the narrow thing you need (e.g. `selectedNodeIds`) into a separate store field so the component re-renders only when *that* changes.
 4. **Collapse large node trees** via the node `hidden` flag, and **simplify node/edge CSS** (animations, shadows, gradients) as a last resort.
 
-> **Actionable here:** `CardNode` (`packages/react-flow-adapter/src/CardNode.tsx`) and `RoutedEdge` (`packages/react-flow-adapter/src/RoutedEdge.tsx`) are **not** wrapped in `React.memo`. They *are* referenced from module-level `nodeTypes`/`edgeTypes` constants in `packages/react-flow-adapter/src/index.ts`, which satisfies the "declared outside the parent component" half of rule 1 — but the memo half is still on the table if node counts grow. Rule 2 has one live miss: `packages/app/src/components/GraphView.tsx:45` passes an inline arrow for `onNodeClick`, recreated every render. `packages/app/src/App.tsx` already does the right thing for the `nodes`/`edges`/`graph` derivations (`useMemo` throughout). Rules 3 and 4 are not currently violated — nothing in the repo calls `useStore`.
+> **Actionable here** *(partly stale — see §5 item 4 and §7.3)*: `CardNode` (`packages/react-flow-adapter/src/CardNode.tsx`) and `RoutedEdge` (`packages/react-flow-adapter/src/RoutedEdge.tsx`) are **not** wrapped in `React.memo`. They *are* referenced from module-level `nodeTypes`/`edgeTypes` constants in `packages/react-flow-adapter/src/index.ts`, which satisfies the "declared outside the parent component" half of rule 1 — and because rule 1 is a disjunction, that closes it (§5 item 4). ~~Rule 2 has one live miss: `packages/app/src/components/GraphView.tsx:45` passes an inline arrow for `onNodeClick`, recreated every render.~~ **Resolved** — every handler and object prop on the element is now memoized or module-level (§7.3). `packages/app/src/App.tsx` already does the right thing for the `nodes`/`edges`/`graph` derivations (`useMemo` throughout). Rule 4 is not violated. Rule 3 is no longer strictly true either: `GraphView` calls `useStore`, but for a narrow derivation rather than the wholesale `nodes`/`edges` read the rule warns about.
 
 ### 3.2 Troubleshooting / common errors — <https://reactflow.dev/learn/troubleshooting/common-errors>
 
@@ -87,15 +94,15 @@ Sixteen numbered warnings. The ones that bite an adapter like this one:
 
 - *"If you want to hide your handles, do not use `display: none`… Use either `opacity: 0` or `visibility: hidden`."* Reason given in the Handles guide: *"React Flow needs to calculate the dimensions of the handle to work properly and using `display: none` will report a width and height of `0`."* `CardNode` already dims via the `opacity` style — correct by the book.
 - *"if you have added more than one handle of the same type (`source` or `target`)… assign IDs to them. Multiple handles of the same kind on a node need to have distinguishable IDs."* This is exactly the per-route `<routeId>::out` / `::in` scheme — and it's the React Flow half of the invariant `AGENTS.md` records for the ELK half (`<cardId>##<handleId>`).
-- *"If you are changing the position of the handles (via reordering, etc.), make sure to call the `updateNodeInternals` function returned by [`useUpdateNodeInternals`](https://reactflow.dev/api-reference/hooks/use-update-node-internals)."* **This is the one documented rule this repo has an unforced exposure to**: handle `offsetY` values change when ELK resolves (first paint is unlaid-out, then ELK's offsets land). Nothing calls `updateNodeInternals` today. It appears to work because node `data` changes force a re-render — but the docs treat that as insufficient, and it's the named cause of #008 and of misattached edges.
+- *"If you are changing the position of the handles (via reordering, etc.), make sure to call the `updateNodeInternals` function returned by [`useUpdateNodeInternals`](https://reactflow.dev/api-reference/hooks/use-update-node-internals)."* ~~**This is the one documented rule this repo has an unforced exposure to**: handle `offsetY` values change when ELK resolves (first paint is unlaid-out, then ELK's offsets land). Nothing calls `updateNodeInternals` today. It appears to work because node `data` changes force a re-render — but the docs treat that as insufficient, and it's the named cause of #008 and of misattached edges.~~ **REVERSED — do not act on this. See §7.1.** The repo declares `node.handles` instead, and `parseHandles` builds `handleBounds` from those declarations without reading the DOM. Adding the hook *causes* #008 here rather than preventing it, because its forced path rebuilds bounds from DOM anchors only and drops every not-yet-incident declaration. Verified both ways against the fixture.
 - *"make sure to correctly pass the `sourceX, sourceY, targetX, targetY`"* and *"`sourcePosition` and `targetPosition`"* into the path-creation function. `RoutedEdge`'s bezier fallback does pass all six — correct.
 
 ### 3.3 Custom nodes and handles — <https://reactflow.dev/learn/customization/handles>
 
 - Multiple handles per side need unique `id`s; edges select them with `sourceHandle` / `targetHandle`.
 - *"By default React Flow positions a handle in the center of the specified side. If you want to display multiple handles on a side, you can adjust the position via inline styles or overwrite the default CSS."* This is the officially sanctioned mechanism behind `CardNode`'s `style={{ top: handle.offsetY }}` — it is not a hack.
-- **Dynamic handles:** *"If you are programmatically changing the position or number of handles in your custom node, you need to update the node internals with the `useUpdateNodeInternals` hook."* Same exposure as above; worth a ticket.
-- Handles get `connecting` / `valid` class names during a connection gesture (irrelevant here — `nodesConnectable={false}`).
+- **Dynamic handles:** *"If you are programmatically changing the position or number of handles in your custom node, you need to update the node internals with the `useUpdateNodeInternals` hook."* ~~Same exposure as above; worth a ticket.~~ **REVERSED — see §7.1.** The declared-`node.handles` path makes the hook actively harmful here.
+- Handles get `connecting` / `valid` class names during a connection gesture. ~~(irrelevant here — `nodesConnectable={false}`)~~ **Now relevant:** cards are connectable, and the authoring handles are the drag-to-connect UX of ADR 0033.
 
 ### 3.4 Custom edges — <https://reactflow.dev/learn/customization/custom-edges>
 
@@ -139,11 +146,11 @@ Directly relevant to a `strict` monorepo:
 - Build `Node`/`Edge` **union types** for the app and pass them as generics to `<ReactFlow />`, `OnNodesChange`, `useReactFlow<N, E>()`, `useStore`, `useNodesData<N>`. `BuiltInNode` / `BuiltInEdge` are exported to fold into the union.
 - Narrow with **type-guard functions** (`node is NumberNode`) rather than casts.
 
-> **Actionable here:** `RoutedEdge` is typed as bare `EdgeProps` and recovers its payload with `(data as RoutedEdgeData | undefined)` (`RoutedEdge.tsx:41-42`) — the documented alternative is `type RoutedFlowEdge = Edge<RoutedEdgeData, 'routed'>` + `EdgeProps<RoutedFlowEdge>`, which deletes the cast. `CardNode` already does the node-side version correctly (`NodeProps<CardFlowNode>`). Also note 12.11.0 exports a `NodeHandle` type ([changelog](https://github.com/xyflow/xyflow/blob/main/packages/react/CHANGELOG.md)).
+> **Actionable here** *(resolved — §5 item 2, §7.3)*: ~~`RoutedEdge` is typed as bare `EdgeProps` and recovers its payload with `(data as RoutedEdgeData | undefined)` (`RoutedEdge.tsx:41-42`) — the documented alternative is `type RoutedFlowEdge = Edge<RoutedEdgeData, 'routed'>` + `EdgeProps<RoutedFlowEdge>`, which deletes the cast.~~ **Done** — `RoutedEdge.tsx` declares `RoutedFlowEdge` and takes `EdgeProps<RoutedFlowEdge>`; the cast is gone. `CardNode` already did the node-side version correctly (`NodeProps<CardFlowNode>`). Also note 12.11.0 exports a `NodeHandle` type ([changelog](https://github.com/xyflow/xyflow/blob/main/packages/react/CHANGELOG.md)).
 
 ### 3.8 Controlled vs uncontrolled state — <https://reactflow.dev/learn/advanced-use/uncontrolled-flow> and <https://reactflow.dev/learn/advanced-use/state-management>
 
-- **Controlled**: pass `nodes`/`edges` + `onNodesChange`/`onEdgesChange`, applying changes with the exported `applyNodeChanges` / `applyEdgeChanges`. *"You need to implement these handlers for an interactive flow (if you are fine with just pan and zoom you don't need them)."* — which is precisely this repo's situation. **Stale as written** — `onNodesChange` is wired and cards are draggable. `onEdgesChange` is still absent; see §7 for why that is not the defect it looks like.
+- **Controlled**: pass `nodes`/`edges` + `onNodesChange`/`onEdgesChange`, applying changes with the exported `applyNodeChanges` / `applyEdgeChanges`. *"You need to implement these handlers for an interactive flow (if you are fine with just pan and zoom you don't need them)."* — which is precisely this repo's situation. **Stale as written** — `onNodesChange` is wired and cards are draggable. ~~`onEdgesChange` is still absent; see §7 for why that is not the defect it looks like.~~ `onEdgesChange` is wired too now, accepting `select` changes only and dropping structural ones, since Hyper has no Edge deletion to apply (§7.4).
 - **Uncontrolled**: `defaultNodes` / `defaultEdges`, state owned by React Flow.
 - The state-management guide is written around **Zustand** *"because React Flow already uses it internally"*, and demonstrates `useShallow` on the selector. Relevant given the app's Zustand store: the pattern is one selector returning a narrow object, wrapped in `useShallow`.
 
@@ -262,6 +269,10 @@ A non-incident anchor's fallback offset is `((index + 1) / (routeIds.length + 1)
 
 ### 7.4 Still open
 
-- `nodes` is fed from two sources (`liveNodes ?? projectedNodes` in `App.tsx`), because `canvasContent` reports `arrangement` before `syncNodes` has run. The ownership filter in `editor.ts` absorbs the consequence. The documented Zustand pattern has one source.
-- `projection.ts` writes `measured` onto projected nodes. The SSR page documents `width`/`height` as inputs and `measured` only as an output. It is load-bearing for the window above.
-- `onEdgesChange` is absent while `elementsSelectable` is true. Measured: an edge click does clear the Card selection — but so does a click on bare canvas, which is React Flow's documented pane behaviour, and the edge never actually reads as selected because the controlled `edges` prop wipes it. No user-visible defect; `selectable: false` on projected edges would make the intent explicit at zero behavioural cost.
+- `projection.ts` writes `measured` onto projected nodes. The SSR page documents `width`/`height` as inputs and `measured` only as an output. It is load-bearing for the first-paint window.
+
+### 7.5 Closed since 7.4 was written
+
+- ~~`nodes` is fed from two sources (`liveNodes ?? projectedNodes` in `App.tsx`), because `canvasContent` reports `arrangement` before `syncNodes` has run.~~ **Closed.** `canvasContent` no longer treats a `ready` placement as an arrangement — only live nodes are one — so the canvas waits for the editor to take the placement and the node array has one owner. The ownership filter in `editor.ts` stays: it is what stops an unowned node's `dimensions` change from re-measuring forever.
+- ~~`onEdgesChange` is absent while `elementsSelectable` is true.~~ **Closed, the other way.** Rather than `selectable: false`, the handler is wired and filters to `select` changes alone, dropping structural ones — which is what makes React Flow's Edge deletion inert through the controlled path rather than only through `deleteKeyCode={null}`. Edge selection is therefore real and observable (`.react-flow__edge.selected`), and `editing.spec.ts` selects an Edge to prove Backspace and Delete remove nothing.
+- Edges stay `edgesFocusable={false}`, so the Edge assistive description names no key. Selecting an Edge leads nowhere, and putting every Edge in the tab order would sit inert stops between a keyboard user and the next Card. Advertising a keypress an Edge cannot receive is the same defect as the delete claim in §7.3, and is answered the same way — correct the instruction, do not build the interaction it names. Covered by `editing.spec.ts`, "does not advertise an Edge keyboard action it cannot receive".
