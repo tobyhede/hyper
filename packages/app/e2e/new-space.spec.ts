@@ -77,6 +77,10 @@ test('the first self-connection mints and activates Route 1 in one persisted Lay
   await expect(page.getByTestId('layout-selector')).toContainText('Layout 1');
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
   await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
+  // Conversion must not move what is already on screen (ADR 0025), so the
+  // position is read once the graph has settled — sampling mid-render could
+  // agree with `before` before the converted Layout has actually rendered.
+  await settled(page);
   expect(await positionOf(card)).toEqual(before);
 });
 

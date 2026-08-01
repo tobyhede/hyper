@@ -1,6 +1,7 @@
 import fc from 'fast-check';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { uuidSchema, type Layout, type SpaceSnapshot } from '@project/core';
+import type { Space } from '@project/graph';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
 import { createPlacementEditor } from '../src/edit-completion';
 import { createViewChoice, layoutPositionMap } from '../src/view';
@@ -11,6 +12,7 @@ const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const CARD_A = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 const CARD_B = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
 const ROUTE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
+const MINTED_ROUTE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000008');
 const DEFAULT_LAYOUT_UUID = '00000000-0000-4000-8000-000000000021' as const;
 const DEFAULT_LAYOUT_ID = uuidSchema.parse(DEFAULT_LAYOUT_UUID);
 const OTHER_LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000022');
@@ -63,6 +65,15 @@ const projected = [node(CARD_A, 10, 20), node(CARD_B, 300, 20)];
 const ignoreInstalledSpace = () => undefined;
 
 describe('completed placement composition', () => {
+  // `vi.spyOn` reconfigures an existing spy rather than installing a fresh one,
+  // so an unrestored `mockReturnValue` becomes the fallback behind a later
+  // test's `mockReturnValueOnce` chain. Minted ids would then depend on which
+  // tests ran before, which is the kind of order dependence that only shows up
+  // once someone runs a single test in isolation.
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it.each(['graph', 'grid'] as const)(
     'leaves the %s View untouched when the Edge already exists',
     (view) => {
@@ -98,18 +109,27 @@ describe('completed placement composition', () => {
       const backend = new MemorySpaceBackend([loaded]);
       const session = openSpaceSession(backend, loaded);
       const viewChoice = createViewChoice({ kind: 'view', view });
+      // The installed Space and the submitted snapshot are two collaborators,
+      // and Edit completion installs the first before notifying. Discarding the
+      // Space would leave the half the graph actually renders from unasserted.
+      const installed: Space[] = [];
       const editor = createPlacementEditor({
         initialPositions: null,
         viewChoice,
         currentActiveRoute: () => ROUTE_ID,
         session,
-        installSpace: ignoreInstalledSpace,
+        installSpace: (space) => installed.push(space),
       });
       editor.getState().syncNodes(projected);
 
       const completed = editor.getState().connectCards(CARD_B, CARD_A, projected);
 
       expect(completed).toBe(true);
+      expect(installed).toHaveLength(1);
+      expect(installed[0]!.routesById.get(ROUTE_ID)?.edges).toEqual([
+        { from: CARD_A, to: CARD_B },
+        { from: CARD_B, to: CARD_A },
+      ]);
       expect(session.getState().working).toMatchObject({
         document: {
           routes: [
@@ -141,6 +161,128 @@ describe('completed placement composition', () => {
       await expect(backend.loadSpace(SPACE_ID)).resolves.toMatchObject({ revision: 1n });
     },
   );
+
+  it('adds the first minted Route to a selected Layout that shows no Routes', async () => {
+    const routeLessLayout: Layout = {
+      id: DEFAULT_LAYOUT_ID,
+      title: 'Focused Layout',
+      kind: 'positioned',
+      positions: { [CARD_A]: { x: 10, y: 20 } },
+      routes: [],
+    };
+    const routeLessSnapshot: SpaceSnapshot = {
+      id: SPACE_ID,
+      document: {
+        version: 2,
+        title: 'Route-less Space',
+        routes: [],
+        layouts: [routeLessLayout],
+        defaultView: DEFAULT_LAYOUT_ID,
+      },
+      cards: [automaticSnapshot.cards[0]!],
+    };
+    const loaded = { snapshot: routeLessSnapshot, revision: 0n, exportedRevision: null };
+    const backend = new MemorySpaceBackend([loaded]);
+    const session = openSpaceSession(backend, loaded);
+    const viewChoice = createViewChoice({ kind: 'layout', layoutId: DEFAULT_LAYOUT_ID });
+    const activatedRoutes: string[] = [];
+    const editor = createPlacementEditor({
+      initialPositions: layoutPositionMap(routeLessLayout),
+      viewChoice,
+      currentActiveRoute: () => null,
+      session,
+      installSpace: ignoreInstalledSpace,
+      activateRoute: (routeId) => activatedRoutes.push(routeId),
+      mintRouteId: () => MINTED_ROUTE_ID,
+    });
+    const projectedCard = [node(CARD_A, 10, 20)];
+    editor.getState().syncNodes(projectedCard);
+
+    const completed = editor.getState().connectCards(CARD_A, CARD_A, projectedCard);
+
+    expect(completed).toBe(true);
+    expect(session.getState().working.document).toMatchObject({
+      routes: [
+        {
+          id: MINTED_ROUTE_ID,
+          title: 'Route 1',
+          edges: [{ from: CARD_A, to: CARD_A }],
+        },
+      ],
+      layouts: [
+        {
+          id: DEFAULT_LAYOUT_ID,
+          title: 'Focused Layout',
+          routes: [MINTED_ROUTE_ID],
+          activeRoute: MINTED_ROUTE_ID,
+        },
+      ],
+      defaultView: DEFAULT_LAYOUT_ID,
+    });
+    expect(activatedRoutes).toEqual([MINTED_ROUTE_ID]);
+    expect(viewChoice.current()).toEqual({ kind: 'layout', layoutId: DEFAULT_LAYOUT_ID });
+
+    await waitForSettled(session.getState, session.subscribe);
+    await expect(backend.loadSpace(SPACE_ID)).resolves.toMatchObject({
+      revision: 1n,
+      snapshot: {
+        document: {
+          layouts: [
+            {
+              id: DEFAULT_LAYOUT_ID,
+              title: 'Focused Layout',
+              routes: [MINTED_ROUTE_ID],
+              activeRoute: MINTED_ROUTE_ID,
+            },
+          ],
+        },
+      },
+    });
+  });
+
+  it('preserves an empty route filter when only placement changes', () => {
+    const routeLessLayout: Layout = {
+      id: DEFAULT_LAYOUT_ID,
+      title: 'Focused Layout',
+      kind: 'positioned',
+      positions: { [CARD_A]: { x: 10, y: 20 } },
+      routes: [],
+    };
+    const routeLessSnapshot: SpaceSnapshot = {
+      id: SPACE_ID,
+      document: {
+        version: 2,
+        title: 'Route-less Space',
+        routes: [],
+        layouts: [routeLessLayout],
+        defaultView: DEFAULT_LAYOUT_ID,
+      },
+      cards: [automaticSnapshot.cards[0]!],
+    };
+    const loaded = { snapshot: routeLessSnapshot, revision: 0n, exportedRevision: null };
+    const session = openSpaceSession(new MemorySpaceBackend([loaded]), loaded);
+    const editor = createPlacementEditor({
+      initialPositions: layoutPositionMap(routeLessLayout),
+      viewChoice: createViewChoice({ kind: 'layout', layoutId: DEFAULT_LAYOUT_ID }),
+      currentActiveRoute: () => null,
+      session,
+      installSpace: ignoreInstalledSpace,
+    });
+    editor.getState().syncNodes([node(CARD_A, 10, 20)]);
+
+    completeDrag(editor, CARD_A, 70, 90);
+
+    expect(session.getState().working.document.routes).toEqual([]);
+    expect(session.getState().working.document.layouts).toEqual([
+      {
+        id: DEFAULT_LAYOUT_ID,
+        title: 'Focused Layout',
+        kind: 'positioned',
+        positions: { [CARD_A]: { x: 70, y: 90 } },
+        routes: [],
+      },
+    ]);
+  });
 
   it('converts current owner state, selects locally, and persists asynchronously', async () => {
     vi.spyOn(crypto, 'randomUUID').mockReturnValue(DEFAULT_LAYOUT_UUID);

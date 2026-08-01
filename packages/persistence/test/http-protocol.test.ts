@@ -33,6 +33,20 @@ describe('revision decoding', () => {
     expect(decodeCommittedRevision({ revision: BIGINT_MAX.toString() })).toBe(BIGINT_MAX);
   });
 
+  // The canonical pattern bounds decoding at 19 digits, which is the *width* of a
+  // PostgreSQL bigint but not its range: every value from BIGINT_MAX + 1 to
+  // 9999999999999999999 is 19 digits and does not fit. Left unchecked it reaches
+  // the repository, where `toDatabaseRevision` is a bare cast, and a client error
+  // surfaces as a database failure.
+  it('rejects a 19-digit revision above the PostgreSQL bigint range', () => {
+    expect(() => decodeCommittedRevision({ revision: (BIGINT_MAX + 1n).toString() })).toThrow(
+      'within the PostgreSQL bigint range',
+    );
+    expect(() => decodeCommittedRevision({ revision: '9'.repeat(19) })).toThrow(
+      'within the PostgreSQL bigint range',
+    );
+  });
+
   const nonCanonical = ['007', '+1', '1.0', '-1', '', ' 1', '1e3', '0x1', '1_000', '00'];
   for (const value of nonCanonical) {
     it(`rejects the non-canonical revision ${JSON.stringify(value)}`, () => {

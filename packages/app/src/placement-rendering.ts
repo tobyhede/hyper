@@ -56,8 +56,11 @@ export function usePlacementRendering(
   // render, where a throw escapes React and takes the page down instead of
   // reaching the failure state below — so an unusable placement is handed on as a
   // rejecting strategy and reported like any other placement failure.
-  const renderingStrategy = useMemo(() => {
-    if (authoredPositions === null) return strategy;
+  // Split from the fallback so authored placement does not depend on `strategy`:
+  // a new automatic strategy identity would otherwise rebuild the positioned one
+  // and re-run layout, discarding a settled authored render for an identical result.
+  const authoredStrategy = useMemo<LayoutStrategy | null>(() => {
+    if (authoredPositions === null) return null;
     try {
       const positions = new Map<CardId, LayoutPoint>();
       for (const [cardId, point] of authoredPositions) {
@@ -67,7 +70,8 @@ export function usePlacementRendering(
     } catch (reason: unknown) {
       return () => Promise.reject(toError(reason));
     }
-  }, [strategy, authoredPositions]);
+  }, [authoredPositions]);
+  const renderingStrategy = authoredStrategy ?? strategy;
 
   useEffect(() => {
     let current = true;

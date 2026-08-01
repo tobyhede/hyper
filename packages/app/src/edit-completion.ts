@@ -124,7 +124,9 @@ function deriveCompletedEdit(current: CurrentEditState): DerivedEdit | null {
     if (current.newRouteId === null || current.newRouteId === undefined) {
       throw new Error('The first connection requires a new Route id.');
     }
-    activeRouteId = current.newRouteId;
+    const mintedRouteId = current.newRouteId;
+    const selectedLayoutId = current.renderer.kind === 'layout' ? current.renderer.layoutId : null;
+    activeRouteId = mintedRouteId;
     connectionAlreadyAdded = true;
     base = {
       ...base,
@@ -137,6 +139,15 @@ function deriveCompletedEdit(current: CurrentEditState): DerivedEdit | null {
             edges: [{ from: current.connection.from, to: current.connection.to }],
           },
         ],
+        ...(selectedLayoutId !== null && base.document.layouts !== undefined
+          ? {
+              layouts: base.document.layouts.map((layout) =>
+                layout.id === selectedLayoutId && layout.routes !== undefined
+                  ? { ...layout, routes: [...layout.routes, mintedRouteId] }
+                  : layout,
+              ),
+            }
+          : {}),
       },
     };
   }

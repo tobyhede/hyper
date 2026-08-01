@@ -16,7 +16,7 @@
 - [x] Obsolete asynchronous strategy results cannot replace the converted Layout after the completed structural Edit.
 - [x] The completed Edit advances one revision and submits one snapshot through the existing session.
 - [x] Pure tests cover Graph and Grid conversion, next-Layout naming, resolved-position copying and unrelated-Layout preservation.
-- [x] Playwright connects two Cards directly from both an Algorithmic View and verifies Layout selection, stable positions and automatic persistence.
+- [x] Playwright connects two Cards directly from each Algorithmic View and verifies Layout selection, stable positions and automatic persistence.
 - [x] `pnpm verify` and `pnpm e2e` pass.
 
 ## Answer
@@ -32,3 +32,7 @@ DOM remeasurement. Existing stale-strategy coverage proves a late automatic
 result cannot replace the positioned rendering. Public composition tests pass
 for Graph and Grid, the browser test exercises both Views, `pnpm verify` passes
 all 436 tests, and `pnpm e2e` passes all 41 tests.
+
+- Re-verified on 2026-08-01 after review follow-up: `pnpm verify` passed 63 test
+  files and 535 tests; `pnpm e2e` passed 47 tests. The counts above are this
+  issue's own run and are left as the record of it.

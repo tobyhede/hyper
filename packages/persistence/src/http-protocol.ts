@@ -9,6 +9,7 @@ import type { LoadedSpace, SpaceSummary } from './backend';
  * header in `http.ts` shares it despite being a different protocol concern.
  */
 export const CANONICAL_DECIMAL = /^(0|[1-9]\d{0,18})$/;
+const BIGINT_MAX = 9_223_372_036_854_775_807n;
 
 const exactRecord = (
   value: unknown,
@@ -31,7 +32,11 @@ const decodeRevision = (value: unknown, label: string): bigint => {
   if (typeof value !== 'string' || !CANONICAL_DECIMAL.test(value)) {
     throw new Error(`${label} must be a canonical non-negative decimal string`);
   }
-  return BigInt(value);
+  const revision = BigInt(value);
+  if (revision > BIGINT_MAX) {
+    throw new Error(`${label} must be within the PostgreSQL bigint range`);
+  }
+  return revision;
 };
 
 const decodeNullableRevision = (value: unknown): bigint | null =>

@@ -175,7 +175,7 @@ Design rules kept throughout: domain logic stays out of React components, React 
 - Route navigation behaviour, with fast-check property tests for clamping/monotonicity and validation invariants.
 - React Flow projection correctness (`@project/react-flow-adapter`).
 - Card rendering smoke test (`@project/ui`).
-- Playwright flows: app loads, the graph is visible, a route is selected, cards open, a completed drag reaches the backend and survives a reload, and a route is walked under the camera.
+- Playwright flows: app loads, the graph is visible, a route is selected, cards open, a completed drag reaches the backend and survives a reload, a drawn connection mints and activates a route, and a route is walked under the camera.
 
 ## Current limitations
 
@@ -183,7 +183,7 @@ Design rules kept throughout: domain logic stays out of React components, React 
 - **The app never touches files.** The browser lists, opens and commits Spaces under `/api/spaces` and nothing else; file discovery and parsing are server-side CLI and import concerns. There is no write-back and no file picker. Canonical file export belongs to the `hyper` CLI ([ADR 0030](docs/adr/0030-postgres-is-the-live-write-model.md)), which regenerates a deterministic version 2 space directory from the database and records the revision it projected.
 - **Overlay legibility.** The graph draws every route at once. Only **compatible** routes — the union of their edges is acyclic — lay out cleanly as parallel forward paths; two routes disagreeing about the order of cards they share force a backward edge, drawn as a routed channel. See [`.scratch/multiple-routes/findings.md`](.scratch/multiple-routes/findings.md).
 - **Cards are a fixed shape.** A card draws its title, so every card is the same size — declared once in `packages/app/src/card.ts` as a 16:9 ratio and consumed by both the layout and the stylesheet. Content adapts to the card, not the reverse, which is why measured DOM sizes are not fed into ELK.
-- **Structure is authored one Edge at a time.** Dragging between cards adds an Edge to the active Route through the four spatial handles of [ADR 0033](docs/adr/0033-route-authoring-uses-spatial-route-coloured-handles.md). Creating and deleting cards and routes is not built, so their titles and content still come from imported files.
+- **Only connections are authored.** Dragging between the spatial handles draws an Edge, and the first one mints and activates Route 1 ([ADR 0033](docs/adr/0033-route-authoring-uses-spatial-route-coloured-handles.md)). Creating and deleting Cards, and editing Route titles, are still file concerns.
 - **No speaker view, timer, transitions or deck export.** They went with the deck framework and return, if wanted, as their own decisions designed against a traversal ([ADR 0024](docs/adr/0024-presenting-is-traversing-a-route.md)).
 - **The presented card is scaled by the camera**, so its text is rasterised rather than laid out at its final size — a property of wanting a spatial camera at all.
 - The production bundle ships React Flow and elkjs in a single chunk (~2.1 MB) — fine for a prototype, not tuned for size.

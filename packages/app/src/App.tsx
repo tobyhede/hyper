@@ -19,7 +19,7 @@ import {
 import type { OpenedSpace } from './space';
 import { createPlacementEditor } from './edit-completion';
 import { canvasContent, usePlacementRendering } from './placement-rendering';
-import { ROUTE_PALETTE, routeColorMap } from './colors';
+import { activeRouteColor, ROUTE_PALETTE, routeColorMap } from './colors';
 import { CARD_HEIGHT, CARD_SIZE, cardSizeVars } from './card';
 import { createSpaceStore } from './store';
 import {
@@ -200,8 +200,7 @@ export const createApp = ({ space, spaceSession }: OpenedSpace, { acceptRemote }
           selectedCardId,
           showActiveCardContent: presenting,
           activeRouteId,
-          activeRouteColor:
-            activeRouteId === null ? ROUTE_PALETTE[0] : (colors[activeRouteId] ?? ROUTE_PALETTE[0]),
+          activeRouteColor: activeRouteColor(colors, activeRouteId),
           emphasis,
           ...(laidOut ? { layoutGraph: laidOut } : {}),
           nodeHeight: CARD_HEIGHT,

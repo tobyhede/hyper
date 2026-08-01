@@ -1,4 +1,10 @@
-import { Agent, request as httpRequest, type IncomingHttpHeaders } from 'node:http';
+import {
+  Agent,
+  request as httpRequest,
+  type IncomingHttpHeaders,
+  type IncomingMessage,
+  type ServerResponse,
+} from 'node:http';
 import { describe, expect, it } from 'vitest';
 import { uuidSchema, type SpaceSnapshot } from '@project/core';
 import { encodeCommitRequest } from '@project/persistence';
@@ -102,11 +108,51 @@ describe('Space HTTP request validation', () => {
     }
   });
 
+  /**
+   * Node's own parser answers a negative `Content-Length` with
+   * `HPE_INVALID_CONTENT_LENGTH` and never dispatches, so sending one over a
+   * socket proves nothing about this handler — the 400 comes from the parser.
+   * The sign rejection is real code, so it is covered at the handler seam.
+   */
+  it('rejects a negative declared length at the handler, below the parser', async () => {
+    const repository = new E2eMemorySpaceRepository([stored]);
+    const headers = { ...validHeaders, 'content-length': '-1' };
+    const request = {
+      method: 'PUT',
+      url: `/api/spaces/${SPACE_ID}`,
+      headers,
+      headersDistinct: Object.fromEntries(
+        Object.entries(headers).map(([key, value]) => [key, [value]]),
+      ),
+    } as unknown as IncomingMessage;
+    const captured = { statusCode: 0, body: '', headers: {} as Record<string, string> };
+    const response = {
+      set statusCode(value: number) {
+        captured.statusCode = value;
+      },
+      setHeader(key: string, value: string) {
+        captured.headers[key.toLowerCase()] = value;
+      },
+      end(chunk?: string) {
+        captured.body = chunk ?? '';
+      },
+    } as unknown as ServerResponse;
+
+    await expect(createSpaceHttpHandler(repository)(request, response)).resolves.toBe(true);
+
+    expect(captured.statusCode).toBe(400);
+    expect(JSON.parse(captured.body)).toEqual({
+      message: `Content-Length must be canonical and at most ${MAX_COMMIT_BODY_BYTES}`,
+    });
+    expect(captured.headers['connection']).toBe('close');
+    expect(repository.commitAttempts).toBe(0);
+  });
+
   it('rejects noncanonical and declared oversized lengths before repository access', async () => {
     const repository = new E2eMemorySpaceRepository([stored]);
     const server = await startHttpServer(createSpaceHttpHandler(repository));
     try {
-      for (const length of ['01', '-1', String(MAX_COMMIT_BODY_BYTES + 1)]) {
+      for (const length of ['01', String(MAX_COMMIT_BODY_BYTES + 1)]) {
         const response = await send(server.url, `/api/spaces/${SPACE_ID}`, validBody, {
           ...validHeaders,
           'content-length': length,
