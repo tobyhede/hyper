@@ -135,10 +135,11 @@ postgres:
 ```
 
 The sketch matches the shipped job, which remains the authority. Each action is
-pinned to the commit its `v4` tag named rather than the tag itself: this job
-holds a generated database password while it installs dependencies, so a
-repointed tag would be a credential exposure and not an abstract supply-chain
-concern.
+pinned to the commit its `v4` tag named rather than the tag itself, because a
+tag can be repointed at new code and an action runs that code in the job. The
+setup steps all finish before the password exists, so none of them sees it —
+but they choose and install the toolchain that the later steps run under, and
+those steps do carry `DATABASE_URL` in their environment.
 
 The generated hex password is URL-safe, never committed, and never passed as a
 command-line argument. GitHub documents that `add-mask` redacts a registered

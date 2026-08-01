@@ -237,7 +237,9 @@ const loadStoredSpace = async (orm: Orm, id: UUID): Promise<StoredSpace | undefi
       .all();
     const after = await orm.public.Space.first({ id });
     if (after === null || toRevision(before.revision) !== toRevision(after.revision)) {
-      await pauseBeforeRetry(attempt);
+      // Nothing follows the last attempt, so pausing after it only delays the
+      // failure the caller is already getting.
+      if (attempt < LOAD_ATTEMPTS - 1) await pauseBeforeRetry(attempt);
       continue;
     }
 
@@ -350,25 +352,20 @@ export class PostgresSpaceRepository implements SpaceRepository {
     const revision = expectedRevision + 1n;
     const databaseRevision = toDatabaseRevision(revision);
 
+    let outcome: { kind: 'committed'; revision: bigint } | { kind: 'stale' };
     try {
-      return await this.#database.transaction(async ({ orm }) => {
+      outcome = await this.#database.transaction(async ({ orm }) => {
         const updated = await orm.public.Space.where({ id: accepted.id })
           .where({ revision: databaseExpectedRevision })
           .update({
             document: toJsonValue(accepted.document),
             revision: databaseRevision,
           });
-        if (updated === null) {
-          const current = await loadStoredSpace(orm, accepted.id);
-          if (current === undefined) {
-            return {
-              kind: 'rejected',
-              code: 'not-found',
-              message: `Space ${accepted.id} does not exist`,
-            };
-          }
-          return { kind: 'conflict', current };
-        }
+        // Reading the current aggregate is what the caller needs next, but it
+        // retries and pauses between attempts. Doing that here would hold this
+        // transaction's connection open across every one of those pauses, so
+        // the write ends and the read happens below.
+        if (updated === null) return { kind: 'stale' };
 
         await upsertCards(orm, accepted);
 
@@ -393,6 +390,18 @@ export class PostgresSpaceRepository implements SpaceRepository {
       }
       throw error;
     }
+
+    if (outcome.kind === 'committed') return outcome;
+
+    const current = await loadStoredSpace(this.#database.orm, accepted.id);
+    if (current === undefined) {
+      return {
+        kind: 'rejected',
+        code: 'not-found',
+        message: `Space ${accepted.id} does not exist`,
+      };
+    }
+    return { kind: 'conflict', current };
   }
 
   async importSpaces(
