@@ -1,8 +1,10 @@
-import { expect, test } from './fixtures';
+import { uuidSchema, type SpaceSnapshot } from '@project/core';
+import { expect, test, type Page } from './fixtures';
 import {
   AUTHORING_HANDLE_SIDES,
   authoringHandle,
   connectHandles,
+  connectToEmptyWithAlt,
   dragBy,
   nodeByTitle,
   positionOf,
@@ -15,6 +17,53 @@ import {
  * This project drives its own empty HTTP repository. Server-side database
  * startup creates the one-card Space once, and reloads reopen that durable UUID.
  */
+
+interface HttpLoadedSpace {
+  readonly snapshot: SpaceSnapshot;
+  readonly revision: string;
+  readonly exportedRevision: string | null;
+}
+
+const FILTERED_LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000099');
+
+async function seedRouteLessFilteredLayout(page: Page): Promise<HttpLoadedSpace> {
+  const summariesResponse = await page.request.get('/api/spaces');
+  expect(summariesResponse.ok()).toBe(true);
+  const summaries = (await summariesResponse.json()) as readonly { readonly id: string }[];
+  const spaceId = summaries[0]?.id;
+  expect(spaceId).toBeDefined();
+
+  const loadedResponse = await page.request.get(`/api/spaces/${spaceId}`);
+  expect(loadedResponse.ok()).toBe(true);
+  const loaded = (await loadedResponse.json()) as HttpLoadedSpace;
+  const cardId = loaded.snapshot.cards[0]?.id;
+  if (cardId === undefined) throw new Error('The new Space must hold Card 1.');
+
+  const snapshot: SpaceSnapshot = {
+    ...loaded.snapshot,
+    document: {
+      ...loaded.snapshot.document,
+      layouts: [
+        {
+          id: FILTERED_LAYOUT_ID,
+          title: 'Empty Route Filter',
+          kind: 'positioned',
+          positions: { [cardId]: { x: 0, y: 0 } },
+          routes: [],
+        },
+      ],
+      defaultView: FILTERED_LAYOUT_ID,
+    },
+  };
+  const commitResponse = await page.request.put(`/api/spaces/${spaceId}`, {
+    data: { snapshot, expectedRevision: loaded.revision },
+  });
+  expect(commitResponse.ok()).toBe(true);
+
+  const seededResponse = await page.request.get(`/api/spaces/${spaceId}`);
+  expect(seededResponse.ok()).toBe(true);
+  return (await seededResponse.json()) as HttpLoadedSpace;
+}
 
 test('shows one card, and it is the only thing on screen', async ({ page }) => {
   await page.goto('/');
@@ -132,6 +181,45 @@ test('Alt empty-drop creates, connects and selects Card 2 at the previewed posit
   await connectHandles(page, continuedSource, authoringHandle(sourceCard, 'target', 'right'));
   await expect(page.locator('.react-flow__edge')).toHaveCount(2);
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '2');
+});
+
+test('Alt empty-drop mints the first visible Route in a filtered positioned Layout', async ({
+  page,
+}) => {
+  const seeded = await seedRouteLessFilteredLayout(page);
+  const persistedRevision = String(BigInt(seeded.revision) + 1n);
+  await page.goto('/');
+
+  const sourceCard = nodeByTitle(page, 'Card 1');
+  await expect(sourceCard).toBeVisible();
+  await expect(page.getByTestId('layout-selector')).toContainText('Empty Route Filter');
+  await expect(page.getByTestId('route-selector')).toContainText('None');
+  await settled(page);
+  await sourceCard.hover();
+
+  await connectToEmptyWithAlt(page, authoringHandle(sourceCard, 'source', 'right'));
+
+  await expect(nodeByTitle(page, 'Card 2')).toBeVisible();
+  await expect(page.locator('.react-flow__edge')).toHaveCount(1);
+  await expect(page.getByTestId('route-selector')).toContainText('Route 1');
+  await expect(page.getByTestId('route-legend')).toContainText('Route 1');
+  await expect(page.getByTestId('layout-selector')).toContainText('Empty Route Filter');
+  await expect(page.getByTestId('persistence-status')).toHaveAttribute(
+    'data-revision',
+    persistedRevision,
+  );
+  await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
+
+  await page.reload();
+  await expect(nodeByTitle(page, 'Card 1')).toBeVisible();
+  await expect(nodeByTitle(page, 'Card 2')).toBeVisible();
+  await expect(page.locator('.react-flow__edge')).toHaveCount(1);
+  await expect(page.getByTestId('route-selector')).toContainText('Route 1');
+  await expect(page.getByTestId('layout-selector')).toContainText('Empty Route Filter');
+  await expect(page.getByTestId('persistence-status')).toHaveAttribute(
+    'data-revision',
+    persistedRevision,
+  );
 });
 
 test('an Alt-drop released off the canvas creates no Card', async ({ page }) => {

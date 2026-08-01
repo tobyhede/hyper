@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { uuidSchema, type Layout, type SpaceSnapshot } from '@project/core';
 import type { Space } from '@project/graph';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
+import { loadSpaceSnapshot } from '@project/graph';
 import { createPlacementEditor } from '../src/edit-completion';
 import { createViewChoice, layoutPositionMap } from '../src/view';
 import { completeDrag, node, settled } from './editor-fixtures';
@@ -115,6 +116,203 @@ describe('completed placement composition', () => {
       working: filteredSnapshot,
     });
     expect(viewChoice.current()).toEqual({ kind: 'layout', layoutId: DEFAULT_LAYOUT_ID });
+  });
+
+  it('creates the first connected Card on a route-less Layout that filters every Route', async () => {
+    const routeLessLayout: Layout = {
+      id: DEFAULT_LAYOUT_ID,
+      title: 'Authored Layout',
+      kind: 'positioned',
+      positions: { [CARD_A]: { x: 10, y: 20 } },
+      routes: [],
+    };
+    const unrelatedLayout: Layout = {
+      id: OTHER_LAYOUT_ID,
+      title: 'Other Layout',
+      kind: 'positioned',
+      positions: { [CARD_A]: { x: 900, y: 700 } },
+      routes: [],
+    };
+    const routeLessSnapshot: SpaceSnapshot = {
+      id: SPACE_ID,
+      document: {
+        version: 2,
+        title: 'New space',
+        routes: [],
+        layouts: [routeLessLayout, unrelatedLayout],
+        defaultView: DEFAULT_LAYOUT_ID,
+      },
+      cards: [{ id: CARD_A, document: { title: 'Card 1', kind: 'markdown', body: '' } }],
+    };
+    const loaded = { snapshot: routeLessSnapshot, revision: 0n, exportedRevision: null };
+    const backend = new MemorySpaceBackend([loaded]);
+    const session = openSpaceSession(backend, loaded);
+    const viewChoice = createViewChoice({ kind: 'layout', layoutId: DEFAULT_LAYOUT_ID });
+    let activeRouteId: typeof ROUTE_ID | null = null;
+    const editor = createPlacementEditor({
+      initialPositions: layoutPositionMap(routeLessLayout),
+      viewChoice,
+      currentActiveRoute: () => activeRouteId,
+      session,
+      installSpace: ignoreInstalledSpace,
+      activateRoute: (routeId) => {
+        activeRouteId = routeId;
+      },
+      mintRouteId: () => ROUTE_ID,
+    });
+    editor.getState().syncNodes([node(CARD_A, 10, 20)]);
+
+    let completed: boolean | undefined;
+    expect(() => {
+      completed = editor
+        .getState()
+        .createConnectedCard(CARD_A, CREATED_CARD_ID, { x: 420, y: 360 });
+    }).not.toThrow();
+
+    expect(completed).toBe(true);
+    expect(activeRouteId).toBe(ROUTE_ID);
+    expect(viewChoice.current()).toEqual({ kind: 'layout', layoutId: DEFAULT_LAYOUT_ID });
+    expect(session.getState().working).toEqual({
+      ...routeLessSnapshot,
+      document: {
+        ...routeLessSnapshot.document,
+        routes: [
+          {
+            id: ROUTE_ID,
+            title: 'Route 1',
+            edges: [{ from: CARD_A, to: CREATED_CARD_ID }],
+          },
+        ],
+        layouts: [
+          {
+            ...routeLessLayout,
+            positions: {
+              [CARD_A]: { x: 10, y: 20 },
+              [CREATED_CARD_ID]: { x: 420, y: 360 },
+            },
+            routes: [ROUTE_ID],
+            activeRoute: ROUTE_ID,
+          },
+          unrelatedLayout,
+        ],
+      },
+      cards: [
+        ...routeLessSnapshot.cards,
+        {
+          id: CREATED_CARD_ID,
+          document: { title: 'Card 2', kind: 'markdown', body: '' },
+        },
+      ],
+    });
+    await waitForSettled(session.getState, session.subscribe);
+    await expect(backend.loadSpace(SPACE_ID)).resolves.toEqual({
+      snapshot: session.getState().working,
+      revision: 1n,
+      exportedRevision: null,
+    });
+  });
+
+  it('creates the first Route from an existing-Card self-connection in an empty Layout filter', async () => {
+    const routeLessLayout: Layout = {
+      id: DEFAULT_LAYOUT_ID,
+      title: 'Authored Layout',
+      kind: 'positioned',
+      positions: { [CARD_A]: { x: 10, y: 20 } },
+      routes: [],
+    };
+    const routeLessSnapshot: SpaceSnapshot = {
+      id: SPACE_ID,
+      document: {
+        version: 2,
+        title: 'New space',
+        routes: [],
+        layouts: [routeLessLayout],
+        defaultView: DEFAULT_LAYOUT_ID,
+      },
+      cards: [{ id: CARD_A, document: { title: 'Card 1', kind: 'markdown', body: '' } }],
+    };
+    const loaded = { snapshot: routeLessSnapshot, revision: 0n, exportedRevision: null };
+    const backend = new MemorySpaceBackend([loaded]);
+    const session = openSpaceSession(backend, loaded);
+    const viewChoice = createViewChoice({ kind: 'layout', layoutId: DEFAULT_LAYOUT_ID });
+    const editor = createPlacementEditor({
+      initialPositions: layoutPositionMap(routeLessLayout),
+      viewChoice,
+      currentActiveRoute: () => null,
+      session,
+      installSpace: ignoreInstalledSpace,
+      mintRouteId: () => ROUTE_ID,
+    });
+    const visibleNodes = [node(CARD_A, 10, 20)];
+    editor.getState().syncNodes(visibleNodes);
+
+    expect(editor.getState().connectCards(CARD_A, CARD_A, visibleNodes)).toBe(true);
+
+    const working = session.getState().working;
+    expect(working.document.routes).toEqual([
+      {
+        id: ROUTE_ID,
+        title: 'Route 1',
+        edges: [{ from: CARD_A, to: CARD_A }],
+      },
+    ]);
+    expect(working.document.layouts).toEqual([
+      {
+        ...routeLessLayout,
+        routes: [ROUTE_ID],
+        activeRoute: ROUTE_ID,
+      },
+    ]);
+    expect(loadSpaceSnapshot(working).ok).toBe(true);
+    await waitForSettled(session.getState, session.subscribe);
+    await expect(backend.loadSpace(SPACE_ID)).resolves.toMatchObject({
+      snapshot: working,
+      revision: 1n,
+    });
+  });
+
+  it('keeps an omitted Layout route filter omitted when it creates the first Route', async () => {
+    const routeLessLayout: Layout = {
+      id: DEFAULT_LAYOUT_ID,
+      title: 'Authored Layout',
+      kind: 'positioned',
+      positions: { [CARD_A]: { x: 10, y: 20 } },
+    };
+    const routeLessSnapshot: SpaceSnapshot = {
+      id: SPACE_ID,
+      document: {
+        version: 2,
+        title: 'New space',
+        routes: [],
+        layouts: [routeLessLayout],
+        defaultView: DEFAULT_LAYOUT_ID,
+      },
+      cards: [{ id: CARD_A, document: { title: 'Card 1', kind: 'markdown', body: '' } }],
+    };
+    const loaded = { snapshot: routeLessSnapshot, revision: 0n, exportedRevision: null };
+    const backend = new MemorySpaceBackend([loaded]);
+    const session = openSpaceSession(backend, loaded);
+    const editor = createPlacementEditor({
+      initialPositions: layoutPositionMap(routeLessLayout),
+      viewChoice: createViewChoice({ kind: 'layout', layoutId: DEFAULT_LAYOUT_ID }),
+      currentActiveRoute: () => null,
+      session,
+      installSpace: ignoreInstalledSpace,
+      mintRouteId: () => ROUTE_ID,
+    });
+    const visibleNodes = [node(CARD_A, 10, 20)];
+    editor.getState().syncNodes(visibleNodes);
+
+    expect(editor.getState().connectCards(CARD_A, CARD_A, visibleNodes)).toBe(true);
+
+    const updatedLayout = session.getState().working.document.layouts?.[0];
+    expect(updatedLayout).toMatchObject({
+      id: DEFAULT_LAYOUT_ID,
+      activeRoute: ROUTE_ID,
+    });
+    expect(updatedLayout).not.toHaveProperty('routes');
+    await waitForSettled(session.getState, session.subscribe);
+    await expect(backend.loadSpace(SPACE_ID)).resolves.toMatchObject({ revision: 1n });
   });
 
   it.each(['graph', 'grid'] as const)(

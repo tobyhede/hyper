@@ -207,6 +207,7 @@ function deriveCompletedEdit(current: CurrentEditState): DerivedEdit | null {
     target.title,
     current.positions,
     activeRouteId,
+    connectionAlreadyAdded ? activeRouteId : null,
   );
   const snapshot =
     current.connection === null || activeRouteId === null || connectionAlreadyAdded

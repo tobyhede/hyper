@@ -17,15 +17,28 @@ export const snapshotFromSpace = (space: Space): SpaceSnapshot => ({
   })),
 });
 
-/** Fold a completed placement edit into a complete authoritative snapshot. */
+/**
+ * Fold a completed placement edit into a complete authoritative snapshot.
+ *
+ * A Route minted by this same Edit becomes visible in an existing explicit
+ * filter before it is named active. Ordinary edits pass no minted Route and
+ * preserve the Layout's authored filter exactly.
+ */
 export const updatePositionedLayout = (
   base: SpaceSnapshot,
   layoutId: UUID,
   title: string,
   positions: ReadonlyMap<string, LayoutPoint>,
   activeRouteId: RouteId | null,
+  mintedRouteId: RouteId | null = null,
 ): SpaceSnapshot => {
   const existing = (base.document.layouts ?? []).find((layout) => layout.id === layoutId);
+  const routes =
+    existing?.routes === undefined ||
+    mintedRouteId === null ||
+    existing.routes.includes(mintedRouteId)
+      ? existing?.routes
+      : [...existing.routes, mintedRouteId];
   const layout = {
     id: layoutId,
     title,
@@ -33,7 +46,7 @@ export const updatePositionedLayout = (
     positions: Object.fromEntries(
       [...positions].map(([id, point]) => [uuidSchema.parse(id), { x: point.x, y: point.y }]),
     ),
-    ...(existing?.routes ? { routes: existing.routes } : {}),
+    ...(routes !== undefined ? { routes } : {}),
     ...(activeRouteId !== null ? { activeRoute: activeRouteId } : {}),
   };
   const layouts = [...(base.document.layouts ?? [])];
