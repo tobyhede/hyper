@@ -57,6 +57,5 @@ headers.
 verify` passed 608 tests across 69 files with every typecheck, lint, formatting
 and coverage gate green; the final `pnpm e2e` run passed all 46 browser tests.
 The Vite configuration changed, so a running development server needs a
-human-initiated restart. Ticket 04 still owns deletion of the unused raw Node
-handler, its legacy test server and the remaining obsolete compatibility tests
-and build descriptions.
+human-initiated restart. Ticket 04 subsequently deleted the unused raw Node
+handler, its legacy test server and the remaining obsolete compatibility tests.

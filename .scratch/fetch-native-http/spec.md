@@ -1,6 +1,6 @@
 # Fetch-native HTTP application
 
-Status: ready-for-agent
+Status: built
 
 Decision: ADR 0034 — The HTTP application is Fetch-native.
 
@@ -8,16 +8,16 @@ Research: `.scratch/http-framework-research.md`.
 
 ## Problem Statement
 
-Hyper's browser persistence resources are currently implemented as a raw Node
-handler. That handler performs routing, response construction, request
+Hyper's browser persistence resources were implemented as a raw Node handler.
+That handler performed routing, response construction, request
 buffering, size enforcement, media-type recognition, UTF-8 decoding and stream
-drainage itself. Its `Promise<boolean>` return exists only to fall through to
+drainage itself. Its `Promise<boolean>` return existed only to fall through to
 Vite's Connect middleware.
 
-The implementation has already accumulated protocol gaps. It accepts a JSON
-media type with any declared charset and then decodes the bytes as UTF-8, and it
-does not define a policy for `Content-Encoding`. More importantly, the shape
-turns accidental prototype choices — Node 24 and a Vite-owned server — into
+That implementation accumulated protocol gaps. It accepted a JSON media type
+with any declared charset and then decoded the bytes as UTF-8, and it did not
+define a policy for `Content-Encoding`. More importantly, the shape turned
+accidental prototype choices — Node 24 and a Vite-owned server — into
 constraints on a module that should be portable.
 
 Hyper wants the broadest practical runtime surface, cross-runtime portability
@@ -27,7 +27,7 @@ HTTP framework.
 
 ## Solution
 
-Introduce a browser-safe `@project/http` package containing a Hono application
+The browser-safe `@project/http` package contains a Hono application
 and the browser's HTTP implementation of `SpaceBackend`. Its route module uses
 standard `Request`, `Response`, `Headers` and stream interfaces. It imports no
 Node, Vite, PostgreSQL or process-lifecycle modules.
@@ -143,14 +143,18 @@ dependency graph.
 
 ## Migration
 
-1. Land the portable Hono package and prove protocol parity through its Fetch
-   interface while the current Node handler still serves the application.
-2. Move `HttpSpaceBackend` behind the typed Hono client without weakening
+Completed in four vertical increments:
+
+1. The portable Hono package established protocol parity through its Fetch
+   interface.
+2. `HttpSpaceBackend` moved behind the typed Hono client without weakening
    runtime response validation or timeout behavior.
-3. Replace the raw Node/Vite handler composition with a concrete host adapter,
+3. The current Vite host moved to Hono's maintained Node adapter while
    preserving development, preview and isolated E2E behavior.
-4. Delete the old parser, boolean fallthrough interface and obsolete build or
-   plugin wiring once all callers use the Hono module.
+4. The old parser, boolean fallthrough interface, legacy test host and duplicate
+   compatibility suites were deleted. The Vite plugin and preview bundle remain
+   because they are the selected current Node composition, not portable route
+   machinery.
 
 ## Out of Scope
 

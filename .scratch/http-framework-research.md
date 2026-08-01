@@ -8,8 +8,8 @@ standard `Request`, `Response`, `Headers` and stream interfaces, with adapters
 for Node.js and runtime-native hosting on platforms including Bun, Deno,
 Cloudflare Workers, Fastly, Vercel and AWS Lambda.[^hono-web-standards]
 
-Vite/Connect hosting and Node 24 are current prototype wiring, not architectural
-decisions. They must not select the HTTP framework. Express was recommended in
+Vite/Connect hosting and Node 24 were prototype wiring, not architectural
+decisions. They did not select the HTTP framework. Express was recommended in
 an earlier version of this note because it fits Vite's internal Connect host;
 once that accidental constraint is removed, Express loses its decisive
 advantage. Fastify is attractive for a deliberately Node-owned production
@@ -105,8 +105,9 @@ make them so.
 
 ## HTTP body policy
 
-The existing handler manually performs routing, JSON media checks, buffering,
-UTF-8 decoding and response writing. That code contains concrete protocol gaps:
+The superseded prototype handler manually performed routing, JSON media checks,
+buffering, UTF-8 decoding and response writing. That code contained concrete
+protocol gaps:
 
 - it discards a declared charset and then always decodes bytes as UTF-8;
 - it ignores `Content-Encoding`, allowing compressed bytes to reach
@@ -142,9 +143,10 @@ interface and complement rather than replace those adapter tests.[^hono-testing]
 The intended relationship is:
 
 ```text
-Development
+Current development
   browser → Vite frontend server
-              └─ /api proxy → selected Hono runtime adapter
+              ├─ /api → Hono Node adapter
+              └─ other paths → Vite middleware
 
 Deployment A
   browser → runtime host
@@ -156,10 +158,10 @@ Deployment B
               └─ /api → separately deployed Hono application
 ```
 
-Vite remains the frontend build and development tool. `vite preview` is for
-local build preview and is explicitly not a production server.[^vite-preview]
-The current Vite plugin can be retired once equivalent development, preview and
-E2E composition exists through runtime adapters and proxying.
+Vite remains the current frontend build and development tool. `vite preview` is
+for local build preview and is explicitly not a production server.[^vite-preview]
+Its plugin is one concrete host composition and can be replaced without changing
+the Hono route module or typed browser backend.
 
 ## Alternatives
 
@@ -196,8 +198,8 @@ is intended to remove.
   to validate every value crossing the network.
 - Runtime-specific WebSocket, shutdown, logging sink and rate-limit storage code
   stays outside portable route modules.
-- The current Vite/Connect handler shape is migration input, not a compatibility
-  constraint.
+- The original Vite/Connect handler shape was migration input, not a
+  compatibility constraint.
 - Portability claims require contract tests across every supported adapter; an
   adapter is not supported merely because Hono publishes one.
 
