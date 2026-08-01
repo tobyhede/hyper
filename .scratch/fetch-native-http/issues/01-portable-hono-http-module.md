@@ -8,26 +8,45 @@ response construction inside the portable module.
 
 **Blocked by:** None — can start immediately.
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] The package exports `createSpaceHttpApp`, its inferred `SpaceHttpApp`
+- [x] The package exports `createSpaceHttpApp`, its inferred `SpaceHttpApp`
       type and the three-operation `SpaceResourceRepository` interface.
-- [ ] Existing PostgreSQL and E2E memory repositories satisfy the interface
+- [x] Existing PostgreSQL and E2E memory repositories satisfy the interface
       structurally; no pass-through repository adapter is added.
-- [ ] `GET /api/spaces`, `GET /api/spaces/:id` and
+- [x] `GET /api/spaces`, `GET /api/spaces/:id` and
       `PUT /api/spaces/:id` preserve repository result mapping.
-- [ ] Hono validation and maintained media parsing replace the raw Node body
+- [x] Hono validation and maintained media parsing replace the raw Node body
       reader and the hand-rolled `Content-Type` split.
-- [ ] The 1 MiB cap covers declared and streamed bodies and returns 413.
-- [ ] Only absent/UTF-8 JSON charset and identity/absent `Content-Encoding` are
+- [x] The 1 MiB cap covers declared and streamed bodies and returns 413.
+- [x] Only absent/UTF-8 JSON charset and identity/absent `Content-Encoding` are
       accepted; unsupported values return 415.
-- [ ] Invalid JSON and path/body id mismatch return 400; invalid snapshots
+- [x] Invalid JSON and path/body id mismatch return 400; invalid snapshots
       return 422; method rejection supplies the correct `Allow` header.
-- [ ] JSON responses are UTF-8, non-cacheable and do not expose repository
+- [x] JSON responses are UTF-8, non-cacheable and do not expose repository
       failure details.
-- [ ] `app.request()` tests exercise every status and header through the public
+- [x] `app.request()` tests exercise every status and header through the public
       factory, including repository failures and malformed input.
-- [ ] Package dependency rules prevent Node, Vite, PostgreSQL, app, React and
+- [x] Package dependency rules prevent Node, Vite, PostgreSQL, app, React and
       React Flow imports.
-- [ ] The old Node handler remains temporarily available only for cutover.
-- [ ] `pnpm verify` passes.
+- [x] The old Node handler remains temporarily available only for cutover.
+- [x] `pnpm verify` passes.
+
+## Answer
+
+Added the browser-safe `@project/http` workspace package. Its public
+`createSpaceHttpApp` factory exposes the complete `/api/spaces` resource tree
+through Hono's Fetch interface and exports the inferred `SpaceHttpApp` type plus
+the three-operation `SpaceResourceRepository` seam. Compile-time tests prove
+the existing PostgreSQL and E2E memory repositories satisfy that seam directly.
+
+The application uses Hono validation and body limiting with maintained
+`content-type` parsing. It enforces the 1 MiB declared and streamed body cap,
+UTF-8 JSON and identity encoding policies, explicit method metadata, stable
+repository result mappings, non-cacheable UTF-8 JSON responses and
+non-revealing logged 503s. Twenty-six `app.request()` cases cover every response
+status and required header without opening a socket. The old raw Node handler
+remains untouched for the later host cutover.
+
+Final verification passed: `pnpm verify` ran 581 tests across 66 files; root and
+all seven package typechecks, lint, formatting and coverage thresholds passed.

@@ -10,6 +10,7 @@ export default defineConfig({
     alias: {
       '@project/core': resolve('./packages/core/src/index.ts'),
       '@project/graph': resolve('./packages/graph/src/index.ts'),
+      '@project/http': resolve('./packages/http/src/index.ts'),
       '@project/persistence': resolve('./packages/persistence/src/index.ts'),
       '@project/react-flow-adapter': resolve('./packages/react-flow-adapter/src/index.ts'),
       '@project/ui': resolve('./packages/ui/src/index.ts'),

@@ -35,6 +35,7 @@
     "paths": {
       "@project/core": ["./packages/core/src/index.ts"],
       "@project/graph": ["./packages/graph/src/index.ts"],
+      "@project/http": ["./packages/http/src/index.ts"],
       "@project/persistence": ["./packages/persistence/src/index.ts"],
       "@project/react-flow-adapter": ["./packages/react-flow-adapter/src/index.ts"],
       "@project/ui": ["./packages/ui/src/index.ts"]

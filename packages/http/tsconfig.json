@@ -1,0 +1,10 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "paths": {
+      "@project/core": ["../core/src/index.ts"],
+      "@project/persistence": ["../persistence/src/index.ts"]
+    }
+  },
+  "include": ["src"]
+}

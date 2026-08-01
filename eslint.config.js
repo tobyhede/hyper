@@ -211,13 +211,48 @@ export default tseslint.config(
     },
   },
   {
-    files: ['packages/{core,graph,persistence}/**/*.{ts,tsx}'],
+    files: ['packages/{core,graph,http,persistence}/**/*.{ts,tsx}'],
     rules: {
       'no-restricted-imports': [
         'error',
         {
           paths: [...RENDER_ONLY, ...REACT],
           patterns: [ESCAPE_PATTERN, RENDER_ONLY_PATTERN, REACT_DOM_PATTERN],
+        },
+      ],
+    },
+  },
+  {
+    files: ['packages/http/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            ...RENDER_ONLY,
+            ...REACT,
+            { name: 'vite', message: '@project/http is independent of Vite hosts.' },
+            { name: '@project/app', message: '@project/http is independent of app composition.' },
+            { name: 'pg', message: '@project/http is independent of PostgreSQL.' },
+            { name: 'postgres', message: '@project/http is independent of PostgreSQL.' },
+          ],
+          patterns: [
+            ESCAPE_PATTERN,
+            RENDER_ONLY_PATTERN,
+            REACT_DOM_PATTERN,
+            {
+              group: ['node:*'],
+              message: '@project/http uses the portable Fetch interface, not Node APIs.',
+            },
+            {
+              group: ['vite/*', '@project/app/*'],
+              message: '@project/http is independent of Vite and app composition.',
+            },
+            {
+              group: ['@prisma-next/*'],
+              message: '@project/http depends on its repository interface, not PostgreSQL.',
+            },
+          ],
         },
       ],
     },
