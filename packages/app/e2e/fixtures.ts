@@ -53,7 +53,10 @@ export const test = base.extend<E2eFixtures>({
       root: appRoot,
       configFile,
       mode: testInfo.project.name === NEW_SPACE_PROJECT ? 'e2e-empty' : 'e2e-fixture',
-      server: { host: '127.0.0.1', port: 5276 + testInfo.workerIndex, strictPort: true },
+      // Away from the human's 5173/5174 and from the PostgreSQL suite's fixed
+      // 5276, which `strictPort` would otherwise turn into a hard failure for
+      // worker 0 whenever the two run at once.
+      server: { host: '127.0.0.1', port: 5300 + testInfo.workerIndex, strictPort: true },
     });
     try {
       await server.listen();

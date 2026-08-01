@@ -3,6 +3,7 @@ import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import { fileURLToPath } from 'node:url';
 import { spaceHttpPlugin } from './vite-space-http-plugin';
+import { workspaceAliases } from './workspace-aliases';
 
 export default defineConfig(({ mode }) => {
   const repositoryFile = (path: string): string => fileURLToPath(new URL(path, import.meta.url));
@@ -14,18 +15,7 @@ export default defineConfig(({ mode }) => {
       : repositoryFile('../../test/support/e2e-http-runtime.ts');
 
   return {
-    // Browser imports resolve through app dependencies, but the SSR runtime
-    // starts above this workspace in `src/`/`test/`, where pnpm intentionally
-    // exposes no @project symlinks. These three mappings are therefore the
-    // server module runner's package boundary, not a browser convenience.
-    resolve: {
-      alias: {
-        '@project/core': repositoryFile('../core/src/index.ts'),
-        '@project/graph': repositoryFile('../graph/src/index.ts'),
-        '@project/http': repositoryFile('../http/src/index.ts'),
-        '@project/persistence': repositoryFile('../persistence/src/index.ts'),
-      },
-    },
+    resolve: { alias: workspaceAliases() },
     plugins: [
       react(),
       tailwindcss(),

@@ -5,6 +5,7 @@ import { gridStrategy, type LayoutGraph, type LayoutStrategy } from '@project/gr
 import { canvasContent, usePlacementRendering } from '../src/placement-rendering';
 
 const CARD_A = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
+const CARD_B = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
 
 const graph: LayoutGraph = {
   cards: [{ id: CARD_A, width: 240, height: 140, ports: [] }],
@@ -73,6 +74,40 @@ describe('usePlacementRendering', () => {
     rerender({ strategy: pending });
 
     expect(result.current).toEqual({ kind: 'pending' });
+  });
+
+  it('makes a placement unavailable when the same strategy is handed a different graph', async () => {
+    // The strategy identity never changes here, so only the `input === graph`
+    // half of the freshness guard can hold the stale arrangement back.
+    const strategy = gridStrategy();
+    const nextGraph: LayoutGraph = {
+      cards: [
+        { id: CARD_A, width: 240, height: 140, ports: [] },
+        { id: CARD_B, width: 240, height: 140, ports: [] },
+      ],
+      edges: [],
+    };
+    const { result, rerender } = renderHook(
+      ({ input }) => usePlacementRendering(input, strategy, null),
+      { initialProps: { input: graph } },
+    );
+    await waitFor(() => expect(result.current.kind).toBe('ready'));
+
+    rerender({ input: nextGraph });
+
+    expect(result.current).toEqual({ kind: 'pending' });
+    await waitFor(() => expect(result.current.kind).toBe('ready'));
+    // Two 240-wide cards in a two-column grid with the default 80 gap.
+    expect(result.current).toEqual({
+      kind: 'ready',
+      graph: {
+        cards: [
+          { ...nextGraph.cards[0]!, x: 0, y: 0 },
+          { ...nextGraph.cards[1]!, x: 320, y: 0 },
+        ],
+        edges: [],
+      },
+    });
   });
 
   it('reports a rejected strategy as a visible failure state', async () => {
