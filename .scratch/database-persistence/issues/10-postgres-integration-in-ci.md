@@ -30,12 +30,21 @@ logs are added on failure, with both credential forms masked first, and an
 `always()` step stops Compose. The offline contract gate and database-free
 browser job remain unchanged and all three peer jobs can run concurrently.
 
-Verification on 2026-07-31:
+The gate found a real failure on its first two runs: `loadStoredSpace` gave up
+after five attempts with no pause between them, so a reader racing a steady
+writer was starved out by the aggregate-revision test. The read is now given a
+larger budget and a growing, jittered pause between attempts. Snapshot isolation
+would remove the race rather than survive it, but Prisma Next's `transaction`
+takes no isolation level and its transaction context exposes no raw SQL tag.
+
+Verification on 2026-08-01, against this branch rebased onto `main`. The earlier
+record read 63 files and 517 tests, which was accurate for the branch point and
+not for the 24 commits of canonical-export work `main` has gained since:
 
 - `actionlint .github/workflows/ci.yml`: passed.
-- `pnpm verify`: 63 files and 517 tests passed with coverage.
-- Isolated `pnpm test:integration:postgres`: 3 files and 32 tests passed after
-  applying both committed migrations to a fresh PostgreSQL database.
-- `prisma-next db verify`: the database marker and live schema matched the
-  emitted contract with no warnings or unclaimed objects.
-- The isolated PostgreSQL container was stopped after verification.
+- `pnpm verify`: 64 files and 545 tests passed with coverage, matching the
+  `verify` job on the same commit.
+- `pnpm test:integration:postgres` in the `postgres` job: 3 files and 34 tests
+  passed after applying the committed migrations to a fresh database.
+- `prisma-next db verify`: passed in the same job against the migrated database.
+- CI stops Compose through its `always()` step; no container is left running.

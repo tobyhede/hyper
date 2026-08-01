@@ -92,17 +92,17 @@ postgres:
   runs-on: ubuntu-latest
   timeout-minutes: 15
   steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       with: { persist-credentials: false }
-    - uses: pnpm/action-setup@v4
-    - uses: actions/setup-node@v4
+    - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
+    - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
       with:
         node-version-file: .node-version
         cache: pnpm
     - run: pnpm install --frozen-lockfile
 
     - name: Configure ephemeral PostgreSQL
-      id: postgres_env
+      id: postgres-env
       run: |
         password="$(openssl rand -hex 32)"
         database_url="postgresql://hyper_ci:${password}@127.0.0.1:55432/hyper_ci"
@@ -126,13 +126,19 @@ postgres:
       run: pnpm exec prisma-next db verify
 
     - name: Show PostgreSQL logs
-      if: failure() && steps.postgres_env.outcome == 'success'
-      run: docker compose logs postgres
+      if: failure() && steps.postgres-env.outcome == 'success'
+      run: docker compose logs --no-color postgres
 
     - name: Stop PostgreSQL
-      if: always() && steps.postgres_env.outcome == 'success'
+      if: always() && steps.postgres-env.outcome == 'success'
       run: pnpm postgres:down
 ```
+
+The sketch matches the shipped job, which remains the authority. Each action is
+pinned to the commit its `v4` tag named rather than the tag itself: this job
+holds a generated database password while it installs dependencies, so a
+repointed tag would be a credential exposure and not an abstract supply-chain
+concern.
 
 The generated hex password is URL-safe, never committed, and never passed as a
 command-line argument. GitHub documents that `add-mask` redacts a registered
