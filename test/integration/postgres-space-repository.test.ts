@@ -26,6 +26,12 @@ const CONCURRENT_SPACE_ID = uuidSchema.parse('99999999-9999-4999-8999-9999999999
 const MIXED_FIRST_CARD_ID = uuidSchema.parse('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
 const MIXED_SECOND_CARD_ID = uuidSchema.parse('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb');
 const UNRESOLVED_CARD_ID = uuidSchema.parse('cccccccc-cccc-4ccc-8ccc-cccccccccccc');
+const ORDERED_SPACE_ID = uuidSchema.parse('dddddddd-dddd-4ddd-8ddd-dddddddddddd');
+const ORDERED_CARD_IDS = [
+  uuidSchema.parse('eeeeeeee-1111-4eee-8eee-eeeeeeeeeeee'),
+  uuidSchema.parse('eeeeeeee-2222-4eee-8eee-eeeeeeeeeeee'),
+  uuidSchema.parse('eeeeeeee-3333-4eee-8eee-eeeeeeeeeeee'),
+] as const;
 
 const snapshot: SpaceSnapshot = {
   id: SPACE_ID,
@@ -280,6 +286,45 @@ describe('PostgresSpaceRepository', () => {
     };
 
     await Promise.all([writeRevisions(), ...Array.from({ length: 4 }, readRevisions)]);
+  });
+
+  it('returns cards in id order however they were stored', async () => {
+    // Card order is now the include aggregate's ORDER BY rather than a separate
+    // query's, so it needs pinning at the one place that can tell the
+    // difference: cards supplied in reverse id order. Every other fixture here
+    // supplies them already sorted, where an unordered aggregate would pass.
+    const [first, second, third] = ORDERED_CARD_IDS;
+    const card = (id: UUID, title: string) => ({
+      id,
+      document: { title, kind: 'markdown' as const, body: title },
+    });
+    const result = await repository.importSpaces([
+      {
+        id: ORDERED_SPACE_ID,
+        document: { version: 2, title: 'Ordered cards', routes: [] },
+        cards: [card(third, 'Third'), card(second, 'Second'), card(first, 'First')],
+      },
+    ]);
+    trackImported(result);
+    expect(result.kind).toBe('imported');
+    if (result.kind !== 'imported') throw new Error(result.message);
+
+    const order = (stored: StoredSpace) => ({
+      ids: stored.snapshot.cards.map((card) => card.id),
+      titles: stored.snapshot.cards.map((card) => card.document.title),
+    });
+    const ascending = { ids: [first, second, third], titles: ['First', 'Second', 'Third'] };
+
+    // Two reads, not one: the import result comes from the read-back inside the
+    // import transaction, and `loadSpace` is the same aggregate read outside
+    // one. Only asserting the second would leave the in-transaction path — the
+    // one place this read sees uncommitted rows — unordered and unnoticed.
+    expect(order(result.spaces[0]!)).toEqual(ascending);
+
+    const loaded = await repository.loadSpace(ORDERED_SPACE_ID);
+    expect(loaded).toBeDefined();
+    if (loaded === undefined) throw new Error('Imported space disappeared');
+    expect(order(loaded)).toEqual(ascending);
   });
 
   it('rejects a commit for an unknown space', async () => {

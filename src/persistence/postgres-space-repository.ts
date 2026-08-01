@@ -206,60 +206,33 @@ const resolveImport = (input: ImportSpace, reservedSpaceId: UUID): SpaceSnapshot
 };
 
 /**
- * How many times a read may lose its race with a writer before giving up.
- *
- * The read itself is sound at any budget: revisions only increase and a commit
- * writes the document and its cards in one transaction, so a revision that is
- * unchanged either side of the card read proves the pair belongs together.
- * What the budget decides is whether a reader competing with a steady writer
- * ever finishes, and five attempts with no pause between them did not — four
- * concurrent readers against fifty sequential commits exhausted it in CI.
+ * One statement, so one snapshot: PostgreSQL fixes it at statement start, and
+ * `include` compiles the child rows into a correlated aggregate rather than a
+ * second round trip. Other transactions still commit while this runs — they are
+ * simply not in the snapshot it reads from, so the document and its cards
+ * cannot come from either side of one. There is no torn read to detect and no
+ * revision comparison to make.
  */
-const LOAD_ATTEMPTS = 12;
+const loadStoredSpace = async (orm: Orm, id: UUID): Promise<StoredSpace | undefined> => {
+  const stored = await orm.public.Space.where({ id })
+    .include('cards', (cards) => cards.select('id', 'document').orderBy((card) => card.id.asc()))
+    .first();
+  if (stored === null) return undefined;
 
-/**
- * Retrying immediately puts the reader straight back into the window it just
- * lost. Pausing — for longer each time, and by an amount no other reader shares
- * — lets the writer's transaction commit and leaves a clean gap to read in.
- */
-const pauseBeforeRetry = (attempt: number): Promise<void> =>
-  new Promise<void>((resolve) => {
-    setTimeout(resolve, attempt + Math.random() * 4);
+  const snapshot = parseSnapshot({
+    id: stored.id,
+    document: spaceDocumentSchema.parse(stored.document),
+    cards: stored.cards.map((card) => ({
+      id: card.id,
+      document: cardDocumentSchema.parse(card.document),
+    })),
   });
 
-const loadStoredSpace = async (orm: Orm, id: UUID): Promise<StoredSpace | undefined> => {
-  for (let attempt = 0; attempt < LOAD_ATTEMPTS; attempt += 1) {
-    const before = await orm.public.Space.first({ id });
-    if (before === null) return undefined;
-
-    const cards = await orm.public.Card.where({ spaceId: id })
-      .orderBy((card) => card.id.asc())
-      .all();
-    const after = await orm.public.Space.first({ id });
-    if (after === null || toRevision(before.revision) !== toRevision(after.revision)) {
-      // Nothing follows the last attempt, so pausing after it only delays the
-      // failure the caller is already getting.
-      if (attempt < LOAD_ATTEMPTS - 1) await pauseBeforeRetry(attempt);
-      continue;
-    }
-
-    const snapshot = parseSnapshot({
-      id: after.id,
-      document: spaceDocumentSchema.parse(after.document),
-      cards: cards.map((card) => ({
-        id: card.id,
-        document: cardDocumentSchema.parse(card.document),
-      })),
-    });
-
-    return {
-      snapshot,
-      revision: toRevision(after.revision),
-      exportedRevision: toOptionalRevision(after.exportedRevision),
-    };
-  }
-
-  throw new Error(`Space ${id} changed repeatedly while loading`);
+  return {
+    snapshot,
+    revision: toRevision(stored.revision),
+    exportedRevision: toOptionalRevision(stored.exportedRevision),
+  };
 };
 
 const upsertCards = async (orm: Orm, snapshot: SpaceSnapshot): Promise<void> => {
@@ -361,10 +334,10 @@ export class PostgresSpaceRepository implements SpaceRepository {
             document: toJsonValue(accepted.document),
             revision: databaseRevision,
           });
-        // Reading the current aggregate is what the caller needs next, but it
-        // retries and pauses between attempts. Doing that here would hold this
-        // transaction's connection open across every one of those pauses, so
-        // the write ends and the read happens below.
+        // A stale write is reported, not resolved here. The conflict response
+        // needs the current aggregate, and reading it below rather than inside
+        // this callback both closes the write transaction first and answers
+        // from committed state.
         if (updated === null) return { kind: 'stale' };
 
         await upsertCards(orm, accepted);
@@ -480,6 +453,10 @@ export class PostgresSpaceRepository implements SpaceRepository {
 
           await importCards(orm, snapshot);
 
+          // The only read that runs inside a transaction, and it reads rows this
+          // transaction has just written and not yet committed. That is exactly
+          // what a transaction sees of its own work, and the aggregate is still
+          // one statement here.
           const stored = await loadStoredSpace(orm, snapshot.id);
           if (stored === undefined) {
             throw new Error(`Space ${snapshot.id} disappeared during import`);

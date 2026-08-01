@@ -32,10 +32,10 @@ browser job remain unchanged and all three peer jobs can run concurrently.
 
 The gate found a real failure on its first two runs: `loadStoredSpace` gave up
 after five attempts with no pause between them, so a reader racing a steady
-writer was starved out by the aggregate-revision test. The read is now given a
-larger budget and a growing, jittered pause between attempts. Snapshot isolation
-would remove the race rather than survive it, but Prisma Next's `transaction`
-takes no isolation level and its transaction context exposes no raw SQL tag.
+writer was starved out by the aggregate-revision test. That was first survived
+with a larger budget and a jittered pause, and is now removed outright — the
+read is a single statement, so there is no race left to lose. See
+`../consistent-aggregate-read-research.md`.
 
 Verification on 2026-08-01, against this branch rebased onto `main`. The earlier
 record read 63 files and 517 tests, which was accurate for the branch point and
