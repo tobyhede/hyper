@@ -243,7 +243,7 @@ export function createEditorStore(
 
     createConnectedCard: (from, cardId, position) => {
       const state = get();
-      if (state.nodes === null) return false;
+      if (state.nodes === null || !acceptsConnection(from, cardId)) return false;
       const positions = positionsForEdit(state.nodes, state.positions);
       positions.set(cardId, position);
       set({

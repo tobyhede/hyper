@@ -36,37 +36,52 @@ interface DerivedEdit {
   readonly activeRouteId: RouteId | null;
 }
 
-function nextLayoutTitle(snapshot: SpaceSnapshot): string {
+/**
+ * The neutral title a minted Layout, Route or Card takes: `<Prefix> N`, one past
+ * the highest N already worn by its kind. Titles that do not follow the form are
+ * not counted, so an authored title never pushes the numbering along.
+ */
+function nextSequentialTitle(prefix: string, titles: Iterable<string>): string {
+  const numbered = new RegExp(`^${prefix} ([1-9]\\d*)$`);
   let highest = 0n;
-  for (const layout of snapshot.document.layouts ?? []) {
-    const match = /^Layout ([1-9]\d*)$/.exec(layout.title);
+  for (const title of titles) {
+    const match = numbered.exec(title);
     if (match?.[1] === undefined) continue;
     const number = BigInt(match[1]);
     if (number > highest) highest = number;
   }
-  return `Layout ${highest + 1n}`;
+  return `${prefix} ${highest + 1n}`;
+}
+
+function nextLayoutTitle(snapshot: SpaceSnapshot): string {
+  return nextSequentialTitle(
+    'Layout',
+    (snapshot.document.layouts ?? []).map((layout) => layout.title),
+  );
 }
 
 function nextRouteTitle(snapshot: SpaceSnapshot): string {
-  let highest = 0n;
-  for (const route of snapshot.document.routes) {
-    const match = /^Route ([1-9]\d*)$/.exec(route.title);
-    if (match?.[1] === undefined) continue;
-    const number = BigInt(match[1]);
-    if (number > highest) highest = number;
-  }
-  return `Route ${highest + 1n}`;
+  return nextSequentialTitle(
+    'Route',
+    snapshot.document.routes.map((route) => route.title),
+  );
 }
 
 export function nextCardTitle(snapshot: SpaceSnapshot): string {
-  let highest = 0n;
-  for (const card of snapshot.cards) {
-    const match = /^Card ([1-9]\d*)$/.exec(card.document.title);
-    if (match?.[1] === undefined) continue;
-    const number = BigInt(match[1]);
-    if (number > highest) highest = number;
-  }
-  return `Card ${highest + 1n}`;
+  return nextSequentialTitle(
+    'Card',
+    snapshot.cards.map((card) => card.document.title),
+  );
+}
+
+/**
+ * A connection with no active Route is only ever a Space's first, which mints
+ * Route 1 to hold it. With Routes already authored, the app cannot choose one on
+ * the author's behalf. Both the live acceptance check and the derivation ask
+ * this, so a connection the graph accepted cannot fail the derivation.
+ */
+function connectsWithoutActiveRoute(snapshot: SpaceSnapshot): boolean {
+  return snapshot.document.routes.length === 0;
 }
 
 function targetForEdit(
@@ -152,7 +167,7 @@ function deriveCompletedEdit(current: CurrentEditState): DerivedEdit | null {
   let activeRouteId = current.activeRouteId;
   let connectionAlreadyAdded = false;
   if (current.connection !== null && activeRouteId === null) {
-    if (base.document.routes.length > 0) {
+    if (!connectsWithoutActiveRoute(base)) {
       throw new Error('A Space with Routes must have an active Route before connecting Cards.');
     }
     if (current.newRouteId === null || current.newRouteId === undefined) {
@@ -290,7 +305,7 @@ export function createPlacementEditor({
     },
     (from, to) => {
       const routeId = currentActiveRoute();
-      if (routeId === null) return session.getState().working.document.routes.length === 0;
+      if (routeId === null) return connectsWithoutActiveRoute(session.getState().working);
       return !inspectRouteEdge(session.getState().working, routeId, from, to).exists;
     },
   );

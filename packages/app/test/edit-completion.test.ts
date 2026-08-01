@@ -11,6 +11,7 @@ import { waitForSettled } from './session-fixtures';
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const CARD_A = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 const CARD_B = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
+const CREATED_CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
 const ROUTE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
 const MINTED_ROUTE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000008');
 const DEFAULT_LAYOUT_UUID = '00000000-0000-4000-8000-000000000021' as const;
@@ -72,6 +73,48 @@ describe('completed placement composition', () => {
   // once someone runs a single test in isolation.
   afterEach(() => {
     vi.restoreAllMocks();
+  });
+
+  it('rejects connections when the selected Layout shows no active Route', () => {
+    const filteredLayout: Layout = { ...defaultLayout, routes: [] };
+    const filteredSnapshot: SpaceSnapshot = {
+      ...positionedSnapshot,
+      document: {
+        ...positionedSnapshot.document,
+        layouts: [filteredLayout, otherLayout],
+      },
+    };
+    const loaded = { snapshot: filteredSnapshot, revision: 0n, exportedRevision: null };
+    const session = openSpaceSession(new MemorySpaceBackend([loaded]), loaded);
+    const viewChoice = createViewChoice({ kind: 'layout', layoutId: DEFAULT_LAYOUT_ID });
+    const initialPositions = layoutPositionMap(filteredLayout);
+    const editor = createPlacementEditor({
+      initialPositions,
+      viewChoice,
+      currentActiveRoute: () => null,
+      session,
+      installSpace: ignoreInstalledSpace,
+    });
+    editor.getState().syncNodes(projected);
+
+    expect(editor.getState().connectCards(CARD_B, CARD_A, projected)).toBe(false);
+    let createResult: boolean | undefined;
+    expect(() => {
+      createResult = editor
+        .getState()
+        .createConnectedCard(CARD_A, CREATED_CARD_ID, { x: 500, y: 300 });
+    }).not.toThrow();
+
+    expect(createResult).toBe(false);
+    expect(editor.getState()).toMatchObject({
+      positions: initialPositions,
+      completedConnection: null,
+    });
+    expect(session.getState()).toMatchObject({
+      acknowledgedRevision: 0n,
+      working: filteredSnapshot,
+    });
+    expect(viewChoice.current()).toEqual({ kind: 'layout', layoutId: DEFAULT_LAYOUT_ID });
   });
 
   it.each(['graph', 'grid'] as const)(

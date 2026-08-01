@@ -229,7 +229,7 @@ describe('completed connection composition', () => {
     const routeLess: SpaceSnapshot = {
       id: SPACE_ID,
       document: { version: 2, title: 'New space', routes: [] },
-      cards: [positionedSnapshot.cards[0]!],
+      cards: [{ id: CARD_A, document: { title: 'Card 1', kind: 'markdown', body: '' } }],
     };
     const loaded = { snapshot: routeLess, revision: 0n, exportedRevision: null };
     const session = openSpaceSession(new MemorySpaceBackend([loaded]), loaded);

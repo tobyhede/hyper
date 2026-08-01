@@ -33,6 +33,16 @@ export default defineConfig({
      * package boundary forbids.
      */
     environment: 'node',
+    /*
+     * Every spy is undone between tests.
+     *
+     * `vi.spyOn` mutates a shared global — `crypto.randomUUID` is the one this
+     * repo pins — and without this each spy outlived the test that set it. A
+     * test written after one that pinned the generator inherited a constant
+     * uuid and passed for a reason its author never chose. Both spy sites set
+     * theirs inside a test, so restoring between tests takes nothing away.
+     */
+    restoreMocks: true,
     environmentMatchGlobs: [['packages/*/test/**/*.tsx', 'jsdom']],
     setupFiles: ['./vitest.setup.ts'],
     include: ['packages/*/test/**/*.{test,spec}.{ts,tsx}', 'test/unit/**/*.{test,spec}.{ts,tsx}'],
