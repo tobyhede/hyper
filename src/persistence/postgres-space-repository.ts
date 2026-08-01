@@ -205,8 +205,30 @@ const resolveImport = (input: ImportSpace, reservedSpaceId: UUID): SpaceSnapshot
   });
 };
 
+/**
+ * How many times a read may lose its race with a writer before giving up.
+ *
+ * The read itself is sound at any budget: revisions only increase and a commit
+ * writes the document and its cards in one transaction, so a revision that is
+ * unchanged either side of the card read proves the pair belongs together.
+ * What the budget decides is whether a reader competing with a steady writer
+ * ever finishes, and five attempts with no pause between them did not — four
+ * concurrent readers against fifty sequential commits exhausted it in CI.
+ */
+const LOAD_ATTEMPTS = 12;
+
+/**
+ * Retrying immediately puts the reader straight back into the window it just
+ * lost. Pausing — for longer each time, and by an amount no other reader shares
+ * — lets the writer's transaction commit and leaves a clean gap to read in.
+ */
+const pauseBeforeRetry = (attempt: number): Promise<void> =>
+  new Promise<void>((resolve) => {
+    setTimeout(resolve, attempt + Math.random() * 4);
+  });
+
 const loadStoredSpace = async (orm: Orm, id: UUID): Promise<StoredSpace | undefined> => {
-  for (let attempt = 0; attempt < 5; attempt += 1) {
+  for (let attempt = 0; attempt < LOAD_ATTEMPTS; attempt += 1) {
     const before = await orm.public.Space.first({ id });
     if (before === null) return undefined;
 
@@ -214,8 +236,10 @@ const loadStoredSpace = async (orm: Orm, id: UUID): Promise<StoredSpace | undefi
       .orderBy((card) => card.id.asc())
       .all();
     const after = await orm.public.Space.first({ id });
-    if (after === null) continue;
-    if (toRevision(before.revision) !== toRevision(after.revision)) continue;
+    if (after === null || toRevision(before.revision) !== toRevision(after.revision)) {
+      await pauseBeforeRetry(attempt);
+      continue;
+    }
 
     const snapshot = parseSnapshot({
       id: after.id,
