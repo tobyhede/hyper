@@ -332,10 +332,10 @@ export class PostgresSpaceRepository implements SpaceRepository {
             document: toJsonValue(accepted.document),
             revision: databaseRevision,
           });
-        // Reading the current aggregate is what the caller needs next, but it
-        // retries and pauses between attempts. Doing that here would hold this
-        // transaction's connection open across every one of those pauses, so
-        // the write ends and the read happens below.
+        // A stale write is reported, not resolved here. The conflict response
+        // needs the current aggregate, and reading it below rather than inside
+        // this callback both closes the write transaction first and answers
+        // from committed state.
         if (updated === null) return { kind: 'stale' };
 
         await upsertCards(orm, accepted);

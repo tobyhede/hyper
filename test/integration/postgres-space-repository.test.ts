@@ -307,14 +307,24 @@ describe('PostgresSpaceRepository', () => {
     ]);
     trackImported(result);
     expect(result.kind).toBe('imported');
+    if (result.kind !== 'imported') throw new Error(result.message);
+
+    const order = (stored: StoredSpace) => ({
+      ids: stored.snapshot.cards.map((card) => card.id),
+      titles: stored.snapshot.cards.map((card) => card.document.title),
+    });
+    const ascending = { ids: [first, second, third], titles: ['First', 'Second', 'Third'] };
+
+    // Two reads, not one: the import result comes from the read-back inside the
+    // import transaction, and `loadSpace` is the same aggregate read outside
+    // one. Only asserting the second would leave the in-transaction path — the
+    // one place this read sees uncommitted rows — unordered and unnoticed.
+    expect(order(result.spaces[0]!)).toEqual(ascending);
 
     const loaded = await repository.loadSpace(ORDERED_SPACE_ID);
-    expect(loaded?.snapshot.cards.map((stored) => stored.id)).toEqual([first, second, third]);
-    expect(loaded?.snapshot.cards.map((stored) => stored.document.title)).toEqual([
-      'First',
-      'Second',
-      'Third',
-    ]);
+    expect(loaded).toBeDefined();
+    if (loaded === undefined) throw new Error('Imported space disappeared');
+    expect(order(loaded)).toEqual(ascending);
   });
 
   it('rejects a commit for an unknown space', async () => {
