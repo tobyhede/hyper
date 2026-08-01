@@ -86,4 +86,8 @@ The CLI-only canonical exporter is built: it writes deterministic, fully
 identified version 2 files through a validated staging directory, atomically
 replaces the destination's managed projection while preserving files outside
 discovery scope, and records the exact exported revision after replacement.
-PostgreSQL CI integration remains to be built.
+
+PostgreSQL CI integration is built: a dedicated peer job starts the pinned
+Compose service with generated masked credentials, applies the committed
+migration history, runs the complete integration suite and verifies the live
+database contract.

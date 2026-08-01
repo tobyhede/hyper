@@ -205,8 +205,30 @@ const resolveImport = (input: ImportSpace, reservedSpaceId: UUID): SpaceSnapshot
   });
 };
 
+/**
+ * How many times a read may lose its race with a writer before giving up.
+ *
+ * The read itself is sound at any budget: revisions only increase and a commit
+ * writes the document and its cards in one transaction, so a revision that is
+ * unchanged either side of the card read proves the pair belongs together.
+ * What the budget decides is whether a reader competing with a steady writer
+ * ever finishes, and five attempts with no pause between them did not — four
+ * concurrent readers against fifty sequential commits exhausted it in CI.
+ */
+const LOAD_ATTEMPTS = 12;
+
+/**
+ * Retrying immediately puts the reader straight back into the window it just
+ * lost. Pausing — for longer each time, and by an amount no other reader shares
+ * — lets the writer's transaction commit and leaves a clean gap to read in.
+ */
+const pauseBeforeRetry = (attempt: number): Promise<void> =>
+  new Promise<void>((resolve) => {
+    setTimeout(resolve, attempt + Math.random() * 4);
+  });
+
 const loadStoredSpace = async (orm: Orm, id: UUID): Promise<StoredSpace | undefined> => {
-  for (let attempt = 0; attempt < 5; attempt += 1) {
+  for (let attempt = 0; attempt < LOAD_ATTEMPTS; attempt += 1) {
     const before = await orm.public.Space.first({ id });
     if (before === null) return undefined;
 
@@ -214,8 +236,12 @@ const loadStoredSpace = async (orm: Orm, id: UUID): Promise<StoredSpace | undefi
       .orderBy((card) => card.id.asc())
       .all();
     const after = await orm.public.Space.first({ id });
-    if (after === null) continue;
-    if (toRevision(before.revision) !== toRevision(after.revision)) continue;
+    if (after === null || toRevision(before.revision) !== toRevision(after.revision)) {
+      // Nothing follows the last attempt, so pausing after it only delays the
+      // failure the caller is already getting.
+      if (attempt < LOAD_ATTEMPTS - 1) await pauseBeforeRetry(attempt);
+      continue;
+    }
 
     const snapshot = parseSnapshot({
       id: after.id,
@@ -326,25 +352,20 @@ export class PostgresSpaceRepository implements SpaceRepository {
     const revision = expectedRevision + 1n;
     const databaseRevision = toDatabaseRevision(revision);
 
+    let outcome: { kind: 'committed'; revision: bigint } | { kind: 'stale' };
     try {
-      return await this.#database.transaction(async ({ orm }) => {
+      outcome = await this.#database.transaction(async ({ orm }) => {
         const updated = await orm.public.Space.where({ id: accepted.id })
           .where({ revision: databaseExpectedRevision })
           .update({
             document: toJsonValue(accepted.document),
             revision: databaseRevision,
           });
-        if (updated === null) {
-          const current = await loadStoredSpace(orm, accepted.id);
-          if (current === undefined) {
-            return {
-              kind: 'rejected',
-              code: 'not-found',
-              message: `Space ${accepted.id} does not exist`,
-            };
-          }
-          return { kind: 'conflict', current };
-        }
+        // Reading the current aggregate is what the caller needs next, but it
+        // retries and pauses between attempts. Doing that here would hold this
+        // transaction's connection open across every one of those pauses, so
+        // the write ends and the read happens below.
+        if (updated === null) return { kind: 'stale' };
 
         await upsertCards(orm, accepted);
 
@@ -369,6 +390,18 @@ export class PostgresSpaceRepository implements SpaceRepository {
       }
       throw error;
     }
+
+    if (outcome.kind === 'committed') return outcome;
+
+    const current = await loadStoredSpace(this.#database.orm, accepted.id);
+    if (current === undefined) {
+      return {
+        kind: 'rejected',
+        code: 'not-found',
+        message: `Space ${accepted.id} does not exist`,
+      };
+    }
+    return { kind: 'conflict', current };
   }
 
   async importSpaces(

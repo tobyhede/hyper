@@ -22,7 +22,7 @@ Measured rate on the batch-import branch: 5 passes / 2 failures with local chang
 - [x] The three integration files no longer run concurrently against one database. `fileParallelism: false` in `vitest.integration.config.ts` is the smallest fix; a database-per-worker via `VITEST_WORKER_ID` is the alternative if the suite grows enough for serial execution to hurt.
 - [x] Whichever is chosen, a comment records *why* — truncation is global by design (ADR 0030's `--dangerous-truncate` deletes all Hyper content), so no amount of per-test fixture cleanup can make these files safe to interleave.
 - [x] The suite passes 10 consecutive runs. A single green run does not evidence a fix for a defect that already passes two runs in three.
-- [ ] Issue `10`'s CI gate is written against the corrected configuration. **Left open deliberately** — issue `10` is unbuilt, and this line is its acceptance criterion, not this issue's.
+- [x] Issue `10`'s CI gate is written against the corrected serial configuration.
 
 ## Answer
 
