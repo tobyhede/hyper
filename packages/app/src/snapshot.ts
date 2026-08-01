@@ -18,6 +18,24 @@ export const snapshotFromSpace = (space: Space): SpaceSnapshot => ({
 });
 
 /**
+ * The placement a completed Edit writes into one Layout.
+ *
+ * `activeRouteId` and `mintedRouteId` are both a `RouteId | null` and each
+ * lands somewhere different — the Layout's `activeRoute`, and its `routes`
+ * filter — so they are named rather than ordered. As positions they typechecked
+ * transposed, and a transposed call wrote both answers wrong in silence.
+ */
+export interface PositionedLayoutEdit {
+  readonly layoutId: UUID;
+  readonly title: string;
+  readonly positions: ReadonlyMap<string, LayoutPoint>;
+  /** The Route the Layout opens on. */
+  readonly activeRouteId: RouteId | null;
+  /** The Route this same Edit minted, if it minted one. */
+  readonly mintedRouteId?: RouteId | null;
+}
+
+/**
  * Fold a completed placement edit into a complete authoritative snapshot.
  *
  * A Route minted by this same Edit becomes visible in an existing explicit
@@ -26,11 +44,7 @@ export const snapshotFromSpace = (space: Space): SpaceSnapshot => ({
  */
 export const updatePositionedLayout = (
   base: SpaceSnapshot,
-  layoutId: UUID,
-  title: string,
-  positions: ReadonlyMap<string, LayoutPoint>,
-  activeRouteId: RouteId | null,
-  mintedRouteId: RouteId | null = null,
+  { layoutId, title, positions, activeRouteId, mintedRouteId = null }: PositionedLayoutEdit,
 ): SpaceSnapshot => {
   const existing = (base.document.layouts ?? []).find((layout) => layout.id === layoutId);
   const routes =
