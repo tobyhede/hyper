@@ -7,9 +7,9 @@ import {
 } from '@project/persistence';
 import { parse as parseContentType } from 'content-type';
 import { Hono } from 'hono';
+import { bodyLimit } from 'hono/body-limit';
 import { createMiddleware } from 'hono/factory';
 import { HTTPException } from 'hono/http-exception';
-import { bodyLimit } from 'hono/body-limit';
 import { validator } from 'hono/validator';
 
 export const MAX_COMMIT_BODY_BYTES = 1_048_576;
@@ -40,6 +40,120 @@ const defaultLogError = (message: string, error: unknown): void => {
   console.error(message, error);
 };
 
+const isOptionalWhitespace = (character: string): boolean =>
+  character === ' ' || character === '\t';
+
+const isTokenCharacter = (character: string): boolean =>
+  /^[!#$%&'*+.^_`|~0-9A-Za-z-]$/.test(character);
+
+const hasValidUniqueMediaTypeParameters = (value: string): boolean => {
+  let index = 0;
+  const skipWhitespace = (): void => {
+    while (index < value.length && isOptionalWhitespace(value.charAt(index))) {
+      index += 1;
+    }
+  };
+  const readToken = (): string => {
+    const start = index;
+    while (index < value.length && isTokenCharacter(value.charAt(index))) {
+      index += 1;
+    }
+    return value.slice(start, index);
+  };
+
+  skipWhitespace();
+  if (readToken() === '' || value[index] !== '/') {
+    return false;
+  }
+  index += 1;
+  if (readToken() === '') {
+    return false;
+  }
+  skipWhitespace();
+
+  const parameterNames = new Set<string>();
+  while (index < value.length) {
+    if (value[index] !== ';') {
+      return false;
+    }
+    index += 1;
+    skipWhitespace();
+    const parameterName = readToken().toLowerCase();
+    if (parameterName === '' || parameterNames.has(parameterName)) {
+      return false;
+    }
+    parameterNames.add(parameterName);
+    skipWhitespace();
+    if (value[index] !== '=') {
+      return false;
+    }
+    index += 1;
+    skipWhitespace();
+
+    if (value[index] === '"') {
+      index += 1;
+      let closed = false;
+      while (index < value.length) {
+        const code = value.charCodeAt(index);
+        if (code === 34) {
+          index += 1;
+          closed = true;
+          break;
+        }
+        if (code === 92) {
+          index += 1;
+          if (index >= value.length) {
+            return false;
+          }
+          const escapedCode = value.charCodeAt(index);
+          if (
+            escapedCode !== 9 &&
+            (escapedCode < 32 || (escapedCode > 126 && escapedCode < 128) || escapedCode > 255)
+          ) {
+            return false;
+          }
+          index += 1;
+          continue;
+        }
+        const isQuotedText =
+          code === 9 ||
+          code === 32 ||
+          code === 33 ||
+          (code >= 35 && code <= 91) ||
+          (code >= 93 && code <= 126) ||
+          (code >= 128 && code <= 255);
+        if (!isQuotedText) {
+          return false;
+        }
+        index += 1;
+      }
+      if (!closed) {
+        return false;
+      }
+    } else if (readToken() === '') {
+      return false;
+    }
+    skipWhitespace();
+  }
+  return true;
+};
+
+const requireBoundedCommitBody = createMiddleware(async (context, next) => {
+  const declaredLength = context.req.header('Content-Length');
+  if (declaredLength !== undefined && Number.parseInt(declaredLength, 10) > MAX_COMMIT_BODY_BYTES) {
+    return context.json({ message: `Request body exceeds ${MAX_COMMIT_BODY_BYTES} bytes` }, 413);
+  }
+
+  const headers = new Headers(context.req.raw.headers);
+  headers.delete('Content-Length');
+  context.req.raw = new Request(context.req.raw, { headers });
+  return bodyLimit({
+    maxSize: MAX_COMMIT_BODY_BYTES,
+    onError: (errorContext) =>
+      errorContext.json({ message: `Request body exceeds ${MAX_COMMIT_BODY_BYTES} bytes` }, 413),
+  })(context, next);
+});
+
 const requireSupportedRequestMedia = createMiddleware(async (context, next) => {
   const contentEncoding = context.req.header('Content-Encoding');
   if (contentEncoding !== undefined && contentEncoding.trim().toLowerCase() !== 'identity') {
@@ -47,6 +161,9 @@ const requireSupportedRequestMedia = createMiddleware(async (context, next) => {
   }
   const contentType = context.req.header('Content-Type');
   if (contentType === undefined) {
+    return context.json({ message: 'Content-Type must be application/json' }, 415);
+  }
+  if (!hasValidUniqueMediaTypeParameters(contentType)) {
     return context.json({ message: 'Content-Type must be application/json' }, 415);
   }
   let parsed: ReturnType<typeof parseContentType>;
@@ -119,11 +236,7 @@ export const createSpaceHttpApp = (
       '/api/spaces/:id',
       validateSpaceId,
       requireSupportedRequestMedia,
-      bodyLimit({
-        maxSize: MAX_COMMIT_BODY_BYTES,
-        onError: (context) =>
-          context.json({ message: `Request body exceeds ${MAX_COMMIT_BODY_BYTES} bytes` }, 413),
-      }),
+      requireBoundedCommitBody,
       validator('json', (value, context) => {
         try {
           return decodeCommitRequest(value);

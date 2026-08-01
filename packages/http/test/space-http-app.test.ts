@@ -203,6 +203,34 @@ describe('Space HTTP application', () => {
     });
   });
 
+  it('rejects duplicate charset parameters', async () => {
+    const response = await createSpaceHttpApp(repository()).request(`/api/spaces/${SPACE_ID}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json; charset=utf-8; charset=utf-16',
+      },
+      body: JSON.stringify(encodeCommitRequest(snapshot, 0n)),
+    });
+
+    expect(response.status).toBe(415);
+    await expect(response.json()).resolves.toEqual({
+      message: 'Content-Type must be application/json',
+    });
+  });
+
+  it('rejects a malformed charset parameter', async () => {
+    const response = await createSpaceHttpApp(repository()).request(`/api/spaces/${SPACE_ID}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json; charset="utf-8' },
+      body: JSON.stringify(encodeCommitRequest(snapshot, 0n)),
+    });
+
+    expect(response.status).toBe(415);
+    await expect(response.json()).resolves.toEqual({
+      message: 'Content-Type must be application/json',
+    });
+  });
+
   it('rejects compressed request bodies', async () => {
     const response = await createSpaceHttpApp(repository()).request(`/api/spaces/${SPACE_ID}`, {
       method: 'PUT',
@@ -246,6 +274,40 @@ describe('Space HTTP application', () => {
     await expect(response.json()).resolves.toEqual({
       message: 'Request body exceeds 1048576 bytes',
     });
+  });
+
+  it('rejects an actual body over 1 MiB when its declared length is understated', async () => {
+    let commitCalls = 0;
+    const oversizedSnapshot: SpaceSnapshot = {
+      ...snapshot,
+      cards: [
+        {
+          id: CARD_ID,
+          document: { title: 'A', kind: 'markdown', body: 'x'.repeat(1_048_576) },
+        },
+      ],
+    };
+    const response = await createSpaceHttpApp(
+      repository({
+        commitSpace: () => {
+          commitCalls += 1;
+          return Promise.resolve({ kind: 'committed', revision: 1n });
+        },
+      }),
+    ).request(`/api/spaces/${SPACE_ID}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Length': '1',
+      },
+      body: JSON.stringify(encodeCommitRequest(oversizedSnapshot, 0n)),
+    });
+
+    expect(response.status).toBe(413);
+    await expect(response.json()).resolves.toEqual({
+      message: 'Request body exceeds 1048576 bytes',
+    });
+    expect(commitCalls).toBe(0);
   });
 
   it('rejects an invalid path identity before inspecting the request body', async () => {
