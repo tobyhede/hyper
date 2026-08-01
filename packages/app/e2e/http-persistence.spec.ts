@@ -41,10 +41,16 @@ test('rapid edits commit in order and the latest position survives reload', asyn
 
   await dragBy(page, card, 0, 180);
   await firstObserved;
-  await expect.poll(() => navigationIsProtected(page)).toBe(true);
-  await dragBy(page, card, 120, 120);
-  expect(expectedRevisions).toEqual(['0']);
-  releaseFirst();
+  // The route handler is parked on `firstGate`, so anything that throws before
+  // the release leaves that commit — and the page — waiting until the test
+  // times out, reporting a hang instead of the assertion that actually failed.
+  try {
+    await expect.poll(() => navigationIsProtected(page)).toBe(true);
+    await dragBy(page, card, 120, 120);
+    expect(expectedRevisions).toEqual(['0']);
+  } finally {
+    releaseFirst();
+  }
 
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '2');
   await expect.poll(() => navigationIsProtected(page)).toBe(false);

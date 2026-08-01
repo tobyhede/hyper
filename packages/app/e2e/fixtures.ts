@@ -44,6 +44,10 @@ const configFile = fileURLToPath(new URL('../vite.config.ts', import.meta.url));
 const appRoot = fileURLToPath(new URL('..', import.meta.url));
 
 export const test = base.extend<E2eFixtures>({
+  // This fixture needs none of its peers, but the parameter cannot be dropped:
+  // Playwright rejects a first argument that is not a destructuring pattern,
+  // and `no-empty-pattern` rejects `{}`. Naming one and discarding it is what
+  // satisfies both.
   e2eServer: async ({ browserName: _browserName }, run, testInfo) => {
     const server = await createServer({
       root: appRoot,

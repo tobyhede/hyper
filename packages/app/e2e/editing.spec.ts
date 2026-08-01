@@ -126,6 +126,10 @@ test('connecting from Graph and Grid converts atomically without moving Cards', 
       await page.mouse.move(pane.x + 16, pane.y + 16);
       await page.mouse.up();
 
+      // Without settling first, "nothing changed" can pass simply because
+      // nothing has had time to change yet — the assertion would hold against a
+      // regression that converts the View one frame later.
+      await settled(page);
       await expect(persistence).toHaveAttribute('data-revision', String(index));
       await expect(page.getByTestId('layout-selector')).toContainText('None');
       expect(await allPositions(page)).toEqual(before);
@@ -394,6 +398,9 @@ test('drawing an existing Edge from an Algorithmic View does not convert or pers
     authoringHandle(target, 'target', 'left'),
   );
 
+  // Settle before asserting the Edge was refused, or the unchanged count is
+  // just the state before the gesture could have taken effect.
+  await settled(page);
   await expect(page.locator('.react-flow__edge')).toHaveCount(FIXTURE_EDGE_COUNT);
   await expect(persistence).toHaveAttribute('data-revision', '0');
   await expect(persistence).toHaveText('Persisted');
