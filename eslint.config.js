@@ -50,6 +50,69 @@ const REACT_DOM_PATTERN = {
 };
 
 /**
+ * Node builtins, barred from the portable Fetch module. `node:fs` and a bare
+ * `fs` are the same import, and ESLint matches specifiers literally, so a
+ * `node:*` group alone leaves the older spelling open — hence both a name list
+ * and the subpath groups built from it below.
+ *
+ * The compiler rejects these too: `tsconfig.base.json` sets `"types": []`, so
+ * `@types/node` is never loaded and a bare `fs` fails with TS2591. That message
+ * suggests *installing* the types, which is the opposite of what this package
+ * wants, and it only surfaces in the per-package typecheck — the usual reason
+ * both enforcement layers exist (AGENTS.md).
+ *
+ * The browserify shims published under these same bare names (`path`, `crypto`,
+ * `stream`, …) are Node's API surface too, so catching them is correct.
+ */
+const NODE_BUILTIN_NAMES = [
+  'assert',
+  'buffer',
+  'child_process',
+  'cluster',
+  'console',
+  'crypto',
+  'dgram',
+  'diagnostics_channel',
+  'dns',
+  'events',
+  'fs',
+  'http',
+  'http2',
+  'https',
+  'inspector',
+  'module',
+  'net',
+  'os',
+  'path',
+  'perf_hooks',
+  'process',
+  'punycode',
+  'querystring',
+  'readline',
+  'repl',
+  'stream',
+  'string_decoder',
+  'timers',
+  'tls',
+  'tty',
+  'url',
+  'util',
+  'v8',
+  'vm',
+  'worker_threads',
+  'zlib',
+];
+
+const NODE_MESSAGE = '@project/http uses the portable Fetch interface, not Node APIs.';
+
+const NODE_BUILTINS = NODE_BUILTIN_NAMES.map((name) => ({ name, message: NODE_MESSAGE }));
+
+const NODE_BUILTIN_PATTERN = {
+  group: ['node:*', ...NODE_BUILTIN_NAMES.map((name) => `${name}/*`)],
+  message: NODE_MESSAGE,
+};
+
+/**
  * The mirror of ESCAPE_PATTERN, for code *outside* `packages/`. Server code and
  * root-level tests reach a workspace package by `@project/*` like everything
  * else; a relative path into its `src/` resolves a module the package never
@@ -231,6 +294,7 @@ export default tseslint.config(
           paths: [
             ...RENDER_ONLY,
             ...REACT,
+            ...NODE_BUILTINS,
             { name: 'vite', message: '@project/http is independent of Vite hosts.' },
             { name: '@project/app', message: '@project/http is independent of app composition.' },
             { name: 'pg', message: '@project/http is independent of PostgreSQL.' },
@@ -240,10 +304,7 @@ export default tseslint.config(
             ESCAPE_PATTERN,
             RENDER_ONLY_PATTERN,
             REACT_DOM_PATTERN,
-            {
-              group: ['node:*'],
-              message: '@project/http uses the portable Fetch interface, not Node APIs.',
-            },
+            NODE_BUILTIN_PATTERN,
             {
               group: ['vite/*', '@project/app/*'],
               message: '@project/http is independent of Vite and app composition.',
