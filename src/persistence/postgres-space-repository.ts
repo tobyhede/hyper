@@ -451,6 +451,10 @@ export class PostgresSpaceRepository implements SpaceRepository {
 
           await importCards(orm, snapshot);
 
+          // The only read that runs inside a transaction, and it reads rows this
+          // transaction has just written and not yet committed. That is exactly
+          // what a transaction sees of its own work, and the aggregate is still
+          // one statement here.
           const stored = await loadStoredSpace(orm, snapshot.id);
           if (stored === undefined) {
             throw new Error(`Space ${snapshot.id} disappeared during import`);
