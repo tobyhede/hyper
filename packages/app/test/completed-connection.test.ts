@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { uuidSchema, type Layout, type SpaceSnapshot } from '@project/core';
-import {
-  completeExistingCardConnection,
-  completePositionedConnection,
-} from '../src/edit-completion';
+import { uuidSchema, type Layout, type SpaceSnapshot, type RouteId } from '@project/core';
+import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
+import { createPlacementEditor } from '../src/edit-completion';
+import { createViewChoice, layoutPositionMap } from '../src/view';
+import { node } from './editor-fixtures';
 
 /**
  * Composing one completed existing-Card connection into the next Space.
@@ -12,6 +12,11 @@ import {
  * half — the Edge a drag between two Cards authors. A Route may contain cycles
  * and self-edges (ADR 0032), so the only rejection is an exact duplicate Edge
  * within one Route, and that is an idempotent no-op rather than an error.
+ *
+ * Everything here drives `connectCards`, the same entry point the canvas uses.
+ * These cases previously called two exported helpers that no production code
+ * path reached, one of which appended the Edge without writing placement — so
+ * they were describing a composition the application never performed.
  */
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
@@ -24,27 +29,6 @@ const MISSING_CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000007')
 const DEFAULT_LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000021');
 const OTHER_LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000022');
 const MISSING_LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000023');
-
-const automaticSnapshot: SpaceSnapshot = {
-  id: SPACE_ID,
-  document: {
-    version: 2,
-    title: 'Space',
-    routes: [{ id: ROUTE_ID, title: 'Main', edges: [{ from: CARD_A, to: CARD_B }] }],
-    layouts: [
-      {
-        id: OTHER_LAYOUT_ID,
-        title: 'Layout 1',
-        kind: 'positioned',
-        positions: { [CARD_B]: { x: 900, y: 700 } },
-      },
-    ],
-  },
-  cards: [
-    { id: CARD_A, document: { title: 'A', kind: 'markdown', body: 'A' } },
-    { id: CARD_B, document: { title: 'B', kind: 'markdown', body: 'B' } },
-  ],
-};
 
 const defaultLayout: Layout = {
   id: DEFAULT_LAYOUT_ID,
@@ -59,13 +43,20 @@ const otherLayout: Layout = {
   kind: 'positioned',
   positions: { [CARD_B]: { x: 900, y: 700 } },
 };
+
 const positionedSnapshot: SpaceSnapshot = {
-  ...automaticSnapshot,
+  id: SPACE_ID,
   document: {
-    ...automaticSnapshot.document,
+    version: 2,
+    title: 'Space',
+    routes: [{ id: ROUTE_ID, title: 'Main', edges: [{ from: CARD_A, to: CARD_B }] }],
     layouts: [defaultLayout, otherLayout],
     defaultView: DEFAULT_LAYOUT_ID,
   },
+  cards: [
+    { id: CARD_A, document: { title: 'A', kind: 'markdown', body: 'A' } },
+    { id: CARD_B, document: { title: 'B', kind: 'markdown', body: 'B' } },
+  ],
 };
 
 /** A Space that carries no Layout at all — the normal hand-authored state (ADR 0025). */
@@ -74,87 +65,41 @@ const unlaidSnapshot: SpaceSnapshot = {
   document: {
     version: 2,
     title: 'Space',
-    routes: automaticSnapshot.document.routes,
+    routes: positionedSnapshot.document.routes,
   },
-  cards: automaticSnapshot.cards,
+  cards: positionedSnapshot.cards,
 };
 
+const projected = [node(CARD_A, 10, 20), node(CARD_B, 300, 20)];
+
+/**
+ * The canvas seam: a session over the given Space, a selected Layout, and an
+ * editor whose nodes are already on screen. `connect` is what a completed
+ * drag between two Cards calls.
+ */
+function connectingIn(
+  snapshot: SpaceSnapshot,
+  layoutId = DEFAULT_LAYOUT_ID,
+  activeRouteId: RouteId | null = ROUTE_ID,
+) {
+  const loaded = { snapshot, revision: 0n, exportedRevision: null };
+  const session = openSpaceSession(new MemorySpaceBackend([loaded]), loaded);
+  const layout = (snapshot.document.layouts ?? []).find((candidate) => candidate.id === layoutId);
+  const editor = createPlacementEditor({
+    initialPositions: layout === undefined ? null : layoutPositionMap(layout),
+    viewChoice: createViewChoice({ kind: 'layout', layoutId }),
+    currentActiveRoute: () => activeRouteId,
+    session,
+    installSpace: () => undefined,
+  });
+  editor.getState().syncNodes(projected);
+  return {
+    session,
+    connect: (from = CARD_A, to = CARD_B) => editor.getState().connectCards(from, to, projected),
+  };
+}
+
 describe('completed connection composition', () => {
-  it.each(['graph', 'grid'] as const)(
-    'converts the %s View and adds the Edge in one complete snapshot',
-    (view) => {
-      const positions = new Map([
-        [CARD_A, { x: 120, y: 240 }],
-        [CARD_B, { x: 480, y: 360 }],
-      ]);
-
-      const completed = completeExistingCardConnection(automaticSnapshot, {
-        renderer: { kind: 'view', view },
-        positions,
-        newLayoutId: DEFAULT_LAYOUT_ID,
-        routeId: ROUTE_ID,
-        from: CARD_B,
-        to: CARD_A,
-      });
-
-      expect(completed).toEqual({
-        layoutId: DEFAULT_LAYOUT_ID,
-        snapshot: {
-          ...automaticSnapshot,
-          document: {
-            ...automaticSnapshot.document,
-            routes: [
-              {
-                id: ROUTE_ID,
-                title: 'Main',
-                edges: [
-                  { from: CARD_A, to: CARD_B },
-                  { from: CARD_B, to: CARD_A },
-                ],
-              },
-            ],
-            layouts: [
-              automaticSnapshot.document.layouts?.[0],
-              {
-                id: DEFAULT_LAYOUT_ID,
-                title: 'Layout 2',
-                kind: 'positioned',
-                positions: {
-                  [CARD_A]: { x: 120, y: 240 },
-                  [CARD_B]: { x: 480, y: 360 },
-                },
-                activeRoute: ROUTE_ID,
-              },
-            ],
-            defaultView: DEFAULT_LAYOUT_ID,
-          },
-        },
-      });
-    },
-  );
-
-  it.each(['graph', 'grid'] as const)(
-    'leaves the %s View unchanged when its active Route already has the Edge',
-    (view) => {
-      const before = structuredClone(automaticSnapshot);
-
-      const completed = completeExistingCardConnection(automaticSnapshot, {
-        renderer: { kind: 'view', view },
-        positions: new Map([
-          [CARD_A, { x: 120, y: 240 }],
-          [CARD_B, { x: 480, y: 360 }],
-        ]),
-        newLayoutId: DEFAULT_LAYOUT_ID,
-        routeId: ROUTE_ID,
-        from: CARD_A,
-        to: CARD_B,
-      });
-
-      expect(completed).toBeNull();
-      expect(automaticSnapshot).toEqual(before);
-    },
-  );
-
   it('adds A → B to the active Route in a positioned Layout', () => {
     const base: SpaceSnapshot = {
       ...positionedSnapshot,
@@ -163,15 +108,11 @@ describe('completed connection composition', () => {
         routes: [{ id: ROUTE_ID, title: 'Main', edges: [{ from: CARD_B, to: CARD_B }] }],
       },
     };
+    const { session, connect } = connectingIn(base);
 
-    const completed = completePositionedConnection(base, {
-      layoutId: DEFAULT_LAYOUT_ID,
-      routeId: ROUTE_ID,
-      from: CARD_A,
-      to: CARD_B,
-    });
+    expect(connect()).toBe(true);
 
-    expect(completed).toEqual({
+    expect(session.getState().working).toEqual({
       ...base,
       document: {
         ...base.document,
@@ -192,17 +133,11 @@ describe('completed connection composition', () => {
   });
 
   it('returns no completed Edit for an Edge already in the active Route', () => {
-    const before = structuredClone(positionedSnapshot);
+    const { session, connect } = connectingIn(positionedSnapshot);
 
-    const completed = completePositionedConnection(positionedSnapshot, {
-      layoutId: DEFAULT_LAYOUT_ID,
-      routeId: ROUTE_ID,
-      from: CARD_A,
-      to: CARD_B,
-    });
+    expect(connect()).toBe(false);
 
-    expect(completed).toBeNull();
-    expect(positionedSnapshot).toEqual(before);
+    expect(session.getState().working).toEqual(positionedSnapshot);
   });
 
   it('allows the same Card pair on another visible Route', () => {
@@ -217,23 +152,16 @@ describe('completed connection composition', () => {
         layouts: [{ ...defaultLayout, routes: [ROUTE_ID, OTHER_ROUTE_ID] }, otherLayout],
       },
     };
+    const { session, connect } = connectingIn(base, DEFAULT_LAYOUT_ID, OTHER_ROUTE_ID);
 
-    const completed = completePositionedConnection(base, {
-      layoutId: DEFAULT_LAYOUT_ID,
-      routeId: OTHER_ROUTE_ID,
-      from: CARD_A,
-      to: CARD_B,
-    });
+    expect(connect()).toBe(true);
 
-    expect(completed?.document.routes).toEqual([
+    const document = session.getState().working.document;
+    expect(document.routes).toEqual([
       positionedSnapshot.document.routes[0],
-      {
-        id: OTHER_ROUTE_ID,
-        title: 'Alternative',
-        edges: [{ from: CARD_A, to: CARD_B }],
-      },
+      { id: OTHER_ROUTE_ID, title: 'Alternative', edges: [{ from: CARD_A, to: CARD_B }] },
     ]);
-    expect(completed?.document.layouts?.[0]).toEqual({
+    expect(document.layouts?.[0]).toEqual({
       ...defaultLayout,
       routes: [ROUTE_ID, OTHER_ROUTE_ID],
       activeRoute: OTHER_ROUTE_ID,
@@ -241,53 +169,39 @@ describe('completed connection composition', () => {
   });
 
   it('rejects a connection on a Route the Space does not have', () => {
-    expect(() =>
-      completePositionedConnection(positionedSnapshot, {
-        layoutId: DEFAULT_LAYOUT_ID,
-        routeId: MISSING_ROUTE_ID,
-        from: CARD_A,
-        to: CARD_B,
-      }),
-    ).toThrow(`The active Route ${MISSING_ROUTE_ID} does not exist.`);
+    const { connect } = connectingIn(positionedSnapshot, DEFAULT_LAYOUT_ID, MISSING_ROUTE_ID);
+
+    expect(() => connect()).toThrow(`The active Route ${MISSING_ROUTE_ID} does not exist.`);
   });
 
   it.each<[string, SpaceSnapshot]>([
     ['holds other Layouts', positionedSnapshot],
     ['holds no Layout at all', unlaidSnapshot],
   ])('rejects a connection into a Layout the Space does not have when it %s', (_case, base) => {
-    expect(() =>
-      completePositionedConnection(base, {
-        layoutId: MISSING_LAYOUT_ID,
-        routeId: ROUTE_ID,
-        from: CARD_B,
-        to: CARD_A,
-      }),
-    ).toThrow(`The selected Layout ${MISSING_LAYOUT_ID} does not exist.`);
+    const { connect } = connectingIn(base, MISSING_LAYOUT_ID);
+
+    expect(() => connect(CARD_B, CARD_A)).toThrow(
+      `The selected Layout ${MISSING_LAYOUT_ID} does not exist.`,
+    );
   });
 
   it('rejects a connection to a Card the Space does not hold, naming it', () => {
-    expect(() =>
-      completePositionedConnection(positionedSnapshot, {
-        layoutId: DEFAULT_LAYOUT_ID,
-        routeId: ROUTE_ID,
-        from: CARD_A,
-        to: MISSING_CARD_ID,
-      }),
-    ).toThrow(new RegExp(`Completed connection produced an invalid Space:.*${MISSING_CARD_ID}`));
+    const { connect } = connectingIn(positionedSnapshot);
+
+    expect(() => connect(CARD_A, MISSING_CARD_ID)).toThrow(
+      new RegExp(`EditCompleted was emitted for invalid editing state:.*${MISSING_CARD_ID}`),
+    );
   });
 
   it.each([
     ['cycle-closing', CARD_B, CARD_A],
     ['self', CARD_B, CARD_B],
   ])('accepts a %s Edge', (_kind, from, to) => {
-    const completed = completePositionedConnection(positionedSnapshot, {
-      layoutId: DEFAULT_LAYOUT_ID,
-      routeId: ROUTE_ID,
-      from,
-      to,
-    });
+    const { session, connect } = connectingIn(positionedSnapshot);
 
-    expect(completed?.document.routes[0]?.edges).toEqual([
+    expect(connect(from, to)).toBe(true);
+
+    expect(session.getState().working.document.routes[0]?.edges).toEqual([
       { from: CARD_A, to: CARD_B },
       { from, to },
     ]);

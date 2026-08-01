@@ -130,6 +130,23 @@ describe('HttpSpaceBackend failure classification', () => {
     });
   });
 
+  it('omits an unusable Retry-After rather than deriving a delay from it', async () => {
+    // The last case is why the header shares `CANONICAL_DECIMAL` with revision
+    // decoding: an arbitrarily long digit string is work `BigInt` has to do
+    // before any range check can reject what it produced.
+    const unusable = ['soon', '-1', '01', '1.5', '9'.repeat(19), '9'.repeat(4096)];
+    for (const value of unusable) {
+      await expect(
+        backendFor(
+          new Response(JSON.stringify({ message: 'Down' }), {
+            status: 503,
+            headers: { 'Retry-After': value },
+          }),
+        ).commitSpace(snapshot, 0n),
+      ).resolves.toEqual({ kind: 'retryable-failure', code: 'unavailable', message: 'Down' });
+    }
+  });
+
   it('rejects malformed success and conflict bodies as permanent protocol failures', async () => {
     for (const status of [200, 409]) {
       await expect(

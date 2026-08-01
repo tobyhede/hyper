@@ -1,10 +1,14 @@
 import { spaceSnapshotSchema, uuidSchema, type SpaceSnapshot } from '@project/core';
 import type { LoadedSpace, SpaceSummary } from './backend';
 
-// Bounded at 19 digits, the width of a PostgreSQL `bigint`, so a hostile body
-// cannot hand `BigInt` an arbitrarily long digit string to parse. Range is the
-// repository's business; this is only a bound on the work decoding will do.
-const canonicalRevision = /^(0|[1-9]\d{0,18})$/;
+/**
+ * A non-negative decimal with no leading zeros, bounded at 19 digits — the width
+ * of a PostgreSQL `bigint` — so a hostile peer cannot hand `BigInt` an
+ * arbitrarily long digit string to parse. Range is the caller's business; this
+ * is only a bound on the work parsing will do, which is why the `Retry-After`
+ * header in `http.ts` shares it despite being a different protocol concern.
+ */
+export const CANONICAL_DECIMAL = /^(0|[1-9]\d{0,18})$/;
 
 const exactRecord = (
   value: unknown,
@@ -24,7 +28,7 @@ const exactRecord = (
 };
 
 const decodeRevision = (value: unknown, label: string): bigint => {
-  if (typeof value !== 'string' || !canonicalRevision.test(value)) {
+  if (typeof value !== 'string' || !CANONICAL_DECIMAL.test(value)) {
     throw new Error(`${label} must be a canonical non-negative decimal string`);
   }
   return BigInt(value);

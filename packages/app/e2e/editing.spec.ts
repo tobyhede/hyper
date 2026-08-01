@@ -1,3 +1,4 @@
+import type { Page } from '@playwright/test';
 import { expect, test } from './fixtures';
 import {
   allPositions,
@@ -11,6 +12,23 @@ import {
   positionOf,
   settled,
 } from './graph';
+
+/**
+ * The barrier a *negative* assertion needs.
+ *
+ * `toHaveAttribute` and `toHaveText` retry, but they succeed on their first poll
+ * when the value already matches — so "the revision did not move" passes
+ * instantly and cannot see an edit that arrives a moment later. Only elapsed
+ * time makes it mean anything. `settled` is not that: it gates the camera, and
+ * the delay it happens to take is incidental to what it promises.
+ *
+ * A completed edit installs its snapshot synchronously and reaches the DOM
+ * within a frame or two, so this is generous against the case being ruled out.
+ */
+async function quiescent(page: Page): Promise<void> {
+  await settled(page);
+  await page.waitForTimeout(250);
+}
 
 /**
  * Dragging a card writes its placement into the Layout.
@@ -126,7 +144,9 @@ test('connecting from Graph and Grid converts atomically without moving Cards', 
       await page.mouse.move(pane.x + 16, pane.y + 16);
       await page.mouse.up();
 
+      await quiescent(page);
       await expect(persistence).toHaveAttribute('data-revision', String(index));
+      await expect(persistence).toHaveText('Persisted');
       await expect(page.getByTestId('layout-selector')).toContainText('None');
       expect(await allPositions(page)).toEqual(before);
 
@@ -394,6 +414,9 @@ test('drawing an existing Edge from an Algorithmic View does not convert or pers
     authoringHandle(target, 'target', 'left'),
   );
 
+  // The Edge was refused, so nothing here will ever announce itself — the
+  // assertions below are all negative and need the barrier to mean anything.
+  await quiescent(page);
   await expect(page.locator('.react-flow__edge')).toHaveCount(FIXTURE_EDGE_COUNT);
   await expect(persistence).toHaveAttribute('data-revision', '0');
   await expect(persistence).toHaveText('Persisted');
