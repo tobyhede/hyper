@@ -1,6 +1,7 @@
 import type { SpaceSnapshot, UUID } from '@project/core';
 import type { CommitResult, LoadedSpace, SpaceBackend, SpaceSummary } from './backend';
 import {
+  CANONICAL_DECIMAL,
   decodeCommittedRevision,
   decodeErrorMessage,
   decodeLoadedSpace,
@@ -144,7 +145,7 @@ const optionalErrorMessage = async (response: Response): Promise<string | undefi
 
 const retryAfterMilliseconds = (response: Response): number | undefined => {
   const value = response.headers.get('Retry-After');
-  if (value === null || !/^(0|[1-9]\d*)$/.test(value)) return undefined;
+  if (value === null || !CANONICAL_DECIMAL.test(value)) return undefined;
   const seconds = BigInt(value);
   if (seconds > BigInt(Number.MAX_SAFE_INTEGER) / 1000n) return undefined;
   return Number(seconds) * 1000;
