@@ -126,11 +126,15 @@ test('connecting from Graph and Grid converts atomically without moving Cards', 
       await page.mouse.move(pane.x + 16, pane.y + 16);
       await page.mouse.up();
 
-      // Without settling first, "nothing changed" can pass simply because
-      // nothing has had time to change yet — the assertion would hold against a
-      // regression that converts the View one frame later.
+      // `settled` gates the camera, not persistence, so it is here for a stable
+      // `allPositions` read. What makes "nothing changed" mean something is the
+      // revision and the status together: an edit installs its snapshot
+      // synchronously, so a leaked one is either still in flight — `Persisting…`
+      // — or already landed on the next revision. Asserting only one of the two
+      // leaves the other timing free to pass.
       await settled(page);
       await expect(persistence).toHaveAttribute('data-revision', String(index));
+      await expect(persistence).toHaveText('Persisted');
       await expect(page.getByTestId('layout-selector')).toContainText('None');
       expect(await allPositions(page)).toEqual(before);
 
@@ -398,8 +402,9 @@ test('drawing an existing Edge from an Algorithmic View does not convert or pers
     authoringHandle(target, 'target', 'left'),
   );
 
-  // Settle before asserting the Edge was refused, or the unchanged count is
-  // just the state before the gesture could have taken effect.
+  // `settled` is for a stable `allPositions` read. The refusal itself is pinned
+  // by the revision and `Persisted` below, which between them leave no timing
+  // where a leaked edit would go unnoticed.
   await settled(page);
   await expect(page.locator('.react-flow__edge')).toHaveCount(FIXTURE_EDGE_COUNT);
   await expect(persistence).toHaveAttribute('data-revision', '0');
