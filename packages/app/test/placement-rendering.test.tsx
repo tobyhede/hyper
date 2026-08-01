@@ -159,8 +159,12 @@ describe('usePlacementRendering', () => {
 describe('canvasContent', () => {
   const placed: LayoutGraph = { cards: [{ ...graph.cards[0]!, x: 0, y: 0 }], edges: [] };
 
-  it('draws the arrangement a ready placement produced', () => {
-    expect(canvasContent({ kind: 'ready', graph: placed }, false)).toEqual({ kind: 'arrangement' });
+  it('waits for the editor to take a ready placement before drawing it', () => {
+    // A resolved placement is not yet an arrangement on screen: `syncNodes`
+    // installs it, and drawing before that would hand React Flow a node array
+    // the editor store does not own — the one thing a controlled flow must not
+    // do, and the reason changes had to be filtered by ownership.
+    expect(canvasContent({ kind: 'ready', graph: placed }, false)).toEqual({ kind: 'placeholder' });
   });
 
   it('has nothing to draw before a first placement resolves', () => {

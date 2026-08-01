@@ -542,3 +542,88 @@ test('clicking a Card authoring handle neither opens the Card nor draws an Edge'
   await expect(page.locator('.react-flow__edge')).toHaveCount(FIXTURE_EDGE_COUNT);
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '0');
 });
+
+/**
+ * React Flow deletes on Backspace by default, and Hyper has no delete Edit.
+ *
+ * The graph is a projection of the authoritative Space. A default that removes a
+ * Card from the live node array without a completed Edit puts the canvas into a
+ * local, unpersisted state the Space never agreed to — and drops the Card's
+ * Edges on the floor, since no `onEdgesChange` receives them.
+ */
+test('Backspace with a Card selected removes nothing', async ({ page }) => {
+  await page.goto('/');
+  const card = nodeByTitle(page, 'A').first();
+  await expect(card).toBeVisible();
+  await expect(page.locator('.react-flow__edge-path').first()).toHaveAttribute('d', /L/);
+  await settled(page);
+
+  const cardBox = (await card.boundingBox())!;
+  await page.mouse.click(cardBox.x + cardBox.width / 2, cardBox.y + cardBox.height / 2);
+  await expect(card).toHaveClass(/selected/);
+  await page.getByTestId('close-card').click();
+  await expect(page.getByTestId('close-card')).toHaveCount(0);
+
+  await page.keyboard.press('Backspace');
+  await page.keyboard.press('Delete');
+
+  await expect(page.locator('.react-flow__node')).toHaveCount(FIXTURE_CARD_COUNT);
+  await expect(page.locator('.react-flow__edge')).toHaveCount(FIXTURE_EDGE_COUNT);
+  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '0');
+});
+
+/**
+ * React Flow's default assistive description offers a delete Hyper has not built.
+ *
+ * Sighted users never meet the claim; a screen reader reads it out as the way to
+ * work with a Card. The keyboard behaviour is inert either way — a removal is
+ * undone by the next projection sync — so the instruction is the whole defect.
+ */
+test('the graph does not advertise a delete action it does not implement', async ({ page }) => {
+  await page.goto('/');
+  await expect(nodeByTitle(page, 'A').first()).toBeVisible();
+
+  await expect(page.locator('[id^="react-flow__node-desc"]')).not.toContainText(/delete/i);
+  await expect(page.locator('[id^="react-flow__edge-desc"]')).not.toContainText(/delete/i);
+});
+
+/**
+ * A duplicate Edge is refused before release, not silently after it.
+ *
+ * The rule already existed — Edit completion drops a duplicate — but it ran only
+ * once the author let go, so a target that could not accept the Edge advertised
+ * itself as valid for the whole drag. React Flow asks `isValidConnection` during
+ * the gesture for exactly this, and drives the handle's own `valid` state from
+ * the answer.
+ */
+test('a duplicate Edge is marked invalid while the drag is still live', async ({ page }) => {
+  await page.goto('/');
+  const source = nodeByTitle(page, 'A').first();
+  await expect(source).toBeVisible();
+  await expect(page.locator('.react-flow__edge-path').first()).toHaveAttribute('d', /L/);
+  await settled(page);
+
+  const startDrag = async () => {
+    await source.hover();
+    const from = (await authoringHandle(source, 'source', 'right').boundingBox())!;
+    await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(from.x + from.width / 2 + 30, from.y + from.height / 2, { steps: 3 });
+  };
+  const dragOnto = async (title: string) => {
+    const handle = authoringHandle(nodeByTitle(page, title).first(), 'target', 'left');
+    const box = (await handle.boundingBox())!;
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2, { steps: 4 });
+    return handle;
+  };
+
+  // A→B is already an Edge of the active Route; A→E is not.
+  await startDrag();
+  await expect(await dragOnto('B')).not.toHaveClass(/valid/);
+  await page.mouse.up();
+  await expect(page.locator('.react-flow__edge')).toHaveCount(FIXTURE_EDGE_COUNT);
+
+  await startDrag();
+  await expect(await dragOnto('E')).toHaveClass(/valid/);
+  await page.mouse.up();
+});

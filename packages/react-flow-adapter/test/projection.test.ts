@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { buildCardHandles, buildRouteEdges, loadSpace, type Space } from '@project/graph';
+import {
+  buildCardHandles,
+  buildLayoutGraph,
+  buildRouteEdges,
+  loadSpace,
+  type Space,
+} from '@project/graph';
 import { projectCardNodes, projectRouteEdges, type RouteEmphasis } from '../src/index';
 import { aliasFile, cardFile } from './card-files';
 import { uuid } from './uuid';
@@ -404,5 +410,91 @@ describe('projectRouteEdges', () => {
       0,
     );
     expect(subtle.count).toBe(equal.count);
+  });
+});
+
+/**
+ * A Card declares an anchor for every Route, including ones it is not on, so an
+ * Edge completed onto it resolves in the render that first makes it incident.
+ *
+ * Those extra anchors have no DOM element, and React Flow picks the *closest*
+ * declared handle within its connection radius. If one ever landed on the same
+ * point as a visible authoring handle, a release near that point could resolve
+ * to an anchor that cannot accept it. The fallback spreads them evenly down the
+ * Card, so with an odd number of Routes the middle one sits at exactly half the
+ * height — where the Left and Right authoring handles are.
+ */
+describe('non-incident route anchors versus the authoring handles', () => {
+  const cardA = '00000000-0000-4000-8000-000000000002';
+  const cardB = '00000000-0000-4000-8000-000000000003';
+
+  const singleRouteSpace = load({
+    version: 2,
+    id: '00000000-0000-4000-8000-000000000001',
+    title: 'One route',
+    routes: [
+      {
+        id: '00000000-0000-4000-8000-000000000004',
+        title: 'Only',
+        edges: [{ from: cardA, to: cardA }],
+      },
+    ],
+  });
+
+  it('places a lone non-incident anchor exactly on the authoring handle centre', () => {
+    const handlesByCard = buildCardHandles(singleRouteSpace);
+    const cardIds = singleRouteSpace.cards.map((card) => card.id);
+    const layoutGraph = buildLayoutGraph(
+      cardIds,
+      handlesByCard,
+      buildRouteEdges(singleRouteSpace),
+      { width: 260, height: 146 },
+    );
+    const colors = { '00000000-0000-4000-8000-000000000004': '#6ea8fe' };
+    const nodes = projectCardNodes(singleRouteSpace, handlesByCard, colors, { layoutGraph });
+    const cardNode = nodes.find((node) => node.id === cardB);
+    if (cardNode === undefined) throw new Error('Card B should be projected');
+    const handles = cardNode.handles ?? [];
+
+    const leftAuthoring = handles.find((handle) => handle.id === 'authoring-target-left');
+    const routeAnchor = handles.find((handle) => handle.id?.endsWith('::in'));
+    if (leftAuthoring === undefined || routeAnchor === undefined) {
+      throw new Error('both a route anchor and a left authoring handle should be declared');
+    }
+
+    const centre = (handle: { x?: number; y?: number; width?: number; height?: number }) => ({
+      x: (handle.x ?? 0) + (handle.width ?? 0) / 2,
+      y: (handle.y ?? 0) + (handle.height ?? 0) / 2,
+    });
+
+    expect(centre(routeAnchor)).toEqual(centre(leftAuthoring));
+  });
+
+  it('declares the authoring handles before the route anchors', () => {
+    const handlesByCard = buildCardHandles(singleRouteSpace);
+    const cardIds = singleRouteSpace.cards.map((card) => card.id);
+    const layoutGraph = buildLayoutGraph(
+      cardIds,
+      handlesByCard,
+      buildRouteEdges(singleRouteSpace),
+      { width: 260, height: 146 },
+    );
+    const colors = { '00000000-0000-4000-8000-000000000004': '#6ea8fe' };
+    const nodes = projectCardNodes(singleRouteSpace, handlesByCard, colors, { layoutGraph });
+    const cardNode = nodes.find((node) => node.id === cardB);
+    if (cardNode === undefined) throw new Error('Card B should be projected');
+    const ids = (cardNode.handles ?? []).map((handle) => handle.id ?? '');
+
+    // React Flow resolves an exact distance tie by array order, preferring a
+    // handle of the opposite type — and both candidates here are targets. The
+    // authoring handle is the one with a DOM element behind it, so it has to come
+    // first or the release resolves to an anchor that cannot accept it.
+    const authoringIndices = ids.flatMap((id, index) =>
+      id.startsWith('authoring-') ? [index] : [],
+    );
+    const lastAuthoring = Math.max(...authoringIndices);
+    const firstAnchor = ids.findIndex((id) => id.endsWith('::in') || id.endsWith('::out'));
+    expect(authoringIndices).toHaveLength(8);
+    expect(firstAnchor).toBeGreaterThan(lastAuthoring);
   });
 });

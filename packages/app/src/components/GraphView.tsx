@@ -1,16 +1,18 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
 import {
   Background,
-  ConnectionMode,
   Controls,
   ReactFlow,
   ViewportPortal,
   useConnection,
   useReactFlow,
   useStore,
-  useViewport,
   type Edge,
+  type IsValidConnection,
+  type NodeMouseHandler,
   type OnConnect,
+  type OnConnectEnd,
+  type OnConnectStart,
   type OnNodesChange,
 } from '@xyflow/react';
 import type { Route } from '@project/core';
@@ -30,6 +32,41 @@ import { CARD_SIZE } from '../card';
  * The card fills the screen; this is the letterbox around it.
  */
 const PRESENTING_PADDING = 1.15;
+
+/**
+ * How the overview frames the graph, shared by the `fitView` prop and the camera.
+ *
+ * `maxZoom` caps the fit at natural size. Without it React Flow's default max of
+ * 2 applies, and a space with a single card — which is what a new space is (ADR
+ * 0018) — gets scaled to 2x and fills the screen. Padding does not help: it
+ * reserves margin, it does not cap zoom. The prop-driven first fit and the
+ * camera's own must agree, or the one-card space fits at 2x and is then animated
+ * back out.
+ */
+const OVERVIEW_FIT = { padding: 0.2, maxZoom: 1 } as const;
+
+/** Constant, so React Flow is not handed a new object on every render. */
+const PRO_OPTIONS = { hideAttribution: true } as const;
+
+/**
+ * What the graph tells assistive technology it can do — minus the delete.
+ *
+ * React Flow's defaults offer "Press delete to remove it" for both a node and an
+ * edge. Hyper has no delete Edit: the key is inert, because a removal applied to
+ * the live node array is undone by the next projection sync. Sighted users never
+ * meet the claim; a screen reader reads it out as the way to work with a Card.
+ *
+ * Both node keys are set because React Flow picks between them on
+ * `disableKeyboardA11y`, and the one it names `keyboardDisabled` is the one an
+ * ordinary keyboard-enabled graph gets.
+ */
+const ARIA_LABEL_CONFIG = {
+  'node.a11yDescription.default':
+    'Press enter or space to select a Card, the arrow keys to move it, and escape to cancel.',
+  'node.a11yDescription.keyboardDisabled':
+    'Press enter or space to select a Card, the arrow keys to move it, and escape to cancel.',
+  'edge.a11yDescription.default': 'Press enter or space to select an Edge, and escape to cancel.',
+} as const;
 
 /**
  * The empty canvas an Alt-drop may author a Card on: inside the renderer, clear
@@ -67,11 +104,7 @@ function OverviewCamera({ presenting }: { presenting: boolean }) {
 
   useEffect(() => {
     if (presenting) return;
-    // `maxZoom` caps the fit at natural size. Without it React Flow's default max
-    // of 2 applies, and a space with a single card — which is what a new space is
-    // (ADR 0018) — gets scaled to 2x and fills the screen. Padding does not help:
-    // it reserves margin, it does not cap zoom.
-    void fitView({ duration: 400, padding: 0.2, maxZoom: 1 });
+    void fitView({ ...OVERVIEW_FIT, duration: 400 });
   }, [presenting, fitView]);
 
   return null;
@@ -129,15 +162,24 @@ function PresentingCamera({ activeCardId }: { activeCardId: string | null }) {
   return null;
 }
 
-function NewCardPreview({ title, pointer }: { title: string; pointer: LayoutPoint | null }) {
-  const connection = useConnection();
-  const { screenToFlowPosition } = useReactFlow();
-  useViewport();
-  if (pointer === null || !connection.inProgress || connection.toNode !== null) return null;
-  const flowPointer = screenToFlowPosition(pointer);
+/**
+ * The Card an Alt-drop would author, drawn where it would land.
+ *
+ * The endpoint comes from `useConnection`, which converts it to flow coordinates
+ * before handing it over — so this needs no `screenToFlowPosition` and no
+ * viewport subscription to stay put under pan and zoom. Tracking the point in
+ * `GraphView`'s own state instead re-rendered the whole flow on every pointer
+ * frame of a connection.
+ */
+function NewCardPreview({ title, active }: { title: string; active: boolean }) {
+  const endpoint = useConnection((connection) => (connection.inProgress ? connection.to : null));
+  const overNode = useConnection(
+    (connection) => connection.inProgress && connection.toNode !== null,
+  );
+  if (!active || endpoint === null || overNode) return null;
   const position = {
-    x: flowPointer.x - CARD_SIZE.width / 2,
-    y: flowPointer.y - CARD_SIZE.height / 2,
+    x: endpoint.x - CARD_SIZE.width / 2,
+    y: endpoint.y - CARD_SIZE.height / 2,
   };
 
   return (
@@ -175,6 +217,12 @@ export interface GraphViewProps {
   onNodesChange: OnNodesChange<CardFlowNode>;
   /** A completed React Flow gesture; incomplete connection state stays local. */
   onConnect: OnConnect;
+  /**
+   * Whether an Edge between these two Cards is acceptable as things stand. Asked
+   * during the drag so a target that cannot take the Edge says so before the
+   * author lets go, and asked again by the editor on release.
+   */
+  acceptsConnection: (from: string, to: string) => boolean;
   /** Runs before React Flow clears its transient connection state. */
   onConnectEnd: () => void;
   /** Complete an explicit modifier empty-drop at the preview's top-left position. */
@@ -197,6 +245,7 @@ export function GraphView({
   editable,
   onNodesChange,
   onConnect,
+  acceptsConnection,
   onConnectEnd,
   onCreateConnectedCard,
   newCardTitle,
@@ -208,7 +257,9 @@ export function GraphView({
 }: GraphViewProps) {
   const connectionGesture = useRef(false);
   const [modifierCreatesCard, setModifierCreatesCard] = useState(false);
-  const [previewPointer, setPreviewPointer] = useState<LayoutPoint | null>(null);
+  // A boolean, not a point: React bails out of an unchanged state write, so a
+  // pointer moving across empty canvas no longer re-renders the flow per frame.
+  const [overEmptyCanvas, setOverEmptyCanvas] = useState(false);
   const { screenToFlowPosition } = useReactFlow();
 
   useEffect(() => {
@@ -225,6 +276,79 @@ export function GraphView({
     };
   }, []);
 
+  // Every handler and object below is memoized because React Flow's own docs
+  // carry a warning about it: props recreated each render can drive it into a
+  // re-render loop. `onMouseMove` is the hot one — it runs per pointer frame
+  // during a connection.
+  const isValidConnection = useCallback<IsValidConnection>(
+    (connection) => acceptsConnection(connection.source, connection.target),
+    [acceptsConnection],
+  );
+
+  const handleConnectStart = useCallback<OnConnectStart>((event) => {
+    connectionGesture.current = true;
+    setOverEmptyCanvas(false);
+    setModifierCreatesCard('altKey' in event && event.altKey);
+  }, []);
+
+  const handleConnectEnd = useCallback<OnConnectEnd>(
+    (event, connection) => {
+      const createsCard =
+        connection.fromNode !== null &&
+        connection.toNode === null &&
+        'altKey' in event &&
+        'clientX' in event &&
+        event.altKey &&
+        // Resolved from the point rather than read off the event: `event.target`
+        // is only the released-over element because `XYHandle` happens not to
+        // capture the pointer, which is an implementation detail rather than a
+        // documented guarantee. `elementFromPoint` is what React Flow itself
+        // uses to resolve a drop target.
+        isEmptyCanvasTarget(document.elementFromPoint(event.clientX, event.clientY));
+      if (createsCard) {
+        const pointer = screenToFlowPosition({ x: event.clientX, y: event.clientY });
+        onCreateConnectedCard(connection.fromNode.id, {
+          x: pointer.x - CARD_SIZE.width / 2,
+          y: pointer.y - CARD_SIZE.height / 2,
+        });
+      }
+      onConnectEnd();
+      setModifierCreatesCard(false);
+      setOverEmptyCanvas(false);
+      // React Flow dispatches the pointer-up node click after this callback.
+      // Keep the guard through that event, then restore ordinary card opening.
+      setTimeout(() => {
+        connectionGesture.current = false;
+      }, 0);
+    },
+    [screenToFlowPosition, onCreateConnectedCard, onConnectEnd],
+  );
+
+  // Clicking a card opens it to read — a gesture that belongs to the overview.
+  // While presenting the canvas is the presentation, so a click must not drop a
+  // reading panel over it.
+  const handleNodeClick = useCallback<NodeMouseHandler<CardFlowNode>>(
+    (_event, node) => {
+      if (!presenting && !connectionGesture.current) onOpenCard(node.id);
+    },
+    [presenting, onOpenCard],
+  );
+
+  const handleMouseMove = useCallback((event: MouseEvent<HTMLDivElement>) => {
+    if (!connectionGesture.current) return;
+    const empty = isEmptyCanvasTarget(event.target);
+    setOverEmptyCanvas(empty);
+    if (empty) setModifierCreatesCard(event.altKey);
+  }, []);
+
+  const connectionLineStyle = useMemo(
+    () => ({
+      stroke: activeRouteColor(colorByRouteId, activeRouteId),
+      strokeWidth: 3,
+    }),
+    [activeRouteId, colorByRouteId],
+  );
+
   return (
     <ReactFlow
       nodes={nodes}
@@ -233,71 +357,33 @@ export function GraphView({
       edgeTypes={edgeTypes}
       onNodesChange={onNodesChange}
       onConnect={onConnect}
-      onConnectStart={(event) => {
-        connectionGesture.current = true;
-        setPreviewPointer(null);
-        setModifierCreatesCard('altKey' in event && event.altKey);
-      }}
-      onConnectEnd={(event, connection) => {
-        const createsCard =
-          connection.fromNode !== null &&
-          connection.toNode === null &&
-          previewPointer !== null &&
-          'altKey' in event &&
-          'clientX' in event &&
-          event.altKey &&
-          isEmptyCanvasTarget(event.target);
-        if (createsCard) {
-          const sourceId = connection.fromNode.id;
-          const pointer = screenToFlowPosition({ x: event.clientX, y: event.clientY });
-          const position = {
-            x: pointer.x - CARD_SIZE.width / 2,
-            y: pointer.y - CARD_SIZE.height / 2,
-          };
-          onCreateConnectedCard(sourceId, position);
-          onConnectEnd();
-        } else {
-          onConnectEnd();
-        }
-        setModifierCreatesCard(false);
-        setPreviewPointer(null);
-        // React Flow dispatches the pointer-up node click after this callback.
-        // Keep the guard through that event, then restore ordinary card opening.
-        setTimeout(() => {
-          connectionGesture.current = false;
-        }, 0);
-      }}
-      // Clicking a card opens it to read — a gesture that belongs to the
-      // overview. While presenting the canvas is the presentation, so a click
-      // must not drop a reading panel over it.
-      onNodeClick={(_event, node) => {
-        if (!presenting && !connectionGesture.current) onOpenCard(node.id);
-      }}
+      isValidConnection={isValidConnection}
+      onConnectStart={handleConnectStart}
+      onConnectEnd={handleConnectEnd}
+      onNodeClick={handleNodeClick}
       fitView
+      fitViewOptions={OVERVIEW_FIT}
       // While presenting the arrow keys are the walk's, so React Flow must not
       // also read them as moving or selecting a node.
       nodesDraggable={editable && !presenting}
       nodesFocusable={!presenting}
       elementsSelectable={!presenting}
       nodesConnectable={editable && !presenting}
-      connectionMode={ConnectionMode.Loose}
-      connectionLineStyle={{
-        stroke: activeRouteColor(colorByRouteId, activeRouteId),
-        strokeWidth: 3,
-      }}
+      ariaLabelConfig={ARIA_LABEL_CONFIG}
+      // Deletion is not built. React Flow's default would apply a removal to the
+      // live node array with no completed Edit behind it — inert today only
+      // because the next projection sync restores the Card.
+      deleteKeyCode={null}
+      // No `connectionMode`: the default is Strict, and every legal drop here is
+      // already source-to-target. Loose only adds source-to-source, which the
+      // authoring handles refuse via `isConnectableEnd` and the route ports via
+      // `pointer-events: none` — so it advertised a capability the design forbids.
+      connectionLineStyle={connectionLineStyle}
       connectionLineComponent={RouteConnectionLine}
-      onMouseMove={(event) => {
-        if (!connectionGesture.current) return;
-        if (!isEmptyCanvasTarget(event.target)) {
-          setPreviewPointer(null);
-          return;
-        }
-        setPreviewPointer({ x: event.clientX, y: event.clientY });
-        setModifierCreatesCard(event.altKey);
-      }}
+      onMouseMove={handleMouseMove}
       edgesFocusable={false}
       minZoom={0.2}
-      proOptions={{ hideAttribution: true }}
+      proOptions={PRO_OPTIONS}
     >
       <Background gap={24} />
       <Controls showInteractive={false} />
@@ -311,7 +397,7 @@ export function GraphView({
       )}
       <OverviewCamera presenting={presenting} />
       <PresentingCamera activeCardId={activeCardId} />
-      <NewCardPreview title={newCardTitle} pointer={modifierCreatesCard ? previewPointer : null} />
+      <NewCardPreview title={newCardTitle} active={modifierCreatesCard && overEmptyCanvas} />
     </ReactFlow>
   );
 }

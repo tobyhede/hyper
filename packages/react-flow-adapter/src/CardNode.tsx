@@ -1,7 +1,7 @@
 import { Handle, Position, useConnection, type NodeProps } from '@xyflow/react';
 import { CardContent } from '@project/ui';
 import type { CardFlowNode, CardHandle } from './projection';
-import { AUTHORING_HANDLE_DIAMETER } from './authoring-handle';
+import { AUTHORING_HANDLE_DIAMETER, ROUTE_PORT_DIAMETER } from './authoring-handle';
 
 /**
  * React Flow custom node: a card's title, with one colored handle per route at
@@ -69,7 +69,13 @@ export function CardNode({ data, selected }: NodeProps<CardFlowNode>) {
       className="rf-card-node__port"
       aria-hidden="true"
       isConnectable={false}
-      style={{ top: handle.offsetY, background: handle.color, opacity: 0 }}
+      style={{
+        top: handle.offsetY,
+        width: ROUTE_PORT_DIAMETER,
+        height: ROUTE_PORT_DIAMETER,
+        background: handle.color,
+        opacity: 0,
+      }}
     />
   );
 

@@ -19,7 +19,7 @@ import {
   type LayoutPoint,
 } from '@project/graph';
 import type { OpenedSpace } from './space';
-import { createPlacementEditor, nextCardTitle } from './edit-completion';
+import { createConnectionPredicate, createPlacementEditor, nextCardTitle } from './edit-completion';
 import { canvasContent, usePlacementRendering } from './placement-rendering';
 import { activeRouteColor, ROUTE_PALETTE, routeColorMap } from './colors';
 import { CARD_HEIGHT, CARD_SIZE, cardSizeVars } from './card';
@@ -67,10 +67,22 @@ export const createApp = ({ space, spaceSession }: OpenedSpace, { acceptRemote }
   // when a route-less Space's first Edge and Route appear in the same render.
   // Until a successful connection uses it, this is runtime-only identity.
   const firstRouteId = space.routes.length === 0 ? newUuid() : null;
+  const currentActiveRoute = () => useSpaceStore.getState().activeRouteId;
+  // The same rule the editor applies on release, handed to React Flow so it can
+  // state a target's validity while the drag is still live.
+  const acceptsConnection = createConnectionPredicate(currentActiveRoute, spaceSession);
+  // React Flow knows node ids as plain strings, and asks this per pointer frame.
+  // An id that is not a Card identity is not a connection to accept — answering
+  // false is the honest reading, and a throw mid-drag would be the wrong one.
+  const acceptsGraphConnection = (from: string, to: string): boolean => {
+    const source = uuidSchema.safeParse(from);
+    const target = uuidSchema.safeParse(to);
+    return source.success && target.success && acceptsConnection(source.data, target.data);
+  };
   const useEditorStore = createPlacementEditor({
     initialPositions,
     viewChoice,
-    currentActiveRoute: () => useSpaceStore.getState().activeRouteId,
+    currentActiveRoute,
     session: spaceSession,
     installSpace: updateSpace,
     activateRoute: (routeId) => useSpaceStore.getState().activateRoute(routeId),
@@ -220,7 +232,6 @@ export const createApp = ({ space, spaceSession }: OpenedSpace, { acceptRemote }
     const liveNodes = useEditorStore((s) => s.nodes);
     const moved = useEditorStore((s) => s.moved);
     const changeNodes = useEditorStore((s) => s.changeNodes);
-    const nodes = liveNodes ?? projectedNodes;
     const canvas = canvasContent(placement, liveNodes !== null);
     // There is an arrangement to drag once the layout has resolved and the store
     // has taken it. Not a permission — every view is editable (ADR 0025) — and not
@@ -416,13 +427,14 @@ export const createApp = ({ space, spaceSession }: OpenedSpace, { acceptRemote }
           ) : canvas.kind === 'arrangement' ? (
             <ReactFlowProvider>
               <GraphView
-                nodes={nodes}
+                nodes={liveNodes ?? []}
                 edges={edges}
                 activeCardId={activeCardId}
                 presenting={presenting}
                 editable={editable}
                 onNodesChange={changeNodes}
                 onConnect={connectCards}
+                acceptsConnection={acceptsGraphConnection}
                 onConnectEnd={finishConnection}
                 onCreateConnectedCard={createConnectedCard}
                 newCardTitle={nextCardTitle(sessionState.working)}

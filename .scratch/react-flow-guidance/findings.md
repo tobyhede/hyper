@@ -81,7 +81,7 @@ Sixteen numbered warnings. The ones that bite an adapter like this one:
 - **#008 "Couldn't create edge for source/target handle id."** Fires when *"a handle is not found by its `id` property or if you haven't updated the node internals after adding or removing handles programmatically."*
 - **#010 "Handle: No node id found."** `<Handle />` used outside a custom node component.
 - **#013 "It seems that you haven't loaded the styles."** `@xyflow/react/dist/style.css` or `base.css` must be imported.
-- **#015** dragging a node without an `onNodesChange` handler. *(Not a risk here — `nodesDraggable={false}`.)*
+- **#015** dragging a node without an `onNodesChange` handler. *(Stale as written: cards are draggable now and `onNodesChange` is wired. See §7.)*
 
 **"Edges are not displaying correctly"** is the single most relevant subsection to this repo, and every bullet maps onto something the adapter does:
 
@@ -143,7 +143,7 @@ Directly relevant to a `strict` monorepo:
 
 ### 3.8 Controlled vs uncontrolled state — <https://reactflow.dev/learn/advanced-use/uncontrolled-flow> and <https://reactflow.dev/learn/advanced-use/state-management>
 
-- **Controlled**: pass `nodes`/`edges` + `onNodesChange`/`onEdgesChange`, applying changes with the exported `applyNodeChanges` / `applyEdgeChanges`. *"You need to implement these handlers for an interactive flow (if you are fine with just pan and zoom you don't need them)."* — which is precisely this repo's situation, so the absence of `onNodesChange` in `GraphView` is sanctioned, not an oversight, given `nodesDraggable={false}`.
+- **Controlled**: pass `nodes`/`edges` + `onNodesChange`/`onEdgesChange`, applying changes with the exported `applyNodeChanges` / `applyEdgeChanges`. *"You need to implement these handlers for an interactive flow (if you are fine with just pan and zoom you don't need them)."* — which is precisely this repo's situation. **Stale as written** — `onNodesChange` is wired and cards are draggable. `onEdgesChange` is still absent; see §7 for why that is not the defect it looks like.
 - **Uncontrolled**: `defaultNodes` / `defaultEdges`, state owned by React Flow.
 - The state-management guide is written around **Zustand** *"because React Flow already uses it internally"*, and demonstrates `useShallow` on the selector. Relevant given the app's Zustand store: the pattern is one selector returning a narrow object, wrapped in `useShallow`.
 
@@ -186,13 +186,13 @@ Not an SSR project, but this page documents a **public API that is directly inte
 
 ## 5. Actionable shortlist for `packages/react-flow-adapter`
 
-Ordered by how well-documented the rule is, not by urgency. None of these are bugs observed in this repo — they are documented rules with an exposure here.
+**Superseded on 2026-08-01 — see §7.** Items 1–5 are resolved or reversed; do not act on the list below without reading §7 first. Item 1 in particular is now the opposite of this repo's verified position.
 
-1. **`useUpdateNodeInternals` when handle geometry changes.** Docs name this as the cause of warning #008 and of edges attaching to the wrong handle. Handle `offsetY` changes on every ELK resolve. (§3.2, §3.3)
-2. **Type `RoutedEdge` with the `Edge<Data, Type>` generic** to remove the `data as RoutedEdgeData` cast. (§3.7)
-3. **`useCallback` the `onNodeClick` arrow in `GraphView`**, per the memoize-functions rule. (§3.1)
-4. **Consider `React.memo` on `CardNode` / `RoutedEdge`** if node/route counts grow — the perf guide names custom node/edge components explicitly. (§3.1)
-5. **Evaluate declaring `node.handles`** from ELK's port geometry as an alternative to (1). Documented under SSR; unproven for this use. (§3.10)
+1. ~~**`useUpdateNodeInternals` when handle geometry changes.**~~ **Reversed.** Declaring `node.handles` (item 5) was built instead, and adding the hook on top is a regression — see §7.
+2. ~~**Type `RoutedEdge` with the `Edge<Data, Type>` generic.**~~ Done.
+3. ~~**`useCallback` the `onNodeClick` arrow in `GraphView`.**~~ Done, along with every other handler on the element.
+4. **Consider `React.memo` on `CardNode` / `RoutedEdge`** — closed unless profiling says otherwise. The perf guide's rule is a disjunction (*"either memoized using `React.memo` **or** declared outside the parent component"*), and `nodeTypes`/`edgeTypes` are module-level constants, so it is already satisfied.
+5. ~~**Evaluate declaring `node.handles`.**~~ Done and proven — `projection.ts`, `declaredHandles`.
 6. **When agents work in this package, feed them `https://reactflow.dev/llms-full.txt`.** That is the whole of xyflow's official agent story. (§1, §2)
 
 ---
@@ -231,3 +231,37 @@ Secondary (linked *from* the primary docs; not independently verified):
 - <https://www.synergycodes.com/blog/guide-to-optimize-react-flow-project-performance>, <https://liambx.com/blog/tuning-edge-animations-reactflow-optimal-performance>, <https://www.youtube.com/watch?v=8M2qZ69iM20> — the three "Additional resources" the Performance guide links
 - <https://medium.com/swlh/routing-orthogonal-diagram-connectors-in-javascript-191dc2c5ff70> and <https://github.com/tisoap/react-flow-smart-edge> — the edge-routing suggestions
 - <https://eclipse.dev/elk/reference.html> — ELK's own Java reference, which the docs call your *"new best friend"* if you use elkjs
+
+---
+
+## 7. Reversals and resolutions — 2026-08-01
+
+Re-reviewed against the same primary source (`llms-full.txt`) plus the installed `@xyflow/react@12.11.2` / `@xyflow/system@0.0.79`. Everything here was checked against a running app, not only read.
+
+### 7.1 `useUpdateNodeInternals` — §3.2, §3.3 and item 1 are REVERSED
+
+The docs still say what §3.2/§3.3 quote. It is the wrong remedy **here**, and following item 1 would reintroduce the bug it claims to prevent.
+
+`projection.ts` declares `node.handles` from the strategy, and `parseHandles` in `@xyflow/system` builds `handleBounds` from those declarations without reading the DOM. The hook's forced path rebuilds them with `getHandleBounds`, which sees only anchors the DOM renders — dropping every not-yet-incident declaration, which is exactly what lets an Edge resolve in the render that first makes its target incident. Verified both ways against the fixture: with the hook, a second connection in one session fails with six #008 warnings; without it, it passes (`editing.spec.ts`).
+
+The invariant is narrower than "don't call the hook". React Flow forces remeasures itself — `useResizeObserver` builds every update with `force: true`, and `useNodeObserver` forces on a change to `type`, `sourcePosition` or `targetPosition`. Both are harmless only because the card box is pinned to `CARD_SIZE` and those two props are never set on a card node. **That** is the rule to preserve.
+
+### 7.2 Handle declaration order now matters
+
+A non-incident anchor's fallback offset is `((index + 1) / (routeIds.length + 1)) * height`. With one Route that is exactly half the height — where the Left and Right authoring handles sit. React Flow picks the closest declared handle within `connectionRadius` and breaks an exact tie by array order, so the anchors used to win, and an anchor with no DOM element behind it is refused. The authoring handles are declared first now (`projection.ts`, covered in `projection.test.ts`). Not reproducible on the fixture, which has four Routes and so no exact tie.
+
+### 7.3 Resolved since this document was written
+
+- `isValidConnection` is wired, so a duplicate Edge is refused during the drag rather than silently dropped on release.
+- `connectOnClick` was leaving a path armed that this design cannot complete, and a click on a handle opened the Card underneath. The handles now stop that click.
+- `deleteKeyCode={null}` plus an `ariaLabelConfig` override: React Flow's default assistive text offered "Press delete to remove it" for a delete Hyper has not built.
+- `connectionMode` is back to the default Strict. Loose only adds source-to-source, which this design refuses twice over.
+- The `fitView` prop now carries `fitViewOptions`, so the first fit and `OverviewCamera` agree on `maxZoom`.
+- Every handler and object prop on the element is memoized or module-level, per the perf guide's warning.
+- `NewCardPreview` reads its point from `useConnection` (already in flow coordinates) rather than from per-frame state in `GraphView`.
+
+### 7.4 Still open
+
+- `nodes` is fed from two sources (`liveNodes ?? projectedNodes` in `App.tsx`), because `canvasContent` reports `arrangement` before `syncNodes` has run. The ownership filter in `editor.ts` absorbs the consequence. The documented Zustand pattern has one source.
+- `projection.ts` writes `measured` onto projected nodes. The SSR page documents `width`/`height` as inputs and `measured` only as an output. It is load-bearing for the window above.
+- `onEdgesChange` is absent while `elementsSelectable` is true. Measured: an edge click does clear the Card selection — but so does a click on bare canvas, which is React Flow's documented pane behaviour, and the edge never actually reads as selected because the controlled `edges` prop wipes it. No user-visible defect; `selectable: false` on projected edges would make the intent explicit at zero behavioural cost.

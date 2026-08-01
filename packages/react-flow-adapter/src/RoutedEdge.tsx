@@ -1,4 +1,4 @@
-import { BaseEdge, getBezierPath, type EdgeProps } from '@xyflow/react';
+import { BaseEdge, getBezierPath, type Edge, type EdgeProps } from '@xyflow/react';
 import type { RouteId } from '@project/core';
 import type { LayoutPoint } from '@project/graph';
 
@@ -25,6 +25,12 @@ export type RoutedEdgeData = {
   points?: LayoutPoint[];
 };
 
+/**
+ * The edge as React Flow knows it. Naming the data and the type discriminant is
+ * what lets `EdgeProps` hand back a typed `data` instead of an `unknown` to cast.
+ */
+export type RoutedFlowEdge = Edge<RoutedEdgeData, 'routed'>;
+
 function polyline(points: LayoutPoint[]): string {
   return points.map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x} ${point.y}`).join(' ');
 }
@@ -40,8 +46,8 @@ export function RoutedEdge({
   targetX,
   targetY,
   targetPosition,
-}: EdgeProps) {
-  const points = (data as RoutedEdgeData | undefined)?.points;
+}: EdgeProps<RoutedFlowEdge>) {
+  const points = data?.points;
 
   const path =
     points && points.length >= 2

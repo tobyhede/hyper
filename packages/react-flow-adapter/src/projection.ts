@@ -13,7 +13,7 @@ import type {
   Space,
 } from '@project/graph';
 import type { RoutedEdgeData } from './RoutedEdge';
-import { AUTHORING_HANDLE_DIAMETER } from './authoring-handle';
+import { AUTHORING_HANDLE_DIAMETER, ROUTE_PORT_DIAMETER } from './authoring-handle';
 
 const FALLBACK_COLOR = '#8a94a6';
 const DEFAULT_NODE_HEIGHT = 300;
@@ -135,6 +135,7 @@ function declaredHandles(
   card: LayoutCard,
 ): NodeHandle[] {
   const radius = AUTHORING_HANDLE_DIAMETER / 2;
+  const portRadius = ROUTE_PORT_DIAMETER / 2;
   const authoring = (
     type: 'source' | 'target',
     side: Position,
@@ -161,31 +162,16 @@ function declaredHandles(
   // the bounds from `getHandleBounds`, which sees only the anchors the DOM draws
   // — and the not-yet-incident declarations, the whole point of the loop below,
   // are gone. `CardNode` records the same rule from the other side.
+  //
+  // Order matters, and the authoring handles come first. React Flow picks the
+  // closest declared handle within its connection radius and resolves an exact
+  // distance tie by array order. A non-incident anchor's fallback offset can land
+  // exactly on an authoring handle — with one Route it always does, since the
+  // lone anchor sits at half the Card's height and so do the Left and Right
+  // handles. The authoring handle is the one with a DOM element behind it, and a
+  // release that resolves to an anchor with none is refused, so the tie has to
+  // fall the other way.
   return [
-    ...routeIds.map((routeId, index): NodeHandle => {
-      const handle = targetByRoute.get(routeId);
-      return {
-        id: handle?.id ?? `${routeId}::in`,
-        type: 'target',
-        position: Position.Left,
-        x: -5.5,
-        y: (handle?.offsetY ?? fallbackOffset(index)) - 5.5,
-        width: 11,
-        height: 11,
-      };
-    }),
-    ...routeIds.map((routeId, index): NodeHandle => {
-      const handle = sourceByRoute.get(routeId);
-      return {
-        id: handle?.id ?? `${routeId}::out`,
-        type: 'source',
-        position: Position.Right,
-        x: card.width - 5.5,
-        y: (handle?.offsetY ?? fallbackOffset(index)) - 5.5,
-        width: 11,
-        height: 11,
-      };
-    }),
     authoring('source', Position.Top, card.width / 2 - radius, -radius),
     authoring('source', Position.Right, card.width - radius, card.height / 2 - radius),
     authoring('source', Position.Bottom, card.width / 2 - radius, card.height - radius),
@@ -194,6 +180,30 @@ function declaredHandles(
     authoring('target', Position.Right, card.width - radius, card.height / 2 - radius),
     authoring('target', Position.Bottom, card.width / 2 - radius, card.height - radius),
     authoring('target', Position.Left, -radius, card.height / 2 - radius),
+    ...routeIds.map((routeId, index): NodeHandle => {
+      const handle = targetByRoute.get(routeId);
+      return {
+        id: handle?.id ?? `${routeId}::in`,
+        type: 'target',
+        position: Position.Left,
+        x: -portRadius,
+        y: (handle?.offsetY ?? fallbackOffset(index)) - portRadius,
+        width: ROUTE_PORT_DIAMETER,
+        height: ROUTE_PORT_DIAMETER,
+      };
+    }),
+    ...routeIds.map((routeId, index): NodeHandle => {
+      const handle = sourceByRoute.get(routeId);
+      return {
+        id: handle?.id ?? `${routeId}::out`,
+        type: 'source',
+        position: Position.Right,
+        x: card.width - portRadius,
+        y: (handle?.offsetY ?? fallbackOffset(index)) - portRadius,
+        width: ROUTE_PORT_DIAMETER,
+        height: ROUTE_PORT_DIAMETER,
+      };
+    }),
   ];
 }
 
@@ -242,11 +252,19 @@ export function projectCardNodes(
       // reasoned about — no measure-then-reflow, and a centred `nodeOrigin` (if a
       // view chooses one) resolves correctly on first paint. Absent before the
       // layout resolves, so React Flow falls back to measuring, as before.
+      //
+      // `measured` is deliberately *not* set alongside them. React Flow documents
+      // it as an output it writes after measuring, and it is redundant as an
+      // input: `nodeHasDimensions` reads `measured?.width ?? width ?? initialWidth`,
+      // so width/height already answer it, and a Card counts as initialized on
+      // those plus its declared `handles`. What supplying it would change is that
+      // React Flow preserves cached `handleBounds` instead of resetting them for
+      // re-measure — a distinction with no meaning here, because the bounds come
+      // from `declaredHandles` either way.
       ...(cardLayout
         ? {
             width: cardLayout.width,
             height: cardLayout.height,
-            measured: { width: cardLayout.width, height: cardLayout.height },
           }
         : {}),
       ...(cardLayout

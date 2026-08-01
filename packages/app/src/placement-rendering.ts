@@ -31,7 +31,7 @@ export function canvasContent(
   hasArrangement: boolean,
 ): CanvasContent {
   if (placement.kind === 'failed') return { kind: 'failure', error: placement.error };
-  if (placement.kind === 'ready' || hasArrangement) return { kind: 'arrangement' };
+  if (hasArrangement) return { kind: 'arrangement' };
   return { kind: 'placeholder' };
 }
 

@@ -224,6 +224,26 @@ function deriveCompletedEdit(current: CurrentEditState): DerivedEdit | null {
   return { snapshot, layoutId: target.layoutId, space: loaded.space, activeRouteId };
 }
 
+/**
+ * Whether the graph may accept this Edge as things currently stand.
+ *
+ * One predicate, asked in two places for two different reasons: React Flow asks
+ * it *during* the drag to state the target's validity, and the editor asks it
+ * again on release to decide whether a completed Edit happened at all. Deriving
+ * both from the same function is what keeps a target that reads as valid from
+ * quietly doing nothing when the author lets go.
+ */
+export function createConnectionPredicate(
+  currentActiveRoute: () => RouteId | null,
+  session: SpaceSession,
+): (from: CardId, to: CardId) => boolean {
+  return (from, to) => {
+    const routeId = currentActiveRoute();
+    if (routeId === null) return connectsWithoutActiveRoute(session.getState().working);
+    return !inspectRouteEdge(session.getState().working, routeId, from, to).exists;
+  };
+}
+
 export function createPlacementEditor({
   initialPositions,
   viewChoice,
@@ -303,11 +323,7 @@ export function createPlacementEditor({
         completing = false;
       }
     },
-    (from, to) => {
-      const routeId = currentActiveRoute();
-      if (routeId === null) return connectsWithoutActiveRoute(session.getState().working);
-      return !inspectRouteEdge(session.getState().working, routeId, from, to).exists;
-    },
+    createConnectionPredicate(currentActiveRoute, session),
   );
   return editor;
 }

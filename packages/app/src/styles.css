@@ -220,16 +220,14 @@ body {
 }
 
 /* Per-route ports, positioned by ELK's computed offset (inline `top`). React
-   Flow handles the left/right edge placement and vertical centering. */
-.rf-card-node__port.react-flow__handle {
-  width: 11px;
-  height: 11px;
-  border: 1px solid #0b0d11;
-}
+   Flow handles the left/right edge placement and vertical centering, and the
+   size is declared alongside the handle bounds in `authoring-handle.ts` so the
+   two cannot drift.
 
-/* Existing Edge attachment geometry stays measurable for React Flow but is not
+   Existing Edge attachment geometry stays measurable for React Flow but is not
    presented as an authoring control (ADR 0033). */
 .rf-card-node__port.react-flow__handle {
+  border: 1px solid #0b0d11;
   pointer-events: none;
 }
 
@@ -498,76 +496,6 @@ body {
 .controls__btn--exit {
   margin-left: 0.5rem;
   border-color: #7f1d1d;
-}
-
-/* ---- ELK multiple-handles demo ---- */
-.elk-demo {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-}
-
-.elk-demo__bar {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  padding: 0.6rem 1rem;
-  background: var(--panel);
-  border-bottom: 1px solid var(--border);
-}
-
-.elk-demo__caption {
-  font-size: 0.85rem;
-  color: var(--muted);
-}
-
-.elk-demo__canvas {
-  position: relative;
-  flex: 1;
-  min-height: 0;
-}
-
-.react-flow__node-elk {
-  width: 150px;
-  padding: 0.6rem 0.75rem;
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  color: var(--text);
-  font-size: 0.85rem;
-  text-align: center;
-}
-
-.react-flow__node-elk .label {
-  pointer-events: none;
-}
-
-.react-flow__node-elk .handles {
-  position: absolute;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-around;
-}
-
-.react-flow__node-elk .handles.sources {
-  right: 0;
-  top: 0;
-  height: 100%;
-  transform: translate(50%, 0);
-}
-
-.react-flow__node-elk .handles.targets {
-  left: 0;
-  top: 0;
-  height: 100%;
-  transform: translate(-50%, 0);
-}
-
-.react-flow__node-elk .handles .react-flow__handle {
-  position: relative;
-  top: 0;
-  left: 0;
-  transform: none;
 }
 
 /* ---- Opened card ---- */
