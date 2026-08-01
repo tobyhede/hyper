@@ -206,7 +206,7 @@ is intended to remove.
 [^hono-validation]: [Hono validation](https://hono.dev/docs/guides/validation)
 [^hono-app]: [Hono application interface](https://hono.dev/docs/api/hono)
 [^hono-body-limit]: [Hono body-limit middleware](https://hono.dev/docs/middleware/builtin/body-limit)
-[^hono-body-limit-source]: [Hono body-limit source](https://github.com/honojs/hono/blob/main/src/middleware/body-limit/index.ts)
+[^hono-body-limit-source]: [Hono body-limit source (v4.12.33)](https://github.com/honojs/hono/blob/v4.12.33/src/middleware/body-limit/index.ts)
 [^hono-testing]: [Hono testing with `app.request`](https://hono.dev/docs/guides/testing#request-and-response)
 [^hono-auth]: [Hono bearer-auth middleware](https://hono.dev/docs/middleware/builtin/bearer-auth)
 [^hono-websocket]: [Hono WebSocket helper and runtime adapters](https://hono.dev/docs/helpers/websocket)
