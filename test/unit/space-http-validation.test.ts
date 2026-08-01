@@ -1,5 +1,10 @@
-import { Agent, type IncomingMessage, type ServerResponse } from 'node:http';
-import { describe, expect, it } from 'vitest';
+import {
+  Agent,
+  request as httpRequest,
+  type IncomingMessage,
+  type ServerResponse,
+} from 'node:http';
+import { describe, expect, it, vi } from 'vitest';
 import { uuidSchema, type SpaceSnapshot } from '@project/core';
 import { encodeCommitRequest } from '@project/persistence';
 import { createSpaceHttpHandler, MAX_COMMIT_BODY_BYTES } from '../../src/http/space-http-handler';
@@ -157,6 +162,44 @@ describe('Space HTTP request validation', () => {
       expect(repository.commitAttempts).toBe(1);
     } finally {
       agent.destroy();
+      await server.close();
+    }
+  });
+
+  it('settles the body read when a client disconnects part way through one', async () => {
+    // A half-sent body is the one path where nothing further arrives to end the
+    // stream. If the read never settles, the handler's promise never resolves
+    // and the connection's work is retained for the process's lifetime rather
+    // than failing — which reads as a working server until enough of them pile
+    // up. Asserting the settlement, not the status, is the point: the client is
+    // already gone and will never see a response.
+    const repository = new E2eMemorySpaceRepository([stored]);
+    const handler = createSpaceHttpHandler(repository);
+    const settled: string[] = [];
+    const server = await startHttpServer(async (request, response) => {
+      try {
+        return await handler(request, response);
+      } finally {
+        settled.push(request.url ?? '');
+      }
+    });
+    try {
+      await new Promise<void>((resolve) => {
+        const aborted = httpRequest(new URL(`/api/spaces/${SPACE_ID}`, server.url), {
+          method: 'PUT',
+          headers: { ...validHeaders, 'content-length': String(Buffer.byteLength(validBody)) },
+        });
+        // Destroying only once the server has the head and a first chunk leaves
+        // the read waiting on bytes that never come.
+        aborted.on('error', () => resolve());
+        aborted.on('close', () => resolve());
+        aborted.write(validBody.slice(0, 8), () => aborted.destroy());
+      });
+      await vi.waitFor(() => expect(settled).toEqual([`/api/spaces/${SPACE_ID}`]), {
+        timeout: 2_000,
+      });
+      expect(repository.commitAttempts).toBe(0);
+    } finally {
       await server.close();
     }
   });

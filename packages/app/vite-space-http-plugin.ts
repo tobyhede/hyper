@@ -1,4 +1,5 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
+import { pathToFileURL } from 'node:url';
 import { getRequestListener } from '@hono/node-server';
 import type { Plugin } from 'vite';
 
@@ -18,7 +19,11 @@ export interface SpaceHttpPluginOptions {
   loadPreviewModule?: (modulePath: string) => Promise<unknown>;
 }
 
-const defaultPreviewLoader = async (modulePath: string): Promise<unknown> => import(modulePath);
+// `previewModule` is a filesystem path, and `import()` takes a module specifier.
+// The two only coincide for tame POSIX paths: a `#` would start a URL fragment
+// and a Windows drive letter reads as a scheme, so the conversion is explicit.
+const defaultPreviewLoader = async (modulePath: string): Promise<unknown> =>
+  import(pathToFileURL(modulePath).href);
 
 type Next = (error?: unknown) => void;
 
