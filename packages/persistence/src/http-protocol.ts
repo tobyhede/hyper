@@ -42,7 +42,13 @@ const decodeRevision = (value: unknown, label: string): bigint => {
 const decodeNullableRevision = (value: unknown): bigint | null =>
   value === null ? null : decodeRevision(value, 'exportedRevision');
 
-export const encodeLoadedSpace = (loaded: LoadedSpace): unknown => ({
+export interface LoadedSpaceJson {
+  snapshot: SpaceSnapshot;
+  revision: string;
+  exportedRevision: string | null;
+}
+
+export const encodeLoadedSpace = (loaded: LoadedSpace): LoadedSpaceJson => ({
   snapshot: loaded.snapshot,
   revision: loaded.revision.toString(),
   exportedRevision: loaded.exportedRevision?.toString() ?? null,

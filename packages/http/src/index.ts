@@ -96,7 +96,7 @@ export const createSpaceHttpApp = (
     })
     .get('/api/spaces', async (context) => {
       try {
-        return context.json(await repository.listSpaces());
+        return context.json(await repository.listSpaces(), 200);
       } catch (error) {
         logError('Failed to list spaces', error);
         return context.json({ message: 'Persistence service unavailable' }, 503);
@@ -109,7 +109,7 @@ export const createSpaceHttpApp = (
         if (loaded === undefined) {
           return context.json({ message: `Space ${id} does not exist` }, 404);
         }
-        return context.json(encodeLoadedSpace(loaded));
+        return context.json(encodeLoadedSpace(loaded), 200);
       } catch (error) {
         logError(`Failed to load space ${id}`, error);
         return context.json({ message: 'Persistence service unavailable' }, 503);
@@ -143,7 +143,7 @@ export const createSpaceHttpApp = (
         try {
           const result = await repository.commitSpace(commit.snapshot, commit.expectedRevision);
           if (result.kind === 'committed') {
-            return context.json({ revision: result.revision.toString() });
+            return context.json({ revision: result.revision.toString() }, 200);
           }
           if (result.kind === 'conflict') {
             return context.json(encodeLoadedSpace(result.current), 409);

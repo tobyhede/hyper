@@ -45,8 +45,11 @@ The application uses Hono validation and body limiting with maintained
 UTF-8 JSON and identity encoding policies, explicit method metadata, stable
 repository result mappings, non-cacheable UTF-8 JSON responses and
 non-revealing logged 503s. Twenty-six `app.request()` cases cover every response
-status and required header without opening a socket. The old raw Node handler
-remains untouched for the later host cutover.
+status and required header without opening a socket. A compile-time Hono RPC
+contract test proves that both a successful load and a commit conflict expose
+the concrete `LoadedSpaceJson` wire shape rather than `unknown`; explicit 200
+statuses keep that response distinct from the 409 branch during inference. The
+old raw Node handler remains untouched for the later host cutover.
 
-Final verification passed: `pnpm verify` ran 581 tests across 66 files; root and
+Final verification passed: `pnpm verify` ran 582 tests across 67 files; root and
 all seven package typechecks, lint, formatting and coverage thresholds passed.
