@@ -152,14 +152,14 @@ export function createSpaceStore(space: Space, initialActiveRouteId: RouteId | n
     },
 
     retreat: () => {
-      const { mode, activeRouteId, walk } = get();
+      const { space, mode, activeRouteId, walk } = get();
       if (mode !== 'presenting' || walk.length < 2) return;
       const back = walk.slice(0, -1);
       const from = back[back.length - 1];
       const to = walk[walk.length - 1];
       // Re-select the edge just walked back over, so going forward again returns
       // where you were rather than to whichever branch happens to be first.
-      const taken = outgoingEdgesFrom(get().space, activeRouteId, from).findIndex(
+      const taken = outgoingEdgesFrom(space, activeRouteId, from).findIndex(
         (edge) => edge.to === to,
       );
       set({ walk: back, branchIndex: taken < 0 ? 0 : taken });

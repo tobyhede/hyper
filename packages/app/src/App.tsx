@@ -432,7 +432,12 @@ export const createApp = ({ space, spaceSession }: OpenedSpace, { acceptRemote }
             <div className="placement-status" role="alert" data-testid="placement-failure">
               <div className="placement-status__panel">
                 <h2>Unable to arrange this view</h2>
-                <pre>{canvas.error.message}</pre>
+                {/* The panel bounds this at 40vh and scrolls it, so it needs to
+                    take focus or a keyboard-only reader cannot reach the rest
+                    of a long failure. Focusable scroll regions need a name. */}
+                <pre tabIndex={0} aria-label="Placement failure detail">
+                  {canvas.error.message}
+                </pre>
               </div>
             </div>
           ) : canvas.kind === 'arrangement' ? (

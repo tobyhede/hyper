@@ -156,3 +156,37 @@ it('preserves authored view scope and unrelated layouts while replacing placemen
   expect(changed.document.layouts?.[0]?.routes).toEqual(['00000000-0000-4000-8000-000000000004']);
   expect(changed.cards).toEqual(snapshot.cards);
 });
+
+/**
+ * `activeRoute` is authored, like the `routes` filter beside it, and the app has
+ * no surface for clearing one. An Edit completed with no active Route therefore
+ * has nothing to say about it, and must leave what the author wrote alone rather
+ * than read its own silence as an instruction to erase.
+ */
+it('leaves an authored active Route alone when the Edit names none', () => {
+  const withActiveRoute = spaceSnapshotSchema.parse({
+    ...snapshot,
+    document: {
+      ...snapshot.document,
+      layouts: [
+        {
+          id: '00000000-0000-4000-8000-000000000021',
+          title: 'Layout',
+          kind: 'positioned',
+          positions: {},
+          activeRoute: '00000000-0000-4000-8000-000000000004',
+        },
+      ],
+    },
+  });
+
+  const changed = updatePositionedLayout(withActiveRoute, {
+    layoutId: uuidSchema.parse('00000000-0000-4000-8000-000000000021'),
+    title: 'Layout',
+    positions: new Map([['00000000-0000-4000-8000-000000000002', { x: 5, y: 6 }]]),
+    activeRouteId: null,
+  });
+
+  expect(changed.document.layouts?.[0]?.activeRoute).toBe('00000000-0000-4000-8000-000000000004');
+  expect(loadSpaceSnapshot(changed).ok).toBe(true);
+});

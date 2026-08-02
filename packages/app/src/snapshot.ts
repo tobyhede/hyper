@@ -61,7 +61,13 @@ export const updatePositionedLayout = (
       [...positions].map(([id, point]) => [uuidSchema.parse(id), { x: point.x, y: point.y }]),
     ),
     ...(routes !== undefined ? { routes } : {}),
-    ...(activeRouteId !== null ? { activeRoute: activeRouteId } : {}),
+    // An Edit with no active Route says nothing about the authored one, so the
+    // existing value carries through. Only a named Route replaces it.
+    ...(activeRouteId !== null
+      ? { activeRoute: activeRouteId }
+      : existing?.activeRoute !== undefined
+        ? { activeRoute: existing.activeRoute }
+        : {}),
   };
   const layouts = [...(base.document.layouts ?? [])];
   const existingIndex = layouts.findIndex((candidate) => candidate.id === layoutId);

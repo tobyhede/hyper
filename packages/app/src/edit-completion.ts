@@ -385,6 +385,10 @@ function serializeCompletion(pass: () => readonly CompletionEffect[] | null): ()
       if (firstEffectError !== null) throw firstEffectError.error;
     } finally {
       running = false;
+      // A `pass` that threw produced no completed state for anything queued
+      // during it to follow, so those notifications are stale. Leaving the flag
+      // set would spend the next notification's drain on a pass nobody asked for.
+      queued = false;
     }
   };
 }

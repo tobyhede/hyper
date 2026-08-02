@@ -136,8 +136,9 @@ describe('Space HTTP request validation', () => {
     const headers = { ...validHeaders, 'content-length': String(validBody.length) };
     const { handled, captured } = await handleHeaders(repository, headers, {
       ...Object.fromEntries(Object.entries(headers).map(([key, value]) => [key, [value]])),
-      // Each value is individually canonical and in range, so only their
-      // multiplicity makes the framing ambiguous.
+      // Identical values declare the same body length, so the framing is not
+      // in doubt. The handler refuses anyway because it requires one canonical
+      // field value, and will not pick a winner from a repeated header.
       'content-length': [String(validBody.length), String(validBody.length)],
     });
 
