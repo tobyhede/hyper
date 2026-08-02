@@ -44,6 +44,18 @@ describe('HTTP workspace startup composition', () => {
     expect(result.opened.spaceSession.getState().acknowledgedRevision).toBe(0n);
   });
 
+  it('fails rather than inventing a workspace when the catalog is empty', async () => {
+    // Server-side startup is what guarantees a database has at least one Space,
+    // so an empty catalog here means that policy did not run. The browser has
+    // no import path of its own to fall back to, and quietly opening something
+    // it minted locally would be a workspace with nowhere to commit.
+    const startup = await startupFor();
+
+    await expect(startup.resolve()).rejects.toThrow(
+      'The persistence service returned no database workspaces.',
+    );
+  });
+
   it('returns the complete catalog and opens the exact selected UUID', async () => {
     const startup = await startupFor(
       snapshot(),

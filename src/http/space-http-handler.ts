@@ -42,7 +42,13 @@ const readBoundedJson = async (
     });
     request.on('end', resolve);
     request.on('error', reject);
-    request.on('aborted', () => reject(new Error('Request aborted')));
+    // `'aborted'` is deprecated, and Node's documented replacement is `'close'`
+    // plus `complete`, which distinguishes a body that arrived from one that
+    // stopped part way. A complete request has already resolved by the time
+    // `'close'` fires, so the late rejection is a no-op there.
+    request.on('close', () => {
+      if (!request.complete) reject(new Error('Request aborted'));
+    });
   });
   if (state.oversized) return { ok: false };
   return { ok: true, value: JSON.parse(Buffer.concat(chunks).toString('utf8')) as unknown };

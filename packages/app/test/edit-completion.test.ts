@@ -401,6 +401,7 @@ describe('completed placement composition', () => {
         { from: CARD_A, to: CARD_B },
         { from: CARD_B, to: CARD_A },
       ]);
+      expect(installed[0]!.defaultView).toBe(DEFAULT_LAYOUT_ID);
       expect(session.getState().working).toMatchObject({
         document: {
           routes: [
