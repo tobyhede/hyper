@@ -213,12 +213,18 @@ function mintConnectionRoute(
   // handed this same id as `mintedRouteId` — writing the filter here as well
   // would be a second derivation of one answer, agreeing only until the rule
   // changed.
+  //
+  // Appending rather than replacing: the guard above rejects a Space that
+  // already has Routes, so today this appends to nothing. That guard states a
+  // policy, though, and a policy is not what should be keeping a data operation
+  // from discarding authored structure.
   return {
     snapshot: {
       ...base,
       document: {
         ...base.document,
         routes: [
+          ...base.document.routes,
           {
             id: newRouteId,
             title: nextRouteTitle(base),
