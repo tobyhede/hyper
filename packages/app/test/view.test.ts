@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { uuidSchema } from '@project/core';
 import { buildLayoutGraph, loadSpace, type Space } from '@project/graph';
 import { CARD_SIZE } from '../src/card';
-import { createViewChoice, resolveView } from '../src/view';
+import { resolveView } from '../src/view';
 import { cardFile } from './card-files';
 
 const CARDS = [
@@ -277,22 +277,5 @@ describe('resolveView', () => {
     });
     expect(resolveView(space).layout?.id).toBe('00000000-0000-4000-8000-000000000035');
     expect((await arrange(space))['00000000-0000-4000-8000-000000000002']).toEqual({ x: 7, y: 9 });
-  });
-});
-
-describe('ViewChoice', () => {
-  it('owns renderer selection synchronously', () => {
-    const choice = createViewChoice({ kind: 'view', view: 'graph' });
-    const selected = {
-      kind: 'layout' as const,
-      layoutId: uuidSchema.parse('00000000-0000-4000-8000-000000000022'),
-    };
-    const observed: unknown[] = [];
-    choice.subscribe(() => observed.push(choice.current()));
-
-    choice.select(selected);
-
-    expect(choice.current()).toEqual(selected);
-    expect(observed).toEqual([selected]);
   });
 });

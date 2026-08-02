@@ -1,4 +1,4 @@
-import type { Move } from '../store';
+import type { Move } from '../navigation';
 
 export interface PresentingChromeProps {
   /** The moves available from the active card, with the selected one marked. */
