@@ -182,7 +182,7 @@ importers:
         specifier: ^2.0.0
         version: 2.0.0
       hono:
-        specifier: ^4.12.33
+        specifier: 4.12.33
         version: 4.12.33
 
   packages/persistence:
