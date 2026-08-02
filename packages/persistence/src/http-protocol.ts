@@ -28,6 +28,28 @@ const exactRecord = (
   return record;
 };
 
+/**
+ * Zod serializes its entire issue array into `Error.message`, and the HTTP layer
+ * ships that verbatim as the `{ message: string }` error contract — hundreds of
+ * characters of internal schema shape for one wrong field, JSON nested inside a
+ * field clients render as prose. Every other decoder here throws a sentence, so
+ * this one does too: the failing paths and their reasons, nothing else.
+ */
+const decodeSnapshot = (value: unknown, label: string): SpaceSnapshot => {
+  const parsed = spaceSnapshotSchema.safeParse(value);
+  if (parsed.success) {
+    return parsed.data;
+  }
+  const described = parsed.error.issues
+    .slice(0, 3)
+    .map((issue) => `${issue.path.join('.') || 'snapshot'} ${issue.message.toLowerCase()}`)
+    .join('; ');
+  const remaining = parsed.error.issues.length - 3;
+  throw new Error(
+    `${label} snapshot is invalid: ${described}${remaining > 0 ? ` (and ${remaining} more)` : ''}`,
+  );
+};
+
 const decodeRevision = (value: unknown, label: string): bigint => {
   if (typeof value !== 'string' || !CANONICAL_DECIMAL.test(value)) {
     throw new Error(`${label} must be a canonical non-negative decimal string`);
@@ -57,7 +79,7 @@ export const encodeLoadedSpace = (loaded: LoadedSpace): LoadedSpaceJson => ({
 export const decodeLoadedSpace = (value: unknown): LoadedSpace => {
   const record = exactRecord(value, ['snapshot', 'revision', 'exportedRevision'], 'loaded space');
   return {
-    snapshot: spaceSnapshotSchema.parse(record['snapshot']),
+    snapshot: decodeSnapshot(record['snapshot'], 'loaded space'),
     revision: decodeRevision(record['revision'], 'revision'),
     exportedRevision: decodeNullableRevision(record['exportedRevision']),
   };
@@ -81,7 +103,7 @@ export const decodeCommitRequest = (
 ): { snapshot: SpaceSnapshot; expectedRevision: bigint } => {
   const record = exactRecord(value, ['snapshot', 'expectedRevision'], 'commit request');
   return {
-    snapshot: spaceSnapshotSchema.parse(record['snapshot']),
+    snapshot: decodeSnapshot(record['snapshot'], 'commit request'),
     expectedRevision: decodeRevision(record['expectedRevision'], 'expectedRevision'),
   };
 };

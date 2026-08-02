@@ -22,9 +22,17 @@ const defaultPreviewLoader = async (modulePath: string): Promise<unknown> => imp
 
 type Next = (error?: unknown) => void;
 
+/**
+ * Node's parser is more permissive than the URL parser: it accepts request
+ * targets that are not valid URL references — `//[` among them, an empty IPv6
+ * host — and hands them to middleware verbatim. `new URL` throws on those, and
+ * this runs synchronously inside the request handler, so the throw escapes the
+ * middleware entirely; the host never answers and the socket hangs. A target we
+ * cannot parse is certainly not one of our API paths, so it belongs to Vite.
+ */
 const isApiRequest = (request: IncomingMessage): boolean => {
-  const pathname = new URL(request.url ?? '/', 'http://hyper.invalid').pathname;
-  return pathname === '/api' || pathname.startsWith('/api/');
+  const pathname = URL.parse(request.url ?? '/', 'http://hyper.invalid')?.pathname;
+  return pathname === '/api' || (pathname?.startsWith('/api/') ?? false);
 };
 
 const asRuntime = (loaded: unknown, modulePath: string): SpaceHttpRuntime => {

@@ -370,6 +370,34 @@ describe('Space HTTP application', () => {
     expect(commitCalls).toBe(0);
   });
 
+  /*
+   * An oversized body is drained so the 413 leaves the connection reusable, and
+   * that drain is itself bounded — a client that never stops sending must not be
+   * able to hold the read loop open indefinitely. The stream below never ends,
+   * so an unbounded drain fails this by hanging; the byte assertion fails it
+   * fast if the bound merely moves somewhere too generous to matter.
+   */
+  it('stops draining a body that keeps arriving past the drain allowance', async () => {
+    const chunk = 64 * 1024;
+    let pulled = 0;
+    const endless = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        pulled += chunk;
+        controller.enqueue(new Uint8Array(chunk));
+      },
+    });
+
+    const response = await createSpaceHttpApp(repository()).request(`/api/spaces/${SPACE_ID}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: endless,
+      duplex: 'half',
+    } as RequestInit);
+
+    expect(response.status).toBe(413);
+    expect(pulled).toBeLessThanOrEqual(MAX_COMMIT_BODY_BYTES * 16);
+  });
+
   // The limit is a maximum, not a threshold the body must stay under. Both size
   // checks compare with `>`, and neither existing case would notice one of them
   // becoming `>=` — the oversize tests would still pass while every commit of
@@ -483,6 +511,31 @@ describe('Space HTTP application', () => {
 
     expect(response.status).toBe(400);
     expect(response.headers.get('content-type')).toBe('application/json; charset=utf-8');
+  });
+
+  /*
+   * `{ message: string }` is the declared error contract, and every other 400
+   * honours it with a sentence. Zod serializes its whole issue array into
+   * `Error.message`, so a snapshot that fails the schema used to answer with
+   * hundreds of characters of internal schema shape — a JSON document nested
+   * inside a field the client renders as prose.
+   */
+  it('describes a schema-invalid snapshot in prose rather than serialized issues', async () => {
+    const response = await createSpaceHttpApp(repository()).request(`/api/spaces/${SPACE_ID}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        snapshot: { ...snapshot, document: { ...snapshot.document, title: '' } },
+        expectedRevision: '0',
+      }),
+    });
+
+    expect(response.status).toBe(400);
+    const { message } = (await response.json()) as { message: string };
+    expect(message).toContain('snapshot is invalid');
+    expect(message).toContain('document.title');
+    expect(message).not.toContain('{');
+    expect(message.length).toBeLessThan(200);
   });
 
   it('advertises the methods supported by a space resource', async () => {

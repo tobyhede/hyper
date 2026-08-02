@@ -85,8 +85,13 @@ parser accidents:
 - Compressed request bodies are not an MVP capability. A non-identity
   `Content-Encoding` is rejected with 415 rather than surfacing as malformed
   JSON.
-- A body over the cap returns 413. Invalid JSON or a path/body id mismatch
-  returns 400. A valid but inadmissible Space snapshot returns 422.
+- A body over the cap returns 413, and the rest of that body is read and
+  discarded so the 413 leaves a persistent connection reusable. The drain is
+  bounded: past its allowance the body is left unconsumed and the host drops the
+  connection, which is the right answer for a client that will not stop sending.
+- Invalid JSON or a path/body id mismatch returns 400. A valid but inadmissible
+  Space snapshot returns 422. Error messages are prose; a schema failure is
+  summarised rather than serialized into the `message` field.
 - Method rejection retains an accurate `Allow` header.
 - Responses remain JSON, UTF-8, and `Cache-Control: no-store`.
 - Repository failures are logged through an injected logger and return the

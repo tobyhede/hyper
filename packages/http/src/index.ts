@@ -8,7 +8,6 @@ import {
 } from '@project/persistence';
 import { parse as parseContentType } from 'content-type';
 import { Hono, type Context, type Env } from 'hono';
-import { bodyLimit } from 'hono/body-limit';
 import { createMiddleware } from 'hono/factory';
 import { HTTPException } from 'hono/http-exception';
 import { validator } from 'hono/validator';
@@ -64,45 +63,97 @@ const invokeLogError = (
   }
 };
 
+/**
+ * How much of an oversized body is read and discarded so the connection stays
+ * reusable. Reusing a persistent connection means consuming the whole message
+ * body, and an honest client that overshoots the cap deserves its 413 on a
+ * connection it can keep using. A client that just keeps sending does not: past
+ * this allowance the drain stops, the body is left unconsumed and the host
+ * drops the connection, which is the answer that costs us least.
+ */
+const MAX_DRAINED_BODY_BYTES = MAX_COMMIT_BODY_BYTES * 8;
+
 const rejectOversizedBody = (context: Context) =>
   context.json({ message: `Request body exceeds ${MAX_COMMIT_BODY_BYTES} bytes` }, 413);
 
-const countCommitBodyBytes = bodyLimit({
-  maxSize: MAX_COMMIT_BODY_BYTES,
-  onError: rejectOversizedBody,
-});
+/** Read and discard what is left, up to the allowance. Bytes are never buffered. */
+const drainRejectedBody = async (
+  reader: ReadableStreamDefaultReader<Uint8Array>,
+): Promise<void> => {
+  let drained = 0;
+  try {
+    while (drained < MAX_DRAINED_BODY_BYTES) {
+      const { done, value } = await reader.read();
+      if (done) return;
+      drained += value.byteLength;
+    }
+  } catch {
+    // A client that vanishes mid-drain costs its own connection, not our response.
+  }
+};
 
 /**
- * One size policy: count what actually arrives, and never trust the declared
- * length. `bodyLimit` *trusts* `Content-Length` when it is present — it
- * compares and returns without reading a byte — so an understated length would
- * skip counting entirely. Deleting the header forces its streaming path, and
- * that deletion is the whole of the bound.
+ * One size policy: count the bytes that arrive, and never consult the declared
+ * length. Hono's `bodyLimit` cannot serve here for two independent reasons.
+ * It *trusts* `Content-Length` when present — comparing and returning without
+ * reading a byte, so an understated length would smuggle any body through. And
+ * on overflow it abandons a **locked** reader without consuming the rest, so
+ * nothing downstream can drain the request: Node's own `_dump()` cannot resume a
+ * stream the web wrapper holds, the socket dies with the 413, and a keep-alive
+ * client loses the connection. Both are pinned by tests — the size cases in this
+ * package, the connection reuse in `vite-hono-host.test.ts`.
  *
- * A declared-length pre-check sat here and was dropped. It was never required
- * for the bound — streaming catches an honest over-declaration too, only later
- * — and trusting the header meant a client could be answered 413 for a body it
- * had not sent. Measuring is the answer a lying header deserves, and one policy
- * beats a fast path that disagrees with it. Do not reintroduce the pre-check
- * without also deciding what a dishonest `Content-Length` should mean.
+ * Draining on overflow is also what the superseded raw Node handler did: it
+ * cleared its buffer and called `request.resume()` for exactly this reason.
+ *
+ * A declared-length pre-check sat here once and was dropped. It was never
+ * required for the bound — counting catches an honest over-declaration too, only
+ * later — and trusting the header meant a client could be answered 413 for a
+ * body it had not sent. Measuring is the answer a lying header deserves. Do not
+ * reintroduce it without first deciding what a dishonest length should mean.
  *
  * The cost is the fast path: every legitimate commit is buffered and re-read.
- * On a real Node host an understated length is already impossible — the HTTP
- * parser bounds the body at `Content-Length` — so this is defence for a future
- * host rather than a live hole, which is what `spec.md` says too.
  */
 const requireBoundedCommitBody = createMiddleware(async (context, next) => {
+  const body = context.req.raw.body;
+  if (body === null) {
+    return next();
+  }
+  const reader = body.getReader();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.byteLength;
+    if (size > MAX_COMMIT_BODY_BYTES) {
+      // Free what was buffered before draining, so an oversized body never costs
+      // more than the cap in memory no matter how much more of it arrives.
+      chunks.length = 0;
+      await drainRejectedBody(reader);
+      return rejectOversizedBody(context);
+    }
+    chunks.push(value);
+  }
   const headers = new Headers(context.req.raw.headers);
+  // The request handed downstream carries our own re-enqueued body. An
+  // over-declared length from the original request would describe it wrongly,
+  // and nothing below this point has any business reading a declared size.
   headers.delete('Content-Length');
-  context.req.raw = new Request(context.req.raw, { headers });
-  // `bodyLimit` is declared as a bare `MiddlewareHandler`, whose response type
-  // defaults to `Response`; returning its result directly widened the union and
-  // erased 413 from the inferred client contract, while the hand-written 415
-  // beside it survived. It answers with `onError` or with `next()`, and its
-  // `onError` is ours, so a response here is always the oversize one — saying
-  // that in code rather than in a cast keeps the status in the contract.
-  const limited = await countCommitBodyBytes(context, next);
-  return limited === undefined ? undefined : rejectOversizedBody(context);
+  const rebuilt = {
+    headers,
+    body: new ReadableStream({
+      start(controller) {
+        for (const chunk of chunks) {
+          controller.enqueue(chunk);
+        }
+        controller.close();
+      },
+    }),
+    duplex: 'half',
+  };
+  context.req.raw = new Request(context.req.raw, rebuilt);
+  return next();
 });
 
 const requireSupportedRequestMedia = createMiddleware(async (context, next) => {

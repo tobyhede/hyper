@@ -5,6 +5,7 @@ import {
   type IncomingMessage,
   type ServerResponse,
 } from 'node:http';
+import { connect } from 'node:net';
 import {
   createSpaceHttpApp,
   MAX_COMMIT_BODY_BYTES,
@@ -100,6 +101,23 @@ const abortChunkedRequest = (baseUrl: string, path: string): Promise<void> =>
     });
   });
 
+/**
+ * A request line `node:http`'s client cannot produce. Node's own parser accepts
+ * targets that are not valid URL references and hands them to the middleware
+ * verbatim, so reaching that case means writing the line onto the socket.
+ */
+const sendRequestLine = (baseUrl: string, target: string): Promise<string> =>
+  new Promise((resolve, reject) => {
+    const { hostname, port } = new URL(baseUrl);
+    const socket = connect(Number(port), hostname, () => {
+      socket.write(`GET ${target} HTTP/1.1\r\nHost: hyper.test\r\nConnection: close\r\n\r\n`);
+    });
+    let received = '';
+    socket.on('data', (chunk: Uint8Array) => (received += Buffer.from(chunk).toString('utf8')));
+    socket.on('close', () => resolve(received.split('\r\n')[0] ?? ''));
+    socket.on('error', reject);
+  });
+
 afterEach(async () => {
   await Promise.all(hosts.splice(0).map((host) => host.close()));
 });
@@ -150,6 +168,37 @@ describe('Vite Hono host', () => {
       agent.destroy();
     }
   });
+
+  it.each([
+    { framing: 'declared length', headers: { 'content-type': 'application/json' } },
+    {
+      framing: 'chunked',
+      headers: { 'content-type': 'application/json', 'transfer-encoding': 'chunked' },
+    },
+  ])(
+    'reuses the connection after rejecting a body far over the limit ($framing)',
+    async ({ headers }) => {
+      const { host, connections } = await startHost(createSpaceHttpApp(repository()));
+      const agent = new Agent({ keepAlive: true, maxSockets: 1 });
+      try {
+        const rejected = await send(
+          host.url,
+          '/api/spaces/00000000-0000-4000-8000-000000000001',
+          `{"padding":"${'x'.repeat(MAX_COMMIT_BODY_BYTES * 4)}"}`,
+          headers,
+          agent,
+        );
+        expect(rejected.status).toBe(413);
+
+        const accepted = await send(host.url, '/api/spaces', '', {}, agent, 'GET');
+        expect(accepted.status).toBe(200);
+        expect(connections).toHaveLength(2);
+        expect(connections[1]).toBe(connections[0]);
+      } finally {
+        agent.destroy();
+      }
+    },
+  );
 
   it('reuses the connection after every early request rejection', async () => {
     const { host, connections } = await startHost(createSpaceHttpApp(repository()));
@@ -217,6 +266,17 @@ describe('Vite Hono host', () => {
     } finally {
       agent.destroy();
     }
+  });
+
+  it('leaves a request target the URL parser rejects to the next middleware', async () => {
+    const { host } = await startHost(createSpaceHttpApp(repository()), (_request, response) => {
+      response.setHeader('Content-Type', 'text/html');
+      response.end('<main>Vite application</main>');
+    });
+
+    // Node accepts `//[` as a request target; `new URL('//[', base)` throws on
+    // the empty IPv6 host. It is not an API path, so it belongs to Vite.
+    await expect(sendRequestLine(host.url, '//[')).resolves.toBe('HTTP/1.1 200 OK');
   });
 
   it('survives a client abort while reading a request body', async () => {

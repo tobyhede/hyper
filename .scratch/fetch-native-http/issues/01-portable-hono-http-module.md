@@ -22,8 +22,11 @@ response construction inside the portable module.
       `parse` has no throw path — so the scanner remains the whole of this
       package's media validation.
 - [x] The 1 MiB cap counts the bytes that arrive and returns 413. It never
-      trusts `Content-Length`: the header is deleted so `bodyLimit` streams, and
-      an over-declared length is measured rather than believed.
+      trusts `Content-Length`, which is deleted rather than consulted, so an
+      over-declared length is measured rather than believed. Hono's `bodyLimit`
+      is not used: it trusts the header, and on overflow it abandons a locked
+      reader, so the request can never be drained and the 413 costs a keep-alive
+      client its connection. The replacement drains within a bounded allowance.
 - [x] Only absent/UTF-8 JSON charset and identity/absent `Content-Encoding` are
       accepted; unsupported values return 415.
 - [x] Invalid JSON and path/body id mismatch return 400; invalid snapshots
