@@ -73,3 +73,42 @@ host and preview build configuration. `pnpm build` emitted
 `pnpm e2e` passed all 46 browser tests. Ticket 04 did not change Vite
 configuration, so it adds no restart requirement beyond ticket 03's stacked
 configuration change.
+
+## Review follow-up
+
+A second review found one contract defect and three gaps the suite could not
+have caught. Each fix was driven from a failing test, and each test was checked
+against the production change it exists to catch.
+
+`HEAD /api/spaces/<non-uuid>` answered 405 `Allow: GET, PUT` while GET and PUT
+answered 400, so it advertised methods for a resource no request can address.
+The HEAD guard matched the resource shape without reading the identity, and it
+duplicated `app.notFound()`'s judgement rather than sharing it. Both now call
+one `unservedContractPath`. Deleting the guard instead is not an option, and the
+test says why: Hono answers HEAD from the GET handler and strips the body, so
+the resource would return 200 carrying nothing.
+
+The Node adapter's global `Request`/`Response` installation was load-bearing and
+recorded only in ticket 03's prose. `requireSupportedRequestMedia` and
+`requireBoundedCommitBody` rebuild the request through the *global* `Request`
+constructor, so `overrideGlobalObjects: false` makes every commit answer 500
+while every rejection path stays green. No test reached the accepted media path
+over a socket, because the host suite's repository rejected every commit. One
+now does, using an RFC 9110-legal `application/json ; charset=utf-8` that only
+the rewrite can serve; with the override disabled it fails 500, as does the
+oversized-body test. AGENTS.md carries both host facts.
+
+`configurePreviewServer` had lost its only dispatch test when the host moved to
+the Node adapter — it asserted the module path and never drove a request — so
+the branch serving the built PostgreSQL runtime was unproven. It is now driven
+over a socket like development; wiring it to the wrong module or dropping its
+registration both fail it.
+
+`packages/http/src/**` had no coverage threshold, which is how the media scanner
+shipped at 69.89% statements unnoticed. It is now gated at 98/94/96, verified to
+fail the run when raised above what holds. `@hono/node-server` moved to
+`devDependencies`: only the Vite host plugin imports it, and no browser or built
+runtime artifact contains it.
+
+`pnpm verify` passed 68 files and 649 tests, `pnpm build` emitted both artifacts
+and `pnpm e2e` passed all 60 browser tests.

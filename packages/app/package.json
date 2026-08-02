@@ -14,7 +14,6 @@
     "dev:new": "vite --mode e2e-empty --port 5174 --strictPort"
   },
   "dependencies": {
-    "@hono/node-server": "2.0.12",
     "@project/core": "workspace:*",
     "@project/graph": "workspace:*",
     "@project/http": "workspace:*",
@@ -28,6 +27,7 @@
     "zustand": "^5.0.2"
   },
   "devDependencies": {
+    "@hono/node-server": "2.0.12",
     "@tailwindcss/vite": "^4.3.3",
     "tailwindcss": "^4.3.3"
   }
