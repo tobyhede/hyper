@@ -180,7 +180,7 @@ describe('completed placement composition', () => {
       positions: { [CARD_A]: { x: 900, y: 700 } },
       routes: [],
     };
-    const routeLessSnapshot: SpaceSnapshot = {
+    const newSpaceSnapshot: SpaceSnapshot = {
       id: SPACE_ID,
       document: {
         version: 2,
@@ -191,7 +191,7 @@ describe('completed placement composition', () => {
       },
       cards: [{ id: CARD_A, document: { title: 'Card 1', kind: 'markdown', body: '' } }],
     };
-    const loaded = { snapshot: routeLessSnapshot, revision: 0n, exportedRevision: null };
+    const loaded = { snapshot: newSpaceSnapshot, revision: 0n, exportedRevision: null };
     const backend = new MemorySpaceBackend([loaded]);
     const session = openSpaceSession(backend, loaded);
     const viewChoice = createViewChoice({ kind: 'layout', layoutId: DEFAULT_LAYOUT_ID });
@@ -220,9 +220,9 @@ describe('completed placement composition', () => {
     expect(activeRouteId).toBe(ROUTE_ID);
     expect(viewChoice.current()).toEqual({ kind: 'layout', layoutId: DEFAULT_LAYOUT_ID });
     expect(session.getState().working).toEqual({
-      ...routeLessSnapshot,
+      ...newSpaceSnapshot,
       document: {
-        ...routeLessSnapshot.document,
+        ...newSpaceSnapshot.document,
         routes: [
           {
             id: ROUTE_ID,
@@ -244,7 +244,7 @@ describe('completed placement composition', () => {
         ],
       },
       cards: [
-        ...routeLessSnapshot.cards,
+        ...newSpaceSnapshot.cards,
         {
           id: CREATED_CARD_ID,
           document: { title: 'Card 2', kind: 'markdown', body: '' },
@@ -267,7 +267,7 @@ describe('completed placement composition', () => {
       positions: { [CARD_A]: { x: 10, y: 20 } },
       routes: [],
     };
-    const routeLessSnapshot: SpaceSnapshot = {
+    const newSpaceSnapshot: SpaceSnapshot = {
       id: SPACE_ID,
       document: {
         version: 2,
@@ -278,7 +278,7 @@ describe('completed placement composition', () => {
       },
       cards: [{ id: CARD_A, document: { title: 'Card 1', kind: 'markdown', body: '' } }],
     };
-    const loaded = { snapshot: routeLessSnapshot, revision: 0n, exportedRevision: null };
+    const loaded = { snapshot: newSpaceSnapshot, revision: 0n, exportedRevision: null };
     const backend = new MemorySpaceBackend([loaded]);
     const session = openSpaceSession(backend, loaded);
     const viewChoice = createViewChoice({ kind: 'layout', layoutId: DEFAULT_LAYOUT_ID });
@@ -325,7 +325,7 @@ describe('completed placement composition', () => {
       kind: 'positioned',
       positions: { [CARD_A]: { x: 10, y: 20 } },
     };
-    const routeLessSnapshot: SpaceSnapshot = {
+    const newSpaceSnapshot: SpaceSnapshot = {
       id: SPACE_ID,
       document: {
         version: 2,
@@ -336,7 +336,7 @@ describe('completed placement composition', () => {
       },
       cards: [{ id: CARD_A, document: { title: 'Card 1', kind: 'markdown', body: '' } }],
     };
-    const loaded = { snapshot: routeLessSnapshot, revision: 0n, exportedRevision: null };
+    const loaded = { snapshot: newSpaceSnapshot, revision: 0n, exportedRevision: null };
     const backend = new MemorySpaceBackend([loaded]);
     const session = openSpaceSession(backend, loaded);
     const editor = createPlacementEditor({
@@ -1000,12 +1000,12 @@ describe('completed placement composition', () => {
   // single gesture has to mint all three at once and still land as one revision.
   it('creates Card 2, Route 1 and Layout 1 while converting a route-less Algorithmic View', async () => {
     vi.spyOn(crypto, 'randomUUID').mockReturnValue(DEFAULT_LAYOUT_UUID);
-    const routeLessSnapshot: SpaceSnapshot = {
+    const newSpaceSnapshot: SpaceSnapshot = {
       id: SPACE_ID,
       document: { version: 2, title: 'New space', routes: [] },
       cards: [{ id: CARD_A, document: { title: 'Card 1', kind: 'markdown', body: '' } }],
     };
-    const loaded = { snapshot: routeLessSnapshot, revision: 0n, exportedRevision: null };
+    const loaded = { snapshot: newSpaceSnapshot, revision: 0n, exportedRevision: null };
     const backend = new MemorySpaceBackend([loaded]);
     const session = openSpaceSession(backend, loaded);
     const viewChoice = createViewChoice({ kind: 'view', view: 'graph' });
@@ -1027,7 +1027,7 @@ describe('completed placement composition', () => {
 
     const working = session.getState().working;
     expect(working.cards).toEqual([
-      ...routeLessSnapshot.cards,
+      ...newSpaceSnapshot.cards,
       { id: CREATED_CARD_ID, document: { title: 'Card 2', kind: 'markdown', body: '' } },
     ]);
     expect(working.document.routes).toEqual([
@@ -1061,12 +1061,12 @@ describe('completed placement composition', () => {
   // being first, is the one the authoring stroke was already drawn in.
   it('mints and activates Route 1 from a self-connection converting an Algorithmic View', async () => {
     vi.spyOn(crypto, 'randomUUID').mockReturnValue(DEFAULT_LAYOUT_UUID);
-    const routeLessSnapshot: SpaceSnapshot = {
+    const newSpaceSnapshot: SpaceSnapshot = {
       id: SPACE_ID,
       document: { version: 2, title: 'New space', routes: [] },
       cards: [{ id: CARD_A, document: { title: 'Card 1', kind: 'markdown', body: '' } }],
     };
-    const loaded = { snapshot: routeLessSnapshot, revision: 0n, exportedRevision: null };
+    const loaded = { snapshot: newSpaceSnapshot, revision: 0n, exportedRevision: null };
     const backend = new MemorySpaceBackend([loaded]);
     const session = openSpaceSession(backend, loaded);
     const viewChoice = createViewChoice({ kind: 'view', view: 'graph' });
