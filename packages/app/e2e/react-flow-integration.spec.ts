@@ -1,6 +1,6 @@
-import { expect, test, type Page } from './fixtures';
-import type { SpaceSnapshot } from '@project/core';
+import { expect, test } from './fixtures';
 import { authoringHandle, boxOf, nodeByTitle, settled } from './graph';
+import { allCardsOnAGrid, seedRouteLessLayout } from './seed';
 
 test('a focused Card opens with Enter and Space', async ({ page }) => {
   await page.goto('/');
@@ -30,57 +30,8 @@ test('the graph shows React Flow attribution', async ({ page }) => {
   await expect(page.locator('.react-flow__attribution a[href*="reactflow.dev"]')).toBeVisible();
 });
 
-interface HttpLoadedSpace {
-  readonly snapshot: SpaceSnapshot;
-  readonly revision: string;
-  readonly exportedRevision: string | null;
-}
-
-const seedLayoutWithNoVisibleRoutes = async (page: Page): Promise<HttpLoadedSpace> => {
-  const summariesResponse = await page.request.get('/api/spaces');
-  expect(summariesResponse.ok()).toBe(true);
-  const summaries = (await summariesResponse.json()) as readonly { id: string }[];
-  const spaceId = summaries[0]?.id;
-  expect(spaceId).toBeDefined();
-
-  const loadedResponse = await page.request.get(`/api/spaces/${spaceId}`);
-  expect(loadedResponse.ok()).toBe(true);
-  const loaded = (await loadedResponse.json()) as HttpLoadedSpace;
-  const layoutId = '00000000-0000-4000-8000-000000000099';
-  const positions = Object.fromEntries(
-    loaded.snapshot.cards.map((card, index) => [
-      card.id,
-      { x: (index % 5) * 320, y: Math.floor(index / 5) * 200 },
-    ]),
-  );
-  const snapshot = {
-    ...loaded.snapshot,
-    document: {
-      ...loaded.snapshot.document,
-      layouts: [
-        {
-          id: layoutId,
-          title: 'No Routes',
-          kind: 'positioned',
-          positions,
-          routes: [],
-        },
-      ],
-      defaultView: layoutId,
-    },
-  };
-  const commitResponse = await page.request.put(`/api/spaces/${spaceId}`, {
-    data: { snapshot, expectedRevision: loaded.revision },
-  });
-  expect(commitResponse.ok()).toBe(true);
-
-  const seededResponse = await page.request.get(`/api/spaces/${spaceId}`);
-  expect(seededResponse.ok()).toBe(true);
-  return (await seededResponse.json()) as HttpLoadedSpace;
-};
-
 test('a Layout with no visible Route suppresses Alt empty-drop creation', async ({ page }) => {
-  const seeded = await seedLayoutWithNoVisibleRoutes(page);
+  const seeded = await seedRouteLessLayout(page, 'No Routes', allCardsOnAGrid);
   await page.goto('/');
   const source = nodeByTitle(page, 'A').first();
   await expect(source).toBeVisible();

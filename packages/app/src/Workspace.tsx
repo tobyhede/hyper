@@ -19,6 +19,10 @@ interface WorkspaceFailureState {
  * throw unmounts the tree and leaves a blank page, which reports nothing. This
  * is a report, not a recovery: the workspace it wrapped is gone, and with it the
  * controls that could have changed the state that broke.
+ *
+ * It catches render throws only, and nothing else reports here. A refused remote
+ * snapshot leaves a workspace that still works, so it reports *inside* the app,
+ * next to the control that was clicked (`App.tsx`).
  */
 class WorkspaceFailure extends Component<{ children: ReactNode }, WorkspaceFailureState> {
   override state: WorkspaceFailureState = { message: null };
@@ -42,17 +46,31 @@ class WorkspaceFailure extends Component<{ children: ReactNode }, WorkspaceFailu
 
 /** Mount a workspace-local app, replacing every derived store after remote acceptance. */
 export function mountWorkspace(opened: OpenedSpace, render: WorkspaceRenderer): void {
-  const acceptRemote = () => {
-    opened.spaceSession.acceptRemote();
-    const accepted = loadSpaceSnapshot(opened.spaceSession.getState().working);
+  /**
+   * Validate the remote snapshot *before* handing it to the session. Accepting
+   * first and checking after published an unloadable snapshot as settled working
+   * state, so the conflict that could still have been resolved was gone. And the
+   * check cannot report by throwing: this runs as an `onClick` handler, which
+   * React error boundaries do not catch, so `WorkspaceFailure` never saw it and
+   * the throw escaped to the window leaving the stale workspace on screen.
+   *
+   * Refusing changes nothing — local work, conflict and every control survive —
+   * so it answers with the reason and leaves the mounted workspace alone. The
+   * caller shows it; unmounting the page over a refusal would take the author's
+   * unsaved work off screen to explain why it could not be replaced.
+   */
+  const acceptRemote = (): string | null => {
+    const { persistence } = opened.spaceSession.getState();
+    if (persistence.kind !== 'conflicted') return null;
+    const accepted = loadSpaceSnapshot(persistence.current.snapshot);
     if (!accepted.ok) {
-      throw new Error(
-        `The accepted remote space is invalid:\n${accepted.errors
-          .map((error) => `  - ${error.message}`)
-          .join('\n')}`,
-      );
+      return `The remote space is invalid and was not accepted:\n${accepted.errors
+        .map((error) => `  - ${error.message}`)
+        .join('\n')}`;
     }
+    opened.spaceSession.acceptRemote();
     mountWorkspace({ space: accepted.space, spaceSession: opened.spaceSession }, render);
+    return null;
   };
   const App = createApp(opened, { acceptRemote });
   render(

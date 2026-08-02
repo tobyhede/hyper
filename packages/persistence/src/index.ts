@@ -14,5 +14,11 @@ export {
 } from './http-protocol';
 export type { LoadedSpaceJson } from './http-protocol';
 export type { CommitRequestJson } from './http-protocol';
-export { MemorySpaceBackend } from './memory';
+/* Two test-facing helpers, two doors, and the difference is what they are.
+ * `MemorySpaceBackendTestControl` is named by `MemorySpaceBackend`'s public
+ * constructor, so a caller that cannot import it cannot construct the adapter
+ * this package ships — it is public surface. The shared backend *suite* imports
+ * vitest and only a test runner can execute it, so it stays behind the
+ * `./test-support` subpath instead. */
+export { MemorySpaceBackend, MemorySpaceBackendTestControl } from './memory';
 export * from './session';

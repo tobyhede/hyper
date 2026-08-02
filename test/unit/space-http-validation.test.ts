@@ -5,21 +5,15 @@ import {
   type ServerResponse,
 } from 'node:http';
 import { describe, expect, it, vi } from 'vitest';
-import { uuidSchema, type SpaceSnapshot } from '@project/core';
+import { uuidSchema } from '@project/core';
 import { encodeCommitRequest } from '@project/persistence';
 import { createSpaceHttpHandler, MAX_COMMIT_BODY_BYTES } from '../../src/http/space-http-handler';
 import { E2eMemorySpaceRepository } from '../support/e2e-memory-space-repository';
 import { startHttpServer } from '../support/http-server';
 import { send } from '../support/raw-http-request';
+import { SPACE_ID, oneCardSnapshot as snapshot } from '../support/space-fixtures';
 
-const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const OTHER_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000099');
-const CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
-const snapshot: SpaceSnapshot = {
-  id: SPACE_ID,
-  document: { version: 2, title: 'One', routes: [] },
-  cards: [{ id: CARD_ID, document: { title: 'A', kind: 'markdown', body: '' } }],
-};
 const stored = { snapshot, revision: 0n, exportedRevision: null };
 
 const validBody = JSON.stringify(encodeCommitRequest(snapshot, 0n));

@@ -1,14 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { uuidSchema, type SpaceSnapshot } from '@project/core';
 import { HttpSpaceBackend } from '@project/http';
-
-const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
-const CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
-const snapshot: SpaceSnapshot = {
-  id: SPACE_ID,
-  document: { version: 2, title: 'One', routes: [] },
-  cards: [{ id: CARD_ID, document: { title: 'A', kind: 'markdown', body: '' } }],
-};
+import { CARD_ID, SPACE_ID, oneCardSnapshot as snapshot } from '../support/space-fixtures';
 
 const backendFor = (response: Response): HttpSpaceBackend =>
   new HttpSpaceBackend('/', { fetch: () => Promise.resolve(response) });

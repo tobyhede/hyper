@@ -1,9 +1,8 @@
 import fc from 'fast-check';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { uuidSchema, type Layout, type SpaceSnapshot } from '@project/core';
-import type { Space } from '@project/graph';
+import { loadSpaceSnapshot, type Space } from '@project/graph';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
-import { loadSpaceSnapshot } from '@project/graph';
 import { createPlacementEditor } from '../src/edit-completion';
 import { ROUTE_PALETTE, routeColorMap } from '../src/colors';
 import { createViewChoice, layoutPositionMap } from '../src/view';

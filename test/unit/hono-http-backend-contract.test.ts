@@ -1,16 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { uuidSchema, type SpaceSnapshot } from '@project/core';
 import { encodeCommitRequest, MemorySpaceBackend, type LoadedSpace } from '@project/persistence';
-import { spaceBackendContract } from '../../packages/persistence/test/backend-contract';
+import { spaceBackendContract } from '@project/persistence/test-support';
 import { createSpaceHttpApp, HttpSpaceBackend, type SpaceResourceRepository } from '@project/http';
+import { SPACE_ID, oneCardSnapshot as snapshot } from '../support/space-fixtures';
 
-const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
-const CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
-const snapshot: SpaceSnapshot = {
-  id: SPACE_ID,
-  document: { version: 2, title: 'One', routes: [] },
-  cards: [{ id: CARD_ID, document: { title: 'A', kind: 'markdown', body: '' } }],
-};
 const loaded: LoadedSpace = { snapshot, revision: 4n, exportedRevision: 3n };
 
 const repository = (overrides: Partial<SpaceResourceRepository> = {}): SpaceResourceRepository => ({

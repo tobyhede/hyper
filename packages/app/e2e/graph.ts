@@ -208,17 +208,39 @@ export async function connectToEmptyWithAlt(
   page: Page,
   sourceHandle: Locator,
 ): Promise<{ x: number; y: number }> {
-  const from = (await sourceHandle.boundingBox())!;
-  const pane = (await page.locator('.react-flow__pane').boundingBox())!;
-  await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
-  await page.mouse.down();
-  await page.mouse.move(from.x + from.width / 2 + 30, from.y + from.height / 2, { steps: 4 });
-  await page.keyboard.down('Alt');
-  await page.mouse.move(pane.x + 36, pane.y + 36, { steps: 4 });
-  const preview = page.getByTestId('new-card-preview');
-  await expect(preview).toBeVisible();
-  const position = await positionOf(preview);
-  await page.mouse.up();
-  await page.keyboard.up('Alt');
-  return position;
+  const from = await boxOf(sourceHandle, 'the source handle');
+  const pane = await boxOf(page.locator('.react-flow__pane'), 'the React Flow pane');
+  let mouseDown = false;
+  let altDown = false;
+  let previewed = false;
+  try {
+    await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
+    await page.mouse.down();
+    mouseDown = true;
+    await page.mouse.move(from.x + from.width / 2 + 30, from.y + from.height / 2, { steps: 4 });
+    await page.keyboard.down('Alt');
+    altDown = true;
+    await page.mouse.move(pane.x + 36, pane.y + 36, { steps: 4 });
+    const preview = page.getByTestId('new-card-preview');
+    await expect(preview).toBeVisible();
+    previewed = true;
+    // Read the position while the drag is still live — the preview is gone the
+    // moment the button comes up.
+    return await positionOf(preview);
+  } finally {
+    // The preview assertion above can fail, and Playwright's mouse and keyboard
+    // state is per-page, not per-test-step: a held button and a held Alt would
+    // otherwise leak into every later interaction on this page and fail it for
+    // an unrelated-looking reason.
+    //
+    // Which key comes up first is the difference between a drop and a cancel.
+    // On the way out with a preview in hand, the drop is what creates the Card,
+    // so it must still see Alt down. On the way out through a failed assertion
+    // it must not: an Alt-drop would create a Card the aborted test never asked
+    // for, and whatever that broke next would be reported instead of the
+    // assertion that actually failed.
+    if (!previewed && altDown) await page.keyboard.up('Alt');
+    if (mouseDown) await page.mouse.up();
+    if (previewed && altDown) await page.keyboard.up('Alt');
+  }
 }

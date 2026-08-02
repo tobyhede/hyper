@@ -72,6 +72,7 @@ const REACT_DOM_PATTERN = {
  * green. `builtinModules` mixes bare names, `node:`-prefixed entries and
  * subpaths, so each is reduced to its base name; the `${name}/*` groups below
  * then re-cover the subpaths that were stripped.
+ * `test/unit/http-node-builtin-restrictions.test.ts` pins the coverage.
  */
 const NODE_BUILTIN_NAMES = [
   ...new Set(builtinModules.map((name) => name.replace(/^node:/, '').split('/')[0])),

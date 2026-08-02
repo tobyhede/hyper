@@ -1,4 +1,3 @@
-import { uuidSchema, type SpaceSnapshot } from '@project/core';
 import { expect, test, type Page } from './fixtures';
 import {
   AUTHORING_HANDLE_SIDES,
@@ -10,6 +9,7 @@ import {
   positionOf,
   settled,
 } from './graph';
+import { seedRouteLessLayout } from './seed';
 
 /**
  * Opening the app with nothing to open gives a new space: one card (ADR 0018).
@@ -18,52 +18,12 @@ import {
  * startup creates the one-card Space once, and reloads reopen that durable UUID.
  */
 
-interface HttpLoadedSpace {
-  readonly snapshot: SpaceSnapshot;
-  readonly revision: string;
-  readonly exportedRevision: string | null;
-}
-
-const FILTERED_LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000099');
-
-async function seedRouteLessFilteredLayout(page: Page): Promise<HttpLoadedSpace> {
-  const summariesResponse = await page.request.get('/api/spaces');
-  expect(summariesResponse.ok()).toBe(true);
-  const summaries = (await summariesResponse.json()) as readonly { readonly id: string }[];
-  const spaceId = summaries[0]?.id;
-  expect(spaceId).toBeDefined();
-
-  const loadedResponse = await page.request.get(`/api/spaces/${spaceId}`);
-  expect(loadedResponse.ok()).toBe(true);
-  const loaded = (await loadedResponse.json()) as HttpLoadedSpace;
-  const cardId = loaded.snapshot.cards[0]?.id;
-  if (cardId === undefined) throw new Error('The new Space must hold Card 1.');
-
-  const snapshot: SpaceSnapshot = {
-    ...loaded.snapshot,
-    document: {
-      ...loaded.snapshot.document,
-      layouts: [
-        {
-          id: FILTERED_LAYOUT_ID,
-          title: 'Empty Route Filter',
-          kind: 'positioned',
-          positions: { [cardId]: { x: 0, y: 0 } },
-          routes: [],
-        },
-      ],
-      defaultView: FILTERED_LAYOUT_ID,
-    },
-  };
-  const commitResponse = await page.request.put(`/api/spaces/${spaceId}`, {
-    data: { snapshot, expectedRevision: loaded.revision },
+const seedRouteLessFilteredLayout = (page: Page) =>
+  seedRouteLessLayout(page, 'Empty Route Filter', (snapshot) => {
+    const cardId = snapshot.cards[0]?.id;
+    if (cardId === undefined) throw new Error('The new Space must hold Card 1.');
+    return { [cardId]: { x: 0, y: 0 } };
   });
-  expect(commitResponse.ok()).toBe(true);
-
-  const seededResponse = await page.request.get(`/api/spaces/${spaceId}`);
-  expect(seededResponse.ok()).toBe(true);
-  return (await seededResponse.json()) as HttpLoadedSpace;
-}
 
 test('shows one card, and it is the only thing on screen', async ({ page }) => {
   await page.goto('/');

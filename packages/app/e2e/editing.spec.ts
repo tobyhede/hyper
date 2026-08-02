@@ -188,6 +188,16 @@ test('creating from an Algorithmic View freezes existing Cards and places Card 1
   await expect(page.getByTestId('layout-selector')).toContainText('Layout 1');
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
   await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
+
+  // `Persisted` says the commit was acknowledged, not that the conversion is what
+  // reopens. Reload against the same repository: the created Layout must still be
+  // `defaultView`, still hold the created Card and still carry its Edge — a
+  // conversion that only lived in runtime state passes every assertion above.
+  await page.reload();
+  await expect(nodeByTitle(page, 'Card 1')).toBeVisible();
+  await settled(page);
+  await expect(page.getByTestId('layout-selector')).toContainText('Layout 1');
+  await expect(page.locator('.react-flow__edge')).toHaveCount(FIXTURE_EDGE_COUNT + 1);
 });
 
 test('editing an existing Layout updates it instead of creating another one', async ({ page }) => {
@@ -592,9 +602,12 @@ test('Backspace with an Edge selected removes nothing', async ({ page }) => {
       const length = geometry.getTotalLength();
       for (const fraction of [0.25, 0.5, 0.75]) {
         const point = geometry.getPointAtLength(length * fraction).matrixTransform(transform);
-        if (document.elementFromPoint(point.x, point.y)?.closest('.react-flow__edge') !== null) {
-          return { x: point.x, y: point.y };
-        }
+        // `elementFromPoint` answers null outside the viewport and `closest`
+        // answers null off an edge, but optional chaining turns the first into
+        // `undefined` — so `!== null` accepted a point covering no edge at all
+        // and the click below landed on the pane.
+        const hit = document.elementFromPoint(point.x, point.y)?.closest('.react-flow__edge');
+        if (hit) return { x: point.x, y: point.y };
       }
     }
     throw new Error('No rendered Edge has a clickable point.');
@@ -679,7 +692,13 @@ test('a duplicate Edge is marked invalid while the drag is still live', async ({
 
   // A→B is already an Edge of the active Route; A→E is not.
   await startDrag();
-  await expect(await dragOnto('B')).not.toHaveClass(/valid/);
+  const overDuplicate = await dragOnto('B');
+  // Wait for React Flow to mark the handle as the drag's current target before
+  // asserting what it did *not* mark. Asserting the absence of `valid` straight
+  // after the move can pass because no connection class has landed yet, which
+  // would make this test green even if `isValidConnection` were never consulted.
+  await expect(overDuplicate).toHaveClass(/connectingto/);
+  await expect(overDuplicate).not.toHaveClass(/valid/);
   await page.mouse.up();
   await expect(page.locator('.react-flow__edge')).toHaveCount(FIXTURE_EDGE_COUNT);
 
