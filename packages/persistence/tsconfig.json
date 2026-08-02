@@ -6,5 +6,12 @@
       "@project/graph": ["../graph/src/index.ts"]
     }
   },
-  "include": ["src"]
+  /*
+   * The only package whose `include` reaches past `src`, because it is the only
+   * one that *exports* a module from outside it: `./test-support` publishes
+   * `test/backend-contract.ts` as an entry point, and an entry point the
+   * package's own typecheck cannot see is one the root program alone defends.
+   * The rest of `test/` stays out, exactly as it does everywhere else.
+   */
+  "include": ["src", "test/backend-contract.ts"]
 }

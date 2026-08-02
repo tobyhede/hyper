@@ -15,5 +15,8 @@
   "dependencies": {
     "@project/core": "workspace:*",
     "@project/graph": "workspace:*"
+  },
+  "devDependencies": {
+    "vitest": "^2.1.8"
   }
 }

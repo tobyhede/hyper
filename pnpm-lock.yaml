@@ -193,6 +193,10 @@ importers:
       '@project/graph':
         specifier: workspace:*
         version: link:../graph
+    devDependencies:
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@24.13.3)(jiti@2.7.0)(jsdom@25.0.1)(lightningcss@1.32.0)(tsx@4.20.6)(yaml@2.9.0)
 
   packages/react-flow-adapter:
     dependencies:
