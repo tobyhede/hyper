@@ -101,7 +101,7 @@ oversized-body test. AGENTS.md carries both host facts.
 `configurePreviewServer` had lost its only dispatch test when the host moved to
 the Node adapter — it asserted the module path and never drove a request — so
 the branch serving the built PostgreSQL runtime was unproven. It is now driven
-over a socket like development; wiring it to the wrong module or dropping its
+over a socket, as in development; wiring it to the wrong module or dropping its
 registration both fail it.
 
 `packages/http/src/**` had no coverage threshold, which is how the media scanner

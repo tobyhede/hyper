@@ -4,7 +4,7 @@
 > 0034 and `.scratch/fetch-native-http/` supersede its transport architecture;
 > the shipped application is now Fetch-native Hono with a typed client and
 > concrete runtime adapters.
-
+>
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Persist browser edits through `HttpSpaceBackend` and bounded HTTP handlers to `SpaceRepository`, preserving the existing session's ordered optimistic writes, visible retry/rejection/conflict states, and lossless revisions.

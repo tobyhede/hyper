@@ -114,10 +114,20 @@ protocol gaps:
   `JSON.parse` as a generic malformed request;
 - it owns request drainage and keep-alive behavior directly.
 
-Do not reproduce those helpers inside Hono route handlers. Use Hono's body-limit
-middleware to cap both declared and streamed bodies; it checks
-`Content-Length`, and reads the stream when the length is absent or transfer
-encoding is present.[^hono-body-limit]
+Do not reproduce those helpers inside Hono route handlers.
+
+This section originally recommended Hono's body-limit middleware to cap both
+declared and streamed bodies, on the grounds that it checks `Content-Length` and
+reads the stream when the length is absent or transfer encoding is
+present.[^hono-body-limit] **That recommendation was rejected during
+implementation and `bodyLimit` is deliberately not used.** Reading the header
+first is the defect, not the feature: `bodyLimit` compares and returns without
+consuming a byte, so an understated `Content-Length` smuggles any body through.
+On overflow it also abandons a *locked* reader without draining the remainder,
+which costs a keep-alive client its connection. `requireBoundedCommitBody` in
+`packages/http/src/index.ts` counts the bytes that arrive, deletes the header
+rather than consulting it, and drains the rejected body up to a bound. See the
+`Content-Length` entry in `AGENTS.md` for the full reasoning.
 
 Some behavior remains protocol policy rather than framework behavior:
 
@@ -131,7 +141,9 @@ Some behavior remains protocol policy rather than framework behavior:
   do not.
 - Reconsider the canonical-decimal `Content-Length` rule independently. Hono's
   body limiter uses the parsed length for its cap; canonical spelling is a
-  separate header policy.[^hono-body-limit-source]
+  separate header policy.[^hono-body-limit-source] **Resolved:** the rule went
+  with the raw handler. Nothing parses `Content-Length` any more, so how it is
+  spelled cannot matter — counting the received bytes subsumes it.
 
 Real host-level tests must remain for adapter behavior that Fetch-level tests
 cannot prove: oversized chunked bodies, connection reuse, early rejection and
