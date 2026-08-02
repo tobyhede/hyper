@@ -30,8 +30,12 @@ export const startHttpServer = async (
   return {
     url: `http://127.0.0.1:${address.port}`,
     close: () =>
-      new Promise<void>((resolve, reject) =>
-        server.close((error) => (error ? reject(error) : resolve())),
-      ),
+      new Promise<void>((resolve, reject) => {
+        server.close((error) => (error ? reject(error) : resolve()));
+        // `close` stops accepting and then waits for every open socket. A
+        // keep-alive agent holds one open by design, so without this the test
+        // that used one hangs teardown until its own timeout.
+        server.closeAllConnections();
+      }),
   };
 };

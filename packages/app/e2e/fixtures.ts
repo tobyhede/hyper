@@ -1,7 +1,7 @@
 import { test as base, expect } from '@playwright/test';
 import { fileURLToPath } from 'node:url';
 import { createServer, type ViteDevServer } from 'vite';
-import { NEW_SPACE_PROJECT } from './projects';
+import { E2E_PORT_BASE, NEW_SPACE_PROJECT } from './projects';
 
 /**
  * The Playwright `test` every spec in this directory imports, extended with a
@@ -53,7 +53,14 @@ export const test = base.extend<E2eFixtures>({
       root: appRoot,
       configFile,
       mode: testInfo.project.name === NEW_SPACE_PROJECT ? 'e2e-empty' : 'e2e-fixture',
-      server: { host: '127.0.0.1', port: 5276 + testInfo.workerIndex, strictPort: true },
+      // Away from the human's 5173/5174, and above `POSTGRES_E2E_PORT` so no
+      // worker index can reach the opt-in suite's fixed host — `strictPort`
+      // turns any overlap into a hard failure that blames startup instead.
+      server: {
+        host: '127.0.0.1',
+        port: E2E_PORT_BASE + testInfo.workerIndex,
+        strictPort: true,
+      },
     });
     try {
       await server.listen();

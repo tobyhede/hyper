@@ -25,12 +25,12 @@ export interface CardContentProps {
  * `javascript:` href and `<iframe src=javascript:>` all passed through intact
  * and ran in the dev server's origin.
  *
- * That hole is closed too — the save endpoint and the whole Vite file
- * integration are gone (ADR 0030) — which is what makes this defence in depth
- * rather than the only thing holding. Keep both: the trust argument recovers
- * its premise only for as long as nothing else can write a card, and card
- * bodies now arrive from a database over HTTP, which is not a property to bet
- * the origin on.
+ * The file write-back went with ADR 0030, but the premise did not come back with
+ * it: `PUT /api/spaces/:id` accepts a whole snapshot, card bodies included, and
+ * checks neither Origin nor Host. A write path a page in the author's browser
+ * can reach is still a write path, so this is not defence in depth behind a
+ * closed hole — it is load-bearing. Card bodies now arrive from a database over
+ * HTTP, which is not a property to bet the origin on either.
  */
 export function CardContent({ title, markdown }: CardContentProps) {
   const html = useMemo(

@@ -5,6 +5,7 @@ import { createServer, type ViteDevServer } from 'vite';
 import { PostgresSpaceRepository } from '../../src/persistence/postgres-space-repository';
 import { db } from '../../src/prisma/db';
 import { dragBy, nodeByTitle, positionOf, settled } from '../../packages/app/e2e/graph';
+import { POSTGRES_E2E_PORT } from '../../packages/app/e2e/projects';
 
 const appRoot = fileURLToPath(new URL('../../packages/app', import.meta.url));
 const configFile = fileURLToPath(new URL('../../packages/app/vite.config.ts', import.meta.url));
@@ -14,10 +15,11 @@ const startHost = async (): Promise<{ server: ViteDevServer; baseURL: string }> 
     root: appRoot,
     configFile,
     mode: 'postgres-e2e',
-    // Clear of the default suite's `5276 + workerIndex` range: this project is
-    // opt-in and may be running beside a normal `pnpm e2e`, and `strictPort`
-    // turns any overlap into a failure that blames the wrong thing.
-    server: { host: '127.0.0.1', port: 5376, strictPort: true },
+    // Below the default suite's `E2E_PORT_BASE + workerIndex` range, which no
+    // worker index can reach downward: this project is opt-in and may be running
+    // beside a normal `pnpm e2e`, and `strictPort` turns any overlap into a
+    // failure that blames the wrong thing.
+    server: { host: '127.0.0.1', port: POSTGRES_E2E_PORT, strictPort: true },
   });
   try {
     await server.listen();

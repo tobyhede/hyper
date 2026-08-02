@@ -252,6 +252,11 @@ test('a completed drag persists automatically', async ({ page }) => {
   await dragBy(page, a, 0, 260);
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
   await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
+
+  // Automatic means automatic: the status is the whole indicator and there is
+  // nothing to press (ADR 0030). A reintroduced Save would still let every
+  // assertion above pass.
+  await expect(page.getByRole('button', { name: /save/i })).toHaveCount(0);
 });
 
 test('a selected Card exposes four circular handles coloured as the active Route', async ({

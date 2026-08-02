@@ -106,7 +106,7 @@ function targetForEdit(
   return { layoutId: layout.id, title: layout.title };
 }
 
-/** Private functional core: derive and validate the whole next Space before effects. */
+/** Locate a Route by id and report whether it already holds this exact Edge. */
 function inspectRouteEdge(
   snapshot: SpaceSnapshot,
   routeId: RouteId,
@@ -144,70 +144,145 @@ function appendRouteEdge(
   return { ...base, document: { ...base.document, routes } };
 }
 
-function deriveCompletedEdit(current: CurrentEditState): DerivedEdit | null {
-  let base = current.snapshot;
-  if (current.connection?.createdCardId !== undefined) {
-    if (current.connection.createdCardId !== current.connection.to) {
-      throw new Error('A created Card must be the completed connection target.');
-    }
-    base = {
-      ...base,
-      cards: [
-        ...base.cards,
-        {
-          id: current.connection.createdCardId,
-          document: {
-            title: nextCardTitle(base),
-            kind: 'markdown',
-            body: '',
-          },
-        },
-      ],
-    };
+/**
+ * Step one — the Card a connection dropped on empty canvas creates, which every
+ * later step then sees as an ordinary Card the Space holds.
+ */
+function createConnectionCard(
+  base: SpaceSnapshot,
+  connection: CompletedConnectionEdit | null,
+): SpaceSnapshot {
+  if (connection?.createdCardId === undefined) return base;
+  if (connection.createdCardId !== connection.to) {
+    throw new Error('A created Card must be the completed connection target.');
   }
-  let activeRouteId = current.activeRouteId;
-  let connectionAlreadyAdded = false;
-  if (current.connection !== null && activeRouteId === null) {
-    if (!connectsWithoutActiveRoute(base)) {
-      throw new Error('A Space with Routes must have an active Route before connecting Cards.');
-    }
-    if (current.newRouteId === null || current.newRouteId === undefined) {
-      throw new Error('The first connection requires a new Route id.');
-    }
-    const mintedRouteId = current.newRouteId;
-    activeRouteId = mintedRouteId;
-    connectionAlreadyAdded = true;
-    // Only the Route is minted here. Making it visible in an explicit filter is
-    // `updatePositionedLayout`'s, which already owns a Layout's `routes` and is
-    // reached below with this same id — writing the filter here as well would be
-    // a second derivation of one answer, agreeing only until the rule changed.
-    base = {
+  return {
+    ...base,
+    cards: [
+      ...base.cards,
+      {
+        id: connection.createdCardId,
+        document: {
+          title: nextCardTitle(base),
+          kind: 'markdown',
+          body: '',
+        },
+      },
+    ],
+  };
+}
+
+/**
+ * Which Route this Edit's connection belongs to, and whether that Route had to
+ * be minted to hold it.
+ *
+ * A minted Route is created already holding the connection's Edge, so
+ * `mintedRouteId` is the one answer to both later questions — which Route the
+ * placement step adds to a Layout's explicit filter, and whether the append step
+ * still has an Edge to write. Threading it replaces a flag those two steps read
+ * at a distance from each other.
+ */
+interface ConnectionRoute {
+  readonly snapshot: SpaceSnapshot;
+  readonly activeRouteId: RouteId | null;
+  readonly mintedRouteId: RouteId | null;
+}
+
+/**
+ * Step two — the Route a Space's first connection mints to hold its Edge. Every
+ * other connection is authored into the Route already active, and a Space with
+ * Routes and none active cannot be connected in at all.
+ */
+function mintConnectionRoute(
+  base: SpaceSnapshot,
+  connection: CompletedConnectionEdit | null,
+  activeRouteId: RouteId | null,
+  newRouteId: RouteId | null | undefined,
+): ConnectionRoute {
+  if (connection === null || activeRouteId !== null) {
+    return { snapshot: base, activeRouteId, mintedRouteId: null };
+  }
+  if (!connectsWithoutActiveRoute(base)) {
+    throw new Error('A Space with Routes must have an active Route before connecting Cards.');
+  }
+  if (newRouteId === null || newRouteId === undefined) {
+    throw new Error('The first connection requires a new Route id.');
+  }
+  // Only the Route is minted here. Making it visible in an explicit filter is
+  // `updatePositionedLayout`'s, which already owns a Layout's `routes` and is
+  // handed this same id as `mintedRouteId` — writing the filter here as well
+  // would be a second derivation of one answer, agreeing only until the rule
+  // changed.
+  //
+  // Appending rather than replacing: the guard above rejects a Space that
+  // already has Routes, so today this appends to nothing. That guard states a
+  // policy, though, and a policy is not what should be keeping a data operation
+  // from discarding authored structure.
+  return {
+    snapshot: {
       ...base,
       document: {
         ...base.document,
         routes: [
+          ...base.document.routes,
           {
-            id: activeRouteId,
+            id: newRouteId,
             title: nextRouteTitle(base),
-            edges: [{ from: current.connection.from, to: current.connection.to }],
+            edges: [{ from: connection.from, to: connection.to }],
           },
         ],
       },
-    };
+    },
+    activeRouteId: newRouteId,
+    mintedRouteId: newRouteId,
+  };
+}
+
+/**
+ * Step four — write the connection's Edge into the Route that holds it, or
+ * report that there is nothing to write.
+ *
+ * A minted Route already carries the Edge, and a placement-only Edit never had
+ * one. `null` is the third answer: the Route already holds this exact Edge, so
+ * drawing it again is an idempotent no-op rather than an Edit (ADR 0032).
+ */
+function appendConnectionEdge(
+  base: SpaceSnapshot,
+  connection: CompletedConnectionEdit | null,
+  route: ConnectionRoute,
+): SpaceSnapshot | null {
+  if (connection === null || route.activeRouteId === null || route.mintedRouteId !== null) {
+    return base;
   }
-  const target = targetForEdit(base, current.renderer, current.newLayoutId);
-  const placed = updatePositionedLayout(
-    base,
-    target.layoutId,
-    target.title,
-    current.positions,
-    activeRouteId,
-    connectionAlreadyAdded ? activeRouteId : null,
+  return appendRouteEdge(base, route.activeRouteId, connection.from, connection.to);
+}
+
+/**
+ * Private functional core: derive and validate the whole next Space before effects.
+ *
+ * Four steps fold the current editing state into one snapshot — create Card,
+ * mint Route, place, append Edge — each taking the last one's snapshot. The
+ * minting step's `mintedRouteId` is what the placement and append steps read;
+ * neither asks a second time what the first already decided.
+ */
+function deriveCompletedEdit(current: CurrentEditState): DerivedEdit | null {
+  const created = createConnectionCard(current.snapshot, current.connection);
+  const route = mintConnectionRoute(
+    created,
+    current.connection,
+    current.activeRouteId,
+    current.newRouteId,
   );
-  const snapshot =
-    current.connection === null || activeRouteId === null || connectionAlreadyAdded
-      ? placed
-      : appendRouteEdge(placed, activeRouteId, current.connection.from, current.connection.to);
+  // Step three — place every Card the editor holds into the target Layout.
+  const target = targetForEdit(route.snapshot, current.renderer, current.newLayoutId);
+  const placed = updatePositionedLayout(route.snapshot, {
+    layoutId: target.layoutId,
+    title: target.title,
+    positions: current.positions,
+    activeRouteId: route.activeRouteId,
+    mintedRouteId: route.mintedRouteId,
+  });
+  const snapshot = appendConnectionEdge(placed, current.connection, route);
   if (snapshot === null) return null;
   const loaded = loadSpaceSnapshot(snapshot);
   if (!loaded.ok) {
@@ -217,8 +292,21 @@ function deriveCompletedEdit(current: CurrentEditState): DerivedEdit | null {
         .join('; ')}`,
     );
   }
-  return { snapshot, layoutId: target.layoutId, space: loaded.space, activeRouteId };
+  return {
+    snapshot,
+    layoutId: target.layoutId,
+    space: loaded.space,
+    activeRouteId: route.activeRouteId,
+  };
 }
+
+type ActiveConnectionRoute =
+  | { readonly kind: 'unavailable' }
+  | { readonly kind: 'new-route' }
+  | {
+      readonly kind: 'active-route';
+      readonly route: SpaceSnapshot['document']['routes'][number];
+    };
 
 /**
  * Whether the graph may accept this Edge as things currently stand.
@@ -228,14 +316,6 @@ function deriveCompletedEdit(current: CurrentEditState): DerivedEdit | null {
  * a Card; the editor asks again on release before emitting a completed Edit.
  * Sharing the policy keeps the preview, drop and completed Edit in agreement.
  */
-type ActiveConnectionRoute =
-  | { readonly kind: 'unavailable' }
-  | { readonly kind: 'new-route' }
-  | {
-      readonly kind: 'active-route';
-      readonly route: SpaceSnapshot['document']['routes'][number];
-    };
-
 export function createConnectionEligibility(
   currentActiveRoute: () => RouteId | null,
   session: SpaceSession,
@@ -260,6 +340,65 @@ export function createConnectionEligibility(
   };
 }
 
+/**
+ * One effect a completed Edit installs on a collaborator. Effects are
+ * independent: an earlier one throwing must not cost a later one its turn.
+ */
+type CompletionEffect = () => void;
+
+/**
+ * The Edit-completion reentrancy protocol, as one notification handler.
+ *
+ * `pass` derives one completed Edit and answers the ordered effects it installs,
+ * or `null` when the notification turned out to be nothing to install. It is the
+ * whole of the derivation: a `pass` that throws propagates immediately, before
+ * any effect of that pass has run.
+ *
+ * A notification arriving while a pass is already running is **queued**, not
+ * re-entered — installing an effect can complete a second Edit synchronously,
+ * because a session listener may — and the loop already running drains it.
+ *
+ * Effects run through their whole list even when one throws, so a failing
+ * collaborator cannot cost the ones after it their turn. Only the first failure
+ * is kept, and it propagates once the queue has drained, so a queued Edit is
+ * installed before the caller learns anything failed.
+ */
+function serializeCompletion(pass: () => readonly CompletionEffect[] | null): () => void {
+  let running = false;
+  let queued = false;
+  const takeQueued = (): boolean => {
+    const wasQueued = queued;
+    queued = false;
+    return wasQueued;
+  };
+  return () => {
+    if (running) {
+      queued = true;
+      return;
+    }
+    running = true;
+    let firstEffectError: { readonly error: unknown } | null = null;
+    try {
+      do {
+        for (const effect of pass() ?? []) {
+          try {
+            effect();
+          } catch (error) {
+            firstEffectError ??= { error };
+          }
+        }
+      } while (takeQueued());
+      if (firstEffectError !== null) throw firstEffectError.error;
+    } finally {
+      running = false;
+      // A `pass` that threw produced no completed state for anything queued
+      // during it to follow, so those notifications are stale. Leaving the flag
+      // set would spend the next notification's drain on a pass nobody asked for.
+      queued = false;
+    }
+  };
+}
+
 export function createPlacementEditor({
   initialPositions,
   viewChoice,
@@ -272,74 +411,41 @@ export function createPlacementEditor({
   // Each completed Edit installs a fresh positions map before notifying. Record
   // that identity before effects so a synchronous listener cannot resubmit it.
   let submittedPositions: ReadonlyMap<string, LayoutPoint> | null = null;
-  let completing = false;
-  let completionQueued = false;
-  const takeQueuedCompletion = (): boolean => {
-    const queued = completionQueued;
-    completionQueued = false;
-    return queued;
-  };
   const connectionEligibility = createConnectionEligibility(currentActiveRoute, session);
   const editor = createEditorStore(
     initialPositions,
-    () => {
-      if (completing) {
-        completionQueued = true;
-        return;
+    serializeCompletion(() => {
+      const positions = editor.getState().positions;
+      if (positions === null) {
+        throw new Error('EditCompleted was emitted without authored placement.');
       }
-      completing = true;
-      let firstEffectError: { readonly error: unknown } | null = null;
-      try {
-        do {
-          const positions = editor.getState().positions;
-          if (positions === null) {
-            throw new Error('EditCompleted was emitted without authored placement.');
-          }
-          if (positions === submittedPositions) continue;
-          const renderer = viewChoice.current();
-          const connection = editor.getState().completedConnection;
-          const activeRouteId = currentActiveRoute();
-          const next = deriveCompletedEdit({
-            snapshot: session.getState().working,
-            positions,
-            renderer,
-            newLayoutId: renderer.kind === 'view' ? newUuid() : null,
-            activeRouteId,
-            newRouteId:
-              connection !== null && activeRouteId === null ? (mintRouteId?.() ?? newUuid()) : null,
-            connection,
-          });
-          editor.setState({ completedConnection: null });
-          if (next === null) continue;
-          submittedPositions = positions;
-          try {
-            session.submit(next.snapshot);
-          } catch (error) {
-            firstEffectError ??= { error };
-          }
-          try {
-            installSpace(next.space);
-          } catch (error) {
-            firstEffectError ??= { error };
-          }
-          if (activeRouteId === null && next.activeRouteId !== null) {
-            try {
-              activateRoute?.(next.activeRouteId);
-            } catch (error) {
-              firstEffectError ??= { error };
-            }
-          }
-          try {
-            viewChoice.select({ kind: 'layout', layoutId: next.layoutId });
-          } catch (error) {
-            firstEffectError ??= { error };
-          }
-        } while (takeQueuedCompletion());
-        if (firstEffectError !== null) throw firstEffectError.error;
-      } finally {
-        completing = false;
-      }
-    },
+      if (positions === submittedPositions) return null;
+      const renderer = viewChoice.current();
+      const connection = editor.getState().completedConnection;
+      const activeRouteId = currentActiveRoute();
+      const next = deriveCompletedEdit({
+        snapshot: session.getState().working,
+        positions,
+        renderer,
+        newLayoutId: renderer.kind === 'view' ? newUuid() : null,
+        activeRouteId,
+        newRouteId:
+          connection !== null && activeRouteId === null ? (mintRouteId?.() ?? newUuid()) : null,
+        connection,
+      });
+      editor.setState({ completedConnection: null });
+      if (next === null) return null;
+      submittedPositions = positions;
+      // A Route is activated only when this Edit minted the Space's first;
+      // activating one is not itself an Edit (ADR 0028).
+      const activatedRouteId = activeRouteId === null ? next.activeRouteId : null;
+      return [
+        () => session.submit(next.snapshot),
+        () => installSpace(next.space),
+        ...(activatedRouteId === null ? [] : [() => activateRoute?.(activatedRouteId)]),
+        () => viewChoice.select({ kind: 'layout', layoutId: next.layoutId }),
+      ];
+    }),
     connectionEligibility,
   );
   return editor;

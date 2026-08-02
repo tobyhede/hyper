@@ -14,8 +14,11 @@ const response = {} as ServerResponse;
 describe('spaceHttpPlugin', () => {
   it('does not leave a failed runtime load unhandled before any request arrives', async () => {
     const rejections: unknown[] = [];
+    const failure = new Error('runtime failed');
+    // Only this rejection. The listener is process-wide, so anything else in
+    // flight elsewhere in the run would otherwise fail this test for it.
     const record = (reason: unknown): void => {
-      rejections.push(reason);
+      if (reason === failure) rejections.push(reason);
     };
     process.on('unhandledRejection', record);
     try {
@@ -28,7 +31,7 @@ describe('spaceHttpPlugin', () => {
       void configureServer.call(
         {} as never,
         {
-          ssrLoadModule: () => Promise.reject(new Error('runtime failed')),
+          ssrLoadModule: () => Promise.reject(failure),
           middlewares: { use: () => undefined },
         } as never,
       );

@@ -172,6 +172,63 @@ describe('typed Hono HttpSpaceBackend failure classification', () => {
     await expect(backend.loadSpace(SPACE_ID)).rejects.toThrow('Request timed out');
   });
 
+  it('decodes a listing into summaries and rejects one it cannot', async () => {
+    const summaries = [
+      { id: SPACE_ID, title: 'One' },
+      { id: CARD_ID, title: 'Two' },
+    ];
+    await expect(
+      backendFor(new Response(JSON.stringify(summaries), { status: 200 })).listSpaces(),
+    ).resolves.toEqual(summaries);
+
+    await expect(
+      backendFor(new Response(JSON.stringify([{ id: 'not-a-uuid', title: 'One' }]))).listSpaces(),
+    ).rejects.toThrow();
+    await expect(
+      backendFor(new Response(JSON.stringify({ spaces: summaries }))).listSpaces(),
+    ).rejects.toThrow();
+  });
+
+  it('reports an unsuccessful listing by status rather than decoding it', async () => {
+    await expect(backendFor(new Response('gateway', { status: 502 })).listSpaces()).rejects.toThrow(
+      'Unable to list spaces: HTTP 502',
+    );
+  });
+
+  /**
+   * Fetch aborts the body stream too, so a `signal` that fires after the headers
+   * have arrived rejects the pending `json()`/`text()`. A timer cleared when the
+   * headers land leaves that read with nothing to interrupt it.
+   */
+  const stalledBody = (status: number, signal: AbortSignal | undefined): Response => {
+    const stalled = <T>(): Promise<T> =>
+      new Promise<T>((_resolve, reject) => {
+        signal?.addEventListener('abort', () => reject(new Error('aborted')));
+      });
+    return {
+      ok: status >= 200 && status < 300,
+      status,
+      headers: new Headers(),
+      json: stalled<unknown>,
+      text: stalled<string>,
+    } as unknown as Response;
+  };
+
+  it('times out a response whose body never arrives', async () => {
+    const backend = new HttpSpaceBackend('/api/spaces', {
+      timeoutMs: 5,
+      fetch: (_input, init) => Promise.resolve(stalledBody(200, init?.signal ?? undefined)),
+    });
+
+    await expect(backend.listSpaces()).rejects.toThrow('Request timed out');
+    await expect(backend.loadSpace(SPACE_ID)).rejects.toThrow('Request timed out');
+    await expect(backend.commitSpace(snapshot, 0n)).resolves.toEqual({
+      kind: 'retryable-failure',
+      code: 'timeout',
+      message: 'Request timed out',
+    });
+  });
+
   it('applies its timeout to a caller-provided Fetch', async () => {
     const backend = new HttpSpaceBackend('/', {
       timeoutMs: 5,

@@ -56,7 +56,6 @@ export const createApp = ({ space, spaceSession }: OpenedSpace, { acceptRemote }
   // runtime aggregate at this composition boundary (ADR 0010).
   const {
     useStore: useSpaceStore,
-    updateSpace,
     selectActiveCardId,
     movesFrom,
   } = createSpaceStore(space, initialView.activeRouteId);
@@ -96,7 +95,7 @@ export const createApp = ({ space, spaceSession }: OpenedSpace, { acceptRemote }
     viewChoice,
     currentActiveRoute,
     session: spaceSession,
-    installSpace: updateSpace,
+    installSpace: (nextSpace) => useSpaceStore.getState().installSpace(nextSpace),
     activateRoute: (routeId) => useSpaceStore.getState().activateRoute(routeId),
     ...(firstRouteId === null ? {} : { mintRouteId: () => firstRouteId }),
   });
@@ -153,8 +152,8 @@ export const createApp = ({ space, spaceSession }: OpenedSpace, { acceptRemote }
     // That is still the rule; what is deliberate is that this is a plain render
     // computation and **not** memoized.
     //
-    // `movesFrom` reads the aggregate the store holds, and `updateSpace` replaces
-    // that by assignment — a mutation no dependency array can name. Authoring an
+    // `movesFrom` reads the aggregate the store holds, and `installSpace` replaces
+    // that in store state — a change no dependency array can name. Authoring an
     // Edge from the Card being presented leaves all three arguments unchanged, so
     // a `useMemo` over them kept listing the moves the Route had before the Edge
     // was drawn. It also bought nothing: `moves` feeds no dependency array and no
@@ -433,7 +432,12 @@ export const createApp = ({ space, spaceSession }: OpenedSpace, { acceptRemote }
             <div className="placement-status" role="alert" data-testid="placement-failure">
               <div className="placement-status__panel">
                 <h2>Unable to arrange this view</h2>
-                <pre>{canvas.error.message}</pre>
+                {/* The panel bounds this at 40vh and scrolls it, so it needs to
+                    take focus or a keyboard-only reader cannot reach the rest
+                    of a long failure. Focusable scroll regions need a name. */}
+                <pre tabIndex={0} aria-label="Placement failure detail">
+                  {canvas.error.message}
+                </pre>
               </div>
             </div>
           ) : canvas.kind === 'arrangement' ? (

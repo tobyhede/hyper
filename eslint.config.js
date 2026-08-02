@@ -93,17 +93,20 @@ const NODE_BUILTIN_PATTERN = {
  * exported, so its public surface stops meaning anything. `src/http` reached
  * `../../packages/persistence/src/http-protocol` and typecheck stayed green.
  *
- * `packages/app` is exempt: it is the composition layer and publishes no
- * `@project/*` entry, so a root test reaching it has no other way in.
+ * The `packages/app` exemption is scoped to *tests*, because the reason for it
+ * is a test's reason: the app is the composition layer and publishes no
+ * `@project/*` entry, so a root test has no other way in. Server code has no
+ * such excuse — `src/` runs the persistence runtime and must never reach into
+ * the browser composition layer — so it gets the pattern without the exemption.
  */
-const PACKAGE_INTERNALS_PATTERN = {
+const packageInternalsPattern = (exemptApp) => ({
   // `group` is matched with gitignore semantics (ESLint uses `ignore`, not
   // minimatch), so `**` crosses the leading `../..` and `!` negates — but
   // `{a,b}` brace expansion silently matches nothing. Don't write braces here.
-  group: ['**/packages/*/src/**', '!**/packages/app/src/**'],
+  group: exemptApp ? ['**/packages/*/src/**', '!**/packages/app/src/**'] : ['**/packages/*/src/**'],
   message:
     'Reaches past a package public surface. Import from @project/* — and export it from the package index if it is missing (AGENTS.md).',
-};
+});
 
 export default tseslint.config(
   {
@@ -242,9 +245,15 @@ export default tseslint.config(
     },
   },
   {
-    files: ['src/**/*.ts', 'test/**/*.ts'],
+    files: ['src/**/*.{ts,tsx}'],
     rules: {
-      'no-restricted-imports': ['error', { patterns: [PACKAGE_INTERNALS_PATTERN] }],
+      'no-restricted-imports': ['error', { patterns: [packageInternalsPattern(false)] }],
+    },
+  },
+  {
+    files: ['test/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': ['error', { patterns: [packageInternalsPattern(true)] }],
     },
   },
   {

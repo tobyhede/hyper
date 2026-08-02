@@ -196,6 +196,10 @@ body {
 
 .placement-status__panel pre {
   margin: 0;
+  /* A placement failure can carry every unresolved id at once. Bounded here so
+     a long one scrolls inside the panel instead of growing it past the canvas
+     and taking its own close affordance off screen. */
+  max-height: 40vh;
   overflow: auto;
   color: var(--muted);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;

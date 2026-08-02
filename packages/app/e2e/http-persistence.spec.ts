@@ -11,6 +11,18 @@ const navigationIsProtected = (page: Page) =>
     return !window.dispatchEvent(event);
   });
 
+/**
+ * A barrier for asserting that a commit did *not* happen. A wall-clock wait
+ * guesses how long is long enough and gets it wrong on a loaded machine; this
+ * round-trips one request through the same page, and anything the app had
+ * already queued is intercepted ahead of it.
+ */
+const settledNetwork = async (page: Page): Promise<void> => {
+  await page.evaluate(async () => {
+    await fetch('/api/spaces');
+  });
+};
+
 test('rapid edits commit in order and the latest position survives reload', async ({ page }) => {
   let releaseFirst = (): void => undefined;
   const firstGate = new Promise<void>((resolve) => {
@@ -121,7 +133,7 @@ test('a stale browser reports conflict and accepts the remote workspace without 
     await expect(acceptRemote).toBeVisible();
     expect(staleCommits).toBe(1);
     await expect.poll(() => navigationIsProtected(stalePage)).toBe(true);
-    await stalePage.waitForTimeout(150);
+    await settledNetwork(stalePage);
     expect(staleCommits).toBe(1);
 
     await acceptRemote.click();
@@ -152,7 +164,7 @@ test('route activation and presenting do not write or protect navigation', async
   await page.getByRole('option', { name: 'Echo' }).click();
   await page.getByTestId('present-button').click();
   await expect(page.getByTestId('presenting-chrome')).toBeVisible();
-  await page.waitForTimeout(100);
+  await settledNetwork(page);
 
   expect(commits).toBe(0);
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '0');
