@@ -493,9 +493,10 @@ describe('completed placement composition', () => {
     });
   });
 
-  it('preserves an empty route filter when only placement changes', () => {
+  it('preserves an empty route filter when only placement changes', async () => {
     const loaded = routeLessLoaded();
-    const session = openSpaceSession(new MemorySpaceBackend([loaded]), loaded);
+    const backend = new MemorySpaceBackend([loaded]);
+    const session = openSpaceSession(backend, loaded);
     const editor = createPlacementEditor({
       initialPositions: layoutPositionMap(routeLessLayout),
       viewChoice: createViewChoice({ kind: 'layout', layoutId: DEFAULT_LAYOUT_ID }),
@@ -517,6 +518,26 @@ describe('completed placement composition', () => {
         routes: [],
       },
     ]);
+
+    // The working snapshot is the local state the editor installed; what the
+    // filter has to survive is the round trip. Asserting the committed document
+    // is what would catch a `routes` the submission path dropped or widened.
+    await waitForSettled(session.getState, session.subscribe);
+    await expect(backend.loadSpace(SPACE_ID)).resolves.toMatchObject({
+      revision: 1n,
+      snapshot: {
+        document: {
+          routes: [],
+          layouts: [
+            {
+              id: DEFAULT_LAYOUT_ID,
+              positions: { [CARD_A]: { x: 70, y: 90 } },
+              routes: [],
+            },
+          ],
+        },
+      },
+    });
   });
 
   it('converts current owner state, selects locally, and persists asynchronously', async () => {

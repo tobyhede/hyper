@@ -26,6 +26,11 @@ export const send = (
   new Promise((resolve, reject) => {
     const request = httpRequest(new URL(path, baseUrl), { method, headers, agent }, (response) => {
       const chunks: Buffer[] = [];
+      // A connection lost part-way through the body is reported here and not on
+      // the request, which has already been answered. Without this the promise
+      // would stay pending and the awaiting test would read as a timeout with
+      // no cause attached to it.
+      response.once('error', reject);
       response.on('data', (chunk: Uint8Array) => chunks.push(Buffer.from(chunk)));
       response.on('end', () =>
         resolve({

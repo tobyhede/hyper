@@ -319,10 +319,13 @@ export const createSpaceHttpApp = (
     return context.json({ message: 'Not found' }, 404);
   });
   app.onError((error, context) => {
+    // Answer through the context rather than `error.getResponse()`, whatever the
+    // status. That method builds a bare `text/plain` Response carrying none of
+    // this application's policy — no `Cache-Control: no-store`, and a body the
+    // typed client cannot decode, since `HttpSpaceBackend` reads every non-200
+    // and non-409 commit response as `{ message }` JSON.
     if (error instanceof HTTPException) {
-      return error.status === 400
-        ? context.json({ message: error.message }, 400)
-        : error.getResponse();
+      return context.json({ message: error.message }, error.status);
     }
     // Never rethrow: Hono does not convert that into a 500, it re-invokes this
     // handler and lets the throw escape, so `app.fetch()` hands the host a

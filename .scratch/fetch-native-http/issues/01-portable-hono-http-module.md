@@ -37,7 +37,8 @@ response construction inside the portable module.
       factory, including repository failures and malformed input.
 - [x] Package dependency rules prevent Node, Vite, PostgreSQL, app, React and
       React Flow imports.
-- [x] The old Node handler remains temporarily available only for cutover.
+- [x] The old Node handler remains temporarily available, now only until the
+      raw-stack cleanup in ticket 04 deletes it.
 - [x] `pnpm verify` passes.
 
 ## Answer
@@ -57,7 +58,7 @@ status and required header without opening a socket. A compile-time Hono RPC
 contract test proves that both a successful load and a commit conflict expose
 the concrete `LoadedSpaceJson` wire shape rather than `unknown`; explicit 200
 statuses keep that response distinct from the 409 branch during inference. The
-old raw Node handler remains untouched for the later host cutover.
+old raw Node handler remains untouched for the later raw-stack cleanup.
 
 Final verification passed: `pnpm verify` ran 582 tests across 67 files; root and
 all seven package typechecks, lint, formatting and coverage thresholds passed.

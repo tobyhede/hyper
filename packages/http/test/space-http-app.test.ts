@@ -1,5 +1,6 @@
 import { uuidSchema, type SpaceSnapshot } from '@project/core';
 import { encodeCommitRequest } from '@project/persistence';
+import { HTTPException } from 'hono/http-exception';
 import { describe, expect, it } from 'vitest';
 import {
   createSpaceHttpApp,
@@ -601,6 +602,35 @@ describe('Space HTTP application', () => {
     expect(response.headers.get('cache-control')).toBe('no-store');
     await expect(response.json()).resolves.toEqual({ message: 'Internal server error' });
   });
+
+  /*
+   * `{ message: string }` is the whole error contract, and `HttpSpaceBackend`
+   * decodes every non-200/409 commit response as JSON. `HTTPException`'s own
+   * `getResponse()` answers `text/plain` with no `Cache-Control`, so forwarding
+   * it for any status but 400 left the typed client a body it cannot read and a
+   * cacheable error. A throwing log sink is the seam that reaches this branch
+   * with a status the application does not itself produce.
+   */
+  it.each([401, 404, 422] as const)(
+    'answers an HTTPException with %i in the declared JSON error shape',
+    async (status) => {
+      const app = createSpaceHttpApp(
+        repository({ listSpaces: () => Promise.reject(new Error('database is down')) }),
+        {
+          logError: () => {
+            throw new HTTPException(status, { message: `Refused with ${status}` });
+          },
+        },
+      );
+
+      const response = await app.request('/api/spaces');
+
+      expect(response.status).toBe(status);
+      expect(response.headers.get('cache-control')).toBe('no-store');
+      expect(response.headers.get('content-type')).toBe('application/json; charset=utf-8');
+      await expect(response.json()).resolves.toEqual({ message: `Refused with ${status}` });
+    },
+  );
 
   // Hono's own json validator applies a stricter Content-Type regex than this
   // module's media policy, and when it disagrees it does not parse the body and
