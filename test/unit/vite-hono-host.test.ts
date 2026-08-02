@@ -349,14 +349,36 @@ describe('Vite Hono host', () => {
   });
 
   it('survives a client abort while reading a request body', async () => {
+    // Counted, because surviving is only half of it: a half-sent body is the one
+    // path where nothing further arrives to end the stream, and a commit built
+    // from the bytes that did arrive would be a write the client never asked
+    // for. The client is already gone and will never see a response, so the
+    // repository is the only place the outcome is observable.
+    let commitAttempts = 0;
     const { host } = await startHost(
-      createSpaceHttpApp(repository(), { logError: () => undefined }),
+      createSpaceHttpApp(
+        {
+          ...repository(),
+          commitSpace: () => {
+            commitAttempts += 1;
+            return Promise.resolve({
+              kind: 'rejected' as const,
+              code: 'not-found' as const,
+              message: 'missing',
+            });
+          },
+        },
+        { logError: () => undefined },
+      ),
     );
 
     await abortChunkedRequest(host.url, '/api/spaces/00000000-0000-4000-8000-000000000001');
 
+    // The next request completing is the ordering barrier: the host answered it
+    // on the same server the abort was handed to, so that handling has run.
     await expect(fetch(`${host.url}/api/spaces`).then((response) => response.status)).resolves.toBe(
       200,
     );
+    expect(commitAttempts).toBe(0);
   });
 });
