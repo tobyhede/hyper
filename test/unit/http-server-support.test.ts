@@ -78,8 +78,11 @@ describe('raw HTTP request helper', () => {
     // socket resets the connection and `node:http` reports *that* on the
     // request, which is already handled; a FIN part-way through a declared body
     // is reported only on the response.
+    // `once`, because the first chunk is the whole trigger: a request head is
+    // free to arrive split, and answering a later chunk would be writing to a
+    // socket this handler has already ended.
     const server = createSocketServer((socket) => {
-      socket.on('data', () => {
+      socket.once('data', () => {
         socket.write('HTTP/1.1 200 OK\r\nContent-Length: 64\r\n\r\npartial');
         socket.end();
       });
