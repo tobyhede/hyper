@@ -72,12 +72,18 @@ export default defineConfig({
        * There is deliberately **no global threshold**. The repo-wide number is
        * dominated by React components that e2e covers and unit tests do not, so
        * a global gate would either sit uselessly low or invite tests written to
-       * move a number. These two packages are the pure domain logic, where a
-       * drop really does mean coverage was lost.
+       * move a number. These packages are the pure domain and transport logic,
+       * where a drop really does mean coverage was lost.
+       *
+       * `http` is gated for a demonstrated reason: its RFC 9110 media scanner
+       * shipped at 69.89% statements with the whole quoted-pair escape path
+       * unexercised, and nothing failed. An ungated package of pure branching
+       * logic is exactly where that goes unnoticed.
        */
       thresholds: {
         'packages/core/src/**': { statements: 96, branches: 88, functions: 95 },
         'packages/graph/src/**': { statements: 95, branches: 90, functions: 95 },
+        'packages/http/src/**': { statements: 98, branches: 94, functions: 96 },
         'packages/persistence/src/**': { statements: 95, branches: 90, functions: 95 },
       },
     },

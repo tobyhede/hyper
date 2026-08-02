@@ -1,9 +1,7 @@
 import { uuidSchema, type SpaceSnapshot } from '@project/core';
-import { HttpSpaceBackend } from '@project/http';
-import { afterEach, describe, expect, it } from 'vitest';
-import { createSpaceHttpHandler } from '../../src/http/space-http-handler';
+import { createSpaceHttpApp, HttpSpaceBackend } from '@project/http';
+import { describe, expect, it } from 'vitest';
 import { E2eMemorySpaceRepository } from '../support/e2e-memory-space-repository';
-import { startHttpServer, type TestHttpServer } from '../support/http-server';
 import { createWorkspaceStartup } from '../../packages/app/src/space';
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
@@ -17,24 +15,21 @@ const snapshot = (id = SPACE_ID, cardId = CARD_ID, title = 'Stored space'): Spac
   cards: [{ id: cardId, document: { title: 'Start here', kind: 'markdown', body: 'Stored body' } }],
 });
 
-const servers: TestHttpServer[] = [];
-
-const startupFor = async (...snapshots: SpaceSnapshot[]) => {
+const startupFor = (...snapshots: SpaceSnapshot[]) => {
   const repository = new E2eMemorySpaceRepository(
     snapshots.map((value) => ({ snapshot: value, revision: 0n, exportedRevision: null })),
   );
-  const server = await startHttpServer(createSpaceHttpHandler(repository));
-  servers.push(server);
-  return createWorkspaceStartup(new HttpSpaceBackend(server.url));
+  const app = createSpaceHttpApp(repository);
+  return createWorkspaceStartup(
+    new HttpSpaceBackend('http://hyper.test', {
+      fetch: (input, init) => Promise.resolve(app.fetch(new Request(input, init))),
+    }),
+  );
 };
-
-afterEach(async () => {
-  await Promise.all(servers.splice(0).map((server) => server.close()));
-});
 
 describe('HTTP workspace startup composition', () => {
   it('opens the only durable workspace through the HTTP backend', async () => {
-    const startup = await startupFor(snapshot());
+    const startup = startupFor(snapshot());
 
     const result = await startup.resolve();
 
@@ -49,7 +44,7 @@ describe('HTTP workspace startup composition', () => {
     // so an empty catalog here means that policy did not run. The browser has
     // no import path of its own to fall back to, and quietly opening something
     // it minted locally would be a workspace with nowhere to commit.
-    const startup = await startupFor();
+    const startup = startupFor();
 
     await expect(startup.resolve()).rejects.toThrow(
       'The persistence service returned no database workspaces.',
@@ -57,10 +52,7 @@ describe('HTTP workspace startup composition', () => {
   });
 
   it('returns the complete catalog and opens the exact selected UUID', async () => {
-    const startup = await startupFor(
-      snapshot(),
-      snapshot(OTHER_SPACE_ID, OTHER_CARD_ID, 'Other space'),
-    );
+    const startup = startupFor(snapshot(), snapshot(OTHER_SPACE_ID, OTHER_CARD_ID, 'Other space'));
 
     await expect(startup.resolve()).resolves.toEqual({
       kind: 'selection',

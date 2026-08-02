@@ -6,14 +6,24 @@ import {
   type ServerResponse,
 } from 'node:http';
 import { connect } from 'node:net';
+import { uuidSchema, type SpaceSnapshot } from '@project/core';
 import {
   createSpaceHttpApp,
   MAX_COMMIT_BODY_BYTES,
   type SpaceResourceRepository,
 } from '@project/http';
+import { encodeCommitRequest } from '@project/persistence';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { spaceHttpPlugin } from '../../packages/app/vite-space-http-plugin';
 import { send } from '../support/raw-http-request';
+
+const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
+const CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
+const snapshot: SpaceSnapshot = {
+  id: SPACE_ID,
+  document: { version: 2, title: 'One', routes: [] },
+  cards: [{ id: CARD_ID, document: { title: 'A', kind: 'markdown', body: '' } }],
+};
 
 type Middleware = (
   request: IncomingMessage,
@@ -40,16 +50,26 @@ const startHost = async (
     response.statusCode = 404;
     response.end();
   },
+  // Development loads through Vite's SSR module runner and preview through a
+  // plain import of the built artifact. Both reach the same `installMiddleware`,
+  // but only by being registered — the hook a host never installs serves
+  // nothing, and preview is the branch that carries the built PostgreSQL
+  // runtime, so it is driven over a socket rather than trusted to symmetry.
+  hook: 'development' | 'preview' = 'development',
 ) => {
   let middleware: Middleware | undefined;
   const createApp = vi.fn(() => application);
   const plugin = spaceHttpPlugin({
     developmentModule: '/runtime.ts',
     previewModule: '/runtime.js',
+    loadPreviewModule: (modulePath) =>
+      modulePath === '/runtime.js'
+        ? Promise.resolve({ createApp })
+        : Promise.reject(new Error(`Unexpected preview module ${modulePath}`)),
   });
-  const configureServer = plugin.configureServer;
-  if (typeof configureServer !== 'function') throw new Error('Expected configureServer hook');
-  void configureServer.call(
+  const configure = hook === 'preview' ? plugin.configurePreviewServer : plugin.configureServer;
+  if (typeof configure !== 'function') throw new Error(`Expected ${hook} hook`);
+  void configure.call(
     {} as never,
     {
       ssrLoadModule: () => Promise.resolve({ createApp }),
@@ -145,6 +165,55 @@ describe('Vite Hono host', () => {
 
     expect(response.status).toBe(200);
     await expect(response.text()).resolves.toBe('<main>Vite application</main>');
+  });
+
+  it('serves the API from the built runtime and leaves the rest to preview static assets', async () => {
+    const { host, createApp } = await startHost(
+      createSpaceHttpApp(repository()),
+      (_request, response) => {
+        response.setHeader('Content-Type', 'text/html');
+        response.end('<main>Built application</main>');
+      },
+      'preview',
+    );
+
+    await expect(
+      fetch(`${host.url}/api/spaces`).then((response) => response.json()),
+    ).resolves.toEqual([]);
+    await expect(fetch(`${host.url}/index.html`).then((response) => response.text())).resolves.toBe(
+      '<main>Built application</main>',
+    );
+    expect(createApp).toHaveBeenCalledOnce();
+  });
+
+  /*
+   * The accepted media path, which no other socket-level test reaches: every
+   * other request here is rejected before a body is read.
+   *
+   * `application/json ; charset=utf-8` is legal under RFC 9110 and rejected by
+   * Hono's narrower json regex, so serving it at all depends on
+   * `requireSupportedRequestMedia` rebuilding the request with a canonical
+   * header. That rebuild calls the *global* `Request` constructor on whatever
+   * request object the host handed in — and `getRequestListener` replaces
+   * `globalThis.Request`/`Response` with its own lightweight classes, so the
+   * native constructor would be handed a foreign instance. Passing
+   * `overrideGlobalObjects: false` therefore breaks every real commit while
+   * leaving all the rejection paths above green.
+   */
+  it('commits through a rewritten media type over a real socket', async () => {
+    const commitSpace = vi.fn(() => Promise.resolve({ kind: 'committed' as const, revision: 3n }));
+    const { host } = await startHost(createSpaceHttpApp({ ...repository(), commitSpace }));
+
+    const response = await send(
+      host.url,
+      `/api/spaces/${SPACE_ID}`,
+      JSON.stringify(encodeCommitRequest(snapshot, 2n)),
+      { 'content-type': 'application/json ; charset=utf-8' },
+    );
+
+    expect(response.status).toBe(200);
+    expect(JSON.parse(response.body)).toEqual({ revision: '3' });
+    expect(commitSpace).toHaveBeenCalledWith(snapshot, 2n);
   });
 
   it('drains an oversized chunked body and reuses the connection', async () => {
@@ -280,14 +349,36 @@ describe('Vite Hono host', () => {
   });
 
   it('survives a client abort while reading a request body', async () => {
+    // Counted, because surviving is only half of it: a half-sent body is the one
+    // path where nothing further arrives to end the stream, and a commit built
+    // from the bytes that did arrive would be a write the client never asked
+    // for. The client is already gone and will never see a response, so the
+    // repository is the only place the outcome is observable.
+    let commitAttempts = 0;
     const { host } = await startHost(
-      createSpaceHttpApp(repository(), { logError: () => undefined }),
+      createSpaceHttpApp(
+        {
+          ...repository(),
+          commitSpace: () => {
+            commitAttempts += 1;
+            return Promise.resolve({
+              kind: 'rejected' as const,
+              code: 'not-found' as const,
+              message: 'missing',
+            });
+          },
+        },
+        { logError: () => undefined },
+      ),
     );
 
     await abortChunkedRequest(host.url, '/api/spaces/00000000-0000-4000-8000-000000000001');
 
+    // The next request completing is the ordering barrier: the host answered it
+    // on the same server the abort was handed to, so that handling has run.
     await expect(fetch(`${host.url}/api/spaces`).then((response) => response.status)).resolves.toBe(
       200,
     );
+    expect(commitAttempts).toBe(0);
   });
 });

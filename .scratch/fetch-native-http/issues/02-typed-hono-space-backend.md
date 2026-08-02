@@ -51,5 +51,5 @@ Injected Fetch responses prove malformed bodies, network failures, response
 body stalls and every existing commit classification remain runtime-checked.
 `pnpm verify` passes with 68 test files and 588 tests; the application production
 build also succeeds. E2E was not run because neither runtime hosting nor UI
-behaviour changed; the existing raw Node host remains the composition until
-ticket 03.
+behaviour changed; the raw Node host remained the composition until ticket 03,
+and ticket 04 then deleted it.

@@ -21,6 +21,11 @@ export const MAX_COMMIT_BODY_BYTES = 1_048_576;
 // Named so the route registration and the json validator's explicit path type
 // cannot drift apart; the validator needs the literal to stay in the schema.
 const SPACE_RESOURCE_PATH = '/api/spaces/:id';
+const SPACE_COLLECTION_PATH = '/api/spaces';
+// The resource path again as a matcher, for a request no route served. Hono has
+// finished routing by then, so its own pattern is no longer available to ask,
+// and this must keep matching what `SPACE_RESOURCE_PATH` registers.
+const SPACE_RESOURCE_PATTERN = /^\/api\/spaces\/([^/]+)$/;
 
 export type SpaceResourceCommitResult =
   | { kind: 'committed'; revision: bigint }
@@ -135,6 +140,11 @@ const requireBoundedCommitBody = createMiddleware(async (context, next) => {
     }
     chunks.push(value);
   }
+
+  // Rebuilding the request calls the *global* `Request` constructor on whatever
+  // the host handed in, so a host whose request objects are not its own globals'
+  // instances breaks here. That is a real constraint, not a theoretical one: see
+  // the note beside the same rebuild in `requireSupportedRequestMedia`.
   const headers = new Headers(context.req.raw.headers);
   // The request handed downstream carries our own re-enqueued body. An
   // over-declared length from the original request would describe it wrongly,
@@ -180,6 +190,12 @@ const requireSupportedRequestMedia = createMiddleware(async (context, next) => {
   // says nothing. Rewriting the header this guard has just accepted leaves one
   // media policy in force. Without it an RFC 9110-legal `application/json ;
   // charset=utf-8` is answered 400 about the fields of a body never read.
+  //
+  // This is the module's one host requirement, and it is not free: `new Request`
+  // resolves to whatever `globalThis.Request` is, so the host must hand in
+  // requests that constructor accepts. `@hono/node-server` satisfies it by
+  // installing its own `Request`/`Response` globals, which is why the Vite host
+  // must not disable that. Portable does not mean indifferent to the host.
   const headers = new Headers(context.req.raw.headers);
   headers.set('Content-Type', 'application/json');
   context.req.raw = new Request(context.req.raw, { headers });
@@ -226,31 +242,81 @@ const validateSpaceId = validator('param', (value, context) => {
   return id.success ? { id: id.data } : context.json({ message: 'Space id must be a UUID' }, 400);
 });
 
+/**
+ * The answer for a request naming a path on the contract that no handler will
+ * serve. Two callers reach it and they must agree, which is why it is one
+ * function rather than two regexes: `app.notFound()`, for a method the route
+ * tree never declared, and the HEAD guard, because Hono answers HEAD from the
+ * GET handler and drops the body — a 200 that silently carries nothing.
+ *
+ * A non-UUID segment is a 400 here exactly as `validateSpaceId` makes it for
+ * GET and PUT. Advertising `Allow` for it instead would name methods for a
+ * resource no request can address, and disagree with GET on the same URL.
+ *
+ * `undefined` means the path is not on the contract at all; only `notFound`
+ * has an answer for that, and the HEAD guard must let it fall through.
+ */
+const unservedContractPath = (context: Context): Response | undefined => {
+  if (context.req.path === SPACE_COLLECTION_PATH) {
+    context.header('Allow', 'GET');
+    return context.body(null, 405);
+  }
+  const resource = SPACE_RESOURCE_PATTERN.exec(context.req.path);
+  if (resource === null) {
+    return undefined;
+  }
+  if (!uuidSchema.safeParse(resource[1]).success) {
+    return context.json({ message: 'Space id must be a UUID' }, 400);
+  }
+  context.header('Allow', 'GET, PUT');
+  return context.body(null, 405);
+};
+
+/**
+ * `c.json()` sets a bare `application/json`, so naming the charset is a rewrite
+ * of what Hono produced rather than a default applied to what we omitted. Both
+ * of the middleware's exits reach it: a response that fell through the route
+ * tree, and the HEAD guard's early return. Only the first went through it
+ * before, so `/api/spaces/not-a-uuid` answered GET and HEAD with the same 400
+ * under two different media types.
+ */
+const normalizeJsonMedia = (response: Response): Response => {
+  if (response.headers.get('Content-Type') === 'application/json') {
+    response.headers.set('Content-Type', 'application/json; charset=utf-8');
+  }
+  return response;
+};
+
+/**
+ * What holds for every request whatever route serves it: nothing is cacheable,
+ * HEAD never reaches a GET handler, and a JSON response names its charset.
+ *
+ * Written through `createMiddleware` like its siblings rather than inline in the
+ * chain. An inline `use('*')` handler's context carries `any` in its input slot,
+ * which makes handing it to `unservedContractPath` an unsafe argument that lint
+ * rejects — the factory types it properly.
+ */
+const applyTransportPolicy = createMiddleware(async (context, next) => {
+  context.header('Cache-Control', 'no-store');
+  if (context.req.method === 'HEAD') {
+    const unserved = unservedContractPath(context);
+    if (unserved !== undefined) {
+      return normalizeJsonMedia(unserved);
+    }
+  }
+  await next();
+  normalizeJsonMedia(context.res);
+  return;
+});
+
 export const createSpaceHttpApp = (
   repository: SpaceResourceRepository,
   options: SpaceHttpAppOptions = {},
 ) => {
   const logError = options.logError ?? defaultLogError;
   const app = new Hono()
-    .use('*', async (context, next) => {
-      context.header('Cache-Control', 'no-store');
-      if (context.req.method === 'HEAD') {
-        if (context.req.path === '/api/spaces') {
-          context.header('Allow', 'GET');
-          return context.body(null, 405);
-        }
-        if (/^\/api\/spaces\/[^/]+$/.test(context.req.path)) {
-          context.header('Allow', 'GET, PUT');
-          return context.body(null, 405);
-        }
-      }
-      await next();
-      if (context.res.headers.get('Content-Type') === 'application/json') {
-        context.header('Content-Type', 'application/json; charset=utf-8');
-      }
-      return;
-    })
-    .get('/api/spaces', async (context) => {
+    .use('*', applyTransportPolicy)
+    .get(SPACE_COLLECTION_PATH, async (context) => {
       try {
         return context.json(await repository.listSpaces(), 200);
       } catch (error) {
@@ -298,26 +364,17 @@ export const createSpaceHttpApp = (
         }
       },
     );
-  app.notFound((context) => {
-    if (context.req.path === '/api/spaces') {
-      context.header('Allow', 'GET');
-      return context.body(null, 405);
-    }
-    const resource = /^\/api\/spaces\/([^/]+)$/.exec(context.req.path);
-    if (resource !== null) {
-      if (!uuidSchema.safeParse(resource[1]).success) {
-        return context.json({ message: 'Space id must be a UUID' }, 400);
-      }
-      context.header('Allow', 'GET, PUT');
-      return context.body(null, 405);
-    }
-    // Not `context.notFound()`. Hono seeds the Context's not-found handler from
-    // the app's, so calling it from inside the handler `app.notFound()`
-    // installed re-enters this function until the stack blows — every path off
-    // the declared contract, including the trailing slash an address bar makes.
-    // The RPC docs independently say not to use it when a client infers types.
-    return context.json({ message: 'Not found' }, 404);
-  });
+  app.notFound(
+    (context) =>
+      unservedContractPath(context) ??
+      // Not `context.notFound()`. Hono seeds the Context's not-found handler
+      // from the app's, so calling it from inside the handler `app.notFound()`
+      // installed re-enters this function until the stack blows — every path
+      // off the declared contract, including the trailing slash an address bar
+      // makes. The RPC docs independently say not to use it when a client
+      // infers types.
+      context.json({ message: 'Not found' }, 404),
+  );
   app.onError((error, context) => {
     // Answer through the context rather than `error.getResponse()`, whatever the
     // status. That method builds a bare `text/plain` Response carrying none of

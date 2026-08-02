@@ -29,9 +29,7 @@ Vite imports. Node, Worker, Bun, Deno or other hosts are supported only when a
 tested adapter and compatible persistence composition exist; Hono advertising
 an adapter is not by itself a Hyper support promise.
 
-The current raw Node handler remains only until
-`.scratch/fetch-native-http/issues/04-remove-the-raw-node-http-stack.md` — remove
-the raw Node HTTP stack — is completed. Every runtime already serves the Hono
-application; what is left is the deletion that ticket owns. Its manual JSON
-buffering, media-type parsing and `Promise<boolean>`-for-fallthrough interface
-are not compatibility contracts.
+This migration is built. The former raw Node handler, manual JSON buffering,
+media-type parser and `Promise<boolean>` fallthrough interface have been
+deleted. The current Vite host is one concrete Node adapter around the Fetch
+application, not part of the portable route contract.

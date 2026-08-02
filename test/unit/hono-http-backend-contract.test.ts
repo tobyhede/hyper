@@ -39,11 +39,14 @@ spaceBackendContract('Hono HttpSpaceBackend', (initial) => {
     commitSpace: async (nextSnapshot, expectedRevision) => {
       const result = await memory.commitSpace(nextSnapshot, expectedRevision);
       if (result.kind === 'committed' || result.kind === 'conflict') return result;
-      return {
-        kind: 'rejected',
-        code: result.code === 'not-found' ? 'not-found' : 'invalid-snapshot',
-        message: result.message,
-      };
+      // `SpaceResourceRepository` declares two rejection codes; `CommitResult`
+      // carries eight. Collapsing the rest into `invalid-snapshot` would let a
+      // transport or authorization failure reach the contract disguised as a
+      // domain rejection, and the assertions downstream would still pass.
+      if (result.code !== 'not-found' && result.code !== 'invalid-snapshot') {
+        throw new Error(`Unmapped commitSpace failure in contract harness: ${result.code}`);
+      }
+      return { kind: 'rejected', code: result.code, message: result.message };
     },
   });
   return Promise.resolve({

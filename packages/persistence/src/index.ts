@@ -1,7 +1,8 @@
 export * from './backend';
 /* The wire contract's two ends live in different processes. These are the
- * codecs the portable HTTP package and the legacy Node host share during the
- * migration. */
+ * codecs the portable HTTP package reads the wire through; the legacy Node host
+ * that used to share them is gone. `CANONICAL_DECIMAL` belongs with them because
+ * `HttpSpaceBackend` validates a revision header against it before decoding. */
 export {
   CANONICAL_DECIMAL,
   decodeCommitRequest,

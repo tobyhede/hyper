@@ -22,6 +22,10 @@
 
 ## Answer
 
+This answer records the transport first shipped by this resolved increment.
+ADR 0034 and `.scratch/fetch-native-http/` later replaced its raw Node handler
+with the Fetch-native Hono application and typed client.
+
 `HttpSpaceBackend` now uses a strict lossless JSON protocol over fixed
 `/api/spaces` resources. The Node handler bounds commit bodies at 1,048,576 raw
 bytes, validates transport shape before repository access, preserves `bigint`
