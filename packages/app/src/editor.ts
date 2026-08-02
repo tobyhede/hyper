@@ -1,4 +1,9 @@
-import { applyNodeChanges, type NodeChange, type NodePositionChange } from '@xyflow/react';
+import {
+  applyNodeChanges,
+  type Edge,
+  type NodeChange,
+  type NodePositionChange,
+} from '@xyflow/react';
 import { create, type StoreApi, type UseBoundStore } from 'zustand';
 import { uuidSchema, type CardId } from '@project/core';
 import type { LayoutPoint } from '@project/graph';
@@ -36,6 +41,8 @@ export interface EditorState {
    * — and a space is correspondingly not editable for that frame.
    */
   nodes: CardFlowNode[] | null;
+  /** Route Edges belonging to the same published projection as `nodes`. */
+  edges: Edge[];
   /** Authoritative, possibly sparse Layout placement; null before conversion. */
   positions: ReadonlyMap<string, LayoutPoint> | null;
   /** Gesture starts retained until each node receives a settled callback. */
@@ -51,11 +58,11 @@ export interface EditorState {
   selectedCardId: CardId | null;
   /** The structural part of the completed Edit most recently notified. */
   completedConnection: CompletedConnectionEdit | null;
-  /** Fold a freshly projected node list into the live one. */
-  syncNodes: (projected: readonly CardFlowNode[]) => void;
+  /** Publish projected Card nodes, their declared handles and Route Edges together. */
+  syncProjection: (nodes: readonly CardFlowNode[], edges: readonly Edge[]) => void;
   /**
    * Navigate to another renderer. The replacement arrangement will arrive via
-   * `syncNodes`; renderer selection itself is not an edit.
+   * `syncProjection`; renderer selection itself is not an edit.
    */
   selectRenderer: (positions: ReadonlyMap<string, LayoutPoint> | null) => void;
   /** Apply React Flow's own changes (drag, measure, select). */
@@ -164,23 +171,23 @@ export function createEditorStore(
 ): EditorStore {
   return create<EditorState>((set, get) => ({
     nodes: null,
+    edges: [],
     positions: initialPositions === null ? null : new Map(initialPositions),
     dragOrigins: new Map(),
     moved: false,
     selectedCardId: null,
     completedConnection: null,
 
-    syncNodes: (projected) =>
-      set((state) => {
-        if (state.nodes === null) {
-          return { nodes: [...projected] };
-        }
-        return { nodes: reconcile(state.nodes, projected) };
-      }),
+    syncProjection: (nodes, edges) =>
+      set((state) => ({
+        nodes: state.nodes === null ? [...nodes] : reconcile(state.nodes, nodes),
+        edges: [...edges],
+      })),
 
     selectRenderer: (positions) =>
       set({
         nodes: null,
+        edges: [],
         positions: positions === null ? null : new Map(positions),
         dragOrigins: new Map(),
         moved: false,

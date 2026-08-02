@@ -1,5 +1,6 @@
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
+import { Position, type Edge } from '@xyflow/react';
 import type { LayoutPoint } from '@project/graph';
 import { createEditorStore } from '../src/editor';
 import { completeDrag, moving, node, settled } from './editor-fixtures';
@@ -18,12 +19,51 @@ const PROJECTED = [
 ];
 
 describe('editor store', () => {
+  it('publishes a new Route Edge only with both endpoint handle declarations', () => {
+    const store = createEditorStore();
+    store.getState().syncProjection(PROJECTED, []);
+    const routeId = '00000000-0000-4000-8000-000000000004';
+    const sourceHandle = `${routeId}::out`;
+    const targetHandle = `${routeId}::in`;
+    const edge: Edge = {
+      id: `${routeId}:A->B`,
+      source: PROJECTED[0]!.id,
+      target: PROJECTED[1]!.id,
+      sourceHandle,
+      targetHandle,
+    };
+    const nextNodes = PROJECTED.map((projected, index) => ({
+      ...projected,
+      handles: [
+        {
+          id: index === 0 ? sourceHandle : targetHandle,
+          type: index === 0 ? ('source' as const) : ('target' as const),
+          position: index === 0 ? Position.Right : Position.Left,
+          x: index === 0 ? 300 : 0,
+          y: 100,
+          width: 8,
+          height: 8,
+        },
+      ],
+    }));
+    const observed: ReturnType<typeof store.getState>[] = [];
+    const unsubscribe = store.subscribe((state) => observed.push(state));
+
+    store.getState().syncProjection(nextNodes, [edge]);
+    unsubscribe();
+
+    expect(observed).toHaveLength(1);
+    expect(observed[0]?.edges).toEqual([edge]);
+    expect(observed[0]?.nodes?.[0]?.handles?.map((handle) => handle.id)).toContain(sourceHandle);
+    expect(observed[0]?.nodes?.[1]?.handles?.map((handle) => handle.id)).toContain(targetHandle);
+  });
+
   it('notifies once after installing a completed Edit', () => {
     const observed: (ReadonlyMap<string, LayoutPoint> | null)[] = [];
     const store = createEditorStore(null, () => {
       observed.push(store.getState().positions);
     });
-    store.getState().syncNodes(PROJECTED);
+    store.getState().syncProjection(PROJECTED, []);
 
     completeDrag(store, '00000000-0000-4000-8000-000000000002', 500, 400);
 
@@ -40,7 +80,7 @@ describe('editor store', () => {
     const store = createEditorStore(null, () => {
       notifications += 1;
     });
-    store.getState().syncNodes(PROJECTED);
+    store.getState().syncProjection(PROJECTED, []);
 
     store.getState().changeNodes(moving('00000000-0000-4000-8000-000000000002', 500, 400));
     store.getState().changeNodes(settled('00000000-0000-4000-8000-000000000002', 10, 20));
@@ -60,7 +100,7 @@ describe('editor store', () => {
 
   it('keeps the first automatic arrangement runtime-only', () => {
     const store = createEditorStore();
-    store.getState().syncNodes(PROJECTED);
+    store.getState().syncProjection(PROJECTED, []);
 
     expect(store.getState().nodes?.map((n) => n.id)).toEqual([
       '00000000-0000-4000-8000-000000000002',
@@ -73,7 +113,7 @@ describe('editor store', () => {
 
   it('converts when settlement repeats the last moving frame', () => {
     const store = createEditorStore();
-    store.getState().syncNodes(PROJECTED);
+    store.getState().syncProjection(PROJECTED, []);
 
     store.getState().changeNodes(moving('00000000-0000-4000-8000-000000000002', 500, 400));
     expect(store.getState().positions).toBeNull();
@@ -94,7 +134,7 @@ describe('editor store', () => {
 
   it('does not convert when a drag returns to its gesture origin', () => {
     const store = createEditorStore();
-    store.getState().syncNodes(PROJECTED);
+    store.getState().syncProjection(PROJECTED, []);
     store.getState().changeNodes(moving('00000000-0000-4000-8000-000000000002', 500, 400));
     store.getState().changeNodes(settled('00000000-0000-4000-8000-000000000002', 10, 20));
 
@@ -105,7 +145,7 @@ describe('editor store', () => {
 
   it('uses the pre-callback position for a settled-only change', () => {
     const store = createEditorStore();
-    store.getState().syncNodes(PROJECTED);
+    store.getState().syncProjection(PROJECTED, []);
     store.getState().changeNodes(settled('00000000-0000-4000-8000-000000000002', 500, 400));
 
     expect(authoredPositions(store).get('00000000-0000-4000-8000-000000000002')).toEqual({
@@ -116,7 +156,7 @@ describe('editor store', () => {
 
   it('records where a drag ends, and moves nothing else', () => {
     const store = createEditorStore();
-    store.getState().syncNodes(PROJECTED);
+    store.getState().syncProjection(PROJECTED, []);
     completeDrag(store, '00000000-0000-4000-8000-000000000002', 500, 400);
 
     expect(authoredPositions(store).get('00000000-0000-4000-8000-000000000002')).toEqual({
@@ -136,7 +176,7 @@ describe('editor store', () => {
 
   it('follows the cursor mid-drag without recording it', () => {
     const store = createEditorStore();
-    store.getState().syncNodes(PROJECTED);
+    store.getState().syncProjection(PROJECTED, []);
     store.getState().changeNodes(moving('00000000-0000-4000-8000-000000000002', 77, 88));
 
     expect(
@@ -149,7 +189,7 @@ describe('editor store', () => {
 
   it('records a subsequent drag against its own origin after conversion', () => {
     const store = createEditorStore();
-    store.getState().syncNodes(PROJECTED);
+    store.getState().syncProjection(PROJECTED, []);
     completeDrag(store, '00000000-0000-4000-8000-000000000002', 500, 400);
     completeDrag(store, '00000000-0000-4000-8000-000000000003', 700, 450);
 
@@ -163,9 +203,9 @@ describe('editor store', () => {
 
   it('keeps a dragged position when the projection is re-synced', () => {
     const store = createEditorStore();
-    store.getState().syncNodes(PROJECTED);
+    store.getState().syncProjection(PROJECTED, []);
     completeDrag(store, '00000000-0000-4000-8000-000000000002', 500, 400);
-    store.getState().syncNodes(PROJECTED);
+    store.getState().syncProjection(PROJECTED, []);
 
     expect(
       store.getState().nodes?.find((n) => n.id === '00000000-0000-4000-8000-000000000002')
@@ -179,14 +219,14 @@ describe('editor store', () => {
 
   it('takes fresh data and styling from the projection', () => {
     const store = createEditorStore();
-    store.getState().syncNodes(PROJECTED);
+    store.getState().syncProjection(PROJECTED, []);
     const restyled = [
       {
         ...node('00000000-0000-4000-8000-000000000002', 10, 20, 'A renamed'),
         className: 'rf-card-node--active',
       },
     ];
-    store.getState().syncNodes(restyled);
+    store.getState().syncProjection(restyled, []);
 
     const a = store.getState().nodes?.[0];
     expect(a?.data.title).toBe('A renamed');
@@ -195,8 +235,8 @@ describe('editor store', () => {
 
   it('drops a node whose card the projection no longer has', () => {
     const store = createEditorStore();
-    store.getState().syncNodes(PROJECTED);
-    store.getState().syncNodes([node('00000000-0000-4000-8000-000000000002', 10, 20)]);
+    store.getState().syncProjection(PROJECTED, []);
+    store.getState().syncProjection([node('00000000-0000-4000-8000-000000000002', 10, 20)], []);
     expect(store.getState().nodes?.map((n) => n.id)).toEqual([
       '00000000-0000-4000-8000-000000000002',
     ]);
@@ -204,13 +244,16 @@ describe('editor store', () => {
 
   it('converts exactly the current projection after cards were added and removed', () => {
     const store = createEditorStore();
-    store.getState().syncNodes(PROJECTED);
+    store.getState().syncProjection(PROJECTED, []);
     store
       .getState()
-      .syncNodes([
-        node('00000000-0000-4000-8000-000000000003', 300, 20),
-        node('00000000-0000-4000-8000-000000000004', 600, 20),
-      ]);
+      .syncProjection(
+        [
+          node('00000000-0000-4000-8000-000000000003', 300, 20),
+          node('00000000-0000-4000-8000-000000000004', 600, 20),
+        ],
+        [],
+      );
 
     completeDrag(store, '00000000-0000-4000-8000-000000000003', 350, 90);
 
@@ -225,7 +268,7 @@ describe('editor store', () => {
   it('starts a positioned view from its existing sparse authored placement', () => {
     const initial = new Map([['00000000-0000-4000-8000-000000000002', { x: 10, y: 20 }]]);
     const store = createEditorStore(initial);
-    store.getState().syncNodes(PROJECTED);
+    store.getState().syncProjection(PROJECTED, []);
 
     expect(authoredPositions(store)).toEqual(initial);
     expect(authoredPositions(store).has('00000000-0000-4000-8000-000000000003')).toBe(false);
@@ -233,7 +276,7 @@ describe('editor store', () => {
 
   it('navigates to another renderer without recording an edit', () => {
     const store = createEditorStore();
-    store.getState().syncNodes(PROJECTED);
+    store.getState().syncProjection(PROJECTED, []);
     store.getState().changeNodes(moving('00000000-0000-4000-8000-000000000002', 90, 80));
     const positioned = new Map([['00000000-0000-4000-8000-000000000002', { x: 700, y: 300 }]]);
 
@@ -250,7 +293,7 @@ describe('editor store', () => {
 
   it('ignores changes for nodes it does not own, and keeps the array stable', () => {
     const store = createEditorStore();
-    store.getState().syncNodes(PROJECTED);
+    store.getState().syncProjection(PROJECTED, []);
     const before = store.getState().nodes;
 
     store.getState().changeNodes([
@@ -275,7 +318,7 @@ describe('editor store', () => {
 
   it('does not call a drag that ends where it started a move', () => {
     const store = createEditorStore();
-    store.getState().syncNodes(PROJECTED);
+    store.getState().syncProjection(PROJECTED, []);
     store.getState().changeNodes(settled('00000000-0000-4000-8000-000000000002', 10, 20));
     expect(store.getState().positions).toBeNull();
     expect(store.getState().moved).toBe(false);
@@ -300,7 +343,7 @@ describe('editor conversion properties', () => {
           const target = projected[rawIndex % projected.length]!;
           const destination = { x: target.position.x + delta, y: target.position.y - delta };
           const store = createEditorStore();
-          store.getState().syncNodes(projected);
+          store.getState().syncProjection(projected, []);
 
           store.getState().changeNodes(moving(target.id, destination.x, destination.y));
           expect(store.getState().positions).toBeNull();
@@ -329,7 +372,7 @@ describe('editor conversion properties', () => {
           const projected = rows.map(({ id, x, y }) => node(id, x, y));
           const target = projected[rawIndex % projected.length]!;
           const store = createEditorStore();
-          store.getState().syncNodes(projected);
+          store.getState().syncProjection(projected, []);
 
           store
             .getState()
