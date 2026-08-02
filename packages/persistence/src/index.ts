@@ -14,5 +14,5 @@ export {
 } from './http-protocol';
 export type { LoadedSpaceJson } from './http-protocol';
 export type { CommitRequestJson } from './http-protocol';
-export { MemorySpaceBackend } from './memory';
+export { MemorySpaceBackend, MemorySpaceBackendTestControl } from './memory';
 export * from './session';

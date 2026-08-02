@@ -2,7 +2,11 @@ import { fireEvent, render, screen, type RenderResult } from '@testing-library/r
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { spaceSnapshotSchema, uuidSchema, type SpaceSnapshot } from '@project/core';
 import { loadSpaceSnapshot } from '@project/graph';
-import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
+import {
+  MemorySpaceBackend,
+  MemorySpaceBackendTestControl,
+  openSpaceSession,
+} from '@project/persistence';
 import { mountWorkspace } from '../src/Workspace';
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
@@ -102,6 +106,56 @@ describe('Workspace conflict recovery', () => {
       .getByRole('heading', { name: 'Remote card' })
       .closest('.react-flow__node');
     expect(cardNode).toHaveStyle({ transform: 'translate(900px,700px)' });
+  });
+
+  /**
+   * `acceptRemote` is an `onClick` handler (`App.tsx`), and React error
+   * boundaries do not catch throws from event handlers — so a throw here escapes
+   * to the window rather than reaching `WorkspaceFailure`, and the session has
+   * *already* published the unloadable snapshot as settled working state. The
+   * page then still shows the stale local workspace with no conflict left to
+   * resolve and no way back. Validate the remote snapshot before accepting it.
+   */
+  it('refuses an unloadable remote snapshot instead of accepting it into the session', async () => {
+    const local = snapshot('Local workspace', 'Local card', 10, 20);
+    const dangling: SpaceSnapshot = {
+      ...local,
+      document: {
+        ...local.document,
+        title: 'Remote workspace',
+        routes: [{ id: ROUTE_ID, title: 'Route', edges: [{ from: CARD_ID, to: MISSING_CARD_ID }] }],
+      },
+    };
+    const control = new MemorySpaceBackendTestControl();
+    control.queueResult({
+      kind: 'conflict',
+      current: { snapshot: dangling, revision: 4n, exportedRevision: null },
+    });
+    const session = openSpaceSession(new MemorySpaceBackend([], control), {
+      snapshot: local,
+      revision: 3n,
+      exportedRevision: null,
+    });
+    session.submit(local);
+    await new Promise<void>((resolve) => {
+      const unsubscribe = session.subscribe(() => {
+        if (session.getState().persistence.kind !== 'conflicted') return;
+        unsubscribe();
+        resolve();
+      });
+    });
+
+    let view: RenderResult | undefined;
+    mountWorkspace({ space: runtime(local), spaceSession: session }, (app) => {
+      if (view === undefined) view = render(app);
+      else view.rerender(app);
+    });
+
+    fireEvent.click(screen.getByTestId('persistence-accept-remote'));
+
+    expect(await screen.findByTestId('workspace-failure')).toHaveTextContent(MISSING_CARD_ID);
+    expect(session.getState().working).toEqual(local);
+    expect(session.getState().persistence.kind).toBe('conflicted');
   });
 });
 

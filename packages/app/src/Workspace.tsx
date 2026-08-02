@@ -1,6 +1,7 @@
 import { Component, type ReactElement, type ReactNode } from 'react';
 import { loadSpaceSnapshot } from '@project/graph';
 import { createApp } from './App';
+import { WorkspaceReport } from './components/WorkspaceReport';
 import type { OpenedSpace } from './space';
 
 export type WorkspaceRenderer = (app: ReactElement) => void;
@@ -19,6 +20,9 @@ interface WorkspaceFailureState {
  * throw unmounts the tree and leaves a blank page, which reports nothing. This
  * is a report, not a recovery: the workspace it wrapped is gone, and with it the
  * controls that could have changed the state that broke.
+ *
+ * It catches render throws only. Event handlers are outside every boundary, so
+ * `acceptRemote` below reports through `WorkspaceReport` directly.
  */
 class WorkspaceFailure extends Component<{ children: ReactNode }, WorkspaceFailureState> {
   override state: WorkspaceFailureState = { message: null };
@@ -29,29 +33,35 @@ class WorkspaceFailure extends Component<{ children: ReactNode }, WorkspaceFailu
 
   override render(): ReactNode {
     if (this.state.message === null) return this.props.children;
-    return (
-      <div className="placement-status" role="alert" data-testid="workspace-failure">
-        <div className="placement-status__panel">
-          <h2>Unable to open this space</h2>
-          <pre>{this.state.message}</pre>
-        </div>
-      </div>
-    );
+    return <WorkspaceReport message={this.state.message} />;
   }
 }
 
 /** Mount a workspace-local app, replacing every derived store after remote acceptance. */
 export function mountWorkspace(opened: OpenedSpace, render: WorkspaceRenderer): void {
+  /**
+   * Validate the remote snapshot *before* handing it to the session. Accepting
+   * first and checking after published an unloadable snapshot as settled working
+   * state, so the conflict that could still have been resolved was gone. And the
+   * check cannot report by throwing: this runs as an `onClick` handler, which
+   * React error boundaries do not catch, so `WorkspaceFailure` never saw it and
+   * the throw escaped to the window leaving the stale workspace on screen.
+   */
   const acceptRemote = () => {
-    opened.spaceSession.acceptRemote();
-    const accepted = loadSpaceSnapshot(opened.spaceSession.getState().working);
+    const { persistence } = opened.spaceSession.getState();
+    if (persistence.kind !== 'conflicted') return;
+    const accepted = loadSpaceSnapshot(persistence.current.snapshot);
     if (!accepted.ok) {
-      throw new Error(
-        `The accepted remote space is invalid:\n${accepted.errors
-          .map((error) => `  - ${error.message}`)
-          .join('\n')}`,
+      render(
+        <WorkspaceReport
+          message={`The remote space is invalid and was not accepted:\n${accepted.errors
+            .map((error) => `  - ${error.message}`)
+            .join('\n')}`}
+        />,
       );
+      return;
     }
+    opened.spaceSession.acceptRemote();
     mountWorkspace({ space: accepted.space, spaceSession: opened.spaceSession }, render);
   };
   const App = createApp(opened, { acceptRemote });
