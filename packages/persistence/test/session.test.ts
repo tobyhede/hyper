@@ -42,6 +42,61 @@ const changedTitle = (title: string) => {
 };
 
 describe('openSpaceSession', () => {
+  it('persists an optimistic Edit and notifies later observers when one observer fails', async () => {
+    const backend = new MemorySpaceBackend([loaded]);
+    const reported: unknown[] = [];
+    const session = openSpaceSession(backend, loaded, {
+      reportObserverError: (error) => reported.push(error),
+    });
+    const observerError = new Error('observer failed');
+    const observedTitles: string[] = [];
+    session.subscribe(() => {
+      throw observerError;
+    });
+    session.subscribe(() => {
+      observedTitles.push(session.getState().working.document.title);
+    });
+
+    expect(() => session.submit(changedTitle('Changed despite observer'))).not.toThrow();
+
+    const settled = await waitFor(
+      session.getState,
+      session.subscribe,
+      (state) => state.persistence.kind === 'settled',
+    );
+    expect(settled.acknowledgedRevision).toBe(4n);
+    expect(observedTitles).toContain('Changed despite observer');
+    expect(reported).toContain(observerError);
+    await expect(backend.loadSpace(SPACE_ID)).resolves.toMatchObject({
+      snapshot: { document: { title: 'Changed despite observer' } },
+      revision: 4n,
+    });
+  });
+
+  it('continues session work when reporting an observer failure also fails', async () => {
+    const backend = new MemorySpaceBackend([loaded]);
+    const session = openSpaceSession(backend, loaded, {
+      reportObserverError: () => {
+        throw new Error('diagnostic failed');
+      },
+    });
+    session.subscribe(() => {
+      throw new Error('observer failed');
+    });
+
+    expect(() => session.submit(changedTitle('Still persisted'))).not.toThrow();
+
+    await waitFor(
+      session.getState,
+      session.subscribe,
+      (state) => state.persistence.kind === 'settled',
+    );
+    await expect(backend.loadSpace(SPACE_ID)).resolves.toMatchObject({
+      snapshot: { document: { title: 'Still persisted' } },
+      revision: 4n,
+    });
+  });
+
   it('updates optimistically, persists a complete snapshot, and acknowledges success', async () => {
     const backend = new MemorySpaceBackend([loaded]);
     const session = openSpaceSession(backend, loaded);

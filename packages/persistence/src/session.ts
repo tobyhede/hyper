@@ -25,6 +25,10 @@ export interface SpaceSession {
   readonly resolveConflict: (snapshot: SpaceSnapshot) => void;
 }
 
+export interface SpaceSessionOptions {
+  readonly reportObserverError?: (error: unknown) => void;
+}
+
 const clone = <T>(value: T): T => structuredClone(value);
 
 const hasChangedSinceExport = (
@@ -32,7 +36,15 @@ const hasChangedSinceExport = (
   exportedRevision: bigint | null,
 ): boolean => exportedRevision === null || acknowledgedRevision !== exportedRevision;
 
-export const openSpaceSession = (backend: SpaceBackend, loaded: LoadedSpace): SpaceSession => {
+const reportToConsole = (error: unknown): void => {
+  console.error('SpaceSession observer failed', error);
+};
+
+export const openSpaceSession = (
+  backend: SpaceBackend,
+  loaded: LoadedSpace,
+  options: SpaceSessionOptions = {},
+): SpaceSession => {
   let exportedRevision = loaded.exportedRevision;
   let state: SpaceSessionState = {
     working: clone(loaded.snapshot),
@@ -43,10 +55,25 @@ export const openSpaceSession = (backend: SpaceBackend, loaded: LoadedSpace): Sp
   let inFlight = false;
   let waiting: SpaceSnapshot | undefined;
   const listeners = new Set<() => void>();
+  const reportObserverError = options.reportObserverError ?? reportToConsole;
+
+  const safelyReportObserverError = (error: unknown): void => {
+    try {
+      reportObserverError(error);
+    } catch {
+      // Diagnostics cannot interrupt session work.
+    }
+  };
 
   const publish = (next: SpaceSessionState): void => {
     state = next;
-    for (const listener of listeners) listener();
+    for (const listener of listeners) {
+      try {
+        listener();
+      } catch (error) {
+        safelyReportObserverError(error);
+      }
+    }
   };
 
   const publishPersistence = (persistence: SpaceSessionState['persistence']): void => {

@@ -750,11 +750,14 @@ describe('completed placement composition', () => {
     });
   });
 
-  it('finishes queued Edit completion before rethrowing a synchronous listener error', async () => {
+  it('finishes and persists queued Edit completion when a session observer fails', async () => {
     vi.spyOn(crypto, 'randomUUID').mockReturnValue(DEFAULT_LAYOUT_UUID);
     const loaded = { snapshot: automaticSnapshot, revision: 0n, exportedRevision: null };
     const backend = new MemorySpaceBackend([loaded]);
-    const session = openSpaceSession(backend, loaded);
+    const reported: unknown[] = [];
+    const session = openSpaceSession(backend, loaded, {
+      reportObserverError: (error) => reported.push(error),
+    });
     const viewChoice = createViewChoice({ kind: 'view', view: 'graph' });
     const editor = createPlacementEditor({
       initialPositions: null,
@@ -773,14 +776,9 @@ describe('completed placement composition', () => {
       throw listenerError;
     });
 
-    let caught: unknown;
-    try {
-      completeDrag(editor, CARD_A, 500, 400);
-    } catch (error) {
-      caught = error;
-    }
+    expect(() => completeDrag(editor, CARD_A, 500, 400)).not.toThrow();
 
-    expect(caught).toBe(listenerError);
+    expect(reported).toContain(listenerError);
     expect(session.getState().working.document.layouts).toHaveLength(2);
     expect(session.getState().working.document.layouts?.at(-1)).toMatchObject({
       id: DEFAULT_LAYOUT_ID,
@@ -793,7 +791,7 @@ describe('completed placement composition', () => {
     expect(viewChoice.current()).toEqual({ kind: 'layout', layoutId: DEFAULT_LAYOUT_ID });
     await waitForSettled(session.getState, session.subscribe);
     await expect(backend.loadSpace(SPACE_ID)).resolves.toMatchObject({
-      revision: 1n,
+      revision: 2n,
       snapshot: {
         document: {
           defaultView: DEFAULT_LAYOUT_ID,
