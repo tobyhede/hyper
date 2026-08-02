@@ -1,6 +1,11 @@
 # PDF export
 
-Status: open
+Status: superseded by ADR 0024 and ADR 0027; feature remains unbuilt
+
+This ticket's reveal.js and deck-export premise is no longer valid. Printable
+or PDF output may still be wanted, but it needs a new decision designed around
+Route traversal rather than a revived deck surface. The proposal below is
+retained as historical evidence and is not an active implementation ticket.
 
 ## Context
 

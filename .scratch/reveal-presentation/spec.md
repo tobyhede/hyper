@@ -2,6 +2,14 @@
 
 Source: conversation 2026-07-20, recorded as [ADR 0008](../../docs/adr/0008-presentation-is-a-reveal-deck.md).
 
+Status: superseded by [ADR 0024](../../docs/adr/0024-presenting-is-traversing-a-route.md)
+and [ADR 0027](../../docs/adr/0027-presenting-is-the-graph-canvas-under-camera-control.md).
+
+This is a historical specification, not the current presentation design.
+Presenting now traverses a Route on the graph canvas under camera control; there
+is no reveal.js deck or second presentation surface. The issues below preserve
+the evidence behind the abandoned stream.
+
 ## What landed
 
 Presenting takes over the screen and renders the selected route's steps as a

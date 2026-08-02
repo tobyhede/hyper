@@ -1,11 +1,18 @@
 # Route authoring
 
-Status: ready-for-agent
+Status: resolved (issues 01–06)
 
 Decisions: ADR 0032 — Routes may contain cycles; ADR 0033 — Route authoring
 uses spatial handles coloured as the active Route.
 
-## Problem Statement
+All six increments are implemented: cyclic Route intake and Edge uniqueness,
+existing-Card connections, Algorithmic View conversion, first-Route minting,
+Option/Alt empty-drop create-and-connect, and disabling unsupported deletion.
+The problem and solution below are retained as the historical specification for
+that completed stream. Detached Card creation remains out of scope: the only
+built Card-creation gesture also authors an Edge from an existing Card.
+
+## Original Problem Statement
 
 Hyper renders authored Routes but does not yet let an author draw them. The
 current card-edge dots are overview rendering machinery rather than a designed

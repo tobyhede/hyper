@@ -1,5 +1,11 @@
 # New space: what the app opens when there is nothing to open
 
+Status: historical; its file-first startup and deterministic-id premises were
+superseded by ADR 0030. The current server-side startup policy creates the
+one-Card new Space when the live repository is empty, while CLI import is the
+only path from space directories into the live model. The text below is retained
+as the specification that led to the earlier ADRs, not as current work.
+
 Two decisions are recorded and neither is built. This is the work that closes the
 gap between the ADRs and the code.
 

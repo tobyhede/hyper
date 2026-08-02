@@ -3,6 +3,7 @@ export * from './backend';
  * codecs the portable HTTP package and the legacy Node host share during the
  * migration. */
 export {
+  CANONICAL_DECIMAL,
   decodeCommitRequest,
   decodeCommittedRevision,
   decodeErrorMessage,
