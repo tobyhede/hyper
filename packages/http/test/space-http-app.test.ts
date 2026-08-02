@@ -487,21 +487,30 @@ describe('Space HTTP application', () => {
     await expect(response.json()).resolves.toEqual({ message: 'Malformed JSON in request body' });
   });
 
+  // Each case carries the guard that should reject it. Asserting only the 400
+  // let any case pass on any other guard's refusal — a noncanonical revision
+  // rejected as an unexpected field would have read as green.
   it.each([
-    ['an array envelope', []],
+    ['an array envelope', [], /commit request must be an object/],
     [
       'an unexpected envelope field',
-      { ...(encodeCommitRequest(snapshot, 0n) as object), extra: true },
+      { ...encodeCommitRequest(snapshot, 0n), extra: true },
+      /commit request has unexpected fields/,
     ],
-    ['a noncanonical revision', { snapshot, expectedRevision: '01' }],
+    [
+      'a noncanonical revision',
+      { snapshot, expectedRevision: '01' },
+      /expectedRevision must be a canonical non-negative decimal string/,
+    ],
     [
       'a schema-invalid snapshot',
       {
         snapshot: { ...snapshot, document: { ...snapshot.document, title: '' } },
         expectedRevision: '0',
       },
+      /title/,
     ],
-  ])('rejects %s as an invalid request', async (_name, body) => {
+  ])('rejects %s as an invalid request', async (_name, body, expectedMessage) => {
     const response = await createSpaceHttpApp(
       repository({ commitSpace: () => Promise.reject(new Error('must not be reached')) }),
     ).request(`/api/spaces/${SPACE_ID}`, {
@@ -512,6 +521,7 @@ describe('Space HTTP application', () => {
 
     expect(response.status).toBe(400);
     expect(response.headers.get('content-type')).toBe('application/json; charset=utf-8');
+    expect(((await response.json()) as { message: string }).message).toMatch(expectedMessage);
   });
 
   /*

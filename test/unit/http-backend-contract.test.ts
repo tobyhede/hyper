@@ -1,5 +1,5 @@
 import { HttpSpaceBackend } from '@project/http';
-import { spaceBackendContract } from '../../packages/persistence/test/backend-contract';
+import { spaceBackendContract } from '@project/persistence/test-support';
 import { createSpaceHttpHandler } from '../../src/http/space-http-handler';
 import { E2eMemorySpaceRepository } from '../support/e2e-memory-space-repository';
 import { startHttpServer } from '../support/http-server';
