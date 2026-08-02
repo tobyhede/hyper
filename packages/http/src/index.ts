@@ -273,6 +273,21 @@ const unservedContractPath = (context: Context): Response | undefined => {
 };
 
 /**
+ * `c.json()` sets a bare `application/json`, so naming the charset is a rewrite
+ * of what Hono produced rather than a default applied to what we omitted. Both
+ * of the middleware's exits reach it: a response that fell through the route
+ * tree, and the HEAD guard's early return. Only the first went through it
+ * before, so `/api/spaces/not-a-uuid` answered GET and HEAD with the same 400
+ * under two different media types.
+ */
+const normalizeJsonMedia = (response: Response): Response => {
+  if (response.headers.get('Content-Type') === 'application/json') {
+    response.headers.set('Content-Type', 'application/json; charset=utf-8');
+  }
+  return response;
+};
+
+/**
  * What holds for every request whatever route serves it: nothing is cacheable,
  * HEAD never reaches a GET handler, and a JSON response names its charset.
  *
@@ -286,13 +301,11 @@ const applyTransportPolicy = createMiddleware(async (context, next) => {
   if (context.req.method === 'HEAD') {
     const unserved = unservedContractPath(context);
     if (unserved !== undefined) {
-      return unserved;
+      return normalizeJsonMedia(unserved);
     }
   }
   await next();
-  if (context.res.headers.get('Content-Type') === 'application/json') {
-    context.header('Content-Type', 'application/json; charset=utf-8');
-  }
+  normalizeJsonMedia(context.res);
   return;
 });
 

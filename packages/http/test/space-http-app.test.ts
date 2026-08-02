@@ -616,6 +616,12 @@ describe('Space HTTP application', () => {
     expect(response.status).toBe(400);
     expect(response.headers.get('allow')).toBeNull();
     expect(response.headers.get('cache-control')).toBe('no-store');
+    // The two rows reach the 400 by different exits — POST through `notFound()`
+    // and back out of the middleware, HEAD through the guard's early return —
+    // and the media type is what tells them apart. The guard returned its own
+    // response without the charset rewrite, so one URL answered under two media
+    // types depending on the method.
+    expect(response.headers.get('content-type')).toBe('application/json; charset=utf-8');
     await expect(response.text()).resolves.toBe(body);
   });
 
