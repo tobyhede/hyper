@@ -7,6 +7,16 @@ const resolve = (p: string) => fileURLToPath(new URL(p, import.meta.url));
 export default defineConfig({
   plugins: [react()],
   resolve: {
+    /*
+     * Order is load-bearing, and the list is therefore NOT alphabetical.
+     *
+     * A string `find` matches when the specifier equals it *or* starts with it
+     * plus a slash, and the first match wins. So `@project/persistence` also
+     * matches `@project/persistence/test-support` and rewrites it to
+     * `…/src/index.ts/test-support`, which resolves to nothing. The subpath must
+     * come first. Sorting these keys makes every test that imports the subpath
+     * fail to collect.
+     */
     alias: {
       '@project/core': resolve('./packages/core/src/index.ts'),
       '@project/graph': resolve('./packages/graph/src/index.ts'),
