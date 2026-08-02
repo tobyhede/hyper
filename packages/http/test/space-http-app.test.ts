@@ -508,7 +508,9 @@ describe('Space HTTP application', () => {
         snapshot: { ...snapshot, document: { ...snapshot.document, title: '' } },
         expectedRevision: '0',
       },
-      /title/,
+      // The snapshot guard, naming the field it refused: a bare /title/ would
+      // also pass on an envelope guard that happened to mention the word.
+      /commit request snapshot is invalid: document\.title/,
     ],
   ])('rejects %s as an invalid request', async (_name, body, expectedMessage) => {
     const response = await createSpaceHttpApp(
