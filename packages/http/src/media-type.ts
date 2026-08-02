@@ -34,6 +34,49 @@ export const hasValidUniqueMediaTypeParameters = (value: string): boolean => {
     }
     return value.slice(start, index);
   };
+  // Expects the opening DQUOTE at `index` and consumes through the closing one.
+  // False means the string never closed or carried a byte the grammar excludes;
+  // `index` is then meaningless, which is safe because every caller gives up.
+  const readQuotedString = (): boolean => {
+    index += 1;
+    while (index < value.length) {
+      const code = value.charCodeAt(index);
+      if (code === 34) {
+        index += 1;
+        return true;
+      }
+      // quoted-pair: "\" ( HTAB / SP / VCHAR / obs-text ).
+      if (code === 92) {
+        index += 1;
+        if (index >= value.length) {
+          return false;
+        }
+        const escapedCode = value.charCodeAt(index);
+        if (
+          escapedCode !== 9 &&
+          (escapedCode < 32 || (escapedCode > 126 && escapedCode < 128) || escapedCode > 255)
+        ) {
+          return false;
+        }
+        index += 1;
+        continue;
+      }
+      // qdtext: HTAB / SP / %x21 / %x23-5B / %x5D-7E / obs-text. DQUOTE and
+      // backslash are absent because both are handled above.
+      const isQuotedText =
+        code === 9 ||
+        code === 32 ||
+        code === 33 ||
+        (code >= 35 && code <= 91) ||
+        (code >= 93 && code <= 126) ||
+        (code >= 128 && code <= 255);
+      if (!isQuotedText) {
+        return false;
+      }
+      index += 1;
+    }
+    return false;
+  };
 
   skipWhitespace();
   if (readToken() === '' || value[index] !== '/') {
@@ -65,43 +108,7 @@ export const hasValidUniqueMediaTypeParameters = (value: string): boolean => {
     skipWhitespace();
 
     if (value[index] === '"') {
-      index += 1;
-      let closed = false;
-      while (index < value.length) {
-        const code = value.charCodeAt(index);
-        if (code === 34) {
-          index += 1;
-          closed = true;
-          break;
-        }
-        if (code === 92) {
-          index += 1;
-          if (index >= value.length) {
-            return false;
-          }
-          const escapedCode = value.charCodeAt(index);
-          if (
-            escapedCode !== 9 &&
-            (escapedCode < 32 || (escapedCode > 126 && escapedCode < 128) || escapedCode > 255)
-          ) {
-            return false;
-          }
-          index += 1;
-          continue;
-        }
-        const isQuotedText =
-          code === 9 ||
-          code === 32 ||
-          code === 33 ||
-          (code >= 35 && code <= 91) ||
-          (code >= 93 && code <= 126) ||
-          (code >= 128 && code <= 255);
-        if (!isQuotedText) {
-          return false;
-        }
-        index += 1;
-      }
-      if (!closed) {
+      if (!readQuotedString()) {
         return false;
       }
     } else if (readToken() === '') {

@@ -579,6 +579,110 @@ describe('Space HTTP application', () => {
     expect(response.headers.get('allow')).toBe('GET');
   });
 
+  // The collection and the resource are separate arms of the HEAD guard, and only
+  // the collection was proven. A resource arm that stopped matching would fall
+  // through to the GET route and answer 200 with a silently dropped body.
+  it('does not add an implicit HEAD resource for a space', async () => {
+    const response = await createSpaceHttpApp(repository()).request(`/api/spaces/${SPACE_ID}`, {
+      method: 'HEAD',
+    });
+
+    expect(response.status).toBe(405);
+    expect(response.headers.get('allow')).toBe('GET, PUT');
+    expect(response.headers.get('cache-control')).toBe('no-store');
+  });
+
+  // The declared methods reject a non-UUID through `validateSpaceId`, so this
+  // reaches the same judgement by the other route: an undeclared method has no
+  // validator to run and lands in `app.notFound()`, which has to identify the
+  // path itself rather than advertise `Allow` for a resource that cannot exist.
+  it('rejects an invalid path identity for an undeclared method', async () => {
+    const response = await createSpaceHttpApp(repository()).request('/api/spaces/not-a-uuid', {
+      method: 'POST',
+    });
+
+    expect(response.status).toBe(400);
+    expect(response.headers.get('allow')).toBeNull();
+    await expect(response.json()).resolves.toEqual({ message: 'Space id must be a UUID' });
+  });
+
+  // The normalization matches `Content-Type` exactly, which holds only while
+  // `c.json()` sets a bare `application/json` for Hono to rewrite. An upgrade
+  // that emitted its own `charset` would not match, and every JSON response
+  // would silently carry a different header than the three pinned above — so
+  // the invariant is asserted across the whole status range, not one path.
+  it('normalizes the media type of every JSON response', async () => {
+    const swallowed: unknown[] = [];
+    const oversized = 'x'.repeat(MAX_COMMIT_BODY_BYTES + 10);
+    const commit = JSON.stringify(encodeCommitRequest(snapshot, 0n));
+    const put = (body: string, contentType = 'application/json') => ({
+      method: 'PUT',
+      headers: { 'Content-Type': contentType },
+      body,
+    });
+    const responses = await Promise.all([
+      createSpaceHttpApp(repository()).request('/api/spaces'),
+      createSpaceHttpApp(repository()).request(`/api/spaces/${SPACE_ID}`),
+      createSpaceHttpApp(repository({ loadSpace: () => Promise.resolve(undefined) })).request(
+        `/api/spaces/${SPACE_ID}`,
+      ),
+      createSpaceHttpApp(repository()).request('/api/spaces/not-a-uuid'),
+      createSpaceHttpApp(repository()).request('/api/spaces/not-a-uuid', { method: 'POST' }),
+      createSpaceHttpApp(repository()).request('/off-contract'),
+      createSpaceHttpApp(repository()).request(`/api/spaces/${SPACE_ID}`, put(commit)),
+      createSpaceHttpApp(repository()).request(`/api/spaces/${SPACE_ID}`, put('not json')),
+      createSpaceHttpApp(repository()).request(`/api/spaces/${SPACE_ID}`, put('{}')),
+      createSpaceHttpApp(repository()).request(
+        `/api/spaces/${SPACE_ID}`,
+        put('{}', 'text/plain; charset=utf-8'),
+      ),
+      createSpaceHttpApp(repository()).request(`/api/spaces/${SPACE_ID}`, put(oversized)),
+      // The conflict branch encodes a whole loaded space rather than a message,
+      // so it reaches `context.json` by a different route than its neighbours.
+      createSpaceHttpApp(
+        repository({
+          commitSpace: () =>
+            Promise.resolve({
+              kind: 'conflict' as const,
+              current: { snapshot, revision: 1n, exportedRevision: null },
+            }),
+        }),
+      ).request(`/api/spaces/${SPACE_ID}`, put(commit)),
+      createSpaceHttpApp(
+        repository({
+          commitSpace: () =>
+            Promise.resolve({
+              kind: 'rejected' as const,
+              code: 'invalid-snapshot' as const,
+              message: 'bad',
+            }),
+        }),
+      ).request(`/api/spaces/${SPACE_ID}`, put(commit)),
+      createSpaceHttpApp(repository({ listSpaces: () => Promise.reject(new Error('down')) }), {
+        logError: (message) => swallowed.push(message),
+      }).request('/api/spaces'),
+    ]);
+
+    expect(responses.map((response) => response.status)).toEqual([
+      200, 200, 404, 400, 400, 404, 200, 400, 400, 415, 413, 409, 422, 503,
+    ]);
+    expect(swallowed).toEqual(['Failed to list spaces']);
+    for (const response of responses) {
+      expect(response.headers.get('content-type')).toBe('application/json; charset=utf-8');
+    }
+  });
+
+  // A bodyless 405 must not claim to carry JSON.
+  it.each([
+    ['the collection', '/api/spaces'],
+    ['a space resource', `/api/spaces/${SPACE_ID}`],
+  ])('sends no media type with the bodyless 405 for %s', async (_name, path) => {
+    const response = await createSpaceHttpApp(repository()).request(path, { method: 'POST' });
+
+    expect(response.status).toBe(405);
+    expect(response.headers.get('content-type')).toBeNull();
+  });
+
   // `c.notFound()` inside the handler installed by `app.notFound()` calls that
   // same handler — Hono seeds the Context's not-found handler from the app's —
   // so it recurses until the stack blows. Every path off the declared contract
