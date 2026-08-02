@@ -596,14 +596,27 @@ describe('Space HTTP application', () => {
   // reaches the same judgement by the other route: an undeclared method has no
   // validator to run and lands in `app.notFound()`, which has to identify the
   // path itself rather than advertise `Allow` for a resource that cannot exist.
-  it('rejects an invalid path identity for an undeclared method', async () => {
+  //
+  // HEAD is in that same position and must reach the same judgement. A guard
+  // that matches the resource shape without reading the identity answers 405
+  // `Allow: GET, PUT` for a path no method can address, so it advertises a
+  // resource that cannot exist and disagrees with GET on the same URL.
+  it.each([
+    ['an undeclared method', 'POST', '{"message":"Space id must be a UUID"}'],
+    // Hono strips a HEAD response's body itself, so the guard that intercepts
+    // HEAD is observable only in the status and headers. The empty string is
+    // asserted rather than ignored: it is why the guard cannot simply be
+    // deleted and left to the GET route, which answers 200 with nothing.
+    ['HEAD', 'HEAD', ''],
+  ])('rejects an invalid path identity for %s', async (_name, method, body) => {
     const response = await createSpaceHttpApp(repository()).request('/api/spaces/not-a-uuid', {
-      method: 'POST',
+      method,
     });
 
     expect(response.status).toBe(400);
     expect(response.headers.get('allow')).toBeNull();
-    await expect(response.json()).resolves.toEqual({ message: 'Space id must be a UUID' });
+    expect(response.headers.get('cache-control')).toBe('no-store');
+    await expect(response.text()).resolves.toBe(body);
   });
 
   // The normalization matches `Content-Type` exactly, which holds only while
