@@ -1,4 +1,4 @@
-import { createSpaceHttpHandler, type SpaceHttpHandler } from '../../src/http/space-http-handler';
+import { createSpaceHttpApp, type SpaceHttpApp } from '@project/http';
 import { resolveDatabaseStartup } from '../../src/startup/database-startup';
 import { E2eMemorySpaceRepository } from './e2e-memory-space-repository';
 import { importFixture } from './import-fixture';
@@ -9,9 +9,9 @@ export interface E2eHttpRuntimeOptions {
 }
 
 /** Create one isolated in-process catalog for one browser test. */
-export const createHandler = async (options: E2eHttpRuntimeOptions): Promise<SpaceHttpHandler> => {
+export const createApp = async (options: E2eHttpRuntimeOptions): Promise<SpaceHttpApp> => {
   const repository = new E2eMemorySpaceRepository();
   if (options.catalog === 'fixture') await importFixture(repository);
   if (options.startup === true) await resolveDatabaseStartup(repository);
-  return createSpaceHttpHandler(repository);
+  return createSpaceHttpApp(repository);
 };

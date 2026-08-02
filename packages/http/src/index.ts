@@ -8,10 +8,10 @@ import {
 } from '@project/persistence';
 import { parse as parseContentType } from 'content-type';
 import { Hono, type Context, type Env } from 'hono';
-import { bodyLimit } from 'hono/body-limit';
 import { createMiddleware } from 'hono/factory';
 import { HTTPException } from 'hono/http-exception';
 import { validator } from 'hono/validator';
+import { hasValidUniqueMediaTypeParameters } from './media-type';
 
 export { HttpSpaceBackend } from './backend';
 export type { HttpSpaceBackendOptions } from './backend';
@@ -63,143 +63,97 @@ const invokeLogError = (
   }
 };
 
-const isOptionalWhitespace = (character: string): boolean =>
-  character === ' ' || character === '\t';
-
-const isTokenCharacter = (character: string): boolean =>
-  /^[!#$%&'*+.^_`|~0-9A-Za-z-]$/.test(character);
-
-const hasValidUniqueMediaTypeParameters = (value: string): boolean => {
-  let index = 0;
-  const skipWhitespace = (): void => {
-    while (index < value.length && isOptionalWhitespace(value.charAt(index))) {
-      index += 1;
-    }
-  };
-  const readToken = (): string => {
-    const start = index;
-    while (index < value.length && isTokenCharacter(value.charAt(index))) {
-      index += 1;
-    }
-    return value.slice(start, index);
-  };
-
-  skipWhitespace();
-  if (readToken() === '' || value[index] !== '/') {
-    return false;
-  }
-  index += 1;
-  if (readToken() === '') {
-    return false;
-  }
-  skipWhitespace();
-
-  const parameterNames = new Set<string>();
-  while (index < value.length) {
-    if (value[index] !== ';') {
-      return false;
-    }
-    index += 1;
-    skipWhitespace();
-    const parameterName = readToken().toLowerCase();
-    if (parameterName === '' || parameterNames.has(parameterName)) {
-      return false;
-    }
-    parameterNames.add(parameterName);
-    skipWhitespace();
-    if (value[index] !== '=') {
-      return false;
-    }
-    index += 1;
-    skipWhitespace();
-
-    if (value[index] === '"') {
-      index += 1;
-      let closed = false;
-      while (index < value.length) {
-        const code = value.charCodeAt(index);
-        if (code === 34) {
-          index += 1;
-          closed = true;
-          break;
-        }
-        if (code === 92) {
-          index += 1;
-          if (index >= value.length) {
-            return false;
-          }
-          const escapedCode = value.charCodeAt(index);
-          if (
-            escapedCode !== 9 &&
-            (escapedCode < 32 || (escapedCode > 126 && escapedCode < 128) || escapedCode > 255)
-          ) {
-            return false;
-          }
-          index += 1;
-          continue;
-        }
-        const isQuotedText =
-          code === 9 ||
-          code === 32 ||
-          code === 33 ||
-          (code >= 35 && code <= 91) ||
-          (code >= 93 && code <= 126) ||
-          (code >= 128 && code <= 255);
-        if (!isQuotedText) {
-          return false;
-        }
-        index += 1;
-      }
-      if (!closed) {
-        return false;
-      }
-    } else if (readToken() === '') {
-      return false;
-    }
-    skipWhitespace();
-  }
-  return true;
-};
+/**
+ * How much of an oversized body is read and discarded so the connection stays
+ * reusable. Reusing a persistent connection means consuming the whole message
+ * body, and an honest client that overshoots the cap deserves its 413 on a
+ * connection it can keep using. A client that just keeps sending does not: past
+ * this allowance the drain stops, the body is left unconsumed and the host
+ * drops the connection, which is the answer that costs us least.
+ */
+const MAX_DRAINED_BODY_BYTES = MAX_COMMIT_BODY_BYTES * 8;
 
 const rejectOversizedBody = (context: Context) =>
   context.json({ message: `Request body exceeds ${MAX_COMMIT_BODY_BYTES} bytes` }, 413);
 
-const countCommitBodyBytes = bodyLimit({
-  maxSize: MAX_COMMIT_BODY_BYTES,
-  onError: rejectOversizedBody,
-});
+/** Read and discard what is left, up to the allowance. Bytes are never buffered. */
+const drainRejectedBody = async (
+  reader: ReadableStreamDefaultReader<Uint8Array>,
+): Promise<void> => {
+  let drained = 0;
+  try {
+    while (drained < MAX_DRAINED_BODY_BYTES) {
+      const { done, value } = await reader.read();
+      if (done) return;
+      drained += value.byteLength;
+    }
+  } catch {
+    // A client that vanishes mid-drain costs its own connection, not our response.
+  }
+};
 
 /**
- * The two halves are complementary, not redundant, and removing either one
- * silently loses a case. `bodyLimit` *trusts* `Content-Length` when it is
- * present — it compares and returns without reading a byte — so an understated
- * length would skip counting entirely. Deleting the header forces its streaming
- * path, which counts what actually arrives; checking the declared length first
- * still buys a cheap rejection for an honest over-declaration, which is why the
- * manual check is not simply replaced by the deletion.
+ * One size policy: count the bytes that arrive, and never consult the declared
+ * length. Hono's `bodyLimit` cannot serve here for two independent reasons.
+ * It *trusts* `Content-Length` when present — comparing and returning without
+ * reading a byte, so an understated length would smuggle any body through. And
+ * on overflow it abandons a **locked** reader without consuming the rest, so
+ * nothing downstream can drain the request: Node's own `_dump()` cannot resume a
+ * stream the web wrapper holds, the socket dies with the 413, and a keep-alive
+ * client loses the connection. Both are pinned by tests — the size cases in this
+ * package, the connection reuse in `vite-hono-host.test.ts`.
  *
- * The cost is the fast path: every legitimate commit is now buffered and
- * re-read. On a real Node host the understated length is already impossible —
- * the HTTP parser bounds the body at `Content-Length` — so this is defence for
- * a future host rather than a live hole, which is what `spec.md` says too.
+ * Draining on overflow is also what the superseded raw Node handler did: it
+ * cleared its buffer and called `request.resume()` for exactly this reason.
+ *
+ * A declared-length pre-check sat here once and was dropped. It was never
+ * required for the bound — counting catches an honest over-declaration too, only
+ * later — and trusting the header meant a client could be answered 413 for a
+ * body it had not sent. Measuring is the answer a lying header deserves. Do not
+ * reintroduce it without first deciding what a dishonest length should mean.
+ *
+ * The cost is the fast path: every legitimate commit is buffered and re-read.
  */
 const requireBoundedCommitBody = createMiddleware(async (context, next) => {
-  const declaredLength = context.req.header('Content-Length');
-  if (declaredLength !== undefined && Number.parseInt(declaredLength, 10) > MAX_COMMIT_BODY_BYTES) {
-    return rejectOversizedBody(context);
+  const body = context.req.raw.body;
+  if (body === null) {
+    return next();
   }
-
+  const reader = body.getReader();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.byteLength;
+    if (size > MAX_COMMIT_BODY_BYTES) {
+      // Free what was buffered before draining, so an oversized body never costs
+      // more than the cap in memory no matter how much more of it arrives.
+      chunks.length = 0;
+      await drainRejectedBody(reader);
+      return rejectOversizedBody(context);
+    }
+    chunks.push(value);
+  }
   const headers = new Headers(context.req.raw.headers);
+  // The request handed downstream carries our own re-enqueued body. An
+  // over-declared length from the original request would describe it wrongly,
+  // and nothing below this point has any business reading a declared size.
   headers.delete('Content-Length');
-  context.req.raw = new Request(context.req.raw, { headers });
-  // `bodyLimit` is declared as a bare `MiddlewareHandler`, whose response type
-  // defaults to `Response`; returning its result directly widened the union and
-  // erased 413 from the inferred client contract, while the hand-written 415
-  // beside it survived. It answers with `onError` or with `next()`, and its
-  // `onError` is ours, so a response here is always the oversize one — saying
-  // that in code rather than in a cast keeps the status in the contract.
-  const limited = await countCommitBodyBytes(context, next);
-  return limited === undefined ? undefined : rejectOversizedBody(context);
+  const rebuilt = {
+    headers,
+    body: new ReadableStream({
+      start(controller) {
+        for (const chunk of chunks) {
+          controller.enqueue(chunk);
+        }
+        controller.close();
+      },
+    }),
+    duplex: 'half',
+  };
+  context.req.raw = new Request(context.req.raw, rebuilt);
+  return next();
 });
 
 const requireSupportedRequestMedia = createMiddleware(async (context, next) => {
@@ -211,11 +165,8 @@ const requireSupportedRequestMedia = createMiddleware(async (context, next) => {
   if (contentType === undefined || !hasValidUniqueMediaTypeParameters(contentType)) {
     return context.json({ message: 'Content-Type must be application/json' }, 415);
   }
-  // `content-type@2` validates nothing: `parse` has no throw path at all and
-  // answers `parse('garbage')` with `{ type: 'garbage' }`, so the scanner above
-  // is the whole of this module's media validation and `parse` only splits and
-  // lowercases a value it has already accepted. Against `content-type@1`, which
-  // threw on malformed parameters, the scanner would have been near-redundant.
+  // `parse` only splits and lowercases a value `./media-type` has already
+  // accepted — `content-type@2` validates nothing itself. See that module.
   const parsed = parseContentType(contentType);
   if (parsed.type !== 'application/json') {
     return context.json({ message: 'Content-Type must be application/json' }, 415);
@@ -368,10 +319,13 @@ export const createSpaceHttpApp = (
     return context.json({ message: 'Not found' }, 404);
   });
   app.onError((error, context) => {
+    // Answer through the context rather than `error.getResponse()`, whatever the
+    // status. That method builds a bare `text/plain` Response carrying none of
+    // this application's policy — no `Cache-Control: no-store`, and a body the
+    // typed client cannot decode, since `HttpSpaceBackend` reads every non-200
+    // and non-409 commit response as `{ message }` JSON.
     if (error instanceof HTTPException) {
-      return error.status === 400
-        ? context.json({ message: error.message }, 400)
-        : error.getResponse();
+      return context.json({ message: error.message }, error.status);
     }
     // Never rethrow: Hono does not convert that into a 500, it re-invokes this
     // handler and lets the throw escape, so `app.fetch()` hands the host a

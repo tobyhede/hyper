@@ -17,8 +17,16 @@ response construction inside the portable module.
 - [x] `GET /api/spaces`, `GET /api/spaces/:id` and
       `PUT /api/spaces/:id` preserve repository result mapping.
 - [x] Hono validation and maintained media parsing replace the raw Node body
-      reader and the hand-rolled `Content-Type` split.
-- [x] The 1 MiB cap covers declared and streamed bodies and returns 413.
+      reader and the hand-rolled `Content-Type` split. The RFC 9110 parameter
+      scanner is kept, not replaced: `content-type@2` validates nothing — its
+      `parse` has no throw path — so the scanner remains the whole of this
+      package's media validation.
+- [x] The 1 MiB cap counts the bytes that arrive and returns 413. It never
+      trusts `Content-Length`, which is deleted rather than consulted, so an
+      over-declared length is measured rather than believed. Hono's `bodyLimit`
+      is not used: it trusts the header, and on overflow it abandons a locked
+      reader, so the request can never be drained and the 413 costs a keep-alive
+      client its connection. The replacement drains within a bounded allowance.
 - [x] Only absent/UTF-8 JSON charset and identity/absent `Content-Encoding` are
       accepted; unsupported values return 415.
 - [x] Invalid JSON and path/body id mismatch return 400; invalid snapshots
@@ -29,7 +37,8 @@ response construction inside the portable module.
       factory, including repository failures and malformed input.
 - [x] Package dependency rules prevent Node, Vite, PostgreSQL, app, React and
       React Flow imports.
-- [x] The old Node handler remains temporarily available only for cutover.
+- [x] The old Node handler remains temporarily available, now only until the
+      raw-stack cleanup in ticket 04 deletes it.
 - [x] `pnpm verify` passes.
 
 ## Answer
@@ -41,7 +50,7 @@ the three-operation `SpaceResourceRepository` seam. Compile-time tests prove
 the existing PostgreSQL and E2E memory repositories satisfy that seam directly.
 
 The application uses Hono validation and body limiting with maintained
-`content-type` parsing. It enforces the 1 MiB declared and streamed body cap,
+`content-type` parsing. It enforces the 1 MiB cap on the bytes that arrive,
 UTF-8 JSON and identity encoding policies, explicit method metadata, stable
 repository result mappings, non-cacheable UTF-8 JSON responses and
 non-revealing logged 503s. Twenty-six `app.request()` cases cover every response
@@ -49,7 +58,7 @@ status and required header without opening a socket. A compile-time Hono RPC
 contract test proves that both a successful load and a commit conflict expose
 the concrete `LoadedSpaceJson` wire shape rather than `unknown`; explicit 200
 statuses keep that response distinct from the 409 branch during inference. The
-old raw Node handler remains untouched for the later host cutover.
+old raw Node handler remains untouched for the later raw-stack cleanup.
 
 Final verification passed: `pnpm verify` ran 582 tests across 67 files; root and
 all seven package typechecks, lint, formatting and coverage thresholds passed.

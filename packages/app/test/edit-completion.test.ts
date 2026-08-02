@@ -66,6 +66,36 @@ const positionedSnapshot: SpaceSnapshot = {
 const projected = [node(CARD_A, 10, 20), node(CARD_B, 300, 20)];
 const ignoreInstalledSpace = () => undefined;
 
+/**
+ * A Space with no Route at all, whose sole Layout filters to no Routes — the
+ * two cases below both start here, one minting the first Route into it and one
+ * proving a placement-only edit leaves the empty filter alone. The loaded
+ * wrapper is built per test because each opens its own backend and session.
+ */
+const routeLessLayout: Layout = {
+  id: DEFAULT_LAYOUT_ID,
+  title: 'Focused Layout',
+  kind: 'positioned',
+  positions: { [CARD_A]: { x: 10, y: 20 } },
+  routes: [],
+};
+const routeLessSnapshot: SpaceSnapshot = {
+  id: SPACE_ID,
+  document: {
+    version: 2,
+    title: 'Route-less Space',
+    routes: [],
+    layouts: [routeLessLayout],
+    defaultView: DEFAULT_LAYOUT_ID,
+  },
+  cards: [automaticSnapshot.cards[0]!],
+};
+const routeLessLoaded = () => ({
+  snapshot: routeLessSnapshot,
+  revision: 0n,
+  exportedRevision: null,
+});
+
 describe('completed placement composition', () => {
   // `vi.spyOn` reconfigures an existing spy rather than installing a fresh one,
   // so an unrestored `mockReturnValue` becomes the fallback behind a later
@@ -404,25 +434,7 @@ describe('completed placement composition', () => {
   );
 
   it('adds the first minted Route to a selected Layout that shows no Routes', async () => {
-    const routeLessLayout: Layout = {
-      id: DEFAULT_LAYOUT_ID,
-      title: 'Focused Layout',
-      kind: 'positioned',
-      positions: { [CARD_A]: { x: 10, y: 20 } },
-      routes: [],
-    };
-    const routeLessSnapshot: SpaceSnapshot = {
-      id: SPACE_ID,
-      document: {
-        version: 2,
-        title: 'Route-less Space',
-        routes: [],
-        layouts: [routeLessLayout],
-        defaultView: DEFAULT_LAYOUT_ID,
-      },
-      cards: [automaticSnapshot.cards[0]!],
-    };
-    const loaded = { snapshot: routeLessSnapshot, revision: 0n, exportedRevision: null };
+    const loaded = routeLessLoaded();
     const backend = new MemorySpaceBackend([loaded]);
     const session = openSpaceSession(backend, loaded);
     const viewChoice = createViewChoice({ kind: 'layout', layoutId: DEFAULT_LAYOUT_ID });
@@ -481,27 +493,10 @@ describe('completed placement composition', () => {
     });
   });
 
-  it('preserves an empty route filter when only placement changes', () => {
-    const routeLessLayout: Layout = {
-      id: DEFAULT_LAYOUT_ID,
-      title: 'Focused Layout',
-      kind: 'positioned',
-      positions: { [CARD_A]: { x: 10, y: 20 } },
-      routes: [],
-    };
-    const routeLessSnapshot: SpaceSnapshot = {
-      id: SPACE_ID,
-      document: {
-        version: 2,
-        title: 'Route-less Space',
-        routes: [],
-        layouts: [routeLessLayout],
-        defaultView: DEFAULT_LAYOUT_ID,
-      },
-      cards: [automaticSnapshot.cards[0]!],
-    };
-    const loaded = { snapshot: routeLessSnapshot, revision: 0n, exportedRevision: null };
-    const session = openSpaceSession(new MemorySpaceBackend([loaded]), loaded);
+  it('preserves an empty route filter when only placement changes', async () => {
+    const loaded = routeLessLoaded();
+    const backend = new MemorySpaceBackend([loaded]);
+    const session = openSpaceSession(backend, loaded);
     const editor = createPlacementEditor({
       initialPositions: layoutPositionMap(routeLessLayout),
       viewChoice: createViewChoice({ kind: 'layout', layoutId: DEFAULT_LAYOUT_ID }),
@@ -523,6 +518,26 @@ describe('completed placement composition', () => {
         routes: [],
       },
     ]);
+
+    // The working snapshot is the local state the editor installed; what the
+    // filter has to survive is the round trip. Asserting the committed document
+    // is what would catch a `routes` the submission path dropped or widened.
+    await waitForSettled(session.getState, session.subscribe);
+    await expect(backend.loadSpace(SPACE_ID)).resolves.toMatchObject({
+      revision: 1n,
+      snapshot: {
+        document: {
+          routes: [],
+          layouts: [
+            {
+              id: DEFAULT_LAYOUT_ID,
+              positions: { [CARD_A]: { x: 70, y: 90 } },
+              routes: [],
+            },
+          ],
+        },
+      },
+    });
   });
 
   it('converts current owner state, selects locally, and persists asynchronously', async () => {

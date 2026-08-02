@@ -38,7 +38,7 @@ const tinyExclude = ['concepts', 'helpers', 'middleware']
 
 The predicate is `filename.startsWith(exclude)`, which also catches `guides/middleware.md` and `guides/helpers.md` by basename. Measured on both files:
 
-```
+```text
 hono-llms-full     H1s=98   bodyLimit=2   createMiddleware=29   'hono/factory'=13
 hono-llms-small    H1s=46   bodyLimit=0   createMiddleware=6    'hono/factory'=5
 ```

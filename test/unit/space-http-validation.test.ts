@@ -1,16 +1,11 @@
-import {
-  Agent,
-  request as httpRequest,
-  type IncomingHttpHeaders,
-  type IncomingMessage,
-  type ServerResponse,
-} from 'node:http';
+import { Agent, type IncomingMessage, type ServerResponse } from 'node:http';
 import { describe, expect, it } from 'vitest';
 import { uuidSchema, type SpaceSnapshot } from '@project/core';
 import { encodeCommitRequest } from '@project/persistence';
 import { createSpaceHttpHandler, MAX_COMMIT_BODY_BYTES } from '../../src/http/space-http-handler';
 import { E2eMemorySpaceRepository } from '../support/e2e-memory-space-repository';
 import { startHttpServer } from '../support/http-server';
+import { send } from '../support/raw-http-request';
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const OTHER_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000099');
@@ -21,37 +16,6 @@ const snapshot: SpaceSnapshot = {
   cards: [{ id: CARD_ID, document: { title: 'A', kind: 'markdown', body: '' } }],
 };
 const stored = { snapshot, revision: 0n, exportedRevision: null };
-
-interface RawResponse {
-  status: number;
-  headers: IncomingHttpHeaders;
-  body: string;
-}
-
-const send = (
-  baseUrl: string,
-  path: string,
-  body: string,
-  headers: Record<string, string>,
-  agent?: Agent,
-  method = 'PUT',
-): Promise<RawResponse> =>
-  new Promise((resolve, reject) => {
-    const url = new URL(path, baseUrl);
-    const request = httpRequest(url, { method, headers, agent }, (response) => {
-      const chunks: Buffer[] = [];
-      response.on('data', (chunk: Uint8Array) => chunks.push(Buffer.from(chunk)));
-      response.on('end', () =>
-        resolve({
-          status: response.statusCode ?? 0,
-          headers: response.headers,
-          body: Buffer.concat(chunks).toString('utf8'),
-        }),
-      );
-    });
-    request.on('error', reject);
-    request.end(body);
-  });
 
 const validBody = JSON.stringify(encodeCommitRequest(snapshot, 0n));
 const validHeaders = { 'content-type': 'application/json; charset=utf-8' };

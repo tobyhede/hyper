@@ -16,6 +16,7 @@ export default defineConfig({
     alias: {
       '@project/core': here('../core/src/index.ts'),
       '@project/graph': here('../graph/src/index.ts'),
+      '@project/http': here('../http/src/index.ts'),
       '@project/persistence': here('../persistence/src/index.ts'),
     },
   },
@@ -28,6 +29,6 @@ export default defineConfig({
     },
   },
   ssr: {
-    noExternal: ['@project/core', '@project/graph', '@project/persistence'],
+    noExternal: ['@project/core', '@project/graph', '@project/http', '@project/persistence'],
   },
 });

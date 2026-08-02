@@ -1,10 +1,13 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
+import { getRequestListener } from '@hono/node-server';
 import type { Plugin } from 'vite';
 
-type SpaceHttpHandler = (request: IncomingMessage, response: ServerResponse) => Promise<boolean>;
+interface FetchApplication {
+  fetch(request: Request, env?: unknown): Response | Promise<Response>;
+}
 
 interface SpaceHttpRuntime {
-  createHandler(options?: unknown): Promise<SpaceHttpHandler> | SpaceHttpHandler;
+  createApp(options?: unknown): Promise<FetchApplication> | FetchApplication;
 }
 
 export interface SpaceHttpPluginOptions {
@@ -19,13 +22,26 @@ const defaultPreviewLoader = async (modulePath: string): Promise<unknown> => imp
 
 type Next = (error?: unknown) => void;
 
+/**
+ * Node's parser is more permissive than the URL parser: it accepts request
+ * targets that are not valid URL references — `//[` among them, an empty IPv6
+ * host — and hands them to middleware verbatim. `new URL` throws on those, and
+ * this runs synchronously inside the request handler, so the throw escapes the
+ * middleware entirely; the host never answers and the socket hangs. A target we
+ * cannot parse is certainly not one of our API paths, so it belongs to Vite.
+ */
+const isApiRequest = (request: IncomingMessage): boolean => {
+  const pathname = URL.parse(request.url ?? '/', 'http://hyper.invalid')?.pathname;
+  return pathname === '/api' || (pathname?.startsWith('/api/') ?? false);
+};
+
 const asRuntime = (loaded: unknown, modulePath: string): SpaceHttpRuntime => {
   if (
     typeof loaded !== 'object' ||
     loaded === null ||
-    typeof (loaded as SpaceHttpRuntime).createHandler !== 'function'
+    typeof (loaded as SpaceHttpRuntime).createApp !== 'function'
   ) {
-    throw new Error(`${modulePath} does not export a createHandler function`);
+    throw new Error(`${modulePath} does not export a createApp function`);
   }
   return loaded as SpaceHttpRuntime;
 };
@@ -38,21 +54,21 @@ const installMiddleware = (
   modulePath: string,
   runtimeOptions: unknown,
 ): void => {
-  const handler = runtime.then((loaded) =>
-    asRuntime(loaded, modulePath).createHandler(runtimeOptions),
-  );
+  const listener = runtime.then(async (loaded) => {
+    const application = await asRuntime(loaded, modulePath).createApp(runtimeOptions);
+    return getRequestListener((request, env) => application.fetch(request, env));
+  });
   // A runtime that fails to load rejects once, here, and nothing is waiting on
   // it until the first request arrives — Node calls that an unhandled rejection
   // and takes the server down with it. Marking it handled costs nothing: the
   // same settled promise still delivers the real error to `next` per request.
-  handler.catch(() => undefined);
+  listener.catch(() => undefined);
   register((request, response, next) => {
-    void handler
-      .then((handle) => handle(request, response))
-      .then((handled) => {
-        if (!handled) next();
-      })
-      .catch(next);
+    if (!isApiRequest(request)) {
+      next();
+      return;
+    }
+    void listener.then((handle) => handle(request, response)).catch(next);
   });
 };
 

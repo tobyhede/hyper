@@ -1,21 +1,15 @@
 import { uuidSchema } from '@project/core';
-import { afterEach, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { HttpSpaceBackend } from '@project/http';
-import { createHandler, type E2eHttpRuntimeOptions } from '../support/e2e-http-runtime';
-import { startHttpServer, type TestHttpServer } from '../support/http-server';
+import { createApp, type E2eHttpRuntimeOptions } from '../support/e2e-http-runtime';
 
 const FIXTURE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000040');
-const servers: TestHttpServer[] = [];
-
 const startRuntime = async (options: E2eHttpRuntimeOptions) => {
-  const server = await startHttpServer(await createHandler(options));
-  servers.push(server);
-  return new HttpSpaceBackend(server.url);
+  const app = await createApp(options);
+  return new HttpSpaceBackend('http://hyper.test', {
+    fetch: (input, init) => Promise.resolve(app.fetch(new Request(input, init))),
+  });
 };
-
-afterEach(async () => {
-  await Promise.all(servers.splice(0).map((server) => server.close()));
-});
 
 describe('e2e HTTP runtime', () => {
   it('imports the abstract-layout fixture into each fresh runtime', async () => {

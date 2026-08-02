@@ -22,6 +22,7 @@ export default defineConfig(({ mode }) => {
       alias: {
         '@project/core': repositoryFile('../core/src/index.ts'),
         '@project/graph': repositoryFile('../graph/src/index.ts'),
+        '@project/http': repositoryFile('../http/src/index.ts'),
         '@project/persistence': repositoryFile('../persistence/src/index.ts'),
       },
     },

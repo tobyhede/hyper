@@ -76,14 +76,22 @@ The existing resources remain fixed:
 The migration deliberately defines the request policy rather than inheriting
 parser accidents:
 
-- JSON request bodies are capped at 1 MiB for declared and streamed lengths.
+- JSON request bodies are capped at 1 MiB, counted as they arrive. A declared
+  `Content-Length` is never trusted, in either direction: an understated one
+  cannot smuggle a larger body past the count, and an over-declared one is
+  measured rather than rejected on the header.
 - `application/json` with no charset or an explicit UTF-8 charset is accepted.
 - Any other charset is rejected with 415 before JSON validation.
 - Compressed request bodies are not an MVP capability. A non-identity
   `Content-Encoding` is rejected with 415 rather than surfacing as malformed
   JSON.
-- A body over the cap returns 413. Invalid JSON or a path/body id mismatch
-  returns 400. A valid but inadmissible Space snapshot returns 422.
+- A body over the cap returns 413, and the rest of that body is read and
+  discarded so the 413 leaves a persistent connection reusable. The drain is
+  bounded: past its allowance the body is left unconsumed and the host drops the
+  connection, which is the right answer for a client that will not stop sending.
+- Invalid JSON or a path/body id mismatch returns 400. A valid but inadmissible
+  Space snapshot returns 422. Error messages are prose; a schema failure is
+  summarised rather than serialized into the `message` field.
 - Method rejection retains an accurate `Allow` header.
 - Responses remain JSON, UTF-8, and `Cache-Control: no-store`.
 - Repository failures are logged through an injected logger and return the

@@ -1,11 +1,11 @@
+import { createSpaceHttpApp, type SpaceHttpApp } from '@project/http';
 import { PostgresSpaceRepository } from '../persistence/postgres-space-repository';
 import { db } from '../prisma/db';
 import { resolveDatabaseStartup } from '../startup/database-startup';
-import { createSpaceHttpHandler, type SpaceHttpHandler } from './space-http-handler';
 
 /** Compose the normal database runtime before exposing browser-safe HTTP resources. */
-export const createHandler = async (): Promise<SpaceHttpHandler> => {
+export const createApp = async (): Promise<SpaceHttpApp> => {
   const repository = new PostgresSpaceRepository(db);
   await resolveDatabaseStartup(repository);
-  return createSpaceHttpHandler(repository);
+  return createSpaceHttpApp(repository);
 };

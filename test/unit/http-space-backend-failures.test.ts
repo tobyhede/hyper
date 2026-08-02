@@ -1,4 +1,3 @@
-import { createServer } from 'node:http';
 import { describe, expect, it } from 'vitest';
 import { uuidSchema, type SpaceSnapshot } from '@project/core';
 import { HttpSpaceBackend } from '@project/http';
@@ -13,33 +12,6 @@ const snapshot: SpaceSnapshot = {
 
 const backendFor = (response: Response): HttpSpaceBackend =>
   new HttpSpaceBackend('/', { fetch: () => Promise.resolve(response) });
-
-const startStalledResponseServer = async (status: number, retryAfter: string) => {
-  let reportHeadersSent: (() => void) | undefined;
-  const headersSent = new Promise<void>((resolve) => {
-    reportHeadersSent = resolve;
-  });
-  const server = createServer((_request, response) => {
-    response.writeHead(status, {
-      'content-type': 'application/json',
-      'Retry-After': retryAfter,
-    });
-    response.write('{"message":"Still working"');
-    reportHeadersSent?.();
-  });
-  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
-  const address = server.address();
-  if (address === null || typeof address === 'string') throw new Error('Expected TCP address');
-  return {
-    url: `http://127.0.0.1:${address.port}`,
-    headersSent,
-    close: () =>
-      new Promise<void>((resolve, reject) => {
-        server.close((error) => (error ? reject(error) : resolve()));
-        server.closeAllConnections();
-      }),
-  };
-};
 
 describe('typed Hono HttpSpaceBackend failure classification', () => {
   const permanent = [
@@ -220,20 +192,29 @@ describe('typed Hono HttpSpaceBackend failure classification', () => {
    * prompt status line hangs the read for as long as the peer holds it open, so
    * the timeout has to stay armed until the body has been decoded — exactly as
    * a real Fetch ties its signal to the response stream.
+   *
+   * The response is built synchronously inside the Fetch, so its status line,
+   * headers and first bytes exist before `#timedRequest`'s timer can fire. A
+   * real socket cannot promise that ordering: the timer is armed before the
+   * request is dispatched, so on a loaded machine the abort wins the race and
+   * the peer is left with no request to answer — and a test waiting on the peer
+   * to report headers then waits forever.
    */
   const stalledBodyFetch =
-    (status: number): typeof globalThis.fetch =>
+    (status: number, headers: Record<string, string> = {}): typeof globalThis.fetch =>
     (_input, init) =>
       Promise.resolve(
         new Response(
           new ReadableStream({
             start(controller) {
+              // Prompt, delivered — and still never a complete body.
+              controller.enqueue(new TextEncoder().encode('{"message":"Still working"'));
               init?.signal?.addEventListener('abort', () => {
                 controller.error(new Error('aborted'));
               });
             },
           }),
-          { status, headers: { 'content-type': 'application/json' } },
+          { status, headers: { 'content-type': 'application/json', ...headers } },
         ),
       );
 
@@ -258,35 +239,30 @@ describe('typed Hono HttpSpaceBackend failure classification', () => {
     });
   }, 1000);
 
+  // `Retry-After` is present and would classify these as `rate-limited` and
+  // `unavailable` with a `retryAfterMs` — but only if the body were ever read to
+  // completion. The timeout outranks it, and that is what these two pin.
   it('reports a rate-limited response whose body stalls as a timeout without Retry-After', async () => {
-    const server = await startStalledResponseServer(429, '60');
-    try {
-      const backend = new HttpSpaceBackend(server.url, { timeoutMs: 100 });
-      const result = backend.commitSpace(snapshot, 0n);
-      await server.headersSent;
-      await expect(result).resolves.toEqual({
-        kind: 'retryable-failure',
-        code: 'timeout',
-        message: 'Request timed out',
-      });
-    } finally {
-      await server.close();
-    }
+    const backend = new HttpSpaceBackend('/', {
+      timeoutMs: 5,
+      fetch: stalledBodyFetch(429, { 'Retry-After': '60' }),
+    });
+    await expect(backend.commitSpace(snapshot, 0n)).resolves.toEqual({
+      kind: 'retryable-failure',
+      code: 'timeout',
+      message: 'Request timed out',
+    });
   }, 1000);
 
   it('reports an unavailable response whose body stalls as a timeout without Retry-After', async () => {
-    const server = await startStalledResponseServer(503, '30');
-    try {
-      const backend = new HttpSpaceBackend(server.url, { timeoutMs: 100 });
-      const result = backend.commitSpace(snapshot, 0n);
-      await server.headersSent;
-      await expect(result).resolves.toEqual({
-        kind: 'retryable-failure',
-        code: 'timeout',
-        message: 'Request timed out',
-      });
-    } finally {
-      await server.close();
-    }
+    const backend = new HttpSpaceBackend('/', {
+      timeoutMs: 5,
+      fetch: stalledBodyFetch(503, { 'Retry-After': '30' }),
+    });
+    await expect(backend.commitSpace(snapshot, 0n)).resolves.toEqual({
+      kind: 'retryable-failure',
+      code: 'timeout',
+      message: 'Request timed out',
+    });
   }, 1000);
 });

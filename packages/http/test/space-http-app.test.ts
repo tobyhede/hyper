@@ -1,7 +1,12 @@
 import { uuidSchema, type SpaceSnapshot } from '@project/core';
 import { encodeCommitRequest } from '@project/persistence';
+import { HTTPException } from 'hono/http-exception';
 import { describe, expect, it } from 'vitest';
-import { createSpaceHttpApp, type SpaceResourceRepository } from '@project/http';
+import {
+  createSpaceHttpApp,
+  MAX_COMMIT_BODY_BYTES,
+  type SpaceResourceRepository,
+} from '@project/http';
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
@@ -10,6 +15,12 @@ const snapshot: SpaceSnapshot = {
   id: SPACE_ID,
   document: { version: 2, title: 'One', routes: [] },
   cards: [{ id: CARD_ID, document: { title: 'A', kind: 'markdown', body: '' } }],
+};
+
+/** A snapshot whose serialized commit request is comfortably over the 1 MiB cap. */
+const oversizedSnapshot: SpaceSnapshot = {
+  ...snapshot,
+  cards: [{ id: CARD_ID, document: { title: 'A', kind: 'markdown', body: 'x'.repeat(1_048_576) } }],
 };
 
 const repository = (overrides: Partial<SpaceResourceRepository> = {}): SpaceResourceRepository => ({
@@ -282,7 +293,14 @@ describe('Space HTTP application', () => {
     });
   });
 
-  it('rejects a declared body over 1 MiB', async () => {
+  /*
+   * One size policy: what arrives is counted, and `Content-Length` is never
+   * trusted. `bodyLimit` returns without reading a byte when it believes the
+   * header, so the header is deleted before it runs — that deletion is the
+   * load-bearing half. The three cases below are the same cap seen through
+   * every declaration a client might send.
+   */
+  it('measures the body rather than trusting an over-declared length', async () => {
     const response = await createSpaceHttpApp(repository()).request(`/api/spaces/${SPACE_ID}`, {
       method: 'PUT',
       headers: {
@@ -290,6 +308,23 @@ describe('Space HTTP application', () => {
         'Content-Length': '1048577',
       },
       body: '{}',
+    });
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      message: 'commit request has unexpected fields',
+    });
+  });
+
+  it('rejects an actual body over 1 MiB when its declared length is honest', async () => {
+    const body = JSON.stringify(encodeCommitRequest(oversizedSnapshot, 0n));
+    const response = await createSpaceHttpApp(repository()).request(`/api/spaces/${SPACE_ID}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Length': String(new TextEncoder().encode(body).byteLength),
+      },
+      body,
     });
 
     expect(response.status).toBe(413);
@@ -313,15 +348,6 @@ describe('Space HTTP application', () => {
 
   it('rejects an actual body over 1 MiB when its declared length is understated', async () => {
     let commitCalls = 0;
-    const oversizedSnapshot: SpaceSnapshot = {
-      ...snapshot,
-      cards: [
-        {
-          id: CARD_ID,
-          document: { title: 'A', kind: 'markdown', body: 'x'.repeat(1_048_576) },
-        },
-      ],
-    };
     const response = await createSpaceHttpApp(
       repository({
         commitSpace: () => {
@@ -345,15 +371,92 @@ describe('Space HTTP application', () => {
     expect(commitCalls).toBe(0);
   });
 
-  it('rejects an invalid path identity before inspecting the request body', async () => {
-    const response = await createSpaceHttpApp(repository()).request('/api/spaces/not-a-uuid', {
+  /*
+   * An oversized body is drained so the 413 leaves the connection reusable, and
+   * that drain is itself bounded — a client that never stops sending must not be
+   * able to hold the read loop open indefinitely. The stream below never ends,
+   * so an unbounded drain fails this by hanging; the byte assertion fails it
+   * fast if the bound merely moves somewhere too generous to matter.
+   */
+  it('stops draining a body that keeps arriving past the drain allowance', async () => {
+    const chunk = 64 * 1024;
+    let pulled = 0;
+    const endless = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        pulled += chunk;
+        controller.enqueue(new Uint8Array(chunk));
+      },
+    });
+
+    const response = await createSpaceHttpApp(repository()).request(`/api/spaces/${SPACE_ID}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: endless,
+      duplex: 'half',
+    } as RequestInit);
+
+    expect(response.status).toBe(413);
+    expect(pulled).toBeLessThanOrEqual(MAX_COMMIT_BODY_BYTES * 16);
+  });
+
+  // The limit is a maximum, not a threshold the body must stay under. Both size
+  // checks compare with `>`, and neither existing case would notice one of them
+  // becoming `>=` — the oversize tests would still pass while every commit of
+  // exactly the permitted size started failing.
+  it('accepts a body of exactly the 1 MiB limit through both size checks', async () => {
+    const padded = (length: number): SpaceSnapshot => ({
+      ...snapshot,
+      cards: [
+        { id: CARD_ID, document: { title: 'A', kind: 'markdown', body: 'x'.repeat(length) } },
+      ],
+    });
+    const overhead = JSON.stringify(encodeCommitRequest(padded(0), 0n)).length;
+    const body = JSON.stringify(encodeCommitRequest(padded(MAX_COMMIT_BODY_BYTES - overhead), 0n));
+    expect(new TextEncoder().encode(body).byteLength).toBe(MAX_COMMIT_BODY_BYTES);
+
+    const declared = await createSpaceHttpApp(repository()).request(`/api/spaces/${SPACE_ID}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
-        'Content-Length': '1048577',
+        'Content-Length': String(MAX_COMMIT_BODY_BYTES),
       },
-      body: '{}',
+      body,
     });
+
+    expect(declared.status).toBe(200);
+    await expect(declared.json()).resolves.toEqual({ revision: '1' });
+
+    const streamed = await createSpaceHttpApp(repository()).request(`/api/spaces/${SPACE_ID}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body,
+    });
+
+    expect(streamed.status).toBe(200);
+    await expect(streamed.json()).resolves.toEqual({ revision: '1' });
+  });
+
+  // The body is genuinely oversized, so this fails as 400 only if the identity
+  // is settled before the body is measured. A small body with a lying length
+  // would pass whichever order the two ran in, and prove nothing.
+  it('rejects an invalid path identity before inspecting the request body', async () => {
+    const response = await createSpaceHttpApp(repository()).request('/api/spaces/not-a-uuid', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(encodeCommitRequest(oversizedSnapshot, 0n)),
+    });
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({ message: 'Space id must be a UUID' });
+  });
+
+  // `validateSpaceId` guards both methods, but only the commit route proved it.
+  // A load route that dropped the validator would hand the repository an
+  // unvalidated path segment and answer 404 rather than 400.
+  it('rejects an invalid path identity before loading a space', async () => {
+    const response = await createSpaceHttpApp(
+      repository({ loadSpace: () => Promise.reject(new Error('must not be reached')) }),
+    ).request('/api/spaces/not-a-uuid');
 
     expect(response.status).toBe(400);
     await expect(response.json()).resolves.toEqual({ message: 'Space id must be a UUID' });
@@ -409,6 +512,31 @@ describe('Space HTTP application', () => {
 
     expect(response.status).toBe(400);
     expect(response.headers.get('content-type')).toBe('application/json; charset=utf-8');
+  });
+
+  /*
+   * `{ message: string }` is the declared error contract, and every other 400
+   * honours it with a sentence. Zod serializes its whole issue array into
+   * `Error.message`, so a snapshot that fails the schema used to answer with
+   * hundreds of characters of internal schema shape — a JSON document nested
+   * inside a field the client renders as prose.
+   */
+  it('describes a schema-invalid snapshot in prose rather than serialized issues', async () => {
+    const response = await createSpaceHttpApp(repository()).request(`/api/spaces/${SPACE_ID}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        snapshot: { ...snapshot, document: { ...snapshot.document, title: '' } },
+        expectedRevision: '0',
+      }),
+    });
+
+    expect(response.status).toBe(400);
+    const { message } = (await response.json()) as { message: string };
+    expect(message).toContain('snapshot is invalid');
+    expect(message).toContain('document.title');
+    expect(message).not.toContain('{');
+    expect(message.length).toBeLessThan(200);
   });
 
   it('advertises the methods supported by a space resource', async () => {
@@ -474,6 +602,35 @@ describe('Space HTTP application', () => {
     expect(response.headers.get('cache-control')).toBe('no-store');
     await expect(response.json()).resolves.toEqual({ message: 'Internal server error' });
   });
+
+  /*
+   * `{ message: string }` is the whole error contract, and `HttpSpaceBackend`
+   * decodes every non-200/409 commit response as JSON. `HTTPException`'s own
+   * `getResponse()` answers `text/plain` with no `Cache-Control`, so forwarding
+   * it for any status but 400 left the typed client a body it cannot read and a
+   * cacheable error. A throwing log sink is the seam that reaches this branch
+   * with a status the application does not itself produce.
+   */
+  it.each([401, 404, 422] as const)(
+    'answers an HTTPException with %i in the declared JSON error shape',
+    async (status) => {
+      const app = createSpaceHttpApp(
+        repository({ listSpaces: () => Promise.reject(new Error('database is down')) }),
+        {
+          logError: () => {
+            throw new HTTPException(status, { message: `Refused with ${status}` });
+          },
+        },
+      );
+
+      const response = await app.request('/api/spaces');
+
+      expect(response.status).toBe(status);
+      expect(response.headers.get('cache-control')).toBe('no-store');
+      expect(response.headers.get('content-type')).toBe('application/json; charset=utf-8');
+      await expect(response.json()).resolves.toEqual({ message: `Refused with ${status}` });
+    },
+  );
 
   // Hono's own json validator applies a stricter Content-Type regex than this
   // module's media policy, and when it disagrees it does not parse the body and
