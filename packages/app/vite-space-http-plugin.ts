@@ -61,6 +61,14 @@ const installMiddleware = (
 ): void => {
   const listener = runtime.then(async (loaded) => {
     const application = await asRuntime(loaded, modulePath).createApp(runtimeOptions);
+    // `getRequestListener` replaces `globalThis.Request`/`Response` with its own
+    // lightweight classes unless `overrideGlobalObjects: false` is passed, and
+    // it defines them non-writable and non-configurable, so the swap is
+    // process-wide and permanent. Leave it enabled: the application rebuilds a
+    // request to canonicalise its media type, and that calls the *global*
+    // `Request` constructor on an instance this adapter made. Disabling the
+    // override answers 500 to every commit; `vite-hono-host.test.ts` pins both
+    // the accepted and the oversized path against exactly that change.
     return getRequestListener((request, env) => application.fetch(request, env));
   });
   // A runtime that fails to load rejects once, here, and nothing is waiting on
