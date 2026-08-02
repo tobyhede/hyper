@@ -6,6 +6,7 @@ import {
   MemorySpaceBackend,
   MemorySpaceBackendTestControl,
   openSpaceSession,
+  type SpaceSession,
 } from '@project/persistence';
 import { mountWorkspace } from '../src/Workspace';
 
@@ -109,14 +110,11 @@ describe('Workspace conflict recovery', () => {
   });
 
   /**
-   * `acceptRemote` is an `onClick` handler (`App.tsx`), and React error
-   * boundaries do not catch throws from event handlers — so a throw here escapes
-   * to the window rather than reaching `WorkspaceFailure`, and the session has
-   * *already* published the unloadable snapshot as settled working state. The
-   * page then still shows the stale local workspace with no conflict left to
-   * resolve and no way back. Validate the remote snapshot before accepting it.
+   * A conflicted session whose remote snapshot does not load. Mounted, with the
+   * accept already clicked, because both tests below assert on what that leaves
+   * behind.
    */
-  it('refuses an unloadable remote snapshot instead of accepting it into the session', async () => {
+  const refusedRemote = async (): Promise<{ local: SpaceSnapshot; session: SpaceSession }> => {
     const local = snapshot('Local workspace', 'Local card', 10, 20);
     const dangling: SpaceSnapshot = {
       ...local,
@@ -152,10 +150,46 @@ describe('Workspace conflict recovery', () => {
     });
 
     fireEvent.click(screen.getByTestId('persistence-accept-remote'));
+    return { local, session };
+  };
 
-    expect(await screen.findByTestId('workspace-failure')).toHaveTextContent(MISSING_CARD_ID);
+  /**
+   * `acceptRemote` is an `onClick` handler (`App.tsx`), and React error
+   * boundaries do not catch throws from event handlers — so a throw here escapes
+   * to the window rather than reaching `WorkspaceFailure`, and the session has
+   * *already* published the unloadable snapshot as settled working state. The
+   * page then still shows the stale local workspace with no conflict left to
+   * resolve and no way back. Validate the remote snapshot before accepting it.
+   */
+  it('refuses an unloadable remote snapshot instead of accepting it into the session', async () => {
+    const { local, session } = await refusedRemote();
+
+    // In the alert's own text, not an attribute: `role="alert"` announces what
+    // it contains, and a reason a pointer has to hover to reach is one a
+    // keyboard or touch user never gets.
+    const refusal = await screen.findByTestId('persistence-remote-refused');
+    expect(refusal).toHaveTextContent('The remote space is invalid and was not accepted');
+    expect(refusal).toHaveTextContent(MISSING_CARD_ID);
     expect(session.getState().working).toEqual(local);
     expect(session.getState().persistence.kind).toBe('conflicted');
+  });
+
+  /**
+   * Refusing is not a failure of the workspace: the local work is intact and the
+   * conflict is still the session's state, so the page that owns both has to
+   * stay. Reporting through the failure panel unmounted the whole tree, which
+   * left the author reading why their unsaved work could not be replaced on a
+   * screen that no longer showed it — and no control to do anything else.
+   */
+  it('keeps the conflicted workspace on screen when it refuses the remote snapshot', async () => {
+    await refusedRemote();
+
+    expect(screen.getByText('Local workspace')).toBeVisible();
+    // Awaited because placement is asynchronous — the Card arrives with the
+    // arrangement, not with the mount.
+    expect(await screen.findByRole('heading', { name: 'Local card' })).toBeVisible();
+    expect(screen.getByTestId('persistence-accept-remote')).toBeVisible();
+    expect(screen.queryByTestId('workspace-failure')).not.toBeInTheDocument();
   });
 });
 

@@ -40,7 +40,8 @@ import { OpenCard } from './components/OpenCard';
 import { PresentingChrome } from './components/PresentingChrome';
 
 export interface AppActions {
-  acceptRemote: () => void;
+  /** Accepts the conflicting remote state, or answers why it was refused. */
+  acceptRemote: () => string | null;
 }
 
 export const createApp = ({ space, spaceSession }: OpenedSpace, { acceptRemote }: AppActions) => {
@@ -106,6 +107,10 @@ export const createApp = ({ space, spaceSession }: OpenedSpace, { acceptRemote }
     const [selectedView, setSelectedView] = useState<BuiltInViewId>(
       initialRenderer.kind === 'view' ? initialRenderer.view : 'graph',
     );
+    // Why the remote state was refused, reported beside the control that asked
+    // for it. The workspace behind it still holds the local work and the
+    // conflict, so this is a message, not a mode.
+    const [remoteRefusal, setRemoteRefusal] = useState<string | null>(null);
     const rendererSpace = useMemo(() => {
       const loaded = loadSpaceSnapshot(sessionState.working);
       if (!loaded.ok) {
@@ -406,9 +411,30 @@ export const createApp = ({ space, spaceSession }: OpenedSpace, { acceptRemote }
             Retry persistence
           </Button>
         ) : sessionState.persistence.kind === 'conflicted' ? (
-          <Button variant="default" data-testid="persistence-accept-remote" onClick={acceptRemote}>
-            Accept remote
-          </Button>
+          <>
+            <Button
+              variant="default"
+              data-testid="persistence-accept-remote"
+              onClick={() => {
+                // Only a refusal is state worth holding: acceptance remounts the
+                // whole workspace, so this component is gone before it could
+                // render anything the call returned.
+                const refusal = acceptRemote();
+                if (refusal !== null) setRemoteRefusal(refusal);
+              }}
+            >
+              Accept remote
+            </Button>
+            {remoteRefusal === null ? null : (
+              <span
+                role="alert"
+                data-testid="persistence-remote-refused"
+                className="persistence-refusal"
+              >
+                {remoteRefusal}
+              </span>
+            )}
+          </>
         ) : (
           <span
             data-testid="persistence-status"
