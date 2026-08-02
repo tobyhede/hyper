@@ -1,6 +1,11 @@
 # Speaker view
 
-Status: open
+Status: superseded by ADR 0024 and ADR 0027; feature remains unbuilt
+
+This ticket's reveal.js implementation premise is no longer valid. A speaker
+view may still be wanted, but it needs a new decision designed around traversing
+a Route on the graph canvas. The proposal below is retained as historical
+evidence and is not an active implementation ticket.
 
 ## Context
 

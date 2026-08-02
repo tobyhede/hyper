@@ -1,7 +1,15 @@
 # 01 — Ids optional in the file, generated on load
 
-Status: open
+Status: superseded by ADR 0030
 Type: task
+
+This deterministic load-time generation proposal belongs to the superseded
+file-first identity model of ADR 0019. In version 2, explicit public ids are
+UUIDs. Imports may omit persistence-owned ids; the import process mints missing
+Card, Route and Layout ids with `newUuid`, while PostgreSQL supplies a Space id
+from its column default. `loadSpace` does not derive stable ids from titles or
+array positions. The proposal below is retained as historical evidence and is
+not an active implementation ticket.
 
 ADR 0019. Pure, lands green on its own, no app change.
 
