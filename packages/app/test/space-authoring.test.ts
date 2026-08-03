@@ -1088,7 +1088,13 @@ describe('Space Authoring', () => {
   });
 
   it('notifies the listeners subscribed when publication began, not those added during it', () => {
-    const { authoring } = openAuthoring(positionedSnapshot, {
+    // `attachAuthoring`, not `openAuthoring`: the Edit has to actually complete.
+    // Without an installed placement this returns `no-edit` before publishing,
+    // the outer listener never runs, and `late` is empty however `publish`
+    // iterates — an assertion that cannot fail. `completed` and `subscribed` are
+    // asserted for the same reason: they are what stop it going vacuous again.
+    const loaded = { snapshot: positionedSnapshot, revision: 0n, exportedRevision: null };
+    const { authoring } = attachAuthoring(new MemorySpaceBackend([loaded]), loaded, {
       kind: 'layout',
       layoutId: LAYOUT_ID,
     });
@@ -1100,7 +1106,10 @@ describe('Space Authoring', () => {
       authoring.subscribe(() => late.push('notified'));
     });
 
-    authoring.complete({ kind: 'connected-cards', from: CARD_B, to: CARD_A });
+    expect(authoring.complete({ kind: 'connected-cards', from: CARD_B, to: CARD_A })).toEqual({
+      kind: 'completed',
+    });
+    expect(subscribed).toBe(true);
 
     // A listener that did not exist when this publication began has not missed
     // anything — it reads current state on its first real notification.
