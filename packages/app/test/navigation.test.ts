@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { uuidSchema, type UUID } from '@project/core';
+import { uuidSchema, type RouteId, type UUID } from '@project/core';
 import { loadSpace, type Space } from '@project/graph';
 import { createNavigation } from '../src/navigation';
 import { cardFile } from './card-files';
@@ -134,6 +134,22 @@ it('activating a Route ends the current walk without changing the Space', () => 
   expect(space.defaultView).toBeUndefined();
 });
 
+it('refuses to activate a Route the current Space does not hold', () => {
+  const space = fixture();
+  const navigation = createNavigation(() => space, { kind: 'view', view: 'graph' });
+  navigation.present();
+  const before = navigation.getState();
+
+  // The same invariant `selectRenderer` holds, for the other half of what
+  // Navigation names. Activating is not an edit, so it cannot mint the Route it
+  // is handed; a Route the Space does not hold would strand every later read —
+  // `moves()`, `present()` and the emphasis — on a lookup that answers nothing.
+  expect(() => navigation.activateRoute(uuid('00000000-0000-4000-8000-000000000099'))).toThrow(
+    /does not exist/,
+  );
+  expect(navigation.getState()).toBe(before);
+});
+
 it('continues the current walk when an Edit converts the renderer to a Layout', () => {
   const space = fixture();
   const navigation = createNavigation(() => space, { kind: 'view', view: 'graph' });
@@ -148,6 +164,47 @@ it('continues the current walk when an Edit converts the renderer to a Layout', 
     mode: 'presenting',
   });
   expect(navigation.getState().walk).toBe(walk);
+});
+
+it('notifies subscribers synchronously until they unsubscribe', () => {
+  const space = fixture();
+  const navigation = createNavigation(() => space, { kind: 'view', view: 'graph' });
+  const seen: (RouteId | null)[] = [];
+  // The seam `useSyncExternalStore` drives. It must notify during the call that
+  // changed the state — React reads `getState` straight after and would
+  // otherwise render the previous Navigation state.
+  const unsubscribe = navigation.subscribe(() => seen.push(navigation.getState().activeRouteId));
+
+  navigation.activateRoute(ROUTE_TWO);
+  expect(seen).toEqual([ROUTE_TWO]);
+
+  navigation.activateRoute(ROUTE_ONE);
+  expect(seen).toEqual([ROUTE_TWO, ROUTE_ONE]);
+
+  unsubscribe();
+  navigation.activateRoute(ROUTE_TWO);
+  expect(seen).toEqual([ROUTE_TWO, ROUTE_ONE]);
+});
+
+it('refuses a renderer the current Space does not hold, leaving navigation untouched', () => {
+  const space = fixture();
+  const missing = uuid('00000000-0000-4000-8000-000000000099');
+  const navigation = createNavigation(() => space, { kind: 'view', view: 'graph' });
+  navigation.present();
+  const before = navigation.getState();
+
+  // Resolving first is the invariant: Navigation may never name a renderer the
+  // Space does not hold, so an unresolvable selection is refused outright rather
+  // than half-applied.
+  expect(() => navigation.selectRenderer({ kind: 'layout', layoutId: missing })).toThrow(
+    /does not exist/,
+  );
+  expect(navigation.getState()).toBe(before);
+
+  expect(() => navigation.continueInRenderer({ kind: 'layout', layoutId: missing })).toThrow(
+    /does not exist/,
+  );
+  expect(navigation.getState()).toBe(before);
 });
 
 it('opens and closes Cards, and closes an opened Card when presenting starts', () => {
@@ -166,6 +223,50 @@ it('opens and closes Cards, and closes an opened Card when presenting starts', (
   expect(navigation.activeCardId()).toBe(uuid('00000000-0000-4000-8000-000000000002'));
   navigation.exitPresenting();
   expect(navigation.getState()).toMatchObject({ mode: 'overview', walk: [] });
+});
+
+it('reads the working Space once per moves() call, whatever the branching', () => {
+  const cardA = uuid('00000000-0000-4000-8000-000000000002');
+  const cardB = uuid('00000000-0000-4000-8000-000000000003');
+  const cardC = uuid('00000000-0000-4000-8000-000000000004');
+  const loaded = loadSpace(
+    {
+      version: 2,
+      id: uuid('00000000-0000-4000-8000-000000000001'),
+      title: 'Fork',
+      routes: [
+        {
+          id: ROUTE_ONE,
+          title: 'Fork',
+          edges: [
+            { from: cardA, to: cardB },
+            { from: cardA, to: cardC },
+          ],
+        },
+      ],
+    },
+    [cardFile(cardA), cardFile(cardB), cardFile(cardC)],
+  );
+  if (!loaded.ok) throw new Error('fork should load');
+  // Reading the Space costs a full parse and reindex of the working snapshot,
+  // and `moves()` runs during every App render — including the per-pointer-frame
+  // renders a drag produces. One read per call, not one per outgoing Edge.
+  let reads = 0;
+  const navigation = createNavigation(
+    () => {
+      reads += 1;
+      return loaded.space;
+    },
+    { kind: 'view', view: 'graph' },
+    loaded.space,
+  );
+  navigation.present();
+
+  reads = 0;
+  const moves = navigation.moves();
+
+  expect(moves).toHaveLength(2);
+  expect(reads).toBe(1);
 });
 
 it('walks a fork, retreats along the walk, and reselects the Edge taken', () => {

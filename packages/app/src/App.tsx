@@ -13,7 +13,6 @@ import {
   buildRouteEdges,
   filterHandlesByRoutes,
   getCard,
-  loadSpaceSnapshot,
   routeCardIds,
   resolveContentCard,
   type LayoutPoint,
@@ -28,6 +27,7 @@ import { canvasContent, usePlacementRendering } from './placement-rendering';
 import { activeRouteColor, ROUTE_PALETTE, routeColorMap } from './colors';
 import { CARD_HEIGHT, CARD_SIZE, cardSizeVars } from './card';
 import { createNavigation } from './navigation';
+import { createWorkingSpaceReader } from './snapshot';
 import { defaultRenderer, layoutPositionMap, resolveView, type RendererSelection } from './view';
 import { GraphView } from './components/GraphView';
 import { OpenCard } from './components/OpenCard';
@@ -39,11 +39,12 @@ export interface AppActions {
 }
 
 export const createApp = ({ space, spaceSession }: OpenedSpace, { acceptRemote }: AppActions) => {
-  const currentSpace = () => {
-    const loaded = loadSpaceSnapshot(spaceSession.getState().working);
-    if (!loaded.ok) throw new Error(loaded.errors.map((error) => error.message).join('; '));
-    return loaded.space;
-  };
+  // One validated aggregate per working snapshot, shared by the render path and
+  // by Navigation. Both read the same reader, so in the steady state a snapshot
+  // is parsed and indexed once rather than once per render — and both see the
+  // same `Space` identity, which is what the render memos below hang on.
+  const readWorkingSpace = createWorkingSpaceReader();
+  const currentSpace = () => readWorkingSpace(spaceSession.getState().working);
   // Which view this space opens in, and the strategy that arranges it. The fixture
   // declares no view, so this resolves to the route-driven ELK graph — exactly
   // what the hardcoded `elkStrategy()` here used to do. It also answers which
@@ -98,13 +99,10 @@ export const createApp = ({ space, spaceSession }: OpenedSpace, { acceptRemote }
     // for it. The workspace behind it still holds the local work and the
     // conflict, so this is a message, not a mode.
     const [remoteRefusal, setRemoteRefusal] = useState<string | null>(null);
-    const rendererSpace = useMemo(() => {
-      const loaded = loadSpaceSnapshot(sessionState.working);
-      if (!loaded.ok) {
-        throw new Error(loaded.errors.map((error) => error.message).join('; '));
-      }
-      return loaded.space;
-    }, [sessionState.working]);
+    const rendererSpace = useMemo(
+      () => readWorkingSpace(sessionState.working),
+      [sessionState.working],
+    );
     const layouts = rendererSpace.layouts;
     const routes = rendererSpace.routes;
     const colors = useMemo(() => routeColorMap(rendererSpace), [rendererSpace]);

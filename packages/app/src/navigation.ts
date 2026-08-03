@@ -99,8 +99,18 @@ export function createNavigation(
         ...(selection.kind === 'view' ? { selectedView: selection.view } : {}),
       });
     },
-    activateRoute: (routeId) =>
-      setState({ activeRouteId: routeId, mode: 'overview', walk: [], branchIndex: 0 }),
+    // Resolved first, for the same reason a renderer is: Navigation may not name
+    // structure the current Space does not hold. Activating is never an Edit
+    // (ADR 0028), so it cannot mint the Route it is handed — an unheld one would
+    // strand `moves()`, `present()` and the emphasis on a lookup answering
+    // nothing. An Edit that mints the first Route submits it before activating
+    // it, so the Route is in the working Space by the time this reads.
+    activateRoute: (routeId) => {
+      if (getRoute(currentSpace(), routeId) === undefined) {
+        throw new Error(`The Route ${routeId} does not exist.`);
+      }
+      setState({ activeRouteId: routeId, mode: 'overview', walk: [], branchIndex: 0 });
+    },
     openCard: (cardId) => setState({ openedCardId: cardId }),
     closeCard: () => setState({ openedCardId: null }),
     present: () => {
@@ -134,11 +144,18 @@ export function createNavigation(
       setState({ branchIndex: (((state.branchIndex + delta) % count) + count) % count });
     },
     activeCardId,
-    moves: () =>
-      outgoingEdgesFrom(currentSpace(), state.activeRouteId, activeCardId()).map((edge, index) => ({
+    // One read for the whole operation. Reading the Space costs a parse and
+    // reindex of the working snapshot, and this runs during every App render —
+    // a per-Edge read made a branching Route pay that cost once per move.
+    // Resolving once also keeps every title in the answer read from the same
+    // Space as the edges they name.
+    moves: () => {
+      const space = currentSpace();
+      return outgoingEdgesFrom(space, state.activeRouteId, activeCardId()).map((edge, index) => ({
         cardId: edge.to,
-        title: getCard(currentSpace(), edge.to)?.title ?? edge.to,
+        title: getCard(space, edge.to)?.title ?? edge.to,
         selected: index === state.branchIndex,
-      })),
+      }));
+    },
   };
 }
