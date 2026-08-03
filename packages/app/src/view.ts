@@ -75,29 +75,6 @@ export type RendererSelection =
   | { readonly kind: 'view'; readonly view: BuiltInViewId }
   | { readonly kind: 'layout'; readonly layoutId: UUID };
 
-/** Synchronous navigation state for the renderer currently selected by the viewer. */
-export interface ViewChoice {
-  readonly current: () => RendererSelection;
-  readonly select: (selection: RendererSelection) => void;
-  readonly subscribe: (listener: () => void) => () => void;
-}
-
-export function createViewChoice(initial: RendererSelection): ViewChoice {
-  let selected = initial;
-  const listeners = new Set<() => void>();
-  return {
-    current: () => selected,
-    select: (selection) => {
-      selected = selection;
-      for (const listener of listeners) listener();
-    },
-    subscribe: (listener) => {
-      listeners.add(listener);
-      return () => listeners.delete(listener);
-    },
-  };
-}
-
 /**
  * Which routes a Layout shows and which of them opens active.
  *

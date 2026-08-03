@@ -10,8 +10,9 @@ import { loadSpaceSnapshot } from '@project/graph';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
 import { ROUTE_PALETTE, routeColorMap } from '../src/colors';
 import { createPlacementEditor } from '../src/edit-completion';
-import { createViewChoice, layoutPositionMap } from '../src/view';
+import { layoutPositionMap } from '../src/view';
 import { node } from './editor-fixtures';
+import { authoringNavigation } from './navigation-fixtures';
 
 /**
  * Composing one completed existing-Card connection into the next Space.
@@ -97,10 +98,8 @@ function connectingIn(
   const layout = (snapshot.document.layouts ?? []).find((candidate) => candidate.id === layoutId);
   const editor = createPlacementEditor({
     initialPositions: layout === undefined ? null : layoutPositionMap(layout),
-    viewChoice: createViewChoice({ kind: 'layout', layoutId }),
-    currentActiveRoute: () => activeRouteId,
+    navigation: authoringNavigation({ kind: 'layout', layoutId }, () => activeRouteId),
     session,
-    installSpace: () => undefined,
   });
   editor.getState().syncNodes(projected);
   return {
@@ -174,13 +173,11 @@ describe('completed connection composition', () => {
 
     const loaded = { snapshot: routeLess, revision: 0n, exportedRevision: null };
     const session = openSpaceSession(new MemorySpaceBackend([loaded]), loaded);
-    const viewChoice = createViewChoice({ kind: 'view', view: 'graph' });
+    const navigation = authoringNavigation({ kind: 'view', view: 'graph' }, () => null);
     const editor = createPlacementEditor({
       initialPositions: null,
-      viewChoice,
-      currentActiveRoute: () => null,
+      navigation,
       session,
-      installSpace: () => undefined,
       mintRouteId: () => MINTED_ROUTE_ID,
     });
     editor.getState().syncNodes([node(CARD_A, 120, 240)]);
@@ -219,7 +216,7 @@ describe('completed connection composition', () => {
         },
       ],
     });
-    expect(viewChoice.current()).toEqual({
+    expect(navigation.selectedRenderer()).toEqual({
       kind: 'layout',
       layoutId: session.getState().working.document.defaultView,
     });
@@ -233,17 +230,18 @@ describe('completed connection composition', () => {
     };
     const loaded = { snapshot: routeLess, revision: 0n, exportedRevision: null };
     const session = openSpaceSession(new MemorySpaceBackend([loaded]), loaded);
-    const viewChoice = createViewChoice({ kind: 'view', view: 'graph' });
     let activated: RouteId | null = null;
-    const editor = createPlacementEditor({
-      initialPositions: null,
-      viewChoice,
-      currentActiveRoute: () => null,
-      session,
-      installSpace: () => undefined,
-      activateRoute: (routeId) => {
+    const navigation = authoringNavigation(
+      { kind: 'view', view: 'graph' },
+      () => null,
+      (routeId) => {
         activated = routeId;
       },
+    );
+    const editor = createPlacementEditor({
+      initialPositions: null,
+      navigation,
+      session,
       mintRouteId: () => MINTED_ROUTE_ID,
     });
     const projectedCard = [node(CARD_A, 120, 240)];
@@ -267,7 +265,7 @@ describe('completed connection composition', () => {
         activeRoute: MINTED_ROUTE_ID,
       }),
     ]);
-    expect(viewChoice.current()).toEqual({
+    expect(navigation.selectedRenderer()).toEqual({
       kind: 'layout',
       layoutId: completed.document.defaultView,
     });

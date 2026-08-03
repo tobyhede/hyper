@@ -1,11 +1,11 @@
 import fc from 'fast-check';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { uuidSchema, type Layout, type SpaceSnapshot } from '@project/core';
-import { loadSpaceSnapshot, type Space } from '@project/graph';
+import { loadSpaceSnapshot } from '@project/graph';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
 import { createPlacementEditor } from '../src/edit-completion';
-import { ROUTE_PALETTE, routeColorMap } from '../src/colors';
-import { createViewChoice, layoutPositionMap } from '../src/view';
+import { layoutPositionMap } from '../src/view';
+import { authoringNavigation, navigationFromChoice, rendererChoice } from './navigation-fixtures';
 import { completeDrag, node, settled } from './editor-fixtures';
 import { waitForSettled } from './session-fixtures';
 
@@ -80,7 +80,6 @@ const unlaidSnapshot: SpaceSnapshot = {
 };
 
 const projected = [node(CARD_A, 10, 20), node(CARD_B, 300, 20)];
-const ignoreInstalledSpace = () => undefined;
 
 /**
  * A Space with no Route at all, whose sole Layout filters to no Routes — the
@@ -133,14 +132,12 @@ describe('completed placement composition', () => {
     };
     const loaded = { snapshot: filteredSnapshot, revision: 0n, exportedRevision: null };
     const session = openSpaceSession(new MemorySpaceBackend([loaded]), loaded);
-    const viewChoice = createViewChoice({ kind: 'layout', layoutId: DEFAULT_LAYOUT_ID });
+    const viewChoice = rendererChoice({ kind: 'layout', layoutId: DEFAULT_LAYOUT_ID });
     const initialPositions = layoutPositionMap(filteredLayout);
     const editor = createPlacementEditor({
       initialPositions,
-      viewChoice,
-      currentActiveRoute: () => null,
+      navigation: navigationFromChoice(viewChoice, () => null),
       session,
-      installSpace: ignoreInstalledSpace,
     });
     editor.getState().syncNodes(projected);
 
@@ -193,17 +190,18 @@ describe('completed placement composition', () => {
     const loaded = { snapshot: newSpaceSnapshot, revision: 0n, exportedRevision: null };
     const backend = new MemorySpaceBackend([loaded]);
     const session = openSpaceSession(backend, loaded);
-    const viewChoice = createViewChoice({ kind: 'layout', layoutId: DEFAULT_LAYOUT_ID });
+    const viewChoice = rendererChoice({ kind: 'layout', layoutId: DEFAULT_LAYOUT_ID });
     let activeRouteId: typeof ROUTE_ID | null = null;
     const editor = createPlacementEditor({
       initialPositions: layoutPositionMap(routeLessLayout),
-      viewChoice,
-      currentActiveRoute: () => activeRouteId,
+      navigation: navigationFromChoice(
+        viewChoice,
+        () => activeRouteId,
+        (routeId) => {
+          activeRouteId = routeId;
+        },
+      ),
       session,
-      installSpace: ignoreInstalledSpace,
-      activateRoute: (routeId) => {
-        activeRouteId = routeId;
-      },
       mintRouteId: () => ROUTE_ID,
     });
     editor.getState().syncNodes([node(CARD_A, 10, 20)]);
@@ -280,13 +278,11 @@ describe('completed placement composition', () => {
     const loaded = { snapshot: newSpaceSnapshot, revision: 0n, exportedRevision: null };
     const backend = new MemorySpaceBackend([loaded]);
     const session = openSpaceSession(backend, loaded);
-    const viewChoice = createViewChoice({ kind: 'layout', layoutId: DEFAULT_LAYOUT_ID });
+    const viewChoice = rendererChoice({ kind: 'layout', layoutId: DEFAULT_LAYOUT_ID });
     const editor = createPlacementEditor({
       initialPositions: layoutPositionMap(routeLessLayout),
-      viewChoice,
-      currentActiveRoute: () => null,
+      navigation: navigationFromChoice(viewChoice, () => null),
       session,
-      installSpace: ignoreInstalledSpace,
       mintRouteId: () => ROUTE_ID,
     });
     const visibleNodes = [node(CARD_A, 10, 20)];
@@ -340,10 +336,8 @@ describe('completed placement composition', () => {
     const session = openSpaceSession(backend, loaded);
     const editor = createPlacementEditor({
       initialPositions: layoutPositionMap(routeLessLayout),
-      viewChoice: createViewChoice({ kind: 'layout', layoutId: DEFAULT_LAYOUT_ID }),
-      currentActiveRoute: () => null,
+      navigation: authoringNavigation({ kind: 'layout', layoutId: DEFAULT_LAYOUT_ID }, () => null),
       session,
-      installSpace: ignoreInstalledSpace,
       mintRouteId: () => ROUTE_ID,
     });
     const visibleNodes = [node(CARD_A, 10, 20)];
@@ -366,13 +360,11 @@ describe('completed placement composition', () => {
     (view) => {
       const loaded = { snapshot: automaticSnapshot, revision: 0n, exportedRevision: null };
       const session = openSpaceSession(new MemorySpaceBackend([loaded]), loaded);
-      const viewChoice = createViewChoice({ kind: 'view', view });
+      const viewChoice = rendererChoice({ kind: 'view', view });
       const editor = createPlacementEditor({
         initialPositions: null,
-        viewChoice,
-        currentActiveRoute: () => ROUTE_ID,
+        navigation: navigationFromChoice(viewChoice, () => ROUTE_ID),
         session,
-        installSpace: ignoreInstalledSpace,
       });
       editor.getState().syncNodes(projected);
 
@@ -395,29 +387,17 @@ describe('completed placement composition', () => {
       const loaded = { snapshot: automaticSnapshot, revision: 0n, exportedRevision: null };
       const backend = new MemorySpaceBackend([loaded]);
       const session = openSpaceSession(backend, loaded);
-      const viewChoice = createViewChoice({ kind: 'view', view });
-      // The installed Space and the submitted snapshot are two collaborators,
-      // and Edit completion installs the first before notifying. Discarding the
-      // Space would leave the half the graph actually renders from unasserted.
-      const installed: Space[] = [];
+      const viewChoice = rendererChoice({ kind: 'view', view });
       const editor = createPlacementEditor({
         initialPositions: null,
-        viewChoice,
-        currentActiveRoute: () => ROUTE_ID,
+        navigation: navigationFromChoice(viewChoice, () => ROUTE_ID),
         session,
-        installSpace: (space) => installed.push(space),
       });
       editor.getState().syncNodes(projected);
 
       const completed = editor.getState().connectCards(CARD_B, CARD_A, projected);
 
       expect(completed).toBe(true);
-      expect(installed).toHaveLength(1);
-      expect(installed[0]!.routesById.get(ROUTE_ID)?.edges).toEqual([
-        { from: CARD_A, to: CARD_B },
-        { from: CARD_B, to: CARD_A },
-      ]);
-      expect(installed[0]!.defaultView).toBe(DEFAULT_LAYOUT_ID);
       expect(session.getState().working).toMatchObject({
         document: {
           routes: [
@@ -454,15 +434,16 @@ describe('completed placement composition', () => {
     const loaded = routeLessLoaded();
     const backend = new MemorySpaceBackend([loaded]);
     const session = openSpaceSession(backend, loaded);
-    const viewChoice = createViewChoice({ kind: 'layout', layoutId: DEFAULT_LAYOUT_ID });
+    const viewChoice = rendererChoice({ kind: 'layout', layoutId: DEFAULT_LAYOUT_ID });
     const activatedRoutes: string[] = [];
     const editor = createPlacementEditor({
       initialPositions: layoutPositionMap(routeLessLayout),
-      viewChoice,
-      currentActiveRoute: () => null,
+      navigation: navigationFromChoice(
+        viewChoice,
+        () => null,
+        (routeId) => activatedRoutes.push(routeId),
+      ),
       session,
-      installSpace: ignoreInstalledSpace,
-      activateRoute: (routeId) => activatedRoutes.push(routeId),
       mintRouteId: () => MINTED_ROUTE_ID,
     });
     const projectedCard = [node(CARD_A, 10, 20)];
@@ -516,10 +497,8 @@ describe('completed placement composition', () => {
     const session = openSpaceSession(backend, loaded);
     const editor = createPlacementEditor({
       initialPositions: layoutPositionMap(routeLessLayout),
-      viewChoice: createViewChoice({ kind: 'layout', layoutId: DEFAULT_LAYOUT_ID }),
-      currentActiveRoute: () => null,
+      navigation: authoringNavigation({ kind: 'layout', layoutId: DEFAULT_LAYOUT_ID }, () => null),
       session,
-      installSpace: ignoreInstalledSpace,
     });
     editor.getState().syncNodes([node(CARD_A, 10, 20)]);
 
@@ -562,7 +541,7 @@ describe('completed placement composition', () => {
     const loaded = { snapshot: automaticSnapshot, revision: 0n, exportedRevision: null };
     const backend = new MemorySpaceBackend([loaded]);
     const session = openSpaceSession(backend, loaded);
-    const viewChoice = createViewChoice({ kind: 'view', view: 'graph' });
+    const viewChoice = rendererChoice({ kind: 'view', view: 'graph' });
     const selectionNotifications: {
       readonly selection: ReturnType<typeof viewChoice.current>;
       readonly defaultView: SpaceSnapshot['document']['defaultView'];
@@ -578,10 +557,8 @@ describe('completed placement composition', () => {
     });
     const editor = createPlacementEditor({
       initialPositions: null,
-      viewChoice,
-      currentActiveRoute: () => ROUTE_ID,
+      navigation: navigationFromChoice(viewChoice, () => ROUTE_ID),
       session,
-      installSpace: ignoreInstalledSpace,
     });
 
     editor.getState().syncNodes(projected);
@@ -629,13 +606,11 @@ describe('completed placement composition', () => {
 
         const loaded = { snapshot: base, revision: 0n, exportedRevision: null };
         const session = openSpaceSession(new MemorySpaceBackend([loaded]), loaded);
-        const viewChoice = createViewChoice({ kind: 'view', view: 'graph' });
+        const viewChoice = rendererChoice({ kind: 'view', view: 'graph' });
         const editor = createPlacementEditor({
           initialPositions: null,
-          viewChoice,
-          currentActiveRoute: () => ROUTE_ID,
+          navigation: navigationFromChoice(viewChoice, () => ROUTE_ID),
           session,
-          installSpace: ignoreInstalledSpace,
         });
         editor.getState().syncNodes(projected);
         completeDrag(editor, CARD_A, 1, 2);
@@ -652,13 +627,11 @@ describe('completed placement composition', () => {
     const loaded = { snapshot: positionedSnapshot, revision: 0n, exportedRevision: null };
     const backend = new MemorySpaceBackend([loaded]);
     const session = openSpaceSession(backend, loaded);
-    const viewChoice = createViewChoice({ kind: 'layout', layoutId: DEFAULT_LAYOUT_ID });
+    const viewChoice = rendererChoice({ kind: 'layout', layoutId: DEFAULT_LAYOUT_ID });
     const editor = createPlacementEditor({
       initialPositions: layoutPositionMap(defaultLayout),
-      viewChoice,
-      currentActiveRoute: () => ROUTE_ID,
+      navigation: navigationFromChoice(viewChoice, () => ROUTE_ID),
       session,
-      installSpace: ignoreInstalledSpace,
     });
 
     editor.getState().syncNodes(projected);
@@ -687,10 +660,11 @@ describe('completed placement composition', () => {
     const session = openSpaceSession(backend, loaded);
     const editor = createPlacementEditor({
       initialPositions: layoutPositionMap(defaultLayout),
-      viewChoice: createViewChoice({ kind: 'layout', layoutId: DEFAULT_LAYOUT_ID }),
-      currentActiveRoute: () => ROUTE_ID,
+      navigation: authoringNavigation(
+        { kind: 'layout', layoutId: DEFAULT_LAYOUT_ID },
+        () => ROUTE_ID,
+      ),
       session,
-      installSpace: ignoreInstalledSpace,
     });
     editor.getState().syncNodes(projected);
 
@@ -708,13 +682,11 @@ describe('completed placement composition', () => {
     const loaded = { snapshot: automaticSnapshot, revision: 0n, exportedRevision: null };
     const backend = new MemorySpaceBackend([loaded]);
     const session = openSpaceSession(backend, loaded);
-    const viewChoice = createViewChoice({ kind: 'view', view: 'graph' });
+    const viewChoice = rendererChoice({ kind: 'view', view: 'graph' });
     const editor = createPlacementEditor({
       initialPositions: null,
-      viewChoice,
-      currentActiveRoute: () => ROUTE_ID,
+      navigation: navigationFromChoice(viewChoice, () => ROUTE_ID),
       session,
-      installSpace: ignoreInstalledSpace,
     });
     editor.getState().syncNodes(projected);
     let secondEditCompleted = false;
@@ -758,13 +730,11 @@ describe('completed placement composition', () => {
     const session = openSpaceSession(backend, loaded, {
       reportObserverError: (error) => reported.push(error),
     });
-    const viewChoice = createViewChoice({ kind: 'view', view: 'graph' });
+    const viewChoice = rendererChoice({ kind: 'view', view: 'graph' });
     const editor = createPlacementEditor({
       initialPositions: null,
-      viewChoice,
-      currentActiveRoute: () => ROUTE_ID,
+      navigation: navigationFromChoice(viewChoice, () => ROUTE_ID),
       session,
-      installSpace: ignoreInstalledSpace,
     });
     editor.getState().syncNodes(projected);
     const listenerError = new Error('session listener failed');
@@ -816,29 +786,45 @@ describe('completed placement composition', () => {
   /*
    * Effect isolation, which `session.submit` used to be the only test's way in:
    * a listener throwing through `submit` is what pinned it, and a session now
-   * contains that itself. An installing collaborator is the remaining effect
-   * that can fail, and the contract is unchanged — every later effect still
-   * runs, and the first failure reaches the caller once the queue has drained.
+   * contains that itself. Navigation is the collaborator the remaining effects
+   * run through, and the contract is unchanged — every later effect still runs,
+   * and the first failure reaches the caller once the queue has drained.
+   *
+   * Activating a minted Route is the middle effect, which is what makes both
+   * halves observable at once: the `submit` before it, and the renderer adopted
+   * after it. An Edit only activates a Route it minted itself (ADR 0028), so
+   * this is a Space with no Routes to begin with.
    */
   it('runs the effects after a failing one and reports its error', async () => {
     vi.spyOn(crypto, 'randomUUID').mockReturnValue(DEFAULT_LAYOUT_UUID);
-    const loaded = { snapshot: automaticSnapshot, revision: 0n, exportedRevision: null };
+    const newSpace: SpaceSnapshot = {
+      id: SPACE_ID,
+      document: { version: 2, title: 'New space', routes: [] },
+      cards: [{ id: CARD_A, document: { title: 'Card 1', kind: 'markdown', body: '' } }],
+    };
+    const loaded = { snapshot: newSpace, revision: 0n, exportedRevision: null };
     const backend = new MemorySpaceBackend([loaded]);
     const session = openSpaceSession(backend, loaded);
-    const viewChoice = createViewChoice({ kind: 'view', view: 'graph' });
-    const installError = new Error('installing the Space failed');
+    const viewChoice = rendererChoice({ kind: 'view', view: 'graph' });
+    const activateError = new Error('activating the Route failed');
     const editor = createPlacementEditor({
       initialPositions: null,
-      viewChoice,
-      currentActiveRoute: () => ROUTE_ID,
+      navigation: navigationFromChoice(
+        viewChoice,
+        () => null,
+        () => {
+          throw activateError;
+        },
+      ),
       session,
-      installSpace: () => {
-        throw installError;
-      },
+      mintRouteId: () => MINTED_ROUTE_ID,
     });
-    editor.getState().syncNodes(projected);
+    const visibleNodes = [node(CARD_A, 120, 240)];
+    editor.getState().syncNodes(visibleNodes);
 
-    expect(() => completeDrag(editor, CARD_A, 500, 400)).toThrow(installError);
+    expect(() => editor.getState().connectCards(CARD_A, CARD_A, visibleNodes)).toThrow(
+      activateError,
+    );
 
     // The effect before the failure, and the one after it.
     expect(session.getState().working.document.defaultView).toBe(DEFAULT_LAYOUT_ID);
@@ -849,10 +835,8 @@ describe('completed placement composition', () => {
       snapshot: {
         document: {
           defaultView: DEFAULT_LAYOUT_ID,
-          layouts: [
-            { id: OTHER_LAYOUT_ID },
-            { id: DEFAULT_LAYOUT_ID, positions: { [CARD_A]: { x: 500, y: 400 } } },
-          ],
+          routes: [{ id: MINTED_ROUTE_ID }],
+          layouts: [{ id: DEFAULT_LAYOUT_ID, positions: { [CARD_A]: { x: 120, y: 240 } } }],
         },
       },
     });
@@ -869,14 +853,11 @@ describe('completed placement composition', () => {
     const loaded = { snapshot: base, revision: 0n, exportedRevision: null };
     const backend = new MemorySpaceBackend([loaded]);
     const session = openSpaceSession(backend, loaded);
-    const viewChoice = createViewChoice({ kind: 'layout', layoutId: DEFAULT_LAYOUT_ID });
-    const installed: Space[] = [];
+    const viewChoice = rendererChoice({ kind: 'layout', layoutId: DEFAULT_LAYOUT_ID });
     const editor = createPlacementEditor({
       initialPositions: layoutPositionMap(defaultLayout),
-      viewChoice,
-      currentActiveRoute: () => ROUTE_ID,
+      navigation: navigationFromChoice(viewChoice, () => ROUTE_ID),
       session,
-      installSpace: (space) => installed.push(space),
     });
     editor.getState().syncNodes(projected);
 
@@ -904,10 +885,6 @@ describe('completed placement composition', () => {
       otherLayout,
     ]);
     expect(session.getState().working.document.defaultView).toBe(DEFAULT_LAYOUT_ID);
-    expect(installed[0]?.routesById.get(ROUTE_ID)?.edges).toEqual([
-      { from: CARD_B, to: CARD_B },
-      { from: CARD_A, to: CARD_B },
-    ]);
     expect(viewChoice.current()).toEqual({ kind: 'layout', layoutId: DEFAULT_LAYOUT_ID });
     await waitForSettled(session.getState, session.subscribe);
     await expect(backend.loadSpace(SPACE_ID)).resolves.toMatchObject({ revision: 1n });
@@ -931,10 +908,11 @@ describe('completed placement composition', () => {
     const session = openSpaceSession(new MemorySpaceBackend([loaded]), loaded);
     const editor = createPlacementEditor({
       initialPositions: layoutPositionMap(defaultLayout),
-      viewChoice: createViewChoice({ kind: 'layout', layoutId: DEFAULT_LAYOUT_ID }),
-      currentActiveRoute: () => OTHER_ROUTE_ID,
+      navigation: authoringNavigation(
+        { kind: 'layout', layoutId: DEFAULT_LAYOUT_ID },
+        () => OTHER_ROUTE_ID,
+      ),
       session,
-      installSpace: ignoreInstalledSpace,
     });
     editor.getState().syncNodes(projected);
 
@@ -957,14 +935,12 @@ describe('completed placement composition', () => {
   it('rejects connections when the active Route is not one the Space holds', () => {
     const loaded = { snapshot: positionedSnapshot, revision: 0n, exportedRevision: null };
     const session = openSpaceSession(new MemorySpaceBackend([loaded]), loaded);
-    const viewChoice = createViewChoice({ kind: 'layout', layoutId: DEFAULT_LAYOUT_ID });
+    const viewChoice = rendererChoice({ kind: 'layout', layoutId: DEFAULT_LAYOUT_ID });
     const initialPositions = layoutPositionMap(defaultLayout);
     const editor = createPlacementEditor({
       initialPositions,
-      viewChoice,
-      currentActiveRoute: () => MISSING_ROUTE_ID,
+      navigation: navigationFromChoice(viewChoice, () => MISSING_ROUTE_ID),
       session,
-      installSpace: ignoreInstalledSpace,
     });
     editor.getState().syncNodes(projected);
 
@@ -1002,13 +978,11 @@ describe('completed placement composition', () => {
     const loaded = { snapshot: base, revision: 0n, exportedRevision: null };
     const backend = new MemorySpaceBackend([loaded]);
     const session = openSpaceSession(backend, loaded);
-    const viewChoice = createViewChoice({ kind: 'layout', layoutId: DEFAULT_LAYOUT_ID });
+    const viewChoice = rendererChoice({ kind: 'layout', layoutId: DEFAULT_LAYOUT_ID });
     const editor = createPlacementEditor({
       initialPositions: layoutPositionMap(defaultLayout),
-      viewChoice,
-      currentActiveRoute: () => ROUTE_ID,
+      navigation: navigationFromChoice(viewChoice, () => ROUTE_ID),
       session,
-      installSpace: ignoreInstalledSpace,
     });
     editor.getState().syncNodes([node(CARD_A, 10, 20)]);
 
@@ -1062,15 +1036,16 @@ describe('completed placement composition', () => {
     const loaded = { snapshot: newSpaceSnapshot, revision: 0n, exportedRevision: null };
     const backend = new MemorySpaceBackend([loaded]);
     const session = openSpaceSession(backend, loaded);
-    const viewChoice = createViewChoice({ kind: 'view', view: 'graph' });
+    const viewChoice = rendererChoice({ kind: 'view', view: 'graph' });
     const activatedRoutes: string[] = [];
     const editor = createPlacementEditor({
       initialPositions: null,
-      viewChoice,
-      currentActiveRoute: () => null,
+      navigation: navigationFromChoice(
+        viewChoice,
+        () => null,
+        (routeId) => activatedRoutes.push(routeId),
+      ),
       session,
-      installSpace: ignoreInstalledSpace,
-      activateRoute: (routeId) => activatedRoutes.push(routeId),
       mintRouteId: () => MINTED_ROUTE_ID,
     });
     editor.getState().syncNodes([node(CARD_A, 120, 240)]);
@@ -1123,14 +1098,11 @@ describe('completed placement composition', () => {
     const loaded = { snapshot: newSpaceSnapshot, revision: 0n, exportedRevision: null };
     const backend = new MemorySpaceBackend([loaded]);
     const session = openSpaceSession(backend, loaded);
-    const viewChoice = createViewChoice({ kind: 'view', view: 'graph' });
-    const installed: Space[] = [];
+    const viewChoice = rendererChoice({ kind: 'view', view: 'graph' });
     const editor = createPlacementEditor({
       initialPositions: null,
-      viewChoice,
-      currentActiveRoute: () => null,
+      navigation: navigationFromChoice(viewChoice, () => null),
       session,
-      installSpace: (space) => installed.push(space),
       mintRouteId: () => MINTED_ROUTE_ID,
     });
     const visibleNodes = [node(CARD_A, 120, 240)];
@@ -1157,7 +1129,6 @@ describe('completed placement composition', () => {
     ]);
     expect(working.document.defaultView).toBe(DEFAULT_LAYOUT_ID);
     expect(viewChoice.current()).toEqual({ kind: 'layout', layoutId: DEFAULT_LAYOUT_ID });
-    expect(routeColorMap(installed[0]!)[MINTED_ROUTE_ID]).toBe(ROUTE_PALETTE[0]);
     await waitForSettled(session.getState, session.subscribe);
     await expect(backend.loadSpace(SPACE_ID)).resolves.toMatchObject({ revision: 1n });
   });
@@ -1171,13 +1142,11 @@ describe('completed placement composition', () => {
   ])('fails when the selected Layout is not one the Space %s', (_case, base) => {
     const loaded = { snapshot: base, revision: 0n, exportedRevision: null };
     const session = openSpaceSession(new MemorySpaceBackend([loaded]), loaded);
-    const viewChoice = createViewChoice({ kind: 'layout', layoutId: MISSING_LAYOUT_ID });
+    const viewChoice = rendererChoice({ kind: 'layout', layoutId: MISSING_LAYOUT_ID });
     const editor = createPlacementEditor({
       initialPositions: null,
-      viewChoice,
-      currentActiveRoute: () => ROUTE_ID,
+      navigation: navigationFromChoice(viewChoice, () => ROUTE_ID),
       session,
-      installSpace: ignoreInstalledSpace,
     });
     editor.getState().syncNodes(projected);
 
@@ -1200,10 +1169,11 @@ describe('completed placement composition', () => {
     const session = openSpaceSession(new MemorySpaceBackend([loaded]), loaded);
     const editor = createPlacementEditor({
       initialPositions: layoutPositionMap(defaultLayout),
-      viewChoice: createViewChoice({ kind: 'layout', layoutId: DEFAULT_LAYOUT_ID }),
-      currentActiveRoute: () => ROUTE_ID,
+      navigation: authoringNavigation(
+        { kind: 'layout', layoutId: DEFAULT_LAYOUT_ID },
+        () => ROUTE_ID,
+      ),
       session,
-      installSpace: ignoreInstalledSpace,
     });
     editor.getState().syncNodes(projected);
 

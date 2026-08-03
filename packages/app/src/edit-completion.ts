@@ -8,15 +8,13 @@ import {
   type EditorStore,
 } from './editor';
 import { updatePositionedLayout } from './snapshot';
-import type { RendererSelection, ViewChoice } from './view';
+import type { Navigation } from './navigation';
+import type { RendererSelection } from './view';
 
 interface PlacementEditorDependencies {
   readonly initialPositions: ReadonlyMap<string, LayoutPoint> | null;
-  readonly viewChoice: ViewChoice;
-  readonly currentActiveRoute: () => RouteId | null;
+  readonly navigation: Pick<Navigation, 'getState' | 'continueInRenderer' | 'activateRoute'>;
   readonly session: SpaceSession;
-  readonly installSpace: (space: Space) => void;
-  readonly activateRoute?: (routeId: RouteId) => void;
   readonly mintRouteId?: () => RouteId;
 }
 
@@ -401,16 +399,14 @@ function serializeCompletion(pass: () => readonly CompletionEffect[] | null): ()
 
 export function createPlacementEditor({
   initialPositions,
-  viewChoice,
-  currentActiveRoute,
+  navigation,
   session,
-  installSpace,
-  activateRoute,
   mintRouteId,
 }: PlacementEditorDependencies): EditorStore {
   // Each completed Edit installs a fresh positions map before notifying. Record
   // that identity before effects so a synchronous listener cannot resubmit it.
   let submittedPositions: ReadonlyMap<string, LayoutPoint> | null = null;
+  const currentActiveRoute = () => navigation.getState().activeRouteId;
   const connectionEligibility = createConnectionEligibility(currentActiveRoute, session);
   const editor = createEditorStore(
     initialPositions,
@@ -420,7 +416,7 @@ export function createPlacementEditor({
         throw new Error('EditCompleted was emitted without authored placement.');
       }
       if (positions === submittedPositions) return null;
-      const renderer = viewChoice.current();
+      const renderer = navigation.getState().selectedRenderer;
       const connection = editor.getState().completedConnection;
       const activeRouteId = currentActiveRoute();
       const next = deriveCompletedEdit({
@@ -441,9 +437,8 @@ export function createPlacementEditor({
       const activatedRouteId = activeRouteId === null ? next.activeRouteId : null;
       return [
         () => session.submit(next.snapshot),
-        () => installSpace(next.space),
-        ...(activatedRouteId === null ? [] : [() => activateRoute?.(activatedRouteId)]),
-        () => viewChoice.select({ kind: 'layout', layoutId: next.layoutId }),
+        ...(activatedRouteId === null ? [] : [() => navigation.activateRoute(activatedRouteId)]),
+        () => navigation.continueInRenderer({ kind: 'layout', layoutId: next.layoutId }),
       ];
     }),
     connectionEligibility,

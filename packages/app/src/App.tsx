@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { ReactFlowProvider } from '@xyflow/react';
 import { AppShell, Button, LayoutSelector, RouteSelector, ViewSelector } from '@project/ui';
-import { newUuid, uuidSchema, type BuiltInViewId } from '@project/core';
+import { newUuid, uuidSchema } from '@project/core';
 import {
   projectCardNodes,
   projectRouteEdges,
@@ -13,7 +13,6 @@ import {
   buildRouteEdges,
   filterHandlesByRoutes,
   getCard,
-  loadSpaceSnapshot,
   routeCardIds,
   resolveContentCard,
   type LayoutPoint,
@@ -27,14 +26,9 @@ import {
 import { canvasContent, usePlacementRendering } from './placement-rendering';
 import { activeRouteColor, ROUTE_PALETTE, routeColorMap } from './colors';
 import { CARD_HEIGHT, CARD_SIZE, cardSizeVars } from './card';
-import { createSpaceStore } from './store';
-import {
-  createViewChoice,
-  defaultRenderer,
-  layoutPositionMap,
-  resolveView,
-  type RendererSelection,
-} from './view';
+import { createNavigation } from './navigation';
+import { createWorkingSpaceReader } from './snapshot';
+import { defaultRenderer, layoutPositionMap, resolveView, type RendererSelection } from './view';
 import { GraphView } from './components/GraphView';
 import { OpenCard } from './components/OpenCard';
 import { PresentingChrome } from './components/PresentingChrome';
@@ -45,6 +39,12 @@ export interface AppActions {
 }
 
 export const createApp = ({ space, spaceSession }: OpenedSpace, { acceptRemote }: AppActions) => {
+  // One validated aggregate per working snapshot, shared by the render path and
+  // by Navigation. Both read the same reader, so in the steady state a snapshot
+  // is parsed and indexed once rather than once per render — and both see the
+  // same `Space` identity, which is what the render memos below hang on.
+  const readWorkingSpace = createWorkingSpaceReader();
+  const currentSpace = () => readWorkingSpace(spaceSession.getState().working);
   // Which view this space opens in, and the strategy that arranges it. The fixture
   // declares no view, so this resolves to the route-driven ELK graph — exactly
   // what the hardcoded `elkStrategy()` here used to do. It also answers which
@@ -52,26 +52,18 @@ export const createApp = ({ space, spaceSession }: OpenedSpace, { acceptRemote }
   // resolve before the store is built.
   const initialRenderer = defaultRenderer(space);
   const initialView = resolveView(space, initialRenderer);
-
-  // Derived once from the opened workspace. The store is bound to the validated
-  // runtime aggregate at this composition boundary (ADR 0010).
-  const {
-    useStore: useSpaceStore,
-    selectActiveCardId,
-    movesFrom,
-  } = createSpaceStore(space, initialView.activeRouteId);
+  const navigation = createNavigation(currentSpace, initialRenderer, space);
 
   // Live nodes hold whichever arrangement is on screen. A positioned view also
   // supplies its already-authored, possibly sparse Layout map; an automatic view
   // starts null and is promoted only by a completed edit (ADR 0025).
   const initialPositions =
     initialView.layout === null ? null : layoutPositionMap(initialView.layout);
-  const viewChoice = createViewChoice(initialRenderer);
   // Reserve the identity whose hidden overview handles must already be declared
   // when a route-less Space's first Edge and Route appear in the same render.
   // Until a successful connection uses it, this is runtime-only identity.
   const firstRouteId = space.routes.length === 0 ? newUuid() : null;
-  const currentActiveRoute = () => useSpaceStore.getState().activeRouteId;
+  const currentActiveRoute = () => navigation.getState().activeRouteId;
   // The same rule the editor applies on release, handed to React Flow so it can
   // state a target's validity while the drag is still live.
   const connectionEligibility = createConnectionEligibility(currentActiveRoute, spaceSession);
@@ -93,31 +85,24 @@ export const createApp = ({ space, spaceSession }: OpenedSpace, { acceptRemote }
   };
   const useEditorStore = createPlacementEditor({
     initialPositions,
-    viewChoice,
-    currentActiveRoute,
+    navigation,
     session: spaceSession,
-    installSpace: (nextSpace) => useSpaceStore.getState().installSpace(nextSpace),
-    activateRoute: (routeId) => useSpaceStore.getState().activateRoute(routeId),
     ...(firstRouteId === null ? {} : { mintRouteId: () => firstRouteId }),
   });
 
   function App() {
     const sessionState = useSyncExternalStore(spaceSession.subscribe, spaceSession.getState);
-    const selectedRenderer = useSyncExternalStore(viewChoice.subscribe, viewChoice.current);
-    const [selectedView, setSelectedView] = useState<BuiltInViewId>(
-      initialRenderer.kind === 'view' ? initialRenderer.view : 'graph',
-    );
+    const navigationState = useSyncExternalStore(navigation.subscribe, navigation.getState);
+    const selectedRenderer = navigationState.selectedRenderer;
+    const selectedView = navigationState.selectedView;
     // Why the remote state was refused, reported beside the control that asked
     // for it. The workspace behind it still holds the local work and the
     // conflict, so this is a message, not a mode.
     const [remoteRefusal, setRemoteRefusal] = useState<string | null>(null);
-    const rendererSpace = useMemo(() => {
-      const loaded = loadSpaceSnapshot(sessionState.working);
-      if (!loaded.ok) {
-        throw new Error(loaded.errors.map((error) => error.message).join('; '));
-      }
-      return loaded.space;
-    }, [sessionState.working]);
+    const rendererSpace = useMemo(
+      () => readWorkingSpace(sessionState.working),
+      [sessionState.working],
+    );
     const layouts = rendererSpace.layouts;
     const routes = rendererSpace.routes;
     const colors = useMemo(() => routeColorMap(rendererSpace), [rendererSpace]);
@@ -135,38 +120,31 @@ export const createApp = ({ space, spaceSession }: OpenedSpace, { acceptRemote }
       [rendererSpace, selectedRenderer],
     );
 
-    const activeRouteId = useSpaceStore((s) => s.activeRouteId);
-    const activateRoute = useSpaceStore((s) => s.activateRoute);
-    const openRenderer = useSpaceStore((s) => s.openRenderer);
-    const openedCardId = useSpaceStore((s) => s.openedCardId);
-    const openCard = useSpaceStore((s) => s.openCard);
-    const closeCard = useSpaceStore((s) => s.closeCard);
-
-    const presenting = useSpaceStore((s) => s.mode === 'presenting');
-    const canRetreat = useSpaceStore((s) => s.walk.length > 1);
-    const present = useSpaceStore((s) => s.present);
-    const exitPresenting = useSpaceStore((s) => s.exitPresenting);
-    const advance = useSpaceStore((s) => s.advance);
-    const retreat = useSpaceStore((s) => s.retreat);
-    const selectBranch = useSpaceStore((s) => s.selectBranch);
-    const activeCardId = useSpaceStore(selectActiveCardId);
-    const branchIndex = useSpaceStore((s) => s.branchIndex);
+    const { activeRouteId, openedCardId } = navigationState;
+    const activateRoute = navigation.activateRoute;
+    const openCard = navigation.openCard;
+    const closeCard = navigation.closeCard;
+    const presenting = navigationState.mode === 'presenting';
+    const canRetreat = navigationState.walk.length > 1;
+    const present = navigation.present;
+    const exitPresenting = navigation.exitPresenting;
+    const advance = navigation.advance;
+    const retreat = navigation.retreat;
+    const selectBranch = navigation.selectBranch;
+    const activeCardId = navigation.activeCardId();
     // Derived here rather than in a store selector: the array is rebuilt on every
     // call, so a selector would hand Zustand a new identity each render — a
     // re-render producing a new value producing a re-render, until React gives up.
     // That is still the rule; what is deliberate is that this is a plain render
     // computation and **not** memoized.
     //
-    // `movesFrom` reads the aggregate the store holds, and `installSpace` replaces
-    // that in store state — a change no dependency array can name. Authoring an
-    // Edge from the Card being presented leaves all three arguments unchanged, so
-    // a `useMemo` over them kept listing the moves the Route had before the Edge
-    // was drawn. It also bought nothing: `moves` feeds no dependency array and no
-    // memoized child, and `PresentingChrome` re-renders with `App` regardless.
+    // Navigation reads the session's current working Space. Authoring an Edge from
+    // the Card being presented leaves the navigation values unchanged, so deriving
+    // moves during render makes the newly authored Edge immediately traversable.
     // A render-time call is not the selector case above — nothing subscribes to
     // this identity, so a fresh array cannot feed a re-render — and the work is a
     // filter and a map over one Route's edges, or nothing at all outside a walk.
-    const moves = movesFrom(activeRouteId, activeCardId, branchIndex);
+    const moves = navigation.moves();
 
     // Which routes the renderer shows, resolved from the Layout that filtered them
     // (ADR 0026). Membership is the view's decision (ADR 0005), which is why it
@@ -256,18 +234,20 @@ export const createApp = ({ space, spaceSession }: OpenedSpace, { acceptRemote }
     const editable = liveNodes !== null;
     const completedConnectionTarget = useRef<string | null>(null);
 
-    const chooseRenderer = useCallback(
-      (selection: RendererSelection) => {
-        const resolved = resolveView(rendererSpace, selection);
-        useEditorStore
-          .getState()
-          .selectRenderer(resolved.layout === null ? null : layoutPositionMap(resolved.layout));
-        openRenderer(resolved.activeRouteId);
-        viewChoice.select(selection);
-        if (selection.kind === 'view') setSelectedView(selection.view);
-      },
-      [openRenderer, rendererSpace],
-    );
+    // One decision resolved from one Space, applied in an order that cannot
+    // leave the two collaborators disagreeing. Both steps that may refuse the
+    // selection run first — the resolve here and Navigation's own — and the
+    // editor update is a plain store write that cannot fail. Resolving against
+    // the session's live Space rather than the rendered one matters because
+    // Navigation resolves against the live one too: deciding from a snapshot
+    // Navigation will not consult is one decision with two sources of truth.
+    const chooseRenderer = useCallback((selection: RendererSelection) => {
+      const resolved = resolveView(currentSpace(), selection);
+      navigation.selectRenderer(selection);
+      useEditorStore
+        .getState()
+        .selectRenderer(resolved.layout === null ? null : layoutPositionMap(resolved.layout));
+    }, []);
 
     // Leaving while persistence is not settled asks first. The handler is absent
     // in the normal durable state, preserving the browser's back/forward cache.
@@ -452,7 +432,7 @@ export const createApp = ({ space, spaceSession }: OpenedSpace, { acceptRemote }
     );
 
     return (
-      <AppShell title={space.title} toolbar={toolbar}>
+      <AppShell title={rendererSpace.title} toolbar={toolbar}>
         <div className="graph-area" style={cardSizeVars}>
           {canvas.kind === 'failure' ? (
             <div className="placement-status" role="alert" data-testid="placement-failure">
