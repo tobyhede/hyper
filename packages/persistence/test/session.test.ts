@@ -160,6 +160,54 @@ describe('openSpaceSession', () => {
     });
   });
 
+  /*
+   * The queue an observer's submit joins is the in-flight one, whatever raised
+   * the notification it is answering. A retry made from an optimistic
+   * publication starts its commit and publishes `pending` from *inside* that
+   * publication, and an Edit submitted from there has a commit to wait behind —
+   * the submit further down the stack is gated on the failure it was published
+   * under and will decide nothing.
+   */
+  it('queues an Edit submitted from a pending notification raised inside an optimistic one', async () => {
+    const control = new MemorySpaceBackendTestControl();
+    control.queueResult({ kind: 'retryable-failure', code: 'unavailable', message: 'Try later' });
+    const backend = new MemorySpaceBackend([loaded], control);
+    const session = openSpaceSession(backend, loaded);
+
+    session.submit(changedTitle('Failed payload'));
+    await waitFor(
+      session.getState,
+      session.subscribe,
+      (state) => state.persistence.kind === 'failed',
+    );
+
+    let retried = false;
+    let resubmitted = false;
+    session.subscribe(() => {
+      if (retried || session.getState().persistence.kind !== 'failed') return;
+      retried = true;
+      session.retry();
+    });
+    session.subscribe(() => {
+      if (resubmitted || session.getState().persistence.kind !== 'pending') return;
+      resubmitted = true;
+      session.submit(changedTitle('Newest while retrying'));
+    });
+
+    session.submit(changedTitle('Retried payload'));
+
+    const settled = await waitFor(
+      session.getState,
+      session.subscribe,
+      (state) => state.persistence.kind === 'settled',
+    );
+    expect(settled.working.document.title).toBe('Newest while retrying');
+    expect(control.attempts.at(-1)?.snapshot.document.title).toBe('Newest while retrying');
+    await expect(backend.loadSpace(SPACE_ID)).resolves.toMatchObject({
+      snapshot: { document: { title: 'Newest while retrying' } },
+    });
+  });
+
   it('updates optimistically, persists a complete snapshot, and acknowledges success', async () => {
     const backend = new MemorySpaceBackend([loaded]);
     const session = openSpaceSession(backend, loaded);

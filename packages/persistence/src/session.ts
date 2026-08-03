@@ -54,7 +54,8 @@ export const openSpaceSession = (
   };
   let inFlight = false;
   let waiting: SpaceSnapshot | undefined;
-  let publishingSubmit = false;
+  /** The snapshot `startCommit` handed the backend. Read only while `inFlight`. */
+  let committing: SpaceSnapshot | undefined;
   const listeners = new Set<() => void>();
   const reportObserverError = options.reportObserverError ?? reportToConsole;
 
@@ -91,6 +92,7 @@ export const openSpaceSession = (
 
   const startCommit = (snapshot: SpaceSnapshot, expectedRevision: bigint): void => {
     inFlight = true;
+    committing = snapshot;
     publishPersistence({ kind: 'pending' });
     void backend.commitSpace(clone(snapshot), expectedRevision).then((result) => {
       inFlight = false;
@@ -139,37 +141,33 @@ export const openSpaceSession = (
     },
     /*
      * An observer may complete the next Edit while this one is still
-     * publishing, so a submit is **queued, not re-entered**: the reentrant call
-     * installs its working Space and stops, and the submit already on the stack
-     * makes the one commit decision, reading the newest installed state rather
-     * than the snapshot it was handed. Deciding from the argument instead would
-     * queue the older snapshot behind the newer one and store it last, undoing
-     * a completed Edit at the next load.
+     * publishing — and a *reentrant* submit runs to completion before this one
+     * resumes, so by the time this call decides, the newest working Space may
+     * no longer be the snapshot it was handed. Every call therefore decides
+     * from `state.working` rather than its argument. Deciding from the argument
+     * queues the older snapshot behind the newer one and stores it last,
+     * undoing a completed Edit at the next load.
      *
-     * The flag covers publication only. `startCommit` publishes `pending` to
-     * the same observers, and a submit made from *there* must reach the queue
-     * normally — this call's commit decision is already behind it.
+     * Reading the newest state is also what makes the decision safe to repeat,
+     * so no call is suppressed to keep a nested one from double-committing:
+     * identity against the in-flight snapshot answers that directly, at any
+     * depth. A guard scoped to this call's publication cannot — `retry` and
+     * `resolveConflict` publish `pending` from *inside* an optimistic
+     * publication, and a submit answering that notification has a commit to
+     * wait behind while the call underneath it is gated on the failure it
+     * published under and will decide nothing.
      */
     submit: (snapshot) => {
       const working = clone(snapshot);
-      if (publishingSubmit) {
-        publish({ ...state, working });
-        return;
-      }
       const previous = state.persistence;
-      publishingSubmit = true;
-      try {
-        publish({ ...state, working });
-      } finally {
-        publishingSubmit = false;
-      }
+      publish({ ...state, working });
       if (previous.kind === 'conflicted' || previous.kind === 'failed') return;
-      const current = state.working;
+      const newest = state.working;
       if (inFlight) {
-        waiting = current;
+        if (newest !== committing) waiting = newest;
         return;
       }
-      startCommit(current, state.acknowledgedRevision);
+      startCommit(newest, state.acknowledgedRevision);
     },
     retry: () => {
       if (state.persistence.kind !== 'failed' || inFlight) return;
