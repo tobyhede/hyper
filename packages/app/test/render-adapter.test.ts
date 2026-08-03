@@ -11,6 +11,7 @@ import {
   type AuthoringResult,
   type SpaceAuthoring,
 } from '../src/space-authoring';
+import type { RendererSelection } from '../src/view';
 import { completeDrag, moving, node, settled } from './render-adapter-fixtures';
 
 const CARD_A = '00000000-0000-4000-8000-000000000002';
@@ -36,8 +37,17 @@ interface InstallRecord {
   readonly nodesAtCall: readonly CardFlowNode[] | null;
 }
 
+/** What Authoring answers about an Edit before the adapter attempts it. */
+interface AuthoringCapabilities {
+  readonly canConnect?: boolean;
+  readonly canCreateConnectedCard?: boolean;
+}
+
 /** A Space Authoring that records what it was told, without a session behind it. */
-function authoringSpy() {
+function authoringSpy({
+  canConnect = true,
+  canCreateConnectedCard = true,
+}: AuthoringCapabilities = {}) {
   const installs: InstallRecord[] = [];
   const completions: unknown[] = [];
   let adapter: RenderAdapter | null = null;
@@ -48,8 +58,8 @@ function authoringSpy() {
     installPlacement: (placement: ReadonlyMap<string, LayoutPoint> | null) => {
       installs.push({ placement, nodesAtCall: adapter?.getState().projection?.nodes ?? null });
     },
-    canConnect: () => true,
-    canCreateConnectedCard: () => true,
+    canConnect: () => canConnect,
+    canCreateConnectedCard: () => canCreateConnectedCard,
     complete: (completion: unknown): AuthoringResult => {
       completions.push(completion);
       return { kind: 'completed' };
@@ -71,6 +81,33 @@ function adapter(): RenderAdapter {
   return createRenderAdapter(authoringSpy().authoring);
 }
 
+/**
+ * A real Session, Navigation and Authoring behind one render adapter. The spy
+ * above answers what the adapter was *told*; this answers what a Space ends up
+ * holding, so the two are not interchangeable.
+ */
+function sessionBackedAdapter(
+  snapshot: SpaceSnapshot,
+  renderer: RendererSelection,
+  initialPlacement?: ReadonlyMap<string, LayoutPoint>,
+) {
+  const loaded = { snapshot, revision: 0n, exportedRevision: null };
+  const session = openSpaceSession(new MemorySpaceBackend([loaded]), loaded);
+  const currentSpace = () => {
+    const result = loadSpaceSnapshot(session.getState().working);
+    if (!result.ok) throw new Error(result.errors.map((error) => error.message).join('; '));
+    return result.space;
+  };
+  const navigation = createNavigation(currentSpace, renderer);
+  const authoring = createSpaceAuthoring({
+    session,
+    navigation,
+    ...(initialPlacement !== undefined ? { initialPlacement } : {}),
+  });
+  return { session, store: createRenderAdapter(authoring) };
+}
+
+/** A Space whose Layout places Card A alone, leaving B and C unplaced. */
 function sparsePositionedAdapter() {
   const snapshot: SpaceSnapshot = {
     id: SPACE_ID,
@@ -109,20 +146,11 @@ function sparsePositionedAdapter() {
       },
     ],
   };
-  const loaded = { snapshot, revision: 0n, exportedRevision: null };
-  const session = openSpaceSession(new MemorySpaceBackend([loaded]), loaded);
-  const currentSpace = () => {
-    const result = loadSpaceSnapshot(session.getState().working);
-    if (!result.ok) throw new Error(result.errors.map((error) => error.message).join('; '));
-    return result.space;
-  };
-  const navigation = createNavigation(currentSpace, { kind: 'layout', layoutId: LAYOUT_ID });
-  const authoring = createSpaceAuthoring({
-    session,
-    navigation,
-    initialPlacement: new Map([[CARD_A, { x: 10, y: 20 }]]),
-  });
-  return { session, store: createRenderAdapter(authoring) };
+  return sessionBackedAdapter(
+    snapshot,
+    { kind: 'layout', layoutId: LAYOUT_ID },
+    new Map([[CARD_A, { x: 10, y: 20 }]]),
+  );
 }
 
 describe('render adapter', () => {
@@ -266,15 +294,7 @@ describe('render adapter', () => {
         },
       ],
     };
-    const loaded = { snapshot, revision: 0n, exportedRevision: null };
-    const session = openSpaceSession(new MemorySpaceBackend([loaded]), loaded);
-    const currentSpace = () => {
-      const result = loadSpaceSnapshot(session.getState().working);
-      if (!result.ok) throw new Error(result.errors.map((error) => error.message).join('; '));
-      return result.space;
-    };
-    const navigation = createNavigation(currentSpace, { kind: 'view', view: 'graph' });
-    const store = createRenderAdapter(createSpaceAuthoring({ session, navigation }));
+    const { session, store } = sessionBackedAdapter(snapshot, { kind: 'view', view: 'graph' });
 
     store.getState().syncProjection(PROJECTED, []);
     expect(
@@ -316,6 +336,44 @@ describe('render adapter', () => {
     });
   });
 
+  /*
+   * Authoring owns eligibility; the adapter only asks. A refusal has to stop
+   * before the placement install, because installing is what converts an
+   * Algorithmic View into a Layout (ADR 0025) — a gesture Authoring rejected
+   * would otherwise still author one as a side effect.
+   */
+  it('installs and completes nothing for a connection Authoring refuses', () => {
+    const spy = authoringSpy({ canConnect: false });
+    const store = createRenderAdapter(spy.authoring);
+    spy.attach(store);
+    store.getState().syncProjection(PROJECTED, []);
+    const published = store.getState().projection;
+    const installedBefore = spy.installs.length;
+
+    expect(
+      store.getState().connectCards(uuidSchema.parse(CARD_A), uuidSchema.parse(CARD_B), PROJECTED),
+    ).toBe(false);
+
+    expect(spy.completions).toEqual([]);
+    expect(spy.installs).toHaveLength(installedBefore);
+    expect(store.getState().projection).toBe(published);
+  });
+
+  it('installs and completes nothing for a created Card Authoring refuses', () => {
+    const spy = authoringSpy({ canCreateConnectedCard: false });
+    const store = createRenderAdapter(spy.authoring);
+    spy.attach(store);
+    store.getState().syncProjection(PROJECTED, []);
+    const installedBefore = spy.installs.length;
+
+    expect(
+      store.getState().createConnectedCard(uuidSchema.parse(CARD_A), { x: 420, y: 360 }),
+    ).toBeNull();
+
+    expect(spy.completions).toEqual([]);
+    expect(spy.installs).toHaveLength(installedBefore);
+  });
+
   it('keeps a live node position across a reprojection', () => {
     const spy = authoringSpy();
     const store = createRenderAdapter(spy.authoring);
@@ -350,6 +408,25 @@ describe('render adapter', () => {
     expect(spy.completions).toEqual([]);
     expect(store.getState().moved).toBe(false);
     expect(store.getState().projection?.nodes[0]?.position).toEqual({ x: 10, y: 20 });
+  });
+
+  it('publishes nothing new for a change aimed at a node it does not own', () => {
+    const spy = authoringSpy();
+    const store = createRenderAdapter(spy.authoring);
+    spy.attach(store);
+    store.getState().syncProjection([node(CARD_A, 10, 20)], []);
+    const published = store.getState().projection;
+
+    store
+      .getState()
+      .changeNodes([{ type: 'dimensions', id: CARD_C, dimensions: { width: 240, height: 120 } }]);
+
+    // React Flow measures everything it renders and reports a `dimensions`
+    // change for it, while `applyNodeChanges` always returns a fresh array. An
+    // unowned node's change therefore round-trips into a re-sync that measures
+    // it again, forever. Holding the published value's identity is what breaks
+    // that loop, so identity — not equality — is the assertion.
+    expect(store.getState().projection).toBe(published);
   });
 
   it('records that a card has moved, so routed Edge geometry stops being drawn', () => {

@@ -263,6 +263,15 @@ export function createRenderAdapter(authoring: SpaceAuthoring): RenderAdapter {
       if (projection === null || !authoring.canConnect(from, to)) {
         return false;
       }
+      // Publish the reconciled nodes but install the placement from the live
+      // ones — deliberately two different lists. `installProjectedPlacement`
+      // reads positions only, and `reconcile` takes every surviving Card's
+      // position from its live node, so the two agree on every Card already on
+      // screen. They diverge only for a Card the projection has gained and the
+      // live list has not, which `App` makes reachable by withholding
+      // `syncProjection` until a strategy resolves. That Card has no resolved
+      // position yet, and authoring the origin it is standing on is exactly
+      // what a sparse Layout exists to avoid.
       set({
         projection: { ...projection, nodes: reconcile(projection.nodes, projected) },
       });

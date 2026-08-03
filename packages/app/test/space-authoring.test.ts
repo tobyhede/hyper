@@ -663,6 +663,31 @@ describe('Space Authoring', () => {
     await vi.waitFor(() => expect(reported.map(String)).toEqual(['Error: observer rejected']));
   });
 
+  it('contains a throwing observer and still notifies the ones behind it', () => {
+    const reported: unknown[] = [];
+    const { authoring, navigation } = openAuthoring(automaticSnapshot, undefined, (error) =>
+      reported.push(error),
+    );
+    const observerFailed = new Error('observer failed');
+    const notified: string[] = [];
+    // The synchronous twin of the rejection above. An observer that throws must
+    // not decide whether the observers registered after it hear about the
+    // publication at all — a notification is not a transaction, and nothing
+    // above one could act on the failure anyway.
+    authoring.subscribe(() => {
+      notified.push('throwing');
+      throw observerFailed;
+    });
+    authoring.subscribe(() => {
+      notified.push('behind it');
+    });
+
+    expect(() => navigation.activateRoute(ROUTE_ID)).not.toThrow();
+
+    expect(notified).toEqual(['throwing', 'behind it']);
+    expect(reported).toEqual([observerFailed]);
+  });
+
   it('treats a selected Layout the Space no longer holds as no Edit', () => {
     const loaded = { snapshot: automaticSnapshot, revision: 0n, exportedRevision: null };
     const session = openSpaceSession(new MemorySpaceBackend([loaded]), loaded);
