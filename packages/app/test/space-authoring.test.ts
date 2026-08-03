@@ -15,6 +15,7 @@ const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const CARD_A = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 const CARD_B = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
 const ROUTE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
+const STORED_ROUTE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000006');
 const LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000021');
 const MINTED_ROUTE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000008');
 const CREATED_CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
@@ -717,5 +718,172 @@ describe('Space Authoring', () => {
 
     expect(authoring.complete({ kind: 'settled-card-movement' })).toEqual({ kind: 'no-edit' });
     expect(session.getState().working).toBe(before);
+  });
+
+  it('keeps the local working Space authorable after a persistence conflict', async () => {
+    const positioned: SpaceSnapshot = {
+      ...automaticSnapshot,
+      document: {
+        ...automaticSnapshot.document,
+        layouts: [
+          {
+            id: LAYOUT_ID,
+            title: 'Layout 1',
+            kind: 'positioned',
+            positions: {
+              [CARD_A]: { x: 10, y: 20 },
+              [CARD_B]: { x: 300, y: 40 },
+            },
+          },
+        ],
+        defaultView: LAYOUT_ID,
+      },
+    };
+    const remote: SpaceSnapshot = {
+      ...positioned,
+      document: { ...positioned.document, title: 'Stored' },
+    };
+    const backend = new MemorySpaceBackend([
+      { snapshot: remote, revision: 1n, exportedRevision: null },
+    ]);
+    const session = openSpaceSession(backend, {
+      snapshot: positioned,
+      revision: 0n,
+      exportedRevision: null,
+    });
+    const currentSpace = () => {
+      const result = loadSpaceSnapshot(session.getState().working);
+      if (!result.ok) throw new Error(result.errors.map((error) => error.message).join('; '));
+      return result.space;
+    };
+    const navigation = createNavigation(currentSpace, { kind: 'layout', layoutId: LAYOUT_ID });
+    const authoring = createSpaceAuthoring({ session, navigation });
+    authoring.installPlacement(
+      new Map([
+        [CARD_A, { x: 100, y: 200 }],
+        [CARD_B, { x: 300, y: 40 }],
+      ]),
+    );
+    authoring.complete({ kind: 'settled-card-movement' });
+    await vi.waitFor(() =>
+      expect(authoring.getState().session.persistence.kind).toBe('conflicted'),
+    );
+
+    authoring.installPlacement(
+      new Map([
+        [CARD_A, { x: 500, y: 600 }],
+        [CARD_B, { x: 300, y: 40 }],
+      ]),
+    );
+
+    expect(authoring.complete({ kind: 'settled-card-movement' })).toEqual({ kind: 'completed' });
+    expect(authoring.getState().session.working.document.layouts?.[0]?.positions[CARD_A]).toEqual({
+      x: 500,
+      y: 600,
+    });
+    expect(authoring.getState().session.persistence.kind).toBe('conflicted');
+  });
+
+  it('accepts the stored Space as a fresh opening and discards every local Edit', async () => {
+    const positioned: SpaceSnapshot = {
+      ...automaticSnapshot,
+      document: {
+        ...automaticSnapshot.document,
+        layouts: [
+          {
+            id: LAYOUT_ID,
+            title: 'Layout 1',
+            kind: 'positioned',
+            positions: {
+              [CARD_A]: { x: 10, y: 20 },
+              [CARD_B]: { x: 300, y: 40 },
+            },
+            activeRoute: ROUTE_ID,
+          },
+        ],
+        defaultView: LAYOUT_ID,
+      },
+    };
+    const remote: SpaceSnapshot = {
+      ...positioned,
+      document: {
+        ...positioned.document,
+        title: 'Stored',
+        routes: [
+          ...positioned.document.routes,
+          { id: STORED_ROUTE_ID, title: 'Stored Route', edges: [{ from: CARD_B, to: CARD_A }] },
+        ],
+        layouts: [
+          {
+            id: LAYOUT_ID,
+            title: 'Stored Layout',
+            kind: 'positioned',
+            positions: {
+              [CARD_A]: { x: 900, y: 700 },
+              [CARD_B]: { x: 600, y: 500 },
+            },
+            activeRoute: STORED_ROUTE_ID,
+          },
+        ],
+      },
+    };
+    const backend = new MemorySpaceBackend([
+      { snapshot: remote, revision: 4n, exportedRevision: null },
+    ]);
+    const session = openSpaceSession(backend, {
+      snapshot: positioned,
+      revision: 3n,
+      exportedRevision: null,
+    });
+    const currentSpace = () => {
+      const result = loadSpaceSnapshot(session.getState().working);
+      if (!result.ok) throw new Error(result.errors.map((error) => error.message).join('; '));
+      return result.space;
+    };
+    const navigation = createNavigation(currentSpace, { kind: 'layout', layoutId: LAYOUT_ID });
+    const authoring = createSpaceAuthoring({ session, navigation });
+    authoring.installPlacement(
+      new Map([
+        [CARD_A, { x: 100, y: 200 }],
+        [CARD_B, { x: 300, y: 40 }],
+      ]),
+    );
+    authoring.complete({ kind: 'settled-card-movement' });
+    await vi.waitFor(() =>
+      expect(authoring.getState().session.persistence.kind).toBe('conflicted'),
+    );
+    authoring.installPlacement(
+      new Map([
+        [CARD_A, { x: 500, y: 600 }],
+        [CARD_B, { x: 300, y: 40 }],
+      ]),
+    );
+    authoring.complete({ kind: 'settled-card-movement' });
+    navigation.selectRenderer({ kind: 'view', view: 'grid' });
+    navigation.present();
+    navigation.openCard(CARD_B);
+
+    expect(authoring.acceptStoredSpace()).toBeNull();
+
+    expect(authoring.getState()).toMatchObject({
+      session: {
+        working: remote,
+        acknowledgedRevision: 4n,
+        persistence: { kind: 'settled' },
+      },
+      navigation: {
+        selectedRenderer: { kind: 'layout', layoutId: LAYOUT_ID },
+        activeRouteId: STORED_ROUTE_ID,
+        mode: 'overview',
+        walk: [],
+        openedCardId: null,
+      },
+    });
+    expect(authoring.authoredPlacement()).toEqual(
+      new Map([
+        [CARD_A, { x: 900, y: 700 }],
+        [CARD_B, { x: 600, y: 500 }],
+      ]),
+    );
   });
 });

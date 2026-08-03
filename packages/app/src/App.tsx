@@ -30,12 +30,7 @@ import { GraphView } from './components/GraphView';
 import { OpenCard } from './components/OpenCard';
 import { PresentingChrome } from './components/PresentingChrome';
 
-export interface AppActions {
-  /** Accepts the conflicting remote state, or answers why it was refused. */
-  acceptRemote: () => string | null;
-}
-
-export const createApp = ({ space, spaceSession }: OpenedSpace, { acceptRemote }: AppActions) => {
+export const createApp = ({ space, spaceSession }: OpenedSpace) => {
   // One validated aggregate per working snapshot, shared by the render path and
   // by Navigation. Both read the same reader, so in the steady state a snapshot
   // is parsed and indexed once rather than once per render — and both see the
@@ -384,10 +379,7 @@ export const createApp = ({ space, spaceSession }: OpenedSpace, { acceptRemote }
               variant="default"
               data-testid="persistence-accept-remote"
               onClick={() => {
-                // Only a refusal is state worth holding: acceptance remounts the
-                // whole workspace, so this component is gone before it could
-                // render anything the call returned.
-                const refusal = acceptRemote();
+                const refusal = authoring.acceptStoredSpace();
                 if (refusal !== null) setRemoteRefusal(refusal);
               }}
             >
@@ -488,8 +480,9 @@ export const createApp = ({ space, spaceSession }: OpenedSpace, { acceptRemote }
     );
   }
 
-  // `dispose` releases what this composition subscribed to. The session is the
-  // one collaborator that outlives the mount, so a workspace replaced over the
-  // same session has to hand it back.
-  return { App, dispose: authoring.dispose };
+  // One composition for the lifetime of the opened Space. Accepting the stored
+  // Space replaces the working state through Authoring rather than mounting a
+  // second app over the same session, so nothing here is ever handed back;
+  // `authoring.dispose` remains the seam that would release it if that changed.
+  return App;
 };

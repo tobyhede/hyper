@@ -165,7 +165,7 @@ function reconcile(
 }
 
 export function createRenderAdapter(authoring: SpaceAuthoring): RenderAdapter {
-  return create<RenderAdapterState>((set, get) => ({
+  const adapter = create<RenderAdapterState>((set, get) => ({
     projection: null,
     dragOrigins: new Map(),
     moved: false,
@@ -292,4 +292,22 @@ export function createRenderAdapter(authoring: SpaceAuthoring): RenderAdapter {
       return result.kind === 'completed' ? (result.createdCardId ?? null) : null;
     },
   }));
+  // A replacement Space arrives without unmounting anything, so the projection
+  // this store is holding describes Cards that may no longer exist and drag
+  // bookkeeping for a gesture made against the Space that is gone. Dropping it
+  // is the same reset `selectRenderer` performs, for the same reason: what is on
+  // screen no longer describes what is being rendered.
+  let opening = authoring.getState().opening;
+  authoring.subscribe(() => {
+    const nextOpening = authoring.getState().opening;
+    if (nextOpening === opening) return;
+    opening = nextOpening;
+    adapter.setState({
+      projection: null,
+      dragOrigins: new Map(),
+      moved: false,
+      selectedCardId: null,
+    });
+  });
+  return adapter;
 }

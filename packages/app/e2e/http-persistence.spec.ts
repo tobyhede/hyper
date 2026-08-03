@@ -136,15 +136,39 @@ test('a stale browser reports conflict and accepts the remote workspace without 
     await settledNetwork(stalePage);
     expect(staleCommits).toBe(1);
 
+    // Leave the conflicted local workspace in unrelated navigation and start an
+    // automatic placement just before acceptance. The stored Layout must open
+    // fresh, and any result still arriving from this Graph placement is obsolete.
+    await stalePage.getByTestId('view-selector').click();
+    await stalePage.getByRole('option', { name: 'Graph' }).click();
+    await stalePage.getByTestId('route-selector').click();
+    await stalePage.getByRole('option', { name: 'Echo' }).click();
+    await stalePage.getByTestId('present-button').click();
+    await expect(stalePage.getByTestId('presenting-chrome')).toBeVisible();
+
+    const mountedGraphArea = await stalePage.locator('.graph-area').elementHandle();
+    expect(mountedGraphArea).not.toBeNull();
+
     await acceptRemote.click();
 
     const acceptedCard = nodeByTitle(stalePage, 'A').first();
     await expect(acceptedCard).toBeVisible();
     await settled(stalePage);
     expect(await positionOf(acceptedCard)).toEqual(remotePosition);
+    await expect(stalePage.getByTestId('route-selector')).toContainText('Long');
+    await expect(stalePage.getByTestId('presenting-chrome')).not.toBeVisible();
+    expect(
+      await mountedGraphArea!.evaluate(
+        (element) => element === document.querySelector('.graph-area'),
+      ),
+    ).toBe(true);
     await expect(stalePage.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
     expect(staleCommits).toBe(1);
     await expect.poll(() => navigationIsProtected(stalePage)).toBe(false);
+
+    await dragBy(stalePage, acceptedCard, 120, 80);
+    await expect(stalePage.getByTestId('persistence-status')).toHaveAttribute('data-revision', '2');
+    expect(staleCommits).toBe(2);
   } finally {
     await stalePage.close();
   }

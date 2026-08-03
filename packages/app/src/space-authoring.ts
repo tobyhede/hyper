@@ -3,6 +3,7 @@ import { loadSpaceSnapshot, type LayoutPoint } from '@project/graph';
 import type { SpaceSession, SpaceSessionState } from '@project/persistence';
 import type { Navigation, NavigationState } from './navigation';
 import { updatePositionedLayout } from './snapshot';
+import { defaultRenderer, layoutPositionMap, resolveView } from './view';
 
 export type AuthoringCompletion =
   | { readonly kind: 'settled-card-movement' }
@@ -19,7 +20,8 @@ export type AuthoringResult =
   | { readonly kind: 'queued' };
 
 /**
- * The published state: what the collaborators say, and nothing else.
+ * The published state: what the collaborators say, plus the one thing only
+ * Authoring knows — that a replacement Space has been opened over them.
  *
  * The on-screen placement is deliberately absent. It is an *input* the renderer
  * pushes in on every projection and pointer frame, not something Authoring
@@ -28,6 +30,8 @@ export type AuthoringResult =
  * One accessor, read when it is needed.
  */
 export interface SpaceAuthoringState {
+  /** Advances when a replacement Space is opened without recreating Authoring. */
+  readonly opening: number;
   readonly session: SpaceSessionState;
   readonly navigation: NavigationState;
 }
@@ -50,13 +54,16 @@ export interface SpaceAuthoring {
   readonly canCreateConnectedCard: (from: CardId) => boolean;
   readonly complete: (completion: AuthoringCompletion) => AuthoringResult;
   readonly retryPersistence: () => void;
+  /** Replace local work with the current stored Space, or explain why it was refused. */
+  readonly acceptStoredSpace: () => string | null;
   /**
    * Release the collaborator subscriptions this Authoring holds.
    *
-   * The session outlives the workspace mounted over it — accepting a remote
-   * Space remounts against the same one — so an Authoring that never
-   * unsubscribes leaves a listener and its captured Navigation behind on every
-   * conflict resolution.
+   * The session outlives any Authoring composed over it, so one that never
+   * unsubscribes leaves a listener and its captured Navigation behind. Nothing
+   * replaces a composition mid-session now that accepting the stored Space is
+   * an edit to this one, but the subscriptions are still this object's to hand
+   * back and the seam is what makes that possible.
    */
   readonly dispose: () => void;
 }
@@ -168,6 +175,7 @@ export function createSpaceAuthoring({
 }: SpaceAuthoringDependencies): SpaceAuthoring {
   let placement: ReadonlyMap<string, LayoutPoint> | null =
     initialPlacement === null ? null : new Map(initialPlacement);
+  let opening = 0;
   let installing = false;
   let state: SpaceAuthoringState;
   // Held as `() => unknown` although `subscribe` accepts `() => void`: a `void`
@@ -177,6 +185,7 @@ export function createSpaceAuthoring({
   const listeners = new Set<() => unknown>();
 
   const snapshotState = (): SpaceAuthoringState => ({
+    opening,
     session: session.getState(),
     navigation: navigation.getState(),
   });
@@ -375,6 +384,49 @@ export function createSpaceAuthoring({
     }
   };
 
+  /**
+   * Validate the stored snapshot *before* handing it to the session. Accepting
+   * first and checking after published an unloadable snapshot as settled working
+   * state, so the conflict that could still have been resolved was gone. And the
+   * check cannot report by throwing: the caller is an `onClick` handler, which
+   * React error boundaries do not catch, so the throw escaped to the window
+   * leaving the stale workspace on screen.
+   *
+   * Refusing changes nothing — local work, conflict and every control survive —
+   * so it answers with the reason and leaves the workspace alone. The caller
+   * shows it; taking the page down over a refusal would remove the author's
+   * unsaved work to explain why it could not be replaced.
+   *
+   * Accepting is an edit to this Authoring rather than a new one: the session,
+   * the placement and Navigation are all replaced in place, and `opening`
+   * advancing is what tells the renderer its nodes describe a Space that is
+   * gone.
+   */
+  const acceptStoredSpace = (): string | null => {
+    const { persistence } = session.getState();
+    if (persistence.kind !== 'conflicted') return null;
+    const accepted = loadSpaceSnapshot(persistence.current.snapshot);
+    if (!accepted.ok) {
+      return `The remote space is invalid and was not accepted:\n${accepted.errors
+        .map((error) => `  - ${error.message}`)
+        .join('\n')}`;
+    }
+    const renderer = defaultRenderer(accepted.space);
+    const resolved = resolveView(accepted.space, renderer);
+    const acceptedPlacement = resolved.layout === null ? null : layoutPositionMap(resolved.layout);
+    installing = true;
+    try {
+      session.acceptRemote();
+      placement = acceptedPlacement;
+      navigation.openFresh(renderer);
+      opening += 1;
+    } finally {
+      installing = false;
+    }
+    publish();
+    return null;
+  };
+
   return {
     getState: () => state,
     authoredPlacement: () =>
@@ -396,6 +448,7 @@ export function createSpaceAuthoring({
     canCreateConnectedCard,
     complete,
     retryPersistence: session.retry,
+    acceptStoredSpace,
     dispose: () => {
       unsubscribeSession();
       unsubscribeNavigation();

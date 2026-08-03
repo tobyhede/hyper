@@ -26,6 +26,8 @@ export interface Navigation {
   readonly getState: () => NavigationState;
   readonly subscribe: (listener: () => void) => () => void;
   readonly selectRenderer: (selection: RendererSelection) => void;
+  /** Open a replacement Space as new navigation, retaining no prior reading state. */
+  readonly openFresh: (selection: RendererSelection) => void;
   /** Adopt a renderer created by an Edit without interrupting the current navigation. */
   readonly continueInRenderer: (selection: RendererSelection) => void;
   readonly activateRoute: (routeId: RouteId) => void;
@@ -87,6 +89,18 @@ export function createNavigation(
         mode: 'overview',
         walk: [],
         branchIndex: 0,
+      });
+    },
+    openFresh: (selection) => {
+      const view = resolveView(currentSpace(), selection);
+      setState({
+        selectedRenderer: selection,
+        selectedView: selection.kind === 'view' ? selection.view : 'graph',
+        activeRouteId: view.activeRouteId,
+        mode: 'overview',
+        walk: [],
+        branchIndex: 0,
+        openedCardId: null,
       });
     },
     continueInRenderer: (selection) => {
