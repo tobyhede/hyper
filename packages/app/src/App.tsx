@@ -227,15 +227,14 @@ export const createApp = ({ space, spaceSession }: OpenedSpace, { acceptRemote }
       if (laidOut) syncProjection(projectedNodes, projectedEdges);
     }, [laidOut, projectedNodes, projectedEdges, syncProjection]);
 
-    const liveNodes = useEditorStore((s) => s.nodes);
-    const liveEdges = useEditorStore((s) => s.edges);
+    const liveProjection = useEditorStore((s) => s.projection);
     const changeNodes = useEditorStore((s) => s.changeNodes);
-    const canvas = canvasContent(placement, liveNodes !== null);
+    const canvas = canvasContent(placement, liveProjection !== null);
     // There is an arrangement to drag once the layout has resolved and the store
-    // has taken it. Not a permission — every view is editable (ADR 0025) — and not
-    // a state the space can go back to: nothing sets `nodes` back to null, so this
-    // is false for one frame and true from then on.
-    const editable = liveNodes !== null;
+    // has taken it. Not a permission — every view is editable (ADR 0025) — but it
+    // is false for the frame before the first placement resolves, and again after
+    // `selectRenderer` clears the projection until the next one is published.
+    const editable = liveProjection !== null;
     const completedConnectionTarget = useRef<string | null>(null);
 
     // One decision resolved from one Space, applied in an order that cannot
@@ -439,8 +438,8 @@ export const createApp = ({ space, spaceSession }: OpenedSpace, { acceptRemote }
           ) : canvas.kind === 'arrangement' ? (
             <ReactFlowProvider>
               <GraphView
-                nodes={liveNodes ?? []}
-                edges={liveEdges}
+                nodes={liveProjection?.nodes ?? []}
+                edges={liveProjection?.edges ?? []}
                 activeCardId={activeCardId}
                 presenting={presenting}
                 editable={editable}
