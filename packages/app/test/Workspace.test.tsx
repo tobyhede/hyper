@@ -216,15 +216,22 @@ describe('Workspace conflict recovery', () => {
     fireEvent.click(screen.getByTestId('persistence-accept-remote'));
     expect(await screen.findByTestId('persistence-remote-refused')).toBeVisible();
 
-    await act(async () => {
+    // `act` around the synchronous publication only, and the wait outside it.
+    // Nesting `waitFor` inside `act` puts the commit's asynchronous conflict
+    // reply inside the window where Testing Library sets the act environment
+    // false on purpose, and React then warns about the very flush it was asked
+    // for.
+    act(() => {
       session.resolveConflict(local);
-      await waitFor(() => {
-        const { persistence } = session.getState();
-        expect(persistence.kind === 'conflicted' ? persistence.current.revision : null).toBe(5n);
-      });
+    });
+    await waitFor(() => {
+      const { persistence } = session.getState();
+      expect(persistence.kind === 'conflicted' ? persistence.current.revision : null).toBe(5n);
     });
 
-    expect(screen.queryByTestId('persistence-remote-refused')).not.toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.queryByTestId('persistence-remote-refused')).not.toBeInTheDocument(),
+    );
     expect(screen.getByTestId('persistence-accept-remote')).toBeVisible();
   });
 

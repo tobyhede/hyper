@@ -541,9 +541,11 @@ describe('Space Authoring', () => {
     navigation.activateRoute(ROUTE_ID);
     expect(published).toBe(1);
 
-    // Accepting a remote Space remounts the workspace against the *same*
-    // long-lived session, so an Authoring that never unsubscribes leaves a
-    // listener and its closure behind on every conflict resolution.
+    // The session outlives any Authoring composed over it, so one that never
+    // unsubscribes leaves a listener and its closure behind on a session still
+    // publishing to it. Nothing replaces a composition mid-session now that
+    // accepting the stored Space is an edit to this one, but releasing the
+    // subscriptions is still this object's to do.
     authoring.dispose();
     navigation.activateRoute(ROUTE_ID);
     session.submit({
@@ -679,6 +681,69 @@ describe('Space Authoring', () => {
       kind: 'no-edit',
     });
     expect(session.getState().working).toBe(before);
+  });
+
+  /**
+   * The diagnostic path cannot become the failure path. A reporter that throws
+   * while explaining a failed queued completion must not interrupt the Edit that
+   * drained the queue, and must not cost the Edits discarded behind it the
+   * report that says they are gone.
+   */
+  it('contains a reporter that throws while reporting a failed queued completion', () => {
+    vi.spyOn(crypto, 'randomUUID').mockReturnValue(
+      LAYOUT_ID as ReturnType<typeof crypto.randomUUID>,
+    );
+    const loaded = { snapshot: automaticSnapshot, revision: 0n, exportedRevision: null };
+    const real = openSpaceSession(new MemorySpaceBackend([loaded]), loaded);
+    let submits = 0;
+    const session: SpaceSession = {
+      ...real,
+      submit: (snapshot) => {
+        submits += 1;
+        if (submits === 2) throw new Error('submit failed');
+        real.submit(snapshot);
+      },
+    };
+    const currentSpace = () => {
+      const result = loadSpaceSnapshot(session.getState().working);
+      if (!result.ok) throw new Error(result.errors.map((error) => error.message).join('; '));
+      return result.space;
+    };
+    const navigation = createNavigation(currentSpace, { kind: 'view', view: 'graph' });
+    const reported: unknown[] = [];
+    const authoring = createSpaceAuthoring({
+      session,
+      navigation,
+      reportObserverError: (error) => {
+        reported.push(error);
+        throw new Error('reporter failed');
+      },
+    });
+    authoring.installPlacement(
+      new Map([
+        [CARD_A, { x: 10, y: 20 }],
+        [CARD_B, { x: 300, y: 40 }],
+      ]),
+    );
+    for (const edge of [
+      { from: CARD_A, to: CARD_A },
+      { from: CARD_B, to: CARD_B },
+    ] as const) {
+      let done = false;
+      authoring.subscribe(() => {
+        if (done) return;
+        done = true;
+        authoring.complete({ kind: 'connected-cards', ...edge });
+      });
+    }
+
+    expect(authoring.complete({ kind: 'connected-cards', from: CARD_B, to: CARD_A })).toEqual({
+      kind: 'completed',
+    });
+
+    expect(reported).toHaveLength(2);
+    expect(String(reported[0])).toContain('submit failed');
+    expect(String(reported[1])).toMatch(/discarded 1 queued completion/);
   });
 
   it('reports the completions a failed drain discards', () => {

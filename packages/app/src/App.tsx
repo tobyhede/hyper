@@ -79,16 +79,22 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
     // Why the remote state was refused, reported beside the control that asked
     // for it. The workspace behind it still holds the local work and the
     // conflict, so this is a message, not a mode.
-    const [remoteRefusal, setRemoteRefusal] = useState<string | null>(null);
-    // A refusal explains one remote snapshot, so it dies with it. `resolveConflict`
-    // commits again without leaving the conflicted state, so the next conflict can
-    // carry a different — and loadable — remote; holding the old sentence over it
-    // would say the local work cannot be replaced when it now can.
+    //
+    // Held against the revision it explains, and read back only while that is
+    // still the revision in conflict. A refusal explains one remote snapshot, so
+    // it dies with it: `resolveConflict` commits again without leaving the
+    // conflicted state, so the next conflict can carry a different — and
+    // loadable — remote, and holding the old sentence over it would say the
+    // local work cannot be replaced when it now can. Derived rather than cleared
+    // by an effect, which would render the stale sentence against the new
+    // conflict for the commit before it ran.
+    const [refusal, setRefusal] = useState<{ revision: bigint; message: string } | null>(null);
     const conflictRevision =
       sessionState.persistence.kind === 'conflicted'
         ? sessionState.persistence.current.revision
         : null;
-    useEffect(() => setRemoteRefusal(null), [conflictRevision]);
+    const remoteRefusal =
+      refusal !== null && refusal.revision === conflictRevision ? refusal.message : null;
     const rendererSpace = useMemo(
       () => readWorkingSpace(sessionState.working),
       [sessionState.working],
@@ -389,7 +395,14 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
               data-testid="persistence-accept-remote"
               // The result of this attempt is the whole message: a success
               // clears whatever the last attempt on this same conflict said.
-              onClick={() => setRemoteRefusal(authoring.acceptStoredSpace())}
+              onClick={() => {
+                const message = authoring.acceptStoredSpace();
+                setRefusal(
+                  message === null || conflictRevision === null
+                    ? null
+                    : { revision: conflictRevision, message },
+                );
+              }}
             >
               Accept remote
             </Button>

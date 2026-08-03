@@ -184,10 +184,16 @@ export function createSpaceAuthoring({
   // synchronous while letting `publish` see what came back.
   const listeners = new Set<() => unknown>();
 
-  // Identity is load-bearing, not just the value: `usePlacementRendering`
-  // rebuilds the positioned strategy whenever this map changes identity and
-  // re-runs layout, so an equal placement must keep the map it already has or
-  // every projection would re-arrange a settled graph.
+  // `installPlacement` only — not the way placement is written in general.
+  // `performCompletion` and `acceptStoredSpace` each assign the map they built,
+  // deliberately taking its identity: both have already replaced the Space the
+  // old one described and want the re-layout this would suppress.
+  //
+  // Here identity is load-bearing the other way, and not just the value:
+  // `usePlacementRendering` rebuilds the positioned strategy whenever this map
+  // changes identity and re-runs layout, so an equal placement pushed in by a
+  // projection must keep the map it already has or every projection would
+  // re-arrange a settled graph.
   const install = (nextPlacement: ReadonlyMap<string, LayoutPoint> | null): void => {
     if (samePlacement(placement, nextPlacement)) return;
     placement = nextPlacement === null ? null : new Map(nextPlacement);
@@ -387,11 +393,7 @@ export function createSpaceAuthoring({
         try {
           performCompletion(next.completion, next.placement);
         } catch (error) {
-          try {
-            reportObserverError(error);
-          } catch {
-            // Diagnostics cannot interrupt Authoring.
-          }
+          safelyReport(error);
           break;
         }
       }

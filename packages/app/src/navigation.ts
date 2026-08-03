@@ -1,6 +1,6 @@
 import type { BuiltInViewId, CardId, RouteId } from '@project/core';
 import { getCard, getRoute, outgoingEdges, routeStartCard, type Space } from '@project/graph';
-import { DEFAULT_VIEW_ID, resolveView, type RendererSelection } from './view';
+import { DEFAULT_VIEW_ID, resolveView, type RendererSelection, type ResolvedView } from './view';
 
 export type NavigationMode = 'overview' | 'presenting';
 
@@ -51,21 +51,37 @@ function outgoingEdgesFrom(
   return route !== undefined && cardId != null ? outgoingEdges(route, cardId) : [];
 }
 
+/**
+ * Navigation as a Space first opens in it: nothing walked, nothing read, and
+ * the active Route the resolved renderer answers.
+ *
+ * The one definition, shared by the initial state and by `openFresh` — a
+ * replacement Space is opened, not navigated to, so the two cannot be allowed
+ * to disagree about what "opened" means. `selectedView` falls back rather than
+ * being retained, which is the one thing that separates this from
+ * `selectRenderer`: there is no earlier Algorithmic View to return to.
+ */
+function openedState(selection: RendererSelection, view: ResolvedView): NavigationState {
+  return {
+    selectedRenderer: selection,
+    selectedView: selection.kind === 'view' ? selection.view : DEFAULT_VIEW_ID,
+    mode: 'overview',
+    activeRouteId: view.activeRouteId,
+    walk: [],
+    branchIndex: 0,
+    openedCardId: null,
+  };
+}
+
 export function createNavigation(
   currentSpace: () => Space,
   initialRenderer: RendererSelection,
   initialSpace: Space = currentSpace(),
 ): Navigation {
-  const initialView = resolveView(initialSpace, initialRenderer);
-  let state: NavigationState = {
-    selectedRenderer: initialRenderer,
-    selectedView: initialRenderer.kind === 'view' ? initialRenderer.view : DEFAULT_VIEW_ID,
-    mode: 'overview',
-    activeRouteId: initialView.activeRouteId,
-    walk: [],
-    branchIndex: 0,
-    openedCardId: null,
-  };
+  let state: NavigationState = openedState(
+    initialRenderer,
+    resolveView(initialSpace, initialRenderer),
+  );
   const listeners = new Set<() => void>();
   const setState = (change: Partial<NavigationState>): void => {
     state = { ...state, ...change };
@@ -92,16 +108,7 @@ export function createNavigation(
       });
     },
     openFresh: (selection) => {
-      const view = resolveView(currentSpace(), selection);
-      setState({
-        selectedRenderer: selection,
-        selectedView: selection.kind === 'view' ? selection.view : DEFAULT_VIEW_ID,
-        activeRouteId: view.activeRouteId,
-        mode: 'overview',
-        walk: [],
-        branchIndex: 0,
-        openedCardId: null,
-      });
+      setState(openedState(selection, resolveView(currentSpace(), selection)));
     },
     continueInRenderer: (selection) => {
       // Resolve first so navigation can never name a renderer the current Space
@@ -143,7 +150,8 @@ export function createNavigation(
     // 0. Reaching a stale index needs the Edge set to shrink under a live walk,
     // which nothing does — an Edit only ever adds Edges, changing Route or Card
     // rewrites the index, structural deletion is not built (ADR 0033), and
-    // accepting remote remounts the workspace outright. Clamping would also be
+    // accepting the stored Space opens fresh navigation, which resets the walk
+    // and the index with it. Clamping would also be
     // the wrong repair rather than a safe one: `moves()` marks the selection by
     // `index === branchIndex`, so a stale index shows *no* move selected, and
     // advancing to "the last valid Edge" would walk down one the presenter was

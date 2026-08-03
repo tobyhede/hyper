@@ -528,6 +528,34 @@ describe('render adapter', () => {
   });
 
   /*
+   * A queued completion has not happened yet: the Edit it is queued behind
+   * decides the Space it will run against, and it can still answer `no-edit`
+   * there. Drawing the connection now publishes it for an Edge the Space has
+   * not gained — the same failure as a refusal, one turn later. If the queued
+   * Edit does land, the projection that follows it draws the Edge anyway.
+   */
+  it('leaves the projected connection uncommitted when the completion is queued', () => {
+    const spy = authoringSpy();
+    const queueing: SpaceAuthoring = {
+      ...spy.authoring,
+      complete: () => ({ kind: 'queued' }),
+    };
+    const store = createRenderAdapter(queueing);
+    store.getState().syncProjection(PROJECTED, []);
+    const published = store.getState().projection;
+    const projected = PROJECTED.map((card) => ({ ...card, className: 'connected' }));
+
+    expect(
+      store.getState().connectCards(uuidSchema.parse(CARD_A), uuidSchema.parse(CARD_B), projected),
+    ).toBe(false);
+
+    expect(store.getState().projection).toBe(published);
+    expect(store.getState().projection?.nodes.every((card) => card.className !== 'connected')).toBe(
+      true,
+    );
+  });
+
+  /*
    * Accepting a stored Space replaces the working state without unmounting
    * anything, so this store is left holding a projection of Cards that may no
    * longer exist. Local placement cannot outlive the Space it belonged to

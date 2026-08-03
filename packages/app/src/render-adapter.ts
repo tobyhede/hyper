@@ -277,9 +277,13 @@ export function createRenderAdapter(authoring: SpaceAuthoring): RenderAdapter {
       // position yet, and authoring the origin it is standing on is exactly
       // what a sparse Layout exists to avoid.
       installProjectedPlacement(authoring, projection.nodes);
-      // Complete first. A refused completion — or one that throws on an invalid
-      // Space — must not leave a connection drawn that the Space never gained.
-      if (authoring.complete({ kind: 'connected-cards', from, to }).kind === 'no-edit') {
+      // Complete first. A completion that has not happened — refused, queued
+      // behind another Edit, or thrown on an invalid Space — must not leave a
+      // connection drawn for an Edge the Space never gained. Only `completed`
+      // says it did: a queued Edit runs against whatever Space the Edit ahead of
+      // it installs and can still answer `no-edit` there, and if it does land the
+      // projection that follows it draws the Edge anyway.
+      if (authoring.complete({ kind: 'connected-cards', from, to }).kind !== 'completed') {
         return false;
       }
       // Re-read: completing published, and a listener may have replaced the
@@ -310,6 +314,10 @@ export function createRenderAdapter(authoring: SpaceAuthoring): RenderAdapter {
   // bookkeeping for a gesture made against the Space that is gone. Dropping it
   // is the same reset `selectRenderer` performs, for the same reason: what is on
   // screen no longer describes what is being rendered.
+  //
+  // The unsubscribe is deliberately dropped: this store's lifetime is the
+  // composition's, and `authoring.dispose` clears the listener set that holds
+  // this. Give the adapter its own teardown if it ever outlives one Authoring.
   let opening = authoring.getState().opening;
   authoring.subscribe(() => {
     const nextOpening = authoring.getState().opening;
