@@ -69,10 +69,14 @@ export function mountWorkspace(opened: OpenedSpace, render: WorkspaceRenderer): 
         .join('\n')}`;
     }
     opened.spaceSession.acceptRemote();
+    // The replacement subscribes to the same session this one is subscribed to,
+    // so the outgoing workspace has to let go first or every conflict resolved
+    // in a sitting leaves another listener on a session that outlives them all.
+    dispose();
     mountWorkspace({ space: accepted.space, spaceSession: opened.spaceSession }, render);
     return null;
   };
-  const App = createApp(opened, { acceptRemote });
+  const { App, dispose } = createApp(opened, { acceptRemote });
   render(
     <WorkspaceFailure>
       <App />

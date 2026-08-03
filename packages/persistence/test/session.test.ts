@@ -490,4 +490,39 @@ describe('openSpaceSession', () => {
     );
     expect(neverExported.getState().changedSinceExport).toBe(true);
   });
+
+  it('contains a rejected asynchronous observer and still notifies the rest', async () => {
+    const backend = new MemorySpaceBackend([loaded]);
+    const reported: unknown[] = [];
+    const session = openSpaceSession(backend, loaded, {
+      reportObserverError: (error) => reported.push(error),
+    });
+    const observedTitles: string[] = [];
+    // `subscribe` takes `() => void` and TypeScript's void-return bivariance
+    // admits an async listener without complaint. Its rejection lands nowhere
+    // near the try/catch guarding the call, and an unhandled rejection is
+    // answered by killing the process — the one failure mode a non-throwing
+    // publisher exists to prevent.
+    // Deliberately the shape lint rejects: the rule is the first line of
+    // defence and this asserts the second, for a listener that reaches the same
+    // shape indirectly and never trips it.
+    // eslint-disable-next-line @typescript-eslint/no-misused-promises
+    session.subscribe(() => Promise.reject(new Error('observer rejected')));
+    session.subscribe(() => {
+      observedTitles.push(session.getState().working.document.title);
+    });
+
+    expect(() => session.submit(changedTitle('Changed despite async observer'))).not.toThrow();
+
+    await waitFor(session.getState, session.subscribe, (s) => s.persistence.kind === 'settled');
+
+    // Exactly one report per publication — the optimistic working state, then
+    // `pending`, then `settled` — counted against the observer that recorded
+    // them rather than a literal, so this pins containment rather than how many
+    // times a commit happens to publish. Every rejection accounted for is the
+    // point: one left over would be one that escaped.
+    expect(observedTitles).toContain('Changed despite async observer');
+    await vi.waitFor(() => expect(reported).toHaveLength(observedTitles.length));
+    expect(new Set(reported.map(String))).toEqual(new Set(['Error: observer rejected']));
+  });
 });

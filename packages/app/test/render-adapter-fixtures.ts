@@ -1,7 +1,7 @@
 import type { NodeChange } from '@xyflow/react';
 import { uuidSchema } from '@project/core';
 import type { CardFlowNode } from '@project/react-flow-adapter';
-import type { EditorStore } from '../src/editor';
+import type { RenderAdapter } from '../src/render-adapter';
 
 export function node(id: string, x: number, y: number, title = id): CardFlowNode {
   return {
@@ -32,7 +32,7 @@ export function settled(id: string, x: number, y: number): NodeChange<CardFlowNo
   return [{ type: 'position', id, position: { x, y }, dragging: false }];
 }
 
-export function completeDrag(store: EditorStore, id: string, x: number, y: number): void {
+export function completeDrag(store: RenderAdapter, id: string, x: number, y: number): void {
   store.getState().changeNodes(moving(id, x, y));
   store.getState().changeNodes(settled(id, x, y));
 }
