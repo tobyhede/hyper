@@ -66,9 +66,15 @@ it('throws the validation failure every time an invalid snapshot is read', () =>
   const base = snapshot('Space');
   const dangling: SpaceSnapshot = { ...base, cards: [] };
   const readWorkingSpace = createWorkingSpaceReader();
+  const valid = readWorkingSpace(base);
 
   expect(() => readWorkingSpace(dangling)).toThrow(/00000000-0000-4000-8000-000000000002/);
   // No poisoned cache: a reader that swallowed the failure once would answer a
   // stale Space forever after.
   expect(() => readWorkingSpace(dangling)).toThrow(/00000000-0000-4000-8000-000000000002/);
+
+  // The failure also leaves the last good pair alone rather than clearing it,
+  // so the valid snapshot still answers from the cache instead of being
+  // revalidated into an equal but distinct aggregate.
+  expect(readWorkingSpace(base)).toBe(valid);
 });

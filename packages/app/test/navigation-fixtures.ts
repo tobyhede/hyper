@@ -26,6 +26,29 @@ export function rendererChoice(initial: RendererSelection): RendererChoiceFixtur
   };
 }
 
+/**
+ * A complete Navigation state around the two fields these fixtures control.
+ *
+ * The rest are real defaults rather than a cast over a partial object: a cast
+ * answers `undefined` for every field it omits while the type promises one, so
+ * the day Edit completion reads `mode` or `walk` the fixture lies instead of
+ * failing.
+ */
+function navigationState(
+  selectedRenderer: RendererSelection,
+  activeRouteId: RouteId | null,
+): NavigationState {
+  return {
+    selectedRenderer,
+    selectedView: selectedRenderer.kind === 'view' ? selectedRenderer.view : 'graph',
+    mode: 'overview',
+    activeRouteId,
+    walk: [],
+    branchIndex: 0,
+    openedCardId: null,
+  };
+}
+
 /** Legacy Edit-completion fixture; Navigation behavior itself is tested at its public seam. */
 export function authoringNavigation(
   initialRenderer: RendererSelection,
@@ -33,8 +56,7 @@ export function authoringNavigation(
   onActivate: (routeId: RouteId) => void = () => undefined,
 ): AuthoringNavigation & { readonly selectedRenderer: () => RendererSelection } {
   let renderer = initialRenderer;
-  const getState = (): NavigationState =>
-    ({ selectedRenderer: renderer, activeRouteId: currentActiveRoute() }) as NavigationState;
+  const getState = (): NavigationState => navigationState(renderer, currentActiveRoute());
   return {
     getState,
     continueInRenderer: (selection) => {
@@ -51,11 +73,7 @@ export function navigationFromChoice(
   onActivate: (routeId: RouteId) => void = () => undefined,
 ): AuthoringNavigation {
   return {
-    getState: () =>
-      ({
-        selectedRenderer: choice.current(),
-        activeRouteId: currentActiveRoute(),
-      }) as NavigationState,
+    getState: () => navigationState(choice.current(), currentActiveRoute()),
     continueInRenderer: choice.select,
     activateRoute: onActivate,
   };

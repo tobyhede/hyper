@@ -234,16 +234,20 @@ export const createApp = ({ space, spaceSession }: OpenedSpace, { acceptRemote }
     const editable = liveNodes !== null;
     const completedConnectionTarget = useRef<string | null>(null);
 
-    const chooseRenderer = useCallback(
-      (selection: RendererSelection) => {
-        const resolved = resolveView(rendererSpace, selection);
-        useEditorStore
-          .getState()
-          .selectRenderer(resolved.layout === null ? null : layoutPositionMap(resolved.layout));
-        navigation.selectRenderer(selection);
-      },
-      [rendererSpace],
-    );
+    // One decision resolved from one Space, applied in an order that cannot
+    // leave the two collaborators disagreeing. Both steps that may refuse the
+    // selection run first — the resolve here and Navigation's own — and the
+    // editor update is a plain store write that cannot fail. Resolving against
+    // the session's live Space rather than the rendered one matters because
+    // Navigation resolves against the live one too: deciding from a snapshot
+    // Navigation will not consult is one decision with two sources of truth.
+    const chooseRenderer = useCallback((selection: RendererSelection) => {
+      const resolved = resolveView(currentSpace(), selection);
+      navigation.selectRenderer(selection);
+      useEditorStore
+        .getState()
+        .selectRenderer(resolved.layout === null ? null : layoutPositionMap(resolved.layout));
+    }, []);
 
     // Leaving while persistence is not settled asks first. The handler is absent
     // in the normal durable state, preserving the browser's back/forward cache.
