@@ -202,9 +202,69 @@ describe('openSpaceSession', () => {
       (state) => state.persistence.kind === 'settled',
     );
     expect(settled.working.document.title).toBe('Newest while retrying');
-    expect(control.attempts.at(-1)?.snapshot.document.title).toBe('Newest while retrying');
+    expect(control.attempts.map((attempt) => attempt.snapshot.document.title)).toEqual([
+      'Failed payload',
+      'Retried payload',
+      'Newest while retrying',
+    ]);
     await expect(backend.loadSpace(SPACE_ID)).resolves.toMatchObject({
       snapshot: { document: { title: 'Newest while retrying' } },
+    });
+  });
+
+  /*
+   * The conflicted twin of the case above, and the reason the queue cannot be
+   * scoped to a call's own publication: `resolveConflict` publishes `pending`
+   * from inside the optimistic publication just as `retry` does, so the same
+   * nesting arises on the path that reconciles rather than the one that repeats.
+   * An Edit made from that `pending` notification has the reconciling commit to
+   * wait behind; dropping it would report `settled` over a visible Edit that was
+   * never stored.
+   */
+  it('queues an Edit submitted from a pending notification raised inside a conflicted one', async () => {
+    const control = new MemorySpaceBackendTestControl();
+    const backend = new MemorySpaceBackend([loaded], control);
+    await backend.commitSpace(changedTitle('Remote'), 3n);
+    const session = openSpaceSession(backend, loaded);
+
+    session.submit(changedTitle('Conflicting payload'));
+    await waitFor(
+      session.getState,
+      session.subscribe,
+      (state) => state.persistence.kind === 'conflicted',
+    );
+
+    let reconciled = false;
+    let resubmitted = false;
+    session.subscribe(() => {
+      if (reconciled || session.getState().persistence.kind !== 'conflicted') return;
+      reconciled = true;
+      session.resolveConflict(changedTitle('Reconciled payload'));
+    });
+    session.subscribe(() => {
+      if (resubmitted || session.getState().persistence.kind !== 'pending') return;
+      resubmitted = true;
+      session.submit(changedTitle('Newest while reconciling'));
+    });
+
+    session.submit(changedTitle('Edited while conflicted'));
+
+    const settled = await waitFor(
+      session.getState,
+      session.subscribe,
+      (state) => state.persistence.kind === 'settled',
+    );
+    expect(settled.working.document.title).toBe('Newest while reconciling');
+    expect(settled.acknowledgedRevision).toBe(6n);
+    expect(control.attempts.map((attempt) => attempt.snapshot.document.title)).toEqual([
+      'Remote',
+      'Conflicting payload',
+      'Reconciled payload',
+      'Newest while reconciling',
+    ]);
+    await expect(backend.loadSpace(SPACE_ID)).resolves.toMatchObject({
+      snapshot: { document: { title: 'Newest while reconciling' } },
+      revision: 6n,
     });
   });
 
