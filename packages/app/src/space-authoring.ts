@@ -354,8 +354,15 @@ export function createSpaceAuthoring({
 
     installing = true;
     try {
-      placement = completedPlacement;
+      // Submit first, and only then replace the authoritative placement. The
+      // submitted snapshot already carries `completedPlacement`, so nothing here
+      // reads the field — but a `submit` that throws must not leave the
+      // placement describing an Edit the session never took. That strand used to
+      // escape with the throw; the drain contains a queued failure now, so it
+      // would otherwise persist silently, and a created Card would sit in the
+      // placement while the Space has no such Card at all.
       session.submit(next);
+      placement = completedPlacement;
       if (mintedRouteId !== null) navigation.activateRoute(mintedRouteId);
       navigation.continueInRenderer({ kind: 'layout', layoutId });
     } finally {

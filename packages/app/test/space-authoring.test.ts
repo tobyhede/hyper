@@ -746,6 +746,72 @@ describe('Space Authoring', () => {
     expect(String(reported[1])).toMatch(/discarded 1 queued completion/);
   });
 
+  /**
+   * Containing a queued failure must not leave the placement describing an Edit
+   * the session never took. `performCompletion` installs before it submits, so a
+   * submit that throws used to strand the placement it had already replaced —
+   * survivable while the throw escaped to the caller, and silent now that the
+   * drain contains it.
+   *
+   * A created Card is what makes the strand visible: only `performCompletion`
+   * adds it to the placement, so `authoredPlacement()` naming a Card the
+   * committed Space does not hold cannot come from anywhere else.
+   */
+  it('keeps the placement level with the session when a queued submit fails', () => {
+    vi.spyOn(crypto, 'randomUUID').mockReturnValue(
+      CREATED_CARD_ID as ReturnType<typeof crypto.randomUUID>,
+    );
+    const loaded = { snapshot: positionedSnapshot, revision: 0n, exportedRevision: null };
+    const real = openSpaceSession(new MemorySpaceBackend([loaded]), loaded);
+    let submits = 0;
+    const session: SpaceSession = {
+      ...real,
+      submit: (snapshot) => {
+        submits += 1;
+        if (submits === 2) throw new Error('submit failed');
+        real.submit(snapshot);
+      },
+    };
+    const currentSpace = () => {
+      const result = loadSpaceSnapshot(session.getState().working);
+      if (!result.ok) throw new Error(result.errors.map((error) => error.message).join('; '));
+      return result.space;
+    };
+    const navigation = createNavigation(currentSpace, { kind: 'layout', layoutId: LAYOUT_ID });
+    const reported: unknown[] = [];
+    const authoring = createSpaceAuthoring({
+      session,
+      navigation,
+      initialPlacement: new Map([
+        [CARD_A, { x: 10, y: 20 }],
+        [CARD_B, { x: 300, y: 40 }],
+      ]),
+      reportObserverError: (error) => reported.push(error),
+    });
+    let queuedOnce = false;
+    authoring.subscribe(() => {
+      if (queuedOnce) return;
+      queuedOnce = true;
+      // Queued behind the Edit publishing right now, and the only thing that
+      // puts the created Card into a placement.
+      authoring.complete({
+        kind: 'create-and-connect',
+        from: CARD_A,
+        position: { x: 700, y: 800 },
+      });
+    });
+
+    expect(authoring.complete({ kind: 'connected-cards', from: CARD_B, to: CARD_A })).toEqual({
+      kind: 'completed',
+    });
+
+    expect(reported).toHaveLength(1);
+    expect(String(reported[0])).toContain('submit failed');
+    const committed = session.getState().working;
+    expect(committed.cards.map((card) => card.id)).toEqual([CARD_A, CARD_B]);
+    expect([...(authoring.authoredPlacement()?.keys() ?? [])]).toEqual([CARD_A, CARD_B]);
+  });
+
   it('reports the completions a failed drain discards', () => {
     vi.spyOn(crypto, 'randomUUID').mockReturnValue(
       LAYOUT_ID as ReturnType<typeof crypto.randomUUID>,

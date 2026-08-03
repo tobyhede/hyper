@@ -225,6 +225,34 @@ it('opens and closes Cards, and closes an opened Card when presenting starts', (
   expect(navigation.getState()).toMatchObject({ mode: 'overview', walk: [] });
 });
 
+/*
+ * Opening a replacement Space is not navigating to a renderer within the one
+ * already open, and the difference is everything `selectRenderer` deliberately
+ * retains. There is no earlier Algorithmic View to fall back to and no Card the
+ * author was still reading, so a Layout selection resets `selectedView` and
+ * clears `openedCardId` — both of which `selectRenderer` leaves standing.
+ */
+it('opens a replacement Space as new navigation, retaining no reading state', () => {
+  const space = fixture();
+  const card = uuid('00000000-0000-4000-8000-000000000003');
+  const navigation = createNavigation(() => space, { kind: 'view', view: 'grid' });
+  navigation.present();
+  navigation.advance();
+  navigation.openCard(card);
+
+  navigation.openFresh({ kind: 'layout', layoutId: LAYOUT });
+
+  expect(navigation.getState()).toEqual({
+    selectedRenderer: { kind: 'layout', layoutId: LAYOUT },
+    selectedView: 'graph',
+    activeRouteId: ROUTE_TWO,
+    mode: 'overview',
+    walk: [],
+    branchIndex: 0,
+    openedCardId: null,
+  });
+});
+
 it('reads the working Space once per moves() call, whatever the branching', () => {
   const cardA = uuid('00000000-0000-4000-8000-000000000002');
   const cardB = uuid('00000000-0000-4000-8000-000000000003');
