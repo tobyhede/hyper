@@ -884,24 +884,7 @@ describe('Space Authoring', () => {
   });
 
   it('keeps the local working Space authorable after a persistence conflict', async () => {
-    const positioned: SpaceSnapshot = {
-      ...automaticSnapshot,
-      document: {
-        ...automaticSnapshot.document,
-        layouts: [
-          {
-            id: LAYOUT_ID,
-            title: 'Layout 1',
-            kind: 'positioned',
-            positions: {
-              [CARD_A]: { x: 10, y: 20 },
-              [CARD_B]: { x: 300, y: 40 },
-            },
-          },
-        ],
-        defaultView: LAYOUT_ID,
-      },
-    };
+    const positioned = positionedSnapshot;
     const remote: SpaceSnapshot = {
       ...positioned,
       document: { ...positioned.document, title: 'Stored' },
