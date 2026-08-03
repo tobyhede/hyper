@@ -750,11 +750,14 @@ describe('completed placement composition', () => {
     });
   });
 
-  it('finishes queued Edit completion before rethrowing a synchronous listener error', async () => {
+  it('finishes and persists queued Edit completion when a session observer fails', async () => {
     vi.spyOn(crypto, 'randomUUID').mockReturnValue(DEFAULT_LAYOUT_UUID);
     const loaded = { snapshot: automaticSnapshot, revision: 0n, exportedRevision: null };
     const backend = new MemorySpaceBackend([loaded]);
-    const session = openSpaceSession(backend, loaded);
+    const reported: unknown[] = [];
+    const session = openSpaceSession(backend, loaded, {
+      reportObserverError: (error) => reported.push(error),
+    });
     const viewChoice = createViewChoice({ kind: 'view', view: 'graph' });
     const editor = createPlacementEditor({
       initialPositions: null,
@@ -773,14 +776,9 @@ describe('completed placement composition', () => {
       throw listenerError;
     });
 
-    let caught: unknown;
-    try {
-      completeDrag(editor, CARD_A, 500, 400);
-    } catch (error) {
-      caught = error;
-    }
+    expect(() => completeDrag(editor, CARD_A, 500, 400)).not.toThrow();
 
-    expect(caught).toBe(listenerError);
+    expect(reported).toContain(listenerError);
     expect(session.getState().working.document.layouts).toHaveLength(2);
     expect(session.getState().working.document.layouts?.at(-1)).toMatchObject({
       id: DEFAULT_LAYOUT_ID,
@@ -792,12 +790,69 @@ describe('completed placement composition', () => {
     expect(session.getState().working.document.defaultView).toBe(DEFAULT_LAYOUT_ID);
     expect(viewChoice.current()).toEqual({ kind: 'layout', layoutId: DEFAULT_LAYOUT_ID });
     await waitForSettled(session.getState, session.subscribe);
+    // The positions, not just the ids: both Layouts carry the same id and
+    // `defaultView`, so an id-only assertion passes just as readily when the
+    // *first* Edit's snapshot is the one stored last.
+    await expect(backend.loadSpace(SPACE_ID)).resolves.toMatchObject({
+      revision: 2n,
+      snapshot: {
+        document: {
+          defaultView: DEFAULT_LAYOUT_ID,
+          layouts: [
+            { id: OTHER_LAYOUT_ID },
+            {
+              id: DEFAULT_LAYOUT_ID,
+              positions: {
+                [CARD_A]: { x: 500, y: 400 },
+                [CARD_B]: { x: 600, y: 800 },
+              },
+            },
+          ],
+        },
+      },
+    });
+  });
+
+  /*
+   * Effect isolation, which `session.submit` used to be the only test's way in:
+   * a listener throwing through `submit` is what pinned it, and a session now
+   * contains that itself. An installing collaborator is the remaining effect
+   * that can fail, and the contract is unchanged — every later effect still
+   * runs, and the first failure reaches the caller once the queue has drained.
+   */
+  it('runs the effects after a failing one and reports its error', async () => {
+    vi.spyOn(crypto, 'randomUUID').mockReturnValue(DEFAULT_LAYOUT_UUID);
+    const loaded = { snapshot: automaticSnapshot, revision: 0n, exportedRevision: null };
+    const backend = new MemorySpaceBackend([loaded]);
+    const session = openSpaceSession(backend, loaded);
+    const viewChoice = createViewChoice({ kind: 'view', view: 'graph' });
+    const installError = new Error('installing the Space failed');
+    const editor = createPlacementEditor({
+      initialPositions: null,
+      viewChoice,
+      currentActiveRoute: () => ROUTE_ID,
+      session,
+      installSpace: () => {
+        throw installError;
+      },
+    });
+    editor.getState().syncNodes(projected);
+
+    expect(() => completeDrag(editor, CARD_A, 500, 400)).toThrow(installError);
+
+    // The effect before the failure, and the one after it.
+    expect(session.getState().working.document.defaultView).toBe(DEFAULT_LAYOUT_ID);
+    expect(viewChoice.current()).toEqual({ kind: 'layout', layoutId: DEFAULT_LAYOUT_ID });
+    await waitForSettled(session.getState, session.subscribe);
     await expect(backend.loadSpace(SPACE_ID)).resolves.toMatchObject({
       revision: 1n,
       snapshot: {
         document: {
           defaultView: DEFAULT_LAYOUT_ID,
-          layouts: [{ id: OTHER_LAYOUT_ID }, { id: DEFAULT_LAYOUT_ID }],
+          layouts: [
+            { id: OTHER_LAYOUT_ID },
+            { id: DEFAULT_LAYOUT_ID, positions: { [CARD_A]: { x: 500, y: 400 } } },
+          ],
         },
       },
     });
