@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { ReactFlowProvider } from '@xyflow/react';
 import { AppShell, Button, LayoutSelector, RouteSelector, ViewSelector } from '@project/ui';
-import { newUuid, uuidSchema } from '@project/core';
+import { uuidSchema } from '@project/core';
 import {
   projectCardNodes,
   projectRouteEdges,
@@ -18,11 +18,8 @@ import {
   type LayoutPoint,
 } from '@project/graph';
 import type { OpenedSpace } from './space';
-import {
-  createConnectionEligibility,
-  createPlacementEditor,
-  nextCardTitle,
-} from './edit-completion';
+import { createSpaceAuthoring, nextCardTitle } from './space-authoring';
+import { createRenderAdapter } from './render-adapter';
 import { canvasContent, usePlacementRendering } from './placement-rendering';
 import { activeRouteColor, routeColorMap } from './colors';
 import { CARD_HEIGHT, CARD_SIZE, cardSizeVars } from './card';
@@ -59,35 +56,29 @@ export const createApp = ({ space, spaceSession }: OpenedSpace, { acceptRemote }
   // starts null and is promoted only by a completed edit (ADR 0025).
   const initialPositions =
     initialView.layout === null ? null : layoutPositionMap(initialView.layout);
-  const currentActiveRoute = () => navigation.getState().activeRouteId;
-  // The same rule the editor applies on release, handed to React Flow so it can
-  // state a target's validity while the drag is still live.
-  const connectionEligibility = createConnectionEligibility(currentActiveRoute, spaceSession);
+  const authoring = createSpaceAuthoring({
+    session: spaceSession,
+    navigation,
+    initialPlacement: initialPositions,
+  });
   // React Flow knows node ids as plain strings, and asks this per pointer frame.
   // An id that is not a Card identity is not a connection to accept — answering
   // false is the honest reading, and a throw mid-drag would be the wrong one.
   const acceptsGraphConnection = (from: string, to: string): boolean => {
     const source = uuidSchema.safeParse(from);
     const target = uuidSchema.safeParse(to);
-    return (
-      source.success &&
-      target.success &&
-      connectionEligibility.acceptsExistingTarget(source.data, target.data)
-    );
+    return source.success && target.success && authoring.canConnect(source.data, target.data);
   };
   const acceptsNewCardTarget = (from: string): boolean => {
     const source = uuidSchema.safeParse(from);
-    return source.success && connectionEligibility.acceptsNewTarget(source.data);
+    return source.success && authoring.canCreateConnectedCard(source.data);
   };
-  const useEditorStore = createPlacementEditor({
-    initialPositions,
-    navigation,
-    session: spaceSession,
-  });
+  const useRenderAdapter = createRenderAdapter(authoring);
 
   function App() {
-    const sessionState = useSyncExternalStore(spaceSession.subscribe, spaceSession.getState);
-    const navigationState = useSyncExternalStore(navigation.subscribe, navigation.getState);
+    const authoringState = useSyncExternalStore(authoring.subscribe, authoring.getState);
+    const sessionState = authoringState.session;
+    const navigationState = authoringState.navigation;
     const selectedRenderer = navigationState.selectedRenderer;
     const selectedView = navigationState.selectedView;
     // Why the remote state was refused, reported beside the control that asked
@@ -166,9 +157,9 @@ export const createApp = ({ space, spaceSession }: OpenedSpace, { acceptRemote }
       () => buildLayoutGraph(visibleCardIds, visibleHandles, visibleEdges, CARD_SIZE),
       [visibleCardIds, visibleHandles, visibleEdges],
     );
-    const authoredPositions = useEditorStore((s) => s.positions);
-    const selectedCardId = useEditorStore((s) => s.selectedCardId);
-    const moved = useEditorStore((s) => s.moved);
+    const authoredPositions = useRenderAdapter(() => authoring.authoredPlacement());
+    const selectedCardId = useRenderAdapter((s) => s.selectedCardId);
+    const moved = useRenderAdapter((s) => s.moved);
     const placement = usePlacementRendering(graph, view.strategy, authoredPositions);
     const laidOut = placement.kind === 'ready' ? placement.graph : null;
 
@@ -222,13 +213,13 @@ export const createApp = ({ space, spaceSession }: OpenedSpace, { acceptRemote }
     // can never become visible before the endpoint nodes declare its handles.
     // Only once the layout has resolved: before that every card sits at the origin
     // and there is nothing worth preserving.
-    const syncProjection = useEditorStore((s) => s.syncProjection);
+    const syncProjection = useRenderAdapter((s) => s.syncProjection);
     useEffect(() => {
       if (laidOut) syncProjection(projectedNodes, projectedEdges);
     }, [laidOut, projectedNodes, projectedEdges, syncProjection]);
 
-    const liveProjection = useEditorStore((s) => s.projection);
-    const changeNodes = useEditorStore((s) => s.changeNodes);
+    const liveProjection = useRenderAdapter((s) => s.projection);
+    const changeNodes = useRenderAdapter((s) => s.changeNodes);
     const canvas = canvasContent(placement, liveProjection !== null);
     // There is an arrangement to drag once the layout has resolved and the store
     // has taken it. Not a permission — every view is editable (ADR 0025) — but it
@@ -240,14 +231,15 @@ export const createApp = ({ space, spaceSession }: OpenedSpace, { acceptRemote }
     // One decision resolved from one Space, applied in an order that cannot
     // leave the two collaborators disagreeing. Both steps that may refuse the
     // selection run first — the resolve here and Navigation's own — and the
-    // editor update is a plain store write that cannot fail. Resolving against
-    // the session's live Space rather than the rendered one matters because
-    // Navigation resolves against the live one too: deciding from a snapshot
-    // Navigation will not consult is one decision with two sources of truth.
+    // render adapter update is a plain store write that cannot fail. Resolving
+    // against the session's live Space rather than the rendered one matters
+    // because Navigation resolves against the live one too: deciding from a
+    // snapshot Navigation will not consult is one decision with two sources of
+    // truth.
     const chooseRenderer = useCallback((selection: RendererSelection) => {
       const resolved = resolveView(currentSpace(), selection);
       navigation.selectRenderer(selection);
-      useEditorStore
+      useRenderAdapter
         .getState()
         .selectRenderer(resolved.layout === null ? null : layoutPositionMap(resolved.layout));
     }, []);
@@ -277,7 +269,7 @@ export const createApp = ({ space, spaceSession }: OpenedSpace, { acceptRemote }
         // Issue 04 owns Route minting. An existing Route can be edited from every
         // resolved renderer; an Algorithmic View converts using exactly the live
         // Card positions the author connected between (ADR 0025).
-        const completed = useEditorStore
+        const completed = useRenderAdapter
           .getState()
           .connectCards(
             uuidSchema.parse(connection.source),
@@ -296,16 +288,15 @@ export const createApp = ({ space, spaceSession }: OpenedSpace, { acceptRemote }
       completedConnectionTarget.current = null;
       if (target === null) return;
       requestAnimationFrame(() => {
-        useEditorStore.getState().selectCard(uuidSchema.parse(target));
+        useRenderAdapter.getState().selectCard(uuidSchema.parse(target));
       });
     }, []);
 
     const createConnectedCard = useCallback((sourceId: string, position: LayoutPoint) => {
-      const cardId = newUuid();
-      const completed = useEditorStore
+      const cardId = useRenderAdapter
         .getState()
-        .createConnectedCard(uuidSchema.parse(sourceId), cardId, position);
-      if (completed) completedConnectionTarget.current = cardId;
+        .createConnectedCard(uuidSchema.parse(sourceId), position);
+      if (cardId !== null) completedConnectionTarget.current = cardId;
     }, []);
 
     const openedCard = openedCardId ? getCard(rendererSpace, openedCardId) : undefined;
@@ -374,7 +365,7 @@ export const createApp = ({ space, spaceSession }: OpenedSpace, { acceptRemote }
           <Button
             variant="default"
             data-testid="persistence-retry"
-            onClick={spaceSession.retry}
+            onClick={authoring.retryPersistence}
             title={sessionState.persistence.failure.message}
           >
             Retry persistence

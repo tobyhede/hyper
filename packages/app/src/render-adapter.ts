@@ -8,31 +8,17 @@ import { create, type StoreApi, type UseBoundStore } from 'zustand';
 import { uuidSchema, type CardId } from '@project/core';
 import type { LayoutPoint } from '@project/graph';
 import type { CardFlowNode } from '@project/react-flow-adapter';
+import type { SpaceAuthoring } from './space-authoring';
 
 /**
- * The editor store is the single owner of React Flow's live node array and the
- * authoritative authored placement, when one exists.
+ * The render adapter owns React Flow's transient projection. Space Authoring
+ * owns the completed on-screen placement.
  *
  * Live nodes absorb every intermediate React Flow change so controlled dragging
- * follows the pointer. `positions` is different: it is null while an automatic
- * arrangement remains runtime-only, or a possibly sparse Layout map after an
- * existing Layout is opened or an edit authors one. `dragOrigins` retains
- * gesture starts across React Flow's separate moving and settled callbacks.
+ * follows the pointer, and they are published together with the Route Edges
+ * drawn against them. `dragOrigins` retains gesture starts across React Flow's
+ * separate moving and settled callbacks.
  */
-
-/**
- * The structural part of a completed Edit: one directed Edge, and the Card the
- * same gesture created, when it created one.
- *
- * The editor installs it and Edit completion reads it back, so both sides name
- * this one type — `createdCardId` in particular carries a rule (it must equal
- * `to`) that only holds if there is a single shape to state it about.
- */
-export interface CompletedConnectionEdit {
-  readonly from: CardId;
-  readonly to: CardId;
-  readonly createdCardId?: CardId;
-}
 
 /**
  * One render's worth of React Flow input. The nodes carry the declared handles
@@ -46,15 +32,13 @@ export interface Projection {
   readonly edges: Edge[];
 }
 
-export interface EditorState {
+export interface RenderAdapterState {
   /**
    * The published projection, or `null` before the first layout resolves. Until
    * then there is nothing worth owning — every projected card sits at the origin
    * — and a space is correspondingly not editable for that frame.
    */
   projection: Projection | null;
-  /** Authoritative, possibly sparse Layout placement; null before conversion. */
-  positions: ReadonlyMap<string, LayoutPoint> | null;
   /** Gesture starts retained until each node receives a settled callback. */
   dragOrigins: ReadonlyMap<string, LayoutPoint>;
   /**
@@ -66,8 +50,6 @@ export interface EditorState {
   moved: boolean;
   /** The ordinary React Flow selection used for continued Route authoring. */
   selectedCardId: CardId | null;
-  /** The structural part of the completed Edit most recently notified. */
-  completedConnection: CompletedConnectionEdit | null;
   /** Publish projected Card nodes, their declared handles and Route Edges together. */
   syncProjection: (nodes: readonly CardFlowNode[], edges: readonly Edge[]) => void;
   /**
@@ -80,32 +62,15 @@ export interface EditorState {
   /** Install and notify one directed Edge between existing Cards, when it is a real Edit. */
   connectCards: (from: CardId, to: CardId, projected: readonly CardFlowNode[]) => boolean;
   /** Install and notify an atomic create-and-connect Edit without adding a transient node. */
-  createConnectedCard: (from: CardId, cardId: CardId, position: LayoutPoint) => boolean;
+  createConnectedCard: (from: CardId, position: LayoutPoint) => CardId | null;
   /** Select one Card after a completed connection. */
   selectCard: (cardId: CardId) => void;
 }
 
-export type EditorStore = UseBoundStore<StoreApi<EditorState>>;
-
-export interface EditorConnectionEligibility {
-  readonly acceptsExistingTarget: (from: CardId, to: CardId) => boolean;
-  readonly acceptsNewTarget: (from: CardId) => boolean;
-}
-
-const rejectsConnections: EditorConnectionEligibility = {
-  acceptsExistingTarget: () => false,
-  acceptsNewTarget: () => false,
-};
+export type RenderAdapter = UseBoundStore<StoreApi<RenderAdapterState>>;
 
 function positionsOf(nodes: readonly CardFlowNode[]): ReadonlyMap<string, LayoutPoint> {
   return new Map(nodes.map((node) => [node.id, { x: node.position.x, y: node.position.y }]));
-}
-
-function positionsForEdit(
-  nodes: readonly CardFlowNode[],
-  positions: ReadonlyMap<string, LayoutPoint> | null,
-): Map<string, LayoutPoint> {
-  return new Map(positions ?? positionsOf(nodes));
 }
 
 function trackDragOrigins(
@@ -174,36 +139,30 @@ function reconcile(
   });
 }
 
-export function createEditorStore(
-  initialPositions: ReadonlyMap<string, LayoutPoint> | null = null,
-  editCompleted: () => void = () => undefined,
-  connectionEligibility: EditorConnectionEligibility = rejectsConnections,
-): EditorStore {
-  return create<EditorState>((set, get) => ({
+export function createRenderAdapter(authoring: SpaceAuthoring): RenderAdapter {
+  return create<RenderAdapterState>((set, get) => ({
     projection: null,
-    positions: initialPositions === null ? null : new Map(initialPositions),
     dragOrigins: new Map(),
     moved: false,
     selectedCardId: null,
-    completedConnection: null,
 
     syncProjection: (nodes, edges) =>
-      set((state) => ({
-        projection: {
-          nodes: state.projection === null ? [...nodes] : reconcile(state.projection.nodes, nodes),
-          edges: [...edges],
-        },
-      })),
+      set((state) => {
+        const reconciled =
+          state.projection === null ? [...nodes] : reconcile(state.projection.nodes, nodes);
+        authoring.installPlacement(positionsOf(reconciled));
+        return { projection: { nodes: reconciled, edges: [...edges] } };
+      }),
 
-    selectRenderer: (positions) =>
+    selectRenderer: (positions) => {
       set({
         projection: null,
-        positions: positions === null ? null : new Map(positions),
         dragOrigins: new Map(),
         moved: false,
         selectedCardId: null,
-        completedConnection: null,
-      }),
+      });
+      authoring.installPlacement(positions);
+    },
 
     selectCard: (cardId) =>
       set((state) => ({
@@ -259,49 +218,42 @@ export function createEditorStore(
         return;
       }
 
-      const positions = positionsForEdit(nodes, state.positions);
-      for (const id of movedIds) {
-        const after = afterById.get(id);
-        if (after !== undefined) positions.set(id, { x: after.x, y: after.y });
-      }
+      const positions = positionsOf(nodes);
       set({
         projection: { ...projection, nodes },
-        positions,
         dragOrigins,
         moved: true,
         selectedCardId,
-        completedConnection: null,
       });
-      editCompleted();
+      authoring.installPlacement(positions);
+      authoring.complete({ kind: 'settled-card-movement' });
     },
 
     connectCards: (from, to, projected) => {
       const state = get();
       const projection = state.projection;
-      if (projection === null || !connectionEligibility.acceptsExistingTarget(from, to)) {
+      if (projection === null || !authoring.canConnect(from, to)) {
         return false;
       }
+      const positions = positionsOf(projection.nodes);
       set({
-        positions: positionsForEdit(projection.nodes, state.positions),
         projection: { ...projection, nodes: reconcile(projection.nodes, projected) },
-        completedConnection: { from, to },
       });
-      editCompleted();
-      return true;
+      authoring.installPlacement(positions);
+      return authoring.complete({ kind: 'connected-cards', from, to }).kind !== 'no-edit';
     },
 
-    createConnectedCard: (from, cardId, position) => {
+    createConnectedCard: (from, position) => {
       const state = get();
       const projection = state.projection;
-      if (projection === null || !connectionEligibility.acceptsNewTarget(from)) return false;
-      const positions = positionsForEdit(projection.nodes, state.positions);
-      positions.set(cardId, position);
-      set({
-        positions,
-        completedConnection: { from, to: cardId, createdCardId: cardId },
+      if (projection === null || !authoring.canCreateConnectedCard(from)) return null;
+      authoring.installPlacement(positionsOf(projection.nodes));
+      const result = authoring.complete({
+        kind: 'create-and-connect',
+        from,
+        position,
       });
-      editCompleted();
-      return true;
+      return result.kind === 'completed' ? (result.createdCardId ?? null) : null;
     },
   }));
 }
