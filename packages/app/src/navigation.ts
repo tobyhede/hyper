@@ -121,6 +121,20 @@ export function createNavigation(
       setState({ mode: 'presenting', walk: [start], branchIndex: 0, openedCardId: null });
     },
     exitPresenting: () => setState({ mode: 'overview', walk: [], branchIndex: 0 }),
+    // The guard is the no-outgoing-Edge case — overview, no active Route, or a
+    // Card the Route leaves by nothing — and not an out-of-range `branchIndex`.
+    // **Don't clamp the index to the Edge count here.** Every write keeps it in
+    // range for the Card it was written against: `selectBranch` takes it modulo
+    // the count, `retreat` uses a `findIndex` result, and every other write is
+    // 0. Reaching a stale index needs the Edge set to shrink under a live walk,
+    // which nothing does — an Edit only ever adds Edges, changing Route or Card
+    // rewrites the index, structural deletion is not built (ADR 0033), and
+    // accepting remote remounts the workspace outright. Clamping would also be
+    // the wrong repair rather than a safe one: `moves()` marks the selection by
+    // `index === branchIndex`, so a stale index shows *no* move selected, and
+    // advancing to "the last valid Edge" would walk down one the presenter was
+    // never shown. It cannot replace this guard either, since an empty Edge set
+    // clamps to `[-1]` and is still `undefined`.
     advance: () => {
       const edge = outgoingEdgesFrom(currentSpace(), state.activeRouteId, activeCardId())[
         state.branchIndex
