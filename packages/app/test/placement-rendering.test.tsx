@@ -195,7 +195,7 @@ describe('canvasContent', () => {
   const placed: LayoutGraph = { cards: [{ ...graph.cards[0]!, x: 0, y: 0 }], edges: [] };
 
   it('waits for the editor to take a ready placement before drawing it', () => {
-    // A resolved placement is not yet an arrangement on screen: `syncNodes`
+    // A resolved placement is not yet an arrangement on screen: `syncProjection`
     // installs it, and drawing before that would hand React Flow a node array
     // the editor store does not own — the one thing a controlled flow must not
     // do, and the reason changes had to be filtered by ownership.

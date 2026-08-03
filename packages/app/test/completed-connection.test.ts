@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   uuidSchema,
   type CardId,
@@ -101,7 +101,7 @@ function connectingIn(
     navigation: authoringNavigation({ kind: 'layout', layoutId }, () => activeRouteId),
     session,
   });
-  editor.getState().syncNodes(projected);
+  editor.getState().syncProjection(projected, []);
   return {
     session,
     connect: (from = CARD_A, to = CARD_B) => editor.getState().connectCards(from, to, projected),
@@ -111,6 +111,10 @@ function connectingIn(
 }
 
 describe('completed connection composition', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it('creates, places and connects the next neutral Card in the selected Layout only', () => {
     const base: SpaceSnapshot = {
       ...positionedSnapshot,
@@ -165,6 +169,9 @@ describe('completed connection composition', () => {
   });
 
   it('creates Card 2 and Route 1 while converting a route-less Algorithmic View', () => {
+    vi.spyOn(crypto, 'randomUUID')
+      .mockReturnValueOnce('00000000-0000-4000-8000-000000000021')
+      .mockReturnValueOnce('00000000-0000-4000-8000-000000000008');
     const routeLess: SpaceSnapshot = {
       id: SPACE_ID,
       document: { version: 2, title: 'New space', routes: [] },
@@ -178,9 +185,8 @@ describe('completed connection composition', () => {
       initialPositions: null,
       navigation,
       session,
-      mintRouteId: () => MINTED_ROUTE_ID,
     });
-    editor.getState().syncNodes([node(CARD_A, 120, 240)]);
+    editor.getState().syncProjection([node(CARD_A, 120, 240)], []);
 
     expect(editor.getState().createConnectedCard(CARD_A, CREATED_CARD_ID, { x: 420, y: 360 })).toBe(
       true,
@@ -223,6 +229,9 @@ describe('completed connection composition', () => {
   });
 
   it('mints and activates Route 1 with the first Edge in one complete snapshot', () => {
+    vi.spyOn(crypto, 'randomUUID')
+      .mockReturnValueOnce('00000000-0000-4000-8000-000000000021')
+      .mockReturnValueOnce('00000000-0000-4000-8000-000000000008');
     const routeLess: SpaceSnapshot = {
       id: SPACE_ID,
       document: { version: 2, title: 'New space', routes: [] },
@@ -242,10 +251,9 @@ describe('completed connection composition', () => {
       initialPositions: null,
       navigation,
       session,
-      mintRouteId: () => MINTED_ROUTE_ID,
     });
     const projectedCard = [node(CARD_A, 120, 240)];
-    editor.getState().syncNodes(projectedCard);
+    editor.getState().syncProjection(projectedCard, []);
 
     expect(editor.getState().connectCards(CARD_A, CARD_A, projectedCard)).toBe(true);
 

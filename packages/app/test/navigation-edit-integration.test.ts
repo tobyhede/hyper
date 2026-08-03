@@ -25,7 +25,9 @@ const LAYOUT_ID = uuidSchema.parse(LAYOUT_UUID);
  * see that ordering, so it is pinned against the real one.
  */
 it('activates the first minted Route against the Space the Edit has already installed', async () => {
-  vi.spyOn(crypto, 'randomUUID').mockReturnValue(LAYOUT_UUID);
+  vi.spyOn(crypto, 'randomUUID')
+    .mockReturnValueOnce(LAYOUT_UUID)
+    .mockReturnValueOnce('00000000-0000-4000-8000-000000000008');
   const newSpace: SpaceSnapshot = {
     id: SPACE_ID,
     document: { version: 2, title: 'New space', routes: [] },
@@ -43,10 +45,9 @@ it('activates the first minted Route against the Space the Edit has already inst
     initialPositions: null,
     navigation,
     session,
-    mintRouteId: () => MINTED_ROUTE_ID,
   });
   const visibleNodes = [node(CARD_A, 120, 240)];
-  editor.getState().syncNodes(visibleNodes);
+  editor.getState().syncProjection(visibleNodes, []);
   // A route-less Space opens with no active Route at all.
   expect(navigation.getState().activeRouteId).toBeNull();
 

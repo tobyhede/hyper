@@ -15,7 +15,6 @@ interface PlacementEditorDependencies {
   readonly initialPositions: ReadonlyMap<string, LayoutPoint> | null;
   readonly navigation: Pick<Navigation, 'getState' | 'continueInRenderer' | 'activateRoute'>;
   readonly session: SpaceSession;
-  readonly mintRouteId?: () => RouteId;
 }
 
 interface CurrentEditState {
@@ -401,7 +400,6 @@ export function createPlacementEditor({
   initialPositions,
   navigation,
   session,
-  mintRouteId,
 }: PlacementEditorDependencies): EditorStore {
   // Each completed Edit installs a fresh positions map before notifying. Record
   // that identity before effects so a synchronous listener cannot resubmit it.
@@ -425,8 +423,7 @@ export function createPlacementEditor({
         renderer,
         newLayoutId: renderer.kind === 'view' ? newUuid() : null,
         activeRouteId,
-        newRouteId:
-          connection !== null && activeRouteId === null ? (mintRouteId?.() ?? newUuid()) : null,
+        newRouteId: connection !== null && activeRouteId === null ? newUuid() : null,
         connection,
       });
       editor.setState({ completedConnection: null });

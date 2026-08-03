@@ -139,7 +139,7 @@ describe('completed placement composition', () => {
       navigation: navigationFromChoice(viewChoice, () => null),
       session,
     });
-    editor.getState().syncNodes(projected);
+    editor.getState().syncProjection(projected, []);
 
     expect(editor.getState().connectCards(CARD_B, CARD_A, projected)).toBe(false);
     let createResult: boolean | undefined;
@@ -162,6 +162,7 @@ describe('completed placement composition', () => {
   });
 
   it('creates the first connected Card on a route-less Layout that filters every Route', async () => {
+    vi.spyOn(crypto, 'randomUUID').mockReturnValue('00000000-0000-4000-8000-000000000004');
     const routeLessLayout: Layout = {
       id: DEFAULT_LAYOUT_ID,
       title: 'Authored Layout',
@@ -202,9 +203,8 @@ describe('completed placement composition', () => {
         },
       ),
       session,
-      mintRouteId: () => ROUTE_ID,
     });
-    editor.getState().syncNodes([node(CARD_A, 10, 20)]);
+    editor.getState().syncProjection([node(CARD_A, 10, 20)], []);
 
     let completed: boolean | undefined;
     expect(() => {
@@ -257,6 +257,7 @@ describe('completed placement composition', () => {
   });
 
   it('creates the first Route from an existing-Card self-connection in an empty Layout filter', async () => {
+    vi.spyOn(crypto, 'randomUUID').mockReturnValue('00000000-0000-4000-8000-000000000004');
     const routeLessLayout: Layout = {
       id: DEFAULT_LAYOUT_ID,
       title: 'Authored Layout',
@@ -283,10 +284,9 @@ describe('completed placement composition', () => {
       initialPositions: layoutPositionMap(routeLessLayout),
       navigation: navigationFromChoice(viewChoice, () => null),
       session,
-      mintRouteId: () => ROUTE_ID,
     });
     const visibleNodes = [node(CARD_A, 10, 20)];
-    editor.getState().syncNodes(visibleNodes);
+    editor.getState().syncProjection(visibleNodes, []);
 
     expect(editor.getState().connectCards(CARD_A, CARD_A, visibleNodes)).toBe(true);
 
@@ -314,6 +314,7 @@ describe('completed placement composition', () => {
   });
 
   it('keeps an omitted Layout route filter omitted when it creates the first Route', async () => {
+    vi.spyOn(crypto, 'randomUUID').mockReturnValue('00000000-0000-4000-8000-000000000004');
     const routeLessLayout: Layout = {
       id: DEFAULT_LAYOUT_ID,
       title: 'Authored Layout',
@@ -338,10 +339,9 @@ describe('completed placement composition', () => {
       initialPositions: layoutPositionMap(routeLessLayout),
       navigation: authoringNavigation({ kind: 'layout', layoutId: DEFAULT_LAYOUT_ID }, () => null),
       session,
-      mintRouteId: () => ROUTE_ID,
     });
     const visibleNodes = [node(CARD_A, 10, 20)];
-    editor.getState().syncNodes(visibleNodes);
+    editor.getState().syncProjection(visibleNodes, []);
 
     expect(editor.getState().connectCards(CARD_A, CARD_A, visibleNodes)).toBe(true);
 
@@ -366,7 +366,7 @@ describe('completed placement composition', () => {
         navigation: navigationFromChoice(viewChoice, () => ROUTE_ID),
         session,
       });
-      editor.getState().syncNodes(projected);
+      editor.getState().syncProjection(projected, []);
 
       const completed = editor.getState().connectCards(CARD_A, CARD_B, projected);
 
@@ -393,7 +393,7 @@ describe('completed placement composition', () => {
         navigation: navigationFromChoice(viewChoice, () => ROUTE_ID),
         session,
       });
-      editor.getState().syncNodes(projected);
+      editor.getState().syncProjection(projected, []);
 
       const completed = editor.getState().connectCards(CARD_B, CARD_A, projected);
 
@@ -431,6 +431,7 @@ describe('completed placement composition', () => {
   );
 
   it('adds the first minted Route to a selected Layout that shows no Routes', async () => {
+    vi.spyOn(crypto, 'randomUUID').mockReturnValue('00000000-0000-4000-8000-000000000008');
     const loaded = routeLessLoaded();
     const backend = new MemorySpaceBackend([loaded]);
     const session = openSpaceSession(backend, loaded);
@@ -444,10 +445,9 @@ describe('completed placement composition', () => {
         (routeId) => activatedRoutes.push(routeId),
       ),
       session,
-      mintRouteId: () => MINTED_ROUTE_ID,
     });
     const projectedCard = [node(CARD_A, 10, 20)];
-    editor.getState().syncNodes(projectedCard);
+    editor.getState().syncProjection(projectedCard, []);
 
     const completed = editor.getState().connectCards(CARD_A, CARD_A, projectedCard);
 
@@ -500,7 +500,7 @@ describe('completed placement composition', () => {
       navigation: authoringNavigation({ kind: 'layout', layoutId: DEFAULT_LAYOUT_ID }, () => null),
       session,
     });
-    editor.getState().syncNodes([node(CARD_A, 10, 20)]);
+    editor.getState().syncProjection([node(CARD_A, 10, 20)], []);
 
     completeDrag(editor, CARD_A, 70, 90);
 
@@ -561,7 +561,7 @@ describe('completed placement composition', () => {
       session,
     });
 
-    editor.getState().syncNodes(projected);
+    editor.getState().syncProjection(projected, []);
     completeDrag(editor, CARD_A, 500, 400);
 
     expect(session.getState().acknowledgedRevision).toBe(0n);
@@ -612,7 +612,7 @@ describe('completed placement composition', () => {
           navigation: navigationFromChoice(viewChoice, () => ROUTE_ID),
           session,
         });
-        editor.getState().syncNodes(projected);
+        editor.getState().syncProjection(projected, []);
         completeDrag(editor, CARD_A, 1, 2);
 
         expect(session.getState().working.document.layouts?.slice(0, -1)).toEqual(layouts);
@@ -634,7 +634,7 @@ describe('completed placement composition', () => {
       session,
     });
 
-    editor.getState().syncNodes(projected);
+    editor.getState().syncProjection(projected, []);
     completeDrag(editor, CARD_A, 700, 500);
     await waitForSettled(session.getState, session.subscribe);
 
@@ -666,7 +666,7 @@ describe('completed placement composition', () => {
       ),
       session,
     });
-    editor.getState().syncNodes(projected);
+    editor.getState().syncProjection(projected, []);
 
     completeDrag(editor, CARD_A, 700, 500);
     editor.getState().changeNodes(settled(CARD_A, 700, 500));
@@ -688,7 +688,7 @@ describe('completed placement composition', () => {
       navigation: navigationFromChoice(viewChoice, () => ROUTE_ID),
       session,
     });
-    editor.getState().syncNodes(projected);
+    editor.getState().syncProjection(projected, []);
     let secondEditCompleted = false;
     session.subscribe(() => {
       if (secondEditCompleted || session.getState().working.document.defaultView === undefined) {
@@ -736,7 +736,7 @@ describe('completed placement composition', () => {
       navigation: navigationFromChoice(viewChoice, () => ROUTE_ID),
       session,
     });
-    editor.getState().syncNodes(projected);
+    editor.getState().syncProjection(projected, []);
     const listenerError = new Error('session listener failed');
     let listenerThrew = false;
     session.subscribe(() => {
@@ -796,7 +796,9 @@ describe('completed placement composition', () => {
    * this is a Space with no Routes to begin with.
    */
   it('runs the effects after a failing one and reports its error', async () => {
-    vi.spyOn(crypto, 'randomUUID').mockReturnValue(DEFAULT_LAYOUT_UUID);
+    vi.spyOn(crypto, 'randomUUID')
+      .mockReturnValueOnce(DEFAULT_LAYOUT_UUID)
+      .mockReturnValueOnce('00000000-0000-4000-8000-000000000008');
     const newSpace: SpaceSnapshot = {
       id: SPACE_ID,
       document: { version: 2, title: 'New space', routes: [] },
@@ -817,10 +819,9 @@ describe('completed placement composition', () => {
         },
       ),
       session,
-      mintRouteId: () => MINTED_ROUTE_ID,
     });
     const visibleNodes = [node(CARD_A, 120, 240)];
-    editor.getState().syncNodes(visibleNodes);
+    editor.getState().syncProjection(visibleNodes, []);
 
     expect(() => editor.getState().connectCards(CARD_A, CARD_A, visibleNodes)).toThrow(
       activateError,
@@ -859,7 +860,7 @@ describe('completed placement composition', () => {
       navigation: navigationFromChoice(viewChoice, () => ROUTE_ID),
       session,
     });
-    editor.getState().syncNodes(projected);
+    editor.getState().syncProjection(projected, []);
 
     expect(editor.getState().connectCards(CARD_A, CARD_B, projected)).toBe(true);
 
@@ -914,7 +915,7 @@ describe('completed placement composition', () => {
       ),
       session,
     });
-    editor.getState().syncNodes(projected);
+    editor.getState().syncProjection(projected, []);
 
     expect(editor.getState().connectCards(CARD_A, CARD_B, projected)).toBe(true);
 
@@ -942,7 +943,7 @@ describe('completed placement composition', () => {
       navigation: navigationFromChoice(viewChoice, () => MISSING_ROUTE_ID),
       session,
     });
-    editor.getState().syncNodes(projected);
+    editor.getState().syncProjection(projected, []);
 
     expect(editor.getState().connectCards(CARD_B, CARD_A, projected)).toBe(false);
     expect(editor.getState().createConnectedCard(CARD_A, CREATED_CARD_ID, { x: 500, y: 300 })).toBe(
@@ -984,7 +985,7 @@ describe('completed placement composition', () => {
       navigation: navigationFromChoice(viewChoice, () => ROUTE_ID),
       session,
     });
-    editor.getState().syncNodes([node(CARD_A, 10, 20)]);
+    editor.getState().syncProjection([node(CARD_A, 10, 20)], []);
 
     expect(editor.getState().createConnectedCard(CARD_A, CREATED_CARD_ID, { x: 420, y: 360 })).toBe(
       true,
@@ -1027,7 +1028,9 @@ describe('completed placement composition', () => {
   // The Space a database startup creates: one Card, no Route and no Layout, so a
   // single gesture has to mint all three at once and still land as one revision.
   it('creates Card 2, Route 1 and Layout 1 while converting a route-less Algorithmic View', async () => {
-    vi.spyOn(crypto, 'randomUUID').mockReturnValue(DEFAULT_LAYOUT_UUID);
+    vi.spyOn(crypto, 'randomUUID')
+      .mockReturnValueOnce(DEFAULT_LAYOUT_UUID)
+      .mockReturnValueOnce('00000000-0000-4000-8000-000000000008');
     const newSpaceSnapshot: SpaceSnapshot = {
       id: SPACE_ID,
       document: { version: 2, title: 'New space', routes: [] },
@@ -1046,9 +1049,8 @@ describe('completed placement composition', () => {
         (routeId) => activatedRoutes.push(routeId),
       ),
       session,
-      mintRouteId: () => MINTED_ROUTE_ID,
     });
-    editor.getState().syncNodes([node(CARD_A, 120, 240)]);
+    editor.getState().syncProjection([node(CARD_A, 120, 240)], []);
 
     expect(editor.getState().createConnectedCard(CARD_A, CREATED_CARD_ID, { x: 420, y: 360 })).toBe(
       true,
@@ -1089,7 +1091,9 @@ describe('completed placement composition', () => {
   // own to convert an Algorithmic View and mint the Space's first Route — which,
   // being first, is the one the authoring stroke was already drawn in.
   it('mints and activates Route 1 from a self-connection converting an Algorithmic View', async () => {
-    vi.spyOn(crypto, 'randomUUID').mockReturnValue(DEFAULT_LAYOUT_UUID);
+    vi.spyOn(crypto, 'randomUUID')
+      .mockReturnValueOnce(DEFAULT_LAYOUT_UUID)
+      .mockReturnValueOnce('00000000-0000-4000-8000-000000000008');
     const newSpaceSnapshot: SpaceSnapshot = {
       id: SPACE_ID,
       document: { version: 2, title: 'New space', routes: [] },
@@ -1103,10 +1107,9 @@ describe('completed placement composition', () => {
       initialPositions: null,
       navigation: navigationFromChoice(viewChoice, () => null),
       session,
-      mintRouteId: () => MINTED_ROUTE_ID,
     });
     const visibleNodes = [node(CARD_A, 120, 240)];
-    editor.getState().syncNodes(visibleNodes);
+    editor.getState().syncProjection(visibleNodes, []);
 
     expect(editor.getState().connectCards(CARD_A, CARD_A, visibleNodes)).toBe(true);
 
@@ -1148,7 +1151,7 @@ describe('completed placement composition', () => {
       navigation: navigationFromChoice(viewChoice, () => ROUTE_ID),
       session,
     });
-    editor.getState().syncNodes(projected);
+    editor.getState().syncProjection(projected, []);
 
     expect(() => completeDrag(editor, CARD_A, 70, 90)).toThrow(
       `The selected Layout ${MISSING_LAYOUT_ID} does not exist.`,
@@ -1175,7 +1178,7 @@ describe('completed placement composition', () => {
       ),
       session,
     });
-    editor.getState().syncNodes(projected);
+    editor.getState().syncProjection(projected, []);
 
     expect(() => editor.getState().connectCards(CARD_A, MISSING_CARD_ID, projected)).toThrow(
       new RegExp(`EditCompleted was emitted for invalid editing state:.*${MISSING_CARD_ID}`),

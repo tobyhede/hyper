@@ -24,7 +24,7 @@ import {
   nextCardTitle,
 } from './edit-completion';
 import { canvasContent, usePlacementRendering } from './placement-rendering';
-import { activeRouteColor, ROUTE_PALETTE, routeColorMap } from './colors';
+import { activeRouteColor, routeColorMap } from './colors';
 import { CARD_HEIGHT, CARD_SIZE, cardSizeVars } from './card';
 import { createNavigation } from './navigation';
 import { createWorkingSpaceReader } from './snapshot';
@@ -59,10 +59,6 @@ export const createApp = ({ space, spaceSession }: OpenedSpace, { acceptRemote }
   // starts null and is promoted only by a completed edit (ADR 0025).
   const initialPositions =
     initialView.layout === null ? null : layoutPositionMap(initialView.layout);
-  // Reserve the identity whose hidden overview handles must already be declared
-  // when a route-less Space's first Edge and Route appear in the same render.
-  // Until a successful connection uses it, this is runtime-only identity.
-  const firstRouteId = space.routes.length === 0 ? newUuid() : null;
   const currentActiveRoute = () => navigation.getState().activeRouteId;
   // The same rule the editor applies on release, handed to React Flow so it can
   // state a target's validity while the drag is still live.
@@ -87,7 +83,6 @@ export const createApp = ({ space, spaceSession }: OpenedSpace, { acceptRemote }
     initialPositions,
     navigation,
     session: spaceSession,
-    ...(firstRouteId === null ? {} : { mintRouteId: () => firstRouteId }),
   });
 
   function App() {
@@ -106,13 +101,6 @@ export const createApp = ({ space, spaceSession }: OpenedSpace, { acceptRemote }
     const layouts = rendererSpace.layouts;
     const routes = rendererSpace.routes;
     const colors = useMemo(() => routeColorMap(rendererSpace), [rendererSpace]);
-    const projectionColors = useMemo(
-      () =>
-        firstRouteId !== null && routes.length === 0
-          ? { ...colors, [firstRouteId]: ROUTE_PALETTE[0] }
-          : colors,
-      [colors, routes],
-    );
     const allHandles = useMemo(() => buildCardHandles(rendererSpace), [rendererSpace]);
     const allRouteEdges = useMemo(() => buildRouteEdges(rendererSpace), [rendererSpace]);
     const view = useMemo(
@@ -180,6 +168,7 @@ export const createApp = ({ space, spaceSession }: OpenedSpace, { acceptRemote }
     );
     const authoredPositions = useEditorStore((s) => s.positions);
     const selectedCardId = useEditorStore((s) => s.selectedCardId);
+    const moved = useEditorStore((s) => s.moved);
     const placement = usePlacementRendering(graph, view.strategy, authoredPositions);
     const laidOut = placement.kind === 'ready' ? placement.graph : null;
 
@@ -188,7 +177,7 @@ export const createApp = ({ space, spaceSession }: OpenedSpace, { acceptRemote }
 
     const projectedNodes = useMemo(
       () =>
-        projectCardNodes(rendererSpace, visibleHandles, projectionColors, {
+        projectCardNodes(rendererSpace, visibleHandles, colors, {
           activeCardId,
           selectedCardId,
           showActiveCardContent: presenting,
@@ -201,7 +190,6 @@ export const createApp = ({ space, spaceSession }: OpenedSpace, { acceptRemote }
         }),
       [
         rendererSpace,
-        projectionColors,
         colors,
         activeCardId,
         selectedCardId,
@@ -214,24 +202,39 @@ export const createApp = ({ space, spaceSession }: OpenedSpace, { acceptRemote }
       ],
     );
 
-    // Hand the projection to the store, which folds it into the live array so a
-    // card keeps its position, measured size and drag state across a re-render.
+    const projectedEdges = useMemo(
+      () =>
+        projectRouteEdges(visibleEdges, colors, {
+          activeRouteId,
+          emphasis,
+          // A layout's routed edge geometry describes the arrangement it computed,
+          // so it stops being true once a card is dragged out of it. From then on
+          // the edges fall back to plain curves between wherever the cards now are
+          // — which is what a positioned view draws anyway, since it routes
+          // nothing.
+          ...(laidOut && !moved ? { layoutGraph: laidOut } : {}),
+        }),
+      [visibleEdges, colors, activeRouteId, emphasis, laidOut, moved],
+    );
+
+    // Hand the complete projection to the render adapter as one state change.
+    // A Card keeps its live position, measured size and drag state, while an Edge
+    // can never become visible before the endpoint nodes declare its handles.
     // Only once the layout has resolved: before that every card sits at the origin
     // and there is nothing worth preserving.
-    const syncNodes = useEditorStore((s) => s.syncNodes);
+    const syncProjection = useEditorStore((s) => s.syncProjection);
     useEffect(() => {
-      if (laidOut) syncNodes(projectedNodes);
-    }, [laidOut, projectedNodes, syncNodes]);
+      if (laidOut) syncProjection(projectedNodes, projectedEdges);
+    }, [laidOut, projectedNodes, projectedEdges, syncProjection]);
 
-    const liveNodes = useEditorStore((s) => s.nodes);
-    const moved = useEditorStore((s) => s.moved);
+    const liveProjection = useEditorStore((s) => s.projection);
     const changeNodes = useEditorStore((s) => s.changeNodes);
-    const canvas = canvasContent(placement, liveNodes !== null);
+    const canvas = canvasContent(placement, liveProjection !== null);
     // There is an arrangement to drag once the layout has resolved and the store
-    // has taken it. Not a permission — every view is editable (ADR 0025) — and not
-    // a state the space can go back to: nothing sets `nodes` back to null, so this
-    // is false for one frame and true from then on.
-    const editable = liveNodes !== null;
+    // has taken it. Not a permission — every view is editable (ADR 0025) — but it
+    // is false for the frame before the first placement resolves, and again after
+    // `selectRenderer` clears the projection until the next one is published.
+    const editable = liveProjection !== null;
     const completedConnectionTarget = useRef<string | null>(null);
 
     // One decision resolved from one Space, applied in an order that cannot
@@ -264,20 +267,6 @@ export const createApp = ({ space, spaceSession }: OpenedSpace, { acceptRemote }
       return () => window.removeEventListener('beforeunload', onBeforeUnload);
     }, [sessionState.persistence.kind]);
 
-    const edges = useMemo(
-      () =>
-        projectRouteEdges(visibleEdges, colors, {
-          activeRouteId,
-          emphasis,
-          // A layout's routed edge geometry describes the arrangement it computed,
-          // so it stops being true once a card is dragged out of it. From then on
-          // the edges fall back to plain curves between wherever the cards now are
-          // — which is what a positioned view draws anyway, since it routes
-          // nothing.
-          ...(laidOut && !moved ? { layoutGraph: laidOut } : {}),
-        }),
-      [visibleEdges, colors, activeRouteId, emphasis, laidOut, moved],
-    );
     const activeRouteCardIds = useMemo(
       () => new Set(activeRouteId === null ? [] : routeCardIds(rendererSpace, activeRouteId)),
       [rendererSpace, activeRouteId],
@@ -449,8 +438,8 @@ export const createApp = ({ space, spaceSession }: OpenedSpace, { acceptRemote }
           ) : canvas.kind === 'arrangement' ? (
             <ReactFlowProvider>
               <GraphView
-                nodes={liveNodes ?? []}
-                edges={edges}
+                nodes={liveProjection?.nodes ?? []}
+                edges={liveProjection?.edges ?? []}
                 activeCardId={activeCardId}
                 presenting={presenting}
                 editable={editable}

@@ -1,4 +1,9 @@
-import { applyNodeChanges, type NodeChange, type NodePositionChange } from '@xyflow/react';
+import {
+  applyNodeChanges,
+  type Edge,
+  type NodeChange,
+  type NodePositionChange,
+} from '@xyflow/react';
 import { create, type StoreApi, type UseBoundStore } from 'zustand';
 import { uuidSchema, type CardId } from '@project/core';
 import type { LayoutPoint } from '@project/graph';
@@ -29,13 +34,25 @@ export interface CompletedConnectionEdit {
   readonly createdCardId?: CardId;
 }
 
+/**
+ * One render's worth of React Flow input. The nodes carry the declared handles
+ * an Edge attaches to, so the two are published as a single value rather than as
+ * two fields written in step: an Edge can then never be on screen in a frame
+ * whose nodes do not yet declare its handles, and no partial write exists to
+ * make it so.
+ */
+export interface Projection {
+  readonly nodes: CardFlowNode[];
+  readonly edges: Edge[];
+}
+
 export interface EditorState {
   /**
-   * React Flow's node array, or `null` before the first layout resolves. Until
+   * The published projection, or `null` before the first layout resolves. Until
    * then there is nothing worth owning — every projected card sits at the origin
    * — and a space is correspondingly not editable for that frame.
    */
-  nodes: CardFlowNode[] | null;
+  projection: Projection | null;
   /** Authoritative, possibly sparse Layout placement; null before conversion. */
   positions: ReadonlyMap<string, LayoutPoint> | null;
   /** Gesture starts retained until each node receives a settled callback. */
@@ -51,11 +68,11 @@ export interface EditorState {
   selectedCardId: CardId | null;
   /** The structural part of the completed Edit most recently notified. */
   completedConnection: CompletedConnectionEdit | null;
-  /** Fold a freshly projected node list into the live one. */
-  syncNodes: (projected: readonly CardFlowNode[]) => void;
+  /** Publish projected Card nodes, their declared handles and Route Edges together. */
+  syncProjection: (nodes: readonly CardFlowNode[], edges: readonly Edge[]) => void;
   /**
    * Navigate to another renderer. The replacement arrangement will arrive via
-   * `syncNodes`; renderer selection itself is not an edit.
+   * `syncProjection`; renderer selection itself is not an edit.
    */
   selectRenderer: (positions: ReadonlyMap<string, LayoutPoint> | null) => void;
   /** Apply React Flow's own changes (drag, measure, select). */
@@ -163,24 +180,24 @@ export function createEditorStore(
   connectionEligibility: EditorConnectionEligibility = rejectsConnections,
 ): EditorStore {
   return create<EditorState>((set, get) => ({
-    nodes: null,
+    projection: null,
     positions: initialPositions === null ? null : new Map(initialPositions),
     dragOrigins: new Map(),
     moved: false,
     selectedCardId: null,
     completedConnection: null,
 
-    syncNodes: (projected) =>
-      set((state) => {
-        if (state.nodes === null) {
-          return { nodes: [...projected] };
-        }
-        return { nodes: reconcile(state.nodes, projected) };
-      }),
+    syncProjection: (nodes, edges) =>
+      set((state) => ({
+        projection: {
+          nodes: state.projection === null ? [...nodes] : reconcile(state.projection.nodes, nodes),
+          edges: [...edges],
+        },
+      })),
 
     selectRenderer: (positions) =>
       set({
-        nodes: null,
+        projection: null,
         positions: positions === null ? null : new Map(positions),
         dragOrigins: new Map(),
         moved: false,
@@ -191,13 +208,22 @@ export function createEditorStore(
     selectCard: (cardId) =>
       set((state) => ({
         selectedCardId: cardId,
-        nodes:
-          state.nodes?.map((node) => ({ ...node, selected: node.id === cardId })) ?? state.nodes,
+        projection:
+          state.projection === null
+            ? null
+            : {
+                ...state.projection,
+                nodes: state.projection.nodes.map((node) => ({
+                  ...node,
+                  selected: node.id === cardId,
+                })),
+              },
       })),
 
     changeNodes: (changes) => {
       const state = get();
-      if (state.nodes === null) return;
+      const projection = state.projection;
+      if (projection === null) return;
 
       // Drop changes aimed at nodes this store does not own. React Flow
       // measures anything it renders and reports a `dimensions` change for it,
@@ -205,12 +231,12 @@ export function createEditorStore(
       // node's change round-trips into a re-sync and re-measures forever.
       // Returning no update when nothing real changed keeps the array
       // reference stable and is what breaks that loop.
-      const owned = new Set(state.nodes.map((node) => node.id));
+      const owned = new Set(projection.nodes.map((node) => node.id));
       const relevant = changes.filter((change) => !('id' in change) || owned.has(change.id));
       if (relevant.length === 0) return;
 
-      const beforeById = new Map(state.nodes.map((node) => [node.id, node.position]));
-      const nodes = applyNodeChanges(relevant, state.nodes);
+      const beforeById = new Map(projection.nodes.map((node) => [node.id, node.position]));
+      const nodes = applyNodeChanges(relevant, projection.nodes);
       const selectedNode = nodes.find((node) => node.selected);
       const selectedCardId = selectedNode ? uuidSchema.parse(selectedNode.id) : null;
       const afterById = new Map(nodes.map((node) => [node.id, node.position]));
@@ -222,14 +248,14 @@ export function createEditorStore(
 
       const settled = positionChanges.filter((change) => change.dragging === false);
       if (settled.length === 0) {
-        set({ nodes, dragOrigins, selectedCardId });
+        set({ projection: { ...projection, nodes }, dragOrigins, selectedCardId });
         return;
       }
 
       const movedIds = consumeSettledMovedIds(settled, dragOrigins, beforeById, afterById);
 
       if (movedIds.length === 0) {
-        set({ nodes, dragOrigins, selectedCardId });
+        set({ projection: { ...projection, nodes }, dragOrigins, selectedCardId });
         return;
       }
 
@@ -239,7 +265,7 @@ export function createEditorStore(
         if (after !== undefined) positions.set(id, { x: after.x, y: after.y });
       }
       set({
-        nodes,
+        projection: { ...projection, nodes },
         positions,
         dragOrigins,
         moved: true,
@@ -251,12 +277,13 @@ export function createEditorStore(
 
     connectCards: (from, to, projected) => {
       const state = get();
-      if (state.nodes === null || !connectionEligibility.acceptsExistingTarget(from, to)) {
+      const projection = state.projection;
+      if (projection === null || !connectionEligibility.acceptsExistingTarget(from, to)) {
         return false;
       }
       set({
-        positions: positionsForEdit(state.nodes, state.positions),
-        nodes: reconcile(state.nodes, projected),
+        positions: positionsForEdit(projection.nodes, state.positions),
+        projection: { ...projection, nodes: reconcile(projection.nodes, projected) },
         completedConnection: { from, to },
       });
       editCompleted();
@@ -265,8 +292,9 @@ export function createEditorStore(
 
     createConnectedCard: (from, cardId, position) => {
       const state = get();
-      if (state.nodes === null || !connectionEligibility.acceptsNewTarget(from)) return false;
-      const positions = positionsForEdit(state.nodes, state.positions);
+      const projection = state.projection;
+      if (projection === null || !connectionEligibility.acceptsNewTarget(from)) return false;
+      const positions = positionsForEdit(projection.nodes, state.positions);
       positions.set(cardId, position);
       set({
         positions,
