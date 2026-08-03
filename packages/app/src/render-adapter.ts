@@ -73,6 +73,31 @@ function positionsOf(nodes: readonly CardFlowNode[]): ReadonlyMap<string, Layout
   return new Map(nodes.map((node) => [node.id, { x: node.position.x, y: node.position.y }]));
 }
 
+/**
+ * Capture every on-screen position for an Algorithmic View, ready for ADR 0025
+ * conversion. A positioned Layout is intentionally sparse: fallback positions
+ * stay runtime-only, and only Cards the author actually moved join its map.
+ */
+function installProjectedPlacement(
+  authoring: SpaceAuthoring,
+  nodes: readonly CardFlowNode[],
+  changedCardIds: readonly string[] = [],
+): void {
+  const authored = authoring.authoredPlacement();
+  if (authored === null) {
+    authoring.installPlacement(positionsOf(nodes));
+    return;
+  }
+  if (changedCardIds.length === 0) return;
+  const projected = positionsOf(nodes);
+  const next = new Map(authored);
+  for (const cardId of changedCardIds) {
+    const position = projected.get(cardId);
+    if (position !== undefined) next.set(cardId, position);
+  }
+  authoring.installPlacement(next);
+}
+
 function trackDragOrigins(
   dragOrigins: Map<string, LayoutPoint>,
   positionChanges: readonly NodePositionChange[],
@@ -155,7 +180,7 @@ export function createRenderAdapter(authoring: SpaceAuthoring): RenderAdapter {
       const current = get().projection;
       const reconciled = current === null ? [...nodes] : reconcile(current.nodes, nodes);
       set({ projection: { nodes: reconciled, edges: [...edges] } });
-      authoring.installPlacement(positionsOf(reconciled));
+      installProjectedPlacement(authoring, reconciled);
     },
 
     selectRenderer: (positions) => {
@@ -222,14 +247,13 @@ export function createRenderAdapter(authoring: SpaceAuthoring): RenderAdapter {
         return;
       }
 
-      const positions = positionsOf(nodes);
       set({
         projection: { ...projection, nodes },
         dragOrigins,
         moved: true,
         selectedCardId,
       });
-      authoring.installPlacement(positions);
+      installProjectedPlacement(authoring, nodes, movedIds);
       authoring.complete({ kind: 'settled-card-movement' });
     },
 
@@ -239,11 +263,10 @@ export function createRenderAdapter(authoring: SpaceAuthoring): RenderAdapter {
       if (projection === null || !authoring.canConnect(from, to)) {
         return false;
       }
-      const positions = positionsOf(projection.nodes);
       set({
         projection: { ...projection, nodes: reconcile(projection.nodes, projected) },
       });
-      authoring.installPlacement(positions);
+      installProjectedPlacement(authoring, projection.nodes);
       return authoring.complete({ kind: 'connected-cards', from, to }).kind !== 'no-edit';
     },
 
@@ -251,7 +274,7 @@ export function createRenderAdapter(authoring: SpaceAuthoring): RenderAdapter {
       const state = get();
       const projection = state.projection;
       if (projection === null || !authoring.canCreateConnectedCard(from)) return null;
-      authoring.installPlacement(positionsOf(projection.nodes));
+      installProjectedPlacement(authoring, projection.nodes);
       const result = authoring.complete({
         kind: 'create-and-connect',
         from,
