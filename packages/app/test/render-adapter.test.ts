@@ -11,7 +11,7 @@ import {
   type AuthoringResult,
   type SpaceAuthoring,
 } from '../src/space-authoring';
-import { completeDrag, node } from './render-adapter-fixtures';
+import { completeDrag, moving, node, settled } from './render-adapter-fixtures';
 
 const CARD_A = '00000000-0000-4000-8000-000000000002';
 const CARD_B = '00000000-0000-4000-8000-000000000003';
@@ -330,5 +330,42 @@ describe('render adapter', () => {
 
     expect(store.getState().projection?.nodes[0]?.position).toEqual({ x: 111, y: 222 });
     expect(spy.installs.at(-1)?.placement).toEqual(new Map([[CARD_A, { x: 111, y: 222 }]]));
+  });
+
+  it('completes no Edit for a drag that returns to where it began', () => {
+    const spy = authoringSpy();
+    const store = createRenderAdapter(spy.authoring);
+    spy.attach(store);
+    store.getState().syncProjection([node(CARD_A, 10, 20)], []);
+
+    // React Flow reports a drag as many moving frames and one settled frame, and
+    // the settled frame is measured against the *gesture's* start, not the
+    // previous frame. `dragOrigins` is what retains that start across the two
+    // callbacks; without it the comparison falls back to the last moving frame,
+    // and a card put back where it came from reads as moved — persisting an Edit
+    // the author did not make.
+    store.getState().changeNodes(moving(CARD_A, 500, 400));
+    store.getState().changeNodes(settled(CARD_A, 10, 20));
+
+    expect(spy.completions).toEqual([]);
+    expect(store.getState().moved).toBe(false);
+    expect(store.getState().projection?.nodes[0]?.position).toEqual({ x: 10, y: 20 });
+  });
+
+  it('records that a card has moved, so routed Edge geometry stops being drawn', () => {
+    const spy = authoringSpy();
+    const store = createRenderAdapter(spy.authoring);
+    spy.attach(store);
+    store.getState().syncProjection(PROJECTED, [EDGE]);
+
+    // A layout's routed Edge geometry describes the arrangement it computed, so
+    // it stops being true the moment a card leaves the place that routing
+    // assumed. `App` reads this flag to fall back to plain curves; left false, a
+    // dragged graph keeps drawing channels routed for positions nothing is at.
+    expect(store.getState().moved).toBe(false);
+    completeDrag(store, CARD_A, 500, 400);
+
+    expect(store.getState().moved).toBe(true);
+    expect(spy.completions).toEqual([{ kind: 'settled-card-movement' }]);
   });
 });
