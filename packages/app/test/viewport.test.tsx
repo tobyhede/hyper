@@ -73,7 +73,7 @@ const viewportTransform = (): string =>
   document.querySelector<HTMLElement>('.react-flow__viewport')?.style.transform ?? '';
 
 describe('graph viewport', () => {
-  it('keeps a finite scale when accepting remote state remounts the workspace', async () => {
+  it('keeps a finite scale when accepted remote placement replaces live nodes', async () => {
     const local = snapshot('Local workspace', 'Local card', 10, 20);
     const remote = snapshot('Remote workspace', 'Remote card', 900, 700);
     const backend = new MemorySpaceBackend([

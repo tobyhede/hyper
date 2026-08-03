@@ -1,6 +1,24 @@
 import '@testing-library/jest-dom/vitest';
 
 /**
+ * React honours `act(...)` only when this global says the environment supports
+ * it, and warns on every call that finds it unset.
+ *
+ * Testing Library sets it around its *own* act calls — `render`, `fireEvent` —
+ * and deliberately sets it *false* inside `waitFor`, so that asynchronous work
+ * landing mid-wait is not reported as an un-acted update. Neither covers a test
+ * that calls `act` directly, which is how a synchronous publication from a store
+ * outside React gets flushed. Without the flag React still applies the update, so
+ * the test passes and the warning is the only trace.
+ *
+ * Guarded on `document` for the same reason as the stubs below: this file also
+ * runs under `environment: 'node'`, where there is no React renderer at all.
+ */
+if (typeof document !== 'undefined') {
+  (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+}
+
+/**
  * jsdom ships no `DOMMatrixReadOnly`, and React Flow needs one.
  *
  * `updateNodeInternals` in `@xyflow/system` reads the viewport's zoom with

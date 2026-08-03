@@ -1,5 +1,4 @@
 import { Component, type ReactElement, type ReactNode } from 'react';
-import { loadSpaceSnapshot } from '@project/graph';
 import { createApp } from './App';
 import type { OpenedSpace } from './space';
 
@@ -44,39 +43,9 @@ class WorkspaceFailure extends Component<{ children: ReactNode }, WorkspaceFailu
   }
 }
 
-/** Mount a workspace-local app, replacing every derived store after remote acceptance. */
+/** Mount one workspace-local application for the lifetime of the opened Space. */
 export function mountWorkspace(opened: OpenedSpace, render: WorkspaceRenderer): void {
-  /**
-   * Validate the remote snapshot *before* handing it to the session. Accepting
-   * first and checking after published an unloadable snapshot as settled working
-   * state, so the conflict that could still have been resolved was gone. And the
-   * check cannot report by throwing: this runs as an `onClick` handler, which
-   * React error boundaries do not catch, so `WorkspaceFailure` never saw it and
-   * the throw escaped to the window leaving the stale workspace on screen.
-   *
-   * Refusing changes nothing — local work, conflict and every control survive —
-   * so it answers with the reason and leaves the mounted workspace alone. The
-   * caller shows it; unmounting the page over a refusal would take the author's
-   * unsaved work off screen to explain why it could not be replaced.
-   */
-  const acceptRemote = (): string | null => {
-    const { persistence } = opened.spaceSession.getState();
-    if (persistence.kind !== 'conflicted') return null;
-    const accepted = loadSpaceSnapshot(persistence.current.snapshot);
-    if (!accepted.ok) {
-      return `The remote space is invalid and was not accepted:\n${accepted.errors
-        .map((error) => `  - ${error.message}`)
-        .join('\n')}`;
-    }
-    opened.spaceSession.acceptRemote();
-    // The replacement subscribes to the same session this one is subscribed to,
-    // so the outgoing workspace has to let go first or every conflict resolved
-    // in a sitting leaves another listener on a session that outlives them all.
-    dispose();
-    mountWorkspace({ space: accepted.space, spaceSession: opened.spaceSession }, render);
-    return null;
-  };
-  const { App, dispose } = createApp(opened, { acceptRemote });
+  const App = createApp(opened);
   render(
     <WorkspaceFailure>
       <App />

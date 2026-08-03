@@ -165,7 +165,7 @@ function reconcile(
 }
 
 export function createRenderAdapter(authoring: SpaceAuthoring): RenderAdapter {
-  return create<RenderAdapterState>((set, get) => ({
+  const adapter = create<RenderAdapterState>((set, get) => ({
     projection: null,
     dragOrigins: new Map(),
     moved: false,
@@ -180,6 +180,8 @@ export function createRenderAdapter(authoring: SpaceAuthoring): RenderAdapter {
       const current = get().projection;
       const reconciled = current === null ? [...nodes] : reconcile(current.nodes, nodes);
       set({ projection: { nodes: reconciled, edges: [...edges] } });
+      // Reporting geometry, not authoring it: a Card the selected Layout omits is
+      // drawn in the fallback band and must stay unplaced.
       installProjectedPlacement(authoring, reconciled);
     },
 
@@ -253,6 +255,8 @@ export function createRenderAdapter(authoring: SpaceAuthoring): RenderAdapter {
         moved: true,
         selectedCardId,
       });
+      // The gesture placed exactly `movedIds`; every other Card keeps whatever
+      // authorship it already had.
       installProjectedPlacement(authoring, nodes, movedIds);
       authoring.complete({ kind: 'settled-card-movement' });
     },
@@ -263,8 +267,8 @@ export function createRenderAdapter(authoring: SpaceAuthoring): RenderAdapter {
       if (projection === null || !authoring.canConnect(from, to)) {
         return false;
       }
-      // Publish the reconciled nodes but install the placement from the live
-      // ones — deliberately two different lists. `installProjectedPlacement`
+      // Install the placement from the live nodes, and publish the reconciled
+      // ones below — deliberately two different lists. `installProjectedPlacement`
       // reads positions only, and `reconcile` takes every surviving Card's
       // position from its live node, so the two agree on every Card already on
       // screen. They diverge only for a Card the projection has gained and the
@@ -272,17 +276,30 @@ export function createRenderAdapter(authoring: SpaceAuthoring): RenderAdapter {
       // `syncProjection` until a strategy resolves. That Card has no resolved
       // position yet, and authoring the origin it is standing on is exactly
       // what a sparse Layout exists to avoid.
-      set({
-        projection: { ...projection, nodes: reconcile(projection.nodes, projected) },
-      });
       installProjectedPlacement(authoring, projection.nodes);
-      return authoring.complete({ kind: 'connected-cards', from, to }).kind !== 'no-edit';
+      // Complete first. A completion that has not happened — refused, queued
+      // behind another Edit, or thrown on an invalid Space — must not leave a
+      // connection drawn for an Edge the Space never gained. Only `completed`
+      // says it did: a queued Edit runs against whatever Space the Edit ahead of
+      // it installs and can still answer `no-edit` there, and if it does land the
+      // projection that follows it draws the Edge anyway.
+      if (authoring.complete({ kind: 'connected-cards', from, to }).kind !== 'completed') {
+        return false;
+      }
+      // Re-read: completing published, and a listener may have replaced the
+      // projection — accepting a stored Space drops it outright.
+      const committed = get().projection;
+      if (committed !== null) {
+        set({ projection: { ...committed, nodes: reconcile(committed.nodes, projected) } });
+      }
+      return true;
     },
 
     createConnectedCard: (from, position) => {
       const state = get();
       const projection = state.projection;
       if (projection === null || !authoring.canCreateConnectedCard(from)) return null;
+      // The dropped Card is placed by `position` inside the completion itself.
       installProjectedPlacement(authoring, projection.nodes);
       const result = authoring.complete({
         kind: 'create-and-connect',
@@ -292,4 +309,26 @@ export function createRenderAdapter(authoring: SpaceAuthoring): RenderAdapter {
       return result.kind === 'completed' ? (result.createdCardId ?? null) : null;
     },
   }));
+  // A replacement Space arrives without unmounting anything, so the projection
+  // this store is holding describes Cards that may no longer exist and drag
+  // bookkeeping for a gesture made against the Space that is gone. Dropping it
+  // is the same reset `selectRenderer` performs, for the same reason: what is on
+  // screen no longer describes what is being rendered.
+  //
+  // The unsubscribe is deliberately dropped: this store's lifetime is the
+  // composition's, and `authoring.dispose` clears the listener set that holds
+  // this. Give the adapter its own teardown if it ever outlives one Authoring.
+  let opening = authoring.getState().opening;
+  authoring.subscribe(() => {
+    const nextOpening = authoring.getState().opening;
+    if (nextOpening === opening) return;
+    opening = nextOpening;
+    adapter.setState({
+      projection: null,
+      dragOrigins: new Map(),
+      moved: false,
+      selectedCardId: null,
+    });
+  });
+  return adapter;
 }

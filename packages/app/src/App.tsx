@@ -30,12 +30,7 @@ import { GraphView } from './components/GraphView';
 import { OpenCard } from './components/OpenCard';
 import { PresentingChrome } from './components/PresentingChrome';
 
-export interface AppActions {
-  /** Accepts the conflicting remote state, or answers why it was refused. */
-  acceptRemote: () => string | null;
-}
-
-export const createApp = ({ space, spaceSession }: OpenedSpace, { acceptRemote }: AppActions) => {
+export const createApp = ({ space, spaceSession }: OpenedSpace) => {
   // One validated aggregate per working snapshot, shared by the render path and
   // by Navigation. Both read the same reader, so in the steady state a snapshot
   // is parsed and indexed once rather than once per render — and both see the
@@ -84,7 +79,22 @@ export const createApp = ({ space, spaceSession }: OpenedSpace, { acceptRemote }
     // Why the remote state was refused, reported beside the control that asked
     // for it. The workspace behind it still holds the local work and the
     // conflict, so this is a message, not a mode.
-    const [remoteRefusal, setRemoteRefusal] = useState<string | null>(null);
+    //
+    // Held against the revision it explains, and read back only while that is
+    // still the revision in conflict. A refusal explains one remote snapshot, so
+    // it dies with it: `resolveConflict` commits again without leaving the
+    // conflicted state, so the next conflict can carry a different — and
+    // loadable — remote, and holding the old sentence over it would say the
+    // local work cannot be replaced when it now can. Derived rather than cleared
+    // by an effect, which would render the stale sentence against the new
+    // conflict for the commit before it ran.
+    const [refusal, setRefusal] = useState<{ revision: bigint; message: string } | null>(null);
+    const conflictRevision =
+      sessionState.persistence.kind === 'conflicted'
+        ? sessionState.persistence.current.revision
+        : null;
+    const remoteRefusal =
+      refusal !== null && refusal.revision === conflictRevision ? refusal.message : null;
     const rendererSpace = useMemo(
       () => readWorkingSpace(sessionState.working),
       [sessionState.working],
@@ -383,12 +393,15 @@ export const createApp = ({ space, spaceSession }: OpenedSpace, { acceptRemote }
             <Button
               variant="default"
               data-testid="persistence-accept-remote"
+              // The result of this attempt is the whole message: a success
+              // clears whatever the last attempt on this same conflict said.
               onClick={() => {
-                // Only a refusal is state worth holding: acceptance remounts the
-                // whole workspace, so this component is gone before it could
-                // render anything the call returned.
-                const refusal = acceptRemote();
-                if (refusal !== null) setRemoteRefusal(refusal);
+                const message = authoring.acceptStoredSpace();
+                setRefusal(
+                  message === null || conflictRevision === null
+                    ? null
+                    : { revision: conflictRevision, message },
+                );
               }}
             >
               Accept remote
@@ -488,8 +501,9 @@ export const createApp = ({ space, spaceSession }: OpenedSpace, { acceptRemote }
     );
   }
 
-  // `dispose` releases what this composition subscribed to. The session is the
-  // one collaborator that outlives the mount, so a workspace replaced over the
-  // same session has to hand it back.
-  return { App, dispose: authoring.dispose };
+  // One composition for the lifetime of the opened Space. Accepting the stored
+  // Space replaces the working state through Authoring rather than mounting a
+  // second app over the same session, so nothing here is ever handed back;
+  // `authoring.dispose` remains the seam that would release it if that changed.
+  return App;
 };
