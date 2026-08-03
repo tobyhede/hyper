@@ -54,9 +54,18 @@ export const openSpaceSession = (
   };
   let inFlight = false;
   let waiting: SpaceSnapshot | undefined;
+  let publishingSubmit = false;
   const listeners = new Set<() => void>();
   const reportObserverError = options.reportObserverError ?? reportToConsole;
 
+  /*
+   * Unconditionally: nothing above a session observer can act on the failure.
+   * `@project/http`'s `invokeLogError` rethrows an `Error` on purpose, because
+   * Hono forwards one to `onError` and a swallowed failure would leave a
+   * request answered by nothing. There is no such handler over a notification,
+   * so rethrowing here would only hand the failure back to the publisher this
+   * whole path exists to protect.
+   */
   const safelyReportObserverError = (error: unknown): void => {
     try {
       reportObserverError(error);
@@ -128,16 +137,39 @@ export const openSpaceSession = (
       listeners.add(listener);
       return () => listeners.delete(listener);
     },
+    /*
+     * An observer may complete the next Edit while this one is still
+     * publishing, so a submit is **queued, not re-entered**: the reentrant call
+     * installs its working Space and stops, and the submit already on the stack
+     * makes the one commit decision, reading the newest installed state rather
+     * than the snapshot it was handed. Deciding from the argument instead would
+     * queue the older snapshot behind the newer one and store it last, undoing
+     * a completed Edit at the next load.
+     *
+     * The flag covers publication only. `startCommit` publishes `pending` to
+     * the same observers, and a submit made from *there* must reach the queue
+     * normally — this call's commit decision is already behind it.
+     */
     submit: (snapshot) => {
       const working = clone(snapshot);
-      const previous = state.persistence;
-      publish({ ...state, working });
-      if (previous.kind === 'conflicted' || previous.kind === 'failed') return;
-      if (inFlight) {
-        waiting = working;
+      if (publishingSubmit) {
+        publish({ ...state, working });
         return;
       }
-      startCommit(working, state.acknowledgedRevision);
+      const previous = state.persistence;
+      publishingSubmit = true;
+      try {
+        publish({ ...state, working });
+      } finally {
+        publishingSubmit = false;
+      }
+      if (previous.kind === 'conflicted' || previous.kind === 'failed') return;
+      const current = state.working;
+      if (inFlight) {
+        waiting = current;
+        return;
+      }
+      startCommit(current, state.acknowledgedRevision);
     },
     retry: () => {
       if (state.persistence.kind !== 'failed' || inFlight) return;
