@@ -1,9 +1,14 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { uuidSchema, type SpaceSnapshot } from '@project/core';
 import { loadSpaceSnapshot } from '@project/graph';
-import { MemorySpaceBackend, openSpaceSession, type SpaceBackend } from '@project/persistence';
-import { createNavigation } from '../src/navigation';
-import { createSpaceAuthoring } from '../src/space-authoring';
+import {
+  MemorySpaceBackend,
+  MemorySpaceBackendTestControl,
+  openSpaceSession,
+  type SpaceSession,
+} from '@project/persistence';
+import { createNavigation, type Navigation, type NavigationState } from '../src/navigation';
+import { createSpaceAuthoring, type AuthoringResult } from '../src/space-authoring';
 import type { RendererSelection } from '../src/view';
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
@@ -30,6 +35,7 @@ const automaticSnapshot: SpaceSnapshot = {
 function openAuthoring(
   snapshot: SpaceSnapshot = automaticSnapshot,
   renderer: RendererSelection = { kind: 'view', view: 'graph' },
+  reportObserverError?: (error: unknown) => void,
 ) {
   const loaded = { snapshot, revision: 0n, exportedRevision: null };
   const backend = new MemorySpaceBackend([loaded]);
@@ -40,7 +46,16 @@ function openAuthoring(
     return result.space;
   };
   const navigation = createNavigation(currentSpace, renderer);
-  return { backend, session, navigation, authoring: createSpaceAuthoring({ session, navigation }) };
+  return {
+    backend,
+    session,
+    navigation,
+    authoring: createSpaceAuthoring({
+      session,
+      navigation,
+      ...(reportObserverError !== undefined ? { reportObserverError } : {}),
+    }),
+  };
 }
 
 describe('Space Authoring', () => {
@@ -243,6 +258,7 @@ describe('Space Authoring', () => {
       ]),
     );
     let reentered = false;
+    let reentrantResult: AuthoringResult | null = null;
     authoring.subscribe(() => {
       if (reentered) return;
       reentered = true;
@@ -252,7 +268,7 @@ describe('Space Authoring', () => {
           [CARD_B, { x: 500, y: 400 }],
         ]),
       );
-      authoring.complete({ kind: 'settled-card-movement' });
+      reentrantResult = authoring.complete({ kind: 'settled-card-movement' });
     });
     const observed: number[] = [];
     authoring.subscribe(() => {
@@ -263,6 +279,9 @@ describe('Space Authoring', () => {
     authoring.complete({ kind: 'connected-cards', from: CARD_B, to: CARD_A });
 
     expect(observed).toEqual([300, 500]);
+    // The answer the reentrant caller got, not just its effect: a completion
+    // made from inside publication is queued rather than run there.
+    expect(reentrantResult).toEqual({ kind: 'queued' });
   });
 
   it('publishes once after the optimistic Space and navigation consequences are installed', () => {
@@ -335,24 +354,12 @@ describe('Space Authoring', () => {
       },
     };
     const loaded = { snapshot: positioned, revision: 0n, exportedRevision: null };
-    const committed: SpaceSnapshot[] = [];
-    let attempt = 0;
-    const backend: SpaceBackend = {
-      listSpaces: () => Promise.resolve([{ id: SPACE_ID, title: positioned.document.title }]),
-      loadSpace: () => Promise.resolve(loaded),
-      commitSpace: (snapshot) => {
-        attempt += 1;
-        if (attempt === 1) {
-          return Promise.resolve({
-            kind: 'retryable-failure',
-            code: 'network',
-            message: 'Offline',
-          });
-        }
-        committed.push(snapshot);
-        return Promise.resolve({ kind: 'committed', revision: 1n });
-      },
-    };
+    // The real adapter, with only the first commit's outcome injected, so the
+    // retry path is exercised against actual backend commit behavior rather than
+    // a stand-in that always succeeds.
+    const control = new MemorySpaceBackendTestControl();
+    control.queueResult({ kind: 'retryable-failure', code: 'network', message: 'Offline' });
+    const backend = new MemorySpaceBackend([loaded], control);
     const session = openSpaceSession(backend, loaded);
     const currentSpace = () => {
       const result = loadSpaceSnapshot(session.getState().working);
@@ -381,6 +388,309 @@ describe('Space Authoring', () => {
 
     authoring.retryPersistence();
     await vi.waitFor(() => expect(authoring.getState().session.persistence.kind).toBe('settled'));
-    expect(committed[0]?.document.layouts?.[0]?.positions[CARD_A]).toEqual({ x: 500, y: 600 });
+    expect(control.attempts.at(-1)?.snapshot.document.layouts?.[0]?.positions[CARD_A]).toEqual({
+      x: 500,
+      y: 600,
+    });
+  });
+
+  it('answers the installed placement from one accessor, and keeps identity for an equal one', () => {
+    const positioned: SpaceSnapshot = {
+      ...automaticSnapshot,
+      document: {
+        ...automaticSnapshot.document,
+        layouts: [
+          {
+            id: LAYOUT_ID,
+            title: 'Layout 1',
+            kind: 'positioned',
+            positions: { [CARD_A]: { x: 10, y: 20 } },
+          },
+        ],
+        defaultView: LAYOUT_ID,
+      },
+    };
+    const { authoring, navigation } = openAuthoring(positioned, {
+      kind: 'layout',
+      layoutId: LAYOUT_ID,
+    });
+
+    authoring.installPlacement(new Map([[CARD_A, { x: 10, y: 20 }]]));
+
+    // One accessor, answering the value that is actually installed. A second
+    // copy carried on the published state could only disagree with this, since
+    // installing a placement is not a publication.
+    const installed = authoring.authoredPlacement();
+    expect(installed).toEqual(new Map([[CARD_A, { x: 10, y: 20 }]]));
+
+    // An equal placement is not a change, and must keep its identity:
+    // `usePlacementRendering` rebuilds the positioned strategy whenever this map
+    // changes identity and re-runs layout, so a fresh copy would re-arrange a
+    // settled graph on every projection.
+    authoring.installPlacement(new Map([[CARD_A, { x: 10, y: 20 }]]));
+    expect(authoring.authoredPlacement()).toBe(installed);
+
+    // Only an authored Layout supplies positions; an Algorithmic View computes
+    // its own, so it must answer null however much placement is installed.
+    navigation.selectRenderer({ kind: 'view', view: 'graph' });
+    expect(authoring.authoredPlacement()).toBeNull();
+  });
+
+  it('releases its session and navigation subscriptions when disposed', () => {
+    const { authoring, session, navigation } = openAuthoring();
+    let published = 0;
+    authoring.subscribe(() => {
+      published += 1;
+    });
+
+    navigation.activateRoute(ROUTE_ID);
+    expect(published).toBe(1);
+
+    // Accepting a remote Space remounts the workspace against the *same*
+    // long-lived session, so an Authoring that never unsubscribes leaves a
+    // listener and its closure behind on every conflict resolution.
+    authoring.dispose();
+    navigation.activateRoute(ROUTE_ID);
+    session.submit({
+      ...automaticSnapshot,
+      document: { ...automaticSnapshot.document, title: 'Renamed' },
+    });
+
+    expect(published).toBe(1);
+  });
+
+  it('treats a value-equal Layout written in another key order as no Edit', () => {
+    const positioned: SpaceSnapshot = {
+      ...automaticSnapshot,
+      document: {
+        ...automaticSnapshot.document,
+        layouts: [
+          // Value-identical to what a completed Edit writes, but with the keys
+          // and the position entries in another order. Nothing promises that a
+          // stored or imported Space agrees with the writer's key order, and
+          // ordering is not a difference an author made.
+          {
+            kind: 'positioned',
+            positions: { [CARD_B]: { x: 300, y: 40 }, [CARD_A]: { x: 10, y: 20 } },
+            activeRoute: ROUTE_ID,
+            title: 'Layout 1',
+            id: LAYOUT_ID,
+          },
+        ],
+        defaultView: LAYOUT_ID,
+      },
+    };
+    const { authoring, session } = openAuthoring(positioned, {
+      kind: 'layout',
+      layoutId: LAYOUT_ID,
+    });
+    const before = session.getState().working;
+    authoring.installPlacement(
+      new Map([
+        [CARD_A, { x: 10, y: 20 }],
+        [CARD_B, { x: 300, y: 40 }],
+      ]),
+    );
+
+    expect(authoring.complete({ kind: 'settled-card-movement' })).toEqual({ kind: 'no-edit' });
+    expect(session.getState().working).toBe(before);
+  });
+
+  it('numbers a new Layout and Card above the highest existing number', () => {
+    vi.spyOn(crypto, 'randomUUID')
+      .mockReturnValueOnce(CREATED_CARD_ID as ReturnType<typeof crypto.randomUUID>)
+      .mockReturnValueOnce(LAYOUT_ID as ReturnType<typeof crypto.randomUUID>);
+    const numbered: SpaceSnapshot = {
+      ...automaticSnapshot,
+      document: {
+        ...automaticSnapshot.document,
+        // 'Notes' is not a numbered title and contributes nothing; 'Layout 7' is
+        // the highest, so the next is 8 rather than one past the count.
+        layouts: [
+          {
+            id: uuidSchema.parse('00000000-0000-4000-8000-000000000022'),
+            title: 'Notes',
+            kind: 'positioned',
+            positions: {},
+          },
+          {
+            id: uuidSchema.parse('00000000-0000-4000-8000-000000000023'),
+            title: 'Layout 7',
+            kind: 'positioned',
+            positions: {},
+          },
+        ],
+      },
+      cards: [
+        { id: CARD_A, document: { title: 'Card 9', kind: 'markdown', body: '' } },
+        { id: CARD_B, document: { title: 'Intro', kind: 'markdown', body: '' } },
+      ],
+    };
+    const { authoring, session } = openAuthoring(numbered);
+    authoring.installPlacement(
+      new Map([
+        [CARD_A, { x: 10, y: 20 }],
+        [CARD_B, { x: 300, y: 40 }],
+      ]),
+    );
+
+    expect(
+      authoring.complete({ kind: 'create-and-connect', from: CARD_A, position: { x: 5, y: 6 } }),
+    ).toEqual({ kind: 'completed', createdCardId: CREATED_CARD_ID });
+
+    expect(session.getState().working.cards.at(-1)?.document.title).toBe('Card 10');
+    expect(session.getState().working.document.layouts?.at(-1)?.title).toBe('Layout 8');
+  });
+
+  it('refuses to connect with no active Route while the Space already holds Routes', () => {
+    // A Layout filtering every Route away resolves to no active Route. Minting
+    // is reserved for a Space that has none at all, so this is refused rather
+    // than quietly adding a second Route the filter would then hide. It is also
+    // why a minted Route is always the first one, and `nextRouteTitle` only
+    // ever numbers against an empty set.
+    const filtered: SpaceSnapshot = {
+      ...automaticSnapshot,
+      document: {
+        ...automaticSnapshot.document,
+        routes: [{ id: ROUTE_ID, title: 'Route 3', edges: [{ from: CARD_A, to: CARD_B }] }],
+        layouts: [
+          {
+            id: LAYOUT_ID,
+            title: 'Layout 1',
+            kind: 'positioned',
+            positions: { [CARD_A]: { x: 10, y: 20 }, [CARD_B]: { x: 300, y: 40 } },
+            routes: [],
+          },
+        ],
+        defaultView: LAYOUT_ID,
+      },
+    };
+    const { authoring, session, navigation } = openAuthoring(filtered, {
+      kind: 'layout',
+      layoutId: LAYOUT_ID,
+    });
+    expect(navigation.getState().activeRouteId).toBeNull();
+    authoring.installPlacement(
+      new Map([
+        [CARD_A, { x: 10, y: 20 }],
+        [CARD_B, { x: 300, y: 40 }],
+      ]),
+    );
+
+    const before = session.getState().working;
+
+    expect(authoring.canConnect(CARD_B, CARD_A)).toBe(false);
+    expect(authoring.complete({ kind: 'connected-cards', from: CARD_B, to: CARD_A })).toEqual({
+      kind: 'no-edit',
+    });
+    expect(session.getState().working).toBe(before);
+  });
+
+  it('reports the completions a failed drain discards', () => {
+    vi.spyOn(crypto, 'randomUUID').mockReturnValue(
+      LAYOUT_ID as ReturnType<typeof crypto.randomUUID>,
+    );
+    const loaded = { snapshot: automaticSnapshot, revision: 0n, exportedRevision: null };
+    const backend = new MemorySpaceBackend([loaded]);
+    const real = openSpaceSession(backend, loaded);
+    let submits = 0;
+    const session: SpaceSession = {
+      ...real,
+      submit: (snapshot) => {
+        submits += 1;
+        if (submits === 2) throw new Error('submit failed');
+        real.submit(snapshot);
+      },
+    };
+    const currentSpace = () => {
+      const result = loadSpaceSnapshot(session.getState().working);
+      if (!result.ok) throw new Error(result.errors.map((error) => error.message).join('; '));
+      return result.space;
+    };
+    const navigation = createNavigation(currentSpace, { kind: 'view', view: 'graph' });
+    const reported: unknown[] = [];
+    const authoring = createSpaceAuthoring({
+      session,
+      navigation,
+      reportObserverError: (error) => reported.push(error),
+    });
+    authoring.installPlacement(
+      new Map([
+        [CARD_A, { x: 10, y: 20 }],
+        [CARD_B, { x: 300, y: 40 }],
+      ]),
+    );
+    // Two observers each completing one further Edit, so the drain still holds
+    // one when the other throws.
+    for (const edge of [
+      { from: CARD_A, to: CARD_A },
+      { from: CARD_B, to: CARD_B },
+    ] as const) {
+      let done = false;
+      authoring.subscribe(() => {
+        if (done) return;
+        done = true;
+        authoring.complete({ kind: 'connected-cards', ...edge });
+      });
+    }
+
+    expect(() => authoring.complete({ kind: 'connected-cards', from: CARD_B, to: CARD_A })).toThrow(
+      'submit failed',
+    );
+
+    // Abandoning them silently is what makes the failure unreadable: the Edits
+    // are gone and nothing said so.
+    expect(reported).toHaveLength(1);
+    expect(String(reported[0])).toMatch(/discarded 1 queued completion/);
+  });
+
+  it('contains a rejected asynchronous observer instead of letting it escape', async () => {
+    const reported: unknown[] = [];
+    const { authoring, navigation } = openAuthoring(automaticSnapshot, undefined, (error) =>
+      reported.push(error),
+    );
+    // `subscribe` takes `() => void`, and TypeScript's void-return bivariance
+    // lets an async listener through without complaint. Its rejection never
+    // reaches the try/catch around the call, and Node answers an unhandled
+    // rejection by killing the process.
+    // Deliberately the shape lint rejects: the rule is the first line of
+    // defence and this asserts the second, for a listener that reaches the same
+    // shape indirectly and never trips it.
+    // eslint-disable-next-line @typescript-eslint/no-misused-promises
+    authoring.subscribe(() => Promise.reject(new Error('observer rejected')));
+    navigation.activateRoute(ROUTE_ID);
+
+    await vi.waitFor(() => expect(reported.map(String)).toEqual(['Error: observer rejected']));
+  });
+
+  it('treats a selected Layout the Space no longer holds as no Edit', () => {
+    const loaded = { snapshot: automaticSnapshot, revision: 0n, exportedRevision: null };
+    const session = openSpaceSession(new MemorySpaceBackend([loaded]), loaded);
+    // Navigation refuses a renderer the Space does not hold, so this state is
+    // only reachable by the Space losing the Layout under a selection that was
+    // valid when it was made — an accepted remote Space that dropped it, say.
+    // Authoring may not resurrect it, so the Edit is refused rather than
+    // written to a fresh Layout under the missing id.
+    const navigation = {
+      getState: () =>
+        ({
+          selectedRenderer: { kind: 'layout', layoutId: LAYOUT_ID },
+          activeRouteId: ROUTE_ID,
+        }) as NavigationState,
+      subscribe: () => () => undefined,
+      continueInRenderer: () => undefined,
+      activateRoute: () => undefined,
+    } as unknown as Navigation;
+    const authoring = createSpaceAuthoring({ session, navigation });
+    authoring.installPlacement(
+      new Map([
+        [CARD_A, { x: 10, y: 20 }],
+        [CARD_B, { x: 300, y: 40 }],
+      ]),
+    );
+    const before = session.getState().working;
+
+    expect(authoring.complete({ kind: 'settled-card-movement' })).toEqual({ kind: 'no-edit' });
+    expect(session.getState().working).toBe(before);
   });
 });

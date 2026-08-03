@@ -146,13 +146,17 @@ export function createRenderAdapter(authoring: SpaceAuthoring): RenderAdapter {
     moved: false,
     selectedCardId: null,
 
-    syncProjection: (nodes, edges) =>
-      set((state) => {
-        const reconciled =
-          state.projection === null ? [...nodes] : reconcile(state.projection.nodes, nodes);
-        authoring.installPlacement(positionsOf(reconciled));
-        return { projection: { nodes: reconciled, edges: [...edges] } };
-      }),
+    // Compute, publish, then tell Authoring where the cards ended up — the same
+    // order as `changeNodes` and `connectCards` below. Installing from inside
+    // the `set` updater put the cross-store write before the state it describes
+    // was committed, so this store still held the previous projection at the
+    // moment anything downstream was told about the new one.
+    syncProjection: (nodes, edges) => {
+      const current = get().projection;
+      const reconciled = current === null ? [...nodes] : reconcile(current.nodes, nodes);
+      set({ projection: { nodes: reconciled, edges: [...edges] } });
+      authoring.installPlacement(positionsOf(reconciled));
+    },
 
     selectRenderer: (positions) => {
       set({

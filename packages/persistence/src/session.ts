@@ -40,6 +40,11 @@ const reportToConsole = (error: unknown): void => {
   console.error('SpaceSession observer failed', error);
 };
 
+const isThenable = (value: unknown): value is PromiseLike<unknown> =>
+  typeof value === 'object' &&
+  value !== null &&
+  typeof (value as { readonly then?: unknown }).then === 'function';
+
 export const openSpaceSession = (
   backend: SpaceBackend,
   loaded: LoadedSpace,
@@ -56,7 +61,11 @@ export const openSpaceSession = (
   let waiting: SpaceSnapshot | undefined;
   /** The snapshot `startCommit` handed the backend. Read only while `inFlight`. */
   let committing: SpaceSnapshot | undefined;
-  const listeners = new Set<() => void>();
+  // Held as `() => unknown` although `subscribe` accepts `() => void`: a `void`
+  // expression cannot be inspected, which is exactly how an async listener's
+  // rejection gets to disappear. Widening here keeps the published contract
+  // synchronous while letting `publish` see what came back.
+  const listeners = new Set<() => unknown>();
   const reportObserverError = options.reportObserverError ?? reportToConsole;
 
   /*
@@ -79,7 +88,14 @@ export const openSpaceSession = (
     state = next;
     for (const listener of listeners) {
       try {
-        listener();
+        // Notification stays synchronous — `useSyncExternalStore` reads
+        // `getState` straight after and nothing here awaits. But `() => void`
+        // admits an async listener by TypeScript's return-type bivariance, and
+        // its rejection lands nowhere near this catch: an unhandled rejection
+        // is answered by ending the process, which is precisely the
+        // interruption a non-throwing publisher exists to prevent.
+        const settled = listener();
+        if (isThenable(settled)) void settled.then(undefined, safelyReportObserverError);
       } catch (error) {
         safelyReportObserverError(error);
       }

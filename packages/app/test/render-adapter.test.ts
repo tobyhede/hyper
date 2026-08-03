@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { Position, type Edge } from '@xyflow/react';
 import { uuidSchema } from '@project/core';
 import type { LayoutPoint } from '@project/graph';
+import type { CardFlowNode } from '@project/react-flow-adapter';
 import { createRenderAdapter, type RenderAdapter } from '../src/render-adapter';
 import type { AuthoringResult, SpaceAuthoring } from '../src/space-authoring';
 import { completeDrag, node } from './render-adapter-fixtures';
@@ -17,16 +18,23 @@ const EDGE: Edge = {
   target: CARD_B,
 };
 
+interface InstallRecord {
+  readonly placement: ReadonlyMap<string, LayoutPoint> | null;
+  /** What the adapter's own state held at the moment the effect ran. */
+  readonly nodesAtCall: readonly CardFlowNode[] | null;
+}
+
 /** A Space Authoring that records what it was told, without a session behind it. */
 function authoringSpy() {
-  const installs: (ReadonlyMap<string, LayoutPoint> | null)[] = [];
+  const installs: InstallRecord[] = [];
   const completions: unknown[] = [];
+  let adapter: RenderAdapter | null = null;
   const authoring = {
     getState: () => ({}) as never,
     authoredPlacement: () => null,
     subscribe: () => () => undefined,
     installPlacement: (placement: ReadonlyMap<string, LayoutPoint> | null) => {
-      installs.push(placement);
+      installs.push({ placement, nodesAtCall: adapter?.getState().projection?.nodes ?? null });
     },
     canConnect: () => true,
     canCreateConnectedCard: () => true,
@@ -37,7 +45,14 @@ function authoringSpy() {
     retryPersistence: () => undefined,
     dispose: () => undefined,
   } as unknown as SpaceAuthoring;
-  return { authoring, installs, completions };
+  return {
+    authoring,
+    installs,
+    completions,
+    attach: (store: RenderAdapter) => {
+      adapter = store;
+    },
+  };
 }
 
 function adapter(): RenderAdapter {
@@ -119,9 +134,32 @@ describe('render adapter', () => {
     );
   });
 
+  it('publishes the projection before installing the placement it produced', () => {
+    const spy = authoringSpy();
+    const store = createRenderAdapter(spy.authoring);
+    spy.attach(store);
+
+    store.getState().syncProjection(PROJECTED, []);
+
+    // Computing inside the `set` updater made the cross-store write land while
+    // the adapter still held its previous state, so anything the effect
+    // notified read the projection from before the one it was told about.
+    expect(spy.installs).toHaveLength(1);
+    expect(spy.installs[0]?.nodesAtCall?.map((entry) => entry.id)).toEqual([CARD_A, CARD_B]);
+    expect(spy.installs[0]?.placement).toEqual(
+      new Map([
+        [CARD_A, { x: 10, y: 20 }],
+        [CARD_B, { x: 300, y: 20 }],
+      ]),
+    );
+    expect(store.getState().projection?.nodes.map((entry) => entry.id)).toEqual([CARD_A, CARD_B]);
+  });
+
   it('keeps a live node position across a reprojection', () => {
     const spy = authoringSpy();
     const store = createRenderAdapter(spy.authoring);
+    spy.attach(store);
+
     store.getState().syncProjection([node(CARD_A, 10, 20)], []);
     completeDrag(store, CARD_A, 111, 222);
 
@@ -130,6 +168,6 @@ describe('render adapter', () => {
     store.getState().syncProjection([node(CARD_A, 0, 0)], []);
 
     expect(store.getState().projection?.nodes[0]?.position).toEqual({ x: 111, y: 222 });
-    expect(spy.installs.at(-1)).toEqual(new Map([[CARD_A, { x: 111, y: 222 }]]));
+    expect(spy.installs.at(-1)?.placement).toEqual(new Map([[CARD_A, { x: 111, y: 222 }]]));
   });
 });

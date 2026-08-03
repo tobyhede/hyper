@@ -157,7 +157,15 @@ export const createApp = ({ space, spaceSession }: OpenedSpace, { acceptRemote }
       () => buildLayoutGraph(visibleCardIds, visibleHandles, visibleEdges, CARD_SIZE),
       [visibleCardIds, visibleHandles, visibleEdges],
     );
-    const authoredPositions = useRenderAdapter(() => authoring.authoredPlacement());
+    // Read at the point of use, like `moves` above and for the same reason: the
+    // placement is not published state, and subscribing to it through the
+    // render adapter — a store that knows nothing about either the placement or
+    // the selected renderer — only worked because every install happened to be
+    // followed by an unrelated notification. This component already re-renders
+    // on both stores, and a render-time read cannot be stale at the render that
+    // uses it. `installPlacement` keeps the map's identity when the value is
+    // unchanged, so this does not defeat the memo below.
+    const authoredPositions = authoring.authoredPlacement();
     const selectedCardId = useRenderAdapter((s) => s.selectedCardId);
     const moved = useRenderAdapter((s) => s.moved);
     const placement = usePlacementRendering(graph, view.strategy, authoredPositions);
@@ -480,5 +488,8 @@ export const createApp = ({ space, spaceSession }: OpenedSpace, { acceptRemote }
     );
   }
 
-  return App;
+  // `dispose` releases what this composition subscribed to. The session is the
+  // one collaborator that outlives the mount, so a workspace replaced over the
+  // same session has to hand it back.
+  return { App, dispose: authoring.dispose };
 };
