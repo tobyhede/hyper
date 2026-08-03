@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, type RenderResult } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, type RenderResult } from '@testing-library/react';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { spaceSnapshotSchema, uuidSchema, type SpaceSnapshot } from '@project/core';
 import { loadSpaceSnapshot } from '@project/graph';
@@ -172,6 +172,60 @@ describe('Workspace conflict recovery', () => {
     expect(refusal).toHaveTextContent(MISSING_CARD_ID);
     expect(session.getState().working).toEqual(local);
     expect(session.getState().persistence.kind).toBe('conflicted');
+  });
+
+  /**
+   * A refusal explains one remote snapshot. `resolveConflict` commits again
+   * without leaving the conflicted state, so the next conflict can arrive
+   * carrying a different — and loadable — remote. Holding the old sentence over
+   * it tells the author their work cannot be replaced when in fact it can.
+   */
+  it('drops a refusal once a different remote snapshot is the one in conflict', async () => {
+    const local = snapshot('Local workspace', 'Local card', 10, 20);
+    const dangling: SpaceSnapshot = {
+      ...local,
+      document: {
+        ...local.document,
+        title: 'Broken remote',
+        routes: [{ id: ROUTE_ID, title: 'Route', edges: [{ from: CARD_ID, to: MISSING_CARD_ID }] }],
+      },
+    };
+    const loadable = snapshot('Remote workspace', 'Remote card', 900, 700);
+    const control = new MemorySpaceBackendTestControl();
+    control.queueResult({
+      kind: 'conflict',
+      current: { snapshot: dangling, revision: 4n, exportedRevision: null },
+    });
+    control.queueResult({
+      kind: 'conflict',
+      current: { snapshot: loadable, revision: 5n, exportedRevision: null },
+    });
+    const session = openSpaceSession(new MemorySpaceBackend([], control), {
+      snapshot: local,
+      revision: 3n,
+      exportedRevision: null,
+    });
+    session.submit(local);
+    await waitFor(() => expect(session.getState().persistence.kind).toBe('conflicted'));
+
+    let view: RenderResult | undefined;
+    mountWorkspace({ space: runtime(local), spaceSession: session }, (app) => {
+      if (view === undefined) view = render(app);
+      else view.rerender(app);
+    });
+    fireEvent.click(screen.getByTestId('persistence-accept-remote'));
+    expect(await screen.findByTestId('persistence-remote-refused')).toBeVisible();
+
+    await act(async () => {
+      session.resolveConflict(local);
+      await waitFor(() => {
+        const { persistence } = session.getState();
+        expect(persistence.kind === 'conflicted' ? persistence.current.revision : null).toBe(5n);
+      });
+    });
+
+    expect(screen.queryByTestId('persistence-remote-refused')).not.toBeInTheDocument();
+    expect(screen.getByTestId('persistence-accept-remote')).toBeVisible();
   });
 
   /**

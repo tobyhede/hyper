@@ -139,15 +139,16 @@ test('a stale browser reports conflict and accepts the remote workspace without 
     // Leave the conflicted local workspace in unrelated navigation and start an
     // automatic placement just before acceptance. The stored Layout must open
     // fresh, and any result still arriving from this Graph placement is obsolete.
+    const mountedGraphArea = await stalePage.locator('.graph-area').elementHandle();
+    expect(mountedGraphArea).not.toBeNull();
+
     await stalePage.getByTestId('view-selector').click();
     await stalePage.getByRole('option', { name: 'Graph' }).click();
     await stalePage.getByTestId('route-selector').click();
     await stalePage.getByRole('option', { name: 'Echo' }).click();
+    // No wait between starting the placement and accepting: settling first would
+    // retire the very race this test exists to cover.
     await stalePage.getByTestId('present-button').click();
-    await expect(stalePage.getByTestId('presenting-chrome')).toBeVisible();
-
-    const mountedGraphArea = await stalePage.locator('.graph-area').elementHandle();
-    expect(mountedGraphArea).not.toBeNull();
 
     await acceptRemote.click();
 

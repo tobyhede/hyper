@@ -90,9 +90,14 @@ function sessionBackedAdapter(
   snapshot: SpaceSnapshot,
   renderer: RendererSelection,
   initialPlacement?: ReadonlyMap<string, LayoutPoint>,
+  /** A newer stored state, so the first commit conflicts rather than settling. */
+  stored?: SpaceSnapshot,
 ) {
   const loaded = { snapshot, revision: 0n, exportedRevision: null };
-  const session = openSpaceSession(new MemorySpaceBackend([loaded]), loaded);
+  const backend = new MemorySpaceBackend([
+    stored === undefined ? loaded : { snapshot: stored, revision: 1n, exportedRevision: null },
+  ]);
+  const session = openSpaceSession(backend, loaded);
   const currentSpace = () => {
     const result = loadSpaceSnapshot(session.getState().working);
     if (!result.ok) throw new Error(result.errors.map((error) => error.message).join('; '));
@@ -104,7 +109,7 @@ function sessionBackedAdapter(
     navigation,
     ...(initialPlacement !== undefined ? { initialPlacement } : {}),
   });
-  return { session, store: createRenderAdapter(authoring) };
+  return { session, authoring, store: createRenderAdapter(authoring) };
 }
 
 /** A Space whose Layout places Card A alone, leaving B and C unplaced. */
@@ -150,6 +155,53 @@ function sparsePositionedAdapter() {
     snapshot,
     { kind: 'layout', layoutId: LAYOUT_ID },
     new Map([[CARD_A, { x: 10, y: 20 }]]),
+  );
+}
+
+/** The same Space, with a newer one already stored — so an Edit conflicts. */
+function storedSpaceAdapter() {
+  const snapshot: SpaceSnapshot = {
+    id: SPACE_ID,
+    document: {
+      version: 2,
+      title: 'Space',
+      routes: [
+        {
+          id: ROUTE_ID,
+          title: 'Main',
+          edges: [{ from: uuidSchema.parse(CARD_A), to: uuidSchema.parse(CARD_B) }],
+        },
+      ],
+      layouts: [
+        {
+          id: LAYOUT_ID,
+          title: 'Layout 1',
+          kind: 'positioned',
+          positions: {
+            [uuidSchema.parse(CARD_A)]: { x: 10, y: 20 },
+            [uuidSchema.parse(CARD_B)]: { x: 300, y: 20 },
+          },
+        },
+      ],
+      defaultView: LAYOUT_ID,
+    },
+    cards: [
+      { id: uuidSchema.parse(CARD_A), document: { title: 'A', kind: 'markdown', body: 'A' } },
+      { id: uuidSchema.parse(CARD_B), document: { title: 'B', kind: 'markdown', body: 'B' } },
+    ],
+  };
+  const stored: SpaceSnapshot = {
+    ...snapshot,
+    document: { ...snapshot.document, title: 'Stored' },
+  };
+  return sessionBackedAdapter(
+    snapshot,
+    { kind: 'layout', layoutId: LAYOUT_ID },
+    new Map([
+      [CARD_A, { x: 10, y: 20 }],
+      [CARD_B, { x: 300, y: 20 }],
+    ]),
+    stored,
   );
 }
 
@@ -444,5 +496,54 @@ describe('render adapter', () => {
 
     expect(store.getState().moved).toBe(true);
     expect(spy.completions).toEqual([{ kind: 'settled-card-movement' }]);
+  });
+
+  /*
+   * Completing comes before the connection is drawn. A completion that refuses
+   * or throws — deriving a Space that fails intake is the realistic way —
+   * would otherwise leave the connected styling published for an Edge the
+   * Space never gained.
+   */
+  it('leaves the projected connection uncommitted when the completion fails', () => {
+    const spy = authoringSpy();
+    const failing: SpaceAuthoring = {
+      ...spy.authoring,
+      complete: () => {
+        throw new Error('Authoring produced an invalid Space');
+      },
+    };
+    const store = createRenderAdapter(failing);
+    store.getState().syncProjection(PROJECTED, []);
+    const published = store.getState().projection;
+    const projected = PROJECTED.map((card) => ({ ...card, className: 'connected' }));
+
+    expect(() =>
+      store.getState().connectCards(uuidSchema.parse(CARD_A), uuidSchema.parse(CARD_B), projected),
+    ).toThrow('Authoring produced an invalid Space');
+
+    expect(store.getState().projection).toBe(published);
+    expect(store.getState().projection?.nodes.every((card) => card.className !== 'connected')).toBe(
+      true,
+    );
+  });
+
+  /*
+   * Accepting a stored Space replaces the working state without unmounting
+   * anything, so this store is left holding a projection of Cards that may no
+   * longer exist. Local placement cannot outlive the Space it belonged to
+   * (ADR 0030).
+   */
+  it('drops the published projection when a replacement Space is opened', async () => {
+    const { store, session, authoring } = storedSpaceAdapter();
+    store.getState().syncProjection(PROJECTED, [EDGE]);
+    completeDrag(store, CARD_A, 500, 400);
+    await vi.waitFor(() => expect(session.getState().persistence.kind).toBe('conflicted'));
+    expect(store.getState().projection).not.toBeNull();
+
+    expect(authoring.acceptStoredSpace()).toBeNull();
+
+    expect(store.getState().projection).toBeNull();
+    expect(store.getState().selectedCardId).toBeNull();
+    expect(store.getState().moved).toBe(false);
   });
 });

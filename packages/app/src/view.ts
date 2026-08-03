@@ -35,7 +35,7 @@ import { elkStrategy } from '@project/react-flow-adapter';
  */
 
 /** Where a space opens when it names no view of its own. */
-const DEFAULT_VIEW_ID: BuiltInViewId = 'graph';
+export const DEFAULT_VIEW_ID: BuiltInViewId = 'graph';
 
 const BUILT_IN_STRATEGIES: Record<BuiltInViewId, () => LayoutStrategy> = {
   graph: elkStrategy,

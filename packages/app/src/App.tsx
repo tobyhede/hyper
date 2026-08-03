@@ -80,6 +80,15 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
     // for it. The workspace behind it still holds the local work and the
     // conflict, so this is a message, not a mode.
     const [remoteRefusal, setRemoteRefusal] = useState<string | null>(null);
+    // A refusal explains one remote snapshot, so it dies with it. `resolveConflict`
+    // commits again without leaving the conflicted state, so the next conflict can
+    // carry a different — and loadable — remote; holding the old sentence over it
+    // would say the local work cannot be replaced when it now can.
+    const conflictRevision =
+      sessionState.persistence.kind === 'conflicted'
+        ? sessionState.persistence.current.revision
+        : null;
+    useEffect(() => setRemoteRefusal(null), [conflictRevision]);
     const rendererSpace = useMemo(
       () => readWorkingSpace(sessionState.working),
       [sessionState.working],
@@ -378,10 +387,9 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
             <Button
               variant="default"
               data-testid="persistence-accept-remote"
-              onClick={() => {
-                const refusal = authoring.acceptStoredSpace();
-                if (refusal !== null) setRemoteRefusal(refusal);
-              }}
+              // The result of this attempt is the whole message: a success
+              // clears whatever the last attempt on this same conflict said.
+              onClick={() => setRemoteRefusal(authoring.acceptStoredSpace())}
             >
               Accept remote
             </Button>

@@ -184,6 +184,15 @@ export function createSpaceAuthoring({
   // synchronous while letting `publish` see what came back.
   const listeners = new Set<() => unknown>();
 
+  // Identity is load-bearing, not just the value: `usePlacementRendering`
+  // rebuilds the positioned strategy whenever this map changes identity and
+  // re-runs layout, so an equal placement must keep the map it already has or
+  // every projection would re-arrange a settled graph.
+  const install = (nextPlacement: ReadonlyMap<string, LayoutPoint> | null): void => {
+    if (samePlacement(placement, nextPlacement)) return;
+    placement = nextPlacement === null ? null : new Map(nextPlacement);
+  };
+
   const snapshotState = (): SpaceAuthoringState => ({
     opening,
     session: session.getState(),
@@ -201,7 +210,10 @@ export function createSpaceAuthoring({
 
   const publish = (): void => {
     state = snapshotState();
-    for (const listener of listeners) {
+    // Iterate a copy: a Set visits entries added mid-iteration, so a listener
+    // that subscribes during publication would be notified about a state it was
+    // not yet watching — and how many times depends on where it was added.
+    for (const listener of [...listeners]) {
       try {
         // Notification stays synchronous — `useSyncExternalStore` reads
         // `getState` straight after and nothing here awaits. But `() => void`
@@ -363,9 +375,25 @@ export function createSpaceAuthoring({
     completing = true;
     try {
       const result = performCompletion(completion, installedPlacement);
+      // Drain what arrived during publication. A queued Edit that cannot produce
+      // a valid Space is a diagnostic, not this Edit's outcome: the completion
+      // that drained the queue already installed and published, and charging it
+      // someone else's failure would name the wrong Edit as the broken one.
+      // Draining stops there — the rest of the queue was written against state
+      // that never came about.
       while (queued.length > 0) {
         const next = queued.shift();
-        if (next !== undefined) performCompletion(next.completion, next.placement);
+        if (next === undefined) continue;
+        try {
+          performCompletion(next.completion, next.placement);
+        } catch (error) {
+          try {
+            reportObserverError(error);
+          } catch {
+            // Diagnostics cannot interrupt Authoring.
+          }
+          break;
+        }
       }
       return result;
     } finally {
@@ -435,15 +463,7 @@ export function createSpaceAuthoring({
       listeners.add(listener);
       return () => listeners.delete(listener);
     },
-    installPlacement: (nextPlacement) => {
-      // Identity is load-bearing, not just the value: `usePlacementRendering`
-      // rebuilds the positioned strategy whenever this map changes identity and
-      // re-runs layout, so an equal placement must keep the map it already has
-      // or every projection would re-arrange a settled graph.
-      if (!samePlacement(placement, nextPlacement)) {
-        placement = nextPlacement === null ? null : new Map(nextPlacement);
-      }
-    },
+    installPlacement: install,
     canConnect,
     canCreateConnectedCard,
     complete,

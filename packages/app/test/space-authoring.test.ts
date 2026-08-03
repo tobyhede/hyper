@@ -5,11 +5,12 @@ import {
   MemorySpaceBackend,
   MemorySpaceBackendTestControl,
   openSpaceSession,
+  type SpaceBackend,
   type SpaceSession,
 } from '@project/persistence';
 import { createNavigation, type Navigation, type NavigationState } from '../src/navigation';
 import { createSpaceAuthoring, type AuthoringResult } from '../src/space-authoring';
-import type { RendererSelection } from '../src/view';
+import { layoutPositionMap, resolveView, type RendererSelection } from '../src/view';
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const CARD_A = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
@@ -19,6 +20,9 @@ const STORED_ROUTE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000006')
 const LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000021');
 const MINTED_ROUTE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000008');
 const CREATED_CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
+
+/** A Card identity no fixture Space holds, so any Layout naming it fails intake. */
+const UNKNOWN_CARD = uuidSchema.parse('00000000-0000-4000-8000-000000000099');
 
 const automaticSnapshot: SpaceSnapshot = {
   id: SPACE_ID,
@@ -32,6 +36,58 @@ const automaticSnapshot: SpaceSnapshot = {
     { id: CARD_B, document: { title: 'B', kind: 'markdown', body: 'B' } },
   ],
 };
+
+/** A Layout that places every Card the Space holds. */
+const positionedSnapshot: SpaceSnapshot = {
+  ...automaticSnapshot,
+  document: {
+    ...automaticSnapshot.document,
+    layouts: [
+      {
+        id: LAYOUT_ID,
+        title: 'Layout 1',
+        kind: 'positioned',
+        positions: { [CARD_A]: { x: 10, y: 20 }, [CARD_B]: { x: 300, y: 40 } },
+      },
+    ],
+    defaultView: LAYOUT_ID,
+  },
+};
+
+interface LoadedFixture {
+  snapshot: SpaceSnapshot;
+  revision: bigint;
+  exportedRevision: bigint | null;
+}
+
+/**
+ * Compose one workspace exactly as `createApp` does, so a test never sees a seam
+ * production does not have — in particular the Layout's own map as the opening
+ * placement. `openAuthoring` below leaves that null on purpose, for the tests
+ * that install one themselves.
+ */
+function attachAuthoring(
+  backend: SpaceBackend,
+  loaded: LoadedFixture,
+  renderer: RendererSelection,
+  reportObserverError?: (error: unknown) => void,
+) {
+  const session = openSpaceSession(backend, loaded);
+  const currentSpace = () => {
+    const result = loadSpaceSnapshot(session.getState().working);
+    if (!result.ok) throw new Error(result.errors.map((error) => error.message).join('; '));
+    return result.space;
+  };
+  const navigation = createNavigation(currentSpace, renderer);
+  const resolved = resolveView(currentSpace(), renderer);
+  const authoring = createSpaceAuthoring({
+    session,
+    navigation,
+    initialPlacement: resolved.layout === null ? null : layoutPositionMap(resolved.layout),
+    ...(reportObserverError !== undefined ? { reportObserverError } : {}),
+  });
+  return { backend, session, navigation, authoring };
+}
 
 function openAuthoring(
   snapshot: SpaceSnapshot = automaticSnapshot,
@@ -285,6 +341,44 @@ describe('Space Authoring', () => {
     expect(reentrantResult).toEqual({ kind: 'queued' });
   });
 
+  it('reports a failed queued completion instead of charging it to the Edit that drained it', () => {
+    const failures: unknown[] = [];
+    const loaded = { snapshot: positionedSnapshot, revision: 0n, exportedRevision: null };
+    // Opened with the Layout's own map already installed, as `createApp` does —
+    // the outer Edit needs a placement of its own to complete at all.
+    const { authoring, session } = attachAuthoring(
+      new MemorySpaceBackend([loaded]),
+      loaded,
+      { kind: 'layout', layoutId: LAYOUT_ID },
+      (error) => failures.push(error),
+    );
+    let reentered = false;
+    authoring.subscribe(() => {
+      if (reentered) return;
+      reentered = true;
+      // A placement naming a Card the Space does not hold cannot become a Layout.
+      authoring.installPlacement(
+        new Map([
+          [CARD_A, { x: 10, y: 20 }],
+          [UNKNOWN_CARD, { x: 700, y: 800 }],
+        ]),
+      );
+      authoring.complete({ kind: 'settled-card-movement' });
+    });
+
+    expect(authoring.complete({ kind: 'connected-cards', from: CARD_B, to: CARD_A })).toEqual({
+      kind: 'completed',
+    });
+
+    expect(failures).toHaveLength(1);
+    expect(String(failures[0])).toContain('Authoring produced an invalid Space');
+    // The Edit that drained the queue still stands.
+    expect(session.getState().working.document.routes[0]?.edges).toEqual([
+      { from: CARD_A, to: CARD_B },
+      { from: CARD_B, to: CARD_A },
+    ]);
+  });
+
   it('publishes once after the optimistic Space and navigation consequences are installed', () => {
     vi.spyOn(crypto, 'randomUUID').mockReturnValue(
       LAYOUT_ID as ReturnType<typeof crypto.randomUUID>,
@@ -317,7 +411,7 @@ describe('Space Authoring', () => {
     const { authoring, session } = openAuthoring();
     const staleCard = uuidSchema.parse('00000000-0000-4000-8000-000000000099');
 
-    expect(() => authoring.complete({ kind: 'settled-card-movement' })).not.toThrow();
+    expect(authoring.complete({ kind: 'settled-card-movement' })).toEqual({ kind: 'no-edit' });
     authoring.installPlacement(
       new Map([
         [CARD_A, { x: 10, y: 20 }],
@@ -635,14 +729,18 @@ describe('Space Authoring', () => {
       });
     }
 
-    expect(() => authoring.complete({ kind: 'connected-cards', from: CARD_B, to: CARD_A })).toThrow(
-      'submit failed',
-    );
+    // The Edit that drained the queue is not charged the failure of one it
+    // drained — it had already installed and published by then.
+    expect(authoring.complete({ kind: 'connected-cards', from: CARD_B, to: CARD_A })).toEqual({
+      kind: 'completed',
+    });
 
-    // Abandoning them silently is what makes the failure unreadable: the Edits
-    // are gone and nothing said so.
-    expect(reported).toHaveLength(1);
-    expect(String(reported[0])).toMatch(/discarded 1 queued completion/);
+    // Two reports, and both are the point. Draining stops at the first failure,
+    // so the Edit behind it never runs — and abandoning either silently is what
+    // makes the failure unreadable: the Edits are gone and nothing said so.
+    expect(reported).toHaveLength(2);
+    expect(String(reported[0])).toContain('submit failed');
+    expect(String(reported[1])).toMatch(/discarded 1 queued completion/);
   });
 
   it('contains a rejected asynchronous observer instead of letting it escape', async () => {
@@ -746,18 +844,11 @@ describe('Space Authoring', () => {
     const backend = new MemorySpaceBackend([
       { snapshot: remote, revision: 1n, exportedRevision: null },
     ]);
-    const session = openSpaceSession(backend, {
-      snapshot: positioned,
-      revision: 0n,
-      exportedRevision: null,
-    });
-    const currentSpace = () => {
-      const result = loadSpaceSnapshot(session.getState().working);
-      if (!result.ok) throw new Error(result.errors.map((error) => error.message).join('; '));
-      return result.space;
-    };
-    const navigation = createNavigation(currentSpace, { kind: 'layout', layoutId: LAYOUT_ID });
-    const authoring = createSpaceAuthoring({ session, navigation });
+    const { authoring } = attachAuthoring(
+      backend,
+      { snapshot: positioned, revision: 0n, exportedRevision: null },
+      { kind: 'layout', layoutId: LAYOUT_ID },
+    );
     authoring.installPlacement(
       new Map([
         [CARD_A, { x: 100, y: 200 }],
@@ -830,18 +921,11 @@ describe('Space Authoring', () => {
     const backend = new MemorySpaceBackend([
       { snapshot: remote, revision: 4n, exportedRevision: null },
     ]);
-    const session = openSpaceSession(backend, {
-      snapshot: positioned,
-      revision: 3n,
-      exportedRevision: null,
-    });
-    const currentSpace = () => {
-      const result = loadSpaceSnapshot(session.getState().working);
-      if (!result.ok) throw new Error(result.errors.map((error) => error.message).join('; '));
-      return result.space;
-    };
-    const navigation = createNavigation(currentSpace, { kind: 'layout', layoutId: LAYOUT_ID });
-    const authoring = createSpaceAuthoring({ session, navigation });
+    const { navigation, authoring } = attachAuthoring(
+      backend,
+      { snapshot: positioned, revision: 3n, exportedRevision: null },
+      { kind: 'layout', layoutId: LAYOUT_ID },
+    );
     authoring.installPlacement(
       new Map([
         [CARD_A, { x: 100, y: 200 }],
@@ -865,6 +949,8 @@ describe('Space Authoring', () => {
 
     expect(authoring.acceptStoredSpace()).toBeNull();
 
+    // The counter the render adapter watches to drop stale local placement.
+    expect(authoring.getState().opening).toBe(1);
     expect(authoring.getState()).toMatchObject({
       session: {
         working: remote,
@@ -885,5 +971,78 @@ describe('Space Authoring', () => {
         [CARD_B, { x: 600, y: 500 }],
       ]),
     );
+  });
+
+  it('notifies the listeners subscribed when publication began, not those added during it', () => {
+    const { authoring } = openAuthoring(positionedSnapshot, {
+      kind: 'layout',
+      layoutId: LAYOUT_ID,
+    });
+    const late: string[] = [];
+    let subscribed = false;
+    authoring.subscribe(() => {
+      if (subscribed) return;
+      subscribed = true;
+      authoring.subscribe(() => late.push('notified'));
+    });
+
+    authoring.complete({ kind: 'connected-cards', from: CARD_B, to: CARD_A });
+
+    // A listener that did not exist when this publication began has not missed
+    // anything — it reads current state on its first real notification.
+    expect(late).toEqual([]);
+  });
+
+  it('has nothing to accept when persistence is not in conflict', () => {
+    const { authoring } = openAuthoring(positionedSnapshot, {
+      kind: 'layout',
+      layoutId: LAYOUT_ID,
+    });
+    const before = authoring.getState();
+
+    expect(authoring.acceptStoredSpace()).toBeNull();
+
+    expect(authoring.getState().opening).toBe(before.opening);
+    expect(authoring.getState().session).toEqual(before.session);
+    expect(authoring.getState().navigation).toEqual(before.navigation);
+  });
+
+  it('refuses a stored Space that does not load and keeps the local work', async () => {
+    const dangling: SpaceSnapshot = {
+      ...positionedSnapshot,
+      document: {
+        ...positionedSnapshot.document,
+        title: 'Stored',
+        routes: [{ id: ROUTE_ID, title: 'Main', edges: [{ from: CARD_A, to: UNKNOWN_CARD }] }],
+      },
+    };
+    const backend = new MemorySpaceBackend([
+      { snapshot: dangling, revision: 4n, exportedRevision: null },
+    ]);
+    const { authoring } = attachAuthoring(
+      backend,
+      { snapshot: positionedSnapshot, revision: 3n, exportedRevision: null },
+      { kind: 'layout', layoutId: LAYOUT_ID },
+    );
+    authoring.installPlacement(
+      new Map([
+        [CARD_A, { x: 500, y: 600 }],
+        [CARD_B, { x: 300, y: 40 }],
+      ]),
+    );
+    authoring.complete({ kind: 'settled-card-movement' });
+    await vi.waitFor(() =>
+      expect(authoring.getState().session.persistence.kind).toBe('conflicted'),
+    );
+    const before = authoring.getState();
+
+    const refusal = authoring.acceptStoredSpace();
+
+    expect(refusal).toBe(
+      `The remote space is invalid and was not accepted:\n  - Route "${ROUTE_ID}" edge 0 references missing card "${UNKNOWN_CARD}" as its to`,
+    );
+    expect(authoring.getState().opening).toBe(before.opening);
+    expect(authoring.getState().session).toEqual(before.session);
+    expect(authoring.getState().session.persistence.kind).toBe('conflicted');
   });
 });

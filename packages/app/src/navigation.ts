@@ -1,6 +1,6 @@
 import type { BuiltInViewId, CardId, RouteId } from '@project/core';
 import { getCard, getRoute, outgoingEdges, routeStartCard, type Space } from '@project/graph';
-import { resolveView, type RendererSelection } from './view';
+import { DEFAULT_VIEW_ID, resolveView, type RendererSelection } from './view';
 
 export type NavigationMode = 'overview' | 'presenting';
 
@@ -59,7 +59,7 @@ export function createNavigation(
   const initialView = resolveView(initialSpace, initialRenderer);
   let state: NavigationState = {
     selectedRenderer: initialRenderer,
-    selectedView: initialRenderer.kind === 'view' ? initialRenderer.view : 'graph',
+    selectedView: initialRenderer.kind === 'view' ? initialRenderer.view : DEFAULT_VIEW_ID,
     mode: 'overview',
     activeRouteId: initialView.activeRouteId,
     walk: [],
@@ -95,7 +95,7 @@ export function createNavigation(
       const view = resolveView(currentSpace(), selection);
       setState({
         selectedRenderer: selection,
-        selectedView: selection.kind === 'view' ? selection.view : 'graph',
+        selectedView: selection.kind === 'view' ? selection.view : DEFAULT_VIEW_ID,
         activeRouteId: view.activeRouteId,
         mode: 'overview',
         walk: [],

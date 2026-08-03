@@ -110,8 +110,14 @@ describe('openSpaceSession', () => {
     session.subscribe(() => {
       throw new Error('observer failed');
     });
+    // The point of the test: a failing observer, whose failure also fails to
+    // report, must not cost the observers behind it their notification.
+    const observedTitles: string[] = [];
+    session.subscribe(() => observedTitles.push(session.getState().working.document.title));
 
     expect(() => session.submit(changedTitle('Still persisted'))).not.toThrow();
+
+    expect(observedTitles).toContain('Still persisted');
 
     await waitFor(
       session.getState,
