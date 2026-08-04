@@ -363,10 +363,15 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
     );
     const openCardForEditing = useCallback(
       (cardIdInput: string): void => {
+        // An opened Card covers the graph, so a pointer cannot reach a second
+        // one — but the pane traps no focus, and `Enter` on a node still behind
+        // it asked to open that Card, swapping the pane's subject out from under
+        // a draft in progress. Declining here matches what the pointer can do.
+        if (openedCardId !== null) return;
         const cardId = uuidSchema.safeParse(cardIdInput);
         if (cardId.success && editableCardIds.has(cardId.data)) openCard(cardId.data);
       },
-      [openCard, editableCardIds],
+      [openCard, editableCardIds, openedCardId],
     );
 
     const openedCard = openedCardId ? getCard(rendererSpace, openedCardId) : undefined;

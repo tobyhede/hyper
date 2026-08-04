@@ -33,13 +33,42 @@ describe('the opened Card', () => {
       'Where every route begins',
     );
     expect(screen.getByRole('textbox', { name: 'Markdown source' })).toHaveValue('**A** source');
-    expect(screen.queryByRole('button', { name: 'Edit Card' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Edit Card/ })).not.toBeInTheDocument();
   });
 
   it('opens with the title focused, which is what an author names first', () => {
     render(<OpenCard content={markdown()} onComplete={vi.fn()} onCancel={vi.fn()} />);
 
     expect(screen.getByRole('textbox', { name: 'Title' })).toHaveFocus();
+  });
+
+  /**
+   * The draft is seeded from `content` once and then owned by the editor, so the
+   * two must not come apart: handed a different Card, the editor has to be a
+   * different editor. Reusing one carried the first Card's text onto the second
+   * under the second's id, and completing wrote it there.
+   *
+   * `App` also declines to open a second Card while one is open, which is the
+   * only way this was reachable. Pinned here anyway — the rule is the editor's,
+   * and a component that only holds while its caller guards it is one refactor
+   * from silently corrupting a Card.
+   */
+  it('never shows one Card’s draft under another Card’s identity', () => {
+    const other = {
+      id: uuidSchema.parse('00000000-0000-4000-8000-000000000003'),
+      title: 'B',
+      kind: 'markdown' as const,
+      body: '**B** source',
+    };
+    const view = render(<OpenCard content={markdown()} onComplete={vi.fn()} onCancel={vi.fn()} />);
+    fireEvent.change(screen.getByRole('textbox', { name: 'Markdown source' }), {
+      target: { value: 'A rewritten' },
+    });
+
+    view.rerender(<OpenCard content={other} onComplete={vi.fn()} onCancel={vi.fn()} />);
+
+    expect(screen.getByRole('textbox', { name: 'Title' })).toHaveValue('B');
+    expect(screen.getByRole('textbox', { name: 'Markdown source' })).toHaveValue('**B** source');
   });
 
   it('completes one whole Card from all three fields', () => {

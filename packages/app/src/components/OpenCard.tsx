@@ -180,7 +180,13 @@ export function OpenCard({ content, onComplete, onCancel }: OpenCardProps) {
     <div className="open-card" data-testid="open-card">
       <div className="open-card__panel">
         {onComplete === undefined ? null : (
+          // Keyed by Card, because the draft is seeded from `card` once and then
+          // owned by the editor. Without this, opening a second Card without
+          // closing the first reuses the same element in the same position: the
+          // draft survives while `card.id` changes underneath it, and `Done`
+          // writes the first Card's title and body onto the second.
           <ResolvedContentEditor
+            key={content.id}
             card={content}
             onComplete={(completed) => {
               onComplete(completed);

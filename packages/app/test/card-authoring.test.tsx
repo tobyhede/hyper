@@ -58,6 +58,11 @@ function mount(): SpaceSession {
 const cardTitleOf = (session: SpaceSession, cardId: string): string | undefined =>
   session.getState().working.cards.find((card) => card.id === cardId)?.document.title;
 
+const bodyOf = (session: SpaceSession, cardId: string): string | undefined => {
+  const document = session.getState().working.cards.find((card) => card.id === cardId)?.document;
+  return document?.kind === 'markdown' ? document.body : undefined;
+};
+
 /**
  * Persistence is asynchronous and the strategy that places Cards is too, so a
  * test that ends the moment it has asserted leaves both to land against an
@@ -160,7 +165,7 @@ describe('authoring an opened Card', () => {
     fireEvent.click(screen.getByTestId('present-button'));
 
     expect(screen.queryByTestId('open-card')).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Edit Card' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Edit Card/ })).not.toBeInTheDocument();
     await settled(session);
   });
 
@@ -177,6 +182,62 @@ describe('authoring an opened Card', () => {
     expect(screen.queryByTestId('open-card')).not.toBeInTheDocument();
     await settled(session);
   });
+
+  /**
+   * The pane keeps its draft in `useState`, seeded once from the Card it was
+   * mounted on. Opening a second Card without closing the first therefore had
+   * the same React element in the same position — so the state survived while
+   * `card.id` changed underneath it, and the fields were now A's text wearing
+   * B's identity. `Done` then wrote A's title and body over B.
+   *
+   * Reachable from the keyboard: the pane traps nothing, so `Enter` on a node
+   * behind it opens that Card (`GraphView`'s handler only declines while
+   * presenting).
+   */
+  it('never carries one Card’s draft onto another', async () => {
+    const session = mount();
+    await openEditor();
+    fireEvent.change(screen.getByRole('textbox', { name: 'Markdown source' }), {
+      target: { value: 'A rewritten' },
+    });
+
+    const other = (await screen.findByRole('heading', { name: 'B' })).closest('.react-flow__node');
+    if (other === null) throw new Error('Card B is not drawn as a node');
+    fireEvent.keyDown(other, { key: 'Enter' });
+
+    // Whatever the pane shows, it must not be A's draft under B's id.
+    expect(screen.getByRole('textbox', { name: 'Title' })).toHaveValue('A');
+    expect(screen.getByRole('textbox', { name: 'Markdown source' })).toHaveValue('A rewritten');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+
+    expect(cardTitleOf(session, OTHER_CARD_ID)).toBe('B');
+    expect(bodyOf(session, OTHER_CARD_ID)).toBe('B source');
+    await settled(session);
+  });
+
+  /**
+   * Two handlers answer Escape — the form's own cancel, and the window listener
+   * `App` registers while a Card is open — and which one runs depends on where
+   * the key lands. Outside the fields only the listener does. Both close without
+   * committing, so the pane behaves the same either way; this is what says so,
+   * since the form's `stopPropagation` makes it easy to assume otherwise.
+   */
+  it('closes without committing when Escape is pressed outside the fields', async () => {
+    const session = mount();
+    await openEditor();
+    fireEvent.change(screen.getByRole('textbox', { name: 'Markdown source' }), {
+      target: { value: 'A rewritten' },
+    });
+
+    const panel = screen.getByTestId('open-card');
+    fireEvent.click(panel);
+    fireEvent.keyDown(panel, { key: 'Escape' });
+
+    expect(screen.queryByTestId('open-card')).not.toBeInTheDocument();
+    expect(bodyOf(session, CARD_ID)).toBe('A source');
+    await settled(session);
+  });
 });
 
 describe('the Card affordance on the graph', () => {
@@ -187,7 +248,7 @@ describe('the Card affordance on the graph', () => {
 
     expect(screen.getByRole('textbox', { name: 'Title' })).toHaveValue('A');
     expect(screen.getByRole('textbox', { name: 'Markdown source' })).toHaveValue('A source');
-    expect(screen.queryByRole('button', { name: 'Edit Card' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Edit Card/ })).not.toBeInTheDocument();
     await settled(session);
   });
 
