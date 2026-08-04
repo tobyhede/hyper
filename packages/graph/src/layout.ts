@@ -17,7 +17,7 @@
  * consume.
  */
 
-import type { CardId } from '@project/core';
+import type { CardId, LayoutPosition } from '@project/core';
 import type { CardHandleSet, GraphEdge } from './routes';
 
 /** A port on a card, by the handle id the render layer knows it by. */
@@ -39,12 +39,6 @@ export interface LayoutCard {
   y?: number;
 }
 
-/** A point in the layout's coordinate space (same space as a card's `x`/`y`). */
-export interface LayoutPoint {
-  x: number;
-  y: number;
-}
-
 /**
  * A routed span of an edge: where it starts, where it ends, and the corners it
  * turns through in between. Mirrors ELK's `ElkEdgeSection` — an orthogonal
@@ -52,9 +46,9 @@ export interface LayoutPoint {
  * across them, and the bend points are how it does that.
  */
 export interface LayoutEdgeSection {
-  startPoint: LayoutPoint;
-  endPoint: LayoutPoint;
-  bendPoints?: LayoutPoint[];
+  startPoint: LayoutPosition;
+  endPoint: LayoutPosition;
+  bendPoints?: LayoutPosition[];
 }
 
 export interface LayoutEdge {

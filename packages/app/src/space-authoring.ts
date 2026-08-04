@@ -2,10 +2,11 @@ import {
   newUuid,
   type CardDocument,
   type CardId,
+  type LayoutPosition,
   type SpaceSnapshot,
   type UUID,
 } from '@project/core';
-import { loadSpaceSnapshot, Placement, type LayoutPoint } from '@project/graph';
+import { loadSpaceSnapshot, Placement } from '@project/graph';
 import type { SpaceSession, SpaceSessionState } from '@project/persistence';
 import type { Navigation, NavigationState } from './navigation';
 import { updatePositionedLayout } from './snapshot';
@@ -18,7 +19,7 @@ export type AuthoringCompletion =
   | {
       readonly kind: 'create-and-connect';
       readonly from: CardId;
-      readonly position: LayoutPoint;
+      readonly position: LayoutPosition;
     };
 
 export type AuthoringResult =

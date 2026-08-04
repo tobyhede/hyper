@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { ReactFlowProvider } from '@xyflow/react';
 import { AppShell, Button, LayoutSelector, RouteSelector, ViewSelector } from '@project/ui';
-import { cardDocumentSchema, uuidSchema } from '@project/core';
+import { cardDocumentSchema, uuidSchema, type LayoutPosition } from '@project/core';
 import {
   projectCardNodes,
   projectRouteEdges,
@@ -16,7 +16,6 @@ import {
   Placement,
   routeCardIds,
   resolveContentCard,
-  type LayoutPoint,
   type ResolvedContentCard,
 } from '@project/graph';
 import type { OpenedSpace } from './space';
@@ -312,7 +311,7 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
       });
     }, []);
 
-    const createConnectedCard = useCallback((sourceId: string, position: LayoutPoint) => {
+    const createConnectedCard = useCallback((sourceId: string, position: LayoutPosition) => {
       const cardId = useRenderAdapter
         .getState()
         .createConnectedCard(uuidSchema.parse(sourceId), position);
