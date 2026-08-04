@@ -15,6 +15,8 @@ import { resolveView, type RendererSelection } from '../src/view';
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const CARD_A = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 const CARD_B = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
+/** A third Card that owns its content, so an Alias may legally target it. */
+const CARD_C = uuidSchema.parse('00000000-0000-4000-8000-000000000007');
 const ROUTE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
 const STORED_ROUTE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000006');
 const LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000021');
@@ -115,8 +117,260 @@ function openAuthoring(
   };
 }
 
+/**
+ * `CARD_B` aliases `CARD_A`, and `CARD_C` is a third Card that owns its content.
+ *
+ * The separate target is what lets the refusal tests below name their reason:
+ * every Alias edit they attempt produces a Space that *loads*, so the only thing
+ * that can answer `no-edit` is the guard each one is about. Aimed at the Alias
+ * instead, a guard removed would leave `loadSpaceSnapshot` to reject the chain
+ * and the test to fail by throwing — still red, but red about the validator
+ * rather than about the refusal it is named for.
+ */
+const openRefusalFixture = () => {
+  const aliased: SpaceSnapshot = {
+    ...positionedSnapshot,
+    cards: [
+      positionedSnapshot.cards[0]!,
+      { id: CARD_B, document: { title: 'A again', kind: 'alias', target: CARD_A } },
+      { id: CARD_C, document: { title: 'C', kind: 'markdown', body: 'C' } },
+    ],
+  };
+  const opened = openAuthoring(aliased, { kind: 'layout', layoutId: LAYOUT_ID });
+  opened.authoring.installPlacement(
+    Placement.fromEntries([
+      [CARD_A, { x: 10, y: 20 }],
+      [CARD_B, { x: 300, y: 40 }],
+      [CARD_C, { x: 600, y: 40 }],
+    ]),
+  );
+  return opened;
+};
+
 describe('Space Authoring', () => {
   afterEach(() => vi.restoreAllMocks());
+
+  it('renames a Card and converts the Algorithmic View from the completed placement', () => {
+    vi.spyOn(crypto, 'randomUUID').mockReturnValue(
+      LAYOUT_ID as ReturnType<typeof crypto.randomUUID>,
+    );
+    const { authoring, session, navigation } = openAuthoring();
+    authoring.installPlacement(
+      Placement.fromEntries([
+        [CARD_A, { x: 10, y: 20 }],
+        [CARD_B, { x: 300, y: 40 }],
+      ]),
+    );
+    authoring.installCardDocument(CARD_A, {
+      title: 'Renamed A',
+      kind: 'markdown',
+      body: 'A',
+    });
+
+    expect(authoring.complete({ kind: 'edited-card', cardId: CARD_A })).toEqual({
+      kind: 'completed',
+    });
+
+    expect(session.getState().working.cards).toEqual([
+      { id: CARD_A, document: { title: 'Renamed A', kind: 'markdown', body: 'A' } },
+      { id: CARD_B, document: { title: 'B', kind: 'markdown', body: 'B' } },
+    ]);
+    expect(session.getState().working.document.layouts?.[0]?.positions).toEqual({
+      [CARD_A]: { x: 10, y: 20 },
+      [CARD_B]: { x: 300, y: 40 },
+    });
+    // Written *and* selected. A conversion that stored the Layout without
+    // repointing the renderer leaves the graph drawing the Algorithmic View it
+    // just replaced, so the next placement would be computed rather than read
+    // back from the Layout this Edit created.
+    expect(navigation.getState().selectedRenderer).toEqual({ kind: 'layout', layoutId: LAYOUT_ID });
+  });
+
+  /**
+   * An installed Card value is one hand-off, not a standing entry. An editor
+   * installs its authoritative value *before* it reports the Edit, so the value
+   * belongs to that report and to nothing after it. Left behind by a completion
+   * that produced no Edit, it becomes state waiting to be applied by whatever
+   * `edited-card` arrives next — a rename the author had abandoned, landing on a
+   * Space they have since changed.
+   */
+  it('does not leave a Card value behind for the next completion to apply', () => {
+    const { authoring, session } = openAuthoring();
+    authoring.installCardDocument(CARD_A, {
+      title: 'Abandoned rename',
+      kind: 'markdown',
+      body: 'A',
+    });
+    // No placement: an Algorithmic View has nothing to write the Edit into yet.
+    expect(authoring.complete({ kind: 'edited-card', cardId: CARD_A })).toEqual({
+      kind: 'no-edit',
+    });
+
+    authoring.installPlacement(
+      Placement.fromEntries([
+        [CARD_A, { x: 10, y: 20 }],
+        [CARD_B, { x: 300, y: 40 }],
+      ]),
+    );
+
+    expect(authoring.complete({ kind: 'edited-card', cardId: CARD_A })).toEqual({
+      kind: 'no-edit',
+    });
+    expect(session.getState().working.cards).toEqual(automaticSnapshot.cards);
+  });
+
+  it('treats an unchanged Card as no Edit before converting or submitting', () => {
+    const minted = vi.spyOn(crypto, 'randomUUID');
+    const control = new MemorySpaceBackendTestControl();
+    const loaded = { snapshot: automaticSnapshot, revision: 0n, exportedRevision: null };
+    const { authoring, session } = attachAuthoring(
+      new MemorySpaceBackend([loaded], control),
+      loaded,
+      { kind: 'view', view: 'graph' },
+    );
+    authoring.installPlacement(
+      Placement.fromEntries([
+        [CARD_A, { x: 10, y: 20 }],
+        [CARD_B, { x: 300, y: 40 }],
+      ]),
+    );
+    const before = session.getState().working;
+    authoring.installCardDocument(CARD_A, automaticSnapshot.cards[0]!.document);
+
+    expect(authoring.complete({ kind: 'edited-card', cardId: CARD_A })).toEqual({
+      kind: 'no-edit',
+    });
+    expect(session.getState().working).toBe(before);
+    expect(control.attempts).toEqual([]);
+    expect(minted).not.toHaveBeenCalled();
+  });
+
+  it('submits one complete Markdown Card Edit without changing Space structure', () => {
+    const control = new MemorySpaceBackendTestControl();
+    const loaded = { snapshot: positionedSnapshot, revision: 0n, exportedRevision: null };
+    const { authoring, session } = attachAuthoring(
+      new MemorySpaceBackend([loaded], control),
+      loaded,
+      { kind: 'layout', layoutId: LAYOUT_ID },
+    );
+    authoring.installCardDocument(CARD_A, {
+      title: 'A',
+      description: 'Edited in place',
+      kind: 'markdown',
+      body: '# Edited',
+    });
+
+    expect(authoring.complete({ kind: 'edited-card', cardId: CARD_A })).toEqual({
+      kind: 'completed',
+    });
+
+    expect(control.attempts).toHaveLength(1);
+    expect(control.attempts[0]?.snapshot.cards[0]?.document).toEqual({
+      title: 'A',
+      description: 'Edited in place',
+      kind: 'markdown',
+      body: '# Edited',
+    });
+    expect(session.getState().working.document.routes).toEqual(positionedSnapshot.document.routes);
+    expect(session.getState().working.document.layouts).toEqual([
+      {
+        ...positionedSnapshot.document.layouts![0]!,
+        activeRoute: ROUTE_ID,
+      },
+    ]);
+  });
+
+  it("renames an Alias without changing the target Card's content", () => {
+    const aliased: SpaceSnapshot = {
+      ...positionedSnapshot,
+      cards: [
+        positionedSnapshot.cards[0]!,
+        { id: CARD_B, document: { title: 'A again', kind: 'alias', target: CARD_A } },
+      ],
+    };
+    const { authoring, session } = openAuthoring(aliased, {
+      kind: 'layout',
+      layoutId: LAYOUT_ID,
+    });
+    authoring.installPlacement(
+      Placement.fromEntries([
+        [CARD_A, { x: 10, y: 20 }],
+        [CARD_B, { x: 300, y: 40 }],
+      ]),
+    );
+    authoring.installCardDocument(CARD_B, {
+      title: 'Reframed A',
+      kind: 'alias',
+      target: CARD_A,
+    });
+
+    expect(authoring.complete({ kind: 'edited-card', cardId: CARD_B })).toEqual({
+      kind: 'completed',
+    });
+    expect(session.getState().working.cards).toEqual([
+      positionedSnapshot.cards[0],
+      { id: CARD_B, document: { title: 'Reframed A', kind: 'alias', target: CARD_A } },
+    ]);
+  });
+
+  it('refuses converting a Card to another kind through Card editing', () => {
+    const { authoring, session } = openRefusalFixture();
+    const before = session.getState().working;
+
+    // Targets `CARD_C`, which owns its content, so this conversion would produce
+    // a Space that loads and `isSupportedCardEdit` is the only thing that can
+    // refuse it. Pointed at the Alias instead, the Alias chain would be rejected
+    // by intake and the failure would say nothing about the guard under test.
+    authoring.installCardDocument(CARD_A, {
+      title: 'Converted A',
+      kind: 'alias',
+      target: CARD_C,
+    });
+
+    expect(authoring.complete({ kind: 'edited-card', cardId: CARD_A })).toEqual({
+      kind: 'no-edit',
+    });
+    expect(session.getState().working).toBe(before);
+  });
+
+  /**
+   * Where an Alias points is structure, not the content it shows, and Card
+   * editing does not author structure. Both changes below produce a Space that
+   * loads — `CARD_C` owns its content and the description is valid — so the only
+   * thing that can refuse them is the guard under test.
+   */
+  it("refuses moving an Alias's target through Card editing", () => {
+    const { authoring, session } = openRefusalFixture();
+    const before = session.getState().working;
+
+    authoring.installCardDocument(CARD_B, {
+      title: 'A again',
+      kind: 'alias',
+      target: CARD_C,
+    });
+
+    expect(authoring.complete({ kind: 'edited-card', cardId: CARD_B })).toEqual({
+      kind: 'no-edit',
+    });
+    expect(session.getState().working).toBe(before);
+  });
+
+  it('refuses adding a description to an Alias through Card editing', () => {
+    const { authoring, session } = openRefusalFixture();
+    const before = session.getState().working;
+
+    authoring.installCardDocument(CARD_B, {
+      title: 'A again',
+      description: 'Alias metadata is not content',
+      kind: 'alias',
+      target: CARD_A,
+    });
+
+    expect(authoring.complete({ kind: 'edited-card', cardId: CARD_B })).toEqual({
+      kind: 'no-edit',
+    });
+    expect(session.getState().working).toBe(before);
+  });
 
   it('converts an Algorithmic View from the completed on-screen placement', () => {
     vi.spyOn(crypto, 'randomUUID').mockReturnValue(
@@ -1217,8 +1471,16 @@ describe('Space Authoring', () => {
     navigation.selectRenderer({ kind: 'view', view: 'grid' });
     navigation.present();
     navigation.openCard(CARD_B);
+    authoring.installCardDocument(CARD_A, {
+      title: 'Stale local title',
+      kind: 'markdown',
+      body: 'stale local body',
+    });
 
     expect(authoring.acceptStoredSpace()).toBeNull();
+    expect(authoring.complete({ kind: 'edited-card', cardId: CARD_A })).toEqual({
+      kind: 'no-edit',
+    });
 
     // The counter the render adapter watches to drop stale local placement.
     expect(authoring.getState().opening).toBe(1);

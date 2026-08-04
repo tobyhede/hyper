@@ -133,7 +133,7 @@ test('Alt empty-drop creates, connects and selects Card 2 at the previewed posit
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
   await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
   await expect(authoringHandle(created, 'source', 'left')).toHaveCSS('opacity', '1');
-  await expect(page.getByTestId('close-card')).toHaveCount(0);
+  await expect(page.getByTestId('open-card')).toHaveCount(0);
 
   await settled(page);
   await created.hover();

@@ -1,5 +1,5 @@
 import '@testing-library/jest-dom/vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import type * as ReactFlowReact from '@xyflow/react';
 import { Position, type NodeProps } from '@xyflow/react';
 import type { HTMLAttributes } from 'react';
@@ -74,6 +74,13 @@ const outHandle = (route: typeof routeId, offsetY: number): CardHandle => ({
 interface Overrides {
   selected?: boolean;
   title?: string;
+  titleEditingEnabled?: boolean;
+  cardEditingEnabled?: boolean;
+  editingTitle?: boolean;
+  onEditCard?: () => void;
+  onBeginTitleEditing?: () => void;
+  onCompleteTitleEditing?: (title: string) => string | null;
+  onCancelTitleEditing?: () => void;
   sourceHandles?: CardHandle[];
   targetHandles?: CardHandle[];
 }
@@ -81,6 +88,13 @@ interface Overrides {
 function props({
   selected = false,
   title = 'A',
+  titleEditingEnabled = false,
+  cardEditingEnabled = false,
+  editingTitle = false,
+  onEditCard,
+  onBeginTitleEditing,
+  onCompleteTitleEditing,
+  onCancelTitleEditing,
   sourceHandles = [outHandle(routeId, 50)],
   targetHandles = [],
 }: Overrides = {}): NodeProps<CardFlowNode> {
@@ -99,6 +113,13 @@ function props({
     data: {
       cardId,
       title,
+      titleEditingEnabled,
+      cardEditingEnabled,
+      editingTitle,
+      ...(onEditCard !== undefined ? { onEditCard } : {}),
+      ...(onBeginTitleEditing !== undefined ? { onBeginTitleEditing } : {}),
+      ...(onCompleteTitleEditing !== undefined ? { onCompleteTitleEditing } : {}),
+      ...(onCancelTitleEditing !== undefined ? { onCancelTitleEditing } : {}),
       active: false,
       selectedForAuthoring: false,
       showContent: false,
@@ -110,6 +131,123 @@ function props({
     },
   };
 }
+
+describe('CardNode title authoring', () => {
+  it('begins inline title editing from a double click on the title', () => {
+    const onBeginTitleEditing = vi.fn();
+    const { rerender } = render(
+      <CardNode {...props({ selected: true, titleEditingEnabled: true, onBeginTitleEditing })} />,
+    );
+
+    fireEvent.doubleClick(screen.getByRole('heading', { name: 'A' }));
+    expect(onBeginTitleEditing).toHaveBeenCalledOnce();
+
+    rerender(
+      <CardNode
+        {...props({
+          selected: true,
+          titleEditingEnabled: true,
+          editingTitle: true,
+          onBeginTitleEditing,
+        })}
+      />,
+    );
+    expect(screen.getByRole('textbox', { name: 'Card title' })).toHaveValue('A');
+  });
+
+  /**
+   * The pencil edits the Card, not one field of it — it opens the description
+   * and Markdown surface. Renaming is the title's own gesture and `F2`.
+   */
+  it('edits the Card from the affordance, without touching the title', () => {
+    const onEditCard = vi.fn();
+    const onBeginTitleEditing = vi.fn();
+    render(
+      <CardNode
+        {...props({
+          selected: true,
+          titleEditingEnabled: true,
+          cardEditingEnabled: true,
+          onEditCard,
+          onBeginTitleEditing,
+        })}
+      />,
+    );
+
+    screen.getByRole('button', { name: 'Edit Card A' }).click();
+
+    expect(onEditCard).toHaveBeenCalledOnce();
+    expect(onBeginTitleEditing).not.toHaveBeenCalled();
+  });
+
+  it('offers no affordance on a Card that owns no content to edit', () => {
+    render(<CardNode {...props({ selected: true, titleEditingEnabled: true })} />);
+
+    expect(screen.queryByRole('button', { name: /^Edit Card/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'A' })).toBeVisible();
+  });
+
+  it('keeps an invalid title local and completes a valid title with Enter', () => {
+    const onCompleteTitleEditing = vi.fn((title: string) =>
+      title.length === 0 ? 'A Card title is required.' : null,
+    );
+    render(
+      <CardNode
+        {...props({
+          selected: true,
+          titleEditingEnabled: true,
+          editingTitle: true,
+          onCompleteTitleEditing,
+        })}
+      />,
+    );
+    const input = screen.getByRole('textbox', { name: 'Card title' });
+
+    fireEvent.change(input, { target: { value: '' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(screen.getByRole('alert')).toHaveTextContent('A Card title is required.');
+    expect(onCompleteTitleEditing).toHaveBeenLastCalledWith('');
+
+    fireEvent.change(input, { target: { value: 'Renamed A' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(onCompleteTitleEditing).toHaveBeenLastCalledWith('Renamed A');
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('completes on blur and cancels on Escape without leaking editor events', () => {
+    const onCompleteTitleEditing = vi.fn(() => null);
+    const onCancelTitleEditing = vi.fn();
+    const leakedClick = vi.fn();
+    const leakedPointer = vi.fn();
+    const leakedKey = vi.fn();
+    render(
+      <div onClick={leakedClick} onPointerDown={leakedPointer} onKeyDown={leakedKey}>
+        <CardNode
+          {...props({
+            selected: true,
+            titleEditingEnabled: true,
+            editingTitle: true,
+            onCompleteTitleEditing,
+            onCancelTitleEditing,
+          })}
+        />
+      </div>,
+    );
+    const input = screen.getByRole('textbox', { name: 'Card title' });
+
+    fireEvent.change(input, { target: { value: 'Blurred A' } });
+    fireEvent.pointerDown(input);
+    fireEvent.click(input);
+    fireEvent.blur(input);
+    expect(onCompleteTitleEditing).toHaveBeenCalledWith('Blurred A');
+
+    fireEvent.keyDown(input, { key: 'Escape' });
+    expect(onCancelTitleEditing).toHaveBeenCalledOnce();
+    expect(leakedClick).not.toHaveBeenCalled();
+    expect(leakedPointer).not.toHaveBeenCalled();
+    expect(leakedKey).not.toHaveBeenCalled();
+  });
+});
 
 /** The four spatial handles of one role, read back as whether a drag may begin
  *  or end at each. */

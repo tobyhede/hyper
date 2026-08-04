@@ -76,6 +76,24 @@ export const PresentIcon = ({ color }: { color: string }) => (
   </svg>
 );
 
+/** A pencil, for the control that renames a Card where its title is drawn. */
+export const EditIcon = () => (
+  <svg
+    width="14"
+    height="14"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.6"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
+    <path d="M4 20h4L19.5 8.5a2.5 2.5 0 0 0-3.5-3.5L4.5 16.5z" />
+    <path d="M14.5 6.5 18 10" />
+  </svg>
+);
+
 export const CheckIcon = () => (
   <svg
     width="14"

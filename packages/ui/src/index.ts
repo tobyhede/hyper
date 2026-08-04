@@ -16,7 +16,15 @@ export { LayoutSelector } from './LayoutSelector';
 export type { LayoutSelectorProps } from './LayoutSelector';
 export { ViewSelector } from './ViewSelector';
 export type { AlgorithmicViewId, ViewSelectorProps } from './ViewSelector';
-export { CheckIcon, GraphIcon, GridIcon, LayoutIcon, PresentIcon, RouteIcon } from './icons';
+export {
+  CheckIcon,
+  EditIcon,
+  GraphIcon,
+  GridIcon,
+  LayoutIcon,
+  PresentIcon,
+  RouteIcon,
+} from './icons';
 export {
   Select,
   SelectContent,

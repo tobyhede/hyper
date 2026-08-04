@@ -146,7 +146,10 @@ test('returning to the overview restores the space and its gestures', async ({ p
   await expect(activeCard(page)).toHaveCount(0);
   await expect(page.getByTestId('card')).toHaveCount(10);
 
-  // Clicking opens again.
-  await nodeByTitle(page, 'B').click();
+  // Opening works again — through the Card's own control, which is the only
+  // pointer route to it (ADR 0036, 0037).
+  const b = nodeByTitle(page, 'B');
+  await b.hover();
+  await b.getByRole('button', { name: 'Edit Card B' }).click();
   await expect(page.getByTestId('open-card')).toBeVisible();
 });

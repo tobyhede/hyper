@@ -1,6 +1,7 @@
 // `test` comes from ./fixtures, not @playwright/test — it carries the auto-use
 // gate that fails a test if React Flow logged a warning while it ran.
 import { expect, test, type Locator, type Page } from './fixtures';
+import { openCard } from './graph';
 
 // The app loads the abstract layout fixture (packages/app/fixture) — two
 // disconnected collections sharing no cards, laid out by ELK as separate bands:
@@ -150,19 +151,20 @@ test('a card shows its title in the graph, and opens to show its Markdown source
   await expect(page.getByTestId('open-card')).toBeHidden();
 
   // Opening shows the Markdown source verbatim, not rendered (ADR 0011) — the
-  // `**` emphasis markers survive rather than becoming bold text.
-  await a.click();
+  // `**` emphasis markers survive rather than becoming bold text — and it is
+  // editable on arrival (ADR 0037).
+  await openCard(a, 'A');
   const opened = page.getByTestId('open-card');
   await expect(opened).toBeVisible();
-  await expect(opened).toContainText('**A**');
+  await expect(opened.getByRole('textbox', { name: 'Markdown source' })).toHaveValue(/\*\*A\*\*/);
 
-  await page.getByTestId('close-card').click();
+  await page.getByRole('button', { name: 'Cancel' }).click();
   await expect(opened).toBeHidden();
 });
 
 test('escape closes an opened card', async ({ page }) => {
   await page.goto('/');
-  await page.locator('.react-flow__node').first().click();
+  await openCard(nodeByTitle(page, 'A').first(), 'A');
   await expect(page.getByTestId('open-card')).toBeVisible();
 
   await page.keyboard.press('Escape');
@@ -176,8 +178,10 @@ test('a card can be opened even when it is not on the selected route', async ({ 
   await page.getByTestId('route-selector').click();
   await page.getByRole('option', { name: 'Long' }).click();
 
-  await nodeByTitle(page, 'E').click();
-  await expect(page.getByTestId('open-card')).toContainText('Echo collection');
+  await openCard(nodeByTitle(page, 'E'), 'E');
+  await expect(
+    page.getByTestId('open-card').getByRole('textbox', { name: 'Markdown source' }),
+  ).toHaveValue(/Echo collection/);
 });
 
 test('cards are drawn at exactly the size the layout placed them at', async ({ page }) => {
@@ -218,7 +222,7 @@ test('the card frame is 16:9, and letterboxes rather than reshaping content', as
 
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto('/');
-  await page.locator('.react-flow__node').first().click();
+  await openCard(nodeByTitle(page, 'A').first(), 'A');
   await expect(page.getByTestId('open-card')).toBeVisible();
   expect(await ratio()).toBeCloseTo(16 / 9, 1);
 
@@ -244,8 +248,8 @@ test('content that exceeds the frame scrolls inside it, keeping controls reachab
   // minimap and can't be clicked, but the open-card overlay re-letterboxes on
   // resize, so the overflow is exercised all the same.
   await page.goto('/');
-  await nodeByTitle(page, 'D').click();
-  const content = page.locator('.open-card__content');
+  await openCard(nodeByTitle(page, 'D'), 'D');
+  const content = page.getByRole('textbox', { name: 'Markdown source' });
   await expect(content).toBeVisible();
 
   await page.setViewportSize({ width: 520, height: 380 });
@@ -261,7 +265,15 @@ test('content that exceeds the frame scrolls inside it, keeping controls reachab
   expect(actions.y + actions.height).toBeLessThanOrEqual(panel.y + panel.height + 1);
 });
 
-test('an alias node names the card it redraws, and opens to that content', async ({ page }) => {
+/**
+ * The half of this that used to open the alias and read A's content through it
+ * is gone, not adapted. Opening a card is editing it (ADR 0037) and an alias
+ * owns no content to edit, so it offers nothing to open — and with the reading
+ * surface deleted there is no longer a way to look at what it points at. That
+ * returns with `card-authoring/03`, which is unbuilt. Asserting the absence
+ * here is what keeps the withdrawal visible rather than silent.
+ */
+test('an alias node names the card it redraws, and offers nothing to open', async ({ page }) => {
   await page.goto('/');
 
   // A′ is an alias of A. It is drawn as its own node, carrying its own title, with
@@ -271,11 +283,11 @@ test('an alias node names the card it redraws, and opens to that content', async
   await expect(recap).toBeVisible();
   await expect(recap.getByTestId('alias-marker')).toHaveText('A');
 
-  // Opening the alias resolves through to A's content — single source of truth —
-  // under A′'s own title, and shows it as source (ADR 0011).
-  await recap.click();
-  const opened = page.getByTestId('open-card');
-  await expect(opened).toBeVisible();
-  await expect(opened.getByRole('heading', { name: 'A′', exact: true })).toBeVisible();
-  await expect(opened).toContainText('entry point');
+  await recap.hover();
+  await expect(recap.getByRole('button', { name: /^Edit Card/ })).toHaveCount(0);
+  await expect(page.getByTestId('open-card')).toHaveCount(0);
+
+  // Its own title is still authored, inline on the graph.
+  await recap.getByRole('heading', { name: 'A′', exact: true }).dblclick();
+  await expect(page.getByRole('textbox', { name: 'Card title' })).toHaveValue('A′');
 });

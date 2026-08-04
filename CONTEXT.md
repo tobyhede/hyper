@@ -28,6 +28,8 @@ _Avoid_: node, slide, page, tile, subgraph. For the content: prose (it may be a 
 
 **Alias**:
 A card that shows another card's **content**: the same content appearing again elsewhere in the space, with a single source of truth, so editing the target changes every place it appears. An alias carries its own title — only content is shared. An alias points to a different card, and that card is never itself an alias: aliasing is a single hop, so an alias never points at itself and alias chains cannot form.
+
+Authoring an alias changes only its title, and it is renamed where it is drawn. An alias owns no content of its own, so it does not open: the surface a card opens on authors content, and an alias has none to author. Reaching its target's content through it, so that every place showing that content changes together, is work not yet done. Changing which card an alias targets is a separate alias-authoring operation, not editing the content it shows.
 _Avoid_: reference, link (an alias shows content, it does not merely jump), copy, transclusion, mirror.
 
 ## Routing
@@ -50,8 +52,13 @@ The one route a space has selected at a time — drawn emphasized, and the route
 Activating is not itself an edit — it touches no card and no route, so it converts nothing. Which route is active may become the authored default when another edit records the surrounding view.
 _Avoid_: selected route and current route as a second concept alongside this one, focus, mode.
 
+**Authoring**:
+Interacting with a Space in a way that may change its authored cards, routes, or Layouts. Authoring includes attempts that produce no change; only a successful authoring interaction produces an **Edit**. Navigating a View or Layout, activating a Route, opening a Card, and presenting are not authoring because they do not change the Space.
+
 **Edit**:
-A completed change to a Space's authored cards, routes, or Layouts.
+A validated transition from one Space to another that changes its authored cards, routes, or Layouts. An attempted gesture is not itself an Edit: cancelling it, drawing an Edge the Route already holds, or moving a Card away and back produces no Edit because the Space does not change.
+
+One Edit may change several authored parts atomically. Creating a Card at the end of a drawn Edge may create the Card, mint the Space's first Route, add the Edge, and write the Card's position into a Layout; together they are one Edit, not a sequence of smaller Edits.
 
 ## Layout and views
 
@@ -94,8 +101,8 @@ Projecting a space into the repository-friendly form an author can review, commi
 _Avoid_: saving, publishing, syncing.
 
 **Opening**:
-Showing a single card's content to a viewer in place, over whatever view they are in. A card of any kind can be opened, and what the viewer sees is whatever its kind holds: a markdown card shows its Markdown source, verbatim; a space card shows its nested graph to explore; an alias shows what its target would show. Opening is not presenting — it is a reading gesture, and the view it happens over is still the thing being looked at. A markdown card is only ever drawn *rendered* by presenting.
-_Avoid_: expand, preview, popup, modal, drill-down.
+Bringing a single card's own content up in place, over whatever view the author is in, to author it. A markdown card opens on its title, its description and its Markdown source, verbatim and editable; a space card opens on its nested graph to explore. Opening is not presenting — the view it happens over is still the thing being worked in, and a markdown card is only ever drawn *rendered* by presenting. There is no separate reading state: what a card opens on is what an author edits, because they were always the same bytes in the same order.
+_Avoid_: expand, preview, popup, modal, drill-down, view mode and edit mode (there is one surface).
 
 **Presenting**:
 Walking a route for an audience, on the space itself, drawn close enough that one card fills the screen. Presenting **traverses** the route: at the active card, the presenter follows one of its outgoing edges. A route that is a line walks as a line; a route that forks offers a choice. There is no separate artefact and no second surface — a presentation is not a thing a route is turned into, it is a way of moving through one.
@@ -104,6 +111,10 @@ _Avoid_: deck, slide, step, slideshow, playback, present mode (that is a mode na
 **Walk**:
 The cards a presenter has actually passed through, in order — one path taken through a route, of the several a route may permit. It belongs to the presenting, not to the space: a route is a graph and holds every path at once; a walk is the one being taken, and it is gone when the presenting ends. It is not itself a route, and recording one would be a second structure beside routes.
 _Avoid_: history, trail, session, playthrough, and route (a route is what is walked).
+
+**Selected card**:
+The card an authoring gesture will act on, named without being read. It is not opening and not activating: selecting a card shows nothing new and changes nothing about the space, it says *this one*. One card is selected at a time, and it is what reveals the controls drawn on a card and what a keyboard rename acts on. Selecting is not authoring, because it produces no Edit.
+_Avoid_: focus (that is the browser's, and a card may be selected without it), highlight, current card, active card (that belongs to a walk).
 
 **Active card**:
 Where a walk currently is — the card a presenter has reached, whose outgoing edges are the moves available. It pairs with the **active route**: the route names what is being walked, the card names the position in it. Going back reads the walk rather than the graph, because a card reached by a merge has several edges in and only the path taken says which one was used.
