@@ -5,7 +5,7 @@ import {
   type NodePositionChange,
 } from '@xyflow/react';
 import { create, type StoreApi, type UseBoundStore } from 'zustand';
-import { uuidSchema, type CardId } from '@project/core';
+import type { CardId } from '@project/core';
 import { Placement, type LayoutPoint } from '@project/graph';
 import type { CardFlowNode } from '@project/react-flow-adapter';
 import type { SpaceAuthoring } from './space-authoring';
@@ -216,7 +216,11 @@ export function createRenderAdapter(authoring: SpaceAuthoring): RenderAdapter {
       const beforeById = new Map(projection.nodes.map((node) => [node.id, node.position]));
       const nodes = applyNodeChanges(relevant, projection.nodes);
       const selectedNode = nodes.find((node) => node.selected);
-      const selectedCardId = selectedNode ? uuidSchema.parse(selectedNode.id) : null;
+      // The same erasure again, read the same way. Parsing here instead would
+      // put a throw on the per-pointer-frame path for a failure the other two
+      // readings agree cannot happen — and `App` already uses `safeParse` at its
+      // own React Flow boundary precisely so a mid-drag throw is impossible.
+      const selectedCardId = selectedNode ? (selectedNode.id as CardId) : null;
       const afterById = new Map(nodes.map((node) => [node.id, node.position]));
       const positionChanges = relevant.filter(
         (change): change is NodePositionChange => change.type === 'position',
