@@ -297,7 +297,9 @@ describe('the opened Card', () => {
  */
 describe('the opened Card as a dialog', () => {
   it('is a modal dialog named for the Card it authors', () => {
-    render(<OpenCard content={markdown()} onComplete={vi.fn()} onCancel={vi.fn()} />);
+    render(
+      <OpenCard opened={markdown()} content={markdown()} onComplete={vi.fn()} onCancel={vi.fn()} />,
+    );
 
     const dialog = screen.getByRole('dialog');
     expect(dialog).toHaveAttribute('aria-modal', 'true');
@@ -305,7 +307,9 @@ describe('the opened Card as a dialog', () => {
   });
 
   it('keeps Tab inside itself, wrapping from the last control to the first', () => {
-    render(<OpenCard content={markdown()} onComplete={vi.fn()} onCancel={vi.fn()} />);
+    render(
+      <OpenCard opened={markdown()} content={markdown()} onComplete={vi.fn()} onCancel={vi.fn()} />,
+    );
     const title = screen.getByRole('textbox', { name: 'Title' });
     const done = screen.getByRole('button', { name: 'Done' });
 
@@ -329,7 +333,9 @@ describe('the opened Card as a dialog', () => {
    * against a browser that actually moves it.
    */
   it('takes focus onto its first field when it opens', () => {
-    render(<OpenCard content={markdown()} onComplete={vi.fn()} onCancel={vi.fn()} />);
+    render(
+      <OpenCard opened={markdown()} content={markdown()} onComplete={vi.fn()} onCancel={vi.fn()} />,
+    );
 
     expect(screen.getByRole('textbox', { name: 'Title' })).toHaveFocus();
   });
