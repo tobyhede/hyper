@@ -24,8 +24,7 @@ import {
   type OnEdgesChange,
   type OnNodesChange,
 } from '@xyflow/react';
-import type { Route } from '@project/core';
-import type { LayoutPoint } from '@project/graph';
+import type { LayoutPosition, Route } from '@project/core';
 import {
   edgeTypes,
   nodeTypes,
@@ -261,7 +260,7 @@ export interface GraphViewProps {
   /** Runs before React Flow clears its transient connection state. */
   onConnectEnd: () => void;
   /** Complete an explicit modifier empty-drop at the preview's top-left position. */
-  onCreateConnectedCard: (sourceId: string, position: LayoutPoint) => void;
+  onCreateConnectedCard: (sourceId: string, position: LayoutPosition) => void;
   /** Exact neutral title shown by the transient empty-drop preview. */
   newCardTitle: string;
   /** Opening a card is a view gesture; the graph only reports which was picked. */

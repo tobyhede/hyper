@@ -1,12 +1,11 @@
 import { describe, expectTypeOf, it } from 'vitest';
-import type { CardId, RouteId } from '@project/core';
+import type { CardId, LayoutPosition, RouteId } from '@project/core';
 import {
   Placement,
   positionedStrategy,
   type GraphEdge,
   type LayoutCard,
   type LayoutEdge,
-  type LayoutPoint,
   type RouteHandleRef,
 } from '@project/graph';
 
@@ -22,16 +21,16 @@ describe('graph identity types', () => {
     expectTypeOf(Placement.fromLayoutGraph).returns.toEqualTypeOf<Placement>();
     expectTypeOf(positionedStrategy).parameter(0).toEqualTypeOf<Placement>();
     // A Placement is a readable card→position map; writing it is what is closed.
-    expectTypeOf<Placement>().toExtend<ReadonlyMap<CardId, Readonly<LayoutPoint>>>();
+    expectTypeOf<Placement>().toExtend<ReadonlyMap<CardId, Readonly<LayoutPosition>>>();
 
     // @ts-expect-error A plain string has not crossed the UUID validation seam.
     const cardId: LayoutCard['id'] = 'card';
     // @ts-expect-error A plain string has not crossed the UUID validation seam.
     const routeId: GraphEdge['routeId'] = 'route';
     // @ts-expect-error Plain strings cannot key a graph-owned position map.
-    positionedStrategy(new Map<string, LayoutPoint>());
+    positionedStrategy(new Map<string, LayoutPosition>());
     // @ts-expect-error A Placement is built through the module, never by hand.
-    positionedStrategy(new Map<CardId, LayoutPoint>());
+    positionedStrategy(new Map<CardId, LayoutPosition>());
     // @ts-expect-error Nor through the sanctioned constructor: closing construction
     // would mean nothing if `fromEntries` re-opened the seam it exists to hold.
     Placement.fromEntries([['card', { x: 0, y: 0 }]]);

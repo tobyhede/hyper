@@ -1,6 +1,5 @@
 import { BaseEdge, getBezierPath, type Edge, type EdgeProps } from '@xyflow/react';
-import type { RouteId } from '@project/core';
-import type { LayoutPoint } from '@project/graph';
+import type { LayoutPosition, RouteId } from '@project/core';
 
 /**
  * React Flow custom edge that draws the polyline ELK routed, not a bezier.
@@ -22,7 +21,7 @@ import type { LayoutPoint } from '@project/graph';
 export type RoutedEdgeData = {
   routeId: RouteId;
   /** ELK's routed path, start → bends → end. Absent until a routing layout runs. */
-  points?: LayoutPoint[];
+  points?: LayoutPosition[];
 };
 
 /**
@@ -31,7 +30,7 @@ export type RoutedEdgeData = {
  */
 export type RoutedFlowEdge = Edge<RoutedEdgeData, 'routed'>;
 
-function polyline(points: LayoutPoint[]): string {
+function polyline(points: LayoutPosition[]): string {
   return points.map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x} ${point.y}`).join(' ');
 }
 

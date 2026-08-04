@@ -1,13 +1,12 @@
 import type { Edge, Node, NodeHandle } from '@xyflow/react';
 import { MarkerType, Position } from '@xyflow/react';
-import type { CardId, RouteId } from '@project/core';
+import type { CardId, LayoutPosition, RouteId } from '@project/core';
 import { resolveContentCard } from '@project/graph';
 import type {
   CardHandleSet,
   LayoutCard,
   LayoutEdge,
   LayoutGraph,
-  LayoutPoint,
   GraphEdge,
   RouteHandleRef,
   Space,
@@ -319,9 +318,9 @@ export interface ProjectRouteEdgesOptions {
 }
 
 /** Flatten an edge's routed sections into one point list: start → bends → end. */
-function routedPoints(edge: LayoutEdge | undefined): LayoutPoint[] | undefined {
+function routedPoints(edge: LayoutEdge | undefined): LayoutPosition[] | undefined {
   if (!edge?.sections?.length) return undefined;
-  const points: LayoutPoint[] = [];
+  const points: LayoutPosition[] = [];
   for (const section of edge.sections) {
     points.push(section.startPoint, ...(section.bendPoints ?? []), section.endPoint);
   }

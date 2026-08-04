@@ -5,8 +5,8 @@ import {
   type NodePositionChange,
 } from '@xyflow/react';
 import { create, type StoreApi, type UseBoundStore } from 'zustand';
-import type { CardId } from '@project/core';
-import { Placement, type LayoutPoint } from '@project/graph';
+import type { CardId, LayoutPosition } from '@project/core';
+import { Placement } from '@project/graph';
 import type { CardFlowNode } from '@project/react-flow-adapter';
 import type { SpaceAuthoring } from './space-authoring';
 
@@ -40,7 +40,7 @@ export interface RenderAdapterState {
    */
   projection: Projection | null;
   /** Gesture starts retained until each node receives a settled callback. */
-  dragOrigins: ReadonlyMap<string, LayoutPoint>;
+  dragOrigins: ReadonlyMap<string, LayoutPosition>;
   /**
    * Set once a card has actually moved. A layout's routed edge geometry
    * describes the arrangement it computed, so it stops being true the moment a
@@ -62,7 +62,7 @@ export interface RenderAdapterState {
   /** Install and notify one directed Edge between existing Cards, when it is a real Edit. */
   connectCards: (from: CardId, to: CardId, projected: readonly CardFlowNode[]) => boolean;
   /** Install and notify an atomic create-and-connect Edit without adding a transient node. */
-  createConnectedCard: (from: CardId, position: LayoutPoint) => CardId | null;
+  createConnectedCard: (from: CardId, position: LayoutPosition) => CardId | null;
   /** Select one Card after a completed connection. */
   selectCard: (cardId: CardId) => void;
 }
@@ -86,9 +86,9 @@ function reportRenderedPlacement(
 }
 
 function trackDragOrigins(
-  dragOrigins: Map<string, LayoutPoint>,
+  dragOrigins: Map<string, LayoutPosition>,
   positionChanges: readonly NodePositionChange[],
-  beforeById: ReadonlyMap<string, LayoutPoint>,
+  beforeById: ReadonlyMap<string, LayoutPosition>,
 ): void {
   for (const change of positionChanges) {
     if (change.dragging !== true || dragOrigins.has(change.id)) continue;
@@ -99,9 +99,9 @@ function trackDragOrigins(
 
 function consumeSettledMovedIds(
   settled: readonly NodePositionChange[],
-  dragOrigins: Map<string, LayoutPoint>,
-  beforeById: ReadonlyMap<string, LayoutPoint>,
-  afterById: ReadonlyMap<string, LayoutPoint>,
+  dragOrigins: Map<string, LayoutPosition>,
+  beforeById: ReadonlyMap<string, LayoutPosition>,
+  afterById: ReadonlyMap<string, LayoutPosition>,
 ): CardId[] {
   // The same `Node.id` erasure `reportRenderedPlacement` repairs above.
   const movedIds: CardId[] = [];
