@@ -38,7 +38,7 @@ pnpm e2e            # Playwright flow (boots the dev server automatically)
 pnpm e2e:fixture    # only scenarios backed by the tracked fixture
 ```
 
-Both E2E commands create and dispose isolated fixture servers automatically. They need the Chromium browser once: `pnpm exec playwright install chromium`.
+Both commands create and dispose an isolated server per test automatically. They differ in what those servers hold: `pnpm e2e:fixture` runs only the tracked-fixture project, while `pnpm e2e` also runs `new-space`, whose servers start from an empty catalog so startup mints the one-card new space. They need the Chromium browser once: `pnpm exec playwright install chromium`.
 
 ### Local PostgreSQL
 

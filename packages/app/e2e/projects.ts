@@ -6,6 +6,16 @@
  * the project, and `fixtures.ts` selects the `e2e-empty` Vite mode by comparing
  * against it. Renaming one alone would quietly serve the tracked fixture to the
  * new-space spec — a green run asserting the wrong catalog.
+ *
+ * Its sibling, the tracked-fixture project, is deliberately *not* here. This
+ * constant exists because a name is compared; that one is only ever selected,
+ * by `playwright.config.ts` declaring it and the `e2e:fixture` script asking
+ * for it. An npm script cannot read a TypeScript constant, so exporting one
+ * would leave the script's copy of the literal exactly as unlinked as it is now
+ * while making the pair look shared. Renaming that project fails loudly —
+ * Playwright reports the project as not found — and `fixtures.ts` reaches the
+ * fixture mode by falling through this comparison rather than by matching a
+ * name, so nothing can silently serve the wrong catalog from it.
  */
 export const NEW_SPACE_PROJECT = 'new-space';
 
