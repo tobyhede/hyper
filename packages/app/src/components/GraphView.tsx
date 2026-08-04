@@ -382,7 +382,7 @@ export function GraphView({
       // Lowered here rather than deferred past the pointer-up node click React
       // Flow dispatches after this callback. That deferral existed so the click
       // ending a connection drag could not open the Card just connected to; a
-      // drag release produces a `click`, and opening now needs a `dblclick`
+      // drag release produces a `click`, and no click opens a Card at all
       // (ADR 0036). The flag itself stays — the Alt listener and the
       // empty-canvas hover tracking read it, and neither concerns clicks.
       connectionGesture.current = false;
@@ -512,10 +512,12 @@ export function GraphView({
       onKeyDown={handleKeyDown}
       fitView
       fitViewOptions={OVERVIEW_FIT}
-      // Double click opens a Card (ADR 0036), and React Flow's own double-click
-      // zoom would fire underneath it — its filter exempts only `.nopan`, which
-      // a Card is not. Off for the whole canvas rather than per node, so the
-      // gesture does not change meaning two pixels away from a Card.
+      // Double click on a title renames the Card (ADR 0036); opening is reached
+      // through the Card's own control or the keyboard. React Flow's own
+      // double-click zoom would fire underneath the rename — its filter exempts
+      // only `.nopan`, which a Card is not. Off for the whole canvas rather than
+      // per node, so the gesture does not change meaning two pixels away from a
+      // Card.
       zoomOnDoubleClick={false}
       // While presenting the arrow keys are the walk's, so React Flow must not
       // also read them as moving or selecting a node.

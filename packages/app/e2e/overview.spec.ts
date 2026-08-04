@@ -1,6 +1,7 @@
 // `test` comes from ./fixtures, not @playwright/test — it carries the auto-use
 // gate that fails a test if React Flow logged a warning while it ran.
 import { expect, test, type Locator, type Page } from './fixtures';
+import { openCard } from './graph';
 
 // The app loads the abstract layout fixture (packages/app/fixture) — two
 // disconnected collections sharing no cards, laid out by ELK as separate bands:
@@ -23,15 +24,6 @@ function nodeByTitle(page: Page, title: string): Locator {
   return page
     .locator('.react-flow__node')
     .filter({ has: page.getByRole('heading', { name: title, exact: true }) });
-}
-
-/**
- * Open a card, which is to say edit it (ADR 0037). Nothing a pointer does to a
- * card's body opens it (ADR 0036); its own control does.
- */
-async function openCard(node: Locator, title: string): Promise<void> {
-  await node.hover();
-  await node.getByRole('button', { name: `Edit Card ${title}` }).click();
 }
 
 test('offers more than one named route', async ({ page }) => {
