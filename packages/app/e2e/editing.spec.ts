@@ -4,14 +4,17 @@ import {
   allPositions,
   authoringHandle,
   AUTHORING_HANDLE_SIDES,
+  boxOf,
   connectHandles,
   connectToEmptyWithAlt,
   dragBy,
   FIXTURE_CARD_COUNT,
   FIXTURE_EDGE_COUNT,
   nodeByTitle,
+  openCard,
   positionOf,
   settled,
+  viewportTransform,
 } from './graph';
 
 /**
@@ -39,9 +42,24 @@ test('inline title editing persists without moving or opening the Card', async (
   const before = await allPositions(page);
 
   await card.hover();
-  const edit = card.getByRole('button', { name: 'Edit title of A' });
+  const edit = card.getByRole('button', { name: 'Edit Card A' });
   await expect(edit).toHaveCSS('opacity', '1');
-  await edit.click();
+  // The affordance draws a glyph, so nothing about its own content keeps it in
+  // shape or in place. Sized square in CSS and parked in the corner, clear of
+  // the title — a name is what a screen reader gets, and the box is all a
+  // pointer gets.
+  const editBox = await boxOf(edit, 'the Card affordance');
+  const cardBox = await boxOf(card, 'Card A');
+  const titleBox = await boxOf(card.getByRole('heading', { name: 'A' }), "Card A's title");
+  expect(Math.abs(editBox.width - editBox.height)).toBeLessThanOrEqual(1);
+  expect(editBox.x).toBeGreaterThanOrEqual(cardBox.x);
+  expect(editBox.x + editBox.width).toBeLessThanOrEqual(cardBox.x + cardBox.width);
+  expect(editBox.y).toBeGreaterThanOrEqual(cardBox.y);
+  expect(editBox.y + editBox.height).toBeLessThanOrEqual(titleBox.y);
+
+  // Renaming is the title's own double click (ADR 0036), and it must not open
+  // the Card — an opened Card covers the field being typed into.
+  await card.getByRole('heading', { name: 'A' }).dblclick();
   await expect(page.getByTestId('open-card')).toHaveCount(0);
   const title = page.getByRole('textbox', { name: 'Card title' });
   await title.fill('Renamed A');
@@ -53,8 +71,9 @@ test('inline title editing persists without moving or opening the Card', async (
   await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
   expect(await allPositions(page)).toEqual(before);
 
+  await openCard(renamed, 'Renamed A');
+  await page.getByRole('button', { name: 'Cancel' }).click();
   await renamed.click();
-  await page.getByTestId('close-card').click();
   await page.keyboard.press('F2');
   const keyboardTitle = page.getByRole('textbox', { name: 'Card title' });
   await expect(keyboardTitle).toBeVisible();
@@ -71,6 +90,63 @@ test('inline title editing persists without moving or opening the Card', async (
   await expect(nodeByTitle(page, 'Renamed A').first()).toBeVisible();
 });
 
+test('a click selects a Card, and no pointer gesture on its body opens it', async ({ page }) => {
+  await page.goto('/');
+  const card = nodeByTitle(page, 'A').first();
+  await expect(card).toBeVisible();
+  await settled(page);
+  const transform = await viewportTransform(page);
+
+  await card.click();
+  await expect(card).toHaveClass(/selected/);
+  await expect(page.getByTestId('open-card')).toHaveCount(0);
+
+  // Off the title, which has its own double click. React Flow zooms on a double
+  // click by default and its filter exempts only `.nopan`, which a Card is not.
+  await card.dblclick({ position: { x: 24, y: 12 } });
+  await expect(page.getByTestId('open-card')).toHaveCount(0);
+  expect(await viewportTransform(page)).toEqual(transform);
+});
+
+test('the Card affordance opens the Card on its editable fields', async ({ page }) => {
+  await page.goto('/');
+  const card = nodeByTitle(page, 'A').first();
+  await expect(card).toBeVisible();
+  await settled(page);
+
+  await openCard(card, 'A');
+
+  const source = page.getByRole('textbox', { name: 'Markdown source' });
+  await expect(page.getByRole('textbox', { name: 'Title' })).toHaveValue('A');
+  await expect(source).toHaveValue(/entry point/);
+  await source.fill('Authored from the graph');
+  await page.getByRole('button', { name: 'Done' }).click();
+  await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
+
+  await page.reload();
+  await openCard(nodeByTitle(page, 'A').first(), 'A');
+  await expect(page.getByRole('textbox', { name: 'Markdown source' })).toHaveValue(
+    'Authored from the graph',
+  );
+});
+
+test('a title authored in the pane persists like one authored on the graph', async ({ page }) => {
+  await page.goto('/');
+  const card = nodeByTitle(page, 'A').first();
+  await expect(card).toBeVisible();
+  await settled(page);
+
+  await openCard(card, 'A');
+  await page.getByRole('textbox', { name: 'Title' }).fill('Renamed from the pane');
+  await page.getByRole('button', { name: 'Done' }).click();
+
+  await expect(nodeByTitle(page, 'Renamed from the pane').first()).toBeVisible();
+  await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
+
+  await page.reload();
+  await expect(nodeByTitle(page, 'Renamed from the pane').first()).toBeVisible();
+});
+
 test('opened Markdown editing persists source and description without moving Cards', async ({
   page,
 }) => {
@@ -80,26 +156,24 @@ test('opened Markdown editing persists source and description without moving Car
   await settled(page);
   const before = await allPositions(page);
 
-  await card.click();
-  await page.getByRole('button', { name: 'Edit Card' }).click();
+  await openCard(card, 'A');
   await page.getByRole('textbox', { name: 'Description' }).fill('Edited in place');
   await page.getByRole('textbox', { name: 'Markdown source' }).fill('# Edited\n\nNew source');
   await page.getByRole('button', { name: 'Done' }).click();
 
-  const opened = page.getByTestId('open-card');
-  await expect(opened).toContainText('# Edited');
+  await expect(page.getByTestId('open-card')).toHaveCount(0);
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
   await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
   expect(await allPositions(page)).toEqual(before);
-  await page.getByTestId('close-card').click();
   await expect(card.getByTestId('card-description')).toHaveText('Edited in place');
 
   await page.reload();
   const persisted = nodeByTitle(page, 'A').first();
   await expect(persisted.getByTestId('card-description')).toHaveText('Edited in place');
-  await persisted.click();
-  await expect(page.getByTestId('open-card')).toContainText('# Edited');
-  await expect(page.getByTestId('open-card')).toContainText('New source');
+  await openCard(persisted, 'A');
+  await expect(page.getByRole('textbox', { name: 'Markdown source' })).toHaveValue(
+    '# Edited\n\nNew source',
+  );
 });
 
 /**
@@ -624,7 +698,7 @@ test('clicking a Card authoring handle neither opens the Card nor draws an Edge'
   const handleBox = (await authoringHandle(card, 'source', 'right').boundingBox())!;
   await page.mouse.click(handleBox.x + handleBox.width / 2, handleBox.y + handleBox.height / 2);
 
-  await expect(page.getByTestId('close-card')).toHaveCount(0);
+  await expect(page.getByTestId('open-card')).toHaveCount(0);
   await expect(page.locator('.react-flow__edge')).toHaveCount(FIXTURE_EDGE_COUNT);
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '0');
 });
@@ -644,11 +718,12 @@ test('Backspace with a Card selected removes nothing', async ({ page }) => {
   await expect(page.locator('.react-flow__edge-path').first()).toHaveAttribute('d', /L/);
   await settled(page);
 
+  // Selecting is all a click does now (ADR 0036), so there is no opened Card to
+  // close before the keys under test are pressed.
   const cardBox = (await card.boundingBox())!;
   await page.mouse.click(cardBox.x + cardBox.width / 2, cardBox.y + cardBox.height / 2);
   await expect(card).toHaveClass(/selected/);
-  await page.getByTestId('close-card').click();
-  await expect(page.getByTestId('close-card')).toHaveCount(0);
+  await expect(page.getByTestId('open-card')).toHaveCount(0);
 
   await page.keyboard.press('Backspace');
   await page.keyboard.press('Delete');

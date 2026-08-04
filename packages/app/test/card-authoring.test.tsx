@@ -95,7 +95,7 @@ describe('authoring a Card title on the graph', () => {
    */
   it('refuses a blank title and leaves the stored Card alone', async () => {
     const session = mount();
-    fireEvent.click(await screen.findByRole('button', { name: 'Edit title of A' }));
+    fireEvent.doubleClick(await screen.findByRole('heading', { name: 'A' }));
     const input = screen.getByRole('textbox', { name: 'Card title' });
 
     fireEvent.change(input, { target: { value: '   ' } });
@@ -109,7 +109,7 @@ describe('authoring a Card title on the graph', () => {
 
   it('stores a title without the whitespace surrounding it', async () => {
     const session = mount();
-    fireEvent.click(await screen.findByRole('button', { name: 'Edit title of A' }));
+    fireEvent.doubleClick(await screen.findByRole('heading', { name: 'A' }));
     const input = screen.getByRole('textbox', { name: 'Card title' });
 
     fireEvent.change(input, { target: { value: '  Renamed A  ' } });
@@ -120,22 +120,19 @@ describe('authoring a Card title on the graph', () => {
   });
 });
 
-/** Open Card A and enter its source editor. */
+/** Open Card A, which is to say edit it (ADR 0037). */
 async function openEditor(): Promise<void> {
-  const card = (await screen.findByRole('heading', { name: 'A' })).closest('.react-flow__node');
-  if (card === null) throw new Error('Card A is not drawn as a node');
-  fireEvent.click(card);
-  fireEvent.click(screen.getByRole('button', { name: 'Edit Card' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Edit Card A' }));
 }
 
 describe('authoring an opened Card', () => {
   /**
-   * Escape is the title editor's cancel, and an author carries that reading
-   * across. Here it reached the window listener that closes the opened Card, so
-   * one key both left the editor and destroyed the source typed into it, with
-   * nothing asked and nothing to undo. The editor owns its own cancel.
+   * Escape cancels, and the pane closes with it — there is no reading state
+   * behind the editor to fall back to (ADR 0037). What matters is that the draft
+   * is discarded rather than committed, and that the window listener does not
+   * also fire.
    */
-  it('cancels the edit on Escape and keeps the Card open', async () => {
+  it('cancels the edit on Escape without committing the draft', async () => {
     const session = mount();
     await openEditor();
     const source = screen.getByRole('textbox', { name: 'Markdown source' });
@@ -143,9 +140,7 @@ describe('authoring an opened Card', () => {
 
     fireEvent.keyDown(source, { key: 'Escape' });
 
-    expect(screen.getByTestId('open-card')).toBeVisible();
-    expect(screen.queryByRole('textbox', { name: 'Markdown source' })).not.toBeInTheDocument();
-    expect(screen.getByTestId('open-card')).toHaveTextContent('A source');
+    expect(screen.queryByTestId('open-card')).not.toBeInTheDocument();
     expect(session.getState().working).toEqual(snapshot);
     await settled(session);
   });
@@ -169,12 +164,44 @@ describe('authoring an opened Card', () => {
     await settled(session);
   });
 
-  it('closes the Card on Escape once the editor has been left', async () => {
+  it('authors the title from the pane, as the graph does inline', async () => {
     const session = mount();
     await openEditor();
-    fireEvent.keyDown(screen.getByRole('textbox', { name: 'Markdown source' }), { key: 'Escape' });
 
-    fireEvent.keyDown(window, { key: 'Escape' });
+    fireEvent.change(screen.getByRole('textbox', { name: 'Title' }), {
+      target: { value: 'Renamed from the pane' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+
+    expect(cardTitleOf(session, CARD_ID)).toBe('Renamed from the pane');
+    expect(screen.queryByTestId('open-card')).not.toBeInTheDocument();
+    await settled(session);
+  });
+});
+
+describe('the Card affordance on the graph', () => {
+  it('opens the Card on its editable fields, with no reading state in front', async () => {
+    const session = mount();
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit Card A' }));
+
+    expect(screen.getByRole('textbox', { name: 'Title' })).toHaveValue('A');
+    expect(screen.getByRole('textbox', { name: 'Markdown source' })).toHaveValue('A source');
+    expect(screen.queryByRole('button', { name: 'Edit Card' })).not.toBeInTheDocument();
+    await settled(session);
+  });
+
+  /**
+   * No gesture on a Card's body opens it (ADR 0036) — the title centres in a
+   * Card, so a body gesture and the rename would want the same pixels.
+   */
+  it('is the only pointer route in — the Card body opens nothing', async () => {
+    const session = mount();
+    const card = (await screen.findByRole('heading', { name: 'A' })).closest('.react-flow__node');
+    if (card === null) throw new Error('Card A is not drawn as a node');
+
+    fireEvent.click(card);
+    fireEvent.doubleClick(card);
 
     expect(screen.queryByTestId('open-card')).not.toBeInTheDocument();
     await settled(session);

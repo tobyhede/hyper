@@ -75,7 +75,9 @@ interface Overrides {
   selected?: boolean;
   title?: string;
   titleEditingEnabled?: boolean;
+  cardEditingEnabled?: boolean;
   editingTitle?: boolean;
+  onEditCard?: () => void;
   onBeginTitleEditing?: () => void;
   onCompleteTitleEditing?: (title: string) => string | null;
   onCancelTitleEditing?: () => void;
@@ -87,7 +89,9 @@ function props({
   selected = false,
   title = 'A',
   titleEditingEnabled = false,
+  cardEditingEnabled = false,
   editingTitle = false,
+  onEditCard,
   onBeginTitleEditing,
   onCompleteTitleEditing,
   onCancelTitleEditing,
@@ -110,7 +114,9 @@ function props({
       cardId,
       title,
       titleEditingEnabled,
+      cardEditingEnabled,
       editingTitle,
+      ...(onEditCard !== undefined ? { onEditCard } : {}),
       ...(onBeginTitleEditing !== undefined ? { onBeginTitleEditing } : {}),
       ...(onCompleteTitleEditing !== undefined ? { onCompleteTitleEditing } : {}),
       ...(onCancelTitleEditing !== undefined ? { onCancelTitleEditing } : {}),
@@ -127,13 +133,13 @@ function props({
 }
 
 describe('CardNode title authoring', () => {
-  it('begins inline title editing from the selected Card affordance', () => {
+  it('begins inline title editing from a double click on the title', () => {
     const onBeginTitleEditing = vi.fn();
     const { rerender } = render(
       <CardNode {...props({ selected: true, titleEditingEnabled: true, onBeginTitleEditing })} />,
     );
 
-    screen.getByRole('button', { name: 'Edit title of A' }).click();
+    fireEvent.doubleClick(screen.getByRole('heading', { name: 'A' }));
     expect(onBeginTitleEditing).toHaveBeenCalledOnce();
 
     rerender(
@@ -147,6 +153,38 @@ describe('CardNode title authoring', () => {
       />,
     );
     expect(screen.getByRole('textbox', { name: 'Card title' })).toHaveValue('A');
+  });
+
+  /**
+   * The pencil edits the Card, not one field of it — it opens the description
+   * and Markdown surface. Renaming is the title's own gesture and `F2`.
+   */
+  it('edits the Card from the affordance, without touching the title', () => {
+    const onEditCard = vi.fn();
+    const onBeginTitleEditing = vi.fn();
+    render(
+      <CardNode
+        {...props({
+          selected: true,
+          titleEditingEnabled: true,
+          cardEditingEnabled: true,
+          onEditCard,
+          onBeginTitleEditing,
+        })}
+      />,
+    );
+
+    screen.getByRole('button', { name: 'Edit Card A' }).click();
+
+    expect(onEditCard).toHaveBeenCalledOnce();
+    expect(onBeginTitleEditing).not.toHaveBeenCalled();
+  });
+
+  it('offers no affordance on a Card that owns no content to edit', () => {
+    render(<CardNode {...props({ selected: true, titleEditingEnabled: true })} />);
+
+    expect(screen.queryByRole('button', { name: /^Edit Card/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'A' })).toBeVisible();
   });
 
   it('keeps an invalid title local and completes a valid title with Enter', () => {

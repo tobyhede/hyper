@@ -1,17 +1,9 @@
-import {
-  useEffect,
-  useRef,
-  useState,
-  type ComponentType,
-  type FormEvent,
-  type ReactNode,
-} from 'react';
+import { useState, type ComponentType, type FormEvent } from 'react';
 import { markdownCardSchema } from '@project/core';
 import type { ResolvedContentCard } from '@project/graph';
-import { Button, CardRenderer } from '@project/ui';
+import { Button } from '@project/ui';
 
 type ContentEditorProps<Card extends ResolvedContentCard> = {
-  readonly displayTitle: string;
   readonly card: Card;
   readonly onComplete: (card: Card) => void;
   readonly onCancel: () => void;
@@ -24,36 +16,51 @@ type ContentEditorRegistry = {
 };
 
 function MarkdownCardEditor({
-  displayTitle,
   card,
   onComplete,
   onCancel,
 }: ContentEditorProps<Extract<ResolvedContentCard, { kind: 'markdown' }>>) {
+  const [title, setTitle] = useState(card.title);
   const [description, setDescription] = useState(card.description ?? '');
   const [body, setBody] = useState(card.body);
+  const [titleError, setTitleError] = useState<string | null>(null);
   const [descriptionError, setDescriptionError] = useState<string | null>(null);
 
   const submit = (event: FormEvent<HTMLFormElement>): void => {
     event.preventDefault();
-    // Trimmed, so a description an author blanked is *absent* rather than a run
-    // of spaces the schema's `min(1)` happily accepts. Every reader keys off the
-    // presence of the key — the node draws its caption for any truthy value — so
-    // a blank one leaves a paragraph that says nothing and no field to clear.
-    // The body is not trimmed: leading and trailing whitespace is Markdown the
-    // author wrote.
+    // Both trimmed, and for the same reason the graph's inline editor trims:
+    // `min(1)` counts characters and a space is one, so a title of spaces draws
+    // as nothing and a description of spaces leaves a caption that says nothing
+    // and no field left to clear. The body is *not* trimmed — leading and
+    // trailing whitespace there is Markdown the author wrote.
+    const named = title.trim();
     const caption = description.trim();
     const parsed = markdownCardSchema.safeParse({
       id: card.id,
-      title: card.title,
+      title: named,
       ...(caption.length > 0 ? { description: caption } : {}),
       kind: 'markdown',
       body,
     });
     if (!parsed.success) {
-      const issue = parsed.error.issues.find((candidate) => candidate.path[0] === 'description');
-      setDescriptionError(issue?.message ?? 'The Card could not be completed.');
+      const forTitle = parsed.error.issues.find((candidate) => candidate.path[0] === 'title');
+      const forDescription = parsed.error.issues.find(
+        (candidate) => candidate.path[0] === 'description',
+      );
+      setTitleError(
+        forTitle === undefined
+          ? null
+          : named.length === 0
+            ? 'A Card title is required.'
+            : forTitle.message,
+      );
+      setDescriptionError(
+        forDescription?.message ??
+          (forTitle === undefined ? 'The Card could not be completed.' : null),
+      );
       return;
     }
+    setTitleError(null);
     setDescriptionError(null);
     onComplete(parsed.data);
   };
@@ -75,11 +82,28 @@ function MarkdownCardEditor({
         onCancel();
       }}
     >
-      <h2 className="card__title">{displayTitle}</h2>
+      <label className="open-card__field">
+        <span>Title</span>
+        <input
+          autoFocus
+          className="open-card__title-input"
+          aria-invalid={titleError !== null}
+          aria-describedby={titleError === null ? undefined : 'open-card-title-error'}
+          value={title}
+          onChange={(event) => {
+            setTitle(event.currentTarget.value);
+            setTitleError(null);
+          }}
+        />
+      </label>
+      {titleError !== null && (
+        <span id="open-card-title-error" role="alert" className="open-card__field-error">
+          {titleError}
+        </span>
+      )}
       <label className="open-card__field">
         <span>Description</span>
         <input
-          autoFocus
           aria-invalid={descriptionError !== null}
           aria-describedby={descriptionError === null ? undefined : 'open-card-description-error'}
           value={description}
@@ -116,7 +140,6 @@ const CONTENT_EDITORS = {
 } satisfies ContentEditorRegistry;
 
 function ResolvedContentEditor({
-  displayTitle,
   card,
   onComplete,
   onCancel,
@@ -124,78 +147,47 @@ function ResolvedContentEditor({
   const Editor = CONTENT_EDITORS[card.kind] as ComponentType<
     ContentEditorProps<ResolvedContentCard>
   >;
-  return (
-    <Editor displayTitle={displayTitle} card={card} onComplete={onComplete} onCancel={onCancel} />
-  );
+  return <Editor card={card} onComplete={onComplete} onCancel={onCancel} />;
 }
 
 export interface OpenCardProps {
-  title: string;
   content: ResolvedContentCard;
-  /** Present only when the opened Card may author this resolved content. */
+  /** Complete one whole Card. Absent only if the Card owns nothing to author. */
   onComplete?: (card: ResolvedContentCard) => void;
-  /** Actions for this card — a close button, say. */
-  footer: ReactNode;
+  /** Close without completing. */
+  onCancel: () => void;
 }
 
 /**
- * A card opened over the graph.
+ * A card opened over the graph — one editable surface, and the only one.
  *
- * The graph draws titles (ADR 0006); this is where a card is opened. Opening is
- * a view-source gesture — `CardRenderer` shows the Markdown verbatim, not
- * rendered (ADR 0011). Presenting is the other half of that distinction and is
- * where a card is drawn *rendered*; it walks the route on the graph canvas
- * rather than on a surface of its own (ADR 0024, 0027).
+ * Opening a card *is* editing it (ADR 0037). There was a reading state in front
+ * of this, and it drew the same bytes in the same order: `CardRenderer` put the
+ * Markdown source in a `<pre>`, the editor puts it in a `<textarea>`, and the
+ * only difference was whether the caret could enter. The mode around that
+ * non-difference is gone, along with the action that crossed it.
+ *
+ * Source, still — not rendered prose. ADR 0011 removed the reading pane's
+ * Markdown renderer so a card could not read one way and present another, and
+ * that half holds: presenting remains the one place a card is drawn rendered.
+ *
+ * The title is authored here *and* on the graph, which is safe because only one
+ * is ever on screen: title editing is withdrawn while a card is open. Both write
+ * the same card through Space Authoring.
  */
-export function OpenCard({ title, content, onComplete, footer }: OpenCardProps) {
-  const [editing, setEditing] = useState(false);
-  const editButton = useRef<HTMLButtonElement>(null);
-  const restoreEditFocus = useRef(false);
-
-  useEffect(() => {
-    if (!editing && restoreEditFocus.current) {
-      restoreEditFocus.current = false;
-      editButton.current?.focus();
-    }
-  }, [editing]);
-
-  const finishEditing = (): void => {
-    restoreEditFocus.current = true;
-    setEditing(false);
-  };
-
+export function OpenCard({ content, onComplete, onCancel }: OpenCardProps) {
   return (
     <div className="open-card" data-testid="open-card">
       <div className="open-card__panel">
-        {editing && onComplete !== undefined ? (
+        {onComplete === undefined ? null : (
           <ResolvedContentEditor
-            displayTitle={title}
             card={content}
             onComplete={(completed) => {
               onComplete(completed);
-              finishEditing();
+              onCancel();
             }}
-            onCancel={finishEditing}
+            onCancel={onCancel}
           />
-        ) : (
-          <>
-            <div className="open-card__content">
-              <CardRenderer title={title} markdown={content.body} variant="full" />
-            </div>
-            <div className="open-card__actions">
-              {onComplete !== undefined && (
-                <Button
-                  ref={editButton}
-                  type="button"
-                  variant="default"
-                  onClick={() => setEditing(true)}
-                >
-                  Edit Card
-                </Button>
-              )}
-              {footer}
-            </div>
-          </>
         )}
       </div>
     </div>

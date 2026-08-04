@@ -49,9 +49,12 @@ export type CardHandle = {
 export type CardNodeData = {
   cardId: CardId;
   title: string;
-  /** Local title-authoring controls supplied by the application composition. */
+  /** Local Card-authoring controls supplied by the application composition. */
   titleEditingEnabled?: boolean;
+  /** Whether this Card owns content to edit — an Alias does not. */
+  cardEditingEnabled?: boolean;
   editingTitle?: boolean;
+  onEditCard?: () => void;
   onBeginTitleEditing?: () => void;
   onCompleteTitleEditing?: (title: string) => string | null;
   onCancelTitleEditing?: () => void;

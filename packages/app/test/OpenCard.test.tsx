@@ -5,94 +5,125 @@ import { OpenCard } from '../src/components/OpenCard';
 
 const CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 
-describe('OpenCard Markdown authoring', () => {
-  it('keeps reading as the default and enters an explicit source editor without a title field', () => {
+const markdown = (over: { description?: string; body?: string } = {}) => ({
+  id: CARD_ID,
+  title: 'A',
+  ...(over.description === undefined ? {} : { description: over.description }),
+  kind: 'markdown' as const,
+  body: over.body ?? '**A** source',
+});
+
+describe('the opened Card', () => {
+  /**
+   * There was a reading state in front of this, and it drew the same bytes in
+   * the same order — a `<pre>` of source against a `<textarea>` of source. The
+   * action that crossed between them was the only thing the boundary had.
+   */
+  it('is editable on arrival, with no action to begin editing', () => {
     render(
       <OpenCard
-        title="A"
-        content={{
-          id: CARD_ID,
-          title: 'A',
-          description: 'Where every route begins',
-          kind: 'markdown',
-          body: '**A** source',
-        }}
+        content={markdown({ description: 'Where every route begins' })}
         onComplete={vi.fn()}
-        footer={<button type="button">Close</button>}
+        onCancel={vi.fn()}
       />,
     );
 
-    expect(screen.getByText('**A** source')).toBeVisible();
-    expect(screen.queryByRole('textbox', { name: 'Markdown source' })).not.toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole('button', { name: 'Edit Card' }));
-
-    expect(screen.getByRole('textbox', { name: 'Description' })).toHaveFocus();
-    expect(screen.getByRole('heading', { name: 'A' })).toBeVisible();
-    expect(screen.queryByRole('textbox', { name: 'Card title' })).not.toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: 'Title' })).toHaveValue('A');
     expect(screen.getByRole('textbox', { name: 'Description' })).toHaveValue(
       'Where every route begins',
     );
     expect(screen.getByRole('textbox', { name: 'Markdown source' })).toHaveValue('**A** source');
+    expect(screen.queryByRole('button', { name: 'Edit Card' })).not.toBeInTheDocument();
   });
 
-  it('keeps invalid description and cancelled Markdown local, then completes one valid Card value', () => {
+  it('opens with the title focused, which is what an author names first', () => {
+    render(<OpenCard content={markdown()} onComplete={vi.fn()} onCancel={vi.fn()} />);
+
+    expect(screen.getByRole('textbox', { name: 'Title' })).toHaveFocus();
+  });
+
+  it('completes one whole Card from all three fields', () => {
     const onComplete = vi.fn();
-    render(
-      <OpenCard
-        title="A"
-        content={{ id: CARD_ID, title: 'A', kind: 'markdown', body: '**A** source' }}
-        onComplete={onComplete}
-        footer={<button type="button">Close</button>}
-      />,
-    );
+    const onCancel = vi.fn();
+    render(<OpenCard content={markdown()} onComplete={onComplete} onCancel={onCancel} />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Edit Card' }));
+    fireEvent.change(screen.getByRole('textbox', { name: 'Title' }), {
+      target: { value: 'Renamed A' },
+    });
     fireEvent.change(screen.getByRole('textbox', { name: 'Description' }), {
-      target: { value: 'x'.repeat(121) },
+      target: { value: 'A caption' },
     });
     fireEvent.change(screen.getByRole('textbox', { name: 'Markdown source' }), {
-      target: { value: 'draft' },
+      target: { value: 'New body' },
     });
     fireEvent.click(screen.getByRole('button', { name: 'Done' }));
-    expect(screen.getByRole('alert')).toHaveTextContent('at most 120');
-    expect(onComplete).not.toHaveBeenCalled();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
-    expect(screen.getByText('**A** source')).toBeVisible();
-    expect(screen.getByRole('button', { name: 'Edit Card' })).toHaveFocus();
-
-    fireEvent.click(screen.getByRole('button', { name: 'Edit Card' }));
-    fireEvent.change(screen.getByRole('textbox', { name: 'Markdown source' }), {
-      target: { value: '' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
     expect(onComplete).toHaveBeenCalledWith({
       id: CARD_ID,
-      title: 'A',
+      title: 'Renamed A',
+      description: 'A caption',
       kind: 'markdown',
-      body: '',
+      body: 'New body',
     });
+    expect(onCancel).toHaveBeenCalledOnce();
   });
 
   /**
-   * A description an author has emptied is *absent*, not an invisible run of
-   * spaces. The stored key is what every reader keys off — the node draws a
-   * `card-description` paragraph for any truthy value — so a blank one leaves a
-   * caption that occupies space and says nothing, and no field is left to clear.
+   * `min(1)` counts characters and a space is one, so the schema alone accepts a
+   * title that draws as nothing — the same reason the graph's inline editor
+   * trims. The body is not trimmed: whitespace there is Markdown.
    */
-  it('removes a description the author blanked rather than storing the blank', () => {
+  it('refuses a blank title and keeps it local', () => {
+    const onComplete = vi.fn();
+    render(<OpenCard content={markdown()} onComplete={onComplete} onCancel={vi.fn()} />);
+    const title = screen.getByRole('textbox', { name: 'Title' });
+
+    fireEvent.change(title, { target: { value: '   ' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+
+    expect(screen.getByRole('alert')).toHaveTextContent('A Card title is required.');
+    expect(title).toHaveAttribute('aria-invalid', 'true');
+    expect(title).toHaveAccessibleDescription('A Card title is required.');
+    expect(onComplete).not.toHaveBeenCalled();
+  });
+
+  it('stores a title and description without the whitespace around them', () => {
     const onComplete = vi.fn();
     render(
       <OpenCard
-        title="A"
-        content={{ id: CARD_ID, title: 'A', description: 'Original', kind: 'markdown', body: 'A' }}
+        content={markdown({ body: ' spaced body ' })}
         onComplete={onComplete}
-        footer={<button type="button">Close</button>}
+        onCancel={vi.fn()}
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Edit Card' }));
+    fireEvent.change(screen.getByRole('textbox', { name: 'Title' }), {
+      target: { value: '  Renamed A  ' },
+    });
+    fireEvent.change(screen.getByRole('textbox', { name: 'Description' }), {
+      target: { value: '  A caption  ' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+
+    expect(onComplete).toHaveBeenCalledWith({
+      id: CARD_ID,
+      title: 'Renamed A',
+      description: 'A caption',
+      kind: 'markdown',
+      body: ' spaced body ',
+    });
+  });
+
+  it('removes a description the author blanked', () => {
+    const onComplete = vi.fn();
+    render(
+      <OpenCard
+        content={markdown({ description: 'Original' })}
+        onComplete={onComplete}
+        onCancel={vi.fn()}
+      />,
+    );
+
     fireEvent.change(screen.getByRole('textbox', { name: 'Description' }), {
       target: { value: '   ' },
     });
@@ -102,64 +133,50 @@ describe('OpenCard Markdown authoring', () => {
       id: CARD_ID,
       title: 'A',
       kind: 'markdown',
-      body: 'A',
+      body: '**A** source',
     });
   });
 
-  it('stores a description without the whitespace surrounding it', () => {
+  it('links a description error to its field and completes once it is valid', () => {
     const onComplete = vi.fn();
-    render(
-      <OpenCard
-        title="A"
-        content={{ id: CARD_ID, title: 'A', kind: 'markdown', body: 'A' }}
-        onComplete={onComplete}
-        footer={<button type="button">Close</button>}
-      />,
-    );
-
-    fireEvent.click(screen.getByRole('button', { name: 'Edit Card' }));
-    fireEvent.change(screen.getByRole('textbox', { name: 'Description' }), {
-      target: { value: '  Where every route begins  ' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
-
-    expect(onComplete).toHaveBeenCalledWith({
-      id: CARD_ID,
-      title: 'A',
-      description: 'Where every route begins',
-      kind: 'markdown',
-      body: 'A',
-    });
-  });
-
-  it('links validation to the description and completes an unchanged Card', () => {
-    const onComplete = vi.fn();
-    render(
-      <OpenCard
-        title="A"
-        content={{ id: CARD_ID, title: 'A', description: 'Original', kind: 'markdown', body: 'A' }}
-        onComplete={onComplete}
-        footer={<button type="button">Close</button>}
-      />,
-    );
-
-    fireEvent.click(screen.getByRole('button', { name: 'Edit Card' }));
+    render(<OpenCard content={markdown()} onComplete={onComplete} onCancel={vi.fn()} />);
     const description = screen.getByRole('textbox', { name: 'Description' });
+
     fireEvent.change(description, { target: { value: 'x'.repeat(121) } });
     fireEvent.click(screen.getByRole('button', { name: 'Done' }));
-
     expect(description).toHaveAttribute('aria-invalid', 'true');
     expect(description).toHaveAccessibleDescription(/at most 120/i);
     expect(onComplete).not.toHaveBeenCalled();
 
-    fireEvent.change(description, { target: { value: 'Original' } });
+    fireEvent.change(description, { target: { value: 'Fits' } });
     fireEvent.click(screen.getByRole('button', { name: 'Done' }));
-    expect(onComplete).toHaveBeenCalledWith({
-      id: CARD_ID,
-      title: 'A',
-      description: 'Original',
-      kind: 'markdown',
-      body: 'A',
+    expect(onComplete).toHaveBeenCalledOnce();
+  });
+
+  it('cancels without completing', () => {
+    const onComplete = vi.fn();
+    const onCancel = vi.fn();
+    render(<OpenCard content={markdown()} onComplete={onComplete} onCancel={onCancel} />);
+
+    fireEvent.change(screen.getByRole('textbox', { name: 'Markdown source' }), {
+      target: { value: 'abandoned' },
     });
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+
+    expect(onCancel).toHaveBeenCalledOnce();
+    expect(onComplete).not.toHaveBeenCalled();
+  });
+
+  it('cancels on Escape without letting it reach the window', () => {
+    const onCancel = vi.fn();
+    const outside = vi.fn();
+    window.addEventListener('keydown', outside);
+    render(<OpenCard content={markdown()} onComplete={vi.fn()} onCancel={onCancel} />);
+
+    fireEvent.keyDown(screen.getByRole('textbox', { name: 'Markdown source' }), { key: 'Escape' });
+
+    expect(onCancel).toHaveBeenCalledOnce();
+    expect(outside).not.toHaveBeenCalled();
+    window.removeEventListener('keydown', outside);
   });
 });

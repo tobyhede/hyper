@@ -289,7 +289,6 @@ body {
   justify-content: center;
   gap: 0.35rem;
   text-align: center;
-  cursor: pointer;
 }
 
 .card--node .card__title {
@@ -298,26 +297,52 @@ body {
   line-height: 1.35;
 }
 
-.card__title-edit {
+/* Renaming is the title's own double click and opening is the Card's, so the two
+   must not want the same pixels — and a Card centres its title, which puts the
+   rename target exactly where a pointer goes to open. Shrunk to the text it
+   draws (a block `h2` spans the full width, most of it empty), so the band
+   either side of a short title opens the Card. `cursor: text` is the only thing
+   telling them apart, which is why it is not decoration. */
+.card--node .card__title--editable {
+  width: fit-content;
+  max-width: 100%;
+  cursor: text;
+}
+
+/* A square icon button in the Card's corner. Sized in its own right rather than
+   from its content, so the glyph cannot drag the box out of square, and kept
+   clear of the title. */
+.card__edit {
   position: absolute;
-  top: 0.55rem;
-  right: 0.55rem;
+  top: 0.4rem;
+  right: 0.4rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
   border: 1px solid var(--border);
   border-radius: 5px;
-  padding: 0.2rem 0.4rem;
+  padding: 0;
   background: var(--panel-2);
   color: var(--muted);
-  font: inherit;
-  font-size: 0.7rem;
   opacity: 0;
   pointer-events: none;
   cursor: pointer;
-  transition: opacity 100ms ease;
+  transition:
+    opacity 100ms ease,
+    color 100ms ease,
+    border-color 100ms ease;
 }
 
-.react-flow__node:hover .card__title-edit,
-.card__title-edit:focus-visible,
-.rf-card-node__inner[data-selected='true'] .card__title-edit {
+.card__edit:hover {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.react-flow__node:hover .card__edit,
+.card__edit:focus-visible,
+.rf-card-node__inner[data-selected='true'] .card__edit {
   opacity: 1;
   pointer-events: auto;
 }
@@ -597,11 +622,6 @@ body {
 
 /* Content scrolls within the frame, so the actions never scroll away — the step
    controls have to stay reachable at any point in a long card. */
-.open-card__content {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-}
 
 .open-card__editor {
   display: flex;

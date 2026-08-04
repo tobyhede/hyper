@@ -348,6 +348,27 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
       return null;
     }, []);
 
+    // An Alias owns a title and a pointer, not content. Opening a Card is
+    // editing it (ADR 0037), so an Alias has nothing to open onto: it offers no
+    // affordance and the keyboard cannot reach one either. Its title is renamed
+    // on the graph. `card-authoring/03` would let an Alias delegate content
+    // editing to its target; it is unbuilt, and reading through one went with
+    // the reading surface.
+    const editableCardIds = useMemo(
+      () =>
+        new Set(
+          rendererSpace.cards.filter((card) => card.kind === 'markdown').map((card) => card.id),
+        ),
+      [rendererSpace],
+    );
+    const openCardForEditing = useCallback(
+      (cardIdInput: string): void => {
+        const cardId = uuidSchema.safeParse(cardIdInput);
+        if (cardId.success && editableCardIds.has(cardId.data)) openCard(cardId.data);
+      },
+      [openCard, editableCardIds],
+    );
+
     const openedCard = openedCardId ? getCard(rendererSpace, openedCardId) : undefined;
     const openedContent = openedCard ? resolveContentCard(rendererSpace, openedCard.id) : undefined;
     const completeOpenedCard = useCallback((completed: ResolvedContentCard): void => {
@@ -507,8 +528,9 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
                 onConnectEnd={finishConnection}
                 onCreateConnectedCard={createConnectedCard}
                 newCardTitle={nextCardTitle(sessionState.working)}
-                onOpenCard={(cardId) => openCard(uuidSchema.parse(cardId))}
+                onOpenCard={openCardForEditing}
                 onCompleteCardTitle={completeCardTitle}
+                editableCardIds={editableCardIds}
                 routes={visibleRoutes}
                 colorByRouteId={colors}
                 activeRouteId={activeRouteId}
@@ -533,14 +555,9 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
 
           {openedCard && openedContent && (
             <OpenCard
-              title={openedCard.title}
               content={openedContent}
               {...(openedCard.kind === 'markdown' ? { onComplete: completeOpenedCard } : {})}
-              footer={
-                <Button variant="secondary" data-testid="close-card" onClick={closeCard}>
-                  Close
-                </Button>
-              }
+              onCancel={closeCard}
             />
           )}
         </div>

@@ -38,18 +38,14 @@ const cardNode = (title: string, id: typeof CARD_ID = CARD_ID, selected = false)
 interface Harness {
   readonly view: RenderResult;
   readonly openCard: ReturnType<typeof vi.fn>;
-  /** Re-render with title editing on or off, everything else unchanged. */
+  /** Re-render with Card authoring on or off, everything else unchanged. */
   readonly setTitleEditing: (enabled: boolean) => void;
 }
 
-/**
- * A GraphView holding one Card, with a title Edit that always refuses.
- *
- * The refusal is what leaves the editor open and the graph's invalid-title guard
- * raised, which is the state these tests take away the editor from.
- */
+/** A GraphView whose title Edit always refuses, so a draft can be left unsettled. */
 function mountGraph(nodes: CardFlowNode[] = [cardNode('A')]): Harness {
   const openCard = vi.fn();
+  const editableCardIds = new Set(nodes.map((node) => node.id));
   const graph = (titleEditingEnabled: boolean) => (
     <ReactFlowProvider>
       <GraphView
@@ -68,6 +64,7 @@ function mountGraph(nodes: CardFlowNode[] = [cardNode('A')]): Harness {
         newCardTitle="Card 2"
         onOpenCard={openCard}
         onCompleteCardTitle={() => 'A Card needs a title'}
+        editableCardIds={editableCardIds}
         routes={[]}
         colorByRouteId={{}}
         activeRouteId={null}
@@ -83,10 +80,26 @@ function mountGraph(nodes: CardFlowNode[] = [cardNode('A')]): Harness {
   };
 }
 
-/** Leave the graph holding an open title editor that has just refused a draft. */
+/**
+ * The node element React Flow dispatches `onNodeDoubleClick` from.
+ *
+ * By id, not by heading: half these tests run with the title editor open, and
+ * then there is no heading to find — `getByRole` throws rather than falling back.
+ */
+function nodeOf(id: string): HTMLElement {
+  const node = document.querySelector<HTMLElement>(`.react-flow__node[data-id="${id}"]`);
+  if (node === null) throw new Error(`No node is drawn for ${id}.`);
+  return node;
+}
+
+/**
+ * Leave the graph holding an open title editor on A that has just refused a
+ * draft. B is there so the tests can ask what the refusal did to the rest of the
+ * graph — A's own affordance is hidden while its title is being renamed.
+ */
 function refuseTitleEdit(settle: 'enter' | 'blur' = 'enter'): Harness {
-  const harness = mountGraph();
-  fireEvent.click(screen.getByRole('button', { name: 'Edit title of A' }));
+  const harness = mountGraph([cardNode('A', CARD_ID, true), cardNode('B', OTHER_CARD_ID)]);
+  fireEvent.doubleClick(screen.getByRole('heading', { name: 'A' }));
   const input = screen.getByRole('textbox', { name: 'Card title' });
   fireEvent.change(input, { target: { value: '' } });
   if (settle === 'enter') fireEvent.keyDown(input, { key: 'Enter' });
@@ -114,29 +127,62 @@ beforeAll(() => {
 
 afterAll(() => vi.unstubAllGlobals());
 
+/**
+ * Leaving a refused title used to open the Card underneath, because the click
+ * that blurred the field was also the click that opened — so the graph carried a
+ * ref that ate exactly one click to stop it. The gesture delivers that now
+ * (ADR 0036): a click selects, and only a double click opens.
+ */
 describe('a title Edit the graph refused', () => {
-  it('swallows the click that blurred it rather than opening a Card', () => {
+  it('does not open a Card on the click that blurred it', () => {
     const { openCard } = refuseTitleEdit('blur');
 
-    fireEvent.click(screen.getByTestId('card'));
+    fireEvent.click(nodeOf(CARD_ID));
 
     expect(openCard).not.toHaveBeenCalled();
   });
 
-  /**
-   * One click, not the rest of the session. The blurring click is the only one
-   * the refusal has any claim on — it was spent leaving the field. Holding the
-   * guard up past it left every Card unopenable by click while the refused
-   * editor sat there, and the only way back was noticing a small field error on
-   * a Card the pointer had already left.
-   */
-  it('opens a Card on the next click, having spent the refusal on the first', () => {
+  it('leaves the rest of the graph working', () => {
     const { openCard } = refuseTitleEdit('blur');
-    fireEvent.click(screen.getByTestId('card'));
 
-    fireEvent.click(screen.getByTestId('card'));
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Card B' }));
+
+    expect(openCard).toHaveBeenCalledWith(OTHER_CARD_ID);
+  });
+});
+
+/**
+ * No pointer gesture on a Card's body opens it (ADR 0036). A Card centres its
+ * title, so a body gesture and the title's rename want the same pixels; opening
+ * moved to the Card's own control and the keyboard instead.
+ */
+describe('opening a Card', () => {
+  it.each([
+    ['a single click', (node: HTMLElement) => fireEvent.click(node)],
+    ['a double click', (node: HTMLElement) => fireEvent.doubleClick(node)],
+  ])('does not happen on %s of the Card body', (_name, gesture) => {
+    const { openCard } = mountGraph();
+
+    gesture(nodeOf(CARD_ID));
+
+    expect(openCard).not.toHaveBeenCalled();
+  });
+
+  it('happens from the Card affordance', () => {
+    const { openCard } = mountGraph();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Card A' }));
 
     expect(openCard).toHaveBeenCalledWith(CARD_ID);
+  });
+
+  it('leaves the title free to rename on a double click', () => {
+    const { openCard } = mountGraph();
+
+    fireEvent.doubleClick(screen.getByRole('heading', { name: 'A' }));
+
+    expect(screen.getByRole('textbox', { name: 'Card title' })).toHaveValue('A');
+    expect(openCard).not.toHaveBeenCalled();
   });
 });
 
@@ -152,7 +198,7 @@ describe('F2 while a control has focus', () => {
   it('does not rename the selected Card from a control on a different Card', () => {
     mountGraph([cardNode('A', CARD_ID, true), cardNode('B', OTHER_CARD_ID)]);
 
-    fireEvent.keyDown(screen.getByRole('button', { name: 'Edit title of B' }), { key: 'F2' });
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Edit Card B' }), { key: 'F2' });
 
     expect(screen.queryByRole('textbox', { name: 'Card title' })).not.toBeInTheDocument();
   });
@@ -167,12 +213,13 @@ describe('F2 while a control has focus', () => {
 });
 
 /**
- * The title-edit affordance is a real button in the tab order, revealed by
+ * The Card affordance is a real button in the tab order, revealed by
  * `:focus-visible`, so a keyboard author reaches it without a pointer. Its
  * activation keys are the same two the graph reads as "open this Card", and the
- * graph's handler sits on the ancestor that sees them first: it opened the Card
- * and called `preventDefault`, which in a browser also cancels the activation
- * the button never got. The button was unusable by the input it was there for.
+ * graph's handler sits on the ancestor that sees them first — it opened the Card
+ * for reading and called `preventDefault`, which in a browser also cancels the
+ * activation the button never got. The button was unusable by the input it is
+ * there for, and its whole point is to open something the plain open does not.
  *
  * Activation is modelled as the browser does it — the keydown, then the click it
  * generates — because jsdom does not synthesize the second from the first.
@@ -180,10 +227,10 @@ describe('F2 while a control has focus', () => {
 describe.each([
   ['Enter', 'Enter'],
   ['Space', ' '],
-] as const)('%s on the focused title-edit button', (_name, key) => {
-  it('does not open the Card', () => {
+] as const)('%s on the focused Card affordance', (_name, key) => {
+  it("does not open the Card twice — the keydown is the button's, not the graph's", () => {
     const { openCard } = mountGraph();
-    const button = screen.getByRole('button', { name: 'Edit title of A' });
+    const button = screen.getByRole('button', { name: 'Edit Card A' });
     button.focus();
 
     fireEvent.keyDown(button, { key });
@@ -191,15 +238,26 @@ describe.each([
     expect(openCard).not.toHaveBeenCalled();
   });
 
-  it('begins title editing', () => {
-    mountGraph();
-    const button = screen.getByRole('button', { name: 'Edit title of A' });
+  it('opens the Card', () => {
+    const { openCard } = mountGraph();
+    const button = screen.getByRole('button', { name: 'Edit Card A' });
     button.focus();
 
     fireEvent.keyDown(button, { key });
     fireEvent.click(button);
 
-    expect(screen.getByRole('textbox', { name: 'Card title' })).toHaveValue('A');
+    expect(openCard).toHaveBeenCalledWith(CARD_ID);
+  });
+});
+
+describe('the Card affordance', () => {
+  it('opens the Card rather than renaming its title on the graph', () => {
+    const { openCard } = mountGraph();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Card A' }));
+
+    expect(openCard).toHaveBeenCalledWith(CARD_ID);
+    expect(screen.queryByRole('textbox', { name: 'Card title' })).not.toBeInTheDocument();
   });
 });
 
@@ -222,12 +280,12 @@ describe('withdrawing title editing', () => {
     expect(screen.getByRole('heading', { name: 'A' })).toBeVisible();
   });
 
-  it('opens a Card clicked after an unsettled title Edit was withdrawn', () => {
+  it('opens a Card after an unsettled title Edit was withdrawn', () => {
     const { openCard, setTitleEditing } = refuseTitleEdit();
 
     setTitleEditing(false);
     setTitleEditing(true);
-    fireEvent.click(screen.getByTestId('card'));
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Card A' }));
 
     expect(openCard).toHaveBeenCalledWith(CARD_ID);
   });

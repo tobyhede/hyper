@@ -18,7 +18,6 @@ import {
   type Edge,
   type EdgeChange,
   type IsValidConnection,
-  type NodeMouseHandler,
   type OnConnect,
   type OnConnectEnd,
   type OnConnectStart,
@@ -269,6 +268,8 @@ export interface GraphViewProps {
   onOpenCard: (cardId: string) => void;
   /** Complete one locally validated title draft, or return its field error. */
   onCompleteCardTitle: (cardId: string, title: string) => string | null;
+  /** Which Cards can be opened — an Alias owns no content, so it offers none. */
+  editableCardIds: ReadonlySet<string>;
   routes: readonly Route[];
   colorByRouteId: Readonly<Record<string, string>>;
   activeRouteId: string | null;
@@ -291,6 +292,7 @@ export function GraphView({
   newCardTitle,
   onOpenCard,
   onCompleteCardTitle,
+  editableCardIds,
   routes,
   colorByRouteId,
   activeRouteId,
@@ -303,23 +305,24 @@ export function GraphView({
   // pointer moving across empty canvas no longer re-renders the flow per frame.
   const [overEmptyCanvas, setOverEmptyCanvas] = useState(false);
   const [editingTitleCardId, setEditingTitleCardId] = useState<string | null>(null);
-  const titleEditInvalid = useRef(false);
   const { screenToFlowPosition } = useReactFlow();
-  const canEditTitles = editable && titleEditingEnabled && !presenting;
+  // One rule for every authoring control drawn on a Card — the title editor and
+  // the Card affordance are offered and withdrawn together.
+  const canAuthorCards = editable && titleEditingEnabled && !presenting;
 
   // A withdrawn editor does not come back on its own.
   //
-  // `canEditTitles` going false — presenting starts, a Card opens over the graph
+  // `canAuthorCards` going false — presenting starts, a Card opens over the graph
   // — unmounts the editor along with the only controls that could settle a draft
   // it refused, so the Card it named is forgotten at that moment rather than
   // remembered until editing returns and reopened over a Card nobody asked to
   // rename. Adjusted during render rather than in an effect: this is React's
   // documented way to reset state on a changed input, and an effect would both
   // cost a second render and be rejected by lint.
-  const [titleEditingWasEnabled, setTitleEditingWasEnabled] = useState(canEditTitles);
-  if (titleEditingWasEnabled !== canEditTitles) {
-    setTitleEditingWasEnabled(canEditTitles);
-    if (!canEditTitles) setEditingTitleCardId(null);
+  const [cardAuthoringWasEnabled, setCardAuthoringWasEnabled] = useState(canAuthorCards);
+  if (cardAuthoringWasEnabled !== canAuthorCards) {
+    setCardAuthoringWasEnabled(canAuthorCards);
+    if (!canAuthorCards) setEditingTitleCardId(null);
   }
 
   useEffect(() => {
@@ -376,36 +379,21 @@ export function GraphView({
       onConnectEnd();
       setModifierCreatesCard(false);
       setOverEmptyCanvas(false);
-      // React Flow dispatches the pointer-up node click after this callback.
-      // Keep the guard through that event, then restore ordinary card opening.
-      setTimeout(() => {
-        connectionGesture.current = false;
-      }, 0);
+      // Lowered here rather than deferred past the pointer-up node click React
+      // Flow dispatches after this callback. That deferral existed so the click
+      // ending a connection drag could not open the Card just connected to; a
+      // drag release produces a `click`, and opening now needs a `dblclick`
+      // (ADR 0036). The flag itself stays — the Alt listener and the
+      // empty-canvas hover tracking read it, and neither concerns clicks.
+      connectionGesture.current = false;
     },
     [screenToFlowPosition, onCreateConnectedCard, onConnectEnd, acceptsNewCardTarget],
   );
 
-  // Clicking a card opens it to read — a gesture that belongs to the overview.
-  // While presenting the canvas is the presentation, so a click must not drop a
-  // reading panel over it.
-  const handleNodeClick = useCallback<NodeMouseHandler<CardFlowNode>>(
-    (_event, node) => {
-      // A refused title swallows the click that blurred it — one click, and
-      // only that one, which is why the flag is spent here rather than left
-      // standing. The blurring click is the only one the refusal has any claim
-      // on: it was spent leaving the field. Held past it, the guard left every
-      // Card unopenable by click for as long as the refused editor was open,
-      // recoverable only by noticing a small field error on a Card the pointer
-      // had already left. Asking for the open editor too keeps a spent flag from
-      // outliving its editing session.
-      if (editingTitleCardId !== null && titleEditInvalid.current) {
-        titleEditInvalid.current = false;
-        return;
-      }
-      if (!presenting && !connectionGesture.current) onOpenCard(node.id);
-    },
-    [presenting, editingTitleCardId, onOpenCard],
-  );
+  // No pointer gesture on a Card's body opens it (ADR 0036). A click is left to
+  // React Flow, which selects; the double click belongs to the title, which
+  // centres in a Card and would otherwise be competing with the Card underneath
+  // it for the same pixels. Opening is the affordance and the keyboard.
 
   const handleMouseMove = useCallback((event: MouseEvent<HTMLDivElement>) => {
     if (!connectionGesture.current) return;
@@ -435,7 +423,7 @@ export function GraphView({
   // handlers for one key means one of them is the unguarded one; don't add a
   // second back.
   useEffect(() => {
-    if (!canEditTitles) return;
+    if (!canAuthorCards) return;
     const beginSelectedTitleEdit = (event: KeyboardEvent): void => {
       if (event.key !== 'F2') return;
       if (
@@ -447,12 +435,11 @@ export function GraphView({
       const selected = nodes.find((node) => node.selected);
       if (selected === undefined) return;
       event.preventDefault();
-      titleEditInvalid.current = false;
       setEditingTitleCardId(selected.id);
     };
     window.addEventListener('keydown', beginSelectedTitleEdit);
     return () => window.removeEventListener('keydown', beginSelectedTitleEdit);
-  }, [canEditTitles, nodes]);
+  }, [canAuthorCards, nodes]);
 
   const editableNodes = useMemo(
     () =>
@@ -460,25 +447,22 @@ export function GraphView({
         ...node,
         data: {
           ...node.data,
-          titleEditingEnabled: canEditTitles,
-          editingTitle: canEditTitles && node.id === editingTitleCardId,
-          onBeginTitleEditing: () => {
-            titleEditInvalid.current = false;
-            setEditingTitleCardId(node.id);
-          },
+          // Two controls, two flags. The title's double click is offered on
+          // every Card; the affordance only on one that owns content to edit.
+          titleEditingEnabled: canAuthorCards,
+          cardEditingEnabled: canAuthorCards && editableCardIds.has(node.id),
+          editingTitle: canAuthorCards && node.id === editingTitleCardId,
+          onEditCard: () => onOpenCard(node.id),
+          onBeginTitleEditing: () => setEditingTitleCardId(node.id),
           onCompleteTitleEditing: (title: string) => {
             const error = onCompleteCardTitle(node.id, title);
-            titleEditInvalid.current = error !== null;
             if (error === null) setEditingTitleCardId(null);
             return error;
           },
-          onCancelTitleEditing: () => {
-            titleEditInvalid.current = false;
-            setEditingTitleCardId(null);
-          },
+          onCancelTitleEditing: () => setEditingTitleCardId(null),
         },
       })),
-    [nodes, canEditTitles, editingTitleCardId, onCompleteCardTitle],
+    [nodes, canAuthorCards, editableCardIds, editingTitleCardId, onCompleteCardTitle, onOpenCard],
   );
 
   const connectionLineStyle = useMemo(
@@ -525,10 +509,14 @@ export function GraphView({
       isValidConnection={isValidConnection}
       onConnectStart={handleConnectStart}
       onConnectEnd={handleConnectEnd}
-      onNodeClick={handleNodeClick}
       onKeyDown={handleKeyDown}
       fitView
       fitViewOptions={OVERVIEW_FIT}
+      // Double click opens a Card (ADR 0036), and React Flow's own double-click
+      // zoom would fire underneath it — its filter exempts only `.nopan`, which
+      // a Card is not. Off for the whole canvas rather than per node, so the
+      // gesture does not change meaning two pixels away from a Card.
+      zoomOnDoubleClick={false}
       // While presenting the arrow keys are the walk's, so React Flow must not
       // also read them as moving or selecting a node.
       nodesDraggable={editable && !presenting}

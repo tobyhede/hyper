@@ -65,6 +65,17 @@ export function nodeByTitle(page: Page, title: string): Locator {
     .filter({ has: page.getByRole('heading', { name: title, exact: true }) });
 }
 
+/**
+ * Open a Card, which is to say edit it (ADR 0037).
+ *
+ * No pointer gesture on a Card's body opens it (ADR 0036) — the Card's own
+ * control does, and it is revealed by hovering the Card.
+ */
+export async function openCard(node: Locator, title: string): Promise<void> {
+  await node.hover();
+  await node.getByRole('button', { name: `Edit Card ${title}` }).click();
+}
+
 /** Where React Flow has actually put a node, in flow coordinates. */
 export async function positionOf(node: Locator): Promise<{ x: number; y: number }> {
   return node.evaluate((el) => {

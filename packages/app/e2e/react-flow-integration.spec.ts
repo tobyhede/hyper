@@ -8,18 +8,21 @@ test('a focused Card opens with Enter and Space', async ({ page }) => {
   await expect(card).toBeVisible();
   await settled(page);
 
+  // The guard that opening did not follow the pointer off the Card when it
+  // stopped being a gesture (ADR 0036, 0037).
+  const source = page.getByRole('textbox', { name: 'Markdown source' });
   await card.focus();
   await expect(card).toBeFocused();
   await page.keyboard.press('Enter');
-  await expect(page.getByTestId('open-card')).toContainText('**A**');
+  await expect(source).toHaveValue(/\*\*A\*\*/);
 
-  await page.getByTestId('close-card').click();
+  await page.getByRole('button', { name: 'Cancel' }).click();
   await expect(page.getByTestId('open-card')).toBeHidden();
   await card.focus();
   await expect(card).toBeFocused();
   const scrollBefore = await page.evaluate(() => window.scrollY);
   await page.keyboard.press('Space');
-  await expect(page.getByTestId('open-card')).toContainText('**A**');
+  await expect(source).toHaveValue(/\*\*A\*\*/);
   expect(await page.evaluate(() => window.scrollY)).toBe(scrollBefore);
 });
 
