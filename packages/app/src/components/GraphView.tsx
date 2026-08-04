@@ -343,6 +343,15 @@ export function GraphView({
   // carry a warning about it: props recreated each render can drive it into a
   // re-render loop. `onMouseMove` is the hot one — it runs per pointer frame
   // during a connection.
+  //
+  // `editableNodes` is the known exception, and memoized does not mean cheap
+  // there: it rebuilds every node's wrapper whenever `nodes` changes identity,
+  // which a drag does per frame, so React Flow's per-node
+  // `userNode === internals.userNode` fast path misses and all of them re-render
+  // rather than the one being dragged. Correctness is unaffected. Closing it
+  // needs a per-node cache or the callbacks moved into context — more machinery
+  // than a ten-Card fixture asks for, so read it as a measured exception rather
+  // than an oversight.
   const isValidConnection = useCallback<IsValidConnection>(
     (connection) => acceptsConnection(connection.source, connection.target),
     [acceptsConnection],

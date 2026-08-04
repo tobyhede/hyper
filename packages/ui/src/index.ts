@@ -4,8 +4,6 @@ export { Button, buttonVariants } from './Button';
 export type { ButtonProps } from './Button';
 export { CardContent } from './CardContent';
 export type { CardContentProps } from './CardContent';
-export { CardRenderer } from './CardRenderer';
-export type { CardRendererProps } from './CardRenderer';
 export { FALLBACK_ROUTE_COLOR, RouteLegend } from './RouteLegend';
 export type { RouteLegendProps } from './RouteLegend';
 export { RouteSelector } from './RouteSelector';

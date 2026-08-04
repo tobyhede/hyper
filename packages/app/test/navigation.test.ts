@@ -78,6 +78,32 @@ it('selects a renderer and its active Route without changing the Space', () => {
   expect(navigation.getState().selectedView).toBe('grid');
 });
 
+/**
+ * Selecting a renderer closes an opened Card, and that is a change: this used to
+ * retain it, on the reasoning that the author was still *reading* it and the
+ * arrangement underneath was none of that reading's business.
+ *
+ * ADR 0037 removed the reading state, so what is retained now is an editor — and
+ * an Algorithmic View installs no placement until its strategy resolves, which
+ * is a window in which the Edit that editor completes is refused for having no
+ * positions to write. The pane closed on `Done` either way, so a refusal was
+ * indistinguishable from success and the author's typing was simply gone.
+ *
+ * Closing removes the window rather than reporting from inside it. The cost is
+ * that a draft is discarded when the author changes what they are looking at —
+ * visibly, and at the moment they ask for it, which is what `present()` has
+ * always done with an opened Card.
+ */
+it('closes an opened Card when the renderer changes, so no editor outlives its placement', () => {
+  const space = fixture();
+  const navigation = createNavigation(() => space, { kind: 'view', view: 'graph' });
+  navigation.openCard(uuid('00000000-0000-4000-8000-000000000002'));
+
+  navigation.selectRenderer({ kind: 'layout', layoutId: LAYOUT });
+
+  expect(navigation.getState().openedCardId).toBeNull();
+});
+
 it('traverses an Edge from the changing working Space without installing a copy', () => {
   const cardA = uuid('00000000-0000-4000-8000-000000000002');
   const cardB = uuid('00000000-0000-4000-8000-000000000003');
@@ -227,10 +253,11 @@ it('opens and closes Cards, and closes an opened Card when presenting starts', (
 
 /*
  * Opening a replacement Space is not navigating to a renderer within the one
- * already open, and the difference is everything `selectRenderer` deliberately
- * retains. There is no earlier Algorithmic View to fall back to and no Card the
- * author was still reading, so a Layout selection resets `selectedView` and
- * clears `openedCardId` — both of which `selectRenderer` leaves standing.
+ * already open, and the difference is what `selectRenderer` deliberately
+ * retains. There is no earlier Algorithmic View to fall back to, so a Layout
+ * selection resets `selectedView`, which `selectRenderer` leaves standing.
+ * Both clear `openedCardId`; the reason differs, and only this one is about
+ * there being no Space left for that Card to belong to.
  */
 it('opens a replacement Space as new navigation, retaining no reading state', () => {
   const space = fixture();

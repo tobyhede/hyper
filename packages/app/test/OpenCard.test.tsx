@@ -209,3 +209,50 @@ describe('the opened Card', () => {
     window.removeEventListener('keydown', outside);
   });
 });
+
+/**
+ * The pane covers the graph and is the one surface for a Card's content (ADR
+ * 0037), so it has to say so. It was a bare `<div>`: no role, no name, and
+ * nothing stopping `Tab` walking out of it into the Card nodes still behind it —
+ * which announce "Press enter or space to open a Card" and, until `App` declined
+ * it, did exactly that to the Card being typed into.
+ */
+describe('the opened Card as a dialog', () => {
+  it('is a modal dialog named for the Card it authors', () => {
+    render(<OpenCard content={markdown()} onComplete={vi.fn()} onCancel={vi.fn()} />);
+
+    const dialog = screen.getByRole('dialog');
+    expect(dialog).toHaveAttribute('aria-modal', 'true');
+    expect(dialog).toHaveAccessibleName('A');
+  });
+
+  it('keeps Tab inside itself, wrapping from the last control to the first', () => {
+    render(<OpenCard content={markdown()} onComplete={vi.fn()} onCancel={vi.fn()} />);
+    const title = screen.getByRole('textbox', { name: 'Title' });
+    const done = screen.getByRole('button', { name: 'Done' });
+
+    done.focus();
+    fireEvent.keyDown(done, { key: 'Tab' });
+    expect(title).toHaveFocus();
+
+    fireEvent.keyDown(title, { key: 'Tab', shiftKey: true });
+    expect(done).toHaveFocus();
+  });
+
+  /**
+   * Taking focus is the pane's own job; giving it back is not, and this asserts
+   * only the half that belongs here.
+   *
+   * An earlier version restored focus on unmount to whatever was active when it
+   * mounted, and a test like this one passed — with a synthetic opener that
+   * stays in the document. The real opener does not: opening a Card withdraws
+   * every Card affordance, so the control is detached long before the pane
+   * closes. `App` returns focus to the Card instead, proven in `editing.spec`
+   * against a browser that actually moves it.
+   */
+  it('takes focus onto its first field when it opens', () => {
+    render(<OpenCard content={markdown()} onComplete={vi.fn()} onCancel={vi.fn()} />);
+
+    expect(screen.getByRole('textbox', { name: 'Title' })).toHaveFocus();
+  });
+});

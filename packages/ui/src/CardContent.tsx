@@ -10,7 +10,10 @@ export interface CardContentProps {
 /**
  * Renders a card's title and its Markdown content, **parsed**.
  *
- * The counterpart to {@link CardRenderer}, which shows the source verbatim.
+ * The counterpart to the opened Card's editor, which shows the source verbatim
+ * in a `<textarea>`. There is no second component beside this one: the
+ * `CardRenderer` that drew source in a `<pre>` went with the reading surface
+ * (ADR 0037), leaving the editor as the only place source is shown.
  * Opening a card is a view-source gesture and presenting is the one place a
  * card's Markdown is drawn rendered (ADR 0011) — the noun changed when the deck
  * went (ADR 0024), the distinction did not. This is now the only Markdown parser

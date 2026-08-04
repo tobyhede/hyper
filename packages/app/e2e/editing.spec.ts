@@ -854,3 +854,97 @@ test('a duplicate Edge is marked invalid while the drag is still live', async ({
   await expect(page.locator('.react-flow__edge')).toHaveCount(FIXTURE_EDGE_COUNT + 1);
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
 });
+
+/**
+ * An opened Card is an editor, and an editor needs somewhere to write. Changing
+ * the renderer underneath one left it on screen over a graph that was still
+ * arranging, and an Edit completed in that window is refused for having no
+ * placement to write into — with the pane closing on `Done` exactly as it does
+ * on success. The author saw a save and got nothing.
+ *
+ * The pane closing with the renderer is what removes the window. The fixture
+ * declares no Layout, so it opens on `Graph` — selecting that again is not a
+ * change and the selector reports nothing. `Grid` is the other Algorithmic View,
+ * and it installs no placement until its strategy resolves, which is the state
+ * this is about.
+ */
+test('changing the renderer closes an opened Card rather than stranding its editor', async ({
+  page,
+}) => {
+  await page.goto('/');
+  const card = nodeByTitle(page, 'A').first();
+  await settled(page);
+  await openCard(card, 'A');
+
+  const source = page.getByRole('textbox', { name: 'Markdown source' });
+  await expect(source).toBeVisible();
+  await source.fill('Typed into a pane about to lose its placement');
+
+  await page.getByTestId('view-selector').click();
+  await page.getByRole('option', { name: 'Grid' }).click();
+
+  await expect(page.getByTestId('open-card')).toHaveCount(0);
+  // Nothing was written, and nothing was persisted from the abandoned draft.
+  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '0');
+});
+
+/**
+ * Containment, in a browser that actually moves focus on `Tab`.
+ *
+ * The unit tests beside `OpenCard` press `Tab` through `fireEvent`, which runs
+ * the handler but moves nothing — jsdom implements no sequential navigation. So
+ * they prove the two wrap-around branches call `focus()` and cannot prove
+ * containment: a break that left the wraps intact would pass them.
+ *
+ * The graph behind the pane cannot be `inert`, because React Flow measures its
+ * nodes and keeps them in the tab order, so this is the only thing keeping a
+ * keyboard author off Cards that answer `Enter` by opening themselves.
+ */
+test('an opened Card keeps Tab inside it, so the graph behind cannot take focus', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await settled(page);
+  await openCard(nodeByTitle(page, 'A').first(), 'A');
+  await expect(page.getByRole('textbox', { name: 'Title' })).toBeFocused();
+
+  const withinPane = () =>
+    page.evaluate(() => document.activeElement?.closest('.open-card__panel') !== null);
+
+  // More presses than the pane has controls, so a leak shows as focus landing on
+  // the toolbar or a Card rather than wrapping back to the first field.
+  for (let press = 1; press <= 8; press += 1) {
+    await page.keyboard.press('Tab');
+    expect(await withinPane(), `focus left the pane after ${press} Tab presses`).toBe(true);
+  }
+  for (let press = 1; press <= 8; press += 1) {
+    await page.keyboard.press('Shift+Tab');
+    expect(await withinPane(), `focus left the pane after ${press} Shift+Tab presses`).toBe(true);
+  }
+});
+
+/**
+ * Closing hands focus back to the Card, not to the document.
+ *
+ * It cannot hand it back to the control that opened it: opening withdraws every
+ * Card affordance (`titleEditingEnabled` goes false while a Card is open), so
+ * that control no longer exists by the time the pane closes. The Card itself is
+ * still there, is focusable outside presenting, and is where the author was — so
+ * it is what `Escape` and `Cancel` return to, leaving `Enter` to reopen and `F2`
+ * to rename without a journey back through the tab order.
+ */
+test('closing an opened Card returns focus to the Card, not the document', async ({ page }) => {
+  await page.goto('/');
+  await settled(page);
+  const card = nodeByTitle(page, 'A').first();
+  await openCard(card, 'A');
+  await expect(page.getByRole('textbox', { name: 'Title' })).toBeFocused();
+
+  await page.getByRole('button', { name: 'Cancel' }).click();
+  await expect(page.getByTestId('open-card')).toHaveCount(0);
+
+  await expect(card).toBeFocused();
+  // And the Card answers the key it advertises, without a Tab in between.
+  await page.keyboard.press('Enter');
+  await expect(page.getByTestId('open-card')).toBeVisible();
+});
