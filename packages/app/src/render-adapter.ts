@@ -254,8 +254,8 @@ export function createRenderAdapter(authoring: SpaceAuthoring): RenderAdapter {
       if (projection === null || !authoring.canConnect(from, to)) {
         return false;
       }
-      // Install the placement from the live nodes, and publish the reconciled
-      // ones below — deliberately two different lists. `installProjectedPlacement`
+      // Report the placement from the live nodes, and publish the reconciled
+      // ones below — deliberately two different lists. `reportRenderedPlacement`
       // reads positions only, and `reconcile` takes every surviving Card's
       // position from its live node, so the two agree on every Card already on
       // screen. They diverge only for a Card the projection has gained and the
