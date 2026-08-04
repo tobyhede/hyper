@@ -1,4 +1,10 @@
-import { newUuid, type CardId, type SpaceSnapshot, type UUID } from '@project/core';
+import {
+  newUuid,
+  type CardDocument,
+  type CardId,
+  type SpaceSnapshot,
+  type UUID,
+} from '@project/core';
 import { loadSpaceSnapshot, Placement, type LayoutPoint } from '@project/graph';
 import type { SpaceSession, SpaceSessionState } from '@project/persistence';
 import type { Navigation, NavigationState } from './navigation';
@@ -8,6 +14,7 @@ import { defaultRenderer, resolveView, type RendererSelection } from './view';
 export type AuthoringCompletion =
   | { readonly kind: 'settled-card-movement' }
   | { readonly kind: 'connected-cards'; readonly from: CardId; readonly to: CardId }
+  | { readonly kind: 'edited-card'; readonly cardId: CardId }
   | {
       readonly kind: 'create-and-connect';
       readonly from: CardId;
@@ -50,6 +57,14 @@ export interface SpaceAuthoring {
   readonly authoredPlacement: () => Placement | null;
   readonly subscribe: (listener: () => void) => () => void;
   readonly installPlacement: (placement: Placement | null) => void;
+  /**
+   * Install an editor's completed Card value before it reports the Edit.
+   *
+   * One hand-off, not a standing entry: the value is consumed by the
+   * `edited-card` completion that carries it, whether or not that produced an
+   * Edit. An editor that installs and then never reports leaves nothing behind.
+   */
+  readonly installCardDocument: (cardId: CardId, document: CardDocument) => void;
   readonly canConnect: (from: CardId, to: CardId) => boolean;
   readonly canCreateConnectedCard: (from: CardId) => boolean;
   readonly complete: (completion: AuthoringCompletion) => AuthoringResult;
@@ -113,6 +128,16 @@ function nextNumberedTitle(prefix: string, titles: Iterable<string>): string {
     if (number > highest) highest = number;
   }
   return `${prefix} ${highest + 1n}`;
+}
+
+function isSupportedCardEdit(previous: CardDocument, next: CardDocument): boolean {
+  if (previous.kind !== next.kind) return false;
+  if (previous.kind === 'markdown') return next.kind === 'markdown';
+  return (
+    next.kind === 'alias' &&
+    previous.target === next.target &&
+    previous.description === next.description
+  );
 }
 
 const nextLayoutTitle = (snapshot: SpaceSnapshot): string =>
@@ -180,6 +205,7 @@ export function createSpaceAuthoring({
   reportObserverError = (error) => console.error('SpaceAuthoring observer failed', error),
 }: SpaceAuthoringDependencies): SpaceAuthoring {
   let placement: Placement | null = initialPlacement;
+  const cardDocuments = new Map<CardId, CardDocument>();
   let opening = 0;
   let installing = 0;
   let state: SpaceAuthoringState;
@@ -320,6 +346,7 @@ export function createSpaceAuthoring({
   const deriveCompletedEdit = (
     completion: AuthoringCompletion,
     completedPlacementInput: Placement | null,
+    completedCardDocuments: ReadonlyMap<CardId, CardDocument>,
   ): CompletedEdit | null => {
     if (completedPlacementInput === null) return null;
     let snapshot = session.getState().working;
@@ -330,7 +357,22 @@ export function createSpaceAuthoring({
     let createdCardId: CardId | undefined;
     let connection: { readonly from: CardId; readonly to: CardId } | null = null;
     let completedPlacement = completedPlacementInput;
-    if (completion.kind === 'create-and-connect') {
+    if (completion.kind === 'edited-card') {
+      const document = completedCardDocuments.get(completion.cardId);
+      const cardIndex = snapshot.cards.findIndex((card) => card.id === completion.cardId);
+      const card = snapshot.cards[cardIndex];
+      if (
+        document === undefined ||
+        card === undefined ||
+        !isSupportedCardEdit(card.document, document) ||
+        sameValue(card.document, document)
+      ) {
+        return null;
+      }
+      const cards = [...snapshot.cards];
+      cards[cardIndex] = { id: card.id, document };
+      snapshot = { ...snapshot, cards };
+    } else if (completion.kind === 'create-and-connect') {
       if (!canCreateConnectedCard(completion.from)) return null;
       createdCardId = newUuid();
       connection = { from: completion.from, to: createdCardId };
@@ -450,8 +492,9 @@ export function createSpaceAuthoring({
   const performCompletion = (
     completion: AuthoringCompletion,
     completedPlacementInput: Placement | null,
+    completedCardDocuments: ReadonlyMap<CardId, CardDocument>,
   ): AuthoringResult => {
-    const edit = deriveCompletedEdit(completion, completedPlacementInput);
+    const edit = deriveCompletedEdit(completion, completedPlacementInput, completedCardDocuments);
     if (edit === null) return { kind: 'no-edit' };
     installCompletedEdit(edit);
     return edit.createdCardId === undefined
@@ -463,16 +506,29 @@ export function createSpaceAuthoring({
   const queued: {
     readonly completion: AuthoringCompletion;
     readonly placement: Placement | null;
+    readonly cardDocuments: ReadonlyMap<CardId, CardDocument>;
   }[] = [];
   const complete = (completion: AuthoringCompletion): AuthoringResult => {
     const installedPlacement = placement;
+    const installedCardDocuments = new Map(cardDocuments);
+    // An installed Card value is one hand-off, consumed by the report that
+    // carries it — including a queued one, which took its copy above. Left
+    // standing by a completion that produced no Edit it becomes state waiting to
+    // be applied by whatever `edited-card` arrives next: a rename the author
+    // abandoned, landing on a Space they have since changed. Copied first, so
+    // the completion this call reports still reads what it installed.
+    if (completion.kind === 'edited-card') cardDocuments.delete(completion.cardId);
     if (completing) {
-      queued.push({ completion, placement: installedPlacement });
+      queued.push({
+        completion,
+        placement: installedPlacement,
+        cardDocuments: installedCardDocuments,
+      });
       return { kind: 'queued' };
     }
     completing = true;
     try {
-      const result = performCompletion(completion, installedPlacement);
+      const result = performCompletion(completion, installedPlacement, installedCardDocuments);
       // Drain what arrived during publication. A queued Edit that cannot produce
       // a valid Space is a diagnostic, not this Edit's outcome: the completion
       // that drained the queue already installed and published, and charging it
@@ -483,7 +539,7 @@ export function createSpaceAuthoring({
         const next = queued.shift();
         if (next === undefined) continue;
         try {
-          performCompletion(next.completion, next.placement);
+          performCompletion(next.completion, next.placement, next.cardDocuments);
         } catch (error) {
           safelyReport(error);
           break;
@@ -540,6 +596,7 @@ export function createSpaceAuthoring({
     installTogether(() => {
       session.acceptRemote();
       install(acceptedPlacement);
+      cardDocuments.clear();
       navigation.openFresh(renderer);
       opening += 1;
     });
@@ -555,6 +612,7 @@ export function createSpaceAuthoring({
       return () => listeners.delete(listener);
     },
     installPlacement: install,
+    installCardDocument: (cardId, document) => cardDocuments.set(cardId, document),
     canConnect,
     canCreateConnectedCard,
     complete,

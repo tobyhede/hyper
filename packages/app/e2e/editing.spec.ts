@@ -31,6 +31,77 @@ async function quiescent(page: Page): Promise<void> {
   await page.waitForTimeout(250);
 }
 
+test('inline title editing persists without moving or opening the Card', async ({ page }) => {
+  await page.goto('/');
+  const card = nodeByTitle(page, 'A').first();
+  await expect(card).toBeVisible();
+  await settled(page);
+  const before = await allPositions(page);
+
+  await card.hover();
+  const edit = card.getByRole('button', { name: 'Edit title of A' });
+  await expect(edit).toHaveCSS('opacity', '1');
+  await edit.click();
+  await expect(page.getByTestId('open-card')).toHaveCount(0);
+  const title = page.getByRole('textbox', { name: 'Card title' });
+  await title.fill('Renamed A');
+  await title.press('Enter');
+
+  const renamed = nodeByTitle(page, 'Renamed A').first();
+  await expect(renamed).toBeVisible();
+  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
+  await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
+  expect(await allPositions(page)).toEqual(before);
+
+  await renamed.click();
+  await page.getByTestId('close-card').click();
+  await page.keyboard.press('F2');
+  const keyboardTitle = page.getByRole('textbox', { name: 'Card title' });
+  await expect(keyboardTitle).toBeVisible();
+  await keyboardTitle.fill('');
+  await nodeByTitle(page, 'B').first().click();
+  await expect(keyboardTitle).toHaveAttribute('aria-invalid', 'true');
+  await expect(page.getByTestId('open-card')).toHaveCount(0);
+  await quiescent(page);
+  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
+  await keyboardTitle.focus();
+  await page.keyboard.press('Escape');
+
+  await page.reload();
+  await expect(nodeByTitle(page, 'Renamed A').first()).toBeVisible();
+});
+
+test('opened Markdown editing persists source and description without moving Cards', async ({
+  page,
+}) => {
+  await page.goto('/');
+  const card = nodeByTitle(page, 'A').first();
+  await expect(card).toBeVisible();
+  await settled(page);
+  const before = await allPositions(page);
+
+  await card.click();
+  await page.getByRole('button', { name: 'Edit Card' }).click();
+  await page.getByRole('textbox', { name: 'Description' }).fill('Edited in place');
+  await page.getByRole('textbox', { name: 'Markdown source' }).fill('# Edited\n\nNew source');
+  await page.getByRole('button', { name: 'Done' }).click();
+
+  const opened = page.getByTestId('open-card');
+  await expect(opened).toContainText('# Edited');
+  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
+  await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
+  expect(await allPositions(page)).toEqual(before);
+  await page.getByTestId('close-card').click();
+  await expect(card.getByTestId('card-description')).toHaveText('Edited in place');
+
+  await page.reload();
+  const persisted = nodeByTitle(page, 'A').first();
+  await expect(persisted.getByTestId('card-description')).toHaveText('Edited in place');
+  await persisted.click();
+  await expect(page.getByTestId('open-card')).toContainText('# Edited');
+  await expect(page.getByTestId('open-card')).toContainText('New source');
+});
+
 /**
  * Dragging a card writes its placement into the Layout.
  *

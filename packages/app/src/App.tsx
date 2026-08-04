@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { ReactFlowProvider } from '@xyflow/react';
 import { AppShell, Button, LayoutSelector, RouteSelector, ViewSelector } from '@project/ui';
-import { uuidSchema } from '@project/core';
+import { cardDocumentSchema, uuidSchema } from '@project/core';
 import {
   projectCardNodes,
   projectRouteEdges,
@@ -17,6 +17,7 @@ import {
   routeCardIds,
   resolveContentCard,
   type LayoutPoint,
+  type ResolvedContentCard,
 } from '@project/graph';
 import type { OpenedSpace } from './space';
 import { createSpaceAuthoring, nextCardTitle } from './space-authoring';
@@ -318,7 +319,42 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
       if (cardId !== null) completedConnectionTarget.current = cardId;
     }, []);
 
+    const completeCardTitle = useCallback((cardIdInput: string, title: string): string | null => {
+      const cardId = uuidSchema.safeParse(cardIdInput);
+      if (!cardId.success) return 'This Card is no longer available.';
+      const stored = spaceSession.getState().working.cards.find((card) => card.id === cardId.data);
+      if (stored === undefined) return 'This Card is no longer available.';
+      // Trimmed, because `z.string().min(1)` counts characters and a space is
+      // one: the schema alone accepts a title that draws as nothing, leaving a
+      // Card indistinguishable from its neighbours and an `Edit title of` label
+      // naming nobody. Blank is the empty case wearing different bytes.
+      const named = title.trim();
+      const parsed = cardDocumentSchema.safeParse({ ...stored.document, title: named });
+      if (!parsed.success) {
+        return named.length === 0
+          ? 'A Card title is required.'
+          : (parsed.error.issues[0]?.message ?? 'The Card title is invalid.');
+      }
+      authoring.installCardDocument(cardId.data, parsed.data);
+      // The result is deliberately not inspected, and that is not an oversight.
+      // `no-edit` here means the title did not change, which is the editor's
+      // ordinary close. Authoring's other refusals need a state no author can
+      // reach from this control: `isSupportedCardEdit` only ever sees a title
+      // change, and the two that turn on a missing placement or a vanished
+      // Layout cannot coincide with a drawn Card, because the affordance is
+      // rendered by the same projection that installs the placement. `queued`
+      // is an Edit that will still be performed.
+      authoring.complete({ kind: 'edited-card', cardId: cardId.data });
+      return null;
+    }, []);
+
     const openedCard = openedCardId ? getCard(rendererSpace, openedCardId) : undefined;
+    const openedContent = openedCard ? resolveContentCard(rendererSpace, openedCard.id) : undefined;
+    const completeOpenedCard = useCallback((completed: ResolvedContentCard): void => {
+      const { id, ...document } = completed;
+      authoring.installCardDocument(id, document);
+      authoring.complete({ kind: 'edited-card', cardId: id });
+    }, []);
 
     // Escape closes an opened card. Registered ahead of the walk's keys and
     // returning early while a card is open, so the two never fight over Escape.
@@ -451,11 +487,19 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
           ) : canvas.kind === 'arrangement' ? (
             <ReactFlowProvider>
               <GraphView
+                // Keyed on the opening counter, so accepting the stored Space
+                // takes the graph's local editing state with it. The render
+                // adapter already drops the projection and drag bookkeeping, but
+                // an open title editor is the graph's own: it names a Card from
+                // a Space that is gone, and its raised invalid guard would go on
+                // swallowing clicks in the one that replaced it.
+                key={authoringState.opening}
                 nodes={liveProjection?.nodes ?? []}
                 edges={liveProjection?.edges ?? []}
                 activeCardId={activeCardId}
                 presenting={presenting}
                 editable={editable}
+                titleEditingEnabled={openedCardId === null}
                 onNodesChange={changeNodes}
                 onConnect={connectCards}
                 acceptsConnection={acceptsGraphConnection}
@@ -464,6 +508,7 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
                 onCreateConnectedCard={createConnectedCard}
                 newCardTitle={nextCardTitle(sessionState.working)}
                 onOpenCard={(cardId) => openCard(uuidSchema.parse(cardId))}
+                onCompleteCardTitle={completeCardTitle}
                 routes={visibleRoutes}
                 colorByRouteId={colors}
                 activeRouteId={activeRouteId}
@@ -486,10 +531,11 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
             />
           )}
 
-          {openedCard && (
+          {openedCard && openedContent && (
             <OpenCard
               title={openedCard.title}
-              markdown={resolveContentCard(rendererSpace, openedCard.id)?.body ?? ''}
+              content={openedContent}
+              {...(openedCard.kind === 'markdown' ? { onComplete: completeOpenedCard } : {})}
               footer={
                 <Button variant="secondary" data-testid="close-card" onClick={closeCard}>
                   Close

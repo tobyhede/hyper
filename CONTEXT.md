@@ -28,6 +28,8 @@ _Avoid_: node, slide, page, tile, subgraph. For the content: prose (it may be a 
 
 **Alias**:
 A card that shows another card's **content**: the same content appearing again elsewhere in the space, with a single source of truth, so editing the target changes every place it appears. An alias carries its own title — only content is shared. An alias points to a different card, and that card is never itself an alias: aliasing is a single hop, so an alias never points at itself and alias chains cannot form.
+
+Authoring an alias itself changes only its title. Opening an alias resolves to its target, and editing the opened content edits that target Card, so every place showing the content changes together. Changing which Card an alias targets is a separate alias-authoring operation, not editing the content it shows.
 _Avoid_: reference, link (an alias shows content, it does not merely jump), copy, transclusion, mirror.
 
 ## Routing
@@ -50,8 +52,13 @@ The one route a space has selected at a time — drawn emphasized, and the route
 Activating is not itself an edit — it touches no card and no route, so it converts nothing. Which route is active may become the authored default when another edit records the surrounding view.
 _Avoid_: selected route and current route as a second concept alongside this one, focus, mode.
 
+**Authoring**:
+Interacting with a Space in a way that may change its authored cards, routes, or Layouts. Authoring includes attempts that produce no change; only a successful authoring interaction produces an **Edit**. Navigating a View or Layout, activating a Route, opening a Card, and presenting are not authoring because they do not change the Space.
+
 **Edit**:
-A completed change to a Space's authored cards, routes, or Layouts.
+A validated transition from one Space to another that changes its authored cards, routes, or Layouts. An attempted gesture is not itself an Edit: cancelling it, drawing an Edge the Route already holds, or moving a Card away and back produces no Edit because the Space does not change.
+
+One Edit may change several authored parts atomically. Creating a Card at the end of a drawn Edge may create the Card, mint the Space's first Route, add the Edge, and write the Card's position into a Layout; together they are one Edit, not a sequence of smaller Edits.
 
 ## Layout and views
 

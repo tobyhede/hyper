@@ -246,6 +246,8 @@ export interface GraphViewProps {
    * nothing to toggle and nothing to keep in sync.
    */
   editable: boolean;
+  /** Card authoring is unavailable while another in-place surface owns focus. */
+  titleEditingEnabled: boolean;
   onNodesChange: OnNodesChange<CardFlowNode>;
   /** A completed React Flow gesture; incomplete connection state stays local. */
   onConnect: OnConnect;
@@ -265,6 +267,8 @@ export interface GraphViewProps {
   newCardTitle: string;
   /** Opening a card is a view gesture; the graph only reports which was picked. */
   onOpenCard: (cardId: string) => void;
+  /** Complete one locally validated title draft, or return its field error. */
+  onCompleteCardTitle: (cardId: string, title: string) => string | null;
   routes: readonly Route[];
   colorByRouteId: Readonly<Record<string, string>>;
   activeRouteId: string | null;
@@ -277,6 +281,7 @@ export function GraphView({
   activeCardId,
   presenting,
   editable,
+  titleEditingEnabled,
   onNodesChange,
   onConnect,
   acceptsConnection,
@@ -285,6 +290,7 @@ export function GraphView({
   onCreateConnectedCard,
   newCardTitle,
   onOpenCard,
+  onCompleteCardTitle,
   routes,
   colorByRouteId,
   activeRouteId,
@@ -296,7 +302,25 @@ export function GraphView({
   // A boolean, not a point: React bails out of an unchanged state write, so a
   // pointer moving across empty canvas no longer re-renders the flow per frame.
   const [overEmptyCanvas, setOverEmptyCanvas] = useState(false);
+  const [editingTitleCardId, setEditingTitleCardId] = useState<string | null>(null);
+  const titleEditInvalid = useRef(false);
   const { screenToFlowPosition } = useReactFlow();
+  const canEditTitles = editable && titleEditingEnabled && !presenting;
+
+  // A withdrawn editor does not come back on its own.
+  //
+  // `canEditTitles` going false — presenting starts, a Card opens over the graph
+  // — unmounts the editor along with the only controls that could settle a draft
+  // it refused, so the Card it named is forgotten at that moment rather than
+  // remembered until editing returns and reopened over a Card nobody asked to
+  // rename. Adjusted during render rather than in an effect: this is React's
+  // documented way to reset state on a changed input, and an effect would both
+  // cost a second render and be rejected by lint.
+  const [titleEditingWasEnabled, setTitleEditingWasEnabled] = useState(canEditTitles);
+  if (titleEditingWasEnabled !== canEditTitles) {
+    setTitleEditingWasEnabled(canEditTitles);
+    if (!canEditTitles) setEditingTitleCardId(null);
+  }
 
   useEffect(() => {
     const updateModifier = (event: KeyboardEvent) => {
@@ -366,9 +390,21 @@ export function GraphView({
   // reading panel over it.
   const handleNodeClick = useCallback<NodeMouseHandler<CardFlowNode>>(
     (_event, node) => {
+      // A refused title swallows the click that blurred it — one click, and
+      // only that one, which is why the flag is spent here rather than left
+      // standing. The blurring click is the only one the refusal has any claim
+      // on: it was spent leaving the field. Held past it, the guard left every
+      // Card unopenable by click for as long as the refused editor was open,
+      // recoverable only by noticing a small field error on a Card the pointer
+      // had already left. Asking for the open editor too keeps a spent flag from
+      // outliving its editing session.
+      if (editingTitleCardId !== null && titleEditInvalid.current) {
+        titleEditInvalid.current = false;
+        return;
+      }
       if (!presenting && !connectionGesture.current) onOpenCard(node.id);
     },
-    [presenting, onOpenCard],
+    [presenting, editingTitleCardId, onOpenCard],
   );
 
   const handleMouseMove = useCallback((event: MouseEvent<HTMLDivElement>) => {
@@ -390,6 +426,59 @@ export function GraphView({
       onOpenCard(cardId);
     },
     [presenting, onOpenCard],
+  );
+
+  // `F2` renames the selected Card, and this is the *only* handler that answers
+  // it. A React Flow `onKeyDown` branch used to answer it first and ask nothing
+  // about the target, so the key typed into a control renamed whichever Card
+  // happened to be selected — a different one, once focus had moved. Two
+  // handlers for one key means one of them is the unguarded one; don't add a
+  // second back.
+  useEffect(() => {
+    if (!canEditTitles) return;
+    const beginSelectedTitleEdit = (event: KeyboardEvent): void => {
+      if (event.key !== 'F2') return;
+      if (
+        event.target instanceof Element &&
+        event.target.closest('input, textarea, select, button, [contenteditable="true"]') !== null
+      ) {
+        return;
+      }
+      const selected = nodes.find((node) => node.selected);
+      if (selected === undefined) return;
+      event.preventDefault();
+      titleEditInvalid.current = false;
+      setEditingTitleCardId(selected.id);
+    };
+    window.addEventListener('keydown', beginSelectedTitleEdit);
+    return () => window.removeEventListener('keydown', beginSelectedTitleEdit);
+  }, [canEditTitles, nodes]);
+
+  const editableNodes = useMemo(
+    () =>
+      nodes.map((node) => ({
+        ...node,
+        data: {
+          ...node.data,
+          titleEditingEnabled: canEditTitles,
+          editingTitle: canEditTitles && node.id === editingTitleCardId,
+          onBeginTitleEditing: () => {
+            titleEditInvalid.current = false;
+            setEditingTitleCardId(node.id);
+          },
+          onCompleteTitleEditing: (title: string) => {
+            const error = onCompleteCardTitle(node.id, title);
+            titleEditInvalid.current = error !== null;
+            if (error === null) setEditingTitleCardId(null);
+            return error;
+          },
+          onCancelTitleEditing: () => {
+            titleEditInvalid.current = false;
+            setEditingTitleCardId(null);
+          },
+        },
+      })),
+    [nodes, canEditTitles, editingTitleCardId, onCompleteCardTitle],
   );
 
   const connectionLineStyle = useMemo(
@@ -426,7 +515,7 @@ export function GraphView({
 
   return (
     <ReactFlow
-      nodes={nodes}
+      nodes={editableNodes}
       edges={selectableEdges}
       nodeTypes={nodeTypes}
       edgeTypes={edgeTypes}

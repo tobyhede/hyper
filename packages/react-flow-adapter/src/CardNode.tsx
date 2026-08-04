@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from 'react';
 import { Handle, Position, useConnection, type NodeProps } from '@xyflow/react';
 import { CardContent } from '@project/ui';
 import type { CardFlowNode, CardHandle } from './projection';
@@ -37,6 +38,69 @@ const AliasGlyph = () => (
 );
 
 const AUTHORING_SIDES = [Position.Top, Position.Right, Position.Bottom, Position.Left] as const;
+
+interface CardTitleEditorProps {
+  readonly cardId: string;
+  readonly title: string;
+  readonly onComplete?: (title: string) => string | null;
+  readonly onCancel?: () => void;
+}
+
+function CardTitleEditor({ cardId, title, onComplete, onCancel }: CardTitleEditorProps) {
+  const [draft, setDraft] = useState(title);
+  const [error, setError] = useState<string | null>(null);
+  const input = useRef<HTMLInputElement>(null);
+  const cancelledBlur = useRef(false);
+
+  useEffect(() => {
+    input.current?.focus();
+    input.current?.select();
+  }, []);
+
+  const complete = (): void => setError(onComplete?.(draft) ?? null);
+
+  return (
+    <div className="card__title-editor nodrag nopan nowheel">
+      <input
+        ref={input}
+        className="card__title-input"
+        aria-label="Card title"
+        aria-invalid={error !== null}
+        aria-describedby={error === null ? undefined : `card-title-error-${cardId}`}
+        value={draft}
+        onChange={(event) => {
+          setDraft(event.currentTarget.value);
+          setError(null);
+        }}
+        onBlur={() => {
+          if (cancelledBlur.current) {
+            cancelledBlur.current = false;
+            return;
+          }
+          complete();
+        }}
+        onClick={(event) => event.stopPropagation()}
+        onPointerDown={(event) => event.stopPropagation()}
+        onKeyDown={(event) => {
+          event.stopPropagation();
+          if (event.key === 'Enter') {
+            event.preventDefault();
+            complete();
+          } else if (event.key === 'Escape') {
+            event.preventDefault();
+            cancelledBlur.current = true;
+            onCancel?.();
+          }
+        }}
+      />
+      {error !== null && (
+        <span id={`card-title-error-${cardId}`} role="alert" className="card__field-error">
+          {error}
+        </span>
+      )}
+    </div>
+  );
+}
 
 /*
  * Handle geometry is *declared*, not measured, so nothing here reports a change
@@ -121,7 +185,20 @@ export function CardNode({ data, selected }: NodeProps<CardFlowNode>) {
         </div>
       ) : (
         <article className="card card--node" data-testid="card">
-          <h2 className="card__title">{data.title}</h2>
+          {data.editingTitle ? (
+            <CardTitleEditor
+              cardId={data.cardId}
+              title={data.title}
+              {...(data.onCompleteTitleEditing !== undefined
+                ? { onComplete: data.onCompleteTitleEditing }
+                : {})}
+              {...(data.onCancelTitleEditing !== undefined
+                ? { onCancel: data.onCancelTitleEditing }
+                : {})}
+            />
+          ) : (
+            <h2 className="card__title">{data.title}</h2>
+          )}
           {data.description && (
             <p className="card__description" data-testid="card-description">
               {data.description}
@@ -132,6 +209,27 @@ export function CardNode({ data, selected }: NodeProps<CardFlowNode>) {
               <AliasGlyph />
               <span>{data.aliasOf}</span>
             </p>
+          )}
+          {data.titleEditingEnabled && !data.editingTitle && (
+            <button
+              type="button"
+              className="card__title-edit nodrag nopan"
+              aria-label={`Edit title of ${data.title}`}
+              onClick={(event) => {
+                event.stopPropagation();
+                data.onBeginTitleEditing?.();
+              }}
+              onPointerDown={(event) => event.stopPropagation()}
+              // A real button in the tab order, and its activation keys are the
+              // same two the graph reads as "open this Card". The graph's
+              // handler sits on an ancestor and sees them first, so Enter and
+              // Space opened the Card and called `preventDefault`, cancelling
+              // the activation this button never got — unusable by the very
+              // input it is here for.
+              onKeyDown={(event) => event.stopPropagation()}
+            >
+              Edit title
+            </button>
           )}
         </article>
       )}

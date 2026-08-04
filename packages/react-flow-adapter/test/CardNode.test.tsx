@@ -1,5 +1,5 @@
 import '@testing-library/jest-dom/vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import type * as ReactFlowReact from '@xyflow/react';
 import { Position, type NodeProps } from '@xyflow/react';
 import type { HTMLAttributes } from 'react';
@@ -74,6 +74,11 @@ const outHandle = (route: typeof routeId, offsetY: number): CardHandle => ({
 interface Overrides {
   selected?: boolean;
   title?: string;
+  titleEditingEnabled?: boolean;
+  editingTitle?: boolean;
+  onBeginTitleEditing?: () => void;
+  onCompleteTitleEditing?: (title: string) => string | null;
+  onCancelTitleEditing?: () => void;
   sourceHandles?: CardHandle[];
   targetHandles?: CardHandle[];
 }
@@ -81,6 +86,11 @@ interface Overrides {
 function props({
   selected = false,
   title = 'A',
+  titleEditingEnabled = false,
+  editingTitle = false,
+  onBeginTitleEditing,
+  onCompleteTitleEditing,
+  onCancelTitleEditing,
   sourceHandles = [outHandle(routeId, 50)],
   targetHandles = [],
 }: Overrides = {}): NodeProps<CardFlowNode> {
@@ -99,6 +109,11 @@ function props({
     data: {
       cardId,
       title,
+      titleEditingEnabled,
+      editingTitle,
+      ...(onBeginTitleEditing !== undefined ? { onBeginTitleEditing } : {}),
+      ...(onCompleteTitleEditing !== undefined ? { onCompleteTitleEditing } : {}),
+      ...(onCancelTitleEditing !== undefined ? { onCancelTitleEditing } : {}),
       active: false,
       selectedForAuthoring: false,
       showContent: false,
@@ -110,6 +125,91 @@ function props({
     },
   };
 }
+
+describe('CardNode title authoring', () => {
+  it('begins inline title editing from the selected Card affordance', () => {
+    const onBeginTitleEditing = vi.fn();
+    const { rerender } = render(
+      <CardNode {...props({ selected: true, titleEditingEnabled: true, onBeginTitleEditing })} />,
+    );
+
+    screen.getByRole('button', { name: 'Edit title of A' }).click();
+    expect(onBeginTitleEditing).toHaveBeenCalledOnce();
+
+    rerender(
+      <CardNode
+        {...props({
+          selected: true,
+          titleEditingEnabled: true,
+          editingTitle: true,
+          onBeginTitleEditing,
+        })}
+      />,
+    );
+    expect(screen.getByRole('textbox', { name: 'Card title' })).toHaveValue('A');
+  });
+
+  it('keeps an invalid title local and completes a valid title with Enter', () => {
+    const onCompleteTitleEditing = vi.fn((title: string) =>
+      title.length === 0 ? 'A Card title is required.' : null,
+    );
+    render(
+      <CardNode
+        {...props({
+          selected: true,
+          titleEditingEnabled: true,
+          editingTitle: true,
+          onCompleteTitleEditing,
+        })}
+      />,
+    );
+    const input = screen.getByRole('textbox', { name: 'Card title' });
+
+    fireEvent.change(input, { target: { value: '' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(screen.getByRole('alert')).toHaveTextContent('A Card title is required.');
+    expect(onCompleteTitleEditing).toHaveBeenLastCalledWith('');
+
+    fireEvent.change(input, { target: { value: 'Renamed A' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(onCompleteTitleEditing).toHaveBeenLastCalledWith('Renamed A');
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('completes on blur and cancels on Escape without leaking editor events', () => {
+    const onCompleteTitleEditing = vi.fn(() => null);
+    const onCancelTitleEditing = vi.fn();
+    const leakedClick = vi.fn();
+    const leakedPointer = vi.fn();
+    const leakedKey = vi.fn();
+    render(
+      <div onClick={leakedClick} onPointerDown={leakedPointer} onKeyDown={leakedKey}>
+        <CardNode
+          {...props({
+            selected: true,
+            titleEditingEnabled: true,
+            editingTitle: true,
+            onCompleteTitleEditing,
+            onCancelTitleEditing,
+          })}
+        />
+      </div>,
+    );
+    const input = screen.getByRole('textbox', { name: 'Card title' });
+
+    fireEvent.change(input, { target: { value: 'Blurred A' } });
+    fireEvent.pointerDown(input);
+    fireEvent.click(input);
+    fireEvent.blur(input);
+    expect(onCompleteTitleEditing).toHaveBeenCalledWith('Blurred A');
+
+    fireEvent.keyDown(input, { key: 'Escape' });
+    expect(onCancelTitleEditing).toHaveBeenCalledOnce();
+    expect(leakedClick).not.toHaveBeenCalled();
+    expect(leakedPointer).not.toHaveBeenCalled();
+    expect(leakedKey).not.toHaveBeenCalled();
+  });
+});
 
 /** The four spatial handles of one role, read back as whether a drag may begin
  *  or end at each. */
