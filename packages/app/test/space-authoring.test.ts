@@ -748,10 +748,9 @@ describe('Space Authoring', () => {
 
   /**
    * Containing a queued failure must not leave the placement describing an Edit
-   * the session never took. `performCompletion` installs before it submits, so a
-   * submit that throws used to strand the placement it had already replaced —
-   * survivable while the throw escaped to the caller, and silent now that the
-   * drain contains it.
+   * the session never took. `performCompletion` submits before it installs, so a
+   * submit that throws leaves the placement untouched — survivable while the
+   * throw escaped to the caller, and silent now that the drain contains it.
    *
    * A created Card is what makes the strand visible: only `performCompletion`
    * adds it to the placement, so `authoredPlacement()` naming a Card the
