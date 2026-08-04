@@ -48,24 +48,22 @@ export type Placement = ReadonlyMap<CardId, LayoutPoint> & {
   readonly [PLACEMENT]: true;
 };
 
-/**
- * The one place a `CardId` key is asserted rather than parsed.
- *
- * Every key reaching a constructor has already been branded: `layoutSchema`
- * declares `positions` as `z.record(idSchema, …)`, so Zod rejects a non-UUID key
- * at parse, and every Space arrives through `loadSpace` or `loadSpaceSnapshot`.
- * A rendered position's key is a React Flow node id, and those are set from
- * `space.cards` by the one function that builds nodes. The brand is lost only to
- * `Object.entries`, which widens keys to `string`, and to React Flow typing
- * `Node.id` as `string` — both erasures in the type system, neither a runtime
- * possibility. Re-parsing here would declare a failure mode nothing can reach
- * and force callers to handle it.
- */
+/** Close the map. Private, so a Placement can only come from this file. */
 const brand = (positions: ReadonlyMap<CardId, LayoutPoint>): Placement => positions as Placement;
 
 const point = (at: LayoutPoint): LayoutPoint => ({ x: at.x, y: at.y });
 
-/** The placement a Layout holds. */
+/**
+ * The placement a Layout holds.
+ *
+ * The one asserted key in this module, and it stays here because the erasure is
+ * the language's rather than a caller's: `layout.positions` is a
+ * `Record<CardId, …>` that `layoutSchema` declares as `z.record(idSchema, …)`,
+ * so Zod rejects a non-UUID key at parse and every Space arrives through
+ * `loadSpace` or `loadSpaceSnapshot` — but `Object.entries` widens every key it
+ * reads to `string` regardless. No caller can supply what TypeScript threw away,
+ * so re-parsing would declare a failure mode nothing can reach.
+ */
 function fromLayout(layout: Layout): Placement {
   const positions = new Map<CardId, LayoutPoint>();
   for (const [cardId, at] of Object.entries(layout.positions)) {
@@ -96,10 +94,17 @@ function fromLayoutGraph(graph: LayoutGraph): Placement {
  * Total by nature — a rendered card always has coordinates — which is why this
  * is never installed directly over an authored placement. `next` decides what
  * any of it is allowed to author.
+ *
+ * Keys are `CardId`, and the caller crosses that seam. A renderer's key is a
+ * React Flow node id, which `Node` types as `string`; asserting it here would
+ * mean this file defending an assertion it cannot see the grounds for, since
+ * what makes the id a Card identity is that the adapter built the node from
+ * `space.cards`. The adapter knows that, and already says so where it names the
+ * Cards a gesture placed.
  */
-function fromEntries(entries: Iterable<readonly [string, LayoutPoint]>): Placement {
+function fromEntries(entries: Iterable<readonly [CardId, LayoutPoint]>): Placement {
   const positions = new Map<CardId, LayoutPoint>();
-  for (const [cardId, at] of entries) positions.set(cardId as CardId, point(at));
+  for (const [cardId, at] of entries) positions.set(cardId, point(at));
   return brand(positions);
 }
 

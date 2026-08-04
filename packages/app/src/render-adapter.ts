@@ -73,13 +73,19 @@ export type RenderAdapter = UseBoundStore<StoreApi<RenderAdapterState>>;
  * Report what React Flow is drawing, and let Placement decide how much of it is
  * authorship. The adapter's whole part is reducing nodes to positions and naming
  * the Cards a completed gesture placed; the sparse rule is `Placement.next`'s.
+ *
+ * Including the cast: a node id is the Card id it was projected from, widened to
+ * `string` by React Flow's `Node` type. This is the package that knows that —
+ * `projectCardNodes` builds every node from `space.cards` — so the seam is
+ * crossed here rather than inside `graph`, and by the same reading as
+ * `consumeSettledMovedIds` below.
  */
 function reportRenderedPlacement(
   authoring: SpaceAuthoring,
   nodes: readonly CardFlowNode[],
   placed: readonly CardId[] = [],
 ): void {
-  const rendered = Placement.fromEntries(nodes.map((node) => [node.id, node.position]));
+  const rendered = Placement.fromEntries(nodes.map((node) => [node.id as CardId, node.position]));
   authoring.installPlacement(Placement.next(authoring.authoredPlacement(), rendered, placed));
 }
 
@@ -101,8 +107,7 @@ function consumeSettledMovedIds(
   beforeById: ReadonlyMap<string, LayoutPoint>,
   afterById: ReadonlyMap<string, LayoutPoint>,
 ): CardId[] {
-  // A node id is the Card id it was projected from, widened to `string` by React
-  // Flow's `Node` type — the same erasure `Placement.fromEntries` documents.
+  // The same erasure `reportRenderedPlacement` crosses above, read the same way.
   const movedIds: CardId[] = [];
   for (const change of settled) {
     const origin = dragOrigins.get(change.id) ?? beforeById.get(change.id);

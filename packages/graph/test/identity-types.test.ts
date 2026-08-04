@@ -32,6 +32,8 @@ describe('graph identity types', () => {
     positionedStrategy(new Map<string, LayoutPoint>());
     // @ts-expect-error A Placement is built through the module, never by hand.
     positionedStrategy(new Map<CardId, LayoutPoint>());
+    // @ts-expect-error A rendered position's key crosses the seam at its caller.
+    Placement.fromEntries([['card', { x: 0, y: 0 }]]);
     void cardId;
     void routeId;
   });
