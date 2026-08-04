@@ -15,15 +15,16 @@ Engine or Docker Desktop with Compose v2.
 
 ```sh
 pnpm install
-pnpm dev            # PostgreSQL-backed app at http://localhost:5173 (needs the database up)
-pnpm dev:new        # mint a fresh one-card memory workspace at http://localhost:5174
+pnpm dev             # PostgreSQL-backed app at http://localhost:5173 (needs the database up)
+pnpm dev:new         # fresh one-card memory workspace at http://localhost:5174
+pnpm dev:fixture     # tracked test fixture in memory at http://localhost:5175
 ```
 
 Then:
 
 1. Pick a route in the toolbar. Every route stays drawn; the one you pick is emphasised.
-2. Click a card to open it and read its Markdown source. `Esc` closes it.
-3. Drag a card to move it. A completed edit is committed automatically through the persistence session; the toolbar reports `Persisting…` and then `Persisted`. Under `pnpm dev` the edit lands in PostgreSQL and outlives the page; under `pnpm dev:new` it lives in that server's memory repository, surviving browser reloads but not a restart.
+2. Hover a card and use its Edit control to author its title, description and Markdown source. `Esc` cancels and closes it.
+3. Drag a card to move it. A completed edit is committed automatically through the persistence session; the toolbar reports `Persisting…` and then `Persisted`. Under `pnpm dev` the edit lands in PostgreSQL and outlives the page; under `pnpm dev:new` and `pnpm dev:fixture` it lives in that server's memory repository, surviving browser reloads but not a restart.
 4. Hover or select a card to reveal its four authoring handles. Drag to another card to add an Edge to the active Route. Dropping on empty canvas cancels unless Option (macOS) or Alt (elsewhere) is held; the modifier gesture previews and atomically creates a blank `Card N`, its placement and the Edge.
 5. Press **Present** to walk the route: `→` follows an edge, `←` goes back, `↑` / `↓` choose at a fork, `Esc` returns to the overview.
 
@@ -34,9 +35,10 @@ The graph uses React Flow's [elkjs multiple-handles technique](https://reactflow
 ```sh
 pnpm verify         # typecheck + lint + prettier check + unit/property tests
 pnpm e2e            # Playwright flow (boots the dev server automatically)
+pnpm e2e:fixture    # only scenarios backed by the tracked fixture
 ```
 
-`pnpm e2e` needs the Chromium browser once: `pnpm exec playwright install chromium`.
+Both E2E commands create and dispose isolated fixture servers automatically. They need the Chromium browser once: `pnpm exec playwright install chromium`.
 
 ### Local PostgreSQL
 

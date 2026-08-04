@@ -1,6 +1,6 @@
 # The app's two spaces
 
-`fixture/` is the abstract space `pnpm dev` loads, and the one Playwright drives.
+`fixture/` is the abstract space `pnpm dev:fixture` loads, and the one Playwright drives.
 It is a **test bed**, not the product demo — the narrative demo lives in
 `example/` and is kept for when real space-loading exists. Tests assert
 *behaviour* against this shape; nothing asserts on card prose beyond the few
