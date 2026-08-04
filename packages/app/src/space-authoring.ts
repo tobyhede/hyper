@@ -181,7 +181,7 @@ export function createSpaceAuthoring({
 }: SpaceAuthoringDependencies): SpaceAuthoring {
   let placement: Placement | null = initialPlacement;
   let opening = 0;
-  let installing = false;
+  let installing = 0;
   let state: SpaceAuthoringState;
   // Held as `() => unknown` although `subscribe` accepts `() => void`: a `void`
   // expression cannot be inspected, which is exactly how an async listener's
@@ -255,22 +255,30 @@ export function createSpaceAuthoring({
    * still reaches the caller; what it can no longer do is take the publication
    * with it. Making the step itself total is the caller's job — see
    * `installCompletedEdit`.
+   *
+   * The gate counts depth rather than holding a flag, because these windows
+   * nest. A collaborator notified from inside one may legally complete an Edit —
+   * the same latitude `SpaceSession` gives an observer that submits — and that
+   * completion opens a second window within the first. A boolean would be
+   * cleared by the inner `finally` and leave the rest of the outer sequence
+   * publishing every part-way state it was raised to hide. Only the outermost
+   * window publishes, so the sequence is still observed exactly once.
    */
   const installTogether = (updates: () => void): void => {
-    installing = true;
+    installing += 1;
     try {
       updates();
     } finally {
-      installing = false;
-      publish();
+      installing -= 1;
+      if (installing === 0) publish();
     }
   };
 
   const unsubscribeSession = session.subscribe(() => {
-    if (!installing) publish();
+    if (installing === 0) publish();
   });
   const unsubscribeNavigation = navigation.subscribe(() => {
-    if (!installing) publish();
+    if (installing === 0) publish();
   });
 
   const canConnect = (from: CardId, to: CardId): boolean => {

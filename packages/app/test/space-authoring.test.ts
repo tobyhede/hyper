@@ -1327,6 +1327,63 @@ describe('Space Authoring', () => {
   });
 
   /**
+   * Nesting is the case a boolean gate cannot carry. Accepting notifies from
+   * inside its own window — `session.acceptRemote()` publishes before the
+   * placement, Navigation and `opening` have moved — and an observer is allowed
+   * to complete an Edit from there, exactly as one may submit from a session
+   * notification. That inner completion opens the gate a second time, and a
+   * boolean drops it on the way out: Navigation's own notification then
+   * publishes the accepted Space while `opening` still names the one it
+   * replaced, which is the read `opening` exists to make impossible.
+   */
+  it('keeps the gate closed when accepting re-enters through a completed Edit', async () => {
+    const remote: SpaceSnapshot = {
+      ...positionedSnapshot,
+      document: { ...positionedSnapshot.document, title: 'Stored' },
+    };
+    const backend = new MemorySpaceBackend([
+      { snapshot: remote, revision: 4n, exportedRevision: null },
+    ]);
+    const { authoring, session } = attachAuthoring(
+      backend,
+      { snapshot: positionedSnapshot, revision: 3n, exportedRevision: null },
+      { kind: 'layout', layoutId: LAYOUT_ID },
+    );
+    authoring.installPlacement(
+      Placement.fromEntries([
+        [CARD_A, { x: 500, y: 600 }],
+        [CARD_B, { x: 300, y: 40 }],
+      ]),
+    );
+    authoring.complete({ kind: 'settled-card-movement' });
+    await vi.waitFor(() =>
+      expect(authoring.getState().session.persistence.kind).toBe('conflicted'),
+    );
+    const openingBefore = authoring.getState().opening;
+
+    let reentered = false;
+    session.subscribe(() => {
+      if (reentered) return;
+      reentered = true;
+      authoring.complete({ kind: 'settled-card-movement' });
+    });
+    const published: { title: string; opening: number }[] = [];
+    authoring.subscribe(() =>
+      published.push({
+        title: authoring.getState().session.working.document.title,
+        opening: authoring.getState().opening,
+      }),
+    );
+
+    expect(authoring.acceptStoredSpace()).toBeNull();
+
+    expect(reentered).toBe(true);
+    // One publication, after the whole sequence — never the accepted Space
+    // carrying the `opening` of the Space it replaced.
+    expect(published).toEqual([{ title: 'Stored', opening: openingBefore + 1 }]);
+  });
+
+  /**
    * Accepting updates the same collaborators behind the same gate, so it has the
    * same obligation: a throw part-way through must not take the publication with
    * it. Reporting a conflict that the session has already resolved away — and
