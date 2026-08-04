@@ -89,17 +89,12 @@ const toJsonValue = (value: unknown): JsonValue => {
 };
 
 const parseSnapshot = (input: unknown): SpaceSnapshot => {
-  const parsed = spaceSnapshotSchema.safeParse(input);
-  if (!parsed.success) {
-    throw new SnapshotValidationError(parsed.error.message);
-  }
-
-  const intake = loadSpaceSnapshot(parsed.data);
+  const intake = loadSpaceSnapshot(input);
   if (!intake.ok) {
     throw new SnapshotValidationError(intake.errors.map(({ message }) => message).join('\n'));
   }
 
-  return parsed.data;
+  return intake.snapshot;
 };
 
 const parseSnapshotShape = (input: unknown): SpaceSnapshot => {
@@ -443,7 +438,6 @@ export class PostgresSpaceRepository implements SpaceRepository {
               intake.errors.map(({ message }) => message).join('\n'),
             );
           }
-
           space = await orm.public.Space.where({ id: snapshot.id })
             .where({ revision: 0 })
             .update({ document: toJsonValue(snapshot.document) });

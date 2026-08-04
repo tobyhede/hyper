@@ -1,10 +1,4 @@
-import {
-  newUuid,
-  spaceSnapshotSchema,
-  type ImportSpace,
-  type SpaceSnapshot,
-  type UUID,
-} from '@project/core';
+import { newUuid, type ImportSpace, type SpaceSnapshot, type UUID } from '@project/core';
 import { loadSpaceSnapshot } from '@project/graph';
 import type {
   ImportMode,
@@ -69,15 +63,7 @@ export class MemorySpaceRepository implements SpaceRepository {
   }
 
   commitSpace(snapshot: SpaceSnapshot, expectedRevision: bigint): Promise<RepositoryCommitResult> {
-    const parsed = spaceSnapshotSchema.safeParse(snapshot);
-    if (!parsed.success) {
-      return Promise.resolve({
-        kind: 'rejected',
-        code: 'invalid-snapshot',
-        message: parsed.error.message,
-      });
-    }
-    const intake = loadSpaceSnapshot(parsed.data);
+    const intake = loadSpaceSnapshot(snapshot);
     if (!intake.ok) {
       return Promise.resolve({
         kind: 'rejected',
@@ -86,21 +72,21 @@ export class MemorySpaceRepository implements SpaceRepository {
       });
     }
 
-    const current = this.#spaces.get(parsed.data.id);
+    const current = this.#spaces.get(intake.snapshot.id);
     if (current === undefined) {
       return Promise.resolve({
         kind: 'rejected',
         code: 'not-found',
-        message: `Space ${parsed.data.id} does not exist`,
+        message: `Space ${intake.snapshot.id} does not exist`,
       });
     }
     if (current.revision !== expectedRevision) {
       return Promise.resolve({ kind: 'conflict', current: clone(current) });
     }
-    for (const card of parsed.data.cards) {
+    for (const card of intake.snapshot.cards) {
       const owner = [...this.#spaces.values()].find(
         ({ snapshot }) =>
-          snapshot.id !== parsed.data.id &&
+          snapshot.id !== intake.snapshot.id &&
           snapshot.cards.some((storedCard) => storedCard.id === card.id),
       );
       if (owner !== undefined) {
@@ -113,8 +99,8 @@ export class MemorySpaceRepository implements SpaceRepository {
     }
 
     const revision = current.revision + 1n;
-    this.#spaces.set(parsed.data.id, {
-      snapshot: clone(parsed.data),
+    this.#spaces.set(intake.snapshot.id, {
+      snapshot: clone(intake.snapshot),
       revision,
       exportedRevision: current.exportedRevision,
     });
@@ -122,17 +108,9 @@ export class MemorySpaceRepository implements SpaceRepository {
   }
 
   importSpaces(input: readonly ImportSpace[], mode: ImportMode): Promise<RepositoryImportResult> {
-    const snapshots = input.map(identifyImport);
-    for (const snapshot of snapshots) {
-      const parsed = spaceSnapshotSchema.safeParse(snapshot);
-      if (!parsed.success) {
-        return Promise.resolve({
-          kind: 'rejected',
-          code: 'invalid-snapshot',
-          message: parsed.error.message,
-        });
-      }
-      const intake = loadSpaceSnapshot(parsed.data);
+    const snapshots: SpaceSnapshot[] = [];
+    for (const inputSpace of input) {
+      const intake = loadSpaceSnapshot(identifyImport(inputSpace));
       if (!intake.ok) {
         return Promise.resolve({
           kind: 'rejected',
@@ -140,6 +118,7 @@ export class MemorySpaceRepository implements SpaceRepository {
           message: intake.errors.map(({ message }) => message).join('\n'),
         });
       }
+      snapshots.push(intake.snapshot);
     }
 
     const incomingSpaceIds = new Set<UUID>();

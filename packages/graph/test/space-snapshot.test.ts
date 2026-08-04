@@ -40,6 +40,18 @@ describe('loadSpaceSnapshot', () => {
     expect(getRoute(result.space, ROUTE_ID)?.title).toBe('Main');
   });
 
+  it('returns the parsed snapshot accepted by intake', () => {
+    const result = loadSpaceSnapshot({
+      ...snapshot,
+      ignored: 'not part of a snapshot',
+      document: { ...snapshot.document, ignored: 'not part of a document' },
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.snapshot).toEqual(snapshot);
+  });
+
   it('canonicalizes backend card order by title and id', () => {
     const reversed = { ...snapshot, cards: [...snapshot.cards].reverse() };
     const fromOriginal = loadSpaceSnapshot(snapshot);

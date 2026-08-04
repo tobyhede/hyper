@@ -1,6 +1,6 @@
 # Four whole-snapshot parses per commit, one of them redundant
 
-Status: needs-info
+Status: resolved
 
 ## Context
 
@@ -52,6 +52,7 @@ form is not the stored form.
 
 ## Caution
 
+<<<<<<< HEAD
 The two-parse shape may be load-bearing in a way only the author knows. Confirm
 before deleting. Two specific things to settle first:
 
@@ -66,3 +67,34 @@ before deleting. Two specific things to settle first:
   `AGENTS.md` already pins under "A wire codec throws prose, not Zod" (and the
   reason `decodeSnapshot` summarises rather than `.parse`es). Decide whether that
   is an intended part of this change or a separate one, and say so here.
+
+## Resolution
+
+`loadSpaceSnapshot` now returns the schema-parsed snapshot alongside the indexed
+Space. The PostgreSQL repository, browser memory backend and server memory
+repository consume that accepted value, removing each listed redundant parse
+without removing wire, authoring, repository-read or domain-intake validation.
+
+Both questions the Caution raised are answered, and neither was deferred.
+
+**(a) The seam — split, not widened.** `LoadSpaceResult` is untouched, so
+`loadSpace` and the shared private `buildSpace` keep the exact type they had. The
+snapshot rides on a new `LoadSpaceSnapshotResult`, which is the return type of
+`loadSpaceSnapshot` alone — the one function of the three that has a snapshot to
+hand back. That avoids both branches the Caution named: no optional field appears
+on a result two callers can never populate, and no caller of `loadSpace` sees a
+changed type. The value handed back is `parsed.data` itself, not a snapshot
+reconstructed from `intake.space`, so the "indexed form is not the stored form"
+risk is not taken either. `space-snapshot.test.ts` pins that directly: a snapshot
+carrying unknown keys at both levels comes back schema-stripped and equal to the
+original, which is what each caller previously got from its own `parsed.data`.
+
+**(b) The message — intended, and the improvement.** Deleting the outer parse
+does change what an invalid snapshot tells a client, and that change is part of
+this ticket rather than a separate one. `parseSnapshot` previously threw
+`parsed.error.message`, Zod's entire serialized issue array in one string; it now
+throws the intake's `invalid-shape` messages, each formatted `path: message` and
+joined by newline. That is the direction `AGENTS.md` already pins under "A wire
+codec throws prose, not Zod" — the same reason `decodeSnapshot` summarises rather
+than calling `.parse`. No path gains a Zod dump it did not have; one loses the one
+it had.
