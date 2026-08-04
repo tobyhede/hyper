@@ -1,6 +1,6 @@
 # One observable-state module; three publishers disagree
 
-Status: ready-for-agent
+Status: resolved
 
 ## Context
 
@@ -44,5 +44,27 @@ consumers of the same observable-state contract.
 
 ## Verification
 
-`pnpm verify` and `pnpm e2e`. Behaviour-preserving, so e2e must be green and
-unchanged.
+`pnpm verify` exits 0: 75 test files, 751 tests passed. `pnpm e2e` exits 0: 68
+passed — the same 68, and the same names, as before the seam moved. That is what
+behaviour-preserving was supposed to mean, and it held.
+
+The 751 is one above what the extraction itself left. The added test is the other
+half of the non-throwing sink: a reporter that throws from the *synchronous* path
+is caught by the `try` that called the observer, so an unwrapped sink still looks
+contained there, and every other test in the file stays green against a copy that
+wraps only that path. The thenable path has no such `try` — a rejection handler
+that throws rejects a promise nobody holds, which Node answers by killing the
+process.
+
+## Answer
+
+`@project/persistence` now owns `createObservableState`, the one module behind
+Navigation, SpaceSession and SpaceAuthoring's existing `getState`/`subscribe`
+interfaces. Publication installs the new state synchronously, snapshots the
+subscriber set, contains synchronous throws and asynchronous rejections,
+continues to later observers, and reports through a contained injected sink.
+
+SpaceAuthoring's queued-completion diagnostics remain outside that seam and use
+the shared non-throwing reporter mechanism directly. The observable-state tests
+pin the complete notification contract, and Navigation has a wiring regression
+test for the previously reachable throw.
