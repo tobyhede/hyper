@@ -239,6 +239,20 @@ describe('render adapter', () => {
     expect(store.getState().projection?.nodes[0]?.position).toEqual({ x: 500, y: 400 });
   });
 
+  it("takes React Flow's own selection change as the Card selected for authoring", () => {
+    // The other path into `selectedCardId`: `selectCard` is the explicit store
+    // action, this is React Flow reporting an ordinary click. Both read a node
+    // id as a Card identity, and only the first was covered.
+    const store = adapter();
+    store.getState().syncProjection(PROJECTED, [EDGE]);
+
+    store.getState().changeNodes([{ type: 'select', id: CARD_A, selected: true }]);
+    expect(store.getState().selectedCardId).toBe(CARD_A);
+
+    store.getState().changeNodes([{ type: 'select', id: CARD_A, selected: false }]);
+    expect(store.getState().selectedCardId).toBeNull();
+  });
+
   it('publishes a new Route Edge only with both endpoint handle declarations', () => {
     const store = adapter();
     store.getState().syncProjection(PROJECTED, []);
