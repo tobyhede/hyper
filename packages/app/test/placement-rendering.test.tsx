@@ -1,7 +1,7 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { uuidSchema } from '@project/core';
-import { gridStrategy, type LayoutGraph, type LayoutStrategy } from '@project/graph';
+import { gridStrategy, Placement, type LayoutGraph, type LayoutStrategy } from '@project/graph';
 import { canvasContent, usePlacementRendering } from '../src/placement-rendering';
 
 const CARD_A = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
@@ -35,7 +35,7 @@ describe('usePlacementRendering', () => {
       automaticCalls += 1;
       return new Promise(() => undefined);
     };
-    const authoredPositions = new Map([[CARD_A, { x: 80, y: 120 }]]);
+    const authoredPositions = Placement.fromEntries([[CARD_A, { x: 80, y: 120 }]]);
     const { result } = renderHook(() =>
       usePlacementRendering(graph, neverResolves, authoredPositions),
     );
@@ -54,12 +54,45 @@ describe('usePlacementRendering', () => {
     });
   });
 
-  it('reports an unusable authored placement as a visible failure rather than throwing', async () => {
-    const strategy = gridStrategy();
-    const authoredPositions = new Map([['not-a-card-id', { x: 80, y: 120 }]]);
-    const { result } = renderHook(() => usePlacementRendering(graph, strategy, authoredPositions));
+  it('re-runs layout for a new graph while the authored placement keeps its identity', async () => {
+    // What Edit completion relies on since it stopped forcing a new placement
+    // identity to provoke a re-layout: a completed Edit replaces the working
+    // snapshot, and the `LayoutGraph` derived from it re-fires this effect on
+    // its own. Nothing here touches the placement — the same object is handed
+    // back on every render, so only the graph half can produce the second
+    // arrangement.
+    const authored = Placement.fromEntries([
+      [CARD_A, { x: 80, y: 120 }],
+      [CARD_B, { x: 400, y: 260 }],
+    ]);
+    const automatic = gridStrategy();
+    const gainedCard: LayoutGraph = {
+      cards: [
+        { id: CARD_A, width: 240, height: 140, ports: [] },
+        { id: CARD_B, width: 240, height: 140, ports: [] },
+      ],
+      edges: [],
+    };
+    const { result, rerender } = renderHook(
+      ({ input }) => usePlacementRendering(input, automatic, authored),
+      { initialProps: { input: graph } },
+    );
+    await waitFor(() => expect(result.current.kind).toBe('ready'));
 
-    await waitFor(() => expect(result.current.kind).toBe('failed'));
+    rerender({ input: gainedCard });
+
+    await waitFor(() =>
+      expect(result.current).toEqual({
+        kind: 'ready',
+        graph: {
+          cards: [
+            { ...gainedCard.cards[0]!, x: 80, y: 120 },
+            { ...gainedCard.cards[1]!, x: 400, y: 260 },
+          ],
+          edges: [],
+        },
+      }),
+    );
   });
 
   it('makes the previous placement unavailable while its replacement is pending', async () => {

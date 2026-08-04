@@ -1,5 +1,5 @@
-import { uuidSchema, type RouteId, type SpaceSnapshot, type UUID } from '@project/core';
-import { loadSpaceSnapshot, type LayoutPoint, type Space } from '@project/graph';
+import type { RouteId, SpaceSnapshot, UUID } from '@project/core';
+import { loadSpaceSnapshot, Placement, type Space } from '@project/graph';
 
 /**
  * Read a working snapshot as the validated aggregate, revalidating only when
@@ -60,7 +60,7 @@ export const snapshotFromSpace = (space: Space): SpaceSnapshot => ({
 export interface PositionedLayoutEdit {
   readonly layoutId: UUID;
   readonly title: string;
-  readonly positions: ReadonlyMap<string, LayoutPoint>;
+  readonly positions: Placement;
   /** The Route the Layout opens on. */
   readonly activeRouteId: RouteId | null;
   /** The Route this same Edit minted, if it minted one. */
@@ -89,9 +89,7 @@ export const updatePositionedLayout = (
     id: layoutId,
     title,
     kind: 'positioned' as const,
-    positions: Object.fromEntries(
-      [...positions].map(([id, point]) => [uuidSchema.parse(id), { x: point.x, y: point.y }]),
-    ),
+    positions: Placement.toPositions(positions),
     ...(routes !== undefined ? { routes } : {}),
     // An Edit with no active Route says nothing about the authored one, so the
     // existing value carries through. Only a named Route replaces it.

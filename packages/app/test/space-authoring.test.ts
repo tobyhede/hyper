@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { uuidSchema, type SpaceSnapshot } from '@project/core';
-import { loadSpaceSnapshot } from '@project/graph';
+import { loadSpaceSnapshot, Placement } from '@project/graph';
 import {
   MemorySpaceBackend,
   MemorySpaceBackendTestControl,
@@ -10,7 +10,7 @@ import {
 } from '@project/persistence';
 import { createNavigation, type Navigation, type NavigationState } from '../src/navigation';
 import { createSpaceAuthoring, type AuthoringResult } from '../src/space-authoring';
-import { layoutPositionMap, resolveView, type RendererSelection } from '../src/view';
+import { resolveView, type RendererSelection } from '../src/view';
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const CARD_A = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
@@ -83,7 +83,7 @@ function attachAuthoring(
   const authoring = createSpaceAuthoring({
     session,
     navigation,
-    initialPlacement: resolved.layout === null ? null : layoutPositionMap(resolved.layout),
+    initialPlacement: resolved.layout === null ? null : Placement.fromLayout(resolved.layout),
     ...(reportObserverError !== undefined ? { reportObserverError } : {}),
   });
   return { backend, session, navigation, authoring };
@@ -124,7 +124,7 @@ describe('Space Authoring', () => {
     );
     const { authoring, session, navigation } = openAuthoring();
     authoring.installPlacement(
-      new Map([
+      Placement.fromEntries([
         [CARD_A, { x: 10, y: 20 }],
         [CARD_B, { x: 300, y: 40 }],
       ]),
@@ -154,7 +154,7 @@ describe('Space Authoring', () => {
     );
     const { authoring, session } = openAuthoring();
     authoring.installPlacement(
-      new Map([
+      Placement.fromEntries([
         [CARD_A, { x: 10, y: 20 }],
         [CARD_B, { x: 300, y: 40 }],
       ]),
@@ -202,7 +202,7 @@ describe('Space Authoring', () => {
       kind: 'layout',
       layoutId: LAYOUT_ID,
     });
-    authoring.installPlacement(new Map([[CARD_A, { x: 10, y: 20 }]]));
+    authoring.installPlacement(Placement.fromEntries([[CARD_A, { x: 10, y: 20 }]]));
 
     expect(session.getState().working.document.routes).toEqual([]);
     expect(authoring.complete({ kind: 'connected-cards', from: CARD_A, to: CARD_A })).toEqual({
@@ -234,7 +234,7 @@ describe('Space Authoring', () => {
       cards: [{ id: CARD_A, document: { title: 'Card 1', kind: 'markdown', body: '' } }],
     };
     const { authoring, session } = openAuthoring(routeLess);
-    authoring.installPlacement(new Map([[CARD_A, { x: 120, y: 240 }]]));
+    authoring.installPlacement(Placement.fromEntries([[CARD_A, { x: 120, y: 240 }]]));
 
     expect(authoring.canCreateConnectedCard(CARD_A)).toBe(true);
     expect(
@@ -309,7 +309,7 @@ describe('Space Authoring', () => {
       layoutId: LAYOUT_ID,
     });
     authoring.installPlacement(
-      new Map([
+      Placement.fromEntries([
         [CARD_A, { x: 10, y: 20 }],
         [CARD_B, { x: 300, y: 40 }],
       ]),
@@ -320,7 +320,7 @@ describe('Space Authoring', () => {
       if (reentered) return;
       reentered = true;
       authoring.installPlacement(
-        new Map([
+        Placement.fromEntries([
           [CARD_A, { x: 10, y: 20 }],
           [CARD_B, { x: 500, y: 400 }],
         ]),
@@ -358,7 +358,7 @@ describe('Space Authoring', () => {
       reentered = true;
       // A placement naming a Card the Space does not hold cannot become a Layout.
       authoring.installPlacement(
-        new Map([
+        Placement.fromEntries([
           [CARD_A, { x: 10, y: 20 }],
           [UNKNOWN_CARD, { x: 700, y: 800 }],
         ]),
@@ -385,7 +385,7 @@ describe('Space Authoring', () => {
     );
     const { authoring } = openAuthoring();
     authoring.installPlacement(
-      new Map([
+      Placement.fromEntries([
         [CARD_A, { x: 10, y: 20 }],
         [CARD_B, { x: 300, y: 40 }],
       ]),
@@ -413,7 +413,7 @@ describe('Space Authoring', () => {
 
     expect(authoring.complete({ kind: 'settled-card-movement' })).toEqual({ kind: 'no-edit' });
     authoring.installPlacement(
-      new Map([
+      Placement.fromEntries([
         [CARD_A, { x: 10, y: 20 }],
         [CARD_B, { x: 300, y: 40 }],
       ]),
@@ -464,7 +464,7 @@ describe('Space Authoring', () => {
     const navigation = createNavigation(currentSpace, { kind: 'layout', layoutId: LAYOUT_ID });
     const authoring = createSpaceAuthoring({ session, navigation });
     authoring.installPlacement(
-      new Map([
+      Placement.fromEntries([
         [CARD_A, { x: 100, y: 200 }],
         [CARD_B, { x: 300, y: 40 }],
       ]),
@@ -473,7 +473,7 @@ describe('Space Authoring', () => {
     await vi.waitFor(() => expect(authoring.getState().session.persistence.kind).toBe('failed'));
 
     authoring.installPlacement(
-      new Map([
+      Placement.fromEntries([
         [CARD_A, { x: 500, y: 600 }],
         [CARD_B, { x: 300, y: 40 }],
       ]),
@@ -510,19 +510,19 @@ describe('Space Authoring', () => {
       layoutId: LAYOUT_ID,
     });
 
-    authoring.installPlacement(new Map([[CARD_A, { x: 10, y: 20 }]]));
+    authoring.installPlacement(Placement.fromEntries([[CARD_A, { x: 10, y: 20 }]]));
 
     // One accessor, answering the value that is actually installed. A second
     // copy carried on the published state could only disagree with this, since
     // installing a placement is not a publication.
     const installed = authoring.authoredPlacement();
-    expect(installed).toEqual(new Map([[CARD_A, { x: 10, y: 20 }]]));
+    expect(installed).toEqual(Placement.fromEntries([[CARD_A, { x: 10, y: 20 }]]));
 
     // An equal placement is not a change, and must keep its identity:
     // `usePlacementRendering` rebuilds the positioned strategy whenever this map
     // changes identity and re-runs layout, so a fresh copy would re-arrange a
     // settled graph on every projection.
-    authoring.installPlacement(new Map([[CARD_A, { x: 10, y: 20 }]]));
+    authoring.installPlacement(Placement.fromEntries([[CARD_A, { x: 10, y: 20 }]]));
     expect(authoring.authoredPlacement()).toBe(installed);
 
     // Only an authored Layout supplies positions; an Algorithmic View computes
@@ -583,7 +583,7 @@ describe('Space Authoring', () => {
     });
     const before = session.getState().working;
     authoring.installPlacement(
-      new Map([
+      Placement.fromEntries([
         [CARD_A, { x: 10, y: 20 }],
         [CARD_B, { x: 300, y: 40 }],
       ]),
@@ -625,7 +625,7 @@ describe('Space Authoring', () => {
     };
     const { authoring, session } = openAuthoring(numbered);
     authoring.installPlacement(
-      new Map([
+      Placement.fromEntries([
         [CARD_A, { x: 10, y: 20 }],
         [CARD_B, { x: 300, y: 40 }],
       ]),
@@ -668,7 +668,7 @@ describe('Space Authoring', () => {
     });
     expect(navigation.getState().activeRouteId).toBeNull();
     authoring.installPlacement(
-      new Map([
+      Placement.fromEntries([
         [CARD_A, { x: 10, y: 20 }],
         [CARD_B, { x: 300, y: 40 }],
       ]),
@@ -720,7 +720,7 @@ describe('Space Authoring', () => {
       },
     });
     authoring.installPlacement(
-      new Map([
+      Placement.fromEntries([
         [CARD_A, { x: 10, y: 20 }],
         [CARD_B, { x: 300, y: 40 }],
       ]),
@@ -746,12 +746,46 @@ describe('Space Authoring', () => {
     expect(String(reported[1])).toMatch(/discarded 1 queued completion/);
   });
 
+  it('completes a settled drag without forcing a new placement identity', () => {
+    // The render adapter reports a settled gesture before completing, so by the
+    // time `performCompletion` installs, the placement it was given is already
+    // the installed one and `install` has nothing to do. That is deliberate —
+    // the alternative, assigning to take a fresh identity, re-ran layout from
+    // every projection that reported unchanged geometry.
+    //
+    // Both halves are asserted together because the re-layout depends on the
+    // second one: dropping the forced identity is only safe while a completed
+    // Edit replaces the working snapshot, which is what the render path derives
+    // its `LayoutGraph` from. Lose that and a settled Edit renders stale.
+    const loaded = { snapshot: positionedSnapshot, revision: 0n, exportedRevision: null };
+    const { authoring, session } = attachAuthoring(new MemorySpaceBackend([loaded]), loaded, {
+      kind: 'layout',
+      layoutId: LAYOUT_ID,
+    });
+    authoring.installPlacement(
+      Placement.fromEntries([
+        [CARD_A, { x: 90, y: 90 }],
+        [CARD_B, { x: 300, y: 40 }],
+      ]),
+    );
+    const reported = authoring.authoredPlacement();
+    const workingBefore = session.getState().working;
+
+    expect(authoring.complete({ kind: 'settled-card-movement' })).toEqual({ kind: 'completed' });
+
+    expect(authoring.authoredPlacement()).toBe(reported);
+    expect(session.getState().working).not.toBe(workingBefore);
+    expect(session.getState().working.document.layouts?.[0]?.positions).toEqual({
+      [CARD_A]: { x: 90, y: 90 },
+      [CARD_B]: { x: 300, y: 40 },
+    });
+  });
+
   /**
    * Containing a queued failure must not leave the placement describing an Edit
-   * the session never took. `performCompletion` installs before it submits, so a
-   * submit that throws used to strand the placement it had already replaced —
-   * survivable while the throw escaped to the caller, and silent now that the
-   * drain contains it.
+   * the session never took. `performCompletion` submits before it installs, so a
+   * submit that throws leaves the placement untouched — survivable while the
+   * throw escaped to the caller, and silent now that the drain contains it.
    *
    * A created Card is what makes the strand visible: only `performCompletion`
    * adds it to the placement, so `authoredPlacement()` naming a Card the
@@ -782,7 +816,7 @@ describe('Space Authoring', () => {
     const authoring = createSpaceAuthoring({
       session,
       navigation,
-      initialPlacement: new Map([
+      initialPlacement: Placement.fromEntries([
         [CARD_A, { x: 10, y: 20 }],
         [CARD_B, { x: 300, y: 40 }],
       ]),
@@ -841,7 +875,7 @@ describe('Space Authoring', () => {
       reportObserverError: (error) => reported.push(error),
     });
     authoring.installPlacement(
-      new Map([
+      Placement.fromEntries([
         [CARD_A, { x: 10, y: 20 }],
         [CARD_B, { x: 300, y: 40 }],
       ]),
@@ -938,7 +972,7 @@ describe('Space Authoring', () => {
     } as unknown as Navigation;
     const authoring = createSpaceAuthoring({ session, navigation });
     authoring.installPlacement(
-      new Map([
+      Placement.fromEntries([
         [CARD_A, { x: 10, y: 20 }],
         [CARD_B, { x: 300, y: 40 }],
       ]),
@@ -964,7 +998,7 @@ describe('Space Authoring', () => {
       { kind: 'layout', layoutId: LAYOUT_ID },
     );
     authoring.installPlacement(
-      new Map([
+      Placement.fromEntries([
         [CARD_A, { x: 100, y: 200 }],
         [CARD_B, { x: 300, y: 40 }],
       ]),
@@ -975,7 +1009,7 @@ describe('Space Authoring', () => {
     );
 
     authoring.installPlacement(
-      new Map([
+      Placement.fromEntries([
         [CARD_A, { x: 500, y: 600 }],
         [CARD_B, { x: 300, y: 40 }],
       ]),
@@ -1041,7 +1075,7 @@ describe('Space Authoring', () => {
       { kind: 'layout', layoutId: LAYOUT_ID },
     );
     authoring.installPlacement(
-      new Map([
+      Placement.fromEntries([
         [CARD_A, { x: 100, y: 200 }],
         [CARD_B, { x: 300, y: 40 }],
       ]),
@@ -1051,7 +1085,7 @@ describe('Space Authoring', () => {
       expect(authoring.getState().session.persistence.kind).toBe('conflicted'),
     );
     authoring.installPlacement(
-      new Map([
+      Placement.fromEntries([
         [CARD_A, { x: 500, y: 600 }],
         [CARD_B, { x: 300, y: 40 }],
       ]),
@@ -1080,7 +1114,7 @@ describe('Space Authoring', () => {
       },
     });
     expect(authoring.authoredPlacement()).toEqual(
-      new Map([
+      Placement.fromEntries([
         [CARD_A, { x: 900, y: 700 }],
         [CARD_B, { x: 600, y: 500 }],
       ]),
@@ -1148,7 +1182,7 @@ describe('Space Authoring', () => {
       { kind: 'layout', layoutId: LAYOUT_ID },
     );
     authoring.installPlacement(
-      new Map([
+      Placement.fromEntries([
         [CARD_A, { x: 500, y: 600 }],
         [CARD_B, { x: 300, y: 40 }],
       ]),

@@ -1,10 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
-import { uuidSchema, type CardId } from '@project/core';
 import {
   positionedStrategy,
   type LayoutGraph,
-  type LayoutPoint,
   type LayoutStrategy,
+  type Placement,
 } from '@project/graph';
 
 export type PlacementRenderingState =
@@ -48,29 +47,20 @@ function toError(reason: unknown): Error {
 export function usePlacementRendering(
   graph: LayoutGraph,
   strategy: LayoutStrategy,
-  authoredPositions: ReadonlyMap<string, LayoutPoint> | null,
+  authoredPlacement: Placement | null,
 ): PlacementRenderingState {
   const [result, setResult] = useState<PlacementRenderingResult | null>(null);
-  // Authored keys are card ids that have already been through the schema, so the
-  // parse here is a branding step and not expected to reject. It still runs during
-  // render, where a throw escapes React and takes the page down instead of
-  // reaching the failure state below — so an unusable placement is handed on as a
-  // rejecting strategy and reported like any other placement failure.
   // Split from the fallback so authored placement does not depend on `strategy`:
   // a new automatic strategy identity would otherwise rebuild the positioned one
   // and re-run layout, discarding a settled authored render for an identical result.
-  const authoredStrategy = useMemo<LayoutStrategy | null>(() => {
-    if (authoredPositions === null) return null;
-    try {
-      const positions = new Map<CardId, LayoutPoint>();
-      for (const [cardId, point] of authoredPositions) {
-        positions.set(uuidSchema.parse(cardId), point);
-      }
-      return positionedStrategy(positions);
-    } catch (reason: unknown) {
-      return () => Promise.reject(toError(reason));
-    }
-  }, [authoredPositions]);
+  //
+  // Keyed on the Placement's identity, which Space Authoring keeps stable while
+  // the value is unchanged — so a projection reporting the geometry already on
+  // screen does not re-arrange a settled graph.
+  const authoredStrategy = useMemo<LayoutStrategy | null>(
+    () => (authoredPlacement === null ? null : positionedStrategy(authoredPlacement)),
+    [authoredPlacement],
+  );
   const renderingStrategy = authoredStrategy ?? strategy;
 
   useEffect(() => {

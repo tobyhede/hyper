@@ -13,6 +13,7 @@ import {
   buildRouteEdges,
   filterHandlesByRoutes,
   getCard,
+  Placement,
   routeCardIds,
   resolveContentCard,
   type LayoutPoint,
@@ -25,7 +26,7 @@ import { activeRouteColor, routeColorMap } from './colors';
 import { CARD_HEIGHT, CARD_SIZE, cardSizeVars } from './card';
 import { createNavigation } from './navigation';
 import { createWorkingSpaceReader } from './snapshot';
-import { defaultRenderer, layoutPositionMap, resolveView, type RendererSelection } from './view';
+import { defaultRenderer, resolveView, type RendererSelection } from './view';
 import { GraphView } from './components/GraphView';
 import { OpenCard } from './components/OpenCard';
 import { PresentingChrome } from './components/PresentingChrome';
@@ -49,12 +50,12 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
   // Live nodes hold whichever arrangement is on screen. A positioned view also
   // supplies its already-authored, possibly sparse Layout map; an automatic view
   // starts null and is promoted only by a completed edit (ADR 0025).
-  const initialPositions =
-    initialView.layout === null ? null : layoutPositionMap(initialView.layout);
+  const initialPlacement =
+    initialView.layout === null ? null : Placement.fromLayout(initialView.layout);
   const authoring = createSpaceAuthoring({
     session: spaceSession,
     navigation,
-    initialPlacement: initialPositions,
+    initialPlacement,
   });
   // React Flow knows node ids as plain strings, and asks this per pointer frame.
   // An id that is not a Card identity is not a connection to accept — answering
@@ -259,7 +260,7 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
       navigation.selectRenderer(selection);
       useRenderAdapter
         .getState()
-        .selectRenderer(resolved.layout === null ? null : layoutPositionMap(resolved.layout));
+        .selectRenderer(resolved.layout === null ? null : Placement.fromLayout(resolved.layout));
     }, []);
 
     // Leaving while persistence is not settled asks first. The handler is absent

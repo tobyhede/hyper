@@ -3,11 +3,11 @@ import type { CardId, RouteId } from '@project/core';
 import {
   buildLayoutGraph,
   gridStrategy,
+  Placement,
   positionedStrategy,
   type CardHandleSet,
   type GraphEdge,
   type LayoutGraph,
-  type LayoutPoint,
   type LayoutStrategy,
 } from '@project/graph';
 import { elkStrategy } from '../src/index';
@@ -78,8 +78,8 @@ function sampleGraph(): LayoutGraph {
 }
 
 /** Positions for `positionedStrategy`, which reads an authored Layout. */
-const authored = (): ReadonlyMap<CardId, LayoutPoint> =>
-  new Map([
+const authored = (): Placement =>
+  Placement.fromEntries([
     [uuid('00000000-0000-4000-8000-000000000002'), { x: 0, y: 100 }],
     [uuid('00000000-0000-4000-8000-000000000003'), { x: 400, y: 0 }],
     [uuid('00000000-0000-4000-8000-000000000005'), { x: 400, y: 200 }],

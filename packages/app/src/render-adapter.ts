@@ -6,7 +6,7 @@ import {
 } from '@xyflow/react';
 import { create, type StoreApi, type UseBoundStore } from 'zustand';
 import { uuidSchema, type CardId } from '@project/core';
-import type { LayoutPoint } from '@project/graph';
+import { Placement, type LayoutPoint } from '@project/graph';
 import type { CardFlowNode } from '@project/react-flow-adapter';
 import type { SpaceAuthoring } from './space-authoring';
 
@@ -56,7 +56,7 @@ export interface RenderAdapterState {
    * Navigate to another renderer. The replacement arrangement will arrive via
    * `syncProjection`; renderer selection itself is not an edit.
    */
-  selectRenderer: (positions: ReadonlyMap<string, LayoutPoint> | null) => void;
+  selectRenderer: (placement: Placement | null) => void;
   /** Apply React Flow's own changes (drag, measure, select). */
   changeNodes: (changes: NodeChange<CardFlowNode>[]) => void;
   /** Install and notify one directed Edge between existing Cards, when it is a real Edit. */
@@ -69,33 +69,18 @@ export interface RenderAdapterState {
 
 export type RenderAdapter = UseBoundStore<StoreApi<RenderAdapterState>>;
 
-function positionsOf(nodes: readonly CardFlowNode[]): ReadonlyMap<string, LayoutPoint> {
-  return new Map(nodes.map((node) => [node.id, { x: node.position.x, y: node.position.y }]));
-}
-
 /**
- * Capture every on-screen position for an Algorithmic View, ready for ADR 0025
- * conversion. A positioned Layout is intentionally sparse: fallback positions
- * stay runtime-only, and only Cards the author actually moved join its map.
+ * Report what React Flow is drawing, and let Placement decide how much of it is
+ * authorship. The adapter's whole part is reducing nodes to positions and naming
+ * the Cards a completed gesture placed; the sparse rule is `Placement.next`'s.
  */
-function installProjectedPlacement(
+function reportRenderedPlacement(
   authoring: SpaceAuthoring,
   nodes: readonly CardFlowNode[],
-  changedCardIds: readonly string[] = [],
+  placed: readonly CardId[] = [],
 ): void {
-  const authored = authoring.authoredPlacement();
-  if (authored === null) {
-    authoring.installPlacement(positionsOf(nodes));
-    return;
-  }
-  if (changedCardIds.length === 0) return;
-  const projected = positionsOf(nodes);
-  const next = new Map(authored);
-  for (const cardId of changedCardIds) {
-    const position = projected.get(cardId);
-    if (position !== undefined) next.set(cardId, position);
-  }
-  authoring.installPlacement(next);
+  const rendered = Placement.fromEntries(nodes.map((node) => [node.id, node.position]));
+  authoring.installPlacement(Placement.next(authoring.authoredPlacement(), rendered, placed));
 }
 
 function trackDragOrigins(
@@ -115,8 +100,10 @@ function consumeSettledMovedIds(
   dragOrigins: Map<string, LayoutPoint>,
   beforeById: ReadonlyMap<string, LayoutPoint>,
   afterById: ReadonlyMap<string, LayoutPoint>,
-): string[] {
-  const movedIds: string[] = [];
+): CardId[] {
+  // A node id is the Card id it was projected from, widened to `string` by React
+  // Flow's `Node` type — the same erasure `Placement.fromEntries` documents.
+  const movedIds: CardId[] = [];
   for (const change of settled) {
     const origin = dragOrigins.get(change.id) ?? beforeById.get(change.id);
     const after = afterById.get(change.id);
@@ -126,7 +113,7 @@ function consumeSettledMovedIds(
       after !== undefined &&
       (origin.x !== after.x || origin.y !== after.y)
     ) {
-      movedIds.push(change.id);
+      movedIds.push(change.id as CardId);
     }
   }
   return movedIds;
@@ -182,17 +169,17 @@ export function createRenderAdapter(authoring: SpaceAuthoring): RenderAdapter {
       set({ projection: { nodes: reconciled, edges: [...edges] } });
       // Reporting geometry, not authoring it: a Card the selected Layout omits is
       // drawn in the fallback band and must stay unplaced.
-      installProjectedPlacement(authoring, reconciled);
+      reportRenderedPlacement(authoring, reconciled);
     },
 
-    selectRenderer: (positions) => {
+    selectRenderer: (placement) => {
       set({
         projection: null,
         dragOrigins: new Map(),
         moved: false,
         selectedCardId: null,
       });
-      authoring.installPlacement(positions);
+      authoring.installPlacement(placement);
     },
 
     selectCard: (cardId) =>
@@ -257,7 +244,7 @@ export function createRenderAdapter(authoring: SpaceAuthoring): RenderAdapter {
       });
       // The gesture placed exactly `movedIds`; every other Card keeps whatever
       // authorship it already had.
-      installProjectedPlacement(authoring, nodes, movedIds);
+      reportRenderedPlacement(authoring, nodes, movedIds);
       authoring.complete({ kind: 'settled-card-movement' });
     },
 
@@ -267,8 +254,8 @@ export function createRenderAdapter(authoring: SpaceAuthoring): RenderAdapter {
       if (projection === null || !authoring.canConnect(from, to)) {
         return false;
       }
-      // Install the placement from the live nodes, and publish the reconciled
-      // ones below — deliberately two different lists. `installProjectedPlacement`
+      // Report the placement from the live nodes, and publish the reconciled
+      // ones below — deliberately two different lists. `reportRenderedPlacement`
       // reads positions only, and `reconcile` takes every surviving Card's
       // position from its live node, so the two agree on every Card already on
       // screen. They diverge only for a Card the projection has gained and the
@@ -276,7 +263,7 @@ export function createRenderAdapter(authoring: SpaceAuthoring): RenderAdapter {
       // `syncProjection` until a strategy resolves. That Card has no resolved
       // position yet, and authoring the origin it is standing on is exactly
       // what a sparse Layout exists to avoid.
-      installProjectedPlacement(authoring, projection.nodes);
+      reportRenderedPlacement(authoring, projection.nodes);
       // Complete first. A completion that has not happened — refused, queued
       // behind another Edit, or thrown on an invalid Space — must not leave a
       // connection drawn for an Edge the Space never gained. Only `completed`
@@ -300,7 +287,7 @@ export function createRenderAdapter(authoring: SpaceAuthoring): RenderAdapter {
       const projection = state.projection;
       if (projection === null || !authoring.canCreateConnectedCard(from)) return null;
       // The dropped Card is placed by `position` inside the completion itself.
-      installProjectedPlacement(authoring, projection.nodes);
+      reportRenderedPlacement(authoring, projection.nodes);
       const result = authoring.complete({
         kind: 'create-and-connect',
         from,

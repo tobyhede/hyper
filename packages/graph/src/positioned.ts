@@ -1,13 +1,13 @@
-import type { CardId } from '@project/core';
-import type { LayoutCard, LayoutGraph, LayoutPoint, LayoutStrategy } from './layout';
+import type { LayoutCard, LayoutGraph, LayoutStrategy } from './layout';
+import type { Placement } from './placement';
 
 /**
  * The positioned strategy: the cards go where the author put them.
  *
  * The third strategy, and the only one that *reads* geometry rather than
  * computing it — placement is authored content, not an artifact of an algorithm
- * (ADR 0025). It is the one strategy with a **Layout** behind it: the positions
- * it takes are that Layout's, and capturing on-screen positions is the same
+ * (ADR 0025). It is the one strategy with a **Layout** behind it: the Placement
+ * it takes is that Layout's, and `Placement.fromLayoutGraph` is this same
  * conversion run backwards. Like `gridStrategy` it consumes only the cards: it never looks at
  * the edges, places no ports, and populates no edge sections, leaving the render
  * layer to spread handles evenly and draw a plain curve. If this file ever needs
@@ -40,25 +40,7 @@ function boundsOf(cards: readonly LayoutCard[]): Bounds | null {
   return minX === Infinity ? null : { minX, maxY };
 }
 
-/**
- * The card→position map a laid-out graph describes: `positionedStrategy` run
- * backwards, and the crossing from computed placement to authored placement that
- * the first completed edit in an Algorithmic View performs.
- *
- * Cards a strategy left unplaced are **omitted**, not defaulted to the origin —
- * absence in a Layout means *unplaced*, and collapsing that to `(0, 0)` would
- * assert a placement no strategy made.
- */
-export function layoutPositions(graph: LayoutGraph): ReadonlyMap<CardId, LayoutPoint> {
-  const positions = new Map<CardId, LayoutPoint>();
-  for (const card of graph.cards) {
-    if (card.x === undefined || card.y === undefined) continue;
-    positions.set(card.id, { x: card.x, y: card.y });
-  }
-  return positions;
-}
-
-export function positionedStrategy(positions: ReadonlyMap<CardId, LayoutPoint>): LayoutStrategy {
+export function positionedStrategy(positions: Placement): LayoutStrategy {
   // Uniformly-async contract (ADR 0005); there is nothing to await.
   // eslint-disable-next-line @typescript-eslint/require-await
   return async (graph: LayoutGraph): Promise<LayoutGraph> => {

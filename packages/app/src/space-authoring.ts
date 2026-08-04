@@ -1,9 +1,9 @@
 import { newUuid, type CardId, type SpaceSnapshot, type UUID } from '@project/core';
-import { loadSpaceSnapshot, type LayoutPoint } from '@project/graph';
+import { loadSpaceSnapshot, Placement, type LayoutPoint } from '@project/graph';
 import type { SpaceSession, SpaceSessionState } from '@project/persistence';
 import type { Navigation, NavigationState } from './navigation';
 import { updatePositionedLayout } from './snapshot';
-import { defaultRenderer, layoutPositionMap, resolveView } from './view';
+import { defaultRenderer, resolveView } from './view';
 
 export type AuthoringCompletion =
   | { readonly kind: 'settled-card-movement' }
@@ -47,9 +47,9 @@ export interface SpaceAuthoring {
    * the render adapter, so a reader that re-reads on notification from either
    * always sees the current value.
    */
-  readonly authoredPlacement: () => ReadonlyMap<string, LayoutPoint> | null;
+  readonly authoredPlacement: () => Placement | null;
   readonly subscribe: (listener: () => void) => () => void;
-  readonly installPlacement: (placement: ReadonlyMap<string, LayoutPoint> | null) => void;
+  readonly installPlacement: (placement: Placement | null) => void;
   readonly canConnect: (from: CardId, to: CardId) => boolean;
   readonly canCreateConnectedCard: (from: CardId) => boolean;
   readonly complete: (completion: AuthoringCompletion) => AuthoringResult;
@@ -71,7 +71,7 @@ export interface SpaceAuthoring {
 interface SpaceAuthoringDependencies {
   readonly session: SpaceSession;
   readonly navigation: Navigation;
-  readonly initialPlacement?: ReadonlyMap<string, LayoutPoint> | null;
+  readonly initialPlacement?: Placement | null;
   readonly reportObserverError?: (error: unknown) => void;
 }
 
@@ -154,27 +154,13 @@ function isThenable(value: unknown): value is PromiseLike<unknown> {
   );
 }
 
-function samePlacement(
-  left: ReadonlyMap<string, LayoutPoint> | null,
-  right: ReadonlyMap<string, LayoutPoint> | null,
-): boolean {
-  if (left === null || right === null) return left === right;
-  if (left.size !== right.size) return false;
-  for (const [id, point] of left) {
-    const candidate = right.get(id);
-    if (candidate?.x !== point.x || candidate.y !== point.y) return false;
-  }
-  return true;
-}
-
 export function createSpaceAuthoring({
   session,
   navigation,
   initialPlacement = null,
   reportObserverError = (error) => console.error('SpaceAuthoring observer failed', error),
 }: SpaceAuthoringDependencies): SpaceAuthoring {
-  let placement: ReadonlyMap<string, LayoutPoint> | null =
-    initialPlacement === null ? null : new Map(initialPlacement);
+  let placement: Placement | null = initialPlacement;
   let opening = 0;
   let installing = false;
   let state: SpaceAuthoringState;
@@ -184,19 +170,18 @@ export function createSpaceAuthoring({
   // synchronous while letting `publish` see what came back.
   const listeners = new Set<() => unknown>();
 
-  // `installPlacement` only — not the way placement is written in general.
-  // `performCompletion` and `acceptStoredSpace` each assign the map they built,
-  // deliberately taking its identity: both have already replaced the Space the
-  // old one described and want the re-layout this would suppress.
+  // The one way placement is written — every path goes through here, including
+  // Edit completion and accepting a stored Space.
   //
-  // Here identity is load-bearing the other way, and not just the value:
-  // `usePlacementRendering` rebuilds the positioned strategy whenever this map
-  // changes identity and re-runs layout, so an equal placement pushed in by a
-  // projection must keep the map it already has or every projection would
-  // re-arrange a settled graph.
-  const install = (nextPlacement: ReadonlyMap<string, LayoutPoint> | null): void => {
-    if (samePlacement(placement, nextPlacement)) return;
-    placement = nextPlacement === null ? null : new Map(nextPlacement);
+  // Identity is load-bearing, not just the value: `usePlacementRendering`
+  // rebuilds the positioned strategy whenever this changes identity and re-runs
+  // layout, so an equal placement pushed in by a projection must keep the one it
+  // already has or every projection would re-arrange a settled graph. A
+  // completed Edit needs no help getting its re-layout — it replaces the working
+  // snapshot, and the `LayoutGraph` derived from it re-fires the same effect.
+  const install = (nextPlacement: Placement | null): void => {
+    if (Placement.equals(placement, nextPlacement)) return;
+    placement = nextPlacement;
   };
 
   const snapshotState = (): SpaceAuthoringState => ({
@@ -266,7 +251,7 @@ export function createSpaceAuthoring({
 
   const performCompletion = (
     completion: AuthoringCompletion,
-    completedPlacementInput: ReadonlyMap<string, LayoutPoint> | null,
+    completedPlacementInput: Placement | null,
   ): AuthoringResult => {
     if (completedPlacementInput === null) return { kind: 'no-edit' };
     let snapshot = session.getState().working;
@@ -276,12 +261,12 @@ export function createSpaceAuthoring({
     let mintedRouteId: UUID | null = null;
     let createdCardId: CardId | undefined;
     let connection: { readonly from: CardId; readonly to: CardId } | null = null;
-    const completedPlacement = new Map(completedPlacementInput);
+    let completedPlacement = completedPlacementInput;
     if (completion.kind === 'create-and-connect') {
       if (!canCreateConnectedCard(completion.from)) return { kind: 'no-edit' };
       createdCardId = newUuid();
       connection = { from: completion.from, to: createdCardId };
-      completedPlacement.set(createdCardId, completion.position);
+      completedPlacement = Placement.place(completedPlacement, createdCardId, completion.position);
       snapshot = {
         ...snapshot,
         cards: [
@@ -362,7 +347,7 @@ export function createSpaceAuthoring({
       // would otherwise persist silently, and a created Card would sit in the
       // placement while the Space has no such Card at all.
       session.submit(next);
-      placement = completedPlacement;
+      install(completedPlacement);
       if (mintedRouteId !== null) navigation.activateRoute(mintedRouteId);
       navigation.continueInRenderer({ kind: 'layout', layoutId });
     } finally {
@@ -377,10 +362,10 @@ export function createSpaceAuthoring({
   let completing = false;
   const queued: {
     readonly completion: AuthoringCompletion;
-    readonly placement: ReadonlyMap<string, LayoutPoint> | null;
+    readonly placement: Placement | null;
   }[] = [];
   const complete = (completion: AuthoringCompletion): AuthoringResult => {
-    const installedPlacement = placement === null ? null : new Map(placement);
+    const installedPlacement = placement;
     if (completing) {
       queued.push({ completion, placement: installedPlacement });
       return { kind: 'queued' };
@@ -450,11 +435,12 @@ export function createSpaceAuthoring({
     }
     const renderer = defaultRenderer(accepted.space);
     const resolved = resolveView(accepted.space, renderer);
-    const acceptedPlacement = resolved.layout === null ? null : layoutPositionMap(resolved.layout);
+    const acceptedPlacement =
+      resolved.layout === null ? null : Placement.fromLayout(resolved.layout);
     installing = true;
     try {
       session.acceptRemote();
-      placement = acceptedPlacement;
+      install(acceptedPlacement);
       navigation.openFresh(renderer);
       opening += 1;
     } finally {

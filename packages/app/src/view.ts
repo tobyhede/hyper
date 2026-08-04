@@ -1,8 +1,6 @@
 import {
   isBuiltInViewId,
-  uuidSchema,
   type BuiltInViewId,
-  type CardId,
   type Layout,
   type RouteId,
   type UUID,
@@ -10,8 +8,8 @@ import {
 import {
   getLayout,
   gridStrategy,
+  Placement,
   positionedStrategy,
-  type LayoutPoint,
   type LayoutStrategy,
   type Space,
 } from '@project/graph';
@@ -96,14 +94,6 @@ function resolveRoutes(
   };
 }
 
-export function layoutPositionMap(layout: Layout): ReadonlyMap<CardId, LayoutPoint> {
-  const positions = new Map<CardId, LayoutPoint>();
-  for (const [cardId, point] of Object.entries(layout.positions)) {
-    if (point !== undefined) positions.set(uuidSchema.parse(cardId), point);
-  }
-  return positions;
-}
-
 /** Resolve the Space default into the initial renderer selection. */
 export function defaultRenderer(space: Space): RendererSelection {
   const requested = space.defaultView ?? DEFAULT_VIEW_ID;
@@ -123,7 +113,7 @@ export function resolveView(
     }
     return {
       id: layout.id,
-      strategy: positionedStrategy(layoutPositionMap(layout)),
+      strategy: positionedStrategy(Placement.fromLayout(layout)),
       layout,
       ...resolveRoutes(space, layout),
     };
