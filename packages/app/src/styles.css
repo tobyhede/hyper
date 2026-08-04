@@ -297,12 +297,12 @@ body {
   line-height: 1.35;
 }
 
-/* Renaming is the title's own double click and opening is the Card's, so the two
-   must not want the same pixels — and a Card centres its title, which puts the
-   rename target exactly where a pointer goes to open. Shrunk to the text it
-   draws (a block `h2` spans the full width, most of it empty), so the band
-   either side of a short title opens the Card. `cursor: text` is the only thing
-   telling them apart, which is why it is not decoration. */
+/* Renaming is the title's own double click (ADR 0036), so it must claim only the
+   pixels it draws — a Card centres its title, and a block `h2` spans the full
+   width with most of it empty, which would put the rename target across the
+   middle of the Card. Shrunk to fit, so a double click on the band either side
+   of a short title renames nothing. `cursor: text` is the only thing telling the
+   title apart from the Card around it, which is why it is not decoration. */
 .card--node .card__title--editable {
   width: fit-content;
   max-width: 100%;

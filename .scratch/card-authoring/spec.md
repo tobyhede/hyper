@@ -65,7 +65,7 @@ unrelated callers to reproduce kind switches.
 ## User Stories
 
 1. As an author, I want to edit a Card title directly on the graph, so that naming a thought does not require leaving its spatial context.
-2. As an author, I want a visible title-edit affordance on a hovered or selected Card, so that inline editing is discoverable.
+2. As an author, I want the drawn title to show that it is editable and to rename on a double click, so that inline editing is discoverable where the title is (ADR 0036). The hovered Card's control opens the Card; it is not the title's affordance.
 3. As a keyboard author, I want `F2` on a selected Card to edit its title, so that title authoring does not require a pointer.
 4. As an author, I want inline editing to begin with the complete current title selected appropriately, so that I can revise or replace it without reconstructing it.
 5. As an author, I want `Enter` to complete a valid title change, so that keyboard editing has an explicit completion gesture.
@@ -74,7 +74,7 @@ unrelated callers to reproduce kind switches.
 8. As an author, I want an empty or otherwise invalid title to remain uncommitted with a clear field error, so that the Space never receives invalid data.
 9. As an author, I want completing an unchanged title to do nothing, so that opening and closing an editor has no persistence consequence.
 10. As an author, I want clicking or typing inside the title editor not to open, drag or connect the Card, so that authoring gestures do not collide.
-11. As an author, I want ordinary Card clicks outside the title editor to keep opening the Card in place, so that title editing does not replace reading.
+11. As an author, I want a Card click outside the title editor to select the Card rather than open it, so that renaming and opening never compete for the same pixels (ADR 0036).
 12. As an author, I want a renamed Card to update immediately anywhere its title is drawn or listed, so that the current Space remains coherent.
 13. As an author, I want an Alias title edit to change only the Alias's own title, so that the target remains the single source of shared content rather than shared identity.
 14. As an author, I want title changes to persist automatically and survive reload, so that Card authoring is durable without a Save action.
@@ -91,7 +91,7 @@ unrelated callers to reproduce kind switches.
 25. As an author, I want editing Markdown through an Alias to update the target and every Alias that shows it, so that no content is copied or allowed to drift. *(Deferred to `03`.)*
 26. As an author, I want editing through an Alias to leave the Alias's own title, description and target unchanged, so that editing content is not confused with retargeting or renaming the Alias. *(Deferred to `03`.)*
 27. As an author, I want an Alias to offer no kind or target field in the opened editor, so that Alias structure is not presented as content metadata. *(Deferred to `03`.)*
-28. As an author, I want cancelling an opened-Card draft to restore the unchanged reading surface, so that abandoned work creates no Edit.
+28. As an author, I want cancelling an opened-Card draft to close it with the Card unchanged, so that abandoned work creates no Edit.
 29. As an author, I want invalid opened-Card fields to remain local with useful errors, so that persistence never receives a malformed snapshot.
 30. As an author, I want one completed Card change to submit exactly one complete Space snapshot, so that description and content cannot persist separately.
 31. As an author editing an Algorithmic View, I want the first completed Card change to create and select a Layout from the positions already on screen, so that no Card moves when authoring begins.
@@ -137,7 +137,7 @@ unrelated callers to reproduce kind switches.
 - Space Authoring tests cover title, description and Markdown Edits completed directly; identical, cancelled, invalid and stale-context no-ops; Algorithmic View conversion; selected-Layout preservation; one-submit semantics; reentrant completion; and conflict replacement closing stale drafts. Edits completed through an Alias arrive with `03`; until then Authoring refusing to change an Alias's non-title fields is what is tested.
 - Normal Space intake tests cover every completed kind shape and reference invariant. Alias self-target, missing target and alias-targets-alias cases remain explicit failures.
 - Card-file codec example and property tests continue proving that parsing and serialization are inverses for every supported kind, including a bodyless Alias and an empty Markdown body.
-- UI tests drive the inline title editor through its pointer and keyboard interface, proving affordance visibility, `F2`, `Enter`, blur, `Escape`, validation and event isolation.
+- UI tests drive the inline title editor through its pointer and keyboard interface, proving the title's double click, `F2`, `Enter`, blur, `Escape`, validation and event isolation.
 - Opened-Card UI tests drive title and description validation, Markdown source changes, cancellation and the absence of kind and target fields. Alias-to-target delegation arrives with `03`; what is proven here is that an Alias offers nothing to open.
 - The exhaustive editor registry is enforced by strict TypeScript and the existing root and per-package typechecks. Runtime tests exercise registry selection through the opened Card interface rather than inspecting the registry.
 - Playwright crosses the existing HTTP boundary and proves that an inline title change and opened Markdown change survive reload, that an Alias is renamed on the graph and offers no opening affordance, and that the first Card Edit from an Algorithmic View converts without moving Cards. Proving an Alias edit reaches its target and every occurrence arrives with `03`.
