@@ -268,7 +268,7 @@ export interface GraphViewProps {
   onOpenCard: (cardId: string) => void;
   /** Complete one locally validated title draft, or return its field error. */
   onCompleteCardTitle: (cardId: string, title: string) => string | null;
-  /** Which Cards can be opened — an Alias owns no content, so it offers none. */
+  /** Which Cards resolve to content the opened editor can author. */
   editableCardIds: ReadonlySet<string>;
   routes: readonly Route[];
   colorByRouteId: Readonly<Record<string, string>>;

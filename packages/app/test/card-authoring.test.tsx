@@ -11,6 +11,7 @@ const LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
 const ROUTE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
 const OTHER_CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
 const ALIAS_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000006');
+const SECOND_ALIAS_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000007');
 
 /**
  * Two Cards on one Route in an authored Layout, so the graph opens on a
@@ -36,6 +37,37 @@ const snapshot: SpaceSnapshot = spaceSnapshotSchema.parse({
   cards: [
     { id: CARD_ID, document: { title: 'A', kind: 'markdown', body: 'A source' } },
     { id: OTHER_CARD_ID, document: { title: 'B', kind: 'markdown', body: 'B source' } },
+  ],
+});
+
+/**
+ * The same content drawn three times: Card A and two Aliases of it, each placed
+ * and titled in its own right.
+ *
+ * One Alias can only show that its target changed, which is the weaker half of
+ * a single source of truth. Two is where an edit made through one occurrence
+ * has somewhere else to be wrong — and where the editor's composite key stops
+ * being redundant, since both Aliases resolve to the same content id.
+ */
+const twiceAliased: SpaceSnapshot = spaceSnapshotSchema.parse({
+  ...snapshot,
+  document: {
+    ...snapshot.document,
+    layouts: [
+      {
+        ...snapshot.document.layouts![0],
+        positions: {
+          ...snapshot.document.layouts![0]!.positions,
+          [ALIAS_ID]: { x: 600, y: 20 },
+          [SECOND_ALIAS_ID]: { x: 900, y: 20 },
+        },
+      },
+    ],
+  },
+  cards: [
+    ...snapshot.cards,
+    { id: ALIAS_ID, document: { title: 'A again', kind: 'alias', target: CARD_ID } },
+    { id: SECOND_ALIAS_ID, document: { title: 'A once more', kind: 'alias', target: CARD_ID } },
   ],
 });
 
@@ -166,11 +198,13 @@ describe('authoring an opened Card', () => {
     expect(screen.getByText('Opened through A again')).toBeVisible();
     expect(screen.getByText('Editing content on A')).toBeVisible();
     expect(screen.queryByRole('textbox', { name: 'Title' })).not.toBeInTheDocument();
-    expect(screen.getByRole('textbox', { name: 'Description' })).toHaveValue('');
-    fireEvent.change(screen.getByRole('textbox', { name: 'Description' }), {
+    // Qualified, because the Alias draws a description of its own on the graph
+    // behind this pane and these fields do not author it.
+    expect(screen.getByRole('textbox', { name: 'Description of A' })).toHaveValue('');
+    fireEvent.change(screen.getByRole('textbox', { name: 'Description of A' }), {
       target: { value: 'Shared target caption' },
     });
-    fireEvent.change(screen.getByRole('textbox', { name: 'Markdown source' }), {
+    fireEvent.change(screen.getByRole('textbox', { name: 'Markdown source of A' }), {
       target: { value: 'Shared target source' },
     });
     fireEvent.click(screen.getByRole('button', { name: 'Done' }));
@@ -185,6 +219,59 @@ describe('authoring an opened Card', () => {
       },
     });
     expect(session.getState().working.cards).toContainEqual(aliased.cards[2]);
+    await settled(session);
+  });
+
+  /**
+   * "Every place showing that content changes together" is the promise, and one
+   * Alias cannot test it: reading the edit back through the target only says the
+   * target was written. A second Alias is a second occurrence that has to have
+   * moved with it, and it never touched the edit itself.
+   */
+  it('shows an edit made through one Alias when a second Alias of the same Card opens', async () => {
+    const session = mount(twiceAliased);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit Card A again' }));
+    fireEvent.change(screen.getByRole('textbox', { name: 'Markdown source of A' }), {
+      target: { value: 'Written once, shown everywhere' },
+    });
+    fireEvent.change(screen.getByRole('textbox', { name: 'Description of A' }), {
+      target: { value: 'One caption, three occurrences' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit Card A once more' }));
+    expect(screen.getByText('Opened through A once more')).toBeVisible();
+    expect(screen.getByRole('textbox', { name: 'Markdown source of A' })).toHaveValue(
+      'Written once, shown everywhere',
+    );
+    expect(screen.getByRole('textbox', { name: 'Description of A' })).toHaveValue(
+      'One caption, three occurrences',
+    );
+    // Neither Alias was written, only the Card they both show.
+    expect(session.getState().working.cards).toContainEqual(twiceAliased.cards[2]);
+    expect(session.getState().working.cards).toContainEqual(twiceAliased.cards[3]);
+    await settled(session);
+  });
+
+  /**
+   * Both Aliases resolve to one content Card, so the identity the editor's draft
+   * hangs on is shared and only the occurrence differs. Nothing typed into the
+   * first and abandoned may appear in the second.
+   */
+  it('opens a second Alias on the stored content, not the draft abandoned in the first', async () => {
+    const session = mount(twiceAliased);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit Card A again' }));
+    fireEvent.change(screen.getByRole('textbox', { name: 'Markdown source of A' }), {
+      target: { value: 'Never completed' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit Card A once more' }));
+
+    expect(screen.getByRole('textbox', { name: 'Markdown source of A' })).toHaveValue('A source');
+    expect(bodyOf(session, CARD_ID)).toBe('A source');
     await settled(session);
   });
 
