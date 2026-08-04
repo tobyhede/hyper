@@ -3,7 +3,7 @@ import { loadSpaceSnapshot, Placement, type LayoutPoint } from '@project/graph';
 import type { SpaceSession, SpaceSessionState } from '@project/persistence';
 import type { Navigation, NavigationState } from './navigation';
 import { updatePositionedLayout } from './snapshot';
-import { defaultRenderer, resolveView } from './view';
+import { defaultRenderer, resolveView, type RendererSelection } from './view';
 
 export type AuthoringCompletion =
   | { readonly kind: 'settled-card-movement' }
@@ -66,6 +66,25 @@ export interface SpaceAuthoring {
    * back and the seam is what makes that possible.
    */
   readonly dispose: () => void;
+}
+
+/**
+ * A completed Edit, derived and validated in full: everything each collaborator
+ * is about to be handed, and nothing left to compute or decide.
+ *
+ * Not a plan a caller executes — `complete` is still the one operation, and this
+ * type is private. What it buys is that the shell installing it cannot grow a
+ * derivation, a refusal or a validation inside the window, because there is
+ * nothing left there to derive from.
+ */
+interface CompletedEdit {
+  readonly snapshot: SpaceSnapshot;
+  readonly placement: Placement;
+  /** The Route this same Edit minted, which Navigation must therefore activate. */
+  readonly mintedRouteId: UUID | null;
+  /** The Layout this Edit wrote, which Navigation continues in. */
+  readonly nextRenderer: RendererSelection;
+  readonly createdCardId?: CardId;
 }
 
 interface SpaceAuthoringDependencies {
@@ -162,7 +181,7 @@ export function createSpaceAuthoring({
 }: SpaceAuthoringDependencies): SpaceAuthoring {
   let placement: Placement | null = initialPlacement;
   let opening = 0;
-  let installing = false;
+  let installing = 0;
   let state: SpaceAuthoringState;
   // Held as `() => unknown` although `subscribe` accepts `() => void`: a `void`
   // expression cannot be inspected, which is exactly how an async listener's
@@ -220,11 +239,46 @@ export function createSpaceAuthoring({
     }
   };
 
+  /**
+   * Update the collaborators as one step, then publish whatever the step left
+   * behind.
+   *
+   * The gate suppresses each collaborator's own notification for the duration,
+   * so nothing observes the sequence part-way through — and nothing observes it
+   * *at all* unless this publishes. That is why `publish` runs in the `finally`
+   * rather than after the block: a throw would otherwise leave every subscriber
+   * reading Authoring's pre-Edit memoized state while the session already holds
+   * the snapshot it published optimistically inside `submit`, and reading it
+   * until some unrelated notification happened along.
+   *
+   * This is not a `catch` and does not pretend the step succeeded. The failure
+   * still reaches the caller; what it can no longer do is take the publication
+   * with it. Making the step itself total is the caller's job — see
+   * `installCompletedEdit`.
+   *
+   * The gate counts depth rather than holding a flag, because these windows
+   * nest. A collaborator notified from inside one may legally complete an Edit —
+   * the same latitude `SpaceSession` gives an observer that submits — and that
+   * completion opens a second window within the first. A boolean would be
+   * cleared by the inner `finally` and leave the rest of the outer sequence
+   * publishing every part-way state it was raised to hide. Only the outermost
+   * window publishes, so the sequence is still observed exactly once.
+   */
+  const installTogether = (updates: () => void): void => {
+    installing += 1;
+    try {
+      updates();
+    } finally {
+      installing -= 1;
+      if (installing === 0) publish();
+    }
+  };
+
   const unsubscribeSession = session.subscribe(() => {
-    if (!installing) publish();
+    if (installing === 0) publish();
   });
   const unsubscribeNavigation = navigation.subscribe(() => {
-    if (!installing) publish();
+    if (installing === 0) publish();
   });
 
   const canConnect = (from: CardId, to: CardId): boolean => {
@@ -249,11 +303,25 @@ export function createSpaceAuthoring({
     );
   };
 
-  const performCompletion = (
+  /**
+   * Derive the complete next state of every collaborator, or refuse.
+   *
+   * The pure core of a completed Edit: every read of the current state, every
+   * reason to refuse, and the one validation that can fail all happen here,
+   * before any collaborator has moved. What comes back is not a plan for the
+   * caller to execute but a value with no decisions left in it — which is what
+   * lets the shell below be a sequence of statements rather than a transaction.
+   *
+   * `null` is a refusal, and refusing is not a failure: an Edit that changes
+   * nothing, names a Card the Space no longer holds, or targets a Layout that
+   * has gone is simply not an Edit. Producing an unloadable Space *is* a
+   * failure, and it throws — here, where the collaborators are all still level.
+   */
+  const deriveCompletedEdit = (
     completion: AuthoringCompletion,
     completedPlacementInput: Placement | null,
-  ): AuthoringResult => {
-    if (completedPlacementInput === null) return { kind: 'no-edit' };
+  ): CompletedEdit | null => {
+    if (completedPlacementInput === null) return null;
     let snapshot = session.getState().working;
     const previousSnapshot = snapshot;
     const navigationState = navigation.getState();
@@ -263,7 +331,7 @@ export function createSpaceAuthoring({
     let connection: { readonly from: CardId; readonly to: CardId } | null = null;
     let completedPlacement = completedPlacementInput;
     if (completion.kind === 'create-and-connect') {
-      if (!canCreateConnectedCard(completion.from)) return { kind: 'no-edit' };
+      if (!canCreateConnectedCard(completion.from)) return null;
       createdCardId = newUuid();
       connection = { from: completion.from, to: createdCardId };
       completedPlacement = Placement.place(completedPlacement, createdCardId, completion.position);
@@ -278,7 +346,7 @@ export function createSpaceAuthoring({
         ],
       };
     } else if (completion.kind === 'connected-cards') {
-      if (!canConnect(completion.from, completion.to)) return { kind: 'no-edit' };
+      if (!canConnect(completion.from, completion.to)) return null;
       connection = { from: completion.from, to: completion.to };
     }
     if (connection !== null) {
@@ -304,7 +372,7 @@ export function createSpaceAuthoring({
           (route) => route.id === activeRouteId,
         );
         const route = snapshot.document.routes[routeIndex];
-        if (route === undefined) return { kind: 'no-edit' };
+        if (route === undefined) return null;
         const routes = [...snapshot.document.routes];
         routes[routeIndex] = {
           ...route,
@@ -319,7 +387,7 @@ export function createSpaceAuthoring({
       renderer.kind === 'layout'
         ? (snapshot.document.layouts ?? []).find((layout) => layout.id === renderer.layoutId)
         : undefined;
-    if (renderer.kind === 'layout' && existing === undefined) return { kind: 'no-edit' };
+    if (renderer.kind === 'layout' && existing === undefined) return null;
     const next = updatePositionedLayout(snapshot, {
       layoutId,
       title: existing?.title ?? nextLayoutTitle(snapshot),
@@ -327,7 +395,7 @@ export function createSpaceAuthoring({
       activeRouteId,
       mintedRouteId,
     });
-    if (sameSnapshot(previousSnapshot, next)) return { kind: 'no-edit' };
+    if (sameSnapshot(previousSnapshot, next)) return null;
     const loaded = loadSpaceSnapshot(next);
     if (!loaded.ok) {
       throw new Error(
@@ -336,27 +404,59 @@ export function createSpaceAuthoring({
           .join('; ')}`,
       );
     }
+    return {
+      snapshot: next,
+      placement: completedPlacement,
+      mintedRouteId,
+      nextRenderer: { kind: 'layout', layoutId },
+      ...(createdCardId !== undefined ? { createdCardId } : {}),
+    };
+  };
 
-    installing = true;
-    try {
-      // Submit first, and only then replace the authoritative placement. The
-      // submitted snapshot already carries `completedPlacement`, so nothing here
-      // reads the field — but a `submit` that throws must not leave the
-      // placement describing an Edit the session never took. That strand used to
-      // escape with the throw; the drain contains a queued failure now, so it
-      // would otherwise persist silently, and a created Card would sit in the
-      // placement while the Space has no such Card at all.
-      session.submit(next);
-      install(completedPlacement);
-      if (mintedRouteId !== null) navigation.activateRoute(mintedRouteId);
-      navigation.continueInRenderer({ kind: 'layout', layoutId });
-    } finally {
-      installing = false;
-    }
-    publish();
-    return createdCardId === undefined
+  /**
+   * Install a derived Edit: one fallible step, and then three that cannot fail.
+   *
+   * `session.submit` has to come first. Both Navigation calls resolve the Route
+   * and the Layout against `currentSpace()`, which reads the working snapshot
+   * `submit` installs synchronously — before it, neither exists yet and both
+   * would refuse. So the order is forced, and the useful consequence is that
+   * the only statement here that can throw is also the first: no later failure
+   * exists to invalidate an earlier success, and a `submit` that throws leaves
+   * the other three untouched rather than half-applied.
+   *
+   * That leaves exactly one failure shape — the session ahead of the placement
+   * and Navigation — and it is the recoverable one. The snapshot the session
+   * took already carries `completedPlacement` inside its Layout, so the local
+   * placement is merely stale and the next projection re-derives it; installing
+   * first would instead leave the placement describing an Edit the session
+   * never took, and for a created Card, a position for a Card that does not
+   * exist. That is the strand `b091623` inverted this order to close.
+   *
+   * The three statements below are total given the session honoured `submit`,
+   * which is its documented synchronous contract. Re-checking the Route and the
+   * Layout here against the snapshot that just passed domain intake would add a
+   * branch that cannot be taken, and this repo deletes those rather than keeps
+   * them.
+   */
+  const installCompletedEdit = (edit: CompletedEdit): void => {
+    installTogether(() => {
+      session.submit(edit.snapshot);
+      install(edit.placement);
+      if (edit.mintedRouteId !== null) navigation.activateRoute(edit.mintedRouteId);
+      navigation.continueInRenderer(edit.nextRenderer);
+    });
+  };
+
+  const performCompletion = (
+    completion: AuthoringCompletion,
+    completedPlacementInput: Placement | null,
+  ): AuthoringResult => {
+    const edit = deriveCompletedEdit(completion, completedPlacementInput);
+    if (edit === null) return { kind: 'no-edit' };
+    installCompletedEdit(edit);
+    return edit.createdCardId === undefined
       ? { kind: 'completed' }
-      : { kind: 'completed', createdCardId };
+      : { kind: 'completed', createdCardId: edit.createdCardId };
   };
 
   let completing = false;
@@ -437,16 +537,12 @@ export function createSpaceAuthoring({
     const resolved = resolveView(accepted.space, renderer);
     const acceptedPlacement =
       resolved.layout === null ? null : Placement.fromLayout(resolved.layout);
-    installing = true;
-    try {
+    installTogether(() => {
       session.acceptRemote();
       install(acceptedPlacement);
       navigation.openFresh(renderer);
       opening += 1;
-    } finally {
-      installing = false;
-    }
-    publish();
+    });
     return null;
   };
 

@@ -79,7 +79,9 @@ function reportRenderedPlacement(
   nodes: readonly CardFlowNode[],
   placed: readonly CardId[] = [],
 ): void {
-  const rendered = Placement.fromEntries(nodes.map((node) => [node.id, node.position]));
+  // A node id is the Card id it was projected from, widened to `string` by React
+  // Flow's `Node` type — the same erasure `consumeSettledMovedIds` repairs below.
+  const rendered = Placement.fromEntries(nodes.map((node) => [node.id as CardId, node.position]));
   authoring.installPlacement(Placement.next(authoring.authoredPlacement(), rendered, placed));
 }
 
@@ -101,8 +103,7 @@ function consumeSettledMovedIds(
   beforeById: ReadonlyMap<string, LayoutPoint>,
   afterById: ReadonlyMap<string, LayoutPoint>,
 ): CardId[] {
-  // A node id is the Card id it was projected from, widened to `string` by React
-  // Flow's `Node` type — the same erasure `Placement.fromEntries` documents.
+  // The same `Node.id` erasure `reportRenderedPlacement` repairs above.
   const movedIds: CardId[] = [];
   for (const change of settled) {
     const origin = dragOrigins.get(change.id) ?? beforeById.get(change.id);

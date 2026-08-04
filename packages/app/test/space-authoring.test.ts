@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { uuidSchema, type SpaceSnapshot } from '@project/core';
+import { uuidSchema, type RouteId, type SpaceSnapshot } from '@project/core';
 import { loadSpaceSnapshot, Placement } from '@project/graph';
 import {
   MemorySpaceBackend,
@@ -783,13 +783,13 @@ describe('Space Authoring', () => {
 
   /**
    * Containing a queued failure must not leave the placement describing an Edit
-   * the session never took. `performCompletion` submits before it installs, so a
-   * submit that throws leaves the placement untouched — survivable while the
-   * throw escaped to the caller, and silent now that the drain contains it.
+   * the session never took. `installCompletedEdit` submits before it installs,
+   * so a submit that throws leaves the placement untouched — survivable while
+   * the throw escaped to the caller, and silent now that the drain contains it.
    *
-   * A created Card is what makes the strand visible: only `performCompletion`
-   * adds it to the placement, so `authoredPlacement()` naming a Card the
-   * committed Space does not hold cannot come from anywhere else.
+   * A created Card is what makes the strand visible: only a completed Edit adds
+   * it to the placement, so `authoredPlacement()` naming a Card the committed
+   * Space does not hold cannot come from anywhere else.
    */
   it('keeps the placement level with the session when a queued submit fails', () => {
     vi.spyOn(crypto, 'randomUUID').mockReturnValue(
@@ -844,6 +844,129 @@ describe('Space Authoring', () => {
     const committed = session.getState().working;
     expect(committed.cards.map((card) => card.id)).toEqual([CARD_A, CARD_B]);
     expect([...(authoring.authoredPlacement()?.keys() ?? [])]).toEqual([CARD_A, CARD_B]);
+  });
+
+  /**
+   * The other half of a failing `submit`, and the one the fault injection above
+   * cannot reach: a submit that fails *after* the session installed and
+   * published its optimistic working Space. The session has taken the Edit by
+   * then, so Authoring may not go on answering with the Space before it.
+   *
+   * Nothing else can say so. The `installing` gate is up for the whole window,
+   * so the session's own notification reached no subscriber — Authoring's
+   * publication is the only one there is, and a completion that skips it leaves
+   * every subscriber reading the pre-Edit state until some unrelated
+   * notification happens to arrive.
+   */
+  it('publishes the Space the session already took when the completing submit fails', () => {
+    vi.spyOn(crypto, 'randomUUID').mockReturnValue(
+      LAYOUT_ID as ReturnType<typeof crypto.randomUUID>,
+    );
+    const loaded = { snapshot: automaticSnapshot, revision: 0n, exportedRevision: null };
+    const real = openSpaceSession(new MemorySpaceBackend([loaded]), loaded);
+    const session: SpaceSession = {
+      ...real,
+      submit: (snapshot) => {
+        real.submit(snapshot);
+        throw new Error('submit failed');
+      },
+    };
+    const currentSpace = () => {
+      const result = loadSpaceSnapshot(session.getState().working);
+      if (!result.ok) throw new Error(result.errors.map((error) => error.message).join('; '));
+      return result.space;
+    };
+    const navigation = createNavigation(currentSpace, { kind: 'view', view: 'graph' });
+    const authoring = createSpaceAuthoring({ session, navigation });
+    authoring.installPlacement(
+      Placement.fromEntries([
+        [CARD_A, { x: 10, y: 20 }],
+        [CARD_B, { x: 300, y: 40 }],
+      ]),
+    );
+    const published: number[] = [];
+    authoring.subscribe(() => {
+      published.push(authoring.getState().session.working.document.routes[0]?.edges.length ?? -1);
+    });
+
+    // Containment is the drain's job, not this function's: the Edit the caller
+    // made itself still fails in the caller's hands.
+    expect(() => authoring.complete({ kind: 'connected-cards', from: CARD_B, to: CARD_A })).toThrow(
+      'submit failed',
+    );
+
+    expect(session.getState().working.document.routes[0]?.edges).toEqual([
+      { from: CARD_A, to: CARD_B },
+      { from: CARD_B, to: CARD_A },
+    ]);
+    expect(authoring.getState().session.working.document.routes[0]?.edges).toHaveLength(2);
+    expect(published).toEqual([2]);
+  });
+
+  /**
+   * The window's other collaborator. Navigation is written last and in two
+   * calls, so a throw between them leaves it half-applied — the minted Route
+   * activated, the Layout that Edit created not yet adopted — and the
+   * publication is the only way anything finds out.
+   *
+   * The fault is injected because the real Navigation has no reachable throw
+   * path here: both calls resolve against the snapshot `submit` installed a line
+   * earlier, and that snapshot passed domain intake before the window opened.
+   * What is pinned is that the guarantee does not depend on that argument
+   * staying true.
+   */
+  it('publishes what the collaborators hold when adopting the new renderer throws', () => {
+    vi.spyOn(crypto, 'randomUUID').mockReturnValue(
+      MINTED_ROUTE_ID as ReturnType<typeof crypto.randomUUID>,
+    );
+    const routeLess: SpaceSnapshot = {
+      id: SPACE_ID,
+      document: {
+        version: 2,
+        title: 'New space',
+        routes: [],
+        layouts: [
+          {
+            id: LAYOUT_ID,
+            title: 'Layout 1',
+            kind: 'positioned',
+            positions: { [CARD_A]: { x: 10, y: 20 } },
+          },
+        ],
+        defaultView: LAYOUT_ID,
+      },
+      cards: [{ id: CARD_A, document: { title: 'Card 1', kind: 'markdown', body: '' } }],
+    };
+    const loaded = { snapshot: routeLess, revision: 0n, exportedRevision: null };
+    const session = openSpaceSession(new MemorySpaceBackend([loaded]), loaded);
+    const currentSpace = () => {
+      const result = loadSpaceSnapshot(session.getState().working);
+      if (!result.ok) throw new Error(result.errors.map((error) => error.message).join('; '));
+      return result.space;
+    };
+    const real = createNavigation(currentSpace, { kind: 'layout', layoutId: LAYOUT_ID });
+    const navigation: Navigation = {
+      ...real,
+      continueInRenderer: () => {
+        throw new Error('renderer failed');
+      },
+    };
+    const authoring = createSpaceAuthoring({
+      session,
+      navigation,
+      initialPlacement: Placement.fromEntries([[CARD_A, { x: 10, y: 20 }]]),
+    });
+    const published: (RouteId | null)[] = [];
+    authoring.subscribe(() => published.push(authoring.getState().navigation.activeRouteId));
+
+    expect(() => authoring.complete({ kind: 'connected-cards', from: CARD_A, to: CARD_A })).toThrow(
+      'renderer failed',
+    );
+
+    expect(session.getState().working.document.routes).toHaveLength(1);
+    expect(real.getState().activeRouteId).toBe(MINTED_ROUTE_ID);
+    expect(authoring.getState().session.working.document.routes).toHaveLength(1);
+    expect(published).toEqual([MINTED_ROUTE_ID]);
   });
 
   it('reports the completions a failed drain discards', () => {
@@ -1201,5 +1324,124 @@ describe('Space Authoring', () => {
     expect(authoring.getState().opening).toBe(before.opening);
     expect(authoring.getState().session).toEqual(before.session);
     expect(authoring.getState().session.persistence.kind).toBe('conflicted');
+  });
+
+  /**
+   * Nesting is the case a boolean gate cannot carry. Accepting notifies from
+   * inside its own window — `session.acceptRemote()` publishes before the
+   * placement, Navigation and `opening` have moved — and an observer is allowed
+   * to complete an Edit from there, exactly as one may submit from a session
+   * notification. That inner completion opens the gate a second time, and a
+   * boolean drops it on the way out: Navigation's own notification then
+   * publishes the accepted Space while `opening` still names the one it
+   * replaced, which is the read `opening` exists to make impossible.
+   */
+  it('keeps the gate closed when accepting re-enters through a completed Edit', async () => {
+    const remote: SpaceSnapshot = {
+      ...positionedSnapshot,
+      document: { ...positionedSnapshot.document, title: 'Stored' },
+    };
+    const backend = new MemorySpaceBackend([
+      { snapshot: remote, revision: 4n, exportedRevision: null },
+    ]);
+    const { authoring, session } = attachAuthoring(
+      backend,
+      { snapshot: positionedSnapshot, revision: 3n, exportedRevision: null },
+      { kind: 'layout', layoutId: LAYOUT_ID },
+    );
+    authoring.installPlacement(
+      Placement.fromEntries([
+        [CARD_A, { x: 500, y: 600 }],
+        [CARD_B, { x: 300, y: 40 }],
+      ]),
+    );
+    authoring.complete({ kind: 'settled-card-movement' });
+    await vi.waitFor(() =>
+      expect(authoring.getState().session.persistence.kind).toBe('conflicted'),
+    );
+    const openingBefore = authoring.getState().opening;
+
+    let reentered = false;
+    session.subscribe(() => {
+      if (reentered) return;
+      reentered = true;
+      authoring.complete({ kind: 'settled-card-movement' });
+    });
+    const published: { title: string; opening: number }[] = [];
+    authoring.subscribe(() =>
+      published.push({
+        title: authoring.getState().session.working.document.title,
+        opening: authoring.getState().opening,
+      }),
+    );
+
+    expect(authoring.acceptStoredSpace()).toBeNull();
+
+    expect(reentered).toBe(true);
+    // One publication, after the whole sequence — never the accepted Space
+    // carrying the `opening` of the Space it replaced.
+    expect(published).toEqual([{ title: 'Stored', opening: openingBefore + 1 }]);
+  });
+
+  /**
+   * Accepting updates the same collaborators behind the same gate, so it has the
+   * same obligation: a throw part-way through must not take the publication with
+   * it. Reporting a conflict that the session has already resolved away — and
+   * going on reporting it until something unrelated publishes — leaves the
+   * author a Resolve control over work that is no longer theirs to resolve.
+   */
+  it('publishes the accepted Space when the accepting session throws', async () => {
+    const remote: SpaceSnapshot = {
+      ...positionedSnapshot,
+      document: { ...positionedSnapshot.document, title: 'Stored' },
+    };
+    const backend = new MemorySpaceBackend([
+      { snapshot: remote, revision: 4n, exportedRevision: null },
+    ]);
+    const real = openSpaceSession(backend, {
+      snapshot: positionedSnapshot,
+      revision: 3n,
+      exportedRevision: null,
+    });
+    const session: SpaceSession = {
+      ...real,
+      acceptRemote: () => {
+        real.acceptRemote();
+        throw new Error('accept failed');
+      },
+    };
+    const currentSpace = () => {
+      const result = loadSpaceSnapshot(session.getState().working);
+      if (!result.ok) throw new Error(result.errors.map((error) => error.message).join('; '));
+      return result.space;
+    };
+    const navigation = createNavigation(currentSpace, { kind: 'layout', layoutId: LAYOUT_ID });
+    const authoring = createSpaceAuthoring({
+      session,
+      navigation,
+      initialPlacement: Placement.fromEntries([
+        [CARD_A, { x: 10, y: 20 }],
+        [CARD_B, { x: 300, y: 40 }],
+      ]),
+    });
+    authoring.installPlacement(
+      Placement.fromEntries([
+        [CARD_A, { x: 500, y: 600 }],
+        [CARD_B, { x: 300, y: 40 }],
+      ]),
+    );
+    authoring.complete({ kind: 'settled-card-movement' });
+    await vi.waitFor(() =>
+      expect(authoring.getState().session.persistence.kind).toBe('conflicted'),
+    );
+    const published: string[] = [];
+    authoring.subscribe(() => published.push(authoring.getState().session.persistence.kind));
+
+    expect(() => authoring.acceptStoredSpace()).toThrow('accept failed');
+
+    expect(session.getState().persistence.kind).toBe('settled');
+    expect(authoring.getState().session.persistence.kind).toBe('settled');
+    expect(authoring.getState().session.working.document.title).toBe('Stored');
+    expect(published).toEqual(['settled']);
   });
 });
