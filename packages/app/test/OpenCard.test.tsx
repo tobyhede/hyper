@@ -4,6 +4,7 @@ import { uuidSchema } from '@project/core';
 import { OpenCard } from '../src/components/OpenCard';
 
 const CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
+const ALIAS_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
 
 const markdown = (over: { description?: string; body?: string } = {}) => ({
   id: CARD_ID,
@@ -14,6 +15,39 @@ const markdown = (over: { description?: string; body?: string } = {}) => ({
 });
 
 describe('the opened Card', () => {
+  it('edits resolved Markdown through an Alias while keeping the delegation visible', () => {
+    const onComplete = vi.fn();
+    render(
+      <OpenCard
+        opened={{ id: ALIAS_ID, title: 'A again', kind: 'alias', target: CARD_ID }}
+        content={markdown({ description: 'Shared caption' })}
+        onComplete={onComplete}
+        onCancel={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText('Opened through A again')).toBeVisible();
+    expect(screen.getByText('Editing content on A')).toBeVisible();
+    expect(screen.queryByRole('textbox', { name: 'Title' })).not.toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: 'Description' })).toHaveValue('Shared caption');
+    expect(screen.getByRole('textbox', { name: 'Markdown source' })).toHaveValue('**A** source');
+    expect(screen.queryByLabelText(/target/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/kind/i)).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByRole('textbox', { name: 'Markdown source' }), {
+      target: { value: 'Shared source rewritten' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+
+    expect(onComplete).toHaveBeenCalledWith({
+      id: CARD_ID,
+      title: 'A',
+      description: 'Shared caption',
+      kind: 'markdown',
+      body: 'Shared source rewritten',
+    });
+  });
+
   /**
    * There was a reading state in front of this, and it drew the same bytes in
    * the same order — a `<pre>` of source against a `<textarea>` of source. The
@@ -22,6 +56,7 @@ describe('the opened Card', () => {
   it('is editable on arrival, with no action to begin editing', () => {
     render(
       <OpenCard
+        opened={markdown({ description: 'Where every route begins' })}
         content={markdown({ description: 'Where every route begins' })}
         onComplete={vi.fn()}
         onCancel={vi.fn()}
@@ -37,7 +72,9 @@ describe('the opened Card', () => {
   });
 
   it('opens with the title focused, which is what an author names first', () => {
-    render(<OpenCard content={markdown()} onComplete={vi.fn()} onCancel={vi.fn()} />);
+    render(
+      <OpenCard opened={markdown()} content={markdown()} onComplete={vi.fn()} onCancel={vi.fn()} />,
+    );
 
     expect(screen.getByRole('textbox', { name: 'Title' })).toHaveFocus();
   });
@@ -60,12 +97,16 @@ describe('the opened Card', () => {
       kind: 'markdown' as const,
       body: '**B** source',
     };
-    const view = render(<OpenCard content={markdown()} onComplete={vi.fn()} onCancel={vi.fn()} />);
+    const view = render(
+      <OpenCard opened={markdown()} content={markdown()} onComplete={vi.fn()} onCancel={vi.fn()} />,
+    );
     fireEvent.change(screen.getByRole('textbox', { name: 'Markdown source' }), {
       target: { value: 'A rewritten' },
     });
 
-    view.rerender(<OpenCard content={other} onComplete={vi.fn()} onCancel={vi.fn()} />);
+    view.rerender(
+      <OpenCard opened={other} content={other} onComplete={vi.fn()} onCancel={vi.fn()} />,
+    );
 
     expect(screen.getByRole('textbox', { name: 'Title' })).toHaveValue('B');
     expect(screen.getByRole('textbox', { name: 'Markdown source' })).toHaveValue('**B** source');
@@ -74,7 +115,14 @@ describe('the opened Card', () => {
   it('completes one whole Card from all three fields', () => {
     const onComplete = vi.fn();
     const onCancel = vi.fn();
-    render(<OpenCard content={markdown()} onComplete={onComplete} onCancel={onCancel} />);
+    render(
+      <OpenCard
+        opened={markdown()}
+        content={markdown()}
+        onComplete={onComplete}
+        onCancel={onCancel}
+      />,
+    );
 
     fireEvent.change(screen.getByRole('textbox', { name: 'Title' }), {
       target: { value: 'Renamed A' },
@@ -104,7 +152,14 @@ describe('the opened Card', () => {
    */
   it('refuses a blank title and keeps it local', () => {
     const onComplete = vi.fn();
-    render(<OpenCard content={markdown()} onComplete={onComplete} onCancel={vi.fn()} />);
+    render(
+      <OpenCard
+        opened={markdown()}
+        content={markdown()}
+        onComplete={onComplete}
+        onCancel={vi.fn()}
+      />,
+    );
     const title = screen.getByRole('textbox', { name: 'Title' });
 
     fireEvent.change(title, { target: { value: '   ' } });
@@ -120,6 +175,7 @@ describe('the opened Card', () => {
     const onComplete = vi.fn();
     render(
       <OpenCard
+        opened={markdown({ body: ' spaced body ' })}
         content={markdown({ body: ' spaced body ' })}
         onComplete={onComplete}
         onCancel={vi.fn()}
@@ -147,6 +203,7 @@ describe('the opened Card', () => {
     const onComplete = vi.fn();
     render(
       <OpenCard
+        opened={markdown({ description: 'Original' })}
         content={markdown({ description: 'Original' })}
         onComplete={onComplete}
         onCancel={vi.fn()}
@@ -168,7 +225,14 @@ describe('the opened Card', () => {
 
   it('links a description error to its field and completes once it is valid', () => {
     const onComplete = vi.fn();
-    render(<OpenCard content={markdown()} onComplete={onComplete} onCancel={vi.fn()} />);
+    render(
+      <OpenCard
+        opened={markdown()}
+        content={markdown()}
+        onComplete={onComplete}
+        onCancel={vi.fn()}
+      />,
+    );
     const description = screen.getByRole('textbox', { name: 'Description' });
 
     fireEvent.change(description, { target: { value: 'x'.repeat(121) } });
@@ -185,7 +249,14 @@ describe('the opened Card', () => {
   it('cancels without completing', () => {
     const onComplete = vi.fn();
     const onCancel = vi.fn();
-    render(<OpenCard content={markdown()} onComplete={onComplete} onCancel={onCancel} />);
+    render(
+      <OpenCard
+        opened={markdown()}
+        content={markdown()}
+        onComplete={onComplete}
+        onCancel={onCancel}
+      />,
+    );
 
     fireEvent.change(screen.getByRole('textbox', { name: 'Markdown source' }), {
       target: { value: 'abandoned' },
@@ -200,7 +271,14 @@ describe('the opened Card', () => {
     const onCancel = vi.fn();
     const outside = vi.fn();
     window.addEventListener('keydown', outside);
-    render(<OpenCard content={markdown()} onComplete={vi.fn()} onCancel={onCancel} />);
+    render(
+      <OpenCard
+        opened={markdown()}
+        content={markdown()}
+        onComplete={vi.fn()}
+        onCancel={onCancel}
+      />,
+    );
 
     fireEvent.keyDown(screen.getByRole('textbox', { name: 'Markdown source' }), { key: 'Escape' });
 

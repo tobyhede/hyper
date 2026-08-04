@@ -176,6 +176,49 @@ test('opened Markdown editing persists source and description without moving Car
   );
 });
 
+test('editing through an Alias updates its target and survives reload', async ({ page }) => {
+  await page.goto('/');
+  const target = nodeByTitle(page, 'A').first();
+  const alias = nodeByTitle(page, 'A′').first();
+  await expect(alias).toBeVisible();
+  await settled(page);
+  const before = await allPositions(page);
+
+  await openCard(alias, 'A′');
+  await expect(page.getByText('Opened through A′')).toBeVisible();
+  await expect(page.getByText('Editing content on A')).toBeVisible();
+  await expect(page.getByRole('textbox', { name: 'Title' })).toHaveCount(0);
+  await page.getByRole('textbox', { name: 'Description' }).fill('Shared through every occurrence');
+  await page.getByRole('textbox', { name: 'Markdown source' }).fill('One shared source');
+  await page.getByRole('button', { name: 'Done' }).click();
+
+  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
+  await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
+  expect(await allPositions(page)).toEqual(before);
+  await expect(nodeByTitle(page, 'A′').first()).toBeVisible();
+
+  await openCard(target, 'A');
+  await expect(page.getByRole('textbox', { name: 'Description' })).toHaveValue(
+    'Shared through every occurrence',
+  );
+  await expect(page.getByRole('textbox', { name: 'Markdown source' })).toHaveValue(
+    'One shared source',
+  );
+  await page.getByRole('button', { name: 'Cancel' }).click();
+
+  await openCard(nodeByTitle(page, 'A′').first(), 'A′');
+  await expect(page.getByRole('textbox', { name: 'Markdown source' })).toHaveValue(
+    'One shared source',
+  );
+  await page.getByRole('button', { name: 'Cancel' }).click();
+
+  await page.reload();
+  await openCard(nodeByTitle(page, 'A′').first(), 'A′');
+  await expect(page.getByRole('textbox', { name: 'Markdown source' })).toHaveValue(
+    'One shared source',
+  );
+});
+
 /**
  * Dragging a card writes its placement into the Layout.
  *

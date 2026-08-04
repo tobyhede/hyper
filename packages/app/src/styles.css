@@ -577,8 +577,8 @@ body {
 }
 
 /* ---- Opened card ---- */
-/* A card opened for reading. The graph shows titles (ADR 0006); this is where a
-   card's content is actually read. */
+/* A card opened for authoring. The graph shows titles (ADR 0006); this is where
+   a card's content is edited (ADR 0037). */
 .open-card {
   position: absolute;
   inset: 0;
@@ -618,6 +618,19 @@ body {
   min-height: 0;
   flex-direction: column;
   gap: 0.75rem;
+}
+
+.open-card__delegation {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.open-card__delegation span:last-child {
+  color: var(--text);
+  font-weight: 600;
 }
 
 .open-card__field {

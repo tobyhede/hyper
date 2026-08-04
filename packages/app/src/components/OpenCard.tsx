@@ -7,7 +7,7 @@ import {
   type FormEvent,
   type KeyboardEvent as ReactKeyboardEvent,
 } from 'react';
-import { markdownCardSchema } from '@project/core';
+import { markdownCardSchema, type Card } from '@project/core';
 import type { ResolvedContentCard } from '@project/graph';
 import { Button } from '@project/ui';
 
@@ -29,6 +29,7 @@ const focusableWithin = (root: HTMLElement): readonly HTMLElement[] => [
 
 type ContentEditorProps<Card extends ResolvedContentCard> = {
   readonly card: Card;
+  readonly titleEditable: boolean;
   readonly onComplete: (card: Card) => void;
   readonly onCancel: () => void;
 };
@@ -41,6 +42,7 @@ type ContentEditorRegistry = {
 
 function MarkdownCardEditor({
   card,
+  titleEditable,
   onComplete,
   onCancel,
 }: ContentEditorProps<Extract<ResolvedContentCard, { kind: 'markdown' }>>) {
@@ -106,23 +108,27 @@ function MarkdownCardEditor({
         onCancel();
       }}
     >
-      <label className="open-card__field">
-        <span>Title</span>
-        <input
-          className="open-card__title-input"
-          aria-invalid={titleError !== null}
-          aria-describedby={titleError === null ? undefined : 'open-card-title-error'}
-          value={title}
-          onChange={(event) => {
-            setTitle(event.currentTarget.value);
-            setTitleError(null);
-          }}
-        />
-      </label>
-      {titleError !== null && (
-        <span id="open-card-title-error" role="alert" className="open-card__field-error">
-          {titleError}
-        </span>
+      {titleEditable && (
+        <>
+          <label className="open-card__field">
+            <span>Title</span>
+            <input
+              className="open-card__title-input"
+              aria-invalid={titleError !== null}
+              aria-describedby={titleError === null ? undefined : 'open-card-title-error'}
+              value={title}
+              onChange={(event) => {
+                setTitle(event.currentTarget.value);
+                setTitleError(null);
+              }}
+            />
+          </label>
+          {titleError !== null && (
+            <span id="open-card-title-error" role="alert" className="open-card__field-error">
+              {titleError}
+            </span>
+          )}
+        </>
       )}
       <label className="open-card__field">
         <span>Description</span>
@@ -164,19 +170,24 @@ const CONTENT_EDITORS = {
 
 function ResolvedContentEditor({
   card,
+  titleEditable,
   onComplete,
   onCancel,
 }: ContentEditorProps<ResolvedContentCard>) {
   const Editor = CONTENT_EDITORS[card.kind] as ComponentType<
     ContentEditorProps<ResolvedContentCard>
   >;
-  return <Editor card={card} onComplete={onComplete} onCancel={onCancel} />;
+  return (
+    <Editor card={card} titleEditable={titleEditable} onComplete={onComplete} onCancel={onCancel} />
+  );
 }
 
 export interface OpenCardProps {
+  /** The authored Card whose occurrence was opened; an Alias remains intact here. */
+  opened: Card;
   content: ResolvedContentCard;
-  /** Complete one whole Card. Absent only if the Card owns nothing to author. */
-  onComplete?: (card: ResolvedContentCard) => void;
+  /** Complete the one whole Card that owns the resolved content. */
+  onComplete: (card: ResolvedContentCard) => void;
   /** Close without completing. */
   onCancel: () => void;
 }
@@ -199,12 +210,13 @@ export interface OpenCardProps {
  * Markdown renderer so a card could not read one way and present another, and
  * that half holds: presenting remains the one place a card is drawn rendered.
  *
- * The title is authored here *and* on the graph, which is safe because only one
- * is ever on screen: title editing is withdrawn while a card is open. Both write
- * the same card through Space Authoring.
+ * A directly opened Card authors its title here and on the graph, with only one
+ * surface visible at a time. An Alias keeps its own title on the graph and this
+ * surface identifies, but does not rename, the Card whose content it delegates.
  */
-export function OpenCard({ content, onComplete, onCancel }: OpenCardProps) {
+export function OpenCard({ opened, content, onComplete, onCancel }: OpenCardProps) {
   const panel = useRef<HTMLDivElement>(null);
+  const delegated = opened.kind === 'alias';
 
   /**
    * The pane takes focus while it is open. Where focus goes when it *closes* is
@@ -269,22 +281,25 @@ export function OpenCard({ content, onComplete, onCancel }: OpenCardProps) {
         aria-label={content.title}
         onKeyDown={containTab}
       >
-        {onComplete === undefined ? null : (
-          // Keyed by Card, because the draft is seeded from `card` once and then
-          // owned by the editor. Without this, opening a second Card without
-          // closing the first reuses the same element in the same position: the
-          // draft survives while `card.id` changes underneath it, and `Done`
-          // writes the first Card's title and body onto the second.
-          <ResolvedContentEditor
-            key={content.id}
-            card={content}
-            onComplete={(completed) => {
-              onComplete(completed);
-              onCancel();
-            }}
-            onCancel={onCancel}
-          />
+        {delegated && (
+          <div className="open-card__delegation">
+            <span>Opened through {opened.title}</span>
+            <span>Editing content on {content.title}</span>
+          </div>
         )}
+        {/* Keyed by opened occurrence and content owner, because the draft is
+            seeded once and then owned by the editor. Reusing one would carry a
+            previous Card's draft under the next Card's identity. */}
+        <ResolvedContentEditor
+          key={`${opened.id}:${content.id}`}
+          card={content}
+          titleEditable={!delegated}
+          onComplete={(completed) => {
+            onComplete(completed);
+            onCancel();
+          }}
+          onCancel={onCancel}
+        />
       </div>
     </div>
   );
