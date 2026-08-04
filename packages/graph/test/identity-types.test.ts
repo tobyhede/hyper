@@ -1,7 +1,7 @@
 import { describe, expectTypeOf, it } from 'vitest';
 import type { CardId, RouteId } from '@project/core';
 import {
-  layoutPositions,
+  Placement,
   positionedStrategy,
   type GraphEdge,
   type LayoutCard,
@@ -19,8 +19,10 @@ describe('graph identity types', () => {
     expectTypeOf<LayoutCard['id']>().toEqualTypeOf<CardId>();
     expectTypeOf<LayoutEdge['source']>().toEqualTypeOf<CardId>();
     expectTypeOf<LayoutEdge['target']>().toEqualTypeOf<CardId>();
-    expectTypeOf(layoutPositions).returns.toEqualTypeOf<ReadonlyMap<CardId, LayoutPoint>>();
-    expectTypeOf(positionedStrategy).parameter(0).toEqualTypeOf<ReadonlyMap<CardId, LayoutPoint>>();
+    expectTypeOf(Placement.fromLayoutGraph).returns.toEqualTypeOf<Placement>();
+    expectTypeOf(positionedStrategy).parameter(0).toEqualTypeOf<Placement>();
+    // A Placement is a readable card→position map; only construction is closed.
+    expectTypeOf<Placement>().toExtend<ReadonlyMap<CardId, LayoutPoint>>();
 
     // @ts-expect-error A plain string has not crossed the UUID validation seam.
     const cardId: LayoutCard['id'] = 'card';
@@ -28,6 +30,8 @@ describe('graph identity types', () => {
     const routeId: GraphEdge['routeId'] = 'route';
     // @ts-expect-error Plain strings cannot key a graph-owned position map.
     positionedStrategy(new Map<string, LayoutPoint>());
+    // @ts-expect-error A Placement is built through the module, never by hand.
+    positionedStrategy(new Map<CardId, LayoutPoint>());
     void cardId;
     void routeId;
   });

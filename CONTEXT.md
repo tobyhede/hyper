@@ -61,7 +61,15 @@ A card-to-position map the author wrote — where a space's cards sit. It belong
 A Layout is authored by definition; the computed kind is not a layout at all but an automatic **layout strategy** (ADR 0014). A space with no Layout is rendered through an **Algorithmic View** the application supplies, and **editing turns that into a Layout**: the card positions already on screen are copied into the new Layout, so nothing moves at the moment it happens.
 
 A layout also names which routes it shows — a filter, absent meaning all of them — and may name which of those opens active.
-_Avoid_: view (a View is application-supplied and carries no authored positions), placement, diagram, manual and custom and free-form (a layout is authored, so the qualifiers say nothing).
+_Avoid_: view (a View is application-supplied and carries no authored positions), placement as a synonym (a Layout *holds* a placement, and adds an identity, a title and its route filter), diagram, manual and custom and free-form (a layout is authored, so the qualifiers say nothing).
+
+**Placement**:
+The card-to-position map itself — which cards sit where, and nothing more. A **Layout** is the authored thing a space holds; the placement is the map inside it. It is also what an automatic **layout strategy** computes and what the positioned strategy reads, and it is the same value in both directions: editing an Algorithmic View copies the computed placement into the new Layout, which is the crossing ADR 0025 describes.
+
+A placement is **sparse**, and omission is meaningful: a card the map leaves out is *unplaced*, and whoever renders it places that card itself. Omission is never the origin, and a position a renderer supplied for an unplaced card is not a placement the author made — promoting one to authored is an Edit, not a side effect of drawing.
+
+This is not the placement layer ADR 0004 rejected. That was an entity sitting *between* a card and its position, which edges and routes referenced instead of the card, so one card could occupy two positions. A placement is keyed by card and holds at most one position for each.
+_Avoid_: arrangement (ADR 0005 — applying a strategy produces no separate entity), layer.
 
 **Layout strategy**:
 A named strategy for arranging a space's cards — how they are organised and positioned. Which cards it arranges is the view's choice, not the strategy's.

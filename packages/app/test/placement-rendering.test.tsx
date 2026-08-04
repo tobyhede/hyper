@@ -1,7 +1,7 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { uuidSchema } from '@project/core';
-import { gridStrategy, type LayoutGraph, type LayoutStrategy } from '@project/graph';
+import { gridStrategy, Placement, type LayoutGraph, type LayoutStrategy } from '@project/graph';
 import { canvasContent, usePlacementRendering } from '../src/placement-rendering';
 
 const CARD_A = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
@@ -35,7 +35,7 @@ describe('usePlacementRendering', () => {
       automaticCalls += 1;
       return new Promise(() => undefined);
     };
-    const authoredPositions = new Map([[CARD_A, { x: 80, y: 120 }]]);
+    const authoredPositions = Placement.fromEntries([[CARD_A, { x: 80, y: 120 }]]);
     const { result } = renderHook(() =>
       usePlacementRendering(graph, neverResolves, authoredPositions),
     );
@@ -52,14 +52,6 @@ describe('usePlacementRendering', () => {
         edges: [],
       },
     });
-  });
-
-  it('reports an unusable authored placement as a visible failure rather than throwing', async () => {
-    const strategy = gridStrategy();
-    const authoredPositions = new Map([['not-a-card-id', { x: 80, y: 120 }]]);
-    const { result } = renderHook(() => usePlacementRendering(graph, strategy, authoredPositions));
-
-    await waitFor(() => expect(result.current.kind).toBe('failed'));
   });
 
   it('makes the previous placement unavailable while its replacement is pending', async () => {

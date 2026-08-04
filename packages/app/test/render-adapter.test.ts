@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Position, type Edge } from '@xyflow/react';
 import { uuidSchema, type SpaceSnapshot } from '@project/core';
-import { loadSpaceSnapshot, type LayoutPoint } from '@project/graph';
+import { loadSpaceSnapshot, Placement, type LayoutPoint } from '@project/graph';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
 import type { CardFlowNode } from '@project/react-flow-adapter';
 import { createNavigation } from '../src/navigation';
@@ -89,7 +89,7 @@ function adapter(): RenderAdapter {
 function sessionBackedAdapter(
   snapshot: SpaceSnapshot,
   renderer: RendererSelection,
-  initialPlacement?: ReadonlyMap<string, LayoutPoint>,
+  initialPlacement?: Placement,
   /** A newer stored state, so the first commit conflicts rather than settling. */
   stored?: SpaceSnapshot,
 ) {
@@ -154,7 +154,7 @@ function sparsePositionedAdapter() {
   return sessionBackedAdapter(
     snapshot,
     { kind: 'layout', layoutId: LAYOUT_ID },
-    new Map([[CARD_A, { x: 10, y: 20 }]]),
+    Placement.fromEntries([[CARD_A, { x: 10, y: 20 }]]),
   );
 }
 
@@ -197,7 +197,7 @@ function storedSpaceAdapter() {
   return sessionBackedAdapter(
     snapshot,
     { kind: 'layout', layoutId: LAYOUT_ID },
-    new Map([
+    Placement.fromEntries([
       [CARD_A, { x: 10, y: 20 }],
       [CARD_B, { x: 300, y: 20 }],
     ]),
@@ -295,7 +295,7 @@ describe('render adapter', () => {
     expect(spy.installs).toHaveLength(1);
     expect(spy.installs[0]?.nodesAtCall?.map((entry) => entry.id)).toEqual([CARD_A, CARD_B]);
     expect(spy.installs[0]?.placement).toEqual(
-      new Map([
+      Placement.fromEntries([
         [CARD_A, { x: 10, y: 20 }],
         [CARD_B, { x: 300, y: 20 }],
       ]),
@@ -439,7 +439,9 @@ describe('render adapter', () => {
     store.getState().syncProjection([node(CARD_A, 0, 0)], []);
 
     expect(store.getState().projection?.nodes[0]?.position).toEqual({ x: 111, y: 222 });
-    expect(spy.installs.at(-1)?.placement).toEqual(new Map([[CARD_A, { x: 111, y: 222 }]]));
+    expect(spy.installs.at(-1)?.placement).toEqual(
+      Placement.fromEntries([[CARD_A, { x: 111, y: 222 }]]),
+    );
   });
 
   it('completes no Edit for a drag that returns to where it began', () => {
