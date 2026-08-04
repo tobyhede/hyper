@@ -57,7 +57,7 @@ function overlaps(a: LayoutCard, b: LayoutCard): boolean {
 
 describe('positionedStrategy', () => {
   it('satisfies the uniformly-async LayoutStrategy contract', () => {
-    expect(positionedStrategy(Placement.empty)(graph)).toBeInstanceOf(Promise);
+    expect(positionedStrategy(Placement.empty())(graph)).toBeInstanceOf(Promise);
   });
 
   it('puts every card exactly where the map says', async () => {
@@ -90,7 +90,7 @@ describe('positionedStrategy', () => {
   });
 
   it('degrades to a grid at the origin when the map is empty', async () => {
-    const laid = await positionedStrategy(Placement.empty)(graph);
+    const laid = await positionedStrategy(Placement.empty())(graph);
     expect(laid.cards.map((c) => [c.x, c.y])).toEqual([
       [0, 0],
       [180, 0],

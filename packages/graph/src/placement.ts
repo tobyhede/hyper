@@ -1,6 +1,9 @@
 import type { CardId, Layout } from '@project/core';
 import type { LayoutGraph, LayoutPoint } from './layout';
 
+/** The brand's carrier. See `Placement` below for what the type means. */
+declare const PLACEMENT: unique symbol;
+
 /**
  * A **Placement** is the card→position map itself: which cards sit where, and
  * nothing more. A `Layout` is the authored thing a Space holds; the placement is
@@ -32,9 +35,15 @@ import type { LayoutGraph, LayoutPoint } from './layout';
  * Layout deliberately omitted. Routing construction through `fromEntries` and
  * merging through `next` is what makes that unrepresentable rather than a rule
  * each new caller has to remember.
+ *
+ * ## Every value here is its caller's alone
+ *
+ * `SpaceAuthoring.install` retains the Placement it is handed rather than
+ * copying it, so no member of this module may mutate an argument or hand back a
+ * value another caller also holds — `empty` is a function for that reason, and
+ * the points are copied on the way in. Reading is closed too: nothing outside
+ * this file can construct one, so this invariant only has to hold here.
  */
-declare const PLACEMENT: unique symbol;
-
 export type Placement = ReadonlyMap<CardId, LayoutPoint> & {
   readonly [PLACEMENT]: true;
 };
@@ -133,7 +142,8 @@ function equals(a: Placement | null, b: Placement | null): boolean {
  *
  * Returns `authored` itself when nothing changes, so an unchanged placement
  * keeps its identity and a settled graph is not re-arranged by the projection
- * that reports it.
+ * that reports it. A report that names no card is the common one — every
+ * projection sync makes one — and answers without walking anything.
  */
 function next(
   authored: Placement | null,
@@ -141,6 +151,7 @@ function next(
   placed: readonly CardId[],
 ): Placement {
   if (authored === null) return rendered;
+  if (placed.length === 0) return authored;
 
   const merged = new Map<CardId, LayoutPoint>(authored);
   for (const cardId of placed) {
@@ -170,8 +181,12 @@ function toPositions(placement: Placement): Record<CardId, LayoutPoint> {
   return Object.fromEntries([...placement].map(([cardId, at]) => [cardId, point(at)]));
 }
 
-/** Empty: a Layout that authors no card yet. Distinct from having no Layout. */
-const empty: Placement = brand(new Map());
+/**
+ * Empty: a Layout that authors no card yet. Distinct from having no Layout.
+ *
+ * A function rather than a constant so no two callers are handed the same map.
+ */
+const empty = (): Placement => brand(new Map());
 
 export const Placement = {
   empty,

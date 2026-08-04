@@ -174,6 +174,50 @@ describe('Placement.place', () => {
   });
 });
 
+describe('Placement.empty', () => {
+  it('hands each caller its own map rather than one shared instance', () => {
+    // Space Authoring installs the Placement it is handed without copying it, so
+    // every constructor has to answer with a map only its caller holds. A shared
+    // instance is the one way a later mutating helper could reach an authored
+    // placement some other holder is still reading.
+    expect(Placement.empty()).not.toBe(Placement.empty());
+    expect(Placement.empty().size).toBe(0);
+  });
+});
+
+describe('Placement immutability', () => {
+  it('leaves the placements it was given alone', () => {
+    // Same reason: nothing may write through to an argument, because the caller
+    // that installed it is still holding it.
+    const authored = at({ '00000000-0000-4000-8000-000000000002': [10, 20] });
+    const rendered = at({
+      '00000000-0000-4000-8000-000000000002': [90, 90],
+      '00000000-0000-4000-8000-000000000003': [500, 60],
+    });
+
+    Placement.next(authored, rendered, [CARD_A, CARD_B]);
+    Placement.place(authored, CARD_C, { x: 1, y: 2 });
+
+    expect(asObject(authored)).toEqual({ [CARD_A]: { x: 10, y: 20 } });
+    expect(asObject(rendered)).toEqual({
+      [CARD_A]: { x: 90, y: 90 },
+      [CARD_B]: { x: 500, y: 60 },
+    });
+  });
+
+  it('copies the points it is handed instead of aliasing them', () => {
+    // `fromEntries` is built from React Flow's live `node.position` objects. A
+    // Placement holding those would follow the next drag frame, which is exactly
+    // the authored-from-a-report mistake this module exists to prevent.
+    const live = { x: 10, y: 20 };
+    const placement = Placement.fromEntries([[CARD_A, live]]);
+
+    live.x = 999;
+
+    expect(placement.get(CARD_A)).toEqual({ x: 10, y: 20 });
+  });
+});
+
 describe('Placement.equals', () => {
   it('answers on value, not identity', () => {
     expect(
@@ -186,7 +230,7 @@ describe('Placement.equals', () => {
 
   it('separates null from empty', () => {
     // No Layout selected at all, versus a Layout that authors nothing.
-    expect(Placement.equals(null, Placement.empty)).toBe(false);
+    expect(Placement.equals(null, Placement.empty())).toBe(false);
     expect(Placement.equals(null, null)).toBe(true);
   });
 
@@ -205,7 +249,7 @@ describe('Placement.equals', () => {
         }),
       ),
     ).toBe(false);
-    expect(Placement.equals(base, Placement.empty)).toBe(false);
+    expect(Placement.equals(base, Placement.empty())).toBe(false);
   });
 });
 
