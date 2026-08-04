@@ -116,10 +116,20 @@ function equals(a: Placement | null, b: Placement | null): boolean {
  * that nothing moves at the moment it happens (ADR 0025).
  *
  * With an authored placement, the rendered geometry is a **report, not an
- * authorship claim**. Cards already authored refresh — they may have been
- * dragged — and only `placed` may join the map. Everything else keeps whatever
- * authorship it had, so a card the Layout omits stays unplaced no matter how
- * many times it is drawn in the fallback band.
+ * authorship claim**, and `placed` is the whole of what may be read out of it —
+ * refreshing a card that was dragged and admitting one that was not in the map
+ * before. Every other card keeps the coordinate it had, so a card the Layout
+ * omits stays unplaced no matter how many times it is drawn in the fallback
+ * band, and a card the report caught **in flight** keeps the place the author
+ * last left it.
+ *
+ * That last one is why refreshing every authored card from the report is wrong
+ * rather than merely broader. A reprojection can land mid-gesture — an activated
+ * Route or a selection redraws the graph without the drag ending — and it
+ * reports the live position, which no gesture has settled on. Reading it would
+ * author a coordinate the author never chose and re-run the strategy underneath
+ * a drag still in progress. A card that really moved arrives in `placed`, so
+ * nothing legitimate needs the wider read.
  *
  * Returns `authored` itself when nothing changes, so an unchanged placement
  * keeps its identity and a settled graph is not re-arranged by the projection
@@ -133,10 +143,6 @@ function next(
   if (authored === null) return rendered;
 
   const merged = new Map<CardId, LayoutPoint>(authored);
-  for (const cardId of authored.keys()) {
-    const at = rendered.get(cardId);
-    if (at !== undefined) merged.set(cardId, point(at));
-  }
   for (const cardId of placed) {
     const at = rendered.get(cardId);
     if (at !== undefined) merged.set(cardId, point(at));

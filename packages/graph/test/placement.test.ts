@@ -128,6 +128,21 @@ describe('Placement.next', () => {
     });
   });
 
+  it('keeps an authored coordinate no completed gesture named', () => {
+    // A Card in flight is drawn wherever the pointer has taken it, and a
+    // reprojection landing mid-drag reports that. No gesture has settled, so
+    // `placed` is empty and the authored coordinate is still the one the author
+    // last left the Card on. Identity is preserved for the reason the test below
+    // gives: a report must not re-arrange a graph nobody has finished moving.
+    const authored = at({ '00000000-0000-4000-8000-000000000002': [10, 20] });
+    const rendered = at({ '00000000-0000-4000-8000-000000000002': [90, 90] });
+
+    expect(asObject(Placement.next(authored, rendered, []))).toEqual({
+      [CARD_A]: { x: 10, y: 20 },
+    });
+    expect(Placement.next(authored, rendered, [])).toBe(authored);
+  });
+
   it('returns the placement it was given when nothing changes', () => {
     // Identity is load-bearing: `usePlacementRendering` re-runs layout whenever
     // this changes identity, so a projection reporting the geometry already on
@@ -254,6 +269,27 @@ describe('Placement properties', () => {
         expect([...Placement.next(authored, rendered, []).keys()].sort()).toEqual(
           [...authored.keys()].sort(),
         );
+      }),
+    );
+  });
+
+  it('is inert when a report names no completed gesture, wherever the Cards are drawn', () => {
+    // The general statement of the rule above: a report that authors nothing
+    // changes nothing — not the Cards in the map and not the coordinates of the
+    // ones already there. Whatever a renderer has cards standing on mid-gesture,
+    // the authored placement is the same value, unmoved and unwidened.
+    fc.assert(
+      fc.property(idsArb, fc.array(coordArb, { minLength: 120 }), (ids, coords) => {
+        const authoredIds = ids.slice(0, Math.ceil(ids.length / 2));
+        const authored = Placement.fromEntries(
+          authoredIds.map((id, i) => [id, { x: coords[i * 2] ?? 0, y: coords[i * 2 + 1] ?? 0 }]),
+        );
+        // Every Card on screen, each one somewhere unrelated to what was authored.
+        const rendered = Placement.fromEntries(
+          ids.map((id, i) => [id, { x: coords[60 + i * 2] ?? 0, y: coords[60 + i * 2 + 1] ?? 0 }]),
+        );
+
+        expect(Placement.next(authored, rendered, [])).toBe(authored);
       }),
     );
   });

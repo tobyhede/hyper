@@ -371,6 +371,29 @@ describe('render adapter', () => {
     });
   });
 
+  /*
+   * A reprojection can land while a Card is in flight — an activated Route or a
+   * selection redraws the graph without the gesture ending. The nodes it reports
+   * carry the live position, and the author has settled on nothing, so that
+   * geometry is not theirs to author. Reported at review as reaching the Layout
+   * through a later connection; it does not, because every completion re-reports
+   * first. What it does reach is the in-memory placement, which re-runs the
+   * strategy under a gesture still in progress.
+   */
+  it('keeps the authored position when a reprojection lands mid-drag', () => {
+    const { authoring, store } = sparsePositionedAdapter();
+    store.getState().syncProjection(SPARSE_PROJECTED, []);
+
+    store.getState().changeNodes(moving(CARD_A, 90, 90));
+    store.getState().syncProjection(SPARSE_PROJECTED, []);
+    // The gesture ends where it began, so no Edit completes and nothing reports.
+    store.getState().changeNodes(settled(CARD_A, 10, 20));
+
+    expect(authoring.authoredPlacement()).toEqual(
+      Placement.fromEntries([[CARD_A, { x: 10, y: 20 }]]),
+    );
+  });
+
   it('adds a newly created Card without placing other omitted Cards', () => {
     vi.spyOn(crypto, 'randomUUID').mockReturnValue(
       CREATED_CARD_ID as ReturnType<typeof crypto.randomUUID>,
