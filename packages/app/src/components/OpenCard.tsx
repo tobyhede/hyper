@@ -6,10 +6,24 @@ import {
   type ComponentType,
   type FormEvent,
   type KeyboardEvent as ReactKeyboardEvent,
+  type MouseEvent as ReactMouseEvent,
 } from 'react';
 import { markdownCardSchema, type Card } from '@project/core';
 import type { ResolvedContentCard } from '@project/graph';
 import { Button } from '@project/ui';
+
+/**
+ * Exactly the three element kinds the pane contains, all of them always enabled
+ * and always tabbable. Links, explicit `tabindex` and a `disabled` filter would
+ * each guard a state no editor here can reach; add them back alongside whatever
+ * introduces one.
+ *
+ * One selector, because the two things it answers have to agree: what `Tab`
+ * cycles through, and what a mousedown is allowed to move focus onto. A control
+ * missing from one list and present in the other is either unreachable by
+ * keyboard or a way out of the pane by pointer.
+ */
+const PANE_FOCUSABLE = 'input, textarea, button';
 
 /**
  * Everything inside the pane a `Tab` can land on, in document order.
@@ -17,14 +31,9 @@ import { Button } from '@project/ui';
  * Queried on each `Tab` rather than cached: the editor grows and loses field
  * errors as an author types, and a cached list would send focus to a node that
  * has since been unmounted.
- *
- * Exactly the three element kinds the pane contains, all of them always enabled
- * and always tabbable. Links, explicit `tabindex` and a `disabled` filter would
- * each guard a state no editor here can reach; add them back alongside whatever
- * introduces one.
  */
 const focusableWithin = (root: HTMLElement): readonly HTMLElement[] => [
-  ...root.querySelectorAll<HTMLElement>('input, textarea, button'),
+  ...root.querySelectorAll<HTMLElement>(PANE_FOCUSABLE),
 ];
 
 /**
@@ -99,9 +108,21 @@ function MarkdownCardEditor({
             ? 'A Card title is required.'
             : forTitle.message,
       );
+      // A refusal has to land somewhere the author can see it. The title's own
+      // node is the right home for a title issue — but only where the title is
+      // authored here, because a delegated open draws neither that field nor
+      // that node, so a title issue reported there is reported nowhere and
+      // `Done` goes quiet. That is the same silent no-op the trimming rule
+      // above removed, reached from the other side, and nothing can reach it
+      // today: `markdownCardDocumentSchema` *is* `markdownCardSchema` less its
+      // id, so a stored title has already passed this exact rule and the
+      // delegated path passes it straight through. What makes it unreachable is
+      // an equality between two schemas that nothing enforces, and the day they
+      // diverge the symptom is a button that does nothing — so a refusal with
+      // nowhere of its own to go falls through to the generic message.
+      const reportedInPlace = titleEditable && forTitle !== undefined;
       setDescriptionError(
-        forDescription?.message ??
-          (forTitle === undefined ? 'The Card could not be completed.' : null),
+        forDescription?.message ?? (reportedInPlace ? null : 'The Card could not be completed.'),
       );
       return;
     }
@@ -287,8 +308,34 @@ export function OpenCard({ opened, content, onComplete, onCancel }: OpenCardProp
     }
   }, []);
 
+  /**
+   * Keep the pointer from putting focus where `containTab` cannot see it.
+   *
+   * `containTab` is bound to the panel, so it only ever answers a `Tab` pressed
+   * while focus is already inside — and a mousedown on anything unfocusable
+   * moves focus to `<body>`, where it never fires at all. `Tab` then walks the
+   * document from the top, into the toolbar and on to the Card nodes the pane
+   * covers, which is the escape the containment exists to close. Two surfaces
+   * reach it: the backdrop, always visible because the panel letterboxes inside
+   * it, and the panel's own padding and gaps.
+   *
+   * Preventing the default leaves focus where it already was, which is the one
+   * answer that needs no opinion about where it should go instead. It is
+   * prevented only where the default would take focus *out* of the pane: a
+   * mousedown on a control keeps its default, or clicking a field would not put
+   * the caret in it. A label's text is not a control and is prevented, and the
+   * field still focuses — a label focuses what it names on `click`, which this
+   * does not cancel. The cost is that the pane's static text no longer
+   * drag-selects; it is two spans of banner and three field labels.
+   */
+  const containFocus = useCallback((event: ReactMouseEvent<HTMLDivElement>): void => {
+    const target = event.target;
+    if (target instanceof Element && target.closest(PANE_FOCUSABLE) !== null) return;
+    event.preventDefault();
+  }, []);
+
   return (
-    <div className="open-card" data-testid="open-card">
+    <div className="open-card" data-testid="open-card" onMouseDown={containFocus}>
       <div
         ref={panel}
         className="open-card__panel"

@@ -973,6 +973,52 @@ test('an opened Card keeps Tab inside it, so the graph behind cannot take focus'
 });
 
 /**
+ * The same containment, and the pointer gesture that walked straight out of it.
+ *
+ * `containTab` is bound to the panel, so it only ever sees a `Tab` pressed while
+ * focus is already inside. A mousedown on anything unfocusable moves focus to
+ * `<body>`, and from there the handler never fires at all: `Tab` walks the
+ * document from the top, into the toolbar and on to the Card nodes the pane
+ * covers. Two surfaces are unfocusable and always clickable — the backdrop,
+ * which is visible at every viewport because the panel letterboxes inside it,
+ * and the panel's own padding and gaps. Both were confirmed to escape before
+ * this was fixed; neither is reachable from the test above, which only ever
+ * presses `Tab` from a field it focused first.
+ */
+test('an opened Card keeps Tab inside it after a click that focuses nothing', async ({ page }) => {
+  await page.goto('/');
+  await settled(page);
+  await openCard(nodeByTitle(page, 'A').first(), 'A');
+  await expect(page.getByRole('textbox', { name: 'Title' })).toBeFocused();
+
+  const withinPane = () =>
+    page.evaluate(() => document.activeElement?.closest('.open-card__panel') !== null);
+
+  // The overlay's top-left corner is inside its 2rem padding, so it is backdrop
+  // whatever the viewport does to the panel it letterboxes.
+  await page.locator('.open-card').click({ position: { x: 4, y: 4 } });
+  expect(await withinPane(), 'focus left the pane when the backdrop was clicked').toBe(true);
+  await page.keyboard.press('Tab');
+  expect(await withinPane(), 'focus left the pane on the Tab after a backdrop click').toBe(true);
+
+  // And the panel's own corner, which is its 1rem padding ring — inside the
+  // pane, and no more focusable than the backdrop.
+  await page.locator('.open-card__panel').click({ position: { x: 4, y: 4 } });
+  expect(await withinPane(), 'focus left the pane when its padding was clicked').toBe(true);
+  await page.keyboard.press('Tab');
+  expect(await withinPane(), 'focus left the pane on the Tab after a padding click').toBe(true);
+
+  // A click on a control still focuses it, which is what the prevention must not
+  // cost: it is prevented only where the default would take focus out of here.
+  await page.getByRole('textbox', { name: 'Markdown source' }).click();
+  await expect(page.getByRole('textbox', { name: 'Markdown source' })).toBeFocused();
+  // Including through a label's text, which focuses its field by click rather
+  // than by mousedown.
+  await page.getByText('Description', { exact: true }).click();
+  await expect(page.getByRole('textbox', { name: 'Description' })).toBeFocused();
+});
+
+/**
  * Closing hands focus back to the Card, not to the document.
  *
  * It cannot hand it back to the control that opened it: opening withdraws every
