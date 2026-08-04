@@ -10,6 +10,7 @@ const CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 const LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
 const ROUTE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
 const OTHER_CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
+const ALIAS_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000006');
 
 /**
  * Two Cards on one Route in an authored Layout, so the graph opens on a
@@ -44,11 +45,11 @@ const runtime = (value: SpaceSnapshot) => {
   return loaded.space;
 };
 
-function mount(): SpaceSession {
-  const stored = { snapshot, revision: 0n, exportedRevision: null };
+function mount(value: SpaceSnapshot = snapshot): SpaceSession {
+  const stored = { snapshot: value, revision: 0n, exportedRevision: null };
   const session = openSpaceSession(new MemorySpaceBackend([stored]), stored);
   let view: RenderResult | undefined;
-  mountWorkspace({ space: runtime(snapshot), spaceSession: session }, (app) => {
+  mountWorkspace({ space: runtime(value), spaceSession: session }, (app) => {
     if (view === undefined) view = render(app);
     else view.rerender(app);
   });
@@ -131,6 +132,62 @@ async function openEditor(): Promise<void> {
 }
 
 describe('authoring an opened Card', () => {
+  it('updates the content owner through an Alias and preserves the authored Alias', async () => {
+    const aliased = spaceSnapshotSchema.parse({
+      ...snapshot,
+      document: {
+        ...snapshot.document,
+        layouts: [
+          {
+            ...snapshot.document.layouts![0],
+            positions: {
+              ...snapshot.document.layouts![0]!.positions,
+              [ALIAS_ID]: { x: 600, y: 20 },
+            },
+          },
+        ],
+      },
+      cards: [
+        ...snapshot.cards,
+        {
+          id: ALIAS_ID,
+          document: {
+            title: 'A again',
+            description: 'Alias caption stays authored here',
+            kind: 'alias',
+            target: CARD_ID,
+          },
+        },
+      ],
+    });
+    const session = mount(aliased);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit Card A again' }));
+    expect(screen.getByText('Opened through A again')).toBeVisible();
+    expect(screen.getByText('Editing content on A')).toBeVisible();
+    expect(screen.queryByRole('textbox', { name: 'Title' })).not.toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: 'Description' })).toHaveValue('');
+    fireEvent.change(screen.getByRole('textbox', { name: 'Description' }), {
+      target: { value: 'Shared target caption' },
+    });
+    fireEvent.change(screen.getByRole('textbox', { name: 'Markdown source' }), {
+      target: { value: 'Shared target source' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+
+    expect(session.getState().working.cards).toContainEqual({
+      id: CARD_ID,
+      document: {
+        title: 'A',
+        description: 'Shared target caption',
+        kind: 'markdown',
+        body: 'Shared target source',
+      },
+    });
+    expect(session.getState().working.cards).toContainEqual(aliased.cards[2]);
+    await settled(session);
+  });
+
   /**
    * Escape cancels, and the pane closes with it — there is no reading state
    * behind the editor to fall back to (ADR 0037). What matters is that the draft

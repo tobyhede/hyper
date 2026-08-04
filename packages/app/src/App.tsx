@@ -347,16 +347,15 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
       return null;
     }, []);
 
-    // An Alias owns a title and a pointer, not content. Opening a Card is
-    // editing it (ADR 0037), so an Alias has nothing to open onto: it offers no
-    // affordance and the keyboard cannot reach one either. Its title is renamed
-    // on the graph. `card-authoring/03` would let an Alias delegate content
-    // editing to its target; it is unbuilt, and reading through one went with
-    // the reading surface.
+    // Opening an Alias delegates to its single-hop content owner. The authored
+    // Alias remains the opened context; only resolution decides whether this
+    // occurrence has an editor to offer.
     const editableCardIds = useMemo(
       () =>
         new Set(
-          rendererSpace.cards.filter((card) => card.kind === 'markdown').map((card) => card.id),
+          rendererSpace.cards
+            .filter((card) => resolveContentCard(rendererSpace, card.id) !== undefined)
+            .map((card) => card.id),
         ),
       [rendererSpace],
     );
@@ -583,8 +582,9 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
 
           {openedCard && openedContent && (
             <OpenCard
+              opened={openedCard}
               content={openedContent}
-              {...(openedCard.kind === 'markdown' ? { onComplete: completeOpenedCard } : {})}
+              onComplete={completeOpenedCard}
               onCancel={closeCard}
             />
           )}

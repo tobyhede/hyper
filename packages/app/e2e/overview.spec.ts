@@ -265,15 +265,7 @@ test('content that exceeds the frame scrolls inside it, keeping controls reachab
   expect(actions.y + actions.height).toBeLessThanOrEqual(panel.y + panel.height + 1);
 });
 
-/**
- * The half of this that used to open the alias and read A's content through it
- * is gone, not adapted. Opening a card is editing it (ADR 0037) and an alias
- * owns no content to edit, so it offers nothing to open — and with the reading
- * surface deleted there is no longer a way to look at what it points at. That
- * returns with `card-authoring/03`, which is unbuilt. Asserting the absence
- * here is what keeps the withdrawal visible rather than silent.
- */
-test('an alias node names the card it redraws, and offers nothing to open', async ({ page }) => {
+test('an alias node names the card it redraws and opens its target content', async ({ page }) => {
   await page.goto('/');
 
   // A′ is an alias of A. It is drawn as its own node, carrying its own title, with
@@ -283,9 +275,11 @@ test('an alias node names the card it redraws, and offers nothing to open', asyn
   await expect(recap).toBeVisible();
   await expect(recap.getByTestId('alias-marker')).toHaveText('A');
 
-  await recap.hover();
-  await expect(recap.getByRole('button', { name: /^Edit Card/ })).toHaveCount(0);
-  await expect(page.getByTestId('open-card')).toHaveCount(0);
+  await openCard(recap, 'A′');
+  await expect(page.getByText('Opened through A′')).toBeVisible();
+  await expect(page.getByText('Editing content on A')).toBeVisible();
+  await expect(page.getByRole('textbox', { name: 'Markdown source' })).toHaveValue(/entry point/);
+  await page.getByRole('button', { name: 'Cancel' }).click();
 
   // Its own title is still authored, inline on the graph.
   await recap.getByRole('heading', { name: 'A′', exact: true }).dblclick();
