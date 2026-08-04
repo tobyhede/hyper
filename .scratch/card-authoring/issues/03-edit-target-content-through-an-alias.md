@@ -28,9 +28,12 @@ its target as editable metadata.
 
 ## Answer
 
-Implemented in `36f5cd9`. Opening an Alias preserves it as the visible context,
+Implemented in `ada7485`. Opening an Alias preserves it as the visible context,
 resolves its single-hop Markdown target before exhaustive editor selection and
 completes the target Card through Space Authoring without exposing or changing
 Alias metadata. The shared content remains one source of truth across the target,
 every Alias and browser reload. Verification passed with all 744 tests in
 `pnpm verify` and all 66 tests in `pnpm e2e`.
+
+The decision itself is ADR 0038, which refines 0037. ADR 0037's own record — that
+an alias could not be opened, and what that cost — stands as it was accepted.

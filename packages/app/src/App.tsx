@@ -347,9 +347,15 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
       return null;
     }, []);
 
-    // Opening an Alias delegates to its single-hop content owner. The authored
-    // Alias remains the opened context; only resolution decides whether this
-    // occurrence has an editor to offer.
+    // Opening an Alias delegates to its single-hop content owner, and the
+    // authored Alias remains the opened context.
+    //
+    // For a loaded Space this set is every Card, and the filter cannot currently
+    // remove one: `loadSpace` rejects an Alias whose target is missing or is
+    // itself an Alias, so resolution refuses nothing that reached this far. It
+    // stays because the refusal is real in the type — a Card kind that resolves
+    // to no content editor would land here as a compile-time obligation rather
+    // than as an occurrence the graph offers to open and the pane cannot draw.
     const editableCardIds = useMemo(
       () =>
         new Set(

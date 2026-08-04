@@ -278,7 +278,11 @@ test('an alias node names the card it redraws and opens its target content', asy
   await openCard(recap, 'A′');
   await expect(page.getByText('Opened through A′')).toBeVisible();
   await expect(page.getByText('Editing content on A')).toBeVisible();
-  await expect(page.getByRole('textbox', { name: 'Markdown source' })).toHaveValue(/entry point/);
+  // The delegated fields name the Card they author; A′'s own description is
+  // still the one drawn on the graph, and nothing here writes it.
+  await expect(
+    page.getByRole('textbox', { name: 'Markdown source of A', exact: true }),
+  ).toHaveValue(/entry point/);
   await page.getByRole('button', { name: 'Cancel' }).click();
 
   // Its own title is still authored, inline on the graph.

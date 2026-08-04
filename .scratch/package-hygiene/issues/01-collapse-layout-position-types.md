@@ -24,7 +24,8 @@ that `graph`'s uses do not want a distinct type for a reason not written down.
 
 ## Resolution
 
-Implemented in `1b5b480`. The graph package's duplicate `LayoutPoint` was removed,
+Implemented in `5b967cb`. The graph package's duplicate `LayoutPoint` was removed,
 and graph, app and React Flow adapter APIs now use the schema-derived
 `LayoutPosition` from `@project/core`. A compile-time package API regression test
-guards the shared type, and ADR 0014 no longer claims the duplication is required.
+guards the shared type. ADR 0014 keeps its own record of why the duplication
+looked structural; ADR 0038 is where that judgement is superseded.

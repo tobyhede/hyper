@@ -2,8 +2,8 @@
 
 Status: accepted
 Refines: 0011
+Refined by: 0038
 Related: 0006, 0020, 0024, 0035, 0036
-Refined by: `card-authoring/03`
 
 Opening a card shows one surface, and that surface is editable. A markdown card opens on its **title**, its **description** and its **Markdown source**, all authored in place. There is no reading state to enter first and no action that turns reading into editing.
 
@@ -17,7 +17,7 @@ ADR 0011 is why they looked alike: it removed the reading pane's Markdown *rende
 
 ## What this costs
 
-**An alias delegates when opened.** It owns a title and a pointer, not content, so `card-authoring/03` preserves the alias as the opened context and selects the editor from its single-hop target. The surface identifies that target, authors its content at the shared source of truth, and exposes no alias metadata. An alias remains renamed on the graph, like any card.
+**An alias cannot be opened.** It owns a title and a pointer, not content, so there is nothing for this surface to author — and with the reading surface gone, there is no longer a way to look at the content an alias points at. That capability does not move somewhere else; it goes, until `card-authoring/03` delegates an alias's content editing to its target. An alias is renamed on the graph, like any card.
 
 **There is no rendered read outside presenting**, which is unchanged from ADR 0011 and is the thing a preview control would alter. Preview is not part of this decision. Adding it would put rendered Markdown back on a second surface — not a second *renderer*, since `CardContent` is the only one and a preview would use it, but a second place, which is what 0011 ruled on. It earns its own ADR or none at all.
 

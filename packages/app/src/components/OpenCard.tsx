@@ -27,10 +27,21 @@ const focusableWithin = (root: HTMLElement): readonly HTMLElement[] => [
   ...root.querySelectorAll<HTMLElement>('input, textarea, button'),
 ];
 
-type ContentEditorProps<Card extends ResolvedContentCard> = {
-  readonly card: Card;
+/**
+ * `Content` rather than `Card`, which is the domain type imported above: a
+ * parameter shadowing it reads as that type at every use and is not one.
+ */
+type ContentEditorProps<Content extends ResolvedContentCard> = {
+  readonly card: Content;
+  /**
+   * Whether the title is authored here as well. False when the content was
+   * reached through another occurrence, which keeps its own title on the graph
+   * and is not the Card this editor writes to. The editor's remaining fields
+   * then name the Card they author, because the occurrence behind the pane
+   * carries a title and a description of its own that they do not touch.
+   */
   readonly titleEditable: boolean;
-  readonly onComplete: (card: Card) => void;
+  readonly onComplete: (card: Content) => void;
   readonly onCancel: () => void;
 };
 
@@ -59,7 +70,15 @@ function MarkdownCardEditor({
     // as nothing and a description of spaces leaves a caption that says nothing
     // and no field left to clear. The body is *not* trimmed — leading and
     // trailing whitespace there is Markdown the author wrote.
-    const named = title.trim();
+    //
+    // The title is trimmed only where it is authored. A delegated open renders
+    // no title field and no node to report a refused title, so trimming a stored
+    // title of spaces — which `min(1)` accepts at rest, and an import can
+    // therefore store — refused the whole edit into a node this pane does not
+    // draw: `Done` did nothing, said nothing, and left no way to find out why.
+    // What the author cannot see, they cannot have broken; the stored title was
+    // validated when it was stored, so passing it through cannot fail here.
+    const named = titleEditable ? title.trim() : card.title;
     const caption = description.trim();
     const parsed = markdownCardSchema.safeParse({
       id: card.id,
@@ -131,7 +150,7 @@ function MarkdownCardEditor({
         </>
       )}
       <label className="open-card__field">
-        <span>Description</span>
+        <span>{titleEditable ? 'Description' : `Description of ${card.title}`}</span>
         <input
           aria-invalid={descriptionError !== null}
           aria-describedby={descriptionError === null ? undefined : 'open-card-description-error'}
@@ -148,7 +167,7 @@ function MarkdownCardEditor({
         </span>
       )}
       <label className="open-card__field open-card__field--source">
-        <span>Markdown source</span>
+        <span>{titleEditable ? 'Markdown source' : `Markdown source of ${card.title}`}</span>
         <textarea value={body} onChange={(event) => setBody(event.currentTarget.value)} />
       </label>
       <div className="open-card__actions">
@@ -276,9 +295,22 @@ export function OpenCard({ opened, content, onComplete, onCancel }: OpenCardProp
         role="dialog"
         aria-modal="true"
         // Named for the Card, which is the only thing distinguishing one opened
-        // Card from another. The title is also the first field, so a screen
-        // reader hears the name and then lands on the control that changes it.
-        aria-label={content.title}
+        // Card from another. Directly opened, that title is also the first
+        // field, so a screen reader hears the name and then lands on the
+        // control that changes it.
+        //
+        // Delegated, the two Cards are different Cards and the name has to say
+        // both: named only for the content owner, opening `A′` announced a
+        // dialog called `A`, which is neither what the author opened nor
+        // something this pane lets them rename. The delegation banner is the
+        // only other signal and it is plain text, so a reader landing on
+        // Description hears no name at all for the occurrence it came from.
+        // `aria-describedby` onto that banner was the alternative and it fixes
+        // the wrong half: a description is heard after the name, and the name
+        // would still be a Card the author did not open.
+        aria-label={
+          delegated ? `${opened.title} — editing content on ${content.title}` : content.title
+        }
         onKeyDown={containTab}
       >
         {delegated && (

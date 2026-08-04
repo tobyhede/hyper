@@ -188,8 +188,14 @@ test('editing through an Alias updates its target and survives reload', async ({
   await expect(page.getByText('Opened through A′')).toBeVisible();
   await expect(page.getByText('Editing content on A')).toBeVisible();
   await expect(page.getByRole('textbox', { name: 'Title' })).toHaveCount(0);
-  await page.getByRole('textbox', { name: 'Description' }).fill('Shared through every occurrence');
-  await page.getByRole('textbox', { name: 'Markdown source' }).fill('One shared source');
+  // Named for the Card they author, exactly, because A′ carries a description of
+  // its own on the graph behind this pane and these fields do not write it.
+  await page
+    .getByRole('textbox', { name: 'Description of A', exact: true })
+    .fill('Shared through every occurrence');
+  await page
+    .getByRole('textbox', { name: 'Markdown source of A', exact: true })
+    .fill('One shared source');
   await page.getByRole('button', { name: 'Done' }).click();
 
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
@@ -207,16 +213,16 @@ test('editing through an Alias updates its target and survives reload', async ({
   await page.getByRole('button', { name: 'Cancel' }).click();
 
   await openCard(nodeByTitle(page, 'A′').first(), 'A′');
-  await expect(page.getByRole('textbox', { name: 'Markdown source' })).toHaveValue(
-    'One shared source',
-  );
+  await expect(
+    page.getByRole('textbox', { name: 'Markdown source of A', exact: true }),
+  ).toHaveValue('One shared source');
   await page.getByRole('button', { name: 'Cancel' }).click();
 
   await page.reload();
   await openCard(nodeByTitle(page, 'A′').first(), 'A′');
-  await expect(page.getByRole('textbox', { name: 'Markdown source' })).toHaveValue(
-    'One shared source',
-  );
+  await expect(
+    page.getByRole('textbox', { name: 'Markdown source of A', exact: true }),
+  ).toHaveValue('One shared source');
 });
 
 /**

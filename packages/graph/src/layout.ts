@@ -44,6 +44,16 @@ export interface LayoutCard {
  * turns through in between. Mirrors ELK's `ElkEdgeSection` — an orthogonal
  * back-edge routes *around* the cards as a channel rather than cutting straight
  * across them, and the bend points are how it does that.
+ *
+ * These points are computed by a strategy, and they are `core`'s
+ * `LayoutPosition` — the same schema-derived type an author's Layout stores.
+ * That is what collapsing the duplicate `LayoutPoint` bought, and it is worth
+ * knowing which way the sharing runs: a constraint added to `layoutPositionSchema`
+ * for the sake of authored placement (a bound, an integer, a non-negative x)
+ * would land here too, on geometry no author wrote and no schema parses. The
+ * schema is bare `{x, y}` today and nothing checks these against it. Constrain
+ * authored positions somewhere that only authored positions pass through, or
+ * split the two again deliberately.
  */
 export interface LayoutEdgeSection {
   startPoint: LayoutPosition;
