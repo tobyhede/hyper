@@ -115,6 +115,38 @@ describe('the opened Card', () => {
   });
 
   /**
+   * A refusal has to land somewhere the author can see it, and a delegated open
+   * draws no title field and no node to report a refused title. Reporting one
+   * there reported it nowhere: `Done` did nothing and said nothing — the same
+   * silent no-op the trimming rule above was written to remove, reached from
+   * the other side.
+   *
+   * Nothing can reach it today, and this test has to manufacture the state to
+   * assert on it: a stored Card's title has already passed this exact rule,
+   * because `markdownCardDocumentSchema` *is* `markdownCardSchema` less its id,
+   * and the delegated path passes the stored title straight through. That is an
+   * equality between two schemas which nothing enforces, and the day it stops
+   * holding the symptom is a button that does nothing. So the refusal falls
+   * through to the generic message wherever it cannot be reported in place.
+   */
+  it('says something when a delegated edit is refused for its target’s title', () => {
+    const onComplete = vi.fn();
+    render(
+      <OpenCard
+        opened={{ id: ALIAS_ID, title: 'A again', kind: 'alias', target: CARD_ID }}
+        content={{ ...markdown(), title: '' }}
+        onComplete={onComplete}
+        onCancel={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+
+    expect(screen.getByRole('alert')).toHaveTextContent('The Card could not be completed.');
+    expect(onComplete).not.toHaveBeenCalled();
+  });
+
+  /**
    * There was a reading state in front of this, and it drew the same bytes in
    * the same order — a `<pre>` of source against a `<textarea>` of source. The
    * action that crossed between them was the only thing the boundary had.
@@ -440,6 +472,33 @@ describe('the opened Card as a dialog', () => {
 
     fireEvent.keyDown(title, { key: 'Tab', shiftKey: true });
     expect(done).toHaveFocus();
+  });
+
+  /**
+   * The pointer half of the same containment.
+   *
+   * jsdom moves no focus on a mousedown, so the outcome this protects is only
+   * observable in `editing.spec`, where a browser does. What is assertable here
+   * is the discrimination the handler makes, which is the part a change is
+   * likely to get wrong: the default is prevented wherever taking it would put
+   * focus on something outside the pane's control — the backdrop, the panel
+   * itself — and left alone on the controls, or clicking a field would not put
+   * the caret in it.
+   */
+  it('prevents only the mousedown that would take focus off its controls', () => {
+    render(
+      <OpenCard opened={markdown()} content={markdown()} onComplete={vi.fn()} onCancel={vi.fn()} />,
+    );
+
+    // `fireEvent` answers false when the default was prevented.
+    expect(fireEvent.mouseDown(screen.getByTestId('open-card'))).toBe(false);
+    expect(fireEvent.mouseDown(screen.getByRole('dialog'))).toBe(false);
+    expect(fireEvent.mouseDown(screen.getByText('Title'))).toBe(false);
+    expect(fireEvent.mouseDown(screen.getByRole('textbox', { name: 'Title' }))).toBe(true);
+    expect(fireEvent.mouseDown(screen.getByRole('textbox', { name: 'Markdown source' }))).toBe(
+      true,
+    );
+    expect(fireEvent.mouseDown(screen.getByRole('button', { name: 'Done' }))).toBe(true);
   });
 
   /**
