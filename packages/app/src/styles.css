@@ -406,17 +406,6 @@ body {
   font-size: 0.95rem;
 }
 
-/* Opening a card shows its Markdown source, verbatim and read-only (ADR 0011):
-   monospace, whitespace preserved, wrapping long lines so nothing is clipped. */
-.card__source {
-  margin: 0;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 0.8rem;
-  line-height: 1.5;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-}
-
 /* ---- The card a walk has reached ---- */
 /* Presenting draws the active card's content instead of its title (ADR 0027).
    Same box as every other card — the layout's 16:9 frame, which the camera then

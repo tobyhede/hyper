@@ -382,6 +382,30 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
       authoring.complete({ kind: 'edited-card', cardId: id });
     }, []);
 
+    /**
+     * Closing an opened Card returns focus to that Card.
+     *
+     * The pane cannot do this itself. The obvious target is the control that
+     * opened it, and opening destroys that control — `titleEditingEnabled` goes
+     * false while a Card is open, so every Card affordance is withdrawn — which
+     * left a closed dialog dropping focus on `<body>`. The Card survives, is
+     * focusable outside presenting, and is where the author was.
+     *
+     * Runs after the pane has unmounted and the graph has re-rendered, so the
+     * node is back in the tree by the time it is asked for. Presenting is
+     * excluded because it closes the opened Card on its way in and takes the
+     * nodes out of the tab order behind it.
+     */
+    const lastOpenedCardId = useRef<string | null>(null);
+    useEffect(() => {
+      const closed = lastOpenedCardId.current;
+      lastOpenedCardId.current = openedCardId;
+      if (closed === null || openedCardId !== null || presenting) return;
+      document
+        .querySelector<HTMLElement>(`.react-flow__node[data-id="${CSS.escape(closed)}"]`)
+        ?.focus();
+    }, [openedCardId, presenting]);
+
     // Escape closes an opened card. Registered ahead of the walk's keys and
     // returning early while a card is open, so the two never fight over Escape.
     useEffect(() => {

@@ -240,20 +240,19 @@ describe('the opened Card as a dialog', () => {
   });
 
   /**
-   * Opening is reached from a control on the Card, so closing has somewhere
-   * definite to go back to. Without this a keyboard author is returned to the
-   * top of the document every time a Card closes.
+   * Taking focus is the pane's own job; giving it back is not, and this asserts
+   * only the half that belongs here.
+   *
+   * An earlier version restored focus on unmount to whatever was active when it
+   * mounted, and a test like this one passed — with a synthetic opener that
+   * stays in the document. The real opener does not: opening a Card withdraws
+   * every Card affordance, so the control is detached long before the pane
+   * closes. `App` returns focus to the Card instead, proven in `editing.spec`
+   * against a browser that actually moves it.
    */
-  it('returns focus to whatever opened it', () => {
-    const opener = document.createElement('button');
-    document.body.append(opener);
-    opener.focus();
+  it('takes focus onto its first field when it opens', () => {
+    render(<OpenCard content={markdown()} onComplete={vi.fn()} onCancel={vi.fn()} />);
 
-    const view = render(<OpenCard content={markdown()} onComplete={vi.fn()} onCancel={vi.fn()} />);
     expect(screen.getByRole('textbox', { name: 'Title' })).toHaveFocus();
-    view.unmount();
-
-    expect(opener).toHaveFocus();
-    opener.remove();
   });
 });

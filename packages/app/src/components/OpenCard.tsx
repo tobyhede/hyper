@@ -17,11 +17,15 @@ import { Button } from '@project/ui';
  * Queried on each `Tab` rather than cached: the editor grows and loses field
  * errors as an author types, and a cached list would send focus to a node that
  * has since been unmounted.
+ *
+ * Exactly the three element kinds the pane contains, all of them always enabled
+ * and always tabbable. Links, explicit `tabindex` and a `disabled` filter would
+ * each guard a state no editor here can reach; add them back alongside whatever
+ * introduces one.
  */
-const focusableWithin = (root: HTMLElement): readonly HTMLElement[] =>
-  [...root.querySelectorAll<HTMLElement>('input, textarea, button, [href], [tabindex]')].filter(
-    (element) => !element.hasAttribute('disabled') && element.tabIndex !== -1,
-  );
+const focusableWithin = (root: HTMLElement): readonly HTMLElement[] => [
+  ...root.querySelectorAll<HTMLElement>('input, textarea, button'),
+];
 
 type ContentEditorProps<Card extends ResolvedContentCard> = {
   readonly card: Card;
@@ -105,7 +109,6 @@ function MarkdownCardEditor({
       <label className="open-card__field">
         <span>Title</span>
         <input
-          autoFocus
           className="open-card__title-input"
           aria-invalid={titleError !== null}
           aria-describedby={titleError === null ? undefined : 'open-card-title-error'}
@@ -203,21 +206,29 @@ export interface OpenCardProps {
 export function OpenCard({ content, onComplete, onCancel }: OpenCardProps) {
   const panel = useRef<HTMLDivElement>(null);
 
-  // Captured during the first render and restored on unmount, so closing returns
-  // the author to the control they opened the Card from.
-  //
-  // Read here rather than in an effect because the title field carries
-  // `autoFocus`, which React applies while committing — before any effect runs.
-  // An effect therefore asks after the pane already owns focus and answers with
-  // the pane's own field, which restores nothing. Render happens before the
-  // commit, so this is the last moment the opener is still the active element.
-  const [opener] = useState<Element | null>(() => document.activeElement);
-  useEffect(
-    () => () => {
-      if (opener instanceof HTMLElement && opener.isConnected) opener.focus();
-    },
-    [opener],
-  );
+  /**
+   * The pane takes focus while it is open. Where focus goes when it *closes* is
+   * not this component's to decide — see `App`, which returns it to the Card.
+   *
+   * Restoring from here was tried and is wrong twice over. The obvious capture,
+   * `document.activeElement` on mount, is the control that opened the Card — and
+   * the app unmounts that control while a Card is open, since `titleEditingEnabled`
+   * goes false and the affordance goes with it, so by closing time the captured
+   * element is detached and focus lands on `<body>`. Worse, a cleanup that only
+   * restores is not idempotent, which `StrictMode` requires rather than prefers:
+   * React double-invokes effects as mount → cleanup → mount, so the restore ran
+   * *immediately* after opening, moved focus to a control about to be removed,
+   * and left the pane with no focus at all — `containTab` never fired, because it
+   * is bound to the panel.
+   *
+   * Focus is taken here rather than by `autoFocus` on the field for that same
+   * reason: `autoFocus` fires once, on the real mount, so it cannot answer a
+   * simulated cleanup that follows it. Taking focus in the setup half can.
+   */
+  useEffect(() => {
+    const pane = panel.current;
+    if (pane !== null) focusableWithin(pane)[0]?.focus();
+  }, []);
 
   /**
    * Keep `Tab` inside the pane.
