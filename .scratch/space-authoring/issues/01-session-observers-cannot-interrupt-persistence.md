@@ -6,18 +6,25 @@ remaining observers and any reentrant Edit completion all continue normally.
 
 **Blocked by:** None — can start immediately.
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] A synchronous observer failure cannot escape through the operation that
+- [x] A synchronous observer failure cannot escape through the operation that
       published session state.
-- [ ] One failing observer does not prevent later observers from receiving the
+- [x] One failing observer does not prevent later observers from receiving the
       same state change.
-- [ ] Submitting an Edit still starts and completes persistence when an observer
+- [x] Submitting an Edit still starts and completes persistence when an observer
       throws during the working-Space publication.
-- [ ] Reentrant Edit completion is queued and derived from the fully installed
+- [x] Reentrant Edit completion is queued and derived from the fully installed
       preceding state even when an observer fails.
-- [ ] Observer failures reach a non-throwing diagnostic path, and a failure in
+- [x] Observer failures reach a non-throwing diagnostic path, and a failure in
       that diagnostic path cannot interrupt session work.
-- [ ] Tests replace the former rethrow contract and prove the stored revision
+- [x] Tests replace the former rethrow contract and prove the stored revision
       contains the completed Edit.
-- [ ] `pnpm verify` passes.
+- [x] `pnpm verify` passes.
+
+## Answer
+
+Implemented by PR #14. `SpaceSession` contains synchronous and asynchronous
+observer failures, continues notification and persistence, and safely reports
+diagnostic failures. Reentrant submissions derive from the installed working
+Space and coalesce to the newest snapshot. Focused tests and `pnpm verify` pass.
