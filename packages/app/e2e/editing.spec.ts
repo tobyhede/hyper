@@ -854,3 +854,36 @@ test('a duplicate Edge is marked invalid while the drag is still live', async ({
   await expect(page.locator('.react-flow__edge')).toHaveCount(FIXTURE_EDGE_COUNT + 1);
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
 });
+
+/**
+ * An opened Card is an editor, and an editor needs somewhere to write. Changing
+ * the renderer underneath one left it on screen over a graph that was still
+ * arranging, and an Edit completed in that window is refused for having no
+ * placement to write into — with the pane closing on `Done` exactly as it does
+ * on success. The author saw a save and got nothing.
+ *
+ * The pane closing with the renderer is what removes the window. The fixture
+ * declares no Layout, so it opens on `Graph` — selecting that again is not a
+ * change and the selector reports nothing. `Grid` is the other Algorithmic View,
+ * and it installs no placement until its strategy resolves, which is the state
+ * this is about.
+ */
+test('changing the renderer closes an opened Card rather than stranding its editor', async ({
+  page,
+}) => {
+  await page.goto('/');
+  const card = nodeByTitle(page, 'A').first();
+  await settled(page);
+  await openCard(card, 'A');
+
+  const source = page.getByRole('textbox', { name: 'Markdown source' });
+  await expect(source).toBeVisible();
+  await source.fill('Typed into a pane about to lose its placement');
+
+  await page.getByTestId('view-selector').click();
+  await page.getByRole('option', { name: 'Grid' }).click();
+
+  await expect(page.getByTestId('open-card')).toHaveCount(0);
+  // Nothing was written, and nothing was persisted from the abandoned draft.
+  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '0');
+});

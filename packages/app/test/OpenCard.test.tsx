@@ -209,3 +209,51 @@ describe('the opened Card', () => {
     window.removeEventListener('keydown', outside);
   });
 });
+
+/**
+ * The pane covers the graph and is the one surface for a Card's content (ADR
+ * 0037), so it has to say so. It was a bare `<div>`: no role, no name, and
+ * nothing stopping `Tab` walking out of it into the Card nodes still behind it —
+ * which announce "Press enter or space to open a Card" and, until `App` declined
+ * it, did exactly that to the Card being typed into.
+ */
+describe('the opened Card as a dialog', () => {
+  it('is a modal dialog named for the Card it authors', () => {
+    render(<OpenCard content={markdown()} onComplete={vi.fn()} onCancel={vi.fn()} />);
+
+    const dialog = screen.getByRole('dialog');
+    expect(dialog).toHaveAttribute('aria-modal', 'true');
+    expect(dialog).toHaveAccessibleName('A');
+  });
+
+  it('keeps Tab inside itself, wrapping from the last control to the first', () => {
+    render(<OpenCard content={markdown()} onComplete={vi.fn()} onCancel={vi.fn()} />);
+    const title = screen.getByRole('textbox', { name: 'Title' });
+    const done = screen.getByRole('button', { name: 'Done' });
+
+    done.focus();
+    fireEvent.keyDown(done, { key: 'Tab' });
+    expect(title).toHaveFocus();
+
+    fireEvent.keyDown(title, { key: 'Tab', shiftKey: true });
+    expect(done).toHaveFocus();
+  });
+
+  /**
+   * Opening is reached from a control on the Card, so closing has somewhere
+   * definite to go back to. Without this a keyboard author is returned to the
+   * top of the document every time a Card closes.
+   */
+  it('returns focus to whatever opened it', () => {
+    const opener = document.createElement('button');
+    document.body.append(opener);
+    opener.focus();
+
+    const view = render(<OpenCard content={markdown()} onComplete={vi.fn()} onCancel={vi.fn()} />);
+    expect(screen.getByRole('textbox', { name: 'Title' })).toHaveFocus();
+    view.unmount();
+
+    expect(opener).toHaveFocus();
+    opener.remove();
+  });
+});

@@ -1,7 +1,27 @@
-import { useState, type ComponentType, type FormEvent } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type ComponentType,
+  type FormEvent,
+  type KeyboardEvent as ReactKeyboardEvent,
+} from 'react';
 import { markdownCardSchema } from '@project/core';
 import type { ResolvedContentCard } from '@project/graph';
 import { Button } from '@project/ui';
+
+/**
+ * Everything inside the pane a `Tab` can land on, in document order.
+ *
+ * Queried on each `Tab` rather than cached: the editor grows and loses field
+ * errors as an author types, and a cached list would send focus to a node that
+ * has since been unmounted.
+ */
+const focusableWithin = (root: HTMLElement): readonly HTMLElement[] =>
+  [...root.querySelectorAll<HTMLElement>('input, textarea, button, [href], [tabindex]')].filter(
+    (element) => !element.hasAttribute('disabled') && element.tabIndex !== -1,
+  );
 
 type ContentEditorProps<Card extends ResolvedContentCard> = {
   readonly card: Card;
@@ -162,10 +182,15 @@ export interface OpenCardProps {
  * A card opened over the graph — one editable surface, and the only one.
  *
  * Opening a card *is* editing it (ADR 0037). There was a reading state in front
- * of this, and it drew the same bytes in the same order: `CardRenderer` put the
- * Markdown source in a `<pre>`, the editor puts it in a `<textarea>`, and the
- * only difference was whether the caret could enter. The mode around that
- * non-difference is gone, along with the action that crossed it.
+ * of this, and it drew the same bytes in the same order: a `CardRenderer` put
+ * the Markdown source in a `<pre>`, the editor puts it in a `<textarea>`, and
+ * the only difference was whether the caret could enter. The mode around that
+ * non-difference is gone, along with the action that crossed it — and so, now,
+ * is the component, which outlived its last caller by one release.
+ *
+ * A modal dialog, because it covers the graph and the graph stays focusable:
+ * React Flow measures its nodes and keeps them in the tab order, so `inert` is
+ * not available and the containment is this component's own.
  *
  * Source, still — not rendered prose. ADR 0011 removed the reading pane's
  * Markdown renderer so a card could not read one way and present another, and
@@ -176,9 +201,63 @@ export interface OpenCardProps {
  * the same card through Space Authoring.
  */
 export function OpenCard({ content, onComplete, onCancel }: OpenCardProps) {
+  const panel = useRef<HTMLDivElement>(null);
+
+  // Captured during the first render and restored on unmount, so closing returns
+  // the author to the control they opened the Card from.
+  //
+  // Read here rather than in an effect because the title field carries
+  // `autoFocus`, which React applies while committing — before any effect runs.
+  // An effect therefore asks after the pane already owns focus and answers with
+  // the pane's own field, which restores nothing. Render happens before the
+  // commit, so this is the last moment the opener is still the active element.
+  const [opener] = useState<Element | null>(() => document.activeElement);
+  useEffect(
+    () => () => {
+      if (opener instanceof HTMLElement && opener.isConnected) opener.focus();
+    },
+    [opener],
+  );
+
+  /**
+   * Keep `Tab` inside the pane.
+   *
+   * The graph behind is not `inert` — React Flow needs its nodes measurable, and
+   * a node keeps `tabIndex=0` outside presenting — so without this, `Tab` walks
+   * out of the editor onto Cards that answer `Enter` by opening themselves.
+   * Wrapping at both ends is the whole of it; the pane's controls are few and
+   * always present.
+   */
+  const containTab = useCallback((event: ReactKeyboardEvent<HTMLDivElement>): void => {
+    if (event.key !== 'Tab' || panel.current === null) return;
+    const focusable = focusableWithin(panel.current);
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (first === undefined || last === undefined) return;
+    // The handler sits on the panel, so the active element is always inside it.
+    const active = document.activeElement;
+    if (event.shiftKey && active === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && active === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  }, []);
+
   return (
     <div className="open-card" data-testid="open-card">
-      <div className="open-card__panel">
+      <div
+        ref={panel}
+        className="open-card__panel"
+        role="dialog"
+        aria-modal="true"
+        // Named for the Card, which is the only thing distinguishing one opened
+        // Card from another. The title is also the first field, so a screen
+        // reader hears the name and then lands on the control that changes it.
+        aria-label={content.title}
+        onKeyDown={containTab}
+      >
         {onComplete === undefined ? null : (
           // Keyed by Card, because the draft is seeded from `card` once and then
           // owned by the editor. Without this, opening a second Card without
