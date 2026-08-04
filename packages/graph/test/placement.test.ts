@@ -143,6 +143,27 @@ describe('Placement.next', () => {
     expect(Placement.next(authored, rendered, [])).toBe(authored);
   });
 
+  it('moves no authored Card the gesture did not place', () => {
+    // The case above is answered by the empty-report fast path, so it says
+    // nothing about the merge itself. Here the gesture placed B, so only B's
+    // report is authorship: A is drawn wherever the renderer currently has it,
+    // and a report is not a move. Without this, `placed` names which Cards may
+    // *join* the map while every Card already in it tracks the screen.
+    const authored = at({
+      '00000000-0000-4000-8000-000000000002': [10, 20],
+      '00000000-0000-4000-8000-000000000003': [300, 40],
+    });
+    const rendered = at({
+      '00000000-0000-4000-8000-000000000002': [777, 888],
+      '00000000-0000-4000-8000-000000000003': [500, 60],
+    });
+
+    expect(asObject(Placement.next(authored, rendered, [CARD_B]))).toEqual({
+      [CARD_A]: { x: 10, y: 20 },
+      [CARD_B]: { x: 500, y: 60 },
+    });
+  });
+
   it('returns the placement it was given when nothing changes', () => {
     // Identity is load-bearing: `usePlacementRendering` re-runs layout whenever
     // this changes identity, so a projection reporting the geometry already on
