@@ -14,9 +14,9 @@ import {
 import type { RendererSelection } from '../src/view';
 import { completeDrag, moving, node, settled } from './render-adapter-fixtures';
 
-const CARD_A = '00000000-0000-4000-8000-000000000002';
-const CARD_B = '00000000-0000-4000-8000-000000000003';
-const CARD_C = '00000000-0000-4000-8000-000000000005';
+const CARD_A = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
+const CARD_B = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
+const CARD_C = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const ROUTE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
 const LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000021');

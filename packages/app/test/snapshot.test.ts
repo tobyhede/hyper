@@ -37,7 +37,9 @@ it('updates placement as a complete valid persistence snapshot', () => {
   const changed = updatePositionedLayout(snapshot, {
     layoutId: uuidSchema.parse('00000000-0000-4000-8000-000000000021'),
     title: 'Layout',
-    positions: Placement.fromEntries([['00000000-0000-4000-8000-000000000002', { x: 10, y: 20 }]]),
+    positions: Placement.fromEntries([
+      [uuidSchema.parse('00000000-0000-4000-8000-000000000002'), { x: 10, y: 20 }],
+    ]),
     activeRouteId: uuidSchema.parse('00000000-0000-4000-8000-000000000004'),
   });
 
@@ -92,7 +94,9 @@ it('opens on the active Route while showing the minted Route the Edit added', ()
   const changed = updatePositionedLayout(twoRoutes, {
     layoutId: uuidSchema.parse('00000000-0000-4000-8000-000000000021'),
     title: 'Layout',
-    positions: Placement.fromEntries([['00000000-0000-4000-8000-000000000002', { x: 1, y: 2 }]]),
+    positions: Placement.fromEntries([
+      [uuidSchema.parse('00000000-0000-4000-8000-000000000002'), { x: 1, y: 2 }],
+    ]),
     activeRouteId: uuidSchema.parse('00000000-0000-4000-8000-000000000004'),
     mintedRouteId: uuidSchema.parse('00000000-0000-4000-8000-000000000005'),
   });
@@ -144,7 +148,9 @@ it('preserves authored view scope and unrelated layouts while replacing placemen
   const changed = updatePositionedLayout(withLayouts, {
     layoutId: uuidSchema.parse('00000000-0000-4000-8000-000000000021'),
     title: 'Layout',
-    positions: Placement.fromEntries([['00000000-0000-4000-8000-000000000002', { x: 5, y: 6 }]]),
+    positions: Placement.fromEntries([
+      [uuidSchema.parse('00000000-0000-4000-8000-000000000002'), { x: 5, y: 6 }],
+    ]),
     activeRouteId: uuidSchema.parse('00000000-0000-4000-8000-000000000004'),
   });
 
@@ -183,7 +189,9 @@ it('leaves an authored active Route alone when the Edit names none', () => {
   const changed = updatePositionedLayout(withActiveRoute, {
     layoutId: uuidSchema.parse('00000000-0000-4000-8000-000000000021'),
     title: 'Layout',
-    positions: Placement.fromEntries([['00000000-0000-4000-8000-000000000002', { x: 5, y: 6 }]]),
+    positions: Placement.fromEntries([
+      [uuidSchema.parse('00000000-0000-4000-8000-000000000002'), { x: 5, y: 6 }],
+    ]),
     activeRouteId: null,
   });
 

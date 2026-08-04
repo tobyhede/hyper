@@ -43,25 +43,33 @@ declare const PLACEMENT: unique symbol;
  * value another caller also holds — `empty` is a function for that reason, and
  * the points are copied on the way in. Reading is closed too: nothing outside
  * this file can construct one, so this invariant only has to hold here.
+ *
+ * The points go back out `Readonly` for the same reason read the other way:
+ * construction being closed says nothing about the values already inside, and
+ * `placement.get(id)!.x = 1` would author a position past `next` and `place`
+ * both — the only two things allowed to decide what a placement authors.
  */
-export type Placement = ReadonlyMap<CardId, LayoutPoint> & {
+export type Placement = ReadonlyMap<CardId, Readonly<LayoutPoint>> & {
   readonly [PLACEMENT]: true;
 };
 
 /**
  * The one place a `CardId` key is asserted rather than parsed.
  *
- * Every key reaching a constructor has already been branded: `layoutSchema`
- * declares `positions` as `z.record(idSchema, …)`, so Zod rejects a non-UUID key
- * at parse, and every Space arrives through `loadSpace` or `loadSpaceSnapshot`.
- * A rendered position's key is a React Flow node id, and those are set from
- * `space.cards` by the one function that builds nodes. The brand is lost only to
- * `Object.entries`, which widens keys to `string`, and to React Flow typing
- * `Node.id` as `string` — both erasures in the type system, neither a runtime
- * possibility. Re-parsing here would declare a failure mode nothing can reach
- * and force callers to handle it.
+ * A single erasure reaches this module: `Object.entries` widens the keys of a
+ * `Layout`'s `positions` to `string`. They have already been branded —
+ * `layoutSchema` declares `positions` as `z.record(idSchema, …)`, so Zod rejects
+ * a non-UUID key at parse, and every Space arrives through `loadSpace` or
+ * `loadSpaceSnapshot`. Re-parsing here would declare a failure mode nothing can
+ * reach and force callers to handle it.
+ *
+ * React Flow typing `Node.id` as `string` is the other erasure, and it is
+ * repaired at the adapter that owns it rather than here. `fromEntries` takes
+ * `CardId` keys, because a constructor open to plain strings would re-open the
+ * seam the brand exists to hold — pinned by `identity-types.test.ts`.
  */
-const brand = (positions: ReadonlyMap<CardId, LayoutPoint>): Placement => positions as Placement;
+const brand = (positions: ReadonlyMap<CardId, Readonly<LayoutPoint>>): Placement =>
+  positions as Placement;
 
 const point = (at: LayoutPoint): LayoutPoint => ({ x: at.x, y: at.y });
 
@@ -97,9 +105,9 @@ function fromLayoutGraph(graph: LayoutGraph): Placement {
  * is never installed directly over an authored placement. `next` decides what
  * any of it is allowed to author.
  */
-function fromEntries(entries: Iterable<readonly [string, LayoutPoint]>): Placement {
+function fromEntries(entries: Iterable<readonly [CardId, LayoutPoint]>): Placement {
   const positions = new Map<CardId, LayoutPoint>();
-  for (const [cardId, at] of entries) positions.set(cardId as CardId, point(at));
+  for (const [cardId, at] of entries) positions.set(cardId, point(at));
   return brand(positions);
 }
 
