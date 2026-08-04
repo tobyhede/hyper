@@ -746,6 +746,41 @@ describe('Space Authoring', () => {
     expect(String(reported[1])).toMatch(/discarded 1 queued completion/);
   });
 
+  it('completes a settled drag without forcing a new placement identity', () => {
+    // The render adapter reports a settled gesture before completing, so by the
+    // time `performCompletion` installs, the placement it was given is already
+    // the installed one and `install` has nothing to do. That is deliberate —
+    // the alternative, assigning to take a fresh identity, re-ran layout from
+    // every projection that reported unchanged geometry.
+    //
+    // Both halves are asserted together because the re-layout depends on the
+    // second one: dropping the forced identity is only safe while a completed
+    // Edit replaces the working snapshot, which is what the render path derives
+    // its `LayoutGraph` from. Lose that and a settled Edit renders stale.
+    const loaded = { snapshot: positionedSnapshot, revision: 0n, exportedRevision: null };
+    const { authoring, session } = attachAuthoring(new MemorySpaceBackend([loaded]), loaded, {
+      kind: 'layout',
+      layoutId: LAYOUT_ID,
+    });
+    authoring.installPlacement(
+      Placement.fromEntries([
+        [CARD_A, { x: 90, y: 90 }],
+        [CARD_B, { x: 300, y: 40 }],
+      ]),
+    );
+    const reported = authoring.authoredPlacement();
+    const workingBefore = session.getState().working;
+
+    expect(authoring.complete({ kind: 'settled-card-movement' })).toEqual({ kind: 'completed' });
+
+    expect(authoring.authoredPlacement()).toBe(reported);
+    expect(session.getState().working).not.toBe(workingBefore);
+    expect(session.getState().working.document.layouts?.[0]?.positions).toEqual({
+      [CARD_A]: { x: 90, y: 90 },
+      [CARD_B]: { x: 300, y: 40 },
+    });
+  });
+
   /**
    * Containing a queued failure must not leave the placement describing an Edit
    * the session never took. `performCompletion` submits before it installs, so a

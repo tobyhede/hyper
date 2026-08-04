@@ -54,6 +54,47 @@ describe('usePlacementRendering', () => {
     });
   });
 
+  it('re-runs layout for a new graph while the authored placement keeps its identity', async () => {
+    // What Edit completion relies on since it stopped forcing a new placement
+    // identity to provoke a re-layout: a completed Edit replaces the working
+    // snapshot, and the `LayoutGraph` derived from it re-fires this effect on
+    // its own. Nothing here touches the placement — the same object is handed
+    // back on every render, so only the graph half can produce the second
+    // arrangement.
+    const authored = Placement.fromEntries([
+      [CARD_A, { x: 80, y: 120 }],
+      [CARD_B, { x: 400, y: 260 }],
+    ]);
+    const automatic = gridStrategy();
+    const gainedCard: LayoutGraph = {
+      cards: [
+        { id: CARD_A, width: 240, height: 140, ports: [] },
+        { id: CARD_B, width: 240, height: 140, ports: [] },
+      ],
+      edges: [],
+    };
+    const { result, rerender } = renderHook(
+      ({ input }) => usePlacementRendering(input, automatic, authored),
+      { initialProps: { input: graph } },
+    );
+    await waitFor(() => expect(result.current.kind).toBe('ready'));
+
+    rerender({ input: gainedCard });
+
+    await waitFor(() =>
+      expect(result.current).toEqual({
+        kind: 'ready',
+        graph: {
+          cards: [
+            { ...gainedCard.cards[0]!, x: 80, y: 120 },
+            { ...gainedCard.cards[1]!, x: 400, y: 260 },
+          ],
+          edges: [],
+        },
+      }),
+    );
+  });
+
   it('makes the previous placement unavailable while its replacement is pending', async () => {
     const ready = gridStrategy();
     const pending: LayoutStrategy = () => new Promise(() => undefined);
