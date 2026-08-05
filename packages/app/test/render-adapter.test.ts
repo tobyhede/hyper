@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Position, type Edge } from '@xyflow/react';
-import { uuidSchema, type SpaceSnapshot } from '@project/core';
-import { loadSpaceSnapshot, Placement, type LayoutPoint } from '@project/graph';
+import { uuidSchema, type LayoutPosition, type SpaceSnapshot } from '@project/core';
+import { loadSpaceSnapshot, Placement } from '@project/graph';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
 import type { CardFlowNode } from '@project/react-flow-adapter';
 import { createNavigation } from '../src/navigation';
@@ -32,7 +32,7 @@ const EDGE: Edge = {
 };
 
 interface InstallRecord {
-  readonly placement: ReadonlyMap<string, LayoutPoint> | null;
+  readonly placement: ReadonlyMap<string, LayoutPosition> | null;
   /** What the adapter's own state held at the moment the effect ran. */
   readonly nodesAtCall: readonly CardFlowNode[] | null;
 }
@@ -55,7 +55,7 @@ function authoringSpy({
     getState: () => ({}) as never,
     authoredPlacement: () => null,
     subscribe: () => () => undefined,
-    installPlacement: (placement: ReadonlyMap<string, LayoutPoint> | null) => {
+    installPlacement: (placement: ReadonlyMap<string, LayoutPosition> | null) => {
       installs.push({ placement, nodesAtCall: adapter?.getState().projection?.nodes ?? null });
     },
     canConnect: () => canConnect,

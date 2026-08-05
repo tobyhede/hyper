@@ -1,5 +1,5 @@
-import type { CardId, Layout } from '@project/core';
-import type { LayoutGraph, LayoutPoint } from './layout';
+import type { CardId, Layout, LayoutPosition } from '@project/core';
+import type { LayoutGraph } from './layout';
 
 /** The brand's carrier. See `Placement` below for what the type means. */
 declare const PLACEMENT: unique symbol;
@@ -49,7 +49,7 @@ declare const PLACEMENT: unique symbol;
  * `placement.get(id)!.x = 1` would author a position past `next` and `place`
  * both — the only two things allowed to decide what a placement authors.
  */
-export type Placement = ReadonlyMap<CardId, Readonly<LayoutPoint>> & {
+export type Placement = ReadonlyMap<CardId, Readonly<LayoutPosition>> & {
   readonly [PLACEMENT]: true;
 };
 
@@ -68,14 +68,14 @@ export type Placement = ReadonlyMap<CardId, Readonly<LayoutPoint>> & {
  * `CardId` keys, because a constructor open to plain strings would re-open the
  * seam the brand exists to hold — pinned by `identity-types.test.ts`.
  */
-const brand = (positions: ReadonlyMap<CardId, Readonly<LayoutPoint>>): Placement =>
+const brand = (positions: ReadonlyMap<CardId, Readonly<LayoutPosition>>): Placement =>
   positions as Placement;
 
-const point = (at: LayoutPoint): LayoutPoint => ({ x: at.x, y: at.y });
+const point = (at: LayoutPosition): LayoutPosition => ({ x: at.x, y: at.y });
 
 /** The placement a Layout holds. */
 function fromLayout(layout: Layout): Placement {
-  const positions = new Map<CardId, LayoutPoint>();
+  const positions = new Map<CardId, LayoutPosition>();
   for (const [cardId, at] of Object.entries(layout.positions)) {
     if (at !== undefined) positions.set(cardId as CardId, point(at));
   }
@@ -90,7 +90,7 @@ function fromLayout(layout: Layout): Placement {
  * collapsing that to `(0, 0)` would assert a placement no strategy made.
  */
 function fromLayoutGraph(graph: LayoutGraph): Placement {
-  const positions = new Map<CardId, LayoutPoint>();
+  const positions = new Map<CardId, LayoutPosition>();
   for (const card of graph.cards) {
     if (card.x === undefined || card.y === undefined) continue;
     positions.set(card.id, { x: card.x, y: card.y });
@@ -105,8 +105,8 @@ function fromLayoutGraph(graph: LayoutGraph): Placement {
  * is never installed directly over an authored placement. `next` decides what
  * any of it is allowed to author.
  */
-function fromEntries(entries: Iterable<readonly [CardId, LayoutPoint]>): Placement {
-  const positions = new Map<CardId, LayoutPoint>();
+function fromEntries(entries: Iterable<readonly [CardId, LayoutPosition]>): Placement {
+  const positions = new Map<CardId, LayoutPosition>();
   for (const [cardId, at] of entries) positions.set(cardId, point(at));
   return brand(positions);
 }
@@ -161,7 +161,7 @@ function next(
   if (authored === null) return rendered;
   if (placed.length === 0) return authored;
 
-  const merged = new Map<CardId, LayoutPoint>(authored);
+  const merged = new Map<CardId, LayoutPosition>(authored);
   for (const cardId of placed) {
     const at = rendered.get(cardId);
     if (at !== undefined) merged.set(cardId, point(at));
@@ -178,14 +178,14 @@ function next(
  * dropped it, which is authorship rather than a report — no renderer has drawn
  * that Card yet, so it cannot come through `next`.
  */
-function place(placement: Placement, cardId: CardId, at: LayoutPoint): Placement {
+function place(placement: Placement, cardId: CardId, at: LayoutPosition): Placement {
   const placed = new Map(placement);
   placed.set(cardId, point(at));
   return brand(placed);
 }
 
 /** The record a Layout stores. Keys are already card ids; this only widens them. */
-function toPositions(placement: Placement): Record<CardId, LayoutPoint> {
+function toPositions(placement: Placement): Record<CardId, LayoutPosition> {
   return Object.fromEntries([...placement].map(([cardId, at]) => [cardId, point(at)]));
 }
 
