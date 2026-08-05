@@ -91,10 +91,41 @@ const parseSnapshot = (input: unknown): SpaceSnapshot => {
   return intake.snapshot;
 };
 
+interface SchemaIssue {
+  readonly path: readonly PropertyKey[];
+  readonly message: string;
+}
+
+/**
+ * Zod serializes its entire issue array into `Error.message`, and both callers
+ * below hand that to `rejectInvalidSnapshot`, which puts it in the
+ * `{ message: string }` error contract — a JSON document nested inside a field
+ * the CLI prints and clients render as a sentence. `parseSnapshot` above already
+ * throws located intake prose; these two were the last raw dumps on the import
+ * path.
+ *
+ * The same answer `decodeSnapshot` gives in `@project/persistence`'s wire codec:
+ * the first three failing paths and their reasons, then a count of the rest.
+ * Restated here rather than shared, because sharing it means exporting a
+ * string-formatting helper from a browser-safe package for one server-side
+ * caller. What the two owe each other is the behaviour — prose, not Zod — and
+ * both now pay it.
+ */
+const describeSchemaFailure = (issues: readonly SchemaIssue[], label: string): string => {
+  const described = issues
+    .slice(0, 3)
+    .map((issue) => `${issue.path.join('.') || 'space'} ${issue.message.toLowerCase()}`)
+    .join('; ');
+  const remaining = issues.length - 3;
+  return `${label} is invalid: ${described}${remaining > 0 ? ` (and ${remaining} more)` : ''}`;
+};
+
 const parseSnapshotShape = (input: unknown): SpaceSnapshot => {
   const parsed = spaceSnapshotSchema.safeParse(input);
   if (!parsed.success) {
-    throw new SnapshotValidationError(parsed.error.message);
+    throw new SnapshotValidationError(
+      describeSchemaFailure(parsed.error.issues, 'identified space'),
+    );
   }
   return parsed.data;
 };
@@ -102,7 +133,7 @@ const parseSnapshotShape = (input: unknown): SpaceSnapshot => {
 const parseImport = (input: unknown): ImportSpace => {
   const parsed = importSpaceSchema.safeParse(input);
   if (!parsed.success) {
-    throw new SnapshotValidationError(parsed.error.message);
+    throw new SnapshotValidationError(describeSchemaFailure(parsed.error.issues, 'import space'));
   }
   return parsed.data;
 };

@@ -17,9 +17,12 @@ of duplication that stays correct only while someone remembers to keep it correc
   and for the three behaviours the contract deliberately omits.
 - `02` — four whole-snapshot parses per commit, one of them redundant.
   **Resolved** (`a0f7632`). It left one thing behind deliberately: two raw Zod
-  messages remain on the import path (`src/persistence/postgres-space-repository.ts:103,111`),
-  which is the shape AGENTS.md forbids under "a wire codec throws prose, not
-  Zod". Nothing tracks them.
+  messages on the import path, which is the shape AGENTS.md forbids under "a
+  wire codec throws prose, not Zod". Those are **now swept too** —
+  `describeSchemaFailure` in `postgres-space-repository.ts` gives `parseImport`
+  and `parseSnapshotShape` the summary `decodeSnapshot` already gave the wire
+  codec — so no raw `parsed.error.message` reaches a client anywhere in the
+  tree.
 
 ## Note
 

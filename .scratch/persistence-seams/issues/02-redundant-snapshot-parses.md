@@ -108,6 +108,11 @@ import path and both predating this ticket: `parseImport` throws
 sweeps is the commit and stored-read path — the two `parseSnapshot` serves — not
 the file.
 
+> **Later:** the two it left are swept. `describeSchemaFailure` in the same file
+> now summarises the first three issues for both, as `decodeSnapshot` does for
+> the wire codec, so the file holds no raw `parsed.error.message` either. The
+> paragraph above stands as the record of what this ticket did and did not do.
+
 `packages/graph/test/space-snapshot.test.ts` and
 `packages/persistence/test/memory-backend.test.ts` pin the swept form directly: a
 shape-invalid snapshot reports a located `path: message`, and the backend's
