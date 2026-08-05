@@ -1,6 +1,11 @@
 # Route authoring
 
-Status: resolved (issues 01–06)
+Status: open — issues `01`–`06` resolved; `07` outstanding.
+
+Issues `01`–`06` delivered the authoring half. User story 32 — a cyclic Route
+remaining presentable — was never ticketed with them, and the gesture `04`
+shipped reaches it: a self-connection mints a Route that `present()` silently
+declines to start. That is issue `07`.
 
 Decisions: ADR 0032 — Routes may contain cycles; ADR 0033 — Route authoring
 uses spatial handles coloured as the active Route.
