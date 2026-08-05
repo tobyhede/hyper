@@ -21,13 +21,16 @@ Layout's `_Avoid_` line to say placement is the map, not the entity holding one.
 The practice around it is not in place, so the next divergence will also go
 unrecorded.
 
-## Why this is a human ticket
+## Why this needed a human
 
 The question is a process one, not a code one: is the `_Avoid_` list meant to be
 enforced against the code, or is it advisory for prose and naming? Both are
 defensible. If enforced, an audit is worth doing once and a check is worth having.
 If advisory, `workflow.md`'s sentence should say so, because as written it promises
 a record that does not exist.
+
+No agent could settle that, so it was put to the human. What follows is their
+answer, not a reading of the existing docs.
 
 ## Resolution
 
