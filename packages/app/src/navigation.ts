@@ -87,15 +87,18 @@ function outgoingEdgesFrom(
 }
 
 /**
- * The Card a walk stands on: its last, and its first when that is the only one.
+ * The Card a walk stands on: its last, read in place.
  *
  * `noUncheckedIndexedAccess` widens a computed index to `| undefined` however
- * the tuple is declared, so a non-empty walk is read through its one fixed
- * element and the tail supplies every Card after it. Neither branch is
- * unreachable — a walk that has not advanced is exactly the first.
+ * the tuple is declared, so the last element needs an answer for a case it
+ * cannot reach; element 0 is a fixed tuple element and keeps its type, so the
+ * walk's own guaranteed Card supplies it. Both reads are indexes and neither
+ * copies: this runs on every render through `activeCardId` and `moves`, and
+ * destructuring a tail to reach the end allocated a copy of the whole
+ * accumulated walk each time.
  */
-function currentCard([first, ...rest]: Walk): CardId {
-  return rest[rest.length - 1] ?? first;
+function currentCard(walk: Walk): CardId {
+  return walk[walk.length - 1] ?? walk[0];
 }
 
 /**

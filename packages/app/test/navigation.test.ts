@@ -182,6 +182,65 @@ it('presents a fully cyclic Route, which has no entry Card', () => {
 });
 
 /*
+ * A walk may stand on the same Card twice. Cycles and self-edges are legal
+ * authored structure (ADR 0032), so a presenter walking a loop accumulates a
+ * walk whose Cards repeat and whose last Card can be its first again. The Card
+ * being presented is the walk's *last* element, never the first occurrence of
+ * it — a read that answered the Card the walk began on would go on offering the
+ * moves out of that Card for the rest of the loop, and the two only diverge once
+ * a Card repeats.
+ *
+ * The other two shapes are pinned already and not repeated here: a one-Card walk
+ * is read by "opens and closes Cards…" straight after `present()`, and a walk
+ * that has advanced by the fork test below.
+ */
+it('reads the last Card of a walk that returns to one it has already stood on', () => {
+  const cardA = uuid('00000000-0000-4000-8000-000000000002');
+  const cardB = uuid('00000000-0000-4000-8000-000000000003');
+  const loaded = loadSpace(
+    {
+      version: 2,
+      id: uuid('00000000-0000-4000-8000-000000000001'),
+      title: 'Cycle',
+      routes: [
+        {
+          id: ROUTE_ONE,
+          title: 'Cycle',
+          edges: [
+            { from: cardA, to: cardB },
+            { from: cardB, to: cardA },
+          ],
+        },
+      ],
+    },
+    [cardFile(cardA), cardFile(cardB)],
+  );
+  if (!loaded.ok) throw new Error('cycle should load');
+  const navigation = createNavigation(() => loaded.space, { kind: 'view', view: 'graph' });
+
+  navigation.present();
+  navigation.advance();
+  navigation.advance();
+
+  // Back where it began: the walk's last Card is its first, and presenting
+  // stands on it rather than merely carrying it at the front.
+  expect(walkOf(navigation.getState())).toEqual([cardA, cardB, cardA]);
+  expect(navigation.activeCardId()).toBe(cardA);
+  expect(navigation.moves()).toEqual([{ cardId: cardB, title: 'B', selected: true }]);
+
+  navigation.advance();
+
+  // The case the two answers separate on: the walk repeats a Card and its last
+  // is no longer its first, so reading the start answers A where the presenter
+  // is standing on B.
+  expect(walkOf(navigation.getState())).toEqual([cardA, cardB, cardA, cardB]);
+  expect(navigation.activeCardId()).toBe(cardB);
+
+  navigation.retreat();
+  expect(navigation.activeCardId()).toBe(cardA);
+});
+
+/*
  * A walk belongs to presenting, and leaving presenting has none to clear. This
  * used to be four hand-written `walk: []` resets — one per path back to the
  * overview — any of which could have been forgotten without anything noticing
