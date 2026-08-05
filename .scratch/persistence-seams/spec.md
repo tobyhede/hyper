@@ -7,8 +7,13 @@ of duplication that stays correct only while someone remembers to keep it correc
 
 ## Issues
 
-- `01` — one repository seam, declared once, with a shared contract suite
-- `02` — four whole-snapshot parses per commit, one of them redundant
+- `01` — one repository seam, declared once, with a shared contract suite. Open
+  (`needs-triage`); its claims were re-verified against the tree and corrected.
+- `02` — four whole-snapshot parses per commit, one of them redundant.
+  **Resolved** (`a0f7632`). It left one thing behind deliberately: two raw Zod
+  messages remain on the import path (`src/persistence/postgres-space-repository.ts:103,111`),
+  which is the shape AGENTS.md forbids under "a wire codec throws prose, not
+  Zod". Nothing tracks them.
 
 ## Note
 

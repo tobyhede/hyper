@@ -1,6 +1,9 @@
 # Gate the documented React Flow mispractices
 
-Status: open
+Status: resolved — `01`–`03` all shipped, and both tail follow-ups landed with
+them: `RoutedEdge` is typed `EdgeProps<RoutedFlowEdge>` (`eb36d30`), and the
+`onNodeClick` `useCallback` item is moot because ADR 0036 deleted the handler
+outright (`24f3059`).
 
 ## Why
 

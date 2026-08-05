@@ -46,9 +46,10 @@ write the same Card document through Space Authoring.
 
 An **Alias cannot be opened**. It owns a title and a pointer, not content, so
 there is nothing for this surface to author; and with the reading surface gone,
-looking at the content an alias points at goes with it. That capability returns
+looking at the content an alias points at goes with it. That capability returned
 with `card-authoring/03`, which delegates an alias's content editing to its
-target and is unbuilt. An Alias is renamed inline, like any Card.
+target and shipped in `1ab90b2` (ADR 0039) — this spec was written while it was
+still unbuilt. An Alias is renamed inline, like any Card.
 
 Preview is not part of this. Rendered Markdown lives only in presenting (ADR
 0011), and a preview surface changes that decision rather than extending it.
@@ -78,7 +79,7 @@ Preview is not part of this. Rendered Markdown lives only in presenting (ADR
 - The title field validates as the graph's inline editor does — trimmed, non-empty — and reports its own accessible error.
 - One Done builds one complete Card document and completes one `edited-card` Edit through Space Authoring, exactly as the description and body already do.
 - An Alias offers no affordance and cannot be opened by keyboard either, so `editableCardIds` gates both paths rather than only the control.
-- `CardRenderer` itself stays in `@project/ui`. It is presentation-agnostic and this is one caller; deleting a component because its only current caller stopped using it is a separate decision.
+- `CardRenderer` itself stays in `@project/ui`. It is presentation-agnostic and this is one caller; deleting a component because its only current caller stopped using it is a separate decision. **That separate decision was later taken:** `CardRenderer` no longer exists anywhere in `packages/`, and `CardContent.tsx:15` records that it "went with the reading surface".
 
 ## Testing Decisions
 

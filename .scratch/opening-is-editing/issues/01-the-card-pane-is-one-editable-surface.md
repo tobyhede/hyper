@@ -31,6 +31,10 @@ The title is a field, validated exactly as the graph's inline editor validates â
 trimmed, non-empty, its own accessible error. `Escape` still cancels, and now
 closes with it: there is no reading state behind the editor to fall back to.
 
+(Later superseded: `CardRenderer` was subsequently deleted from `@project/ui`
+altogether, as the separate decision this paragraph anticipated. It exists
+nowhere in `packages/` now.)
+
 `CardRenderer` stays in `@project/ui` with no caller. It is presentation-agnostic
 and losing its only current use is not a reason to delete it; that is a separate
 decision for whoever wants one.
