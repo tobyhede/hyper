@@ -1,8 +1,16 @@
 import { readFileSync, readdirSync } from 'node:fs';
-import { basename } from 'node:path';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
+
+/** Every TypeScript source under `directory`, at any depth, as absolute paths. */
+const typeScriptSourceFiles = (directory: string): readonly string[] =>
+  readdirSync(directory, { recursive: true, encoding: 'utf8' })
+    .filter((entry) => entry.endsWith('.ts') || entry.endsWith('.tsx'))
+    .map((entry) => join(directory, entry));
 
 /**
  * ADR 0038: `core`'s schema-derived `LayoutPosition` is the one representation of
@@ -26,10 +34,7 @@ import { describe, expect, it } from 'vitest';
 describe('a point has one type', () => {
   const graphSourceDir = fileURLToPath(new URL('../../packages/graph/src/', import.meta.url));
 
-  const graphSourceFiles = (): readonly string[] =>
-    readdirSync(graphSourceDir)
-      .filter((entry) => entry.endsWith('.ts'))
-      .map((entry) => `${graphSourceDir}${entry}`);
+  const graphSourceFiles = (): readonly string[] => typeScriptSourceFiles(graphSourceDir);
 
   const parse = (file: string): ts.SourceFile =>
     ts.createSourceFile(file, readFileSync(file, 'utf8'), ts.ScriptTarget.Latest, true);
@@ -63,7 +68,7 @@ describe('a point has one type', () => {
       parse(file)
         .statements.map(declaredPoint)
         .filter((name) => name !== null)
-        .map((name) => `${name} in packages/graph/src/${basename(file)}`),
+        .map((name) => `${name} in packages/graph/src/${relative(graphSourceDir, file)}`),
     );
 
     expect(declared).toEqual([]);
@@ -85,5 +90,40 @@ describe('a point has one type', () => {
     );
 
     expect(importers.length).toBeGreaterThan(0);
+  });
+});
+
+/**
+ * The guard above is only as wide as the walk under it: a point re-declared in a
+ * file the walk skips is a point it never reads, silently. `packages/graph/src`
+ * is flat and entirely `.ts` today, so nothing there can prove the walk reaches
+ * further — which is the whole reason to prove it here instead, against a
+ * directory shaped like the one a later change would make.
+ */
+describe('the walk that guard reads', () => {
+  const temporaryDirectories: string[] = [];
+
+  afterEach(async () => {
+    await Promise.all(
+      temporaryDirectories.splice(0).map((directory) => rm(directory, { recursive: true })),
+    );
+  });
+
+  it('finds TypeScript at any depth, and nothing that is not TypeScript', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'hyper-point-type-identity-'));
+    temporaryDirectories.push(directory);
+    await mkdir(join(directory, 'nested'));
+    await writeFile(join(directory, 'top.ts'), '');
+    await writeFile(join(directory, 'nested', 'deep.ts'), '');
+    await writeFile(join(directory, 'nested', 'view.tsx'), '');
+    await writeFile(join(directory, 'nested', 'notes.md'), '');
+
+    expect([...typeScriptSourceFiles(directory)].sort()).toEqual(
+      [
+        join(directory, 'nested', 'deep.ts'),
+        join(directory, 'nested', 'view.tsx'),
+        join(directory, 'top.ts'),
+      ].sort(),
+    );
   });
 });
