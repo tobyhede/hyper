@@ -222,15 +222,63 @@ function ResolvedContentEditor({
   );
 }
 
-export interface OpenCardProps {
-  /** The authored Card whose occurrence was opened; an Alias remains intact here. */
-  opened: Card;
-  content: ResolvedContentCard;
-  /** Complete the one whole Card that owns the resolved content. */
-  onComplete: (card: ResolvedContentCard) => void;
-  /** Close without completing. */
-  onCancel: () => void;
+/**
+ * A Card opened on its own content — the ordinary case, and one Card.
+ *
+ * `content` and `through` are declared absent rather than left off, so a caller
+ * cannot quietly hand this variant a second Card: the pair is refused by
+ * assignability, not by an excess-property check a spread or an intermediate
+ * variable would slip past.
+ */
+interface DirectOpen {
+  /** The Card that was opened, which owns the content this pane authors. */
+  readonly card: ResolvedContentCard;
+  readonly through?: never;
+  readonly content?: never;
 }
+
+/**
+ * A Card opened through another occurrence of its content — an Alias today
+ * (ADR 0039), and whatever later kind resolves its content elsewhere.
+ */
+interface DelegatedOpen {
+  /**
+   * The authored Card whose occurrence was opened; an Alias remains intact
+   * here. Named for what the pane says — "Opened through A again" — because
+   * that is the relation this prop records: the Card the author reached the
+   * content *through*, which keeps its own title on the graph.
+   */
+  readonly through: Card;
+  /** The Card that owns the content reached through the occurrence above. */
+  readonly content: ResolvedContentCard;
+  readonly card?: never;
+}
+
+/**
+ * What the pane was opened on, in exactly one of its two forms.
+ *
+ * This was two independent props — `opened: Card` and `content:
+ * ResolvedContentCard` — with the relation `content === resolveContentCard(
+ * space, opened.id)` holding only because every caller happened to establish
+ * it. Any two Cards typechecked, and a mismatched pair silently authored a Card
+ * the author never opened. A direct open now names one Card, so that pair
+ * cannot be written down.
+ *
+ * The second thing the union buys is that **delegation is declared, not
+ * derived**. `opened.kind === 'alias'` answered the question by proxy and would
+ * answer it wrong for any later Card kind whose content resolves elsewhere: the
+ * pane would draw a Title field, that field would rename the *content* owner,
+ * and the graph behind it would go on drawing the *opened* Card's title — two
+ * cards' titles, one field, which is exactly the negative ADR 0039 records.
+ * Callers pick a variant from the relation — whether the Card that was opened
+ * is the Card that owns its content — never from the opened Card's kind.
+ */
+export type OpenCardProps = {
+  /** Complete the one whole Card that owns the resolved content. */
+  readonly onComplete: (card: ResolvedContentCard) => void;
+  /** Close without completing. */
+  readonly onCancel: () => void;
+} & (DirectOpen | DelegatedOpen);
 
 /**
  * A card opened over the graph — one editable surface, and the only one.
@@ -254,9 +302,17 @@ export interface OpenCardProps {
  * surface visible at a time. An Alias keeps its own title on the graph and this
  * surface identifies, but does not rename, the Card whose content it delegates.
  */
-export function OpenCard({ opened, content, onComplete, onCancel }: OpenCardProps) {
+export function OpenCard(props: OpenCardProps) {
+  const { onComplete, onCancel } = props;
   const panel = useRef<HTMLDivElement>(null);
-  const delegated = opened.kind === 'alias';
+  // The one place the variant is read. A direct open is one Card being its own
+  // content, so the pair below cannot disagree; a delegated one carries two,
+  // and `delegated` is what the caller declared rather than a `kind` this
+  // component reads back off a Card.
+  const { delegated, opened, content } =
+    props.through === undefined
+      ? { delegated: false, opened: props.card, content: props.card }
+      : { delegated: true, opened: props.through, content: props.content };
 
   /**
    * The pane takes focus while it is open. Where focus goes when it *closes* is

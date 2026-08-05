@@ -586,14 +586,24 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
             />
           )}
 
-          {openedCard && openedContent && (
-            <OpenCard
-              opened={openedCard}
-              content={openedContent}
-              onComplete={completeOpenedCard}
-              onCancel={closeCard}
-            />
-          )}
+          {/* Which form the pane opens in is the *relation* between the Card
+              that was opened and the Card that owns its content, not the opened
+              Card's kind: a Card that resolves to itself is a direct open, and
+              anything else was reached through an occurrence. Deciding on
+              `kind === 'alias'` would answer the same question by proxy today
+              and wrongly for the next kind that resolves elsewhere. */}
+          {openedCard &&
+            openedContent &&
+            (openedCard.id === openedContent.id ? (
+              <OpenCard card={openedContent} onComplete={completeOpenedCard} onCancel={closeCard} />
+            ) : (
+              <OpenCard
+                through={openedCard}
+                content={openedContent}
+                onComplete={completeOpenedCard}
+                onCancel={closeCard}
+              />
+            ))}
         </div>
       </AppShell>
     );
