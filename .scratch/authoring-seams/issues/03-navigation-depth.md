@@ -1,6 +1,6 @@
 # `NavigationState` permits states that mean nothing
 
-Status: ready-for-agent
+Status: resolved
 
 Filed as "`Navigation` is shallow". Verification did not support that reading,
 and the direction below replaces it. The file keeps its old name so existing
@@ -67,20 +67,20 @@ export type NavigationState =
     });
 ```
 
-- [ ] `exitPresenting` becomes `{ ...base, mode: 'overview' }` — there is no walk
+- [x] `exitPresenting` becomes `{ ...base, mode: 'overview' }` — there is no walk
       to forget to clear, and the four reset sites collapse.
-- [ ] The presenting walk is typed non-empty, so `activeCardId` returns a
+- [x] The presenting walk is typed non-empty, so `activeCardId` returns a
       `CardId` inside that branch and the `?? null` goes.
-- [ ] `advance`, `retreat` and `selectBranch` narrow on mode rather than
+- [x] `advance`, `retreat` and `selectBranch` narrow on mode rather than
       guarding at runtime. `advance`'s no-outgoing-Edge guard stays — that one is
       about Edges, not about mode, and the fifteen-line comment above it still
       applies in full.
-- [ ] `App.tsx:117` (`navigationState.walk.length > 1`) reads the walk without
+- [x] `App.tsx:117` (`navigationState.walk.length > 1`) reads the walk without
       checking mode today and must narrow first. Expect the same at any other
       consumer read — that narrowing is the point, not incidental churn.
-- [ ] `space-authoring.ts` compiles unchanged or its required changes are
+- [x] `space-authoring.ts` compiles unchanged or its required changes are
       explained; it is the second consumer and is easy to forget.
-- [ ] No behaviour changes. `pnpm verify` and `pnpm e2e` both pass, and e2e
+- [x] No behaviour changes. `pnpm verify` and `pnpm e2e` both pass, and e2e
       passes **unchanged** — that is the guard proving this was behaviour-
       preserving (`docs/agents/workflow.md`).
 
@@ -149,3 +149,56 @@ pre-refusal read path would.
 Touching `NavigationState`'s shape reaches both consumers. `docs/agents/workflow.md`
 says a rename must not ride along with a structural change — if any member is
 renamed while doing this, that is its own commit.
+
+## Answer
+
+`NavigationState` is a discriminated union on `mode`, exactly as directed. The
+walk and `branchIndex` sit on the presenting member alone, the walk typed
+`readonly [CardId, ...CardId[]]` behind a module-private `Walk` alias.
+
+What the four reset sites became: `openedState` and `exitPresenting` name no
+walk at all, and `selectRenderer` and `activateRoute` publish
+`{ ...baseOf(current), mode: 'overview', … }`. `baseOf` projects the four shared
+fields by name rather than by spread — spreading a presenting state into an
+overview one would carry the walk across at runtime, past a type that says there
+is none. `setState` was narrowed to `Partial<NavigationBase>`, so a partial
+update can no longer name `mode` and therefore cannot start or end a walk.
+
+`advance`, `retreat`, `selectBranch` and `moves` narrow on `mode` first;
+`advance`'s Edge guard and its comment stay, with the one clause that enumerated
+"overview" among the guard's cases corrected — overview is answered by the type
+a line above now, and saying otherwise would have been stale rather than
+preserved. `activeCardId` reads a `CardId` through `currentCard`, whose `??` is
+a live branch (a one-Card walk *is* its first) rather than the dead one a
+`walk[len - 1] ?? walk[0]` would have been; `noUncheckedIndexedAccess` widens a
+computed index however the tuple is declared, so the non-emptiness is spent in
+one named place.
+
+Consumers: `App.tsx` needed one line — `canRetreat` narrows through the existing
+`presenting` alias. **`space-authoring.ts` compiled unchanged**: it reads only
+`activeRouteId` and `selectedRenderer`, both on the base, and the four-method
+mock at `space-authoring.test.ts:1340` still casts cleanly because every union
+member carries the two fields it supplies.
+
+One thing the change nearly broke, caught by a red test written first: `openFresh`
+went through `setState`, which merged `openedState`'s result over the current
+state. That was equivalent only while `openedState` named every field — the
+moment it stopped naming a walk it stopped clearing one, and a walk survived into
+a freshly opened Space under `mode: 'overview'`. It now publishes whole. The
+exact-equality assertion in "opens a replacement Space as new navigation" is what
+found it.
+
+Tests: two new ones in `navigation.test.ts` — "leaves no walk behind when
+presenting ends" (exact equality, the runtime half) and "stands on a Card for as
+long as it is presenting" (an `expectTypeOf` on `state.walk[0]`, enforced by
+`pnpm typecheck` rather than `pnpm test`, as with `space-http-app-types.test.ts`).
+Four existing assertions naming `walk: []` on an overview state dropped it and
+assert `activeCardId()` is null instead, so they still say what they were
+written to say.
+
+`NavigationMode` was deleted: it typed only the field the union replaced, had no
+reference anywhere else in the repo, and `NavigationState['mode']` still answers
+it.
+
+Verified: `pnpm verify` green (838 tests), `pnpm e2e` 71 passed — the same 71 as
+the pre-change baseline, with no e2e file touched.

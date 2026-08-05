@@ -1494,7 +1494,6 @@ describe('Space Authoring', () => {
         selectedRenderer: { kind: 'layout', layoutId: LAYOUT_ID },
         activeRouteId: STORED_ROUTE_ID,
         mode: 'overview',
-        walk: [],
         openedCardId: null,
       },
     });

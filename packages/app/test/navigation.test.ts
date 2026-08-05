@@ -1,10 +1,20 @@
-import { expect, it, vi } from 'vitest';
-import { uuidSchema, type RouteId, type UUID } from '@project/core';
+import { expect, expectTypeOf, it, vi } from 'vitest';
+import { uuidSchema, type CardId, type RouteId, type UUID } from '@project/core';
 import { loadSpace, type Space } from '@project/graph';
-import { createNavigation } from '../src/navigation';
+import { createNavigation, type NavigationState } from '../src/navigation';
 import { cardFile } from './card-files';
 
 const uuid = (value: string): UUID => uuidSchema.parse(value);
+
+/**
+ * The walk behind a presenting state. Reading one is narrowing now, which is the
+ * point of the split: a state that is not presenting has no walk to read, here
+ * or anywhere else.
+ */
+function walkOf(state: NavigationState): readonly CardId[] {
+  if (state.mode !== 'presenting') throw new Error('navigation should be presenting');
+  return state.walk;
+}
 
 const ROUTE_ONE = uuid('00000000-0000-4000-8000-000000000031');
 const ROUTE_TWO = uuid('00000000-0000-4000-8000-000000000032');
@@ -70,8 +80,8 @@ it('selects a renderer and its active Route without changing the Space', () => {
     selectedView: 'graph',
     activeRouteId: ROUTE_TWO,
     mode: 'overview',
-    walk: [],
   });
+  expect(navigation.activeCardId()).toBeNull();
   expect(space.defaultView).toBeUndefined();
 
   navigation.selectRenderer({ kind: 'view', view: 'grid' });
@@ -171,6 +181,47 @@ it('presents a fully cyclic Route, which has no entry Card', () => {
   expect(navigation.moves()).toEqual([{ cardId: card, title: 'A', selected: true }]);
 });
 
+/*
+ * A walk belongs to presenting, and leaving presenting has none to clear. This
+ * used to be four hand-written `walk: []` resets — one per path back to the
+ * overview — any of which could have been forgotten without anything noticing
+ * until a stale Card was read out of a walk nobody was on.
+ */
+it('leaves no walk behind when presenting ends', () => {
+  const space = fixture();
+  const navigation = createNavigation(() => space, { kind: 'view', view: 'graph' });
+  navigation.present();
+  navigation.advance();
+
+  navigation.exitPresenting();
+
+  expect(navigation.getState()).toEqual({
+    selectedRenderer: { kind: 'view', view: 'graph' },
+    selectedView: 'graph',
+    activeRouteId: ROUTE_ONE,
+    mode: 'overview',
+    openedCardId: null,
+  });
+  expect(navigation.activeCardId()).toBeNull();
+});
+
+/*
+ * Presenting stands on a Card for as long as it lasts: it begins on the Route's
+ * start Card and `retreat` keeps the first, so the walk is non-empty by type
+ * rather than by a check at each read.
+ */
+it('stands on a Card for as long as it is presenting', () => {
+  const space = fixture();
+  const navigation = createNavigation(() => space, { kind: 'view', view: 'graph' });
+
+  navigation.present();
+
+  const state = navigation.getState();
+  if (state.mode !== 'presenting') throw new Error('present() should have started a walk');
+  expectTypeOf(state.walk[0]).toEqualTypeOf<CardId>();
+  expect(state.walk[0]).toBe(uuid('00000000-0000-4000-8000-000000000002'));
+});
+
 it('activating a Route ends the current walk without changing the Space', () => {
   const space = fixture();
   const navigation = createNavigation(() => space, { kind: 'view', view: 'graph' });
@@ -181,9 +232,8 @@ it('activating a Route ends the current walk without changing the Space', () => 
   expect(navigation.getState()).toMatchObject({
     activeRouteId: ROUTE_TWO,
     mode: 'overview',
-    walk: [],
-    branchIndex: 0,
   });
+  expect(navigation.activeCardId()).toBeNull();
   expect(space.defaultView).toBeUndefined();
 });
 
@@ -207,7 +257,7 @@ it('continues the current walk when an Edit converts the renderer to a Layout', 
   const space = fixture();
   const navigation = createNavigation(() => space, { kind: 'view', view: 'graph' });
   navigation.present();
-  const walk = navigation.getState().walk;
+  const walk = walkOf(navigation.getState());
 
   navigation.continueInRenderer({ kind: 'layout', layoutId: LAYOUT });
 
@@ -216,7 +266,7 @@ it('continues the current walk when an Edit converts the renderer to a Layout', 
     activeRouteId: ROUTE_ONE,
     mode: 'presenting',
   });
-  expect(navigation.getState().walk).toBe(walk);
+  expect(walkOf(navigation.getState())).toBe(walk);
 });
 
 it('notifies subscribers synchronously until they unsubscribe', () => {
@@ -297,7 +347,8 @@ it('opens and closes Cards, and closes an opened Card when presenting starts', (
   expect(navigation.getState()).toMatchObject({ mode: 'presenting', openedCardId: null });
   expect(navigation.activeCardId()).toBe(uuid('00000000-0000-4000-8000-000000000002'));
   navigation.exitPresenting();
-  expect(navigation.getState()).toMatchObject({ mode: 'overview', walk: [] });
+  expect(navigation.getState()).toMatchObject({ mode: 'overview' });
+  expect(navigation.activeCardId()).toBeNull();
 });
 
 /*
@@ -323,8 +374,6 @@ it('opens a replacement Space as new navigation, retaining no reading state', ()
     selectedView: 'graph',
     activeRouteId: ROUTE_TWO,
     mode: 'overview',
-    walk: [],
-    branchIndex: 0,
     openedCardId: null,
   });
 });

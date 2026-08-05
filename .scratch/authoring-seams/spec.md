@@ -14,20 +14,21 @@ The app's authoring cluster took roughly twenty of the thirty commits before the
 review. The recurring shape was a rule that belonged in one place living in
 several, and being re-fixed each time it broke somewhere new. Placement was the
 worst case — five fixes to one concept, two of them 43 minutes apart. These three
-are the same shape at smaller scale. `01` is now resolved; `02` and `03` remain
-open.
+are the same shape at smaller scale. `01` and `03` are now resolved; `02`
+remains open.
 
 ## Issues
 
 - `01` — one observable-state module; three publishers disagree (resolved)
 - `02` — a seam for authoring gestures, so `GraphView` is testable off-browser
-- `03` — `NavigationState` permits states that mean nothing. Filed as
+- `03` — `NavigationState` permits states that mean nothing (resolved). Filed as
   "`Navigation` is shallow"; verification did not support that reading. The
   module is deep — some 56 lines of it are comments recording ADR interactions
   and negative knowledge — and the repetition that looked like shallow members
-  is illegal states being excluded by hand on every path. Now `ready-for-agent`
-  against a discriminated union on `mode`, with the original fold-the-setters
-  direction rejected in the ticket.
+  is illegal states being excluded by hand on every path. Closed by a
+  discriminated union on `mode`, with the original fold-the-setters direction
+  rejected in the ticket. Derived reads out of the interface, a reducer, and
+  `selectBranch` taking a delta stay parked there.
 
 ## Not in scope
 
