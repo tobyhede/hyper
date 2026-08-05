@@ -15,6 +15,11 @@ it('accepts the existing PostgreSQL and E2E repositories without adapters', () =
 // application consumes, and it fails at the declaration rather than at a call site.
 it('declares the server repository as a strict superset of the HTTP seam', () => {
   expectTypeOf<SpaceRepository>().toExtend<SpaceResourceRepository>();
+  // Strict in both directions: `importSpaces` and `markExported` are CLI
+  // capability and must stay unnameable from the browser-safe seam. Without
+  // this, lifting either one onto `SpaceResourceRepository` leaves the two
+  // mutually assignable again and the assertion above still passes.
+  expectTypeOf<SpaceResourceRepository>().not.toExtend<SpaceRepository>();
   expectTypeOf<Awaited<ReturnType<SpaceRepository['loadSpace']>>>().toEqualTypeOf<
     LoadedSpace | undefined
   >();
