@@ -27,8 +27,12 @@ import type { SpaceRepository } from '../../src/persistence/space-repository';
  *    through `String.localeCompare` and the other through PostgreSQL's ordering
  *    of the `uuid` type. Those agree for canonical lowercase UUIDs by a property
  *    of ICU collation, not by anything either implementation promises, so the
- *    contract compares catalogs as sets.
- *  - **Rejection messages**, except the two both implementations produce
+ *    contract compares catalogs as sets. The Cards *inside* a Space are a
+ *    different matter: both order them by id on every read, by codepoint over
+ *    the canonical text on one side and by the `uuid` bytes on the other, which
+ *    are the same comparison — so the whole-snapshot `toEqual` comparisons below
+ *    pin that order rather than tolerating it.
+ *  - **Rejection messages**, except the three both implementations produce
  *    character-for-character. The codes are the contract; the prose is not.
  *  - **Transactional isolation.** The concurrent-insert race and the
  *    one-statement aggregate read are PostgreSQL behaviour a `Map` cannot have,
@@ -200,6 +204,33 @@ export const spaceRepositoryContract = (
     });
   });
 
+  /*
+   * `loadSpaceAggregate` orders the PostgreSQL aggregate's cards by id, on the
+   * read inside an import transaction and on the one outside it alike, so
+   * ascending id order is what every read path answers with — and the
+   * whole-snapshot `toEqual` comparisons throughout this suite are
+   * order-sensitive on that array. Supplied here in descending order, because
+   * every other case supplies them already sorted, where an unordered
+   * implementation passes.
+   */
+  it(`${name} returns a Space's Cards in ascending id order however they were supplied`, async () => {
+    await withHarness(async (repository) => {
+      const descending = space(SPACE_ID, 'Unordered', [OTHER_CARD_ID, SECOND_CARD_ID, CARD_ID]);
+      const ascending = space(SPACE_ID, 'Unordered', [CARD_ID, SECOND_CARD_ID, OTHER_CARD_ID]);
+
+      await expect(repository.importSpaces([descending], 'insert')).resolves.toEqual({
+        kind: 'imported',
+        spaces: [stored(ascending, 0n, null)],
+      });
+      await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual(stored(ascending, 0n, null));
+
+      await expect(repository.commitSpace(descending, 0n)).resolves.toMatchObject({
+        kind: 'committed',
+      });
+      await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual(stored(ascending, 1n, null));
+    });
+  });
+
   it(`${name} records an exported revision and carries it across later commits`, async () => {
     await withHarness(async (repository) => {
       const first = space(SPACE_ID, 'One', [CARD_ID]);
@@ -314,6 +345,36 @@ export const spaceRepositoryContract = (
       await expect(repository.importSpaces([valid, dangling], 'insert')).resolves.toMatchObject({
         kind: 'rejected',
         code: 'invalid-snapshot',
+      });
+      expect(await repository.listSpaces()).toEqual([]);
+    });
+  });
+
+  /*
+   * A batch can be both, and only one code comes back.
+   * `PostgresSpaceRepository` settles that before its transaction opens: shape
+   * and then batch identity run over the whole batch, while domain intake runs
+   * per Space inside it. Identity therefore wins over intake whatever order the
+   * batch is in, and the double has to lose the same way round — otherwise the
+   * CLI names a different fault for the same directory depending on backend.
+   */
+  it(`${name} answers a batch that is both duplicated and domain-invalid with the duplicate`, async () => {
+    await withHarness(async (repository) => {
+      const dangling: SpaceSnapshot = {
+        ...space(SPACE_ID, 'Dangling', [CARD_ID]),
+        document: {
+          version: 2,
+          title: 'Dangling',
+          routes: [
+            { id: ROUTE_ID, title: 'Dangling', edges: [{ from: CARD_ID, to: MISSING_CARD_ID }] },
+          ],
+        },
+      };
+      const repeated = space(SPACE_ID, 'Repeat', [OTHER_CARD_ID]);
+
+      await expect(repository.importSpaces([dangling, repeated], 'insert')).resolves.toMatchObject({
+        kind: 'rejected',
+        code: 'duplicate-identity',
       });
       expect(await repository.listSpaces()).toEqual([]);
     });

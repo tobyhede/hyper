@@ -104,12 +104,30 @@ interface SchemaIssue {
  * throws located intake prose; these two were the last raw dumps on the import
  * path.
  *
- * The same answer `decodeSnapshot` gives in `@project/persistence`'s wire codec:
- * the first three failing paths and their reasons, then a count of the rest.
- * Restated here rather than shared, because sharing it means exporting a
- * string-formatting helper from a browser-safe package for one server-side
- * caller. What the two owe each other is the behaviour — prose, not Zod — and
- * both now pay it.
+ * The same answer `decodeSnapshot` gives in `@project/persistence`'s wire codec
+ * (`packages/persistence/src/http-protocol.ts`): the first three failing paths
+ * and their reasons, then a count of the rest. Restated here rather than shared,
+ * because sharing it means exporting a string-formatting helper from a
+ * browser-safe package for one server-side caller. What the two owe each other
+ * is the behaviour — prose, not Zod — and that format is the whole of the debt,
+ * so neither moves alone: one failure should not read one way at the CLI and
+ * another on the wire. `postgres-import-decoding.test.ts` holds them to it.
+ *
+ * The fold to lower case is checked rather than incidental. Zod capitalises a
+ * sentence that stands alone; here it is a clause after a path, so it reads as
+ * one — but only while no message carries a word whose case is information.
+ * None does: Zod 3 writes `Invalid uuid`, no reachable message echoes the input
+ * back, and every literal `@project/core` declares is already lower case, so the
+ * kinds a discriminator quotes survive intact. It costs exactly one thing, the
+ * capital on the second sentence of that discriminator message. The test scans
+ * real failures from both schemas for an acronym or a capitalised quoted
+ * identifier, so the day Zod or a literal grows one, this stops being safe out
+ * loud rather than quietly.
+ *
+ * `issues` is never empty. A failed `safeParse` goes through Zod's
+ * `handleResult`, which throws `Validation failed but no issues detected.`
+ * rather than returning a zero-issue error, so the summary always names a path
+ * and `remaining` never counts below zero.
  */
 const describeSchemaFailure = (issues: readonly SchemaIssue[], label: string): string => {
   const described = issues
