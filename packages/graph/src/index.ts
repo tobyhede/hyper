@@ -1,17 +1,28 @@
 /**
  * What `@project/graph` offers.
  *
- * Every name a consumer calls, plus the types those signatures make a consumer
- * write down — a parameter, a return shape, or a member of one that is narrowed
- * by name. A helper whose only caller is the module that declares it stays in
- * that module, and so does a type reachable only from inside a result union
- * nobody narrows.
+ * The unit of curation is the module, not the name. A module reaches this index
+ * when something outside the package calls into it, and then every type that
+ * module exports comes with it — those types are the vocabulary of the calls
+ * being made, nameable the moment a consumer wants a variable for one, which is
+ * why `GridStrategyOptions`, `LayoutPort` and `CardFileErrorKind` are here with
+ * nothing importing them. Functions are named one at a time: a helper whose
+ * only callers are inside the package stays in its module, behind the form
+ * consumers do call — `cardIdsForRoutes` and `filterHandlesByRoute` behind the
+ * plural forms, `outHandleId`/`inHandleId` behind `buildCardHandles` and
+ * `buildRouteEdges`, and `incomingEdges`/`routeEntryCards` behind
+ * `routeStartCard`.
  *
- * Two modules are absent for that reason and not by oversight. `frontmatter` is
- * how `card-file` reads a fence, and `parseCardFile` is the intake it exists to
- * serve. `validate` runs inside `loadSpace`, which ADR 0010 makes the one
- * intake — a caller never checks references itself, so it never names the
- * check, its input or its errors.
+ * Two modules are absent whole for that reason and not by oversight.
+ * `frontmatter` is how `card-file` reads a fence, and `parseCardFile` is the
+ * intake it exists to serve. `validate` runs inside `loadSpace`, which ADR 0010
+ * makes the one intake — a caller never checks references itself, so it never
+ * names the check, its input or its errors. `SpaceReferenceError` is the edge
+ * worth knowing, and not because a union nobody narrows hides it: `loadSpace`
+ * returns `SpaceError`, `SpaceError` names it, and `CardFileError` sits in that
+ * same union and is offered. Reachability separates nothing; the module each
+ * belongs to does. Narrowing `SpaceError` by `kind` still reaches the
+ * branch — what a consumer cannot do is write the type's name.
  *
  * `test/unit/graph-package-surface.test.ts` holds this list and the module it
  * produces to the same set of names.
