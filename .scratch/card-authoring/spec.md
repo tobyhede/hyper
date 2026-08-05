@@ -1,6 +1,6 @@
 # Card authoring
 
-Status: ready-for-agent
+Status: resolved
 
 Decision: ADR 0035 — Space Authoring owns the complete Edit lifecycle.
 
@@ -38,13 +38,12 @@ it and no action that crosses from reading into editing. A Markdown Card opens
 on its title, its description and its Markdown source. The title is authored
 there and on the graph, which is safe because only one is ever on screen — graph
 title editing is withdrawn while a Card is open — and both write the same Card.
-An Alias owns a title and a pointer rather than content, so it has nothing to
-open onto; its title is renamed on the graph like any Card's.
 
-**Editing an Alias's target content through the Alias is out of scope for this
-effort.** It is specified by issue `03` and is unbuilt, so an Alias offers no
-opening affordance at all, and reading a target's content through an Alias went
-with the reading surface (ADR 0037). Presenting remains read-only.
+An Alias preserves the authored occurrence as the opened context and delegates
+editor selection to its single-hop target. The surface identifies both Cards,
+authors the target's description and Markdown source, and exposes none of the
+Alias's own metadata. The Alias title remains authored on the graph. Presenting
+remains read-only.
 
 Each editing surface owns its temporary draft and installs the authoritative
 completed value before notifying Space Authoring. Space Authoring reads that
@@ -80,17 +79,17 @@ unrelated callers to reproduce kind switches.
 14. As an author, I want title changes to persist automatically and survive reload, so that Card authoring is durable without a Save action.
 15. As an author, I want opening a Card to create no Edit by itself, so that inspecting content does not convert a View or create persistence work.
 16. As an author, I want an opened Card to be editable on arrival, so that authoring its content costs no mode change and needs no global edit mode (ADR 0037).
-17. As an author, I want the opened editor to show the Card's description and kind-specific fields, so that its non-title content has one coherent home.
-18. As an author, I want the opened Card's title editable beside its content while graph title editing is withdrawn, so that two surfaces never author one title at once.
+17. As an author, I want the opened editor to show the content-owning Card's description and kind-specific fields, so that its content has one coherent home.
+18. As an author, I want a directly opened Markdown Card's title editable beside its content while graph title editing is withdrawn, so that two surfaces never author one title at once.
 19. As an author, I want to edit a Markdown Card as Markdown source, so that its stored content remains ordinary Markdown rather than rich-text output.
 20. As an author, I want an empty Markdown body to remain valid, so that a newly created Card can be named before it is written.
 21. As an author, I want to add, change or remove a Markdown Card description, so that the graph can carry a concise caption without turning it into content.
 22. As an author, I want description validation to enforce the existing single-line length limit before completion, so that the graph's fixed Card shape remains valid.
-23. As an author, I want opening an Alias to edit the Card that owns the content it shows, so that every occurrence retains one source of truth. *(Deferred to `03`.)*
-24. As an author, I want the opened editor to identify the target Card whose content I am changing, so that delegation is visible before I author an Edit. *(Deferred to `03`.)*
-25. As an author, I want editing Markdown through an Alias to update the target and every Alias that shows it, so that no content is copied or allowed to drift. *(Deferred to `03`.)*
-26. As an author, I want editing through an Alias to leave the Alias's own title, description and target unchanged, so that editing content is not confused with retargeting or renaming the Alias. *(Deferred to `03`.)*
-27. As an author, I want an Alias to offer no kind or target field in the opened editor, so that Alias structure is not presented as content metadata. *(Deferred to `03`.)*
+23. As an author, I want opening an Alias to edit the Card that owns the content it shows, so that every occurrence retains one source of truth.
+24. As an author, I want the opened editor to identify the target Card whose content I am changing, so that delegation is visible before I author an Edit.
+25. As an author, I want editing Markdown through an Alias to update the target and every Alias that shows it, so that no content is copied or allowed to drift.
+26. As an author, I want editing through an Alias to leave the Alias's own title, description and target unchanged, so that editing content is not confused with retargeting or renaming the Alias.
+27. As an author, I want an Alias to offer no kind or target field in the opened editor, so that Alias structure is not presented as content metadata.
 28. As an author, I want cancelling an opened-Card draft to close it with the Card unchanged, so that abandoned work creates no Edit.
 29. As an author, I want invalid opened-Card fields to remain local with useful errors, so that persistence never receives a malformed snapshot.
 30. As an author, I want one completed Card change to submit exactly one complete Space snapshot, so that description and content cannot persist separately.
@@ -99,7 +98,7 @@ unrelated callers to reproduce kind switches.
 33. As an author, I want persistence progress, failure, retry and conflict behavior to remain visible after a Card Edit, so that Card authoring follows the same durability contract as placement and Edge authoring.
 34. As an author, I want a remote conflict acceptance to replace the local Space and close any stale Card draft, so that an editor cannot later apply data derived from the replaced Space.
 35. As a presenter, I want every Card authoring affordance disabled while presenting, so that presentation gestures cannot mutate the Space.
-36. As a viewer, I want an Alias to open onto the content its target would open, so that an occurrence is not a dead end. *(Deferred to `03`. Until then an Alias offers nothing to open: the reading surface it relied on is gone with ADR 0037, and it owns no content of its own to author.)*
+36. As a viewer, I want an Alias to continue opening the content its target would open, so that adding authoring does not change reading semantics.
 37. As a developer adding a Card kind, I want TypeScript to identify every required domain, graph and editor decision, so that a partially supported kind cannot compile silently.
 38. As a developer adding a Card kind, I want the kind to carry only its meaningful fields, so that absence is represented by the union rather than sentinel or optional values.
 39. As a developer adding a Card kind, I want content consumers to resolve content through the graph module, so that Alias and future delegated-content rules do not spread through renderers.
@@ -111,13 +110,13 @@ unrelated callers to reproduce kind switches.
 
 - ADR 0035 governs the lifecycle. Space Authoring is the only application module that mutates `SpaceSession`; Card editors do not submit snapshots or alter navigation directly.
 - Opening, entering an editor and changing draft fields are not Edits. A valid changed value becomes one Edit only when the local editor completes it.
-- Inline title editing is available through a double click on the drawn title and `F2` on a selected Card (ADR 0036). `Enter` and valid blur complete; `Escape` cancels. The editor stops pointer and keyboard propagation that would otherwise open, drag, select or connect the Card.
-- A Card's title is authored on the graph and on the opened surface (ADR 0037). Only one is ever on screen — graph title editing is withdrawn while a Card is open — and both write the same Card through Space Authoring.
-- An opened Card is editable on arrival, with no reading state in front of it and no action crossing into editing (ADR 0037). There is no global edit mode, and presenting exposes no Card editor.
-- The opened editor owns the resolved content Card's title, description and kind-specific fields. Markdown owns `body`. An Alias owns no content, so it has no opened editor and no opening affordance; delegating to its target is `03`'s work.
+- Inline title editing is available by double clicking the drawn title and through `F2` on a selected Card. `Enter` and valid blur complete; `Escape` cancels. The editor stops pointer and keyboard propagation that would otherwise drag, select or connect the Card.
+- A directly opened Markdown Card authors its title in the same editor as its description and source. Inline graph title editing is unavailable while any Card is open.
+- An opened Card is editable on arrival, with no preceding reading state or explicit Edit action. There is no global edit mode, and presenting exposes no Card editor.
+- The opened editor owns the resolved content Card's description and kind-specific fields. Markdown owns `body`. Alias delegates to its target and has no opened editor of its own.
 - Drafts are local and may temporarily be incomplete. Completion constructs a complete kind-specific Card value and validates it before Space Authoring observes a completed authoring fact.
 - Completing an identical Card is a no-op. A rejected or cancelled draft does not convert an Algorithmic View, mint an id, publish state or submit persistence.
-- Editing an Alias title changes the Alias Card itself, and the graph is where it is edited. Opening an Alias to resolve its target and change that target Card's non-title fields — leaving the Alias's description and target untouched — is deferred to `03`.
+- Editing an Alias title changes the Alias Card itself. Editing an opened Alias resolves its target and changes that target Card's non-title fields; it leaves the Alias's description and target untouched.
 - Kind conversion and Alias retargeting are not generic Card-field edits. They require separate authoring interactions and are not implemented by this effort.
 - A Card Edit in an Algorithmic View follows ADR 0025: Space Authoring copies every currently displayed Card position into the next neutral Layout before applying the Card change, making conversion visually inert. A Card Edit in a selected Layout updates that Layout.
 - `SpaceSession.working` remains the authoritative Space snapshot. Space Authoring derives the complete replacement from the current session, current placement, current renderer and the Card editor's authoritative completed value; the notification does not carry a proposed Space or effect plan.
@@ -134,13 +133,13 @@ unrelated callers to reproduce kind switches.
 
 - Tests assert observable Card, Space and user behavior rather than React component state, Zustand event order or private helper calls.
 - The primary application test seam is the Space Authoring interface established by ADR 0035. Tests complete Card values through the same authoring operation used by UI adapters and observe the working Space, renderer/navigation changes, publication and session submission.
-- Space Authoring tests cover title, description and Markdown Edits completed directly; identical, cancelled, invalid and stale-context no-ops; Algorithmic View conversion; selected-Layout preservation; one-submit semantics; reentrant completion; and conflict replacement closing stale drafts. Edits completed through an Alias arrive with `03`; until then Authoring refusing to change an Alias's non-title fields is what is tested.
+- Space Authoring tests cover title, description and Markdown Edits completed directly and through an Alias; identical, cancelled, invalid and stale-context no-ops; Algorithmic View conversion; selected-Layout preservation; one-submit semantics; reentrant completion; and conflict replacement closing stale drafts.
 - Normal Space intake tests cover every completed kind shape and reference invariant. Alias self-target, missing target and alias-targets-alias cases remain explicit failures.
 - Card-file codec example and property tests continue proving that parsing and serialization are inverses for every supported kind, including a bodyless Alias and an empty Markdown body.
-- UI tests drive the inline title editor through its pointer and keyboard interface, proving the title's double click, `F2`, `Enter`, blur, `Escape`, validation and event isolation.
-- Opened-Card UI tests drive title and description validation, Markdown source changes, cancellation and the absence of kind and target fields. Alias-to-target delegation arrives with `03`; what is proven here is that an Alias offers nothing to open.
+- UI tests drive the inline title editor through its pointer and keyboard interface, proving affordance visibility, `F2`, `Enter`, blur, `Escape`, validation and event isolation.
+- Opened-Card UI tests drive direct editing on arrival, description validation, Markdown source changes, Alias-to-target delegation, cancellation and the absence of Alias title, kind and target fields.
 - The exhaustive editor registry is enforced by strict TypeScript and the existing root and per-package typechecks. Runtime tests exercise registry selection through the opened Card interface rather than inspecting the registry.
-- Playwright crosses the existing HTTP boundary and proves that an inline title change and opened Markdown change survive reload, that an Alias is renamed on the graph and offers no opening affordance, and that the first Card Edit from an Algorithmic View converts without moving Cards. Proving an Alias edit reaches its target and every occurrence arrives with `03`.
+- Playwright crosses the existing HTTP boundary and proves that an inline title change and opened Markdown change survive reload, editing through an Alias updates its target and every occurrence, and the first Card Edit from an Algorithmic View converts without moving Cards.
 - Playwright also proves Card authoring is unavailable while presenting and that inline editing emits no React Flow warning or accidental open, drag or Edge gesture.
 - Persistence adapters receive no duplicate kind-specific suite. Existing backend contracts cover complete snapshots; the application and browser tests prove Card authoring reaches that contract.
 - `pnpm verify` and `pnpm e2e` are required before the effort is resolved.
@@ -155,8 +154,7 @@ unrelated callers to reproduce kind switches.
 - Adding the Space Card or any other new Card kind.
 - Runtime-loaded Card-kind plugins or third-party editor registration.
 - Rich-text or WYSIWYG Markdown editing, collaborative cursors, comments or revision history.
-- Editing an Alias's target or description.
-- Editing the content an Alias points at, through the Alias, and reading that content through it. Specified by issue `03`, delivered by neither this effort nor ADR 0037.
+- Retargeting an Alias or editing the Alias's own description.
 - Converting a Card from one kind to another.
 - Changing Card ids.
 - Editing imported source files or adding a browser Save action; durability remains database-backed and exporting remains CLI-only.

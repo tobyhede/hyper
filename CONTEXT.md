@@ -29,7 +29,7 @@ _Avoid_: node, slide, page, tile, subgraph. For the content: prose (it may be a 
 **Alias**:
 A card that shows another card's **content**: the same content appearing again elsewhere in the space, with a single source of truth, so editing the target changes every place it appears. An alias carries its own title — only content is shared. An alias points to a different card, and that card is never itself an alias: aliasing is a single hop, so an alias never points at itself and alias chains cannot form.
 
-Authoring an alias changes only its title, and it is renamed where it is drawn. An alias owns no content of its own, so it does not open: the surface a card opens on authors content, and an alias has none to author. Reaching its target's content through it, so that every place showing that content changes together, is work not yet done. Changing which card an alias targets is a separate alias-authoring operation, not editing the content it shows.
+Authoring an alias itself changes only its title, and it is renamed where it is drawn. Opening an alias preserves that occurrence as the opened context and delegates content authoring to the card it targets. The surface identifies both cards, exposes the target's content rather than the alias's metadata, and completes the target edit at its single source of truth, so every alias shows the change. Changing which card an alias targets is a separate alias-authoring operation, not editing the content it shows.
 _Avoid_: reference, link (an alias shows content, it does not merely jump), copy, transclusion, mirror.
 
 ## Routing
@@ -101,7 +101,7 @@ Projecting a space into the repository-friendly form an author can review, commi
 _Avoid_: saving, publishing, syncing.
 
 **Opening**:
-Bringing a single card's own content up in place, over whatever view the author is in, to author it. A markdown card opens on its title, its description and its Markdown source, verbatim and editable; a space card opens on its nested graph to explore. Opening is not presenting — the view it happens over is still the thing being worked in, and a markdown card is only ever drawn *rendered* by presenting. There is no separate reading state: what a card opens on is what an author edits, because they were always the same bytes in the same order.
+Bringing a single card's content up in place, over whatever view the author is in, to author it. A markdown card opens on its title, its description and its Markdown source, verbatim and editable; an alias opens the same content surface through its target while remaining visibly the occurrence that was opened, and a space card opens on its nested graph to explore. Opening is not presenting — the view it happens over is still the thing being worked in, and a markdown card is only ever drawn *rendered* by presenting. There is no separate reading state: what a card opens on is what an author edits, because they were always the same bytes in the same order.
 _Avoid_: expand, preview, popup, modal, drill-down, view mode and edit mode (there is one surface).
 
 **Presenting**:
