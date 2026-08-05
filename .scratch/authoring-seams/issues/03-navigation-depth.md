@@ -168,11 +168,30 @@ update can no longer name `mode` and therefore cannot start or end a walk.
 `advance`'s Edge guard and its comment stay, with the one clause that enumerated
 "overview" among the guard's cases corrected — overview is answered by the type
 a line above now, and saying otherwise would have been stale rather than
-preserved. `activeCardId` reads a `CardId` through `currentCard`, whose `??` is
-a live branch (a one-Card walk *is* its first) rather than the dead one a
-`walk[len - 1] ?? walk[0]` would have been; `noUncheckedIndexedAccess` widens a
-computed index however the tuple is declared, so the non-emptiness is spent in
-one named place.
+preserved. `activeCardId` reads a `CardId` through `currentCard`, which indexes
+the walk's last element and answers `?? walk[0]`. That `??` is **dead**, and
+deliberately so: the walk is non-empty by type, so `walk[walk.length - 1]` is
+always defined and the right-hand side is unreachable. It is written because
+`noUncheckedIndexedAccess` widens a *computed* index to `| undefined` however
+the tuple is declared, while element 0 is a fixed tuple element that keeps its
+type — so the walk's own guaranteed Card answers a case it cannot present, and
+the non-emptiness is still spent in one named place.
+
+The rejected alternative is the *live* branch, and it was live for a real
+reason: destructuring `[first, ...rest]` and reading
+`rest[rest.length - 1] ?? first` makes a one-Card walk genuinely *be* its first,
+so neither side is unreachable. It costs a copy of the whole accumulated walk on
+every call. `currentCard` runs on every App render, through both `activeCardId`
+and `moves`, and neither is memoized — O(walk) and fresh garbage per render, to
+answer a read that is O(1). A dead branch that is checked beats a live branch
+that is paid for. The third option, a non-null assertion, buys the same O(1) by
+switching the check off rather than answering it, and was not taken. `retreat`
+still destructures, which is not an oversight but the same trade coming out the
+other way: `slice` makes it O(walk) regardless, it runs once per gesture rather
+than once per render, and the copy is what carries the non-emptiness to the
+type. Its comment now says so. The two readings only diverge once a walk repeats
+a Card, which is what "reads the last Card of a walk that returns to one it has
+already stood on" pins — cycles are legal authored structure (ADR 0032).
 
 Consumers: `App.tsx` needed one line — `canRetreat` narrows through the existing
 `presenting` alias. **`space-authoring.ts` compiled unchanged**: it reads only
@@ -200,5 +219,16 @@ written to say.
 reference anywhere else in the repo, and `NavigationState['mode']` still answers
 it.
 
-Verified: `pnpm verify` green (838 tests), `pnpm e2e` 71 passed — the same 71 as
+One saving neither commit message records: `moves()` returns `[]` on the mode
+check, **before** it calls `currentSpace()`. The flat state read the Space
+unconditionally and then answered `[]` anyway, because `activeCardId()` was
+null — and that read costs a parse and reindex of the working snapshot, which
+is what `moves()`'s own comment warns about on a call made during every App
+render. Overview is the common mode, so the guard skips a parse and reindex per
+render: a larger saving than the `currentCard` change above, and one nothing
+else records. Pinned by "answers no moves outside a walk without reading the
+working Space", which counts the thunk's calls rather than the answer — a read
+moved back above the guard returns the same `[]`.
+
+Verified: `pnpm verify` green (840 tests), `pnpm e2e` 71 passed — the same 71 as
 the pre-change baseline, with no e2e file touched.

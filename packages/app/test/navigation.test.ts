@@ -232,9 +232,13 @@ it('reads the last Card of a walk that returns to one it has already stood on', 
 
   // The case the two answers separate on: the walk repeats a Card and its last
   // is no longer its first, so reading the start answers A where the presenter
-  // is standing on B.
+  // is standing on B. The moves are asserted here rather than only above,
+  // because above the last Card *is* the first and both readings agree — this
+  // is the only place the Edges offered can tell a correct read from a wrong
+  // one, and they are what the presenting chrome puts on screen.
   expect(walkOf(navigation.getState())).toEqual([cardA, cardB, cardA, cardB]);
   expect(navigation.activeCardId()).toBe(cardB);
+  expect(navigation.moves()).toEqual([{ cardId: cardA, title: 'A', selected: true }]);
 
   navigation.retreat();
   expect(navigation.activeCardId()).toBe(cardA);
@@ -479,6 +483,31 @@ it('reads the working Space once per moves() call, whatever the branching', () =
 
   expect(moves).toHaveLength(2);
   expect(reads).toBe(1);
+});
+
+/*
+ * The overview answers no moves, and it costs nothing to say so: the mode check
+ * sits *above* the read of the Space rather than below it. Overview is the
+ * common mode and `moves()` is called at render time, so a read below the guard
+ * would pay a parse and reindex of the working snapshot on every render only to
+ * hand back an empty array — which is exactly what the flat state did, its
+ * `activeCardId()` answering null after the Space had already been read.
+ *
+ * The answer alone cannot tell the two apart, so this counts the calls to the
+ * thunk instead. `createNavigation` reads the Space to resolve its initial
+ * renderer, and other members read it too, so what is pinned is that this one
+ * call adds nothing rather than that the total is zero.
+ */
+it('answers no moves outside a walk without reading the working Space', () => {
+  const space = fixture();
+  const currentSpace = vi.fn(() => space);
+  const navigation = createNavigation(currentSpace, { kind: 'view', view: 'graph' });
+
+  const before = currentSpace.mock.calls.length;
+  const moves = navigation.moves();
+
+  expect(moves).toEqual([]);
+  expect(currentSpace).toHaveBeenCalledTimes(before);
 });
 
 it('walks a fork, retreats along the walk, and reselects the Edge taken', () => {

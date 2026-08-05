@@ -273,7 +273,11 @@ export function createNavigation(
       // Dropping the last Card cannot empty the walk, and this is where that
       // stops being a fact about the length check above and becomes one about
       // the value: the first Card is carried over as itself, so what comes back
-      // is a walk rather than an array that happens not to be empty.
+      // is a walk rather than an array that happens not to be empty. The
+      // rest-destructuring `currentCard` dropped stays here deliberately:
+      // `slice` makes this O(walk) whatever shape it takes, it runs once per
+      // user gesture rather than on every render, and the copy is what carries
+      // the non-emptiness into the type instead of asserting it away.
       const [first, ...rest] = state.walk;
       const back: Walk = [first, ...rest.slice(0, -1)];
       const to = currentCard(state.walk);
