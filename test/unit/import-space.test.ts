@@ -2,6 +2,7 @@ import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { uuidSchema, type ImportSpace, type SpaceSnapshot, type UUID } from '@project/core';
+import type { LoadedSpace, RepositoryCommitResult, SpaceSummary } from '@project/persistence';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   SpaceImportError,
@@ -11,11 +12,8 @@ import {
 import { SpaceImportFileError } from '../../src/import/read-single-space';
 import type {
   ImportMode,
-  RepositoryCommitResult,
   RepositoryImportResult,
   SpaceRepository,
-  SpaceSummary,
-  StoredSpace,
 } from '../../src/persistence/space-repository';
 
 const SPACE_ID = uuidSchema.parse('11111111-1111-4111-8111-111111111111');
@@ -34,13 +32,13 @@ const storedSnapshot: SpaceSnapshot = {
   ],
 };
 
-const storedSpace: StoredSpace = {
+const storedSpace: LoadedSpace = {
   snapshot: storedSnapshot,
   revision: 3n,
   exportedRevision: null,
 };
 
-const otherStoredSpace: StoredSpace = {
+const otherStoredSpace: LoadedSpace = {
   snapshot: {
     id: OTHER_SPACE_ID,
     document: { version: 2, title: 'Other stored talk', routes: [] },
@@ -63,7 +61,7 @@ class RecordingRepository implements SpaceRepository {
     throw new Error('Unexpected listSpaces call');
   }
 
-  loadSpace(_id: UUID): Promise<StoredSpace | undefined> {
+  loadSpace(_id: UUID): Promise<LoadedSpace | undefined> {
     throw new Error('Unexpected loadSpace call');
   }
 

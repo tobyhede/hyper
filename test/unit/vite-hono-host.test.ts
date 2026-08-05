@@ -7,12 +7,8 @@ import {
 } from 'node:http';
 import { connect } from 'node:net';
 import { uuidSchema, type SpaceSnapshot } from '@project/core';
-import {
-  createSpaceHttpApp,
-  MAX_COMMIT_BODY_BYTES,
-  type SpaceResourceRepository,
-} from '@project/http';
-import { encodeCommitRequest } from '@project/persistence';
+import { createSpaceHttpApp, MAX_COMMIT_BODY_BYTES } from '@project/http';
+import { encodeCommitRequest, type SpaceResourceRepository } from '@project/persistence';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { spaceHttpPlugin } from '../../packages/app/vite-space-http-plugin';
 import { send } from '../support/raw-http-request';

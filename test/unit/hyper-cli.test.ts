@@ -2,17 +2,15 @@ import { access, lstat, mkdtemp, mkdir, readFile, rm, symlink, writeFile } from 
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { uuidSchema, type ImportSpace, type SpaceSnapshot, type UUID } from '@project/core';
+import type { LoadedSpace, RepositoryCommitResult, SpaceSummary } from '@project/persistence';
 import { afterEach, describe, expect, it } from 'vitest';
 import { runCliMain } from '../../src/cli/main';
 import { runHyper, type CliIo } from '../../src/cli/run';
 import { readSingleSpace } from '../../src/import/read-single-space';
 import type {
   ImportMode,
-  RepositoryCommitResult,
   RepositoryImportResult,
   SpaceRepository,
-  SpaceSummary,
-  StoredSpace,
 } from '../../src/persistence/space-repository';
 import { MemorySpaceRepository } from '../support/memory-space-repository';
 
@@ -22,7 +20,7 @@ const ROUTE_ID = uuidSchema.parse('33333333-3333-4333-8333-333333333333');
 const OTHER_SPACE_ID = uuidSchema.parse('44444444-4444-4444-8444-444444444444');
 const THIRD_SPACE_ID = uuidSchema.parse('55555555-5555-4555-8555-555555555555');
 
-const storedSpace: StoredSpace = {
+const storedSpace: LoadedSpace = {
   snapshot: {
     id: SPACE_ID,
     document: { version: 2, title: 'Stored talk', routes: [] },
@@ -56,7 +54,7 @@ class ImportRepository implements SpaceRepository {
     );
   }
 
-  loadSpace(id: UUID): Promise<StoredSpace | undefined> {
+  loadSpace(id: UUID): Promise<LoadedSpace | undefined> {
     if (this.outcome instanceof Error || this.outcome.kind !== 'imported') {
       throw new Error('Unexpected loadSpace call');
     }
@@ -421,7 +419,7 @@ describe('runHyper', () => {
 
   it('canonicalizes card frontmatter independently of document key insertion order', async () => {
     const destination = join(await makeTemporaryDirectory(), 'exported');
-    const reordered: StoredSpace = {
+    const reordered: LoadedSpace = {
       ...storedSpace,
       snapshot: {
         ...storedSpace.snapshot,
@@ -452,7 +450,7 @@ describe('runHyper', () => {
 
   it('normalizes exported Markdown line endings to LF', async () => {
     const destination = join(await makeTemporaryDirectory(), 'exported');
-    const withMixedLineEndings: StoredSpace = {
+    const withMixedLineEndings: LoadedSpace = {
       ...storedSpace,
       snapshot: {
         ...storedSpace.snapshot,

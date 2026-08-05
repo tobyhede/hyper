@@ -1,11 +1,12 @@
 import type { ImportSpace, UUID } from '@project/core';
 import { newSpace, parseCardFile } from '@project/graph';
 import { requireImportedSpaces } from '../import/import-space';
-import type { SpaceRepository, SpaceSummary, StoredSpace } from '../persistence/space-repository';
+import type { LoadedSpace, SpaceSummary } from '@project/persistence';
+import type { SpaceRepository } from '../persistence/space-repository';
 
 export interface OpenedDatabaseStartup {
   kind: 'opened';
-  space: StoredSpace;
+  space: LoadedSpace;
 }
 
 export interface DatabaseStartupSelection {
@@ -42,7 +43,7 @@ const createNewSpaceImport = (): ImportSpace => {
 /** Resolve the initial durable workspace from the database catalog. */
 export const resolveDatabaseStartup = async (
   repository: SpaceRepository,
-  importedSpaces?: readonly StoredSpace[],
+  importedSpaces?: readonly LoadedSpace[],
 ): Promise<DatabaseStartupResult> => {
   if (importedSpaces !== undefined) {
     if (importedSpaces.length === 0) throw new Error('Database import returned no spaces');

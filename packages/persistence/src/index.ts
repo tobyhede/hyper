@@ -23,4 +23,7 @@ export type { CommitRequestJson } from './http-protocol';
  * `./test-support` subpath instead. */
 export { MemorySpaceBackend, MemorySpaceBackendTestControl } from './memory';
 export * from './observable-state';
+/* The stored side of the seam, declared once for both consumers: the Fetch
+ * application in `@project/http` and the PostgreSQL adapter under `src/`. */
+export * from './repository';
 export * from './session';

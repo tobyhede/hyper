@@ -1,18 +1,43 @@
 import { uuidSchema, type ImportSpace, type SpaceSnapshot, type UUID } from '@project/core';
+import type { LoadedSpace } from '@project/persistence';
 import { afterAll, afterEach, describe, expect, expectTypeOf, it } from 'vitest';
 import { PostgresSpaceRepository } from '../../src/persistence/postgres-space-repository';
 import type {
   ImportMode,
   RepositoryImportResult,
   SpaceRepository,
-  StoredSpace,
 } from '../../src/persistence/space-repository';
 import { db } from '../../src/prisma/db';
+import { spaceRepositoryContract } from '../support/repository-contract';
 
 expectTypeOf<Parameters<SpaceRepository['importSpaces']>[0]>().toEqualTypeOf<
   readonly ImportSpace[]
 >();
 expectTypeOf<Parameters<SpaceRepository['importSpaces']>[1]>().toEqualTypeOf<ImportMode>();
+
+/**
+ * Every Hyper row, gone. The same thing `--dangerous-truncate` does, and safe
+ * for the same reason the truncate-mode tests below are: `fileParallelism` is
+ * off, so one integration file at a time owns the single `DATABASE_URL`.
+ */
+const clearHyperContent = async (): Promise<void> => {
+  for (const space of await db.orm.public.Space.all()) {
+    await db.orm.public.Card.where({ spaceId: space.id }).deleteAll();
+    await db.orm.public.Space.where({ id: space.id }).delete();
+  }
+};
+
+/*
+ * Declared before the suite below so it runs before it, and therefore before the
+ * `afterAll` that closes the connection. The harness owns a clean database at
+ * both ends rather than tracking the ids it created: half these cases are about
+ * what a rejected batch leaves behind, and a per-id cleanup list would be
+ * written from the same assumption the test is checking.
+ */
+spaceRepositoryContract('PostgresSpaceRepository', async () => {
+  await clearHyperContent();
+  return { repository: new PostgresSpaceRepository(db), close: clearHyperContent };
+});
 
 const SPACE_ID = uuidSchema.parse('11111111-1111-4111-8111-111111111111');
 const CARD_ID = uuidSchema.parse('22222222-2222-4222-8222-222222222222');
@@ -309,7 +334,7 @@ describe('PostgresSpaceRepository', () => {
     expect(result.kind).toBe('imported');
     if (result.kind !== 'imported') throw new Error(result.message);
 
-    const order = (stored: StoredSpace) => ({
+    const order = (stored: LoadedSpace) => ({
       ids: stored.snapshot.cards.map((card) => card.id),
       titles: stored.snapshot.cards.map((card) => card.document.title),
     });
@@ -534,7 +559,7 @@ describe('PostgresSpaceRepository', () => {
       throw new Error(second.message);
     }
 
-    const identities = (stored: StoredSpace): UUID[] => [
+    const identities = (stored: LoadedSpace): UUID[] => [
       stored.snapshot.id,
       stored.snapshot.cards[0]!.id,
       stored.snapshot.document.layouts![0]!.id,

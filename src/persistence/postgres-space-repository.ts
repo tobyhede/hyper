@@ -10,15 +10,9 @@ import {
   type UUID,
 } from '@project/core';
 import { loadSpaceSnapshot } from '@project/graph';
+import type { LoadedSpace, RepositoryCommitResult, SpaceSummary } from '@project/persistence';
 import { db } from '../prisma/db';
-import type {
-  ImportMode,
-  RepositoryCommitResult,
-  RepositoryImportResult,
-  SpaceRepository,
-  SpaceSummary,
-  StoredSpace,
-} from './space-repository';
+import type { ImportMode, RepositoryImportResult, SpaceRepository } from './space-repository';
 
 type Orm = typeof db.orm;
 type JsonValue =
@@ -97,10 +91,59 @@ const parseSnapshot = (input: unknown): SpaceSnapshot => {
   return intake.snapshot;
 };
 
+interface SchemaIssue {
+  readonly path: readonly PropertyKey[];
+  readonly message: string;
+}
+
+/**
+ * Zod serializes its entire issue array into `Error.message`, and both callers
+ * below hand that to `rejectInvalidSnapshot`, which puts it in the
+ * `{ message: string }` error contract — a JSON document nested inside a field
+ * the CLI prints and clients render as a sentence. `parseSnapshot` above already
+ * throws located intake prose; these two were the last raw dumps on the import
+ * path.
+ *
+ * The same answer `decodeSnapshot` gives in `@project/persistence`'s wire codec
+ * (`packages/persistence/src/http-protocol.ts`): the first three failing paths
+ * and their reasons, then a count of the rest. Restated here rather than shared,
+ * because sharing it means exporting a string-formatting helper from a
+ * browser-safe package for one server-side caller. What the two owe each other
+ * is the behaviour — prose, not Zod — and that format is the whole of the debt,
+ * so neither moves alone: one failure should not read one way at the CLI and
+ * another on the wire. `postgres-import-decoding.test.ts` holds them to it.
+ *
+ * The fold to lower case is checked rather than incidental. Zod capitalises a
+ * sentence that stands alone; here it is a clause after a path, so it reads as
+ * one — but only while no message carries a word whose case is information.
+ * None does: Zod 3 writes `Invalid uuid`, no reachable message echoes the input
+ * back, and every literal `@project/core` declares is already lower case, so the
+ * kinds a discriminator quotes survive intact. It costs exactly one thing, the
+ * capital on the second sentence of that discriminator message. The test scans
+ * real failures from both schemas for an acronym or a capitalised quoted
+ * identifier, so the day Zod or a literal grows one, this stops being safe out
+ * loud rather than quietly.
+ *
+ * `issues` is never empty. A failed `safeParse` goes through Zod's
+ * `handleResult`, which throws `Validation failed but no issues detected.`
+ * rather than returning a zero-issue error, so the summary always names a path
+ * and `remaining` never counts below zero.
+ */
+const describeSchemaFailure = (issues: readonly SchemaIssue[], label: string): string => {
+  const described = issues
+    .slice(0, 3)
+    .map((issue) => `${issue.path.join('.') || 'space'} ${issue.message.toLowerCase()}`)
+    .join('; ');
+  const remaining = issues.length - 3;
+  return `${label} is invalid: ${described}${remaining > 0 ? ` (and ${remaining} more)` : ''}`;
+};
+
 const parseSnapshotShape = (input: unknown): SpaceSnapshot => {
   const parsed = spaceSnapshotSchema.safeParse(input);
   if (!parsed.success) {
-    throw new SnapshotValidationError(parsed.error.message);
+    throw new SnapshotValidationError(
+      describeSchemaFailure(parsed.error.issues, 'identified space'),
+    );
   }
   return parsed.data;
 };
@@ -108,7 +151,7 @@ const parseSnapshotShape = (input: unknown): SpaceSnapshot => {
 const parseImport = (input: unknown): ImportSpace => {
   const parsed = importSpaceSchema.safeParse(input);
   if (!parsed.success) {
-    throw new SnapshotValidationError(parsed.error.message);
+    throw new SnapshotValidationError(describeSchemaFailure(parsed.error.issues, 'import space'));
   }
   return parsed.data;
 };
@@ -208,7 +251,7 @@ const resolveImport = (input: ImportSpace, reservedSpaceId: UUID): SpaceSnapshot
  * cannot come from either side of one. There is no torn read to detect and no
  * revision comparison to make.
  */
-const loadStoredSpace = async (orm: Orm, id: UUID): Promise<StoredSpace | undefined> => {
+const loadSpaceAggregate = async (orm: Orm, id: UUID): Promise<LoadedSpace | undefined> => {
   const stored = await orm.public.Space.where({ id })
     .include('cards', (cards) => cards.select('id', 'document').orderBy((card) => card.id.asc()))
     .first();
@@ -291,8 +334,8 @@ export class PostgresSpaceRepository implements SpaceRepository {
     }));
   }
 
-  loadSpace(id: UUID): Promise<StoredSpace | undefined> {
-    return loadStoredSpace(this.#database.orm, id);
+  loadSpace(id: UUID): Promise<LoadedSpace | undefined> {
+    return loadSpaceAggregate(this.#database.orm, id);
   }
 
   async markExported(id: UUID, revision: bigint): Promise<void> {
@@ -361,7 +404,7 @@ export class PostgresSpaceRepository implements SpaceRepository {
 
     if (outcome.kind === 'committed') return outcome;
 
-    const current = await loadStoredSpace(this.#database.orm, accepted.id);
+    const current = await loadSpaceAggregate(this.#database.orm, accepted.id);
     if (current === undefined) {
       return {
         kind: 'rejected',
@@ -396,7 +439,7 @@ export class PostgresSpaceRepository implements SpaceRepository {
 
     try {
       return await this.#database.transaction(async ({ orm }) => {
-        const imported: StoredSpace[] = [];
+        const imported: LoadedSpace[] = [];
 
         if (mode === 'truncate') await truncateHyperContent(orm);
 
@@ -452,7 +495,7 @@ export class PostgresSpaceRepository implements SpaceRepository {
           // transaction has just written and not yet committed. That is exactly
           // what a transaction sees of its own work, and the aggregate is still
           // one statement here.
-          const stored = await loadStoredSpace(orm, snapshot.id);
+          const stored = await loadSpaceAggregate(orm, snapshot.id);
           if (stored === undefined) {
             throw new Error(`Space ${snapshot.id} disappeared during import`);
           }

@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { encodeCommitRequest, MemorySpaceBackend, type LoadedSpace } from '@project/persistence';
+import {
+  encodeCommitRequest,
+  MemorySpaceBackend,
+  type LoadedSpace,
+  type SpaceResourceRepository,
+} from '@project/persistence';
 import { spaceBackendContract } from '@project/persistence/test-support';
-import { createSpaceHttpApp, HttpSpaceBackend, type SpaceResourceRepository } from '@project/http';
+import { createSpaceHttpApp, HttpSpaceBackend } from '@project/http';
 import { SPACE_ID, oneCardSnapshot as snapshot } from '../support/space-fixtures';
 
 const loaded: LoadedSpace = { snapshot, revision: 4n, exportedRevision: 3n };

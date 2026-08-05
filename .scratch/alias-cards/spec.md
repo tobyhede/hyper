@@ -49,7 +49,8 @@ Recorded in ADR 0009 and `CONTEXT.md`; full trail in `issues/01`.
   surfaces stay title-only.
 
 The feature is complete: schema and validation (02), resolution and rendering
-(03), all three issues resolved.
+(03), and an alias carrying no `body` field at all (04). All four issues
+resolved — `04` was added after this line first claimed three.
 
 ## Issues
 

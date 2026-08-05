@@ -16,7 +16,7 @@ Issue 04's first route-less completed connection now implements this requirement
 
 ## Evidence
 
-- `packages/app/src/edit-completion.ts` derives the minted Route id as the completed edit's `activeRouteId`, writes it explicitly through `updatePositionedLayout`, installs the validated Space and activates the Route in runtime state.
-- `packages/app/test/completed-connection.test.ts` asserts the exact route-less snapshot, including `Route 1`, its first self-Edge and the new Layout's explicit `activeRoute`.
+- The completed edit derives the minted Route id as its `activeRouteId`, writes it explicitly through `updatePositionedLayout`, installs the validated Space and activates the Route in runtime state. (Recorded here as `packages/app/src/edit-completion.ts`; that module is gone and the behaviour now lives in `snapshot.ts` and `space-authoring.ts`.)
+- The route-less snapshot is asserted exactly, including `Route 1`, its first self-Edge and the new Layout's explicit `activeRoute`. (Recorded here as `packages/app/test/completed-connection.test.ts`, which no longer exists; the assertions moved with the module above.)
 - `packages/app/e2e/new-space.spec.ts` observes `Route 1` in the active Route selector and legend, `Layout 1` selected, and persistence revision `1` after one first-connection gesture.
 - Final verification on 2026-07-31: `mise exec -- pnpm verify` passed 63 test files and 526 tests; `mise exec -- pnpm e2e` passed 47 tests.

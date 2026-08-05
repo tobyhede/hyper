@@ -34,6 +34,23 @@ const exactRecord = (
  * characters of internal schema shape for one wrong field, JSON nested inside a
  * field clients render as prose. Every other decoder here throws a sentence, so
  * this one does too: the failing paths and their reasons, nothing else.
+ *
+ * `describeSchemaFailure` in `src/persistence/postgres-space-repository.ts`
+ * summarises an import failure in this same format — first three failing paths,
+ * then a count of the rest — restated rather than shared, because one
+ * server-side caller does not earn a string-formatting export from a
+ * browser-safe package. That format is the whole of what the two owe each other,
+ * so neither moves alone: one failure should not read one way at the CLI and
+ * another on the wire. `test/unit/postgres-import-decoding.test.ts` holds them
+ * to it.
+ *
+ * That test also pins the two things this formula quietly assumes. The fold to
+ * lower case loses nothing whose case is information — no message either schema
+ * produces carries an acronym or a capitalised quoted identifier, Zod 3 writing
+ * `Invalid uuid` rather than `Invalid UUID`. And `issues` is never empty: a
+ * failed `safeParse` goes through Zod's `handleResult`, which throws rather than
+ * returning a zero-issue error, so the summary always names a path and
+ * `remaining` never counts below zero.
  */
 const decodeSnapshot = (value: unknown, label: string): SpaceSnapshot => {
   const parsed = spaceSnapshotSchema.safeParse(value);

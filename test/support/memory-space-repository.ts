@@ -1,15 +1,38 @@
 import { newUuid, type ImportSpace, type SpaceSnapshot, type UUID } from '@project/core';
 import { loadSpaceSnapshot } from '@project/graph';
+import type { LoadedSpace, RepositoryCommitResult, SpaceSummary } from '@project/persistence';
 import type {
   ImportMode,
-  RepositoryCommitResult,
   RepositoryImportResult,
   SpaceRepository,
-  SpaceSummary,
-  StoredSpace,
 } from '../../src/persistence/space-repository';
 
 const clone = <T>(value: T): T => structuredClone(value);
+
+const ascendingById = (left: { readonly id: UUID }, right: { readonly id: UUID }): number => {
+  if (left.id === right.id) return 0;
+  return left.id < right.id ? -1 : 1;
+};
+
+/**
+ * PostgreSQL orders the aggregate's cards on read — `loadSpaceAggregate` sorts
+ * `card.id.asc()`, on the read inside an import transaction and on the one
+ * outside it alike — so every `LoadedSpace` this double hands back has to be
+ * ordered the same way. The shared contract compares whole snapshots, and
+ * `toEqual` is order-sensitive on arrays, so insertion order here would be a
+ * divergence the suite asserts.
+ *
+ * Codepoint order, not `localeCompare`: over canonical lowercase UUID text it is
+ * byte order over the `uuid` value PostgreSQL compares, so the two agree by
+ * construction rather than by a property of ICU collation. `listSpaces` below
+ * still sorts by collation, and its order stays outside the contract for exactly
+ * that reason.
+ */
+const read = (loaded: LoadedSpace): LoadedSpace =>
+  clone({
+    ...loaded,
+    snapshot: { ...loaded.snapshot, cards: [...loaded.snapshot.cards].sort(ascendingById) },
+  });
 
 const identifyImport = (input: ImportSpace): SpaceSnapshot => {
   const layouts = input.document.layouts?.map(({ id, ...layout }) => ({
@@ -36,9 +59,9 @@ const identifyImport = (input: ImportSpace): SpaceSnapshot => {
 
 /** Behavioral repository for server-side startup tests. */
 export class MemorySpaceRepository implements SpaceRepository {
-  readonly #spaces = new Map<UUID, StoredSpace>();
+  readonly #spaces = new Map<UUID, LoadedSpace>();
 
-  constructor(spaces: readonly StoredSpace[] = []) {
+  constructor(spaces: readonly LoadedSpace[] = []) {
     for (const space of spaces) this.#spaces.set(space.snapshot.id, clone(space));
   }
 
@@ -50,9 +73,9 @@ export class MemorySpaceRepository implements SpaceRepository {
     );
   }
 
-  loadSpace(id: UUID): Promise<StoredSpace | undefined> {
+  loadSpace(id: UUID): Promise<LoadedSpace | undefined> {
     const stored = this.#spaces.get(id);
-    return Promise.resolve(stored === undefined ? undefined : clone(stored));
+    return Promise.resolve(stored === undefined ? undefined : read(stored));
   }
 
   markExported(id: UUID, revision: bigint): Promise<void> {
@@ -81,7 +104,7 @@ export class MemorySpaceRepository implements SpaceRepository {
       });
     }
     if (current.revision !== expectedRevision) {
-      return Promise.resolve({ kind: 'conflict', current: clone(current) });
+      return Promise.resolve({ kind: 'conflict', current: read(current) });
     }
     for (const card of intake.snapshot.cards) {
       const owner = [...this.#spaces.values()].find(
@@ -108,54 +131,38 @@ export class MemorySpaceRepository implements SpaceRepository {
   }
 
   importSpaces(input: readonly ImportSpace[], mode: ImportMode): Promise<RepositoryImportResult> {
-    const snapshots: SpaceSnapshot[] = [];
-    for (const inputSpace of input) {
-      const intake = loadSpaceSnapshot(identifyImport(inputSpace));
-      if (!intake.ok) {
-        return Promise.resolve({
-          kind: 'rejected',
-          code: 'invalid-snapshot',
-          message: intake.errors.map(({ message }) => message).join('\n'),
-        });
-      }
-      snapshots.push(intake.snapshot);
-    }
+    const identified = input.map(identifyImport);
 
-    const incomingSpaceIds = new Set<UUID>();
+    // Batch identity is settled before any Space faces domain intake, because
+    // `PostgresSpaceRepository` settles it before its transaction opens:
+    // `parseImport` then `validateImportIdentities` run over the whole batch,
+    // and `loadSpaceSnapshot` runs per Space inside. A batch that is both
+    // duplicated and domain-invalid is therefore a `duplicate-identity` there
+    // whatever order it is in, and has to be one here.
+    //
+    // One deliberate difference of input, not of outcome: `duplicateIdentity`
+    // there reads the ids the caller *supplied* and skips every absent one,
+    // while this runs over the identified batch, after `identifyImport` has
+    // minted the missing ones. A minted id is a fresh `newUuid` and can collide
+    // with nothing, so the wider read rejects no batch of id-less Spaces the
+    // real backend would accept — where it, too, mints ids that cannot repeat.
+    const batchSpaceIds = new Set<UUID>();
     // Two distinct facts, deliberately not merged. `batchCardIds` is what this
     // batch already claims, and a repeat is `duplicate-identity`. `storedCardOwner`
-    // is what survives the call, and claiming one of those is `card-ownership`.
-    // `PostgresSpaceRepository` draws the same line — `duplicateIdentity` runs
-    // over the batch before its transaction opens — so folding them together
-    // makes this double reject valid input under a code the real backend
-    // never returns for it.
+    // below is what survives the call, and claiming one of those is
+    // `card-ownership` — a collision the real backend only meets on its card
+    // writes, inside the transaction. Folding them together makes this double
+    // reject valid input under a code the real backend never returns for it.
     const batchCardIds = new Set<UUID>();
-    const storedCardOwner = new Map<UUID, UUID>();
-    if (mode === 'insert') {
-      for (const { snapshot } of this.#spaces.values()) {
-        for (const card of snapshot.cards) storedCardOwner.set(card.id, snapshot.id);
-      }
-    }
-    for (const snapshot of snapshots) {
-      if (incomingSpaceIds.has(snapshot.id)) {
+    for (const snapshot of identified) {
+      if (batchSpaceIds.has(snapshot.id)) {
         return Promise.resolve({
           kind: 'rejected',
           code: 'duplicate-identity',
           message: `Duplicate Space identity ${snapshot.id}`,
         });
       }
-      incomingSpaceIds.add(snapshot.id);
-
-      if (mode === 'insert') {
-        const current = this.#spaces.get(snapshot.id);
-        if (current !== undefined) {
-          return Promise.resolve({
-            kind: 'rejected',
-            code: 'duplicate-identity',
-            message: `Space ${snapshot.id} already exists`,
-          });
-        }
-      }
+      batchSpaceIds.add(snapshot.id);
 
       for (const card of snapshot.cards) {
         if (batchCardIds.has(card.id)) {
@@ -166,9 +173,41 @@ export class MemorySpaceRepository implements SpaceRepository {
           });
         }
         batchCardIds.add(card.id);
+      }
+    }
 
+    const storedCardOwner = new Map<UUID, UUID>();
+    if (mode === 'insert') {
+      for (const { snapshot } of this.#spaces.values()) {
+        for (const card of snapshot.cards) storedCardOwner.set(card.id, snapshot.id);
+      }
+    }
+
+    // Then per Space in batch order, in the order the real transaction meets
+    // each fault: the row insert a stored Space identity rejects, then domain
+    // intake, then the card writes a stored owner rejects.
+    const snapshots: SpaceSnapshot[] = [];
+    for (const identifiedSnapshot of identified) {
+      if (mode === 'insert' && this.#spaces.has(identifiedSnapshot.id)) {
+        return Promise.resolve({
+          kind: 'rejected',
+          code: 'duplicate-identity',
+          message: `Space ${identifiedSnapshot.id} already exists`,
+        });
+      }
+
+      const intake = loadSpaceSnapshot(identifiedSnapshot);
+      if (!intake.ok) {
+        return Promise.resolve({
+          kind: 'rejected',
+          code: 'invalid-snapshot',
+          message: intake.errors.map(({ message }) => message).join('\n'),
+        });
+      }
+
+      for (const card of intake.snapshot.cards) {
         const owner = storedCardOwner.get(card.id);
-        if (owner !== undefined && owner !== snapshot.id) {
+        if (owner !== undefined && owner !== intake.snapshot.id) {
           return Promise.resolve({
             kind: 'rejected',
             code: 'card-ownership',
@@ -176,15 +215,16 @@ export class MemorySpaceRepository implements SpaceRepository {
           });
         }
       }
+      snapshots.push(intake.snapshot);
     }
 
     if (mode === 'truncate') this.#spaces.clear();
-    const stored = snapshots.map((snapshot): StoredSpace => ({
+    const stored = snapshots.map((snapshot): LoadedSpace => ({
       snapshot: clone(snapshot),
       revision: 0n,
       exportedRevision: null,
     }));
     for (const space of stored) this.#spaces.set(space.snapshot.id, clone(space));
-    return Promise.resolve({ kind: 'imported', spaces: clone(stored) });
+    return Promise.resolve({ kind: 'imported', spaces: stored.map(read) });
   }
 }

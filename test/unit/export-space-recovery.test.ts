@@ -3,9 +3,9 @@ import type * as FsPromises from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { uuidSchema } from '@project/core';
+import type { LoadedSpace } from '@project/persistence';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { exportSpace } from '../../src/export/export-space';
-import type { StoredSpace } from '../../src/persistence/space-repository';
 import { MemorySpaceRepository } from '../support/memory-space-repository';
 
 const cleanupFailure = vi.hoisted(() => ({
@@ -57,7 +57,7 @@ vi.mock('node:fs/promises', async (importOriginal) => {
 const SPACE_ID = uuidSchema.parse('11111111-1111-4111-8111-111111111111');
 const CARD_ID = uuidSchema.parse('22222222-2222-4222-8222-222222222222');
 
-const storedSpace: StoredSpace = {
+const storedSpace: LoadedSpace = {
   snapshot: {
     id: SPACE_ID,
     document: { version: 2, title: 'Stored talk', routes: [] },

@@ -1,12 +1,8 @@
 import { uuidSchema, type SpaceSnapshot } from '@project/core';
-import { encodeCommitRequest } from '@project/persistence';
+import { encodeCommitRequest, type SpaceResourceRepository } from '@project/persistence';
 import { HTTPException } from 'hono/http-exception';
 import { describe, expect, it } from 'vitest';
-import {
-  createSpaceHttpApp,
-  MAX_COMMIT_BODY_BYTES,
-  type SpaceResourceRepository,
-} from '@project/http';
+import { createSpaceHttpApp, MAX_COMMIT_BODY_BYTES } from '@project/http';
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
