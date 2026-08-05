@@ -40,13 +40,27 @@ export function routeEntryCards(route: Route): CardId[] {
 }
 
 /**
- * Where a walk of this route begins: the first entry card. A fully cyclic Route
- * has no entry, so presentation must choose how starting it should work.
+ * Where a walk of this route begins. Two rules, in this order.
  *
- * Which entry is a policy choice and this is the plain one — the same shape as
- * ADR 0026's "absent an `activeRoute`, the first visible route". If a route ever
- * wants to name its own start, that is a field on the route and a change here.
+ * **A card nothing arrives at wins**, and this rule stays first. It makes the
+ * start a property of the route's shape rather than of the order its edges were
+ * drawn: connecting appends, so an author who draws `b → c` and then attaches
+ * `a → b` stores the `b` edge first, and starting there would skip `a` — a card
+ * forward traversal never reaches. Which entry, when there are several, is a
+ * policy choice and this is the plain one — the same shape as ADR 0026's
+ * "absent an `activeRoute`, the first visible route".
+ *
+ * **Otherwise the first edge's `from`.** Every card of a fully cyclic route is
+ * arrived at, so rule 1 has no answer and authoring order is the only tie-break
+ * left (ADR 0032). The two rules are not the same kind of answer: for a
+ * self-edge rule 2 *derives* the start — one card, one edge, nothing to choose
+ * — while for a multi-card cycle it *picks* one, and any card on the loop would
+ * have been as defensible.
+ *
+ * `undefined` is left only for a route with no edges, which `routeSchema`
+ * forbids. If a route ever wants to name its own start, that is a field on the
+ * route and a change here.
  */
 export function routeStartCard(route: Route): CardId | undefined {
-  return routeEntryCards(route)[0];
+  return routeEntryCards(route)[0] ?? route.edges[0]?.from;
 }

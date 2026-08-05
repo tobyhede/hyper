@@ -61,6 +61,11 @@ export function RouteSelector({
           ))}
         </SelectContent>
       </Select>
+      {/* Presenting refuses exactly one thing: no active Route. Every Route
+          that *is* active can be presented, cyclic ones included (ADR 0032),
+          so this condition and `present()`'s own guard now agree. They once
+          did not, and a fully cyclic Route fell through the gap between them:
+          the control read `Present`, stayed enabled, and swallowed the click. */}
       <button
         type="button"
         data-testid={presenting ? 'exit-presenting-button' : 'present-button'}

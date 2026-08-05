@@ -149,11 +149,24 @@ export function createNavigation(
     },
     openCard: (cardId) => setState({ openedCardId: cardId }),
     closeCard: () => setState({ openedCardId: null }),
+    // Two refusals, and only the first is reachable. **No active Route** is the
+    // one the author can produce, and it is exactly what `RouteSelector`
+    // disables its control on, so the two now agree: `routeStartCard` answers
+    // every schema-valid Route, cyclic ones included, so a Route that is active
+    // can always be presented. These used to be one guard, and a fully cyclic
+    // Route fell through the gap between them — the control read `Present`,
+    // stayed enabled, and swallowed the click.
+    //
+    // The **edge-less Route** below is the one `routeSchema` forbids
+    // (`edges.min(1)`). Its `undefined` is admitted by the type and not by the
+    // domain; the guard is here because the type still needs answering, not
+    // because presenting has anything to decline.
     present: () => {
       const state = observable.getState();
       const route =
         state.activeRouteId === null ? undefined : getRoute(currentSpace(), state.activeRouteId);
-      const start = route === undefined ? undefined : routeStartCard(route);
+      if (route === undefined) return;
+      const start = routeStartCard(route);
       if (start === undefined) return;
       setState({ mode: 'presenting', walk: [start], branchIndex: 0, openedCardId: null });
     },

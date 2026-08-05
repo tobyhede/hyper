@@ -144,6 +144,33 @@ it('traverses an Edge from the changing working Space without installing a copy'
   expect(navigation.activeCardId()).toBe(cardC);
 });
 
+/**
+ * A self-connection is the first gesture authoring ships, and the Route it mints
+ * is fully cyclic: every Card it holds is arrived at, so no Card is an entry.
+ * Presenting one used to do nothing at all — `routeStartCard` answered nothing,
+ * `present()` returned before any state change, and the enabled control that
+ * called it swallowed the click.
+ */
+it('presents a fully cyclic Route, which has no entry Card', () => {
+  const card = uuid('00000000-0000-4000-8000-000000000002');
+  const loaded = loadSpace(
+    {
+      version: 2,
+      id: uuid('00000000-0000-4000-8000-000000000001'),
+      title: 'Loop',
+      routes: [{ id: ROUTE_ONE, title: 'Loop', edges: [{ from: card, to: card }] }],
+    },
+    [cardFile(card)],
+  );
+  if (!loaded.ok) throw new Error('loop should load');
+  const navigation = createNavigation(() => loaded.space, { kind: 'view', view: 'graph' });
+
+  navigation.present();
+
+  expect(navigation.getState()).toMatchObject({ mode: 'presenting', walk: [card] });
+  expect(navigation.moves()).toEqual([{ cardId: card, title: 'A', selected: true }]);
+});
+
 it('activating a Route ends the current walk without changing the Space', () => {
   const space = fixture();
   const navigation = createNavigation(() => space, { kind: 'view', view: 'graph' });
