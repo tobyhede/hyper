@@ -1,11 +1,15 @@
 # Route authoring
 
-Status: open — issues `01`–`06` resolved; `07` outstanding.
+Status: resolved — issues `01`–`07` resolved.
 
 Issues `01`–`06` delivered the authoring half. User story 32 — a cyclic Route
 remaining presentable — was never ticketed with them, and the gesture `04`
-shipped reaches it: a self-connection mints a Route that `present()` silently
-declines to start. That is issue `07`.
+shipped reached it: a self-connection minted a Route that `present()` silently
+declined to start. Issue `07` closed that. `routeStartCard` falls back to the
+first Edge's `from` when no Card is an entry, so every schema-valid Route has a
+place to begin; `routeEntryCards` still reports `[]` for a loop, which is the
+honest answer to what it asks. Where a walk of a loop *ends* stays out of scope
+below, with the rest of the repeated-visit presentation UX.
 
 Decisions: ADR 0032 — Routes may contain cycles; ADR 0033 — Route authoring
 uses spatial handles coloured as the active Route.
