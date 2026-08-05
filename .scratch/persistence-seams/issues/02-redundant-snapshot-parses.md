@@ -52,7 +52,6 @@ form is not the stored form.
 
 ## Caution
 
-<<<<<<< HEAD
 The two-parse shape may be load-bearing in a way only the author knows. Confirm
 before deleting. Two specific things to settle first:
 
@@ -98,3 +97,20 @@ joined by newline. That is the direction `AGENTS.md` already pins under "A wire
 codec throws prose, not Zod" — the same reason `decodeSnapshot` summarises rather
 than calling `.parse`. No path gains a Zod dump it did not have; one loses the one
 it had.
+
+That is one path of three, and the record should not read as more. Two raw Zod
+messages remain in `src/persistence/postgres-space-repository.ts`, both on the
+import path and both predating this ticket: `parseImport` throws
+`parsed.error.message` for input that fails `importSpaceSchema`, and
+`parseSnapshotShape` throws it again for the fully identified snapshot
+`resolveImport` assembles from that input. Each reaches a client through
+`rejectInvalidSnapshot` exactly as `parseSnapshot` used to. What this change
+sweeps is the commit and stored-read path — the two `parseSnapshot` serves — not
+the file.
+
+`packages/graph/test/space-snapshot.test.ts` and
+`packages/persistence/test/memory-backend.test.ts` pin the swept form directly: a
+shape-invalid snapshot reports a located `path: message`, and the backend's
+`invalid-snapshot` rejection carries that same prose rather than a serialized
+issue array. Every other `invalid-snapshot` assertion in the repo matches on
+`code` alone, which is why the message could change under them unremarked.

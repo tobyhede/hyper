@@ -30,6 +30,33 @@ describe('loadSpaceSnapshot', () => {
     expect(result.errors[0]?.message).toContain('id');
   });
 
+  /**
+   * The format the callers that deleted their own outer `safeParse` now report
+   * with. `parseSnapshot` in the PostgreSQL repository used to reach a client
+   * with `parsed.error.message` — Zod's entire serialized issue array as one
+   * string, a JSON document nested inside a field the client renders as a
+   * sentence — and reaches it with these instead, which is what `AGENTS.md` pins
+   * under "A wire codec throws prose, not Zod".
+   *
+   * The *shape* is pinned, not the sentence: a located field path, then Zod's
+   * own reason, whatever wording a version of Zod gives it.
+   */
+  it('locates an invalid shape in prose rather than dumping Zod', () => {
+    const result = loadSpaceSnapshot({
+      ...snapshot,
+      cards: [{ id: CARD_A, document: { kind: 'markdown', body: 'Body A' } }],
+    });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.errors.map(({ kind }) => kind)).toEqual(['invalid-shape']);
+
+    const message = result.errors.map((error) => error.message).join('\n');
+    expect(message).toMatch(/^cards\.0\.document\.title: \S/);
+    expect(message.startsWith('[')).toBe(false);
+    expect(() => JSON.parse(message) as unknown).toThrow();
+  });
+
   it('builds the validated indexed Space consumed by graph logic', () => {
     const result = loadSpaceSnapshot(snapshot);
     expect(result.ok).toBe(true);

@@ -438,6 +438,7 @@ export class PostgresSpaceRepository implements SpaceRepository {
               intake.errors.map(({ message }) => message).join('\n'),
             );
           }
+
           space = await orm.public.Space.where({ id: snapshot.id })
             .where({ revision: 0 })
             .update({ document: toJsonValue(snapshot.document) });
