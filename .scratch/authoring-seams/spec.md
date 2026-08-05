@@ -21,7 +21,13 @@ open.
 
 - `01` — one observable-state module; three publishers disagree (resolved)
 - `02` — a seam for authoring gestures, so `GraphView` is testable off-browser
-- `03` — `Navigation` is shallow
+- `03` — `NavigationState` permits states that mean nothing. Filed as
+  "`Navigation` is shallow"; verification did not support that reading. The
+  module is deep — some 56 lines of it are comments recording ADR interactions
+  and negative knowledge — and the repetition that looked like shallow members
+  is illegal states being excluded by hand on every path. Now `ready-for-agent`
+  against a discriminated union on `mode`, with the original fold-the-setters
+  direction rejected in the ticket.
 
 ## Not in scope
 
