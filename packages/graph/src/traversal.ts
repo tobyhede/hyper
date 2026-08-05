@@ -57,6 +57,12 @@ export function routeEntryCards(route: Route): CardId[] {
  * — while for a multi-card cycle it *picks* one, and any card on the loop would
  * have been as defensible.
  *
+ * **A start, not a reachable whole.** Every schema-valid route gets a place to
+ * begin, and nothing more: a route of two components — `a → b` plus a disjoint
+ * loop — starts at `a` under rule 1, and forward traversal never reaches the
+ * loop. Whether a walk can reach every card of a disconnected route is a
+ * separate question, and the fallback does not answer it.
+ *
  * `undefined` is left only for a route with no edges, which `routeSchema`
  * forbids. If a route ever wants to name its own start, that is a field on the
  * route and a change here.
