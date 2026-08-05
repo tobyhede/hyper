@@ -1,5 +1,6 @@
 import { expect, test, type Page } from './fixtures';
 import {
+  activeCard,
   AUTHORING_HANDLE_SIDES,
   authoringHandle,
   connectHandles,
@@ -265,10 +266,7 @@ test('the Route that self-connection mints can be presented', async ({ page }) =
   await page.getByTestId('present-button').click();
 
   await expect(page.getByTestId('presenting-chrome')).toBeVisible();
-  await expect(page.locator('.react-flow__node.rf-card-node--active')).toHaveAttribute(
-    'data-id',
-    cardId!,
-  );
+  await expect(activeCard(page)).toHaveAttribute('data-id', cardId!);
   const moves = page.getByTestId('presenting-moves').getByRole('button');
   await expect(moves).toHaveCount(1);
   await expect(moves).toHaveText('Card 1');
