@@ -1,6 +1,6 @@
 import type { BuiltInViewId, CardId, RouteId } from '@project/core';
 import { getCard, getRoute, outgoingEdges, routeStartCard, type Space } from '@project/graph';
-import { createObservableState } from '@project/persistence';
+import { createObservableState, type ObserverErrorReporter } from '@project/persistence';
 import { DEFAULT_VIEW_ID, resolveView, type RendererSelection, type ResolvedView } from './view';
 
 export type NavigationMode = 'overview' | 'presenting';
@@ -44,7 +44,7 @@ export interface Navigation {
 }
 
 export interface NavigationOptions {
-  readonly reportObserverError?: (error: unknown) => void;
+  readonly reportObserverError?: ObserverErrorReporter;
 }
 
 const reportToConsole = (error: unknown): void => {

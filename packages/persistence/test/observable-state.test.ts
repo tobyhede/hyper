@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createObservableState } from '../src/observable-state';
+import { createNonThrowingReporter, createObservableState } from '../src/observable-state';
 
 describe('createObservableState', () => {
   it('publishes the next state synchronously until a subscriber leaves', () => {
@@ -50,6 +50,35 @@ describe('createObservableState', () => {
     await vi.waitFor(() => expect(reported).toHaveLength(2));
     expect(reported[0]).toBe(thrown);
     expect(reported[1]).toBe(rejected);
+  });
+
+  /**
+   * A thenable is anything with a callable `then`, and Promises/A+ counts a
+   * *function* carrying one. Nothing in this repo returns one today, so this
+   * test is the whole of what holds `isThenable` open to them: narrowed back to
+   * `typeof value === 'object'`, the rejection below escapes uncontained and
+   * every other test in this file stays green.
+   */
+  it('contains a rejection from a callable thenable', async () => {
+    const reported: unknown[] = [];
+    const observable = createObservableState(0, (error) => reported.push(error));
+    const rejected = new Error('callable thenable rejected');
+    // Deferred rather than a held `Promise.reject`, so a narrowed guard fails
+    // this test by reporting nothing instead of by killing the process.
+    const callableThenable = Object.assign(() => undefined, {
+      then: (_onFulfilled: unknown, onRejected: (reason: unknown) => unknown): void => {
+        queueMicrotask(() => onRejected(rejected));
+      },
+    });
+    const seen: number[] = [];
+    observable.subscribe(() => callableThenable);
+    observable.subscribe(() => seen.push(observable.getState()));
+
+    expect(() => observable.publish(1)).not.toThrow();
+
+    expect(seen).toEqual([1]);
+    await vi.waitFor(() => expect(reported).toHaveLength(1));
+    expect(reported[0]).toBe(rejected);
   });
 
   it('continues notifying when diagnostic reporting itself throws', () => {
@@ -112,5 +141,33 @@ describe('createObservableState', () => {
     observable.clearSubscribers();
     observable.publish(1);
     expect(listener).not.toHaveBeenCalled();
+  });
+});
+
+/*
+ * Exported beside `createObservableState` because SpaceAuthoring wraps its own
+ * completion diagnostics with it, outside the observable-state seam — so it is
+ * public surface with a caller of its own, not an implementation detail reached
+ * only through publication.
+ */
+describe('createNonThrowingReporter', () => {
+  it('forwards what it was handed to the wrapped reporter', () => {
+    const reported: unknown[] = [];
+    const report = createNonThrowingReporter((error) => reported.push(error));
+    const error = new Error('observer failed');
+
+    report(error);
+
+    // Identity, not shape: forwarding the caller's own failure is the point.
+    expect(reported).toHaveLength(1);
+    expect(reported[0]).toBe(error);
+  });
+
+  it('contains a reporter that throws', () => {
+    const report = createNonThrowingReporter(() => {
+      throw new Error('reporter failed');
+    });
+
+    expect(() => report(new Error('observer failed'))).not.toThrow();
   });
 });

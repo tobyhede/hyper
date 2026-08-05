@@ -9,6 +9,7 @@ import { loadSpaceSnapshot, Placement, type LayoutPoint } from '@project/graph';
 import {
   createNonThrowingReporter,
   createObservableState,
+  type ObserverErrorReporter,
   type SpaceSession,
   type SpaceSessionState,
 } from '@project/persistence';
@@ -111,7 +112,7 @@ interface SpaceAuthoringDependencies {
   readonly session: SpaceSession;
   readonly navigation: Navigation;
   readonly initialPlacement?: Placement | null;
-  readonly reportObserverError?: (error: unknown) => void;
+  readonly reportObserverError?: ObserverErrorReporter;
 }
 
 /**

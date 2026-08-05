@@ -1,6 +1,6 @@
 import type { SpaceSnapshot } from '@project/core';
 import type { CommitResult, LoadedSpace, SpaceBackend } from './backend';
-import { createObservableState } from './observable-state';
+import { createObservableState, type ObserverErrorReporter } from './observable-state';
 
 type RetryableFailure = Extract<CommitResult, { kind: 'retryable-failure' }>;
 type PermanentFailure = Extract<CommitResult, { kind: 'permanent-failure' }>;
@@ -27,7 +27,7 @@ export interface SpaceSession {
 }
 
 export interface SpaceSessionOptions {
-  readonly reportObserverError?: (error: unknown) => void;
+  readonly reportObserverError?: ObserverErrorReporter;
 }
 
 const clone = <T>(value: T): T => structuredClone(value);
@@ -64,14 +64,25 @@ export const openSpaceSession = (
     observable.publish({ ...observable.getState(), persistence });
   };
 
+  /**
+   * Begin a commit, installing `unpublishedState` as it announces `pending`.
+   *
+   * `unpublishedState` is state the caller derived and deliberately did not
+   * publish: the transition into `pending` installs it, rather than the caller
+   * spending a publication that this one would overwrite a line later. The
+   * `committed` branch threads through it the revision it has just acknowledged;
+   * `resolveConflict` threads the working snapshot it has just reconciled, which
+   * exists nowhere else. The default reads the installed state, for the callers
+   * that derived none.
+   */
   const startCommit = (
     snapshot: SpaceSnapshot,
     expectedRevision: bigint,
-    currentState: SpaceSessionState = observable.getState(),
+    unpublishedState: SpaceSessionState = observable.getState(),
   ): void => {
     inFlight = true;
     committing = snapshot;
-    observable.publish({ ...currentState, persistence: { kind: 'pending' } });
+    observable.publish({ ...unpublishedState, persistence: { kind: 'pending' } });
     void backend.commitSpace(clone(snapshot), expectedRevision).then((result) => {
       inFlight = false;
       switch (result.kind) {
