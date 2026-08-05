@@ -53,9 +53,11 @@ export const test = base.extend<E2eFixtures>({
       root: appRoot,
       configFile,
       mode: testInfo.project.name === NEW_SPACE_PROJECT ? 'e2e-empty' : 'e2e-fixture',
-      // Away from the human's 5173/5174, and above `POSTGRES_E2E_PORT` so no
-      // worker index can reach the opt-in suite's fixed host — `strictPort`
-      // turns any overlap into a hard failure that blames startup instead.
+      // Away from the ports the `dev:*` scripts hold (5173–5175), and above
+      // `POSTGRES_E2E_PORT` so no worker index can reach the opt-in suite's
+      // fixed host — `strictPort` turns any overlap into a hard failure that
+      // blames startup instead. `test/unit/e2e-ports.test.ts` derives that
+      // reserved range from the scripts and asserts the separation.
       server: {
         host: '127.0.0.1',
         port: E2E_PORT_BASE + testInfo.workerIndex,

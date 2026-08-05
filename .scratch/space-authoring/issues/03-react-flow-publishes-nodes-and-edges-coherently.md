@@ -7,21 +7,28 @@ it.
 
 **Blocked by:** None — can start immediately.
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] A render that first contains an Edge also contains both endpoint handle
+- [x] A render that first contains an Edge also contains both endpoint handle
       declarations under the Edge's actual Route id.
-- [ ] The application no longer reserves a future first-Route UUID while a
+- [x] The application no longer reserves a future first-Route UUID while a
       route-less Space is merely open.
-- [ ] Cancelling or rejecting a connection changes no Space identity or authored
+- [x] Cancelling or rejecting a connection changes no Space identity or authored
       content.
-- [ ] The successful first connection mints one Route identity and renders its
+- [x] The successful first connection mints one Route identity and renders its
       Edge without an intermediate state containing stale node handles.
-- [ ] Consecutive connections in one browser session continue resolving their
+- [x] Consecutive connections in one browser session continue resolving their
       declared handles without forced DOM remeasurement.
-- [ ] Existing route-independent spatial authoring handles and per-Route
+- [x] Existing route-independent spatial authoring handles and per-Route
       overview handles retain their distinct render responsibilities.
-- [ ] Real-browser coverage fails on React Flow warning #008 and proves both the
+- [x] Real-browser coverage fails on React Flow warning #008 and proves both the
       first and a consecutive connection remain warning-free.
-- [ ] The pinned React Flow release remains unchanged.
-- [ ] `pnpm verify` and `pnpm e2e` pass.
+- [x] The pinned React Flow release remains unchanged.
+- [x] `pnpm verify` and `pnpm e2e` pass.
+
+## Answer
+
+Implemented by PR #12. The render adapter publishes nodes, declared handles and
+Edges as one projection. The successful completion mints the first Route id;
+cancelled attempts reserve nothing. Declarative handle coverage includes first
+and consecutive real-browser connections and rejects React Flow warning #008.
