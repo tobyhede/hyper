@@ -66,6 +66,19 @@ export function nodeByTitle(page: Page, title: string): Locator {
 }
 
 /**
+ * The Card a walk is standing on, by the class the projection marks it with.
+ *
+ * Shared because presenting is asserted from both projects: `presenting.spec`
+ * walks the fixture's authored Routes, and `new-space.spec` presents the Route a
+ * self-connection mints in a Space that started with none. The class is the
+ * render layer's, not the domain's, so a second copy of the string is one the
+ * next rename leaves behind.
+ */
+export function activeCard(page: Page): Locator {
+  return page.locator('.react-flow__node.rf-card-node--active');
+}
+
+/**
  * Open a Card, which is to say edit it (ADR 0037).
  *
  * No pointer gesture on a Card's body opens it (ADR 0036) — the Card's own

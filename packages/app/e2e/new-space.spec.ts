@@ -1,5 +1,6 @@
 import { expect, test, type Page } from './fixtures';
 import {
+  activeCard,
   AUTHORING_HANDLE_SIDES,
   authoringHandle,
   connectHandles,
@@ -241,6 +242,34 @@ test('the first self-connection mints and activates Route 1 in one persisted Lay
   // settles somewhere else a frame later.
   await settled(page);
   expect(await positionOf(card)).toEqual(before);
+});
+
+test('the Route that self-connection mints can be presented', async ({ page }) => {
+  await page.goto('/');
+  const card = nodeByTitle(page, 'Card 1');
+  await expect(card).toBeVisible();
+  await settled(page);
+  const cardId = await card.getAttribute('data-id');
+  expect(cardId).not.toBeNull();
+  await card.hover();
+
+  await connectHandles(
+    page,
+    authoringHandle(card, 'source', 'right'),
+    authoringHandle(card, 'target', 'left'),
+  );
+  await expect(page.getByTestId('route-selector')).toContainText('Route 1');
+
+  // Every Card a fully cyclic Route holds is arrived at, so it has no entry
+  // Card. The control is enabled because a Route *is* active, and presenting
+  // used to return before changing anything — the click went nowhere.
+  await page.getByTestId('present-button').click();
+
+  await expect(page.getByTestId('presenting-chrome')).toBeVisible();
+  await expect(activeCard(page)).toHaveAttribute('data-id', cardId!);
+  const moves = page.getByTestId('presenting-moves').getByRole('button');
+  await expect(moves).toHaveCount(1);
+  await expect(moves).toHaveText('Card 1');
 });
 
 test('shows an empty disabled route control and no route HUD (ADR 0015)', async ({ page }) => {

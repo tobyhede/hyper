@@ -1,7 +1,7 @@
 // `test` comes from ./fixtures, not @playwright/test — it carries the auto-use
 // gate that fails a test if React Flow logged a warning while it ran.
 import { expect, test, type Page } from './fixtures';
-import { nodeByTitle, settled, viewportTransform } from './graph';
+import { activeCard, nodeByTitle, settled, viewportTransform } from './graph';
 
 // Presenting is the graph canvas under camera control (ADR 0027): the same
 // cards, the same coordinates, drawn close enough that one fills the screen.
@@ -11,9 +11,6 @@ import { nodeByTitle, settled, viewportTransform } from './graph';
 // The fixture's routes are all lines (see fixture/README.md), which is the
 // degenerate graph rather than a second kind, so a fork is asserted in unit
 // tests over a purpose-built space and here only via the chrome's shape.
-
-/** The active card while presenting, by the class the projection marks it with. */
-const activeCard = (page: Page) => page.locator('.react-flow__node.rf-card-node--active');
 
 /** The camera, read off React Flow's viewport transform. */
 async function camera(page: Page): Promise<{ x: number; y: number; zoom: number }> {

@@ -61,6 +61,7 @@ export function RouteSelector({
           ))}
         </SelectContent>
       </Select>
+      {/* Dead on exactly one thing: no Route is active to present. */}
       <button
         type="button"
         data-testid={presenting ? 'exit-presenting-button' : 'present-button'}

@@ -1,6 +1,7 @@
 import type { Page } from '@playwright/test';
 import { expect, test } from './fixtures';
 import {
+  activeCard,
   allPositions,
   authoringHandle,
   AUTHORING_HANDLE_SIDES,
@@ -574,14 +575,13 @@ test('an authored Edge is immediately available when presenting the Route', asyn
 
   await page.getByTestId('present-button').click();
   await expect(page.getByTestId('presenting-chrome')).toBeVisible();
-  const activeCard = page.locator('.react-flow__node.rf-card-node--active');
-  await expect(activeCard).toHaveAttribute('data-id', '00000000-0000-4000-8000-000000000008');
+  await expect(activeCard(page)).toHaveAttribute('data-id', '00000000-0000-4000-8000-000000000008');
   await expect(page.getByTestId('presenting-moves').getByRole('button')).toHaveText('A');
 
   await page.keyboard.press('ArrowRight');
-  await expect(activeCard).toHaveAttribute('data-id', '00000000-0000-4000-8000-000000000002');
+  await expect(activeCard(page)).toHaveAttribute('data-id', '00000000-0000-4000-8000-000000000002');
   await page.keyboard.press('ArrowLeft');
-  await expect(activeCard).toHaveAttribute('data-id', '00000000-0000-4000-8000-000000000008');
+  await expect(activeCard(page)).toHaveAttribute('data-id', '00000000-0000-4000-8000-000000000008');
 });
 
 test('an Edge drawn from the presented Card is a move the presenter can take now', async ({
@@ -602,8 +602,7 @@ test('an Edge drawn from the presented Card is a move the presenter can take now
 
   await page.getByTestId('present-button').click();
   await expect(page.getByTestId('presenting-chrome')).toBeVisible();
-  const activeCard = page.locator('.react-flow__node.rf-card-node--active');
-  await expect(activeCard).toHaveAttribute('data-id', A);
+  await expect(activeCard(page)).toHaveAttribute('data-id', A);
   const moves = page.getByTestId('presenting-moves').getByRole('button');
   await expect(moves).toHaveText(['B']);
   // The presenting camera closes in over two animated moves; a handle box read
@@ -616,8 +615,8 @@ test('an Edge drawn from the presented Card is a move the presenter can take now
   // are the only ones on screen.
   await connectHandles(
     page,
-    authoringHandle(activeCard, 'source', 'right'),
-    authoringHandle(activeCard, 'target', 'left'),
+    authoringHandle(activeCard(page), 'source', 'right'),
+    authoringHandle(activeCard(page), 'target', 'left'),
   );
 
   await expect(page.getByLabel(`Edge from ${A} to ${A}`)).toBeVisible();
