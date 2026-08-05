@@ -9,5 +9,5 @@ Small, independent, none urgent. Filed so they are not rediscovered.
 
 - `01` — `LayoutPosition` and `LayoutPoint` are the same type in two packages
   (resolved)
-- `02` — `packages/graph/src/index.ts` is uncurated `export *`
+- `02` — `packages/graph/src/index.ts` is uncurated `export *` (resolved)
 - `03` — code/glossary divergences are not being recorded (resolved)

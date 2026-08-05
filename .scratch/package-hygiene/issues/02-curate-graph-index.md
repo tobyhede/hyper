@@ -1,6 +1,6 @@
 # `packages/graph/src/index.ts` is uncurated `export *`
 
-Status: needs-triage
+Status: resolved
 
 ## Context
 
@@ -54,3 +54,55 @@ The original caution here — "changing what a package exports touches every
 consumer's import list" — does not hold for this change, for the reason above.
 It would hold for a rename. `docs/agents/workflow.md` still applies if one rides
 along: keep a rename off a structural commit.
+
+## Resolution
+
+Fourteen names left the index and forty-one stayed. No import site outside
+`packages/graph` moved, as predicted.
+
+The line drawn, which is the part worth keeping: the index names every function
+and value a consumer calls, plus the types those signatures make a consumer write
+down — a parameter, a return shape, or a member of one narrowed by name. A helper
+whose only caller is the module declaring it stays there, and so does a type
+reachable only from inside a result union nobody narrows.
+
+That rule took **two whole modules** off the surface rather than picking names one
+at a time. `frontmatter` (`OPENING_FENCE`, `FrontmatterSplit`, `splitFrontmatter`)
+is how `card-file` reads a fence, and `parseCardFile` is the intake it exists to
+serve. `validate` (`Referenceable`, `SpaceReferenceErrorKind`,
+`SpaceReferenceError`, `validateReferences`, `isValidGraph`) runs inside
+`loadSpace`, which ADR 0010 makes the one intake — a caller never checks
+references itself. Six further helpers went: `cardIdsForRoutes` and
+`filterHandlesByRoute` behind the plural forms the app calls, `outHandleId` and
+`inHandleId` behind `buildCardHandles`/`buildRouteEdges` which are the only things
+that build a handle id, and `incomingEdges`/`routeEntryCards` behind
+`routeStartCard`.
+
+The judgement calls went the other way for `GridStrategyOptions`, `NewSpace`,
+`SpaceError`, `LoadSpaceResult`, `LoadSpaceSnapshotResult`, `LayoutPort`,
+`CardFileError`, `CardFileErrorKind`, `ParseCardFileResult` and
+`ParseImportCardFileResult`. None is imported by name today; each is the parameter
+or result shape of an exported function, consumed structurally now and nameable
+the moment a consumer wants a variable for one. `SpaceReferenceError` is the
+counter-example that fixes the rule's edge: it is reachable from `loadSpace` only
+through `SpaceError`, a union nothing narrows.
+
+The guard is `test/unit/graph-package-surface.test.ts`, written red first. It
+holds three things together: the index declares no `export *`, its declarations
+name exactly the offered list, and the module those declarations produce carries
+exactly the offered *values* at runtime. Parsing catches the type-only exports
+that `Object.keys` cannot see; the runtime read catches a type re-exported as a
+value or a name resolving to nothing. It sits in the root suite beside
+`point-type-identity.test.ts`, which already reads `packages/graph/src` with the
+TypeScript compiler — inside `graph` it would mean the package declaring a
+`typescript` dependency it does not otherwise have.
+
+The `ReferenceError` collision was fixed both ways, in a separate commit as the
+caution above requires. It left the public surface with the rest of `validate`,
+and it was renamed to `SpaceReferenceError`, because curation only shrinks the
+blast radius to the three files inside the package — `validate.ts`, `space.ts` and
+`validate.test.ts` — and `validate.test.ts` importing the bare name is the case
+this ticket recorded. `Referenceable` kept its name; it collides with nothing.
+
+The `Placement` namespace stayed one object. Its eight member names are exactly
+what this curation exists to keep out of the surface.
