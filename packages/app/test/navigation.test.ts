@@ -1,4 +1,4 @@
-import { expect, it } from 'vitest';
+import { expect, it, vi } from 'vitest';
 import { uuidSchema, type RouteId, type UUID } from '@project/core';
 import { loadSpace, type Space } from '@project/graph';
 import { createNavigation } from '../src/navigation';
@@ -210,6 +210,28 @@ it('notifies subscribers synchronously until they unsubscribe', () => {
   unsubscribe();
   navigation.activateRoute(ROUTE_TWO);
   expect(seen).toEqual([ROUTE_TWO, ROUTE_ONE]);
+});
+
+it('contains a failing subscriber and still notifies the ones behind it', () => {
+  const space = fixture();
+  const reported: unknown[] = [];
+  const navigation = createNavigation(() => space, { kind: 'view', view: 'graph' }, space, {
+    reportObserverError: (error) => reported.push(error),
+  });
+  const observerError = new Error('observer failed');
+  const later = vi.fn();
+  navigation.subscribe(() => {
+    throw observerError;
+  });
+  navigation.subscribe(later);
+  expect(() => navigation.activateRoute(ROUTE_TWO)).not.toThrow();
+  expect(later).toHaveBeenCalledOnce();
+  // Identity, not shape. `toEqual` compares an Error by name and message, so a
+  // reporter handed any distinct `new Error('observer failed')` satisfied it —
+  // including one the publisher manufactured instead of forwarding. What this
+  // pins is that the observer's own throw reached the sink, exactly once.
+  expect(reported).toHaveLength(1);
+  expect(reported[0]).toBe(observerError);
 });
 
 it('refuses a renderer the current Space does not hold, leaving navigation untouched', () => {

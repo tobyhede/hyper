@@ -22,4 +22,5 @@ export type { CommitRequestJson } from './http-protocol';
  * vitest and only a test runner can execute it, so it stays behind the
  * `./test-support` subpath instead. */
 export { MemorySpaceBackend, MemorySpaceBackendTestControl } from './memory';
+export * from './observable-state';
 export * from './session';

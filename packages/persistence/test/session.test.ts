@@ -332,6 +332,41 @@ describe('openSpaceSession', () => {
     });
   });
 
+  /*
+   * `startCommit`'s `unpublishedState` on the `committed` path. The revision the
+   * finished commit acknowledged reaches subscribers *with* the coalesced
+   * commit's `pending`, rather than in a publication of its own that the
+   * transition would overwrite a line later. Nothing outside this module reads
+   * `changedSinceExport`, so the publication is the only place the threading is
+   * observable at all — hence a subscriber rather than a downstream effect.
+   */
+  it('carries the acknowledged revision into the coalesced commit it starts', async () => {
+    const control = new MemorySpaceBackendTestControl();
+    const release = control.deferNextCommit();
+    const backend = new MemorySpaceBackend([loaded], control);
+    const session = openSpaceSession(backend, loaded);
+    const pendingRevisions: bigint[] = [];
+    session.subscribe(() => {
+      const state = session.getState();
+      if (state.persistence.kind === 'pending') pendingRevisions.push(state.acknowledgedRevision);
+    });
+
+    session.submit(changedTitle('First'));
+    session.submit(changedTitle('Latest'));
+    release();
+
+    await waitFor(
+      session.getState,
+      session.subscribe,
+      (state) => state.persistence.kind === 'settled',
+    );
+    // The first commit's own `pending`, the coalesced Edit republished under it
+    // while it was still in flight, then the second commit's `pending` — the
+    // one carrying what the first commit acknowledged rather than the 3n it
+    // started from.
+    expect(pendingRevisions).toEqual([3n, 3n, 4n]);
+  });
+
   it('stops on retryable failure and retries the latest working snapshot explicitly', async () => {
     const control = new MemorySpaceBackendTestControl();
     control.queueResult({
@@ -442,6 +477,45 @@ describe('openSpaceSession', () => {
       working: { document: { title: 'Reconciled' } },
       acknowledgedRevision: 5n,
     });
+  });
+
+  /*
+   * The same threading on the reconciling path, where it is load-bearing rather
+   * than merely earlier: the reconciled snapshot exists nowhere but the state
+   * `resolveConflict` derived, so the transition into `pending` is what installs
+   * it. Without it the session would leave `working` on the local snapshot the
+   * conflict rejected and commit under the wrong one.
+   */
+  it('carries the reconciled working snapshot into the commit it starts', async () => {
+    const backend = new MemorySpaceBackend([loaded]);
+    const session = openSpaceSession(backend, loaded);
+    await backend.commitSpace(changedTitle('Remote'), 3n);
+
+    session.submit(changedTitle('Local'));
+    const conflicted = await waitFor(
+      session.getState,
+      session.subscribe,
+      (state) => state.persistence.kind === 'conflicted',
+    );
+    const pending: SpaceSessionState[] = [];
+    session.subscribe(() => {
+      const state = session.getState();
+      if (state.persistence.kind === 'pending') pending.push(state);
+    });
+
+    session.resolveConflict(changedTitle('Reconciled'));
+
+    expect(pending).toHaveLength(1);
+    expect(pending[0]).toMatchObject({
+      working: { document: { title: 'Reconciled' } },
+      acknowledgedRevision: conflicted.acknowledgedRevision,
+    });
+    expect(conflicted.acknowledgedRevision).toBe(4n);
+    await waitFor(
+      session.getState,
+      session.subscribe,
+      (state) => state.persistence.kind === 'settled',
+    );
   });
 
   it('derives export status from the returned durable state while conflicted', async () => {

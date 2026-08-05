@@ -1,5 +1,6 @@
 import type { BuiltInViewId, CardId, RouteId } from '@project/core';
 import { getCard, getRoute, outgoingEdges, routeStartCard, type Space } from '@project/graph';
+import { createObservableState, type ObserverErrorReporter } from '@project/persistence';
 import { DEFAULT_VIEW_ID, resolveView, type RendererSelection, type ResolvedView } from './view';
 
 export type NavigationMode = 'overview' | 'presenting';
@@ -42,6 +43,14 @@ export interface Navigation {
   readonly moves: () => readonly Move[];
 }
 
+export interface NavigationOptions {
+  readonly reportObserverError?: ObserverErrorReporter;
+}
+
+const reportToConsole = (error: unknown): void => {
+  console.error('Navigation observer failed', error);
+};
+
 function outgoingEdgesFrom(
   space: Space,
   routeId: RouteId | null,
@@ -77,25 +86,23 @@ export function createNavigation(
   currentSpace: () => Space,
   initialRenderer: RendererSelection,
   initialSpace: Space = currentSpace(),
+  options: NavigationOptions = {},
 ): Navigation {
-  let state: NavigationState = openedState(
-    initialRenderer,
-    resolveView(initialSpace, initialRenderer),
+  const observable = createObservableState(
+    openedState(initialRenderer, resolveView(initialSpace, initialRenderer)),
+    options.reportObserverError ?? reportToConsole,
   );
-  const listeners = new Set<() => void>();
   const setState = (change: Partial<NavigationState>): void => {
-    state = { ...state, ...change };
-    for (const listener of listeners) listener();
+    observable.publish({ ...observable.getState(), ...change });
   };
-  const activeCardId = (): CardId | null =>
-    state.mode === 'presenting' ? (state.walk[state.walk.length - 1] ?? null) : null;
+  const activeCardId = (): CardId | null => {
+    const state = observable.getState();
+    return state.mode === 'presenting' ? (state.walk[state.walk.length - 1] ?? null) : null;
+  };
 
   return {
-    getState: () => state,
-    subscribe: (listener) => {
-      listeners.add(listener);
-      return () => listeners.delete(listener);
-    },
+    getState: observable.getState,
+    subscribe: observable.subscribe,
     selectRenderer: (selection) => {
       const view = resolveView(currentSpace(), selection);
       setState({
@@ -143,6 +150,7 @@ export function createNavigation(
     openCard: (cardId) => setState({ openedCardId: cardId }),
     closeCard: () => setState({ openedCardId: null }),
     present: () => {
+      const state = observable.getState();
       const route =
         state.activeRouteId === null ? undefined : getRoute(currentSpace(), state.activeRouteId);
       const start = route === undefined ? undefined : routeStartCard(route);
@@ -166,6 +174,7 @@ export function createNavigation(
     // never shown. It cannot replace this guard either, since an empty Edge set
     // clamps to `[-1]` and is still `undefined`.
     advance: () => {
+      const state = observable.getState();
       const edge = outgoingEdgesFrom(currentSpace(), state.activeRouteId, activeCardId())[
         state.branchIndex
       ];
@@ -173,6 +182,7 @@ export function createNavigation(
       setState({ walk: [...state.walk, edge.to], branchIndex: 0 });
     },
     retreat: () => {
+      const state = observable.getState();
       if (state.mode !== 'presenting' || state.walk.length < 2) return;
       const back = state.walk.slice(0, -1);
       const from = back[back.length - 1];
@@ -183,6 +193,7 @@ export function createNavigation(
       setState({ walk: back, branchIndex: taken < 0 ? 0 : taken });
     },
     selectBranch: (delta) => {
+      const state = observable.getState();
       const count = outgoingEdgesFrom(currentSpace(), state.activeRouteId, activeCardId()).length;
       if (count < 2) return;
       setState({ branchIndex: (((state.branchIndex + delta) % count) + count) % count });
@@ -194,6 +205,7 @@ export function createNavigation(
     // Resolving once also keeps every title in the answer read from the same
     // Space as the edges they name.
     moves: () => {
+      const state = observable.getState();
       const space = currentSpace();
       return outgoingEdgesFrom(space, state.activeRouteId, activeCardId()).map((edge, index) => ({
         cardId: edge.to,

@@ -1,5 +1,6 @@
 import type { SpaceSnapshot } from '@project/core';
 import type { CommitResult, LoadedSpace, SpaceBackend } from './backend';
+import { createObservableState, type ObserverErrorReporter } from './observable-state';
 
 type RetryableFailure = Extract<CommitResult, { kind: 'retryable-failure' }>;
 type PermanentFailure = Extract<CommitResult, { kind: 'permanent-failure' }>;
@@ -26,7 +27,7 @@ export interface SpaceSession {
 }
 
 export interface SpaceSessionOptions {
-  readonly reportObserverError?: (error: unknown) => void;
+  readonly reportObserverError?: ObserverErrorReporter;
 }
 
 const clone = <T>(value: T): T => structuredClone(value);
@@ -40,18 +41,13 @@ const reportToConsole = (error: unknown): void => {
   console.error('SpaceSession observer failed', error);
 };
 
-const isThenable = (value: unknown): value is PromiseLike<unknown> =>
-  typeof value === 'object' &&
-  value !== null &&
-  typeof (value as { readonly then?: unknown }).then === 'function';
-
 export const openSpaceSession = (
   backend: SpaceBackend,
   loaded: LoadedSpace,
   options: SpaceSessionOptions = {},
 ): SpaceSession => {
   let exportedRevision = loaded.exportedRevision;
-  let state: SpaceSessionState = {
+  const initialState: SpaceSessionState = {
     working: clone(loaded.snapshot),
     acknowledgedRevision: loaded.revision,
     changedSinceExport: hasChangedSinceExport(loaded.revision, exportedRevision),
@@ -61,70 +57,47 @@ export const openSpaceSession = (
   let waiting: SpaceSnapshot | undefined;
   /** The snapshot `startCommit` handed the backend. Read only while `inFlight`. */
   let committing: SpaceSnapshot | undefined;
-  // Held as `() => unknown` although `subscribe` accepts `() => void`: a `void`
-  // expression cannot be inspected, which is exactly how an async listener's
-  // rejection gets to disappear. Widening here keeps the published contract
-  // synchronous while letting `publish` see what came back.
-  const listeners = new Set<() => unknown>();
   const reportObserverError = options.reportObserverError ?? reportToConsole;
-
-  /*
-   * Unconditionally: nothing above a session observer can act on the failure.
-   * `@project/http`'s `invokeLogError` rethrows an `Error` on purpose, because
-   * Hono forwards one to `onError` and a swallowed failure would leave a
-   * request answered by nothing. There is no such handler over a notification,
-   * so rethrowing here would only hand the failure back to the publisher this
-   * whole path exists to protect.
-   */
-  const safelyReportObserverError = (error: unknown): void => {
-    try {
-      reportObserverError(error);
-    } catch {
-      // Diagnostics cannot interrupt session work.
-    }
-  };
-
-  const publish = (next: SpaceSessionState): void => {
-    state = next;
-    for (const listener of listeners) {
-      try {
-        // Notification stays synchronous — `useSyncExternalStore` reads
-        // `getState` straight after and nothing here awaits. But `() => void`
-        // admits an async listener by TypeScript's return-type bivariance, and
-        // its rejection lands nowhere near this catch: an unhandled rejection
-        // is answered by ending the process, which is precisely the
-        // interruption a non-throwing publisher exists to prevent.
-        const settled = listener();
-        if (isThenable(settled)) void settled.then(undefined, safelyReportObserverError);
-      } catch (error) {
-        safelyReportObserverError(error);
-      }
-    }
-  };
+  const observable = createObservableState(initialState, reportObserverError);
 
   const publishPersistence = (persistence: SpaceSessionState['persistence']): void => {
-    publish({ ...state, persistence });
+    observable.publish({ ...observable.getState(), persistence });
   };
 
-  const startCommit = (snapshot: SpaceSnapshot, expectedRevision: bigint): void => {
+  /**
+   * Begin a commit, installing `unpublishedState` as it announces `pending`.
+   *
+   * `unpublishedState` is state the caller derived and deliberately did not
+   * publish: the transition into `pending` installs it, rather than the caller
+   * spending a publication that this one would overwrite a line later. The
+   * `committed` branch threads through it the revision it has just acknowledged;
+   * `resolveConflict` threads the working snapshot it has just reconciled, which
+   * exists nowhere else. The default reads the installed state, for the callers
+   * that derived none.
+   */
+  const startCommit = (
+    snapshot: SpaceSnapshot,
+    expectedRevision: bigint,
+    unpublishedState: SpaceSessionState = observable.getState(),
+  ): void => {
     inFlight = true;
     committing = snapshot;
-    publishPersistence({ kind: 'pending' });
+    observable.publish({ ...unpublishedState, persistence: { kind: 'pending' } });
     void backend.commitSpace(clone(snapshot), expectedRevision).then((result) => {
       inFlight = false;
       switch (result.kind) {
         case 'committed': {
           const nextWaiting = waiting;
           waiting = undefined;
-          state = {
-            ...state,
+          const committedState: SpaceSessionState = {
+            ...observable.getState(),
             acknowledgedRevision: result.revision,
             changedSinceExport: hasChangedSinceExport(result.revision, exportedRevision),
           };
           if (nextWaiting === undefined) {
-            publishPersistence({ kind: 'settled' });
+            observable.publish({ ...committedState, persistence: { kind: 'settled' } });
           } else {
-            startCommit(nextWaiting, result.revision);
+            startCommit(nextWaiting, result.revision, committedState);
           }
           return;
         }
@@ -139,8 +112,8 @@ export const openSpaceSession = (
         case 'conflict':
           waiting = undefined;
           exportedRevision = result.current.exportedRevision;
-          publish({
-            ...state,
+          observable.publish({
+            ...observable.getState(),
             acknowledgedRevision: result.current.revision,
             changedSinceExport: hasChangedSinceExport(result.current.revision, exportedRevision),
             persistence: { kind: 'conflicted', current: clone(result.current) },
@@ -150,11 +123,8 @@ export const openSpaceSession = (
   };
 
   return {
-    getState: () => state,
-    subscribe: (listener) => {
-      listeners.add(listener);
-      return () => listeners.delete(listener);
-    },
+    getState: observable.getState,
+    subscribe: observable.subscribe,
     /*
      * An observer may complete the next Edit while this one is still
      * publishing — and a *reentrant* submit runs to completion before this one
@@ -175,25 +145,27 @@ export const openSpaceSession = (
      */
     submit: (snapshot) => {
       const working = clone(snapshot);
-      const previous = state.persistence;
-      publish({ ...state, working });
+      const previous = observable.getState().persistence;
+      observable.publish({ ...observable.getState(), working });
       if (previous.kind === 'conflicted' || previous.kind === 'failed') return;
-      const newest = state.working;
+      const newest = observable.getState().working;
       if (inFlight) {
         if (newest !== committing) waiting = newest;
         return;
       }
-      startCommit(newest, state.acknowledgedRevision);
+      startCommit(newest, observable.getState().acknowledgedRevision);
     },
     retry: () => {
+      const state = observable.getState();
       if (state.persistence.kind !== 'failed' || inFlight) return;
       startCommit(state.working, state.acknowledgedRevision);
     },
     acceptRemote: () => {
+      const state = observable.getState();
       if (state.persistence.kind !== 'conflicted') return;
       const { current } = state.persistence;
       exportedRevision = current.exportedRevision;
-      publish({
+      observable.publish({
         working: clone(current.snapshot),
         acknowledgedRevision: current.revision,
         changedSinceExport: hasChangedSinceExport(current.revision, exportedRevision),
@@ -201,17 +173,18 @@ export const openSpaceSession = (
       });
     },
     resolveConflict: (snapshot) => {
+      const state = observable.getState();
       if (state.persistence.kind !== 'conflicted' || inFlight) return;
       const { current } = state.persistence;
       exportedRevision = current.exportedRevision;
       const working = clone(snapshot);
-      state = {
+      const resolvedState: SpaceSessionState = {
         working,
         acknowledgedRevision: current.revision,
         changedSinceExport: hasChangedSinceExport(current.revision, exportedRevision),
         persistence: { kind: 'conflicted', current },
       };
-      startCommit(working, current.revision);
+      startCommit(working, current.revision, resolvedState);
     },
   };
 };

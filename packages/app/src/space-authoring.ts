@@ -6,7 +6,13 @@ import {
   type UUID,
 } from '@project/core';
 import { loadSpaceSnapshot, Placement, type LayoutPoint } from '@project/graph';
-import type { SpaceSession, SpaceSessionState } from '@project/persistence';
+import {
+  createNonThrowingReporter,
+  createObservableState,
+  type ObserverErrorReporter,
+  type SpaceSession,
+  type SpaceSessionState,
+} from '@project/persistence';
 import type { Navigation, NavigationState } from './navigation';
 import { updatePositionedLayout } from './snapshot';
 import { defaultRenderer, resolveView, type RendererSelection } from './view';
@@ -106,7 +112,7 @@ interface SpaceAuthoringDependencies {
   readonly session: SpaceSession;
   readonly navigation: Navigation;
   readonly initialPlacement?: Placement | null;
-  readonly reportObserverError?: (error: unknown) => void;
+  readonly reportObserverError?: ObserverErrorReporter;
 }
 
 /**
@@ -190,14 +196,6 @@ function sameValue(left: unknown, right: unknown): boolean {
 
 const sameSnapshot = (left: SpaceSnapshot, right: SpaceSnapshot): boolean => sameValue(left, right);
 
-function isThenable(value: unknown): value is PromiseLike<unknown> {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    typeof (value as { readonly then?: unknown }).then === 'function'
-  );
-}
-
 export function createSpaceAuthoring({
   session,
   navigation,
@@ -208,12 +206,6 @@ export function createSpaceAuthoring({
   const cardDocuments = new Map<CardId, CardDocument>();
   let opening = 0;
   let installing = 0;
-  let state: SpaceAuthoringState;
-  // Held as `() => unknown` although `subscribe` accepts `() => void`: a `void`
-  // expression cannot be inspected, which is exactly how an async listener's
-  // rejection gets to disappear. Widening here keeps the published contract
-  // synchronous while letting `publish` see what came back.
-  const listeners = new Set<() => unknown>();
 
   // The one way placement is written — every path goes through here, including
   // Edit completion and accepting a stored Space.
@@ -234,35 +226,13 @@ export function createSpaceAuthoring({
     session: session.getState(),
     navigation: navigation.getState(),
   });
-  state = snapshotState();
-
-  const safelyReport = (error: unknown): void => {
-    try {
-      reportObserverError(error);
-    } catch {
-      // Diagnostics cannot interrupt Authoring.
-    }
-  };
+  const observable = createObservableState(snapshotState(), reportObserverError);
+  // Completion failures use the same configured diagnostic sink, but are not
+  // observer failures and therefore remain outside the observable-state seam.
+  const safelyReport = createNonThrowingReporter(reportObserverError);
 
   const publish = (): void => {
-    state = snapshotState();
-    // Iterate a copy: a Set visits entries added mid-iteration, so a listener
-    // that subscribes during publication would be notified about a state it was
-    // not yet watching — and how many times depends on where it was added.
-    for (const listener of [...listeners]) {
-      try {
-        // Notification stays synchronous — `useSyncExternalStore` reads
-        // `getState` straight after and nothing here awaits. But `() => void`
-        // admits an async listener by TypeScript's return-type bivariance, and
-        // its rejection would land nowhere near this catch: Node answers an
-        // unhandled rejection by ending the process, which is the one outcome a
-        // non-throwing publisher exists to prevent.
-        const settled = listener();
-        if (isThenable(settled)) void settled.then(undefined, safelyReport);
-      } catch (error) {
-        safelyReport(error);
-      }
-    }
+    observable.publish(snapshotState());
   };
 
   /**
@@ -604,13 +574,10 @@ export function createSpaceAuthoring({
   };
 
   return {
-    getState: () => state,
+    getState: observable.getState,
     authoredPlacement: () =>
       navigation.getState().selectedRenderer.kind === 'layout' ? placement : null,
-    subscribe: (listener) => {
-      listeners.add(listener);
-      return () => listeners.delete(listener);
-    },
+    subscribe: observable.subscribe,
     installPlacement: install,
     installCardDocument: (cardId, document) => cardDocuments.set(cardId, document),
     canConnect,
@@ -621,7 +588,7 @@ export function createSpaceAuthoring({
     dispose: () => {
       unsubscribeSession();
       unsubscribeNavigation();
-      listeners.clear();
+      observable.clearSubscribers();
     },
   };
 }
