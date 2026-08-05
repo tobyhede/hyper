@@ -1,4 +1,4 @@
-import { spaceSnapshotSchema, type SpaceSnapshot, type UUID } from '@project/core';
+import type { SpaceSnapshot, UUID } from '@project/core';
 import { loadSpaceSnapshot } from '@project/graph';
 import type { CommitResult, LoadedSpace, SpaceBackend, SpaceSummary } from './backend';
 
@@ -72,15 +72,7 @@ export class MemorySpaceBackend implements SpaceBackend {
     const injected = this.#testControl?.nextResult();
     if (injected !== undefined) return clone(injected);
 
-    const parsed = spaceSnapshotSchema.safeParse(snapshot);
-    if (!parsed.success) {
-      return {
-        kind: 'permanent-failure',
-        code: 'invalid-snapshot',
-        message: parsed.error.message,
-      };
-    }
-    const intake = loadSpaceSnapshot(parsed.data);
+    const intake = loadSpaceSnapshot(snapshot);
     if (!intake.ok) {
       return {
         kind: 'permanent-failure',
@@ -89,12 +81,12 @@ export class MemorySpaceBackend implements SpaceBackend {
       };
     }
 
-    const current = this.#spaces.get(parsed.data.id);
+    const current = this.#spaces.get(intake.snapshot.id);
     if (current === undefined) {
       return {
         kind: 'permanent-failure',
         code: 'not-found',
-        message: `Space ${parsed.data.id} does not exist`,
+        message: `Space ${intake.snapshot.id} does not exist`,
       };
     }
     if (current.revision !== expectedRevision) {
@@ -102,8 +94,8 @@ export class MemorySpaceBackend implements SpaceBackend {
     }
 
     const revision = current.revision + 1n;
-    this.#spaces.set(parsed.data.id, {
-      snapshot: clone(parsed.data),
+    this.#spaces.set(intake.snapshot.id, {
+      snapshot: clone(intake.snapshot),
       revision,
       exportedRevision: current.exportedRevision,
     });

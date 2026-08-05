@@ -7,6 +7,7 @@ import {
   type Layout,
   type Route,
   type RouteId,
+  type SpaceSnapshot,
   type UUID,
 } from '@project/core';
 import { parseCardFile, type CardFile, type CardFileError } from './card-file';
@@ -46,6 +47,9 @@ export type SpaceError =
   { kind: 'invalid-shape'; message: string } | CardFileError | ReferenceError;
 
 export type LoadSpaceResult = { ok: true; space: Space } | { ok: false; errors: SpaceError[] };
+
+export type LoadSpaceSnapshotResult =
+  { ok: true; space: Space; snapshot: SpaceSnapshot } | { ok: false; errors: SpaceError[] };
 
 /**
  * Parse, validate references, and index raw input into a {@link Space}.
@@ -103,7 +107,7 @@ export function loadSpace(input: unknown, cardFiles: readonly CardFile[]): LoadS
 }
 
 /** Validate and index a fully identified persistence aggregate. */
-export function loadSpaceSnapshot(input: unknown): LoadSpaceResult {
+export function loadSpaceSnapshot(input: unknown): LoadSpaceSnapshotResult {
   const parsed = spaceSnapshotSchema.safeParse(input);
   if (!parsed.success) {
     return {
@@ -120,7 +124,7 @@ export function loadSpaceSnapshot(input: unknown): LoadSpaceResult {
     id: cardId,
     ...cardDocument,
   })) as Card[];
-  return buildSpace({
+  const loaded = buildSpace({
     id,
     title: document.title,
     cards,
@@ -128,6 +132,7 @@ export function loadSpaceSnapshot(input: unknown): LoadSpaceResult {
     layouts: document.layouts,
     defaultView: document.defaultView,
   });
+  return loaded.ok ? { ...loaded, snapshot: parsed.data } : loaded;
 }
 
 function buildSpace(input: {

@@ -51,6 +51,29 @@ describe('MemorySpaceBackend', () => {
     });
   });
 
+  /**
+   * The rejection a client actually reads. Every other `invalid-snapshot`
+   * assertion in the repo matches on `code`, which stayed identical while the
+   * message changed underneath it: the backends that dropped their own outer
+   * `spaceSnapshotSchema.safeParse` stopped forwarding `parsed.error.message` —
+   * Zod's whole serialized issue array in one string — and now forward the
+   * intake's located `invalid-shape` prose ("A wire codec throws prose, not
+   * Zod"). Pin the shape, not Zod's wording.
+   */
+  it('rejects with located intake prose rather than a serialized Zod dump', async () => {
+    const backend = new MemorySpaceBackend([loaded]);
+    const invalid = structuredClone(loaded.snapshot);
+    invalid.document.title = '';
+
+    const result = await backend.commitSpace(invalid, 3n);
+
+    expect(result).toMatchObject({ kind: 'permanent-failure', code: 'invalid-snapshot' });
+    const message = result.kind === 'permanent-failure' ? result.message : '';
+    expect(message).toMatch(/^document\.title: \S/);
+    expect(message.startsWith('[')).toBe(false);
+    expect(() => JSON.parse(message) as unknown).toThrow();
+  });
+
   it('rejects shape-valid snapshots that fail normal domain intake', async () => {
     const backend = new MemorySpaceBackend([loaded]);
     const secondCard = {
