@@ -466,6 +466,12 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
           routes={visibleRoutes}
           activeRouteId={activeRouteId}
           onActivate={(routeId) => activateRoute(uuidSchema.parse(routeId))}
+          // `RouteSelector` disables its control on "no active Route" and
+          // `present()` refuses on exactly that, so the two conditions agree:
+          // every Route that *is* active can be presented, cyclic ones included
+          // (ADR 0032). They once did not, and a fully cyclic Route fell through
+          // the gap between them — the control read `Present`, stayed enabled,
+          // and swallowed the click.
           onPresent={present}
           presenting={presenting}
           onExitPresenting={exitPresenting}
