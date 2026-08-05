@@ -34,7 +34,7 @@ The graph uses React Flow's [elkjs multiple-handles technique](https://reactflow
 
 ```sh
 pnpm verify         # typecheck + lint + prettier check + unit/property tests
-pnpm e2e            # Playwright flow (boots the dev server automatically)
+pnpm e2e            # Playwright flow (each test boots its own isolated server)
 pnpm e2e:fixture    # only scenarios backed by the tracked fixture
 ```
 
