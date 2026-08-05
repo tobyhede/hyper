@@ -11,7 +11,7 @@ import {
   type UUID,
 } from '@project/core';
 import { parseCardFile, type CardFile, type CardFileError } from './card-file';
-import { validateReferences, type ReferenceError } from './validate';
+import { validateReferences, type SpaceReferenceError } from './validate';
 
 /**
  * A Space: the validated, indexed top-level domain value (ADR 0010). It carries
@@ -44,7 +44,7 @@ export interface Space {
  * reference that does not resolve.
  */
 export type SpaceError =
-  { kind: 'invalid-shape'; message: string } | CardFileError | ReferenceError;
+  { kind: 'invalid-shape'; message: string } | CardFileError | SpaceReferenceError;
 
 export type LoadSpaceResult = { ok: true; space: Space } | { ok: false; errors: SpaceError[] };
 

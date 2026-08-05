@@ -2,13 +2,13 @@ import { describe, expect, it } from 'vitest';
 import {
   buildCardHandles,
   buildRouteEdges,
-  cardIdsForRoutes,
-  filterHandlesByRoute,
   filterHandlesByRoutes,
   loadSpace,
   routeCardIds,
   type Space,
 } from '../src/index';
+// Internal to the package, so not reachable through what it offers.
+import { cardIdsForRoutes, filterHandlesByRoute } from '../src/routes';
 import { cardFile, uuid } from './card-files';
 
 // a → b → c  (main),  a → c  (quick): c is shared, a fans out.

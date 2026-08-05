@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import type { BuiltInViewId, Card, Layout, LayoutPosition, Route, UUID } from '@project/core';
-import { isValidGraph, validateReferences, type ReferenceError } from '../src/index';
+// The whole module is internal: `loadSpace` is the one intake that runs it.
+import { isValidGraph, validateReferences, type SpaceReferenceError } from '../src/validate';
 import { alias, card, uuid } from './card-files';
 
-const errorKinds = (errors: readonly ReferenceError[]): string[] => errors.map((e) => e.kind);
+const errorKinds = (errors: readonly SpaceReferenceError[]): string[] => errors.map((e) => e.kind);
 
 // A mutable space-file shape: these tests deliberately construct broken graphs
 // (which loadSpace would reject) and hand them straight to validateReferences.
