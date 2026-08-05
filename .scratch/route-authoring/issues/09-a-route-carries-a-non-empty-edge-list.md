@@ -9,7 +9,7 @@ comment `07` wrote to explain why it had to stay — goes away.
 
 **Blocked by:** nothing.
 
-**Status:** needs-triage
+**Status:** wontfix
 
 ## Why
 
@@ -129,3 +129,45 @@ the diff is otherwise unreadable.
   `schema.test.ts` pins it.
 - **A Route naming its own start**, still floated by `traversal.ts` and still
   deferred by `07`.
+
+## Answer
+
+**Closed `wontfix`, taking the recommendation above as written.** The type is
+right in principle and the tree is not shaped to receive it cheaply. Nothing in
+the analysis was disputed on review; the measurements were re-checked rather than
+re-argued.
+
+The decisive point is this ticket's own sixth acceptance criterion, which is a
+better argument than the cost table it sits under. The change exists to stop
+`Route['edges']` lying about being possibly empty. Two of the fourteen errors can
+only be answered by writing `as [RouteEdge, ...RouteEdge[]]` in
+`graph.property.test.ts` — a hand-written assertion of exactly the guarantee the
+change was supposed to make the compiler prove. Buying a truthful type in
+`core` by writing an unchecked one in a property test is not a net gain in
+honesty, it is the same lie relocated somewhere with less scrutiny. The ticket
+anticipated this and named it as the signal to stop, so stopping is following
+its own instruction rather than overriding it.
+
+The prize is unchanged and remains one dead line plus one comment in
+`navigation.ts`, both already documented as dead. `07`'s comment there explains
+why the branch must stay, so the current state misleads nobody and costs one
+unreachable `return`.
+
+**What would reopen this**, so a future reader knows when to revisit rather than
+re-deriving the table:
+
+- `graph.property.test.ts` being restructured for its own reasons, so that
+  `spaceFileFromIds` builds its Edges head-and-tail instead of by `map`. The
+  property test is 5 of the 14 errors and the only cast-forcing site; without it
+  the balance shifts.
+- A TypeScript release that preserves tuple length through
+  `Array.prototype.map`. That alone answers the exporter (1 error) and the
+  property test's `map` cases together, leaving only the three UI/adapter tests
+  that must invent an Edge.
+- The three UI/adapter tests (`RouteLegend`, `RouteSelector`, `RouteHud`) gaining
+  a shared Route fixture for unrelated reasons, which would absorb 6 of the 14
+  errors at no marginal cost to this change.
+
+Any one of those makes this cheap; none of them is worth doing *in order* to make
+it cheap. Left as `wontfix` rather than `needs-info` because no new information
+is being waited on — the decision is made on the evidence present.

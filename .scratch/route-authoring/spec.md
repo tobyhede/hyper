@@ -4,7 +4,10 @@ Status: resolved — the authoring stream, issues `01`–`07`, is resolved.
 Higher-numbered tickets in this directory are follow-ons rather than authoring
 increments and carry their own status: `08` holds the repeated-visit
 presentation question this spec lists as out of scope, which `07` made
-reachable.
+reachable, and `09` is closed `wontfix` — tightening `routeSchema.edges` to
+`.nonempty()` buys one already-documented dead branch and charges a
+hand-written tuple cast in a property test for it, which is the guarantee the
+change existed to prove.
 
 Issues `01`–`06` delivered the authoring half. User story 32 — a cyclic Route
 remaining presentable — was never ticketed with them, and the gesture `04`
