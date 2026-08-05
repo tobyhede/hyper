@@ -29,6 +29,30 @@ The disable condition and the guard test different things, and this is the gap
 between them. A fully cyclic Route is the only way to reach it: `routeSchema`
 requires `edges.min(1)`, so a valid Route always has a card.
 
+`present()`'s single guard is also answering two questions at once — "is a Route
+active" and "does it have a start" — and that conflation is what lets a cyclic
+Route fall through it. Only the first is reachable once `routeStartCard` is
+total.
+
+## How six resolved tickets left this reachable
+
+Worth recording, because the same shape will hide the next one. Ticket `01` is
+the one that made cycles legal, and it closed on this criterion:
+
+> `pnpm e2e` passes unchanged, proving existing rendering and presenting still
+> tolerate the accepted fixture behavior.
+
+That checks presenting against **the fixture**, which is acyclic by
+construction — every fixture route returns to its start through an alias rather
+than an edge, precisely so it lays out as clean forward paths. So the one check
+meant to reassure about presenting could not have caught this: `01` legalised
+cycles in the domain and then verified presenting on a graph that has none. The
+line reads as coverage and is not.
+
+The general form: an e2e criterion asserting "presenting still works" is only as
+good as the fixture's shape, and a ticket that widens what the domain accepts
+cannot be reassured by a fixture that never exercises the new shape.
+
 ## What to change
 
 `routeStartCard` returns the first entry when one exists, and otherwise the
@@ -63,9 +87,11 @@ to do when the structure declines to answer.
       it has an entry, so rule 2 never runs.
 - [ ] `routeEntryCards` is unchanged and still answers `[]` for a fully cyclic
       Route.
-- [ ] `present()`'s `start === undefined` guard is removed or proven
-      unreachable, and `RouteSelector`'s `disabled` condition is correct on its
-      own once it is.
+- [ ] `present()` stops answering two questions with one guard. "No active
+      Route" is the reachable refusal and is exactly what `RouteSelector`
+      disables on, so the two must agree and that disable condition must be
+      correct on its own afterwards. Decide deliberately what happens to the
+      unreachable half rather than deleting it by default.
 - [ ] Presenting a self-connected Route enters presenting mode, draws the Card,
       and offers its one outgoing move.
 - [ ] `pnpm verify` and `pnpm e2e` pass.
