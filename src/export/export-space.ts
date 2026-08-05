@@ -2,13 +2,14 @@ import { cp, lstat, mkdir, mkdtemp, readdir, rename, rm, stat, writeFile } from 
 import { basename, dirname, join, resolve } from 'node:path';
 import { spaceSnapshotSchema, type Card, type SpaceFile, type UUID } from '@project/core';
 import { loadSpaceSnapshot, serializeCardFile } from '@project/graph';
+import type { LoadedSpace } from '@project/persistence';
 import { readSingleSpace } from '../import/read-single-space';
-import type { SpaceRepository, StoredSpace } from '../persistence/space-repository';
+import type { SpaceRepository } from '../persistence/space-repository';
 
 const compareOrdinal = (left: string, right: string): number =>
   left < right ? -1 : left > right ? 1 : 0;
 
-const canonicalSpaceFile = ({ snapshot }: StoredSpace): SpaceFile => {
+const canonicalSpaceFile = ({ snapshot }: LoadedSpace): SpaceFile => {
   const layouts = snapshot.document.layouts?.map((layout) => ({
     id: layout.id,
     title: layout.title,
@@ -38,7 +39,7 @@ const canonicalSpaceFile = ({ snapshot }: StoredSpace): SpaceFile => {
 
 const canonicalCard = (
   id: UUID,
-  document: StoredSpace['snapshot']['cards'][number]['document'],
+  document: LoadedSpace['snapshot']['cards'][number]['document'],
 ): Card => {
   const common = {
     id,
@@ -81,7 +82,7 @@ const removeMarkdownFiles = async (directory: string): Promise<void> => {
   );
 };
 
-const prepareReplacement = async (stored: StoredSpace, directory: string): Promise<void> => {
+const prepareReplacement = async (stored: LoadedSpace, directory: string): Promise<void> => {
   await removeMarkdownFiles(directory);
   await removeMarkdownFiles(join(directory, 'cards'));
   await rm(join(directory, 'space.json'), { force: true });
@@ -154,7 +155,7 @@ export const exportSpace = async (
   repository: SpaceRepository,
   id: UUID,
   destinationPath: string,
-): Promise<StoredSpace | undefined> => {
+): Promise<LoadedSpace | undefined> => {
   const stored = await repository.loadSpace(id);
   if (stored === undefined) return undefined;
 

@@ -1,6 +1,11 @@
 import { uuidSchema, type ImportSpace, type UUID } from '@project/core';
 import { describe, expect, it } from 'vitest';
 import { MemorySpaceRepository } from '../support/memory-space-repository';
+import { spaceRepositoryContract } from '../support/repository-contract';
+
+spaceRepositoryContract('MemorySpaceRepository', () =>
+  Promise.resolve({ repository: new MemorySpaceRepository(), close: () => Promise.resolve() }),
+);
 
 const SPACE_ID = uuidSchema.parse('11111111-1111-4111-8111-111111111111');
 const OTHER_SPACE_ID = uuidSchema.parse('22222222-2222-4222-8222-222222222222');

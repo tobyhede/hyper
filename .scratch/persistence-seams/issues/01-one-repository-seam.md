@@ -1,6 +1,6 @@
 # One repository seam, declared once, with a shared contract suite
 
-Status: needs-triage
+Status: resolved
 
 ## Context
 
@@ -84,3 +84,89 @@ exactly that publication pattern.
 One declaration plus a contract suite both adapters run, as `SpaceBackend` already
 has. Whether the declaration lands in `@project/persistence` or a new shared module
 is the open question.
+
+## Answer
+
+Done. The declaration landed in `@project/persistence`, in a new
+`src/repository.ts` beside `backend.ts`: `SpaceResourceRepository` and
+`RepositoryCommitResult`, written in terms of the `LoadedSpace` and
+`SpaceSummary` that package already owned. `@project/http` imports both instead
+of declaring them, and `src/persistence/space-repository.ts` is now
+
+```ts
+export interface SpaceRepository extends SpaceResourceRepository {
+  importSpaces(input: readonly ImportSpace[], mode: ImportMode): Promise<RepositoryImportResult>;
+  markExported(id: UUID, revision: bigint): Promise<void>;
+}
+```
+
+No new module. A third home would have been a third place to look for a seam
+this issue exists because there were two of.
+
+**Names.** `StoredSpace` went and `LoadedSpace` stayed. The two were
+field-for-field identical, so this was purely which word to keep, and the wire
+codec settled it: `encodeLoadedSpace`, `decodeLoadedSpace` and `LoadedSpaceJson`
+in `http-protocol.ts` already spoke of a *loaded* space in the package that was
+keeping the declaration. Keeping `StoredSpace` would have meant renaming those
+three across two browser-safe packages to say the same thing. Likewise
+`SpaceResourceCommitResult` went and `RepositoryCommitResult` stayed:
+`SpaceResource` is HTTP-resource vocabulary that stops meaning anything once the
+type lives in `@project/persistence`, and `Repository` is the word both
+interfaces already use. `loadStoredSpace` in the PostgreSQL adapter became
+`loadSpaceAggregate`, which is what its own comments call the thing.
+
+`SpaceResourceRepository` is *not* re-exported from `@project/http`. Its
+neighbours `LoadedSpace` and `SpaceSummary` were never re-exported either, and
+consumers already reach for those from `@project/persistence`.
+
+**The contract suite** is `test/support/repository-contract.ts`, exporting
+`spaceRepositoryContract(name, createHarness)`, run by
+`test/unit/memory-space-repository.test.ts` over `MemorySpaceRepository` and by
+`test/integration/postgres-space-repository.test.ts` over
+`PostgresSpaceRepository`. Fifteen cases: import/list/load/commit, stale
+conflict, the three commit rejections, card removal, exported-revision
+carry-through and its missing-Space refusal, the four import rejections,
+truncate mode freeing the Card ids it clears, and identity minting.
+
+It is **not** published behind `@project/persistence/test-support`, unlike the
+`SpaceBackend` contract it is modelled on, and that is forced rather than
+chosen: it is written against `SpaceRepository`, whose extra two members are CLI
+capability and stay out of the browser-safe package, and `packages/persistence`
+may not import `src/` — its tsconfig `paths` resolve only `core` and `graph`,
+and ESLint blocks the relative escape. Both consumers are root tests, so there
+is no boundary to publish across and no `package.json`, `tsconfig.base.json` or
+`vitest.config.ts` change was needed.
+
+Three behaviours were left out because the two implementations do not genuinely
+share them, and the deliberate difference the double's own comment warns about
+was preserved rather than smoothed over:
+
+- **`listSpaces` ordering.** Both sort ascending by id — one through
+  `String.localeCompare`, the other through PostgreSQL's ordering of the `uuid`
+  type. Those agree for canonical lowercase UUIDs by a property of ICU
+  collation, not by anything either implementation promises. The contract
+  compares catalogs as sets, as the `SpaceBackend` contract already does.
+- **Rejection messages**, except the two both produce character-for-character
+  (`Duplicate card identity "<id>"` and `Space <id> already exists`), which the
+  contract does pin. `Duplicate Space identity <id>` versus
+  `Duplicate space identity "<id>"` for a repeated *space* id is a genuine
+  divergence; the contract asserts the code only, and it is a real finding —
+  the two disagree on prose while agreeing on classification.
+- **Transactional isolation.** The concurrent-insert race and the one-statement
+  aggregate read are PostgreSQL behaviour a `Map` cannot have; they stay in the
+  integration suite.
+
+The batch/stored distinction the double's comment defends — a Card repeated
+inside one batch is `duplicate-identity`, a Card a stored Space owns is
+`card-ownership` — is asserted as two separate contract cases, so folding them
+together now fails against both implementations rather than silently only
+against one.
+
+**Unverified:** the PostgreSQL half was not run. `pnpm test:integration:postgres`
+needs a live database and none was available; the suite is correct by
+construction, walked case by case against `PostgresSpaceRepository`, and
+typechecks in the root program.
+
+`test/unit/space-resource-repository.test.ts` kept its `expectTypeOf` conformance
+check and gained the superset assertion. The issue is right that `pnpm test`
+does not enforce either — only `pnpm typecheck` does.

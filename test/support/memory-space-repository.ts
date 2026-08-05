@@ -1,12 +1,10 @@
 import { newUuid, type ImportSpace, type SpaceSnapshot, type UUID } from '@project/core';
 import { loadSpaceSnapshot } from '@project/graph';
+import type { LoadedSpace, RepositoryCommitResult, SpaceSummary } from '@project/persistence';
 import type {
   ImportMode,
-  RepositoryCommitResult,
   RepositoryImportResult,
   SpaceRepository,
-  SpaceSummary,
-  StoredSpace,
 } from '../../src/persistence/space-repository';
 
 const clone = <T>(value: T): T => structuredClone(value);
@@ -36,9 +34,9 @@ const identifyImport = (input: ImportSpace): SpaceSnapshot => {
 
 /** Behavioral repository for server-side startup tests. */
 export class MemorySpaceRepository implements SpaceRepository {
-  readonly #spaces = new Map<UUID, StoredSpace>();
+  readonly #spaces = new Map<UUID, LoadedSpace>();
 
-  constructor(spaces: readonly StoredSpace[] = []) {
+  constructor(spaces: readonly LoadedSpace[] = []) {
     for (const space of spaces) this.#spaces.set(space.snapshot.id, clone(space));
   }
 
@@ -50,7 +48,7 @@ export class MemorySpaceRepository implements SpaceRepository {
     );
   }
 
-  loadSpace(id: UUID): Promise<StoredSpace | undefined> {
+  loadSpace(id: UUID): Promise<LoadedSpace | undefined> {
     const stored = this.#spaces.get(id);
     return Promise.resolve(stored === undefined ? undefined : clone(stored));
   }
@@ -179,7 +177,7 @@ export class MemorySpaceRepository implements SpaceRepository {
     }
 
     if (mode === 'truncate') this.#spaces.clear();
-    const stored = snapshots.map((snapshot): StoredSpace => ({
+    const stored = snapshots.map((snapshot): LoadedSpace => ({
       snapshot: clone(snapshot),
       revision: 0n,
       exportedRevision: null,

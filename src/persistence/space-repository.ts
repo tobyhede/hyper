@@ -1,27 +1,8 @@
-import type { ImportSpace, SpaceSnapshot, UUID } from '@project/core';
-
-export interface SpaceSummary {
-  id: UUID;
-  title: string;
-}
-
-export interface StoredSpace {
-  snapshot: SpaceSnapshot;
-  revision: bigint;
-  exportedRevision: bigint | null;
-}
-
-export type RepositoryCommitResult =
-  | { kind: 'committed'; revision: bigint }
-  | { kind: 'conflict'; current: StoredSpace }
-  | {
-      kind: 'rejected';
-      code: 'invalid-snapshot' | 'not-found';
-      message: string;
-    };
+import type { ImportSpace, UUID } from '@project/core';
+import type { LoadedSpace, SpaceResourceRepository } from '@project/persistence';
 
 /**
- * No `conflict` variant, unlike {@link RepositoryCommitResult} above.
+ * No `conflict` variant, unlike {@link RepositoryCommitResult}.
  *
  * Import is insert-only (ADR 0030) and takes no expected revision, so it runs no
  * optimistic concurrency check and has no revision to disagree about. A taken id
@@ -31,7 +12,7 @@ export type RepositoryCommitResult =
  * or merges existing content.
  */
 export type RepositoryImportResult =
-  | { kind: 'imported'; spaces: readonly StoredSpace[] }
+  | { kind: 'imported'; spaces: readonly LoadedSpace[] }
   | {
       kind: 'rejected';
       code: 'invalid-snapshot' | 'duplicate-identity' | 'card-ownership';
@@ -40,10 +21,17 @@ export type RepositoryImportResult =
 
 export type ImportMode = 'insert' | 'truncate';
 
-export interface SpaceRepository {
-  listSpaces(): Promise<readonly SpaceSummary[]>;
-  loadSpace(id: UUID): Promise<StoredSpace | undefined>;
-  commitSpace(snapshot: SpaceSnapshot, expectedRevision: bigint): Promise<RepositoryCommitResult>;
+/**
+ * The server-side seam: everything the HTTP application consumes, plus the two
+ * members only the CLI reaches for.
+ *
+ * Extension, not a second declaration. `listSpaces`, `loadSpace` and
+ * `commitSpace` are `SpaceResourceRepository`'s, so a change to any of them
+ * cannot leave the two sides disagreeing — and the browser still cannot name
+ * import or export, because the seam the Fetch application takes does not
+ * declare them.
+ */
+export interface SpaceRepository extends SpaceResourceRepository {
   importSpaces(input: readonly ImportSpace[], mode: ImportMode): Promise<RepositoryImportResult>;
   /** Records the revision projected by a completed external export. */
   markExported(id: UUID, revision: bigint): Promise<void>;

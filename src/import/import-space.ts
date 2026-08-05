@@ -1,10 +1,10 @@
-import { readImportBatch, readSingleSpace } from './read-single-space';
+import type { LoadedSpace } from '@project/persistence';
 import type {
   ImportMode,
   RepositoryImportResult,
   SpaceRepository,
-  StoredSpace,
 } from '../persistence/space-repository';
+import { readImportBatch, readSingleSpace } from './read-single-space';
 
 type SpaceImportErrorKind = 'identity' | 'domain-validation';
 
@@ -18,7 +18,7 @@ export class SpaceImportError extends Error {
   }
 }
 
-export const requireImportedSpaces = (result: RepositoryImportResult): readonly StoredSpace[] => {
+export const requireImportedSpaces = (result: RepositoryImportResult): readonly LoadedSpace[] => {
   if (result.kind === 'imported') return result.spaces;
 
   throw new SpaceImportError(
@@ -30,7 +30,7 @@ export const requireImportedSpaces = (result: RepositoryImportResult): readonly 
 export const importSingleSpace = async (
   path: string,
   repository: SpaceRepository,
-): Promise<StoredSpace> => {
+): Promise<LoadedSpace> => {
   const input = await readSingleSpace(path);
   const storedSpaces = requireImportedSpaces(await repository.importSpaces([input], 'insert'));
   const [stored] = storedSpaces;
@@ -44,7 +44,7 @@ export const importSpaceBatch = async (
   path: string,
   repository: SpaceRepository,
   mode: ImportMode = 'insert',
-): Promise<readonly StoredSpace[]> => {
+): Promise<readonly LoadedSpace[]> => {
   const input = await readImportBatch(path);
   return requireImportedSpaces(await repository.importSpaces(input, mode));
 };

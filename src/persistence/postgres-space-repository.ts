@@ -10,15 +10,9 @@ import {
   type UUID,
 } from '@project/core';
 import { loadSpaceSnapshot } from '@project/graph';
+import type { LoadedSpace, RepositoryCommitResult, SpaceSummary } from '@project/persistence';
 import { db } from '../prisma/db';
-import type {
-  ImportMode,
-  RepositoryCommitResult,
-  RepositoryImportResult,
-  SpaceRepository,
-  SpaceSummary,
-  StoredSpace,
-} from './space-repository';
+import type { ImportMode, RepositoryImportResult, SpaceRepository } from './space-repository';
 
 type Orm = typeof db.orm;
 type JsonValue =
@@ -208,7 +202,7 @@ const resolveImport = (input: ImportSpace, reservedSpaceId: UUID): SpaceSnapshot
  * cannot come from either side of one. There is no torn read to detect and no
  * revision comparison to make.
  */
-const loadStoredSpace = async (orm: Orm, id: UUID): Promise<StoredSpace | undefined> => {
+const loadSpaceAggregate = async (orm: Orm, id: UUID): Promise<LoadedSpace | undefined> => {
   const stored = await orm.public.Space.where({ id })
     .include('cards', (cards) => cards.select('id', 'document').orderBy((card) => card.id.asc()))
     .first();
@@ -291,8 +285,8 @@ export class PostgresSpaceRepository implements SpaceRepository {
     }));
   }
 
-  loadSpace(id: UUID): Promise<StoredSpace | undefined> {
-    return loadStoredSpace(this.#database.orm, id);
+  loadSpace(id: UUID): Promise<LoadedSpace | undefined> {
+    return loadSpaceAggregate(this.#database.orm, id);
   }
 
   async markExported(id: UUID, revision: bigint): Promise<void> {
@@ -361,7 +355,7 @@ export class PostgresSpaceRepository implements SpaceRepository {
 
     if (outcome.kind === 'committed') return outcome;
 
-    const current = await loadStoredSpace(this.#database.orm, accepted.id);
+    const current = await loadSpaceAggregate(this.#database.orm, accepted.id);
     if (current === undefined) {
       return {
         kind: 'rejected',
@@ -396,7 +390,7 @@ export class PostgresSpaceRepository implements SpaceRepository {
 
     try {
       return await this.#database.transaction(async ({ orm }) => {
-        const imported: StoredSpace[] = [];
+        const imported: LoadedSpace[] = [];
 
         if (mode === 'truncate') await truncateHyperContent(orm);
 
@@ -452,7 +446,7 @@ export class PostgresSpaceRepository implements SpaceRepository {
           // transaction has just written and not yet committed. That is exactly
           // what a transaction sees of its own work, and the aggregate is still
           // one statement here.
-          const stored = await loadStoredSpace(orm, snapshot.id);
+          const stored = await loadSpaceAggregate(orm, snapshot.id);
           if (stored === undefined) {
             throw new Error(`Space ${snapshot.id} disappeared during import`);
           }

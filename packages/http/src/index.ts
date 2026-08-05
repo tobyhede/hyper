@@ -1,10 +1,9 @@
-import { uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
+import { uuidSchema } from '@project/core';
 import {
   decodeCommitRequest,
   encodeLoadedSpace,
   type CommitRequestJson,
-  type LoadedSpace,
-  type SpaceSummary,
+  type SpaceResourceRepository,
 } from '@project/persistence';
 import { parse as parseContentType } from 'content-type';
 import { Hono, type Context, type Env } from 'hono';
@@ -26,24 +25,6 @@ const SPACE_COLLECTION_PATH = '/api/spaces';
 // finished routing by then, so its own pattern is no longer available to ask,
 // and this must keep matching what `SPACE_RESOURCE_PATH` registers.
 const SPACE_RESOURCE_PATTERN = /^\/api\/spaces\/([^/]+)$/;
-
-export type SpaceResourceCommitResult =
-  | { kind: 'committed'; revision: bigint }
-  | { kind: 'conflict'; current: LoadedSpace }
-  | {
-      kind: 'rejected';
-      code: 'invalid-snapshot' | 'not-found';
-      message: string;
-    };
-
-export interface SpaceResourceRepository {
-  listSpaces(): Promise<readonly SpaceSummary[]>;
-  loadSpace(id: UUID): Promise<LoadedSpace | undefined>;
-  commitSpace(
-    snapshot: SpaceSnapshot,
-    expectedRevision: bigint,
-  ): Promise<SpaceResourceCommitResult>;
-}
 
 export interface SpaceHttpAppOptions {
   logError?: (message: string, error: unknown) => void;

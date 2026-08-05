@@ -1,14 +1,12 @@
 import { uuidSchema, type ImportSpace, type SpaceSnapshot, type UUID } from '@project/core';
+import type { LoadedSpace, RepositoryCommitResult, SpaceSummary } from '@project/persistence';
 import { describe, expect, it } from 'vitest';
-import { openDatabaseSelection, resolveDatabaseStartup } from '../../src/startup/database-startup';
 import type {
   ImportMode,
-  RepositoryCommitResult,
   RepositoryImportResult,
   SpaceRepository,
-  SpaceSummary,
-  StoredSpace,
 } from '../../src/persistence/space-repository';
+import { openDatabaseSelection, resolveDatabaseStartup } from '../../src/startup/database-startup';
 import { MemorySpaceRepository } from '../support/memory-space-repository';
 
 const SPACE_ID = uuidSchema.parse('11111111-1111-4111-8111-111111111111');
@@ -25,7 +23,7 @@ class PersistenceOwnedSpaceIdRepository implements SpaceRepository {
     return this.#memory.listSpaces();
   }
 
-  loadSpace(id: UUID): Promise<StoredSpace | undefined> {
+  loadSpace(id: UUID): Promise<LoadedSpace | undefined> {
     return this.#memory.loadSpace(id);
   }
 
@@ -70,7 +68,7 @@ const storedSpace = (
   id = SPACE_ID,
   cardId = CARD_ID,
   title = 'Existing space',
-): StoredSpace => ({
+): LoadedSpace => ({
   snapshot: {
     id,
     document: { version: 2, title, routes: [] },
