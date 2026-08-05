@@ -60,32 +60,44 @@ along: keep a rename off a structural commit.
 Fourteen names left the index and forty-one stayed. No import site outside
 `packages/graph` moved, as predicted.
 
-The line drawn, which is the part worth keeping: the index names every function
-and value a consumer calls, plus the types those signatures make a consumer write
-down — a parameter, a return shape, or a member of one narrowed by name. A helper
-whose only caller is the module declaring it stays there, and so does a type
-reachable only from inside a result union nobody narrows.
+The line drawn, which is the part worth keeping: **the unit of curation is the
+module, not the name.** A module reaches the index when something outside
+`packages/graph` calls into it, and then every type that module exports is
+offered with it — those types are the vocabulary of the calls being made, and
+they are nameable the moment a consumer wants a variable for one. Functions are
+named one at a time: a helper whose only callers are inside the package stays in
+its module, behind the form consumers do call.
 
-That rule took **two whole modules** off the surface rather than picking names one
-at a time. `frontmatter` (`OPENING_FENCE`, `FrontmatterSplit`, `splitFrontmatter`)
-is how `card-file` reads a fence, and `parseCardFile` is the intake it exists to
-serve. `validate` (`Referenceable`, `SpaceReferenceErrorKind`,
-`SpaceReferenceError`, `validateReferences`, `isValidGraph`) runs inside
-`loadSpace`, which ADR 0010 makes the one intake — a caller never checks
-references itself. Six further helpers went: `cardIdsForRoutes` and
-`filterHandlesByRoute` behind the plural forms the app calls, `outHandleId` and
-`inHandleId` behind `buildCardHandles`/`buildRouteEdges` which are the only things
-that build a handle id, and `incomingEdges`/`routeEntryCards` behind
-`routeStartCard`.
+That is why **two whole modules** came off the surface rather than names picked
+one at a time. `frontmatter` (`OPENING_FENCE`, `FrontmatterSplit`,
+`splitFrontmatter`) is how `card-file` reads a fence, and `parseCardFile` is the
+intake it exists to serve. `validate` (`Referenceable`,
+`SpaceReferenceErrorKind`, `SpaceReferenceError`, `validateReferences`) runs
+inside `loadSpace`, which ADR 0010 makes the one intake — a caller never checks
+references itself. `isValidGraph` left the surface with them and was then deleted
+outright: its only caller was its own test, and once the package no longer
+offered it there was nothing holding it up. Six further helpers went:
+`cardIdsForRoutes` and `filterHandlesByRoute` behind the plural forms the app
+calls, `outHandleId` and `inHandleId` behind `buildCardHandles`/`buildRouteEdges`
+which are the only things that build a handle id, and
+`incomingEdges`/`routeEntryCards` behind `routeStartCard`.
 
-The judgement calls went the other way for `GridStrategyOptions`, `NewSpace`,
-`SpaceError`, `LoadSpaceResult`, `LoadSpaceSnapshotResult`, `LayoutPort`,
-`CardFileError`, `CardFileErrorKind`, `ParseCardFileResult` and
-`ParseImportCardFileResult`. None is imported by name today; each is the parameter
-or result shape of an exported function, consumed structurally now and nameable
-the moment a consumer wants a variable for one. `SpaceReferenceError` is the
-counter-example that fixes the rule's edge: it is reachable from `loadSpace` only
-through `SpaceError`, a union nothing narrows.
+The rule predicts the whole list, checked name by name. Every one of the
+twenty offered values has a caller outside the package and every one of the ten
+dropped values has none; no module that kept a value lost a type. The ten names
+kept without an importer — `GridStrategyOptions`, `NewSpace`, `SpaceError`,
+`LoadSpaceResult`, `LoadSpaceSnapshotResult`, `LayoutPort`, `CardFileError`,
+`CardFileErrorKind`, `ParseCardFileResult` and `ParseImportCardFileResult` — are
+all types, and each stayed because its module did.
+
+`SpaceReferenceError` fixes the rule's edge, though not by sitting inside a
+result union nobody narrows: `loadSpace` returns `SpaceError`, `SpaceError` names
+it, and `CardFileError` sits in that same union and is offered. Reachability
+separates nothing. Neither does depth — `CardFileErrorKind` is a member of a
+member and stayed, `LayoutPort` is three levels inside `LayoutGraph` and stayed,
+and `Referenceable` is the direct parameter type of `validateReferences` and
+went. What separates them is the module each belongs to, which is the whole rule
+restated at its hardest case.
 
 The guard is `test/unit/graph-package-surface.test.ts`, written red first. It
 holds three things together: the index declares no `export *`, its declarations
