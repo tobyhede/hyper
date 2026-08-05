@@ -1,6 +1,7 @@
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
-import { validateReferences } from '../src/index';
+// The whole module is internal: `loadSpace` is the one intake that runs it.
+import { validateReferences } from '../src/validate';
 import { card, uuid } from './card-files';
 
 const cardId = (value: number) =>

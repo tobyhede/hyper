@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { BuiltInViewId, Card, Layout, LayoutPosition, Route, UUID } from '@project/core';
-import { isValidGraph, validateReferences, type ReferenceError } from '../src/index';
+// The whole module is internal: `loadSpace` is the one intake that runs it.
+import { isValidGraph, validateReferences, type ReferenceError } from '../src/validate';
 import { alias, card, uuid } from './card-files';
 
 const errorKinds = (errors: readonly ReferenceError[]): string[] => errors.map((e) => e.kind);

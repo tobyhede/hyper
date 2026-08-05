@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { Route, UUID } from '@project/core';
-import { incomingEdges, outgoingEdges, routeEntryCards, routeStartCard } from '../src/index';
+import { outgoingEdges, routeStartCard } from '../src/index';
+// Internal to the package: `routeStartCard` is the offered way in.
+import { incomingEdges, routeEntryCards } from '../src/traversal';
 import { uuid } from './card-files';
 
 const route = (edges: [UUID, UUID][]): Route => ({
