@@ -21,7 +21,7 @@ export interface Referenceable {
   readonly defaultView?: BuiltInViewId | UUID | undefined;
 }
 
-export type ReferenceErrorKind =
+export type SpaceReferenceErrorKind =
   | 'duplicate-card-id'
   | 'duplicate-route-id'
   | 'duplicate-layout-id'
@@ -35,8 +35,14 @@ export type ReferenceErrorKind =
   | 'alias-self-reference'
   | 'alias-targets-alias';
 
-export interface ReferenceError {
-  kind: ReferenceErrorKind;
+/**
+ * One failed cross-reference. Named for the space whose references it is about,
+ * beside `CardFileError` and inside `SpaceError` — and deliberately not
+ * `ReferenceError`, which is a JavaScript global that any file importing the
+ * bare name would lose.
+ */
+export interface SpaceReferenceError {
+  kind: SpaceReferenceErrorKind;
   /** The id that failed to resolve or was duplicated. */
   ref: string;
   /** Human-readable description, useful for surfacing in the UI or CLI. */
@@ -57,8 +63,8 @@ function duplicates(ids: readonly string[]): string[] {
  * Check every cross-reference resolves. Returns an empty array when the space is
  * internally consistent. Runs inside `loadSpace` over the freshly parsed file.
  */
-export function validateReferences(space: Referenceable): ReferenceError[] {
-  const errors: ReferenceError[] = [];
+export function validateReferences(space: Referenceable): SpaceReferenceError[] {
+  const errors: SpaceReferenceError[] = [];
 
   const cardsById = new Map(space.cards.map((c) => [c.id, c]));
   const cardIds = new Set(space.cards.map((c) => c.id));
