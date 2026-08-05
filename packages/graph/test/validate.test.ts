@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { BuiltInViewId, Card, Layout, LayoutPosition, Route, UUID } from '@project/core';
 // The whole module is internal: `loadSpace` is the one intake that runs it.
-import { isValidGraph, validateReferences, type SpaceReferenceError } from '../src/validate';
+import { validateReferences, type SpaceReferenceError } from '../src/validate';
 import { alias, card, uuid } from './card-files';
 
 const errorKinds = (errors: readonly SpaceReferenceError[]): string[] => errors.map((e) => e.kind);
@@ -43,7 +43,6 @@ function layout(id: UUID, positions: Partial<Record<UUID, LayoutPosition>>): Lay
 describe('validateReferences', () => {
   it('reports no errors for a consistent space', () => {
     expect(validateReferences(baseSpaceFile())).toEqual([]);
-    expect(isValidGraph(baseSpaceFile())).toBe(true);
   });
 
   it('accepts a valid single-hop alias to a markdown card', () => {
@@ -342,7 +341,6 @@ describe('validateReferences: layouts (ADR 0025)', () => {
           e.ref === uuid('00000000-0000-4000-8000-000000000099'),
       ),
     ).toBe(true);
-    expect(isValidGraph(m)).toBe(false);
   });
 });
 
@@ -411,7 +409,6 @@ describe('validateReferences: the routes a Layout names (ADR 0026)', () => {
           e.ref === uuid('00000000-0000-4000-8000-000000000099'),
       ),
     ).toBe(true);
-    expect(isValidGraph(m)).toBe(false);
   });
 
   it('reports an activeRoute the space does not have', () => {

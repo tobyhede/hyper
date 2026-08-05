@@ -205,7 +205,3 @@ export function validateReferences(space: Referenceable): SpaceReferenceError[] 
 
   return errors;
 }
-
-export function isValidGraph(space: Referenceable): boolean {
-  return validateReferences(space).length === 0;
-}
