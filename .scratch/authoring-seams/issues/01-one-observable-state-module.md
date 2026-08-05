@@ -68,3 +68,29 @@ SpaceAuthoring's queued-completion diagnostics remain outside that seam and use
 the shared non-throwing reporter mechanism directly. The observable-state tests
 pin the complete notification contract, and Navigation has a wiring regression
 test for the previously reachable throw.
+
+## The home, decided
+
+`@project/persistence` owns the module, and `packages/app/src/navigation.ts`
+imports it from there although Navigation has nothing to do with persistence.
+That is the decision, not an accident to be tidied later.
+
+`core` is not a better home. It is the domain model — the Zod schemas and the
+`Card`/`Route`/`RouteEdge`/`Layout` types derived from them — and a generic
+pub/sub is no more at home among those than beside a commit queue. Moving it
+there buys a name that reads better in one import statement and loses the
+package's meaning.
+
+A dedicated `@project/observable` is the shape that actually matches the
+dependency graph: the module depends on nothing, and both real consumers would
+then depend on it rather than one of them depending on the other's package. It
+was judged not worth a package for ~65 lines — a manifest, a tsconfig with its
+own narrowed `paths`, an entry in every alias list `AGENTS.md` names as two to
+keep in sync, and a lint zone, all to carry one file with no dependencies. Revisit
+it when a third consumer arrives from a package that cannot legally see
+`persistence`.
+
+The import as it stands is legal and acyclic under both enforced layers: `app` is
+the composition layer and its narrowed `paths` already resolve `@project/persistence`,
+which it depends on for `SpaceSession` regardless, and `persistence` neither
+imports nor may import `app`.
