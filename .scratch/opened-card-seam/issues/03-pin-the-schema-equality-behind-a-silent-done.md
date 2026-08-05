@@ -51,10 +51,26 @@ Three assertions, all deterministic:
    that point, and whoever makes it standalone owes the equality a proof that is
    not this one.
 3. What that buys, in values: the two schemas agree over the cartesian product
-   of the edges of the rules the pane depends on — titles of `''`/`' '`/`'   '`,
-   descriptions absent/empty/120/121/multi-line, bodies absent/empty/present,
-   `kind` absent/`markdown`/`alias`. 270 documents, each parsed both ways, with
-   the parsed values compared where both succeed.
+   of the edges of the rules the pane depends on — titles of
+   `''`/`' '`/`'   '`/`'A'`/`' A '`, descriptions
+   absent/empty/`'caption'`/120/121/multi-line, bodies absent/empty/present,
+   `kind` absent/`markdown`/`alias`. 5 × 6 × 3 × 3 = 270 documents, each parsed
+   both ways for 540 parses, with the parsed values compared where both succeed.
+   The test asserts that 270 itself, so the enumeration above and the table it
+   describes cannot drift apart again silently.
+
+   They had. This list named three titles and five descriptions against a table
+   of five and six, so the product it described was 135 and the count beside it
+   was the table's 270 — caught in review, and the count was the correct half.
+
+   Not covered, deliberately: unknown keys. An object-level mode
+   (`.passthrough()`, `.strict()`, a catchall) lives on the schema rather than
+   in its `.shape`, so it escapes both (2) and (3) — `omit` carries the mode
+   across, and both schemas are `strip`, so reaching a divergence needs the same
+   standalone re-declaration (2) already refuses. It could not produce the
+   silent `Done` in any case: `OpenCard` builds the object it validates key by
+   key rather than spreading the stored document, so no unknown key reaches
+   `markdownCardSchema` along the path this issue is about.
 
 Proven against the defect, not only against the fix. Re-declaring
 `markdownCardDocumentSchema` as a standalone `z.object` with `title: z.string()`

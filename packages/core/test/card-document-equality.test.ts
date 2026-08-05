@@ -53,6 +53,17 @@ describe('a stored markdown document is the card less its id', () => {
    * this too, and that is the intended reading rather than a false alarm: the
    * document schema stops being *derived* at that point, and whoever makes it
    * standalone owes the equality a proof that is not this one.
+   *
+   * Field rules, precisely. An object-level mode — `.passthrough()`,
+   * `.strict()`, a catchall — sits on the schema rather than in its `.shape`,
+   * so a derived schema that appended one passes this and the table below
+   * alike, neither of which offers an unknown key. That is a bound, not a hole:
+   * the pane builds the object it validates key by key (`OpenCard.tsx`), so no
+   * unknown key can reach `markdownCardSchema` along the path this file exists
+   * to guard, and a mode the two disagree about cannot produce the silent
+   * `Done`. `omit` carries the mode across anyway — both are `strip` — so a
+   * divergence there needs the same standalone re-declaration that (2) already
+   * refuses.
    */
   it('shares one instance of every rule with the card schema', () => {
     const cardShape: Record<string, unknown> = markdownCardSchema.shape;
@@ -78,6 +89,7 @@ describe('a stored markdown document is the card less its id', () => {
 
   it('accepts a document exactly when the card accepts it with an id', () => {
     const disagreements: string[] = [];
+    let examined = 0;
     for (const title of titles) {
       for (const description of descriptions) {
         for (const body of bodies) {
@@ -88,6 +100,7 @@ describe('a stored markdown document is the card less its id', () => {
               ...(body === undefined ? {} : { body }),
               ...(kind === undefined ? {} : { kind }),
             };
+            examined += 1;
             const asDocument = markdownCardDocumentSchema.safeParse(document);
             const asCard = markdownCardSchema.safeParse({ ...document, id: CARD_ID });
             if (asDocument.success !== asCard.success) {
@@ -105,5 +118,18 @@ describe('a stored markdown document is the card less its id', () => {
     }
 
     expect(disagreements).toEqual([]);
+    /*
+     * The size of the product, asserted after it, because a loop that visits
+     * nothing agrees with itself perfectly: empty one of the four lists and the
+     * line above passes while checking no value at all. Asserted as a literal
+     * rather than as the product of the four lengths, because the product moves
+     * with whatever it is measuring and would notice only the empty case.
+     *
+     * It is also the one number written down twice. The issue that resolved
+     * this file quotes it, and quoted a shorter enumeration beside it for as
+     * long as nothing tied the two together; change the table and this says
+     * which number the prose now owes.
+     */
+    expect(examined).toBe(270);
   });
 });
