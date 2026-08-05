@@ -5,7 +5,6 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "dev:memory": "vite --mode e2e-fixture",
     "dev:fixture": "vite --mode e2e-fixture --port 5175 --strictPort",
     "http-server:build": "vite build --config http-server-build.config.ts",
     "build": "tsc -p tsconfig.json --noEmit && pnpm http-server:build && vite build",
