@@ -8,7 +8,35 @@ ticket is where that choice gets made; it is not a place to make it in advance.
 **Blocked by:** nothing. `07` gave a cyclic Route a place to start. This is the
 other end of the same walk.
 
-**Status:** needs-triage
+**Status:** needs-triage — reviewed and deliberately deferred, 2026-08-05.
+
+## Deferred
+
+Read in full and consciously not scheduled. The status stays `needs-triage`
+because that is the truth: the ticket needs a decision, and none of the five
+triage labels means "not now". Deferral is a scheduling state, not a triage one,
+so it is recorded here rather than encoded in a label that would then be lying.
+
+Nothing about the analysis is disputed and nothing is being waited on — this is
+a choice not to spend the decision yet, which the ticket's own framing supports:
+it is unbounded state with no signal attached, not a runaway loop, and one
+keypress still buys exactly one entry.
+
+**What should prompt picking it up:**
+
+- Anyone presenting a real cyclic Route and being confused by it. That is the
+  problem this describes, and it has not been observed yet — the case is
+  reachable but no author has walked into it outside a test.
+- A second reason to touch `moves()`. The cheapest candidate answer — marking a
+  move whose target is already in the walk — is a derived read needing no new
+  state, so it costs little if something else is already opening that function.
+- Any work that bounds or reshapes the walk for another reason, since `advance`
+  and `retreat` read and write the same list and a change to one is a change to
+  both.
+
+**Not** a reason to pick it up: the ticket being the only open one left in this
+directory. Closing a directory is not a reason to make a design decision early,
+and ADR 0032 deferred this once already on its merits.
 
 ## Why this is reachable now
 
