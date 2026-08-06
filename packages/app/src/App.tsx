@@ -29,6 +29,7 @@ import { createWorkingSpaceReader } from './snapshot';
 import { defaultRenderer, resolveView, type RendererSelection } from './view';
 import { GraphView } from './components/GraphView';
 import { OpenCard } from './components/OpenCard';
+import { PlacementFailure } from './components/PlacementFailure';
 import { PresentingChrome } from './components/PresentingChrome';
 
 export const createApp = ({ space, spaceSession }: OpenedSpace) => {
@@ -536,17 +537,7 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
       <AppShell title={rendererSpace.title} toolbar={toolbar}>
         <div className="graph-area" style={cardSizeVars}>
           {canvas.kind === 'failure' ? (
-            <div className="placement-status" role="alert" data-testid="placement-failure">
-              <div className="placement-status__panel">
-                <h2>Unable to arrange this view</h2>
-                {/* The panel bounds this at 40vh and scrolls it, so it needs to
-                    take focus or a keyboard-only reader cannot reach the rest
-                    of a long failure. Focusable scroll regions need a name. */}
-                <pre tabIndex={0} aria-label="Placement failure detail">
-                  {canvas.error.message}
-                </pre>
-              </div>
-            </div>
+            <PlacementFailure error={canvas.error} />
           ) : canvas.kind === 'arrangement' ? (
             <ReactFlowProvider>
               <GraphView
@@ -580,7 +571,7 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
               />
             </ReactFlowProvider>
           ) : (
-            <div className="placement-status" role="status" data-testid="placement-pending">
+            <div className="placement-status" role="status">
               Arranging…
             </div>
           )}
