@@ -1,10 +1,20 @@
-import { expect, it, vi } from 'vitest';
-import { uuidSchema, type RouteId, type UUID } from '@project/core';
+import { expect, expectTypeOf, it, vi } from 'vitest';
+import { uuidSchema, type CardId, type RouteId, type UUID } from '@project/core';
 import { loadSpace, type Space } from '@project/graph';
-import { createNavigation } from '../src/navigation';
+import { createNavigation, type NavigationState } from '../src/navigation';
 import { cardFile } from './card-files';
 
 const uuid = (value: string): UUID => uuidSchema.parse(value);
+
+/**
+ * The walk behind a presenting state. Reading one is narrowing now, which is the
+ * point of the split: a state that is not presenting has no walk to read, here
+ * or anywhere else.
+ */
+function walkOf(state: NavigationState): readonly CardId[] {
+  if (state.mode !== 'presenting') throw new Error('navigation should be presenting');
+  return state.walk;
+}
 
 const ROUTE_ONE = uuid('00000000-0000-4000-8000-000000000031');
 const ROUTE_TWO = uuid('00000000-0000-4000-8000-000000000032');
@@ -70,8 +80,8 @@ it('selects a renderer and its active Route without changing the Space', () => {
     selectedView: 'graph',
     activeRouteId: ROUTE_TWO,
     mode: 'overview',
-    walk: [],
   });
+  expect(navigation.activeCardId()).toBeNull();
   expect(space.defaultView).toBeUndefined();
 
   navigation.selectRenderer({ kind: 'view', view: 'grid' });
@@ -171,6 +181,110 @@ it('presents a fully cyclic Route, which has no entry Card', () => {
   expect(navigation.moves()).toEqual([{ cardId: card, title: 'A', selected: true }]);
 });
 
+/*
+ * A walk may stand on the same Card twice. Cycles and self-edges are legal
+ * authored structure (ADR 0032), so a presenter walking a loop accumulates a
+ * walk whose Cards repeat and whose last Card can be its first again. The Card
+ * being presented is the walk's *last* element, never the first occurrence of
+ * it — a read that answered the Card the walk began on would go on offering the
+ * moves out of that Card for the rest of the loop, and the two only diverge once
+ * a Card repeats.
+ *
+ * The other two shapes are pinned already and not repeated here: a one-Card walk
+ * is read by "opens and closes Cards…" straight after `present()`, and a walk
+ * that has advanced by the fork test below.
+ */
+it('reads the last Card of a walk that returns to one it has already stood on', () => {
+  const cardA = uuid('00000000-0000-4000-8000-000000000002');
+  const cardB = uuid('00000000-0000-4000-8000-000000000003');
+  const loaded = loadSpace(
+    {
+      version: 2,
+      id: uuid('00000000-0000-4000-8000-000000000001'),
+      title: 'Cycle',
+      routes: [
+        {
+          id: ROUTE_ONE,
+          title: 'Cycle',
+          edges: [
+            { from: cardA, to: cardB },
+            { from: cardB, to: cardA },
+          ],
+        },
+      ],
+    },
+    [cardFile(cardA), cardFile(cardB)],
+  );
+  if (!loaded.ok) throw new Error('cycle should load');
+  const navigation = createNavigation(() => loaded.space, { kind: 'view', view: 'graph' });
+
+  navigation.present();
+  navigation.advance();
+  navigation.advance();
+
+  // Back where it began: the walk's last Card is its first, and presenting
+  // stands on it rather than merely carrying it at the front.
+  expect(walkOf(navigation.getState())).toEqual([cardA, cardB, cardA]);
+  expect(navigation.activeCardId()).toBe(cardA);
+  expect(navigation.moves()).toEqual([{ cardId: cardB, title: 'B', selected: true }]);
+
+  navigation.advance();
+
+  // The case the two answers separate on: the walk repeats a Card and its last
+  // is no longer its first, so reading the start answers A where the presenter
+  // is standing on B. The moves are asserted here rather than only above,
+  // because above the last Card *is* the first and both readings agree — this
+  // is the only place the Edges offered can tell a correct read from a wrong
+  // one, and they are what the presenting chrome puts on screen.
+  expect(walkOf(navigation.getState())).toEqual([cardA, cardB, cardA, cardB]);
+  expect(navigation.activeCardId()).toBe(cardB);
+  expect(navigation.moves()).toEqual([{ cardId: cardA, title: 'A', selected: true }]);
+
+  navigation.retreat();
+  expect(navigation.activeCardId()).toBe(cardA);
+});
+
+/*
+ * A walk belongs to presenting, and leaving presenting has none to clear. This
+ * used to be four hand-written `walk: []` resets — one per path back to the
+ * overview — any of which could have been forgotten without anything noticing
+ * until a stale Card was read out of a walk nobody was on.
+ */
+it('leaves no walk behind when presenting ends', () => {
+  const space = fixture();
+  const navigation = createNavigation(() => space, { kind: 'view', view: 'graph' });
+  navigation.present();
+  navigation.advance();
+
+  navigation.exitPresenting();
+
+  expect(navigation.getState()).toEqual({
+    selectedRenderer: { kind: 'view', view: 'graph' },
+    selectedView: 'graph',
+    activeRouteId: ROUTE_ONE,
+    mode: 'overview',
+    openedCardId: null,
+  });
+  expect(navigation.activeCardId()).toBeNull();
+});
+
+/*
+ * Presenting stands on a Card for as long as it lasts: it begins on the Route's
+ * start Card and `retreat` keeps the first, so the walk is non-empty by type
+ * rather than by a check at each read.
+ */
+it('stands on a Card for as long as it is presenting', () => {
+  const space = fixture();
+  const navigation = createNavigation(() => space, { kind: 'view', view: 'graph' });
+
+  navigation.present();
+
+  const state = navigation.getState();
+  if (state.mode !== 'presenting') throw new Error('present() should have started a walk');
+  expectTypeOf(state.walk[0]).toEqualTypeOf<CardId>();
+  expect(state.walk[0]).toBe(uuid('00000000-0000-4000-8000-000000000002'));
+});
+
 it('activating a Route ends the current walk without changing the Space', () => {
   const space = fixture();
   const navigation = createNavigation(() => space, { kind: 'view', view: 'graph' });
@@ -181,9 +295,8 @@ it('activating a Route ends the current walk without changing the Space', () => 
   expect(navigation.getState()).toMatchObject({
     activeRouteId: ROUTE_TWO,
     mode: 'overview',
-    walk: [],
-    branchIndex: 0,
   });
+  expect(navigation.activeCardId()).toBeNull();
   expect(space.defaultView).toBeUndefined();
 });
 
@@ -207,7 +320,7 @@ it('continues the current walk when an Edit converts the renderer to a Layout', 
   const space = fixture();
   const navigation = createNavigation(() => space, { kind: 'view', view: 'graph' });
   navigation.present();
-  const walk = navigation.getState().walk;
+  const walk = walkOf(navigation.getState());
 
   navigation.continueInRenderer({ kind: 'layout', layoutId: LAYOUT });
 
@@ -216,7 +329,7 @@ it('continues the current walk when an Edit converts the renderer to a Layout', 
     activeRouteId: ROUTE_ONE,
     mode: 'presenting',
   });
-  expect(navigation.getState().walk).toBe(walk);
+  expect(walkOf(navigation.getState())).toBe(walk);
 });
 
 it('notifies subscribers synchronously until they unsubscribe', () => {
@@ -297,7 +410,8 @@ it('opens and closes Cards, and closes an opened Card when presenting starts', (
   expect(navigation.getState()).toMatchObject({ mode: 'presenting', openedCardId: null });
   expect(navigation.activeCardId()).toBe(uuid('00000000-0000-4000-8000-000000000002'));
   navigation.exitPresenting();
-  expect(navigation.getState()).toMatchObject({ mode: 'overview', walk: [] });
+  expect(navigation.getState()).toMatchObject({ mode: 'overview' });
+  expect(navigation.activeCardId()).toBeNull();
 });
 
 /*
@@ -323,8 +437,6 @@ it('opens a replacement Space as new navigation, retaining no reading state', ()
     selectedView: 'graph',
     activeRouteId: ROUTE_TWO,
     mode: 'overview',
-    walk: [],
-    branchIndex: 0,
     openedCardId: null,
   });
 });
@@ -371,6 +483,31 @@ it('reads the working Space once per moves() call, whatever the branching', () =
 
   expect(moves).toHaveLength(2);
   expect(reads).toBe(1);
+});
+
+/*
+ * The overview answers no moves, and it costs nothing to say so: the mode check
+ * sits *above* the read of the Space rather than below it. Overview is the
+ * common mode and `moves()` is called at render time, so a read below the guard
+ * would pay a parse and reindex of the working snapshot on every render only to
+ * hand back an empty array — which is exactly what the flat state did, its
+ * `activeCardId()` answering null after the Space had already been read.
+ *
+ * The answer alone cannot tell the two apart, so this counts the calls to the
+ * thunk instead. `createNavigation` reads the Space to resolve its initial
+ * renderer, and other members read it too, so what is pinned is that this one
+ * call adds nothing rather than that the total is zero.
+ */
+it('answers no moves outside a walk without reading the working Space', () => {
+  const space = fixture();
+  const currentSpace = vi.fn(() => space);
+  const navigation = createNavigation(currentSpace, { kind: 'view', view: 'graph' });
+
+  const before = currentSpace.mock.calls.length;
+  const moves = navigation.moves();
+
+  expect(moves).toEqual([]);
+  expect(currentSpace).toHaveBeenCalledTimes(before);
 });
 
 it('walks a fork, retreats along the walk, and reselects the Edge taken', () => {

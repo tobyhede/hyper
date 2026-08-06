@@ -3,24 +3,50 @@ import { getCard, getRoute, outgoingEdges, routeStartCard, type Space } from '@p
 import { createObservableState, type ObserverErrorReporter } from '@project/persistence';
 import { DEFAULT_VIEW_ID, resolveView, type RendererSelection, type ResolvedView } from './view';
 
-export type NavigationMode = 'overview' | 'presenting';
-
 export interface Move {
   readonly cardId: CardId;
   readonly title: string;
   readonly selected: boolean;
 }
 
-export interface NavigationState {
+/**
+ * The Cards a presenter has passed through, in order, the last of them the one
+ * being presented.
+ *
+ * Non-empty, and by type rather than by convention: presenting begins on a
+ * Route's start Card and `retreat` keeps the first, so a walk standing on
+ * nothing is a state navigation cannot hold rather than one every read has to
+ * exclude.
+ */
+type Walk = readonly [CardId, ...CardId[]];
+
+/** What navigation carries whatever it is doing. */
+interface NavigationBase {
   readonly selectedRenderer: RendererSelection;
   /** The last Algorithmic View selected, retained while a Layout is selected. */
   readonly selectedView: BuiltInViewId;
-  readonly mode: NavigationMode;
   readonly activeRouteId: RouteId | null;
-  readonly walk: readonly CardId[];
-  readonly branchIndex: number;
   readonly openedCardId: CardId | null;
 }
+
+/**
+ * Navigation is either overviewing the whole Space or presenting a walk through
+ * one Route, and the walk and its branch belong to the second alone.
+ *
+ * They used to sit beside `mode` on one flat state, which admitted an overview
+ * carrying a walk and a `branchIndex` naming a branch of nothing. Nothing in the
+ * type held the correspondence, so every operation maintained it by hand: four
+ * separate `walk: []` with `branchIndex: 0` resets, and a `mode` check in front
+ * of every read of either. Splitting on `mode` makes those states
+ * unrepresentable, so the resets have nothing to clear and the reads narrow.
+ */
+export type NavigationState =
+  | (NavigationBase & { readonly mode: 'overview' })
+  | (NavigationBase & {
+      readonly mode: 'presenting';
+      readonly walk: Walk;
+      readonly branchIndex: number;
+    });
 
 /** Navigation through the current working Space, independent of any UI framework. */
 export interface Navigation {
@@ -61,6 +87,33 @@ function outgoingEdgesFrom(
 }
 
 /**
+ * The Card a walk stands on: its last, read in place.
+ *
+ * `noUncheckedIndexedAccess` widens a computed index to `| undefined` however
+ * the tuple is declared, so the last element needs an answer for a case it
+ * cannot reach; element 0 is a fixed tuple element and keeps its type, so the
+ * walk's own guaranteed Card supplies it. Both reads are indexes and neither
+ * copies: this runs on every render through `activeCardId` and `moves`, and
+ * destructuring a tail to reach the end allocated a copy of the whole
+ * accumulated walk each time.
+ */
+function currentCard(walk: Walk): CardId {
+  return walk[walk.length - 1] ?? walk[0];
+}
+
+/**
+ * The fields both modes carry, taken off whichever state is current.
+ *
+ * Named rather than spread, because spreading a presenting state into an
+ * overview one carries the walk across at runtime — the very thing the type is
+ * here to stop, arriving through the back door as an untyped property.
+ */
+function baseOf(state: NavigationState): NavigationBase {
+  const { selectedRenderer, selectedView, activeRouteId, openedCardId } = state;
+  return { selectedRenderer, selectedView, activeRouteId, openedCardId };
+}
+
+/**
  * Navigation as a Space first opens in it: nothing walked, nothing read, and
  * the active Route the resolved renderer answers.
  *
@@ -76,8 +129,6 @@ function openedState(selection: RendererSelection, view: ResolvedView): Navigati
     selectedView: selection.kind === 'view' ? selection.view : DEFAULT_VIEW_ID,
     mode: 'overview',
     activeRouteId: view.activeRouteId,
-    walk: [],
-    branchIndex: 0,
     openedCardId: null,
   };
 }
@@ -92,12 +143,14 @@ export function createNavigation(
     openedState(initialRenderer, resolveView(initialSpace, initialRenderer)),
     options.reportObserverError ?? reportToConsole,
   );
-  const setState = (change: Partial<NavigationState>): void => {
+  // Whatever navigation is doing, it goes on doing: a change to the fields both
+  // modes share cannot name `mode`, so it can neither start nor end a walk.
+  const setState = (change: Partial<NavigationBase>): void => {
     observable.publish({ ...observable.getState(), ...change });
   };
   const activeCardId = (): CardId | null => {
     const state = observable.getState();
-    return state.mode === 'presenting' ? (state.walk[state.walk.length - 1] ?? null) : null;
+    return state.mode === 'presenting' ? currentCard(state.walk) : null;
   };
 
   return {
@@ -105,13 +158,12 @@ export function createNavigation(
     subscribe: observable.subscribe,
     selectRenderer: (selection) => {
       const view = resolveView(currentSpace(), selection);
-      setState({
+      observable.publish({
+        ...baseOf(observable.getState()),
         selectedRenderer: selection,
         ...(selection.kind === 'view' ? { selectedView: selection.view } : {}),
         activeRouteId: view.activeRouteId,
         mode: 'overview',
-        walk: [],
-        branchIndex: 0,
         // An opened Card closes with the renderer it was opened over. This once
         // retained it, because opening was reading and a re-arrangement beneath
         // a Card being read changes nothing about it — but opening is editing
@@ -122,8 +174,13 @@ export function createNavigation(
         openedCardId: null,
       });
     },
+    // Published whole, not merged over what is there: a replacement Space is
+    // opened rather than navigated to, so nothing of the previous one survives
+    // it. Merging was equivalent only while `openedState` named every field —
+    // once it stopped naming a walk it stopped clearing one, and the walk of a
+    // Space that was gone rode across under a `mode` saying there was none.
     openFresh: (selection) => {
-      setState(openedState(selection, resolveView(currentSpace(), selection)));
+      observable.publish(openedState(selection, resolveView(currentSpace(), selection)));
     },
     continueInRenderer: (selection) => {
       // Resolve first so navigation can never name a renderer the current Space
@@ -145,7 +202,11 @@ export function createNavigation(
       if (getRoute(currentSpace(), routeId) === undefined) {
         throw new Error(`The Route ${routeId} does not exist.`);
       }
-      setState({ activeRouteId: routeId, mode: 'overview', walk: [], branchIndex: 0 });
+      observable.publish({
+        ...baseOf(observable.getState()),
+        activeRouteId: routeId,
+        mode: 'overview',
+      });
     },
     openCard: (cardId) => setState({ openedCardId: cardId }),
     closeCard: () => setState({ openedCardId: null }),
@@ -168,11 +229,21 @@ export function createNavigation(
       if (route === undefined) return;
       const start = routeStartCard(route);
       if (start === undefined) return;
-      setState({ mode: 'presenting', walk: [start], branchIndex: 0, openedCardId: null });
+      observable.publish({
+        ...baseOf(state),
+        mode: 'presenting',
+        walk: [start],
+        branchIndex: 0,
+        openedCardId: null,
+      });
     },
-    exitPresenting: () => setState({ mode: 'overview', walk: [], branchIndex: 0 }),
-    // The guard is the no-outgoing-Edge case — overview, no active Route, or a
-    // Card the Route leaves by nothing — and not an out-of-range `branchIndex`.
+    exitPresenting: () =>
+      observable.publish({ ...baseOf(observable.getState()), mode: 'overview' }),
+    // The guard is the no-outgoing-Edge case — no active Route, or a Card the
+    // Route leaves by nothing — and not an out-of-range `branchIndex`. Overview
+    // no longer reaches it and is no longer one of the cases it answers: the
+    // walk and the index are presenting's alone, so the mode is settled by the
+    // narrowing a line below rather than by falling through to an empty Edge set.
     // **Don't clamp the index to the Edge count here.** Every write keeps it in
     // range for the Card it was written against: `selectBranch` takes it modulo
     // the count, `retreat` uses a `findIndex` result, and every other write is
@@ -188,43 +259,68 @@ export function createNavigation(
     // clamps to `[-1]` and is still `undefined`.
     advance: () => {
       const state = observable.getState();
-      const edge = outgoingEdgesFrom(currentSpace(), state.activeRouteId, activeCardId())[
+      if (state.mode !== 'presenting') return;
+      const edge = outgoingEdgesFrom(currentSpace(), state.activeRouteId, currentCard(state.walk))[
         state.branchIndex
       ];
       if (edge === undefined) return;
-      setState({ walk: [...state.walk, edge.to], branchIndex: 0 });
+      const walk: Walk = [...state.walk, edge.to];
+      observable.publish({ ...state, walk, branchIndex: 0 });
     },
     retreat: () => {
       const state = observable.getState();
       if (state.mode !== 'presenting' || state.walk.length < 2) return;
-      const back = state.walk.slice(0, -1);
-      const from = back[back.length - 1];
-      const to = state.walk[state.walk.length - 1];
-      const taken = outgoingEdgesFrom(currentSpace(), state.activeRouteId, from).findIndex(
-        (edge) => edge.to === to,
-      );
-      setState({ walk: back, branchIndex: taken < 0 ? 0 : taken });
+      // Dropping the last Card cannot empty the walk, and this is where that
+      // stops being a fact about the length check above and becomes one about
+      // the value: the first Card is carried over as itself, so what comes back
+      // is a walk rather than an array that happens not to be empty. The
+      // rest-destructuring `currentCard` dropped stays here deliberately:
+      // `slice` makes this O(walk) whatever shape it takes, it runs once per
+      // user gesture rather than on every render, and the copy is what carries
+      // the non-emptiness into the type instead of asserting it away.
+      const [first, ...rest] = state.walk;
+      const back: Walk = [first, ...rest.slice(0, -1)];
+      const to = currentCard(state.walk);
+      const taken = outgoingEdgesFrom(
+        currentSpace(),
+        state.activeRouteId,
+        currentCard(back),
+      ).findIndex((edge) => edge.to === to);
+      observable.publish({ ...state, walk: back, branchIndex: taken < 0 ? 0 : taken });
     },
     selectBranch: (delta) => {
       const state = observable.getState();
-      const count = outgoingEdgesFrom(currentSpace(), state.activeRouteId, activeCardId()).length;
+      if (state.mode !== 'presenting') return;
+      const count = outgoingEdgesFrom(
+        currentSpace(),
+        state.activeRouteId,
+        currentCard(state.walk),
+      ).length;
       if (count < 2) return;
-      setState({ branchIndex: (((state.branchIndex + delta) % count) + count) % count });
+      observable.publish({
+        ...state,
+        branchIndex: (((state.branchIndex + delta) % count) + count) % count,
+      });
     },
     activeCardId,
     // One read for the whole operation. Reading the Space costs a parse and
     // reindex of the working snapshot, and this runs during every App render —
     // a per-Edge read made a branching Route pay that cost once per move.
     // Resolving once also keeps every title in the answer read from the same
-    // Space as the edges they name.
+    // Space as the edges they name. Outside a walk there is nothing to read it
+    // for: the moves are a presented Card's outgoing Edges, and there is no
+    // presented Card.
     moves: () => {
       const state = observable.getState();
+      if (state.mode !== 'presenting') return [];
       const space = currentSpace();
-      return outgoingEdgesFrom(space, state.activeRouteId, activeCardId()).map((edge, index) => ({
-        cardId: edge.to,
-        title: getCard(space, edge.to)?.title ?? edge.to,
-        selected: index === state.branchIndex,
-      }));
+      return outgoingEdgesFrom(space, state.activeRouteId, currentCard(state.walk)).map(
+        (edge, index) => ({
+          cardId: edge.to,
+          title: getCard(space, edge.to)?.title ?? edge.to,
+          selected: index === state.branchIndex,
+        }),
+      );
     },
   };
 }

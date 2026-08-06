@@ -115,7 +115,10 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
     const openCard = navigation.openCard;
     const closeCard = navigation.closeCard;
     const presenting = navigationState.mode === 'presenting';
-    const canRetreat = navigationState.walk.length > 1;
+    // There is a Card to go back to only once a walk has left its first, and only
+    // presenting has a walk at all — the same narrowing the alias above already
+    // makes, spent here on the value behind it rather than on the mode.
+    const canRetreat = presenting && navigationState.walk.length > 1;
     const present = navigation.present;
     const exitPresenting = navigation.exitPresenting;
     const advance = navigation.advance;
