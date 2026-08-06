@@ -25,7 +25,7 @@ describe('a placement failure', () => {
   it('gives the bounded detail a tab stop and a name to reach it by', () => {
     render(<PlacementFailure error={new Error('No position for Card A')} />);
 
-    const detail = screen.getByLabelText('Placement failure detail');
+    const detail = screen.getByRole('region', { name: 'Placement failure detail' });
     detail.focus();
 
     expect(detail).toHaveFocus();
