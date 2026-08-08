@@ -284,7 +284,7 @@ describe('reading a surface sees every way a name is offered', () => {
 
   it('sees a name a nested pattern binds, and one bound with a default', () => {
     // `a` is a property being destructured through, not a binding; `b` and `c`
-    // are the names that arrive. Traversing one level of elements and stopping
+    // are the names that arrive. Walking one level of elements and stopping
     // would report the inner pattern where `b` belongs.
     expect(read('export const {\n  a: { b },\n  c = 1,\n} = obj;\n').unlisted).toEqual(['b', 'c']);
   });

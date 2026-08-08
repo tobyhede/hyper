@@ -2,19 +2,19 @@ import type { CardId, GraphId } from '@project/core';
 import type { Space } from './space';
 
 /**
- * Derives the graph's ports and connections from its graphs.
+ * Derives the render surface's ports and connections from the authored Graphs.
  *
- * The model: a card that a graph leaves gets one outbound port
- * (`<graphId>::out`, on the right), a card a graph arrives at gets one inbound
- * port (`<graphId>::in`, on the left), and each authored `{ from, to }` edge
- * becomes a port-to-port connection belonging to that graph. One port per graph
- * per side, however many edges use it — a fork leaves a card by the same
+ * The model: a card that a Graph leaves gets one outbound port
+ * (`<graphId>::out`, on the right), a card a Graph arrives at gets one inbound
+ * port (`<graphId>::in`, on the left), and each authored `{ from, to }` Edge
+ * becomes a port-to-port connection belonging to that Graph. One port per Graph
+ * per side, however many Edges use it — a fork leaves a card by the same
  * outbound port twice.
  *
- * This is what lets each graph render as its own colored line through the graph
- * and drives the ELK multiple-handles layout. It belongs to the **overview** —
- * the view that draws every graph at once and needs distinct attachment points
- * to stay legible (ADR 0021) — not to the domain.
+ * This is what lets each Graph render as its own colored line across the
+ * canvas and drives the ELK multiple-handles layout. It belongs to the
+ * **overview** — the view that draws every Graph at once and needs distinct
+ * attachment points to stay legible (ADR 0021) — not to the domain.
  */
 
 export interface GraphRenderHandleRef {
