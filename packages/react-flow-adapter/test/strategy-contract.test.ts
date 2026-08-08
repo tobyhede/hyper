@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import type { CardId, RouteId } from '@project/core';
+import type { CardId, GraphId } from '@project/core';
 import {
-  buildLayoutGraph,
+  buildLayoutStrategyGraph,
   gridStrategy,
   Placement,
   positionedStrategy,
   type CardHandleSet,
-  type GraphEdge,
-  type LayoutGraph,
+  type GraphRenderEdge,
+  type LayoutStrategyGraph,
   type LayoutStrategy,
 } from '@project/graph';
 import { elkStrategy } from '../src/index';
@@ -31,16 +31,16 @@ import { uuid } from './uuid';
 
 const SIZE = { width: 320, height: 180 };
 
-/** A card with one inbound and one outbound handle, as `buildLayoutGraph` makes
- *  them from a route's edges. */
-const handles = (routeId: RouteId): CardHandleSet => ({
-  targetHandles: [{ id: `${routeId}::in`, routeId }],
-  sourceHandles: [{ id: `${routeId}::out`, routeId }],
+/** A card with one inbound and one outbound handle, as `buildLayoutStrategyGraph` makes
+ *  them from a graph's edges. */
+const handles = (graphId: GraphId): CardHandleSet => ({
+  targetHandles: [{ id: `${graphId}::in`, graphId }],
+  sourceHandles: [{ id: `${graphId}::out`, graphId }],
 });
 
 /**
  * A fork and a merge over five cards — deliberately not a line, since a line is
- * the degenerate case and every fixture route already is one.
+ * the degenerate case and every fixture graph already is one.
  *
  *      b
  *    /   \
@@ -48,7 +48,7 @@ const handles = (routeId: RouteId): CardHandleSet => ({
  *    \   /
  *      c
  */
-function sampleGraph(): LayoutGraph {
+function sampleGraph(): LayoutStrategyGraph {
   const cardIds = [
     '00000000-0000-4000-8000-000000000002',
     '00000000-0000-4000-8000-000000000003',
@@ -56,8 +56,8 @@ function sampleGraph(): LayoutGraph {
     '00000000-0000-4000-8000-000000000006',
     '00000000-0000-4000-8000-000000000008',
   ].map(uuid);
-  const routeId = uuid('00000000-0000-4000-8000-000000000004');
-  const handlesByCard = new Map(cardIds.map((id) => [id, handles(routeId)]));
+  const graphId = uuid('00000000-0000-4000-8000-000000000004');
+  const handlesByCard = new Map(cardIds.map((id) => [id, handles(graphId)]));
   const connections: readonly [CardId, CardId][] = [
     [uuid('00000000-0000-4000-8000-000000000002'), uuid('00000000-0000-4000-8000-000000000003')],
     [uuid('00000000-0000-4000-8000-000000000002'), uuid('00000000-0000-4000-8000-000000000005')],
@@ -65,16 +65,16 @@ function sampleGraph(): LayoutGraph {
     [uuid('00000000-0000-4000-8000-000000000005'), uuid('00000000-0000-4000-8000-000000000006')],
     [uuid('00000000-0000-4000-8000-000000000006'), uuid('00000000-0000-4000-8000-000000000008')],
   ];
-  const edges: GraphEdge[] = connections.map(([from, to]) => ({
-    id: `${routeId}:${from}->${to}`,
-    routeId,
+  const edges: GraphRenderEdge[] = connections.map(([from, to]) => ({
+    id: `${graphId}:${from}->${to}`,
+    graphId,
     source: from,
     target: to,
-    sourceHandle: `${routeId}::out`,
-    targetHandle: `${routeId}::in`,
+    sourceHandle: `${graphId}::out`,
+    targetHandle: `${graphId}::in`,
   }));
 
-  return buildLayoutGraph(cardIds, handlesByCard, edges, SIZE);
+  return buildLayoutStrategyGraph(cardIds, handlesByCard, edges, SIZE);
 }
 
 /** Positions for `positionedStrategy`, which reads an authored Layout. */
@@ -139,7 +139,7 @@ describe.each(STRATEGIES)('LayoutStrategy contract: %s', (_name, make) => {
     const input = sampleGraph();
     const output = await make()(input);
 
-    const identity = (g: LayoutGraph) =>
+    const identity = (g: LayoutStrategyGraph) =>
       g.edges
         .map((e) => `${e.id}|${e.source}|${e.target}|${e.sourceHandle}|${e.targetHandle}`)
         .sort();
@@ -151,7 +151,7 @@ describe.each(STRATEGIES)('LayoutStrategy contract: %s', (_name, make) => {
     const input = sampleGraph();
     const output = await make()(input);
 
-    const ports = (g: LayoutGraph) =>
+    const ports = (g: LayoutStrategyGraph) =>
       g.cards.flatMap((c) => c.ports.map((p) => `${c.id}/${p.id}/${p.side}`)).sort();
 
     // A handle a strategy dropped is an edge React Flow cannot resolve — its
@@ -172,13 +172,13 @@ describe.each(STRATEGIES)('LayoutStrategy contract: %s', (_name, make) => {
   it('arranges an empty graph without complaint', async () => {
     const output = await make()({ cards: [], edges: [] });
 
-    // A new space has one card and no routes, and reaches this on first paint.
+    // A new space has one card and no graphs, and reaches this on first paint.
     expect(output.cards).toEqual([]);
     expect(output.edges).toEqual([]);
   });
 
   it('arranges a single card with no edges', async () => {
-    const only = buildLayoutGraph(
+    const only = buildLayoutStrategyGraph(
       [uuid('00000000-0000-4000-8000-000000000099')],
       new Map(),
       [],

@@ -3,7 +3,7 @@ import { ReactFlowProvider } from '@xyflow/react';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { uuidSchema } from '@project/core';
 import type { CardFlowNode } from '@project/react-flow-adapter';
-import { GraphView } from '../src/components/GraphView';
+import { SpaceCanvas } from '../src/components/SpaceCanvas';
 import { CARD_SIZE } from '../src/card';
 
 const CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
@@ -27,8 +27,8 @@ const cardNode = (title: string, id: typeof CARD_ID = CARD_ID, selected = false)
     active: false,
     selectedForAuthoring: false,
     showContent: false,
-    activeRouteId: null,
-    activeRouteColor: '#8a94a6',
+    activeGraphId: null,
+    activeGraphColor: '#8a94a6',
     emphasis: 'equal',
     sourceHandles: [],
     targetHandles: [],
@@ -42,13 +42,13 @@ interface Harness {
   readonly setTitleEditing: (enabled: boolean) => void;
 }
 
-/** A GraphView whose title Edit always refuses, so a draft can be left unsettled. */
+/** A SpaceCanvas whose title Edit always refuses, so a draft can be left unsettled. */
 function mountGraph(nodes: CardFlowNode[] = [cardNode('A')]): Harness {
   const openCard = vi.fn();
   const editableCardIds = new Set(nodes.map((node) => node.id));
   const graph = (titleEditingEnabled: boolean) => (
     <ReactFlowProvider>
-      <GraphView
+      <SpaceCanvas
         nodes={nodes}
         edges={[]}
         activeCardId={null}
@@ -65,10 +65,10 @@ function mountGraph(nodes: CardFlowNode[] = [cardNode('A')]): Harness {
         onOpenCard={openCard}
         onCompleteCardTitle={() => 'A Card needs a title'}
         editableCardIds={editableCardIds}
-        routes={[]}
-        colorByRouteId={{}}
-        activeRouteId={null}
-        activeRouteCardIds={new Set()}
+        graphs={[]}
+        colorByGraphId={{}}
+        activeGraphId={null}
+        activeGraphCardIds={new Set()}
       />
     </ReactFlowProvider>
   );

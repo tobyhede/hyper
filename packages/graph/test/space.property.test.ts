@@ -26,7 +26,7 @@ const emptySpaceFile = {
   version: 2,
   id: '00000000-0000-4000-8000-000000000001',
   title: 'Generated',
-  routes: [],
+  graphs: [],
 };
 
 describe('loadSpace over card files', () => {

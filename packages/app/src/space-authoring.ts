@@ -2,6 +2,7 @@ import {
   newUuid,
   type CardDocument,
   type CardId,
+  type GraphId,
   type LayoutPosition,
   type SpaceSnapshot,
   type UUID,
@@ -102,8 +103,8 @@ export interface SpaceAuthoring {
 interface CompletedEdit {
   readonly snapshot: SpaceSnapshot;
   readonly placement: Placement;
-  /** The Route this same Edit minted, which Navigation must therefore activate. */
-  readonly mintedRouteId: UUID | null;
+  /** The Graph this same Edit minted, which Navigation must therefore activate. */
+  readonly mintedGraphId: GraphId | null;
   /** The Layout this Edit wrote, which Navigation continues in. */
   readonly nextRenderer: RendererSelection;
   readonly createdCardId?: CardId;
@@ -153,10 +154,10 @@ const nextLayoutTitle = (snapshot: SpaceSnapshot): string =>
     (snapshot.document.layouts ?? []).map((layout) => layout.title),
   );
 
-const nextRouteTitle = (snapshot: SpaceSnapshot): string =>
+const nextGraphTitle = (snapshot: SpaceSnapshot): string =>
   nextNumberedTitle(
-    'Route',
-    snapshot.document.routes.map((route) => route.title),
+    'Graph',
+    snapshot.document.graphs.map((graph) => graph.title),
   );
 
 export const nextCardTitle = (snapshot: SpaceSnapshot): string =>
@@ -216,7 +217,7 @@ export function createSpaceAuthoring({
   // layout, so an equal placement pushed in by a projection must keep the one it
   // already has or every projection would re-arrange a settled graph. A
   // completed Edit needs no help getting its re-layout — it replaces the working
-  // snapshot, and the `LayoutGraph` derived from it re-fires the same effect.
+  // snapshot, and the `LayoutStrategyGraph` derived from it re-fires the same effect.
   const install = (nextPlacement: Placement | null): void => {
     if (Placement.equals(placement, nextPlacement)) return;
     placement = nextPlacement;
@@ -283,20 +284,20 @@ export function createSpaceAuthoring({
     const snapshot = session.getState().working;
     if (!snapshot.cards.some((card) => card.id === from)) return false;
     if (!snapshot.cards.some((card) => card.id === to)) return false;
-    const routeId = navigation.getState().activeRouteId;
-    if (routeId === null) return snapshot.document.routes.length === 0;
-    const route = snapshot.document.routes.find((candidate) => candidate.id === routeId);
-    return route !== undefined && !route.edges.some((edge) => edge.from === from && edge.to === to);
+    const graphId = navigation.getState().activeGraphId;
+    if (graphId === null) return snapshot.document.graphs.length === 0;
+    const graph = snapshot.document.graphs.find((candidate) => candidate.id === graphId);
+    return graph !== undefined && !graph.edges.some((edge) => edge.from === from && edge.to === to);
   };
 
   const canCreateConnectedCard = (from: CardId): boolean => {
     if (placement === null) return false;
     const snapshot = session.getState().working;
     if (!snapshot.cards.some((card) => card.id === from)) return false;
-    const routeId = navigation.getState().activeRouteId;
+    const graphId = navigation.getState().activeGraphId;
     return (
-      (routeId === null && snapshot.document.routes.length === 0) ||
-      snapshot.document.routes.some((route) => route.id === routeId)
+      (graphId === null && snapshot.document.graphs.length === 0) ||
+      snapshot.document.graphs.some((graph) => graph.id === graphId)
     );
   };
 
@@ -323,8 +324,8 @@ export function createSpaceAuthoring({
     let snapshot = session.getState().working;
     const previousSnapshot = snapshot;
     const navigationState = navigation.getState();
-    let activeRouteId = navigationState.activeRouteId;
-    let mintedRouteId: UUID | null = null;
+    let activeGraphId = navigationState.activeGraphId;
+    let mintedGraphId: GraphId | null = null;
     let createdCardId: CardId | undefined;
     let connection: { readonly from: CardId; readonly to: CardId } | null = null;
     let completedPlacement = completedPlacementInput;
@@ -363,35 +364,35 @@ export function createSpaceAuthoring({
       connection = { from: completion.from, to: completion.to };
     }
     if (connection !== null) {
-      if (activeRouteId === null) {
-        mintedRouteId = newUuid();
-        activeRouteId = mintedRouteId;
+      if (activeGraphId === null) {
+        mintedGraphId = newUuid();
+        activeGraphId = mintedGraphId;
         snapshot = {
           ...snapshot,
           document: {
             ...snapshot.document,
-            routes: [
-              ...snapshot.document.routes,
+            graphs: [
+              ...snapshot.document.graphs,
               {
-                id: mintedRouteId,
-                title: nextRouteTitle(snapshot),
+                id: mintedGraphId,
+                title: nextGraphTitle(snapshot),
                 edges: [connection],
               },
             ],
           },
         };
       } else {
-        const routeIndex = snapshot.document.routes.findIndex(
-          (route) => route.id === activeRouteId,
+        const graphIndex = snapshot.document.graphs.findIndex(
+          (graph) => graph.id === activeGraphId,
         );
-        const route = snapshot.document.routes[routeIndex];
-        if (route === undefined) return null;
-        const routes = [...snapshot.document.routes];
-        routes[routeIndex] = {
-          ...route,
-          edges: [...route.edges, connection],
+        const graph = snapshot.document.graphs[graphIndex];
+        if (graph === undefined) return null;
+        const graphs = [...snapshot.document.graphs];
+        graphs[graphIndex] = {
+          ...graph,
+          edges: [...graph.edges, connection],
         };
-        snapshot = { ...snapshot, document: { ...snapshot.document, routes } };
+        snapshot = { ...snapshot, document: { ...snapshot.document, graphs } };
       }
     }
     const renderer = navigationState.selectedRenderer;
@@ -405,8 +406,8 @@ export function createSpaceAuthoring({
       layoutId,
       title: existing?.title ?? nextLayoutTitle(snapshot),
       positions: completedPlacement,
-      activeRouteId,
-      mintedRouteId,
+      activeGraphId,
+      mintedGraphId,
     });
     if (sameSnapshot(previousSnapshot, next)) return null;
     const loaded = loadSpaceSnapshot(next);
@@ -420,7 +421,7 @@ export function createSpaceAuthoring({
     return {
       snapshot: next,
       placement: completedPlacement,
-      mintedRouteId,
+      mintedGraphId,
       nextRenderer: { kind: 'layout', layoutId },
       ...(createdCardId !== undefined ? { createdCardId } : {}),
     };
@@ -429,7 +430,7 @@ export function createSpaceAuthoring({
   /**
    * Install a derived Edit: one fallible step, and then three that cannot fail.
    *
-   * `session.submit` has to come first. Both Navigation calls resolve the Route
+   * `session.submit` has to come first. Both Navigation calls resolve the Graph
    * and the Layout against `currentSpace()`, which reads the working snapshot
    * `submit` installs synchronously — before it, neither exists yet and both
    * would refuse. So the order is forced, and the useful consequence is that
@@ -446,7 +447,7 @@ export function createSpaceAuthoring({
    * exist. That is the strand `b091623` inverted this order to close.
    *
    * The three statements below are total given the session honoured `submit`,
-   * which is its documented synchronous contract. Re-checking the Route and the
+   * which is its documented synchronous contract. Re-checking the Graph and the
    * Layout here against the snapshot that just passed domain intake would add a
    * branch that cannot be taken, and this repo deletes those rather than keeps
    * them.
@@ -455,7 +456,7 @@ export function createSpaceAuthoring({
     installTogether(() => {
       session.submit(edit.snapshot);
       install(edit.placement);
-      if (edit.mintedRouteId !== null) navigation.activateRoute(edit.mintedRouteId);
+      if (edit.mintedGraphId !== null) navigation.activateGraph(edit.mintedGraphId);
       navigation.continueInRenderer(edit.nextRenderer);
     });
   };

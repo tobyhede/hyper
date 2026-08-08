@@ -57,7 +57,7 @@ const REGULAR_FILE_MODES = new Set(['100644', '100755']);
 
 /**
  * The repository's tracked regular files, as repo-relative paths. Git rather
- * than a directory walk: `node_modules` alone is larger than everything worth
+ * than a directory traversal: `node_modules` alone is larger than everything worth
  * reading, and an untracked working file cannot reach a commit.
  *
  * The mode is read rather than assumed because `.claude/skills/*` are tracked

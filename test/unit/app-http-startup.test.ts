@@ -11,7 +11,7 @@ const OTHER_CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
 
 const snapshot = (id = SPACE_ID, cardId = CARD_ID, title = 'Stored space'): SpaceSnapshot => ({
   id,
-  document: { version: 2, title, routes: [] },
+  document: { version: 2, title, graphs: [] },
   cards: [{ id: cardId, document: { title: 'Start here', kind: 'markdown', body: 'Stored body' } }],
 });
 

@@ -1,20 +1,20 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { ReactFlowProvider } from '@xyflow/react';
-import { AppShell, Button, LayoutSelector, RouteSelector, ViewSelector } from '@project/ui';
+import { AppShell, Button, LayoutSelector, GraphSelector, ViewSelector } from '@project/ui';
 import { cardDocumentSchema, uuidSchema, type LayoutPosition } from '@project/core';
 import {
   projectCardNodes,
-  projectRouteEdges,
-  type RouteEmphasis,
+  projectGraphEdges,
+  type GraphEmphasis,
 } from '@project/react-flow-adapter';
 import {
   buildCardHandles,
-  buildLayoutGraph,
-  buildRouteEdges,
-  filterHandlesByRoutes,
+  buildLayoutStrategyGraph,
+  buildGraphRenderEdges,
+  filterHandlesByGraphs,
   getCard,
   Placement,
-  routeCardIds,
+  graphCardIds,
   resolveContentCard,
   type ResolvedContentCard,
 } from '@project/graph';
@@ -22,12 +22,12 @@ import type { OpenedSpace } from './space';
 import { createSpaceAuthoring, nextCardTitle } from './space-authoring';
 import { createRenderAdapter } from './render-adapter';
 import { canvasContent, usePlacementRendering } from './placement-rendering';
-import { activeRouteColor, routeColorMap } from './colors';
+import { activeGraphColor, graphColorMap } from './colors';
 import { CARD_HEIGHT, CARD_SIZE, cardSizeVars } from './card';
 import { createNavigation } from './navigation';
 import { createWorkingSpaceReader } from './snapshot';
 import { defaultRenderer, resolveView, type RendererSelection } from './view';
-import { GraphView } from './components/GraphView';
+import { SpaceCanvas } from './components/SpaceCanvas';
 import { OpenCard } from './components/OpenCard';
 import { PlacementFailure } from './components/PlacementFailure';
 import { PresentingChrome } from './components/PresentingChrome';
@@ -40,9 +40,9 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
   const readWorkingSpace = createWorkingSpaceReader();
   const currentSpace = () => readWorkingSpace(spaceSession.getState().working);
   // Which view this space opens in, and the strategy that arranges it. The fixture
-  // declares no view, so this resolves to the route-driven ELK graph — exactly
+  // declares no view, so this resolves to the graph-driven ELK graph — exactly
   // what the hardcoded `elkStrategy()` here used to do. It also answers which
-  // routes are shown and which of them opens active (ADR 0026), so it has to
+  // graphs are shown and which of them opens active (ADR 0026), so it has to
   // resolve before the store is built.
   const initialRenderer = defaultRenderer(space);
   const initialView = resolveView(space, initialRenderer);
@@ -102,24 +102,24 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
       [sessionState.working],
     );
     const layouts = rendererSpace.layouts;
-    const routes = rendererSpace.routes;
-    const colors = useMemo(() => routeColorMap(rendererSpace), [rendererSpace]);
+    const graphs = rendererSpace.graphs;
+    const colors = useMemo(() => graphColorMap(rendererSpace), [rendererSpace]);
     const allHandles = useMemo(() => buildCardHandles(rendererSpace), [rendererSpace]);
-    const allRouteEdges = useMemo(() => buildRouteEdges(rendererSpace), [rendererSpace]);
+    const allGraphEdges = useMemo(() => buildGraphRenderEdges(rendererSpace), [rendererSpace]);
     const view = useMemo(
       () => resolveView(rendererSpace, selectedRenderer),
       [rendererSpace, selectedRenderer],
     );
 
-    const { activeRouteId, openedCardId } = navigationState;
-    const activateRoute = navigation.activateRoute;
+    const { activeGraphId, openedCardId } = navigationState;
+    const activateGraph = navigation.activateGraph;
     const openCard = navigation.openCard;
     const closeCard = navigation.closeCard;
     const presenting = navigationState.mode === 'presenting';
-    // There is a Card to go back to only once a walk has left its first, and only
-    // presenting has a walk at all — the same narrowing the alias above already
+    // There is a Card to go back to only once a traversal has left its first, and only
+    // presenting has Traversal history at all — the same narrowing the alias above already
     // makes, spent here on the value behind it rather than on the mode.
-    const canRetreat = presenting && navigationState.walk.length > 1;
+    const canRetreat = presenting && navigationState.traversalHistory.length > 1;
     const present = navigation.present;
     const exitPresenting = navigation.exitPresenting;
     const advance = navigation.advance;
@@ -137,22 +137,22 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
     // moves during render makes the newly authored Edge immediately traversable.
     // A render-time call is not the selector case above — nothing subscribes to
     // this identity, so a fresh array cannot feed a re-render — and the work is a
-    // filter and a map over one Route's edges, or nothing at all outside a walk.
+    // filter and a map over one Graph's Edges, or nothing at all outside presentation.
     const moves = navigation.moves();
 
-    // Which routes the renderer shows, resolved from the Layout that filtered them
+    // Which graphs the renderer shows, resolved from the Layout that filtered them
     // (ADR 0026). Membership is the view's decision (ADR 0005), which is why it
     // arrives from `resolveView` rather than being decided in the graph or layout
     // packages.
-    const visibleRouteIds = view.visibleRouteIds;
-    const visibleRouteIdSet = useMemo(() => new Set(visibleRouteIds), [visibleRouteIds]);
-    const visibleRoutes = useMemo(
-      () => routes.filter((route) => visibleRouteIdSet.has(route.id)),
-      [routes, visibleRouteIdSet],
+    const visibleGraphIds = view.visibleGraphIds;
+    const visibleGraphIdSet = useMemo(() => new Set(visibleGraphIds), [visibleGraphIds]);
+    const visibleGraphs = useMemo(
+      () => graphs.filter((graph) => visibleGraphIdSet.has(graph.id)),
+      [graphs, visibleGraphIdSet],
     );
 
-    // Every card, not just the route-visited ones. A space may have cards and no
-    // routes at all (ADR 0015) — deriving the card set from the routes would render
+    // Every card, not just the graph-visited ones. A space may have cards and no
+    // graphs at all (ADR 0015) — deriving the card set from the graphs would render
     // a new space as an empty canvas, which is the one thing it must not do. Which
     // cards a view draws was always the View's call, not the layout's (ADR 0005).
     const visibleCardIds = useMemo(
@@ -160,16 +160,16 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
       [rendererSpace.cards],
     );
     const visibleHandles = useMemo(
-      () => filterHandlesByRoutes(allHandles, visibleRouteIds),
-      [allHandles, visibleRouteIds],
+      () => filterHandlesByGraphs(allHandles, visibleGraphIds),
+      [allHandles, visibleGraphIds],
     );
     const visibleEdges = useMemo(
-      () => allRouteEdges.filter((edge) => visibleRouteIdSet.has(edge.routeId)),
-      [allRouteEdges, visibleRouteIdSet],
+      () => allGraphEdges.filter((edge) => visibleGraphIdSet.has(edge.graphId)),
+      [allGraphEdges, visibleGraphIdSet],
     );
 
-    const graph = useMemo(
-      () => buildLayoutGraph(visibleCardIds, visibleHandles, visibleEdges, CARD_SIZE),
+    const strategyGraph = useMemo(
+      () => buildLayoutStrategyGraph(visibleCardIds, visibleHandles, visibleEdges, CARD_SIZE),
       [visibleCardIds, visibleHandles, visibleEdges],
     );
     // Read at the point of use, like `moves` above and for the same reason: the
@@ -183,11 +183,11 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
     const authoredPositions = authoring.authoredPlacement();
     const selectedCardId = useRenderAdapter((s) => s.selectedCardId);
     const moved = useRenderAdapter((s) => s.moved);
-    const placement = usePlacementRendering(graph, view.strategy, authoredPositions);
-    const laidOut = placement.kind === 'ready' ? placement.graph : null;
+    const placement = usePlacementRendering(strategyGraph, view.strategy, authoredPositions);
+    const laidOut = placement.kind === 'ready' ? placement.strategyGraph : null;
 
-    // Selecting a route emphasises it; it never hides the rest of the space.
-    const emphasis: RouteEmphasis = activeRouteId ? 'subtle' : 'equal';
+    // Selecting a graph emphasises it; it never hides the rest of the space.
+    const emphasis: GraphEmphasis = activeGraphId ? 'subtle' : 'equal';
 
     const projectedNodes = useMemo(
       () =>
@@ -195,10 +195,10 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
           activeCardId,
           selectedCardId,
           showActiveCardContent: presenting,
-          activeRouteId,
-          activeRouteColor: activeRouteColor(colors, activeRouteId),
+          activeGraphId,
+          activeGraphColor: activeGraphColor(colors, activeGraphId),
           emphasis,
-          ...(laidOut ? { layoutGraph: laidOut } : {}),
+          ...(laidOut ? { strategyGraph: laidOut } : {}),
           nodeHeight: CARD_HEIGHT,
           cardIds: visibleCardIds,
         }),
@@ -208,7 +208,7 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
         activeCardId,
         selectedCardId,
         presenting,
-        activeRouteId,
+        activeGraphId,
         emphasis,
         laidOut,
         visibleHandles,
@@ -218,17 +218,17 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
 
     const projectedEdges = useMemo(
       () =>
-        projectRouteEdges(visibleEdges, colors, {
-          activeRouteId,
+        projectGraphEdges(visibleEdges, colors, {
+          activeGraphId,
           emphasis,
           // A layout's routed edge geometry describes the arrangement it computed,
           // so it stops being true once a card is dragged out of it. From then on
           // the edges fall back to plain curves between wherever the cards now are
           // — which is what a positioned view draws anyway, since it routes
           // nothing.
-          ...(laidOut && !moved ? { layoutGraph: laidOut } : {}),
+          ...(laidOut && !moved ? { strategyGraph: laidOut } : {}),
         }),
-      [visibleEdges, colors, activeRouteId, emphasis, laidOut, moved],
+      [visibleEdges, colors, activeGraphId, emphasis, laidOut, moved],
     );
 
     // Hand the complete projection to the render adapter as one state change.
@@ -282,14 +282,14 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
       return () => window.removeEventListener('beforeunload', onBeforeUnload);
     }, [sessionState.persistence.kind]);
 
-    const activeRouteCardIds = useMemo(
-      () => new Set(activeRouteId === null ? [] : routeCardIds(rendererSpace, activeRouteId)),
-      [rendererSpace, activeRouteId],
+    const activeGraphCardIds = useMemo(
+      () => new Set(activeGraphId === null ? [] : graphCardIds(rendererSpace, activeGraphId)),
+      [rendererSpace, activeGraphId],
     );
 
     const connectCards = useCallback(
       (connection: { source: string; target: string }) => {
-        // Issue 04 owns Route minting. An existing Route can be edited from every
+        // Issue 04 owns Graph minting. An existing Graph can be edited from every
         // resolved renderer; an Algorithmic View converts using exactly the live
         // Card positions the author connected between (ADR 0025).
         const completed = useRenderAdapter
@@ -414,7 +414,7 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
         ?.focus();
     }, [openedCardId, presenting]);
 
-    // Escape closes an opened card. Registered ahead of the walk's keys and
+    // Escape closes an opened Card. Registered ahead of the traversal controls and
     // returning early while a card is open, so the two never fight over Escape.
     useEffect(() => {
       if (!openedCardId) return;
@@ -428,7 +428,7 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
       return () => window.removeEventListener('keydown', onKeyDown);
     }, [openedCardId, closeCard]);
 
-    // Walking the route (ADR 0027). Right commits the selected edge, Left walks
+    // Traversing the graph (ADR 0027). Right commits the selected edge, Left traverses
     // back, Up and Down move the selection among a fork's outgoing edges without
     // moving the camera — the move a deck framework's per-key redirect cannot
     // express, and the reason there is no framework here.
@@ -466,14 +466,14 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
             chooseRenderer({ kind: 'layout', layoutId: uuidSchema.parse(layoutId) })
           }
         />
-        <RouteSelector
-          routes={visibleRoutes}
-          activeRouteId={activeRouteId}
-          onActivate={(routeId) => activateRoute(uuidSchema.parse(routeId))}
-          // `RouteSelector` disables its control on "no active Route" and
+        <GraphSelector
+          graphs={visibleGraphs}
+          activeGraphId={activeGraphId}
+          onActivate={(graphId) => activateGraph(uuidSchema.parse(graphId))}
+          // `GraphSelector` disables its control on "no active Graph" and
           // `present()` refuses on exactly that, so the two conditions agree:
-          // every Route that *is* active can be presented, cyclic ones included
-          // (ADR 0032). They once did not, and a fully cyclic Route fell through
+          // every Graph that *is* active can be presented, cyclic ones included
+          // (ADR 0032). They once did not, and a fully cyclic Graph fell through
           // the gap between them — the control read `Present`, stayed enabled,
           // and swallowed the click.
           onPresent={present}
@@ -540,9 +540,9 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
             <PlacementFailure error={canvas.error} />
           ) : canvas.kind === 'arrangement' ? (
             <ReactFlowProvider>
-              <GraphView
+              <SpaceCanvas
                 // Keyed on the opening counter, so accepting the stored Space
-                // takes the graph's local editing state with it. The render
+                // takes the canvas's local editing state with it. The render
                 // adapter already drops the projection and drag bookkeeping, but
                 // an open title editor is the graph's own: it names a Card from
                 // a Space that is gone, and its raised invalid guard would go on
@@ -564,10 +564,10 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
                 onOpenCard={openCardForEditing}
                 onCompleteCardTitle={completeCardTitle}
                 editableCardIds={editableCardIds}
-                routes={visibleRoutes}
-                colorByRouteId={colors}
-                activeRouteId={activeRouteId}
-                activeRouteCardIds={activeRouteCardIds}
+                graphs={visibleGraphs}
+                colorByGraphId={colors}
+                activeGraphId={activeGraphId}
+                activeGraphCardIds={activeGraphCardIds}
               />
             </ReactFlowProvider>
           ) : (

@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeAll, describe, expect, expectTypeOf, it, vi } from 'vitest';
-import { uuidSchema, type Route } from '@project/core';
-import { RouteSelector, type RouteSelectorProps } from '../src/index';
+import { uuidSchema, type Graph } from '@project/core';
+import { GraphSelector, type GraphSelectorProps } from '../src/index';
 
 beforeAll(() => {
   HTMLElement.prototype.hasPointerCapture = () => false;
@@ -10,95 +10,95 @@ beforeAll(() => {
   HTMLElement.prototype.scrollIntoView = () => undefined;
 });
 
-const routes: readonly Route[] = [
+const graphs: readonly Graph[] = [
   {
     id: uuidSchema.parse('11111111-1111-4111-8111-111111111111'),
-    title: 'Long route',
+    title: 'Long graph',
     color: '#6ea8fe',
     edges: [],
   },
   {
     id: uuidSchema.parse('22222222-2222-4222-8222-222222222222'),
-    title: 'Short route',
+    title: 'Short graph',
     color: '#f4a259',
     edges: [],
   },
 ];
 
-describe('RouteSelector', () => {
+describe('GraphSelector', () => {
   it('requires an exit action for every presenting state', () => {
-    expectTypeOf<RouteSelectorProps['onExitPresenting']>().toEqualTypeOf<() => void>();
+    expectTypeOf<GraphSelectorProps['onExitPresenting']>().toEqualTypeOf<() => void>();
   });
 
-  it('joins the active Route selector to the route-coloured Present action', () => {
+  it('joins the active Graph selector to the graph-coloured Present action', () => {
     const onPresent = vi.fn();
     render(
-      <RouteSelector
-        routes={routes}
-        activeRouteId={routes[1]?.id ?? null}
+      <GraphSelector
+        graphs={graphs}
+        activeGraphId={graphs[1]?.id ?? null}
         onActivate={() => undefined}
         onPresent={onPresent}
         onExitPresenting={() => undefined}
       />,
     );
 
-    const group = screen.getByRole('group', { name: 'Route controls' });
-    const trigger = screen.getByRole('combobox', { name: 'Active route' });
-    const present = screen.getByRole('button', { name: 'Present this route' });
+    const group = screen.getByRole('group', { name: 'Graph controls' });
+    const trigger = screen.getByRole('combobox', { name: 'Active Graph' });
+    const present = screen.getByRole('button', { name: 'Present this Graph' });
 
     expect(group).toContainElement(trigger);
     expect(group).toContainElement(present);
-    expect(trigger).toHaveAttribute('title', 'Active route');
-    expect(trigger).toHaveTextContent('Short route');
+    expect(trigger).toHaveAttribute('title', 'Active Graph');
+    expect(trigger).toHaveTextContent('Short graph');
     expect(trigger.querySelector('svg')).toHaveAttribute('stroke', '#f4a259');
-    expect(present).toHaveAttribute('title', 'Present this route');
+    expect(present).toHaveAttribute('title', 'Present this Graph');
     expect(present.querySelector('svg')).toHaveAttribute('fill', '#f4a259');
 
     fireEvent.click(present);
     expect(onPresent).toHaveBeenCalledOnce();
   });
 
-  it('disables Present when there is no active Route', () => {
+  it('disables Present when there is no active Graph', () => {
     render(
-      <RouteSelector
-        routes={routes}
-        activeRouteId={null}
+      <GraphSelector
+        graphs={graphs}
+        activeGraphId={null}
         onActivate={() => undefined}
         onPresent={() => undefined}
         onExitPresenting={() => undefined}
       />,
     );
 
-    expect(screen.getByRole('combobox', { name: 'Active route' })).toHaveTextContent('None');
-    expect(screen.getByRole('button', { name: 'Present this route' })).toBeDisabled();
+    expect(screen.getByRole('combobox', { name: 'Active Graph' })).toHaveTextContent('None');
+    expect(screen.getByRole('button', { name: 'Present this Graph' })).toBeDisabled();
   });
 
-  it('activates the chosen Route', () => {
+  it('activates the chosen Graph', () => {
     const onActivate = vi.fn();
     render(
-      <RouteSelector
-        routes={routes}
-        activeRouteId={routes[1]?.id ?? null}
+      <GraphSelector
+        graphs={graphs}
+        activeGraphId={graphs[1]?.id ?? null}
         onActivate={onActivate}
         onPresent={() => undefined}
         onExitPresenting={() => undefined}
       />,
     );
 
-    fireEvent.keyDown(screen.getByRole('combobox', { name: 'Active route' }), { key: 'ArrowDown' });
-    fireEvent.click(screen.getByRole('option', { name: /Long route/ }));
+    fireEvent.keyDown(screen.getByRole('combobox', { name: 'Active Graph' }), { key: 'ArrowDown' });
+    fireEvent.click(screen.getByRole('option', { name: /Long graph/ }));
 
     expect(onActivate).toHaveBeenCalledOnce();
-    expect(onActivate).toHaveBeenCalledWith(routes[0]?.id);
+    expect(onActivate).toHaveBeenCalledWith(graphs[0]?.id);
   });
 
   it('exits presenting through the Overview action', () => {
     const onExitPresenting = vi.fn();
     const onPresent = vi.fn();
     render(
-      <RouteSelector
-        routes={routes}
-        activeRouteId={routes[1]?.id ?? null}
+      <GraphSelector
+        graphs={graphs}
+        activeGraphId={graphs[1]?.id ?? null}
         onActivate={() => undefined}
         onPresent={onPresent}
         presenting

@@ -2,6 +2,7 @@
 
 Status: accepted
 Refines: 0024
+Refined by: 0041
 Related: 0002, 0006, 0023, 0025, 0026
 
 Presenting renders on the arrangement already on screen. Traversal drives React Flow's camera: `setCenter(x, y, { zoom, duration })` moves to the active card, `fitBounds` frames the whole space for an overview. There is no second surface, no second coordinate system, and nothing a Card is transformed into.

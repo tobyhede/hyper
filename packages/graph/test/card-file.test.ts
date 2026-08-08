@@ -60,7 +60,7 @@ describe('parseCardFile', () => {
   it('reads a card from its frontmatter and keeps the body', () => {
     const result = parseCardFile({
       path: 'cards/a.md',
-      text: '---\nid: 00000000-0000-4000-8000-000000000002\ntitle: A\ndescription: Where every route begins\n---\n\nCard **A** is the entry point.\n',
+      text: '---\nid: 00000000-0000-4000-8000-000000000002\ntitle: A\ndescription: Where every graph begins\n---\n\nCard **A** is the entry point.\n',
     });
 
     expect(result.ok).toBe(true);
@@ -68,7 +68,7 @@ describe('parseCardFile', () => {
     expect(result.card).toEqual({
       id: '00000000-0000-4000-8000-000000000002',
       title: 'A',
-      description: 'Where every route begins',
+      description: 'Where every graph begins',
       kind: 'markdown',
       body: 'Card **A** is the entry point.\n',
     });

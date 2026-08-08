@@ -5,8 +5,8 @@ import {
   type BuiltInViewId,
   type CardId,
   type Layout,
-  type Route,
-  type RouteId,
+  type Graph,
+  type GraphId,
   type SpaceSnapshot,
   type UUID,
 } from '@project/core';
@@ -25,7 +25,7 @@ export interface Space {
   readonly id: UUID;
   readonly title: string;
   readonly cards: readonly Card[];
-  readonly routes: readonly Route[];
+  readonly graphs: readonly Graph[];
   /**
    * The positioned layouts the author wrote, if any. Empty is the normal state
    * of a hand-authored space: automatic layouts carry no data, so they are
@@ -35,7 +35,7 @@ export interface Space {
   /** Which view this space opens in — a layout's id or a built-in view's. */
   readonly defaultView: BuiltInViewId | UUID | undefined;
   readonly cardsById: ReadonlyMap<CardId, Card>;
-  readonly routesById: ReadonlyMap<RouteId, Route>;
+  readonly graphsById: ReadonlyMap<GraphId, Graph>;
   readonly layoutsById: ReadonlyMap<UUID, Layout>;
 }
 
@@ -100,7 +100,7 @@ export function loadSpace(input: unknown, cardFiles: readonly CardFile[]): LoadS
     id: file.id,
     title: file.title,
     cards,
-    routes: file.routes,
+    graphs: file.graphs,
     layouts: file.layouts,
     defaultView: file.defaultView,
   });
@@ -128,7 +128,7 @@ export function loadSpaceSnapshot(input: unknown): LoadSpaceSnapshotResult {
     id,
     title: document.title,
     cards,
-    routes: document.routes,
+    graphs: document.graphs,
     layouts: document.layouts,
     defaultView: document.defaultView,
   });
@@ -139,7 +139,7 @@ function buildSpace(input: {
   id: UUID;
   title: string;
   cards: Card[];
-  routes: Route[];
+  graphs: Graph[];
   layouts: Layout[] | undefined;
   defaultView: BuiltInViewId | UUID | undefined;
 }): LoadSpaceResult {
@@ -156,11 +156,11 @@ function buildSpace(input: {
     id: input.id,
     title: input.title,
     cards,
-    routes: input.routes,
+    graphs: input.graphs,
     layouts,
     defaultView: input.defaultView,
     cardsById: new Map(cards.map((card) => [card.id, card])),
-    routesById: new Map(input.routes.map((r) => [r.id, r])),
+    graphsById: new Map(input.graphs.map((r) => [r.id, r])),
     layoutsById: new Map(layouts.map((l) => [l.id, l])),
   };
   return { ok: true, space };

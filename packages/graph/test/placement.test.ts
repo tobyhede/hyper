@@ -2,7 +2,7 @@ import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import type { CardId, Layout } from '@project/core';
 import { Placement, positionedStrategy } from '../src/index';
-import type { LayoutCard, LayoutGraph } from '../src/index';
+import type { LayoutStrategyCard, LayoutStrategyGraph } from '../src/index';
 import { uuid } from './card-files';
 
 const SIZE = { width: 100, height: 50 };
@@ -11,7 +11,7 @@ const CARD_A = uuid('00000000-0000-4000-8000-000000000002');
 const CARD_B = uuid('00000000-0000-4000-8000-000000000003');
 const CARD_C = uuid('00000000-0000-4000-8000-000000000005');
 
-function cardsOf(...ids: CardId[]): LayoutCard[] {
+function cardsOf(...ids: CardId[]): LayoutStrategyCard[] {
   return ids.map((id) => ({
     id,
     ...SIZE,
@@ -22,7 +22,7 @@ function cardsOf(...ids: CardId[]): LayoutCard[] {
   }));
 }
 
-const graph: LayoutGraph = { cards: cardsOf(CARD_A, CARD_B, CARD_C), edges: [] };
+const graph: LayoutStrategyGraph = { cards: cardsOf(CARD_A, CARD_B, CARD_C), edges: [] };
 
 const at = (entries: Record<string, [number, number]>) =>
   Placement.fromEntries(Object.entries(entries).map(([id, [x, y]]) => [uuid(id), { x, y }]));
@@ -57,7 +57,7 @@ describe('Placement.fromLayout', () => {
   });
 });
 
-describe('Placement.fromLayoutGraph', () => {
+describe('Placement.fromLayoutStrategyGraph', () => {
   it('reads back what a strategy placed', async () => {
     const laid = await positionedStrategy(
       at({
@@ -67,7 +67,7 @@ describe('Placement.fromLayoutGraph', () => {
       }),
     )(graph);
 
-    expect(asObject(Placement.fromLayoutGraph(laid))).toEqual({
+    expect(asObject(Placement.fromLayoutStrategyGraph(laid))).toEqual({
       [CARD_A]: { x: 10, y: 20 },
       [CARD_B]: { x: 300, y: 20 },
       [CARD_C]: { x: 600, y: 20 },
@@ -76,7 +76,7 @@ describe('Placement.fromLayoutGraph', () => {
 
   it('omits a card no strategy placed, rather than calling it the origin', () => {
     expect([
-      ...Placement.fromLayoutGraph({ cards: cardsOf(CARD_A, CARD_B), edges: [] }).keys(),
+      ...Placement.fromLayoutStrategyGraph({ cards: cardsOf(CARD_A, CARD_B), edges: [] }).keys(),
     ]).toEqual([]);
   });
 });
@@ -306,7 +306,7 @@ describe('Placement properties', () => {
           ids.map((id, i) => [id, { x: coords[i * 2] ?? 0, y: coords[i * 2 + 1] ?? 0 }]),
         );
         const laid = await positionedStrategy(positions)({ cards: cardsOf(...ids), edges: [] });
-        const replayed = await positionedStrategy(Placement.fromLayoutGraph(laid))({
+        const replayed = await positionedStrategy(Placement.fromLayoutStrategyGraph(laid))({
           cards: cardsOf(...ids),
           edges: [],
         });
@@ -329,7 +329,7 @@ describe('Placement properties', () => {
         );
         // Everything on screen, including the fallback band the omitted Cards sit in.
         const laid = await positionedStrategy(authored)({ cards: cardsOf(...ids), edges: [] });
-        const rendered = Placement.fromLayoutGraph(laid);
+        const rendered = Placement.fromLayoutStrategyGraph(laid);
 
         expect([...Placement.next(authored, rendered, []).keys()].sort()).toEqual(
           [...authored.keys()].sort(),

@@ -60,7 +60,7 @@ const CARD_ID = uuidSchema.parse('22222222-2222-4222-8222-222222222222');
 const storedSpace: LoadedSpace = {
   snapshot: {
     id: SPACE_ID,
-    document: { version: 2, title: 'Stored talk', routes: [] },
+    document: { version: 2, title: 'Stored talk', graphs: [] },
     cards: [
       {
         id: CARD_ID,

@@ -2,6 +2,7 @@
 
 Status: accepted
 Refines: 0025, 0026
+Refined by: 0040, 0041
 Related: 0021
 
 ADR 0026 gives a Layout an optional `activeRoute` and rules that absent one, the first visible route is active. **That fallback is a read, never a write.** It is resolved on load so a hand-authored space works with nothing typed, and the app writes the field explicitly every time it saves — so a file the app has written names its active route outright rather than depending on the order its routes happen to sit in.

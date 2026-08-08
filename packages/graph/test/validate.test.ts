@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { BuiltInViewId, Card, Layout, LayoutPosition, Route, UUID } from '@project/core';
+import type { BuiltInViewId, Card, Layout, LayoutPosition, Graph, UUID } from '@project/core';
 // The whole module is internal: `loadSpace` is the one intake that runs it.
 import { validateReferences, type SpaceReferenceError } from '../src/validate';
 import { alias, card, uuid } from './card-files';
@@ -11,7 +11,7 @@ const errorKinds = (errors: readonly SpaceReferenceError[]): string[] => errors.
 function baseSpaceFile(): {
   title: string;
   cards: Card[];
-  routes: Route[];
+  graphs: Graph[];
   layouts?: Layout[];
   defaultView?: BuiltInViewId | UUID;
 } {
@@ -21,7 +21,7 @@ function baseSpaceFile(): {
       card(uuid('00000000-0000-4000-8000-000000000002')),
       card(uuid('00000000-0000-4000-8000-000000000003')),
     ],
-    routes: [
+    graphs: [
       {
         id: uuid('00000000-0000-4000-8000-000000000004'),
         title: 'Main',
@@ -59,38 +59,38 @@ describe('validateReferences', () => {
 
   it('detects an unresolved edge endpoint, naming which end it was', () => {
     const m = baseSpaceFile();
-    m.routes[0]!.edges[0]!.to = uuid('00000000-0000-4000-8000-000000000098');
+    m.graphs[0]!.edges[0]!.to = uuid('00000000-0000-4000-8000-000000000098');
     const errors = validateReferences(m);
-    const error = errors.find((e) => e.kind === 'unresolved-route-edge');
+    const error = errors.find((e) => e.kind === 'unresolved-graph-edge');
     expect(error?.ref).toBe(uuid('00000000-0000-4000-8000-000000000098'));
     expect(error?.message).toContain('as its to');
   });
 
-  it('accepts a route that closes a cycle (ADR 0032)', () => {
+  it('accepts a graph that closes a cycle (ADR 0032)', () => {
     const m = baseSpaceFile();
     // A → B → A: presenting decides how to traverse the authored loop.
-    m.routes[0]!.edges.push({
+    m.graphs[0]!.edges.push({
       from: uuid('00000000-0000-4000-8000-000000000003'),
       to: uuid('00000000-0000-4000-8000-000000000002'),
     });
     expect(validateReferences(m)).toEqual([]);
   });
 
-  it('rejects an exact duplicate Edge within one Route', () => {
+  it('rejects an exact duplicate Edge within one Graph', () => {
     const m = baseSpaceFile();
-    m.routes[0]!.edges.push({ ...m.routes[0]!.edges[0]! });
+    m.graphs[0]!.edges.push({ ...m.graphs[0]!.edges[0]! });
 
     expect(validateReferences(m)).toContainEqual({
-      kind: 'duplicate-route-edge',
+      kind: 'duplicate-graph-edge',
       ref: '00000000-0000-4000-8000-000000000002 → 00000000-0000-4000-8000-000000000003',
       message:
-        'Route "00000000-0000-4000-8000-000000000004" repeats edge 00000000-0000-4000-8000-000000000002 → 00000000-0000-4000-8000-000000000003 at index 1 (first at index 0)',
+        'Graph "00000000-0000-4000-8000-000000000004" repeats edge 00000000-0000-4000-8000-000000000002 → 00000000-0000-4000-8000-000000000003 at index 1 (first at index 0)',
     });
   });
 
   it('accepts a self-edge', () => {
     const m = baseSpaceFile();
-    m.routes[0]!.edges.push({
+    m.graphs[0]!.edges.push({
       from: uuid('00000000-0000-4000-8000-000000000003'),
       to: uuid('00000000-0000-4000-8000-000000000003'),
     });
@@ -103,7 +103,7 @@ describe('validateReferences', () => {
       card(uuid('00000000-0000-4000-8000-000000000005')),
       card(uuid('00000000-0000-4000-8000-000000000006')),
     );
-    m.routes[0]!.edges.push(
+    m.graphs[0]!.edges.push(
       {
         from: uuid('00000000-0000-4000-8000-000000000005'),
         to: uuid('00000000-0000-4000-8000-000000000006'),
@@ -124,7 +124,7 @@ describe('validateReferences', () => {
     );
     // a forks to b and c, which merge back into d. `d` is reachable two ways,
     // which is exactly what a merge is.
-    m.routes[0]!.edges = [
+    m.graphs[0]!.edges = [
       {
         from: uuid('00000000-0000-4000-8000-000000000002'),
         to: uuid('00000000-0000-4000-8000-000000000003'),
@@ -145,9 +145,9 @@ describe('validateReferences', () => {
     expect(validateReferences(m)).toEqual([]);
   });
 
-  it('allows the same Edge in different Routes', () => {
+  it('allows the same Edge in different Graphs', () => {
     const m = baseSpaceFile();
-    m.routes.push({
+    m.graphs.push({
       id: uuid('00000000-0000-4000-8000-000000000030'),
       title: 'Alt',
       edges: [
@@ -160,11 +160,11 @@ describe('validateReferences', () => {
     expect(validateReferences(m)).toEqual([]);
   });
 
-  it('allows two routes to disagree about order', () => {
+  it('allows two graphs to disagree about order', () => {
     // main goes a → b and alt goes b → a. Their union has a cycle, which a
     // renderer must tolerate (ADR 0032).
     const m = baseSpaceFile();
-    m.routes.push({
+    m.graphs.push({
       id: uuid('00000000-0000-4000-8000-000000000030'),
       title: 'Alt',
       edges: [
@@ -322,7 +322,7 @@ describe('validateReferences: layouts (ADR 0025)', () => {
   });
 
   it('accepts a defaultView naming a built-in automatic view', () => {
-    for (const view of ['graph', 'grid'] as const) {
+    for (const view of ['flow', 'grid'] as const) {
       const m = baseSpaceFile();
       m.defaultView = view;
       expect(validateReferences(m)).toEqual([]);
@@ -344,11 +344,11 @@ describe('validateReferences: layouts (ADR 0025)', () => {
   });
 });
 
-describe('validateReferences: the routes a Layout names (ADR 0026)', () => {
-  /** Two routes, so a filter has something to leave out. */
-  function twoRoutes() {
+describe('validateReferences: the graphs a Layout names (ADR 0026)', () => {
+  /** Two graphs, so a filter has something to leave out. */
+  function twoGraphs() {
     const m = baseSpaceFile();
-    m.routes.push({
+    m.graphs.push({
       id: uuid('00000000-0000-4000-8000-000000000020'),
       title: 'Aside',
       edges: [
@@ -361,41 +361,41 @@ describe('validateReferences: the routes a Layout names (ADR 0026)', () => {
     return m;
   }
 
-  it('accepts a layout that names neither — every route shown, the first active', () => {
-    const m = twoRoutes();
+  it('accepts a layout that names neither — every graph shown, the first active', () => {
+    const m = twoGraphs();
     m.layouts = [layout(uuid('00000000-0000-4000-8000-000000000022'), {})];
     expect(validateReferences(m)).toEqual([]);
   });
 
-  it('accepts a filter and an active route inside it', () => {
-    const m = twoRoutes();
+  it('accepts a filter and an active graph inside it', () => {
+    const m = twoGraphs();
     m.layouts = [
       {
         ...layout(uuid('00000000-0000-4000-8000-000000000022'), {}),
-        routes: [uuid('00000000-0000-4000-8000-000000000004')],
-        activeRoute: uuid('00000000-0000-4000-8000-000000000004'),
+        graphs: [uuid('00000000-0000-4000-8000-000000000004')],
+        activeGraph: uuid('00000000-0000-4000-8000-000000000004'),
       },
     ];
     expect(validateReferences(m)).toEqual([]);
   });
 
-  it('accepts an active route with no filter — every route is visible', () => {
-    const m = twoRoutes();
+  it('accepts an active graph with no filter — every graph is visible', () => {
+    const m = twoGraphs();
     m.layouts = [
       {
         ...layout(uuid('00000000-0000-4000-8000-000000000022'), {}),
-        activeRoute: uuid('00000000-0000-4000-8000-000000000020'),
+        activeGraph: uuid('00000000-0000-4000-8000-000000000020'),
       },
     ];
     expect(validateReferences(m)).toEqual([]);
   });
 
-  it('reports a filter naming a route the space does not have', () => {
-    const m = twoRoutes();
+  it('reports a filter naming a graph the space does not have', () => {
+    const m = twoGraphs();
     m.layouts = [
       {
         ...layout(uuid('00000000-0000-4000-8000-000000000022'), {}),
-        routes: [
+        graphs: [
           uuid('00000000-0000-4000-8000-000000000004'),
           uuid('00000000-0000-4000-8000-000000000099'),
         ],
@@ -405,83 +405,83 @@ describe('validateReferences: the routes a Layout names (ADR 0026)', () => {
     expect(
       errors.some(
         (e) =>
-          e.kind === 'layout-unknown-route' &&
+          e.kind === 'layout-unknown-graph' &&
           e.ref === uuid('00000000-0000-4000-8000-000000000099'),
       ),
     ).toBe(true);
   });
 
-  it('reports an activeRoute the space does not have', () => {
-    const m = twoRoutes();
+  it('reports an activeGraph the space does not have', () => {
+    const m = twoGraphs();
     m.layouts = [
       {
         ...layout(uuid('00000000-0000-4000-8000-000000000022'), {}),
-        activeRoute: uuid('00000000-0000-4000-8000-000000000099'),
+        activeGraph: uuid('00000000-0000-4000-8000-000000000099'),
       },
     ];
     const errors = validateReferences(m);
     expect(
       errors.some(
         (e) =>
-          e.kind === 'layout-unknown-route' &&
+          e.kind === 'layout-unknown-graph' &&
           e.ref === uuid('00000000-0000-4000-8000-000000000099'),
       ),
     ).toBe(true);
   });
 
-  it('reports an activeRoute the layout filters out, though both ids resolve', () => {
+  it('reports an activeGraph the layout filters out, though both ids resolve', () => {
     // The one check that relates the two fields rather than resolving either
     // against the space. Activating moves emphasis within the visible set, so a
-    // layout opening active on a route it hides has asked for an unreachable
-    // state — and it is an error even though "aside" is a perfectly real route.
-    const m = twoRoutes();
+    // layout opening active on a graph it hides has asked for an unreachable
+    // state — and it is an error even though "aside" is a perfectly real graph.
+    const m = twoGraphs();
     m.layouts = [
       {
         ...layout(uuid('00000000-0000-4000-8000-000000000022'), {}),
-        routes: [uuid('00000000-0000-4000-8000-000000000004')],
-        activeRoute: uuid('00000000-0000-4000-8000-000000000020'),
+        graphs: [uuid('00000000-0000-4000-8000-000000000004')],
+        activeGraph: uuid('00000000-0000-4000-8000-000000000020'),
       },
     ];
     const errors = validateReferences(m);
     expect(
       errors.some(
         (e) =>
-          e.kind === 'layout-active-route-not-shown' &&
+          e.kind === 'layout-active-graph-not-shown' &&
           e.ref === uuid('00000000-0000-4000-8000-000000000020'),
       ),
     ).toBe(true);
     // Not also reported as unknown: it resolves, it is just not shown.
-    expect(errorKinds(errors)).not.toContain('layout-unknown-route');
+    expect(errorKinds(errors)).not.toContain('layout-unknown-graph');
   });
 
-  it('reports an empty filter with an active route, rather than treating it as absent', () => {
-    // A layout showing no routes is legal shape; naming an active one is not,
+  it('reports an empty filter with an active graph, rather than treating it as absent', () => {
+    // A layout showing no graphs is legal shape; naming an active one is not,
     // because the visible set it must belong to is empty. Absent means all —
     // empty means none, and the two must not collapse.
-    const m = twoRoutes();
+    const m = twoGraphs();
     m.layouts = [
       {
         ...layout(uuid('00000000-0000-4000-8000-000000000022'), {}),
-        routes: [],
-        activeRoute: uuid('00000000-0000-4000-8000-000000000004'),
+        graphs: [],
+        activeGraph: uuid('00000000-0000-4000-8000-000000000004'),
       },
     ];
     const errors = validateReferences(m);
     expect(
       errors.some(
         (e) =>
-          e.kind === 'layout-active-route-not-shown' &&
+          e.kind === 'layout-active-graph-not-shown' &&
           e.ref === uuid('00000000-0000-4000-8000-000000000004'),
       ),
     ).toBe(true);
   });
 
   it('names the layout in the message, since the id alone does not say where', () => {
-    const m = twoRoutes();
+    const m = twoGraphs();
     m.layouts = [
       {
         ...layout(uuid('00000000-0000-4000-8000-000000000022'), {}),
-        routes: [uuid('00000000-0000-4000-8000-000000000099')],
+        graphs: [uuid('00000000-0000-4000-8000-000000000099')],
       },
     ];
     const [error] = validateReferences(m);

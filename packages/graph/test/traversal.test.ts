@@ -1,19 +1,19 @@
 import { describe, expect, it } from 'vitest';
-import type { Route, UUID } from '@project/core';
-import { outgoingEdges, routeStartCard } from '../src/index';
-// Internal to the package: `routeStartCard` is the offered way in.
-import { incomingEdges, routeEntryCards } from '../src/traversal';
+import type { Graph, UUID } from '@project/core';
+import { outgoingEdges, graphStartCard } from '../src/index';
+// Internal to the package: `graphStartCard` is the offered way in.
+import { incomingEdges, graphEntryCards } from '../src/traversal';
 import { uuid } from './card-files';
 
-const route = (edges: [UUID, UUID][]): Route => ({
+const graph = (edges: [UUID, UUID][]): Graph => ({
   id: uuid('00000000-0000-4000-8000-000000000001'),
   title: 'R',
   edges: edges.map(([from, to]) => ({ from, to })),
 });
 
-// a forks to b and c, which merge back into d. Every move a walk can make is in
+// a forks to b and c, which merge back into d. Every move a traversal can make is in
 // here: a choice, a single step, and an arrival by two paths.
-const diamond = route([
+const diamond = graph([
   [uuid('00000000-0000-4000-8000-000000000002'), uuid('00000000-0000-4000-8000-000000000003')],
   [uuid('00000000-0000-4000-8000-000000000002'), uuid('00000000-0000-4000-8000-000000000005')],
   [uuid('00000000-0000-4000-8000-000000000003'), uuid('00000000-0000-4000-8000-000000000006')],
@@ -33,11 +33,11 @@ describe('outgoingEdges', () => {
     ).toEqual(['00000000-0000-4000-8000-000000000006']);
   });
 
-  it('gives a sink none, which is how a walk ends', () => {
+  it('gives a sink none, which is how traversal ends', () => {
     expect(outgoingEdges(diamond, uuid('00000000-0000-4000-8000-000000000006'))).toEqual([]);
   });
 
-  it('gives a card the route does not touch none', () => {
+  it('gives a card the graph does not touch none', () => {
     expect(outgoingEdges(diamond, uuid('00000000-0000-4000-8000-000000000098'))).toEqual([]);
   });
 });
@@ -50,15 +50,15 @@ describe('incomingEdges', () => {
   });
 });
 
-describe('routeEntryCards', () => {
+describe('graphEntryCards', () => {
   it('finds the card nothing arrives at', () => {
-    expect(routeEntryCards(diamond)).toEqual(['00000000-0000-4000-8000-000000000002']);
+    expect(graphEntryCards(diamond)).toEqual(['00000000-0000-4000-8000-000000000002']);
   });
 
-  it('finds one per component — a Route need not be connected (ADR 0032)', () => {
+  it('finds one per component — a Graph need not be connected (ADR 0032)', () => {
     expect(
-      routeEntryCards(
-        route([
+      graphEntryCards(
+        graph([
           [
             uuid('00000000-0000-4000-8000-000000000002'),
             uuid('00000000-0000-4000-8000-000000000003'),
@@ -73,16 +73,16 @@ describe('routeEntryCards', () => {
   });
 
   it('lists each entry once however many edges leave it', () => {
-    expect(routeEntryCards(diamond)).toEqual(['00000000-0000-4000-8000-000000000002']);
+    expect(graphEntryCards(diamond)).toEqual(['00000000-0000-4000-8000-000000000002']);
   });
 
-  it('answers none for a fully cyclic Route, which is the honest answer', () => {
+  it('answers none for a fully cyclic Graph, which is the honest answer', () => {
     // "A card nothing arrives at" is a true question about the structure, and a
-    // loop has none. `routeStartCard` decides what to do about that; making this
+    // loop has none. `graphStartCard` decides what to do about that; making this
     // report a card would make the word a lie.
     expect(
-      routeEntryCards(
-        route([
+      graphEntryCards(
+        graph([
           [
             uuid('00000000-0000-4000-8000-000000000003'),
             uuid('00000000-0000-4000-8000-000000000005'),
@@ -97,22 +97,22 @@ describe('routeEntryCards', () => {
   });
 });
 
-describe('routeStartCard', () => {
-  it('starts a walk at the first entry', () => {
-    expect(routeStartCard(diamond)).toBe('00000000-0000-4000-8000-000000000002');
+describe('graphStartCard', () => {
+  it('starts traversal at the first entry', () => {
+    expect(graphStartCard(diamond)).toBe('00000000-0000-4000-8000-000000000002');
   });
 
-  it('is undefined only for a route with no edges, which the schema forbids', () => {
-    expect(routeStartCard(route([]))).toBeUndefined();
+  it('is undefined only for a graph with no edges, which the schema forbids', () => {
+    expect(graphStartCard(graph([]))).toBeUndefined();
   });
 
-  it('starts a self-connected Route at its only card', () => {
+  it('starts a self-connected Graph at its only card', () => {
     // The first gesture authoring ships: connecting a card to itself. Nothing
     // arrives at nothing here — the card arrives at itself — so rule 1 has no
-    // answer and the walk would never begin.
+    // answer and traversal would never begin.
     expect(
-      routeStartCard(
-        route([
+      graphStartCard(
+        graph([
           [
             uuid('00000000-0000-4000-8000-000000000002'),
             uuid('00000000-0000-4000-8000-000000000002'),
@@ -127,8 +127,8 @@ describe('routeStartCard', () => {
     // any of the three would have been defensible, and authoring order is the
     // only tie-break left.
     expect(
-      routeStartCard(
-        route([
+      graphStartCard(
+        graph([
           [
             uuid('00000000-0000-4000-8000-000000000003'),
             uuid('00000000-0000-4000-8000-000000000005'),
@@ -146,13 +146,13 @@ describe('routeStartCard', () => {
     ).toBe('00000000-0000-4000-8000-000000000003');
   });
 
-  it('prefers an entry to the first edge’s source when a Route has both', () => {
+  it('prefers an entry to the first edge’s source when a Graph has both', () => {
     // A cycle with a tail into it: b → c, c → b, a → b. `a` is an entry, so
     // rule 2 never runs — and the two rules disagree here, because the first
     // edge's source is `b`, inside the loop.
     expect(
-      routeStartCard(
-        route([
+      graphStartCard(
+        graph([
           [
             uuid('00000000-0000-4000-8000-000000000003'),
             uuid('00000000-0000-4000-8000-000000000005'),
@@ -174,10 +174,10 @@ describe('routeStartCard', () => {
     // The authored order runs b → c before a → b, so the first `from` is not the
     // entry. Connecting appends, so that is what an author who draws b → c and
     // then attaches a → b in front of it stores, and rule 2 alone would start
-    // the walk at b — skipping a, which forward traversal never reaches.
+    // traversal at b — skipping a, which forward traversal never reaches.
     expect(
-      routeStartCard(
-        route([
+      graphStartCard(
+        graph([
           [
             uuid('00000000-0000-4000-8000-000000000003'),
             uuid('00000000-0000-4000-8000-000000000005'),

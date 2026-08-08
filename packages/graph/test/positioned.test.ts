@@ -2,12 +2,12 @@ import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import type { CardId } from '@project/core';
 import { Placement, positionedStrategy } from '../src/index';
-import type { LayoutCard, LayoutGraph } from '../src/index';
+import type { LayoutStrategyCard, LayoutStrategyGraph } from '../src/index';
 import { uuid } from './card-files';
 
 const SIZE = { width: 100, height: 50 };
 
-function cardsOf(...ids: string[]): LayoutCard[] {
+function cardsOf(...ids: string[]): LayoutStrategyCard[] {
   return ids.map((id) => ({
     id: uuid(id),
     ...SIZE,
@@ -18,7 +18,7 @@ function cardsOf(...ids: string[]): LayoutCard[] {
   }));
 }
 
-const graph: LayoutGraph = {
+const graph: LayoutStrategyGraph = {
   cards: cardsOf(
     '00000000-0000-4000-8000-000000000002',
     '00000000-0000-4000-8000-000000000003',
@@ -46,7 +46,7 @@ const at = (entries: Record<string, [number, number]>): Placement =>
   Placement.fromEntries(Object.entries(entries).map(([id, [x, y]]) => [uuid(id), { x, y }]));
 
 /** Do two placed cards' boxes intersect? Touching edges do not count. */
-function overlaps(a: LayoutCard, b: LayoutCard): boolean {
+function overlaps(a: LayoutStrategyCard, b: LayoutStrategyCard): boolean {
   return (
     a.x! < b.x! + b.width &&
     b.x! < a.x! + a.width &&

@@ -1,5 +1,5 @@
 import { expect, expectTypeOf, it, vi } from 'vitest';
-import { uuidSchema, type CardId, type RouteId, type UUID } from '@project/core';
+import { uuidSchema, type CardId, type GraphId, type UUID } from '@project/core';
 import { loadSpace, type Space } from '@project/graph';
 import { createNavigation, type NavigationState } from '../src/navigation';
 import { cardFile } from './card-files';
@@ -7,17 +7,17 @@ import { cardFile } from './card-files';
 const uuid = (value: string): UUID => uuidSchema.parse(value);
 
 /**
- * The walk behind a presenting state. Reading one is narrowing now, which is the
- * point of the split: a state that is not presenting has no walk to read, here
+ * Traversal history belongs to a presenting state. Reading it requires narrowing, which is the
+ * point of the split: a state that is not presenting has no Traversal history to read, here
  * or anywhere else.
  */
-function walkOf(state: NavigationState): readonly CardId[] {
+function traversalHistoryOf(state: NavigationState): readonly CardId[] {
   if (state.mode !== 'presenting') throw new Error('navigation should be presenting');
-  return state.walk;
+  return state.traversalHistory;
 }
 
-const ROUTE_ONE = uuid('00000000-0000-4000-8000-000000000031');
-const ROUTE_TWO = uuid('00000000-0000-4000-8000-000000000032');
+const GRAPH_ONE = uuid('00000000-0000-4000-8000-000000000031');
+const GRAPH_TWO = uuid('00000000-0000-4000-8000-000000000032');
 const LAYOUT = uuid('00000000-0000-4000-8000-000000000041');
 
 function fixture(): Space {
@@ -26,9 +26,9 @@ function fixture(): Space {
       version: 2,
       id: uuid('00000000-0000-4000-8000-000000000001'),
       title: 'Fixture',
-      routes: [
+      graphs: [
         {
-          id: ROUTE_ONE,
+          id: GRAPH_ONE,
           title: 'One',
           edges: [
             {
@@ -38,7 +38,7 @@ function fixture(): Space {
           ],
         },
         {
-          id: ROUTE_TWO,
+          id: GRAPH_TWO,
           title: 'Two',
           edges: [
             {
@@ -51,10 +51,10 @@ function fixture(): Space {
       layouts: [
         {
           id: LAYOUT,
-          title: 'Second route',
+          title: 'Second graph',
           positions: {},
-          routes: [ROUTE_TWO],
-          activeRoute: ROUTE_TWO,
+          graphs: [GRAPH_TWO],
+          activeGraph: GRAPH_TWO,
         },
       ],
     },
@@ -68,17 +68,17 @@ function fixture(): Space {
   return result.space;
 }
 
-it('selects a renderer and its active Route without changing the Space', () => {
+it('selects a renderer and its active Graph without changing the Space', () => {
   const space = fixture();
-  const navigation = createNavigation(() => space, { kind: 'view', view: 'graph' });
+  const navigation = createNavigation(() => space, { kind: 'view', view: 'flow' });
   navigation.present();
 
   navigation.selectRenderer({ kind: 'layout', layoutId: LAYOUT });
 
   expect(navigation.getState()).toMatchObject({
     selectedRenderer: { kind: 'layout', layoutId: LAYOUT },
-    selectedView: 'graph',
-    activeRouteId: ROUTE_TWO,
+    selectedView: 'flow',
+    activeGraphId: GRAPH_TWO,
     mode: 'overview',
   });
   expect(navigation.activeCardId()).toBeNull();
@@ -106,7 +106,7 @@ it('selects a renderer and its active Route without changing the Space', () => {
  */
 it('closes an opened Card when the renderer changes, so no editor outlives its placement', () => {
   const space = fixture();
-  const navigation = createNavigation(() => space, { kind: 'view', view: 'graph' });
+  const navigation = createNavigation(() => space, { kind: 'view', view: 'flow' });
   navigation.openCard(uuid('00000000-0000-4000-8000-000000000002'));
 
   navigation.selectRenderer({ kind: 'layout', layoutId: LAYOUT });
@@ -119,7 +119,7 @@ it('traverses an Edge from the changing working Space without installing a copy'
   const cardB = uuid('00000000-0000-4000-8000-000000000003');
   const cardC = uuid('00000000-0000-4000-8000-000000000004');
   let working = fixture();
-  const navigation = createNavigation(() => working, { kind: 'view', view: 'graph' });
+  const navigation = createNavigation(() => working, { kind: 'view', view: 'flow' });
   navigation.present();
 
   const changed = loadSpace(
@@ -127,16 +127,16 @@ it('traverses an Edge from the changing working Space without installing a copy'
       version: 2,
       id: working.id,
       title: working.title,
-      routes: [
+      graphs: [
         {
-          id: ROUTE_ONE,
+          id: GRAPH_ONE,
           title: 'One',
           edges: [
             { from: cardA, to: cardB },
             { from: cardA, to: cardC },
           ],
         },
-        working.routes[1]!,
+        working.graphs[1]!,
       ],
       layouts: working.layouts,
     },
@@ -155,46 +155,46 @@ it('traverses an Edge from the changing working Space without installing a copy'
 });
 
 /**
- * A self-connection is the first gesture authoring ships, and the Route it mints
+ * A self-connection is the first gesture authoring ships, and the Graph it mints
  * is fully cyclic: every Card it holds is arrived at, so no Card is an entry.
- * Presenting one used to do nothing at all — `routeStartCard` answered nothing,
+ * Presenting one used to do nothing at all — `graphStartCard` answered nothing,
  * `present()` returned before any state change, and the enabled control that
  * called it swallowed the click.
  */
-it('presents a fully cyclic Route, which has no entry Card', () => {
+it('presents a fully cyclic Graph, which has no entry Card', () => {
   const card = uuid('00000000-0000-4000-8000-000000000002');
   const loaded = loadSpace(
     {
       version: 2,
       id: uuid('00000000-0000-4000-8000-000000000001'),
       title: 'Loop',
-      routes: [{ id: ROUTE_ONE, title: 'Loop', edges: [{ from: card, to: card }] }],
+      graphs: [{ id: GRAPH_ONE, title: 'Loop', edges: [{ from: card, to: card }] }],
     },
     [cardFile(card)],
   );
   if (!loaded.ok) throw new Error('loop should load');
-  const navigation = createNavigation(() => loaded.space, { kind: 'view', view: 'graph' });
+  const navigation = createNavigation(() => loaded.space, { kind: 'view', view: 'flow' });
 
   navigation.present();
 
-  expect(navigation.getState()).toMatchObject({ mode: 'presenting', walk: [card] });
+  expect(navigation.getState()).toMatchObject({ mode: 'presenting', traversalHistory: [card] });
   expect(navigation.moves()).toEqual([{ cardId: card, title: 'A', selected: true }]);
 });
 
 /*
- * A walk may stand on the same Card twice. Cycles and self-edges are legal
- * authored structure (ADR 0032), so a presenter walking a loop accumulates a
- * walk whose Cards repeat and whose last Card can be its first again. The Card
- * being presented is the walk's *last* element, never the first occurrence of
- * it — a read that answered the Card the walk began on would go on offering the
+ * Traversal history may contain the same Card twice. Cycles and self-Edges are legal
+ * authored structure (ADR 0032), so a presenter traversing a loop accumulates a
+ * history whose Cards repeat and whose last Card can be its first again. The Card
+ * being presented is Traversal history's *last* element, never the first occurrence of
+ * it — a read that answered the first Card in Traversal history would go on offering the
  * moves out of that Card for the rest of the loop, and the two only diverge once
  * a Card repeats.
  *
- * The other two shapes are pinned already and not repeated here: a one-Card walk
- * is read by "opens and closes Cards…" straight after `present()`, and a walk
+ * The other two shapes are pinned already and not repeated here: a one-Card Traversal history
+ * is read by "opens and closes Cards…" straight after `present()`, and Traversal history
  * that has advanced by the fork test below.
  */
-it('reads the last Card of a walk that returns to one it has already stood on', () => {
+it('reads the last Card when Traversal history returns to one it has already visited', () => {
   const cardA = uuid('00000000-0000-4000-8000-000000000002');
   const cardB = uuid('00000000-0000-4000-8000-000000000003');
   const loaded = loadSpace(
@@ -202,9 +202,9 @@ it('reads the last Card of a walk that returns to one it has already stood on', 
       version: 2,
       id: uuid('00000000-0000-4000-8000-000000000001'),
       title: 'Cycle',
-      routes: [
+      graphs: [
         {
-          id: ROUTE_ONE,
+          id: GRAPH_ONE,
           title: 'Cycle',
           edges: [
             { from: cardA, to: cardB },
@@ -216,27 +216,27 @@ it('reads the last Card of a walk that returns to one it has already stood on', 
     [cardFile(cardA), cardFile(cardB)],
   );
   if (!loaded.ok) throw new Error('cycle should load');
-  const navigation = createNavigation(() => loaded.space, { kind: 'view', view: 'graph' });
+  const navigation = createNavigation(() => loaded.space, { kind: 'view', view: 'flow' });
 
   navigation.present();
   navigation.advance();
   navigation.advance();
 
-  // Back where it began: the walk's last Card is its first, and presenting
+  // Back where it began: Traversal history's last Card is its first, and presenting
   // stands on it rather than merely carrying it at the front.
-  expect(walkOf(navigation.getState())).toEqual([cardA, cardB, cardA]);
+  expect(traversalHistoryOf(navigation.getState())).toEqual([cardA, cardB, cardA]);
   expect(navigation.activeCardId()).toBe(cardA);
   expect(navigation.moves()).toEqual([{ cardId: cardB, title: 'B', selected: true }]);
 
   navigation.advance();
 
-  // The case the two answers separate on: the walk repeats a Card and its last
+  // The case the two answers separate on: Traversal history repeats a Card and its last
   // is no longer its first, so reading the start answers A where the presenter
   // is standing on B. The moves are asserted here rather than only above,
   // because above the last Card *is* the first and both readings agree — this
   // is the only place the Edges offered can tell a correct read from a wrong
   // one, and they are what the presenting chrome puts on screen.
-  expect(walkOf(navigation.getState())).toEqual([cardA, cardB, cardA, cardB]);
+  expect(traversalHistoryOf(navigation.getState())).toEqual([cardA, cardB, cardA, cardB]);
   expect(navigation.activeCardId()).toBe(cardB);
   expect(navigation.moves()).toEqual([{ cardId: cardA, title: 'A', selected: true }]);
 
@@ -245,23 +245,23 @@ it('reads the last Card of a walk that returns to one it has already stood on', 
 });
 
 /*
- * A walk belongs to presenting, and leaving presenting has none to clear. This
- * used to be four hand-written `walk: []` resets — one per path back to the
+ * Traversal history belongs to presenting, and leaving presenting has none to clear. This
+ * used to be four hand-written `traversalHistory: []` resets — one per path back to the
  * overview — any of which could have been forgotten without anything noticing
- * until a stale Card was read out of a walk nobody was on.
+ * until a stale Card was read from history after presentation had ended.
  */
-it('leaves no walk behind when presenting ends', () => {
+it('leaves no Traversal history behind when presenting ends', () => {
   const space = fixture();
-  const navigation = createNavigation(() => space, { kind: 'view', view: 'graph' });
+  const navigation = createNavigation(() => space, { kind: 'view', view: 'flow' });
   navigation.present();
   navigation.advance();
 
   navigation.exitPresenting();
 
   expect(navigation.getState()).toEqual({
-    selectedRenderer: { kind: 'view', view: 'graph' },
-    selectedView: 'graph',
-    activeRouteId: ROUTE_ONE,
+    selectedRenderer: { kind: 'view', view: 'flow' },
+    selectedView: 'flow',
+    activeGraphId: GRAPH_ONE,
     mode: 'overview',
     openedCardId: null,
   });
@@ -269,93 +269,94 @@ it('leaves no walk behind when presenting ends', () => {
 });
 
 /*
- * Presenting stands on a Card for as long as it lasts: it begins on the Route's
- * start Card and `retreat` keeps the first, so the walk is non-empty by type
+ * Presenting stands on a Card for as long as it lasts: it begins on the Graph's
+ * start Card and `retreat` keeps the first, so Traversal history is non-empty by type
  * rather than by a check at each read.
  */
 it('stands on a Card for as long as it is presenting', () => {
   const space = fixture();
-  const navigation = createNavigation(() => space, { kind: 'view', view: 'graph' });
+  const navigation = createNavigation(() => space, { kind: 'view', view: 'flow' });
 
   navigation.present();
 
   const state = navigation.getState();
-  if (state.mode !== 'presenting') throw new Error('present() should have started a walk');
-  expectTypeOf(state.walk[0]).toEqualTypeOf<CardId>();
-  expect(state.walk[0]).toBe(uuid('00000000-0000-4000-8000-000000000002'));
+  if (state.mode !== 'presenting')
+    throw new Error('present() should have started Traversal history');
+  expectTypeOf(state.traversalHistory[0]).toEqualTypeOf<CardId>();
+  expect(state.traversalHistory[0]).toBe(uuid('00000000-0000-4000-8000-000000000002'));
 });
 
-it('activating a Route ends the current walk without changing the Space', () => {
+it('activating a Graph ends the current Traversal history without changing the Space', () => {
   const space = fixture();
-  const navigation = createNavigation(() => space, { kind: 'view', view: 'graph' });
+  const navigation = createNavigation(() => space, { kind: 'view', view: 'flow' });
   navigation.present();
 
-  navigation.activateRoute(ROUTE_TWO);
+  navigation.activateGraph(GRAPH_TWO);
 
   expect(navigation.getState()).toMatchObject({
-    activeRouteId: ROUTE_TWO,
+    activeGraphId: GRAPH_TWO,
     mode: 'overview',
   });
   expect(navigation.activeCardId()).toBeNull();
   expect(space.defaultView).toBeUndefined();
 });
 
-it('refuses to activate a Route the current Space does not hold', () => {
+it('refuses to activate a Graph the current Space does not hold', () => {
   const space = fixture();
-  const navigation = createNavigation(() => space, { kind: 'view', view: 'graph' });
+  const navigation = createNavigation(() => space, { kind: 'view', view: 'flow' });
   navigation.present();
   const before = navigation.getState();
 
   // The same invariant `selectRenderer` holds, for the other half of what
-  // Navigation names. Activating is not an edit, so it cannot mint the Route it
-  // is handed; a Route the Space does not hold would strand every later read —
+  // Navigation names. Activating is not an edit, so it cannot mint the Graph it
+  // is handed; a Graph the Space does not hold would strand every later read —
   // `moves()`, `present()` and the emphasis — on a lookup that answers nothing.
-  expect(() => navigation.activateRoute(uuid('00000000-0000-4000-8000-000000000099'))).toThrow(
+  expect(() => navigation.activateGraph(uuid('00000000-0000-4000-8000-000000000099'))).toThrow(
     /does not exist/,
   );
   expect(navigation.getState()).toBe(before);
 });
 
-it('continues the current walk when an Edit converts the renderer to a Layout', () => {
+it('continues the current Traversal history when an Edit converts the renderer to a Layout', () => {
   const space = fixture();
-  const navigation = createNavigation(() => space, { kind: 'view', view: 'graph' });
+  const navigation = createNavigation(() => space, { kind: 'view', view: 'flow' });
   navigation.present();
-  const walk = walkOf(navigation.getState());
+  const traversalHistory = traversalHistoryOf(navigation.getState());
 
   navigation.continueInRenderer({ kind: 'layout', layoutId: LAYOUT });
 
   expect(navigation.getState()).toMatchObject({
     selectedRenderer: { kind: 'layout', layoutId: LAYOUT },
-    activeRouteId: ROUTE_ONE,
+    activeGraphId: GRAPH_ONE,
     mode: 'presenting',
   });
-  expect(walkOf(navigation.getState())).toBe(walk);
+  expect(traversalHistoryOf(navigation.getState())).toBe(traversalHistory);
 });
 
 it('notifies subscribers synchronously until they unsubscribe', () => {
   const space = fixture();
-  const navigation = createNavigation(() => space, { kind: 'view', view: 'graph' });
-  const seen: (RouteId | null)[] = [];
+  const navigation = createNavigation(() => space, { kind: 'view', view: 'flow' });
+  const seen: (GraphId | null)[] = [];
   // The seam `useSyncExternalStore` drives. It must notify during the call that
   // changed the state — React reads `getState` straight after and would
   // otherwise render the previous Navigation state.
-  const unsubscribe = navigation.subscribe(() => seen.push(navigation.getState().activeRouteId));
+  const unsubscribe = navigation.subscribe(() => seen.push(navigation.getState().activeGraphId));
 
-  navigation.activateRoute(ROUTE_TWO);
-  expect(seen).toEqual([ROUTE_TWO]);
+  navigation.activateGraph(GRAPH_TWO);
+  expect(seen).toEqual([GRAPH_TWO]);
 
-  navigation.activateRoute(ROUTE_ONE);
-  expect(seen).toEqual([ROUTE_TWO, ROUTE_ONE]);
+  navigation.activateGraph(GRAPH_ONE);
+  expect(seen).toEqual([GRAPH_TWO, GRAPH_ONE]);
 
   unsubscribe();
-  navigation.activateRoute(ROUTE_TWO);
-  expect(seen).toEqual([ROUTE_TWO, ROUTE_ONE]);
+  navigation.activateGraph(GRAPH_TWO);
+  expect(seen).toEqual([GRAPH_TWO, GRAPH_ONE]);
 });
 
 it('contains a failing subscriber and still notifies the ones behind it', () => {
   const space = fixture();
   const reported: unknown[] = [];
-  const navigation = createNavigation(() => space, { kind: 'view', view: 'graph' }, space, {
+  const navigation = createNavigation(() => space, { kind: 'view', view: 'flow' }, space, {
     reportObserverError: (error) => reported.push(error),
   });
   const observerError = new Error('observer failed');
@@ -364,7 +365,7 @@ it('contains a failing subscriber and still notifies the ones behind it', () => 
     throw observerError;
   });
   navigation.subscribe(later);
-  expect(() => navigation.activateRoute(ROUTE_TWO)).not.toThrow();
+  expect(() => navigation.activateGraph(GRAPH_TWO)).not.toThrow();
   expect(later).toHaveBeenCalledOnce();
   // Identity, not shape. `toEqual` compares an Error by name and message, so a
   // reporter handed any distinct `new Error('observer failed')` satisfied it —
@@ -377,7 +378,7 @@ it('contains a failing subscriber and still notifies the ones behind it', () => 
 it('refuses a renderer the current Space does not hold, leaving navigation untouched', () => {
   const space = fixture();
   const missing = uuid('00000000-0000-4000-8000-000000000099');
-  const navigation = createNavigation(() => space, { kind: 'view', view: 'graph' });
+  const navigation = createNavigation(() => space, { kind: 'view', view: 'flow' });
   navigation.present();
   const before = navigation.getState();
 
@@ -398,7 +399,7 @@ it('refuses a renderer the current Space does not hold, leaving navigation untou
 it('opens and closes Cards, and closes an opened Card when presenting starts', () => {
   const space = fixture();
   const card = uuid('00000000-0000-4000-8000-000000000003');
-  const navigation = createNavigation(() => space, { kind: 'view', view: 'graph' });
+  const navigation = createNavigation(() => space, { kind: 'view', view: 'flow' });
 
   navigation.openCard(card);
   expect(navigation.getState().openedCardId).toBe(card);
@@ -434,8 +435,8 @@ it('opens a replacement Space as new navigation, retaining no reading state', ()
 
   expect(navigation.getState()).toEqual({
     selectedRenderer: { kind: 'layout', layoutId: LAYOUT },
-    selectedView: 'graph',
-    activeRouteId: ROUTE_TWO,
+    selectedView: 'flow',
+    activeGraphId: GRAPH_TWO,
     mode: 'overview',
     openedCardId: null,
   });
@@ -450,9 +451,9 @@ it('reads the working Space once per moves() call, whatever the branching', () =
       version: 2,
       id: uuid('00000000-0000-4000-8000-000000000001'),
       title: 'Fork',
-      routes: [
+      graphs: [
         {
-          id: ROUTE_ONE,
+          id: GRAPH_ONE,
           title: 'Fork',
           edges: [
             { from: cardA, to: cardB },
@@ -473,7 +474,7 @@ it('reads the working Space once per moves() call, whatever the branching', () =
       reads += 1;
       return loaded.space;
     },
-    { kind: 'view', view: 'graph' },
+    { kind: 'view', view: 'flow' },
     loaded.space,
   );
   navigation.present();
@@ -498,10 +499,10 @@ it('reads the working Space once per moves() call, whatever the branching', () =
  * renderer, and other members read it too, so what is pinned is that this one
  * call adds nothing rather than that the total is zero.
  */
-it('answers no moves outside a walk without reading the working Space', () => {
+it('answers no moves outside Traversal history without reading the working Space', () => {
   const space = fixture();
   const currentSpace = vi.fn(() => space);
-  const navigation = createNavigation(currentSpace, { kind: 'view', view: 'graph' });
+  const navigation = createNavigation(currentSpace, { kind: 'view', view: 'flow' });
 
   const before = currentSpace.mock.calls.length;
   const moves = navigation.moves();
@@ -510,7 +511,7 @@ it('answers no moves outside a walk without reading the working Space', () => {
   expect(currentSpace).toHaveBeenCalledTimes(before);
 });
 
-it('walks a fork, retreats along the walk, and reselects the Edge taken', () => {
+it('traverses a fork, retreats along Traversal history, and reselects the Edge taken', () => {
   const cardA = uuid('00000000-0000-4000-8000-000000000002');
   const cardB = uuid('00000000-0000-4000-8000-000000000003');
   const cardC = uuid('00000000-0000-4000-8000-000000000004');
@@ -519,9 +520,9 @@ it('walks a fork, retreats along the walk, and reselects the Edge taken', () => 
       version: 2,
       id: uuid('00000000-0000-4000-8000-000000000001'),
       title: 'Fork',
-      routes: [
+      graphs: [
         {
-          id: ROUTE_ONE,
+          id: GRAPH_ONE,
           title: 'Fork',
           edges: [
             { from: cardA, to: cardB },
@@ -533,7 +534,7 @@ it('walks a fork, retreats along the walk, and reselects the Edge taken', () => 
     [cardFile(cardA), cardFile(cardB), cardFile(cardC)],
   );
   if (!loaded.ok) throw new Error('fork should load');
-  const navigation = createNavigation(() => loaded.space, { kind: 'view', view: 'graph' });
+  const navigation = createNavigation(() => loaded.space, { kind: 'view', view: 'flow' });
   navigation.present();
 
   navigation.selectBranch(-1);

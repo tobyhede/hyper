@@ -12,7 +12,7 @@ const validSpaceFile = {
   version: 2,
   id: '00000000-0000-4000-8000-000000000001',
   title: 'Test deck',
-  routes: [
+  graphs: [
     {
       id: '00000000-0000-4000-8000-000000000004',
       title: 'Main',
@@ -43,7 +43,7 @@ describe('space file schema', () => {
   it('parses a valid space file', () => {
     const file = spaceFileSchema.parse(validSpaceFile);
     expect(file.title).toBe('Test deck');
-    expect(file.routes).toHaveLength(1);
+    expect(file.graphs).toHaveLength(1);
   });
 
   it('holds no cards — a card exists because its file does (ADR 0020)', () => {
@@ -63,14 +63,14 @@ describe('space file schema', () => {
       version: 1,
       id: 'space',
       title: 'Old space',
-      routes: [{ id: 'main', title: 'Main', edges: [{ from: 'a', to: 'b' }] }],
+      graphs: [{ id: 'main', title: 'Main', edges: [{ from: 'a', to: 'b' }] }],
       layouts: [
         {
           id: '00000000-0000-4000-8000-000000000010',
           title: 'Working',
           positions: { '00000000-0000-4000-8000-000000000002': { x: 0, y: 0 } },
-          routes: ['00000000-0000-4000-8000-000000000004'],
-          activeRoute: '00000000-0000-4000-8000-000000000004',
+          graphs: ['00000000-0000-4000-8000-000000000004'],
+          activeGraph: '00000000-0000-4000-8000-000000000004',
         },
       ],
       defaultView: '00000000-0000-4000-8000-000000000010',
@@ -78,8 +78,8 @@ describe('space file schema', () => {
     expect(result.success).toBe(false);
   });
 
-  it('drops a top-level edges array, which routes replaced', () => {
-    // ADR 0007 deleted the structural layer beside routes; a route's own `edges`
+  it('drops a top-level edges array, which graphs replaced', () => {
+    // ADR 0007 deleted the structural layer beside graphs; a graph's own `edges`
     // (ADR 0032) are a different thing that happens to share the word. An older
     // file carrying the old array still parses, and the array is ignored.
     const result = spaceFileSchema.safeParse({
@@ -96,32 +96,32 @@ describe('space file schema', () => {
     expect(result.success && 'edges' in result.data).toBe(false);
   });
 
-  it('accepts a space file with no routes — a new space has no structure yet', () => {
+  it('accepts a space file with no graphs — a new space has no structure yet', () => {
     // ADR 0015. It renders; it cannot be presented. The `min(1)` this replaces
-    // was inherited from `paths.min(1)` in the Route rename, never decided.
-    const result = spaceFileSchema.safeParse({ ...validSpaceFile, routes: [] });
+    // was inherited from `paths.min(1)` in the Graph rename, never decided.
+    const result = spaceFileSchema.safeParse({ ...validSpaceFile, graphs: [] });
     expect(result.success).toBe(true);
   });
 
-  it('still requires the routes key itself, so a dropped array is a shape error', () => {
-    const { routes: _routes, ...withoutRoutes } = validSpaceFile;
-    expect(spaceFileSchema.safeParse(withoutRoutes).success).toBe(false);
+  it('still requires the graphs key itself, so a dropped array is a shape error', () => {
+    const { graphs: _graphs, ...withoutGraphs } = validSpaceFile;
+    expect(spaceFileSchema.safeParse(withoutGraphs).success).toBe(false);
   });
 
-  it('rejects a route with no edges — a Route is its Edges (ADR 0032)', () => {
+  it('rejects a graph with no edges — a Graph is its Edges (ADR 0032)', () => {
     const result = spaceFileSchema.safeParse({
       ...validSpaceFile,
-      routes: [{ id: '00000000-0000-4000-8000-000000000004', title: 'Main', edges: [] }],
+      graphs: [{ id: '00000000-0000-4000-8000-000000000004', title: 'Main', edges: [] }],
     });
     expect(result.success).toBe(false);
   });
 
-  it('accepts a route that forks and merges — shape puts no limit on either', () => {
-    // Edge-set uniqueness and resolved endpoints need the whole Route/Space in
+  it('accepts a graph that forks and merges — shape puts no limit on either', () => {
+    // Edge-set uniqueness and resolved endpoints need the whole Graph/Space in
     // view, so it lives in `@project/graph`; nothing here should reject a graph.
     const result = spaceFileSchema.safeParse({
       ...validSpaceFile,
-      routes: [
+      graphs: [
         {
           id: '00000000-0000-4000-8000-000000000004',
           title: 'Main',
@@ -157,7 +157,7 @@ describe('space file schema', () => {
     ]) {
       const result = spaceFileSchema.safeParse({
         ...validSpaceFile,
-        routes: [{ id: '00000000-0000-4000-8000-000000000004', title: 'Main', edges: [edge] }],
+        graphs: [{ id: '00000000-0000-4000-8000-000000000004', title: 'Main', edges: [edge] }],
       });
       expect(result.success).toBe(false);
     }
@@ -320,61 +320,61 @@ describe('space file layouts', () => {
     expect(result.success).toBe(false);
   });
 
-  it('parses the routes a layout shows and the one it opens active', () => {
+  it('parses the graphs a layout shows and the one it opens active', () => {
     const file = spaceFileSchema.parse({
       ...validSpaceFile,
       layouts: [
         {
           ...working,
-          routes: ['00000000-0000-4000-8000-000000000011', '00000000-0000-4000-8000-000000000012'],
-          activeRoute: '00000000-0000-4000-8000-000000000012',
+          graphs: ['00000000-0000-4000-8000-000000000011', '00000000-0000-4000-8000-000000000012'],
+          activeGraph: '00000000-0000-4000-8000-000000000012',
         },
       ],
     });
-    expect(file.layouts?.[0]?.routes).toEqual([
+    expect(file.layouts?.[0]?.graphs).toEqual([
       '00000000-0000-4000-8000-000000000011',
       '00000000-0000-4000-8000-000000000012',
     ]);
-    expect(file.layouts?.[0]?.activeRoute).toBe('00000000-0000-4000-8000-000000000012');
+    expect(file.layouts?.[0]?.activeGraph).toBe('00000000-0000-4000-8000-000000000012');
   });
 
-  it('leaves both absent — every route shown, the first of them active', () => {
+  it('leaves both absent — every graph shown, the first of them active', () => {
     // Absent is the meaningful case, not a missing field to be filled in: it is
     // how a layout says "all of them" and defers the active one (ADR 0026).
     const file = spaceFileSchema.parse({ ...validSpaceFile, layouts: [working] });
-    expect(file.layouts?.[0]?.routes).toBeUndefined();
-    expect(file.layouts?.[0]?.activeRoute).toBeUndefined();
+    expect(file.layouts?.[0]?.graphs).toBeUndefined();
+    expect(file.layouts?.[0]?.activeGraph).toBeUndefined();
   });
 
   it('takes either without the other — the two are independent', () => {
     const filtered = spaceFileSchema.parse({
       ...validSpaceFile,
-      layouts: [{ ...working, routes: ['00000000-0000-4000-8000-000000000011'] }],
+      layouts: [{ ...working, graphs: ['00000000-0000-4000-8000-000000000011'] }],
     });
-    expect(filtered.layouts?.[0]?.activeRoute).toBeUndefined();
+    expect(filtered.layouts?.[0]?.activeGraph).toBeUndefined();
 
     const named = spaceFileSchema.parse({
       ...validSpaceFile,
-      layouts: [{ ...working, activeRoute: '00000000-0000-4000-8000-000000000011' }],
+      layouts: [{ ...working, activeGraph: '00000000-0000-4000-8000-000000000011' }],
     });
-    expect(named.layouts?.[0]?.routes).toBeUndefined();
+    expect(named.layouts?.[0]?.graphs).toBeUndefined();
   });
 
-  it('accepts an empty routes list — a layout that shows none', () => {
+  it('accepts an empty graphs list — a layout that shows none', () => {
     // Not the same as absent, which means all. Shape allows it; whether it is
     // sensible is the author's business.
     const file = spaceFileSchema.parse({
       ...validSpaceFile,
-      layouts: [{ ...working, routes: [] }],
+      layouts: [{ ...working, graphs: [] }],
     });
-    expect(file.layouts?.[0]?.routes).toEqual([]);
+    expect(file.layouts?.[0]?.graphs).toEqual([]);
   });
 
-  it('rejects route references that are not ids', () => {
+  it('rejects graph references that are not ids', () => {
     for (const layout of [
-      { ...working, routes: [''] },
-      { ...working, routes: '00000000-0000-4000-8000-000000000011' },
-      { ...working, activeRoute: '' },
+      { ...working, graphs: [''] },
+      { ...working, graphs: '00000000-0000-4000-8000-000000000011' },
+      { ...working, activeGraph: '' },
     ]) {
       expect(spaceFileSchema.safeParse({ ...validSpaceFile, layouts: [layout] }).success).toBe(
         false,
@@ -382,20 +382,20 @@ describe('space file layouts', () => {
     }
   });
 
-  it('accepts an activeRoute no route has — resolution is a reference check', () => {
-    // Shape only, as everywhere here. That it names a real route, and one this
+  it('accepts an activeGraph no graph has — resolution is a reference check', () => {
+    // Shape only, as everywhere here. That it names a real graph, and one this
     // layout shows, needs the whole space in view (@project/graph).
     const file = spaceFileSchema.parse({
       ...validSpaceFile,
       layouts: [
         {
           ...working,
-          routes: ['00000000-0000-4000-8000-000000000011'],
-          activeRoute: '00000000-0000-4000-8000-000000000099',
+          graphs: ['00000000-0000-4000-8000-000000000011'],
+          activeGraph: '00000000-0000-4000-8000-000000000099',
         },
       ],
     });
-    expect(file.layouts?.[0]?.activeRoute).toBe('00000000-0000-4000-8000-000000000099');
+    expect(file.layouts?.[0]?.activeGraph).toBe('00000000-0000-4000-8000-000000000099');
   });
 
   it('accepts defaultView as a plain name, resolved elsewhere', () => {
@@ -412,11 +412,11 @@ describe('space file layouts', () => {
 
 describe('built-in view ids', () => {
   it('names the automatic views a space can open in without declaring one', () => {
-    expect([...BUILT_IN_VIEW_IDS]).toEqual(['graph', 'grid']);
+    expect([...BUILT_IN_VIEW_IDS]).toEqual(['flow', 'grid']);
   });
 
   it('recognises exactly those names', () => {
-    expect(isBuiltInViewId('graph')).toBe(true);
+    expect(isBuiltInViewId('flow')).toBe(true);
     expect(isBuiltInViewId('grid')).toBe(true);
     expect(isBuiltInViewId('00000000-0000-4000-8000-000000000010')).toBe(false);
     expect(isBuiltInViewId('')).toBe(false);

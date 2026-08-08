@@ -10,7 +10,7 @@ export interface SelectorTriggerProps {
   testId?: string;
 }
 
-/** Shared toolbar control shape for selecting a renderer or active route. */
+/** Shared toolbar control shape for selecting a renderer or active graph. */
 export function SelectorTrigger({
   accessibleName,
   glyph,

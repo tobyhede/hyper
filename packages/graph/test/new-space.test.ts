@@ -14,7 +14,7 @@ describe('newSpace', () => {
     expect(result.ok).toBe(true);
     if (!result.ok) throw new Error(result.errors.map((e) => e.message).join('\n'));
     expect(result.space.cards).toHaveLength(1);
-    expect(result.space.routes).toEqual([]);
+    expect(result.space.graphs).toEqual([]);
   });
 
   it('begins neutral Card numbering at Card 1 with an empty body (ADR 0018, ADR 0020)', () => {

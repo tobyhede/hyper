@@ -2,7 +2,7 @@ import {
   isBuiltInViewId,
   type BuiltInViewId,
   type Layout,
-  type RouteId,
+  type GraphId,
   type UUID,
 } from '@project/core';
 import {
@@ -18,14 +18,14 @@ import { elkStrategy } from '@project/react-flow-adapter';
 /**
  * Which view a space opens in, and what that means for arranging and editing.
  *
- * The chain is `space.defaultView` → viewer default → the route-driven graph.
+ * The chain is `space.defaultView` → viewer default → the graph-driven flow.
  * The middle link has no surface yet: a viewer-level preference is named in the
  * spec and deliberately not built, so today the chain is two links long.
  *
- * A view also answers which routes it shows and which of them opens active
+ * A view also answers which graphs it shows and which of them opens active
  * (ADR 0026). Both are read off the resolved Layout, and both have a fallback,
  * so the answer exists for every space — including one with no Layout and one
- * with no routes at all.
+ * with no graphs at all.
  *
  * This lives in `app` rather than `graph` because resolving a view means
  * choosing a strategy, and `elkStrategy` lives in the adapter — `graph` may not
@@ -33,10 +33,10 @@ import { elkStrategy } from '@project/react-flow-adapter';
  */
 
 /** Where a space opens when it names no view of its own. */
-export const DEFAULT_VIEW_ID: BuiltInViewId = 'graph';
+export const DEFAULT_VIEW_ID: BuiltInViewId = 'flow';
 
 const BUILT_IN_STRATEGIES: Record<BuiltInViewId, () => LayoutStrategy> = {
-  graph: elkStrategy,
+  flow: elkStrategy,
   grid: gridStrategy,
 };
 
@@ -54,18 +54,18 @@ export interface ResolvedView {
    */
   layout: Layout | null;
   /**
-   * The routes this view draws — a Layout's filter, or every route (ADR 0026).
+   * The graphs this view draws — a Layout's filter, or every graph (ADR 0026).
    * Authored view scope, decided once by whoever wrote the Layout, and never
-   * touched by activating a route. Which routes a view shows is the View's call
+   * touched by activating a graph. Which graphs a view shows is the View's call
    * (ADR 0005), and this is the View making it.
    */
-  visibleRouteIds: readonly RouteId[];
+  visibleGraphIds: readonly GraphId[];
   /**
-   * Which visible route opens active, or `null` in a space with no routes
-   * (ADR 0015). The fallback to the first visible route lives here rather than
+   * Which visible graph opens active, or `null` in a space with no graphs
+   * (ADR 0015). The fallback to the first visible graph lives here rather than
    * in the store, so there is one place that answers it (ADR 0026).
    */
-  activeRouteId: RouteId | null;
+  activeGraphId: GraphId | null;
 }
 
 /** The one renderer currently navigating a Space (ADR 0031). */
@@ -74,23 +74,23 @@ export type RendererSelection =
   | { readonly kind: 'layout'; readonly layoutId: UUID };
 
 /**
- * Which routes a Layout shows and which of them opens active.
+ * Which graphs a Layout shows and which of them opens active.
  *
  * A read, never a write: an author's space needs neither field, and the answers
  * are computed rather than filled in. What the app *saves* names the active
- * route outright, which is a different rule and lives in `persist.ts` (ADR 0028).
+ * graph outright, which is a different rule and lives in `persist.ts` (ADR 0028).
  */
-function resolveRoutes(
+function resolveGraphs(
   space: Space,
   layout: Layout | null,
-): Pick<ResolvedView, 'visibleRouteIds' | 'activeRouteId'> {
-  const all = space.routes.map((route) => route.id);
-  const visibleRouteIds = layout?.routes ?? all;
+): Pick<ResolvedView, 'visibleGraphIds' | 'activeGraphId'> {
+  const all = space.graphs.map((graph) => graph.id);
+  const visibleGraphIds = layout?.graphs ?? all;
   return {
-    visibleRouteIds,
-    // `loadSpace` has already checked that a named `activeRoute` is one of these,
+    visibleGraphIds,
+    // `loadSpace` has already checked that a named `activeGraph` is one of these,
     // so the `??` is the absent case and not a repair of a bad reference.
-    activeRouteId: layout?.activeRoute ?? visibleRouteIds[0] ?? null,
+    activeGraphId: layout?.activeGraph ?? visibleGraphIds[0] ?? null,
   };
 }
 
@@ -115,17 +115,17 @@ export function resolveView(
       id: layout.id,
       strategy: positionedStrategy(Placement.fromLayout(layout)),
       layout,
-      ...resolveRoutes(space, layout),
+      ...resolveGraphs(space, layout),
     };
   }
 
   const strategy = BUILT_IN_STRATEGIES[selection.view]();
-  // A built-in view carries no Layout and so filters nothing: every route shows,
+  // A built-in view carries no Layout and so filters nothing: every graph shows,
   // and the first is active.
   return {
     id: selection.view,
     strategy,
     layout: null,
-    ...resolveRoutes(space, null),
+    ...resolveGraphs(space, null),
   };
 }

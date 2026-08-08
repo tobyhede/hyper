@@ -13,7 +13,7 @@ import { mountWorkspace } from '../src/Workspace';
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 const LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
-const ROUTE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
+const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
 const MISSING_CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
 
 const snapshot = (title: string, cardTitle: string, x: number, y: number): SpaceSnapshot =>
@@ -22,7 +22,7 @@ const snapshot = (title: string, cardTitle: string, x: number, y: number): Space
     document: {
       version: 2,
       title,
-      routes: [],
+      graphs: [],
       layouts: [
         {
           id: LAYOUT_ID,
@@ -121,7 +121,7 @@ describe('Workspace conflict recovery', () => {
       document: {
         ...local.document,
         title: 'Remote workspace',
-        routes: [{ id: ROUTE_ID, title: 'Route', edges: [{ from: CARD_ID, to: MISSING_CARD_ID }] }],
+        graphs: [{ id: GRAPH_ID, title: 'Graph', edges: [{ from: CARD_ID, to: MISSING_CARD_ID }] }],
       },
     };
     const control = new MemorySpaceBackendTestControl();
@@ -187,7 +187,7 @@ describe('Workspace conflict recovery', () => {
       document: {
         ...local.document,
         title: 'Broken remote',
-        routes: [{ id: ROUTE_ID, title: 'Route', edges: [{ from: CARD_ID, to: MISSING_CARD_ID }] }],
+        graphs: [{ id: GRAPH_ID, title: 'Graph', edges: [{ from: CARD_ID, to: MISSING_CARD_ID }] }],
       },
     };
     const loadable = snapshot('Remote workspace', 'Remote card', 900, 700);
@@ -261,7 +261,7 @@ describe('Workspace failure reporting', () => {
       ...valid,
       document: {
         ...valid.document,
-        routes: [{ id: ROUTE_ID, title: 'Route', edges: [{ from: CARD_ID, to: MISSING_CARD_ID }] }],
+        graphs: [{ id: GRAPH_ID, title: 'Graph', edges: [{ from: CARD_ID, to: MISSING_CARD_ID }] }],
       },
     };
     const session = openSpaceSession(new MemorySpaceBackend(), {

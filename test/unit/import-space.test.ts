@@ -19,11 +19,11 @@ import type {
 const SPACE_ID = uuidSchema.parse('11111111-1111-4111-8111-111111111111');
 const OTHER_SPACE_ID = uuidSchema.parse('22222222-2222-4222-8222-222222222222');
 const CARD_ID = uuidSchema.parse('33333333-3333-4333-8333-333333333333');
-const ROUTE_ID = uuidSchema.parse('44444444-4444-4444-8444-444444444444');
+const GRAPH_ID = uuidSchema.parse('44444444-4444-4444-8444-444444444444');
 
 const storedSnapshot: SpaceSnapshot = {
   id: SPACE_ID,
-  document: { version: 2, title: 'Stored talk', routes: [] },
+  document: { version: 2, title: 'Stored talk', graphs: [] },
   cards: [
     {
       id: CARD_ID,
@@ -41,7 +41,7 @@ const storedSpace: LoadedSpace = {
 const otherStoredSpace: LoadedSpace = {
   snapshot: {
     id: OTHER_SPACE_ID,
-    document: { version: 2, title: 'Other stored talk', routes: [] },
+    document: { version: 2, title: 'Other stored talk', graphs: [] },
     cards: [],
   },
   revision: 0n,
@@ -96,7 +96,7 @@ const writeValidSpace = async (): Promise<string> => {
   await mkdir(join(directory, 'cards'));
   await writeFile(
     join(directory, 'space.json'),
-    JSON.stringify({ version: 2, id: SPACE_ID, title: 'Imported talk', routes: [] }),
+    JSON.stringify({ version: 2, id: SPACE_ID, title: 'Imported talk', graphs: [] }),
   );
   await writeFile(join(directory, 'cards', 'opening.md'), '---\ntitle: Opening\n---\nHello.\n');
   return directory;
@@ -140,7 +140,7 @@ describe('importSingleSpace', () => {
       [
         {
           id: SPACE_ID,
-          document: { version: 2, title: 'Imported talk', routes: [] },
+          document: { version: 2, title: 'Imported talk', graphs: [] },
           cards: [
             {
               document: { title: 'Opening', kind: 'markdown', body: 'Hello.\n' },
@@ -156,10 +156,10 @@ describe('importSingleSpace', () => {
       result: {
         kind: 'rejected',
         code: 'duplicate-identity',
-        message: `Duplicate route ${ROUTE_ID}`,
+        message: `Duplicate graph ${GRAPH_ID}`,
       } satisfies RepositoryImportResult,
       expectedKind: 'identity',
-      expectedMessage: `Duplicate route ${ROUTE_ID}`,
+      expectedMessage: `Duplicate graph ${GRAPH_ID}`,
     },
     {
       result: {
@@ -174,10 +174,10 @@ describe('importSingleSpace', () => {
       result: {
         kind: 'rejected',
         code: 'invalid-snapshot',
-        message: `Route ${ROUTE_ID} has an unresolved card`,
+        message: `Graph ${GRAPH_ID} has an unresolved card`,
       } satisfies RepositoryImportResult,
       expectedKind: 'domain-validation',
-      expectedMessage: `Route ${ROUTE_ID} has an unresolved card`,
+      expectedMessage: `Graph ${GRAPH_ID} has an unresolved card`,
     },
   ] as const)(
     'maps a repository result to $expectedKind without changing its diagnostic',
@@ -216,7 +216,7 @@ describe('importSpaceBatch', () => {
     await mkdir(invalid);
     await writeFile(
       join(valid, 'space.json'),
-      JSON.stringify({ version: 2, id: SPACE_ID, title: 'Valid', routes: [] }),
+      JSON.stringify({ version: 2, id: SPACE_ID, title: 'Valid', graphs: [] }),
     );
     await writeFile(join(invalid, 'space.json'), '{ invalid JSON');
     const repository = new RecordingRepository({ kind: 'imported', spaces: [storedSpace] });
@@ -235,11 +235,11 @@ describe('importSpaceBatch', () => {
     await mkdir(second);
     await writeFile(
       join(first, 'space.json'),
-      JSON.stringify({ version: 2, id: SPACE_ID, title: 'First', routes: [] }),
+      JSON.stringify({ version: 2, id: SPACE_ID, title: 'First', graphs: [] }),
     );
     await writeFile(
       join(second, 'space.json'),
-      JSON.stringify({ version: 2, id: OTHER_SPACE_ID, title: 'Second', routes: [] }),
+      JSON.stringify({ version: 2, id: OTHER_SPACE_ID, title: 'Second', graphs: [] }),
     );
     const repository = new RecordingRepository({
       kind: 'imported',
@@ -262,19 +262,19 @@ describe('importSpaceBatch', () => {
       result: {
         kind: 'rejected',
         code: 'duplicate-identity',
-        message: `Duplicate route ${ROUTE_ID}`,
+        message: `Duplicate graph ${GRAPH_ID}`,
       } satisfies RepositoryImportResult,
       expectedKind: 'identity',
-      expectedMessage: `Duplicate route ${ROUTE_ID}`,
+      expectedMessage: `Duplicate graph ${GRAPH_ID}`,
     },
     {
       result: {
         kind: 'rejected',
         code: 'invalid-snapshot',
-        message: `Route ${ROUTE_ID} has an unresolved card`,
+        message: `Graph ${GRAPH_ID} has an unresolved card`,
       } satisfies RepositoryImportResult,
       expectedKind: 'domain-validation',
-      expectedMessage: `Route ${ROUTE_ID} has an unresolved card`,
+      expectedMessage: `Graph ${GRAPH_ID} has an unresolved card`,
     },
   ] as const)(
     'maps a repository result to $expectedKind without changing its diagnostic',

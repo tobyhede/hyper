@@ -1,5 +1,5 @@
 import { BaseEdge, getBezierPath, type Edge, type EdgeProps } from '@xyflow/react';
-import type { LayoutPosition, RouteId } from '@project/core';
+import type { LayoutPosition, GraphId } from '@project/core';
 
 /**
  * React Flow custom edge that draws the polyline ELK routed, not a bezier.
@@ -7,7 +7,7 @@ import type { LayoutPosition, RouteId } from '@project/core';
  * ELK computes where each edge runs — around the cards, as a channel — and the
  * app used to throw that away and let React Flow draw its own curve between the
  * two handles. A forward edge looks fine either way; a back-edge (target left of
- * source, e.g. two routes disagreeing on the order of cards they share) does not:
+ * source, e.g. two graphs disagreeing on the order of cards they share) does not:
  * the bezier leaves
  * rightward and hooks back on itself, reading as a broken stub. Drawing ELK's
  * routed points instead makes it a clean channel. See
@@ -19,7 +19,7 @@ import type { LayoutPosition, RouteId } from '@project/core';
  * we fall back to a bezier between the handles React Flow already knows.
  */
 export type RoutedEdgeData = {
-  routeId: RouteId;
+  graphId: GraphId;
   /** ELK's routed path, start → bends → end. Absent until a routing layout runs. */
   points?: LayoutPosition[];
 };

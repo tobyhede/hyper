@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { uuidSchema, type RouteId, type SpaceSnapshot } from '@project/core';
+import { uuidSchema, type GraphId, type SpaceSnapshot } from '@project/core';
 import { loadSpaceSnapshot, Placement } from '@project/graph';
 import {
   MemorySpaceBackend,
@@ -17,10 +17,10 @@ const CARD_A = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 const CARD_B = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
 /** A third Card that owns its content, so an Alias may legally target it. */
 const CARD_C = uuidSchema.parse('00000000-0000-4000-8000-000000000007');
-const ROUTE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
-const STORED_ROUTE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000006');
+const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
+const STORED_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000006');
 const LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000021');
-const MINTED_ROUTE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000008');
+const MINTED_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000008');
 const CREATED_CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
 
 /** A Card identity no fixture Space holds, so any Layout naming it fails intake. */
@@ -31,7 +31,7 @@ const automaticSnapshot: SpaceSnapshot = {
   document: {
     version: 2,
     title: 'Space',
-    routes: [{ id: ROUTE_ID, title: 'Main', edges: [{ from: CARD_A, to: CARD_B }] }],
+    graphs: [{ id: GRAPH_ID, title: 'Main', edges: [{ from: CARD_A, to: CARD_B }] }],
   },
   cards: [
     { id: CARD_A, document: { title: 'A', kind: 'markdown', body: 'A' } },
@@ -93,7 +93,7 @@ function attachAuthoring(
 
 function openAuthoring(
   snapshot: SpaceSnapshot = automaticSnapshot,
-  renderer: RendererSelection = { kind: 'view', view: 'graph' },
+  renderer: RendererSelection = { kind: 'view', view: 'flow' },
   reportObserverError?: (error: unknown) => void,
 ) {
   const loaded = { snapshot, revision: 0n, exportedRevision: null };
@@ -226,7 +226,7 @@ describe('Space Authoring', () => {
     const { authoring, session } = attachAuthoring(
       new MemorySpaceBackend([loaded], control),
       loaded,
-      { kind: 'view', view: 'graph' },
+      { kind: 'view', view: 'flow' },
     );
     authoring.installPlacement(
       Placement.fromEntries([
@@ -271,11 +271,11 @@ describe('Space Authoring', () => {
       kind: 'markdown',
       body: '# Edited',
     });
-    expect(session.getState().working.document.routes).toEqual(positionedSnapshot.document.routes);
+    expect(session.getState().working.document.graphs).toEqual(positionedSnapshot.document.graphs);
     expect(session.getState().working.document.layouts).toEqual([
       {
         ...positionedSnapshot.document.layouts![0]!,
-        activeRoute: ROUTE_ID,
+        activeGraph: GRAPH_ID,
       },
     ]);
   });
@@ -395,7 +395,7 @@ describe('Space Authoring', () => {
           [CARD_A]: { x: 10, y: 20 },
           [CARD_B]: { x: 300, y: 40 },
         },
-        activeRoute: ROUTE_ID,
+        activeGraph: GRAPH_ID,
       },
     ]);
     expect(session.getState().working.document.defaultView).toBe(LAYOUT_ID);
@@ -418,7 +418,7 @@ describe('Space Authoring', () => {
     expect(authoring.complete({ kind: 'connected-cards', from: CARD_B, to: CARD_A })).toEqual({
       kind: 'completed',
     });
-    expect(session.getState().working.document.routes[0]?.edges).toEqual([
+    expect(session.getState().working.document.graphs[0]?.edges).toEqual([
       { from: CARD_A, to: CARD_B },
       { from: CARD_B, to: CARD_A },
     ]);
@@ -429,65 +429,65 @@ describe('Space Authoring', () => {
     });
   });
 
-  it('mints and activates Route 1 only when the first connection completes', () => {
+  it('mints and activates Graph 1 only when the first connection completes', () => {
     vi.spyOn(crypto, 'randomUUID').mockReturnValue(
-      MINTED_ROUTE_ID as ReturnType<typeof crypto.randomUUID>,
+      MINTED_GRAPH_ID as ReturnType<typeof crypto.randomUUID>,
     );
-    const routeLess: SpaceSnapshot = {
+    const graphLess: SpaceSnapshot = {
       id: SPACE_ID,
       document: {
         version: 2,
         title: 'New space',
-        routes: [],
+        graphs: [],
         layouts: [
           {
             id: LAYOUT_ID,
             title: 'Layout 1',
             kind: 'positioned',
             positions: { [CARD_A]: { x: 10, y: 20 } },
-            routes: [],
+            graphs: [],
           },
         ],
         defaultView: LAYOUT_ID,
       },
       cards: [{ id: CARD_A, document: { title: 'Card 1', kind: 'markdown', body: '' } }],
     };
-    const { authoring, session, navigation } = openAuthoring(routeLess, {
+    const { authoring, session, navigation } = openAuthoring(graphLess, {
       kind: 'layout',
       layoutId: LAYOUT_ID,
     });
     authoring.installPlacement(Placement.fromEntries([[CARD_A, { x: 10, y: 20 }]]));
 
-    expect(session.getState().working.document.routes).toEqual([]);
+    expect(session.getState().working.document.graphs).toEqual([]);
     expect(authoring.complete({ kind: 'connected-cards', from: CARD_A, to: CARD_A })).toEqual({
       kind: 'completed',
     });
 
-    expect(session.getState().working.document.routes).toEqual([
+    expect(session.getState().working.document.graphs).toEqual([
       {
-        id: MINTED_ROUTE_ID,
-        title: 'Route 1',
+        id: MINTED_GRAPH_ID,
+        title: 'Graph 1',
         edges: [{ from: CARD_A, to: CARD_A }],
       },
     ]);
     expect(session.getState().working.document.layouts?.[0]).toMatchObject({
-      routes: [MINTED_ROUTE_ID],
-      activeRoute: MINTED_ROUTE_ID,
+      graphs: [MINTED_GRAPH_ID],
+      activeGraph: MINTED_GRAPH_ID,
     });
-    expect(navigation.getState().activeRouteId).toBe(MINTED_ROUTE_ID);
+    expect(navigation.getState().activeGraphId).toBe(MINTED_GRAPH_ID);
   });
 
-  it('creates the Card, first Route, Edge and Layout as one Edit with internal identities', () => {
+  it('creates the Card, first Graph, Edge and Layout as one Edit with internal identities', () => {
     vi.spyOn(crypto, 'randomUUID')
       .mockReturnValueOnce(CREATED_CARD_ID as ReturnType<typeof crypto.randomUUID>)
-      .mockReturnValueOnce(MINTED_ROUTE_ID as ReturnType<typeof crypto.randomUUID>)
+      .mockReturnValueOnce(MINTED_GRAPH_ID as ReturnType<typeof crypto.randomUUID>)
       .mockReturnValueOnce(LAYOUT_ID as ReturnType<typeof crypto.randomUUID>);
-    const routeLess: SpaceSnapshot = {
+    const graphLess: SpaceSnapshot = {
       id: SPACE_ID,
-      document: { version: 2, title: 'New space', routes: [] },
+      document: { version: 2, title: 'New space', graphs: [] },
       cards: [{ id: CARD_A, document: { title: 'Card 1', kind: 'markdown', body: '' } }],
     };
-    const { authoring, session } = openAuthoring(routeLess);
+    const { authoring, session } = openAuthoring(graphLess);
     authoring.installPlacement(Placement.fromEntries([[CARD_A, { x: 120, y: 240 }]]));
 
     expect(authoring.canCreateConnectedCard(CARD_A)).toBe(true);
@@ -500,13 +500,13 @@ describe('Space Authoring', () => {
     ).toEqual({ kind: 'completed', createdCardId: CREATED_CARD_ID });
 
     expect(session.getState().working).toEqual({
-      ...routeLess,
+      ...graphLess,
       document: {
-        ...routeLess.document,
-        routes: [
+        ...graphLess.document,
+        graphs: [
           {
-            id: MINTED_ROUTE_ID,
-            title: 'Route 1',
+            id: MINTED_GRAPH_ID,
+            title: 'Graph 1',
             edges: [{ from: CARD_A, to: CREATED_CARD_ID }],
           },
         ],
@@ -519,13 +519,13 @@ describe('Space Authoring', () => {
               [CARD_A]: { x: 120, y: 240 },
               [CREATED_CARD_ID]: { x: 420, y: 360 },
             },
-            activeRoute: MINTED_ROUTE_ID,
+            activeGraph: MINTED_GRAPH_ID,
           },
         ],
         defaultView: LAYOUT_ID,
       },
       cards: [
-        ...routeLess.cards,
+        ...graphLess.cards,
         {
           id: CREATED_CARD_ID,
           document: { title: 'Card 2', kind: 'markdown', body: '' },
@@ -536,7 +536,7 @@ describe('Space Authoring', () => {
     expect(
       authoring.complete({ kind: 'connected-cards', from: CREATED_CARD_ID, to: CARD_A }),
     ).toEqual({ kind: 'completed' });
-    expect(session.getState().working.document.routes[0]?.edges).toHaveLength(2);
+    expect(session.getState().working.document.graphs[0]?.edges).toHaveLength(2);
   });
 
   it('queues a reentrant completion behind publication of the fully installed Edit', () => {
@@ -627,7 +627,7 @@ describe('Space Authoring', () => {
     expect(failures).toHaveLength(1);
     expect(String(failures[0])).toContain('Authoring produced an invalid Space');
     // The Edit that drained the queue still stands.
-    expect(session.getState().working.document.routes[0]?.edges).toEqual([
+    expect(session.getState().working.document.graphs[0]?.edges).toEqual([
       { from: CARD_A, to: CARD_B },
       { from: CARD_B, to: CARD_A },
     ]);
@@ -781,7 +781,7 @@ describe('Space Authoring', () => {
 
     // Only an authored Layout supplies positions; an Algorithmic View computes
     // its own, so it must answer null however much placement is installed.
-    navigation.selectRenderer({ kind: 'view', view: 'graph' });
+    navigation.selectRenderer({ kind: 'view', view: 'flow' });
     expect(authoring.authoredPlacement()).toBeNull();
   });
 
@@ -792,7 +792,7 @@ describe('Space Authoring', () => {
       published += 1;
     });
 
-    navigation.activateRoute(ROUTE_ID);
+    navigation.activateGraph(GRAPH_ID);
     expect(published).toBe(1);
 
     // The session outlives any Authoring composed over it, so one that never
@@ -801,7 +801,7 @@ describe('Space Authoring', () => {
     // accepting the stored Space is an edit to this one, but releasing the
     // subscriptions is still this object's to do.
     authoring.dispose();
-    navigation.activateRoute(ROUTE_ID);
+    navigation.activateGraph(GRAPH_ID);
     session.submit({
       ...automaticSnapshot,
       document: { ...automaticSnapshot.document, title: 'Renamed' },
@@ -823,7 +823,7 @@ describe('Space Authoring', () => {
           {
             kind: 'positioned',
             positions: { [CARD_B]: { x: 300, y: 40 }, [CARD_A]: { x: 10, y: 20 } },
-            activeRoute: ROUTE_ID,
+            activeGraph: GRAPH_ID,
             title: 'Layout 1',
             id: LAYOUT_ID,
           },
@@ -893,24 +893,24 @@ describe('Space Authoring', () => {
     expect(session.getState().working.document.layouts?.at(-1)?.title).toBe('Layout 8');
   });
 
-  it('refuses to connect with no active Route while the Space already holds Routes', () => {
-    // A Layout filtering every Route away resolves to no active Route. Minting
+  it('refuses to connect with no active Graph while the Space already holds Graphs', () => {
+    // A Layout filtering every Graph away resolves to no active Graph. Minting
     // is reserved for a Space that has none at all, so this is refused rather
-    // than quietly adding a second Route the filter would then hide. It is also
-    // why a minted Route is always the first one, and `nextRouteTitle` only
+    // than quietly adding a second Graph the filter would then hide. It is also
+    // why a minted Graph is always the first one, and `nextGraphTitle` only
     // ever numbers against an empty set.
     const filtered: SpaceSnapshot = {
       ...automaticSnapshot,
       document: {
         ...automaticSnapshot.document,
-        routes: [{ id: ROUTE_ID, title: 'Route 3', edges: [{ from: CARD_A, to: CARD_B }] }],
+        graphs: [{ id: GRAPH_ID, title: 'Graph 3', edges: [{ from: CARD_A, to: CARD_B }] }],
         layouts: [
           {
             id: LAYOUT_ID,
             title: 'Layout 1',
             kind: 'positioned',
             positions: { [CARD_A]: { x: 10, y: 20 }, [CARD_B]: { x: 300, y: 40 } },
-            routes: [],
+            graphs: [],
           },
         ],
         defaultView: LAYOUT_ID,
@@ -920,7 +920,7 @@ describe('Space Authoring', () => {
       kind: 'layout',
       layoutId: LAYOUT_ID,
     });
-    expect(navigation.getState().activeRouteId).toBeNull();
+    expect(navigation.getState().activeGraphId).toBeNull();
     authoring.installPlacement(
       Placement.fromEntries([
         [CARD_A, { x: 10, y: 20 }],
@@ -963,7 +963,7 @@ describe('Space Authoring', () => {
       if (!result.ok) throw new Error(result.errors.map((error) => error.message).join('; '));
       return result.space;
     };
-    const navigation = createNavigation(currentSpace, { kind: 'view', view: 'graph' });
+    const navigation = createNavigation(currentSpace, { kind: 'view', view: 'flow' });
     const reported: unknown[] = [];
     const authoring = createSpaceAuthoring({
       session,
@@ -1010,7 +1010,7 @@ describe('Space Authoring', () => {
     // Both halves are asserted together because the re-layout depends on the
     // second one: dropping the forced identity is only safe while a completed
     // Edit replaces the working snapshot, which is what the render path derives
-    // its `LayoutGraph` from. Lose that and a settled Edit renders stale.
+    // its `LayoutStrategyGraph` from. Lose that and a settled Edit renders stale.
     const loaded = { snapshot: positionedSnapshot, revision: 0n, exportedRevision: null };
     const { authoring, session } = attachAuthoring(new MemorySpaceBackend([loaded]), loaded, {
       kind: 'layout',
@@ -1130,7 +1130,7 @@ describe('Space Authoring', () => {
       if (!result.ok) throw new Error(result.errors.map((error) => error.message).join('; '));
       return result.space;
     };
-    const navigation = createNavigation(currentSpace, { kind: 'view', view: 'graph' });
+    const navigation = createNavigation(currentSpace, { kind: 'view', view: 'flow' });
     const authoring = createSpaceAuthoring({ session, navigation });
     authoring.installPlacement(
       Placement.fromEntries([
@@ -1140,7 +1140,7 @@ describe('Space Authoring', () => {
     );
     const published: number[] = [];
     authoring.subscribe(() => {
-      published.push(authoring.getState().session.working.document.routes[0]?.edges.length ?? -1);
+      published.push(authoring.getState().session.working.document.graphs[0]?.edges.length ?? -1);
     });
 
     // Containment is the drain's job, not this function's: the Edit the caller
@@ -1149,17 +1149,17 @@ describe('Space Authoring', () => {
       'submit failed',
     );
 
-    expect(session.getState().working.document.routes[0]?.edges).toEqual([
+    expect(session.getState().working.document.graphs[0]?.edges).toEqual([
       { from: CARD_A, to: CARD_B },
       { from: CARD_B, to: CARD_A },
     ]);
-    expect(authoring.getState().session.working.document.routes[0]?.edges).toHaveLength(2);
+    expect(authoring.getState().session.working.document.graphs[0]?.edges).toHaveLength(2);
     expect(published).toEqual([2]);
   });
 
   /**
    * The window's other collaborator. Navigation is written last and in two
-   * calls, so a throw between them leaves it half-applied — the minted Route
+   * calls, so a throw between them leaves it half-applied — the minted Graph
    * activated, the Layout that Edit created not yet adopted — and the
    * publication is the only way anything finds out.
    *
@@ -1171,14 +1171,14 @@ describe('Space Authoring', () => {
    */
   it('publishes what the collaborators hold when adopting the new renderer throws', () => {
     vi.spyOn(crypto, 'randomUUID').mockReturnValue(
-      MINTED_ROUTE_ID as ReturnType<typeof crypto.randomUUID>,
+      MINTED_GRAPH_ID as ReturnType<typeof crypto.randomUUID>,
     );
-    const routeLess: SpaceSnapshot = {
+    const graphLess: SpaceSnapshot = {
       id: SPACE_ID,
       document: {
         version: 2,
         title: 'New space',
-        routes: [],
+        graphs: [],
         layouts: [
           {
             id: LAYOUT_ID,
@@ -1191,7 +1191,7 @@ describe('Space Authoring', () => {
       },
       cards: [{ id: CARD_A, document: { title: 'Card 1', kind: 'markdown', body: '' } }],
     };
-    const loaded = { snapshot: routeLess, revision: 0n, exportedRevision: null };
+    const loaded = { snapshot: graphLess, revision: 0n, exportedRevision: null };
     const session = openSpaceSession(new MemorySpaceBackend([loaded]), loaded);
     const currentSpace = () => {
       const result = loadSpaceSnapshot(session.getState().working);
@@ -1210,17 +1210,17 @@ describe('Space Authoring', () => {
       navigation,
       initialPlacement: Placement.fromEntries([[CARD_A, { x: 10, y: 20 }]]),
     });
-    const published: (RouteId | null)[] = [];
-    authoring.subscribe(() => published.push(authoring.getState().navigation.activeRouteId));
+    const published: (GraphId | null)[] = [];
+    authoring.subscribe(() => published.push(authoring.getState().navigation.activeGraphId));
 
     expect(() => authoring.complete({ kind: 'connected-cards', from: CARD_A, to: CARD_A })).toThrow(
       'renderer failed',
     );
 
-    expect(session.getState().working.document.routes).toHaveLength(1);
-    expect(real.getState().activeRouteId).toBe(MINTED_ROUTE_ID);
-    expect(authoring.getState().session.working.document.routes).toHaveLength(1);
-    expect(published).toEqual([MINTED_ROUTE_ID]);
+    expect(session.getState().working.document.graphs).toHaveLength(1);
+    expect(real.getState().activeGraphId).toBe(MINTED_GRAPH_ID);
+    expect(authoring.getState().session.working.document.graphs).toHaveLength(1);
+    expect(published).toEqual([MINTED_GRAPH_ID]);
   });
 
   it('reports the completions a failed drain discards', () => {
@@ -1244,7 +1244,7 @@ describe('Space Authoring', () => {
       if (!result.ok) throw new Error(result.errors.map((error) => error.message).join('; '));
       return result.space;
     };
-    const navigation = createNavigation(currentSpace, { kind: 'view', view: 'graph' });
+    const navigation = createNavigation(currentSpace, { kind: 'view', view: 'flow' });
     const reported: unknown[] = [];
     const authoring = createSpaceAuthoring({
       session,
@@ -1299,7 +1299,7 @@ describe('Space Authoring', () => {
     // shape indirectly and never trips it.
     // eslint-disable-next-line @typescript-eslint/no-misused-promises
     authoring.subscribe(() => Promise.reject(new Error('observer rejected')));
-    navigation.activateRoute(ROUTE_ID);
+    navigation.activateGraph(GRAPH_ID);
 
     await vi.waitFor(() => expect(reported.map(String)).toEqual(['Error: observer rejected']));
   });
@@ -1323,7 +1323,7 @@ describe('Space Authoring', () => {
       notified.push('behind it');
     });
 
-    expect(() => navigation.activateRoute(ROUTE_ID)).not.toThrow();
+    expect(() => navigation.activateGraph(GRAPH_ID)).not.toThrow();
 
     expect(notified).toEqual(['throwing', 'behind it']);
     expect(reported).toEqual([observerFailed]);
@@ -1341,11 +1341,11 @@ describe('Space Authoring', () => {
       getState: () =>
         ({
           selectedRenderer: { kind: 'layout', layoutId: LAYOUT_ID },
-          activeRouteId: ROUTE_ID,
+          activeGraphId: GRAPH_ID,
         }) as NavigationState,
       subscribe: () => () => undefined,
       continueInRenderer: () => undefined,
-      activateRoute: () => undefined,
+      activateGraph: () => undefined,
     } as unknown as Navigation;
     const authoring = createSpaceAuthoring({ session, navigation });
     authoring.installPlacement(
@@ -1414,7 +1414,7 @@ describe('Space Authoring', () => {
               [CARD_A]: { x: 10, y: 20 },
               [CARD_B]: { x: 300, y: 40 },
             },
-            activeRoute: ROUTE_ID,
+            activeGraph: GRAPH_ID,
           },
         ],
         defaultView: LAYOUT_ID,
@@ -1425,9 +1425,9 @@ describe('Space Authoring', () => {
       document: {
         ...positioned.document,
         title: 'Stored',
-        routes: [
-          ...positioned.document.routes,
-          { id: STORED_ROUTE_ID, title: 'Stored Route', edges: [{ from: CARD_B, to: CARD_A }] },
+        graphs: [
+          ...positioned.document.graphs,
+          { id: STORED_GRAPH_ID, title: 'Stored Graph', edges: [{ from: CARD_B, to: CARD_A }] },
         ],
         layouts: [
           {
@@ -1438,7 +1438,7 @@ describe('Space Authoring', () => {
               [CARD_A]: { x: 900, y: 700 },
               [CARD_B]: { x: 600, y: 500 },
             },
-            activeRoute: STORED_ROUTE_ID,
+            activeGraph: STORED_GRAPH_ID,
           },
         ],
       },
@@ -1492,7 +1492,7 @@ describe('Space Authoring', () => {
       },
       navigation: {
         selectedRenderer: { kind: 'layout', layoutId: LAYOUT_ID },
-        activeRouteId: STORED_ROUTE_ID,
+        activeGraphId: STORED_GRAPH_ID,
         mode: 'overview',
         openedCardId: null,
       },
@@ -1554,7 +1554,7 @@ describe('Space Authoring', () => {
       document: {
         ...positionedSnapshot.document,
         title: 'Stored',
-        routes: [{ id: ROUTE_ID, title: 'Main', edges: [{ from: CARD_A, to: UNKNOWN_CARD }] }],
+        graphs: [{ id: GRAPH_ID, title: 'Main', edges: [{ from: CARD_A, to: UNKNOWN_CARD }] }],
       },
     };
     const backend = new MemorySpaceBackend([
@@ -1580,7 +1580,7 @@ describe('Space Authoring', () => {
     const refusal = authoring.acceptStoredSpace();
 
     expect(refusal).toBe(
-      `The remote space is invalid and was not accepted:\n  - Route "${ROUTE_ID}" edge 0 references missing card "${UNKNOWN_CARD}" as its to`,
+      `The remote space is invalid and was not accepted:\n  - Graph "${GRAPH_ID}" edge 0 references missing card "${UNKNOWN_CARD}" as its to`,
     );
     expect(authoring.getState().opening).toBe(before.opening);
     expect(authoring.getState().session).toEqual(before.session);

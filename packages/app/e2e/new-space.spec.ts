@@ -10,7 +10,7 @@ import {
   positionOf,
   settled,
 } from './graph';
-import { seedRouteLessLayout } from './seed';
+import { seedGraphLessLayout } from './seed';
 
 /**
  * Opening the app with nothing to open gives a new space: one card (ADR 0018).
@@ -19,8 +19,8 @@ import { seedRouteLessLayout } from './seed';
  * startup creates the one-card Space once, and reloads reopen that durable UUID.
  */
 
-const seedRouteLessFilteredLayout = (page: Page) =>
-  seedRouteLessLayout(page, 'Empty Route Filter', (snapshot) => {
+const seedGraphLessFilteredLayout = (page: Page) =>
+  seedGraphLessLayout(page, 'Empty Graph Filter', (snapshot) => {
     const cardId = snapshot.cards[0]?.id;
     if (cardId === undefined) throw new Error('The new Space must hold Card 1.');
     return { [cardId]: { x: 0, y: 0 } };
@@ -32,11 +32,11 @@ test('shows one card, and it is the only thing on screen', async ({ page }) => {
   const card = nodeByTitle(page, 'Card 1');
   await expect(card).toBeVisible();
   await expect(page.locator('.react-flow__node')).toHaveCount(1);
-  // No routes means no edges to draw.
+  // No graphs means no edges to draw.
   await expect(page.locator('.react-flow__edge')).toHaveCount(0);
 });
 
-test('route-less handles preview Route 1 and an empty drop cancels', async ({ page }) => {
+test('graph-less handles preview Graph 1 and an empty drop cancels', async ({ page }) => {
   await page.goto('/');
   const card = nodeByTitle(page, 'Card 1');
   await expect(card).toBeVisible();
@@ -59,9 +59,9 @@ test('route-less handles preview Route 1 and an empty drop cancels', async ({ pa
   await page.mouse.up();
 
   await expect(page.locator('.react-flow__edge')).toHaveCount(0);
-  await expect(page.getByTestId('route-selector')).toContainText('None');
+  await expect(page.getByTestId('graph-selector')).toContainText('None');
   await expect(page.getByTestId('layout-selector')).toContainText('None');
-  await expect(page.getByTestId('view-selector')).toContainText('Graph');
+  await expect(page.getByTestId('view-selector')).toContainText('Flow');
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '0');
 });
 
@@ -129,7 +129,7 @@ test('Alt empty-drop creates, connects and selects Card 2 at the previewed posit
   expect(createdBox.x + createdBox.width / 2).toBeCloseTo(dropPoint.x, 0);
   expect(createdBox.y + createdBox.height / 2).toBeCloseTo(dropPoint.y, 0);
   await expect(page.locator('.react-flow__edge')).toHaveCount(1);
-  await expect(page.getByTestId('route-selector')).toContainText('Route 1');
+  await expect(page.getByTestId('graph-selector')).toContainText('Graph 1');
   await expect(page.getByTestId('layout-selector')).toContainText('Layout 1');
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
   await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
@@ -144,17 +144,17 @@ test('Alt empty-drop creates, connects and selects Card 2 at the previewed posit
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '2');
 });
 
-test('Alt empty-drop mints the first visible Route in a filtered positioned Layout', async ({
+test('Alt empty-drop mints the first visible Graph in a filtered positioned Layout', async ({
   page,
 }) => {
-  const seeded = await seedRouteLessFilteredLayout(page);
+  const seeded = await seedGraphLessFilteredLayout(page);
   const persistedRevision = String(BigInt(seeded.revision) + 1n);
   await page.goto('/');
 
   const sourceCard = nodeByTitle(page, 'Card 1');
   await expect(sourceCard).toBeVisible();
-  await expect(page.getByTestId('layout-selector')).toContainText('Empty Route Filter');
-  await expect(page.getByTestId('route-selector')).toContainText('None');
+  await expect(page.getByTestId('layout-selector')).toContainText('Empty Graph Filter');
+  await expect(page.getByTestId('graph-selector')).toContainText('None');
   await settled(page);
   await sourceCard.hover();
 
@@ -162,9 +162,9 @@ test('Alt empty-drop mints the first visible Route in a filtered positioned Layo
 
   await expect(nodeByTitle(page, 'Card 2')).toBeVisible();
   await expect(page.locator('.react-flow__edge')).toHaveCount(1);
-  await expect(page.getByTestId('route-selector')).toContainText('Route 1');
-  await expect(page.getByTestId('route-legend')).toContainText('Route 1');
-  await expect(page.getByTestId('layout-selector')).toContainText('Empty Route Filter');
+  await expect(page.getByTestId('graph-selector')).toContainText('Graph 1');
+  await expect(page.getByTestId('graph-legend')).toContainText('Graph 1');
+  await expect(page.getByTestId('layout-selector')).toContainText('Empty Graph Filter');
   await expect(page.getByTestId('persistence-status')).toHaveAttribute(
     'data-revision',
     persistedRevision,
@@ -175,8 +175,8 @@ test('Alt empty-drop mints the first visible Route in a filtered positioned Layo
   await expect(nodeByTitle(page, 'Card 1')).toBeVisible();
   await expect(nodeByTitle(page, 'Card 2')).toBeVisible();
   await expect(page.locator('.react-flow__edge')).toHaveCount(1);
-  await expect(page.getByTestId('route-selector')).toContainText('Route 1');
-  await expect(page.getByTestId('layout-selector')).toContainText('Empty Route Filter');
+  await expect(page.getByTestId('graph-selector')).toContainText('Graph 1');
+  await expect(page.getByTestId('layout-selector')).toContainText('Empty Graph Filter');
   await expect(page.getByTestId('persistence-status')).toHaveAttribute(
     'data-revision',
     persistedRevision,
@@ -214,7 +214,7 @@ test('an Alt-drop released off the canvas creates no Card', async ({ page }) => 
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '0');
 });
 
-test('the first self-connection mints and activates Route 1 in one persisted Layout', async ({
+test('the first self-connection mints and activates Graph 1 in one persisted Layout', async ({
   page,
 }) => {
   await page.goto('/');
@@ -231,8 +231,8 @@ test('the first self-connection mints and activates Route 1 in one persisted Lay
   );
 
   await expect(page.locator('.react-flow__edge')).toHaveCount(1);
-  await expect(page.getByTestId('route-selector')).toContainText('Route 1');
-  await expect(page.getByTestId('route-legend')).toContainText('Route 1');
+  await expect(page.getByTestId('graph-selector')).toContainText('Graph 1');
+  await expect(page.getByTestId('graph-legend')).toContainText('Graph 1');
   await expect(page.getByTestId('layout-selector')).toContainText('Layout 1');
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
   await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
@@ -244,7 +244,7 @@ test('the first self-connection mints and activates Route 1 in one persisted Lay
   expect(await positionOf(card)).toEqual(before);
 });
 
-test('the Route that self-connection mints can be presented', async ({ page }) => {
+test('the Graph that self-connection mints can be presented', async ({ page }) => {
   await page.goto('/');
   const card = nodeByTitle(page, 'Card 1');
   await expect(card).toBeVisible();
@@ -258,10 +258,10 @@ test('the Route that self-connection mints can be presented', async ({ page }) =
     authoringHandle(card, 'source', 'right'),
     authoringHandle(card, 'target', 'left'),
   );
-  await expect(page.getByTestId('route-selector')).toContainText('Route 1');
+  await expect(page.getByTestId('graph-selector')).toContainText('Graph 1');
 
-  // Every Card a fully cyclic Route holds is arrived at, so it has no entry
-  // Card. The control is enabled because a Route *is* active, and presenting
+  // Every Card a fully cyclic Graph holds is arrived at, so it has no entry
+  // Card. The control is enabled because a Graph *is* active, and presenting
   // used to return before changing anything — the click went nowhere.
   await page.getByTestId('present-button').click();
 
@@ -272,13 +272,13 @@ test('the Route that self-connection mints can be presented', async ({ page }) =
   await expect(moves).toHaveText('Card 1');
 });
 
-test('shows an empty disabled route control and no route HUD (ADR 0015)', async ({ page }) => {
+test('shows an empty disabled graph control and no graph HUD (ADR 0015)', async ({ page }) => {
   await page.goto('/');
   await expect(nodeByTitle(page, 'Card 1')).toBeVisible();
 
-  await expect(page.getByTestId('route-selector')).toContainText('None');
+  await expect(page.getByTestId('graph-selector')).toContainText('None');
   await expect(page.getByTestId('present-button')).toBeDisabled();
-  await expect(page.getByTestId('route-legend')).toHaveCount(0);
+  await expect(page.getByTestId('graph-legend')).toHaveCount(0);
 });
 
 test('its one card is draggable once its automatic arrangement resolves (ADR 0025)', async ({

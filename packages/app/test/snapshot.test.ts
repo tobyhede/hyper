@@ -8,7 +8,7 @@ const snapshot = spaceSnapshotSchema.parse({
   document: {
     version: 2,
     title: 'Space',
-    routes: [
+    graphs: [
       {
         id: '00000000-0000-4000-8000-000000000004',
         title: 'Main',
@@ -40,7 +40,7 @@ it('updates placement as a complete valid persistence snapshot', () => {
     positions: Placement.fromEntries([
       [uuidSchema.parse('00000000-0000-4000-8000-000000000002'), { x: 10, y: 20 }],
     ]),
-    activeRouteId: uuidSchema.parse('00000000-0000-4000-8000-000000000004'),
+    activeGraphId: uuidSchema.parse('00000000-0000-4000-8000-000000000004'),
   });
 
   expect(changed.cards).toEqual(snapshot.cards);
@@ -51,23 +51,23 @@ it('updates placement as a complete valid persistence snapshot', () => {
       title: 'Layout',
       kind: 'positioned',
       positions: { '00000000-0000-4000-8000-000000000002': { x: 10, y: 20 } },
-      activeRoute: '00000000-0000-4000-8000-000000000004',
+      activeGraph: '00000000-0000-4000-8000-000000000004',
     },
   ]);
   expect(loadSpaceSnapshot(changed).ok).toBe(true);
 });
 
-// The active Route and the minted Route are both a `RouteId`, and a Layout puts
-// them in two different places: `activeRoute`, and the `routes` filter. Every
+// The active Graph and the minted Graph are both a `GraphId`, and a Layout puts
+// them in two different places: `activeGraph`, and the `graphs` filter. Every
 // other case passes one id or the same id twice, so only a case where the two
 // must differ tells a transposed pair from a correct one.
-it('opens on the active Route while showing the minted Route the Edit added', () => {
-  const twoRoutes = spaceSnapshotSchema.parse({
+it('opens on the active Graph while showing the minted Graph the Edit added', () => {
+  const twoGraphs = spaceSnapshotSchema.parse({
     ...snapshot,
     document: {
       ...snapshot.document,
-      routes: [
-        ...snapshot.document.routes,
+      graphs: [
+        ...snapshot.document.graphs,
         {
           id: '00000000-0000-4000-8000-000000000005',
           title: 'Minted',
@@ -85,20 +85,20 @@ it('opens on the active Route while showing the minted Route the Edit added', ()
           title: 'Layout',
           kind: 'positioned',
           positions: {},
-          routes: ['00000000-0000-4000-8000-000000000004'],
+          graphs: ['00000000-0000-4000-8000-000000000004'],
         },
       ],
     },
   });
 
-  const changed = updatePositionedLayout(twoRoutes, {
+  const changed = updatePositionedLayout(twoGraphs, {
     layoutId: uuidSchema.parse('00000000-0000-4000-8000-000000000021'),
     title: 'Layout',
     positions: Placement.fromEntries([
       [uuidSchema.parse('00000000-0000-4000-8000-000000000002'), { x: 1, y: 2 }],
     ]),
-    activeRouteId: uuidSchema.parse('00000000-0000-4000-8000-000000000004'),
-    mintedRouteId: uuidSchema.parse('00000000-0000-4000-8000-000000000005'),
+    activeGraphId: uuidSchema.parse('00000000-0000-4000-8000-000000000004'),
+    mintedGraphId: uuidSchema.parse('00000000-0000-4000-8000-000000000005'),
   });
 
   expect(changed.document.layouts).toEqual([
@@ -107,8 +107,8 @@ it('opens on the active Route while showing the minted Route the Edit added', ()
       title: 'Layout',
       kind: 'positioned',
       positions: { '00000000-0000-4000-8000-000000000002': { x: 1, y: 2 } },
-      routes: ['00000000-0000-4000-8000-000000000004', '00000000-0000-4000-8000-000000000005'],
-      activeRoute: '00000000-0000-4000-8000-000000000004',
+      graphs: ['00000000-0000-4000-8000-000000000004', '00000000-0000-4000-8000-000000000005'],
+      activeGraph: '00000000-0000-4000-8000-000000000004',
     },
   ]);
   expect(loadSpaceSnapshot(changed).ok).toBe(true);
@@ -133,7 +133,7 @@ it('preserves authored view scope and unrelated layouts while replacing placemen
           title: 'Layout',
           kind: 'positioned',
           positions: {},
-          routes: ['00000000-0000-4000-8000-000000000004'],
+          graphs: ['00000000-0000-4000-8000-000000000004'],
         },
         {
           id: '00000000-0000-4000-8000-000000000022',
@@ -151,7 +151,7 @@ it('preserves authored view scope and unrelated layouts while replacing placemen
     positions: Placement.fromEntries([
       [uuidSchema.parse('00000000-0000-4000-8000-000000000002'), { x: 5, y: 6 }],
     ]),
-    activeRouteId: uuidSchema.parse('00000000-0000-4000-8000-000000000004'),
+    activeGraphId: uuidSchema.parse('00000000-0000-4000-8000-000000000004'),
   });
 
   expect(changed.document.layouts).toHaveLength(2);
@@ -159,18 +159,18 @@ it('preserves authored view scope and unrelated layouts while replacing placemen
     '00000000-0000-4000-8000-000000000021',
     '00000000-0000-4000-8000-000000000022',
   ]);
-  expect(changed.document.layouts?.[0]?.routes).toEqual(['00000000-0000-4000-8000-000000000004']);
+  expect(changed.document.layouts?.[0]?.graphs).toEqual(['00000000-0000-4000-8000-000000000004']);
   expect(changed.cards).toEqual(snapshot.cards);
 });
 
 /**
- * `activeRoute` is authored, like the `routes` filter beside it, and the app has
- * no surface for clearing one. An Edit completed with no active Route therefore
+ * `activeGraph` is authored, like the `graphs` filter beside it, and the app has
+ * no surface for clearing one. An Edit completed with no active Graph therefore
  * has nothing to say about it, and must leave what the author wrote alone rather
  * than read its own silence as an instruction to erase.
  */
-it('leaves an authored active Route alone when the Edit names none', () => {
-  const withActiveRoute = spaceSnapshotSchema.parse({
+it('leaves an authored active Graph alone when the Edit names none', () => {
+  const withActiveGraph = spaceSnapshotSchema.parse({
     ...snapshot,
     document: {
       ...snapshot.document,
@@ -180,21 +180,21 @@ it('leaves an authored active Route alone when the Edit names none', () => {
           title: 'Layout',
           kind: 'positioned',
           positions: {},
-          activeRoute: '00000000-0000-4000-8000-000000000004',
+          activeGraph: '00000000-0000-4000-8000-000000000004',
         },
       ],
     },
   });
 
-  const changed = updatePositionedLayout(withActiveRoute, {
+  const changed = updatePositionedLayout(withActiveGraph, {
     layoutId: uuidSchema.parse('00000000-0000-4000-8000-000000000021'),
     title: 'Layout',
     positions: Placement.fromEntries([
       [uuidSchema.parse('00000000-0000-4000-8000-000000000002'), { x: 5, y: 6 }],
     ]),
-    activeRouteId: null,
+    activeGraphId: null,
   });
 
-  expect(changed.document.layouts?.[0]?.activeRoute).toBe('00000000-0000-4000-8000-000000000004');
+  expect(changed.document.layouts?.[0]?.activeGraph).toBe('00000000-0000-4000-8000-000000000004');
   expect(loadSpaceSnapshot(changed).ok).toBe(true);
 });

@@ -4,10 +4,10 @@ export { Button, buttonVariants } from './Button';
 export type { ButtonProps } from './Button';
 export { CardContent } from './CardContent';
 export type { CardContentProps } from './CardContent';
-export { FALLBACK_ROUTE_COLOR, RouteLegend } from './RouteLegend';
-export type { RouteLegendProps } from './RouteLegend';
-export { RouteSelector } from './RouteSelector';
-export type { RouteSelectorProps } from './RouteSelector';
+export { FALLBACK_GRAPH_COLOR, GraphLegend } from './GraphLegend';
+export type { GraphLegendProps } from './GraphLegend';
+export { GraphSelector } from './GraphSelector';
+export type { GraphSelectorProps } from './GraphSelector';
 export { SelectorTrigger } from './SelectorTrigger';
 export type { SelectorTriggerProps } from './SelectorTrigger';
 export { LayoutSelector } from './LayoutSelector';
@@ -17,11 +17,11 @@ export type { AlgorithmicViewId, ViewSelectorProps } from './ViewSelector';
 export {
   CheckIcon,
   EditIcon,
+  FlowIcon,
   GraphIcon,
   GridIcon,
   LayoutIcon,
   PresentIcon,
-  RouteIcon,
 } from './icons';
 export {
   Select,

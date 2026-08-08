@@ -1,9 +1,9 @@
 import { getBezierPath, type ConnectionLineComponentProps } from '@xyflow/react';
 
-const MARKER_ID = 'route-authoring-connection-arrow';
+const MARKER_ID = 'graph-authoring-connection-arrow';
 
-/** The transient directed Edge preview used while authoring a Route. */
-export function RouteConnectionLine({
+/** The transient directed Edge preview used while authoring a Graph. */
+export function GraphConnectionLine({
   fromX,
   fromY,
   fromPosition,

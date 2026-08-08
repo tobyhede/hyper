@@ -5,14 +5,14 @@ import { openCard } from './graph';
 
 // The app loads the abstract layout fixture (packages/app/fixture) — two
 // disconnected collections sharing no cards, laid out by ELK as separate bands:
-//   1. Long (A→B→C→D→A′), Mid (A→B→C→D), Short (A→B→C) — routes over one spine
+//   1. Long (A→B→C→D→A′), Mid (A→B→C→D), Short (A→B→C) — graphs over one spine
 //   2. Echo (E→F→G→H→E′) — a plain linear collection
 // Each returns to its start via an alias, so this particular fixture is acyclic
-// and lays out as clean forward paths even though Routes may contain cycles
+// and lays out as clean forward paths even though Graphs may contain cycles
 // (ADR 0032). These tests assert *behaviour* against that shape; none read card prose. See
 // fixture/README.md for why each case is there.
 //
-// This file is the **overview**: the space drawn whole, every route at once.
+// This file is the **overview**: the space drawn whole, every graph at once.
 // Presenting is absent — the deck it used to be went with the step sequence (ADR
 // 0023, 0024) and returns as a traversal on this same canvas (ADR 0027), with
 // its own spec. The deck's tests are not adapted here; they asserted against a
@@ -26,27 +26,27 @@ function nodeByTitle(page: Page, title: string): Locator {
     .filter({ has: page.getByRole('heading', { name: title, exact: true }) });
 }
 
-test('offers more than one named route', async ({ page }) => {
+test('offers more than one named graph', async ({ page }) => {
   await page.goto('/');
   // Open the (Radix, non-native) select and count its listbox options.
-  await page.getByTestId('route-selector').click();
+  await page.getByTestId('graph-selector').click();
   await expect(page.getByRole('option')).toHaveCount(4);
 });
 
-test('draws every route at once, each in its own color', async ({ page }) => {
+test('draws every graph at once, each in its own color', async ({ page }) => {
   await page.goto('/');
 
-  // A legend maps each route to a color.
-  await expect(page.getByTestId('route-legend').locator('.legend__item')).toHaveCount(4);
+  // A legend maps each graph to a color.
+  await expect(page.getByTestId('graph-legend').locator('.legend__item')).toHaveCount(4);
 
   // Two collections: 5 + 5 = 10 cards, and one drawn edge per authored edge:
-  // Long 4 + Mid 3 + Short 2 + Echo 4 = 13. Handles per (route, direction)
+  // Long 4 + Mid 3 + Short 2 + Echo 4 = 13. Handles per (graph, direction)
   // through a card sum to 18 (collection 1) + 8 (collection 2) = 26.
   await expect(page.locator('.react-flow__node')).toHaveCount(10);
   await expect(page.locator('.react-flow__edge')).toHaveCount(13);
   await expect(page.locator('.rf-card-node__port')).toHaveCount(26);
 
-  // Distinct colors, so the routes can be told apart.
+  // Distinct colors, so the graphs can be told apart.
   const strokes = await page
     .locator('.react-flow__edge-path')
     .evaluateAll((els) => els.map((el) => getComputedStyle(el).stroke));
@@ -60,7 +60,7 @@ test('handles stay measurable, so edges attach where the layout put them', async
   // React Flow measures every handle's box to work out where an edge attaches,
   // so a handle hidden with `display: none` reports 0x0 and its edges land
   // somewhere else — silently, with no warning to catch. `CardNode` dims
-  // receding routes with `opacity`, which keeps the box; that reads as an
+  // receding graphs with `opacity`, which keeps the box; that reads as an
   // ordinary styling choice, and this is what stops a later CSS tidy-up from
   // reaching for `display: none`. See react-flow-guidance/issues/03.
   const ports = page.locator('.rf-card-node__port');
@@ -73,7 +73,7 @@ test('handles stay measurable, so edges attach where the layout put them', async
     }),
   );
 
-  // Asserted against whatever the fixture currently draws — its route/card
+  // Asserted against whatever the fixture currently draws — its graph/card
   // shape is free to change (fixture/README.md).
   expect(boxes.length).toBeGreaterThan(0);
   expect(boxes.every((box) => box.width > 0 && box.height > 0)).toBe(true);
@@ -90,7 +90,7 @@ test("edges are drawn along ELK's routing, not default beziers", async ({ page }
   const first = page.locator('.react-flow__edge-path').first();
   await expect(first).toHaveAttribute('d', /L/);
 
-  // Every route edge is a polyline along ELK's routed points (issue 03) — none
+  // Every graph edge is a polyline along ELK's routed points (issue 03) — none
   // is a React Flow cubic bezier, which would carry a `C` command.
   const paths = await page
     .locator('.react-flow__edge-path')
@@ -99,22 +99,22 @@ test("edges are drawn along ELK's routing, not default beziers", async ({ page }
   expect(paths.every((d) => d.startsWith('M') && !d.includes('C'))).toBe(true);
 });
 
-test('selecting a route keeps the others on screen', async ({ page }) => {
+test('selecting a graph keeps the others on screen', async ({ page }) => {
   await page.goto('/');
   const persistence = page.getByTestId('persistence-status');
   await expect(persistence).toHaveAttribute('data-revision', '0');
 
   // Selection is emphasis: it never hides the rest of the space.
-  await page.getByTestId('route-selector').click();
+  await page.getByTestId('graph-selector').click();
   await page.getByRole('option', { name: 'Echo' }).click();
   await expect(page.locator('.react-flow__node')).toHaveCount(10);
   await expect(page.locator('.react-flow__edge')).toHaveCount(13);
-  // Activating a route changes emphasis, not the persisted document.
+  // Activating a graph changes emphasis, not the persisted document.
   await page.waitForTimeout(50);
   await expect(persistence).toHaveAttribute('data-revision', '0');
 });
 
-test('selecting a route emphasises it without hiding the others', async ({ page }) => {
+test('selecting a graph emphasises it without hiding the others', async ({ page }) => {
   await page.goto('/');
   await expect(page.locator('.react-flow__edge')).toHaveCount(13);
 
@@ -123,13 +123,13 @@ test('selecting a route emphasises it without hiding the others', async ({ page 
       .locator('.react-flow__edge-path')
       .evaluateAll((els) => els.map((el) => Number(getComputedStyle(el).opacity)));
 
-  // "Long" is the first route, so it is selected on load and every other route
+  // "Long" is the first graph, so it is selected on load and every other graph
   // recedes — Mid 3 + Short 2 + Echo 4 = 9 edges.
   const faded = (await opacities()).filter((o) => o < 1);
   expect(faded).toHaveLength(9);
   expect(faded[0]!).toBeGreaterThan(0);
 
-  // Every route stays drawn.
+  // Every graph stays drawn.
   await expect(page.locator('.react-flow__edge')).toHaveCount(13);
 });
 
@@ -144,7 +144,7 @@ test('a card shows its title in the graph, and opens to show its Markdown source
   // "entry point" is its body text, which must not appear.
   const a = nodeByTitle(page, 'A');
   await expect(a).toBeVisible();
-  await expect(a.getByTestId('card-description')).toHaveText('Where every route begins');
+  await expect(a.getByTestId('card-description')).toHaveText('Where the first collection begins');
   await expect(a).not.toContainText('entry point');
   // A card without a description renders no description element.
   await expect(nodeByTitle(page, 'B').getByTestId('card-description')).toHaveCount(0);
@@ -171,11 +171,11 @@ test('escape closes an opened card', async ({ page }) => {
   await expect(page.getByTestId('open-card')).toBeHidden();
 });
 
-test('a card can be opened even when it is not on the selected route', async ({ page }) => {
+test('a card can be opened even when it is not on the selected graph', async ({ page }) => {
   await page.goto('/');
 
   // "E" is in the Echo collection; select Long (band 1), then open E anyway.
-  await page.getByTestId('route-selector').click();
+  await page.getByTestId('graph-selector').click();
   await page.getByRole('option', { name: 'Long' }).click();
 
   await openCard(nodeByTitle(page, 'E'), 'E');

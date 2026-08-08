@@ -9,7 +9,7 @@ const CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 const OTHER_SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
 const snapshot: SpaceSnapshot = {
   id: SPACE_ID,
-  document: { version: 2, title: 'One', routes: [] },
+  document: { version: 2, title: 'One', graphs: [] },
   cards: [{ id: CARD_ID, document: { title: 'A', kind: 'markdown', body: '' } }],
 };
 
@@ -126,7 +126,7 @@ describe('Space HTTP application', () => {
           Promise.resolve({
             kind: 'rejected',
             code: 'invalid-snapshot',
-            message: 'Route names an absent card',
+            message: 'Graph names an absent card',
           }),
       }),
     ).request(`/api/spaces/${SPACE_ID}`, {
@@ -136,7 +136,7 @@ describe('Space HTTP application', () => {
     });
 
     expect(response.status).toBe(422);
-    await expect(response.json()).resolves.toEqual({ message: 'Route names an absent card' });
+    await expect(response.json()).resolves.toEqual({ message: 'Graph names an absent card' });
   });
 
   it('reports an absent space while committing', async () => {
@@ -446,8 +446,8 @@ describe('Space HTTP application', () => {
     await expect(response.json()).resolves.toEqual({ message: 'Space id must be a UUID' });
   });
 
-  // `validateSpaceId` guards both methods, but only the commit route proved it.
-  // A load route that dropped the validator would hand the repository an
+  // `validateSpaceId` guards both methods, but only the commit graph proved it.
+  // A load graph that dropped the validator would hand the repository an
   // unvalidated path segment and answer 404 rather than 400.
   it('rejects an invalid path identity before loading a space', async () => {
     const response = await createSpaceHttpApp(
@@ -577,7 +577,7 @@ describe('Space HTTP application', () => {
 
   // The collection and the resource are separate arms of the HEAD guard, and only
   // the collection was proven. A resource arm that stopped matching would fall
-  // through to the GET route and answer 200 with a silently dropped body.
+  // through to the GET graph and answer 200 with a silently dropped body.
   it('does not add an implicit HEAD resource for a space', async () => {
     const response = await createSpaceHttpApp(repository()).request(`/api/spaces/${SPACE_ID}`, {
       method: 'HEAD',
@@ -589,7 +589,7 @@ describe('Space HTTP application', () => {
   });
 
   // The declared methods reject a non-UUID through `validateSpaceId`, so this
-  // reaches the same judgement by the other route: an undeclared method has no
+  // reaches the same judgement by the other graph: an undeclared method has no
   // validator to run and lands in `app.notFound()`, which has to identify the
   // path itself rather than advertise `Allow` for a resource that cannot exist.
   //
@@ -602,7 +602,7 @@ describe('Space HTTP application', () => {
     // Hono strips a HEAD response's body itself, so the guard that intercepts
     // HEAD is observable only in the status and headers. The empty string is
     // asserted rather than ignored: it is why the guard cannot simply be
-    // deleted and left to the GET route, which answers 200 with nothing.
+    // deleted and left to the GET graph, which answers 200 with nothing.
     ['HEAD', 'HEAD', ''],
   ])('rejects an invalid path identity for %s', async (_name, method, body) => {
     const response = await createSpaceHttpApp(repository()).request('/api/spaces/not-a-uuid', {
@@ -653,7 +653,7 @@ describe('Space HTTP application', () => {
       ),
       createSpaceHttpApp(repository()).request(`/api/spaces/${SPACE_ID}`, put(oversized)),
       // The conflict branch encodes a whole loaded space rather than a message,
-      // so it reaches `context.json` by a different route than its neighbours.
+      // so it reaches `context.json` by a different graph than its neighbours.
       createSpaceHttpApp(
         repository({
           commitSpace: () =>

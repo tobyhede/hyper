@@ -13,23 +13,23 @@ export interface HttpLoadedSpace {
 }
 
 /**
- * The Layout id every route-filter scenario seeds. One shared constant because
+ * The Layout id every graph-filter scenario seeds. One shared constant because
  * two tests asserting against two different literals that happen to match reads
  * as coincidence.
  */
 export const FILTERED_LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000099');
 
 /**
- * Seed the opened Space with a single Layout whose route filter is empty, then
+ * Seed the opened Space with a single Layout whose graph filter is empty, then
  * read it back.
  *
- * A Layout carrying `routes: []` draws no Route at all (ADR 0026), which is the
+ * A Layout carrying `graphs: []` draws no Graph at all (ADR 0026), which is the
  * state both the empty-filter and the suppressed-creation scenarios need. This
  * goes through the same HTTP boundary the browser uses rather than reaching past
  * it, so the seeded revision is one the app will actually observe — hence the
  * read-back: the caller asserts against the revision the commit produced.
  */
-export async function seedRouteLessLayout(
+export async function seedGraphLessLayout(
   page: Page,
   title: string,
   positionsFor: (snapshot: SpaceSnapshot) => Record<string, { x: number; y: number }>,
@@ -54,7 +54,7 @@ export async function seedRouteLessLayout(
           title,
           kind: 'positioned',
           positions: positionsFor(loaded.snapshot),
-          routes: [],
+          graphs: [],
         },
       ],
       defaultView: FILTERED_LAYOUT_ID,

@@ -6,13 +6,13 @@ import { openImportedWorkspace, openStoredWorkspace } from '../src/open-workspac
 const SPACE_ID = '00000000-0000-4000-8000-000000000001';
 const CARD_ID = '00000000-0000-4000-8000-000000000002';
 const OTHER_SPACE_ID = '00000000-0000-4000-8000-000000000003';
-const ROUTE_ID = '00000000-0000-4000-8000-000000000004';
+const GRAPH_ID = '00000000-0000-4000-8000-000000000004';
 const MISSING_CARD_A = '00000000-0000-4000-8000-000000000005';
 const MISSING_CARD_B = '00000000-0000-4000-8000-000000000006';
 
 const storedSnapshot: SpaceSnapshot = {
   id: uuidSchema.parse(SPACE_ID),
-  document: { version: 2, title: 'Stored space', routes: [] },
+  document: { version: 2, title: 'Stored space', graphs: [] },
   cards: [
     {
       id: uuidSchema.parse(CARD_ID),
@@ -72,10 +72,10 @@ describe('openStoredWorkspace', () => {
           document: {
             version: 2,
             title: 'Invalid stored space',
-            routes: [
+            graphs: [
               {
-                id: uuidSchema.parse(ROUTE_ID),
-                title: 'Dangling route',
+                id: uuidSchema.parse(GRAPH_ID),
+                title: 'Dangling graph',
                 edges: [
                   {
                     from: uuidSchema.parse(MISSING_CARD_A),
@@ -94,8 +94,8 @@ describe('openStoredWorkspace', () => {
 
     await expect(openStoredWorkspace(backend, uuidSchema.parse(SPACE_ID))).rejects.toThrow(
       `The backend returned an invalid space:\n` +
-        `  - Route "${ROUTE_ID}" edge 0 references missing card "${MISSING_CARD_A}" as its from\n` +
-        `  - Route "${ROUTE_ID}" edge 0 references missing card "${MISSING_CARD_B}" as its to`,
+        `  - Graph "${GRAPH_ID}" edge 0 references missing card "${MISSING_CARD_A}" as its from\n` +
+        `  - Graph "${GRAPH_ID}" edge 0 references missing card "${MISSING_CARD_B}" as its to`,
     );
   });
 });
@@ -103,7 +103,7 @@ describe('openStoredWorkspace', () => {
 describe('openImportedWorkspace', () => {
   it('opens a valid import through the memory backend and session seam', async () => {
     const opened = await openImportedWorkspace(
-      { version: 2, id: SPACE_ID, title: 'New space', routes: [] },
+      { version: 2, id: SPACE_ID, title: 'New space', graphs: [] },
       cardFiles,
     );
 
@@ -115,7 +115,7 @@ describe('openImportedWorkspace', () => {
   it('rejects an unsupported version with the complete validation detail', async () => {
     await expect(
       openImportedWorkspace(
-        { version: 1, id: SPACE_ID, title: 'Legacy space', routes: [] },
+        { version: 1, id: SPACE_ID, title: 'Legacy space', graphs: [] },
         cardFiles,
       ),
     ).rejects.toThrow(
