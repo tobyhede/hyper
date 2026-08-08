@@ -1,7 +1,7 @@
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
-import { buildCardHandles, buildRouteEdges, loadSpace, type CardFile } from '@project/graph';
-import { projectCardNodes, projectRouteEdges } from '../src/index';
+import { buildCardHandles, buildGraphRenderEdges, loadSpace, type CardFile } from '@project/graph';
+import { projectCardNodes, projectGraphEdges } from '../src/index';
 import { cardFile } from './card-files';
 
 /**
@@ -10,17 +10,17 @@ import { cardFile } from './card-files';
  * React Flow warning #008 — "Couldn't create edge for source/target handle id" —
  * fires when an edge names a handle that doesn't resolve on the node it points
  * at, and that condition is fully determined by what `projectCardNodes` and
- * `projectRouteEdges` produce *together*. Each projection is well covered on its
+ * `projectGraphEdges` produce *together*. Each projection is well covered on its
  * own in `projection.test.ts`; nothing there asserts the relationship, so a
  * change to the handle id scheme on one side only would pass every test and
  * render a graph with no edges.
  *
- * Properties rather than examples because the failure mode is multi-route: a
- * card carries more than one same-side handle only when routes share it. See
+ * Properties rather than examples because the failure mode is multi-graph: a
+ * card carries more than one same-side handle only when graphs share it. See
  * `.scratch/react-flow-guidance/issues/02-projection-handle-invariants.md`.
  */
 
-/** Ids from a shared pool, so generated routes overlap on cards — the case that
+/** Ids from a shared pool, so generated graphs overlap on cards — the case that
  *  puts several same-side handles on one node. */
 const cardIdPool = fc
   .uniqueArray(fc.integer({ min: 0, max: 25 }), { minLength: 2, maxLength: 8 })
@@ -31,17 +31,17 @@ function uuidFrom(value: number): string {
 }
 
 /**
- * A space file whose routes each run over distinct cards in some order: a chain
+ * A space file whose graphs each run over distinct cards in some order: a chain
  * through all of them, plus up to three **shortcuts** skipping ahead. Every edge
  * points forward in that order and each exact Edge appears once, so `loadSpace`
- * always accepts what we generate; cards are the union of what the routes
+ * always accepts what we generate; cards are the union of what the graphs
  * touch, so there are no orphans either.
  *
  * The shortcuts are the point. They fork a card and merge into a later one,
  * which is the shape a step list could not express and the one that puts several
  * edges on a single handle.
  */
-const routeArb = (pool: string[]) =>
+const graphArb = (pool: string[]) =>
   fc
     .tuple(
       fc.shuffledSubarray(pool, { minLength: 2 }),
@@ -64,17 +64,17 @@ const routeArb = (pool: string[]) =>
     });
 
 const spaceFileArb = cardIdPool.chain((pool) =>
-  fc.array(routeArb(pool), { minLength: 1, maxLength: 4 }).map((routes) => {
-    const visited = [...new Set(routes.flatMap((r) => r.cards))];
+  fc.array(graphArb(pool), { minLength: 1, maxLength: 4 }).map((graphs) => {
+    const visited = [...new Set(graphs.flatMap((r) => r.cards))];
     return {
       file: {
         version: 2,
         id: '00000000-0000-4000-8000-000000000001',
         title: 'Generated',
-        routes: routes.map((route, index) => ({
+        graphs: graphs.map((graph, index) => ({
           id: uuidFrom(index + 100),
-          title: `Route ${index}`,
-          edges: route.edges,
+          title: `Graph ${index}`,
+          edges: graph.edges,
         })),
       },
       cardFiles: visited.map((id) => cardFile(id)),
@@ -91,7 +91,7 @@ function project(generated: { file: unknown; cardFiles: CardFile[] }) {
 
   return {
     nodes: projectCardNodes(space, buildCardHandles(space), {}),
-    edges: projectRouteEdges(buildRouteEdges(space), {}),
+    edges: projectGraphEdges(buildGraphRenderEdges(space), {}),
   };
 }
 
@@ -111,7 +111,7 @@ describe('projection handle invariants', () => {
           ]),
         );
 
-        // Not vacuous: every generated route carries at least one edge.
+        // Not vacuous: every generated graph carries at least one edge.
         expect(edges.length).toBeGreaterThan(0);
 
         for (const edge of edges) {
@@ -133,7 +133,7 @@ describe('projection handle invariants', () => {
 
         // React Flow can't tell two same-side handles apart otherwise, and picks
         // whichever it finds first. Holds here because a handle id is
-        // `<routeId>::out`/`::in` — one per route per side, so a card a route
+        // `<graphId>::out`/`::in` — one per graph per side, so a card a graph
         // forks at still carries exactly one outbound handle however many edges
         // leave it. The scheme, not a domain rule, is what makes this true.
         for (const node of nodes) {

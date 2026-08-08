@@ -8,8 +8,8 @@ Two small pieces, imported from `space.json` and the card Markdown files:
 | Piece | Purpose |
 | ----- | ------- |
 | `cards` | Markdown content + frontmatter |
-| `routes` | Graphs of unique `{ from, to }` edges; cycles are allowed |
+| `graphs` | Graphs of unique `{ from, to }` edges; cycles are allowed |
 
-Cards *are* the graph, and routes are its only structure — a route's edges reference cards directly.
+Cards *are* the graph, and graphs are its only structure — a Graph's edges reference cards directly.
 
 A Zod schema validates shape; the `graph` package validates that every reference resolves.

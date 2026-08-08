@@ -15,7 +15,7 @@ import type { SpaceAuthoring } from './space-authoring';
  * owns the completed on-screen placement.
  *
  * Live nodes absorb every intermediate React Flow change so controlled dragging
- * follows the pointer, and they are published together with the Route Edges
+ * follows the pointer, and they are published together with the Graph Edges
  * drawn against them. `dragOrigins` retains gesture starts across React Flow's
  * separate moving and settled callbacks.
  */
@@ -48,9 +48,9 @@ export interface RenderAdapterState {
    * plain curves between wherever the cards now are.
    */
   moved: boolean;
-  /** The ordinary React Flow selection used for continued Route authoring. */
+  /** The ordinary React Flow selection used for continued Graph authoring. */
   selectedCardId: CardId | null;
-  /** Publish projected Card nodes, their declared handles and Route Edges together. */
+  /** Publish projected Card nodes, their declared handles and Graph Edges together. */
   syncProjection: (nodes: readonly CardFlowNode[], edges: readonly Edge[]) => void;
   /**
    * Navigate to another renderer. The replacement arrangement will arrive via

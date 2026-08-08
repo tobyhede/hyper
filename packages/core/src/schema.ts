@@ -4,7 +4,7 @@ import { z } from 'zod';
 /**
  * Zod schemas for the space file (`space.json`).
  *
- * These validate *shape* only. Referential integrity (do a route's edge
+ * These validate *shape* only. Referential integrity (do a graph's edge
  * endpoints actually resolve to real cards) is checked separately in `@project/graph`,
  * because it needs the whole space in view. A value that passes here is not yet
  * a Space — `loadSpace` adds the reference check and the index (ADR 0010).
@@ -20,7 +20,7 @@ const idSchema = uuidSchema;
  *
  * **Mint, not allocate.** Nothing reserves an id from a registry, and in
  * particular PostgreSQL does not hand them out: a space's id comes from its
- * column default, and every other id — card, route, layout — is generated here,
+ * column default, and every other id — card, graph, layout — is generated here,
  * in whichever process is doing the work. Calling it allocation is what made the
  * importer read as though the database had to be consulted for a random value.
  *
@@ -130,9 +130,9 @@ export const layoutPositionSchema = z.object({
  * not exist; that is a reference error, checked in `@project/graph` where the
  * whole space is in view.
  *
- * It also points at routes: which it shows, and which of those is active (ADR
+ * It also points at graphs: which it shows, and which of those is active (ADR
  * 0026). Both are optional and independent, and the dependency runs one way —
- * geometry references topology, never the reverse. A Route stays a peer of
+ * geometry references topology, never the reverse. A Graph stays a peer of
  * Layout under the Space and knows nothing about where it is drawn.
  */
 export const positionedLayoutSchema = z.object({
@@ -141,29 +141,29 @@ export const positionedLayoutSchema = z.object({
   kind: z.literal('positioned'),
   positions: z.record(idSchema, layoutPositionSchema),
   /**
-   * The routes this layout *shows* — a filter, absent meaning every route (ADR
-   * 0026). Authored view scope: one arrangement does not suit every route, and
+   * The graphs this layout *shows* — a filter, absent meaning every graph (ADR
+   * 0026). Authored view scope: one arrangement does not suit every graph, and
    * a layout arranged for some should not draw the ones it was not arranged
-   * for. Activating a route moves emphasis within this set and never changes
+   * for. Activating a graph moves emphasis within this set and never changes
    * it — *selection is emphasis, not filtering, and the filter is the Layout's*.
    */
-  routes: z.array(idSchema).optional(),
+  graphs: z.array(idSchema).optional(),
   /**
-   * Which visible route is active when this layout opens. Absent, the **first
-   * visible route** is (ADR 0026) — resolved on read, so a hand-authored space
+   * Which visible graph is active when this layout opens. Absent, the **first
+   * visible graph** is (ADR 0026) — resolved on read, so a hand-authored space
    * needs nothing here, while a file the app wrote names it outright rather
-   * than depending on route order (ADR 0028).
+   * than depending on graph order (ADR 0028).
    *
-   * Independent of `routes`: a layout may filter without naming an active
-   * route, or name one without filtering. That it names a *visible* route is a
+   * Independent of `graphs`: a layout may filter without naming an active
+   * graph, or name one without filtering. That it names a *visible* graph is a
    * relation between the two fields and is checked in `@project/graph`.
    */
-  activeRoute: idSchema.optional(),
+  activeGraph: idSchema.optional(),
 });
 
 /**
  * A layout carried by the space file, discriminated by `kind`. Every Layout is
- * authored: an automatic strategy computes placement from the cards and routes
+ * authored: an automatic strategy computes placement from the cards and graphs
  * alone, so it has nothing to write down and appears here nowhere (ADR 0025).
  * There is one kind today; the union is what makes a second one cost no
  * migration.
@@ -183,14 +183,14 @@ export const layoutSchema = z.preprocess(
 );
 
 /**
- * The views a space can name without declaring anything: the route-driven graph
+ * The views a space can name without declaring anything: the graph-driven graph
  * and a plain grid. Both are automatic, so they are named, never configured —
  * `defaultView` records intent ("open me like this") and carries no parameters,
  * because parameters would put computed geometry back into authored content
  * (ADR 0025). A `defaultView` naming none of these and no declared layout is a
  * reference error.
  */
-export const BUILT_IN_VIEW_IDS = ['graph', 'grid'] as const;
+export const BUILT_IN_VIEW_IDS = ['flow', 'grid'] as const;
 
 export type BuiltInViewId = (typeof BUILT_IN_VIEW_IDS)[number];
 
@@ -199,31 +199,31 @@ export function isBuiltInViewId(id: string): id is BuiltInViewId {
 }
 
 /**
- * One edge of a route: a directed connection from one card to another (ADR
- * 0032). This is the element an author draws, and the route is the set of them.
+ * One edge of a graph: a directed connection from one card to another (ADR
+ * 0032). This is the element an author draws, and the graph is the set of them.
  *
  * Shape only, as everywhere in this file. Whether both ids name real cards and
- * whether an exact edge occurs more than once need the whole Route/Space in
+ * whether an exact edge occurs more than once need the whole Graph/Space in
  * view and are checked in `@project/graph`.
  */
-export const routeEdgeSchema = z.object({
+export const graphEdgeSchema = z.object({
   from: idSchema,
   to: idSchema,
 });
 
-export const routeSchema = z.object({
+export const graphSchema = z.object({
   id: idSchema,
   title: z.string().min(1),
-  // Optional CSS color for this route's edges; falls back to a palette by order.
+  // Optional CSS color for this graph's edges; falls back to a palette by order.
   color: z.string().min(1).optional(),
   /**
-   * At least one. A route is a set of edges, so a route with none connects
+   * At least one. A graph is a set of edges, so a graph with none connects
    * nothing and draws nothing — and drawing an edge is the gesture that mints a
-   * route in the first place (ADR 0033), so one is the fewest a route is ever
+   * graph in the first place (ADR 0033), so one is the fewest a graph is ever
    * created with. A card may appear as the `from` of several edges (a fork) and
    * the `to` of several (a merge); nothing here constrains that.
    */
-  edges: z.array(routeEdgeSchema).min(1),
+  edges: z.array(graphEdgeSchema).min(1),
 });
 
 /**
@@ -249,10 +249,10 @@ export const spaceFileSchema = z.object({
   id: idSchema,
   title: z.string().min(1),
   /**
-   * May be empty: a space with no routes has no structure yet, which is what a
+   * May be empty: a space with no graphs has no structure yet, which is what a
    * new space *is*. It renders and it cannot be presented (ADR 0015).
    */
-  routes: z.array(routeSchema),
+  graphs: z.array(graphSchema),
   /** Optional: a space can be hand-authored with no coordinates at all. */
   layouts: z.array(layoutSchema).optional(),
   /** A declared layout's id, or a built-in view's. See {@link BUILT_IN_VIEW_IDS}. */
@@ -277,7 +277,7 @@ export const spaceSnapshotSchema = z.object({
   cards: z.array(z.object({ id: uuidSchema, document: cardDocumentSchema })),
 });
 
-const importRouteSchema = routeSchema.extend({ id: uuidSchema.optional() });
+export const importGraphSchema = graphSchema.extend({ id: uuidSchema.optional() });
 const importPositionedLayoutSchema = positionedLayoutSchema.extend({ id: uuidSchema.optional() });
 const importLayoutSchema = z.preprocess(
   defaultPositionedKind,
@@ -286,7 +286,7 @@ const importLayoutSchema = z.preprocess(
 
 export const importSpaceFileSchema = spaceFileSchema.extend({
   id: uuidSchema.optional(),
-  routes: z.array(importRouteSchema),
+  graphs: z.array(importGraphSchema),
   layouts: z.array(importLayoutSchema).optional(),
 });
 

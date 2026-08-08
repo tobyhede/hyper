@@ -12,6 +12,6 @@ export const CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 
 export const oneCardSnapshot: SpaceSnapshot = {
   id: SPACE_ID,
-  document: { version: 2, title: 'One', routes: [] },
+  document: { version: 2, title: 'One', graphs: [] },
   cards: [{ id: CARD_ID, document: { title: 'A', kind: 'markdown', body: '' } }],
 };

@@ -6,9 +6,9 @@ import { activeCard, nodeByTitle, settled, viewportTransform } from './graph';
 // Presenting is the graph canvas under camera control (ADR 0027): the same
 // cards, the same coordinates, drawn close enough that one fills the screen.
 // These tests assert that — that the space is still there, that the camera
-// moved, and that the walk follows edges rather than an index.
+// moved, and that the traversalHistory follows edges rather than an index.
 //
-// The fixture's routes are all lines (see fixture/README.md), which is the
+// The fixture's graphs are all lines (see fixture/README.md), which is the
 // degenerate graph rather than a second kind, so a fork is asserted in unit
 // tests over a purpose-built space and here only via the chrome's shape.
 
@@ -29,7 +29,7 @@ async function present(page: Page): Promise<void> {
   await expect(page.getByTestId('presenting-chrome')).toBeVisible();
 }
 
-test('walks the route, and the space is still what you are looking at', async ({ page }) => {
+test('traverses the graph, and the space is still what you are looking at', async ({ page }) => {
   await present(page);
 
   // No second surface (ADR 0027): every card is still drawn, on the same canvas.
@@ -69,7 +69,7 @@ test('a body heading is just a heading, drawn once alongside the title (ADR 0020
 
   // C's body opens with `# Where Short ends`. A card is one file, so its title
   // and its body live together and a leading heading cannot repeat a title held
-  // elsewhere. Walk A → B → C.
+  // elsewhere. TraversalHistory A → B → C.
   await page.keyboard.press('ArrowRight');
   await page.keyboard.press('ArrowRight');
   await expect(activeCard(page)).toHaveAttribute('data-id', '00000000-0000-4000-8000-000000000005');
@@ -95,7 +95,7 @@ test('the camera closes in on the active card, and pulls back on exit', async ({
   const presenting = await camera(page);
   expect(presenting.zoom).toBeGreaterThan(overview.zoom * 2);
 
-  // Walking moves the camera without changing how close it is.
+  // Traversing moves the camera without changing how close it is.
   await page.keyboard.press('ArrowRight');
   await settled(page);
   const next = await camera(page);
@@ -108,7 +108,7 @@ test('the camera closes in on the active card, and pulls back on exit', async ({
   expect((await camera(page)).zoom).toBeCloseTo(overview.zoom, 1);
 });
 
-test('the chrome names the moves available, and says when the route ends', async ({ page }) => {
+test('the chrome names the moves available, and says when the graph ends', async ({ page }) => {
   await present(page);
 
   // A line gives a one-member choice at each card — the degenerate fork, not a
@@ -144,7 +144,7 @@ test('returning to the overview restores the space and its gestures', async ({ p
   await expect(page.getByTestId('card')).toHaveCount(10);
 
   // Opening works again — through the Card's own control, which is the only
-  // pointer route to it (ADR 0036, 0037).
+  // pointer graph to it (ADR 0036, 0037).
   const b = nodeByTitle(page, 'B');
   await b.hover();
   await b.getByRole('button', { name: 'Edit Card B' }).click();

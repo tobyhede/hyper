@@ -8,7 +8,7 @@ function baseSpace(): Space {
       version: 2,
       id: uuid('00000000-0000-4000-8000-000000000001'),
       title: 'Test',
-      routes: [
+      graphs: [
         {
           id: uuid('00000000-0000-4000-8000-000000000004'),
           title: 'Main',

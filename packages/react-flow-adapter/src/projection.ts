@@ -1,43 +1,43 @@
 import type { Edge, Node, NodeHandle } from '@xyflow/react';
 import { MarkerType, Position } from '@xyflow/react';
-import type { CardId, LayoutPosition, RouteId } from '@project/core';
+import type { CardId, LayoutPosition, GraphId } from '@project/core';
 import { resolveContentCard } from '@project/graph';
 import type {
   CardHandleSet,
-  LayoutCard,
-  LayoutEdge,
-  LayoutGraph,
-  GraphEdge,
-  RouteHandleRef,
+  LayoutStrategyCard,
+  LayoutStrategyEdge,
+  LayoutStrategyGraph,
+  GraphRenderEdge,
+  GraphRenderHandleRef,
   Space,
 } from '@project/graph';
 import type { RoutedEdgeData } from './RoutedEdge';
-import { AUTHORING_HANDLE_DIAMETER, ROUTE_PORT_DIAMETER } from './authoring-handle';
+import { AUTHORING_HANDLE_DIAMETER, GRAPH_PORT_DIAMETER } from './authoring-handle';
 
 const FALLBACK_COLOR = '#8a94a6';
 const DEFAULT_NODE_HEIGHT = 300;
 
 /**
- * How strongly routes other than the active one recede.
+ * How strongly graphs other than the active one recede.
  *
  * A level rather than a boolean, because a view may want more than on/off — and
  * because the adapter should not know that the app has modes. It once carried a
  * third, 'strong', for dimming the graph while presenting; presenting no longer
  * draws the graph at all (ADR 0008), so that level had no caller.
  */
-export type RouteEmphasis = 'equal' | 'subtle';
+export type GraphEmphasis = 'equal' | 'subtle';
 
-/** Opacity applied to routes that are not the active one. */
-export const OTHER_ROUTE_OPACITY: Record<RouteEmphasis, number> = {
+/** Opacity applied to graphs that are not the active one. */
+export const OTHER_GRAPH_OPACITY: Record<GraphEmphasis, number> = {
   equal: 1,
   subtle: 0.35,
 };
 
-/** A route handle resolved for rendering: a color and a vertical offset (px from
+/** A graph handle resolved for rendering: a color and a vertical offset (px from
  *  the node's top) matching where ELK placed the port. */
 export type CardHandle = {
   id: string;
-  routeId: RouteId;
+  graphId: GraphId;
   color: string;
   offsetY: number;
 };
@@ -76,23 +76,23 @@ export type CardNodeData = {
    *  target's body. Absent otherwise — content is not embedded in every node
    *  (ADR 0006), which is the constraint that made this per-card. */
   body?: string;
-  /** The route being emphasised, if any. Drives handle dimming. */
-  activeRouteId: RouteId | null;
-  /** The active Route's colour, used by route-independent authoring handles. */
-  activeRouteColor: string;
-  emphasis: RouteEmphasis;
+  /** The graph being emphasised, if any. Drives handle dimming. */
+  activeGraphId: GraphId | null;
+  /** The active Graph's colour, used by graph-independent authoring handles. */
+  activeGraphColor: string;
+  emphasis: GraphEmphasis;
   sourceHandles: CardHandle[];
   targetHandles: CardHandle[];
 };
 
 export type CardFlowNode = Node<CardNodeData, 'card'>;
 
-export type ColorByRouteId = Readonly<Partial<Record<RouteId, string>>>;
+export type ColorByGraphId = Readonly<Partial<Record<GraphId, string>>>;
 
 const EMPTY_HANDLES: CardHandleSet = { sourceHandles: [], targetHandles: [] };
 
 export interface ProjectCardNodesOptions {
-  /** Card id the walk has reached, if any, to flag as active. */
+  /** Card id the traversalHistory has reached, if any, to flag as active. */
   activeCardId?: CardId | null;
   /** Ordinary renderer selection used to expose continued-authoring handles. */
   selectedCardId?: CardId | null;
@@ -102,23 +102,23 @@ export interface ProjectCardNodesOptions {
    * in the projection rather than every card's.
    */
   showActiveCardContent?: boolean;
-  /** The route to emphasise, if any. */
-  activeRouteId?: RouteId | null;
-  /** The active Route's resolved colour for route authoring controls. */
-  activeRouteColor?: string;
-  emphasis?: RouteEmphasis;
+  /** The graph to emphasise, if any. */
+  activeGraphId?: GraphId | null;
+  /** The active Graph's resolved colour for graph authoring controls. */
+  activeGraphColor?: string;
+  emphasis?: GraphEmphasis;
   /** The laid-out graph; positions and port offsets come from here when present. */
-  layoutGraph?: LayoutGraph;
+  strategyGraph?: LayoutStrategyGraph;
   /** Node height used to evenly distribute handles before the layout resolves. */
   nodeHeight?: number;
-  /** Restrict the projection to these card ids (e.g. one route's cards). */
+  /** Restrict the projection to these card ids (e.g. one graph's cards). */
   cardIds?: readonly CardId[];
 }
 
 function resolveHandles(
-  refs: RouteHandleRef[],
-  colors: ColorByRouteId,
-  card: LayoutCard | undefined,
+  refs: GraphRenderHandleRef[],
+  colors: ColorByGraphId,
+  card: LayoutStrategyCard | undefined,
   nodeHeight: number,
 ): CardHandle[] {
   const count = refs.length;
@@ -129,8 +129,8 @@ function resolveHandles(
     const offsetY = port?.y ?? ((index + 1) / (count + 1)) * nodeHeight;
     return {
       id: ref.id,
-      routeId: ref.routeId,
-      color: colors[ref.routeId] ?? FALLBACK_COLOR,
+      graphId: ref.graphId,
+      color: colors[ref.graphId] ?? FALLBACK_COLOR,
       offsetY,
     };
   });
@@ -139,11 +139,11 @@ function resolveHandles(
 function declaredHandles(
   sourceHandles: readonly CardHandle[],
   targetHandles: readonly CardHandle[],
-  routeIds: readonly RouteId[],
-  card: LayoutCard,
+  graphIds: readonly GraphId[],
+  card: LayoutStrategyCard,
 ): NodeHandle[] {
   const radius = AUTHORING_HANDLE_DIAMETER / 2;
-  const portRadius = ROUTE_PORT_DIAMETER / 2;
+  const portRadius = GRAPH_PORT_DIAMETER / 2;
   const authoring = (
     type: 'source' | 'target',
     side: Position,
@@ -158,11 +158,11 @@ function declaredHandles(
     width: AUTHORING_HANDLE_DIAMETER,
     height: AUTHORING_HANDLE_DIAMETER,
   });
-  const targetByRoute = new Map(targetHandles.map((handle) => [handle.routeId, handle]));
-  const sourceByRoute = new Map(sourceHandles.map((handle) => [handle.routeId, handle]));
-  const fallbackOffset = (index: number) => ((index + 1) / (routeIds.length + 1)) * card.height;
+  const targetByGraph = new Map(targetHandles.map((handle) => [handle.graphId, handle]));
+  const sourceByGraph = new Map(sourceHandles.map((handle) => [handle.graphId, handle]));
+  const fallbackOffset = (index: number) => ((index + 1) / (graphIds.length + 1)) * card.height;
   // The DOM renders only incident overview anchors. Declaring every existing
-  // Route id keeps a completed connection resolvable in the same render that
+  // Graph id keeps a completed connection resolvable in the same render that
   // first makes its target incident, without exposing another visible control.
   //
   // This is also why nothing may force a React Flow remeasure of a placed Card:
@@ -174,7 +174,7 @@ function declaredHandles(
   // Order matters, and the authoring handles come first. React Flow picks the
   // closest declared handle within its connection radius and resolves an exact
   // distance tie by array order. A non-incident anchor's fallback offset can land
-  // exactly on an authoring handle — with one Route it always does, since the
+  // exactly on an authoring handle — with one Graph it always does, since the
   // lone anchor sits at half the Card's height and so do the Left and Right
   // handles. The authoring handle is the one with a DOM element behind it, and a
   // release that resolves to an anchor with none is refused, so the tie has to
@@ -188,35 +188,35 @@ function declaredHandles(
     authoring('target', Position.Right, card.width - radius, card.height / 2 - radius),
     authoring('target', Position.Bottom, card.width / 2 - radius, card.height - radius),
     authoring('target', Position.Left, -radius, card.height / 2 - radius),
-    ...routeIds.map((routeId, index): NodeHandle => {
-      const handle = targetByRoute.get(routeId);
+    ...graphIds.map((graphId, index): NodeHandle => {
+      const handle = targetByGraph.get(graphId);
       return {
-        id: handle?.id ?? `${routeId}::in`,
+        id: handle?.id ?? `${graphId}::in`,
         type: 'target',
         position: Position.Left,
         x: -portRadius,
         y: (handle?.offsetY ?? fallbackOffset(index)) - portRadius,
-        width: ROUTE_PORT_DIAMETER,
-        height: ROUTE_PORT_DIAMETER,
+        width: GRAPH_PORT_DIAMETER,
+        height: GRAPH_PORT_DIAMETER,
       };
     }),
-    ...routeIds.map((routeId, index): NodeHandle => {
-      const handle = sourceByRoute.get(routeId);
+    ...graphIds.map((graphId, index): NodeHandle => {
+      const handle = sourceByGraph.get(graphId);
       return {
-        id: handle?.id ?? `${routeId}::out`,
+        id: handle?.id ?? `${graphId}::out`,
         type: 'source',
         position: Position.Right,
         x: card.width - portRadius,
         y: (handle?.offsetY ?? fallbackOffset(index)) - portRadius,
-        width: ROUTE_PORT_DIAMETER,
-        height: ROUTE_PORT_DIAMETER,
+        width: GRAPH_PORT_DIAMETER,
+        height: GRAPH_PORT_DIAMETER,
       };
     }),
   ];
 }
 
 /**
- * Map cards → React Flow card nodes, attaching per-route handles positioned at
+ * Map cards → React Flow card nodes, attaching per-graph handles positioned at
  * their ELK port offsets. The card id is the React Flow node id.
  *
  * A node carries its card's *title*, not its content (ADR 0006) — the content is
@@ -225,16 +225,16 @@ function declaredHandles(
 export function projectCardNodes(
   space: Space,
   handlesByCard: ReadonlyMap<CardId, CardHandleSet>,
-  colors: ColorByRouteId,
+  colors: ColorByGraphId,
   options: ProjectCardNodesOptions = {},
 ): CardFlowNode[] {
   const activeCardId = options.activeCardId ?? null;
   const showActiveCardContent = options.showActiveCardContent ?? false;
-  const activeRouteId = options.activeRouteId ?? null;
+  const activeGraphId = options.activeGraphId ?? null;
   const emphasis = options.emphasis ?? 'equal';
   const nodeHeight = options.nodeHeight ?? DEFAULT_NODE_HEIGHT;
   const visible = options.cardIds ? new Set(options.cardIds) : null;
-  const laidOut = new Map((options.layoutGraph?.cards ?? []).map((c) => [c.id, c]));
+  const laidOut = new Map((options.strategyGraph?.cards ?? []).map((c) => [c.id, c]));
 
   const source = visible ? space.cards.filter((c) => visible.has(c.id)) : space.cards;
 
@@ -280,7 +280,7 @@ export function projectCardNodes(
             handles: declaredHandles(
               sourceHandles,
               targetHandles,
-              Object.keys(colors) as RouteId[],
+              Object.keys(colors) as GraphId[],
               cardLayout,
             ),
           }
@@ -297,8 +297,8 @@ export function projectCardNodes(
         selectedForAuthoring: card.id === (options.selectedCardId ?? null),
         showContent,
         ...(body !== undefined ? { body } : {}),
-        activeRouteId,
-        activeRouteColor: options.activeRouteColor ?? FALLBACK_COLOR,
+        activeGraphId,
+        activeGraphColor: options.activeGraphColor ?? FALLBACK_COLOR,
         emphasis,
         sourceHandles,
         targetHandles,
@@ -308,17 +308,17 @@ export function projectCardNodes(
   });
 }
 
-export interface ProjectRouteEdgesOptions {
-  /** The route to emphasise, if any. */
-  activeRouteId?: RouteId | null;
-  /** How strongly the other routes recede. */
-  emphasis?: RouteEmphasis;
+export interface ProjectGraphEdgesOptions {
+  /** The graph to emphasise, if any. */
+  activeGraphId?: GraphId | null;
+  /** How strongly the other graphs recede. */
+  emphasis?: GraphEmphasis;
   /** The laid-out graph; ELK's routed edge geometry comes from here when present. */
-  layoutGraph?: LayoutGraph;
+  strategyGraph?: LayoutStrategyGraph;
 }
 
 /** Flatten an edge's routed sections into one point list: start → bends → end. */
-function routedPoints(edge: LayoutEdge | undefined): LayoutPosition[] | undefined {
+function routedPoints(edge: LayoutStrategyEdge | undefined): LayoutPosition[] | undefined {
   if (!edge?.sections?.length) return undefined;
   const points: LayoutPosition[] = [];
   for (const section of edge.sections) {
@@ -327,20 +327,20 @@ function routedPoints(edge: LayoutEdge | undefined): LayoutPosition[] | undefine
   return points;
 }
 
-/** Map route-derived edges → colored React Flow edges drawn along ELK's routing. */
-export function projectRouteEdges(
-  routeEdges: readonly GraphEdge[],
-  colors: ColorByRouteId,
-  options: ProjectRouteEdgesOptions = {},
+/** Map graph-derived edges → colored React Flow edges drawn along ELK's routing. */
+export function projectGraphEdges(
+  graphRenderEdges: readonly GraphRenderEdge[],
+  colors: ColorByGraphId,
+  options: ProjectGraphEdgesOptions = {},
 ): Edge[] {
-  const activeRouteId = options.activeRouteId ?? null;
+  const activeGraphId = options.activeGraphId ?? null;
   const emphasis = options.emphasis ?? 'equal';
-  const laidEdges = new Map((options.layoutGraph?.edges ?? []).map((e) => [e.id, e]));
+  const laidEdges = new Map((options.strategyGraph?.edges ?? []).map((e) => [e.id, e]));
 
-  return routeEdges.map((edge) => {
-    const color = colors[edge.routeId] ?? FALLBACK_COLOR;
-    const isActiveRoute = edge.routeId === activeRouteId;
-    const emphasized = isActiveRoute || emphasis === 'equal';
+  return graphRenderEdges.map((edge) => {
+    const color = colors[edge.graphId] ?? FALLBACK_COLOR;
+    const isActiveGraph = edge.graphId === activeGraphId;
+    const emphasized = isActiveGraph || emphasis === 'equal';
     const points = routedPoints(laidEdges.get(edge.id));
 
     return {
@@ -352,16 +352,16 @@ export function projectRouteEdges(
       target: edge.target,
       sourceHandle: edge.sourceHandle,
       targetHandle: edge.targetHandle,
-      className: `rf-route-edge rf-route-edge--${edge.routeId}`,
+      className: `rf-graph-edge rf-graph-edge--${edge.graphId}`,
       animated: emphasized,
       style: {
         stroke: color,
-        strokeWidth: isActiveRoute ? 3 : 2,
-        opacity: emphasized ? 1 : OTHER_ROUTE_OPACITY[emphasis],
+        strokeWidth: isActiveGraph ? 3 : 2,
+        opacity: emphasized ? 1 : OTHER_GRAPH_OPACITY[emphasis],
       },
       markerEnd: { type: MarkerType.ArrowClosed, color },
       data: {
-        routeId: edge.routeId,
+        graphId: edge.graphId,
         ...(points !== undefined ? { points } : {}),
       } satisfies RoutedEdgeData,
     };

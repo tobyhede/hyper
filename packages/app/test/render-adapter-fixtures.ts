@@ -17,8 +17,8 @@ export function node(id: string, x: number, y: number, title = id): CardFlowNode
       active: false,
       selectedForAuthoring: false,
       showContent: false,
-      activeRouteId: null,
-      activeRouteColor: '#8a94a6',
+      activeGraphId: null,
+      activeGraphColor: '#8a94a6',
       emphasis: 'equal',
     },
   };

@@ -1,17 +1,17 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   positionedStrategy,
-  type LayoutGraph,
+  type LayoutStrategyGraph,
   type LayoutStrategy,
   type Placement,
 } from '@project/graph';
 
 export type PlacementRenderingState =
   | { readonly kind: 'pending' }
-  | { readonly kind: 'ready'; readonly graph: LayoutGraph }
+  | { readonly kind: 'ready'; readonly strategyGraph: LayoutStrategyGraph }
   | { readonly kind: 'failed'; readonly error: Error };
 
-/** What the graph area draws, given the placement and whether cards are on screen. */
+/** What the canvas draws, given the placement and whether Cards are on screen. */
 export type CanvasContent =
   | { readonly kind: 'failure'; readonly error: Error }
   | { readonly kind: 'arrangement' }
@@ -35,7 +35,7 @@ export function canvasContent(
 }
 
 interface PlacementRenderingResult {
-  readonly input: LayoutGraph;
+  readonly input: LayoutStrategyGraph;
   readonly strategy: LayoutStrategy;
   readonly state: Exclude<PlacementRenderingState, { readonly kind: 'pending' }>;
 }
@@ -45,7 +45,7 @@ function toError(reason: unknown): Error {
 }
 
 export function usePlacementRendering(
-  graph: LayoutGraph,
+  strategyGraph: LayoutStrategyGraph,
   strategy: LayoutStrategy,
   authoredPlacement: Placement | null,
 ): PlacementRenderingState {
@@ -56,7 +56,7 @@ export function usePlacementRendering(
   //
   // Keyed on the Placement's identity, which Space Authoring keeps stable while
   // the value is unchanged — so a projection reporting the geometry already on
-  // screen does not re-arrange a settled graph.
+  // screen does not re-arrange a settled strategyGraph.
   const authoredStrategy = useMemo<LayoutStrategy | null>(
     () => (authoredPlacement === null ? null : positionedStrategy(authoredPlacement)),
     [authoredPlacement],
@@ -66,20 +66,20 @@ export function usePlacementRendering(
   useEffect(() => {
     let current = true;
     void Promise.resolve()
-      .then(() => renderingStrategy(graph))
+      .then(() => renderingStrategy(strategyGraph))
       .then((placed) => {
         if (current) {
           setResult({
-            input: graph,
+            input: strategyGraph,
             strategy: renderingStrategy,
-            state: { kind: 'ready', graph: placed },
+            state: { kind: 'ready', strategyGraph: placed },
           });
         }
       })
       .catch((reason: unknown) => {
         if (current) {
           setResult({
-            input: graph,
+            input: strategyGraph,
             strategy: renderingStrategy,
             state: { kind: 'failed', error: toError(reason) },
           });
@@ -88,9 +88,9 @@ export function usePlacementRendering(
     return () => {
       current = false;
     };
-  }, [graph, renderingStrategy]);
+  }, [strategyGraph, renderingStrategy]);
 
-  return result?.input === graph && result.strategy === renderingStrategy
+  return result?.input === strategyGraph && result.strategy === renderingStrategy
     ? result.state
     : { kind: 'pending' };
 }

@@ -24,15 +24,15 @@ import {
   type OnEdgesChange,
   type OnNodesChange,
 } from '@xyflow/react';
-import type { LayoutPosition, Route } from '@project/core';
+import type { LayoutPosition, Graph } from '@project/core';
 import {
   edgeTypes,
   nodeTypes,
-  RouteConnectionLine,
-  RouteHud,
+  GraphConnectionLine,
+  GraphHud,
   type CardFlowNode,
 } from '@project/react-flow-adapter';
-import { activeRouteColor } from '../colors';
+import { activeGraphColor } from '../colors';
 import { CARD_SIZE } from '../card';
 
 /**
@@ -76,7 +76,7 @@ const ARIA_LABEL_CONFIG = {
     'Press enter or space to open a Card, the arrow keys to move it, and escape to cancel.',
   'node.a11yDescription.keyboardDisabled':
     'Press enter or space to open a Card, the arrow keys to move it, and escape to cancel.',
-  'edge.a11yDescription.default': 'An Edge a Route draws from one Card to the next.',
+  'edge.a11yDescription.default': 'An Edge a Graph draws from one Card to the next.',
 } as const;
 
 /**
@@ -122,7 +122,7 @@ function OverviewCamera({ presenting }: { presenting: boolean }) {
 }
 
 /**
- * Moves the camera to the card a walk has reached (ADR 0027).
+ * Moves the camera to the card a traversalHistory has reached (ADR 0027).
  *
  * There is no second surface: presenting is this canvas, drawn close enough that
  * one card fills the screen. `setCenter` is the whole mechanism.
@@ -130,7 +130,7 @@ function OverviewCamera({ presenting }: { presenting: boolean }) {
  * Arriving from the overview changes zoom by a large factor, and a single
  * combined move whips — the translation happens while scaled in, so the cards
  * tear past. So a zoom-changing move is **split**: pan at the wider of the two
- * scales, then close in. Card-to-card inside a walk holds zoom, so it is one
+ * scales, then close in. Card-to-card inside a traversalHistory holds zoom, so it is one
  * move. (Copied from impress.js, which is the one thing the spike kept from it.)
  */
 function PresentingCamera({ activeCardId }: { activeCardId: string | null }) {
@@ -179,7 +179,7 @@ function PresentingCamera({ activeCardId }: { activeCardId: string | null }) {
  * The endpoint comes from `useConnection`, which converts it to flow coordinates
  * before handing it over — so this needs no `screenToFlowPosition` and no
  * viewport subscription to stay put under pan and zoom. Tracking the point in
- * `GraphView`'s own state instead re-rendered the whole flow on every pointer
+ * `SpaceCanvas`'s own state instead re-rendered the whole flow on every pointer
  * frame of a connection.
  */
 function NewCardPreview({
@@ -230,10 +230,10 @@ function NewCardPreview({
   );
 }
 
-export interface GraphViewProps {
+export interface SpaceCanvasProps {
   nodes: CardFlowNode[];
   edges: Edge[];
-  /** The card a walk has reached, or `null` in overview. */
+  /** The card a traversalHistory has reached, or `null` in overview. */
   activeCardId: string | null;
   presenting: boolean;
   /**
@@ -269,13 +269,13 @@ export interface GraphViewProps {
   onCompleteCardTitle: (cardId: string, title: string) => string | null;
   /** Which Cards resolve to content the opened editor can author. */
   editableCardIds: ReadonlySet<string>;
-  routes: readonly Route[];
-  colorByRouteId: Readonly<Record<string, string>>;
-  activeRouteId: string | null;
-  activeRouteCardIds: ReadonlySet<string>;
+  graphs: readonly Graph[];
+  colorByGraphId: Readonly<Record<string, string>>;
+  activeGraphId: string | null;
+  activeGraphCardIds: ReadonlySet<string>;
 }
 
-export function GraphView({
+export function SpaceCanvas({
   nodes,
   edges,
   activeCardId,
@@ -292,11 +292,11 @@ export function GraphView({
   onOpenCard,
   onCompleteCardTitle,
   editableCardIds,
-  routes,
-  colorByRouteId,
-  activeRouteId,
-  activeRouteCardIds,
-}: GraphViewProps) {
+  graphs,
+  colorByGraphId,
+  activeGraphId,
+  activeGraphCardIds,
+}: SpaceCanvasProps) {
   const connectionGesture = useRef(false);
   const [modifierCreatesCard, setModifierCreatesCard] = useState(false);
   const [selectedEdgeIds, setSelectedEdgeIds] = useState<ReadonlySet<string>>(() => new Set());
@@ -475,10 +475,10 @@ export function GraphView({
 
   const connectionLineStyle = useMemo(
     () => ({
-      stroke: activeRouteColor(colorByRouteId, activeRouteId),
+      stroke: activeGraphColor(colorByGraphId, activeGraphId),
       strokeWidth: 3,
     }),
-    [activeRouteId, colorByRouteId],
+    [activeGraphId, colorByGraphId],
   );
 
   const selectableEdges = useMemo(
@@ -527,7 +527,7 @@ export function GraphView({
       // per node, so the gesture does not change meaning two pixels away from a
       // Card.
       zoomOnDoubleClick={false}
-      // While presenting the arrow keys are the walk's, so React Flow must not
+      // While presenting the arrow keys are the traversalHistory's, so React Flow must not
       // also read them as moving or selecting a node.
       nodesDraggable={editable && !presenting}
       nodesFocusable={!presenting}
@@ -540,22 +540,22 @@ export function GraphView({
       deleteKeyCode={null}
       // No `connectionMode`: the default is Strict, and every legal drop here is
       // already source-to-target. Loose only adds source-to-source, which the
-      // authoring handles refuse via `isConnectableEnd` and the route ports via
+      // authoring handles refuse via `isConnectableEnd` and the graph ports via
       // `pointer-events: none` — so it advertised a capability the design forbids.
       connectionLineStyle={connectionLineStyle}
-      connectionLineComponent={RouteConnectionLine}
+      connectionLineComponent={GraphConnectionLine}
       onMouseMove={handleMouseMove}
       edgesFocusable={false}
       minZoom={0.2}
     >
       <Background gap={24} />
       <Controls showInteractive={false} />
-      {routes.length > 0 && (
-        <RouteHud
-          routes={routes}
-          colorByRouteId={colorByRouteId}
-          activeRouteId={activeRouteId}
-          activeRouteCardIds={activeRouteCardIds}
+      {graphs.length > 0 && (
+        <GraphHud
+          graphs={graphs}
+          colorByGraphId={colorByGraphId}
+          activeGraphId={activeGraphId}
+          activeGraphCardIds={activeGraphCardIds}
         />
       )}
       <OverviewCamera presenting={presenting} />

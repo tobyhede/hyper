@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { uuidSchema } from '@project/core';
-import { buildLayoutGraph, loadSpace, type Space } from '@project/graph';
+import { buildLayoutStrategyGraph, loadSpace, type Space } from '@project/graph';
 import { CARD_SIZE } from '../src/card';
 import { resolveView } from '../src/view';
 import { cardFile } from './card-files';
@@ -35,7 +35,7 @@ function spaceWith(extra: Record<string, unknown> = {}): Space {
       version: 2,
       id: '00000000-0000-4000-8000-000000000001',
       title: 'T',
-      routes: ROUTES,
+      graphs: ROUTES,
       ...extra,
     },
     CARDS,
@@ -47,7 +47,7 @@ function spaceWith(extra: Record<string, unknown> = {}): Space {
 /** Run a resolved view's strategy over its space, so we test what it *does*. */
 async function arrange(space: Space) {
   const view = resolveView(space);
-  const graph = buildLayoutGraph(
+  const graph = buildLayoutStrategyGraph(
     space.cards.map((c) => c.id),
     new Map(),
     [],
@@ -70,7 +70,7 @@ describe('resolveView', () => {
     expect(view.layout).toBeNull();
     expect(view).not.toHaveProperty('automatic');
     expect(space.defaultView).toBe('00000000-0000-4000-8000-000000000022');
-    const graph = buildLayoutGraph(
+    const graph = buildLayoutStrategyGraph(
       space.cards.map((card) => card.id),
       new Map(),
       [],
@@ -91,7 +91,7 @@ describe('resolveView', () => {
     expect(view.id).toBe('00000000-0000-4000-8000-000000000022');
     expect(view.layout?.title).toBe('Working');
     expect(space.defaultView).toBe('grid');
-    const graph = buildLayoutGraph(
+    const graph = buildLayoutStrategyGraph(
       space.cards.map((card) => card.id),
       new Map(),
       [],
@@ -113,9 +113,9 @@ describe('resolveView', () => {
     ).toThrow('The selected Layout 00000000-0000-4000-8000-000000000099 does not exist.');
   });
 
-  it('falls back to the route-driven graph when a space names no view', () => {
+  it('falls back to the graph-driven graph when a space names no view', () => {
     const view = resolveView(spaceWith());
-    expect(view.id).toBe('graph');
+    expect(view.id).toBe('flow');
     expect(view.layout).toBeNull();
   });
 
@@ -147,13 +147,13 @@ describe('resolveView', () => {
 
   it('ignores a declared Layout the space does not open in', () => {
     const view = resolveView(spaceWith({ layouts: [WORKING] }));
-    expect(view.id).toBe('graph');
+    expect(view.id).toBe('flow');
     expect(view.layout).toBeNull();
   });
 
-  it('shows every route and opens on the first when no Layout filters', () => {
+  it('shows every graph and opens on the first when no Layout filters', () => {
     const space = spaceWith({
-      routes: [
+      graphs: [
         ...ROUTES,
         {
           id: '00000000-0000-4000-8000-000000000020',
@@ -168,16 +168,16 @@ describe('resolveView', () => {
       ],
     });
     const view = resolveView(space);
-    expect(view.visibleRouteIds).toEqual([
+    expect(view.visibleGraphIds).toEqual([
       '00000000-0000-4000-8000-000000000004',
       '00000000-0000-4000-8000-000000000020',
     ]);
-    expect(view.activeRouteId).toBe('00000000-0000-4000-8000-000000000004');
+    expect(view.activeGraphId).toBe('00000000-0000-4000-8000-000000000004');
   });
 
-  it('shows only the routes its Layout names', () => {
+  it('shows only the graphs its Layout names', () => {
     const space = spaceWith({
-      routes: [
+      graphs: [
         ...ROUTES,
         {
           id: '00000000-0000-4000-8000-000000000020',
@@ -190,18 +190,18 @@ describe('resolveView', () => {
           ],
         },
       ],
-      layouts: [{ ...WORKING, routes: ['00000000-0000-4000-8000-000000000020'] }],
+      layouts: [{ ...WORKING, graphs: ['00000000-0000-4000-8000-000000000020'] }],
       defaultView: '00000000-0000-4000-8000-000000000022',
     });
     const view = resolveView(space);
-    expect(view.visibleRouteIds).toEqual(['00000000-0000-4000-8000-000000000020']);
+    expect(view.visibleGraphIds).toEqual(['00000000-0000-4000-8000-000000000020']);
   });
 
-  it('opens on the first *visible* route, not the space’s first', () => {
+  it('opens on the first *visible* graph, not the space’s first', () => {
     // The filter is what the fallback runs over. Reading it off the space would
-    // open active on a route the Layout does not draw.
+    // open active on a graph the Layout does not draw.
     const space = spaceWith({
-      routes: [
+      graphs: [
         ...ROUTES,
         {
           id: '00000000-0000-4000-8000-000000000020',
@@ -214,15 +214,15 @@ describe('resolveView', () => {
           ],
         },
       ],
-      layouts: [{ ...WORKING, routes: ['00000000-0000-4000-8000-000000000020'] }],
+      layouts: [{ ...WORKING, graphs: ['00000000-0000-4000-8000-000000000020'] }],
       defaultView: '00000000-0000-4000-8000-000000000022',
     });
-    expect(resolveView(space).activeRouteId).toBe('00000000-0000-4000-8000-000000000020');
+    expect(resolveView(space).activeGraphId).toBe('00000000-0000-4000-8000-000000000020');
   });
 
-  it('honours a Layout’s named activeRoute over the first', () => {
+  it('honours a Layout’s named activeGraph over the first', () => {
     const space = spaceWith({
-      routes: [
+      graphs: [
         ...ROUTES,
         {
           id: '00000000-0000-4000-8000-000000000020',
@@ -235,36 +235,36 @@ describe('resolveView', () => {
           ],
         },
       ],
-      layouts: [{ ...WORKING, activeRoute: '00000000-0000-4000-8000-000000000020' }],
+      layouts: [{ ...WORKING, activeGraph: '00000000-0000-4000-8000-000000000020' }],
       defaultView: '00000000-0000-4000-8000-000000000022',
     });
     const view = resolveView(space);
-    expect(view.visibleRouteIds).toEqual([
+    expect(view.visibleGraphIds).toEqual([
       '00000000-0000-4000-8000-000000000004',
       '00000000-0000-4000-8000-000000000020',
     ]);
-    expect(view.activeRouteId).toBe('00000000-0000-4000-8000-000000000020');
+    expect(view.activeGraphId).toBe('00000000-0000-4000-8000-000000000020');
   });
 
-  it('has no active route in a space with none (ADR 0015)', () => {
-    const view = resolveView(spaceWith({ routes: [] }));
-    expect(view.visibleRouteIds).toEqual([]);
-    expect(view.activeRouteId).toBeNull();
+  it('has no active graph in a space with none (ADR 0015)', () => {
+    const view = resolveView(spaceWith({ graphs: [] }));
+    expect(view.visibleGraphIds).toEqual([]);
+    expect(view.activeGraphId).toBeNull();
   });
 
-  it('has no active route when a Layout shows none', () => {
-    // Empty is not absent: absent means every route, empty means this layout
-    // draws no routes at all, and there is then nothing to be active.
+  it('has no active graph when a Layout shows none', () => {
+    // Empty is not absent: absent means every graph, empty means this layout
+    // draws no graphs at all, and there is then nothing to be active.
     const space = spaceWith({
-      layouts: [{ ...WORKING, routes: [] }],
+      layouts: [{ ...WORKING, graphs: [] }],
       defaultView: '00000000-0000-4000-8000-000000000022',
     });
-    expect(resolveView(space).activeRouteId).toBeNull();
+    expect(resolveView(space).activeGraphId).toBeNull();
   });
 
-  it('opens a space with no routes, which is where editing starts (ADR 0015)', async () => {
+  it('opens a space with no graphs, which is where editing starts (ADR 0015)', async () => {
     const space = spaceWith({
-      routes: [],
+      graphs: [],
       layouts: [
         {
           id: '00000000-0000-4000-8000-000000000035',

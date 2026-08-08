@@ -8,7 +8,7 @@ const snapshot = (title: string): SpaceSnapshot =>
     document: {
       version: 2,
       title,
-      routes: [
+      graphs: [
         {
           id: '00000000-0000-4000-8000-000000000004',
           title: 'Main',
@@ -61,7 +61,7 @@ it('revalidates when the session installs a different working snapshot', () => {
 });
 
 it('throws the validation failure every time an invalid snapshot is read', () => {
-  // A Route naming Cards the snapshot does not carry: valid wire shape, invalid
+  // A Graph naming Cards the snapshot does not carry: valid wire shape, invalid
   // aggregate, so this fails domain intake rather than the schema.
   const base = snapshot('Space');
   const dangling: SpaceSnapshot = { ...base, cards: [] };

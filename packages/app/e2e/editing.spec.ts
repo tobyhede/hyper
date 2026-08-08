@@ -272,7 +272,7 @@ test('a dragged card stays where it is dropped, and nothing else moves', async (
   }
 });
 
-test('selecting Graph or Grid is navigation and does not persist', async ({ page }) => {
+test('selecting Flow or Grid is navigation and does not persist', async ({ page }) => {
   await page.goto('/');
   const a = nodeByTitle(page, 'A').first();
   await expect(a).toBeVisible();
@@ -284,8 +284,8 @@ test('selecting Graph or Grid is navigation and does not persist', async ({ page
   await expect(page.getByText('Layouts · authored')).toBeVisible();
   await page.keyboard.press('Escape');
 
-  await page.getByTestId('route-selector').click();
-  await expect(page.getByText('Active route', { exact: true })).toBeVisible();
+  await page.getByTestId('graph-selector').click();
+  await expect(page.getByText('Active Graph', { exact: true })).toBeVisible();
   await page.keyboard.press('Escape');
 
   await page.getByTestId('view-selector').click();
@@ -296,17 +296,15 @@ test('selecting Graph or Grid is navigation and does not persist', async ({ page
   await expect(persistence).toHaveAttribute('data-revision', '0');
 
   await page.getByTestId('view-selector').click();
-  await page.getByRole('option', { name: 'Graph' }).click();
-  await expect(page.getByTestId('view-selector')).toContainText('Graph');
+  await page.getByRole('option', { name: 'Flow' }).click();
+  await expect(page.getByTestId('view-selector')).toContainText('Flow');
   await expect(persistence).toHaveAttribute('data-revision', '0');
 });
 
-test('connecting from Graph and Grid converts atomically without moving Cards', async ({
-  page,
-}) => {
+test('connecting from Flow and Grid converts atomically without moving Cards', async ({ page }) => {
   await page.goto('/');
   for (const [index, view, targetTitle] of [
-    [0, 'Graph', 'E'],
+    [0, 'Flow', 'E'],
     [1, 'Grid', 'F'],
   ] as const) {
     await test.step(view, async () => {
@@ -464,7 +462,7 @@ test('a completed drag persists automatically', async ({ page }) => {
   await expect(page.getByRole('button', { name: /save/i })).toHaveCount(0);
 });
 
-test('a selected Card exposes four circular handles coloured as the active Route', async ({
+test('a selected Card exposes four circular handles coloured as the active Graph', async ({
   page,
 }) => {
   await page.goto('/');
@@ -477,8 +475,8 @@ test('a selected Card exposes four circular handles coloured as the active Route
   await expect(handles).toHaveCount(4);
   await expect(handles.first()).toHaveCSS('width', '24px');
   await expect(handles.first()).toHaveCSS('height', '24px');
-  const routeStroke = await page
-    .locator('.rf-route-edge')
+  const graphStroke = await page
+    .locator('.rf-graph-edge')
     .filter({ has: page.locator('.react-flow__edge-path') })
     .first()
     .locator('.react-flow__edge-path')
@@ -486,7 +484,7 @@ test('a selected Card exposes four circular handles coloured as the active Route
   const handleColors = await handles.evaluateAll((elements) =>
     elements.map((element) => getComputedStyle(element).backgroundColor),
   );
-  expect(handleColors).toEqual(Array(4).fill(routeStroke));
+  expect(handleColors).toEqual(Array(4).fill(graphStroke));
   expect(
     await handles.evaluateAll((elements) =>
       elements.every((element) => getComputedStyle(element).borderRadius === '50%'),
@@ -495,7 +493,7 @@ test('a selected Card exposes four circular handles coloured as the active Route
   await expect(a.locator('.rf-card-node__port').first()).toHaveCSS('opacity', '0');
 });
 
-test('drawing between existing Cards persists one active-Route Edge and selects the target', async ({
+test('drawing between existing Cards persists one active-Graph Edge and selects the target', async ({
   page,
 }) => {
   await page.goto('/');
@@ -543,7 +541,7 @@ test('drawing between existing Cards persists one active-Route Edge and selects 
   await expect(page.getByTestId('open-card')).toHaveCount(0);
 });
 
-test('an authored Edge is immediately available when presenting the Route', async ({ page }) => {
+test('an authored Edge is immediately available when presenting the Graph', async ({ page }) => {
   await page.goto('/');
   const source = nodeByTitle(page, 'E').first();
   const target = nodeByTitle(page, 'A').first();
@@ -552,7 +550,7 @@ test('an authored Edge is immediately available when presenting the Route', asyn
   await expect(page.locator('.react-flow__edge-path').first()).toHaveAttribute('d', /L/);
 
   // Convert the Algorithmic View through the public placement gesture before
-  // authoring E → A on Long. That Edge makes E the Route's only entry Card:
+  // authoring E → A on Long. That Edge makes E the Graph's only entry Card:
   // A was the old entry, but now has an incoming Edge.
   await dragBy(page, source, 0, -100);
   const persistence = page.getByTestId('persistence-status');
@@ -624,7 +622,7 @@ test('an Edge drawn from the presented Card is a move the presenter can take now
   await expect(persistence).toHaveText('Persisted');
 
   // The chrome enumerates the active Card's outgoing Edges, so the Edge just
-  // drawn is available without leaving and re-entering the walk.
+  // drawn is available without leaving and re-entering the traversalHistory.
   await expect(moves).toHaveText(['B', 'A']);
 });
 
@@ -663,7 +661,7 @@ test('drawing an existing Edge from an Algorithmic View does not convert or pers
  * first selected.
  *
  * The second one is the whole point. A Card's declared handles (`projection.ts`)
- * include every Route id, not only the ones incident to it, so a completed
+ * include every Graph id, not only the ones incident to it, so a completed
  * connection resolves in the same render that first makes its target incident.
  * Forcing React Flow to re-measure from the DOM replaces those declarations with
  * only the anchors actually rendered, which drops the not-yet-incident ones — and
@@ -705,7 +703,7 @@ test('a second connection drawn in the same session resolves its handles', async
   await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
 });
 
-test('changing the active Route recolours authoring handles without persisting or filtering', async ({
+test('changing the active Graph recolours authoring handles without persisting or filtering', async ({
   page,
 }) => {
   await page.goto('/');
@@ -717,7 +715,7 @@ test('changing the active Route recolours authoring handles without persisting o
   const handle = source.locator('.rf-card-node__authoring-handle--source').first();
   const longColour = await handle.evaluate((element) => getComputedStyle(element).backgroundColor);
 
-  await page.getByTestId('route-selector').click();
+  await page.getByTestId('graph-selector').click();
   await page.getByRole('option', { name: 'Mid' }).click();
 
   await expect(handle).not.toHaveCSS('background-color', longColour);
@@ -884,7 +882,7 @@ test('a duplicate Edge is marked invalid while the drag is still live', async ({
     return handle;
   };
 
-  // A→B is already an Edge of the active Route; A→E is not.
+  // A→B is already an Edge of the active Graph; A→E is not.
   await startDrag();
   const overDuplicate = await dragOnto('B');
   // Wait for React Flow to mark the handle as the drag's current target before
@@ -972,11 +970,11 @@ test('an opened Card keeps Tab inside it, so the graph behind cannot take focus'
 });
 
 /**
- * The same containment, and the pointer gesture that walked straight out of it.
+ * The same containment, and the pointer gesture that traversed straight out of it.
  *
  * `containTab` is bound to the panel, so it only ever sees a `Tab` pressed while
  * focus is already inside. A mousedown on anything unfocusable moves focus to
- * `<body>`, and from there the handler never fires at all: `Tab` walks the
+ * `<body>`, and from there the handler never fires at all: `Tab` traverses the
  * document from the top, into the toolbar and on to the Card nodes the pane
  * covers. Two surfaces are unfocusable and always clickable — the backdrop,
  * which is visible at every viewport because the panel letterboxes inside it,

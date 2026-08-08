@@ -28,7 +28,7 @@ import { markdownCardDocumentSchema, markdownCardSchema } from '../src/index';
  * Only the markdown pair is guarded, because only that one is passed through an
  * authoring surface that cannot report its own refusal. The alias pair is built
  * the same way and earns the same guard the day an Alias document takes the
- * same route.
+ * same graph.
  */
 describe('a stored markdown document is the card less its id', () => {
   const CARD_ID = '00000000-0000-4000-8000-000000000002';

@@ -43,16 +43,16 @@ const markdownFileCount = (directory: string): number =>
 export const FIXTURE_CARD_COUNT =
   markdownFileCount(fixtureDir) + markdownFileCount(`${fixtureDir}/cards`);
 
-/** Routes are a space's only structure, so every Edge the graph draws is one of
- *  a Route's authored `{from, to}` pairs. */
+/** Graphs are a space's only structure, so every Edge the graph draws is one of
+ *  a Graph's authored `{from, to}` pairs. */
 export const FIXTURE_EDGE_COUNT = (
   JSON.parse(readFileSync(`${fixtureDir}/space.json`, 'utf8')) as {
-    routes: readonly { edges: readonly unknown[] }[];
+    graphs: readonly { edges: readonly unknown[] }[];
   }
-).routes.reduce((total, route) => total + route.edges.length, 0);
+).graphs.reduce((total, graph) => total + graph.edges.length, 0);
 
 /** Authoring presents one handle per side of a Card, source and target alike —
- *  four sides, route-independent (ADR 0033). */
+ *  four sides, graph-independent (ADR 0033). */
 export const AUTHORING_HANDLE_SIDES = 4;
 
 /* -------------------------------------------------------------------------- */
@@ -66,10 +66,10 @@ export function nodeByTitle(page: Page, title: string): Locator {
 }
 
 /**
- * The Card a walk is standing on, by the class the projection marks it with.
+ * The Card a traversalHistory is standing on, by the class the projection marks it with.
  *
  * Shared because presenting is asserted from both projects: `presenting.spec`
- * walks the fixture's authored Routes, and `new-space.spec` presents the Route a
+ * traverses the fixture's authored Graphs, and `new-space.spec` presents the Graph a
  * self-connection mints in a Space that started with none. The class is the
  * render layer's, not the domain's, so a second copy of the string is one the
  * next rename leaves behind.
@@ -183,7 +183,7 @@ export async function dragBy(page: Page, node: Locator, dx: number, dy: number):
  *  geometry and is never authored (ADR 0033). */
 export type HandleSide = 'top' | 'right' | 'bottom' | 'left';
 
-/** A Card's route-independent authoring handle on one side. */
+/** A Card's graph-independent authoring handle on one side. */
 export function authoringHandle(
   node: Locator,
   type: 'source' | 'target',

@@ -4,7 +4,11 @@ import ELK, {
   type ElkPort,
   type LayoutOptions,
 } from 'elkjs/lib/elk.bundled.js';
-import type { LayoutEdgeSection, LayoutGraph, LayoutStrategy } from '@project/graph';
+import type {
+  LayoutStrategyEdgeSection,
+  LayoutStrategyGraph,
+  LayoutStrategy,
+} from '@project/graph';
 import { DEFAULT_ELK_LAYOUT_OPTIONS, elkPortId, PORT_ID_SEPARATOR } from './layout';
 
 /**
@@ -12,7 +16,7 @@ import { DEFAULT_ELK_LAYOUT_OPTIONS, elkPortId, PORT_ID_SEPARATOR } from './layo
  * all a strategy is (ADR 0005) — and the engine is injectable so the seam can be
  * tested without running elkjs.
  *
- * Automatic: it computes placement from the cards and routes, so no Layout
+ * Automatic: it computes placement from the cards and graphs, so no Layout
  * stands behind it. A view of it is still editable — the edit **converts** the
  * arrangement into a Layout and is written there (ADR 0025).
  */
@@ -28,11 +32,11 @@ export function elkStrategy(
   layoutOptions: LayoutOptions = DEFAULT_ELK_LAYOUT_OPTIONS,
   engine: ElkEngine = defaultEngine,
 ): LayoutStrategy {
-  return async (graph: LayoutGraph): Promise<LayoutGraph> => {
+  return async (strategyGraph: LayoutStrategyGraph): Promise<LayoutStrategyGraph> => {
     const elkGraph: ElkGraphNode = {
       id: 'root',
       layoutOptions,
-      children: graph.cards.map((card) => ({
+      children: strategyGraph.cards.map((card) => ({
         id: card.id,
         width: card.width,
         height: card.height,
@@ -44,7 +48,7 @@ export function elkStrategy(
           },
         })),
       })),
-      edges: graph.edges.map((edge): ElkExtendedEdge => ({
+      edges: strategyGraph.edges.map((edge): ElkExtendedEdge => ({
         id: edge.id,
         sources: [elkPortId(edge.source, edge.sourceHandle)],
         targets: [elkPortId(edge.target, edge.targetHandle)],
@@ -57,7 +61,7 @@ export function elkStrategy(
     // ELK's routed geometry, keyed by edge id. Points are in the root graph's
     // coordinate space — the same one the node positions come back in — so they
     // map straight onto React Flow's flow coordinates without translation.
-    const sectionsByEdgeId = new Map<string, LayoutEdgeSection[]>();
+    const sectionsByEdgeId = new Map<string, LayoutStrategyEdgeSection[]>();
     for (const edge of laid.edges ?? []) {
       if (!edge.sections?.length) continue;
       sectionsByEdgeId.set(
@@ -73,7 +77,7 @@ export function elkStrategy(
     }
 
     return {
-      cards: graph.cards.map((card) => {
+      cards: strategyGraph.cards.map((card) => {
         const child = byId.get(card.id);
         if (!child) return card;
 
@@ -97,7 +101,7 @@ export function elkStrategy(
       }),
       // Carry ELK's routed geometry back onto the edges so the render layer can
       // draw the channels ELK computed rather than its own bezier (issue 03).
-      edges: graph.edges.map((edge) => {
+      edges: strategyGraph.edges.map((edge) => {
         const sections = sectionsByEdgeId.get(edge.id);
         return sections ? { ...edge, sections } : edge;
       }),

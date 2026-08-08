@@ -1,4 +1,4 @@
-import type { LayoutCard, LayoutGraph, LayoutStrategy } from './layout';
+import type { LayoutStrategyCard, LayoutStrategyGraph, LayoutStrategy } from './layout';
 import type { Placement } from './placement';
 
 /**
@@ -7,7 +7,7 @@ import type { Placement } from './placement';
  * The third strategy, and the only one that *reads* geometry rather than
  * computing it — placement is authored content, not an artifact of an algorithm
  * (ADR 0025). It is the one strategy with a **Layout** behind it: the Placement
- * it takes is that Layout's, and `Placement.fromLayoutGraph` is this same
+ * it takes is that Layout's, and `Placement.fromLayoutStrategyGraph` is this same
  * conversion run backwards. Like `gridStrategy` it consumes only the cards: it never looks at
  * the edges, places no ports, and populates no edge sections, leaving the render
  * layer to spread handles evenly and draw a plain curve. If this file ever needs
@@ -29,7 +29,7 @@ interface Bounds {
   maxY: number;
 }
 
-function boundsOf(cards: readonly LayoutCard[]): Bounds | null {
+function boundsOf(cards: readonly LayoutStrategyCard[]): Bounds | null {
   let minX = Infinity;
   let maxY = -Infinity;
   for (const card of cards) {
@@ -43,14 +43,14 @@ function boundsOf(cards: readonly LayoutCard[]): Bounds | null {
 export function positionedStrategy(positions: Placement): LayoutStrategy {
   // Uniformly-async contract (ADR 0005); there is nothing to await.
   // eslint-disable-next-line @typescript-eslint/require-await
-  return async (graph: LayoutGraph): Promise<LayoutGraph> => {
-    const placed = graph.cards.map((card) => {
+  return async (strategyGraph: LayoutStrategyGraph): Promise<LayoutStrategyGraph> => {
+    const placed = strategyGraph.cards.map((card) => {
       const at = positions.get(card.id);
       return at ? { ...card, x: at.x, y: at.y } : card;
     });
 
     const unplaced = placed.filter((card) => card.x === undefined || card.y === undefined);
-    if (unplaced.length === 0) return { cards: placed, edges: graph.edges };
+    if (unplaced.length === 0) return { cards: placed, edges: strategyGraph.edges };
 
     // The unplaced band: a square-ish grid starting below the authored cards.
     const bounds = boundsOf(placed);
@@ -75,7 +75,7 @@ export function positionedStrategy(positions: Placement): LayoutStrategy {
         const slot = slots.get(card.id);
         return slot ? { ...card, x: slot.x, y: slot.y } : card;
       }),
-      edges: graph.edges,
+      edges: strategyGraph.edges,
     };
   };
 }

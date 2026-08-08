@@ -3,7 +3,7 @@ import type { Move } from '../navigation';
 export interface PresentingChromeProps {
   /** The moves available from the active card, with the selected one marked. */
   moves: readonly Move[];
-  /** Whether the walk can go back — false on the card it started from. */
+  /** Whether the traversalHistory can go back — false on the card it started from. */
   canRetreat: boolean;
   onSelect: (index: number) => void;
   onAdvance: () => void;
@@ -20,7 +20,7 @@ export interface PresentingChromeProps {
  * and enumerating them here does that while the camera still frames one card.
  *
  * A line renders as a one-item list: the degenerate fork, not a second mode.
- * A sink renders as none, which is how the walk says it has ended.
+ * A sink renders as none, which is how the traversalHistory says it has ended.
  */
 export function PresentingChrome({
   moves,
@@ -34,7 +34,7 @@ export function PresentingChrome({
       <div className="presenting__moves">
         {moves.length === 0 ? (
           <p className="presenting__end" data-testid="presenting-end">
-            End of the route
+            End of the graph
           </p>
         ) : (
           <ul className="presenting__list" data-testid="presenting-moves">

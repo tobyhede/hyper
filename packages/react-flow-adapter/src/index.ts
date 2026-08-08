@@ -6,9 +6,9 @@ export * from './projection';
 export * from './elk';
 export { CardNode } from './CardNode';
 export { RoutedEdge, type RoutedEdgeData } from './RoutedEdge';
-export { RouteHud } from './RouteHud';
-export { RouteConnectionLine } from './RouteConnectionLine';
-export type { RouteHudProps } from './RouteHud';
+export { GraphHud } from './GraphHud';
+export { GraphConnectionLine } from './GraphConnectionLine';
+export type { GraphHudProps } from './GraphHud';
 
 /** Register the custom node type(s) with React Flow. */
 export const nodeTypes: NodeTypes = {

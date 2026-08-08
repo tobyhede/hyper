@@ -5,13 +5,13 @@
  * when something outside the package calls into it, and then every type that
  * module exports comes with it — those types are the vocabulary of the calls
  * being made, nameable the moment a consumer wants a variable for one, which is
- * why `GridStrategyOptions`, `LayoutPort` and `CardFileErrorKind` are here with
+ * why `GridStrategyOptions`, `LayoutStrategyPort` and `CardFileErrorKind` are here with
  * nothing importing them. Functions are named one at a time: a helper whose
  * only callers are inside the package stays in its module, behind the form
- * consumers do call — `cardIdsForRoutes` and `filterHandlesByRoute` behind the
+ * consumers do call — `cardIdsForGraphs` and `filterHandlesByGraph` behind the
  * plural forms, `outHandleId`/`inHandleId` behind `buildCardHandles` and
- * `buildRouteEdges`, and `incomingEdges`/`routeEntryCards` behind
- * `routeStartCard`.
+ * `buildGraphRenderEdges`, and `incomingEdges`/`graphEntryCards` behind
+ * `graphStartCard`.
  *
  * Two modules are absent whole for that reason and not by oversight.
  * `frontmatter` is how `card-file` reads a fence, and `parseCardFile` is the
@@ -40,17 +40,17 @@ export type {
 export { gridStrategy } from './grid';
 export type { GridStrategyOptions } from './grid';
 
-export { buildLayoutGraph } from './layout';
+export { buildLayoutStrategyGraph } from './layout';
 export type {
-  LayoutCard,
-  LayoutEdge,
-  LayoutEdgeSection,
-  LayoutGraph,
-  LayoutPort,
+  LayoutStrategyCard,
+  LayoutStrategyEdge,
+  LayoutStrategyEdgeSection,
+  LayoutStrategyGraph,
+  LayoutStrategyPort,
   LayoutStrategy,
 } from './layout';
 
-export { getCard, getLayout, getRoute, resolveContentCard } from './lookup';
+export { getCard, getLayout, getGraph, resolveContentCard } from './lookup';
 export type { ResolvedContentCard } from './lookup';
 
 export { newSpace } from './new-space';
@@ -62,10 +62,15 @@ export { Placement } from './placement';
 
 export { positionedStrategy } from './positioned';
 
-export { buildCardHandles, buildRouteEdges, filterHandlesByRoutes, routeCardIds } from './routes';
-export type { CardHandleSet, GraphEdge, RouteHandleRef } from './routes';
+export {
+  buildCardHandles,
+  buildGraphRenderEdges,
+  filterHandlesByGraphs,
+  graphCardIds,
+} from './graph-rendering';
+export type { CardHandleSet, GraphRenderEdge, GraphRenderHandleRef } from './graph-rendering';
 
 export { loadSpace, loadSpaceSnapshot } from './space';
 export type { LoadSpaceResult, LoadSpaceSnapshotResult, Space, SpaceError } from './space';
 
-export { outgoingEdges, routeStartCard } from './traversal';
+export { outgoingEdges, graphStartCard } from './traversal';

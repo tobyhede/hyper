@@ -43,7 +43,7 @@ const SPACE_ID = uuidSchema.parse('11111111-1111-4111-8111-111111111111');
 const CARD_ID = uuidSchema.parse('22222222-2222-4222-8222-222222222222');
 const OMITTED_CARD_ID = uuidSchema.parse('33333333-3333-4333-8333-333333333333');
 const MISSING_SPACE_ID = uuidSchema.parse('44444444-4444-4444-8444-444444444444');
-const ROUTE_ID = uuidSchema.parse('55555555-5555-4555-8555-555555555555');
+const GRAPH_ID = uuidSchema.parse('55555555-5555-4555-8555-555555555555');
 const MISSING_CARD_ID = uuidSchema.parse('66666666-6666-4666-8666-666666666666');
 const OTHER_SPACE_ID = uuidSchema.parse('77777777-7777-4777-8777-777777777777');
 const OTHER_CARD_ID = uuidSchema.parse('88888888-8888-4888-8888-888888888888');
@@ -63,7 +63,7 @@ const snapshot: SpaceSnapshot = {
   document: {
     version: 2,
     title: 'Repository space',
-    routes: [],
+    graphs: [],
   },
   cards: [
     {
@@ -90,7 +90,7 @@ const otherSnapshot: SpaceSnapshot = {
   document: {
     version: 2,
     title: 'Other space',
-    routes: [],
+    graphs: [],
   },
   cards: [
     {
@@ -108,9 +108,9 @@ const mixedImport: ImportSpace = {
   document: {
     version: 2,
     title: 'Mixed identity space',
-    routes: [
+    graphs: [
       {
-        title: 'Explicit card route',
+        title: 'Explicit card graph',
         edges: [{ from: MIXED_FIRST_CARD_ID, to: MIXED_SECOND_CARD_ID }],
       },
     ],
@@ -141,7 +141,7 @@ const allIdlessImport: ImportSpace = {
   document: {
     version: 2,
     title: 'All generated identities',
-    routes: [],
+    graphs: [],
     layouts: [
       {
         title: 'Generated empty layout',
@@ -326,7 +326,7 @@ describe('PostgresSpaceRepository', () => {
     const result = await repository.importSpaces([
       {
         id: ORDERED_SPACE_ID,
-        document: { version: 2, title: 'Ordered cards', routes: [] },
+        document: { version: 2, title: 'Ordered cards', graphs: [] },
         cards: [card(third, 'Third'), card(second, 'Second'), card(first, 'First')],
       },
     ]);
@@ -355,7 +355,7 @@ describe('PostgresSpaceRepository', () => {
   it('rejects a commit for an unknown space', async () => {
     const missing: SpaceSnapshot = {
       id: MISSING_SPACE_ID,
-      document: { version: 2, title: 'Missing space', routes: [] },
+      document: { version: 2, title: 'Missing space', graphs: [] },
       cards: [],
     };
 
@@ -373,10 +373,10 @@ describe('PostgresSpaceRepository', () => {
       ...snapshot,
       document: {
         ...snapshot.document,
-        routes: [
+        graphs: [
           {
-            id: ROUTE_ID,
-            title: 'Dangling route',
+            id: GRAPH_ID,
+            title: 'Dangling graph',
             edges: [{ from: CARD_ID, to: MISSING_CARD_ID }],
           },
         ],
@@ -487,9 +487,9 @@ describe('PostgresSpaceRepository', () => {
       document: {
         version: 2,
         title: 'Invalid later space',
-        routes: [
+        graphs: [
           {
-            title: 'Dangling route',
+            title: 'Dangling graph',
             edges: [{ from: UNRESOLVED_CARD_ID, to: MISSING_CARD_ID }],
           },
         ],
@@ -521,7 +521,7 @@ describe('PostgresSpaceRepository', () => {
     }
 
     const stored = result.spaces[0]!;
-    const route = stored.snapshot.document.routes[0]!;
+    const graph = stored.snapshot.document.graphs[0]!;
     const layout = stored.snapshot.document.layouts?.[0];
     expect(layout).toBeDefined();
     if (layout === undefined) throw new Error('Generated layout was not returned');
@@ -530,7 +530,7 @@ describe('PostgresSpaceRepository', () => {
     );
     expect(generatedCard).toBeDefined();
     if (generatedCard === undefined) throw new Error('Generated card was not returned');
-    const generatedIds = [stored.snapshot.id, generatedCard.id, route.id, layout.id];
+    const generatedIds = [stored.snapshot.id, generatedCard.id, graph.id, layout.id];
 
     for (const id of generatedIds) expect(uuidSchema.safeParse(id).success).toBe(true);
     expect(new Set(generatedIds).size).toBe(4);
@@ -539,7 +539,7 @@ describe('PostgresSpaceRepository', () => {
     expect(new Set(stored.snapshot.cards.map(({ id }) => id))).toEqual(
       new Set([MIXED_FIRST_CARD_ID, MIXED_SECOND_CARD_ID, generatedCard.id]),
     );
-    expect(route.edges).toEqual([{ from: MIXED_FIRST_CARD_ID, to: MIXED_SECOND_CARD_ID }]);
+    expect(graph.edges).toEqual([{ from: MIXED_FIRST_CARD_ID, to: MIXED_SECOND_CARD_ID }]);
     expect(layout.positions).toEqual({ [MIXED_FIRST_CARD_ID]: { x: 40, y: 80 } });
     await expect(repository.loadSpace(stored.snapshot.id)).resolves.toEqual(stored);
   });
@@ -608,9 +608,9 @@ describe('PostgresSpaceRepository', () => {
       document: {
         version: 2,
         title: 'Invalid generated space',
-        routes: [
+        graphs: [
           {
-            title: 'Unresolved route',
+            title: 'Unresolved graph',
             edges: [{ from: UNRESOLVED_CARD_ID, to: MISSING_CARD_ID }],
           },
         ],
@@ -707,9 +707,9 @@ describe('PostgresSpaceRepository', () => {
     await expect(repository.loadSpace(OTHER_SPACE_ID)).resolves.toBeUndefined();
   });
 
-  it('imports a route id already nested in another stored space', async () => {
-    // Route and layout ids are scoped to the space document that carries them.
-    // There is no routes table and no layouts table (ADR 0030 keeps both nested),
+  it('imports a graph id already nested in another stored space', async () => {
+    // Graph and layout ids are scoped to the space document that carries them.
+    // There is no graphs table and no layouts table (ADR 0030 keeps both nested),
     // and every query in the repository is by space id or card id, so no lookup
     // anywhere can be made ambiguous by the reuse below. Space and card ids are
     // rows and stay globally unique — enforced by their primary keys, which the
@@ -722,10 +722,10 @@ describe('PostgresSpaceRepository', () => {
       document: {
         version: 2,
         title: 'First space',
-        routes: [
+        graphs: [
           {
-            id: ROUTE_ID,
-            title: 'Shared route id',
+            id: GRAPH_ID,
+            title: 'Shared graph id',
             edges: [{ from: CARD_ID, to: OMITTED_CARD_ID }],
           },
         ],
@@ -740,10 +740,10 @@ describe('PostgresSpaceRepository', () => {
       document: {
         version: 2,
         title: 'Second space',
-        routes: [
+        graphs: [
           {
-            id: ROUTE_ID,
-            title: 'Same route id, other space',
+            id: GRAPH_ID,
+            title: 'Same graph id, other space',
             edges: [{ from: OTHER_CARD_ID, to: MIXED_FIRST_CARD_ID }],
           },
         ],
@@ -758,26 +758,26 @@ describe('PostgresSpaceRepository', () => {
     expect((await repository.importSpaces([second])).kind).toBe('imported');
 
     await expect(repository.loadSpace(SPACE_ID)).resolves.toMatchObject({
-      snapshot: { document: { routes: [{ id: ROUTE_ID, title: 'Shared route id' }] } },
+      snapshot: { document: { graphs: [{ id: GRAPH_ID, title: 'Shared graph id' }] } },
     });
     await expect(repository.loadSpace(OTHER_SPACE_ID)).resolves.toMatchObject({
-      snapshot: { document: { routes: [{ id: ROUTE_ID, title: 'Same route id, other space' }] } },
+      snapshot: { document: { graphs: [{ id: GRAPH_ID, title: 'Same graph id, other space' }] } },
     });
   });
 
-  it('imports one batch whose Spaces share a route id', async () => {
+  it('imports one batch whose Spaces share a graph id', async () => {
     // The same two Spaces as the test above, in one batch instead of two.
-    // Splitting a batch must not change what is accepted: route ids resolve only
+    // Splitting a batch must not change what is accepted: graph ids resolve only
     // within their owning Space, so the batch boundary is not a scope.
     const first: SpaceSnapshot = {
       id: SPACE_ID,
       document: {
         version: 2,
         title: 'First space',
-        routes: [
+        graphs: [
           {
-            id: ROUTE_ID,
-            title: 'Shared route id',
+            id: GRAPH_ID,
+            title: 'Shared graph id',
             edges: [{ from: CARD_ID, to: OMITTED_CARD_ID }],
           },
         ],
@@ -792,10 +792,10 @@ describe('PostgresSpaceRepository', () => {
       document: {
         version: 2,
         title: 'Second space',
-        routes: [
+        graphs: [
           {
-            id: ROUTE_ID,
-            title: 'Same route id',
+            id: GRAPH_ID,
+            title: 'Same graph id',
             edges: [{ from: OTHER_CARD_ID, to: MIXED_FIRST_CARD_ID }],
           },
         ],
@@ -809,19 +809,19 @@ describe('PostgresSpaceRepository', () => {
     expect((await repository.importSpaces([first, second])).kind).toBe('imported');
   });
 
-  it('imports a Space whose route id equals one of its card ids', async () => {
+  it('imports a Space whose graph id equals one of its card ids', async () => {
     // Entity kinds do not share an identity space. Intake checks each kind
-    // separately — cards among cards, routes among routes — so a UUID naming
-    // both a card and a route names two different things unambiguously.
+    // separately — cards among cards, graphs among graphs — so a UUID naming
+    // both a card and a graph names two different things unambiguously.
     const shared: SpaceSnapshot = {
       id: SPACE_ID,
       document: {
         version: 2,
-        title: 'Route id equals card id',
-        routes: [
+        title: 'Graph id equals card id',
+        graphs: [
           {
             id: CARD_ID,
-            title: 'Route named like a card',
+            title: 'Graph named like a card',
             edges: [{ from: CARD_ID, to: OMITTED_CARD_ID }],
           },
         ],
@@ -840,7 +840,7 @@ describe('PostgresSpaceRepository', () => {
     // before any write rather than as a late primary-key violation.
     const claimant: SpaceSnapshot = {
       id: OTHER_SPACE_ID,
-      document: { version: 2, title: 'Claims the first space card', routes: [] },
+      document: { version: 2, title: 'Claims the first space card', graphs: [] },
       cards: [{ id: CARD_ID, document: { title: 'Taken', kind: 'markdown', body: 'Taken.' } }],
     };
 
@@ -852,21 +852,21 @@ describe('PostgresSpaceRepository', () => {
     await expect(repository.loadSpace(OTHER_SPACE_ID)).resolves.toBeUndefined();
   });
 
-  it('rejects two routes sharing an id within one Space', async () => {
+  it('rejects two graphs sharing an id within one Space', async () => {
     // Domain intake's job, not the batch check's — and the reason the batch check
-    // does not need to look at route ids at all.
-    const collidingRoutes: SpaceSnapshot = {
+    // does not need to look at graph ids at all.
+    const collidingGraphs: SpaceSnapshot = {
       ...snapshot,
       document: {
         ...snapshot.document,
-        routes: [
-          { id: ROUTE_ID, title: 'First', edges: [{ from: CARD_ID, to: OMITTED_CARD_ID }] },
-          { id: ROUTE_ID, title: 'Second', edges: [{ from: OMITTED_CARD_ID, to: CARD_ID }] },
+        graphs: [
+          { id: GRAPH_ID, title: 'First', edges: [{ from: CARD_ID, to: OMITTED_CARD_ID }] },
+          { id: GRAPH_ID, title: 'Second', edges: [{ from: OMITTED_CARD_ID, to: CARD_ID }] },
         ],
       },
     };
 
-    await expect(repository.importSpaces([collidingRoutes])).resolves.toMatchObject({
+    await expect(repository.importSpaces([collidingGraphs])).resolves.toMatchObject({
       kind: 'rejected',
       code: 'invalid-snapshot',
     });
@@ -887,12 +887,12 @@ describe('PostgresSpaceRepository', () => {
     const secondRepository = new PostgresSpaceRepository(db);
     const firstSnapshot: SpaceSnapshot = {
       id: CONCURRENT_SPACE_ID,
-      document: { version: 2, title: 'First concurrent insert', routes: [] },
+      document: { version: 2, title: 'First concurrent insert', graphs: [] },
       cards: [],
     };
     const secondSnapshot: SpaceSnapshot = {
       ...firstSnapshot,
-      document: { ...firstSnapshot.document, title: 'Second concurrent insert', routes: [] },
+      document: { ...firstSnapshot.document, title: 'Second concurrent insert', graphs: [] },
     };
 
     const results = await Promise.all([

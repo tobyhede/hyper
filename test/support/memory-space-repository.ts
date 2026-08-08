@@ -44,8 +44,8 @@ const identifyImport = (input: ImportSpace): SpaceSnapshot => {
     document: {
       version: 2,
       title: input.document.title,
-      routes: input.document.routes.map(({ id, ...route }) => ({
-        ...route,
+      graphs: input.document.graphs.map(({ id, ...graph }) => ({
+        ...graph,
         id: id ?? newUuid(),
       })),
       ...(layouts === undefined ? {} : { layouts }),

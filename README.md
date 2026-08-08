@@ -2,11 +2,11 @@
 
 A local prototype that proves one idea:
 
-> A technical deck can be authored as Markdown cards on a spatial graph, then presented as a curated route through that graph.
+> A technical deck can be authored as Markdown cards on a spatial graph, then presented as a curated Graph through that graph.
 
-Content can be authored in version-controlled files and imported into the live persistence model. A space directory holds a space file naming the routes, plus one Markdown file per card. [React Flow](https://reactflow.dev) draws **every** route at once, each in its own colour, and [elkjs](https://github.com/kieler/elkjs) lays them out automatically (layered, left→right). Each card exposes one inbound and one outbound handle per route (the "multiple handles" approach). Choosing a route in the toolbar emphasises it without hiding the others.
+Content can be authored in version-controlled files and imported into the live persistence model. A space directory holds a space file naming the graphs, plus one Markdown file per card. [React Flow](https://reactflow.dev) draws **every** Graph at once, each in its own colour, and [elkjs](https://github.com/kieler/elkjs) lays them out automatically (layered, left→right). Each card exposes one inbound and one outbound handle per Graph (the "multiple handles" approach). Choosing a Graph in the toolbar emphasises it without hiding the others.
 
-**Presenting is the same canvas, closer in.** There is no deck and no second surface ([ADR 0024](docs/adr/0024-presenting-is-traversing-a-route.md)): pressing Present moves React Flow's camera to the route's first card and draws that card's content rendered. Arrow keys walk the route's edges — Right follows the selected one, Left goes back along the path taken, Up and Down choose among a fork's branches without moving the camera ([ADR 0027](docs/adr/0027-presenting-is-the-graph-canvas-under-camera-control.md)).
+**Presenting is the same canvas, closer in.** There is no deck and no second surface ([ADR 0024](docs/adr/0024-presenting-is-traversing-a-route.md)): pressing Present moves React Flow's camera to the Graph's first card and draws that card's content rendered. Arrow keys traverse the Graph's edges — Right follows the selected one, Left goes back along the path taken, Up and Down choose among a fork's branches without moving the camera ([ADR 0027](docs/adr/0027-presenting-is-the-graph-canvas-under-camera-control.md)).
 
 ## Running it
 
@@ -22,13 +22,13 @@ pnpm dev:fixture     # tracked test fixture in memory at http://localhost:5175
 
 Then:
 
-1. Pick a route in the toolbar. Every route stays drawn; the one you pick is emphasised.
+1. Pick a Graph in the toolbar. Every Graph stays drawn; the one you pick is emphasised.
 2. Hover a card and use its Edit control to author its title, description and Markdown source. `Esc` cancels and closes it.
 3. Drag a card to move it. A completed edit is committed automatically through the persistence session; the toolbar reports `Persisting…` and then `Persisted`. Under `pnpm dev` the edit lands in PostgreSQL and outlives the page; under `pnpm dev:new` and `pnpm dev:fixture` it lives in that server's memory repository, surviving browser reloads but not a restart.
-4. Hover or select a card to reveal its four authoring handles. Drag to another card to add an Edge to the active Route. Dropping on empty canvas cancels unless Option (macOS) or Alt (elsewhere) is held; the modifier gesture previews and atomically creates a blank `Card N`, its placement and the Edge.
-5. Press **Present** to walk the route: `→` follows an edge, `←` goes back, `↑` / `↓` choose at a fork, `Esc` returns to the overview.
+4. Hover or select a card to reveal its four authoring handles. Drag to another card to add an Edge to the active Graph. Dropping on empty canvas cancels unless Option (macOS) or Alt (elsewhere) is held; the modifier gesture previews and atomically creates a blank `Card N`, its placement and the Edge.
+5. Press **Present** to traverse the Graph: `→` follows an edge, `←` goes back, `↑` / `↓` choose at a fork, `Esc` returns to the overview.
 
-The graph uses React Flow's [elkjs multiple-handles technique](https://reactflow.dev/examples/layout/elkjs-multiple-handles): ELK lays out the nodes and computes each port's position, and those exact offsets are applied to the handles so connected handles line up and the colored route edges stay legible.
+The graph uses React Flow's [elkjs multiple-handles technique](https://reactflow.dev/examples/layout/elkjs-multiple-handles): ELK lays out the nodes and computes each port's position, and those exact offsets are applied to the handles so connected handles line up and the colored Graph edges stay legible.
 
 ### Verify
 
@@ -91,7 +91,7 @@ A space is a **space directory**: a space file (`space.json`) plus one Markdown 
   "version": 2,
   "id": "00000000-0000-4000-8000-000000000041",
   "title": "Graph-Native Technical Presentations",
-  "routes": [
+  "graphs": [
     {
       "id": "00000000-0000-4000-8000-000000000004",
       "title": "Main walkthrough",
@@ -111,7 +111,7 @@ A space is a **space directory**: a space file (`space.json`) plus one Markdown 
       "positions": {
         "00000000-0000-4000-8000-000000000027": { "x": 0, "y": 0 }
       },
-      "activeRoute": "00000000-0000-4000-8000-000000000004"
+      "activeGraph": "00000000-0000-4000-8000-000000000004"
     }
   ],
   "defaultView": "00000000-0000-4000-8000-000000000048"
@@ -121,37 +121,37 @@ A space is a **space directory**: a space file (`space.json`) plus one Markdown 
 | Key | Meaning |
 | --- | --- |
 | `id`, `title` | What names the space. In version 2 every explicit id is a UUID; an import may omit ids for the persistence layer to allocate. The id is not the title and not the file name. |
-| `routes` | Named walkthroughs, each an `id`, `title`, optional `color`, and a set of `{ from, to }` **edges** between card ids ([ADR 0032](docs/adr/0032-routes-may-contain-cycles.md)). Forks, merges, disconnected components, cycles and self-edges are legal; an exact duplicate Edge within one Route is not. Routes are a space's only structure ([ADR 0007](docs/adr/0007-routes-are-the-only-structure.md)), and the drawn edges and handles are derived from these. May be empty — a space with no routes renders and cannot be presented ([ADR 0015](docs/adr/0015-a-space-may-have-no-routes.md)). |
-| `layouts` | Optional authored card-to-position maps ([ADR 0014](docs/adr/0014-layout-is-the-authored-data-strategy-is-the-behaviour.md)). Positions are sparse — a layout may omit cards but may not name one the space lacks. A layout also names the routes it shows (`routes`, a filter; absent means all) and which of them opens **active** (`activeRoute`; absent means the first visible one) — [ADR 0026](docs/adr/0026-a-route-is-active-and-the-layout-may-name-it.md). |
-| `defaultView` | Which view the space opens in: a declared layout's id, or a built-in automatic one (`graph`, `grid`). A declared layout wins a name collision. |
+| `graphs` | Named walkthroughs, each an `id`, `title`, optional `color`, and a set of `{ from, to }` **edges** between card ids ([ADR 0032](docs/adr/0032-routes-may-contain-cycles.md)). Forks, merges, disconnected components, cycles and self-edges are legal; an exact duplicate Edge within one Graph is not. Graphs are a space's only structure ([ADR 0007](docs/adr/0007-routes-are-the-only-structure.md)), and the drawn edges and handles are derived from these. May be empty — a space with no graphs renders and cannot be presented ([ADR 0015](docs/adr/0015-a-space-may-have-no-routes.md)). |
+| `layouts` | Optional authored card-to-position maps ([ADR 0014](docs/adr/0014-layout-is-the-authored-data-strategy-is-the-behaviour.md)). Positions are sparse — a layout may omit cards but may not name one the space lacks. A layout also names the graphs it shows (`graphs`, a filter; absent means all) and which of them opens **active** (`activeGraph`; absent means the first visible one) — [ADR 0026](docs/adr/0026-a-route-is-active-and-the-layout-may-name-it.md). |
+| `defaultView` | Which view the space opens in: a declared layout's id, or a built-in automatic one (`flow`, `grid`). A declared layout wins a name collision. |
 
-### Routes as color-coded flows
+### Graphs as color-coded flows
 
-Each authored edge becomes a colored drawn edge, and each card a route leaves gains a `<routeId>::out` handle (right) while each card it arrives at gains a `<routeId>::in` handle (left) — one per route per side, so a fork's several outgoing edges share one handle. Those become namespaced ELK port ids. ELK keeps each port on its assigned side and returns its exact offset so the handles line up and the edge runs cleanly. `@project/graph` derives the handles (`buildCardHandles`) and edges (`buildRouteEdges`), then assembles the graph to arrange (`buildLayoutGraph`); `@project/react-flow-adapter` applies a `LayoutStrategy` and colors the projection. Switching routes changes emphasis, not visibility or placement.
+Each authored edge becomes a colored drawn edge, and each card a Graph leaves gains a `<graphId>::out` handle (right) while each card it arrives at gains a `<graphId>::in` handle (left) — one per Graph per side, so a fork's several outgoing edges share one handle. Those become namespaced ELK port ids. ELK keeps each port on its assigned side and returns its exact offset so the handles line up and the edge runs cleanly. `@project/graph` derives the handles (`buildCardHandles`) and edges (`buildGraphRenderEdges`), then assembles the graph to arrange (`buildLayoutStrategyGraph`); `@project/react-flow-adapter` applies a `LayoutStrategy` and colors the projection. Switching graphs changes emphasis, not visibility or placement.
 
 ### Markdown cards
 
-A card is **one file**: frontmatter, then body ([ADR 0020](docs/adr/0020-a-card-is-a-markdown-file-with-frontmatter.md)). The frontmatter carries `id`, `title`, an optional `description`, and for an alias its `kind` and `target`; everything under it is the content, GitHub-flavoured Markdown. A card can be visited by any number of routes — that reuse is the whole point, and a card shared by several routes carries one handle pair per route running through it.
+A card is **one file**: frontmatter, then body ([ADR 0020](docs/adr/0020-a-card-is-a-markdown-file-with-frontmatter.md)). The frontmatter carries `id`, `title`, an optional `description`, and for an alias its `kind` and `target`; everything under it is the content, GitHub-flavoured Markdown. A card can be visited by any number of graphs — that reuse is the whole point, and a card shared by several graphs carries one handle pair per Graph running through it.
 
 A card's identity is its frontmatter `id`, never its filename, so renaming the file is not a data migration. Since the title lives in the same file as the body, a body may open with a heading — it is just a heading, not a repeat of a title held somewhere else.
 
-The graph draws a card's **title**, not its body ([ADR 0006](docs/adr/0006-cards-show-titles-in-the-graph.md)). Click a card to open it and read its Markdown **source**, verbatim; the one place a card is drawn *rendered* is presenting ([ADR 0011](docs/adr/0011-opening-shows-markdown-source.md)). Content reaches a node only when that node is the card a walk has reached, so it is not embedded in every node.
+The graph draws a card's **title**, not its body ([ADR 0006](docs/adr/0006-cards-show-titles-in-the-graph.md)). Click a card to open it and read its Markdown **source**, verbatim; the one place a card is drawn *rendered* is presenting ([ADR 0011](docs/adr/0011-opening-shows-markdown-source.md)). Content reaches a node only when that node is the Card the Traversal history has reached, so it is not embedded in every node.
 
 A card occupies exactly one position in the graph; there is no placement layer letting the same card sit in two places. Showing the same content at a second position is the job of an **alias** card ([ADR 0004](docs/adr/0004-cards-are-the-graph.md)).
 
 Validation happens in two layers:
 
 - **Shape** — Zod schemas (`@project/core`) validate the space file and each card file's frontmatter.
-- **References** — `@project/graph` checks that both ends of every route Edge resolve to a Card, that no Route contains an exact duplicate Edge, that a Layout positions and shows only things the Space has, and flags duplicate ids. Unresolved references are surfaced as a banner in the app rather than crashing it.
+- **References** — `@project/graph` checks that both ends of every Graph Edge resolve to a Card, that no Graph contains an exact duplicate Edge, that a Layout positions and shows only things the Space has, and flags duplicate ids. Unresolved references are surfaced as a banner in the app rather than crashing it.
 
-`@project/graph` also derives the route handles and edges (`buildCardHandles`, `buildRouteEdges`); `@project/react-flow-adapter` projects colored card nodes and edges (`projectCardNodes`, `projectRouteEdges`).
+`@project/graph` also derives the Graph handles and edges (`buildCardHandles`, `buildGraphRenderEdges`); `@project/react-flow-adapter` projects colored card nodes and edges (`projectCardNodes`, `projectGraphEdges`).
 
 ### Layouts
 
 A **Layout** is authored data: a named card-to-position map stored with the space. A **LayoutStrategy** is behaviour: it takes the graph to arrange and asynchronously returns that same graph with geometry on its cards and handles ([ADR 0014](docs/adr/0014-layout-is-the-authored-data-strategy-is-the-behaviour.md)):
 
 ```ts
-type LayoutStrategy = (graph: LayoutGraph) => Promise<LayoutGraph>;
+type LayoutStrategy = (graph: LayoutStrategyGraph) => Promise<LayoutStrategyGraph>;
 ```
 
 Three ship. `elkStrategy` (in `@project/react-flow-adapter`, the only package that may touch elkjs) is one automatic strategy and runs ELK layered left→right. `gridStrategy` (in `@project/graph`) is a pure automatic strategy that places cards on a grid. `positionedStrategy` reads an authored Layout. Which cards a strategy arranges is the view's choice, not the strategy's.
@@ -163,10 +163,10 @@ A pnpm workspace with strict TypeScript and enforced package boundaries:
 | Package | Responsibility |
 | --- | --- |
 | `@project/core` | Domain types + Zod schema. No framework code. |
-| `@project/graph` | Pure graph/route logic: intake and indexing, lookups, route navigation, referential validation, route→handles/edges derivation, and the `LayoutStrategy` contract. Property-tested. |
+| `@project/graph` | Pure graph/Graph logic: intake and indexing, lookups, Graph navigation, referential validation, Graph→handles/edges derivation, and the `LayoutStrategy` contract. Property-tested. |
 | `@project/persistence` | Browser-safe backend and session contracts, optimistic revisions, commit coalescing, failure/conflict handling, and the memory adapter. |
 | `@project/react-flow-adapter` | The only package that imports `@xyflow/react` and `elkjs`. Runs the ELK layout and projects the domain model into colored React Flow card nodes/edges. |
-| `@project/ui` | Reusable, framework-agnostic React: card renderer, route selector, route legend, presentation controls, app shell. |
+| `@project/ui` | Reusable, framework-agnostic React: card renderer, Graph selector, Graph legend, presentation controls, app shell. |
 | `@project/app` | Wiring: TanStack Router, a Zustand store for presentation state, the example presentation, and Vite. |
 
 Design rules kept throughout: domain logic stays out of React components, React Flow specifics stay in the adapter, and app wiring stays in `@project/app`.
@@ -174,28 +174,28 @@ Design rules kept throughout: domain logic stays out of React components, React 
 ### Tests
 
 - Schema validation and rejection cases (`@project/core`).
-- Unresolved card/edge/route-step references and duplicate ids (`@project/graph`).
-- Route navigation behaviour, with fast-check property tests for clamping/monotonicity and validation invariants.
+- Unresolved card/edge/Graph-step references and duplicate ids (`@project/graph`).
+- Graph navigation behaviour, with fast-check property tests for clamping/monotonicity and validation invariants.
 - React Flow projection correctness (`@project/react-flow-adapter`).
 - Card rendering smoke test (`@project/ui`).
-- Playwright flows: app loads, the graph is visible, a route is selected, cards open, a completed drag reaches the backend and survives a reload, a drawn connection mints and activates a route, and a route is walked under the camera.
+- Playwright flows: app loads, the graph is visible, a Graph is selected, cards open, a completed drag reaches the backend and survives a reload, a drawn connection mints and activates a Graph, and a Graph is traversed under the camera.
 
 ## Current limitations
 
 - **Card content is read-only.** No visual or Markdown editing, no freehand drawing, no whiteboard shapes. Placement and Edge edits commit through the HTTP persistence session: under `pnpm dev` they land in PostgreSQL and outlive the page, and under `pnpm dev:new` they survive a browser reload but not a server restart.
 - **The app never touches files.** The browser lists, opens and commits Spaces under `/api/spaces` and nothing else; file discovery and parsing are server-side CLI and import concerns. There is no write-back and no file picker. Canonical file export belongs to the `hyper` CLI ([ADR 0030](docs/adr/0030-postgres-is-the-live-write-model.md)), which regenerates a deterministic version 2 space directory from the database and records the revision it projected.
-- **Overlay legibility.** The graph draws every route at once. Only **compatible** routes — the union of their edges is acyclic — lay out cleanly as parallel forward paths; two routes disagreeing about the order of cards they share force a backward edge, drawn as a routed channel. See [`.scratch/multiple-routes/findings.md`](.scratch/multiple-routes/findings.md).
+- **Overlay legibility.** The graph draws every Graph at once. Only **compatible** graphs — the union of their edges is acyclic — lay out cleanly as parallel forward paths; two graphs disagreeing about the order of cards they share force a backward edge, drawn as a routed channel. See [`.scratch/multiple-routes/findings.md`](.scratch/multiple-routes/findings.md).
 - **Cards are a fixed shape.** A card draws its title, so every card is the same size — declared once in `packages/app/src/card.ts` as a 16:9 ratio and consumed by both the layout and the stylesheet. Content adapts to the card, not the reverse, which is why measured DOM sizes are not fed into ELK.
-- **Structural authoring is partial.** Dragging between spatial handles draws an Edge, and the first one mints and activates `Route 1` ([ADR 0033](docs/adr/0033-route-authoring-uses-spatial-route-coloured-handles.md)). Option/Alt plus an empty drop atomically creates and connects a blank `Card N`. There is no detached Card creation, and deleting Cards, Edges or Routes is deliberately disabled until those operations can complete through the same persisted-Edit lifecycle. Card content and metadata editing, and broader Route management, are also unbuilt.
+- **Structural authoring is partial.** Dragging between spatial handles draws an Edge, and the first one mints and activates `Graph 1` ([ADR 0033](docs/adr/0033-route-authoring-uses-spatial-route-coloured-handles.md)). Option/Alt plus an empty drop atomically creates and connects a blank `Card N`. There is no detached Card creation, and deleting Cards, Edges or Graphs is deliberately disabled until those operations can complete through the same persisted-Edit lifecycle. Card content and metadata editing, and broader Graph management, are also unbuilt.
 - **No speaker view, timer, transitions or deck export.** They went with the deck framework and return, if wanted, as their own decisions designed against a traversal ([ADR 0024](docs/adr/0024-presenting-is-traversing-a-route.md)).
 - **The presented card is scaled by the camera**, so its text is rasterised rather than laid out at its final size — a property of wanting a spatial camera at all.
 - The production bundle ships React Flow and elkjs in a single chunk (~2.1 MB) — fine for a prototype, not tuned for size.
 
 ## Next likely improvements
 
-- Structural deletion for Edges, Cards and Routes through the completed-Edit lifecycle.
+- Structural deletion for Edges, Cards and Graphs through the completed-Edit lifecycle.
 - Detached Card creation, without requiring an Edge from an existing Card.
-- Card content and metadata editing, plus creation, naming, recolouring and reordering of additional Routes.
-- Encode the active route and card in the TanStack Router URL so a position is linkable and refresh-safe.
+- Card content and metadata editing, plus creation, naming, recolouring and reordering of additional Graphs.
+- Encode the active Graph and card in the TanStack Router URL so a position is linkable and refresh-safe.
 - Authored camera hints (zoom/pan/highlight several nodes) and move transitions in the space file.
 - A traversal-native speaker view: current and next Card, notes, and elapsed time.

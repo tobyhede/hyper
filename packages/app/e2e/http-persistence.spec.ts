@@ -53,7 +53,7 @@ test('rapid edits commit in order and the latest position survives reload', asyn
 
   await dragBy(page, card, 0, 180);
   await firstObserved;
-  // The route handler is parked on `firstGate`, so anything that throws before
+  // The graph handler is parked on `firstGate`, so anything that throws before
   // the release leaves that commit — and the page — waiting until the test
   // times out, reporting a hang instead of the assertion that actually failed.
   try {
@@ -143,8 +143,8 @@ test('a stale browser reports conflict and accepts the remote workspace without 
     expect(mountedGraphArea).not.toBeNull();
 
     await stalePage.getByTestId('view-selector').click();
-    await stalePage.getByRole('option', { name: 'Graph' }).click();
-    await stalePage.getByTestId('route-selector').click();
+    await stalePage.getByRole('option', { name: 'Flow' }).click();
+    await stalePage.getByTestId('graph-selector').click();
     await stalePage.getByRole('option', { name: 'Echo' }).click();
     // No wait between starting the placement and accepting: settling first would
     // retire the very race this test exists to cover.
@@ -156,7 +156,7 @@ test('a stale browser reports conflict and accepts the remote workspace without 
     await expect(acceptedCard).toBeVisible();
     await settled(stalePage);
     expect(await positionOf(acceptedCard)).toEqual(remotePosition);
-    await expect(stalePage.getByTestId('route-selector')).toContainText('Long');
+    await expect(stalePage.getByTestId('graph-selector')).toContainText('Long');
     await expect(stalePage.getByTestId('presenting-chrome')).not.toBeVisible();
     expect(
       await mountedGraphArea!.evaluate(
@@ -175,7 +175,7 @@ test('a stale browser reports conflict and accepts the remote workspace without 
   }
 });
 
-test('route activation and presenting do not write or protect navigation', async ({ page }) => {
+test('graph activation and presenting do not write or protect navigation', async ({ page }) => {
   let commits = 0;
   await page.route('**/api/spaces/*', async (route) => {
     const request = route.request();
@@ -185,7 +185,7 @@ test('route activation and presenting do not write or protect navigation', async
 
   await page.goto('/');
   await expect(nodeByTitle(page, 'A').first()).toBeVisible();
-  await page.getByTestId('route-selector').click();
+  await page.getByTestId('graph-selector').click();
   await page.getByRole('option', { name: 'Echo' }).click();
   await page.getByTestId('present-button').click();
   await expect(page.getByTestId('presenting-chrome')).toBeVisible();

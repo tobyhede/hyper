@@ -2,7 +2,7 @@ import { newUuid, type Card, type SpaceFile } from '@project/core';
 import { serializeCardFile, type CardFile } from './card-file';
 
 /**
- * A new space: one card, no routes (ADR 0018).
+ * A new space: one card, no graphs (ADR 0018).
  *
  * The default when there is nothing else to open — not the fixture, which is a
  * purpose-shaped test bed, and not an empty canvas, which offers no gesture a
@@ -12,7 +12,7 @@ import { serializeCardFile, type CardFile } from './card-file';
  * Returned as the **on-disk shape** — a space file and its card files — rather
  * than as a `Space`. That is what a writer emits and what `loadSpace` takes, so
  * a minted space goes down exactly the path an authored one does, with no second
- * route into the domain (ADR 0010).
+ * graph into the domain (ADR 0010).
  */
 export interface NewSpace {
   readonly file: SpaceFile;
@@ -34,7 +34,7 @@ export function newSpace(): NewSpace {
     version: 2,
     id: spaceId,
     title: 'New space',
-    routes: [],
+    graphs: [],
   };
 
   const card: Card = {

@@ -8,22 +8,22 @@ import { mountWorkspace } from '../src/Workspace';
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 const LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
-const ROUTE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
+const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
 const OTHER_CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
 const ALIAS_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000006');
 const SECOND_ALIAS_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000007');
 
 /**
- * Two Cards on one Route in an authored Layout, so the graph opens on a
+ * Two Cards on one Graph in an authored Layout, so the graph opens on a
  * Positioned renderer with a placement already installed and presenting has a
- * walk to run.
+ * traversalHistory to run.
  */
 const snapshot: SpaceSnapshot = spaceSnapshotSchema.parse({
   id: SPACE_ID,
   document: {
     version: 2,
     title: 'Workspace',
-    routes: [{ id: ROUTE_ID, title: 'Route', edges: [{ from: CARD_ID, to: OTHER_CARD_ID }] }],
+    graphs: [{ id: GRAPH_ID, title: 'Graph', edges: [{ from: CARD_ID, to: OTHER_CARD_ID }] }],
     layouts: [
       {
         id: LAYOUT_ID,
@@ -296,7 +296,7 @@ describe('authoring an opened Card', () => {
 
   /**
    * Presenting is read-only, and the reason no Edit action survives into it is
-   * that no opened Card does: starting the walk closes whatever was open, and
+   * that no opened Card does: starting the traversalHistory closes whatever was open, and
    * the graph refuses to open a Card while presenting. `OpenCard` is handed its
    * Edit action without being told the mode, so this is the guarantee that keeps
    * that honest, and it is a long way from the component relying on it.
@@ -335,7 +335,7 @@ describe('authoring an opened Card', () => {
    * B's identity. `Done` then wrote A's title and body over B.
    *
    * Reachable from the keyboard: the pane traps nothing, so `Enter` on a node
-   * behind it opens that Card (`GraphView`'s handler only declines while
+   * behind it opens that Card (`SpaceCanvas`'s handler only declines while
    * presenting).
    */
   it('never carries one Card’s draft onto another', async () => {
@@ -400,7 +400,7 @@ describe('the Card affordance on the graph', () => {
    * No gesture on a Card's body opens it (ADR 0036) — the title centres in a
    * Card, so a body gesture and the rename would want the same pixels.
    */
-  it('is the only pointer route in — the Card body opens nothing', async () => {
+  it('is the only pointer graph in — the Card body opens nothing', async () => {
     const session = mount();
     const card = (await screen.findByRole('heading', { name: 'A' })).closest('.react-flow__node');
     if (card === null) throw new Error('Card A is not drawn as a node');

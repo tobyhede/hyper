@@ -1,8 +1,8 @@
-import { CheckIcon, GraphIcon, GridIcon } from './icons';
+import { CheckIcon, FlowIcon, GridIcon } from './icons';
 import { Select, SelectContent, SelectItem } from './Select';
 import { SelectorTrigger } from './SelectorTrigger';
 
-export type AlgorithmicViewId = 'graph' | 'grid';
+export type AlgorithmicViewId = 'flow' | 'grid';
 
 export interface ViewSelectorProps {
   value: AlgorithmicViewId;
@@ -12,7 +12,7 @@ export interface ViewSelectorProps {
 }
 
 const views = [
-  { id: 'graph', title: 'Graph', icon: GraphIcon },
+  { id: 'flow', title: 'Flow', icon: FlowIcon },
   { id: 'grid', title: 'Grid', icon: GridIcon },
 ] as const;
 

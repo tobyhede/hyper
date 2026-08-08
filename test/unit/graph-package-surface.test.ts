@@ -10,7 +10,7 @@ import * as graphPackage from '@project/graph';
  * The rule behind the list: the unit of curation is the module, not the name. A
  * module reaches the index when something outside the package calls into it, and
  * every type that module exports is offered with it — which is why
- * `GridStrategyOptions`, `LayoutPort` and `CardFileErrorKind` are listed below
+ * `GridStrategyOptions`, `LayoutStrategyPort` and `CardFileErrorKind` are listed below
  * with nothing importing them. Functions are named one at a time: a helper whose
  * only callers are inside the package stays in its module, behind the form
  * consumers do call.
@@ -30,12 +30,12 @@ import * as graphPackage from '@project/graph';
 const OFFERED_VALUES = [
   'Placement',
   'buildCardHandles',
-  'buildLayoutGraph',
-  'buildRouteEdges',
-  'filterHandlesByRoutes',
+  'buildLayoutStrategyGraph',
+  'buildGraphRenderEdges',
+  'filterHandlesByGraphs',
   'getCard',
   'getLayout',
-  'getRoute',
+  'getGraph',
   'gridStrategy',
   'loadSpace',
   'loadSpaceSnapshot',
@@ -45,8 +45,8 @@ const OFFERED_VALUES = [
   'parseImportCardFile',
   'positionedStrategy',
   'resolveContentCard',
-  'routeCardIds',
-  'routeStartCard',
+  'graphCardIds',
+  'graphStartCard',
   'serializeCardFile',
 ] as const;
 
@@ -55,13 +55,13 @@ const OFFERED_TYPES = [
   'CardFileError',
   'CardFileErrorKind',
   'CardHandleSet',
-  'GraphEdge',
+  'GraphRenderEdge',
   'GridStrategyOptions',
-  'LayoutCard',
-  'LayoutEdge',
-  'LayoutEdgeSection',
-  'LayoutGraph',
-  'LayoutPort',
+  'LayoutStrategyCard',
+  'LayoutStrategyEdge',
+  'LayoutStrategyEdgeSection',
+  'LayoutStrategyGraph',
+  'LayoutStrategyPort',
   'LayoutStrategy',
   'LoadSpaceResult',
   'LoadSpaceSnapshotResult',
@@ -69,7 +69,7 @@ const OFFERED_TYPES = [
   'ParseCardFileResult',
   'ParseImportCardFileResult',
   'ResolvedContentCard',
-  'RouteHandleRef',
+  'GraphRenderHandleRef',
   'Space',
   'SpaceError',
 ] as const;
@@ -284,7 +284,7 @@ describe('reading a surface sees every way a name is offered', () => {
 
   it('sees a name a nested pattern binds, and one bound with a default', () => {
     // `a` is a property being destructured through, not a binding; `b` and `c`
-    // are the names that arrive. Walking one level of elements and stopping
+    // are the names that arrive. Traversing one level of elements and stopping
     // would report the inner pattern where `b` belongs.
     expect(read('export const {\n  a: { b },\n  c = 1,\n} = obj;\n').unlisted).toEqual(['b', 'c']);
   });

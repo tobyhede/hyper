@@ -2,17 +2,17 @@ import { useEffect, useRef, useState } from 'react';
 import { Handle, Position, useConnection, type NodeProps } from '@xyflow/react';
 import { CardContent, EditIcon } from '@project/ui';
 import type { CardFlowNode, CardHandle } from './projection';
-import { AUTHORING_HANDLE_DIAMETER, ROUTE_PORT_DIAMETER } from './authoring-handle';
+import { AUTHORING_HANDLE_DIAMETER, GRAPH_PORT_DIAMETER } from './authoring-handle';
 
 /**
- * React Flow custom node: a card's title, with one colored handle per route at
+ * React Flow custom node: a card's title, with one colored handle per graph at
  * the vertical offset ELK computed for it.
  *
  * The card's content is deliberately not drawn here (ADR 0006) — a graph is for
  * reading the shape of a space, and a wall of clipped markdown at graph zoom is
  * unreadable anyway. Opening a card is how you read it.
  *
- * The one exception is the card a walk has reached while presenting, which draws
+ * The one exception is the card a traversalHistory has reached while presenting, which draws
  * its content instead: presenting is the graph seen close enough that one card
  * fills the screen (ADR 0027), so at that zoom the content is exactly what is
  * legible. It is still the same node — nothing is transformed into anything, and
@@ -111,13 +111,13 @@ function CardTitleEditor({ cardId, title, onComplete, onCancel }: CardTitleEdito
  * documented remedy is `useUpdateNodeInternals`. That remedy is for nodes that
  * leave measuring to React Flow. `projection.ts` does not: it puts the
  * strategy's geometry on `node.handles`, `parseHandles` prefers that to the DOM,
- * and every projection allocates fresh nodes, so a Route gaining a handle or a
+ * and every projection allocates fresh nodes, so a Graph gaining a handle or a
  * strategy moving one is re-derived on the spot.
  *
  * Calling the hook on top of that is a regression rather than a belt-and-braces:
  * a forced update rebuilds the bounds with `getHandleBounds`, which reads only
- * the handles the DOM renders — the anchors of Routes this Card is already on.
- * The declarations for every other Route go with it, and those are exactly what
+ * the handles the DOM renders — the anchors of Graphs this Card is already on.
+ * The declarations for every other Graph go with it, and those are exactly what
  * lets an Edge completed onto this Card resolve in the render that first makes
  * it incident, before the projection catches up.
  */
@@ -135,8 +135,8 @@ export function CardNode({ data, selected }: NodeProps<CardFlowNode>) {
       isConnectable={false}
       style={{
         top: handle.offsetY,
-        width: ROUTE_PORT_DIAMETER,
-        height: ROUTE_PORT_DIAMETER,
+        width: GRAPH_PORT_DIAMETER,
+        height: GRAPH_PORT_DIAMETER,
         background: handle.color,
         opacity: 0,
       }}
@@ -165,7 +165,7 @@ export function CardNode({ data, selected }: NodeProps<CardFlowNode>) {
       style={{
         width: AUTHORING_HANDLE_DIAMETER,
         height: AUTHORING_HANDLE_DIAMETER,
-        background: data.activeRouteColor,
+        background: data.activeGraphColor,
       }}
     />
   );

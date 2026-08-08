@@ -28,7 +28,7 @@ const typeScriptSourceFiles = (directory: string): readonly string[] =>
  *
  * The check is structural rather than a search for the name `LayoutPoint`: it
  * finds a point re-declared under any name, and it stays silent about the many
- * legitimate uses of `x` and `y` next door (`LayoutCard`, `LayoutPort`), whose
+ * legitimate uses of `x` and `y` next door (`LayoutStrategyCard`, `LayoutStrategyPort`), whose
  * members are optional and not alone.
  */
 describe('a point has one type', () => {
@@ -94,13 +94,13 @@ describe('a point has one type', () => {
 });
 
 /**
- * The guard above is only as wide as the walk under it: a point re-declared in a
- * file the walk skips is a point it never reads, silently. `packages/graph/src`
- * is flat and entirely `.ts` today, so nothing there can prove the walk reaches
+ * The guard above is only as wide as the traversalHistory under it: a point re-declared in a
+ * file the traversalHistory skips is a point it never reads, silently. `packages/graph/src`
+ * is flat and entirely `.ts` today, so nothing there can prove the traversalHistory reaches
  * further — which is the whole reason to prove it here instead, against a
  * directory shaped like the one a later change would make.
  */
-describe('the walk that guard reads', () => {
+describe('the traversalHistory that guard reads', () => {
   const temporaryDirectories: string[] = [];
 
   afterEach(async () => {

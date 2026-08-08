@@ -4,7 +4,7 @@ import { importSpaceFileSchema, importSpaceSchema, spaceSnapshotSchema } from '.
 const SPACE_ID = '00000000-0000-4000-8000-000000000001';
 const CARD_A = '00000000-0000-4000-8000-000000000002';
 const CARD_B = '00000000-0000-4000-8000-000000000003';
-const ROUTE_ID = '00000000-0000-4000-8000-000000000004';
+const GRAPH_ID = '00000000-0000-4000-8000-000000000004';
 const LAYOUT_ID = '00000000-0000-4000-8000-000000000005';
 
 const identified = {
@@ -12,7 +12,7 @@ const identified = {
   document: {
     version: 2,
     title: 'Test space',
-    routes: [{ id: ROUTE_ID, title: 'Main', edges: [{ from: CARD_A, to: CARD_B }] }],
+    graphs: [{ id: GRAPH_ID, title: 'Main', edges: [{ from: CARD_A, to: CARD_B }] }],
     layouts: [
       {
         id: LAYOUT_ID,
@@ -34,9 +34,9 @@ describe('import space schema', () => {
     const parsed = importSpaceFileSchema.parse({
       version: 2,
       title: 'Import input',
-      routes: [
+      graphs: [
         {
-          title: 'Generated route',
+          title: 'Generated graph',
           edges: [{ from: CARD_A, to: CARD_B }],
         },
       ],
@@ -49,12 +49,12 @@ describe('import space schema', () => {
     });
 
     expect(parsed.id).toBeUndefined();
-    expect(parsed.routes[0]?.id).toBeUndefined();
+    expect(parsed.graphs[0]?.id).toBeUndefined();
     expect(parsed.layouts?.[0]?.id).toBeUndefined();
     expect(
       importSpaceFileSchema.safeParse({
         ...parsed,
-        routes: [{ ...parsed.routes[0], edges: [{ from: 'card-a', to: CARD_B }] }],
+        graphs: [{ ...parsed.graphs[0], edges: [{ from: 'card-a', to: CARD_B }] }],
       }).success,
     ).toBe(false);
   });
@@ -63,7 +63,7 @@ describe('import space schema', () => {
     const input = {
       document: {
         ...identified.document,
-        routes: [{ ...identified.document.routes[0], id: undefined }],
+        graphs: [{ ...identified.document.graphs[0], id: undefined }],
         layouts: [
           {
             title: 'Working',
@@ -77,7 +77,7 @@ describe('import space schema', () => {
     const parsed = importSpaceSchema.parse(input);
     expect(parsed.document.layouts?.[0]?.kind).toBe('positioned');
     expect(parsed.id).toBeUndefined();
-    expect(parsed.document.routes[0]?.id).toBeUndefined();
+    expect(parsed.document.graphs[0]?.id).toBeUndefined();
     expect(parsed.cards.at(-1)?.id).toBeUndefined();
   });
 
@@ -88,7 +88,7 @@ describe('import space schema', () => {
         ...identified,
         document: {
           ...identified.document,
-          routes: [{ ...identified.document.routes[0], id: 'main' }],
+          graphs: [{ ...identified.document.graphs[0], id: 'main' }],
         },
       },
       {
@@ -114,7 +114,7 @@ describe('space snapshot schema', () => {
         ...identified,
         document: {
           ...identified.document,
-          routes: [{ ...identified.document.routes[0], id: undefined }],
+          graphs: [{ ...identified.document.graphs[0], id: undefined }],
         },
       }).success,
     ).toBe(false);

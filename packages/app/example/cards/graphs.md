@@ -1,9 +1,9 @@
 ---
 id: 00000000-0000-4000-8000-000000000047
-title: Routes are graphs
+title: Graphs are graphs
 ---
 
-A **route** is a set of directed edges between cards.
+A **Graph** is a set of directed edges between cards.
 
 ```json
 {
@@ -19,9 +19,9 @@ A **route** is a set of directed edges between cards.
 ```
 
 A card may have several edges out — a **fork** — and several in — a **merge**.
-A route may contain cycles and self-edges; presenting decides how to traverse
+A Graph may contain cycles and self-edges; presenting decides how to traverse
 them. An **alias** is a distinct card with its own title and position that shows
 another card's content, not a workaround for returning to an existing card.
 
-A route that gives every card one edge out is a **line**. That is the degenerate
-graph, not a second kind of route.
+A Graph that gives every card one edge out is a **line**. That is the degenerate
+graph, not a second kind of Graph.

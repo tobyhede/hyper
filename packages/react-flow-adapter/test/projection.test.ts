@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildCardHandles,
-  buildLayoutGraph,
-  buildRouteEdges,
+  buildLayoutStrategyGraph,
+  buildGraphRenderEdges,
   loadSpace,
   type Space,
 } from '@project/graph';
-import { projectCardNodes, projectRouteEdges, type RouteEmphasis } from '../src/index';
+import { projectCardNodes, projectGraphEdges, type GraphEmphasis } from '../src/index';
 import { aliasFile, cardFile } from './card-files';
 import { uuid } from './uuid';
 
@@ -26,7 +26,7 @@ const space = load({
   version: 2,
   id: '00000000-0000-4000-8000-000000000001',
   title: 'Test',
-  routes: [
+  graphs: [
     {
       id: '00000000-0000-4000-8000-000000000004',
       title: 'Main',
@@ -73,7 +73,7 @@ describe('projectCardNodes', () => {
         version: 2,
         id: '00000000-0000-4000-8000-000000000001',
         title: 'Test',
-        routes: [
+        graphs: [
           {
             id: '00000000-0000-4000-8000-000000000004',
             title: 'Main',
@@ -104,21 +104,21 @@ describe('projectCardNodes', () => {
     ).toBe(false);
   });
 
-  it('attaches per-route handles colored by route', () => {
+  it('attaches per-graph handles colored by graph', () => {
     const nodes = projectCardNodes(space, handles, colors);
     const a = nodes.find((n) => n.id === '00000000-0000-4000-8000-000000000002')!;
     // main leaves card a (out); alt ends at card a (in).
     expect(a.data.sourceHandles).toMatchObject([
       {
         id: '00000000-0000-4000-8000-000000000004::out',
-        routeId: '00000000-0000-4000-8000-000000000004',
+        graphId: '00000000-0000-4000-8000-000000000004',
         color: '#111111',
       },
     ]);
     expect(a.data.targetHandles).toMatchObject([
       {
         id: '00000000-0000-4000-8000-000000000030::in',
-        routeId: '00000000-0000-4000-8000-000000000030',
+        graphId: '00000000-0000-4000-8000-000000000030',
         color: '#222222',
       },
     ]);
@@ -128,7 +128,7 @@ describe('projectCardNodes', () => {
 
   it('uses the port offsets and positions a layout put on the cards', () => {
     const nodes = projectCardNodes(space, handles, colors, {
-      layoutGraph: {
+      strategyGraph: {
         cards: [
           {
             id: uuid('00000000-0000-4000-8000-000000000002'),
@@ -154,15 +154,15 @@ describe('projectCardNodes', () => {
     });
   });
 
-  it('declares an attachment point for every Route on a card the layout has placed', () => {
-    // A third Route that never touches card A, so "every Route" is distinguishable
-    // from "every Route this card is already on". A self-edge is authored structure
+  it('declares an attachment point for every Graph on a card the layout has placed', () => {
+    // A third Graph that never touches card A, so "every Graph" is distinguishable
+    // from "every Graph this card is already on". A self-edge is authored structure
     // (ADR 0032), which is the cheapest way to keep it away from A.
-    const withThirdRoute = load({
+    const withThirdGraph = load({
       version: 2,
       id: '00000000-0000-4000-8000-000000000001',
       title: 'Test',
-      routes: [
+      graphs: [
         {
           id: '00000000-0000-4000-8000-000000000004',
           title: 'Main',
@@ -189,8 +189,8 @@ describe('projectCardNodes', () => {
       '00000000-0000-4000-8000-000000000004': '#111111',
       '00000000-0000-4000-8000-000000000031': '#333333',
     };
-    const nodes = projectCardNodes(withThirdRoute, buildCardHandles(withThirdRoute), palette, {
-      layoutGraph: {
+    const nodes = projectCardNodes(withThirdGraph, buildCardHandles(withThirdGraph), palette, {
+      strategyGraph: {
         cards: [
           {
             id: uuid('00000000-0000-4000-8000-000000000002'),
@@ -239,7 +239,7 @@ describe('projectCardNodes', () => {
 
   it('declares no geometry for a card the layout has not placed, leaving React Flow to measure it', () => {
     const nodes = projectCardNodes(space, handles, colors, {
-      layoutGraph: {
+      strategyGraph: {
         cards: [
           {
             id: uuid('00000000-0000-4000-8000-000000000002'),
@@ -281,7 +281,7 @@ describe('projectCardNodes', () => {
         version: 2,
         id: '00000000-0000-4000-8000-000000000001',
         title: 'Test',
-        routes: [
+        graphs: [
           {
             id: '00000000-0000-4000-8000-000000000004',
             title: 'Main',
@@ -315,11 +315,11 @@ describe('projectCardNodes', () => {
   });
 });
 
-describe('projectRouteEdges', () => {
-  const routeEdges = buildRouteEdges(space);
+describe('projectGraphEdges', () => {
+  const graphRenderEdges = buildGraphRenderEdges(space);
 
-  it('maps route edges to colored, port-connected React Flow edges', () => {
-    const edges = projectRouteEdges(routeEdges, colors);
+  it('maps graph edges to colored, port-connected React Flow edges', () => {
+    const edges = projectGraphEdges(graphRenderEdges, colors);
     expect(edges).toHaveLength(2);
     const mainEdge = edges.find((e) => e.id === '00000000-0000-4000-8000-000000000004::0')!;
     expect(mainEdge).toMatchObject({
@@ -333,8 +333,8 @@ describe('projectRouteEdges', () => {
   });
 
   it("carries ELK's routed points when a layout has placed them", () => {
-    const edges = projectRouteEdges(routeEdges, colors, {
-      layoutGraph: {
+    const edges = projectGraphEdges(graphRenderEdges, colors, {
+      strategyGraph: {
         cards: [],
         edges: [
           {
@@ -364,24 +364,24 @@ describe('projectRouteEdges', () => {
         { x: 10, y: 4 },
       ],
     });
-    // An edge the layout did not route carries no `points` key at all (bezier
+    // An edge the layout did not graph carries no `points` key at all (bezier
     // fallback). The key is omitted, not set to undefined (exactOptionalPropertyTypes).
     expect(
       edges.find((e) => e.id === '00000000-0000-4000-8000-000000000030::0')!.data,
     ).not.toHaveProperty('points');
   });
 
-  it('draws every route the same when nothing is emphasised', () => {
-    const edges = projectRouteEdges(routeEdges, colors, { emphasis: 'equal' });
+  it('draws every graph the same when nothing is emphasised', () => {
+    const edges = projectGraphEdges(graphRenderEdges, colors, { emphasis: 'equal' });
     expect(edges.every((e) => e.style?.opacity === 1)).toBe(true);
     expect(edges.every((e) => e.animated)).toBe(true);
   });
 
-  it('recedes the other routes, never hiding them', () => {
-    const at = (emphasis: RouteEmphasis) => {
-      const edges = projectRouteEdges(routeEdges, colors, {
+  it('recedes the other graphs, never hiding them', () => {
+    const at = (emphasis: GraphEmphasis) => {
+      const edges = projectGraphEdges(graphRenderEdges, colors, {
         emphasis,
-        activeRouteId: uuid('00000000-0000-4000-8000-000000000004'),
+        activeGraphId: uuid('00000000-0000-4000-8000-000000000004'),
       });
       return {
         '00000000-0000-4000-8000-000000000004': edges.find(
@@ -397,7 +397,7 @@ describe('projectRouteEdges', () => {
     const equal = at('equal');
     const subtle = at('subtle');
 
-    // The emphasised route is untouched at either level.
+    // The emphasised graph is untouched at either level.
     expect(equal['00000000-0000-4000-8000-000000000004'].style?.opacity).toBe(1);
     expect(subtle['00000000-0000-4000-8000-000000000004'].style?.opacity).toBe(1);
     expect(subtle['00000000-0000-4000-8000-000000000004'].animated).toBe(true);
@@ -414,25 +414,25 @@ describe('projectRouteEdges', () => {
 });
 
 /**
- * A Card declares an anchor for every Route, including ones it is not on, so an
+ * A Card declares an anchor for every Graph, including ones it is not on, so an
  * Edge completed onto it resolves in the render that first makes it incident.
  *
  * Those extra anchors have no DOM element, and React Flow picks the *closest*
  * declared handle within its connection radius. If one ever landed on the same
  * point as a visible authoring handle, a release near that point could resolve
  * to an anchor that cannot accept it. The fallback spreads them evenly down the
- * Card, so with an odd number of Routes the middle one sits at exactly half the
+ * Card, so with an odd number of Graphs the middle one sits at exactly half the
  * height — where the Left and Right authoring handles are.
  */
-describe('non-incident route anchors versus the authoring handles', () => {
+describe('non-incident graph anchors versus the authoring handles', () => {
   const cardA = '00000000-0000-4000-8000-000000000002';
   const cardB = '00000000-0000-4000-8000-000000000003';
 
-  const singleRouteSpace = load({
+  const singleGraphSpace = load({
     version: 2,
     id: '00000000-0000-4000-8000-000000000001',
-    title: 'One route',
-    routes: [
+    title: 'One graph',
+    graphs: [
       {
         id: '00000000-0000-4000-8000-000000000004',
         title: 'Only',
@@ -442,24 +442,24 @@ describe('non-incident route anchors versus the authoring handles', () => {
   });
 
   it('places a lone non-incident anchor exactly on the authoring handle centre', () => {
-    const handlesByCard = buildCardHandles(singleRouteSpace);
-    const cardIds = singleRouteSpace.cards.map((card) => card.id);
-    const layoutGraph = buildLayoutGraph(
+    const handlesByCard = buildCardHandles(singleGraphSpace);
+    const cardIds = singleGraphSpace.cards.map((card) => card.id);
+    const strategyGraph = buildLayoutStrategyGraph(
       cardIds,
       handlesByCard,
-      buildRouteEdges(singleRouteSpace),
+      buildGraphRenderEdges(singleGraphSpace),
       { width: 260, height: 146 },
     );
     const colors = { '00000000-0000-4000-8000-000000000004': '#6ea8fe' };
-    const nodes = projectCardNodes(singleRouteSpace, handlesByCard, colors, { layoutGraph });
+    const nodes = projectCardNodes(singleGraphSpace, handlesByCard, colors, { strategyGraph });
     const cardNode = nodes.find((node) => node.id === cardB);
     if (cardNode === undefined) throw new Error('Card B should be projected');
     const handles = cardNode.handles ?? [];
 
     const leftAuthoring = handles.find((handle) => handle.id === 'authoring-target-left');
-    const routeAnchor = handles.find((handle) => handle.id?.endsWith('::in'));
-    if (leftAuthoring === undefined || routeAnchor === undefined) {
-      throw new Error('both a route anchor and a left authoring handle should be declared');
+    const graphAnchor = handles.find((handle) => handle.id?.endsWith('::in'));
+    if (leftAuthoring === undefined || graphAnchor === undefined) {
+      throw new Error('both a graph anchor and a left authoring handle should be declared');
     }
 
     const centre = (handle: { x?: number; y?: number; width?: number; height?: number }) => ({
@@ -467,20 +467,20 @@ describe('non-incident route anchors versus the authoring handles', () => {
       y: (handle.y ?? 0) + (handle.height ?? 0) / 2,
     });
 
-    expect(centre(routeAnchor)).toEqual(centre(leftAuthoring));
+    expect(centre(graphAnchor)).toEqual(centre(leftAuthoring));
   });
 
-  it('declares the authoring handles before the route anchors', () => {
-    const handlesByCard = buildCardHandles(singleRouteSpace);
-    const cardIds = singleRouteSpace.cards.map((card) => card.id);
-    const layoutGraph = buildLayoutGraph(
+  it('declares the authoring handles before the graph anchors', () => {
+    const handlesByCard = buildCardHandles(singleGraphSpace);
+    const cardIds = singleGraphSpace.cards.map((card) => card.id);
+    const strategyGraph = buildLayoutStrategyGraph(
       cardIds,
       handlesByCard,
-      buildRouteEdges(singleRouteSpace),
+      buildGraphRenderEdges(singleGraphSpace),
       { width: 260, height: 146 },
     );
     const colors = { '00000000-0000-4000-8000-000000000004': '#6ea8fe' };
-    const nodes = projectCardNodes(singleRouteSpace, handlesByCard, colors, { layoutGraph });
+    const nodes = projectCardNodes(singleGraphSpace, handlesByCard, colors, { strategyGraph });
     const cardNode = nodes.find((node) => node.id === cardB);
     if (cardNode === undefined) throw new Error('Card B should be projected');
     const ids = (cardNode.handles ?? []).map((handle) => handle.id ?? '');

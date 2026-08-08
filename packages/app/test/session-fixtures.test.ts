@@ -5,7 +5,7 @@ import { waitForSettled } from './session-fixtures';
 
 const snapshot: SpaceSnapshot = {
   id: uuidSchema.parse('00000000-0000-4000-8000-000000000001'),
-  document: { version: 2, title: 'Space', routes: [] },
+  document: { version: 2, title: 'Space', graphs: [] },
   cards: [],
 };
 

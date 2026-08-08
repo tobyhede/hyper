@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildCardHandles,
-  buildLayoutGraph,
-  buildRouteEdges,
+  buildLayoutStrategyGraph,
+  buildGraphRenderEdges,
   gridStrategy,
   loadSpace,
 } from '../src/index';
-import type { LayoutGraph, Space } from '../src/index';
+import type { LayoutStrategyGraph, Space } from '../src/index';
 import { cardFile, uuid } from './card-files';
 
 function loadFixture(): Space {
@@ -15,7 +15,7 @@ function loadFixture(): Space {
       version: 2,
       id: '00000000-0000-4000-8000-000000000001',
       title: 'T',
-      routes: [
+      graphs: [
         {
           id: '00000000-0000-4000-8000-000000000004',
           title: 'Main',
@@ -46,16 +46,16 @@ const space = loadFixture();
 
 const SIZE = { width: 100, height: 50 };
 
-describe('buildLayoutGraph', () => {
+describe('buildLayoutStrategyGraph', () => {
   it('carries each card’s size and its ports, inbound first', () => {
-    const graph = buildLayoutGraph(
+    const graph = buildLayoutStrategyGraph(
       [
         uuid('00000000-0000-4000-8000-000000000002'),
         uuid('00000000-0000-4000-8000-000000000003'),
         uuid('00000000-0000-4000-8000-000000000005'),
       ],
       buildCardHandles(space),
-      buildRouteEdges(space),
+      buildGraphRenderEdges(space),
       SIZE,
     );
 
@@ -70,10 +70,10 @@ describe('buildLayoutGraph', () => {
   });
 
   it('drops edges whose endpoints the view is not showing', () => {
-    const graph = buildLayoutGraph(
+    const graph = buildLayoutStrategyGraph(
       [uuid('00000000-0000-4000-8000-000000000002'), uuid('00000000-0000-4000-8000-000000000003')],
       buildCardHandles(space),
-      buildRouteEdges(space),
+      buildGraphRenderEdges(space),
       SIZE,
     );
     expect(graph.edges.map((e) => e.id)).toEqual(['00000000-0000-4000-8000-000000000004::0']);
@@ -81,14 +81,14 @@ describe('buildLayoutGraph', () => {
 });
 
 describe('gridStrategy', () => {
-  const graph: LayoutGraph = buildLayoutGraph(
+  const graph: LayoutStrategyGraph = buildLayoutStrategyGraph(
     [
       uuid('00000000-0000-4000-8000-000000000002'),
       uuid('00000000-0000-4000-8000-000000000003'),
       uuid('00000000-0000-4000-8000-000000000005'),
     ],
     buildCardHandles(space),
-    buildRouteEdges(space),
+    buildGraphRenderEdges(space),
     SIZE,
   );
 

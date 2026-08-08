@@ -8,8 +8,8 @@ import type {
   layoutPositionSchema,
   layoutSchema,
   positionedLayoutSchema,
-  routeEdgeSchema,
-  routeSchema,
+  graphEdgeSchema,
+  graphSchema,
   spaceFileSchema,
   spaceDocumentSchema,
   spaceSnapshotSchema,
@@ -34,12 +34,12 @@ export type ImportSpace = z.infer<typeof importSpaceSchema>;
  */
 export type CardFrontmatter = z.infer<typeof cardFrontmatterSchema>;
 /**
- * One `{ from, to }` connection a route is made of (ADR 0032). The authored
- * element — distinct from `@project/graph`'s `GraphEdge`, which is this plus the
- * handles it attaches to, and from `LayoutEdge`, which is that plus geometry.
+ * One `{ from, to }` connection a graph is made of (ADR 0032). The authored
+ * element — distinct from `@project/graph`'s `GraphRenderEdge`, which is this plus the
+ * handles it attaches to, and from `LayoutStrategyEdge`, which is that plus geometry.
  */
-export type RouteEdge = z.infer<typeof routeEdgeSchema>;
-export type Route = z.infer<typeof routeSchema>;
+export type GraphEdge = z.infer<typeof graphEdgeSchema>;
+export type Graph = z.infer<typeof graphSchema>;
 export type LayoutPosition = z.infer<typeof layoutPositionSchema>;
 export type PositionedLayout = z.infer<typeof positionedLayoutSchema>;
 
@@ -53,7 +53,7 @@ export type PositionedLayout = z.infer<typeof positionedLayoutSchema>;
 export type Layout = z.infer<typeof layoutSchema>;
 
 export type CardId = Card['id'];
-export type RouteId = Route['id'];
+export type GraphId = Graph['id'];
 
 /**
  * The on-disk shape of a space — what `loadSpace` reads and what a writer emits

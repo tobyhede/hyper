@@ -236,7 +236,7 @@ body {
   pointer-events: none;
 }
 
-/* Per-route ports, positioned by ELK's computed offset (inline `top`). React
+/* Per-graph ports, positioned by ELK's computed offset (inline `top`). React
    Flow handles the left/right edge placement and vertical centering, and the
    size is declared alongside the handle bounds in `authoring-handle.ts` so the
    two cannot drift.
@@ -406,7 +406,7 @@ body {
   font-size: 0.95rem;
 }
 
-/* ---- The card a walk has reached ---- */
+/* ---- The Card the Traversal history has reached ---- */
 /* Presenting draws the active card's content instead of its title (ADR 0027).
    Same box as every other card — the layout's 16:9 frame, which the camera then
    fills the screen with — so the type is sized in *container* units and scales
