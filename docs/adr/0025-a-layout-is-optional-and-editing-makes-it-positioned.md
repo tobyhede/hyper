@@ -12,7 +12,7 @@ A space opens its default Layout. A space need not have one: with no Layout, the
 
 ## Conversion copies what is on screen
 
-The new Layout takes its positions from the arrangement the author is looking at — the strategy's resolved output for **every** card, not only the one touched. So **conversion is visually a no-op**: nothing moves at the moment it happens, and the edit is the only change the author sees.
+The new Layout takes its positions from the arrangement the author is looking at — the strategy's resolved output for **every Card rendered by that View**, not only the one touched. So **conversion is visually a no-op**: nothing moves at the moment it happens, and the edit is the only change the author sees. ADR 0040 makes the View's subject explicit: a Space-scoped View chooses from Space Cards, while a Route-scoped View borrows one Layout-owned Route and copies it under a new identity during conversion.
 
 That is a requirement, not an implementation note. Three ways to get it wrong, each of which makes cards jump under the author's hand: recording only the edited card's position and leaving the rest unplaced; re-running the strategy *after* the edit rather than before; or converting into the output of a different strategy than the one on screen. Any of them turns an edit into a rearrangement, which is the surprise this design exists to avoid.
 
@@ -30,7 +30,7 @@ Both are replaced by permitting exactly the thing they refused. An algorithmic l
 
 Any interaction that touches a card or a route. Moving a card, creating one, deleting one, editing its content, drawing an edge, removing an edge. Panning and zooming the canvas do not.
 
-This is wider than 0013's definition, which was interactions that *write placement*. Drawing an edge between two existing cards writes structure and no position (ADR 0021), and it converts anyway — because the resulting Layout captures the strategy's output for every card, an edit that places nothing still fixes where everything sits. That is intended. After any edit the arrangement stops moving under the author, which is the property that makes the next edit predictable.
+This is wider than 0013's definition, which was interactions that *write placement*. Drawing an edge between two existing cards writes structure and no position (ADR 0021), and it converts anyway — because the resulting Layout captures the strategy's output for every Card rendered by that View, an edit that places nothing still fixes where that subject sits. That is intended. After any edit the arrangement stops moving under the author, which is the property that makes the next edit predictable.
 
 ## What this changes in 0021
 
@@ -44,7 +44,7 @@ ADR 0021 leans on 0013 explicitly: "Connecting and creating both write structure
 
 ## The cost we accept
 
-An edit is consequential in a way a pan is not: touching one card fixes the position of every card, and there is no way back to the algorithmic arrangement except to discard the Layout. Re-running a strategy is Auto-arrange's job — the half of its purpose 0017 said survives, "re-run the automatic strategy and take the result" — and it stays an explicit act.
+An edit is consequential in a way a pan is not: touching one Card fixes the position of every Card in the View's rendered subject, and there is no way back to the algorithmic arrangement except to discard the Layout. Re-running a strategy is Auto-arrange's job — the half of its purpose 0017 said survives, "re-run the automatic strategy and take the result" — and it stays an explicit act.
 
 Where cards start depends on which algorithmic layout resolved, so the same space converted from a grid and from name-ascending yields different authored positions. 0017 named this cost and it stands.
 
