@@ -280,7 +280,7 @@ export function projectCardNodes(
             handles: declaredHandles(
               sourceHandles,
               targetHandles,
-              Object.keys(colors) as GraphId[],
+              space.graphs.map((graph) => graph.id),
               cardLayout,
             ),
           }
