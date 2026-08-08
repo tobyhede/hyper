@@ -3,6 +3,7 @@
 Status: accepted
 Supersedes: 0019, 0029
 Refines: 0010, 0020
+Refined by: 0040, 0041
 
 Hyper persists every edit transactionally to PostgreSQL and regenerates the
 existing `space.json` plus card Markdown structure through explicit CLI export.
@@ -18,21 +19,21 @@ it — set out below — while every missing space, card, route and layout id is
 minted during the import transaction. An id-less entity is therefore always new
 until export writes its generated UUID.
 
-**Uniqueness is scoped to how an id is resolved.** Space and card ids are unique
-across the database, being primary keys; import additionally rejects a batch that
-repeats either, so a collision surfaces before any write rather than as a late
-constraint violation. Route and layout ids are unique only within the space
-document that carries them, per kind, which normal domain intake already checks.
-They may be reused in another space — stored or elsewhere in the same batch — and
-entities of different kinds may share a UUID.
+**Uniqueness is scoped to how an id is resolved.** Space and Card ids are unique
+across the database, being primary keys; import additionally rejects a batch
+that repeats either, so a collision surfaces before any write rather than as a
+late constraint violation. A Layout id is unique within its Space; after ADR
+0040, a Route id is unique within its owning Layout. Either nested id may be
+reused under another owner, and entities of different kinds may share a UUID.
 
-Nothing resolves a route or layout id outside its own space: there is no routes
-table and no layouts table, and every query is by space id or card id. So a
-reused nested id makes no lookup ambiguous, and rejecting one would mean reading
-every stored document on every import to defend an invariant no code depends on.
-Don't add that check, and don't widen the batch check to route or layout ids —
-doing so makes acceptance depend on how a batch was split, since importing two
-such spaces separately would still succeed.
+Nothing resolves a Route outside its owning Layout or a Layout outside its
+Space: there is no Routes table and no Layouts table, and every query is by
+Space id or Card id. So a reused nested id makes no lookup ambiguous, and
+rejecting one would mean reading every stored document on every import to
+defend an invariant no code depends on. Don't add a database-wide check or
+widen the batch check to Route or Layout ids — doing so makes acceptance depend
+on how a batch was split, since importing the same owners separately would
+still succeed.
 
 Minting is not allocation, and the database is not a source of identity. A
 space's id comes from the `spaces.id` column default, because that is what a
@@ -69,6 +70,12 @@ schemas allow persistence-owned ids to be omitted, and `SpaceBackend`,
 There is no browser Save action or file write-back endpoint. The Vite file
 integration is gone entirely — file discovery and parsing are server-side CLI
 and import concerns, and the browser reaches persistence only over HTTP.
+
+That built version 2 document still stores Routes at Space scope and validates
+their ids there. ADR 0040 deliberately replaces this disposable pre-release
+shape with Layout-owned Routes for the first-public version 1 document. The
+aggregate still commits as one JSONB snapshot; no database table or commit
+protocol changes merely because ownership moves within it.
 
 The Prisma Next/PostgreSQL adapter and insert-only transactional importer are
 built, as is database-driven startup: server-side policy resolves the zero, one

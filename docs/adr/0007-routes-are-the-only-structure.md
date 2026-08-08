@@ -3,7 +3,7 @@
 Status: accepted
 Supersedes: none
 Refines: 0003
-Refined by: 0015
+Refined by: 0015, 0040, 0041
 Related: 0023
 
 A space is **cards and routes**. There is no separately authored connection between two cards. The manifest's `edges` array — each entry `{ id, source, target, kind: 'sequence' | 'reference' }` — is removed from the schema, along with both kinds.
@@ -27,6 +27,8 @@ A space's shape is now entirely the routes laid across its cards. Any structure 
 `ReferenceErrorKind` loses `unresolved-edge-source` and `unresolved-edge-target`.
 
 This refines ADR 0003, which established that routes are independent narratives whose orders may conflict, by making them the *only* structure — there is no second, authored ordering that could agree or disagree with them.
+
+ADR 0040 later relocates that structure without adding another kind: Routes are owned by Layouts rather than stored as peers under the Space. Within a Layout they remain the only authored graph structure over its Cards.
 
 ## The cost we accept
 
