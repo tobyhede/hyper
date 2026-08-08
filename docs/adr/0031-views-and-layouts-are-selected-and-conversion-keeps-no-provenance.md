@@ -5,32 +5,26 @@ Refines: 0025
 Refined by: 0040, 0041
 Related: 0014, 0028, 0030
 
-The primary canvas renderer for a Space is chosen from two different things: an application-
+The renderer for a Space is chosen from two different things: an application-
 supplied **Algorithmic View**, or one of the Space's authored **Positioned
 Layouts**. A Space's optional `defaultView` may name either a built-in View or
 one of its Layouts. When it names neither, the application fallback is always a
 View; a global fallback cannot name a Layout owned by one particular Space.
 
 The toolbar exposes that choice through an icon View selector, grouped into
-Algorithmic Views and Layouts. Selecting either is navigation, not an edit: it
-changes what the viewer sees without changing the Space or its persisted
-default. Other application-supplied Views may coexist with that primary
-renderer: the Cards View, for example, projects Cards absent from the selected
-Layout in a Sidebar and is not another renderer choice. The generic prototype
-Auto-arrange button is removed. A concrete layout strategy is offered as an
-Algorithmic View, never hidden behind a command whose behavior depends on what
+Views and Layouts. Selecting either is navigation, not an edit: it changes what
+the viewer sees without changing the Space or its persisted default. The
+generic prototype Auto-arrange button is removed. A concrete layout strategy is
+offered as a View, never hidden behind a command whose behavior depends on what
 was previously selected.
 
-Editing any Algorithmic View converts through the same crossing. The Card
-positions already on screen are copied into a new Positioned Layout, the edit
-is applied there, and the selector immediately names that new Layout. It
-receives the next unique neutral title (`Layout 1`, `Layout 2`, and so on).
-Existing Layouts are left untouched. Automatic persistence adds the new Layout
-to the Space and makes it the `defaultView`; editing an existing Layout instead
-updates that Layout and makes it the default. ADR 0040 distinguishes the
-subject being copied: a Space-scoped View selects Space Cards, while a
-Route-scoped View borrows one Layout-owned Route and copies it under a fresh
-identity into the new Layout.
+Editing any Algorithmic View converts uniformly. The card positions already on
+screen are copied into a new Positioned Layout, the edit is applied there, and
+the selector immediately names that new Layout. It receives the next unique
+neutral title (`Layout 1`, `Layout 2`, and so on). Existing Layouts are left
+untouched. Automatic persistence adds the new Layout to the Space and makes it
+the `defaultView`; editing an existing Layout instead updates that Layout and
+makes it the default.
 
 Conversion deliberately retains no provenance linking the new Layout to the
 View or layout strategy that produced its initial positions. Editing ends the

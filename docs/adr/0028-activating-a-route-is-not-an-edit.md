@@ -5,7 +5,7 @@ Refines: 0025, 0026
 Refined by: 0040, 0041
 Related: 0021
 
-ADR 0040 gives a Layout an optional `activeRoute` among the Routes it owns and rules that absent one, the first owned Route is active. **That fallback is a read, never a write.** It is resolved on load so a hand-authored Space works with nothing typed, and the app writes the field explicitly with the next Edit — so an application-authored Layout names its active Route outright rather than depending on the order its Routes happen to sit in.
+ADR 0026 gives a Layout an optional `activeRoute` and rules that absent one, the first visible route is active. **That fallback is a read, never a write.** It is resolved on load so a hand-authored space works with nothing typed, and the app writes the field explicitly every time it saves — so a file the app has written names its active route outright rather than depending on the order its routes happen to sit in.
 
 **Activating a route is not an edit.** It converts no algorithmic layout, it does not dirty the space, and on its own it never reaches the file. What it changes is carried in by the next **real** save — a drag, an auto-arrange, a drawn edge, a created card — written alongside whatever that save was for.
 
@@ -19,7 +19,7 @@ So the write-side rule is attached to saving rather than to activating. The stat
 
 ## What this does not change
 
-ADR 0040 changes ownership but preserves this resolution order: a Layout's `activeRoute` if it names one of its Routes, else its first Route. Nothing here removes the fallback or makes the field required — an authored Layout with Routes and no `activeRoute` still opens without another required field. This decision is about what the *application* writes, not about what an import document must contain.
+ADR 0026's resolution order stands untouched: a Layout's `activeRoute` if it names one, else the first visible route. Nothing here removes the fallback or makes the field required — a space an author wrote by hand, with routes and no `activeRoute`, opens exactly as 0026 says it does. This decision is about what the *application* writes, not about what a space file must contain.
 
 ## The cost we accept
 
