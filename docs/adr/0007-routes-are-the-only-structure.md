@@ -28,8 +28,6 @@ A space's shape is now entirely the routes laid across its cards. Any structure 
 
 This refines ADR 0003, which established that routes are independent narratives whose orders may conflict, by making them the *only* structure — there is no second, authored ordering that could agree or disagree with them.
 
-ADR 0040 later relocates that structure without adding another kind: Routes are owned by Layouts rather than stored as peers under the Space. Within a Layout they remain the only authored graph structure over its Cards.
-
 ## The cost we accept
 
 A future review will note that a graph library is being fed a graph with no authored edges, and suggest adding them back for a "structural layer" beneath the routes. That suggestion is this ADR. The structural layer it imagines was present for the entire life of the prototype, drawn nothing, and duplicated the routes.
