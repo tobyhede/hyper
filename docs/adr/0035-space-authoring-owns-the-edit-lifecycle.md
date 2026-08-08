@@ -1,6 +1,7 @@
 # Space Authoring owns the complete Edit lifecycle
 
 Status: accepted
+Refined by: 0041, 0042
 Related: 0025, 0028, 0030, 0031, 0033
 
 An **Edit** is a validated transition from one Space to another; **Authoring** is
