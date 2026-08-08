@@ -35,6 +35,10 @@ describe('GraphSelector', () => {
     render(
       <GraphSelector
         graphs={graphs}
+        colorByGraphId={{
+          [graphs[0]!.id]: '#6ea8fe',
+          [graphs[1]!.id]: '#f4a259',
+        }}
         activeGraphId={graphs[1]?.id ?? null}
         onActivate={() => undefined}
         onPresent={onPresent}
@@ -58,10 +62,72 @@ describe('GraphSelector', () => {
     expect(onPresent).toHaveBeenCalledOnce();
   });
 
+  it('uses the resolved Graph colours shared with the canvas', () => {
+    render(
+      <GraphSelector
+        graphs={graphs}
+        colorByGraphId={{
+          [graphs[0]!.id]: '#112233',
+          [graphs[1]!.id]: '#445566',
+        }}
+        activeGraphId={graphs[1]?.id ?? null}
+        onActivate={() => undefined}
+        onPresent={() => undefined}
+        onExitPresenting={() => undefined}
+      />,
+    );
+
+    expect(
+      screen.getByRole('combobox', { name: 'Active Graph' }).querySelector('svg'),
+    ).toHaveAttribute('stroke', '#445566');
+    expect(
+      screen.getByRole('button', { name: 'Present this Graph' }).querySelector('svg'),
+    ).toHaveAttribute('fill', '#445566');
+
+    fireEvent.keyDown(screen.getByRole('combobox', { name: 'Active Graph' }), { key: 'ArrowDown' });
+    const options = screen.getAllByRole('option');
+    expect(options[0]?.querySelector('[aria-hidden="true"]')).toHaveStyle({
+      background: '#112233',
+    });
+    expect(options[1]?.querySelector('[aria-hidden="true"]')).toHaveStyle({
+      background: '#445566',
+    });
+  });
+
+  it('falls back to authored colours when the resolved map is partial', () => {
+    render(
+      <GraphSelector
+        graphs={graphs}
+        colorByGraphId={{ [graphs[0]!.id]: '#112233' }}
+        activeGraphId={graphs[1]?.id ?? null}
+        onActivate={() => undefined}
+        onPresent={() => undefined}
+        onExitPresenting={() => undefined}
+      />,
+    );
+
+    expect(
+      screen.getByRole('combobox', { name: 'Active Graph' }).querySelector('svg'),
+    ).toHaveAttribute('stroke', '#f4a259');
+    expect(
+      screen.getByRole('button', { name: 'Present this Graph' }).querySelector('svg'),
+    ).toHaveAttribute('fill', '#f4a259');
+
+    fireEvent.keyDown(screen.getByRole('combobox', { name: 'Active Graph' }), { key: 'ArrowDown' });
+    const options = screen.getAllByRole('option');
+    expect(options[0]?.querySelector('[aria-hidden="true"]')).toHaveStyle({
+      background: '#112233',
+    });
+    expect(options[1]?.querySelector('[aria-hidden="true"]')).toHaveStyle({
+      background: '#f4a259',
+    });
+  });
+
   it('disables Present when there is no active Graph', () => {
     render(
       <GraphSelector
         graphs={graphs}
+        colorByGraphId={{}}
         activeGraphId={null}
         onActivate={() => undefined}
         onPresent={() => undefined}
@@ -78,6 +144,7 @@ describe('GraphSelector', () => {
     render(
       <GraphSelector
         graphs={graphs}
+        colorByGraphId={{}}
         activeGraphId={graphs[1]?.id ?? null}
         onActivate={onActivate}
         onPresent={() => undefined}
@@ -98,6 +165,7 @@ describe('GraphSelector', () => {
     render(
       <GraphSelector
         graphs={graphs}
+        colorByGraphId={{}}
         activeGraphId={graphs[1]?.id ?? null}
         onActivate={() => undefined}
         onPresent={onPresent}
