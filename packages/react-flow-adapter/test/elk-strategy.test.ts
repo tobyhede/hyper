@@ -120,12 +120,12 @@ describe('elkStrategy', () => {
   });
 });
 
-describe('graphs a back-edge around the cards', () => {
+describe('routes a back-edge around the cards', () => {
   // We hand the adapter a graph that contains a back-edge directly: it lays out a
   // LayoutStrategyGraph and does not enforce domain rules, so this is the level to test
   // back-edge *rendering*. Cyclic Graphs are valid authored structure (ADR
   // 0032). The edges below (`… → C → B`, target B laid left of source C) are
-  // the simplest deterministic back-edge; ELK graphs it around the cards and
+  // the simplest deterministic back-edge; ELK routes it around the cards and
   // issue 03 draws that instead of a bezier stub.
   const CARDS = [
     uuid('00000000-0000-4000-8000-00000000000a'),

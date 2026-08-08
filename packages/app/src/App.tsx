@@ -469,7 +469,6 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
         <GraphSelector
           graphs={visibleGraphs}
           activeGraphId={activeGraphId}
-          colorByGraphId={colors}
           onActivate={(graphId) => activateGraph(uuidSchema.parse(graphId))}
           // `GraphSelector` disables its control on "no active Graph" and
           // `present()` refuses on exactly that, so the two conditions agree:

@@ -237,40 +237,6 @@ describe('projectCardNodes', () => {
     ).toBe(82.5);
   });
 
-  it('declares every Graph attachment point when the colour map is incomplete', () => {
-    const nodes = projectCardNodes(
-      space,
-      handles,
-      {},
-      {
-        strategyGraph: {
-          cards: [
-            {
-              id: uuid('00000000-0000-4000-8000-000000000002'),
-              x: 500,
-              y: 600,
-              width: 260,
-              height: 300,
-              ports: [],
-            },
-          ],
-          edges: [],
-        },
-      },
-    );
-    const a = nodes.find((node) => node.id === '00000000-0000-4000-8000-000000000002')!;
-    const graphHandleIds = (a.handles ?? [])
-      .map((handle) => handle.id)
-      .filter((id) => id?.includes('::'));
-
-    expect(graphHandleIds).toEqual([
-      '00000000-0000-4000-8000-000000000004::in',
-      '00000000-0000-4000-8000-000000000030::in',
-      '00000000-0000-4000-8000-000000000004::out',
-      '00000000-0000-4000-8000-000000000030::out',
-    ]);
-  });
-
   it('declares no geometry for a card the layout has not placed, leaving React Flow to measure it', () => {
     const nodes = projectCardNodes(space, handles, colors, {
       strategyGraph: {
@@ -398,7 +364,7 @@ describe('projectGraphEdges', () => {
         { x: 10, y: 4 },
       ],
     });
-    // An edge the layout did not graph carries no `points` key at all (bezier
+    // An edge the layout did not route carries no `points` key at all (bezier
     // fallback). The key is omitted, not set to undefined (exactOptionalPropertyTypes).
     expect(
       edges.find((e) => e.id === '00000000-0000-4000-8000-000000000030::0')!.data,

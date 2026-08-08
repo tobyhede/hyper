@@ -165,7 +165,7 @@ A pnpm workspace with strict TypeScript and enforced package boundaries:
 | `@project/core` | Domain types + Zod schema. No framework code. |
 | `@project/graph` | Pure graph/Graph logic: intake and indexing, lookups, Graph navigation, referential validation, Graph→handles/edges derivation, and the `LayoutStrategy` contract. Property-tested. |
 | `@project/persistence` | Browser-safe backend and session contracts, optimistic revisions, commit coalescing, failure/conflict handling, and the memory adapter. |
-| `@project/react-flow-adapter` | The only package that imports `@xyflow/react` and `elkjs`. Runs the ELK layout and projects the domain model into colored React Flow card nodes/edges. |
+| `@project/react-flow-adapter` | Owns React Flow projection and all elkjs specifics. Runs the ELK strategy and projects the domain model into coloured React Flow Card nodes and Edges. |
 | `@project/ui` | Reusable, framework-agnostic React: card renderer, Graph selector, Graph legend, presentation controls, app shell. |
 | `@project/app` | Wiring: TanStack Router, a Zustand store for presentation state, the example presentation, and Vite. |
 

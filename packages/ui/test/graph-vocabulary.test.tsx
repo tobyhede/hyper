@@ -14,7 +14,6 @@ describe('Graph product vocabulary', () => {
     render(
       <GraphSelector
         graphs={[graph]}
-        colorByGraphId={{ [graph.id]: '#6ea8fe' }}
         activeGraphId={graph.id}
         onActivate={() => undefined}
         onPresent={() => undefined}
