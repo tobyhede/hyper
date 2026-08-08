@@ -1,17 +1,17 @@
 # Hyper
 
-Graph-native technical content. Cards of content live in a spatial graph; authors lay curated routes across them and offer different views onto them. This glossary is the shared language for that domain — it holds no implementation detail (file formats, storage, and rendering libraries are out of scope here), with one exception noted at the end.
+Graph-native technical content. Cards of content live in spatial Layouts; authors connect them into curated directed Graphs and offer different Views onto them. This glossary is the shared language for that domain — it holds no implementation detail (file formats, storage, and rendering libraries are out of scope here), with one exception noted at the end.
 
 ## The space
 
 **Space**:
-The whole authored world, and the top-level of the domain model: a graph of cards together with the routes and views laid over them. Everything else — cards, routes, layouts, views — belongs to a space. A card may itself be a space, so spaces nest arbitrarily deep; the space you load is the root, and a nested space is reached by opening a space-card.
+The whole authored world, and the top-level of the domain model: Cards organised into spatial Layouts, with each Layout carrying the Graphs authored across its Cards. Everything else — Cards, Layouts, their Graphs, and application-supplied Views — belongs within a Space. A Card may itself be a Space, so Spaces nest arbitrarily deep; the Space you load is the root, and a nested Space is reached by opening a Space Card.
 _Avoid_: presentation (that is one view of a space), manifest (a shipping-ledger word, wrong for an authored, reshapeable thing — retired from the code, not merely avoided), deck, document, canvas, board, file, subgraph.
 
-A **new space** is one card, centered — not an empty canvas (ADR 0018). It has no routes yet, so it can be read and edited but not presented.
+A **new space** is one Card, centered — not an empty canvas (ADR 0018). It has no Graphs yet, so it can be read and edited but not presented. One Card is the starting state, not a permanent minimum: deliberate deletion may later leave the Space with no Cards.
 
 **Id**:
-The durable UUID that names a referenceable thing — a space, card, route or layout. It is the entity's only identifier and is unique within that entity's scope: space ids among Spaces, card ids among Cards, and route and layout ids within their owning Space. Different entity kinds may carry the same UUID, and route or layout ids may be reused in different Spaces; references carry the id directly in the scope that resolves it rather than pairing it with a second authored or machine-facing name.
+The durable UUID that names a referenceable thing — a Space, Card, Layout, or Graph. It is the entity's only identifier and is unique within that entity's scope: Space ids among Spaces, Card and Layout ids within their owning Space, and Graph ids within their owning Layout. Different entity kinds may carry the same UUID, and scoped ids may be reused under different owners; references carry the id directly in the scope that resolves it rather than pairing it with a second authored or machine-facing name.
 
 An author need not supply one when introducing an entity. Anything accepted into Hyper receives an id before it becomes part of a Space; once assigned, changing it is a real edit because every reference names it.
 _Avoid_: guid, key, slug, local id, authored id, and any pairing of a "human" id with a "durable" one.
@@ -19,7 +19,7 @@ _Avoid_: guid, key, slug, local id, authored id, and any pairing of a "human" id
 ## Cards
 
 **Card**:
-A single addressable piece of a space, and the thing a route's edges run between. Named for HyperCard's card.
+A single addressable piece of a space, and the thing a Graph's Edges run between. Named for HyperCard's card.
 
 A card has a **title**, which names it wherever it is listed or drawn, and **content**, which is what it holds. The two are distinct: a view may show one without the other, and the graph draws the title, not the content. A card may also carry a short optional **description** — a caption saying what it is when the title alone is too terse — which the graph draws under the title; it is not a second body (it is capped and single-line), and the content still lives in the card.
 
@@ -27,61 +27,67 @@ A card is one of three kinds, and the kind is what its content is: **Markdown** 
 _Avoid_: node, slide, page, tile, subgraph. For the content: prose (it may be a table, a diagram or code, not only writing), body (works for markdown, but a space card's content is a graph).
 
 **Alias**:
-A card that shows another card's **content**: the same content appearing again elsewhere in the space, with a single source of truth, so editing the target changes every place it appears. An alias carries its own title — only content is shared. An alias points to a different card, and that card is never itself an alias: aliasing is a single hop, so an alias never points at itself and alias chains cannot form.
+A card that shows another card's **content**: the same content appearing again elsewhere in the space, with a single source of truth, so editing the target changes every place it appears. An alias carries its own title — only content is shared. An alias may target any non-alias card kind, including a Markdown card or a space card, but never another alias: aliasing is a single hop, so an alias never points at itself and alias chains cannot form.
 
 Authoring an alias itself changes only its title, and it is renamed where it is drawn. Opening an alias preserves that occurrence as the opened context and delegates content authoring to the card it targets. The surface identifies both cards, exposes the target's content rather than the alias's metadata, and completes the target edit at its single source of truth, so every alias shows the change. Changing which card an alias targets is a separate alias-authoring operation, not editing the content it shows.
 _Avoid_: reference, link (an alias shows content, it does not merely jump), copy, transclusion, mirror.
 
-## Routing
+## Graphs
 
-**Route**:
-A curated way through the cards — a narrative an author wants a viewer to follow. Routes are the space's structure: a space's shape is the routes laid across its cards, and there is no separately authored connection between cards.
+**Graph**:
+A curated directed structure over the Cards in one Layout — a narrative an author wants a viewer to traverse. Graphs are a Layout's only connection structure: there is no separately authored connection between Cards. A Graph belongs to exactly one Layout and is authored only through that Layout.
 
-A route is a set of directed **edges** between cards. A card may have several edges out — a **fork** — and several in — a **merge**; routes may also contain cycles and self-edges. Presentation decides how to traverse that graph. A route is not a line; a line is the shape a route takes when every card has one edge out.
+A Graph is a set of directed **Edges** between Cards, and the set may be empty while an author prepares a new narrative. A Card may have several Edges out — a **fork** — and several in — a **merge**; Graphs may also contain cycles and self-Edges. A Graph is not a line; a line is the shape a Graph takes when every Card has one Edge out.
 
-A space can hold many routes; each has a name and a colour so they can be told apart when a view shows several at once. One is **active** at a time.
-_Avoid_: path, track, tour, journey, sequence, rail, step (a route stores edges, not positions in a list).
+A Layout keeps its one or more Graphs in a stable authored order. This order organises Graphs and supplies the fallback Active Graph; it does not order traversal within a Graph. New Graphs append, deletion preserves the relative order of survivors, and manual reordering is a separate authoring operation. The last Graph cannot be deleted through Graph management.
+
+A Layout holds one or many Graphs; each Graph has a title and may have a colour so Graphs can be told apart when the Layout shows several at once. An empty Graph is fully authored and may be active, but cannot be presented until it has an Edge. A Space with no Layout has no Graphs; creating a Layout also creates its initial empty Active Graph in the same Edit.
+
+Every Edge in a Graph connects two Cards present in the Graph's Layout. Removing a Card from a Layout therefore removes every Edge incident to that Card from all Graphs in that Layout as part of the same Edit; Graphs that become empty remain. The Card still belongs to the Space and may remain present in other Layouts.
+_Avoid_: route, path, track, tour, journey, sequence, rail, step.
 
 **Edge**:
-A directed connection from one card to another, and the element a route is made of. An author draws one and the route records it. An exact edge appears at most once in a route; drawing it again changes nothing. An edge belongs to one route, so two routes crossing the same pair of cards are two edges.
+A directed connection from one Card to another, and the element a Graph is made of. An author draws one and the Graph records it. An exact Edge appears at most once in a Graph; drawing it again changes nothing. An Edge belongs to one Graph, so two Graphs crossing the same pair of Cards hold two Edges.
 _Avoid_: link, connection, transition, arrow, step, relationship.
 
-**Active route**:
-The one route a space has selected at a time — drawn emphasized, and the route an author's new edges join. There is one concept here, not two: a route is active, and highlighting is how that is shown. A layout may name which route opens active; failing that it is the first route the layout shows. Changing it is a deliberate act, never a side effect of drawing or reading.
+**Active Graph**:
+The one Graph selected in the current Layout — drawn emphasized, and the Graph an author's new Edges join. There is one concept here, not two: a Graph is active, and highlighting is how that is shown. A Layout may name which Graph opens active; failing that it is the Layout's first Graph. Changing it is a deliberate act, never a side effect of drawing or reading.
 
-Activating is not itself an edit — it touches no card and no route, so it converts nothing. Which route is active may become the authored default when another edit records the surrounding view.
-_Avoid_: selected route and current route as a second concept alongside this one, focus, mode.
+Activating is not itself an edit — it touches no Card and no Graph, so it converts nothing. Which Graph is active may become the authored default when another Edit records the surrounding View.
+_Avoid_: selected Graph and current Graph as a second concept alongside this one, focus, mode.
 
 **Authoring**:
-Interacting with a Space in a way that may change its authored cards, routes, or Layouts. Authoring includes attempts that produce no change; only a successful authoring interaction produces an **Edit**. Navigating a View or Layout, activating a Route, opening a Card, and presenting are not authoring because they do not change the Space.
+Interacting with a Space in a way that may change its authored Cards, Graphs, or Layouts. Authoring includes attempts that produce no change; only a successful authoring interaction produces an **Edit**. Navigating a View or Layout, activating a Graph, opening a Card, and presenting are not authoring because they do not change the Space.
 
 **Edit**:
-A validated transition from one Space to another that changes its authored cards, routes, or Layouts. An attempted gesture is not itself an Edit: cancelling it, drawing an Edge the Route already holds, or moving a Card away and back produces no Edit because the Space does not change.
+A validated transition from one Space to another that changes its authored Cards, Graphs, or Layouts. An attempted gesture is not itself an Edit: cancelling it, drawing an Edge the Graph already holds, or moving a Card away and back produces no Edit because the Space does not change.
 
-One Edit may change several authored parts atomically. Creating a Card at the end of a drawn Edge may create the Card, mint the Space's first Route, add the Edge, and write the Card's position into a Layout; together they are one Edit, not a sequence of smaller Edits.
+One Edit may change several authored parts atomically. Creating a Card at the end of a drawn Edge may create the Card, mint the Layout's first Graph, add the Edge, and write the Card's position into a Layout; together they are one Edit, not a sequence of smaller Edits.
 
 ## Layout and views
 
 **Layout**:
-A card-to-position map the author wrote — where a space's cards sit. It belongs to the space and is part of what the space is. A space may hold several layouts, and may hold none. Positions are a property of the layout, never of the card: the same card sits at different coordinates in each. A layout may omit cards, and whoever renders it places those itself; it may not name cards the space does not have.
+A card-to-position map the author wrote — which of a Space's Cards are in the Layout and where they sit. It belongs to the Space and is part of what the Space is. A Space may hold several Layouts, and may hold none. Membership and position are properties of the Layout, never of the Card: the same Card may be absent from one Layout and sit at different coordinates in others. A Layout may not name Cards the Space does not have.
 
-A Layout is authored by definition; the computed kind is not a layout at all but an automatic **layout strategy** (ADR 0014). A space with no Layout is rendered through an **Algorithmic View** the application supplies, and **editing turns that into a Layout**: the card positions already on screen are copied into the new Layout, so nothing moves at the moment it happens.
+A Layout is authored by definition; the computed kind is not a layout at all but an automatic **layout strategy** (ADR 0014). An **Algorithmic View** the application supplies may render either the Space generally or a Graph from one of its Layouts, and **editing turns that into a Layout**: the Card positions already on screen are copied into the new Layout, so nothing moves at the moment it happens. When the View is Graph-scoped, conversion also copies the source Graph under a new identity owned by the new Layout; the source Layout and Graph remain unchanged.
 
-A layout also names which routes it shows — a filter, absent meaning all of them — and may name which of those opens active.
-_Avoid_: view (a View is application-supplied and carries no authored positions), placement as a synonym (a Layout *holds* a placement, and adds an identity, a title and its route filter), diagram, manual and custom and free-form (a layout is authored, so the qualifiers say nothing).
+A Layout owns a non-empty ordered collection of Graphs over its Cards. Several Graphs may share Cards within that Layout. A Layout may also name which of its Graphs opens active; otherwise its first Graph opens active.
+_Avoid_: view (a View is application-supplied and carries no authored positions), placement as a synonym (a Layout *holds* a placement, and adds an identity, a title and its owned Graphs), diagram, manual and custom and free-form (a layout is authored, so the qualifiers say nothing).
 
 **Placement**:
-The card-to-position map itself — which cards sit where, and nothing more. A **Layout** is the authored thing a space holds; the placement is the map inside it. It is also what an automatic **layout strategy** computes and what the positioned strategy reads, and it is the same value in both directions: editing an Algorithmic View copies the computed placement into the new Layout, which is the crossing ADR 0025 describes.
+The card-to-position map itself — which Cards are present and where they sit, and nothing more. A **Layout** is the authored thing a Space holds; the placement is the map inside it. It is also what an automatic **layout strategy** computes and what the positioned strategy reads, and it is the same value in both directions: editing an Algorithmic View copies the computed placement into the new Layout, which is the crossing ADR 0025 describes.
 
-A placement is **sparse**, and omission is meaningful: a card the map leaves out is *unplaced*, and whoever renders it places that card itself. Omission is never the origin, and a position a renderer supplied for an unplaced card is not a placement the author made — promoting one to authored is an Edit, not a side effect of drawing.
+A Layout's placement is **sparse** relative to the Space, and omission is meaningful: a Card the map leaves out is not in that Layout and is not rendered there. Adding an existing Space Card to a Layout writes its position. Removing it from the Layout removes that entry and the incident Edges the Layout owns without deleting the Card from the Space. Omission is never the origin.
 
-This is not the placement layer ADR 0004 rejected. That was an entity sitting *between* a card and its position, which edges and routes referenced instead of the card, so one card could occupy two positions. A placement is keyed by card and holds at most one position for each.
+**Add Card** creates a new Space Card and adds it to the current Layout. **Add to Layout** adds an existing Space Card with its initial position. **Move Card** changes the position of a Card already in the Layout. **Remove from Layout** removes its membership, position and incident Layout-local Edges. “Place” is not a separate domain operation: every Card in a Layout necessarily has a position.
+
+This is not the placement layer ADR 0004 rejected. That was an entity sitting *between* a Card and its position, which Edges and Graphs referenced instead of the Card, so one Card could occupy two positions. A placement is keyed by Card and holds at most one position for each.
 _Avoid_: arrangement (ADR 0005 — applying a strategy produces no separate entity), layer.
 
 **Layout strategy**:
 A named strategy for arranging a space's cards — how they are organised and positioned. Which cards it arranges is the view's choice, not the strategy's.
 
-A strategy is either **automatic** or **positioned**. An automatic strategy computes placement from the cards and routes alone — a grid, cards ordered by name, a tree, a cluster map, a route-driven graph — so it needs nothing from the space and carries no authored data. The positioned strategy reads a **Layout**. Every Layout has a strategy that renders it; not every strategy has a Layout behind it.
+A strategy is either **automatic** or **positioned**. An automatic strategy computes placement from the Cards and Graphs alone — a grid, Cards ordered by name, a tree, a cluster map, a Graph-driven arrangement — so it needs nothing from the Space and carries no authored data. The positioned strategy reads a **Layout**. Every Layout has a strategy that renders it; not every strategy has a Layout behind it.
 
 No strategy is the primary one. A space is arranged by whichever the author or the application chose, the set of them grows, and any particular graph-layout engine is one member of it rather than the thing layout means.
 
@@ -89,12 +95,20 @@ An automatic strategy has nowhere to record where an author put a card, so editi
 _Avoid_: arrangement (applying a strategy produces no separate entity — the cards themselves carry the positions), algorithm, engine.
 
 **View**:
-An application-supplied way to render and explore a Space without authored card positions. An **Algorithmic View** uses an automatic **layout strategy** to compute those positions; the **Graph** View draws cards and routes across them, while the **Grid** View places cards on a grid. Views are named choices the application supplies, not authored things a Space owns.
+An application-supplied projection of a subject through which someone explores or acts on a Space. A View is not tied to a rendering surface and carries no authored Space state.
+_Avoid_: screen, page, panel, mode.
 
-A viewer chooses between the application's Views and the Space's Layouts. The Space may name either as its default renderer; a viewer may have a default View of their own; failing both, the application supplies a View. Choosing one is navigation, not an edit, and never changes the Space by itself.
+**Algorithmic View**:
+A spatial View that uses an automatic **layout strategy** over an explicit subject and renders its computed Card positions on the canvas. A **Space-scoped View**, such as Grid or an alphabetical list, arranges Space Cards without a Graph; a future **Graph-scoped View**, such as a tree, may borrow one selected Layout-owned Graph and the Cards it connects.
 
-Nothing tracks whether a viewer is editing, and there is no edit mode. Editing an Algorithmic View creates a new Layout from the card positions already on screen; editing a Layout changes that Layout directly. Conversion retains no relationship to the View or layout strategy that produced those initial positions: selecting another View later is a fresh rendering choice, not undo or reversal.
-_Avoid_: mode, screen, page, layout.
+A viewer chooses between the application's Algorithmic Views and the Space's Layouts as the primary canvas renderer. The Space may name either as its default renderer; a viewer may have a default Algorithmic View of their own; failing both, the application supplies one. Choosing one is navigation, not an edit, and never changes the Space by itself.
+
+Nothing tracks whether a viewer is editing, and there is no edit mode. Editing an Algorithmic View creates a new Layout from the Cards and positions already on screen; moving or connecting a Card, or choosing Add Graph, therefore converts before writing the Edit. A connection or Add Graph may create the new Layout's first Graph as part of that same Edit. Converting a Graph-scoped View also copies its source Graph under a new identity into the new Layout, leaving the source unchanged. Editing a Layout changes that Layout directly. Conversion retains no relationship to the View or layout strategy that produced those initial positions: selecting another View later is a fresh rendering choice, not undo or reversal.
+_Avoid_: layout, arrangement, algorithm.
+
+**Cards View**:
+An application-supplied collection View of the Space Cards absent from the selected Layout. Its current rendering is a Sidebar, but that mounting location is not part of the View's identity.
+_Avoid_: Space-card palette, Card panel, Sidebar as the domain name.
 
 **Exporting**:
 Projecting a space into the repository-friendly form an author can review, commit and share. Exporting is not what makes an edit durable; it records the space outside Hyper at a chosen revision.
@@ -105,19 +119,23 @@ Bringing a single card's content up in place, over whatever view the author is i
 _Avoid_: expand, preview, popup, modal, drill-down, view mode and edit mode (there is one surface).
 
 **Presenting**:
-Walking a route for an audience, on the space itself, drawn close enough that one card fills the screen. Presenting **traverses** the route: at the active card, the presenter follows one of its outgoing edges. A route that is a line walks as a line; a route that forks offers a choice. There is no separate artefact and no second surface — a presentation is not a thing a route is turned into, it is a way of moving through one.
+Traversing a Graph in its Layout for an audience, drawn close enough that one Card fills the screen. Presenting is available from a Layout, not an Algorithmic View, and traverses its Active Graph: at the Active Card, the presenter follows one of its outgoing Edges. A Graph that is a line traverses as a line; a Graph that forks offers a choice. There is no separate artefact and no second surface — a presentation is not a thing a Graph is turned into, it is a way of moving through one.
 _Avoid_: deck, slide, step, slideshow, playback, present mode (that is a mode name, not the thing).
 
-**Walk**:
-The cards a presenter has actually passed through, in order — one path taken through a route, of the several a route may permit. It belongs to the presenting, not to the space: a route is a graph and holds every path at once; a walk is the one being taken, and it is gone when the presenting ends. It is not itself a route, and recording one would be a second structure beside routes.
-_Avoid_: history, trail, session, playthrough, and route (a route is what is walked).
+**Graph navigation**:
+Moving keyboard focus through the Active Graph while working in its Layout. It uses the same fork, merge, cycle, and backtracking rules as Presenting but remains a separate transient interaction rather than an audience-facing presentation.
+_Avoid_: overview traversal, browsing, walking.
+
+**Traversal history**:
+The ordered Cards actually visited during one Graph navigation or presentation interaction. It is transient viewer state used to retrace the path actually taken through merges and cycles; the Space never owns or persists it.
+_Avoid_: Walk, route, trail, session, playthrough.
 
 **Selected card**:
 The card an authoring gesture will act on, named without being read. It is not opening and not activating: selecting a card shows nothing new and changes nothing about the space, it says *this one*. One card is selected at a time, and it is what reveals the controls drawn on a card and what a keyboard rename acts on. Selecting is not authoring, because it produces no Edit.
-_Avoid_: focus (that is the browser's, and a card may be selected without it), highlight, current card, active card (that belongs to a walk).
+_Avoid_: focus (that is the browser's, and a Card may be selected without it), highlight, current Card, Active Card (that belongs to Graph navigation or Presenting).
 
 **Active card**:
-Where a walk currently is — the card a presenter has reached, whose outgoing edges are the moves available. It pairs with the **active route**: the route names what is being walked, the card names the position in it. Going back reads the walk rather than the graph, because a card reached by a merge has several edges in and only the path taken says which one was used.
+The Card currently reached during Graph navigation or Presenting, whose outgoing Edges are the moves available. It pairs with the **Active Graph**: the Graph names what is being traversed, and the Card names the position in it. Going back reads Traversal history rather than the Graph, because a Card reached by a merge has several Edges in and only the path taken says which one was used.
 _Avoid_: current slide, cursor, position, step.
 
 ## At the render layer
@@ -128,5 +146,5 @@ Terms below are **React Flow's**, not ours. They are listed because we build aga
 React Flow's drawn line between two nodes, and the gesture that draws one. It shares its name with the domain's **Edge** because it is the same thing seen twice — the one place a render-layer word and a domain word coincide, deliberately, rather than a bridging term.
 
 **Handle**:
-React Flow's attachment point on a node, where an edge meets it or an author begins or ends drawing one. Route authoring presents four route-independent handles on a card, one on each side, coloured as the active route; the side is interaction geometry and is not authored. A renderer may use other invisible attachment geometry to keep existing edges legible, but that remains rendering and never becomes a rule the model obeys.
+React Flow's attachment point on a node, where an edge meets it or an author begins or ends drawing one. Graph authoring presents four Graph-independent handles on a Card, one on each side, coloured as the Active Graph; the side is interaction geometry and is not authored. A renderer may use other invisible attachment geometry to keep existing Edges legible, but that remains rendering and never becomes a rule the model obeys.
 _Avoid_: port (that is the word a graph-layout engine uses for the same thing, and any such engine is one implementation choice among several).

@@ -8,5 +8,6 @@ describe('React Flow adapter Graph vocabulary', () => {
     expect(adapter).toHaveProperty('projectGraphEdges');
     expect(adapter).not.toHaveProperty('RouteHud');
     expect(adapter).not.toHaveProperty('RouteConnectionLine');
+    expect(adapter).not.toHaveProperty('projectRouteEdges');
   });
 });

@@ -2,6 +2,7 @@ import {
   newUuid,
   type CardDocument,
   type CardId,
+  type GraphId,
   type LayoutPosition,
   type SpaceSnapshot,
   type UUID,
@@ -103,7 +104,7 @@ interface CompletedEdit {
   readonly snapshot: SpaceSnapshot;
   readonly placement: Placement;
   /** The Graph this same Edit minted, which Navigation must therefore activate. */
-  readonly mintedGraphId: UUID | null;
+  readonly mintedGraphId: GraphId | null;
   /** The Layout this Edit wrote, which Navigation continues in. */
   readonly nextRenderer: RendererSelection;
   readonly createdCardId?: CardId;
@@ -324,7 +325,7 @@ export function createSpaceAuthoring({
     const previousSnapshot = snapshot;
     const navigationState = navigation.getState();
     let activeGraphId = navigationState.activeGraphId;
-    let mintedGraphId: UUID | null = null;
+    let mintedGraphId: GraphId | null = null;
     let createdCardId: CardId | undefined;
     let connection: { readonly from: CardId; readonly to: CardId } | null = null;
     let completedPlacement = completedPlacementInput;

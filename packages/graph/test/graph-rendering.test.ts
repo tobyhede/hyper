@@ -86,7 +86,7 @@ describe('buildCardHandles', () => {
 
   it('gives a fork one outbound port, not one per outgoing edge', () => {
     // The handle is per graph per side, so several edges leaving a card by the
-    // same graph share it — which is why the scheme survives branching at all.
+    // same Graph share it — which is why the scheme survives branching at all.
     const forked = loadSpace(
       {
         version: 2,

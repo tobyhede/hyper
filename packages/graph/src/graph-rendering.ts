@@ -88,7 +88,7 @@ export function buildCardHandles(space: Space): Map<CardId, CardHandleSet> {
  * The distinct cards the given graphs touch — graphs in the order supplied,
  * edges in authored order within each, and each edge's `from` before its `to`.
  *
- * A membership query, not a traversalHistory: it answers *which* cards, and the order is
+ * A membership query, not a traversal: it answers *which* Cards, and the order is
  * only a stable one to list them in. A graph is a graph, so there is no single
  * order to visit them in and this does not claim one.
  *

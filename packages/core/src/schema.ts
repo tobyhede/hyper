@@ -183,7 +183,7 @@ export const layoutSchema = z.preprocess(
 );
 
 /**
- * The views a space can name without declaring anything: the graph-driven graph
+ * The views a space can name without declaring anything: the graph-driven flow
  * and a plain grid. Both are automatic, so they are named, never configured —
  * `defaultView` records intent ("open me like this") and carries no parameters,
  * because parameters would put computed geometry back into authored content

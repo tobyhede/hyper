@@ -83,7 +83,7 @@ test("edges are drawn along ELK's routing, not default beziers", async ({ page }
   await page.goto('/');
 
   // Retries until the async ELK layout resolves and replaces the first-paint
-  // bezier fallback with the routed polyline (a single layout pass graphs them
+  // bezier fallback with the routed polyline (a single layout pass routes them
   // all, so once one has an `L` command they all do). No visibility check — a
   // dead-horizontal SVG line has a zero-height box, which Playwright reads as
   // hidden.
@@ -144,7 +144,7 @@ test('a card shows its title in the graph, and opens to show its Markdown source
   // "entry point" is its body text, which must not appear.
   const a = nodeByTitle(page, 'A');
   await expect(a).toBeVisible();
-  await expect(a.getByTestId('card-description')).toHaveText('Where every Graph begins');
+  await expect(a.getByTestId('card-description')).toHaveText('Where the first collection begins');
   await expect(a).not.toContainText('entry point');
   // A card without a description renders no description element.
   await expect(nodeByTitle(page, 'B').getByTestId('card-description')).toHaveCount(0);

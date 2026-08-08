@@ -12,7 +12,7 @@ import { AUTHORING_HANDLE_DIAMETER, GRAPH_PORT_DIAMETER } from './authoring-hand
  * reading the shape of a space, and a wall of clipped markdown at graph zoom is
  * unreadable anyway. Opening a card is how you read it.
  *
- * The one exception is the card a traversalHistory has reached while presenting, which draws
+ * The one exception is the Card reached during traversal while presenting, which draws
  * its content instead: presenting is the graph seen close enough that one card
  * fills the screen (ADR 0027), so at that zoom the content is exactly what is
  * legible. It is still the same node — nothing is transformed into anything, and

@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { BUILT_IN_VIEW_IDS, graphSchema, spaceFileSchema } from '../src/schema';
+import { BUILT_IN_VIEW_IDS, graphSchema, isBuiltInViewId, spaceFileSchema } from '../src/schema';
 
 const SPACE_ID = '00000000-0000-4000-8000-000000000001';
 const GRAPH_ID = '00000000-0000-4000-8000-000000000002';
 
 describe('first-public Graph vocabulary', () => {
-  it('accepts Graph document names and rejects the superseded Graph names', () => {
+  it('accepts Graph document names and rejects the superseded Route names', () => {
     expect(
       graphSchema.parse({
         id: GRAPH_ID,
@@ -33,9 +33,10 @@ describe('first-public Graph vocabulary', () => {
         id: SPACE_ID,
         title: 'Example',
         routes: [],
-        defaultView: 'graph',
+        defaultView: 'flow',
       }).success,
     ).toBe(false);
+    expect(isBuiltInViewId('graph')).toBe(false);
     expect(BUILT_IN_VIEW_IDS).toEqual(['flow', 'grid']);
   });
 });

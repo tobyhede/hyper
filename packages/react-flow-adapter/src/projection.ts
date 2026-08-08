@@ -92,7 +92,7 @@ export type ColorByGraphId = Readonly<Partial<Record<GraphId, string>>>;
 const EMPTY_HANDLES: CardHandleSet = { sourceHandles: [], targetHandles: [] };
 
 export interface ProjectCardNodesOptions {
-  /** Card id the traversalHistory has reached, if any, to flag as active. */
+  /** Card id reached during traversal, if any, to flag as active. */
   activeCardId?: CardId | null;
   /** Ordinary renderer selection used to expose continued-authoring handles. */
   selectedCardId?: CardId | null;
@@ -280,7 +280,7 @@ export function projectCardNodes(
             handles: declaredHandles(
               sourceHandles,
               targetHandles,
-              Object.keys(colors) as GraphId[],
+              space.graphs.map((graph) => graph.id),
               cardLayout,
             ),
           }

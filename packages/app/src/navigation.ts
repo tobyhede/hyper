@@ -14,9 +14,9 @@ export interface Move {
  * being presented.
  *
  * Non-empty, and by type rather than by convention: presenting begins on a
- * Graph's start Card and `retreat` keeps the first, so a traversalHistory standing on
- * nothing is a state navigation cannot hold rather than one every read has to
- * exclude.
+ * Graph's start Card and `retreat` keeps the first, so its Traversal history can
+ * never be empty. Navigation excludes that state by construction rather than at
+ * every read.
  */
 type TraversalHistory = readonly [CardId, ...CardId[]];
 
@@ -30,11 +30,11 @@ interface NavigationBase {
 }
 
 /**
- * Navigation is either overviewing the whole Space or presenting a traversalHistory through
- * one Graph, and the traversalHistory and its branch belong to the second alone.
+ * Navigation is either overviewing the whole Space or presenting one Graph;
+ * Traversal history and its selected branch belong to the second state alone.
  *
  * They used to sit beside `mode` on one flat state, which admitted an overview
- * carrying a traversalHistory and a `branchIndex` naming a branch of nothing. Nothing in the
+ * carrying Traversal history and a `branchIndex` naming a branch of nothing. Nothing in the
  * type held the correspondence, so every operation maintained it by hand: four
  * separate `traversalHistory: []` with `branchIndex: 0` resets, and a `mode` check in front
  * of every read of either. Splitting on `mode` makes those states
@@ -87,15 +87,15 @@ function outgoingEdgesFrom(
 }
 
 /**
- * The Card a traversalHistory stands on: its last, read in place.
+ * The Card at the end of Traversal history, read in place.
  *
  * `noUncheckedIndexedAccess` widens a computed index to `| undefined` however
  * the tuple is declared, so the last element needs an answer for a case it
  * cannot reach; element 0 is a fixed tuple element and keeps its type, so the
- * traversalHistory's own guaranteed Card supplies it. Both reads are indexes and neither
+ * Traversal history's guaranteed first Card supplies it. Both reads are indexes and neither
  * copies: this runs on every render through `activeCardId` and `moves`, and
  * destructuring a tail to reach the end allocated a copy of the whole
- * accumulated traversalHistory each time.
+ * accumulated history each time.
  */
 function currentCard(traversalHistory: TraversalHistory): CardId {
   return traversalHistory[traversalHistory.length - 1] ?? traversalHistory[0];
@@ -105,7 +105,7 @@ function currentCard(traversalHistory: TraversalHistory): CardId {
  * The fields both modes carry, taken off whichever state is current.
  *
  * Named rather than spread, because spreading a presenting state into an
- * overview one carries the traversalHistory across at runtime — the very thing the type is
+ * overview one carries Traversal history across at runtime — the very thing the type is
  * here to stop, arriving through the back door as an untyped property.
  */
 function baseOf(state: NavigationState): NavigationBase {
@@ -144,7 +144,7 @@ export function createNavigation(
     options.reportObserverError ?? reportToConsole,
   );
   // Whatever navigation is doing, it goes on doing: a change to the fields both
-  // modes share cannot name `mode`, so it can neither start nor end a traversalHistory.
+  // modes share cannot name `mode`, so it can neither start nor end a traversal.
   const setState = (change: Partial<NavigationBase>): void => {
     observable.publish({ ...observable.getState(), ...change });
   };
@@ -177,15 +177,15 @@ export function createNavigation(
     // Published whole, not merged over what is there: a replacement Space is
     // opened rather than navigated to, so nothing of the previous one survives
     // it. Merging was equivalent only while `openedState` named every field —
-    // once it stopped naming a traversalHistory it stopped clearing one, and the traversalHistory of a
-    // Space that was gone rode across under a `mode` saying there was none.
+    // once it stopped naming `traversalHistory` it stopped clearing Traversal history, and
+    // history from a Space that was gone rode across under a `mode` saying there was none.
     openFresh: (selection) => {
       observable.publish(openedState(selection, resolveView(currentSpace(), selection)));
     },
     continueInRenderer: (selection) => {
       // Resolve first so navigation can never name a renderer the current Space
       // does not hold. Unlike explicit selection, adopting the Layout an Edit
-      // just created is not navigation and must not interrupt a traversalHistory.
+      // just created is not navigation and must not interrupt a traversal.
       resolveView(currentSpace(), selection);
       setState({
         selectedRenderer: selection,
@@ -242,19 +242,19 @@ export function createNavigation(
     // The guard is the no-outgoing-Edge case — no active Graph, or a Card the
     // Graph leaves by nothing — and not an out-of-range `branchIndex`. Overview
     // no longer reaches it and is no longer one of the cases it answers: the
-    // traversalHistory and the index are presenting's alone, so the mode is settled by the
+    // Traversal history and the index are presenting's alone, so the mode is settled by the
     // narrowing a line below rather than by falling through to an empty Edge set.
     // **Don't clamp the index to the Edge count here.** Every write keeps it in
     // range for the Card it was written against: `selectBranch` takes it modulo
     // the count, `retreat` uses a `findIndex` result, and every other write is
-    // 0. Reaching a stale index needs the Edge set to shrink under a live traversalHistory,
+    // 0. Reaching a stale index needs the Edge set to shrink during a live traversal,
     // which nothing does — an Edit only ever adds Edges, changing Graph or Card
     // rewrites the index, structural deletion is not built (ADR 0033), and
-    // accepting the stored Space opens fresh navigation, which resets the traversalHistory
+    // accepting the stored Space opens fresh navigation, which resets Traversal history
     // and the index with it. Clamping would also be
     // the wrong repair rather than a safe one: `moves()` marks the selection by
     // `index === branchIndex`, so a stale index shows *no* move selected, and
-    // advancing to "the last valid Edge" would traversalHistory down one the presenter was
+    // advancing to "the last valid Edge" would silently move down one the presenter was
     // never shown. It cannot replace this guard either, since an empty Edge set
     // clamps to `[-1]` and is still `undefined`.
     advance: () => {
@@ -272,12 +272,12 @@ export function createNavigation(
     retreat: () => {
       const state = observable.getState();
       if (state.mode !== 'presenting' || state.traversalHistory.length < 2) return;
-      // Dropping the last Card cannot empty the traversalHistory, and this is where that
+      // Dropping the last Card cannot empty Traversal history, and this is where that
       // stops being a fact about the length check above and becomes one about
       // the value: the first Card is carried over as itself, so what comes back
-      // is a traversalHistory rather than an array that happens not to be empty. The
+      // is non-empty Traversal history rather than an array that happens not to be. The
       // rest-destructuring `currentCard` dropped stays here deliberately:
-      // `slice` makes this O(traversalHistory) whatever shape it takes, it runs once per
+      // `slice` makes this O(n) in the history length, but it runs once per
       // user gesture rather than on every render, and the copy is what carries
       // the non-emptiness into the type instead of asserting it away.
       const [first, ...rest] = state.traversalHistory;
@@ -309,9 +309,9 @@ export function createNavigation(
     // reindex of the working snapshot, and this runs during every App render —
     // a per-Edge read made a branching Graph pay that cost once per move.
     // Resolving once also keeps every title in the answer read from the same
-    // Space as the edges they name. Outside a traversalHistory there is nothing to read it
-    // for: the moves are a presented Card's outgoing Edges, and there is no
-    // presented Card.
+    // Space as the Edges they name. Outside presentation there is no Traversal
+    // history to read: the moves are a presented Card's outgoing Edges, and
+    // there is no presented Card.
     moves: () => {
       const state = observable.getState();
       if (state.mode !== 'presenting') return [];

@@ -18,7 +18,7 @@ import { elkStrategy } from '@project/react-flow-adapter';
 /**
  * Which view a space opens in, and what that means for arranging and editing.
  *
- * The chain is `space.defaultView` → viewer default → the graph-driven graph.
+ * The chain is `space.defaultView` → viewer default → the graph-driven flow.
  * The middle link has no surface yet: a viewer-level preference is named in the
  * spec and deliberately not built, so today the chain is two links long.
  *

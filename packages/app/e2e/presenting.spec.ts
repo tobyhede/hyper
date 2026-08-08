@@ -6,7 +6,7 @@ import { activeCard, nodeByTitle, settled, viewportTransform } from './graph';
 // Presenting is the graph canvas under camera control (ADR 0027): the same
 // cards, the same coordinates, drawn close enough that one fills the screen.
 // These tests assert that — that the space is still there, that the camera
-// moved, and that the traversalHistory follows edges rather than an index.
+// moved, and that traversal follows Edges rather than an index.
 //
 // The fixture's graphs are all lines (see fixture/README.md), which is the
 // degenerate graph rather than a second kind, so a fork is asserted in unit

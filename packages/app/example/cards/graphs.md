@@ -23,5 +23,6 @@ A Graph may contain cycles and self-edges; presenting decides how to traverse
 them. An **alias** is a distinct card with its own title and position that shows
 another card's content, not a workaround for returning to an existing card.
 
-A Graph that gives every card one edge out is a **line**. That is the degenerate
+A Graph whose Cards form a single chain, with one outgoing Edge from each
+non-terminal Card and no branches or merges, is a **line**. It is the degenerate
 graph, not a second kind of Graph.

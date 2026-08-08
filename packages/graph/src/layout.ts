@@ -7,7 +7,7 @@
  *
  * Modelled on how ELK does it, deliberately. Geometry lives as *optional fields
  * on the elements* — a card carries `x`/`y`, a port carries its offset — and a
- * strategy takes a graph and returns the same graph with those fields populated.
+ * strategy takes a layout-strategy graph and returns the same value with those fields populated.
  * There is no separate arranged-result type; `CONTEXT.md` lists "arrangement"
  * under _Avoid_ and ADR 0005 records why.
  *
@@ -42,7 +42,7 @@ export interface LayoutStrategyCard {
 /**
  * A routed span of an edge: where it starts, where it ends, and the corners it
  * turns through in between. Mirrors ELK's `ElkEdgeSection` — an orthogonal
- * back-edge graphs *around* the cards as a channel rather than cutting straight
+ * back-edge routes *around* the cards as a channel rather than cutting straight
  * across them, and the bend points are how it does that.
  *
  * These points are computed by a strategy, and they are `core`'s

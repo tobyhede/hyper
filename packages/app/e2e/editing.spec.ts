@@ -622,7 +622,7 @@ test('an Edge drawn from the presented Card is a move the presenter can take now
   await expect(persistence).toHaveText('Persisted');
 
   // The chrome enumerates the active Card's outgoing Edges, so the Edge just
-  // drawn is available without leaving and re-entering the traversalHistory.
+  // drawn is available without leaving and re-entering presentation.
   await expect(moves).toHaveText(['B', 'A']);
 });
 

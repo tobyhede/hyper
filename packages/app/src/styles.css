@@ -406,7 +406,7 @@ body {
   font-size: 0.95rem;
 }
 
-/* ---- The Card the Traversal history has reached ---- */
+/* ---- The Card reached during traversal ---- */
 /* Presenting draws the active card's content instead of its title (ADR 0027).
    Same box as every other card — the layout's 16:9 frame, which the camera then
    fills the screen with — so the type is sized in *container* units and scales

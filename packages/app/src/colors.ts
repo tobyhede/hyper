@@ -1,7 +1,7 @@
 import type { Space } from '@project/graph';
 
 /** Distinct, reasonably accessible edge colors, assigned to graphs by order. */
-export const ROUTE_PALETTE = [
+export const GRAPH_PALETTE = [
   '#6ea8fe', // blue
   '#f59e0b', // amber
   '#34d399', // green
@@ -19,15 +19,15 @@ export function activeGraphColor(
   colorByGraphId: Record<string, string>,
   activeGraphId: string | null,
 ): string {
-  if (activeGraphId === null) return ROUTE_PALETTE[0];
-  return colorByGraphId[activeGraphId] ?? ROUTE_PALETTE[0];
+  if (activeGraphId === null) return GRAPH_PALETTE[0];
+  return colorByGraphId[activeGraphId] ?? GRAPH_PALETTE[0];
 }
 
 /** Resolve each graph's color: its space `color`, else a palette slot by order. */
 export function graphColorMap(space: Space): Record<string, string> {
   const map: Record<string, string> = {};
   space.graphs.forEach((graph, index) => {
-    map[graph.id] = graph.color ?? ROUTE_PALETTE[index % ROUTE_PALETTE.length] ?? '#8a94a6';
+    map[graph.id] = graph.color ?? GRAPH_PALETTE[index % GRAPH_PALETTE.length] ?? '#8a94a6';
   });
   return map;
 }

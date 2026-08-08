@@ -9,7 +9,7 @@ const CARDS = [
   cardFile('00000000-0000-4000-8000-000000000002'),
   cardFile('00000000-0000-4000-8000-000000000003'),
 ];
-const ROUTES = [
+const GRAPHS = [
   {
     id: '00000000-0000-4000-8000-000000000004',
     title: 'Main',
@@ -35,7 +35,7 @@ function spaceWith(extra: Record<string, unknown> = {}): Space {
       version: 2,
       id: '00000000-0000-4000-8000-000000000001',
       title: 'T',
-      graphs: ROUTES,
+      graphs: GRAPHS,
       ...extra,
     },
     CARDS,
@@ -113,7 +113,7 @@ describe('resolveView', () => {
     ).toThrow('The selected Layout 00000000-0000-4000-8000-000000000099 does not exist.');
   });
 
-  it('falls back to the graph-driven graph when a space names no view', () => {
+  it('falls back to the graph-driven Flow View when a Space names no View', () => {
     const view = resolveView(spaceWith());
     expect(view.id).toBe('flow');
     expect(view.layout).toBeNull();
@@ -154,7 +154,7 @@ describe('resolveView', () => {
   it('shows every graph and opens on the first when no Layout filters', () => {
     const space = spaceWith({
       graphs: [
-        ...ROUTES,
+        ...GRAPHS,
         {
           id: '00000000-0000-4000-8000-000000000020',
           title: 'Aside',
@@ -178,7 +178,7 @@ describe('resolveView', () => {
   it('shows only the graphs its Layout names', () => {
     const space = spaceWith({
       graphs: [
-        ...ROUTES,
+        ...GRAPHS,
         {
           id: '00000000-0000-4000-8000-000000000020',
           title: 'Aside',
@@ -202,7 +202,7 @@ describe('resolveView', () => {
     // open active on a graph the Layout does not draw.
     const space = spaceWith({
       graphs: [
-        ...ROUTES,
+        ...GRAPHS,
         {
           id: '00000000-0000-4000-8000-000000000020',
           title: 'Aside',
@@ -223,7 +223,7 @@ describe('resolveView', () => {
   it('honours a Layout’s named activeGraph over the first', () => {
     const space = spaceWith({
       graphs: [
-        ...ROUTES,
+        ...GRAPHS,
         {
           id: '00000000-0000-4000-8000-000000000020',
           title: 'Aside',

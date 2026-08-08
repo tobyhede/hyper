@@ -7,8 +7,8 @@ import { cardFile } from './card-files';
 const uuid = (value: string): UUID => uuidSchema.parse(value);
 
 /**
- * The traversalHistory behind a presenting state. Reading one is narrowing now, which is the
- * point of the split: a state that is not presenting has no traversalHistory to read, here
+ * Traversal history belongs to a presenting state. Reading it requires narrowing, which is the
+ * point of the split: a state that is not presenting has no Traversal history to read, here
  * or anywhere else.
  */
 function traversalHistoryOf(state: NavigationState): readonly CardId[] {
@@ -182,19 +182,19 @@ it('presents a fully cyclic Graph, which has no entry Card', () => {
 });
 
 /*
- * A traversalHistory may stand on the same Card twice. Cycles and self-edges are legal
+ * Traversal history may contain the same Card twice. Cycles and self-Edges are legal
  * authored structure (ADR 0032), so a presenter traversing a loop accumulates a
- * traversalHistory whose Cards repeat and whose last Card can be its first again. The Card
- * being presented is the traversalHistory's *last* element, never the first occurrence of
- * it — a read that answered the Card the traversalHistory began on would go on offering the
+ * history whose Cards repeat and whose last Card can be its first again. The Card
+ * being presented is Traversal history's *last* element, never the first occurrence of
+ * it — a read that answered the first Card in Traversal history would go on offering the
  * moves out of that Card for the rest of the loop, and the two only diverge once
  * a Card repeats.
  *
- * The other two shapes are pinned already and not repeated here: a one-Card traversalHistory
- * is read by "opens and closes Cards…" straight after `present()`, and a traversalHistory
+ * The other two shapes are pinned already and not repeated here: a one-Card Traversal history
+ * is read by "opens and closes Cards…" straight after `present()`, and Traversal history
  * that has advanced by the fork test below.
  */
-it('reads the last Card of a traversalHistory that returns to one it has already stood on', () => {
+it('reads the last Card when Traversal history returns to one it has already visited', () => {
   const cardA = uuid('00000000-0000-4000-8000-000000000002');
   const cardB = uuid('00000000-0000-4000-8000-000000000003');
   const loaded = loadSpace(
@@ -222,7 +222,7 @@ it('reads the last Card of a traversalHistory that returns to one it has already
   navigation.advance();
   navigation.advance();
 
-  // Back where it began: the traversalHistory's last Card is its first, and presenting
+  // Back where it began: Traversal history's last Card is its first, and presenting
   // stands on it rather than merely carrying it at the front.
   expect(traversalHistoryOf(navigation.getState())).toEqual([cardA, cardB, cardA]);
   expect(navigation.activeCardId()).toBe(cardA);
@@ -230,7 +230,7 @@ it('reads the last Card of a traversalHistory that returns to one it has already
 
   navigation.advance();
 
-  // The case the two answers separate on: the traversalHistory repeats a Card and its last
+  // The case the two answers separate on: Traversal history repeats a Card and its last
   // is no longer its first, so reading the start answers A where the presenter
   // is standing on B. The moves are asserted here rather than only above,
   // because above the last Card *is* the first and both readings agree — this
@@ -245,12 +245,12 @@ it('reads the last Card of a traversalHistory that returns to one it has already
 });
 
 /*
- * A traversalHistory belongs to presenting, and leaving presenting has none to clear. This
+ * Traversal history belongs to presenting, and leaving presenting has none to clear. This
  * used to be four hand-written `traversalHistory: []` resets — one per path back to the
  * overview — any of which could have been forgotten without anything noticing
- * until a stale Card was read out of a traversalHistory nobody was on.
+ * until a stale Card was read from history after presentation had ended.
  */
-it('leaves no traversalHistory behind when presenting ends', () => {
+it('leaves no Traversal history behind when presenting ends', () => {
   const space = fixture();
   const navigation = createNavigation(() => space, { kind: 'view', view: 'flow' });
   navigation.present();
@@ -270,7 +270,7 @@ it('leaves no traversalHistory behind when presenting ends', () => {
 
 /*
  * Presenting stands on a Card for as long as it lasts: it begins on the Graph's
- * start Card and `retreat` keeps the first, so the traversalHistory is non-empty by type
+ * start Card and `retreat` keeps the first, so Traversal history is non-empty by type
  * rather than by a check at each read.
  */
 it('stands on a Card for as long as it is presenting', () => {
@@ -281,12 +281,12 @@ it('stands on a Card for as long as it is presenting', () => {
 
   const state = navigation.getState();
   if (state.mode !== 'presenting')
-    throw new Error('present() should have started a traversalHistory');
+    throw new Error('present() should have started Traversal history');
   expectTypeOf(state.traversalHistory[0]).toEqualTypeOf<CardId>();
   expect(state.traversalHistory[0]).toBe(uuid('00000000-0000-4000-8000-000000000002'));
 });
 
-it('activating a Graph ends the current traversalHistory without changing the Space', () => {
+it('activating a Graph ends the current Traversal history without changing the Space', () => {
   const space = fixture();
   const navigation = createNavigation(() => space, { kind: 'view', view: 'flow' });
   navigation.present();
@@ -317,7 +317,7 @@ it('refuses to activate a Graph the current Space does not hold', () => {
   expect(navigation.getState()).toBe(before);
 });
 
-it('continues the current traversalHistory when an Edit converts the renderer to a Layout', () => {
+it('continues the current Traversal history when an Edit converts the renderer to a Layout', () => {
   const space = fixture();
   const navigation = createNavigation(() => space, { kind: 'view', view: 'flow' });
   navigation.present();
@@ -499,7 +499,7 @@ it('reads the working Space once per moves() call, whatever the branching', () =
  * renderer, and other members read it too, so what is pinned is that this one
  * call adds nothing rather than that the total is zero.
  */
-it('answers no moves outside a traversalHistory without reading the working Space', () => {
+it('answers no moves outside Traversal history without reading the working Space', () => {
   const space = fixture();
   const currentSpace = vi.fn(() => space);
   const navigation = createNavigation(currentSpace, { kind: 'view', view: 'flow' });
@@ -511,7 +511,7 @@ it('answers no moves outside a traversalHistory without reading the working Spac
   expect(currentSpace).toHaveBeenCalledTimes(before);
 });
 
-it('traverses a fork, retreats along the traversalHistory, and reselects the Edge taken', () => {
+it('traverses a fork, retreats along Traversal history, and reselects the Edge taken', () => {
   const cardA = uuid('00000000-0000-4000-8000-000000000002');
   const cardB = uuid('00000000-0000-4000-8000-000000000003');
   const cardC = uuid('00000000-0000-4000-8000-000000000004');

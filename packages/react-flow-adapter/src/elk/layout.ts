@@ -16,7 +16,7 @@ export const DEFAULT_ELK_LAYOUT_OPTIONS: LayoutOptions = {
   // Explicit statement of ELK's default (layered graphs orthogonally), now that
   // the app actually *draws* ELK's routed geometry rather than discarding it and
   // letting React Flow bezier between the handles. Cyclic graphs and graphs that
-  // disagree on shared-card order can both produce back-edges; this graphs them
+  // disagree on shared-card order can both produce back-edges; this routes them
   // as channels around the cards rather than self-curling stubs. See
   // `.scratch/layout-seam/issues/03-render-elk-edge-routing.md`.
   'elk.edgeRouting': 'ORTHOGONAL',

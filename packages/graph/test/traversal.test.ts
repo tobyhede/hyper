@@ -11,7 +11,7 @@ const graph = (edges: [UUID, UUID][]): Graph => ({
   edges: edges.map(([from, to]) => ({ from, to })),
 });
 
-// a forks to b and c, which merge back into d. Every move a traversalHistory can make is in
+// a forks to b and c, which merge back into d. Every move a traversal can make is in
 // here: a choice, a single step, and an arrival by two paths.
 const diamond = graph([
   [uuid('00000000-0000-4000-8000-000000000002'), uuid('00000000-0000-4000-8000-000000000003')],
@@ -33,7 +33,7 @@ describe('outgoingEdges', () => {
     ).toEqual(['00000000-0000-4000-8000-000000000006']);
   });
 
-  it('gives a sink none, which is how a traversalHistory ends', () => {
+  it('gives a sink none, which is how traversal ends', () => {
     expect(outgoingEdges(diamond, uuid('00000000-0000-4000-8000-000000000006'))).toEqual([]);
   });
 
@@ -98,7 +98,7 @@ describe('graphEntryCards', () => {
 });
 
 describe('graphStartCard', () => {
-  it('starts a traversalHistory at the first entry', () => {
+  it('starts traversal at the first entry', () => {
     expect(graphStartCard(diamond)).toBe('00000000-0000-4000-8000-000000000002');
   });
 
@@ -109,7 +109,7 @@ describe('graphStartCard', () => {
   it('starts a self-connected Graph at its only card', () => {
     // The first gesture authoring ships: connecting a card to itself. Nothing
     // arrives at nothing here — the card arrives at itself — so rule 1 has no
-    // answer and the traversalHistory would never begin.
+    // answer and traversal would never begin.
     expect(
       graphStartCard(
         graph([
@@ -174,7 +174,7 @@ describe('graphStartCard', () => {
     // The authored order runs b → c before a → b, so the first `from` is not the
     // entry. Connecting appends, so that is what an author who draws b → c and
     // then attaches a → b in front of it stores, and rule 2 alone would start
-    // the traversalHistory at b — skipping a, which forward traversal never reaches.
+    // traversal at b — skipping a, which forward traversal never reaches.
     expect(
       graphStartCard(
         graph([

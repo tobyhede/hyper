@@ -32,7 +32,7 @@ and laid out as clean forward paths. Graphs themselves may contain cycles; an
 alias is useful when the author wants a separately titled and positioned Card
 showing the same content (ADR 0009, ADR 0032).
 
-Every Graph here is a **line**: each card has one edge out. That is the
+Every Graph here is a **line**: each non-terminal Card has one Edge out. That is the
 degenerate graph, not a separate kind (ADR 0024), and it keeps the fixture's
 overlay counts easy to read. Forks and merges are legal and are covered by unit
 and property tests rather than here.
@@ -48,7 +48,7 @@ Between them the shape exercises every behaviour the e2e suite covers:
 - **Aliases on a Graph (ADR 0009).** `A′` / `E′` show `A` / `E`'s content under
   their own titles and at distinct positions.
 - **Card description (ADR 0006, card-display/03).** `A` carries a `description`
-  ("Where every Graph begins"), drawn under its title in the graph node; the other
+  ("Where the first collection begins"), drawn under its title in the graph node; the other
   cards have none, so the node renders with and without one.
 - **Open shows source (ADR 0011).** `A`'s body carries `**A**`, so opening it can
   prove the Markdown markers survive rather than rendering bold.

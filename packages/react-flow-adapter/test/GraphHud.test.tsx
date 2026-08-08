@@ -1,6 +1,6 @@
 import '@testing-library/jest-dom/vitest';
 import { render, screen } from '@testing-library/react';
-import type { Node } from '@xyflow/react';
+import type { Node as FlowNode } from '@xyflow/react';
 import { vi } from 'vitest';
 import { GraphHud } from '../src/GraphHud';
 import { uuid } from './uuid';
@@ -15,10 +15,10 @@ vi.mock('@xyflow/react', () => ({
     nodeColor,
     nodeStrokeColor,
   }: {
-    nodeColor: string | ((node: Node) => string);
-    nodeStrokeColor: string | ((node: Node) => string);
+    nodeColor: string | ((node: FlowNode) => string);
+    nodeStrokeColor: string | ((node: FlowNode) => string);
   }) => {
-    const color = (value: string | ((node: Node) => string), node: Node) =>
+    const color = (value: string | ((node: FlowNode) => string), node: FlowNode) =>
       typeof value === 'function' ? value(node) : value;
     return (
       <div
@@ -71,7 +71,9 @@ describe('GraphHud', () => {
     expect(screen.getByTestId('panel')).toHaveAttribute('data-position', 'bottom-right');
     const legend = screen.getByTestId('graph-legend');
     const minimap = screen.getByTestId('minimap');
-    expect(legend.compareDocumentPosition(minimap) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
+    expect(
+      legend.compareDocumentPosition(minimap) & globalThis.Node.DOCUMENT_POSITION_FOLLOWING,
+    ).not.toBe(0);
     expect(minimap).toHaveAttribute('data-active-fill', 'var(--panel-2)');
     expect(minimap).toHaveAttribute('data-active-stroke', '#6ea8fe');
     expect(minimap).toHaveAttribute('data-other-fill', 'var(--panel-2)');

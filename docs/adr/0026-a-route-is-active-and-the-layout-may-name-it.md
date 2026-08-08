@@ -1,6 +1,7 @@
 # A space has one active route; a Layout may name it, and otherwise it is the first
 
-Status: accepted
+Status: superseded
+Superseded by: 0040
 Supersedes: 0022
 Refined by: 0028
 Related: 0003, 0021, 0024, 0027

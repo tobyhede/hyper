@@ -116,8 +116,8 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
     const openCard = navigation.openCard;
     const closeCard = navigation.closeCard;
     const presenting = navigationState.mode === 'presenting';
-    // There is a Card to go back to only once a traversalHistory has left its first, and only
-    // presenting has a traversalHistory at all — the same narrowing the alias above already
+    // There is a Card to go back to only once a traversal has left its first, and only
+    // presenting has Traversal history at all — the same narrowing the alias above already
     // makes, spent here on the value behind it rather than on the mode.
     const canRetreat = presenting && navigationState.traversalHistory.length > 1;
     const present = navigation.present;
@@ -137,7 +137,7 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
     // moves during render makes the newly authored Edge immediately traversable.
     // A render-time call is not the selector case above — nothing subscribes to
     // this identity, so a fresh array cannot feed a re-render — and the work is a
-    // filter and a map over one Graph's edges, or nothing at all outside a traversalHistory.
+    // filter and a map over one Graph's Edges, or nothing at all outside presentation.
     const moves = navigation.moves();
 
     // Which graphs the renderer shows, resolved from the Layout that filtered them
@@ -168,7 +168,7 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
       [allGraphEdges, visibleGraphIdSet],
     );
 
-    const graph = useMemo(
+    const strategyGraph = useMemo(
       () => buildLayoutStrategyGraph(visibleCardIds, visibleHandles, visibleEdges, CARD_SIZE),
       [visibleCardIds, visibleHandles, visibleEdges],
     );
@@ -183,7 +183,7 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
     const authoredPositions = authoring.authoredPlacement();
     const selectedCardId = useRenderAdapter((s) => s.selectedCardId);
     const moved = useRenderAdapter((s) => s.moved);
-    const placement = usePlacementRendering(graph, view.strategy, authoredPositions);
+    const placement = usePlacementRendering(strategyGraph, view.strategy, authoredPositions);
     const laidOut = placement.kind === 'ready' ? placement.strategyGraph : null;
 
     // Selecting a graph emphasises it; it never hides the rest of the space.
@@ -224,7 +224,7 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
           // A layout's routed edge geometry describes the arrangement it computed,
           // so it stops being true once a card is dragged out of it. From then on
           // the edges fall back to plain curves between wherever the cards now are
-          // — which is what a positioned view draws anyway, since it graphs
+          // — which is what a positioned view draws anyway, since it routes
           // nothing.
           ...(laidOut && !moved ? { strategyGraph: laidOut } : {}),
         }),
@@ -414,7 +414,7 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
         ?.focus();
     }, [openedCardId, presenting]);
 
-    // Escape closes an opened card. Registered ahead of the traversalHistory's keys and
+    // Escape closes an opened Card. Registered ahead of the traversal controls and
     // returning early while a card is open, so the two never fight over Escape.
     useEffect(() => {
       if (!openedCardId) return;
@@ -469,6 +469,7 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
         <GraphSelector
           graphs={visibleGraphs}
           activeGraphId={activeGraphId}
+          colorByGraphId={colors}
           onActivate={(graphId) => activateGraph(uuidSchema.parse(graphId))}
           // `GraphSelector` disables its control on "no active Graph" and
           // `present()` refuses on exactly that, so the two conditions agree:
@@ -542,7 +543,7 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
             <ReactFlowProvider>
               <SpaceCanvas
                 // Keyed on the opening counter, so accepting the stored Space
-                // takes the graph's local editing state with it. The render
+                // takes the canvas's local editing state with it. The render
                 // adapter already drops the projection and drag bookkeeping, but
                 // an open title editor is the graph's own: it names a Card from
                 // a Space that is gone, and its raised invalid guard would go on

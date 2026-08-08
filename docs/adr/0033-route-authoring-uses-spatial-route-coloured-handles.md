@@ -2,6 +2,7 @@
 
 Status: accepted
 Supersedes: 0021
+Refined by: 0040, 0041
 Related: 0025, 0026, 0032
 
 An author draws an Edge by dragging from one of four small circular handles on

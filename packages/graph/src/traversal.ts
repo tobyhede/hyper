@@ -1,12 +1,12 @@
 import type { CardId, Graph, GraphEdge } from '@project/core';
 
 /**
- * Reading a graph as something to traversalHistory (ADR 0024, 0027).
+ * Reading a Graph as something to traverse (ADR 0024, 0027).
  *
- * Presenting traverses a graph: at a card, the presenter follows one of its
- * outgoing edges. These are the reads that supports — what a card's moves are,
- * and where a traversalHistory can begin. Nothing here holds a position; the traversalHistory itself is
- * state and lives with whoever is traversing.
+ * Presenting traverses a Graph: at a Card, the presenter follows one of its
+ * outgoing Edges. These are the reads that traversal supports — what a Card's moves are,
+ * and where a traversal can begin. Nothing here holds a position; Traversal
+ * history itself is state and lives with whoever is traversing.
  *
  * **A line is not a special case.** A graph where every card has one outgoing
  * edge traverses with a one-member choice at each step, which is what "advance" is.
@@ -24,7 +24,7 @@ export function incomingEdges(graph: Graph, cardId: CardId): GraphEdge[] {
 }
 
 /**
- * The cards a traversalHistory can start from: those an edge leaves but none arrives at, in
+ * The Cards a traversal can start from: those an Edge leaves but none arrives at, in
  * the order the author's edges first mention them.
  *
  * There may be several because a graph need not be connected, or none when
@@ -40,7 +40,7 @@ export function graphEntryCards(graph: Graph): CardId[] {
 }
 
 /**
- * Where a traversalHistory of this graph begins. Two rules, in this order.
+ * Where a traversal of this Graph begins. Two rules, in this order.
  *
  * **A card nothing arrives at wins**, and this rule stays first. It makes the
  * start a property of the graph's shape rather than of the order its edges were
@@ -60,7 +60,7 @@ export function graphEntryCards(graph: Graph): CardId[] {
  * **A start, not a reachable whole.** Every schema-valid graph gets a place to
  * begin, and nothing more: a graph of two components — `a → b` plus a disjoint
  * loop — starts at `a` under rule 1, and forward traversal never reaches the
- * loop. Whether a traversalHistory can reach every card of a disconnected graph is a
+ * loop. Whether a traversal can reach every Card of a disconnected Graph is a
  * separate question, and the fallback does not answer it.
  *
  * `undefined` is left only for a Graph with no Edges, which `graphSchema`

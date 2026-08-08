@@ -219,7 +219,7 @@ const validateSnapshotIdentities = (snapshot: SpaceSnapshot): void => {
  * aggregate that domain intake and the writes below both require.
  *
  * Ids are minted in process by `newUuid`. Only the space id comes from
- * PostgreSQL, and by the ordinary graph: the `spaces.id` column default fires
+ * PostgreSQL, and by the ordinary path: the `spaces.id` column default fires
  * when `Space.create` omits it, and the created row hands the value back as
  * `reservedSpaceId`. Graphs and layouts are not rows at all — they live inside
  * the space document (ADR 0030) — so no column default can reach them, and

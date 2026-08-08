@@ -53,6 +53,11 @@ const PRESENTING_PADDING = 1.15;
  */
 const OVERVIEW_FIT = { padding: 0.2, maxZoom: 1 } as const;
 
+/** Camera moves are best-effort: interruption must not escape the render shell. */
+function containCameraAnimation(animation: Promise<unknown>): void {
+  void animation.catch(() => undefined);
+}
+
 /**
  * What the graph tells assistive technology it can do — minus the delete.
  *
@@ -115,14 +120,14 @@ function OverviewCamera({ presenting }: { presenting: boolean }) {
 
   useEffect(() => {
     if (presenting) return;
-    void fitView({ ...OVERVIEW_FIT, duration: 400 });
+    containCameraAnimation(fitView({ ...OVERVIEW_FIT, duration: 400 }));
   }, [presenting, fitView]);
 
   return null;
 }
 
 /**
- * Moves the camera to the card a traversalHistory has reached (ADR 0027).
+ * Moves the camera to the Card the traversal has reached (ADR 0027).
  *
  * There is no second surface: presenting is this canvas, drawn close enough that
  * one card fills the screen. `setCenter` is the whole mechanism.
@@ -130,7 +135,7 @@ function OverviewCamera({ presenting }: { presenting: boolean }) {
  * Arriving from the overview changes zoom by a large factor, and a single
  * combined move whips — the translation happens while scaled in, so the cards
  * tear past. So a zoom-changing move is **split**: pan at the wider of the two
- * scales, then close in. Card-to-card inside a traversalHistory holds zoom, so it is one
+ * scales, then close in. Card-to-card movement during traversal holds zoom, so it is one
  * move. (Copied from impress.js, which is the one thing the spike kept from it.)
  */
 function PresentingCamera({ activeCardId }: { activeCardId: string | null }) {
@@ -158,13 +163,15 @@ function PresentingCamera({ activeCardId }: { activeCardId: string | null }) {
     const from = getZoom();
     // A tenth of a stop either way is not a jump worth splitting.
     if (Math.abs(from - zoom) / zoom < 0.1) {
-      void setCenter(x, y, { zoom, duration: 500 });
+      containCameraAnimation(setCenter(x, y, { zoom, duration: 500 }));
       return;
     }
 
-    void setCenter(x, y, { zoom: Math.min(from, zoom), duration: 400 }).then(() => {
-      if (!cancelled) void setCenter(x, y, { zoom, duration: 300 });
-    });
+    containCameraAnimation(
+      setCenter(x, y, { zoom: Math.min(from, zoom), duration: 400 }).then(() => {
+        if (!cancelled) containCameraAnimation(setCenter(x, y, { zoom, duration: 300 }));
+      }),
+    );
     return () => {
       cancelled = true;
     };
@@ -233,7 +240,7 @@ function NewCardPreview({
 export interface SpaceCanvasProps {
   nodes: CardFlowNode[];
   edges: Edge[];
-  /** The card a traversalHistory has reached, or `null` in overview. */
+  /** The Card the traversal has reached, or `null` in overview. */
   activeCardId: string | null;
   presenting: boolean;
   /**
@@ -527,7 +534,7 @@ export function SpaceCanvas({
       // per node, so the gesture does not change meaning two pixels away from a
       // Card.
       zoomOnDoubleClick={false}
-      // While presenting the arrow keys are the traversalHistory's, so React Flow must not
+      // While presenting the arrow keys control traversal, so React Flow must not
       // also read them as moving or selecting a node.
       nodesDraggable={editable && !presenting}
       nodesFocusable={!presenting}

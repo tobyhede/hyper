@@ -66,7 +66,7 @@ export function nodeByTitle(page: Page, title: string): Locator {
 }
 
 /**
- * The Card a traversalHistory is standing on, by the class the projection marks it with.
+ * The Card reached during traversal, by the class the projection marks it with.
  *
  * Shared because presenting is asserted from both projects: `presenting.spec`
  * traverses the fixture's authored Graphs, and `new-space.spec` presents the Graph a
