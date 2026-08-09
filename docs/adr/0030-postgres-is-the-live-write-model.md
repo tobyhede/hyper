@@ -12,35 +12,39 @@ longer the live working copy. This separates editing durability from repository
 publication and removes the need to preserve file paths and source bytes through
 the application.
 
-Spaces and cards are UUID-keyed rows with JSONB documents. Routes and layouts
-remain nested in the space document. An id is optional only in import input: an
-explicit id must be a UUID and must not collide within the scope that resolves
-it — set out below — while every missing space, card, route and layout id is
-minted during the import transaction. An id-less entity is therefore always new
-until export writes its generated UUID.
+In the built version 2 implementation, Spaces and Cards are UUID-keyed rows
+with JSONB documents, while Routes and Layouts remain nested in the Space
+document. An id is optional only in import input: an explicit id must be a UUID
+and must not collide within the scope that resolves it — set out below — while
+every missing Space, Card, Route and Layout id is minted during the import
+transaction. An id-less entity is therefore always new until export writes its
+generated UUID. ADRs 0040 and 0041 replace these version 2 Route rules with
+Layout-owned Graphs in the first-public document.
 
-**Uniqueness is scoped to how an id is resolved.** Space and card ids are unique
-across the database, being primary keys; import additionally rejects a batch that
-repeats either, so a collision surfaces before any write rather than as a late
-constraint violation. Route and layout ids are unique only within the space
-document that carries them, per kind, which normal domain intake already checks.
-They may be reused in another space — stored or elsewhere in the same batch — and
-entities of different kinds may share a UUID.
+**For the built version 2 implementation, uniqueness is scoped to how an id is
+resolved.** Space and Card ids are unique across the database, being primary
+keys; import additionally rejects a batch that repeats either, so a collision
+surfaces before any write rather than as a late constraint violation. Route and
+Layout ids are unique only within the Space document that carries them, per
+kind, which normal domain intake already checks. They may be reused in another
+Space — stored or elsewhere in the same batch — and entities of different kinds
+may share a UUID.
 
-Nothing resolves a route or layout id outside its own space: there is no routes
-table and no layouts table, and every query is by space id or card id. So a
-reused nested id makes no lookup ambiguous, and rejecting one would mean reading
-every stored document on every import to defend an invariant no code depends on.
-Don't add that check, and don't widen the batch check to route or layout ids —
-doing so makes acceptance depend on how a batch was split, since importing two
-such spaces separately would still succeed.
+In that version 2 implementation, nothing resolves a Route or Layout id outside
+its own Space: there is no Routes table and no Layouts table, and every query is
+by Space id or Card id. So a reused nested id makes no lookup ambiguous, and
+rejecting one would mean reading every stored document on every import to defend
+an invariant no code depends on. Don't add that check, and don't widen the
+batch check to Route or Layout ids — doing so makes acceptance depend on how a
+batch was split, since importing two such Spaces separately would still
+succeed.
 
-Minting is not allocation, and the database is not a source of identity. A
-space's id comes from the `spaces.id` column default, because that is what a
-primary key already does; every other id is generated in process. Routes and
-layouts are not rows — they are nested in the space document — so no column
-default can reach them, and the application mints layout ids the same way when
-editing converts an Algorithmic View (ADR 0025).
+Minting is not allocation, and the database is not a source of identity. In the
+version 2 implementation, a Space's id comes from the `spaces.id` column
+default, because that is what a primary key already does; every other id is
+generated in process. Routes and Layouts are not rows — they are nested in the
+Space document — so no column default can reach them, and the application mints
+Layout ids the same way when editing converts an Algorithmic View (ADR 0025).
 
 Import, seed data and test fixtures share one transactional import mechanism.
 Ordinary import inserts complete new Spaces and rejects the whole batch on any
@@ -64,7 +68,13 @@ interfaces.
 
 ## Implementation status
 
-The first increment is built: version 2 public schemas require UUIDs, import
+The version 2 shape described by this implementation status is the built
+pre-0040/0041 implementation, including Space-scoped Route identity. ADRs 0040
+and 0041 supersede it as the accepted first-public document contract: version 1,
+with Layout-owned Graphs nested under Layouts. Version 2 is not a compatibility
+format or a second public document shape.
+
+The first increment is built: version 2 implementation schemas require UUIDs, import
 schemas allow persistence-owned ids to be omitted, and `SpaceBackend`,
 `SpaceSession` and the memory adapter drive automatic whole-snapshot commits.
 There is no browser Save action or file write-back endpoint. The Vite file
@@ -85,7 +95,8 @@ conflicts, navigation protection and durability across both reload and a fresh
 PostgreSQL-backed Vite host are covered.
 
 The CLI-only canonical exporter is built: it writes deterministic, fully
-identified version 2 files through a validated staging directory, atomically
+identified version 2 implementation files through a validated staging directory,
+atomically
 replaces the destination's managed projection while preserving files outside
 discovery scope, and records the exact exported revision after replacement.
 
