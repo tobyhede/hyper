@@ -2,9 +2,9 @@
 
 Status: accepted
 Supersedes: 0022, 0026
-Refines: 0003, 0007, 0014, 0015, 0025, 0028, 0031
+Refines: 0003, 0007, 0014, 0015, 0025, 0028, 0030, 0031, 0033
 Refined by: 0041
-Related: 0033, 0035
+Related: 0035
 
 A Space owns Cards and Layouts. A Layout explicitly owns the subset of Space
 Cards it contains, each Card's position, and a non-empty ordered collection of
