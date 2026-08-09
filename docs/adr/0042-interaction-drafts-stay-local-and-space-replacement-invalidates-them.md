@@ -22,9 +22,13 @@ title fields open; cancelling that rename keeps the new entity. Alias creation,
 by contrast, remains a local picker draft until a target makes the Alias valid.
 
 Expected completion outcomes are **completed**, **unchanged** and **refused**.
-An unchanged operation produces no Edit and no error. A refused operation also
-produces no Edit and returns an associated explanation to the initiating
-surface, which keeps focus and its relevant draft. Programming errors and
+Cancelled interactions, duplicate requests, and attempts that produce zero
+movement are **unchanged**: they produce no Edit and no error. Stale context
+and other user-facing validation failures are **refused**: they produce no Edit
+and return an associated explanation to the initiating surface, which keeps
+focus and its relevant draft. A validation refusal from **Accept stored** is
+also **refused**; it leaves the current working Space, persistence conflict and
+initiating surface's draft unchanged and available. Programming errors and
 broken internal invariants are still reported as failures; they are not
 converted into user-facing refusals. This is a result vocabulary shared by
 semantic operations, not a generic command union or a new command module.

@@ -28,8 +28,14 @@ Routes are not reusable objects and a Layout no longer filters a Space-level
 Route collection. Its ordered `routes` collection contains the Routes it owns;
 it may optionally name one of them as `activeRoute`, otherwise the first is the
 fallback. Route identity is scoped to the owning Layout. Deleting a Route
-changes only that Layout and is unavailable for its last Route, while deleting
-a Card from the Space performs Remove from Layout's cascade in every Layout.
+changes only that Layout and is unavailable for its last Route. If the deleted
+Route is the named `activeRoute`, the remaining Routes are considered in
+authored order and the first survivor becomes active; if no Route survives,
+`activeRoute` is cleared and the resulting Layout is rejected because a valid
+Layout cannot have no Route. This same rule must be enforced by both authoring
+and intake, with intake rejecting any dangling `activeRoute` rather than
+preserving it. Deleting a Card from the Space performs Remove from Layout's
+cascade in every Layout.
 Creating a Layout creates its initial empty active Route in the same Edit.
 **Add Route** appends and activates a new empty Route in an existing Layout; on
 an Algorithmic View, the initial Route created by conversion is itself the one
