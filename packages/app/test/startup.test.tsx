@@ -13,7 +13,7 @@ const OTHER_CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
 
 const snapshot: SpaceSnapshot = spaceSnapshotSchema.parse({
   id: SPACE_ID,
-  document: { version: 2, title: 'Stored space', routes: [] },
+  document: { version: 2, title: 'Stored space', graphs: [] },
   cards: [
     {
       id: CARD_ID,
@@ -24,7 +24,7 @@ const snapshot: SpaceSnapshot = spaceSnapshotSchema.parse({
 
 const otherSnapshot: SpaceSnapshot = spaceSnapshotSchema.parse({
   id: OTHER_SPACE_ID,
-  document: { version: 2, title: 'Exact selected space', routes: [] },
+  document: { version: 2, title: 'Exact selected space', graphs: [] },
   cards: [
     {
       id: OTHER_CARD_ID,

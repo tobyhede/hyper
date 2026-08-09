@@ -1,4 +1,4 @@
-export const GraphIcon = () => (
+export const FlowIcon = () => (
   <svg
     width="16"
     height="16"
@@ -49,7 +49,7 @@ export const LayoutIcon = () => (
   </svg>
 );
 
-export const RouteIcon = ({
+export const GraphIcon = ({
   color = 'currentColor',
   size = 16,
 }: {

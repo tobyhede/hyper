@@ -30,7 +30,7 @@ const snapshot = (title: string, cardTitle: string, x: number, y: number): Space
     document: {
       version: 2,
       title,
-      routes: [],
+      graphs: [],
       layouts: [
         {
           id: LAYOUT_ID,

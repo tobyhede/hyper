@@ -14,14 +14,14 @@ spaceBackendContract('MemorySpaceBackend', (initial) =>
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 const CARD_B = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
-const ROUTE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
+const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
 const LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
 const MISSING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000099');
 
 const loaded: LoadedSpace = {
   snapshot: {
     id: SPACE_ID,
-    document: { version: 2, title: 'One', routes: [] },
+    document: { version: 2, title: 'One', graphs: [] },
     cards: [{ id: CARD_ID, document: { title: 'A', kind: 'markdown', body: 'Original' } }],
   },
   revision: 3n,
@@ -85,16 +85,16 @@ describe('MemorySpaceBackend', () => {
         ...loaded.snapshot,
         document: {
           ...loaded.snapshot.document,
-          routes: [{ id: ROUTE_ID, title: 'Dangling', edges: [{ from: CARD_ID, to: MISSING_ID }] }],
+          graphs: [{ id: GRAPH_ID, title: 'Dangling', edges: [{ from: CARD_ID, to: MISSING_ID }] }],
         },
       },
       {
         ...loaded.snapshot,
         document: {
           ...loaded.snapshot.document,
-          routes: [
+          graphs: [
             {
-              id: ROUTE_ID,
+              id: GRAPH_ID,
               title: 'Duplicate Edge',
               edges: [
                 { from: CARD_ID, to: CARD_B },

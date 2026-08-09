@@ -65,7 +65,7 @@ test('a PostgreSQL-backed edit survives a fresh Vite host', async ({ browser }) 
     const imported = await repository.importSpaces([
       {
         id: spaceId,
-        document: { version: 2, title, routes: [] },
+        document: { version: 2, title, graphs: [] },
         cards: [
           {
             id: cardId,

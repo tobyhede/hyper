@@ -4,33 +4,33 @@ import {
   type BuiltInViewId,
   type Card,
   type Layout,
-  type Route,
+  type Graph,
   type UUID,
 } from '@project/core';
 
 /**
- * The cards, routes and layouts a reference check reads. Structural so it
+ * The cards, graphs and layouts a reference check reads. Structural so it
  * accepts both a freshly parsed space file (inside `loadSpace`) and an
  * already-built `Space`. `layouts` and `defaultView` are optional: a space may
  * declare neither and open in an automatic view (ADR 0025).
  */
 export interface Referenceable {
   readonly cards: readonly Card[];
-  readonly routes: readonly Route[];
+  readonly graphs: readonly Graph[];
   readonly layouts?: readonly Layout[] | undefined;
   readonly defaultView?: BuiltInViewId | UUID | undefined;
 }
 
 export type SpaceReferenceErrorKind =
   | 'duplicate-card-id'
-  | 'duplicate-route-id'
+  | 'duplicate-graph-id'
   | 'duplicate-layout-id'
   | 'layout-position-unknown-card'
-  | 'layout-unknown-route'
-  | 'layout-active-route-not-shown'
+  | 'layout-unknown-graph'
+  | 'layout-active-graph-not-shown'
   | 'unresolved-default-view'
-  | 'unresolved-route-edge'
-  | 'duplicate-route-edge'
+  | 'unresolved-graph-edge'
+  | 'duplicate-graph-edge'
   | 'unresolved-alias-target'
   | 'alias-self-reference'
   | 'alias-targets-alias';
@@ -72,8 +72,8 @@ export function validateReferences(space: Referenceable): SpaceReferenceError[] 
   for (const id of duplicates(space.cards.map((c) => c.id))) {
     errors.push({ kind: 'duplicate-card-id', ref: id, message: `Duplicate card id "${id}"` });
   }
-  for (const id of duplicates(space.routes.map((r) => r.id))) {
-    errors.push({ kind: 'duplicate-route-id', ref: id, message: `Duplicate route id "${id}"` });
+  for (const id of duplicates(space.graphs.map((r) => r.id))) {
+    errors.push({ kind: 'duplicate-graph-id', ref: id, message: `Duplicate graph id "${id}"` });
   }
 
   const layouts = space.layouts ?? [];
@@ -84,7 +84,7 @@ export function validateReferences(space: Referenceable): SpaceReferenceError[] 
   // Positions are sparse: a layout may omit cards, and whoever renders it places
   // those itself. The asymmetry is that it may not name a card that does not
   // exist — a position left behind by a deleted card (ADR 0025).
-  const routeIds = new Set(space.routes.map((r) => r.id));
+  const graphIds = new Set(space.graphs.map((r) => r.id));
 
   for (const layout of layouts) {
     for (const key of Object.keys(layout.positions)) {
@@ -98,37 +98,37 @@ export function validateReferences(space: Referenceable): SpaceReferenceError[] 
       }
     }
 
-    // A Layout also points at routes — which it shows, and which of those opens
-    // active (ADR 0026). Both are references into the space's own routes, and
+    // A Layout also points at graphs — which it shows, and which of those opens
+    // active (ADR 0026). Both are references into the space's own graphs, and
     // the dependency runs one way: geometry references topology, never back.
-    for (const routeId of layout.routes ?? []) {
-      if (!routeIds.has(routeId)) {
+    for (const graphId of layout.graphs ?? []) {
+      if (!graphIds.has(graphId)) {
         errors.push({
-          kind: 'layout-unknown-route',
-          ref: routeId,
-          message: `Layout "${layout.id}" shows missing route "${routeId}"`,
+          kind: 'layout-unknown-graph',
+          ref: graphId,
+          message: `Layout "${layout.id}" shows missing graph "${graphId}"`,
         });
       }
     }
 
-    if (layout.activeRoute !== undefined) {
-      if (!routeIds.has(layout.activeRoute)) {
+    if (layout.activeGraph !== undefined) {
+      if (!graphIds.has(layout.activeGraph)) {
         errors.push({
-          kind: 'layout-unknown-route',
-          ref: layout.activeRoute,
-          message: `Layout "${layout.id}" opens active on missing route "${layout.activeRoute}"`,
+          kind: 'layout-unknown-graph',
+          ref: layout.activeGraph,
+          message: `Layout "${layout.id}" opens active on missing graph "${layout.activeGraph}"`,
         });
-      } else if (layout.routes && !layout.routes.includes(layout.activeRoute)) {
+      } else if (layout.graphs && !layout.graphs.includes(layout.activeGraph)) {
         // The one check here that relates two fields rather than resolving one
         // against the space: both ids are real and it is still an error, because
-        // the active route must be one the Layout shows. Activating only ever
+        // the active graph must be one the Layout shows. Activating only ever
         // moves emphasis within the visible set, so a Layout opening active on a
-        // route it filters out has asked for a state nothing can reach. Absent a
-        // filter every route is visible and there is nothing left to check.
+        // graph it filters out has asked for a state nothing can reach. Absent a
+        // filter every graph is visible and there is nothing left to check.
         errors.push({
-          kind: 'layout-active-route-not-shown',
-          ref: layout.activeRoute,
-          message: `Layout "${layout.id}" opens active on route "${layout.activeRoute}", which it does not show`,
+          kind: 'layout-active-graph-not-shown',
+          ref: layout.activeGraph,
+          message: `Layout "${layout.id}" opens active on graph "${layout.activeGraph}", which it does not show`,
         });
       }
     }
@@ -147,15 +147,15 @@ export function validateReferences(space: Referenceable): SpaceReferenceError[] 
     }
   }
 
-  for (const route of space.routes) {
+  for (const graph of space.graphs) {
     const firstEdgeIndex = new Map<string, number>();
-    route.edges.forEach((edge, index) => {
+    graph.edges.forEach((edge, index) => {
       for (const end of ['from', 'to'] as const) {
         if (!cardIds.has(edge[end])) {
           errors.push({
-            kind: 'unresolved-route-edge',
+            kind: 'unresolved-graph-edge',
             ref: edge[end],
-            message: `Route "${route.id}" edge ${index} references missing card "${edge[end]}" as its ${end}`,
+            message: `Graph "${graph.id}" edge ${index} references missing card "${edge[end]}" as its ${end}`,
           });
         }
       }
@@ -167,9 +167,9 @@ export function validateReferences(space: Referenceable): SpaceReferenceError[] 
       } else {
         const ref = `${edge.from} → ${edge.to}`;
         errors.push({
-          kind: 'duplicate-route-edge',
+          kind: 'duplicate-graph-edge',
           ref,
-          message: `Route "${route.id}" repeats edge ${ref} at index ${index} (first at index ${firstIndex})`,
+          message: `Graph "${graph.id}" repeats edge ${ref} at index ${index} (first at index ${firstIndex})`,
         });
       }
     });

@@ -20,7 +20,7 @@ import { afterAll, beforeAll, expect, it, vi } from 'vitest';
  * passing and then exits 1 on the unhandled error.
  *
  * `CardNode` deliberately does *not* call `updateNodeInternals` — a forced
- * remeasure discards the handles `projection.ts` declares for Routes not yet
+ * remeasure discards the handles `projection.ts` declares for Graphs not yet
  * incident to the card, which breaks the next connection. But the stub is still
  * required: React Flow's own `useResizeObserver` reaches the same
  * `DOMMatrixReadOnly` call with `force: true`, so any test rendering a real

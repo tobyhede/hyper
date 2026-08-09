@@ -2,7 +2,7 @@
 
 Status: accepted
 Refines: 0005, 0013
-Refined by: 0038
+Refined by: 0038, 0040, 0041
 Related: 0025
 
 `Layout` now names the authored card-to-position map a space carries, and `LayoutStrategy` names the function that arranges cards. ADR 0005 gave the word to the function — "a Layout is a named strategy" — which was right while placement was always computed, because a strategy was the only layout-shaped thing in the system. ADR 0013 changed that: a positioned layout is a value the author writes, holds, and edits. Two things then wanted one word, and the code resolved the collision the way code does when nobody decides — by prefixing. `AuthoredLayout` shipped for about an hour before it was obvious that it named a property every layout in the file has by construction, so it distinguished nothing.

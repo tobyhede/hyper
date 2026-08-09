@@ -3,6 +3,7 @@
 Status: accepted
 Supersedes: 0012, 0023
 Refines: 0009
+Refined by: 0041
 Related: 0021, 0024, 0027, 0033
 
 A Route is a set of directed card Edges. It may contain forks, merges, cycles,

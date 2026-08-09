@@ -45,7 +45,7 @@ const CARD_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000010');
 const SECOND_CARD_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000011');
 const OTHER_CARD_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000012');
 const MISSING_CARD_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000013');
-const ROUTE_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000020');
+const GRAPH_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000020');
 
 const card = (id: UUID, title: string) => ({
   id,
@@ -54,7 +54,7 @@ const card = (id: UUID, title: string) => ({
 
 const space = (id: UUID, title: string, cardIds: readonly UUID[]): SpaceSnapshot => ({
   id,
-  document: { version: 2, title, routes: [] },
+  document: { version: 2, title, graphs: [] },
   cards: cardIds.map((cardId) => card(cardId, `${title} card`)),
 });
 
@@ -145,8 +145,8 @@ export const spaceRepositoryContract = (
         ...first,
         document: {
           ...first.document,
-          routes: [
-            { id: ROUTE_ID, title: 'Dangling', edges: [{ from: CARD_ID, to: MISSING_CARD_ID }] },
+          graphs: [
+            { id: GRAPH_ID, title: 'Dangling', edges: [{ from: CARD_ID, to: MISSING_CARD_ID }] },
           ],
         },
       };
@@ -332,9 +332,9 @@ export const spaceRepositoryContract = (
         document: {
           version: 2,
           title: 'Dangling',
-          routes: [
+          graphs: [
             {
-              id: ROUTE_ID,
+              id: GRAPH_ID,
               title: 'Dangling',
               edges: [{ from: OTHER_CARD_ID, to: MISSING_CARD_ID }],
             },
@@ -365,8 +365,8 @@ export const spaceRepositoryContract = (
         document: {
           version: 2,
           title: 'Dangling',
-          routes: [
-            { id: ROUTE_ID, title: 'Dangling', edges: [{ from: CARD_ID, to: MISSING_CARD_ID }] },
+          graphs: [
+            { id: GRAPH_ID, title: 'Dangling', edges: [{ from: CARD_ID, to: MISSING_CARD_ID }] },
           ],
         },
       };
@@ -407,7 +407,7 @@ export const spaceRepositoryContract = (
         document: {
           version: 2,
           title: 'Partly identified',
-          routes: [{ title: 'Explicit cards', edges: [{ from: CARD_ID, to: SECOND_CARD_ID }] }],
+          graphs: [{ title: 'Explicit cards', edges: [{ from: CARD_ID, to: SECOND_CARD_ID }] }],
           layouts: [
             {
               title: 'Minted layout',
@@ -430,15 +430,15 @@ export const spaceRepositoryContract = (
       if (only === undefined) throw new Error('Import returned no Space');
 
       const minted = only.snapshot.cards.find(({ id }) => id !== CARD_ID && id !== SECOND_CARD_ID);
-      const route = only.snapshot.document.routes[0];
+      const graph = only.snapshot.document.graphs[0];
       const layout = only.snapshot.document.layouts?.[0];
       if (minted === undefined) throw new Error('The id-less card kept no identity');
-      if (route === undefined || layout === undefined) throw new Error('Structure was not stored');
+      if (graph === undefined || layout === undefined) throw new Error('Structure was not stored');
 
-      const identities = [only.snapshot.id, minted.id, route.id, layout.id];
+      const identities = [only.snapshot.id, minted.id, graph.id, layout.id];
       for (const id of identities) expect(uuidSchema.safeParse(id).success).toBe(true);
       expect(new Set(identities).size).toBe(identities.length);
-      expect(route.edges).toEqual([{ from: CARD_ID, to: SECOND_CARD_ID }]);
+      expect(graph.edges).toEqual([{ from: CARD_ID, to: SECOND_CARD_ID }]);
       expect(layout.positions).toEqual({ [CARD_ID]: { x: 4, y: 8 } });
       await expect(repository.loadSpace(only.snapshot.id)).resolves.toEqual(only);
     });

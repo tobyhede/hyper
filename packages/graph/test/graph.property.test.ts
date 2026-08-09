@@ -7,12 +7,12 @@ import { card, uuid } from './card-files';
 const cardId = (value: number) =>
   uuid(`00000000-0000-4000-8000-${value.toString(16).padStart(12, '0')}`);
 
-/** Build a structurally-consistent space file: one route chaining every card. */
+/** Build a structurally-consistent space file: one graph chaining every card. */
 function spaceFileFromIds(ids: number[]) {
   return {
     title: 'Generated',
     cards: ids.map((id) => card(cardId(id), String(id))),
-    routes: [
+    graphs: [
       {
         id: uuid('00000000-0000-4000-8000-000000000004'),
         title: 'Main',
@@ -42,23 +42,23 @@ describe('graph validation properties', () => {
     fc.assert(
       fc.property(idsArb, fc.nat(), (ids, raw) => {
         const file = spaceFileFromIds(ids);
-        const edges = file.routes[0]!.edges;
+        const edges = file.graphs[0]!.edges;
         edges[raw % edges.length]!.to = uuid('00000000-0000-4000-8000-ffffffffffff');
         const errors = validateReferences(file);
-        expect(errors.some((e) => e.kind === 'unresolved-route-edge')).toBe(true);
+        expect(errors.some((e) => e.kind === 'unresolved-graph-edge')).toBe(true);
       }),
     );
   });
 });
 
-describe('Route shape properties (ADR 0032)', () => {
+describe('Graph shape properties (ADR 0032)', () => {
   it('a cycle through any earlier card is accepted', () => {
     fc.assert(
       fc.property(idsArb, fc.nat(), fc.nat(), (ids, rawFrom, rawTo) => {
         const to = rawTo % ids.length;
         const from = to + (rawFrom % (ids.length - to));
         const file = spaceFileFromIds(ids);
-        file.routes[0]!.edges.push({ from: cardId(ids[from]!), to: cardId(ids[to]!) });
+        file.graphs[0]!.edges.push({ from: cardId(ids[from]!), to: cardId(ids[to]!) });
         expect(validateReferences(file)).toEqual([]);
       }),
     );
@@ -68,10 +68,10 @@ describe('Route shape properties (ADR 0032)', () => {
     fc.assert(
       fc.property(idsArb, fc.nat(), (ids, raw) => {
         const file = spaceFileFromIds(ids);
-        const edges = file.routes[0]!.edges;
+        const edges = file.graphs[0]!.edges;
         edges.push({ ...edges[raw % edges.length]! });
         expect(
-          validateReferences(file).some((error) => error.kind === 'duplicate-route-edge'),
+          validateReferences(file).some((error) => error.kind === 'duplicate-graph-edge'),
         ).toBe(true);
       }),
     );
@@ -86,7 +86,7 @@ describe('Route shape properties (ADR 0032)', () => {
         const file = {
           title: 'Diamond',
           cards: [card(cardId(1)), card(cardId(2)), ...middles.map((id) => card(id))],
-          routes: [
+          graphs: [
             {
               id: uuid('00000000-0000-4000-8000-000000000004'),
               title: 'Main',

@@ -1,4 +1,4 @@
-import type { Card, CardId, Layout, Route, RouteId, UUID } from '@project/core';
+import type { Card, CardId, Layout, Graph, GraphId, UUID } from '@project/core';
 import type { Space } from './space';
 
 /** A card that owns content rather than pointing at another card's content. */
@@ -8,8 +8,8 @@ export function getCard(space: Space, cardId: CardId): Card | undefined {
   return space.cardsById.get(cardId);
 }
 
-export function getRoute(space: Space, routeId: RouteId): Route | undefined {
-  return space.routesById.get(routeId);
+export function getGraph(space: Space, graphId: GraphId): Graph | undefined {
+  return space.graphsById.get(graphId);
 }
 
 /**

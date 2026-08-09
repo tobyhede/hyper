@@ -154,7 +154,7 @@ describe('the opened Card', () => {
   it('is editable on arrival, with no action to begin editing', () => {
     render(
       <OpenCard
-        card={markdown({ description: 'Where every route begins' })}
+        card={markdown({ description: 'Where every graph begins' })}
         onComplete={vi.fn()}
         onCancel={vi.fn()}
       />,
@@ -162,7 +162,7 @@ describe('the opened Card', () => {
 
     expect(screen.getByRole('textbox', { name: 'Title' })).toHaveValue('A');
     expect(screen.getByRole('textbox', { name: 'Description' })).toHaveValue(
-      'Where every route begins',
+      'Where every graph begins',
     );
     expect(screen.getByRole('textbox', { name: 'Markdown source' })).toHaveValue('**A** source');
     expect(screen.queryByRole('button', { name: /^Edit Card/ })).not.toBeInTheDocument();

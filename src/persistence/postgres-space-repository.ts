@@ -160,16 +160,16 @@ const parseImport = (input: unknown): ImportSpace => {
  * The identities a batch may not repeat: space ids among spaces, card ids among
  * cards. Both are rows, so both must stay unique across the database.
  *
- * Per kind, and no wider. An earlier version pooled space, card, route and
+ * Per kind, and no wider. An earlier version pooled space, card, graph and
  * layout ids into one set spanning the whole batch, which rejected two things
- * the model allows (ADR 0030): a route id reused in a second Space, and one UUID
+ * the model allows (ADR 0030): a graph id reused in a second Space, and one UUID
  * naming entities of different kinds. It also made acceptance depend on how a
  * batch was split — importing two such Spaces separately succeeded while
  * importing them together failed, for identical stored results.
  *
- * Route and layout ids are absent here deliberately. They resolve only inside
+ * Graph and layout ids are absent here deliberately. They resolve only inside
  * the space document that carries them, and normal domain intake already rejects
- * duplicates of each kind within a Space (`duplicate-route-id`,
+ * duplicates of each kind within a Space (`duplicate-graph-id`,
  * `duplicate-layout-id`). Checking them here would either duplicate that or
  * exceed it.
  */
@@ -219,9 +219,9 @@ const validateSnapshotIdentities = (snapshot: SpaceSnapshot): void => {
  * aggregate that domain intake and the writes below both require.
  *
  * Ids are minted in process by `newUuid`. Only the space id comes from
- * PostgreSQL, and by the ordinary route: the `spaces.id` column default fires
+ * PostgreSQL, and by the ordinary path: the `spaces.id` column default fires
  * when `Space.create` omits it, and the created row hands the value back as
- * `reservedSpaceId`. Routes and layouts are not rows at all — they live inside
+ * `reservedSpaceId`. Graphs and layouts are not rows at all — they live inside
  * the space document (ADR 0030) — so no column default can reach them, and
  * cards are minted here too, so the whole snapshot can be validated before the
  * first card is written.
@@ -236,7 +236,7 @@ const resolveImport = (input: ImportSpace, reservedSpaceId: UUID): SpaceSnapshot
     id: input.id ?? reservedSpaceId,
     document: {
       ...input.document,
-      routes: input.document.routes.map((route) => ({ ...route, id: route.id ?? newUuid() })),
+      graphs: input.document.graphs.map((graph) => ({ ...graph, id: graph.id ?? newUuid() })),
       ...(layouts === undefined ? {} : { layouts }),
     },
     cards: input.cards.map((card) => ({ ...card, id: card.id ?? newUuid() })),
@@ -451,7 +451,7 @@ export class PostgresSpaceRepository implements SpaceRepository {
               document: toJsonValue({
                 version: 2,
                 title: importInput.document.title,
-                routes: [],
+                graphs: [],
               }),
               revision: 0,
             });

@@ -60,13 +60,13 @@ beforeEach(() => {
   connection.inProgress = false;
 });
 
-const routeId = uuid('00000000-0000-4000-8000-000000000010');
-const otherRouteId = uuid('00000000-0000-4000-8000-000000000011');
+const graphId = uuid('00000000-0000-4000-8000-000000000010');
+const otherGraphId = uuid('00000000-0000-4000-8000-000000000011');
 const cardId = uuid('00000000-0000-4000-8000-000000000001');
 
-const outHandle = (route: typeof routeId, offsetY: number): CardHandle => ({
-  id: `${route}::out`,
-  routeId: route,
+const outHandle = (graph: typeof graphId, offsetY: number): CardHandle => ({
+  id: `${graph}::out`,
+  graphId: graph,
   color: '#6ea8fe',
   offsetY,
 });
@@ -95,7 +95,7 @@ function props({
   onBeginTitleEditing,
   onCompleteTitleEditing,
   onCancelTitleEditing,
-  sourceHandles = [outHandle(routeId, 50)],
+  sourceHandles = [outHandle(graphId, 50)],
   targetHandles = [],
 }: Overrides = {}): NodeProps<CardFlowNode> {
   return {
@@ -123,8 +123,8 @@ function props({
       active: false,
       selectedForAuthoring: false,
       showContent: false,
-      activeRouteId: routeId,
-      activeRouteColor: '#6ea8fe',
+      activeGraphId: graphId,
+      activeGraphColor: '#6ea8fe',
       emphasis: 'subtle',
       sourceHandles,
       targetHandles,
@@ -256,8 +256,8 @@ const connectable = (label: 'Connect from' | 'Connect to', end: 'start' | 'end')
     .getAllByRole('button', { name: new RegExp(`^${label} `) })
     .map((handle) => handle.getAttribute(`data-connectable-${end}`) === 'true');
 
-describe('CardNode route authoring', () => {
-  it('shows four active-Route-coloured spatial source handles on a selected Card', () => {
+describe('CardNode graph authoring', () => {
+  it('shows four active-Graph-coloured spatial source handles on a selected Card', () => {
     render(<CardNode {...props({ selected: true })} />);
 
     const handles = screen.getAllByRole('button', { name: /^Connect from / });
@@ -295,8 +295,8 @@ describe('CardNode route authoring', () => {
  * `projection.ts` declares each laid-out Card's handle geometry on the node, and
  * React Flow's `parseHandles` takes that in preference to measuring the DOM. A
  * forced remeasure replaces it with `getHandleBounds`, which reads *only* the
- * handles the DOM currently renders — the overview anchors of Routes the Card is
- * already on. The declarations for every other Route, which are what let an Edge
+ * handles the DOM currently renders — the overview anchors of Graphs the Card is
+ * already on. The declarations for every other Graph, which are what let an Edge
  * completed onto this Card resolve in the render that first makes it incident,
  * are discarded. So the contract with React Flow is that we never ask.
  *
@@ -315,12 +315,12 @@ describe('CardNode handle geometry', () => {
     expect(updateNodeInternals).not.toHaveBeenCalled();
   });
 
-  it('leaves the declared geometry alone when a new Edge gives the Card another Route handle', () => {
+  it('leaves the declared geometry alone when a new Edge gives the Card another Graph handle', () => {
     const { rerender } = render(<CardNode {...props()} />);
 
     rerender(
       <CardNode
-        {...props({ sourceHandles: [outHandle(routeId, 50), outHandle(otherRouteId, 150)] })}
+        {...props({ sourceHandles: [outHandle(graphId, 50), outHandle(otherGraphId, 150)] })}
       />,
     );
 
@@ -330,7 +330,7 @@ describe('CardNode handle geometry', () => {
   it('leaves the declared geometry alone when a strategy moves a handle the Card already had', () => {
     const { rerender } = render(<CardNode {...props()} />);
 
-    rerender(<CardNode {...props({ sourceHandles: [outHandle(routeId, 210)] })} />);
+    rerender(<CardNode {...props({ sourceHandles: [outHandle(graphId, 210)] })} />);
 
     expect(updateNodeInternals).not.toHaveBeenCalled();
   });

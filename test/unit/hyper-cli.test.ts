@@ -16,14 +16,14 @@ import { MemorySpaceRepository } from '../support/memory-space-repository';
 
 const SPACE_ID = uuidSchema.parse('11111111-1111-4111-8111-111111111111');
 const CARD_ID = uuidSchema.parse('22222222-2222-4222-8222-222222222222');
-const ROUTE_ID = uuidSchema.parse('33333333-3333-4333-8333-333333333333');
+const GRAPH_ID = uuidSchema.parse('33333333-3333-4333-8333-333333333333');
 const OTHER_SPACE_ID = uuidSchema.parse('44444444-4444-4444-8444-444444444444');
 const THIRD_SPACE_ID = uuidSchema.parse('55555555-5555-4555-8555-555555555555');
 
 const storedSpace: LoadedSpace = {
   snapshot: {
     id: SPACE_ID,
-    document: { version: 2, title: 'Stored talk', routes: [] },
+    document: { version: 2, title: 'Stored talk', graphs: [] },
     cards: [
       {
         id: CARD_ID,
@@ -92,7 +92,7 @@ const writeValidSpace = async (id: UUID = SPACE_ID, title = 'Imported talk'): Pr
   await mkdir(join(directory, 'cards'));
   await writeFile(
     join(directory, 'space.json'),
-    JSON.stringify({ version: 2, id, title, routes: [] }),
+    JSON.stringify({ version: 2, id, title, graphs: [] }),
   );
   await writeFile(join(directory, 'cards', 'opening.md'), '---\ntitle: Opening\n---\nHello.\n');
   return directory;
@@ -132,7 +132,7 @@ describe('runHyper', () => {
     expect(output.stdout).toEqual([`Exported space ${SPACE_ID} at revision 0 to ${destination}\n`]);
     expect(output.stderr).toEqual([]);
     await expect(readFile(join(destination, 'space.json'), 'utf8')).resolves.toBe(
-      `${JSON.stringify({ version: 2, id: SPACE_ID, title: 'Stored talk', routes: [] }, null, 2)}\n`,
+      `${JSON.stringify({ version: 2, id: SPACE_ID, title: 'Stored talk', graphs: [] }, null, 2)}\n`,
     );
     await expect(readFile(join(destination, 'cards', `${CARD_ID}.md`), 'utf8')).resolves.toBe(
       `---\nid: ${CARD_ID}\ntitle: Stored card\nkind: markdown\n---\n\nStored body.\n`,
@@ -358,10 +358,10 @@ describe('runHyper', () => {
       document: {
         version: 2,
         title: 'Canonical: talk',
-        routes: [
+        graphs: [
           {
-            id: ROUTE_ID,
-            title: 'Main route',
+            id: GRAPH_ID,
+            title: 'Main graph',
             color: '#123456',
             edges: [{ from: CARD_ID, to: THIRD_SPACE_ID }],
           },
@@ -375,8 +375,8 @@ describe('runHyper', () => {
               [THIRD_SPACE_ID]: { x: 30, y: 40 },
               [CARD_ID]: { x: 10, y: 20 },
             },
-            routes: [ROUTE_ID],
-            activeRoute: ROUTE_ID,
+            graphs: [GRAPH_ID],
+            activeGraph: GRAPH_ID,
           },
         ],
         defaultView: OTHER_SPACE_ID,
@@ -578,11 +578,11 @@ describe('runHyper', () => {
     await mkdir(second);
     await writeFile(
       join(first, 'space.json'),
-      JSON.stringify({ version: 2, id: OTHER_SPACE_ID, title: 'First imported', routes: [] }),
+      JSON.stringify({ version: 2, id: OTHER_SPACE_ID, title: 'First imported', graphs: [] }),
     );
     await writeFile(
       join(second, 'space.json'),
-      JSON.stringify({ version: 2, id: THIRD_SPACE_ID, title: 'Second imported', routes: [] }),
+      JSON.stringify({ version: 2, id: THIRD_SPACE_ID, title: 'Second imported', graphs: [] }),
     );
     const output = captureIo();
     const repository = new MemorySpaceRepository([storedSpace]);
@@ -626,17 +626,17 @@ describe('runHyper', () => {
       outcome: {
         kind: 'rejected',
         code: 'duplicate-identity',
-        message: `Duplicate route ${ROUTE_ID}`,
+        message: `Duplicate graph ${GRAPH_ID}`,
       } satisfies RepositoryImportResult,
-      entityId: ROUTE_ID,
+      entityId: GRAPH_ID,
     },
     {
       outcome: {
         kind: 'rejected',
         code: 'invalid-snapshot',
-        message: `Route ${ROUTE_ID} has an unresolved card`,
+        message: `Graph ${GRAPH_ID} has an unresolved card`,
       } satisfies RepositoryImportResult,
-      entityId: ROUTE_ID,
+      entityId: GRAPH_ID,
     },
     {
       outcome: {
@@ -726,11 +726,11 @@ describe('runHyper', () => {
     await mkdir(second);
     await writeFile(
       join(first, 'space.json'),
-      JSON.stringify({ version: 2, id: SPACE_ID, title: 'First imported', routes: [] }),
+      JSON.stringify({ version: 2, id: SPACE_ID, title: 'First imported', graphs: [] }),
     );
     await writeFile(
       join(second, 'space.json'),
-      JSON.stringify({ version: 2, id: OTHER_SPACE_ID, title: 'Second imported', routes: [] }),
+      JSON.stringify({ version: 2, id: OTHER_SPACE_ID, title: 'Second imported', graphs: [] }),
     );
     const output = captureIo();
     const repository = new MemorySpaceRepository();

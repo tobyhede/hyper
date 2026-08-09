@@ -17,18 +17,18 @@ const canonicalSpaceFile = ({ snapshot }: LoadedSpace): SpaceFile => {
     positions: Object.fromEntries(
       Object.entries(layout.positions).sort(([left], [right]) => compareOrdinal(left, right)),
     ),
-    ...(layout.routes === undefined ? {} : { routes: layout.routes }),
-    ...(layout.activeRoute === undefined ? {} : { activeRoute: layout.activeRoute }),
+    ...(layout.graphs === undefined ? {} : { graphs: layout.graphs }),
+    ...(layout.activeGraph === undefined ? {} : { activeGraph: layout.activeGraph }),
   }));
   return {
     version: 2,
     id: snapshot.id,
     title: snapshot.document.title,
-    routes: snapshot.document.routes.map((route) => ({
-      id: route.id,
-      title: route.title,
-      ...(route.color === undefined ? {} : { color: route.color }),
-      edges: route.edges.map(({ from, to }) => ({ from, to })),
+    graphs: snapshot.document.graphs.map((graph) => ({
+      id: graph.id,
+      title: graph.title,
+      ...(graph.color === undefined ? {} : { color: graph.color }),
+      edges: graph.edges.map(({ from, to }) => ({ from, to })),
     })),
     ...(layouts === undefined ? {} : { layouts }),
     ...(snapshot.document.defaultView === undefined

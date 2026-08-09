@@ -1,5 +1,5 @@
 import type { CardId, Layout, LayoutPosition } from '@project/core';
-import type { LayoutGraph } from './layout';
+import type { LayoutStrategyGraph } from './layout';
 
 /** The brand's carrier. See `Placement` below for what the type means. */
 declare const PLACEMENT: unique symbol;
@@ -13,7 +13,7 @@ declare const PLACEMENT: unique symbol;
  * which is the crossing ADR 0025 describes.
  *
  * Not the placement layer ADR 0004 rejected. That was an entity between a card
- * and its position that edges and routes referenced instead of the card, letting
+ * and its position that edges and graphs referenced instead of the card, letting
  * one card occupy two positions. This is keyed by card and holds at most one
  * position for each.
  *
@@ -89,9 +89,9 @@ function fromLayout(layout: Layout): Placement {
  * A card the strategy left unplaced is omitted rather than defaulted, because
  * collapsing that to `(0, 0)` would assert a placement no strategy made.
  */
-function fromLayoutGraph(graph: LayoutGraph): Placement {
+function fromLayoutStrategyGraph(strategyGraph: LayoutStrategyGraph): Placement {
   const positions = new Map<CardId, LayoutPosition>();
-  for (const card of graph.cards) {
+  for (const card of strategyGraph.cards) {
     if (card.x === undefined || card.y === undefined) continue;
     positions.set(card.id, { x: card.x, y: card.y });
   }
@@ -142,7 +142,7 @@ function equals(a: Placement | null, b: Placement | null): boolean {
  *
  * That last one is why refreshing every authored card from the report is wrong
  * rather than merely broader. A reprojection can land mid-gesture — an activated
- * Route or a selection redraws the graph without the drag ending — and it
+ * Graph or a selection redraws the graph without the drag ending — and it
  * reports the live position, which no gesture has settled on. Reading it would
  * author a coordinate the author never chose and re-run the strategy underneath
  * a drag still in progress. A card that really moved arrives in `placed`, so
@@ -199,7 +199,7 @@ const empty = (): Placement => brand(new Map());
 export const Placement = {
   empty,
   fromLayout,
-  fromLayoutGraph,
+  fromLayoutStrategyGraph,
   fromEntries,
   equals,
   next,

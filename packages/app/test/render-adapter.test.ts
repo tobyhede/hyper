@@ -18,7 +18,7 @@ const CARD_A = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 const CARD_B = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
 const CARD_C = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
-const ROUTE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
+const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
 const LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000021');
 const CREATED_CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000006');
 
@@ -119,9 +119,9 @@ function sparsePositionedAdapter() {
     document: {
       version: 2,
       title: 'Space',
-      routes: [
+      graphs: [
         {
-          id: ROUTE_ID,
+          id: GRAPH_ID,
           title: 'Main',
           edges: [{ from: uuidSchema.parse(CARD_A), to: uuidSchema.parse(CARD_B) }],
         },
@@ -165,9 +165,9 @@ function storedSpaceAdapter() {
     document: {
       version: 2,
       title: 'Space',
-      routes: [
+      graphs: [
         {
-          id: ROUTE_ID,
+          id: GRAPH_ID,
           title: 'Main',
           edges: [{ from: uuidSchema.parse(CARD_A), to: uuidSchema.parse(CARD_B) }],
         },
@@ -209,7 +209,7 @@ describe('render adapter', () => {
   afterEach(() => vi.restoreAllMocks());
 
   /*
-   * Nodes and their Route Edges are one published value, not two fields that
+   * Nodes and their Graph Edges are one published value, not two fields that
    * happen to be written together. The tests below pin the states that
    * separation allowed: Edges surviving without the nodes declaring their
    * handles, and Edges being dropped by a change that concerns only nodes.
@@ -218,7 +218,7 @@ describe('render adapter', () => {
     expect(adapter().getState().projection).toBeNull();
   });
 
-  it('drops the published Route Edges with their nodes when the renderer changes', () => {
+  it('drops the published Graph Edges with their nodes when the renderer changes', () => {
     const store = adapter();
     store.getState().syncProjection(PROJECTED, [EDGE]);
     expect(store.getState().projection?.edges).toEqual([EDGE]);
@@ -228,7 +228,7 @@ describe('render adapter', () => {
     expect(store.getState().projection).toBeNull();
   });
 
-  it('keeps the published Route Edges through a change that concerns only nodes', () => {
+  it('keeps the published Graph Edges through a change that concerns only nodes', () => {
     const store = adapter();
     store.getState().syncProjection(PROJECTED, [EDGE]);
 
@@ -253,14 +253,14 @@ describe('render adapter', () => {
     expect(store.getState().selectedCardId).toBeNull();
   });
 
-  it('publishes a new Route Edge only with both endpoint handle declarations', () => {
+  it('publishes a new Graph Edge only with both endpoint handle declarations', () => {
     const store = adapter();
     store.getState().syncProjection(PROJECTED, []);
-    const routeId = '00000000-0000-4000-8000-000000000004';
-    const sourceHandle = `${routeId}::out`;
-    const targetHandle = `${routeId}::in`;
+    const graphId = '00000000-0000-4000-8000-000000000004';
+    const sourceHandle = `${graphId}::out`;
+    const targetHandle = `${graphId}::in`;
     const edge: Edge = {
-      id: `${routeId}:A->B`,
+      id: `${graphId}:A->B`,
       source: CARD_A,
       target: CARD_B,
       sourceHandle,
@@ -341,9 +341,9 @@ describe('render adapter', () => {
       document: {
         version: 2,
         title: 'Space',
-        routes: [
+        graphs: [
           {
-            id: ROUTE_ID,
+            id: GRAPH_ID,
             title: 'Main',
             edges: [{ from: uuidSchema.parse(CARD_A), to: uuidSchema.parse(CARD_B) }],
           },
@@ -360,7 +360,7 @@ describe('render adapter', () => {
         },
       ],
     };
-    const { session, store } = sessionBackedAdapter(snapshot, { kind: 'view', view: 'graph' });
+    const { session, store } = sessionBackedAdapter(snapshot, { kind: 'view', view: 'flow' });
 
     store.getState().syncProjection(PROJECTED, []);
     expect(
@@ -386,7 +386,7 @@ describe('render adapter', () => {
   });
 
   /*
-   * A reprojection can land while a Card is in flight — an activated Route or a
+   * A reprojection can land while a Card is in flight — an activated Graph or a
    * selection redraws the graph without the gesture ending. The nodes it reports
    * carry the live position, and the author has settled on nothing, so that
    * geometry is not theirs to author. Reported at review as reaching the Layout

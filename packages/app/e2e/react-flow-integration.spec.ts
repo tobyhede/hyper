@@ -1,6 +1,6 @@
 import { expect, test } from './fixtures';
 import { authoringHandle, boxOf, nodeByTitle, settled } from './graph';
-import { allCardsOnAGrid, seedRouteLessLayout } from './seed';
+import { allCardsOnAGrid, seedGraphLessLayout } from './seed';
 
 test('a focused Card opens with Enter and Space', async ({ page }) => {
   await page.goto('/');
@@ -33,14 +33,14 @@ test('the graph shows React Flow attribution', async ({ page }) => {
   await expect(page.locator('.react-flow__attribution a[href*="reactflow.dev"]')).toBeVisible();
 });
 
-test('a Layout with no visible Route suppresses Alt empty-drop creation', async ({ page }) => {
-  const seeded = await seedRouteLessLayout(page, 'No Routes', allCardsOnAGrid);
+test('a Layout with no visible Graph suppresses Alt empty-drop creation', async ({ page }) => {
+  const seeded = await seedGraphLessLayout(page, 'No Graphs', allCardsOnAGrid);
   await page.goto('/');
   const source = nodeByTitle(page, 'A').first();
   await expect(source).toBeVisible();
   await settled(page);
-  await expect(page.getByTestId('layout-selector')).toContainText('No Routes');
-  await expect(page.getByTestId('route-selector')).toContainText('None');
+  await expect(page.getByTestId('layout-selector')).toContainText('No Graphs');
+  await expect(page.getByTestId('graph-selector')).toContainText('None');
   await expect(page.getByTestId('persistence-status')).toHaveAttribute(
     'data-revision',
     seeded.revision,

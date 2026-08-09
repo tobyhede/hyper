@@ -1,14 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildCardHandles,
-  buildRouteEdges,
-  filterHandlesByRoutes,
+  buildGraphRenderEdges,
+  filterHandlesByGraphs,
   loadSpace,
-  routeCardIds,
+  graphCardIds,
   type Space,
 } from '../src/index';
 // Internal to the package, so not reachable through what it offers.
-import { cardIdsForRoutes, filterHandlesByRoute } from '../src/routes';
+import { cardIdsForGraphs, filterHandlesByGraph } from '../src/graph-rendering';
 import { cardFile, uuid } from './card-files';
 
 // a → b → c  (main),  a → c  (quick): c is shared, a fans out.
@@ -18,7 +18,7 @@ function loadFixture(): Space {
       version: 2,
       id: uuid('00000000-0000-4000-8000-000000000001'),
       title: 'Test',
-      routes: [
+      graphs: [
         {
           id: uuid('00000000-0000-4000-8000-000000000004'),
           title: 'Main',
@@ -60,7 +60,7 @@ const space = loadFixture();
 describe('buildCardHandles', () => {
   const handles = buildCardHandles(space);
 
-  it('gives a card nothing arrives at only outbound ports, one per route leaving it', () => {
+  it('gives a card nothing arrives at only outbound ports, one per graph leaving it', () => {
     const a = handles.get(uuid('00000000-0000-4000-8000-000000000002'))!;
     expect(a.targetHandles).toEqual([]);
     expect(a.sourceHandles.map((h) => h.id)).toEqual([
@@ -69,13 +69,13 @@ describe('buildCardHandles', () => {
     ]);
   });
 
-  it('gives an interior card both in and out ports for its route', () => {
+  it('gives an interior card both in and out ports for its graph', () => {
     const b = handles.get(uuid('00000000-0000-4000-8000-000000000003'))!;
     expect(b.targetHandles.map((h) => h.id)).toEqual(['00000000-0000-4000-8000-000000000004::in']);
     expect(b.sourceHandles.map((h) => h.id)).toEqual(['00000000-0000-4000-8000-000000000004::out']);
   });
 
-  it('gives a shared sink one inbound port per route arriving', () => {
+  it('gives a shared sink one inbound port per graph arriving', () => {
     const c = handles.get(uuid('00000000-0000-4000-8000-000000000005'))!;
     expect(c.sourceHandles).toEqual([]);
     expect(c.targetHandles.map((h) => h.id)).toEqual([
@@ -85,14 +85,14 @@ describe('buildCardHandles', () => {
   });
 
   it('gives a fork one outbound port, not one per outgoing edge', () => {
-    // The handle is per route per side, so several edges leaving a card by the
-    // same route share it — which is why the scheme survives branching at all.
+    // The handle is per graph per side, so several edges leaving a card by the
+    // same Graph share it — which is why the scheme survives branching at all.
     const forked = loadSpace(
       {
         version: 2,
         id: uuid('00000000-0000-4000-8000-000000000001'),
         title: 'Fork',
-        routes: [
+        graphs: [
           {
             id: uuid('00000000-0000-4000-8000-000000000004'),
             title: 'Main',
@@ -124,25 +124,25 @@ describe('buildCardHandles', () => {
   });
 });
 
-describe('routeCardIds', () => {
-  it('lists a route’s distinct cards', () => {
-    expect(routeCardIds(space, uuid('00000000-0000-4000-8000-000000000004'))).toEqual([
+describe('graphCardIds', () => {
+  it('lists a graph’s distinct cards', () => {
+    expect(graphCardIds(space, uuid('00000000-0000-4000-8000-000000000004'))).toEqual([
       uuid('00000000-0000-4000-8000-000000000002'),
       uuid('00000000-0000-4000-8000-000000000003'),
       uuid('00000000-0000-4000-8000-000000000005'),
     ]);
-    expect(routeCardIds(space, uuid('00000000-0000-4000-8000-000000000031'))).toEqual([
+    expect(graphCardIds(space, uuid('00000000-0000-4000-8000-000000000031'))).toEqual([
       uuid('00000000-0000-4000-8000-000000000002'),
       uuid('00000000-0000-4000-8000-000000000005'),
     ]);
-    expect(routeCardIds(space, uuid('00000000-0000-4000-8000-000000000099'))).toEqual([]);
+    expect(graphCardIds(space, uuid('00000000-0000-4000-8000-000000000099'))).toEqual([]);
   });
 });
 
-describe('cardIdsForRoutes', () => {
-  it('unions several routes, keeping each card once', () => {
+describe('cardIdsForGraphs', () => {
+  it('unions several graphs, keeping each card once', () => {
     expect(
-      cardIdsForRoutes(space, [
+      cardIdsForGraphs(space, [
         uuid('00000000-0000-4000-8000-000000000004'),
         uuid('00000000-0000-4000-8000-000000000031'),
       ]),
@@ -153,10 +153,10 @@ describe('cardIdsForRoutes', () => {
     ]);
   });
 
-  it('orders by the routes given, then by authored edge order within each', () => {
+  it('orders by the graphs given, then by authored edge order within each', () => {
     // quick first, so c is listed before b.
     expect(
-      cardIdsForRoutes(space, [
+      cardIdsForGraphs(space, [
         uuid('00000000-0000-4000-8000-000000000031'),
         uuid('00000000-0000-4000-8000-000000000004'),
       ]),
@@ -167,25 +167,25 @@ describe('cardIdsForRoutes', () => {
     ]);
   });
 
-  it('ignores unknown route ids', () => {
+  it('ignores unknown graph ids', () => {
     const missing = uuid('00000000-0000-4000-8000-000000000099');
-    expect(cardIdsForRoutes(space, [missing])).toEqual([]);
+    expect(cardIdsForGraphs(space, [missing])).toEqual([]);
     expect(
-      cardIdsForRoutes(space, [uuid('00000000-0000-4000-8000-000000000031'), missing]),
+      cardIdsForGraphs(space, [uuid('00000000-0000-4000-8000-000000000031'), missing]),
     ).toEqual([
       uuid('00000000-0000-4000-8000-000000000002'),
       uuid('00000000-0000-4000-8000-000000000005'),
     ]);
   });
 
-  it('returns nothing for no routes', () => {
-    expect(cardIdsForRoutes(space, [])).toEqual([]);
+  it('returns nothing for no graphs', () => {
+    expect(cardIdsForGraphs(space, [])).toEqual([]);
   });
 });
 
-describe('filterHandlesByRoute', () => {
-  it('keeps only the selected route’s handles', () => {
-    const quick = filterHandlesByRoute(
+describe('filterHandlesByGraph', () => {
+  it('keeps only the selected graph’s handles', () => {
+    const quick = filterHandlesByGraph(
       buildCardHandles(space),
       uuid('00000000-0000-4000-8000-000000000031'),
     );
@@ -197,13 +197,13 @@ describe('filterHandlesByRoute', () => {
   });
 });
 
-describe('filterHandlesByRoutes', () => {
-  it('keeps a shared card’s handles for every route given', () => {
-    const both = filterHandlesByRoutes(buildCardHandles(space), [
+describe('filterHandlesByGraphs', () => {
+  it('keeps a shared card’s handles for every graph given', () => {
+    const both = filterHandlesByGraphs(buildCardHandles(space), [
       uuid('00000000-0000-4000-8000-000000000004'),
       uuid('00000000-0000-4000-8000-000000000031'),
     ]);
-    // The multi-route case: c carries one inbound handle per route arriving.
+    // The multi-graph case: c carries one inbound handle per graph arriving.
     expect(
       both.get(uuid('00000000-0000-4000-8000-000000000005'))!.targetHandles.map((h) => h.id),
     ).toEqual([
@@ -222,21 +222,21 @@ describe('filterHandlesByRoutes', () => {
   });
 
   it('drops cards left with no handles at all', () => {
-    const quickOnly = filterHandlesByRoutes(buildCardHandles(space), [
+    const quickOnly = filterHandlesByGraphs(buildCardHandles(space), [
       uuid('00000000-0000-4000-8000-000000000031'),
     ]);
     expect(quickOnly.get(uuid('00000000-0000-4000-8000-000000000003'))).toBeUndefined();
   });
 });
 
-describe('buildRouteEdges', () => {
-  const edges = buildRouteEdges(space);
+describe('buildGraphRenderEdges', () => {
+  const edges = buildGraphRenderEdges(space);
 
-  it('produces one edge per authored edge, connected via route ports', () => {
+  it('produces one edge per authored edge, connected via graph ports', () => {
     expect(edges).toHaveLength(3);
     expect(edges).toContainEqual({
       id: '00000000-0000-4000-8000-000000000004::0',
-      routeId: uuid('00000000-0000-4000-8000-000000000004'),
+      graphId: uuid('00000000-0000-4000-8000-000000000004'),
       source: uuid('00000000-0000-4000-8000-000000000002'),
       target: uuid('00000000-0000-4000-8000-000000000003'),
       sourceHandle: '00000000-0000-4000-8000-000000000004::out',
@@ -244,7 +244,7 @@ describe('buildRouteEdges', () => {
     });
     expect(edges).toContainEqual({
       id: '00000000-0000-4000-8000-000000000031::0',
-      routeId: uuid('00000000-0000-4000-8000-000000000031'),
+      graphId: uuid('00000000-0000-4000-8000-000000000031'),
       source: uuid('00000000-0000-4000-8000-000000000002'),
       target: uuid('00000000-0000-4000-8000-000000000005'),
       sourceHandle: '00000000-0000-4000-8000-000000000031::out',
@@ -258,7 +258,7 @@ describe('buildRouteEdges', () => {
         version: 2,
         id: uuid('00000000-0000-4000-8000-000000000001'),
         title: 'Fork',
-        routes: [
+        graphs: [
           {
             id: uuid('00000000-0000-4000-8000-000000000004'),
             title: 'Main',
@@ -282,7 +282,7 @@ describe('buildRouteEdges', () => {
       ],
     );
     if (!forked.ok) throw new Error('fixture should load');
-    const forkEdges = buildRouteEdges(forked.space);
+    const forkEdges = buildGraphRenderEdges(forked.space);
     expect(forkEdges.map((e) => e.id)).toEqual([
       '00000000-0000-4000-8000-000000000004::0',
       '00000000-0000-4000-8000-000000000004::1',
