@@ -6,6 +6,7 @@ import { SelectorTrigger } from './SelectorTrigger';
 
 export interface GraphSelectorProps {
   graphs: readonly Graph[];
+  colorByGraphId: Readonly<Record<string, string>>;
   activeGraphId: string | null;
   onActivate: (graphId: string) => void;
   onPresent: () => void;
@@ -15,6 +16,7 @@ export interface GraphSelectorProps {
 
 export function GraphSelector({
   graphs,
+  colorByGraphId,
   activeGraphId,
   onActivate,
   onPresent,
@@ -22,7 +24,10 @@ export function GraphSelector({
   onExitPresenting,
 }: GraphSelectorProps) {
   const activeGraph = graphs.find((graph) => graph.id === activeGraphId);
-  const activeColor = activeGraph?.color ?? FALLBACK_GRAPH_COLOR;
+  const activeColor =
+    activeGraph === undefined
+      ? FALLBACK_GRAPH_COLOR
+      : (colorByGraphId[activeGraph.id] ?? activeGraph.color ?? FALLBACK_GRAPH_COLOR);
   const actionName = presenting ? 'Return to overview' : 'Present this Graph';
 
   return (
@@ -51,7 +56,9 @@ export function GraphSelector({
               <span className="flex w-full items-center gap-[10px]">
                 <span
                   className="h-[3px] w-[14px] shrink-0 rounded-[2px]"
-                  style={{ background: graph.color ?? FALLBACK_GRAPH_COLOR }}
+                  style={{
+                    background: colorByGraphId[graph.id] ?? graph.color ?? FALLBACK_GRAPH_COLOR,
+                  }}
                   aria-hidden="true"
                 />
                 <span className="flex-1">{graph.title}</span>
