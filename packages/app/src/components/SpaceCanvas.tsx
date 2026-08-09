@@ -53,11 +53,6 @@ const PRESENTING_PADDING = 1.15;
  */
 const OVERVIEW_FIT = { padding: 0.2, maxZoom: 1 } as const;
 
-/** Camera moves are best-effort: interruption must not escape the render shell. */
-function containCameraAnimation(animation: Promise<unknown>): void {
-  void animation.catch(() => undefined);
-}
-
 /**
  * What the graph tells assistive technology it can do — minus the delete.
  *
@@ -120,7 +115,7 @@ function OverviewCamera({ presenting }: { presenting: boolean }) {
 
   useEffect(() => {
     if (presenting) return;
-    containCameraAnimation(fitView({ ...OVERVIEW_FIT, duration: 400 }));
+    void fitView({ ...OVERVIEW_FIT, duration: 400 });
   }, [presenting, fitView]);
 
   return null;
@@ -163,15 +158,13 @@ function PresentingCamera({ activeCardId }: { activeCardId: string | null }) {
     const from = getZoom();
     // A tenth of a stop either way is not a jump worth splitting.
     if (Math.abs(from - zoom) / zoom < 0.1) {
-      containCameraAnimation(setCenter(x, y, { zoom, duration: 500 }));
+      void setCenter(x, y, { zoom, duration: 500 });
       return;
     }
 
-    containCameraAnimation(
-      setCenter(x, y, { zoom: Math.min(from, zoom), duration: 400 }).then(() => {
-        if (!cancelled) containCameraAnimation(setCenter(x, y, { zoom, duration: 300 }));
-      }),
-    );
+    void setCenter(x, y, { zoom: Math.min(from, zoom), duration: 400 }).then(() => {
+      if (!cancelled) void setCenter(x, y, { zoom, duration: 300 });
+    });
     return () => {
       cancelled = true;
     };
