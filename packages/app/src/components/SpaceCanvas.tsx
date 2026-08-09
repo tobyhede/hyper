@@ -104,17 +104,27 @@ function isEmptyCanvasTarget(target: EventTarget | null): boolean {
 }
 
 /**
- * Frames the whole graph — the overview `fitBounds` gives (ADR 0027).
+ * Returns the camera from presenting to the whole-graph overview (ADR 0027).
  *
- * Fitting on mount is the whole of it: the graph area draws this canvas only
- * once a placement has produced an arrangement, so there is no not-yet-arranged
- * state to wait out here.
+ * Only the *return* — the initial fit belongs to React Flow's own `fitView`
+ * prop, which runs before first paint at the identity transform. This effect
+ * used to fire on mount as well, which put a second, animated fit *after* that
+ * one, so every load began at the viewport origin and flew the whole graph in.
+ * The mount case looked like it needed handling because the effect is the only
+ * fit written down here; the prop is the other one, and it already ran.
+ *
+ * `previouslyPresenting` is what separates the two: an effect keyed on
+ * `presenting` cannot otherwise tell "arrived at false" from "was always
+ * false".
  */
 function OverviewCamera({ presenting }: { presenting: boolean }) {
   const { fitView } = useReactFlow();
+  const previouslyPresenting = useRef(presenting);
 
   useEffect(() => {
-    if (presenting) return;
+    const wasPresenting = previouslyPresenting.current;
+    previouslyPresenting.current = presenting;
+    if (presenting || !wasPresenting) return;
     void fitView({ ...OVERVIEW_FIT, duration: 400 });
   }, [presenting, fitView]);
 

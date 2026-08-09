@@ -26,6 +26,56 @@ const seedGraphLessFilteredLayout = (page: Page) =>
     return { [cardId]: { x: 0, y: 0 } };
   });
 
+/**
+ * The overview arrives already framed, rather than flying in from the origin.
+ *
+ * Asserted on the transform rather than on a screenshot, because the bug is a
+ * *second* fit running after the first: React Flow's `fitView` prop fits before
+ * first paint, and an effect that also fits on mount animates away from the
+ * result the author is already looking at. Counting distinct transforms is what
+ * distinguishes "fitted once" from "fitted, then moved" — a final-state check
+ * passes either way, since both end up correctly framed.
+ */
+test('centres its first card without animating it in from the canvas origin', async ({ page }) => {
+  await page.addInitScript(() => {
+    const transforms: string[] = [];
+    Object.defineProperty(window, '__hyperOverviewTransforms', { value: transforms });
+
+    const observeViewport = () => {
+      const viewport = document.querySelector<HTMLElement>('.react-flow__viewport');
+      if (viewport === null) {
+        requestAnimationFrame(observeViewport);
+        return;
+      }
+
+      const record = () => {
+        const transform = viewport.style.transform;
+        if (transform !== '' && transforms.at(-1) !== transform) transforms.push(transform);
+      };
+      new MutationObserver(record).observe(viewport, {
+        attributes: true,
+        attributeFilter: ['style'],
+      });
+      record();
+    };
+
+    requestAnimationFrame(observeViewport);
+  });
+
+  await page.goto('/');
+  await expect(nodeByTitle(page, 'Card 1')).toBeVisible();
+  await settled(page);
+
+  const transforms = await page.evaluate(
+    () =>
+      (window as Window & { __hyperOverviewTransforms?: string[] }).__hyperOverviewTransforms ?? [],
+  );
+
+  // React Flow's prop-driven initial fit may replace its identity transform once.
+  // Intermediate transforms mean a second, animated fit ran after first paint.
+  expect(transforms.length).toBeLessThanOrEqual(2);
+});
+
 test('shows one card, and it is the only thing on screen', async ({ page }) => {
   await page.goto('/');
 
