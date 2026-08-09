@@ -50,6 +50,23 @@ owner discards its draft when that epoch changes; target-bound surfaces close,
 selection and Traversal history clear, and App composition focuses the canvas
 only after the replacement is complete.
 
+Replacement invalidation also applies to completed authoring work that is
+queued for re-entrant processing. Space Authoring may queue a completion when
+an observer attempts another completion while an earlier Edit is being
+installed and published. The queued value is no longer an Interaction draft,
+but it may still contain identities, placement, or completed Card values read
+from the Space that was current when it was queued.
+
+Each queued completion records the current `replacementEpoch`. When the queue
+is drained, Space Authoring discards any completion whose recorded epoch
+differs from the current epoch. It must not derive that completion against the
+replaced Space, even if some of its identities still happen to exist there.
+Discarding such work produces no Edit and does not report an expected user
+refusal. The accepted stored Space remains authoritative, and the next
+completion must be derived from that Space. The replacement contract therefore
+covers both unfinished Interaction drafts and completed work waiting for safe
+re-entrant ordering.
+
 The epoch is invalidation, not a registry. Space Authoring does not know which
 field, picker, popover, drag or armed control is open, and those surfaces do not
 register cancellation callbacks. Each owner compares or is keyed by the epoch
