@@ -64,6 +64,11 @@ interfaces.
 
 ## Implementation status
 
+The version 2 shape described by this implementation status is the built
+pre-0040/0041 implementation. ADRs 0040 and 0041 supersede it as the accepted
+first-public document contract: version 1, with Graphs nested under Layouts.
+Version 2 is not a compatibility format or a second public document shape.
+
 The first increment is built: version 2 public schemas require UUIDs, import
 schemas allow persistence-owned ids to be omitted, and `SpaceBackend`,
 `SpaceSession` and the memory adapter drive automatic whole-snapshot commits.
