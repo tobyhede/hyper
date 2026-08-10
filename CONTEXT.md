@@ -59,6 +59,12 @@ _Avoid_: selected Graph and current Graph as a second concept alongside this one
 **Authoring**:
 Interacting with a Space in a way that may change its authored Cards, Graphs, or Layouts. Authoring includes attempts that produce no change; only a successful authoring interaction produces an **Edit**. Navigating a View or Layout, activating a Graph, opening a Card, and presenting are not authoring because they do not change the Space.
 
+**Interaction draft**:
+A transient value owned by the surface conducting an unfinished authoring interaction — a title field's changed text, a picker's unconfirmed target, React Flow's connection or drag attempt, an armed destructive control's confirmation state. None of these is part of the Space or an Edit waiting to be persisted, so cancelling discards the draft and needs no compensating Edit.
+
+A completed Edit is authoritative local work rather than a draft, and a draft may outlive the Edit that opened it: Add Card and Add Graph complete before their follow-up title fields open, so cancelling that rename keeps the entity the Edit created. Replacing the working Space invalidates the drafts outstanding against the Space it replaced.
+_Avoid_: Draft Space, pending Edit, unsaved Edit, working copy.
+
 **Edit**:
 A validated transition from one Space to another that changes its authored Cards, Graphs, or Layouts. An attempted gesture is not itself an Edit: cancelling it, drawing an Edge the Graph already holds, or moving a Card away and back produces no Edit because the Space does not change.
 
