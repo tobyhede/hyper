@@ -8,8 +8,9 @@
  * why `GridStrategyOptions`, `LayoutStrategyPort` and `CardFileErrorKind` are here with
  * nothing importing them. Functions are named one at a time: a helper whose
  * only callers are inside the package stays in its module, behind the form
- * consumers do call — `cardIdsForGraphs` and `filterHandlesByGraph` behind the
- * plural forms, `outHandleId`/`inHandleId` behind `buildCardHandles` and
+ * consumers do call — `cardIdsForGraphs` behind `graphCardIds` and
+ * `filterHandlesByGraph` behind `filterHandlesByGraphs`,
+ * `outHandleId`/`inHandleId` behind `buildCardHandles` and
  * `buildGraphRenderEdges`, and `incomingEdges`/`graphEntryCards` behind
  * `graphStartCard`.
  *

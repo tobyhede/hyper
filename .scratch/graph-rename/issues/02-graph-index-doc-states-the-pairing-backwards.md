@@ -1,6 +1,7 @@
 # The graph index doc states the offered-name pairing backwards
 
-Status: ready-for-agent
+Status: resolved — both pairs are now named individually; the sentence's other
+two pairings were checked against the source and are correct as written.
 
 Surfaced by: review of PR #36, reported before merge and not fixed
 
@@ -45,5 +46,5 @@ State both pairs explicitly rather than generalising over them:
 
 ## Acceptance
 
-- The sentence names each hidden helper and its offered form individually.
-- No behavioural change; `pnpm verify` stays green.
+- [x] The sentence names each hidden helper and its offered form individually.
+- [x] No behavioural change; `pnpm verify` stays green.
