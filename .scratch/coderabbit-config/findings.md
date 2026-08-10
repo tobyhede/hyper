@@ -46,7 +46,14 @@ Lock files, `dist/`, `coverage/`, `node_modules/` and media are excluded by Code
 
 Sixteen entries, each capped at 20 000 characters by the schema. The selection principle: **encode the places where a competent general reviewer will confidently give the wrong advice**, not general good practice.
 
-The highest-value entry is the repo-wide one about **ADR 0041**. The Route → Graph rename is accepted and not built, so every `route`, `activeRoute`, `RouteEdge` and `projectRouteEdges` in the tree is correct-as-is. Without that instruction, "inconsistent naming" would be the dominant finding of every review for as long as the rename is pending. It also lists the retired vocabulary (`manifest`, `Arrangement`, `Walk`, shared `Draft`) and the fact that `path` means a filesystem/router path.
+The highest-value entry is the repo-wide one, and the first draft of it was **wrong** — worth recording, because the failure mode is general. It asserted that ADR 0041 was accepted and not built, so the retired names were expected in the tree. That was read from the `AGENTS.md` in a working tree sitting mid-merge; on `origin/main` the rename is built. CI caught it: `test/unit/current-domain-vocabulary.test.ts` scans every tracked file for the retired compounds, and the new `.coderabbit.yaml` was itself a tracked file containing them.
+
+Two lessons, both now in the config:
+
+- **Read the branch you are branching from, not the working tree you are standing in.** A config that describes the repository is source about source, and it goes stale the same way.
+- The guard test is itself the thing worth telling CodeRabbit about. The instruction now says ADR 0041 is built, names the three historical trees and `packages/app/src/router.tsx` as the only places the retired names survive, and points at the test — so a reviewer knows reintroduction fails the build, not the review.
+
+The entry also carries the opposite direction, which is the part a diff-only reader cannot know: **ADR 0040 is accepted and not built.** A Layout's `graphs` field is a visibility filter and the Space owns the Graph collection. Without that, the current shape reads as a bug against an ADR CodeRabbit can see in `docs/adr/`.
 
 The rest are drawn straight from the AGENTS.md gotchas that cost real debugging time:
 
@@ -119,7 +126,11 @@ The 42 ADRs are deliberately **not** loaded wholesale — 244 KB of decision rec
 
 - Parses with `yaml@2.9.0`.
 - Structurally valid against `schema.v2.json` — every key known, every enum value legal, `tone_instructions` within its 250-character cap.
-- `prettier --check .coderabbit.yaml` passes, so it does not break `pnpm format:check`.
+- `pnpm verify` passes: exit 0, 85 test files, 853 tests. That includes `format:check` over the YAML and `test/unit/current-domain-vocabulary.test.ts` over its contents.
+
+`pnpm e2e` was not run. This changes no application code, no fixture and no test — the only checks that read either file are Prettier and the vocabulary scan, both covered by `verify`.
+
+The first version of this was pushed without running `verify`, on the reasoning that a YAML file and a Markdown note change nothing the test suite reads. That reasoning was wrong in a way worth keeping: a repository-wide guard scans **tracked files**, so any new tracked file is a test input, whatever its extension.
 
 ## Open questions
 

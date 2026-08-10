@@ -68,19 +68,30 @@ reviews:
     - '!migrations/**/*.d.ts'
 
   path_instructions:
-    # Repo-wide: the rename in flight is the single biggest source of false
-    # findings a general reviewer will produce here.
+    # Repo-wide: which vocabulary is live, and which accepted ADR the code has
+    # deliberately not caught up with. Both directions produce confident wrong
+    # findings from a reviewer reading only the diff.
     - path: '**/*'
       instructions: >-
-        ADR 0041 renames Route to Graph. It is accepted and NOT built: existing
-        `route`, `routes`, `activeRoute`, `RouteEdge`, `projectRouteEdges` and
-        `LayoutGraph` names are expected and correct. Do not report them as
-        inconsistencies, and do not suggest aliases, unless the pull request
-        states it is implementing ADR 0041. `path` identifiers are filesystem
-        paths, TanStack Router URLs or React Flow's `edge-path` class — never a
-        domain concept. Retired vocabulary that must not be reintroduced:
-        `manifest`, `Arrangement`, `Walk`, a shared `Draft`, a `cards` array in
-        the space file, an `edges` array beside Routes/Graphs.
+        ADR 0041 is BUILT. The live domain vocabulary is Graph, Graph
+        navigation and Traversal history. The names it retired — Route and
+        Walk, in any compound — survive only in the historical trees
+        `docs/adr/`, `docs/superpowers/` and `.scratch/`, and in TanStack
+        Router's own vocabulary in `packages/app/src/router.tsx`.
+        `test/unit/current-domain-vocabulary.test.ts` scans every tracked file
+        for them, so reintroducing one fails the build rather than the review.
+        Qualified senses are kept and are not findings: Hono handles a request
+        route, ELK produces routed geometry, a URL has one, and `path`
+        identifiers are filesystem paths, router URLs or React Flow's
+        `edge-path` class. Other retired vocabulary: `manifest`, `Arrangement`,
+        a shared `Draft`, a `cards` array in the space file, an `edges` array
+        beside Graphs.
+
+        ADR 0040 is accepted and NOT built. A Layout's `graphs` field is
+        currently a visibility filter and the Space owns the Graph collection;
+        Layout-owned Card membership and nested Graphs do not exist yet. Do not
+        review code as though they do, and do not report the current shape as a
+        bug.
 
     - path: 'packages/core/**'
       instructions: >-
@@ -116,7 +127,7 @@ reviews:
         `opacity` or `visibility`. ELK port constraints are `FIXED_SIDE`, not
         `FIXED_ORDER` (clockwise ordering crosses every edge at a shared card).
         ELK port ids are namespaced `<cardId>##<handleId>`; a bare handle id
-        mislays even single-route graphs. Handle ids stay `<routeId>::out` /
+        mislays even a single-Graph graph. Handle ids stay `<graphId>::out` /
         `::in` — a per-side counter breaks React Flow's own resolution (#008).
         Do not tune global ELK options against the fixture screenshot.
 
@@ -154,10 +165,14 @@ reviews:
         when a newly drawn Edge should become traversable. In `space-authoring`,
         `session.submit` is deliberately the first statement of the install
         shell and the only fallible one; do not reorder it or re-check the
-        Route/Layout inside that window. The install gate counts depth and
+        Graph/Layout inside that window. The install gate counts depth and
         publishes in the `finally` — a boolean flag republishes part-way state.
         `beforeunload` is registered only while persistence is unsettled and
         calls `preventDefault()` alone; `event.returnValue` is deprecated.
+        `resolveView` is the one seam answering the subject and the Active
+        Graph, and both fallbacks live there; Navigation takes that answer as
+        an argument rather than reaching for the Space's first Graph, because
+        two places answering it would disagree the moment a Layout filters.
         There is no Save action, and card markdown stays behind DOMPurify.
 
     - path: '{,packages/*/}*.config.ts'
@@ -278,10 +293,13 @@ reviews:
         mode: 'warning'
         instructions: >-
           New identifiers and prose use the vocabulary in CONTEXT.md. Retired
-          terms must not reappear: `manifest`, `Arrangement`, `Walk`, a shared
-          `Draft`, a `cards` array in the space file, or an `edges` array beside
-          Routes/Graphs. A new domain term, or a renamed one, needs a CONTEXT.md
-          entry in the same pull request.
+          terms must not reappear: the names ADR 0041 retired (Route and Walk,
+          in any compound), `manifest`, `Arrangement`, a shared `Draft`, a
+          `cards` array in the space file, or an `edges` array beside Graphs.
+          `test/unit/current-domain-vocabulary.test.ts` already enforces the
+          first of those over every tracked file; this check covers the rest. A
+          new domain term, or a renamed one, needs a CONTEXT.md entry in the
+          same pull request.
 
   tools:
     # ESLint is skipped for this repo whatever this says: the flat config uses
