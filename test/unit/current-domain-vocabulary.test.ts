@@ -81,6 +81,26 @@ const RETIRED_COMPOUND = new RegExp(
  */
 const RETIRED_BARE = new RegExp(`\\b(?:${ENTITY}|${TRAVERSAL})\\b`);
 
+/**
+ * The retired name's *initial*, bound over a Graph collection. A single-letter
+ * callback binding is below what the two patterns above can read — they need a
+ * compound or a whole word — so `space.graphs.map((r) => r.id)` survived the
+ * rename in three places with the guard green, and the last of them sat twelve
+ * lines from the first.
+ *
+ * A bare ban on the letter is what makes this look unaffordable: `r` is
+ * legitimately a result, a row, a request or a repository, and the deny-list
+ * that follows would never stop growing. Requiring the Graph collection on the
+ * same line is what removes that cost entirely — the repo's convention is the
+ * domain initial (`(c)` for card, `(l)` for layout, `(e)` for edge), so a
+ * binding introduced over `graphs` has exactly one correct letter and the
+ * retired name's is not it. This is the answer to the open question in
+ * `.scratch/graph-rename/issues/03-...`: worth reading, once scoped this way.
+ */
+const RETIRED_INITIAL_BINDING = new RegExp(
+  `\\.graphs\\b.*\\(\\s*${ENTITY[0]?.toLowerCase() ?? ''}\\s*\\)\\s*=>`,
+);
+
 const isImplementationSource = (file: string): boolean =>
   file.startsWith('src/') || /^packages\/[^/]+\/src\//.test(file);
 
@@ -166,6 +186,17 @@ describe('the retired domain vocabulary is gone from tracked files', () => {
     expect(found).toEqual([]);
   });
 
+  it('finds no retired initial bound over a Graph collection', () => {
+    const found = scanned.filter(isImplementationSource).flatMap((file) => {
+      const source = readTracked(file);
+      return source === null
+        ? []
+        : hits(source, RETIRED_INITIAL_BINDING).map((hit) => `${file}:${hit}`);
+    });
+
+    expect(found).toEqual([]);
+  });
+
   it('keeps no exemption that has stopped earning itself', () => {
     // An exemption outlives its reason silently, and the scan then covers less
     // than it reads as covering. Each one has to still be doing something.
@@ -203,6 +234,39 @@ describe('the vocabulary that guard reads', () => {
     }
     expect(RETIRED_BARE.test(`export type ${ENTITY} = { id: string };`)).toBe(true);
     expect(RETIRED_BARE.test(`export interface ${TRAVERSAL} { cards: string[] }`)).toBe(true);
+  });
+
+  it('reports the retired initial only where a Graph collection introduces it', () => {
+    const initial = ENTITY[0]?.toLowerCase() ?? '';
+    const bound = [
+      `for (const id of duplicates(space.graphs.map((${initial}) => ${initial}.id))) {`,
+      `const graphIds = new Set(space.graphs.map((${initial}) => ${initial}.id));`,
+      `graphsById: new Map(input.graphs.map((${initial}) => [${initial}.id, ${initial}])),`,
+    ];
+
+    for (const line of bound) {
+      expect(RETIRED_INITIAL_BINDING.test(line), line).toBe(true);
+    }
+  });
+
+  it('stays silent on the letter in every sense that is not a Graph', () => {
+    const initial = ENTITY[0]?.toLowerCase() ?? '';
+    const kept = [
+      // The domain initial that is correct over a Graph collection.
+      `const graphIds = new Set(space.graphs.map((g) => g.id));`,
+      `space.graphs.map((graph) => graph.id)`,
+      // The letter, legitimately, over anything that is not a Graph.
+      `const rows = result.rows.map((${initial}) => ${initial}.id);`,
+      `responses.map((${initial}) => ${initial}.status)`,
+      `repositories.forEach((${initial}) => ${initial}.close());`,
+      // The collection without a binding, and a binding without the collection.
+      `const all = space.graphs.map((graph) => graph.id);`,
+      `const ids = cards.map((${initial}) => ${initial}.id);`,
+    ];
+
+    for (const line of kept) {
+      expect(RETIRED_INITIAL_BINDING.test(line), line).toBe(false);
+    }
   });
 
   it('stays silent on the qualified senses the ADR keeps', () => {

@@ -64,7 +64,7 @@ either.
 ## Constraint that must survive
 
 One place answers which Graphs a view shows and which opens active —
-`resolveVisibleGraphs` in `packages/app/src/view.ts` (ADR 0026). A widened guard
+`resolveGraphs` in `packages/app/src/view.ts:83` (ADR 0026). A widened guard
 reads that answer; it does not compute a second one, and no store learns to
 reach for a Space-level Graph collection.
 

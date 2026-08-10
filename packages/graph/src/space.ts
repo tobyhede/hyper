@@ -160,7 +160,7 @@ function buildSpace(input: {
     layouts,
     defaultView: input.defaultView,
     cardsById: new Map(cards.map((card) => [card.id, card])),
-    graphsById: new Map(input.graphs.map((r) => [r.id, r])),
+    graphsById: new Map(input.graphs.map((graph) => [graph.id, graph])),
     layoutsById: new Map(layouts.map((l) => [l.id, l])),
   };
   return { ok: true, space };

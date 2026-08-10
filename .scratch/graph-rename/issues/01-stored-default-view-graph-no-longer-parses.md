@@ -45,6 +45,15 @@ not open. Three postures, in the order they cost:
 1. **Nothing.** Confirm no reachable stored document names `"graph"` and record
    that as the reason. Cheapest, and probably correct — but it is a claim about
    data, so it needs a query against the live database, not a grep.
+
+   **A database query does not discharge it on its own.** The other exposure
+   named above is a hand-authored `space.json`, and `importSpaceFileSchema`
+   (`packages/core/src/schema.ts:287`) extends `spaceFileSchema` overriding only
+   `id`, `graphs` and `layouts` — not `defaultView` — so the CLI's
+   `safeParse` in `src/import/read-single-space.ts:109` rejects `"graph"`
+   identically. No query against stored rows can say anything about a file
+   somebody imports next week. Posture 1 has to answer both, or narrow itself to
+   the database and leave the import path to posture 2.
 2. **A better failure.** Keep the strict schema and make the rejection legible:
    name the superseded value and its replacement in the parse error, so the
    failure reads as "this document predates ADR 0041" rather than as a
@@ -64,5 +73,6 @@ built-in view id. Whatever is chosen, the resolution chain stays where it is —
 ## Acceptance
 
 - A recorded answer, including how the live-database claim was checked if
-  posture 1 is taken.
+  posture 1 is taken, and what it says about a hand-authored file imported
+  later.
 - If posture 2 or 3, coverage for a document naming the superseded value.
