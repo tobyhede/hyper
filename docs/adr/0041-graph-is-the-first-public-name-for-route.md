@@ -19,17 +19,30 @@ Graph, not the history chosen through it. **Graph navigation** is the transient
 working interaction and **Traversal history** is the ordered Cards actually
 visited. `Walk` is retired rather than retained as another name for either.
 
-This ADR changes vocabulary only. It does not change any invariant recorded by
-ADR 0040: every Graph belongs to exactly one Layout, every Edge endpoint names
+This ADR decides vocabulary. Every invariant ADR 0040 records survives it
+unchanged: every Graph belongs to exactly one Layout, every Edge endpoint names
 a Card in that Layout, a Layout owns a non-empty ordered Graph collection and
 always resolves one Active Graph, creating a Layout creates its initial empty
 Active Graph in the same Edit, and Graph management cannot delete the final
 Graph.
 
+That is not the same as leaving the document contract untouched. The nesting of
+Graphs under Layouts, the version number and the refusal of a compatibility path
+are ADR 0040's decisions, restated below in the renamed vocabulary rather than
+made here. The one contract clause this ADR adds is the refusal of a `route`-key
+alias, which only a rename could create the need for.
+
 ## The first-public document
 
-The one public document is version 1. Graphs are nested values under their
-owning Layout; no Space-level `routes` or `graphs` collection exists:
+The one public document is version 1. The number restarts rather than continues.
+The prototype opened at version 1 and became version 2 when persistence identity
+moved to UUIDs (ADR 0030), so both earlier numbers named disposable pre-release
+shapes and neither was ever public. Version 1 is therefore free to name the
+first public contract, and a reader meeting 1 after 2 is seeing a restart rather
+than a typo.
+
+Graphs are nested values under their owning Layout; no Space-level `routes` or
+`graphs` collection exists:
 
 ```json
 {
