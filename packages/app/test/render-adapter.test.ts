@@ -332,6 +332,24 @@ describe('render adapter', () => {
     });
   });
 
+  it('keeps the Cards on screen when a connection completes with no fresh projection', () => {
+    // A Space change starts a replacement arrangement, so the render path has no
+    // projection to hand over — while the canvas deliberately keeps drawing the
+    // one already on screen, which is what makes it still connectable. Nothing
+    // fresh to merge means keep what is live: reconciling against an empty list
+    // would blank the canvas until the strategy resolved.
+    const spy = authoringSpy();
+    const store = createRenderAdapter(spy.authoring);
+    spy.attach(store);
+
+    store.getState().syncProjection(PROJECTED, []);
+    expect(
+      store.getState().connectCards(uuidSchema.parse(CARD_A), uuidSchema.parse(CARD_B), null),
+    ).toBe(true);
+
+    expect(store.getState().projection?.nodes.map((node) => node.id)).toEqual([CARD_A, CARD_B]);
+  });
+
   it('captures every projected Card when an Algorithmic View converts', () => {
     vi.spyOn(crypto, 'randomUUID').mockReturnValue(
       LAYOUT_ID as ReturnType<typeof crypto.randomUUID>,

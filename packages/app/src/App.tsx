@@ -227,15 +227,17 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
         // Issue 04 owns Graph minting. An existing Graph can be edited from every
         // resolved renderer; an Algorithmic View converts using exactly the live
         // Card positions the author connected between (ADR 0025).
-        // Empty only before a strategy resolves, and the store refuses a
-        // connection while its own projection is null — which is the same
-        // condition — so `reconcile` never sees the empty list.
+        // Null while a replacement arrangement resolves. The canvas keeps drawing
+        // the one on screen through that window — deliberately, so a gesture is
+        // never interrupted — so a connection is reachable with no fresh
+        // projection to hand over, and the store keeps its live nodes rather than
+        // reconciling against nothing.
         const completed = useRenderAdapter
           .getState()
           .connectCards(
             uuidSchema.parse(connection.source),
             uuidSchema.parse(connection.target),
-            projected?.nodes ?? [],
+            projected?.nodes ?? null,
           );
         if (completed) {
           completedConnectionTarget.current = connection.target;
