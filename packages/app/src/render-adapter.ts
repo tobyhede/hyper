@@ -310,11 +310,11 @@ export function createRenderAdapter(authoring: SpaceAuthoring): RenderAdapter {
   // The unsubscribe is deliberately dropped: this store's lifetime is the
   // composition's, and `authoring.dispose` clears the listener set that holds
   // this. Give the adapter its own teardown if it ever outlives one Authoring.
-  let opening = authoring.getState().opening;
+  let replacementEpoch = authoring.getState().replacementEpoch;
   authoring.subscribe(() => {
-    const nextOpening = authoring.getState().opening;
-    if (nextOpening === opening) return;
-    opening = nextOpening;
+    const nextEpoch = authoring.getState().replacementEpoch;
+    if (nextEpoch === replacementEpoch) return;
+    replacementEpoch = nextEpoch;
     adapter.setState({
       projection: null,
       dragOrigins: new Map(),
