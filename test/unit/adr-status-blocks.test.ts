@@ -94,39 +94,49 @@ const readAdrs = (): ReadonlyMap<string, StatusBlock> =>
  * 0099` is a dead end for a reader, and an unreachable target is exactly the
  * shape a typo takes.
  *
- * A rejected ADR is exempt from reciprocity at both ends. Its claims never took
- * effect, so it has nothing to announce on the ADR it proposed to refine, and a
- * live decision must not point forward at a discarded one — so a `Refined by:`
- * naming a rejected ADR is a fault rather than a link to complete. ADR 0016 is
- * the tree's only rejected ADR: the part of it that survived is carried by ADR
- * 0019, which ADR 0010 already names.
+ * **A rejected ADR is outside the guard as a source**, decided before any of its
+ * targets is resolved. Its claims never took effect, so it announces nothing on
+ * the ADR it proposed to refine and nobody navigates outward from it — which
+ * makes policing its reference list while exempting its reciprocity half a rule.
+ *
+ * As a *target* it is treated the other way round, and the asymmetry is the
+ * point: a `Refines:` naming it asks nothing (there is no live block to answer
+ * with), while a `Refined by:` naming it is a fault, because that is a live
+ * decision pointing a reader forward at a discarded one.
+ *
+ * ADR 0016 is the tree's only rejected ADR: the part of it that survived is
+ * carried by ADR 0019, which ADR 0010 already names.
  */
 const refinesFaults = (adrs: ReadonlyMap<string, StatusBlock>): string[] =>
   [...adrs].flatMap(([number, adr]) =>
-    refs(adr.fields.get('Refines')).flatMap((target) => {
-      const refined = adrs.get(target);
-      if (refined === undefined) return [`${number} Refines ${target}, which is not an ADR`];
-      if (adr.status === 'rejected' || refined.status === 'rejected') return [];
-      return refs(refined.fields.get('Refined by')).includes(number)
-        ? []
-        : [`${number} Refines ${target}, but ${target} does not answer`];
-    }),
+    adr.status === 'rejected'
+      ? []
+      : refs(adr.fields.get('Refines')).flatMap((target) => {
+          const refined = adrs.get(target);
+          if (refined === undefined) return [`${number} Refines ${target}, which is not an ADR`];
+          if (refined.status === 'rejected') return [];
+          return refs(refined.fields.get('Refined by')).includes(number)
+            ? []
+            : [`${number} Refines ${target}, but ${target} does not answer`];
+        }),
   );
 
 const refinedByFaults = (adrs: ReadonlyMap<string, StatusBlock>): string[] =>
   [...adrs].flatMap(([number, adr]) =>
-    refs(adr.fields.get('Refined by')).flatMap((target) => {
-      const refiner = adrs.get(target);
-      if (refiner === undefined) {
-        return [`${number} is 'Refined by' ${target}, which is not an ADR`];
-      }
-      if (refiner.status === 'rejected') {
-        return [`${number} is 'Refined by' ${target}, which is rejected`];
-      }
-      return refs(refiner.fields.get('Refines')).includes(number)
-        ? []
-        : [`${number} is 'Refined by' ${target}, but ${target} does not answer`];
-    }),
+    adr.status === 'rejected'
+      ? []
+      : refs(adr.fields.get('Refined by')).flatMap((target) => {
+          const refiner = adrs.get(target);
+          if (refiner === undefined) {
+            return [`${number} is 'Refined by' ${target}, which is not an ADR`];
+          }
+          if (refiner.status === 'rejected') {
+            return [`${number} is 'Refined by' ${target}, which is rejected`];
+          }
+          return refs(refiner.fields.get('Refines')).includes(number)
+            ? []
+            : [`${number} is 'Refined by' ${target}, but ${target} does not answer`];
+        }),
   );
 
 describe('ADR status blocks point both ways', () => {
@@ -238,6 +248,19 @@ describe('the status block that guard reads', () => {
       '0010': ['Status: accepted', 'Refined by: 0019'],
       '0016': ['Status: rejected', 'Refines: 0010', 'Partly carried by: 0019'],
       '0019': ['Status: accepted', 'Refines: 0010'],
+    });
+
+    expect(refinesFaults(adrs)).toEqual([]);
+    expect(refinedByFaults(adrs)).toEqual([]);
+  });
+
+  it('asks nothing of a rejected ADR, even when its own references are broken', () => {
+    // The exemption is decided before any target is resolved. A discarded
+    // document is not a live navigation path, so a reference nothing follows is
+    // not a fault anyone is going to repair — and exempting it from reciprocity
+    // while still policing its reference list would be half a rule.
+    const adrs = synthetic({
+      '0016': ['Status: rejected', 'Refines: 0099', 'Refined by: 0098'],
     });
 
     expect(refinesFaults(adrs)).toEqual([]);
