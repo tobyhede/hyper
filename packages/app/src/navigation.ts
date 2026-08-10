@@ -1,7 +1,13 @@
 import type { BuiltInViewId, CardId, GraphId } from '@project/core';
 import { getCard, getGraph, outgoingEdges, graphStartCard, type Space } from '@project/graph';
 import { createObservableState, type ObserverErrorReporter } from '@project/persistence';
-import { DEFAULT_VIEW_ID, resolveView, type RendererSelection, type ResolvedView } from './view';
+import {
+  DEFAULT_VIEW_ID,
+  resolveView,
+  viewShowsGraph,
+  type RendererSelection,
+  type ResolvedView,
+} from './view';
 
 export interface Move {
   readonly cardId: CardId;
@@ -182,11 +188,40 @@ export function createNavigation(
     openFresh: (selection) => {
       observable.publish(openedState(selection, resolveView(currentSpace(), selection)));
     },
+    // Resolve first so navigation can never name a renderer the current Space
+    // does not hold. Unlike explicit selection, adopting the Layout an Edit just
+    // created is not navigation and must not interrupt a traversal.
+    //
+    // The refusal below is `activateGraph`'s, from the other side. What either
+    // one protects is the *pair* — the selected renderer and the Active Graph —
+    // and there is no third writer of it: `openedState` and `selectRenderer`
+    // resolve both together, `activateGraph` writes the Graph, and this writes
+    // the renderer. Leaving one of the two writers unguarded is the asymmetry
+    // this guard was added to close, one level along, and the state it admits is
+    // the same dead Edit: an Active Graph the renderer does not show rides into
+    // `updatePositionedLayout` as the Layout's `activeGraph`, which intake
+    // rejects outright.
+    //
+    // **Re-resolving instead of refusing was the wrong repair.** Falling back to
+    // the adopted view's own Active Graph moves the emphasis without being
+    // asked, and this call is the one that must not interrupt a traversal: the
+    // history being presented belongs to the Graph that was active, so silently
+    // naming another strands `moves()` on Edges out of Cards nothing is
+    // presenting. Refusing leaves the traversal exactly as it was.
+    //
+    // Its only caller is Edit completion, which cannot reach the refusal: the
+    // Layout it hands over names Navigation's own Active Graph as `activeGraph`,
+    // and the snapshot carrying it passed domain intake — which is precisely the
+    // check that a named `activeGraph` is one of the Layout's Graphs. An absent
+    // Active Graph names nothing and is exempt.
     continueInRenderer: (selection) => {
-      // Resolve first so navigation can never name a renderer the current Space
-      // does not hold. Unlike explicit selection, adopting the Layout an Edit
-      // just created is not navigation and must not interrupt a traversal.
-      resolveView(currentSpace(), selection);
+      const state = observable.getState();
+      const view = resolveView(currentSpace(), selection);
+      if (state.activeGraphId !== null && !viewShowsGraph(view, state.activeGraphId)) {
+        throw new Error(
+          `The adopted renderer does not show the active Graph ${state.activeGraphId}.`,
+        );
+      }
       setState({
         selectedRenderer: selection,
         ...(selection.kind === 'view' ? { selectedView: selection.view } : {}),
@@ -197,23 +232,28 @@ export function createNavigation(
     // (ADR 0028), so it can neither mint the Graph it is handed nor widen a
     // filter to admit one.
     //
-    // Two refusals, one question, because the Space is not the set this names
-    // from. A Graph the Space does not hold strands `moves()`, `present()` and
-    // the emphasis on a lookup answering nothing. A Graph the Space *does* hold
-    // but the resolved view filters out is the quieter failure: every lookup
-    // still answers, so nothing is stranded, and the id instead rides into the
-    // next completed Edit, where `updatePositionedLayout` writes it as the
-    // Layout's `activeGraph` — the one combination intake rejects outright
-    // ("opens active on graph X, which it does not show"). That Edit is dead on
-    // arrival: a permanent `invalid-snapshot`, neither a conflict nor a retry,
-    // reported at the commit rather than at the gesture that caused it.
+    // **The harm is a dead Edit, not a stranded read.** A Graph the resolved
+    // view filters out still answers every lookup, so nothing on screen breaks;
+    // the id rides into the next completed Edit instead, where
+    // `updatePositionedLayout` writes it as the Layout's `activeGraph` — the one
+    // combination intake rejects outright ("opens active on graph X, which it
+    // does not show"). That Edit is dead on arrival: a permanent
+    // `invalid-snapshot`, neither a conflict nor a retry, reported at the commit
+    // rather than at the gesture that caused it. This is the authoritative copy
+    // of that reasoning; the tests point at it rather than restating it.
+    //
+    // **The second refusal subsumes the first, and they are still both here.**
+    // `visibleGraphIds` is either the Layout's filter or every Graph in the
+    // Space, and intake validates that a filter names only Graphs the Space
+    // holds — so the visible set is a subset and a Graph that does not exist
+    // cannot be in it. What the first refusal adds is the sentence: "does not
+    // exist" and "does not show" are different mistakes by the caller, and one
+    // message covering both would name neither. It is a discriminator, not a
+    // case the second one misses.
     //
     // The visible set is read off `resolveView` rather than recomputed here:
     // one place answers which Graphs a view draws (ADR 0026), and two would
-    // disagree the moment a Layout filters. An Edit that mints the first Graph
-    // submits it before activating it, so by the time this reads, the Graph is
-    // in the working Space *and* in the Layout's filter — widening it is the
-    // same write that added the Graph.
+    // disagree the moment a Layout filters.
     //
     // Both refusals throw, and deliberately alike. Neither is reachable through
     // the product — `GraphSelector` is fed the visible Graphs — so each is a
@@ -223,13 +263,22 @@ export function createNavigation(
     // the call that made it, which is the whole point of moving this refusal
     // off the commit. Nothing is half-applied either way: both checks sit above
     // `publish`, so Navigation is left exactly as `selectRenderer` leaves it.
+    //
+    // **A minted Graph passes by ordering, not by an exemption.** Edit
+    // completion submits, *then* adopts the Layout it wrote, and only then
+    // activates — so what this resolves is that Layout rather than the renderer
+    // the Edit began in. Both shapes admit the minted Graph, for different
+    // reasons: a Layout converted from an Algorithmic View carries no filter at
+    // all and therefore shows every Graph in the Space, while an existing
+    // Layout that does filter was widened by `updatePositionedLayout` in the
+    // same write that added the Graph.
     activateGraph: (graphId) => {
       const state = observable.getState();
       const space = currentSpace();
       if (getGraph(space, graphId) === undefined) {
         throw new Error(`The Graph ${graphId} does not exist.`);
       }
-      if (!resolveView(space, state.selectedRenderer).visibleGraphIds.includes(graphId)) {
+      if (!viewShowsGraph(resolveView(space, state.selectedRenderer), graphId)) {
         throw new Error(`The selected renderer does not show the Graph ${graphId}.`);
       }
       observable.publish({

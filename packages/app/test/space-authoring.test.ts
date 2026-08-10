@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { uuidSchema, type GraphId, type SpaceSnapshot } from '@project/core';
+import { uuidSchema, type SpaceSnapshot } from '@project/core';
 import { loadSpaceSnapshot, Placement } from '@project/graph';
 import {
   MemorySpaceBackend,
@@ -531,6 +531,66 @@ describe('Space Authoring', () => {
       activeGraph: MINTED_GRAPH_ID,
     });
     expect(navigation.getState().activeGraphId).toBe(MINTED_GRAPH_ID);
+  });
+
+  /**
+   * The other half of the minted-Graph ordering, and the only half where the two
+   * renderers differ. Converting an Algorithmic View replaces the selection, so
+   * the renderer the Edit began in and the one it produced are different values
+   * — where an Edit written back into a selected Layout leaves them sharing an
+   * id, and every question about which one was asked answers the same.
+   *
+   * So this is where activating before adopting is visible at all: the guard
+   * asked the outgoing View, whose answer is every Graph in the Space for want
+   * of a filter, and passed for a reason that had nothing to do with the Edit.
+   * What is pinned is the renderer Navigation is on *at the moment of
+   * activation*, and that the Layout the conversion wrote carries no filter of
+   * its own — which is what makes the minted Graph one it shows.
+   */
+  it('activates the minted Graph against the Layout the Edit created, not the View it converted', () => {
+    vi.spyOn(crypto, 'randomUUID')
+      .mockReturnValueOnce(MINTED_GRAPH_ID as ReturnType<typeof crypto.randomUUID>)
+      .mockReturnValue(LAYOUT_ID as ReturnType<typeof crypto.randomUUID>);
+    const graphLess: SpaceSnapshot = {
+      id: SPACE_ID,
+      document: { version: 2, title: 'New space', graphs: [] },
+      cards: [{ id: CARD_A, document: { title: 'Card 1', kind: 'markdown', body: '' } }],
+    };
+    const loaded = { snapshot: graphLess, revision: 0n, exportedRevision: null };
+    const session = openSpaceSession(new MemorySpaceBackend([loaded]), loaded);
+    const currentSpace = () => {
+      const result = loadSpaceSnapshot(session.getState().working);
+      if (!result.ok) throw new Error(result.errors.map((error) => error.message).join('; '));
+      return result.space;
+    };
+    const real = createNavigation(currentSpace, { kind: 'view', view: 'flow' });
+    const activatedUnder: RendererSelection[] = [];
+    const navigation: Navigation = {
+      ...real,
+      activateGraph: (graphId) => {
+        activatedUnder.push(real.getState().selectedRenderer);
+        real.activateGraph(graphId);
+      },
+    };
+    const authoring = createSpaceAuthoring({
+      session,
+      navigation,
+      initialPlacement: Placement.fromEntries([[CARD_A, { x: 10, y: 20 }]]),
+    });
+
+    expect(authoring.complete({ kind: 'connected-cards', from: CARD_A, to: CARD_A })).toEqual({
+      kind: 'completed',
+    });
+
+    expect(activatedUnder).toEqual([{ kind: 'layout', layoutId: LAYOUT_ID }]);
+    expect(real.getState()).toMatchObject({
+      selectedRenderer: { kind: 'layout', layoutId: LAYOUT_ID },
+      activeGraphId: MINTED_GRAPH_ID,
+    });
+    expect(session.getState().working.document.layouts?.[0]).not.toHaveProperty('graphs');
+    expect(
+      resolveView(currentSpace(), { kind: 'layout', layoutId: LAYOUT_ID }).visibleGraphIds,
+    ).toEqual([MINTED_GRAPH_ID]);
   });
 
   it('creates the Card, first Graph, Edge and Layout as one Edit with internal identities', () => {
@@ -1215,36 +1275,27 @@ describe('Space Authoring', () => {
 
   /**
    * The window's other collaborator. Navigation is written last and in two
-   * calls, so a throw between them leaves it half-applied — the minted Graph
-   * activated, the Layout that Edit created not yet adopted — and the
-   * publication is the only way anything finds out.
+   * calls, so a throw between them leaves it half-applied — the Layout this Edit
+   * created adopted, the Graph it minted not yet activated — and the publication
+   * is the only way anything finds out.
    *
    * The fault is injected because the real Navigation has no reachable throw
    * path here: both calls resolve against the snapshot `submit` installed a line
-   * earlier, and that snapshot passed domain intake before the window opened.
-   * What is pinned is that the guarantee does not depend on that argument
-   * staying true.
+   * earlier, that snapshot passed domain intake before the window opened, and
+   * the Layout it carries shows the minted Graph. What is pinned is that the
+   * guarantee does not depend on that argument staying true.
+   *
+   * It is injected into the *second* call because that is the one a throw can
+   * leave a half-applied Navigation behind: a converted View means the adopted
+   * renderer is visibly not the one the Edit began in.
    */
-  it('publishes what the collaborators hold when adopting the new renderer throws', () => {
-    vi.spyOn(crypto, 'randomUUID').mockReturnValue(
-      MINTED_GRAPH_ID as ReturnType<typeof crypto.randomUUID>,
-    );
+  it('publishes what the collaborators hold when activating the minted Graph throws', () => {
+    vi.spyOn(crypto, 'randomUUID')
+      .mockReturnValueOnce(MINTED_GRAPH_ID as ReturnType<typeof crypto.randomUUID>)
+      .mockReturnValue(LAYOUT_ID as ReturnType<typeof crypto.randomUUID>);
     const graphLess: SpaceSnapshot = {
       id: SPACE_ID,
-      document: {
-        version: 2,
-        title: 'New space',
-        graphs: [],
-        layouts: [
-          {
-            id: LAYOUT_ID,
-            title: 'Layout 1',
-            kind: 'positioned',
-            positions: { [CARD_A]: { x: 10, y: 20 } },
-          },
-        ],
-        defaultView: LAYOUT_ID,
-      },
+      document: { version: 2, title: 'New space', graphs: [] },
       cards: [{ id: CARD_A, document: { title: 'Card 1', kind: 'markdown', body: '' } }],
     };
     const loaded = { snapshot: graphLess, revision: 0n, exportedRevision: null };
@@ -1254,11 +1305,11 @@ describe('Space Authoring', () => {
       if (!result.ok) throw new Error(result.errors.map((error) => error.message).join('; '));
       return result.space;
     };
-    const real = createNavigation(currentSpace, { kind: 'layout', layoutId: LAYOUT_ID });
+    const real = createNavigation(currentSpace, { kind: 'view', view: 'flow' });
     const navigation: Navigation = {
       ...real,
-      continueInRenderer: () => {
-        throw new Error('renderer failed');
+      activateGraph: () => {
+        throw new Error('activation failed');
       },
     };
     const authoring = createSpaceAuthoring({
@@ -1266,17 +1317,24 @@ describe('Space Authoring', () => {
       navigation,
       initialPlacement: Placement.fromEntries([[CARD_A, { x: 10, y: 20 }]]),
     });
-    const published: (GraphId | null)[] = [];
-    authoring.subscribe(() => published.push(authoring.getState().navigation.activeGraphId));
+    const published: NavigationState[] = [];
+    authoring.subscribe(() => published.push(authoring.getState().navigation));
 
     expect(() => authoring.complete({ kind: 'connected-cards', from: CARD_A, to: CARD_A })).toThrow(
-      'renderer failed',
+      'activation failed',
     );
 
     expect(session.getState().working.document.graphs).toHaveLength(1);
-    expect(real.getState().activeGraphId).toBe(MINTED_GRAPH_ID);
     expect(authoring.getState().session.working.document.graphs).toHaveLength(1);
-    expect(published).toEqual([MINTED_GRAPH_ID]);
+    expect(real.getState()).toMatchObject({
+      selectedRenderer: { kind: 'layout', layoutId: LAYOUT_ID },
+      activeGraphId: null,
+    });
+    expect(published).toHaveLength(1);
+    expect(published[0]).toMatchObject({
+      selectedRenderer: { kind: 'layout', layoutId: LAYOUT_ID },
+      activeGraphId: null,
+    });
   });
 
   it('reports the completions a failed drain discards', () => {

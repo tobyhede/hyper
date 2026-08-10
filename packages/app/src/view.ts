@@ -94,6 +94,18 @@ function resolveGraphs(
   };
 }
 
+/**
+ * Whether a resolved view draws a Graph.
+ *
+ * The membership test for the set `resolveGraphs` answers, and it lives beside
+ * it so the question and the one answer to it sit in the same module (ADR 0026).
+ * It reads `visibleGraphIds` rather than deciding visibility a second time —
+ * Navigation asks this, and a Navigation that computed its own answer would
+ * disagree with the renderer the moment a Layout filters.
+ */
+export const viewShowsGraph = (view: ResolvedView, graphId: GraphId): boolean =>
+  view.visibleGraphIds.includes(graphId);
+
 /** Resolve the Space default into the initial renderer selection. */
 export function defaultRenderer(space: Space): RendererSelection {
   const requested = space.defaultView ?? DEFAULT_VIEW_ID;
