@@ -1,7 +1,7 @@
 # Layouts own Card membership and Routes
 
 Status: accepted
-Supersedes: 0022, 0026
+Supersedes: 0026
 Refines: 0003, 0007, 0014, 0015, 0025, 0028, 0030, 0031, 0033
 Refined by: 0041
 Related: 0035

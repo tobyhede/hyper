@@ -1,6 +1,6 @@
 # ADR 0040 claims to supersede an already-superseded ADR
 
-Status: ready-for-human
+Status: resolved
 
 Surfaced by: review of PR #39
 
@@ -54,3 +54,57 @@ Two further asymmetries exist on `main` and predate this work: `0007 Refines
 - 0040 and 0022 agree about what supersedes 0022.
 - A status-block scan reports no `Supersedes`/`Superseded by` asymmetry
   involving 0040.
+
+## Answer
+
+**One superseder per ADR**, the recommended option. 0040's line now reads
+`Supersedes: 0026`, and 0022 keeps `Superseded by: 0026` unchanged. The chain is
+0022 → 0026 → 0040 and a reader follows it one hop at a time.
+
+Three things in the tree argue for it beyond it being the ticket's preference,
+and none argued against.
+
+The convention is already the de-facto one. A scan of all 42 ADRs finds ten
+superseded documents and every one of them names exactly one superseder; 0040's
+line was the only place a second was implied. Taking the other option would have
+made this the tree's first multi-superseder block for a single case.
+
+`workflow.md`'s status-block template distinguishes the two shapes on purpose.
+`Superseded by: 0009` is written singular while `Refined by: 0005, 0006` is
+written plural — refinement accumulates, supersession replaces.
+
+The chain loses nothing, which was the real risk. 0022 carried two halves, and
+the ticket is right that 0026 retired only the active one. But 0026 does not
+drop the filter half — it restates it under "What survives from 0022", including
+the filter/emphasis split and the one-way dependency, and 0040 then kills the
+filter outright. So a reader landing on 0022 is sent to 0026, finds the surviving
+half restated there rather than merely referenced, and is sent on to 0040. The
+transitive reading is complete because 0026 did the carrying work; nothing
+depends on 0022 pointing at 0040 directly.
+
+**Scan result: zero directed-relation asymmetries across the tree**, down from
+the single pre-existing one, which was this ticket's. Run over `Supersedes`,
+`Superseded by`, `Refines` and `Refined by`, honouring the spellings issue `05`
+catalogued — the inline `Status: superseded by ADR NNNN` that 0019 and 0029 use,
+`Supersedes: none` on 0007, and the rejected-ADR exemption for 0016. The scan
+was a throwaway; the committed guard is
+`test/unit/adr-status-blocks.test.ts`.
+
+## Note
+
+**The follow-up this decision unblocks.** `test/unit/adr-status-blocks.test.ts`
+already parses both supersession spellings and deliberately withholds the
+reciprocity assertion, its comment naming this ticket: "a guard that forced
+either answer would decide it by accident … adding the assertion is a one-line
+change once that decision lands." Issue `05`'s answer says the same. That
+decision has now landed, and the assertion is not part of this change — the work
+was scoped to the ADR record, and turning the convention into a passing guard
+touches a test file. It is a small, well-specified follow-up, and until it is
+made the convention adopted here is unenforced.
+
+The ticket's note about two pre-existing asymmetries is now stale in a way worth
+recording: issue `05` resolved both. `0007 Refines 0003` was repaired — 0003
+reads `Refined by: 0007, 0012, 0032, 0040, 0041`. `0016 Refines 0010` was
+deliberately left one-way and exempted in the guard, because 0016 is the tree's
+only `Status: rejected` ADR and a live decision must not point a reader forward
+at a discarded one. Neither is outstanding.
