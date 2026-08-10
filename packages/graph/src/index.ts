@@ -5,14 +5,17 @@
  * when something outside the package calls into it, and then every type that
  * module exports comes with it — those types are the vocabulary of the calls
  * being made, nameable the moment a consumer wants a variable for one, which is
- * why `GridStrategyOptions`, `LayoutStrategyPort` and `CardFileErrorKind` are here with
- * nothing importing them. Functions are named one at a time: a helper whose
- * only callers are inside the package stays in its module, behind the form
- * consumers do call — `cardIdsForGraphs` behind `graphCardIds` and
- * `filterHandlesByGraph` behind `filterHandlesByGraphs`,
- * `outHandleId`/`inHandleId` behind `buildCardHandles` and
- * `buildGraphRenderEdges`, and `incomingEdges`/`graphEntryCards` behind
- * `graphStartCard`.
+ * why `GridStrategyOptions`, `LayoutStrategyPort` and `CardFileErrorKind` are
+ * here with nothing importing them. Functions are named one at a time, and a
+ * helper no consumer needs to write stays in its module. Usually it sits behind
+ * an offered form that calls it — `graphCardIds` calls `cardIdsForGraphs`,
+ * `graphStartCard` calls `graphEntryCards`, while `buildCardHandles` and
+ * `buildGraphRenderEdges` both call `outHandleId`/`inHandleId`. It runs the
+ * other way for `filterHandlesByGraph`, the single-Graph specialisation written
+ * on the offered `filterHandlesByGraphs`. And it does not hold at all for
+ * `incomingEdges`: nothing calls it but its own test, so it is unoffered for
+ * want of a caller rather than behind one, and stays in `traversal` as
+ * `outgoingEdges`'s mirror.
  *
  * Two modules are absent whole for that reason and not by oversight.
  * `frontmatter` is how `card-file` reads a fence, and `parseCardFile` is the
