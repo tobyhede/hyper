@@ -25,11 +25,12 @@ jobs:
     steps:
       # Every action is pinned to the commit its tag named when it was added or
       # last bumped, because a tag can be repointed at new code and a SHA
-      # cannot. The `postgres` job below puts a generated database password in
-      # the job environment and then runs an install, so this is the difference
-      # between trusting a commit and trusting whoever can move a tag. Read the
-      # SHA off the *commit*, not the ref: `pnpm/action-setup` tags are
-      # annotated, so `git/ref/tags/<tag>` answers with the tag object.
+      # cannot. The `postgres` job below generates a database password into the
+      # job environment part-way through, and every action's post step then runs
+      # at job end with it in scope, so this is the difference between trusting
+      # a commit and trusting whoever can move a tag. Read the SHA off the
+      # *commit*, not the ref: `pnpm/action-setup` tags are annotated, so
+      # `git/ref/tags/<tag>` answers with the tag object.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         # The token is never persisted, so no install script can find it. Which
         # file it would have been written to changed in checkout v6 — creds moved
@@ -43,8 +44,8 @@ jobs:
       - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
       # `cache: pnpm` is the explicit input and still supports pnpm. What v6
       # narrowed to npm was the *automatic* caching behind `package-manager-cache`,
-      # which this never used. The pnpm install above has to stay first, or the
-      # cache step has no store path to read.
+      # which this never used. The `pnpm/action-setup` step above has to stay
+      # first, or `setup-node` has no `pnpm store path` to cache.
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version-file: .node-version
