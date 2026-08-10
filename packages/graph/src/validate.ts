@@ -72,7 +72,7 @@ export function validateReferences(space: Referenceable): SpaceReferenceError[] 
   for (const id of duplicates(space.cards.map((c) => c.id))) {
     errors.push({ kind: 'duplicate-card-id', ref: id, message: `Duplicate card id "${id}"` });
   }
-  for (const id of duplicates(space.graphs.map((r) => r.id))) {
+  for (const id of duplicates(space.graphs.map((graph) => graph.id))) {
     errors.push({ kind: 'duplicate-graph-id', ref: id, message: `Duplicate graph id "${id}"` });
   }
 
@@ -84,7 +84,7 @@ export function validateReferences(space: Referenceable): SpaceReferenceError[] 
   // Positions are sparse: a layout may omit cards, and whoever renders it places
   // those itself. The asymmetry is that it may not name a card that does not
   // exist — a position left behind by a deleted card (ADR 0025).
-  const graphIds = new Set(space.graphs.map((r) => r.id));
+  const graphIds = new Set(space.graphs.map((graph) => graph.id));
 
   for (const layout of layouts) {
     for (const key of Object.keys(layout.positions)) {

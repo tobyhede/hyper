@@ -81,6 +81,40 @@ const RETIRED_COMPOUND = new RegExp(
  */
 const RETIRED_BARE = new RegExp(`\\b(?:${ENTITY}|${TRAVERSAL})\\b`);
 
+/**
+ * The retired name's *initial*, bound over a Graph collection. A single-letter
+ * callback binding is below what the two patterns above can read — they need a
+ * compound or a whole word — so `space.graphs.map((r) => r.id)` survived the
+ * rename in three places with the guard green, and the last of them sat twelve
+ * lines from the first.
+ *
+ * A bare ban on the letter is what makes this look unaffordable: `r` is
+ * legitimately a result, a row, a request or a repository, and the deny-list
+ * that follows would never stop growing. Requiring the Graph collection on the
+ * same line is what removes that cost entirely — the repo's convention is the
+ * domain initial (`(c)` for card, `(l)` for layout, `(e)` for edge), so a
+ * binding introduced over `graphs` has exactly one correct letter and the
+ * retired name's is not it. This is the answer to the open question in
+ * `.scratch/graph-rename/issues/03-...`: worth reading, once scoped this way.
+ *
+ * The collection has to be the **receiver of the callback**, with nothing
+ * between them. An earlier draft allowed any gap, and matched a correct
+ * `space.graphs.map((graph) => …)` followed on the same line by
+ * `rows.map((r) => …)`, where the letter is bound by something this guard does
+ * not govern. It also read one line at a time and required parentheses, so the
+ * two forms Prettier actually produces — an unparenthesized single parameter,
+ * and a callback broken across lines — were both invisible.
+ */
+const RETIRED_INITIAL_BINDING = new RegExp(
+  [
+    // The Graph collection, then the iteration method it is the receiver of.
+    `\\.graphs\\s*\\.\\s*[A-Za-z]+\\s*\\(`,
+    // The callback's first parameter: parenthesized, optionally annotated, or
+    // bare. `\\b` is what keeps `result`, `rows` and `repositories` out.
+    `\\s*(?:\\(\\s*${ENTITY[0]?.toLowerCase() ?? ''}\\s*(?::[^)]*)?\\)|${ENTITY[0]?.toLowerCase() ?? ''}\\b)\\s*=>`,
+  ].join(''),
+);
+
 const isImplementationSource = (file: string): boolean =>
   file.startsWith('src/') || /^packages\/[^/]+\/src\//.test(file);
 
@@ -125,6 +159,18 @@ const hits = (text: string, pattern: RegExp): string[] =>
     .split('\n')
     .flatMap((line, index) => (pattern.test(line) ? [`${index + 1}: ${line.trim()}`] : []));
 
+/**
+ * Every match of `pattern` anywhere in `text`, as `line: text`. Separate from
+ * `hits` because a callback may be broken across lines and a line-by-line read
+ * cannot see one. The pattern is recompiled global here rather than declared
+ * that way, so `lastIndex` never carries between calls or into a `.test()`.
+ */
+const spanningHits = (text: string, pattern: RegExp): string[] =>
+  [...text.matchAll(new RegExp(pattern.source, 'g'))].map((match) => {
+    const line = text.slice(0, match.index).split('\n').length;
+    return `${line}: ${match[0].replace(/\s+/g, ' ')}`;
+  });
+
 const readTracked = (file: string): string | null => {
   const absolute = join(repoRoot, file);
   // A tracked file deleted in the working tree is still an index entry, and
@@ -161,6 +207,17 @@ describe('the retired domain vocabulary is gone from tracked files', () => {
     const found = scanned.filter(isImplementationSource).flatMap((file) => {
       const source = readTracked(file);
       return source === null ? [] : hits(source, RETIRED_BARE).map((hit) => `${file}:${hit}`);
+    });
+
+    expect(found).toEqual([]);
+  });
+
+  it('finds no retired initial bound over a Graph collection', () => {
+    const found = scanned.filter(isImplementationSource).flatMap((file) => {
+      const source = readTracked(file);
+      return source === null
+        ? []
+        : spanningHits(source, RETIRED_INITIAL_BINDING).map((hit) => `${file}:${hit}`);
     });
 
     expect(found).toEqual([]);
@@ -203,6 +260,54 @@ describe('the vocabulary that guard reads', () => {
     }
     expect(RETIRED_BARE.test(`export type ${ENTITY} = { id: string };`)).toBe(true);
     expect(RETIRED_BARE.test(`export interface ${TRAVERSAL} { cards: string[] }`)).toBe(true);
+  });
+
+  it('reports the retired initial only where a Graph collection introduces it', () => {
+    const initial = ENTITY[0]?.toLowerCase() ?? '';
+    const bound = [
+      `for (const id of duplicates(space.graphs.map((${initial}) => ${initial}.id))) {`,
+      `const graphIds = new Set(space.graphs.map((${initial}) => ${initial}.id));`,
+      `graphsById: new Map(input.graphs.map((${initial}) => [${initial}.id, ${initial}])),`,
+      // A single parameter needs no parentheses, and Prettier removes them at
+      // the repo's width often enough that this is the form a new one arrives in.
+      `const ids = space.graphs.map(${initial} => ${initial}.id);`,
+      // Broken across lines, which is what Prettier does once the line is long.
+      `const ids = space.graphs.map(\n      (${initial}) => ${initial}.id,\n    );`,
+      // Annotated, which the inferred call sites do not write but a new one might.
+      `space.graphs.map((${initial}: Graph) => ${initial}.id)`,
+      // Any iteration method, not just `map`.
+      `layout.graphs.some((${initial}) => ${initial}.id === graphId)`,
+    ];
+
+    for (const line of bound) {
+      expect(RETIRED_INITIAL_BINDING.test(line), line).toBe(true);
+    }
+  });
+
+  it('stays silent on the letter in every sense that is not a Graph', () => {
+    const initial = ENTITY[0]?.toLowerCase() ?? '';
+    const kept = [
+      // The domain initial that is correct over a Graph collection.
+      `const graphIds = new Set(space.graphs.map((g) => g.id));`,
+      `space.graphs.map((graph) => graph.id)`,
+      // The letter, legitimately, over anything that is not a Graph.
+      `const rows = result.rows.map((${initial}) => ${initial}.id);`,
+      `responses.map((${initial}) => ${initial}.status)`,
+      `repositories.forEach((${initial}) => ${initial}.close());`,
+      // The collection without a binding, and a binding without the collection.
+      `const all = space.graphs.map((graph) => graph.id);`,
+      `const ids = cards.map((${initial}) => ${initial}.id);`,
+      // The one the unconstrained form got wrong: a correct Graph callback, then
+      // a later callback over a *derived* collection on the same line. The
+      // letter there is bound by `rows`, not by anything this guard governs.
+      `const ids = space.graphs.map((graph) => graph.id).concat(rows.map((${initial}) => ${initial}.id));`,
+      // `.graphs` reached, but not as the receiver of the callback.
+      `if (layout.graphs.includes(graphId)) return rows.map((${initial}) => ${initial}.id);`,
+    ];
+
+    for (const line of kept) {
+      expect(RETIRED_INITIAL_BINDING.test(line), line).toBe(false);
+    }
   });
 
   it('stays silent on the qualified senses the ADR keeps', () => {
