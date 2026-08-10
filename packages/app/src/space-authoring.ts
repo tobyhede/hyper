@@ -45,8 +45,17 @@ export type AuthoringResult =
  * One accessor, read when it is needed.
  */
 export interface SpaceAuthoringState {
-  /** Advances when a replacement Space is opened without recreating Authoring. */
-  readonly opening: number;
+  /**
+   * ADR 0042's replacement signal: advances when a replacement Space is opened
+   * over this Authoring without recreating it, and at no other time. Retry,
+   * Keep local, persistence status changes, renderer selection and completed
+   * Edits all leave it where it is.
+   *
+   * It is invalidation rather than a registry — Authoring never learns which
+   * field, picker, drag or armed control is open. Each owner compares the epoch
+   * it captured, or is keyed by it, and applies its own cancellation.
+   */
+  readonly replacementEpoch: number;
   readonly session: SpaceSessionState;
   readonly navigation: NavigationState;
 }
@@ -206,7 +215,7 @@ export function createSpaceAuthoring({
 }: SpaceAuthoringDependencies): SpaceAuthoring {
   let placement: Placement | null = initialPlacement;
   const cardDocuments = new Map<CardId, CardDocument>();
-  let opening = 0;
+  let replacementEpoch = 0;
   let installing = 0;
 
   // The one way placement is written — every path goes through here, including
@@ -224,7 +233,7 @@ export function createSpaceAuthoring({
   };
 
   const snapshotState = (): SpaceAuthoringState => ({
-    opening,
+    replacementEpoch,
     session: session.getState(),
     navigation: navigation.getState(),
   });
@@ -548,9 +557,9 @@ export function createSpaceAuthoring({
    * unsaved work to explain why it could not be replaced.
    *
    * Accepting is an edit to this Authoring rather than a new one: the session,
-   * the placement and Navigation are all replaced in place, and `opening`
-   * advancing is what tells the renderer its nodes describe a Space that is
-   * gone.
+   * the placement and Navigation are all replaced in place, and the replacement
+   * epoch advancing is what tells the renderer its nodes describe a Space that
+   * is gone.
    */
   const acceptStoredSpace = (): string | null => {
     const { persistence } = session.getState();
@@ -570,7 +579,7 @@ export function createSpaceAuthoring({
       install(acceptedPlacement);
       cardDocuments.clear();
       navigation.openFresh(renderer);
-      opening += 1;
+      replacementEpoch += 1;
     });
     return null;
   };

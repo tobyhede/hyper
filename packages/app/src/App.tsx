@@ -542,13 +542,13 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
           ) : canvas.kind === 'arrangement' ? (
             <ReactFlowProvider>
               <SpaceCanvas
-                // Keyed on the opening counter, so accepting the stored Space
+                // Keyed on the replacement epoch, so accepting the stored Space
                 // takes the canvas's local editing state with it. The render
                 // adapter already drops the projection and drag bookkeeping, but
                 // an open title editor is the graph's own: it names a Card from
                 // a Space that is gone, and its raised invalid guard would go on
                 // swallowing clicks in the one that replaced it.
-                key={authoringState.opening}
+                key={authoringState.replacementEpoch}
                 nodes={liveProjection?.nodes ?? []}
                 edges={liveProjection?.edges ?? []}
                 activeCardId={activeCardId}

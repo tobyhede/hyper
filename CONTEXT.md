@@ -70,6 +70,12 @@ A validated transition from one Space to another that changes its authored Cards
 
 One Edit may change several authored parts atomically. Creating a Card at the end of a drawn Edge may create the Card, mint the Layout's first Graph, add the Edge, and write the Card's position into a Layout; together they are one Edit, not a sequence of smaller Edits.
 
+**Replacement epoch**:
+Which generation of the working Space a piece of local work was made against. Replacing the working Space wholesale — accepting the stored Space is the only thing that does it — advances the epoch once, as part of the same transition that installs the replacement. Nothing else advances it: retrying, keeping local work, a change in persistence status, choosing another View or Layout, and completing an Edit all leave it where it is.
+
+It is invalidation rather than a registry. Nothing learns which fields, pickers, drags or armed controls are open; each owner remembers the epoch its work was made under, or is keyed by it, and discards that work itself once the epoch no longer matches. Completed work is covered as well as Interaction drafts: an authoring operation that completed but is still waiting its turn behind an earlier one names identities and positions read from the Space it was derived from, so an epoch that has moved on means that work is discarded rather than applied to the Space that replaced it. Discarding it produces no Edit and is not a refusal the author asked for.
+_Avoid_: revision (that is what a stored Space is versioned by, and the two move for unrelated reasons), version, generation, session, dirty flag, cancellation registry, and _opening_ (the code's superseded name for this counter, and already the word for bringing a Card up).
+
 ## Layout and views
 
 **Layout**:

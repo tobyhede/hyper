@@ -1483,7 +1483,7 @@ describe('Space Authoring', () => {
     });
 
     // The counter the render adapter watches to drop stale local placement.
-    expect(authoring.getState().opening).toBe(1);
+    expect(authoring.getState().replacementEpoch).toBe(1);
     expect(authoring.getState()).toMatchObject({
       session: {
         working: remote,
@@ -1543,7 +1543,7 @@ describe('Space Authoring', () => {
 
     expect(authoring.acceptStoredSpace()).toBeNull();
 
-    expect(authoring.getState().opening).toBe(before.opening);
+    expect(authoring.getState().replacementEpoch).toBe(before.replacementEpoch);
     expect(authoring.getState().session).toEqual(before.session);
     expect(authoring.getState().navigation).toEqual(before.navigation);
   });
@@ -1582,7 +1582,7 @@ describe('Space Authoring', () => {
     expect(refusal).toBe(
       `The remote space is invalid and was not accepted:\n  - Graph "${GRAPH_ID}" edge 0 references missing card "${UNKNOWN_CARD}" as its to`,
     );
-    expect(authoring.getState().opening).toBe(before.opening);
+    expect(authoring.getState().replacementEpoch).toBe(before.replacementEpoch);
     expect(authoring.getState().session).toEqual(before.session);
     expect(authoring.getState().session.persistence.kind).toBe('conflicted');
   });
@@ -1590,12 +1590,12 @@ describe('Space Authoring', () => {
   /**
    * Nesting is the case a boolean gate cannot carry. Accepting notifies from
    * inside its own window — `session.acceptRemote()` publishes before the
-   * placement, Navigation and `opening` have moved — and an observer is allowed
-   * to complete an Edit from there, exactly as one may submit from a session
-   * notification. That inner completion opens the gate a second time, and a
-   * boolean drops it on the way out: Navigation's own notification then
-   * publishes the accepted Space while `opening` still names the one it
-   * replaced, which is the read `opening` exists to make impossible.
+   * placement, Navigation and the replacement epoch have moved — and an
+   * observer is allowed to complete an Edit from there, exactly as one may
+   * submit from a session notification. That inner completion opens the gate a
+   * second time, and a boolean drops it on the way out: Navigation's own
+   * notification then publishes the accepted Space while the epoch still names
+   * the one it replaced, which is the read the epoch exists to make impossible.
    */
   it('keeps the gate closed when accepting re-enters through a completed Edit', async () => {
     const remote: SpaceSnapshot = {
@@ -1620,7 +1620,7 @@ describe('Space Authoring', () => {
     await vi.waitFor(() =>
       expect(authoring.getState().session.persistence.kind).toBe('conflicted'),
     );
-    const openingBefore = authoring.getState().opening;
+    const epochBefore = authoring.getState().replacementEpoch;
 
     let reentered = false;
     session.subscribe(() => {
@@ -1628,11 +1628,11 @@ describe('Space Authoring', () => {
       reentered = true;
       authoring.complete({ kind: 'settled-card-movement' });
     });
-    const published: { title: string; opening: number }[] = [];
+    const published: { title: string; replacementEpoch: number }[] = [];
     authoring.subscribe(() =>
       published.push({
         title: authoring.getState().session.working.document.title,
-        opening: authoring.getState().opening,
+        replacementEpoch: authoring.getState().replacementEpoch,
       }),
     );
 
@@ -1640,8 +1640,8 @@ describe('Space Authoring', () => {
 
     expect(reentered).toBe(true);
     // One publication, after the whole sequence — never the accepted Space
-    // carrying the `opening` of the Space it replaced.
-    expect(published).toEqual([{ title: 'Stored', opening: openingBefore + 1 }]);
+    // carrying the replacement epoch of the Space it replaced.
+    expect(published).toEqual([{ title: 'Stored', replacementEpoch: epochBefore + 1 }]);
   });
 
   /**

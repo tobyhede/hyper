@@ -53,7 +53,7 @@ called, so it covers a refused or throwing completion, where the renderer stays
 algorithmic and the substitution never happens. It also covers the asynchronous
 window after conversion but before the positioned re-layout resolves, during
 which `laidOut` still holds ELK's now-stale sections. And it is sticky — reset
-only by `selectRenderer` or an `opening` change — where the substitution is
+only by `selectRenderer` or a `replacementEpoch` change — where the substitution is
 derived state that flips back with the placement.
 
 So a declared staleness would have to carry two different things: the static
