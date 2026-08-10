@@ -124,10 +124,9 @@ export const viewportTransform = (page: Page) =>
 /**
  * Wait until the viewport stops moving.
  *
- * Once the layout resolves, `ViewController` runs an animated `fitView`. A
- * bounding box read during it is stale by the time the mouse gets there, so
- * mousedown lands beside the card and no drag starts — a failure that looks
- * exactly like dragging being broken.
+ * Camera moves while presenting are animated. A bounding box read during one is
+ * stale by the time the mouse gets there, so mousedown lands beside the card and
+ * no drag starts — a failure that looks exactly like dragging being broken.
  */
 export async function settled(page: Page): Promise<void> {
   await expect
