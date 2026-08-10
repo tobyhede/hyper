@@ -23,19 +23,29 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      # Every action is pinned to the commit its `v4` tag named when it was
-      # added, because a tag can be repointed at new code and a SHA cannot. The
-      # `postgres` job below puts a generated database password in the job
-      # environment and then runs an install, so this is the difference between
-      # trusting a commit and trusting whoever can move a tag.
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
-        # Keeps the job's token out of `.git/config`, where any dependency's
-        # install script could read it.
+      # Every action is pinned to the commit its tag named when it was added or
+      # last bumped, because a tag can be repointed at new code and a SHA
+      # cannot. The `postgres` job below puts a generated database password in
+      # the job environment and then runs an install, so this is the difference
+      # between trusting a commit and trusting whoever can move a tag. Read the
+      # SHA off the *commit*, not the ref: `pnpm/action-setup` tags are
+      # annotated, so `git/ref/tags/<tag>` answers with the tag object.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        # The token is never persisted, so no install script can find it. Which
+        # file it would have been written to changed in checkout v6 — creds moved
+        # out of `.git/config` into one of their own — and this setting is what
+        # makes that irrelevant rather than merely less bad.
         with: { persist-credentials: false }
       # No `version:` input on purpose — the action then reads `packageManager`
       # from package.json, so the pin cannot drift between here and a laptop.
-      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+      # Still true in v6, and still `action-setup`: its successor `pnpm/setup`
+      # requires pnpm v11 or newer and this repo pins pnpm 9.15.0.
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+      # `cache: pnpm` is the explicit input and still supports pnpm. What v6
+      # narrowed to npm was the *automatic* caching behind `package-manager-cache`,
+      # which this never used. The pnpm install above has to stay first, or the
+      # cache step has no store path to read.
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version-file: .node-version
           cache: pnpm
@@ -49,10 +59,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: { persist-credentials: false }
-      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version-file: .node-version
           cache: pnpm
@@ -99,10 +109,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: { persist-credentials: false }
-      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version-file: .node-version
           cache: pnpm
@@ -114,7 +124,7 @@ jobs:
           version=$(node -p "require('./node_modules/@playwright/test/package.json').version")
           echo "version=$version" >> "$GITHUB_OUTPUT"
 
-      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         id: pw-cache
         with:
           path: ~/.cache/ms-playwright
@@ -130,7 +140,7 @@ jobs:
       - run: pnpm e2e
 
       - if: failure()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: playwright-report
           path: |
