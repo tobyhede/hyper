@@ -119,6 +119,29 @@ interface CompletedEdit {
   readonly createdCardId?: CardId;
 }
 
+/**
+ * Everything a completion is derived from: the report itself, and the editor
+ * state read at the moment it was made.
+ *
+ * The three travel together from `complete` to the derivation, and a queued one
+ * has to hold them until the drain reaches it, so they are one value rather than
+ * three parameters repeated at each hand-off.
+ */
+interface ReportedCompletion {
+  readonly completion: AuthoringCompletion;
+  readonly placement: Placement | null;
+  readonly cardDocuments: ReadonlyMap<CardId, CardDocument>;
+}
+
+/** A `ReportedCompletion` waiting behind the Edit that was installing when it arrived. */
+interface QueuedCompletion extends ReportedCompletion {
+  /**
+   * The Space this work was made against, named by the epoch that Space was
+   * current in — read by the drain, and the only reason it is recorded.
+   */
+  readonly replacementEpoch: number;
+}
+
 interface SpaceAuthoringDependencies {
   readonly session: SpaceSession;
   readonly navigation: Navigation;
@@ -324,12 +347,12 @@ export function createSpaceAuthoring({
    * has gone is simply not an Edit. Producing an unloadable Space *is* a
    * failure, and it throws — here, where the collaborators are all still level.
    */
-  const deriveCompletedEdit = (
-    completion: AuthoringCompletion,
-    completedPlacementInput: Placement | null,
-    completedCardDocuments: ReadonlyMap<CardId, CardDocument>,
-  ): CompletedEdit | null => {
-    if (completedPlacementInput === null) return null;
+  const deriveCompletedEdit = ({
+    completion,
+    placement: reportedPlacement,
+    cardDocuments: reportedCardDocuments,
+  }: ReportedCompletion): CompletedEdit | null => {
+    if (reportedPlacement === null) return null;
     let snapshot = session.getState().working;
     const previousSnapshot = snapshot;
     const navigationState = navigation.getState();
@@ -337,9 +360,9 @@ export function createSpaceAuthoring({
     let mintedGraphId: GraphId | null = null;
     let createdCardId: CardId | undefined;
     let connection: { readonly from: CardId; readonly to: CardId } | null = null;
-    let completedPlacement = completedPlacementInput;
+    let completedPlacement = reportedPlacement;
     if (completion.kind === 'edited-card') {
-      const document = completedCardDocuments.get(completion.cardId);
+      const document = reportedCardDocuments.get(completion.cardId);
       const cardIndex = snapshot.cards.findIndex((card) => card.id === completion.cardId);
       const card = snapshot.cards[cardIndex];
       if (
@@ -470,12 +493,8 @@ export function createSpaceAuthoring({
     });
   };
 
-  const performCompletion = (
-    completion: AuthoringCompletion,
-    completedPlacementInput: Placement | null,
-    completedCardDocuments: ReadonlyMap<CardId, CardDocument>,
-  ): AuthoringResult => {
-    const edit = deriveCompletedEdit(completion, completedPlacementInput, completedCardDocuments);
+  const performCompletion = (reported: ReportedCompletion): AuthoringResult => {
+    const edit = deriveCompletedEdit(reported);
     if (edit === null) return { kind: 'no-edit' };
     installCompletedEdit(edit);
     return edit.createdCardId === undefined
@@ -484,14 +503,13 @@ export function createSpaceAuthoring({
   };
 
   let completing = false;
-  const queued: {
-    readonly completion: AuthoringCompletion;
-    readonly placement: Placement | null;
-    readonly cardDocuments: ReadonlyMap<CardId, CardDocument>;
-  }[] = [];
+  const queued: QueuedCompletion[] = [];
   const complete = (completion: AuthoringCompletion): AuthoringResult => {
-    const installedPlacement = placement;
-    const installedCardDocuments = new Map(cardDocuments);
+    const reported: ReportedCompletion = {
+      completion,
+      placement,
+      cardDocuments: new Map(cardDocuments),
+    };
     // An installed Card value is one hand-off, consumed by the report that
     // carries it — including a queued one, which took its copy above. Left
     // standing by a completion that produced no Edit it becomes state waiting to
@@ -500,31 +518,50 @@ export function createSpaceAuthoring({
     // the completion this call reports still reads what it installed.
     if (completion.kind === 'edited-card') cardDocuments.delete(completion.cardId);
     if (completing) {
-      queued.push({
-        completion,
-        placement: installedPlacement,
-        cardDocuments: installedCardDocuments,
-      });
+      queued.push({ ...reported, replacementEpoch });
       return { kind: 'queued' };
     }
     completing = true;
     try {
-      const result = performCompletion(completion, installedPlacement, installedCardDocuments);
+      const result = performCompletion(reported);
       // Drain what arrived during publication. A queued Edit that cannot produce
       // a valid Space is a diagnostic, not this Edit's outcome: the completion
       // that drained the queue already installed and published, and charging it
       // someone else's failure would name the wrong Edit as the broken one.
       // Draining stops there — the rest of the queue was written against state
       // that never came about.
+      let discardedAsReplaced = 0;
       while (queued.length > 0) {
         const next = queued.shift();
         if (next === undefined) continue;
+        // ADR 0042: an entry was derived from identities, positions and Card
+        // values read out of the Space that was current when it was queued, and
+        // an observer may accept the stored Space from inside the very
+        // publication this queue fills during. An entry the epoch has outlived
+        // is therefore discarded rather than derived against the Space that
+        // replaced it, and a later entry still drains — why refusing would not
+        // save it, and why this skips rather than stops, is AGENTS.md's
+        // install-gate rule.
+        if (next.replacementEpoch !== replacementEpoch) {
+          discardedAsReplaced += 1;
+          continue;
+        }
         try {
-          performCompletion(next.completion, next.placement, next.cardDocuments);
+          performCompletion(next);
         } catch (error) {
           safelyReport(error);
           break;
         }
+      }
+      // Not a user-facing refusal — the author asked for nothing here, and the
+      // accepted Space is the right answer. It is still an Edit that completed
+      // and then vanished, and nothing else in a running app would ever say so.
+      if (discardedAsReplaced > 0) {
+        safelyReport(
+          new Error(
+            `SpaceAuthoring discarded ${discardedAsReplaced} queued completion(s) written against a replaced Space.`,
+          ),
+        );
       }
       return result;
     } finally {

@@ -1,6 +1,6 @@
 # Queued completions do not record the replacement epoch
 
-Status: ready-for-agent
+Status: resolved
 
 Surfaced by: review of PR #39
 
@@ -59,6 +59,36 @@ drain, before a queued completion is derived, not inside that window.
 - The drain discards a completion whose epoch differs, produces no Edit, and
   reports the discard through the existing diagnostics.
 - Coverage for a completion queued before `acceptStoredSpace` and drained after.
+
+## Answer
+
+The counter already existed under another name. `opening` was a monotonic
+number in the Space Authoring interface, advanced only where `acceptStoredSpace`
+installs a replacement, and already read as an invalidation signal by the render
+adapter and by the canvas key that takes an open title editor down with the
+Space it names. That is ADR 0042's `replacementEpoch` in everything but
+spelling, so it was renamed — alone, in its own commit — rather than joined by a
+second counter incremented on the same line.
+
+The queue entry is a named `QueuedCompletion` — the report, the placement and
+the Card values it was made against, plus the epoch current at `queued.push` —
+and the drain skips any entry whose recorded epoch differs from the current one,
+reporting its discards once per drain through `safelyReport`, the sink the
+failed-drain report already used. Why a stale entry is discarded rather than
+refused, and skipped rather than stopped at, is written out once in AGENTS.md's
+install-gate rule and not restated here.
+
+Two tests, each mutation-checked, sharing one arrange helper. The first queues a
+completion, accepts the stored Space from the same publication, and asserts the
+accepted snapshot comes through untouched — it fails without the gate by writing
+the abandoned drag's `{111, 222}` over the stored `{900, 700}`. The second pins
+the skip, and fails if the drain breaks at the first stale entry instead.
+
+Interaction-draft invalidation — the other half of ADR 0042 — is deliberately
+still unbuilt. It reads this same epoch.
+
+`pnpm verify` green: 86 test files, 871 tests. `pnpm e2e` green: 71 passed,
+unchanged.
 
 ## Note
 

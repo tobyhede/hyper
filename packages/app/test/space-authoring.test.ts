@@ -147,6 +147,53 @@ const openRefusalFixture = () => {
   return opened;
 };
 
+/**
+ * A workspace held in conflict against a stored Space that differs from local
+ * work in the positions it carries.
+ *
+ * Both replacement-epoch tests start here and diverge only in what their
+ * observers do from the publication that follows. The stored positions are what
+ * makes either one able to fail: a drained completion writes the local drag over
+ * `{900, 700}`, so the harm shows up in the resulting Space rather than having
+ * to be inferred from a counter.
+ */
+const openConflictedAgainstStoredSpace = async () => {
+  const remote: SpaceSnapshot = {
+    ...positionedSnapshot,
+    document: {
+      ...positionedSnapshot.document,
+      title: 'Stored',
+      layouts: [
+        {
+          id: LAYOUT_ID,
+          title: 'Stored Layout',
+          kind: 'positioned',
+          positions: { [CARD_A]: { x: 900, y: 700 }, [CARD_B]: { x: 600, y: 500 } },
+        },
+      ],
+    },
+  };
+  const backend = new MemorySpaceBackend([
+    { snapshot: remote, revision: 4n, exportedRevision: null },
+  ]);
+  const reported: unknown[] = [];
+  const { authoring } = attachAuthoring(
+    backend,
+    { snapshot: positionedSnapshot, revision: 3n, exportedRevision: null },
+    { kind: 'layout', layoutId: LAYOUT_ID },
+    (error) => reported.push(error),
+  );
+  authoring.installPlacement(
+    Placement.fromEntries([
+      [CARD_A, { x: 500, y: 600 }],
+      [CARD_B, { x: 300, y: 40 }],
+    ]),
+  );
+  authoring.complete({ kind: 'settled-card-movement' });
+  await vi.waitFor(() => expect(authoring.getState().session.persistence.kind).toBe('conflicted'));
+  return { authoring, remote, reported };
+};
+
 describe('Space Authoring', () => {
   afterEach(() => vi.restoreAllMocks());
 
@@ -1642,6 +1689,126 @@ describe('Space Authoring', () => {
     // One publication, after the whole sequence — never the accepted Space
     // carrying the replacement epoch of the Space it replaced.
     expect(published).toEqual([{ title: 'Stored', replacementEpoch: epochBefore + 1 }]);
+  });
+
+  /**
+   * ADR 0042's discard, against the path the depth-counting gate already allows:
+   * the drain runs after publication, and accepting the stored Space is among
+   * the things an observer may legally do from inside that publication. The
+   * queued completion is finished work, but the Space it was derived from is
+   * gone by the time the drain reaches it.
+   *
+   * Why the discard is not a refusal the derivation could make is AGENTS.md's
+   * install-gate rule; what this pins is that the accepted Space comes through
+   * untouched.
+   */
+  it('discards a queued completion written against the Space a replacement replaced', async () => {
+    const { authoring, remote, reported } = await openConflictedAgainstStoredSpace();
+
+    let reentered = false;
+    let queuedResult: AuthoringResult | null = null;
+    let refusal: string | null | undefined;
+    authoring.subscribe(() => {
+      if (reentered) return;
+      reentered = true;
+      // Queued against the local Space, and then that Space is replaced while
+      // this completion waits behind the publication it was made from.
+      authoring.installPlacement(
+        Placement.fromEntries([
+          [CARD_A, { x: 111, y: 222 }],
+          [CARD_B, { x: 300, y: 40 }],
+        ]),
+      );
+      queuedResult = authoring.complete({ kind: 'settled-card-movement' });
+      refusal = authoring.acceptStoredSpace();
+    });
+
+    authoring.installPlacement(
+      Placement.fromEntries([
+        [CARD_A, { x: 700, y: 800 }],
+        [CARD_B, { x: 300, y: 40 }],
+      ]),
+    );
+    expect(authoring.complete({ kind: 'settled-card-movement' })).toEqual({ kind: 'completed' });
+
+    // Both asserted so the test cannot go vacuous: a completion that ran instead
+    // of queueing, or an accept that refused, would leave nothing to discard and
+    // the assertions below would hold however the drain behaved.
+    expect(queuedResult).toEqual({ kind: 'queued' });
+    expect(refusal).toBeNull();
+    expect(authoring.getState().replacementEpoch).toBe(1);
+    // The accepted Space is authoritative, down to the positions it arrived
+    // with — the drained completion contributed nothing to it.
+    expect(authoring.getState().session.working).toEqual(remote);
+    expect(authoring.authoredPlacement()).toEqual(
+      Placement.fromEntries([
+        [CARD_A, { x: 900, y: 700 }],
+        [CARD_B, { x: 600, y: 500 }],
+      ]),
+    );
+    // Reported rather than dropped in silence: the author completed that Edit,
+    // and nothing else in the running app will mention that it is gone.
+    expect(reported).toHaveLength(1);
+    expect(String(reported[0])).toMatch(/discarded 1 queued completion.*replaced/);
+  });
+
+  /**
+   * The same rule seen from the other side: two entries queued behind one drain,
+   * the stale one first. Fails if the drain breaks at the stale entry instead of
+   * skipping it — see AGENTS.md's install-gate rule for why the queue is not
+   * abandoned wholesale.
+   */
+  it('still drains a completion queued after the replacement it was made against', async () => {
+    const { authoring, reported } = await openConflictedAgainstStoredSpace();
+
+    let replaced = false;
+    authoring.subscribe(() => {
+      if (replaced) return;
+      replaced = true;
+      authoring.installPlacement(
+        Placement.fromEntries([
+          [CARD_A, { x: 111, y: 222 }],
+          [CARD_B, { x: 300, y: 40 }],
+        ]),
+      );
+      authoring.complete({ kind: 'settled-card-movement' });
+      authoring.acceptStoredSpace();
+    });
+    // Subscribed second, so its first notification is the one accepting
+    // publishes from inside the observer above — after the epoch has advanced.
+    let afterwards = false;
+    let queuedAfterwards: AuthoringResult | null = null;
+    authoring.subscribe(() => {
+      if (afterwards) return;
+      afterwards = true;
+      authoring.installPlacement(
+        Placement.fromEntries([
+          [CARD_A, { x: 40, y: 50 }],
+          [CARD_B, { x: 600, y: 500 }],
+        ]),
+      );
+      queuedAfterwards = authoring.complete({ kind: 'settled-card-movement' });
+    });
+
+    authoring.installPlacement(
+      Placement.fromEntries([
+        [CARD_A, { x: 700, y: 800 }],
+        [CARD_B, { x: 300, y: 40 }],
+      ]),
+    );
+    expect(authoring.complete({ kind: 'settled-card-movement' })).toEqual({ kind: 'completed' });
+
+    expect(queuedAfterwards).toEqual({ kind: 'queued' });
+    expect(authoring.getState().replacementEpoch).toBe(1);
+    // Made against the accepted Space, so it is an Edit to it — while the one
+    // that named the replaced Space contributed nothing.
+    expect(authoring.getState().session.working.document.title).toBe('Stored');
+    expect(authoring.getState().session.working.document.layouts?.[0]?.positions).toEqual({
+      [CARD_A]: { x: 40, y: 50 },
+      [CARD_B]: { x: 600, y: 500 },
+    });
+    expect(reported).toHaveLength(1);
+    expect(String(reported[0])).toMatch(/discarded 1 queued completion.*replaced/);
   });
 
   /**
