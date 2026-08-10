@@ -317,9 +317,42 @@ it('refuses to activate a Graph the current Space does not hold', () => {
   expect(navigation.getState()).toBe(before);
 });
 
+/*
+ * The other half of the same question, and the half the guard used to miss: a
+ * Layout's `graphs` is a filter, so a Graph can exist in the Space without being
+ * one this renderer draws (ADR 0026). What that state costs is written up in
+ * `activateGraph`.
+ */
+it('refuses to activate a Graph the selected renderer does not show', () => {
+  const space = fixture();
+  const navigation = createNavigation(() => space, { kind: 'layout', layoutId: LAYOUT });
+  const before = navigation.getState();
+
+  expect(() => navigation.activateGraph(GRAPH_ONE)).toThrow(/does not show/);
+  expect(navigation.getState()).toBe(before);
+
+  // The same Graph under a renderer that filters nothing is fine: what is
+  // refused is naming a Graph this view does not draw, never the Graph itself.
+  navigation.selectRenderer({ kind: 'view', view: 'flow' });
+  navigation.activateGraph(GRAPH_ONE);
+  expect(navigation.getState().activeGraphId).toBe(GRAPH_ONE);
+});
+
+/*
+ * This used to adopt `LAYOUT` while active on `GRAPH_ONE` — the very pair
+ * `activateGraph` now refuses — and the renderer half of that pair is written
+ * here. The Graph is activated first so the adopted Layout is one that shows it,
+ * which is also the only shape Edit completion can produce: the Layout it hands
+ * over names the current Active Graph as its own `activeGraph`.
+ *
+ * What the test is for is unchanged, and is the thing `selectRenderer` does not
+ * do: adopting the Layout an Edit created continues the traversal rather than
+ * ending it, down to the same Traversal history array.
+ */
 it('continues the current Traversal history when an Edit converts the renderer to a Layout', () => {
   const space = fixture();
   const navigation = createNavigation(() => space, { kind: 'view', view: 'flow' });
+  navigation.activateGraph(GRAPH_TWO);
   navigation.present();
   const traversalHistory = traversalHistoryOf(navigation.getState());
 
@@ -327,10 +360,62 @@ it('continues the current Traversal history when an Edit converts the renderer t
 
   expect(navigation.getState()).toMatchObject({
     selectedRenderer: { kind: 'layout', layoutId: LAYOUT },
-    activeGraphId: GRAPH_ONE,
+    activeGraphId: GRAPH_TWO,
     mode: 'presenting',
   });
   expect(traversalHistoryOf(navigation.getState())).toBe(traversalHistory);
+});
+
+/*
+ * The same invariant from the other writer. `activateGraph` and
+ * `continueInRenderer` are the only two writes that can put the selected
+ * renderer and the Active Graph out of step, so guarding one of them leaves the
+ * dead Edit reachable through the other.
+ *
+ * Refusing rather than re-resolving is what keeps the traversal intact: falling
+ * back to the adopted Layout's own Active Graph would leave the history being
+ * presented belonging to a Graph that is no longer active, and `moves()`
+ * answering Edges out of a Card nothing is standing on.
+ */
+it('refuses to adopt a renderer that does not show the active Graph', () => {
+  const space = fixture();
+  const navigation = createNavigation(() => space, { kind: 'view', view: 'flow' });
+  navigation.present();
+  const before = navigation.getState();
+
+  expect(() => navigation.continueInRenderer({ kind: 'layout', layoutId: LAYOUT })).toThrow(
+    /does not show the active Graph/,
+  );
+  expect(navigation.getState()).toBe(before);
+});
+
+/*
+ * A Space with no Graphs has no Active Graph, and no renderer can fail to show
+ * one that was never named. Edit completion adopts the Layout it wrote before
+ * activating the Graph it minted, so this is the state the guard is in when the
+ * very first connection converts an Algorithmic View.
+ */
+it('adopts a renderer with no active Graph to name', () => {
+  const loaded = loadSpace(
+    {
+      version: 2,
+      id: uuid('00000000-0000-4000-8000-000000000001'),
+      title: 'Empty',
+      graphs: [],
+      layouts: [{ id: LAYOUT, title: 'Only', positions: {}, graphs: [] }],
+    },
+    [cardFile(uuid('00000000-0000-4000-8000-000000000002'))],
+  );
+  if (!loaded.ok) throw new Error('empty fixture should load');
+  const navigation = createNavigation(() => loaded.space, { kind: 'view', view: 'flow' });
+  expect(navigation.getState().activeGraphId).toBeNull();
+
+  navigation.continueInRenderer({ kind: 'layout', layoutId: LAYOUT });
+
+  expect(navigation.getState()).toMatchObject({
+    selectedRenderer: { kind: 'layout', layoutId: LAYOUT },
+    activeGraphId: null,
+  });
 });
 
 it('notifies subscribers synchronously until they unsubscribe', () => {

@@ -460,13 +460,14 @@ export function createSpaceAuthoring({
   };
 
   /**
-   * Install a derived Edit: one fallible step, and then three that cannot fail.
+   * Install a derived Edit: one fallible step, and then three that refuse
+   * nothing this Edit produces.
    *
    * `session.submit` has to come first. Both Navigation calls resolve the Graph
    * and the Layout against `currentSpace()`, which reads the working snapshot
    * `submit` installs synchronously — before it, neither exists yet and both
    * would refuse. So the order is forced, and the useful consequence is that
-   * the only statement here that can throw is also the first: no later failure
+   * the only statement here that can *fail* is also the first: no later failure
    * exists to invalidate an earlier success, and a `submit` that throws leaves
    * the other three untouched rather than half-applied.
    *
@@ -478,18 +479,41 @@ export function createSpaceAuthoring({
    * never took, and for a created Card, a position for a Card that does not
    * exist. That is the strand `b091623` inverted this order to close.
    *
-   * The three statements below are total given the session honoured `submit`,
-   * which is its documented synchronous contract. Re-checking the Graph and the
-   * Layout here against the snapshot that just passed domain intake would add a
-   * branch that cannot be taken, and this repo deletes those rather than keeps
-   * them.
+   * **The renderer is adopted before the minted Graph is activated**, because
+   * Navigation's guards resolve the *selected* renderer and this Edit's answer
+   * is `nextRenderer`. Activating first asked the renderer the Edit began in,
+   * which is not the renderer the Edit produced, and it only ever agreed by
+   * accident: an outgoing Layout happens to share the id of the Layout written
+   * back into it, and an outgoing Algorithmic View filters nothing so any
+   * answer passed. Neither accident is a reason, and the second hides the case
+   * that would break.
+   *
+   * In that order the three statements below refuse nothing, and each for a
+   * reason this Edit established rather than by having no guard to trip:
+   *
+   * - `install` decides nothing and reads nothing.
+   * - `continueInRenderer` resolves a Layout `updatePositionedLayout` wrote into
+   *   the snapshot `submit` just installed, and refuses only a Layout that does
+   *   not show the current Active Graph — which is the same Graph that Layout
+   *   names as its `activeGraph`, on a snapshot `loadSpaceSnapshot` accepted a
+   *   line earlier, and intake is exactly what checks that pairing. A null
+   *   Active Graph names nothing and is exempt.
+   * - `activateGraph` resolves that same adopted Layout. The minted Graph is in
+   *   the snapshot's Graphs, and the Layout shows it either by carrying no
+   *   filter (a Layout converted from an Algorithmic View has none) or by the
+   *   widening `updatePositionedLayout` performed in the write that added it.
+   *
+   * Re-checking any of that *here* would add a branch that cannot be taken, and
+   * this repo deletes those rather than keeps them. The guards live in
+   * Navigation because they are Navigation's invariant, held against every
+   * caller; this window is simply a caller that satisfies them.
    */
   const installCompletedEdit = (edit: CompletedEdit): void => {
     installTogether(() => {
       session.submit(edit.snapshot);
       install(edit.placement);
-      if (edit.mintedGraphId !== null) navigation.activateGraph(edit.mintedGraphId);
       navigation.continueInRenderer(edit.nextRenderer);
+      if (edit.mintedGraphId !== null) navigation.activateGraph(edit.mintedGraphId);
     });
   };
 
