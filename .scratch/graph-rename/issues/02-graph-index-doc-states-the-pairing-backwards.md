@@ -9,7 +9,7 @@ Surfaced by: review of PR #36, reported before merge and not fixed
 `packages/graph/src/index.ts` explains the package's curation rule, and gets one
 of its own examples inverted:
 
-```
+```text
  * only callers are inside the package stays in its module, behind the form
  * consumers do call — `cardIdsForGraphs` and `filterHandlesByGraph` behind the
  * plural forms, …
@@ -38,7 +38,7 @@ Reported during the review of #36 and not fixed before it merged; present on
 
 State both pairs explicitly rather than generalising over them:
 
-```
+```text
  * consumers do call — `cardIdsForGraphs` behind `graphCardIds` and
  * `filterHandlesByGraph` behind `filterHandlesByGraphs`, …
 ```

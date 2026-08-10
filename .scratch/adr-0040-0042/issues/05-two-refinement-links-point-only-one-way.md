@@ -10,7 +10,7 @@ A status block is only navigable if both ends agree. The repository already
 holds that: a scan of all 41 ADRs finds the `Refines`/`Refined by` graph
 symmetric except for two pairs, both predating PR #39.
 
-```
+```text
 0007 Refines 0003, but 0003 does not list 0007 under "Refined by"
 0016 Refines 0010, but 0010 does not list 0016 under "Refined by"
 ```
@@ -28,7 +28,7 @@ Add `0007` to ADR 0003's `Refined by:` and `0016` to ADR 0010's. Status-block
 edits only — ADR 0041 rules that accepted bodies stay historical, and the status
 block is the sanctioned place for a later decision to announce itself.
 
-Note that ADR 0003's `Refined by:` already reads `0012, 0032, 0040, 0041`, so
+Note that ADR 0003's `Refined by:` already reads `0012, 0040, 0041`, so
 this appends to an existing line rather than adding one.
 
 ## Worth considering

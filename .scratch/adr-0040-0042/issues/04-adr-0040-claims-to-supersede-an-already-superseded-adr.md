@@ -10,16 +10,17 @@ ADR 0040's status block reads `Supersedes: 0022, 0026`.
 
 ADR 0022 already reads:
 
-```
+```text
 Status: superseded
 Superseded by: 0026
 ```
 
-An ADR cannot be retired twice by different decisions, and 0022's block names
-only 0026. So the two disagree, and a scan of the status graph reports it as an
-asymmetry:
+The repository has no agreed convention for an ADR whose claims are retired by
+multiple later decisions. 0022's block names only 0026, while 0040 also claims
+to supersede it. So the two disagree, and a scan of the status graph reports it
+as an asymmetry:
 
-```
+```text
 0040 Supersedes 0022, but 0022 does not list 0040 under "Superseded by"
 ```
 
@@ -30,14 +31,15 @@ half outright, so it does retire something 0026 left standing.
 
 ## Direction
 
-Pick one and make both blocks agree:
+Pick a convention and make both blocks agree:
 
-- **0040 supersedes only 0026.** 0026 had already superseded 0022, and
-  supersession is transitive for a reader following the chain. Drop 0022 from
-  0040's `Supersedes:`. Simplest, and keeps one superseder per ADR.
-- **0022 is superseded by both.** Write `Superseded by: 0026, 0040` on 0022.
-  Honest about the two-stage retirement, but introduces the repo's first
-  multi-superseder block, so it sets a convention.
+- **Adopt one superseder per ADR.** Treat supersession as transitive for a
+  reader following the chain, and drop 0022 from 0040's `Supersedes:` because
+  0026 had already superseded it.
+- **Allow multiple superseders.** Keep 0022 in 0040's `Supersedes:` and write
+  `Superseded by: 0026, 0040` on 0022 to record the two-stage retirement. This
+  introduces the repo's first multi-superseder block and establishes that
+  convention.
 
 The first unless there is a reason to prefer the second.
 

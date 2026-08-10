@@ -10,7 +10,7 @@ Surfaced by: review of PR #36
 Graph exists in the Space, and nothing more:
 
 ```ts
-if (graph === undefined) {
+if (getGraph(currentSpace(), graphId) === undefined) {
   throw new Error(`The Graph ${graphId} does not exist.`);
 }
 ```
@@ -25,7 +25,7 @@ Navigation and hands it to `updatePositionedLayout`, which writes it as the
 Layout's `activeGraph`. Intake rejects exactly that combination in
 `packages/graph/src/validate.ts`:
 
-```
+```text
 Layout "<id>" opens active on graph "<id>", which it does not show
 ```
 
