@@ -1,4 +1,4 @@
-# ADR 0042 is silent on a completion queued across a Space replacement
+# ADR 0035 is silent on a completion queued across a Space replacement
 
 Status: ready-for-human
 
@@ -6,18 +6,11 @@ Surfaced by: review of PR #39
 
 ## Context
 
-ADR 0042's whole subject is what a wholesale Space replacement invalidates. It
-defines `replacementEpoch` for interaction-local drafts:
-
-> Every interaction-local owner discards its draft when that epoch changes
-
-and lists what does not advance it:
-
-> Retry, Keep local, persistence status changes, ordinary renderer selection and
-> completed Edits do not advance it.
-
-It says nothing about a completion that is **already queued** when
-`acceptStoredSpace` lands.
+ADR 0035 defines both the re-entrant completion queue and the wholesale Space
+replacement performed by `acceptStoredSpace`, but it says nothing about a
+completion that is **already queued** when that replacement lands. The later
+replacement-invalidation rule and its `replacementEpoch` are the proposed
+context for closing that gap, not an existing ADR on this branch.
 
 That path is real. Space Authoring has a completion queue with drain semantics,
 `installTogether` counts window depth, and `acceptStoredSpace` publishes from
@@ -53,7 +46,8 @@ not gain a callback.
 
 ## Acceptance
 
-- ADR 0042 answers what happens to a completion queued across a replacement.
+- A follow-up ADR answers what happens to a completion queued across a
+  replacement, including the `replacementEpoch` invalidation rule.
 - If the answer is "discarded", the discard is reported through the existing
   non-throwing diagnostics rather than silently.
 - Coverage for a completion queued before `acceptStoredSpace` and drained after.

@@ -7,7 +7,7 @@ Surfaced by: review of PR #39
 ## Context
 
 A status block is only navigable if both ends agree. The repository already
-holds that: a scan of all 42 ADRs finds the `Refines`/`Refined by` graph
+holds that: a scan of all 41 ADRs finds the `Refines`/`Refined by` graph
 symmetric except for two pairs, both predating PR #39.
 
 ```
