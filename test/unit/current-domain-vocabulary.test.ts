@@ -96,9 +96,23 @@ const RETIRED_BARE = new RegExp(`\\b(?:${ENTITY}|${TRAVERSAL})\\b`);
  * binding introduced over `graphs` has exactly one correct letter and the
  * retired name's is not it. This is the answer to the open question in
  * `.scratch/graph-rename/issues/03-...`: worth reading, once scoped this way.
+ *
+ * The collection has to be the **receiver of the callback**, with nothing
+ * between them. An earlier draft allowed any gap, and matched a correct
+ * `space.graphs.map((graph) => …)` followed on the same line by
+ * `rows.map((r) => …)`, where the letter is bound by something this guard does
+ * not govern. It also read one line at a time and required parentheses, so the
+ * two forms Prettier actually produces — an unparenthesized single parameter,
+ * and a callback broken across lines — were both invisible.
  */
 const RETIRED_INITIAL_BINDING = new RegExp(
-  `\\.graphs\\b.*\\(\\s*${ENTITY[0]?.toLowerCase() ?? ''}\\s*\\)\\s*=>`,
+  [
+    // The Graph collection, then the iteration method it is the receiver of.
+    `\\.graphs\\s*\\.\\s*[A-Za-z]+\\s*\\(`,
+    // The callback's first parameter: parenthesized, optionally annotated, or
+    // bare. `\\b` is what keeps `result`, `rows` and `repositories` out.
+    `\\s*(?:\\(\\s*${ENTITY[0]?.toLowerCase() ?? ''}\\s*(?::[^)]*)?\\)|${ENTITY[0]?.toLowerCase() ?? ''}\\b)\\s*=>`,
+  ].join(''),
 );
 
 const isImplementationSource = (file: string): boolean =>
@@ -144,6 +158,18 @@ const hits = (text: string, pattern: RegExp): string[] =>
   text
     .split('\n')
     .flatMap((line, index) => (pattern.test(line) ? [`${index + 1}: ${line.trim()}`] : []));
+
+/**
+ * Every match of `pattern` anywhere in `text`, as `line: text`. Separate from
+ * `hits` because a callback may be broken across lines and a line-by-line read
+ * cannot see one. The pattern is recompiled global here rather than declared
+ * that way, so `lastIndex` never carries between calls or into a `.test()`.
+ */
+const spanningHits = (text: string, pattern: RegExp): string[] =>
+  [...text.matchAll(new RegExp(pattern.source, 'g'))].map((match) => {
+    const line = text.slice(0, match.index).split('\n').length;
+    return `${line}: ${match[0].replace(/\s+/g, ' ')}`;
+  });
 
 const readTracked = (file: string): string | null => {
   const absolute = join(repoRoot, file);
@@ -191,7 +217,7 @@ describe('the retired domain vocabulary is gone from tracked files', () => {
       const source = readTracked(file);
       return source === null
         ? []
-        : hits(source, RETIRED_INITIAL_BINDING).map((hit) => `${file}:${hit}`);
+        : spanningHits(source, RETIRED_INITIAL_BINDING).map((hit) => `${file}:${hit}`);
     });
 
     expect(found).toEqual([]);
@@ -242,6 +268,15 @@ describe('the vocabulary that guard reads', () => {
       `for (const id of duplicates(space.graphs.map((${initial}) => ${initial}.id))) {`,
       `const graphIds = new Set(space.graphs.map((${initial}) => ${initial}.id));`,
       `graphsById: new Map(input.graphs.map((${initial}) => [${initial}.id, ${initial}])),`,
+      // A single parameter needs no parentheses, and Prettier removes them at
+      // the repo's width often enough that this is the form a new one arrives in.
+      `const ids = space.graphs.map(${initial} => ${initial}.id);`,
+      // Broken across lines, which is what Prettier does once the line is long.
+      `const ids = space.graphs.map(\n      (${initial}) => ${initial}.id,\n    );`,
+      // Annotated, which the inferred call sites do not write but a new one might.
+      `space.graphs.map((${initial}: Graph) => ${initial}.id)`,
+      // Any iteration method, not just `map`.
+      `layout.graphs.some((${initial}) => ${initial}.id === graphId)`,
     ];
 
     for (const line of bound) {
@@ -262,6 +297,12 @@ describe('the vocabulary that guard reads', () => {
       // The collection without a binding, and a binding without the collection.
       `const all = space.graphs.map((graph) => graph.id);`,
       `const ids = cards.map((${initial}) => ${initial}.id);`,
+      // The one the unconstrained form got wrong: a correct Graph callback, then
+      // a later callback over a *derived* collection on the same line. The
+      // letter there is bound by `rows`, not by anything this guard governs.
+      `const ids = space.graphs.map((graph) => graph.id).concat(rows.map((${initial}) => ${initial}.id));`,
+      // `.graphs` reached, but not as the receiver of the callback.
+      `if (layout.graphs.includes(graphId)) return rows.map((${initial}) => ${initial}.id);`,
     ];
 
     for (const line of kept) {

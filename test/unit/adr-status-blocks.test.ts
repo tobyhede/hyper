@@ -87,6 +87,48 @@ const readAdrs = (): ReadonlyMap<string, StatusBlock> =>
       .map((file) => [adrNumber(file), parseStatusBlock(readFileSync(join(adrDir, file), 'utf8'))]),
   );
 
+/**
+ * A reference naming no ADR is reported rather than skipped. Resolving the
+ * target first and *filtering* on it — which is what this did at first — makes
+ * the guard silent about the one fault it cannot repair by symmetry: `Refines:
+ * 0099` is a dead end for a reader, and an unreachable target is exactly the
+ * shape a typo takes.
+ *
+ * A rejected ADR is exempt from reciprocity at both ends. Its claims never took
+ * effect, so it has nothing to announce on the ADR it proposed to refine, and a
+ * live decision must not point forward at a discarded one — so a `Refined by:`
+ * naming a rejected ADR is a fault rather than a link to complete. ADR 0016 is
+ * the tree's only rejected ADR: the part of it that survived is carried by ADR
+ * 0019, which ADR 0010 already names.
+ */
+const refinesFaults = (adrs: ReadonlyMap<string, StatusBlock>): string[] =>
+  [...adrs].flatMap(([number, adr]) =>
+    refs(adr.fields.get('Refines')).flatMap((target) => {
+      const refined = adrs.get(target);
+      if (refined === undefined) return [`${number} Refines ${target}, which is not an ADR`];
+      if (adr.status === 'rejected' || refined.status === 'rejected') return [];
+      return refs(refined.fields.get('Refined by')).includes(number)
+        ? []
+        : [`${number} Refines ${target}, but ${target} does not answer`];
+    }),
+  );
+
+const refinedByFaults = (adrs: ReadonlyMap<string, StatusBlock>): string[] =>
+  [...adrs].flatMap(([number, adr]) =>
+    refs(adr.fields.get('Refined by')).flatMap((target) => {
+      const refiner = adrs.get(target);
+      if (refiner === undefined) {
+        return [`${number} is 'Refined by' ${target}, which is not an ADR`];
+      }
+      if (refiner.status === 'rejected') {
+        return [`${number} is 'Refined by' ${target}, which is rejected`];
+      }
+      return refs(refiner.fields.get('Refines')).includes(number)
+        ? []
+        : [`${number} is 'Refined by' ${target}, but ${target} does not answer`];
+    }),
+  );
+
 describe('ADR status blocks point both ways', () => {
   const adrs = readAdrs();
 
@@ -99,36 +141,12 @@ describe('ADR status blocks point both ways', () => {
     expect([...adrs.values()].every((adr) => adr.status !== '')).toBe(true);
   });
 
-  /**
-   * A rejected ADR is exempt as a refiner. Its claims never took effect, so it
-   * has nothing to announce on the ADR it proposed to refine, and a forward
-   * pointer to it would send a reader from a live decision to a discarded one.
-   * ADR 0016 is the tree's only rejected ADR and the only case this reaches:
-   * the part of it that survived is carried by ADR 0019, which ADR 0010 already
-   * names.
-   */
   it('answers every `Refines` with a `Refined by`, except from a rejected ADR', () => {
-    const missing = [...adrs].flatMap(([number, adr]) =>
-      adr.status === 'rejected'
-        ? []
-        : refs(adr.fields.get('Refines'))
-            .filter((target) => adrs.has(target))
-            .filter((target) => !refs(adrs.get(target)?.fields.get('Refined by')).includes(number))
-            .map((target) => `${number} Refines ${target}, but ${target} does not answer`),
-    );
-
-    expect(missing).toEqual([]);
+    expect(refinesFaults(adrs)).toEqual([]);
   });
 
-  it('answers every `Refined by` with a `Refines`', () => {
-    const missing = [...adrs].flatMap(([number, adr]) =>
-      refs(adr.fields.get('Refined by'))
-        .filter((target) => adrs.has(target))
-        .filter((target) => !refs(adrs.get(target)?.fields.get('Refines')).includes(number))
-        .map((target) => `${number} is 'Refined by' ${target}, but ${target} does not answer`),
-    );
-
-    expect(missing).toEqual([]);
+  it('answers every `Refined by` with a `Refines`, and never names a rejected ADR', () => {
+    expect(refinedByFaults(adrs)).toEqual([]);
   });
 
   it('names a real superseder for every superseded ADR, in either spelling', () => {
@@ -151,6 +169,15 @@ describe('ADR status blocks point both ways', () => {
  * only look like fields.
  */
 describe('the status block that guard reads', () => {
+  /** An ADR set written as status-block fields, parsed the way the tree is. */
+  const synthetic = (blocks: Record<string, readonly string[]>): ReadonlyMap<string, StatusBlock> =>
+    new Map(
+      Object.entries(blocks).map(([number, fields]) => [
+        number,
+        parseStatusBlock(['# A title', '', ...fields].join('\n')),
+      ]),
+    );
+
   it('reads a field block and stops at the body', () => {
     const block = parseStatusBlock(
       ['# A title', '', 'Status: accepted', 'Refines: 0003, 0007', '', 'Body: not a field.'].join(
@@ -179,6 +206,59 @@ describe('the status block that guard reads', () => {
     const block = parseStatusBlock(['# T', '', 'Status: accepted', 'Supersedes: none'].join('\n'));
 
     expect(refs(block.fields.get('Supersedes'))).toEqual([]);
+  });
+
+  it('reports a reference that names no ADR, at either end', () => {
+    // Filtering these out is what made the guard silent about a typo, and a
+    // dead reference is the one fault symmetry cannot repair.
+    const adrs = synthetic({
+      '0001': ['Status: accepted', 'Refines: 0099'],
+      '0002': ['Status: accepted', 'Refined by: 0098'],
+    });
+
+    expect(refinesFaults(adrs)).toEqual(['0001 Refines 0099, which is not an ADR']);
+    expect(refinedByFaults(adrs)).toEqual([
+      "0002 is 'Refined by' 0098, which is not an ADR",
+      // 0002 claims a refiner that does not exist; nothing claims to refine it.
+    ]);
+  });
+
+  it('reports a live ADR pointing forward at a rejected one', () => {
+    const adrs = synthetic({
+      '0010': ['Status: accepted', 'Refined by: 0016'],
+      '0016': ['Status: rejected', 'Refines: 0010'],
+    });
+
+    expect(refinedByFaults(adrs)).toEqual(["0010 is 'Refined by' 0016, which is rejected"]);
+  });
+
+  it('asks nothing of a rejected ADR at either end', () => {
+    // This is the tree's actual shape: 0016 refines 0010 and 0010 stays silent.
+    const adrs = synthetic({
+      '0010': ['Status: accepted', 'Refined by: 0019'],
+      '0016': ['Status: rejected', 'Refines: 0010', 'Partly carried by: 0019'],
+      '0019': ['Status: accepted', 'Refines: 0010'],
+    });
+
+    expect(refinesFaults(adrs)).toEqual([]);
+    expect(refinedByFaults(adrs)).toEqual([]);
+  });
+
+  it('reports an ordinary one-way link in both directions', () => {
+    const adrs = synthetic({
+      '0003': ['Status: accepted'],
+      '0007': ['Status: accepted', 'Refines: 0003'],
+    });
+
+    expect(refinesFaults(adrs)).toEqual(['0007 Refines 0003, but 0003 does not answer']);
+
+    const answered = synthetic({
+      '0003': ['Status: accepted', 'Refined by: 0007'],
+      '0007': ['Status: accepted', 'Refines: 0003'],
+    });
+
+    expect(refinesFaults(answered)).toEqual([]);
+    expect(refinedByFaults(answered)).toEqual([]);
   });
 
   it('keeps a one-off relation out of the reciprocal fields it does not belong to', () => {
