@@ -317,6 +317,31 @@ it('refuses to activate a Graph the current Space does not hold', () => {
   expect(navigation.getState()).toBe(before);
 });
 
+/*
+ * The other half of the same question, and the half the guard used to miss. A
+ * Layout's `graphs` is a filter, so the resolved view answers a narrower set
+ * than the Space holds (ADR 0026) and a Graph can exist without being one this
+ * renderer draws. Activating it carried that id into the next completed Edit,
+ * which wrote it as the Layout's `activeGraph` — the one combination intake
+ * rejects outright. The Edit was then dead: not a conflict and not a retry, a
+ * permanent rejection reported at the commit rather than at the gesture that
+ * caused it.
+ */
+it('refuses to activate a Graph the selected renderer does not show', () => {
+  const space = fixture();
+  const navigation = createNavigation(() => space, { kind: 'layout', layoutId: LAYOUT });
+  const before = navigation.getState();
+
+  expect(() => navigation.activateGraph(GRAPH_ONE)).toThrow(/does not show/);
+  expect(navigation.getState()).toBe(before);
+
+  // The same Graph under a renderer that filters nothing is fine: what is
+  // refused is naming a Graph this view does not draw, never the Graph itself.
+  navigation.selectRenderer({ kind: 'view', view: 'flow' });
+  navigation.activateGraph(GRAPH_ONE);
+  expect(navigation.getState().activeGraphId).toBe(GRAPH_ONE);
+});
+
 it('continues the current Traversal history when an Edit converts the renderer to a Layout', () => {
   const space = fixture();
   const navigation = createNavigation(() => space, { kind: 'view', view: 'flow' });

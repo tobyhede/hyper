@@ -1,6 +1,6 @@
 # `activateGraph` guards against the Space, not the resolved view
 
-Status: ready-for-agent
+Status: resolved
 
 Surfaced by: review of PR #36
 
@@ -75,8 +75,50 @@ Graphs, at which point "a Graph the Layout does not show" stops being
 expressible and this dissolves. Prefer the small guard now unless that
 structural work is imminent — in which case close this and say so.
 
+## Resolution
+
+**Not `wontfix`.** ADR 0040 is accepted and unbuilt — the Layout `graphs` filter
+is still the built model, so the state this describes is still expressible and
+the small guard was taken.
+
+`activateGraph` now asks `resolveView(space, selectedRenderer).visibleGraphIds`
+whether the Graph is one this renderer draws, and refuses it if not. It reads
+that answer rather than computing a second one, so `resolveGraphs` remains the
+one place that decides which Graphs a view shows (ADR 0026); no store learned to
+reach for `space.graphs`, and nothing was threaded into Navigation, which
+already imported `resolveView` for `selectRenderer`, `openFresh` and
+`continueInRenderer`. The Space-scoped check stays in front of it, because the
+two refusals are not the same sentence: a Graph the Space does not hold gets
+"does not exist", a Graph it holds but this renderer filters out gets "the
+selected renderer does not show".
+
+**The refusal throws, matching the one beside it.** Both answer the same
+question — Navigation may not name structure the current view does not hold —
+so reporting them differently would re-create this ticket's asymmetry one level
+down. Neither is reachable through the product, since `GraphSelector` is fed the
+visible Graphs, which makes each a caller's mistake rather than an author's:
+returning would answer one by moving no emphasis and saying nothing, leaving the
+stale Active Graph to be written by every Edit after it. Throwing names the
+wrong call at the call that made it, which is the point of moving the failure
+off the commit. `acceptStoredSpace`'s reasoning for *not* throwing does not
+transfer — it refuses an author's gesture that has a message to show and local
+work to protect, where this refuses a call the product cannot make. Nothing is
+half-applied either way: both checks sit above `publish`.
+
+**The minted Graph keeps its exception by ordering, not by an exemption.**
+`installCompletedEdit` submits before it activates, and the snapshot it submits
+is the one `updatePositionedLayout` widened, so the minted Graph is inside the
+filter one statement before it is named active. The existing
+`space-authoring.test.ts` case that covers this opens on a Layout whose `graphs`
+is explicitly `[]` — a filter that shows nothing — which is what makes it a
+genuine regression guard rather than a Layout that happens not to filter; a
+comment now says so, since omitting the field would silently retire the
+coverage.
+
 ## Acceptance
 
-- Activating a Graph outside the resolved view's visible set is refused.
-- The minted-Graph path still activates.
-- The refusal is covered at the Navigation seam.
+- [x] Activating a Graph outside the resolved view's visible set is refused.
+- [x] The minted-Graph path still activates.
+- [x] The refusal is covered at the Navigation seam
+      (`packages/app/test/navigation.test.ts`), which also pins that the same
+      Graph activates under a renderer that filters nothing.

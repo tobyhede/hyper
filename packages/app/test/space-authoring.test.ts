@@ -476,6 +476,15 @@ describe('Space Authoring', () => {
     });
   });
 
+  /**
+   * The Layout's explicit empty `graphs` is load-bearing, not incidental
+   * scaffolding: it is a filter that shows nothing, and `activateGraph` refuses
+   * a Graph the resolved view does not show. What makes the minted Graph the
+   * exception is that `updatePositionedLayout` widens the filter to admit it in
+   * the same snapshot `submit` installs, so it is visible one statement before
+   * it is named active. Omitting the field would filter nothing and leave that
+   * ordering untested.
+   */
   it('mints and activates Graph 1 only when the first connection completes', () => {
     vi.spyOn(crypto, 'randomUUID').mockReturnValue(
       MINTED_GRAPH_ID as ReturnType<typeof crypto.randomUUID>,

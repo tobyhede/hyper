@@ -193,17 +193,47 @@ export function createNavigation(
       });
     },
     // Resolved first, for the same reason a renderer is: Navigation may not name
-    // structure the current Space does not hold. Activating is never an Edit
-    // (ADR 0028), so it cannot mint the Graph it is handed — an unheld one would
-    // strand `moves()`, `present()` and the emphasis on a lookup answering
-    // nothing. An Edit that mints the first Graph submits it before activating
-    // it, so the Graph is in the working Space by the time this reads.
+    // structure the current view does not hold. Activating is never an Edit
+    // (ADR 0028), so it can neither mint the Graph it is handed nor widen a
+    // filter to admit one.
+    //
+    // Two refusals, one question, because the Space is not the set this names
+    // from. A Graph the Space does not hold strands `moves()`, `present()` and
+    // the emphasis on a lookup answering nothing. A Graph the Space *does* hold
+    // but the resolved view filters out is the quieter failure: every lookup
+    // still answers, so nothing is stranded, and the id instead rides into the
+    // next completed Edit, where `updatePositionedLayout` writes it as the
+    // Layout's `activeGraph` — the one combination intake rejects outright
+    // ("opens active on graph X, which it does not show"). That Edit is dead on
+    // arrival: a permanent `invalid-snapshot`, neither a conflict nor a retry,
+    // reported at the commit rather than at the gesture that caused it.
+    //
+    // The visible set is read off `resolveView` rather than recomputed here:
+    // one place answers which Graphs a view draws (ADR 0026), and two would
+    // disagree the moment a Layout filters. An Edit that mints the first Graph
+    // submits it before activating it, so by the time this reads, the Graph is
+    // in the working Space *and* in the Layout's filter — widening it is the
+    // same write that added the Graph.
+    //
+    // Both refusals throw, and deliberately alike. Neither is reachable through
+    // the product — `GraphSelector` is fed the visible Graphs — so each is a
+    // caller's mistake rather than an author's, and returning would answer one
+    // by moving no emphasis and saying nothing, leaving the stale Active Graph
+    // to be written by every Edit after it. Throwing names the wrong call at
+    // the call that made it, which is the whole point of moving this refusal
+    // off the commit. Nothing is half-applied either way: both checks sit above
+    // `publish`, so Navigation is left exactly as `selectRenderer` leaves it.
     activateGraph: (graphId) => {
-      if (getGraph(currentSpace(), graphId) === undefined) {
+      const state = observable.getState();
+      const space = currentSpace();
+      if (getGraph(space, graphId) === undefined) {
         throw new Error(`The Graph ${graphId} does not exist.`);
       }
+      if (!resolveView(space, state.selectedRenderer).visibleGraphIds.includes(graphId)) {
+        throw new Error(`The selected renderer does not show the Graph ${graphId}.`);
+      }
       observable.publish({
-        ...baseOf(observable.getState()),
+        ...baseOf(state),
         activeGraphId: graphId,
         mode: 'overview',
       });
