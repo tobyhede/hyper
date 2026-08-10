@@ -82,9 +82,12 @@ half restated there rather than merely referenced, and is sent on to 0040. The
 transitive reading is complete because 0026 did the carrying work; nothing
 depends on 0022 pointing at 0040 directly.
 
-**Scan result: zero directed-relation asymmetries across the tree**, down from
-the single pre-existing one, which was this ticket's. Run over `Supersedes`,
-`Superseded by`, `Refines` and `Refined by`, honouring the spellings issue `05`
+**Scan result: zero non-exempt directed-relation asymmetries**, down from the
+single pre-existing one, which was this ticket's. Not zero asymmetries outright:
+ADR 0016's one-way `Refines 0010` remains, exempted by issue `05` because a
+rejected ADR announces nothing on the decision it proposed to refine. Run over
+`Supersedes`, `Superseded by`, `Refines` and `Refined by`, honouring the
+spellings issue `05`
 catalogued — the inline `Status: superseded by ADR NNNN` that 0019 and 0029 use,
 `Supersedes: none` on 0007, and the rejected-ADR exemption for 0016. The scan
 was a throwaway; the committed guard is
@@ -92,15 +95,20 @@ was a throwaway; the committed guard is
 
 ## Note
 
-**The follow-up this decision unblocks.** `test/unit/adr-status-blocks.test.ts`
-already parses both supersession spellings and deliberately withholds the
-reciprocity assertion, its comment naming this ticket: "a guard that forced
-either answer would decide it by accident … adding the assertion is a one-line
-change once that decision lands." Issue `05`'s answer says the same. That
-decision has now landed, and the assertion is not part of this change — the work
-was scoped to the ADR record, and turning the convention into a passing guard
-touches a test file. It is a small, well-specified follow-up, and until it is
-made the convention adopted here is unenforced.
+**The convention is enforced, not merely written down.**
+`test/unit/adr-status-blocks.test.ts` parsed both supersession spellings and
+deliberately withheld the reciprocity assertion, its comment naming this ticket:
+"a guard that forced either answer would decide it by accident … adding the
+assertion is a one-line change once that decision lands." That decision has now
+landed, so the assertion is part of this change: `supersedesFaults` and
+`supersededByFaults` sit beside the refinement pair and take the same
+rejected-ADR treatment. The tree already satisfied both directions, including
+0019 and 0029 answering 0030 through the inline spelling alone.
+
+The guard that matters most is the one pinning the decision rather than the
+tree's current state: a synthetic two-stage retirement — 0040 naming both 0022
+and 0026 while 0022 names only 0026 — is reported as a fault, so the convention
+cannot drift back without a red test.
 
 The ticket's note about two pre-existing asymmetries is now stale in a way worth
 recording: issue `05` resolved both. `0007 Refines 0003` was repaired — 0003
