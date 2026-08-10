@@ -165,23 +165,40 @@ const supersedesFaults = (adrs: ReadonlyMap<string, StatusBlock>): string[] =>
         }),
   );
 
+/**
+ * Reciprocity is not the whole convention, and on its own it does not enforce
+ * it. Issue `04` adopted **one** superseder per ADR, and a two-stage retirement
+ * written at both ends — 0022 naming 0026 and 0040, each naming 0022 back —
+ * satisfies every reciprocal check there is. Cardinality is the assertion that
+ * makes the convention hold; without it the shape 0040 was carrying is legal
+ * again as soon as someone answers the second link.
+ *
+ * Counted over *distinct* targets, because `supersededBy` folds the inline
+ * spelling in beside the line: an ADR writing both names one superseder twice,
+ * which is a redundant record rather than a second retirement.
+ */
 const supersededByFaults = (adrs: ReadonlyMap<string, StatusBlock>): string[] =>
-  [...adrs].flatMap(([number, adr]) =>
-    adr.status === 'rejected'
-      ? []
-      : adr.supersededBy.flatMap((target) => {
-          const superseder = adrs.get(target);
-          if (superseder === undefined) {
-            return [`${number} is 'Superseded by' ${target}, which is not an ADR`];
-          }
-          if (superseder.status === 'rejected') {
-            return [`${number} is 'Superseded by' ${target}, which is rejected`];
-          }
-          return refs(superseder.fields.get('Supersedes')).includes(number)
-            ? []
-            : [`${number} is 'Superseded by' ${target}, but ${target} does not answer`];
-        }),
-  );
+  [...adrs].flatMap(([number, adr]) => {
+    if (adr.status === 'rejected') return [];
+    const targets = [...new Set(adr.supersededBy)];
+    return [
+      ...(targets.length > 1
+        ? [`${number} is 'Superseded by' ${targets.join(', ')}, but an ADR takes one superseder`]
+        : []),
+      ...targets.flatMap((target) => {
+        const superseder = adrs.get(target);
+        if (superseder === undefined) {
+          return [`${number} is 'Superseded by' ${target}, which is not an ADR`];
+        }
+        if (superseder.status === 'rejected') {
+          return [`${number} is 'Superseded by' ${target}, which is rejected`];
+        }
+        return refs(superseder.fields.get('Supersedes')).includes(number)
+          ? []
+          : [`${number} is 'Superseded by' ${target}, but ${target} does not answer`];
+      }),
+    ];
+  });
 
 describe('ADR status blocks point both ways', () => {
   const adrs = readAdrs();
@@ -369,6 +386,38 @@ describe('the status block that guard reads', () => {
     });
 
     expect(supersedesFaults(adrs)).toEqual(['0040 Supersedes 0022, but 0022 does not answer']);
+  });
+
+  it('reports two superseders even when both directions answer', () => {
+    // The convention issue `04` adopted is one superseder per ADR, and
+    // reciprocity alone does not enforce it: write the second link at both ends
+    // and every `Supersedes` has its `Superseded by` and vice versa. Without a
+    // cardinality check the guard would call this record well-formed, and the
+    // two-stage shape the convention exists to rule out would return through
+    // the one door left open.
+    const adrs = synthetic({
+      '0022': ['Status: superseded', 'Superseded by: 0026, 0040'],
+      '0026': ['Status: superseded', 'Supersedes: 0022', 'Superseded by: 0040'],
+      '0040': ['Status: accepted', 'Supersedes: 0022, 0026'],
+    });
+
+    expect(supersedesFaults(adrs)).toEqual([]);
+    expect(supersededByFaults(adrs)).toEqual([
+      "0022 is 'Superseded by' 0026, 0040, but an ADR takes one superseder",
+    ]);
+  });
+
+  it('counts distinct superseders, so one named in both spellings is not two', () => {
+    // `supersededBy` folds the inline spelling in beside the line, so an ADR
+    // writing both would list the same superseder twice. That is a redundant
+    // record, not a two-stage retirement, and the cardinality fault is about
+    // the second *superseder*.
+    const adrs = synthetic({
+      '0019': ['Status: superseded by ADR 0030', 'Superseded by: 0030'],
+      '0030': ['Status: accepted', 'Supersedes: 0019'],
+    });
+
+    expect(supersededByFaults(adrs)).toEqual([]);
   });
 
   it('keeps a one-off relation out of the reciprocal fields it does not belong to', () => {

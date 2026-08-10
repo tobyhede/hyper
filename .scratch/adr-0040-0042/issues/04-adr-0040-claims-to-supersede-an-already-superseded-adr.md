@@ -87,13 +87,12 @@ single pre-existing one, which was this ticket's. Not zero asymmetries outright:
 ADR 0016's one-way `Refines 0010` remains, exempted by issue `05` because a
 rejected ADR announces nothing on the decision it proposed to refine. Run over
 `Supersedes`, `Superseded by`, `Refines` and `Refined by`, honouring the
-spellings issue `05`
-catalogued — the inline `Status: superseded by ADR NNNN` that 0019 and 0029 use,
-`Supersedes: none` on 0007, and the rejected-ADR exemption for 0016. The scan
-was a throwaway; the committed guard is
+spellings issue `05` catalogued — the inline `Status: superseded by ADR NNNN`
+that 0019 and 0029 use, `Supersedes: none` on 0007, and the rejected-ADR
+exemption for 0016. The scan was a throwaway; the committed guard is
 `test/unit/adr-status-blocks.test.ts`.
 
-## Note
+## Notes on the answer
 
 **The convention is enforced, not merely written down.**
 `test/unit/adr-status-blocks.test.ts` parsed both supersession spellings and
@@ -105,10 +104,19 @@ landed, so the assertion is part of this change: `supersedesFaults` and
 rejected-ADR treatment. The tree already satisfied both directions, including
 0019 and 0029 answering 0030 through the inline spelling alone.
 
-The guard that matters most is the one pinning the decision rather than the
-tree's current state: a synthetic two-stage retirement — 0040 naming both 0022
-and 0026 while 0022 names only 0026 — is reported as a fault, so the convention
-cannot drift back without a red test.
+The guards that matter most pin the decision rather than the tree's current
+state, and it takes two of them. A synthetic two-stage retirement left one-way —
+0040 naming both 0022 and 0026 while 0022 names only 0026 — is caught by
+reciprocity. The same retirement written at *both* ends is not: every
+`Supersedes` has its answering `Superseded by`, so reciprocity alone calls it
+well-formed, and the shape the convention exists to rule out would return
+through the one door left open. Cardinality closes it — more than one distinct
+superseder is itself a fault — and that is what makes "one superseder per ADR"
+enforced rather than merely reciprocal.
+
+Counted over distinct targets, because `supersededBy` folds the inline spelling
+in beside the line: an ADR writing both names one superseder twice, which is a
+redundant record and not a second retirement. Both cases are covered.
 
 The ticket's note about two pre-existing asymmetries is now stale in a way worth
 recording: issue `05` resolved both. `0007 Refines 0003` was repaired — 0003
