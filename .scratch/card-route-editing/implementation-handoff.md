@@ -47,6 +47,8 @@ The key architecture is fixed:
   carries a fresh identity owned by the new Layout.
 - A View whose subject is the Space's Cards draws every Graph in the Space,
   flattened across its Layouts. The flatten is derived and never stored.
+- A Graph belongs to one Layout, and its id is unique across the whole Space.
+  Intake rejects a Space where one Graph id appears twice, naming both owners.
 - A View is application-supplied and not a synonym for the canvas. Flow and
   Grid are Algorithmic Views; Cards View is a distinct collection View;
   `SpaceCanvas` is rendering composition.
@@ -205,11 +207,22 @@ Layout would leave that rule untested. AGENTS.md's line explaining that ELK
 renders the fixture because it declares no Layout becomes wrong here — the
 reason becomes the absent `defaultView`.
 
+Graph ids stay unique across the Space even though every Graph is owned by one
+Layout (ADR 0045), because the flatten keys colour, handles, Edge ids and
+activation on the id alone. Add the duplicate check to `loadSpace` beside the
+existing Card-id one and have it name both owning Layouts; the index it protects
+is `graphsById`, which is built with `new Map` and would otherwise drop one
+Graph in silence. Do not answer this by owner-qualifying Graph references
+through the render pipeline — that alternative is weighed and rejected in the
+ADR, and it costs the `<graphId>::out`/`::in` scheme that two libraries depend
+on.
+
 Gate: schema/reference property tests, deterministic export tests, HTTP/backend
 contracts, PostgreSQL integration and database-free E2E on the new shape. Add a
 property test that no View output can violate closure or reuse a source Graph
-identity, and an E2E proving the fixture's Flow view still draws all four
-Graphs across its two Layouts.
+identity, a test that a Space carrying one Graph id in two Layouts is a named
+load error rather than a silently shortened index, and an E2E proving the
+fixture's Flow view still draws all four Graphs across its two Layouts.
 
 ### 3. Deep semantic authoring interface
 

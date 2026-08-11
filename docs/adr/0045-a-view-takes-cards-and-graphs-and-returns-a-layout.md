@@ -34,6 +34,16 @@ ADR 0040's alternative — that a Space-scoped View borrows no Graph and therefo
 
 The cost is that "the Graphs of a Space" returns as a concept. It is derived and never stored: a flatten over the Layouts, computed where it is needed, and no Graph gains a second owner by appearing in it. The legibility ceiling such a flatten can reach is the overlay problem `.scratch/multiple-routes/findings.md` measured — clean while the union of the drawn Edges is acyclic, and past about four Graphs colour stops separating them — and the answer to that is the built emphasis-and-dim behaviour, not a restriction on what a View may draw.
 
+## Graph identity is unique within the Space
+
+A Graph belongs to one Layout, and its id is unique across the Space rather than only within that owner. ADR 0040 scoped Route identity to the owning Layout, which permits two Layouts to hold Graphs carrying the same UUID. The flatten above makes that permission unusable rather than merely unused: `loadSpace` indexes Graphs as `new Map(graphs.map((g) => [g.id, g]))`, so a duplicate id silently drops one Graph from the index while it remains in the collection; `outHandleId` and `inHandleId` would put a single handle id on a Card for two different Graphs, which is exactly the per-Card-per-side distinguishability React Flow requires and the named cause of its warning #008; and colour, visibility and activation all key on the same id.
+
+The alternative was to carry an owner qualifier through the flattened view — every Graph reference becoming a Layout-and-Graph pair, through `visibleGraphIds`, `viewShowsGraph`, the active Graph, the colour map, the render Edge, the legend and the handle-id scheme. That is a wide change to a pipeline whose handle ids are load-bearing for two libraries at once, bought to support a reuse nothing asks for.
+
+Nothing does ask for it. `newUuid` mints globally, every Graph a View returns is fresh by the rule above, and a future copy-a-Layout operation mints on copy for the same reason. The one remaining source is a hand-authored document, where a duplicate is a load error naming both — which is already what a duplicate Card id across files is.
+
+Layout-scoped identity was never chosen: it fell out of nesting, the way sharing fell out of the ids-and-filter shape that preceded it. This refines ADR 0040's identity sentence and nothing else in it. Which Layout a Graph belongs to is unchanged; only the scope its id must be unique in moves.
+
 ## What follows for the built-in Views
 
 Both of these are consequences of the interface rather than rules of their own, and either may be revisited without touching this ADR.
