@@ -1,6 +1,6 @@
 # Define camera animation rejection handling
 
-Status: ready-for-human
+Status: resolved
 
 ## Context
 
@@ -94,3 +94,51 @@ ignores synchronous executor throws. The claim was corrected before merge.
 - Re-read `setTransform`, `scaleTo`, `scaleBy`, `resolveFitView` and
   `getD3Transition` when the React Flow pin moves; all of the above is a fact
   about 12.11.2 rather than about the library's contract.
+
+## Answer
+
+**A camera command is issued, never awaited, and never contained.** Recorded as
+ADR 0043, which refines ADR 0027 — 0027 counted awaitability among React Flow's
+advantages over impress.js, and that one clause is now wrong. It earned an ADR
+rather than a comment because it is precisely the negative a future review will
+re-suggest: a dropped Promise reads as a missing `await` or a missing `.catch`,
+and both are wrong, for opposite reasons.
+
+Branch by branch, against the three questions this ticket ended on:
+
+**A synchronous d3 fault surfaces as a rejection — leave it unhandled.** Not
+routed through the non-throwing reporting seam. Reporting would mean threading a
+reporter into a component whose whole job is two effects, and the seam's
+implementation reports to `console.error` anyway, which is where an unhandled
+rejection already goes — with a stack the reporter would have to be given
+deliberately. Containment is the option actually rejected here, and the reason
+is the sharper one this ticket found: `.catch(() => undefined)` silences the only
+signal worth hearing while doing nothing about either hang.
+
+**A never-settling camera Promise is a supported outcome, so chaining required
+work on one is forbidden.** Both hangs are ordinary rather than exceptional — a
+superseded transition is what *any* second command produces. Sequencing belongs
+to the issuing effect, on its own timer, cancelled by its own cleanup. Issue `02`
+is the one live consequence and is fixed.
+
+**`fitView` before `panZoom` is a caller ordering rule, not a seam obligation.**
+`OverviewCamera` is the only `fitView` caller and it fires on the transition
+*out* of presenting, so `panZoom` has existed for the whole of the session by
+then. Nothing is added to tolerate an early call; if one ever appears, it is that
+caller's ordering bug.
+
+**Where the policy lives.** `packages/app/src/components/cameras.tsx` — a new
+module holding `OverviewCamera` and `PresentingCamera`, extracted from
+`SpaceCanvas.tsx`. That extraction is what makes "the owning camera seam" a place
+rather than a phrase: every camera call in the app is now in this one file, so
+"no required behaviour chained on a camera Promise" is checkable by reading one
+module instead of grepping a component. It also made issue `02`'s coverage
+possible — the effect can be rendered against a stubbed `useReactFlow`, where
+mounting a real flow would have supplied the very d3 transition whose settlement
+cannot be relied on.
+
+Coverage: `packages/app/test/cameras.test.tsx`. Every stubbed camera call there
+returns a Promise that never settles, which is the interruption branch; the
+rejection branch is deliberately uncovered, because the policy for it is *no
+code*, and a test asserting the absence of a `.catch` would pin the mock rather
+than the seam.

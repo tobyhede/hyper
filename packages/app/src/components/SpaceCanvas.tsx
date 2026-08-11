@@ -14,7 +14,6 @@ import {
   ViewportPortal,
   useConnection,
   useReactFlow,
-  useStore,
   type Edge,
   type EdgeChange,
   type IsValidConnection,
@@ -34,24 +33,8 @@ import {
 } from '@project/react-flow-adapter';
 import { activeGraphColor } from '../colors';
 import { CARD_SIZE } from '../card';
-
-/**
- * How much of the shorter viewport axis the presented card leaves as margin.
- * The card fills the screen; this is the letterbox around it.
- */
-const PRESENTING_PADDING = 1.15;
-
-/**
- * How the overview frames the graph, shared by the `fitView` prop and the camera.
- *
- * `maxZoom` caps the fit at natural size. Without it React Flow's default max of
- * 2 applies, and a space with a single card — which is what a new space is (ADR
- * 0018) — gets scaled to 2x and fills the screen. Padding does not help: it
- * reserves margin, it does not cap zoom. The prop-driven first fit and the
- * camera's own must agree, or the one-card space fits at 2x and is then animated
- * back out.
- */
-const OVERVIEW_FIT = { padding: 0.2, maxZoom: 1 } as const;
+import { MAX_ZOOM, OVERVIEW_FIT } from '../camera';
+import { OverviewCamera, PresentingCamera } from './cameras';
 
 /**
  * What the graph tells assistive technology it can do — minus the delete.
@@ -101,86 +84,6 @@ function isEmptyCanvasTarget(target: EventTarget | null): boolean {
     target.closest('.react-flow__renderer') !== null &&
     target.closest('.react-flow__node') === null
   );
-}
-
-/**
- * Returns the camera from presenting to the whole-graph overview (ADR 0027).
- *
- * Only the *return* — the initial fit belongs to React Flow's own `fitView`
- * prop, which runs before first paint at the identity transform. This effect
- * used to fire on mount as well, which put a second, animated fit *after* that
- * one, so every load began at the viewport origin and flew the whole graph in.
- * The mount case looked like it needed handling because the effect is the only
- * fit written down here; the prop is the other one, and it already ran.
- *
- * `previouslyPresenting` is what separates the two: an effect keyed on
- * `presenting` cannot otherwise tell "arrived at false" from "was always
- * false".
- */
-function OverviewCamera({ presenting }: { presenting: boolean }) {
-  const { fitView } = useReactFlow();
-  const previouslyPresenting = useRef(presenting);
-
-  useEffect(() => {
-    const wasPresenting = previouslyPresenting.current;
-    previouslyPresenting.current = presenting;
-    if (presenting || !wasPresenting) return;
-    void fitView({ ...OVERVIEW_FIT, duration: 400 });
-  }, [presenting, fitView]);
-
-  return null;
-}
-
-/**
- * Moves the camera to the Card the traversal has reached (ADR 0027).
- *
- * There is no second surface: presenting is this canvas, drawn close enough that
- * one card fills the screen. `setCenter` is the whole mechanism.
- *
- * Arriving from the overview changes zoom by a large factor, and a single
- * combined move whips — the translation happens while scaled in, so the cards
- * tear past. So a zoom-changing move is **split**: pan at the wider of the two
- * scales, then close in. Card-to-card movement during traversal holds zoom, so it is one
- * move. (Copied from impress.js, which is the one thing the spike kept from it.)
- */
-function PresentingCamera({ activeCardId }: { activeCardId: string | null }) {
-  const { setCenter, getNode, getZoom } = useReactFlow();
-  const viewportWidth = useStore((s) => s.width);
-  const viewportHeight = useStore((s) => s.height);
-
-  useEffect(() => {
-    if (!activeCardId || viewportWidth === 0 || viewportHeight === 0) return;
-    const node = getNode(activeCardId);
-    if (!node) return;
-
-    const width = node.width ?? node.measured?.width ?? 0;
-    const height = node.height ?? node.measured?.height ?? 0;
-    if (width === 0 || height === 0) return;
-
-    const x = node.position.x + width / 2;
-    const y = node.position.y + height / 2;
-    const zoom = Math.min(
-      viewportWidth / (width * PRESENTING_PADDING),
-      viewportHeight / (height * PRESENTING_PADDING),
-    );
-
-    let cancelled = false;
-    const from = getZoom();
-    // A tenth of a stop either way is not a jump worth splitting.
-    if (Math.abs(from - zoom) / zoom < 0.1) {
-      void setCenter(x, y, { zoom, duration: 500 });
-      return;
-    }
-
-    void setCenter(x, y, { zoom: Math.min(from, zoom), duration: 400 }).then(() => {
-      if (!cancelled) void setCenter(x, y, { zoom, duration: 300 });
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [activeCardId, viewportWidth, viewportHeight, getNode, getZoom, setCenter]);
-
-  return null;
 }
 
 /**
@@ -557,6 +460,10 @@ export function SpaceCanvas({
       onMouseMove={handleMouseMove}
       edgesFocusable={false}
       minZoom={0.2}
+      // Presenting draws one card full-screen, which is far closer than React
+      // Flow's default ceiling of 2. See `MAX_ZOOM` — without it the camera sits
+      // outside its own extent and the first wheel tick yanks it back.
+      maxZoom={MAX_ZOOM}
     >
       <Background gap={24} />
       <Controls showInteractive={false} />

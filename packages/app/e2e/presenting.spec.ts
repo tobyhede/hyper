@@ -21,12 +21,23 @@ async function camera(page: Page): Promise<{ x: number; y: number; zoom: number 
   return { x: Number(x), y: Number(y), zoom: Number(zoom) };
 }
 
+/**
+ * Present the fixture and wait until the camera has arrived.
+ *
+ * The chrome appearing is not arrival — it renders as soon as presenting starts,
+ * while the camera is still moving. Every caller here assumes the destination,
+ * and one of them acted on the way there: at the overview zoom the whole space is
+ * on screen, at the presenting zoom one card fills it, so a click aimed at any
+ * other card hit or missed depending on how far the animation had run. That
+ * failed about half the time.
+ */
 async function present(page: Page): Promise<void> {
   await page.goto('/');
   await expect(page.locator('.react-flow__node').first()).toBeVisible();
   await settled(page);
   await page.getByTestId('present-button').click();
   await expect(page.getByTestId('presenting-chrome')).toBeVisible();
+  await settled(page);
 }
 
 test('traverses the graph, and the space is still what you are looking at', async ({ page }) => {
@@ -128,9 +139,34 @@ test('the chrome names the moves available, and says when the graph ends', async
   await expect(activeCard(page)).toHaveAttribute('data-id', '00000000-0000-4000-8000-00000000000c');
 });
 
+/**
+ * No pointer gesture on a Card's body opens it (ADR 0036), and presenting does
+ * not make an exception. It holds twice over, and the two are worth separating
+ * because only the second is ours.
+ *
+ * React Flow makes a node inert when it is neither selectable nor draggable and
+ * carries none of its own pointer handlers (`hasPointerEvents` in `NodeWrapper`).
+ * All of those are off while presenting, so a Card is `pointer-events: none` and
+ * the pane takes the click — a real click cannot reach a Card at all, which is
+ * why aiming one here is not a thing to work around.
+ *
+ * The second assertion is what survives if that ever changes: the event is
+ * dispatched straight to the element, past `pointer-events` and past the
+ * viewport requirement a real click has, and still nothing opens. Both Cards
+ * get it, because at the presenting zoom the active one fills the screen and
+ * every other one is far outside it — which was the flake, not a detail: this
+ * test used to aim a forced click at a Card that was only in the viewport while
+ * the camera was still moving, and failed about half the time.
+ */
 test('clicking a card while presenting does not open a reading panel', async ({ page }) => {
   await present(page);
-  await nodeByTitle(page, 'E').click({ force: true });
+
+  await expect(activeCard(page)).toHaveCSS('pointer-events', 'none');
+  await expect(nodeByTitle(page, 'E')).toHaveCSS('pointer-events', 'none');
+
+  await activeCard(page).dispatchEvent('click');
+  await nodeByTitle(page, 'E').dispatchEvent('click');
+
   await expect(page.getByTestId('open-card')).toHaveCount(0);
 });
 
