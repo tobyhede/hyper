@@ -53,7 +53,7 @@ _Avoid_: link, connection, transition, arrow, step, relationship.
 **Active Graph**:
 The one Graph selected in the current Layout — drawn emphasized, and the Graph an author's new Edges join. There is one concept here, not two: a Graph is active, and highlighting is how that is shown. A Layout may name which Graph opens active; failing that it is the Layout's first Graph. Changing it is a deliberate act, never a side effect of drawing or reading.
 
-Activating is not itself an edit — it touches no Card and no Graph, so it converts nothing. Which Graph is active may become the authored default when another Edit records the surrounding View.
+Activating is not itself an edit — it touches no Card and no Graph, so it converts nothing. Which Graph is active may become the authored default when another Edit records the surrounding View. On an Algorithmic View, where no Layout is selected, emphasis is the whole of it: the emphasised Graph is not the one a new Edge joins, because conversion returns Graphs of the View's own (ADR 0045).
 _Avoid_: selected Graph and current Graph as a second concept alongside this one, focus, mode.
 
 **Authoring**:
@@ -81,7 +81,7 @@ _Avoid_: revision (that is what a stored Space is versioned by, and the two move
 **Layout**:
 A card-to-position map the author wrote — which of a Space's Cards are in the Layout and where they sit. It belongs to the Space and is part of what the Space is. A Space may hold several Layouts, and may hold none. Membership and position are properties of the Layout, never of the Card: the same Card may be absent from one Layout and sit at different coordinates in others. A Layout may not name Cards the Space does not have.
 
-A Layout is authored by definition; the computed kind is not a layout at all but an automatic **layout strategy** (ADR 0014). An **Algorithmic View** the application supplies may render either the Space generally or a Graph from one of its Layouts, and **editing turns that into a Layout**: the Card positions already on screen are copied into the new Layout, so nothing moves at the moment it happens. When the View is Graph-scoped, conversion also copies the source Graph under a new identity owned by the new Layout; the source Layout and Graph remain unchanged.
+A Layout is authored by definition; the computed kind is not a layout at all but an automatic **layout strategy** (ADR 0014). An **Algorithmic View** the application supplies renders a subject of Cards and Graphs, and **editing turns that into a Layout**: the View returns the Cards and positions already on screen along with one or more Graphs, so nothing moves at the moment it happens. Every Graph it returns carries a new identity owned by the new Layout, so no conversion can leave two Layouts owning one Graph (ADR 0045).
 
 A Layout owns a non-empty ordered collection of Graphs over its Cards. Several Graphs may share Cards within that Layout. A Layout may also name which of its Graphs opens active; otherwise its first Graph opens active.
 _Avoid_: view (a View is application-supplied and carries no authored positions), placement as a synonym (a Layout *holds* a placement, and adds an identity, a title and its owned Graphs), diagram, manual and custom and free-form (a layout is authored, so the qualifiers say nothing).
@@ -108,14 +108,16 @@ _Avoid_: arrangement (applying a strategy produces no separate entity — the ca
 
 **View**:
 An application-supplied projection of a subject through which someone explores or acts on a Space. A View is not tied to a rendering surface and carries no authored Space state.
-_Avoid_: screen, page, panel, mode.
+
+A View is an interface with two sides (ADR 0045). It receives its subject — Cards, and zero or more Graphs — and renders it; when an author edits it, it returns what a Layout is made of: those Cards with their positions, and one or more Graphs, which may hold no Edges. Two rules hold at that boundary. Every Edge endpoint of every returned Graph is one of the returned Cards. Every returned Graph carries a new identity. What a View does between its two sides is its own business, and there are no kinds of View in the domain — only different subjects.
+_Avoid_: screen, page, panel, mode. Space-scoped and Graph-scoped as named kinds (a View has a subject, not a type).
 
 **Algorithmic View**:
-A spatial View that uses an automatic **layout strategy** over an explicit subject and renders its computed Card positions on the canvas. A **Space-scoped View**, such as Grid or an alphabetical list, arranges Space Cards without a Graph; a future **Graph-scoped View**, such as a tree, may borrow one selected Layout-owned Graph and the Cards it connects.
+A spatial View that uses an automatic **layout strategy** over its subject and renders the computed Card positions on the canvas. A View whose subject is the Space's Cards — Grid, an alphabetical list, Flow — draws every Graph in the Space, flattened across its Layouts, which no Edge can escape because every endpoint is a Space Card. A View whose subject is the Cards one Graph connects, such as a future tree, draws that Graph. The subject is what differs; neither is a kind of View.
 
 A viewer chooses between the application's Algorithmic Views and the Space's Layouts as the primary canvas renderer. The Space may name either as its default renderer; a viewer may have a default Algorithmic View of their own; failing both, the application supplies one. Choosing one is navigation, not an edit, and never changes the Space by itself.
 
-Nothing tracks whether a viewer is editing, and there is no edit mode. Editing an Algorithmic View creates a new Layout from the Cards and positions already on screen; moving or connecting a Card, or choosing Add Graph, therefore converts before writing the Edit. A connection or Add Graph may create the new Layout's first Graph as part of that same Edit. Converting a Graph-scoped View also copies its source Graph under a new identity into the new Layout, leaving the source unchanged. Editing a Layout changes that Layout directly. Conversion retains no relationship to the View or layout strategy that produced those initial positions: selecting another View later is a fresh rendering choice, not undo or reversal.
+Nothing tracks whether a viewer is editing, and there is no edit mode. Editing an Algorithmic View creates a new Layout from the Cards and positions already on screen; moving or connecting a Card, or choosing Add Graph, therefore converts before writing the Edit. A connection or Add Graph may create the new Layout's first Graph as part of that same Edit. Whatever Graphs a conversion returns, the Graphs the View was drawing are left unchanged, because what it returns are new Graphs and not those ones. Editing a Layout changes that Layout directly. Conversion retains no relationship to the View or layout strategy that produced those initial positions: selecting another View later is a fresh rendering choice, not undo or reversal.
 _Avoid_: layout, arrangement, algorithm.
 
 **Cards View**:

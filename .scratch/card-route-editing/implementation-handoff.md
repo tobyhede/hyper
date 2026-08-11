@@ -16,7 +16,7 @@ When two records appear to disagree, use this order:
 
 1. `CONTEXT.md` for current ubiquitous language.
 2. The newest accepted ADR that refines or supersedes an older one, especially
-   ADRs 0040, 0041 and 0042.
+   ADRs 0040, 0041, 0042 and 0045.
 3. The complete keyboard specification.
 4. The operation-specific accepted prototypes.
 5. This handoff for cross-operation sequencing and proof obligations.
@@ -40,6 +40,13 @@ The key architecture is fixed:
 - Graph management cannot delete the final Graph.
 - An Algorithmic View has no authored Layout or Graph. Its first Edit converts
   the rendered Cards and positions into a new Layout without moving them.
+- A View is one interface over an open subject (ADR 0045), not a set of kinds.
+  In: Cards and zero or more Graphs. Out, on conversion: those Cards with
+  positions, and one or more Graphs, which may hold no Edges. Every returned
+  Graph's Edge endpoints are among the returned Cards, and every returned Graph
+  carries a fresh identity owned by the new Layout.
+- A View whose subject is the Space's Cards draws every Graph in the Space,
+  flattened across its Layouts. The flatten is derived and never stored.
 - A View is application-supplied and not a synonym for the canvas. Flow and
   Grid are Algorithmic Views; Cards View is a distinct collection View;
   `SpaceCanvas` is rendering composition.
@@ -177,8 +184,32 @@ resolution, canonical export, PostgreSQL decoding, HTTP snapshots, CLI
 diagnostics, fixtures and all repository contracts. Reject version 2 and old
 keys rather than migrating them.
 
+Implement ADR 0045 in the same package, because it is the same document shape.
+`ResolvedView` gains an explicit Card subject and a conversion result — Cards
+with positions plus one or more Graphs — and the two boundary obligations are
+enforced there rather than in any View. `resolveGraphs` in
+`packages/app/src/view.ts` stops reading a Layout's `graphs` filter, which no
+longer exists, and answers a Space-Card subject by flattening every Layout's
+Graphs. Keep this seam distinct from `LayoutStrategy`, which still only
+arranges. The Flow view returns a fresh empty Graph on conversion; that is this
+View's choice among legal outputs, so put it in the View and not in the
+boundary.
+
+The tracked fixture rolls forward as **two** Layouts — Long/Mid/Short over the
+A–D spine, and Echo — because Graphs nest under Layouts in version 1 and a
+Space cannot otherwise hold them. Seed both position maps from one ELK run over
+the current fixture so first paint is unchanged, and leave `defaultView` absent
+so Flow still renders it. Two Layouts rather than one is deliberate: it is the
+only place in the tree where the flatten crosses a Layout boundary, and one
+Layout would leave that rule untested. AGENTS.md's line explaining that ELK
+renders the fixture because it declares no Layout becomes wrong here — the
+reason becomes the absent `defaultView`.
+
 Gate: schema/reference property tests, deterministic export tests, HTTP/backend
-contracts, PostgreSQL integration and database-free E2E on the new shape.
+contracts, PostgreSQL integration and database-free E2E on the new shape. Add a
+property test that no View output can violate closure or reuse a source Graph
+identity, and an E2E proving the fixture's Flow view still draws all four
+Graphs across its two Layouts.
 
 ### 3. Deep semantic authoring interface
 
