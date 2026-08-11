@@ -1,8 +1,8 @@
 # A split presentation move can strand at the wide zoom
 
-Status: ready-for-human
+Status: resolved
 
-Blocked by: 01
+Blocked by: 01 (resolved)
 
 ## Context
 
@@ -66,3 +66,46 @@ in one call site, rather than at the seam.
 - Coverage at the camera seam for a superseded first-half move, not only for the
   uninterrupted split already pinned by the existing tests.
 - No required behaviour chained on a camera Promise anywhere else in the canvas.
+
+## Answer
+
+**Both shapes, because they are one shape.** The close-in is scheduled on a
+`window.setTimeout` matched to the pan's duration, and that timer belongs to the
+effect that issued the pan — so the cleanup which runs when `activeCardId`
+changes cancels it. Sequencing no longer depends on the pan's Promise settling,
+and an interrupted move is *replaced* by the next card's own split rather than
+orphaned. Treating them as alternatives was the ticket's framing; scheduling
+without the cancellation would leave a superseded move's close-in to fire over
+the move that replaced it.
+
+The `cancelled` flag is gone. It guarded teardown, which the timer's own cleanup
+now covers, and it was never the thing at fault.
+
+`packages/app/src/components/cameras.tsx` is the seam, extracted from
+`SpaceCanvas.tsx` under issue `01` — see that ticket for why it is a module.
+Every camera call in the app is now inside it, all `void`, none chained: the
+third acceptance criterion holds by construction rather than by a grep that has
+to be repeated.
+
+The cost, recorded in ADR 0043: a throttled timer can fire slightly off the
+transition's true end. That is visually inert, because the close-in supersedes
+whatever is left of the pan, and it buys a sequence that always completes over
+one that usually completes exactly on time.
+
+Coverage: `packages/app/test/cameras.test.tsx`, where every stubbed `setCenter`
+returns a Promise that never settles — the interruption branch, not a synthetic
+one. Two of its four tests were confirmed **red against the chained
+implementation** before the fix landed: the uninterrupted split never reached its
+close-in, and traversing mid-pan produced two moves where three are required.
+
+### Later: the split itself is gone (ADR 0044)
+
+The answer above describes a timer that no longer exists. The two-phase move was
+removed outright a few days later: both shapes were built behind a toggle and
+watched on the fixture, found indistinguishable, and the move became one
+`fitView` call. The tests named above were rewritten around it.
+
+That does not undo this ticket, it generalises it. The defect was a `.then` on a
+Promise that never settles, and the fix was to stop depending on settlement;
+having one command rather than two means there is no follow-up work left to
+depend on it. ADR 0043 remains the standing rule.
