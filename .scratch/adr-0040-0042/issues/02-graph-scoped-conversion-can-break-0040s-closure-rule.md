@@ -51,6 +51,16 @@ more said about it.
 - ADR 0040 answers what a partial Graph-scoped conversion does.
 - The answer is consistent with the closure invariant as stated.
 
+**The first criterion is superseded, and this ticket is not resolved by
+satisfying it.** It asked an ADR to choose between whole-Graph conversion and a
+projected Graph. ADR 0045 makes that choice unnecessary rather than making it:
+both remain legal implementations of the View interface, neither can violate the
+invariant, and the deferred Graph-scoped work decides between them when it is
+actually designed. Deciding it here would be pre-deciding a feature nobody has
+specified, which is what this ticket's own Context section warns the deferral
+does not require. The second criterion is met, by construction rather than by
+wording. See the Answer.
+
 ## Answer
 
 **Neither of the two directions was taken. The gap closed structurally instead, and this ticket resolves as a consequence of issue `06`.**
