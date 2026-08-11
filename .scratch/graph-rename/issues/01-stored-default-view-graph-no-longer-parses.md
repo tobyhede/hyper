@@ -1,6 +1,6 @@
 # A stored `defaultView: "graph"` no longer parses
 
-Status: ready-for-human
+Status: resolved
 
 Surfaced by: review of PR #36, filed after it merged
 
@@ -76,3 +76,46 @@ built-in view id. Whatever is chosen, the resolution chain stays where it is —
   posture 1 is taken, and what it says about a hand-authored file imported
   later.
 - If posture 2 or 3, coverage for a document naming the superseded value.
+
+## Answer
+
+**Posture 1. Nothing changes.**
+
+The claim this ticket asked to be checked is not "no row happens to carry the
+value today". It is stronger, and it is about how the project is developed
+rather than about the current contents of a table: **the development database is
+hard reset, not migrated.** No row outlives a schema change, so no row can carry
+a name a schema change retired. A query would only have re-proved that for one
+instant.
+
+That closes the second door as well, which is the half a query could never
+reach. A hand-authored `space.json` is a risk only if there is an old file to
+copy from or an old value someone has met. Hyper is unreleased, nothing in this
+tree has ever written `"graph"` into a `defaultView` position, and every space
+in existence is regenerated. There is nothing to copy.
+
+The refusal itself was never in question and is unchanged: `"flow"` is
+canonical, `isBuiltInViewId('graph')` is false, and `spaceFileSchema` rejects
+the value. It simply reports it as `Invalid uuid` rather than by name.
+
+### What was tried and reverted
+
+Posture 2 was built first — a `fatal` superseded-name check ahead of the union,
+piped into it, with tests and an AGENTS.md entry — and then reverted once the
+hard-reset practice was stated. It cost about fifty lines in `core` to name a
+value nothing can produce, which is exactly the over-generalisation the scope
+rule warns against.
+
+One finding from it is worth keeping even though the code is gone, because it
+will bite anyone who tries this again. **A check placed on the union does not
+run.** Zod 3 reports a failed `.uuid()` as *dirty* rather than aborted, so
+`ZodUnion` returns that branch's result and never raises `invalid_union` — which
+means a union-level `errorMap` or `.superRefine` on `defaultView` is dead code.
+Verified against `zod@3.25.76`. The check has to sit *ahead* of the union and
+pipe into it.
+
+### What would reopen this
+
+A release, or the first import of a space file written outside this tree by
+somebody who is not resetting their database. Neither has happened. If either
+does, posture 2 is what to build, and the paragraph above says how.
