@@ -3,15 +3,6 @@ import { ReactFlowProvider } from '@xyflow/react';
 import { AppShell, Button, LayoutSelector, GraphSelector, ViewSelector } from '@project/ui';
 import { cardDocumentSchema, uuidSchema, type LayoutPosition } from '@project/core';
 import {
-  projectCardNodes,
-  projectGraphEdges,
-  type GraphEmphasis,
-} from '@project/react-flow-adapter';
-import {
-  buildCardHandles,
-  buildLayoutStrategyGraph,
-  buildGraphRenderEdges,
-  filterHandlesByGraphs,
   getCard,
   Placement,
   graphCardIds,
@@ -21,9 +12,10 @@ import {
 import type { OpenedSpace } from './space';
 import { createSpaceAuthoring, nextCardTitle } from './space-authoring';
 import { createRenderAdapter } from './render-adapter';
-import { canvasContent, usePlacementRendering } from './placement-rendering';
-import { activeGraphColor, graphColorMap } from './colors';
-import { CARD_HEIGHT, CARD_SIZE, cardSizeVars } from './card';
+import { canvasProjection } from './canvas-projection';
+import { canvasContent } from './canvas-content';
+import { usePlacementRendering } from './placement-rendering';
+import { cardSizeVars } from './card';
 import { createNavigation } from './navigation';
 import { createWorkingSpaceReader } from './snapshot';
 import { defaultRenderer, resolveView, type RendererSelection } from './view';
@@ -102,14 +94,14 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
       [sessionState.working],
     );
     const layouts = rendererSpace.layouts;
-    const graphs = rendererSpace.graphs;
-    const colors = useMemo(() => graphColorMap(rendererSpace), [rendererSpace]);
-    const allHandles = useMemo(() => buildCardHandles(rendererSpace), [rendererSpace]);
-    const allGraphEdges = useMemo(() => buildGraphRenderEdges(rendererSpace), [rendererSpace]);
     const view = useMemo(
       () => resolveView(rendererSpace, selectedRenderer),
       [rendererSpace, selectedRenderer],
     );
+    // Everything the canvas draws, derived once from the Space and the view.
+    // Memoized on those two alone: the interaction state below changes far more
+    // often, and it is `project` that reads it rather than this.
+    const projection = useMemo(() => canvasProjection(rendererSpace, view), [rendererSpace, view]);
 
     const { activeGraphId, openedCardId } = navigationState;
     const activateGraph = navigation.activateGraph;
@@ -140,38 +132,6 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
     // filter and a map over one Graph's Edges, or nothing at all outside presentation.
     const moves = navigation.moves();
 
-    // Which graphs the renderer shows, resolved from the Layout that filtered them
-    // (ADR 0026). Membership is the view's decision (ADR 0005), which is why it
-    // arrives from `resolveView` rather than being decided in the graph or layout
-    // packages.
-    const visibleGraphIds = view.visibleGraphIds;
-    const visibleGraphIdSet = useMemo(() => new Set(visibleGraphIds), [visibleGraphIds]);
-    const visibleGraphs = useMemo(
-      () => graphs.filter((graph) => visibleGraphIdSet.has(graph.id)),
-      [graphs, visibleGraphIdSet],
-    );
-
-    // Every card, not just the graph-visited ones. A space may have cards and no
-    // graphs at all (ADR 0015) — deriving the card set from the graphs would render
-    // a new space as an empty canvas, which is the one thing it must not do. Which
-    // cards a view draws was always the View's call, not the layout's (ADR 0005).
-    const visibleCardIds = useMemo(
-      () => rendererSpace.cards.map((card) => card.id),
-      [rendererSpace.cards],
-    );
-    const visibleHandles = useMemo(
-      () => filterHandlesByGraphs(allHandles, visibleGraphIds),
-      [allHandles, visibleGraphIds],
-    );
-    const visibleEdges = useMemo(
-      () => allGraphEdges.filter((edge) => visibleGraphIdSet.has(edge.graphId)),
-      [allGraphEdges, visibleGraphIdSet],
-    );
-
-    const strategyGraph = useMemo(
-      () => buildLayoutStrategyGraph(visibleCardIds, visibleHandles, visibleEdges, CARD_SIZE),
-      [visibleCardIds, visibleHandles, visibleEdges],
-    );
     // Read at the point of use, like `moves` above and for the same reason: the
     // placement is not published state, and subscribing to it through the
     // render adapter — a store that knows nothing about either the placement or
@@ -183,72 +143,47 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
     const authoredPositions = authoring.authoredPlacement();
     const selectedCardId = useRenderAdapter((s) => s.selectedCardId);
     const moved = useRenderAdapter((s) => s.moved);
-    const placement = usePlacementRendering(strategyGraph, view.strategy, authoredPositions);
+    const placement = usePlacementRendering(
+      projection.strategyGraph,
+      view.strategy,
+      authoredPositions,
+    );
     const laidOut = placement.kind === 'ready' ? placement.strategyGraph : null;
 
-    // Selecting a graph emphasises it; it never hides the rest of the space.
-    const emphasis: GraphEmphasis = activeGraphId ? 'subtle' : 'equal';
-
-    const projectedNodes = useMemo(
+    // Nothing is worth projecting before a strategy resolves — every card would
+    // sit at the origin — and `project` will not take a null arrangement, so this
+    // is the whole of that gate rather than a rule the sync effect remembers.
+    const projected = useMemo(
       () =>
-        projectCardNodes(rendererSpace, visibleHandles, colors, {
-          activeCardId,
-          selectedCardId,
-          showActiveCardContent: presenting,
-          activeGraphId,
-          activeGraphColor: activeGraphColor(colors, activeGraphId),
-          emphasis,
-          ...(laidOut ? { strategyGraph: laidOut } : {}),
-          nodeHeight: CARD_HEIGHT,
-          cardIds: visibleCardIds,
-        }),
-      [
-        rendererSpace,
-        colors,
-        activeCardId,
-        selectedCardId,
-        presenting,
-        activeGraphId,
-        emphasis,
-        laidOut,
-        visibleHandles,
-        visibleCardIds,
-      ],
-    );
-
-    const projectedEdges = useMemo(
-      () =>
-        projectGraphEdges(visibleEdges, colors, {
-          activeGraphId,
-          emphasis,
-          // A layout's routed edge geometry describes the arrangement it computed,
-          // so it stops being true once a card is dragged out of it. From then on
-          // the edges fall back to plain curves between wherever the cards now are
-          // — which is what a positioned view draws anyway, since it routes
-          // nothing.
-          ...(laidOut && !moved ? { strategyGraph: laidOut } : {}),
-        }),
-      [visibleEdges, colors, activeGraphId, emphasis, laidOut, moved],
+        laidOut === null
+          ? null
+          : projection.project(laidOut, {
+              activeGraphId,
+              activeCardId,
+              selectedCardId,
+              presenting,
+              moved,
+            }),
+      [projection, laidOut, activeGraphId, activeCardId, selectedCardId, presenting, moved],
     );
 
     // Hand the complete projection to the render adapter as one state change.
     // A Card keeps its live position, measured size and drag state, while an Edge
     // can never become visible before the endpoint nodes declare its handles.
-    // Only once the layout has resolved: before that every card sits at the origin
-    // and there is nothing worth preserving.
     const syncProjection = useRenderAdapter((s) => s.syncProjection);
     useEffect(() => {
-      if (laidOut) syncProjection(projectedNodes, projectedEdges);
-    }, [laidOut, projectedNodes, projectedEdges, syncProjection]);
+      if (projected) syncProjection(projected.nodes, projected.edges);
+    }, [projected, syncProjection]);
 
     const liveProjection = useRenderAdapter((s) => s.projection);
     const changeNodes = useRenderAdapter((s) => s.changeNodes);
-    const canvas = canvasContent(placement, liveProjection !== null);
     // There is an arrangement to drag once the layout has resolved and the store
     // has taken it. Not a permission — every view is editable (ADR 0025) — but it
     // is false for the frame before the first placement resolves, and again after
     // `selectRenderer` clears the projection until the next one is published.
-    const editable = liveProjection !== null;
+    const hasArrangement = liveProjection !== null;
+    const canvas = canvasContent(placement, hasArrangement);
+    const editable = hasArrangement;
     const completedConnectionTarget = useRef<string | null>(null);
 
     // One decision resolved from one Space, applied in an order that cannot
@@ -292,18 +227,23 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
         // Issue 04 owns Graph minting. An existing Graph can be edited from every
         // resolved renderer; an Algorithmic View converts using exactly the live
         // Card positions the author connected between (ADR 0025).
+        // Null while a replacement arrangement resolves. The canvas keeps drawing
+        // the one on screen through that window — deliberately, so a gesture is
+        // never interrupted — so a connection is reachable with no fresh
+        // projection to hand over, and the store keeps its live nodes rather than
+        // reconciling against nothing.
         const completed = useRenderAdapter
           .getState()
           .connectCards(
             uuidSchema.parse(connection.source),
             uuidSchema.parse(connection.target),
-            projectedNodes,
+            projected?.nodes ?? null,
           );
         if (completed) {
           completedConnectionTarget.current = connection.target;
         }
       },
-      [projectedNodes],
+      [projected],
     );
 
     const finishConnection = useCallback(() => {
@@ -467,9 +407,9 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
           }
         />
         <GraphSelector
-          graphs={visibleGraphs}
+          graphs={projection.visibleGraphs}
           activeGraphId={activeGraphId}
-          colorByGraphId={colors}
+          colorByGraphId={projection.colors}
           onActivate={(graphId) => activateGraph(uuidSchema.parse(graphId))}
           // `GraphSelector` disables its control on "no active Graph" and
           // `present()` refuses on exactly that, so the two conditions agree:
@@ -565,8 +505,8 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
                 onOpenCard={openCardForEditing}
                 onCompleteCardTitle={completeCardTitle}
                 editableCardIds={editableCardIds}
-                graphs={visibleGraphs}
-                colorByGraphId={colors}
+                graphs={projection.visibleGraphs}
+                colorByGraphId={projection.colors}
                 activeGraphId={activeGraphId}
                 activeGraphCardIds={activeGraphCardIds}
               />

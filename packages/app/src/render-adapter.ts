@@ -59,8 +59,17 @@ export interface RenderAdapterState {
   selectRenderer: (placement: Placement | null) => void;
   /** Apply React Flow's own changes (drag, measure, select). */
   changeNodes: (changes: NodeChange<CardFlowNode>[]) => void;
-  /** Install and notify one directed Edge between existing Cards, when it is a real Edit. */
-  connectCards: (from: CardId, to: CardId, projected: readonly CardFlowNode[]) => boolean;
+  /**
+   * Install and notify one directed Edge between existing Cards, when it is a
+   * real Edit.
+   *
+   * `projected` is the render path's next projection, merged onto the live nodes
+   * so the Edge draws without waiting for a strategy. It is `null` while a
+   * replacement arrangement is still resolving — the canvas keeps drawing the one
+   * already on screen, so a connection is still reachable — and then there is
+   * nothing to merge and the live nodes stand until the next `syncProjection`.
+   */
+  connectCards: (from: CardId, to: CardId, projected: readonly CardFlowNode[] | null) => boolean;
   /** Install and notify an atomic create-and-connect Edit without adding a transient node. */
   createConnectedCard: (from: CardId, position: LayoutPosition) => CardId | null;
   /** Select one Card after a completed connection. */
@@ -281,7 +290,7 @@ export function createRenderAdapter(authoring: SpaceAuthoring): RenderAdapter {
       // Re-read: completing published, and a listener may have replaced the
       // projection — accepting a stored Space drops it outright.
       const committed = get().projection;
-      if (committed !== null) {
+      if (committed !== null && projected !== null) {
         set({ projection: { ...committed, nodes: reconcile(committed.nodes, projected) } });
       }
       return true;
