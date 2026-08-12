@@ -40,6 +40,15 @@ replacement together. Do not take it out here because it looks vestigial.
 green, all reported with real output. `pnpm postgres:up` before the integration
 run and `pnpm postgres:down` after.
 
+**PostgreSQL is a first verification here, not a re-run.** Ticket 04 migrated
+`test/integration/postgres-space-repository.test.ts` and `hyper-cli.test.ts` and
+left them typecheck-clean, but could not execute them — no Docker daemon was
+available in that worktree. Nothing has yet exercised the version 1 shape
+against a live database: not the id minting under a Layout, not the JSONB
+round-trip, not the revision check. Treat a failure here as a real defect in
+ticket 04's work rather than as environment noise, and do not close this ticket
+on the strength of the tests merely compiling.
+
 ## Acceptance criteria
 
 - [ ] `pnpm verify` green.
