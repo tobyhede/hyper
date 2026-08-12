@@ -139,7 +139,7 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
     // the selected renderer — only worked because every install happened to be
     // followed by an unrelated notification. This component already re-renders
     // on both stores, and a render-time read cannot be stale at the render that
-    // uses it. `installPlacement` keeps the map's identity when the value is
+    // uses it. `replacePlacement` keeps the map's identity when the value is
     // unchanged, so this does not defeat the memo below.
     const authoredPositions = authoring.authoredPlacement();
     const selectedCardId = useRenderAdapter((s) => s.selectedCardId);

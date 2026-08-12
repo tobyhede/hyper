@@ -55,7 +55,10 @@ function authoringSpy({
     getState: () => ({}) as never,
     authoredPlacement: () => null,
     subscribe: () => () => undefined,
-    installPlacement: (placement: ReadonlyMap<string, LayoutPosition> | null) => {
+    reportRendered: (placement: ReadonlyMap<string, LayoutPosition>) => {
+      installs.push({ placement, nodesAtCall: adapter?.getState().projection?.nodes ?? null });
+    },
+    replacePlacement: (placement: ReadonlyMap<string, LayoutPosition> | null) => {
       installs.push({ placement, nodesAtCall: adapter?.getState().projection?.nodes ?? null });
     },
     canConnect: () => canConnect,
@@ -552,7 +555,16 @@ describe('render adapter', () => {
     completeDrag(store, CARD_A, 500, 400);
 
     expect(store.getState().moved).toBe(true);
-    expect(spy.completions).toEqual([{ kind: 'settled-card-movement' }]);
+    expect(spy.completions).toEqual([
+      {
+        kind: 'settled-card-movement',
+        rendered: Placement.fromEntries([
+          [CARD_A, { x: 500, y: 400 }],
+          [CARD_B, { x: 300, y: 20 }],
+        ]),
+        placed: [CARD_A],
+      },
+    ]);
   });
 
   /*

@@ -20,13 +20,23 @@ import { updatePositionedLayout } from './snapshot';
 import { defaultRenderer, resolveView, type RendererSelection } from './view';
 
 export type AuthoringCompletion =
-  | { readonly kind: 'settled-card-movement' }
-  | { readonly kind: 'connected-cards'; readonly from: CardId; readonly to: CardId }
+  | {
+      readonly kind: 'settled-card-movement';
+      readonly rendered: Placement;
+      readonly placed: readonly CardId[];
+    }
+  | {
+      readonly kind: 'connected-cards';
+      readonly from: CardId;
+      readonly to: CardId;
+      readonly rendered: Placement;
+    }
   | { readonly kind: 'edited-card'; readonly cardId: CardId }
   | {
       readonly kind: 'create-and-connect';
       readonly from: CardId;
       readonly position: LayoutPosition;
+      readonly rendered: Placement;
     };
 
 export type AuthoringResult =
@@ -73,7 +83,8 @@ export interface SpaceAuthoring {
    */
   readonly authoredPlacement: () => Placement | null;
   readonly subscribe: (listener: () => void) => () => void;
-  readonly installPlacement: (placement: Placement | null) => void;
+  readonly reportRendered: (rendered: Placement) => void;
+  readonly replacePlacement: (placement: Placement | null) => void;
   /**
    * Install an editor's completed Card value before it reports the Edit.
    *
@@ -253,6 +264,13 @@ export function createSpaceAuthoring({
   const install = (nextPlacement: Placement | null): void => {
     if (Placement.equals(placement, nextPlacement)) return;
     placement = nextPlacement;
+  };
+
+  const mergeBase = (): Placement | null =>
+    navigation.getState().selectedRenderer.kind === 'layout' ? placement : null;
+
+  const reportRendered = (rendered: Placement): void => {
+    install(Placement.next(mergeBase(), rendered, []));
   };
 
   const snapshotState = (): SpaceAuthoringState => ({
@@ -529,9 +547,18 @@ export function createSpaceAuthoring({
   let completing = false;
   const queued: QueuedCompletion[] = [];
   const complete = (completion: AuthoringCompletion): AuthoringResult => {
+    const completedPlacement =
+      completion.kind === 'edited-card'
+        ? placement
+        : Placement.next(
+            mergeBase(),
+            completion.rendered,
+            completion.kind === 'settled-card-movement' ? completion.placed : [],
+          );
+    install(completedPlacement);
     const reported: ReportedCompletion = {
       completion,
-      placement,
+      placement: completedPlacement,
       cardDocuments: new Map(cardDocuments),
     };
     // An installed Card value is one hand-off, consumed by the report that
@@ -647,10 +674,10 @@ export function createSpaceAuthoring({
 
   return {
     getState: observable.getState,
-    authoredPlacement: () =>
-      navigation.getState().selectedRenderer.kind === 'layout' ? placement : null,
+    authoredPlacement: () => mergeBase(),
     subscribe: observable.subscribe,
-    installPlacement: install,
+    reportRendered,
+    replacePlacement: install,
     installCardDocument: (cardId, document) => cardDocuments.set(cardId, document),
     canConnect,
     canCreateConnectedCard,
