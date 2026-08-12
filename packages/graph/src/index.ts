@@ -53,7 +53,7 @@ export type {
   LayoutStrategy,
 } from './layout';
 
-export { getCard, getLayout, getGraph, resolveContentCard } from './lookup';
+export { getCard, getLayout, getGraph, getGraphOwner, resolveContentCard } from './lookup';
 export type { ResolvedContentCard } from './lookup';
 
 export { newSpace } from './new-space';

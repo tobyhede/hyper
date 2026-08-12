@@ -36,6 +36,7 @@ const OFFERED_VALUES = [
   'getCard',
   'getLayout',
   'getGraph',
+  'getGraphOwner',
   'gridStrategy',
   'inHandleId',
   'loadSpace',

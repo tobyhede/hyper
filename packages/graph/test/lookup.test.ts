@@ -5,17 +5,27 @@ import { aliasFile, cardFile, uuid } from './card-files';
 function baseSpace(): Space {
   const result = loadSpace(
     {
-      version: 2,
+      version: 1,
       id: uuid('00000000-0000-4000-8000-000000000001'),
       title: 'Test',
-      graphs: [
+      layouts: [
         {
-          id: uuid('00000000-0000-4000-8000-000000000004'),
-          title: 'Main',
-          edges: [
+          id: uuid('00000000-0000-4000-8000-000000000022'),
+          title: 'Working',
+          positions: {
+            [uuid('00000000-0000-4000-8000-000000000045')]: { x: 0, y: 0 },
+            [uuid('00000000-0000-4000-8000-000000000044')]: { x: 320, y: 0 },
+          },
+          graphs: [
             {
-              from: uuid('00000000-0000-4000-8000-000000000045'),
-              to: uuid('00000000-0000-4000-8000-000000000044'),
+              id: uuid('00000000-0000-4000-8000-000000000004'),
+              title: 'Main',
+              edges: [
+                {
+                  from: uuid('00000000-0000-4000-8000-000000000045'),
+                  to: uuid('00000000-0000-4000-8000-000000000044'),
+                },
+              ],
             },
           ],
         },

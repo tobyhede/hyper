@@ -1,8 +1,8 @@
-import { newUuid, type Card, type SpaceFile } from '@project/core';
+import { newUuid, SPACE_FILE_VERSION, type Card, type SpaceFile } from '@project/core';
 import { serializeCardFile, type CardFile } from './card-file';
 
 /**
- * A new space: one card, no graphs (ADR 0018).
+ * A new space: one card, no layouts and so no graphs (ADR 0018).
  *
  * The default when there is nothing else to open — not the fixture, which is a
  * purpose-shaped test bed, and not an empty canvas, which offers no gesture a
@@ -25,16 +25,17 @@ const FIRST_CARD_TITLE = 'Card 1';
 export function newSpace(): NewSpace {
   const spaceId = newUuid();
   const cardId = newUuid();
-  // No `layouts` and no `defaultView`. A new space's card carries no position,
-  // because centering is the view's job — `fitView` frames whatever is on
-  // screen, and a position nobody wrote would be authored content nobody wrote.
-  // The Layout arrives when the space is edited (ADR 0025), not here and not on
-  // open: a space that is only read keeps none.
+  // No `layouts` and no `defaultView`, which is now the same statement as "no
+  // graphs": a Layout owns at least one (ADR 0040), so a space with neither is
+  // the state a new one starts in. A new space's card carries no position
+  // either, because centering is the view's job — `fitView` frames whatever is
+  // on screen, and a position nobody wrote would be authored content nobody
+  // wrote. The Layout arrives when the space is edited (ADR 0025), not here and
+  // not on open: a space that is only read keeps none.
   const file: SpaceFile = {
-    version: 2,
+    version: SPACE_FILE_VERSION,
     id: spaceId,
     title: 'New space',
-    graphs: [],
   };
 
   const card: Card = {

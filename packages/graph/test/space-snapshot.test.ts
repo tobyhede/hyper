@@ -7,13 +7,22 @@ const SPACE_ID = uuid('00000000-0000-4000-8000-000000000001');
 const CARD_A = uuid('00000000-0000-4000-8000-000000000002');
 const CARD_B = uuid('00000000-0000-4000-8000-000000000003');
 const GRAPH_ID = uuid('00000000-0000-4000-8000-000000000004');
+const LAYOUT_ID = uuid('00000000-0000-4000-8000-000000000022');
 
 const snapshot: SpaceSnapshot = {
   id: SPACE_ID,
   document: {
-    version: 2,
+    version: 1,
     title: 'Snapshot space',
-    graphs: [{ id: GRAPH_ID, title: 'Main', edges: [{ from: CARD_A, to: CARD_B }] }],
+    layouts: [
+      {
+        id: LAYOUT_ID,
+        title: 'Working',
+        kind: 'positioned',
+        positions: { [CARD_A]: { x: 0, y: 0 }, [CARD_B]: { x: 320, y: 0 } },
+        graphs: [{ id: GRAPH_ID, title: 'Main', edges: [{ from: CARD_A, to: CARD_B }] }],
+      },
+    ],
   },
   cards: [
     { id: CARD_A, document: { title: 'A', kind: 'markdown', body: 'Body A' } },

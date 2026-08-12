@@ -13,6 +13,18 @@ export function getGraph(space: Space, graphId: GraphId): Graph | undefined {
 }
 
 /**
+ * The layout that owns a graph (ADR 0040).
+ *
+ * `space.graphs` is a flatten across every layout, so a caller holding a graph
+ * id off it has lost the one thing ownership adds — which layout's cards its
+ * edges are closed over, and which layout an edit to it belongs in. This
+ * answers that in O(1) rather than by scanning the layouts.
+ */
+export function getGraphOwner(space: Space, graphId: GraphId): Layout | undefined {
+  return space.layoutByGraphId.get(graphId);
+}
+
+/**
  * A layout the space declares, by id. Only positioned layouts are declared;
  * a built-in automatic view's name resolves to no layout here (ADR 0025).
  */
