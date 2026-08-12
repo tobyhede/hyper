@@ -405,6 +405,12 @@ interface CreatedCard {
 const incomingAliases = (cards: SnapshotCards, cardId: CardId): SnapshotCards =>
   cards.filter((card) => card.document.kind === 'alias' && card.document.target === cardId);
 
+/** A title normalized for authorship, or `null` when it contains no name. */
+const trimmedNonBlankTitle = (title: string): string | null => {
+  const trimmed = title.trim();
+  return trimmed.length === 0 ? null : trimmed;
+};
+
 /**
  * Structural equality over the JSON values a snapshot is built from.
  *
@@ -708,8 +714,8 @@ export function createSpaceAuthoring({
       // answers an empty one by failing — which this derivation reports by
       // throwing, and an author's mistake may not throw. Every caller of this
       // operation is covered by one rule instead of each remembering it.
-      const title = completion.document.title.trim();
-      if (title.length === 0) return refuse('A Card title is required.');
+      const title = trimmedNonBlankTitle(completion.document.title);
+      if (title === null) return refuse('A Card title is required.');
       const document: CardDocument = { ...completion.document, title };
       if (sameValue(card.document, document)) return UNCHANGED;
       const refusal = aliasTargetRefusal(space, document);
@@ -864,7 +870,7 @@ export function createSpaceAuthoring({
       const graph: Graph = {
         id: newId(),
         title: nextGraphTitle(space.graphs),
-        color: nextGraphColor(space.graphs.length),
+        color: nextGraphColor(ownedGraphs.length),
         edges: [],
       };
       ownedGraphs = [...ownedGraphs, graph];
@@ -887,8 +893,8 @@ export function createSpaceAuthoring({
       if (completion.kind === 'renamed-graph') {
         // Trimmed, for the reason a Card title is: `z.string().min(1)` counts
         // characters, so blank is the empty case wearing different bytes.
-        const title = completion.title.trim();
-        if (title.length === 0) return refuse('A Graph title is required.');
+        const title = trimmedNonBlankTitle(completion.title);
+        if (title === null) return refuse('A Graph title is required.');
         if (title === graph.title) return UNCHANGED;
         ownedGraphs = replacing({ ...graph, title });
       } else if (completion.kind === 'recolored-graph') {

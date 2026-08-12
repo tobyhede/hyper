@@ -308,16 +308,12 @@ const spaceSubject = (space: Space): RendererSubject => ({
  *
  * The stored colour is the same rule Graph management's Add Graph uses, so a
  * Graph does not come out with different properties according to whether the
- * author asked for it or drew the first connection that minted it. The subject's
- * Graphs are the Space flatten for a converting View, so their count is exactly
- * the rotation `nextGraphColor` wants.
+ * author asked for it or drew the first connection that minted it. A conversion
+ * creates the Layout, so this Graph occupies its first position and takes the
+ * first palette colour, whatever the View was drawing.
  */
 const freshEmptyGraph: ViewGraphPolicy = (_space, subject) => [
-  {
-    title: nextGraphTitle(subject.graphs),
-    color: nextGraphColor(subject.graphs.length),
-    edges: [],
-  },
+  { title: nextGraphTitle(subject.graphs), color: nextGraphColor(0), edges: [] },
 ];
 
 /**

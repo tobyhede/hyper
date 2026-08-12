@@ -336,6 +336,36 @@ describe('Add Alias', () => {
 });
 
 describe('Add Graph', () => {
+  it('rotates colour by its appended position in the owning Layout', () => {
+    const snapshot: SpaceSnapshot = {
+      ...positionedSnapshot,
+      document: {
+        ...positionedSnapshot.document,
+        layouts: [
+          positionedSnapshot.document.layouts![0]!,
+          {
+            id: OTHER_LAYOUT_ID,
+            title: 'Layout 2',
+            kind: 'positioned',
+            positions: { [CARD_A]: { x: 20, y: 30 }, [CARD_B]: { x: 310, y: 50 } },
+            graphs: [{ id: OTHER_GRAPH_ID, title: 'Other', edges: [] }],
+          },
+        ],
+      },
+    };
+    const { authoring, session } = open(snapshot);
+    place(authoring, { [CARD_A]: [10, 20], [CARD_B]: [300, 40] });
+
+    expect(authoring.complete({ kind: 'added-graph' })).toEqual({
+      kind: 'completed',
+      createdGraphId: MINTED,
+    });
+
+    expect(layoutOf(session.getState().working, LAYOUT_ID)?.graphs.at(-1)?.color).toBe(
+      GRAPH_PALETTE[1],
+    );
+  });
+
   it('appends, colours and activates one empty Graph without touching the others', () => {
     const { authoring, session, navigation } = openPositioned();
 
@@ -404,13 +434,13 @@ describe('Edit Graph', () => {
     expect(session.getState().working).toBe(before);
   });
 
-  it('treats renaming to the stored title as unchanged', () => {
+  it('treats a padded rename to the stored title as unchanged', () => {
     const { authoring, session } = openPositioned();
     const before = session.getState().working;
 
-    expect(authoring.complete({ kind: 'renamed-graph', graphId: GRAPH_ID, title: 'Main' })).toEqual(
-      { kind: 'unchanged' },
-    );
+    expect(
+      authoring.complete({ kind: 'renamed-graph', graphId: GRAPH_ID, title: ' Main ' }),
+    ).toEqual({ kind: 'unchanged' });
     expect(session.getState().working).toBe(before);
   });
 

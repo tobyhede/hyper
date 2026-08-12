@@ -25,22 +25,19 @@ export function activeGraphColor(
 
 /**
  * The color authoring stores on a graph it creates, rotating through the
- * palette by how many graphs the space already holds.
+ * palette by the Graph's appended position in its owning Layout.
  *
- * Stored rather than resolved, and by the count across the *space* rather than
- * within the owning layout, because a Space-subject view draws every graph in
- * the space at once — the flatten across its layouts (ADR 0045) — and that is
- * where two graphs wearing one color would actually collide. Every creation
- * gesture rotates by this same rule, so a graph does not get different
- * properties according to whether it was added through Graph management or
- * minted by the first connection drawn on an Algorithmic View.
+ * Stored rather than resolved. Every creation gesture rotates by this same
+ * Layout-local rule, so a Graph does not get different properties according to
+ * whether it was added through Graph management or minted by the first
+ * connection drawn on an Algorithmic View.
  *
  * The palette is an authoring constant, not a domain constraint:
  * {@link graphColorMap} still resolves a fallback for an imported graph that
  * carries no color of its own.
  */
-export const nextGraphColor = (existingGraphCount: number): string =>
-  GRAPH_PALETTE[existingGraphCount % GRAPH_PALETTE.length] ?? GRAPH_PALETTE[0];
+export const nextGraphColor = (owningLayoutGraphCount: number): string =>
+  GRAPH_PALETTE[owningLayoutGraphCount % GRAPH_PALETTE.length] ?? GRAPH_PALETTE[0];
 
 /** Resolve each graph's color: its space `color`, else a palette slot by order. */
 export function graphColorMap(space: Space): Record<string, string> {

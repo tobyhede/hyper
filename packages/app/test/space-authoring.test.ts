@@ -734,10 +734,10 @@ describe('Space Authoring', () => {
       {
         id: MINTED_GRAPH_ID,
         title: 'Graph 1',
-        // The second palette slot, because the Space already holds `Main`: the
-        // rotation runs over the flatten a Space-subject View draws, which is
-        // where two Graphs wearing one colour would actually collide.
-        color: GRAPH_PALETTE[1],
+        // The first palette slot, although the Space already holds `Main`: the
+        // rotation is Layout-local, and a conversion creates the Layout, so its
+        // initial Graph occupies the first position in it.
+        color: GRAPH_PALETTE[0],
         edges: [{ from: CARD_A, to: CARD_B }],
       },
     ]);

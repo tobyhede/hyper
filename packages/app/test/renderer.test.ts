@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { uuidSchema, type GraphId } from '@project/core';
 import { buildLayoutStrategyGraph, loadSpace, Placement, type Space } from '@project/graph';
 import { CARD_SIZE } from '../src/card';
+import { GRAPH_PALETTE } from '../src/colors';
 import {
   createRendererResolver,
   RendererInvariantError,
@@ -347,6 +348,14 @@ describe('converting a View into a Layout’s Graphs', () => {
     expect(converted.graphs[0].title).toBe('Graph 1');
     expect(converted.graphs[0].id).toBe(minted[0]);
     expect(renderer.subject.graphs.map((graph) => graph.id)).not.toContain(converted.graphs[0].id);
+  });
+
+  it('starts the converted Layout palette at its first position', () => {
+    // A conversion creates the Layout, so its initial Graph occupies the first
+    // Layout-order position whatever the View was drawing.
+    expect(
+      asView(spaceWith({ layouts: [WORKING, SECOND] })).convert(onScreen).graphs[0].color,
+    ).toBe(GRAPH_PALETTE[0]);
   });
 
   it('numbers the minted Graph above the highest already taken', () => {
