@@ -449,7 +449,6 @@ export function createSpaceAuthoring({
       title: existing?.title ?? nextLayoutTitle(snapshot),
       positions: completedPlacement,
       activeGraphId,
-      mintedGraphId,
     });
     if (sameSnapshot(previousSnapshot, next)) return null;
     const loaded = loadSpaceSnapshot(next);
@@ -494,7 +493,7 @@ export function createSpaceAuthoring({
    * is `nextRenderer`. Activating first asked the renderer the Edit began in,
    * which is not the renderer the Edit produced, and it only ever agreed by
    * accident: an outgoing Layout happens to share the id of the Layout written
-   * back into it, and an outgoing Algorithmic View filters nothing so any
+   * back into it, and an outgoing Algorithmic View draws every Graph so any
    * answer passed. Neither accident is a reason, and the second hides the case
    * that would break.
    *
@@ -504,14 +503,12 @@ export function createSpaceAuthoring({
    * - `install` decides nothing and reads nothing.
    * - `continueInRenderer` resolves a Layout `updatePositionedLayout` wrote into
    *   the snapshot `submit` just installed, and refuses only a Layout that does
-   *   not show the current Active Graph — which is the same Graph that Layout
-   *   names as its `activeGraph`, on a snapshot `loadSpaceSnapshot` accepted a
-   *   line earlier, and intake is exactly what checks that pairing. A null
-   *   Active Graph names nothing and is exempt.
-   * - `activateGraph` resolves that same adopted Layout. The minted Graph is in
-   *   the snapshot's Graphs, and the Layout shows it either by carrying no
-   *   filter (a Layout converted from an Algorithmic View has none) or by the
-   *   widening `updatePositionedLayout` performed in the write that added it.
+   *   not show the current Active Graph — which every renderer draws, on a
+   *   snapshot `loadSpaceSnapshot` accepted a line earlier. A null Active Graph
+   *   names nothing and is exempt.
+   * - `activateGraph` resolves that same adopted Layout, which shows the minted
+   *   Graph because it is in the snapshot's Graphs and a renderer draws all of
+   *   them.
    *
    * Re-checking any of that *here* would add a branch that cannot be taken, and
    * this repo deletes those rather than keeps them. The guards live in

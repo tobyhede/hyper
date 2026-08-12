@@ -375,7 +375,6 @@ describe('runHyper', () => {
               [THIRD_SPACE_ID]: { x: 30, y: 40 },
               [CARD_ID]: { x: 10, y: 20 },
             },
-            graphs: [GRAPH_ID],
             activeGraph: GRAPH_ID,
           },
         ],

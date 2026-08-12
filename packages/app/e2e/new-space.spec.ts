@@ -10,7 +10,7 @@ import {
   positionOf,
   settled,
 } from './graph';
-import { seedGraphLessLayout } from './seed';
+import { seedPositionedLayout } from './seed';
 
 /**
  * Opening the app with nothing to open gives a new space: one card (ADR 0018).
@@ -19,8 +19,8 @@ import { seedGraphLessLayout } from './seed';
  * startup creates the one-card Space once, and reloads reopen that durable UUID.
  */
 
-const seedGraphLessFilteredLayout = (page: Page) =>
-  seedGraphLessLayout(page, 'Empty Graph Filter', (snapshot) => {
+const seedNewSpaceLayout = (page: Page) =>
+  seedPositionedLayout(page, 'Authored Layout', (snapshot) => {
     const cardId = snapshot.cards[0]?.id;
     if (cardId === undefined) throw new Error('The new Space must hold Card 1.');
     return { [cardId]: { x: 0, y: 0 } };
@@ -194,16 +194,14 @@ test('Alt empty-drop creates, connects and selects Card 2 at the previewed posit
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '2');
 });
 
-test('Alt empty-drop mints the first visible Graph in a filtered positioned Layout', async ({
-  page,
-}) => {
-  const seeded = await seedGraphLessFilteredLayout(page);
+test('Alt empty-drop mints the first Graph in a selected positioned Layout', async ({ page }) => {
+  const seeded = await seedNewSpaceLayout(page);
   const persistedRevision = String(BigInt(seeded.revision) + 1n);
   await page.goto('/');
 
   const sourceCard = nodeByTitle(page, 'Card 1');
   await expect(sourceCard).toBeVisible();
-  await expect(page.getByTestId('layout-selector')).toContainText('Empty Graph Filter');
+  await expect(page.getByTestId('layout-selector')).toContainText('Authored Layout');
   await expect(page.getByTestId('graph-selector')).toContainText('None');
   await settled(page);
   await sourceCard.hover();
@@ -214,7 +212,7 @@ test('Alt empty-drop mints the first visible Graph in a filtered positioned Layo
   await expect(page.locator('.react-flow__edge')).toHaveCount(1);
   await expect(page.getByTestId('graph-selector')).toContainText('Graph 1');
   await expect(page.getByTestId('graph-legend')).toContainText('Graph 1');
-  await expect(page.getByTestId('layout-selector')).toContainText('Empty Graph Filter');
+  await expect(page.getByTestId('layout-selector')).toContainText('Authored Layout');
   await expect(page.getByTestId('persistence-status')).toHaveAttribute(
     'data-revision',
     persistedRevision,
@@ -226,7 +224,7 @@ test('Alt empty-drop mints the first visible Graph in a filtered positioned Layo
   await expect(nodeByTitle(page, 'Card 2')).toBeVisible();
   await expect(page.locator('.react-flow__edge')).toHaveCount(1);
   await expect(page.getByTestId('graph-selector')).toContainText('Graph 1');
-  await expect(page.getByTestId('layout-selector')).toContainText('Empty Graph Filter');
+  await expect(page.getByTestId('layout-selector')).toContainText('Authored Layout');
   await expect(page.getByTestId('persistence-status')).toHaveAttribute(
     'data-revision',
     persistedRevision,

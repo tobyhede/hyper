@@ -534,13 +534,10 @@ describe('Space Authoring', () => {
   });
 
   /**
-   * The Layout's explicit empty `graphs` is load-bearing, not incidental
-   * scaffolding: it is a filter that shows nothing, and `activateGraph` refuses
-   * a Graph the resolved view does not show. What makes the minted Graph the
-   * exception is that `updatePositionedLayout` widens the filter to admit it in
-   * the same snapshot `submit` installs, so it is visible one statement before
-   * it is named active. Omitting the field would filter nothing and leave that
-   * ordering untested.
+   * The Edit is completed with a Layout already selected, so the renderer it
+   * begins in is the one it writes back into. `activateGraph` refuses a Graph
+   * the resolved view does not show, and what admits the minted one is that
+   * `submit` installs the snapshot carrying it before Navigation is asked.
    */
   it('mints and activates Graph 1 only when the first connection completes', () => {
     vi.spyOn(crypto, 'randomUUID').mockReturnValue(
@@ -558,7 +555,6 @@ describe('Space Authoring', () => {
             title: 'Layout 1',
             kind: 'positioned',
             positions: { [CARD_A]: { x: 10, y: 20 } },
-            graphs: [],
           },
         ],
         defaultView: LAYOUT_ID,
@@ -584,7 +580,6 @@ describe('Space Authoring', () => {
       },
     ]);
     expect(session.getState().working.document.layouts?.[0]).toMatchObject({
-      graphs: [MINTED_GRAPH_ID],
       activeGraph: MINTED_GRAPH_ID,
     });
     expect(navigation.getState().activeGraphId).toBe(MINTED_GRAPH_ID);
@@ -598,11 +593,9 @@ describe('Space Authoring', () => {
    * id, and every question about which one was asked answers the same.
    *
    * So this is where activating before adopting is visible at all: the guard
-   * asked the outgoing View, whose answer is every Graph in the Space for want
-   * of a filter, and passed for a reason that had nothing to do with the Edit.
-   * What is pinned is the renderer Navigation is on *at the moment of
-   * activation*, and that the Layout the conversion wrote carries no filter of
-   * its own — which is what makes the minted Graph one it shows.
+   * asked the outgoing View, and passed for a reason that had nothing to do
+   * with the Edit. What is pinned is the renderer Navigation is on *at the
+   * moment of activation*.
    */
   it('activates the minted Graph against the Layout the Edit created, not the View it converted', () => {
     vi.spyOn(crypto, 'randomUUID')
@@ -1137,51 +1130,6 @@ describe('Space Authoring', () => {
 
     expect(session.getState().working.cards.at(-1)?.document.title).toBe('Card 10');
     expect(session.getState().working.document.layouts?.at(-1)?.title).toBe('Layout 8');
-  });
-
-  it('refuses to connect with no active Graph while the Space already holds Graphs', () => {
-    // A Layout filtering every Graph away resolves to no active Graph. Minting
-    // is reserved for a Space that has none at all, so this is refused rather
-    // than quietly adding a second Graph the filter would then hide. It is also
-    // why a minted Graph is always the first one, and `nextGraphTitle` only
-    // ever numbers against an empty set.
-    const filtered: SpaceSnapshot = {
-      ...automaticSnapshot,
-      document: {
-        ...automaticSnapshot.document,
-        graphs: [{ id: GRAPH_ID, title: 'Graph 3', edges: [{ from: CARD_A, to: CARD_B }] }],
-        layouts: [
-          {
-            id: LAYOUT_ID,
-            title: 'Layout 1',
-            kind: 'positioned',
-            positions: { [CARD_A]: { x: 10, y: 20 }, [CARD_B]: { x: 300, y: 40 } },
-            graphs: [],
-          },
-        ],
-        defaultView: LAYOUT_ID,
-      },
-    };
-    const { authoring, session, navigation } = openAuthoring(filtered, {
-      kind: 'layout',
-      layoutId: LAYOUT_ID,
-    });
-    expect(navigation.getState().activeGraphId).toBeNull();
-    replacePlacementForTest(
-      authoring,
-      Placement.fromEntries([
-        [CARD_A, { x: 10, y: 20 }],
-        [CARD_B, { x: 300, y: 40 }],
-      ]),
-    );
-
-    const before = session.getState().working;
-
-    expect(authoring.canConnect(CARD_B, CARD_A)).toBe(false);
-    expect(complete(authoring, { kind: 'connected-cards', from: CARD_B, to: CARD_A })).toEqual({
-      kind: 'no-edit',
-    });
-    expect(session.getState().working).toBe(before);
   });
 
   /**

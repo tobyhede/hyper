@@ -212,8 +212,8 @@ export function createNavigation(
     // Its only caller is Edit completion, which cannot reach the refusal: the
     // Layout it hands over names Navigation's own Active Graph as `activeGraph`,
     // and the snapshot carrying it passed domain intake — which is precisely the
-    // check that a named `activeGraph` is one of the Layout's Graphs. An absent
-    // Active Graph names nothing and is exempt.
+    // check that a named `activeGraph` is a Graph the Space holds, and every
+    // renderer draws those. An absent Active Graph names nothing and is exempt.
     continueInRenderer: (selection) => {
       const state = observable.getState();
       const view = resolveView(currentSpace(), selection);
@@ -229,31 +229,27 @@ export function createNavigation(
     },
     // Resolved first, for the same reason a renderer is: Navigation may not name
     // structure the current view does not hold. Activating is never an Edit
-    // (ADR 0028), so it can neither mint the Graph it is handed nor widen a
-    // filter to admit one.
+    // (ADR 0028), so it cannot mint the Graph it is handed.
     //
     // **The harm is a dead Edit, not a stranded read.** A Graph the resolved
-    // view filters out still answers every lookup, so nothing on screen breaks;
-    // the id rides into the next completed Edit instead, where
-    // `updatePositionedLayout` writes it as the Layout's `activeGraph` — the one
-    // combination intake rejects outright ("opens active on graph X, which it
-    // does not show"). That Edit is dead on arrival: a permanent
+    // view does not draw still answers every lookup, so nothing on screen
+    // breaks; the id rides into the next completed Edit instead, where
+    // `updatePositionedLayout` writes it as the Layout's `activeGraph` and
+    // intake rejects it. That Edit is dead on arrival: a permanent
     // `invalid-snapshot`, neither a conflict nor a retry, reported at the commit
     // rather than at the gesture that caused it. This is the authoritative copy
     // of that reasoning; the tests point at it rather than restating it.
     //
-    // **The second refusal subsumes the first, and they are still both here.**
-    // `visibleGraphIds` is either the Layout's filter or every Graph in the
-    // Space, and intake validates that a filter names only Graphs the Space
-    // holds — so the visible set is a subset and a Graph that does not exist
-    // cannot be in it. What the first refusal adds is the sentence: "does not
-    // exist" and "does not show" are different mistakes by the caller, and one
-    // message covering both would name neither. It is a discriminator, not a
-    // case the second one misses.
+    // **The second refusal is subsumed by the first today, and is still here.**
+    // `visibleGraphIds` is every Graph in the Space, so nothing that exists can
+    // fail to be drawn and only the first refusal can fire. It is kept because
+    // "does not exist" and "does not show" are different mistakes by the caller,
+    // and the seam that answers the second is the one ADR 0040 makes narrow
+    // again — a Layout will draw the Graphs it owns.
     //
     // The visible set is read off `resolveView` rather than recomputed here:
     // one place answers which Graphs a view draws (ADR 0026), and two would
-    // disagree the moment a Layout filters.
+    // disagree the moment the answers differ.
     //
     // Both refusals throw, and deliberately alike. Neither is reachable through
     // the product — `GraphSelector` is fed the visible Graphs — so each is a
@@ -267,11 +263,8 @@ export function createNavigation(
     // **A minted Graph passes by ordering, not by an exemption.** Edit
     // completion submits, *then* adopts the Layout it wrote, and only then
     // activates — so what this resolves is that Layout rather than the renderer
-    // the Edit began in. Both shapes admit the minted Graph, for different
-    // reasons: a Layout converted from an Algorithmic View carries no filter at
-    // all and therefore shows every Graph in the Space, while an existing
-    // Layout that does filter was widened by `updatePositionedLayout` in the
-    // same write that added the Graph.
+    // the Edit began in, and the Graph the same snapshot added is one that
+    // Layout draws.
     activateGraph: (graphId) => {
       const state = observable.getState();
       const space = currentSpace();

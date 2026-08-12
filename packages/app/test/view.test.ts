@@ -19,6 +19,18 @@ const GRAPHS = [
   },
 ];
 
+/** A second Graph, so "every Graph" is more than one. */
+const TWO_GRAPHS = [
+  ...GRAPHS,
+  {
+    id: '00000000-0000-4000-8000-000000000020',
+    title: 'Aside',
+    edges: [
+      { from: '00000000-0000-4000-8000-000000000003', to: '00000000-0000-4000-8000-000000000002' },
+    ],
+  },
+];
+
 const WORKING = {
   id: '00000000-0000-4000-8000-000000000022',
   title: 'Working',
@@ -151,22 +163,8 @@ describe('resolveView', () => {
     expect(view.layout).toBeNull();
   });
 
-  it('shows every graph and opens on the first when no Layout filters', () => {
-    const space = spaceWith({
-      graphs: [
-        ...GRAPHS,
-        {
-          id: '00000000-0000-4000-8000-000000000020',
-          title: 'Aside',
-          edges: [
-            {
-              from: '00000000-0000-4000-8000-000000000003',
-              to: '00000000-0000-4000-8000-000000000002',
-            },
-          ],
-        },
-      ],
-    });
+  it('shows every graph and opens on the first under an Algorithmic View', () => {
+    const space = spaceWith({ graphs: TWO_GRAPHS });
     const view = resolveView(space);
     expect(view.visibleGraphIds).toEqual([
       '00000000-0000-4000-8000-000000000004',
@@ -175,66 +173,26 @@ describe('resolveView', () => {
     expect(view.activeGraphId).toBe('00000000-0000-4000-8000-000000000004');
   });
 
-  it('shows only the graphs its Layout names', () => {
+  it('shows every graph under a selected Layout too', () => {
+    // A Layout draws every Graph the Space holds. It once named a subset, and
+    // the answer is now the same one an Algorithmic View gives.
     const space = spaceWith({
-      graphs: [
-        ...GRAPHS,
-        {
-          id: '00000000-0000-4000-8000-000000000020',
-          title: 'Aside',
-          edges: [
-            {
-              from: '00000000-0000-4000-8000-000000000003',
-              to: '00000000-0000-4000-8000-000000000002',
-            },
-          ],
-        },
-      ],
-      layouts: [{ ...WORKING, graphs: ['00000000-0000-4000-8000-000000000020'] }],
+      graphs: TWO_GRAPHS,
+      layouts: [WORKING],
       defaultView: '00000000-0000-4000-8000-000000000022',
     });
     const view = resolveView(space);
-    expect(view.visibleGraphIds).toEqual(['00000000-0000-4000-8000-000000000020']);
-  });
-
-  it('opens on the first *visible* graph, not the space’s first', () => {
-    // The filter is what the fallback runs over. Reading it off the space would
-    // open active on a graph the Layout does not draw.
-    const space = spaceWith({
-      graphs: [
-        ...GRAPHS,
-        {
-          id: '00000000-0000-4000-8000-000000000020',
-          title: 'Aside',
-          edges: [
-            {
-              from: '00000000-0000-4000-8000-000000000003',
-              to: '00000000-0000-4000-8000-000000000002',
-            },
-          ],
-        },
-      ],
-      layouts: [{ ...WORKING, graphs: ['00000000-0000-4000-8000-000000000020'] }],
-      defaultView: '00000000-0000-4000-8000-000000000022',
-    });
-    expect(resolveView(space).activeGraphId).toBe('00000000-0000-4000-8000-000000000020');
+    expect(view.layout?.id).toBe('00000000-0000-4000-8000-000000000022');
+    expect(view.visibleGraphIds).toEqual([
+      '00000000-0000-4000-8000-000000000004',
+      '00000000-0000-4000-8000-000000000020',
+    ]);
+    expect(view.activeGraphId).toBe('00000000-0000-4000-8000-000000000004');
   });
 
   it('honours a Layout’s named activeGraph over the first', () => {
     const space = spaceWith({
-      graphs: [
-        ...GRAPHS,
-        {
-          id: '00000000-0000-4000-8000-000000000020',
-          title: 'Aside',
-          edges: [
-            {
-              from: '00000000-0000-4000-8000-000000000003',
-              to: '00000000-0000-4000-8000-000000000002',
-            },
-          ],
-        },
-      ],
+      graphs: TWO_GRAPHS,
       layouts: [{ ...WORKING, activeGraph: '00000000-0000-4000-8000-000000000020' }],
       defaultView: '00000000-0000-4000-8000-000000000022',
     });
@@ -250,16 +208,6 @@ describe('resolveView', () => {
     const view = resolveView(spaceWith({ graphs: [] }));
     expect(view.visibleGraphIds).toEqual([]);
     expect(view.activeGraphId).toBeNull();
-  });
-
-  it('has no active graph when a Layout shows none', () => {
-    // Empty is not absent: absent means every graph, empty means this layout
-    // draws no graphs at all, and there is then nothing to be active.
-    const space = spaceWith({
-      layouts: [{ ...WORKING, graphs: [] }],
-      defaultView: '00000000-0000-4000-8000-000000000022',
-    });
-    expect(resolveView(space).activeGraphId).toBeNull();
   });
 
   it('opens a space with no graphs, which is where editing starts (ADR 0015)', async () => {

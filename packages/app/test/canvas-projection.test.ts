@@ -10,23 +10,22 @@ import { cardFile } from './card-files';
 const CARD_A = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 const CARD_B = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
 const DRAWN_GRAPH = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
-const FILTERED_GRAPH = uuidSchema.parse('00000000-0000-4000-8000-000000000007');
+const OTHER_GRAPH = uuidSchema.parse('00000000-0000-4000-8000-000000000007');
 const LAYOUT = uuidSchema.parse('00000000-0000-4000-8000-000000000008');
 
 const CARDS = [cardFile(CARD_A), cardFile(CARD_B)];
 
 const TWO_GRAPHS = [
   { id: DRAWN_GRAPH, title: 'Drawn', edges: [{ from: CARD_A, to: CARD_B }] },
-  { id: FILTERED_GRAPH, title: 'Filtered', edges: [{ from: CARD_B, to: CARD_A }] },
+  { id: OTHER_GRAPH, title: 'Other', edges: [{ from: CARD_B, to: CARD_A }] },
 ];
 
-/** A Layout drawing one of the Space's two Graphs (ADR 0026). */
-const FILTERING_LAYOUT = {
+/** An authored Layout, selected instead of an Algorithmic View. */
+const POSITIONED_LAYOUT = {
   id: LAYOUT,
-  title: 'Filtering',
+  title: 'Working',
   kind: 'positioned',
   positions: { [CARD_A]: { x: 0, y: 0 }, [CARD_B]: { x: 400, y: 0 } },
-  graphs: [DRAWN_GRAPH],
 };
 
 /** Nothing activated, nothing selected, nothing dragged. */
@@ -106,7 +105,7 @@ describe('canvasProjection', () => {
     const opacityOf = (graphId: string) =>
       Number(edges.find((edge) => edge.data?.['graphId'] === graphId)?.style?.opacity);
     expect(opacityOf(DRAWN_GRAPH)).toBe(1);
-    expect(opacityOf(FILTERED_GRAPH)).toBeLessThan(1);
+    expect(opacityOf(OTHER_GRAPH)).toBeLessThan(1);
   });
 
   it('names the traversal position, the authoring selection and what Presenting draws', async () => {
@@ -137,16 +136,20 @@ describe('canvasProjection', () => {
     expect(dragged.edges[0]?.data?.['points']).toBeUndefined();
   });
 
-  it('draws only the Graphs the selected Layout shows', async () => {
-    const space = spaceWith({ graphs: TWO_GRAPHS, layouts: [FILTERING_LAYOUT] });
+  it('draws every Graph the Space holds under a selected Layout', async () => {
+    const space = spaceWith({ graphs: TWO_GRAPHS, layouts: [POSITIONED_LAYOUT] });
 
     const { visibleGraphs, nodes, edges } = await projectThrough(space, AT_REST, {
       kind: 'layout',
       layoutId: LAYOUT,
     });
 
-    expect(visibleGraphs.map((graph) => graph.id)).toEqual([DRAWN_GRAPH]);
-    expect(edges.map((edge) => edge.data?.['graphId'])).toEqual([DRAWN_GRAPH]);
-    expect(handledGraphIds(nodes)).toEqual([DRAWN_GRAPH]);
+    // Graphs, Edges and handles are derived separately and must agree on the
+    // same set; a Layout no longer narrows any of the three.
+    expect(visibleGraphs.map((graph) => graph.id)).toEqual([DRAWN_GRAPH, OTHER_GRAPH]);
+    expect(edges.map((edge) => edge.data?.['graphId']).sort()).toEqual(
+      [DRAWN_GRAPH, OTHER_GRAPH].sort(),
+    );
+    expect(handledGraphIds(nodes)).toEqual([DRAWN_GRAPH, OTHER_GRAPH].sort());
   });
 });

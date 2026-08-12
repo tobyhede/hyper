@@ -57,63 +57,6 @@ it('updates placement as a complete valid persistence snapshot', () => {
   expect(loadSpaceSnapshot(changed).ok).toBe(true);
 });
 
-// The active Graph and the minted Graph are both a `GraphId`, and a Layout puts
-// them in two different places: `activeGraph`, and the `graphs` filter. Every
-// other case passes one id or the same id twice, so only a case where the two
-// must differ tells a transposed pair from a correct one.
-it('opens on the active Graph while showing the minted Graph the Edit added', () => {
-  const twoGraphs = spaceSnapshotSchema.parse({
-    ...snapshot,
-    document: {
-      ...snapshot.document,
-      graphs: [
-        ...snapshot.document.graphs,
-        {
-          id: '00000000-0000-4000-8000-000000000005',
-          title: 'Minted',
-          edges: [
-            {
-              from: '00000000-0000-4000-8000-000000000002',
-              to: '00000000-0000-4000-8000-000000000002',
-            },
-          ],
-        },
-      ],
-      layouts: [
-        {
-          id: '00000000-0000-4000-8000-000000000021',
-          title: 'Layout',
-          kind: 'positioned',
-          positions: {},
-          graphs: ['00000000-0000-4000-8000-000000000004'],
-        },
-      ],
-    },
-  });
-
-  const changed = updatePositionedLayout(twoGraphs, {
-    layoutId: uuidSchema.parse('00000000-0000-4000-8000-000000000021'),
-    title: 'Layout',
-    positions: Placement.fromEntries([
-      [uuidSchema.parse('00000000-0000-4000-8000-000000000002'), { x: 1, y: 2 }],
-    ]),
-    activeGraphId: uuidSchema.parse('00000000-0000-4000-8000-000000000004'),
-    mintedGraphId: uuidSchema.parse('00000000-0000-4000-8000-000000000005'),
-  });
-
-  expect(changed.document.layouts).toEqual([
-    {
-      id: '00000000-0000-4000-8000-000000000021',
-      title: 'Layout',
-      kind: 'positioned',
-      positions: { '00000000-0000-4000-8000-000000000002': { x: 1, y: 2 } },
-      graphs: ['00000000-0000-4000-8000-000000000004', '00000000-0000-4000-8000-000000000005'],
-      activeGraph: '00000000-0000-4000-8000-000000000004',
-    },
-  ]);
-  expect(loadSpaceSnapshot(changed).ok).toBe(true);
-});
-
 it('converts the validated runtime aggregate back to the persistence seam', () => {
   const loaded = loadSpaceSnapshot(snapshot);
   expect(loaded.ok).toBe(true);
@@ -122,7 +65,7 @@ it('converts the validated runtime aggregate back to the persistence seam', () =
   expect(snapshotFromSpace(loaded.space)).toEqual(snapshot);
 });
 
-it('preserves authored view scope and unrelated layouts while replacing placement', () => {
+it('leaves unrelated layouts standing while replacing placement', () => {
   const withLayouts = spaceSnapshotSchema.parse({
     ...snapshot,
     document: {
@@ -133,7 +76,6 @@ it('preserves authored view scope and unrelated layouts while replacing placemen
           title: 'Layout',
           kind: 'positioned',
           positions: {},
-          graphs: ['00000000-0000-4000-8000-000000000004'],
         },
         {
           id: '00000000-0000-4000-8000-000000000022',
@@ -159,15 +101,15 @@ it('preserves authored view scope and unrelated layouts while replacing placemen
     '00000000-0000-4000-8000-000000000021',
     '00000000-0000-4000-8000-000000000022',
   ]);
-  expect(changed.document.layouts?.[0]?.graphs).toEqual(['00000000-0000-4000-8000-000000000004']);
+  expect(changed.document.layouts?.[1]).toEqual(withLayouts.document.layouts?.[1]);
   expect(changed.cards).toEqual(snapshot.cards);
 });
 
 /**
- * `activeGraph` is authored, like the `graphs` filter beside it, and the app has
- * no surface for clearing one. An Edit completed with no active Graph therefore
- * has nothing to say about it, and must leave what the author wrote alone rather
- * than read its own silence as an instruction to erase.
+ * `activeGraph` is authored and the app has no surface for clearing one. An Edit
+ * completed with no active Graph therefore has nothing to say about it, and must
+ * leave what the author wrote alone rather than read its own silence as an
+ * instruction to erase.
  */
 it('leaves an authored active Graph alone when the Edit names none', () => {
   const withActiveGraph = spaceSnapshotSchema.parse({

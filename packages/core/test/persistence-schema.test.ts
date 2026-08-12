@@ -81,6 +81,23 @@ describe('import space schema', () => {
     expect(parsed.cards.at(-1)?.id).toBeUndefined();
   });
 
+  /**
+   * The import shape relaxes identity and nothing else. A layout that names the
+   * graphs it draws is refused here too, so an authored directory carrying the
+   * retired filter cannot enter through the CLI what the space file rejects.
+   */
+  it('rejects an imported layout that names the graphs it draws', () => {
+    expect(
+      importSpaceSchema.safeParse({
+        ...identified,
+        document: {
+          ...identified.document,
+          layouts: [{ ...identified.document.layouts[0], graphs: [GRAPH_ID] }],
+        },
+      }).success,
+    ).toBe(false);
+  });
+
   it('rejects a non-UUID whenever an import entity id is explicit', () => {
     for (const input of [
       { ...identified, id: 'space' },

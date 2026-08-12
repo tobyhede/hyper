@@ -53,7 +53,6 @@ function fixture(): Space {
           id: LAYOUT,
           title: 'Second graph',
           positions: {},
-          graphs: [GRAPH_TWO],
           activeGraph: GRAPH_TWO,
         },
       ],
@@ -318,27 +317,6 @@ it('refuses to activate a Graph the current Space does not hold', () => {
 });
 
 /*
- * The other half of the same question, and the half the guard used to miss: a
- * Layout's `graphs` is a filter, so a Graph can exist in the Space without being
- * one this renderer draws (ADR 0026). What that state costs is written up in
- * `activateGraph`.
- */
-it('refuses to activate a Graph the selected renderer does not show', () => {
-  const space = fixture();
-  const navigation = createNavigation(() => space, { kind: 'layout', layoutId: LAYOUT });
-  const before = navigation.getState();
-
-  expect(() => navigation.activateGraph(GRAPH_ONE)).toThrow(/does not show/);
-  expect(navigation.getState()).toBe(before);
-
-  // The same Graph under a renderer that filters nothing is fine: what is
-  // refused is naming a Graph this view does not draw, never the Graph itself.
-  navigation.selectRenderer({ kind: 'view', view: 'flow' });
-  navigation.activateGraph(GRAPH_ONE);
-  expect(navigation.getState().activeGraphId).toBe(GRAPH_ONE);
-});
-
-/*
  * This used to adopt `LAYOUT` while active on `GRAPH_ONE` — the very pair
  * `activateGraph` now refuses — and the renderer half of that pair is written
  * here. The Graph is activated first so the adopted Layout is one that shows it,
@@ -367,21 +345,33 @@ it('continues the current Traversal history when an Edit converts the renderer t
 });
 
 /*
- * The same invariant from the other writer. `activateGraph` and
- * `continueInRenderer` are the only two writes that can put the selected
- * renderer and the Active Graph out of step, so guarding one of them leaves the
- * dead Edit reachable through the other.
- *
- * Refusing rather than re-resolving is what keeps the traversal intact: falling
- * back to the adopted Layout's own Active Graph would leave the history being
- * presented belonging to a Graph that is no longer active, and `moves()`
- * answering Edges out of a Card nothing is standing on.
+ * Replacing the working Space can make Navigation's retained Active Graph
+ * absent from the renderer an Edit asks it to adopt. Refusing is what keeps the
+ * selected renderer and Active Graph as one valid pair; it also leaves the
+ * current traversal untouched rather than silently moving it to another Graph.
  */
-it('refuses to adopt a renderer that does not show the active Graph', () => {
-  const space = fixture();
-  const navigation = createNavigation(() => space, { kind: 'view', view: 'flow' });
+it('refuses to adopt a renderer that does not show the retained active Graph', () => {
+  let working = fixture();
+  const navigation = createNavigation(() => working, { kind: 'view', view: 'flow' });
   navigation.present();
   const before = navigation.getState();
+
+  const replacement = loadSpace(
+    {
+      version: 2,
+      id: working.id,
+      title: working.title,
+      graphs: [working.graphs[1]!],
+      layouts: working.layouts,
+    },
+    [
+      cardFile(uuid('00000000-0000-4000-8000-000000000002')),
+      cardFile(uuid('00000000-0000-4000-8000-000000000003')),
+      cardFile(uuid('00000000-0000-4000-8000-000000000004')),
+    ],
+  );
+  if (!replacement.ok) throw new Error('replacement fixture should load');
+  working = replacement.space;
 
   expect(() => navigation.continueInRenderer({ kind: 'layout', layoutId: LAYOUT })).toThrow(
     /does not show the active Graph/,
@@ -402,7 +392,7 @@ it('adopts a renderer with no active Graph to name', () => {
       id: uuid('00000000-0000-4000-8000-000000000001'),
       title: 'Empty',
       graphs: [],
-      layouts: [{ id: LAYOUT, title: 'Only', positions: {}, graphs: [] }],
+      layouts: [{ id: LAYOUT, title: 'Only', positions: {} }],
     },
     [cardFile(uuid('00000000-0000-4000-8000-000000000002'))],
   );

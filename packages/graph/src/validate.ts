@@ -27,7 +27,6 @@ export type SpaceReferenceErrorKind =
   | 'duplicate-layout-id'
   | 'layout-position-unknown-card'
   | 'layout-unknown-graph'
-  | 'layout-active-graph-not-shown'
   | 'unresolved-default-view'
   | 'unresolved-graph-edge'
   | 'duplicate-graph-edge'
@@ -98,39 +97,17 @@ export function validateReferences(space: Referenceable): SpaceReferenceError[] 
       }
     }
 
-    // A Layout also points at graphs — which it shows, and which of those opens
-    // active (ADR 0026). Both are references into the space's own graphs, and
-    // the dependency runs one way: geometry references topology, never back.
-    for (const graphId of layout.graphs ?? []) {
-      if (!graphIds.has(graphId)) {
-        errors.push({
-          kind: 'layout-unknown-graph',
-          ref: graphId,
-          message: `Layout "${layout.id}" shows missing graph "${graphId}"`,
-        });
-      }
-    }
-
-    if (layout.activeGraph !== undefined) {
-      if (!graphIds.has(layout.activeGraph)) {
-        errors.push({
-          kind: 'layout-unknown-graph',
-          ref: layout.activeGraph,
-          message: `Layout "${layout.id}" opens active on missing graph "${layout.activeGraph}"`,
-        });
-      } else if (layout.graphs && !layout.graphs.includes(layout.activeGraph)) {
-        // The one check here that relates two fields rather than resolving one
-        // against the space: both ids are real and it is still an error, because
-        // the active graph must be one the Layout shows. Activating only ever
-        // moves emphasis within the visible set, so a Layout opening active on a
-        // graph it filters out has asked for a state nothing can reach. Absent a
-        // filter every graph is visible and there is nothing left to check.
-        errors.push({
-          kind: 'layout-active-graph-not-shown',
-          ref: layout.activeGraph,
-          message: `Layout "${layout.id}" opens active on graph "${layout.activeGraph}", which it does not show`,
-        });
-      }
+    // A Layout also points at one graph — the one that opens active (ADR 0026).
+    // That is a reference into the space's own graphs, and the dependency runs
+    // one way: geometry references topology, never back. Every renderer draws
+    // every graph, so resolving the id is the whole of the check: there is no
+    // second, narrower set the active one must also belong to.
+    if (layout.activeGraph !== undefined && !graphIds.has(layout.activeGraph)) {
+      errors.push({
+        kind: 'layout-unknown-graph',
+        ref: layout.activeGraph,
+        message: `Layout "${layout.id}" opens active on missing graph "${layout.activeGraph}"`,
+      });
     }
   }
 
