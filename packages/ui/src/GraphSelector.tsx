@@ -68,13 +68,23 @@ export function GraphSelector({
           ))}
         </SelectContent>
       </Select>
-      {/* Dead on exactly one thing: no Graph is active to present. */}
+      {/*
+        Dead on two things, and they are one rule: there is no Card to begin at.
+        No Graph is active, or the active Graph holds no Edges — and the second
+        is not a defensive nicety. Creating a Layout creates its initial Active
+        Graph empty in the same Edit (ADR 0040), so a Layout converted out of an
+        Algorithmic View by a plain Card drag is *always* in this state until the
+        author draws something. `graphStartCard` has no answer for such a Graph
+        and `present()` returns without changing anything, so an enabled control
+        here would read `Present` and swallow the click — the exact defect a
+        fully cyclic Graph used to produce.
+      */}
       <button
         type="button"
         data-testid={presenting ? 'exit-presenting-button' : 'present-button'}
         aria-label={actionName}
         title={actionName}
-        disabled={!presenting && activeGraph === undefined}
+        disabled={!presenting && (activeGraph === undefined || activeGraph.edges.length === 0)}
         onClick={presenting ? onExitPresenting : onPresent}
         className="inline-flex items-center gap-[7px] border-0 border-l border-l-[var(--border)] bg-transparent px-[11px] py-[6px] text-[13px] text-[var(--text)] hover:bg-[var(--border)] disabled:cursor-not-allowed disabled:opacity-50"
       >

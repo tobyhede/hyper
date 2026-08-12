@@ -158,6 +158,50 @@ describe('authoring a Card title on the graph', () => {
   });
 });
 
+/**
+ * The gap between `present()`'s refusal and the control that calls it, at the one
+ * place it now opens.
+ *
+ * Dropping a Graph's minimum Edge count made an empty Graph legal, and ADR 0040
+ * made it *ordinary*: converting an Algorithmic View mints a Layout whose one
+ * Active Graph holds nothing, so this is the state the author is in immediately
+ * after their first edit on the Flow view. `graphStartCard` has no answer for
+ * such a Graph, so `present()` returns having changed nothing — and an enabled
+ * control would read `Present` and swallow the click, which is verbatim the
+ * defect a fully cyclic Graph produced before its guard was split out.
+ *
+ * Neither half proves this on its own: the refusal is in Navigation and the
+ * enablement is in `GraphSelector`, and what went wrong was that they disagreed.
+ */
+describe('presenting after a conversion', () => {
+  const noLayouts: SpaceSnapshot = spaceSnapshotSchema.parse({
+    ...snapshot,
+    document: { version: 1, title: 'Workspace' },
+  });
+
+  it('offers no Present action while the converted Layout’s Graph is empty', async () => {
+    const session = mount(noLayouts);
+    // Nothing to present before the conversion either: a Space with no Layouts
+    // has no Graphs at all, so there is no Active Graph.
+    expect(await screen.findByTestId('present-button')).toBeDisabled();
+
+    fireEvent.doubleClick(await screen.findByRole('heading', { name: 'A' }));
+    const input = screen.getByRole('textbox', { name: 'Card title' });
+    fireEvent.change(input, { target: { value: 'Renamed A' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+
+    // The Edit converted: there is a Layout now, and it is active on the empty
+    // Graph the conversion minted for it.
+    await waitFor(() =>
+      expect(session.getState().working.document.layouts?.[0]?.graphs).toEqual([
+        expect.objectContaining({ edges: [] }),
+      ]),
+    );
+    expect(screen.getByTestId('present-button')).toBeDisabled();
+    await settled(session);
+  });
+});
+
 /** Open Card A, which is to say edit it (ADR 0037). */
 async function openEditor(): Promise<void> {
   fireEvent.click(await screen.findByRole('button', { name: 'Edit Card A' }));

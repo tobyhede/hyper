@@ -299,18 +299,26 @@ export function createNavigation(
     },
     openCard: (cardId) => setState({ openedCardId: cardId }),
     closeCard: () => setState({ openedCardId: null }),
-    // Two refusals, and only the first is reachable. **No active Graph** is the
-    // one the author can produce, and it is exactly what `GraphSelector`
-    // disables its control on, so the two now agree: `graphStartCard` answers
-    // every schema-valid Graph, cyclic ones included, so a Graph that is active
-    // can always be presented. These used to be one guard, and a fully cyclic
-    // Graph fell through the gap between them — the control read `Present`,
+    // Two refusals, and **both are reachable**. Each is a state with no Card to
+    // begin at, and `GraphSelector` disables its control on exactly the union of
+    // them, so the two agree — which is what stops either from being a click the
+    // control accepts and silently drops. They used to be one guard, and a fully
+    // cyclic Graph fell through the gap between them: the control read `Present`,
     // stayed enabled, and swallowed the click.
     //
-    // The **edge-less Graph** below is the one `graphSchema` forbids
-    // (`edges.min(1)`). Its `undefined` is admitted by the type and not by the
-    // domain; the guard is here because the type still needs answering, not
-    // because presenting has anything to decline.
+    // **No active Graph** is the state a Space with no Layouts is in, since a
+    // Layout is what owns Graphs (ADR 0040).
+    //
+    // The **edge-less Graph** below was once the shape `graphSchema` forbade,
+    // and its guard was type ceremony. It is now ordinary: creating a Layout
+    // creates its initial Active Graph *empty* in the same Edit (ADR 0040), and
+    // the Flow view converts by returning exactly that (ADR 0045), so every
+    // Layout a plain Card drag produces sits here until the author draws an
+    // Edge. `graphStartCard` has no answer for such a Graph. Presenting has
+    // something real to decline.
+    //
+    // Between them, a Graph that is active *and* holds an Edge can always be
+    // presented — cyclic ones included (ADR 0032).
     present: () => {
       const state = observable.getState();
       const graph =

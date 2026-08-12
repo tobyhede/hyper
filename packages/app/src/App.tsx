@@ -413,12 +413,14 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
           activeGraphId={activeGraphId}
           colorByGraphId={projection.colors}
           onActivate={(graphId) => activateGraph(uuidSchema.parse(graphId))}
-          // `GraphSelector` disables its control on "no active Graph" and
-          // `present()` refuses on exactly that, so the two conditions agree:
-          // every Graph that *is* active can be presented, cyclic ones included
-          // (ADR 0032). They once did not, and a fully cyclic Graph fell through
-          // the gap between them — the control read `Present`, stayed enabled,
-          // and swallowed the click.
+          // `GraphSelector` disables its control on "no active Graph" *or* "the
+          // active Graph holds no Edges", and `present()` refuses on exactly
+          // those two, so the conditions agree: every Graph that is active and
+          // has an Edge can be presented, cyclic ones included (ADR 0032). They
+          // once did not, and a fully cyclic Graph fell through the gap between
+          // them — the control read `Present`, stayed enabled, and swallowed the
+          // click. The empty Graph is the same gap reopened by ADR 0040, which
+          // creates every Layout's initial Active Graph empty.
           onPresent={present}
           presenting={presenting}
           onExitPresenting={exitPresenting}

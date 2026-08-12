@@ -1,6 +1,6 @@
 # Convert a View into a Layout that owns its Graph
 
-Status: ready-for-agent
+Status: resolved
 Blocked by: 02
 
 ## What to build
@@ -69,21 +69,69 @@ run is what proves that.
 
 ## Acceptance criteria
 
-- [ ] `ResolvedView` names its Card subject and answers a conversion result of
+- [x] `ResolvedView` names its Card subject and answers a conversion result of
       Cards-with-positions plus one or more Graphs.
-- [ ] Conversion from an Algorithmic View produces a Layout owning exactly one
+- [x] Conversion from an Algorithmic View produces a Layout owning exactly one
       fresh, empty Graph, which is also its Active Graph.
-- [ ] A connection drawn in the converting Edit lands in that Graph, in the same
+- [x] A connection drawn in the converting Edit lands in that Graph, in the same
       Edit, with nothing left at the Space level.
-- [ ] An Edit on a selected Layout adds its Edge to a Graph that Layout owns.
-- [ ] A property test proves no View output can violate closure or return a
+- [x] An Edit on a selected Layout adds its Edge to a Graph that Layout owns.
+- [x] A property test proves no View output can violate closure or return a
       source Graph's identity.
-- [ ] Activating a Graph on an Algorithmic View submits nothing, and a
+- [x] Activating a Graph on an Algorithmic View submits nothing, and a
       subsequent connection joins the new Layout's initial Graph.
-- [ ] Drawing an Edge on an Algorithmic View is offered even when the emphasised
+- [x] Drawing an Edge on an Algorithmic View is offered even when the emphasised
       Graph already holds that exact Edge, and refused on a selected Layout whose
       own Graph holds it.
-- [ ] `canCreateConnectedCard` keeps the signature `connection-gesture` consumes.
-- [ ] Existing Space Authoring guarantees still hold under fault injection:
+- [x] `canCreateConnectedCard` keeps the signature `connection-gesture` consumes.
+- [x] Existing Space Authoring guarantees still hold under fault injection:
       derivation is total before installation, and a failing submit leaves
       placement and Navigation untouched.
+
+## Answer
+
+Two things a later reader will want, neither obvious from the diff.
+
+### Navigation takes the renderer and its Active Graph in one call
+
+`installCompletedEdit` calls `navigation.continueInRenderer(selection, activeGraphId)`
+and never calls `activateGraph`. The ticket said to preserve "the renderer this
+Edit wrote is adopted before the Graph it minted is activated", and the two-call
+form cannot survive Layout-owned Graphs: between the calls Navigation would name
+the converted Layout beside the Graph that was emphasised on the outgoing
+Algorithmic View, which some *other* Layout owns — exactly the pair
+`continueInRenderer` guards against. Every conversion would have thrown, and a
+conversion is every first edit on an Algorithmic View.
+
+Three alternatives were weighed and are worse. Reversing the calls validates the
+Graph against the renderer the Edit *began* in, which is what the original rule
+existed to prevent. Dropping `continueInRenderer`'s guard removes a refusal ADR
+0040 has just made load-bearing again. Re-resolving the Active Graph inside
+Navigation is the repair AGENTS.md already rejects, because it moves emphasis
+without being asked and strands a live traversal.
+
+Folding them keeps the property the ordering bought — the Graph is checked
+against the renderer this Edit wrote — and makes it hold by construction rather
+than by statement order. `activateGraph` keeps both its guards for its own
+caller, `GraphSelector`. AGENTS.md's bullet is amended to match.
+
+### `graphSchema.edges` lost its `min(1)`
+
+Ticket 02 carried the rule forward unchanged, and this ticket's own acceptance
+criterion — a Layout owning one fresh, **empty** Graph — is unrepresentable
+under it, so every card-drag conversion would have produced a snapshot intake
+rejects. ADR 0040 ("empty Routes are valid", "creating a Layout creates its
+initial empty Active Graph") and ADR 0045 ("one or more Graphs, which may hold
+no Edges") both require it. The superseded rule read ADR 0033's connect gesture
+as the only way a Graph came into being.
+
+Two consequences followed and are done here rather than left to be found:
+
+- **Present had to learn the new empty case.** `GraphSelector` disabled its
+  control only on "no active Graph", so a converted Layout's empty Active Graph
+  left it enabled while `present()` refused — verbatim the swallowed-click defect
+  a fully cyclic Graph produced before. Both halves are covered, and the app-level
+  test converts on the Flow view and asserts Present is unavailable.
+- **Two comments asserted the constraint.** `traversal.ts` and `navigation.ts`
+  both described an edge-less Graph as forbidden by the schema and their guards
+  as type ceremony. Both guards are load-bearing now.
