@@ -1,7 +1,11 @@
 import { expect, it } from 'vitest';
 import { spaceSnapshotSchema, uuidSchema, type Graph } from '@project/core';
 import { loadSpaceSnapshot, Placement } from '@project/graph';
-import { snapshotFromSpace, updatePositionedLayout } from '../src/snapshot';
+import {
+  snapshotFromSpace,
+  updatePositionedLayout,
+  withCardRemovedFromLayouts,
+} from '../src/snapshot';
 
 const CARD_A = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 const CARD_B = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
@@ -176,4 +180,54 @@ it('leaves an authored active Graph alone when the Edit names none', () => {
 
   expect(authored.document.layouts?.[0]?.activeGraph).toBe(GRAPH_ID);
   expect(loadSpaceSnapshot(authored).ok).toBe(true);
+});
+
+/**
+ * Deleting a Card from the Space is one Edit over every Layout at once, and this
+ * is the part of it no single-Layout write can do: the Card's membership and its
+ * incident Edges leave every Layout that held them, while empty Graphs and
+ * Layouts stay exactly where they were.
+ */
+it('cascades a deleted Card out of every Layout that held it', () => {
+  const withLayouts = spaceSnapshotSchema.parse({
+    ...snapshot,
+    document: {
+      ...snapshot.document,
+      layouts: [
+        ...(snapshot.document.layouts ?? []),
+        {
+          id: OTHER_LAYOUT_ID,
+          title: 'Other',
+          kind: 'positioned',
+          positions: { [CARD_A]: { x: 0, y: 400 }, [CARD_B]: { x: 0, y: 600 } },
+          graphs: [
+            {
+              id: OTHER_GRAPH_ID,
+              title: 'Aside',
+              edges: [
+                { from: CARD_A, to: CARD_A },
+                { from: CARD_B, to: CARD_A },
+              ],
+            },
+          ],
+        },
+      ],
+    },
+  });
+
+  const changed = withCardRemovedFromLayouts(withLayouts, CARD_A);
+
+  expect(changed.document.layouts?.[0]?.positions).toEqual({ [CARD_B]: { x: 200, y: 0 } });
+  expect(changed.document.layouts?.[0]?.graphs).toEqual([{ ...MAIN, edges: [] }]);
+  expect(changed.document.layouts?.[1]?.positions).toEqual({ [CARD_B]: { x: 0, y: 600 } });
+  expect(changed.document.layouts?.[1]?.graphs).toEqual([
+    { id: OTHER_GRAPH_ID, title: 'Aside', edges: [] },
+  ]);
+  // The Card itself is the caller's to remove: this answers only what the
+  // Layouts hold, so an intake over the result still names the Card it lists.
+  expect(changed.cards).toEqual(withLayouts.cards);
+});
+
+it('answers the snapshot it was given when no Layout held the Card', () => {
+  expect(withCardRemovedFromLayouts(snapshot, OTHER_LAYOUT_ID)).toBe(snapshot);
 });

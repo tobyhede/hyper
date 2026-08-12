@@ -17,6 +17,7 @@ import {
   type Space,
 } from '@project/graph';
 import { elkStrategy } from '@project/react-flow-adapter';
+import { nextGraphColor } from './colors';
 import { nextGraphTitle } from './titles';
 
 /**
@@ -291,7 +292,8 @@ const spaceSubject = (space: Space): RendererSubject => ({
 });
 
 /**
- * One fresh Graph holding no Edges, numbered above the Graphs being shown.
+ * One fresh Graph holding no Edges, numbered and coloured above the Graphs being
+ * shown.
  *
  * The **View's choice** among legal outputs and not a rule of the boundary (ADR
  * 0045) — a copy of the Graph the author was emphasising would satisfy every
@@ -303,9 +305,19 @@ const spaceSubject = (space: Space): RendererSubject => ({
  * It needs no input Graph, which is what lets either View render a new Space
  * with none: the empty Graph exists only because an Edit is creating a Layout,
  * and a Layout's Graph collection is non-empty (ADR 0040).
+ *
+ * The stored colour is the same rule Graph management's Add Graph uses, so a
+ * Graph does not come out with different properties according to whether the
+ * author asked for it or drew the first connection that minted it. The subject's
+ * Graphs are the Space flatten for a converting View, so their count is exactly
+ * the rotation `nextGraphColor` wants.
  */
 const freshEmptyGraph: ViewGraphPolicy = (_space, subject) => [
-  { title: nextGraphTitle(subject.graphs), edges: [] },
+  {
+    title: nextGraphTitle(subject.graphs),
+    color: nextGraphColor(subject.graphs.length),
+    edges: [],
+  },
 ];
 
 /**

@@ -184,6 +184,25 @@ function place(placement: Placement, cardId: CardId, at: LayoutPosition): Placem
   return brand(placed);
 }
 
+/**
+ * The placement without one card.
+ *
+ * A layout's position keys **are** its card membership (ADR 0040), so removing a
+ * card from a layout is exactly this — and, like `place`, it is authorship
+ * rather than a report, which is why it belongs here beside the closed
+ * constructors rather than being done with a `new Map` at the call site.
+ *
+ * Answers the placement it was given when the card was not in it, so an
+ * unchanged placement keeps its identity and the positioned strategy is not
+ * rebuilt for an edit that moved nothing.
+ */
+function remove(placement: Placement, cardId: CardId): Placement {
+  if (!placement.has(cardId)) return placement;
+  const remaining = new Map(placement);
+  remaining.delete(cardId);
+  return brand(remaining);
+}
+
 /** The record a Layout stores. Keys are already card ids; this only widens them. */
 function toPositions(placement: Placement): Record<CardId, LayoutPosition> {
   return Object.fromEntries([...placement].map(([cardId, at]) => [cardId, point(at)]));
@@ -204,5 +223,6 @@ export const Placement = {
   equals,
   next,
   place,
+  remove,
   toPositions,
 } as const;
