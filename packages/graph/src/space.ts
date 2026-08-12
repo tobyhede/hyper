@@ -87,13 +87,11 @@ export type SpaceError =
  * Three doors ask it: the two intakes below, and `readSingleSpace`, which parses
  * against import schemas that run ahead of intake and would otherwise answer
  * that cascade to the one reader hand-authoring a Space directory (ADR 0030).
- * Two doors do **not**, and knowing which is the point of writing it here:
- * `decodeSnapshot` and `parseSnapshotShape` parse `spaceSnapshotSchema` before
- * `loadSpaceSnapshot` is ever reached, so a version 2 snapshot is still refused
- * there — by cascade rather than by name. That is diagnostic quality on a door
- * no human hand-authors, tracked as issue `09` under
- * `.scratch/first-public-aggregate/`. Answer it by asking this gate earlier, not
- * by deciding a version somewhere new.
+ * The snapshot decoders do not — they parse `spaceSnapshotSchema` first, so they
+ * refuse a version 2 snapshot by cascade rather than by name. Deliberate, not an
+ * oversight: there are no version 2 documents, and a directory is the only one a
+ * human writes by hand. Issue `09` is the wontfix that says so. If it ever
+ * matters, ask this gate earlier there; never decide a version somewhere new.
  */
 export function unsupportedDocumentVersion(document: unknown): UnsupportedVersionError | null {
   if (typeof document !== 'object' || document === null) return null;

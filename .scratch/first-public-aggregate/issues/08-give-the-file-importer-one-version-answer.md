@@ -94,10 +94,13 @@ is absent or not a number, which the gate deliberately declines to speak for.
 `parseSnapshotShape` (`src/persistence/postgres-space-repository.ts`) parse
 `spaceSnapshotSchema` before `loadSpaceSnapshot` is reached, so a version 2
 snapshot is refused at those two doors by cascade rather than by name — the same
-defect this ticket fixed, one door over. It is out of scope here (the ticket names
-the file importer) and it is not the same severity: no human hand-authors a
-snapshot. Raised as ticket `09`. It does **not** cost acceptance criterion 2 —
-those doors decide no version, they only fail to ask.
+defect this ticket fixed, one door over. It does **not** cost acceptance
+criterion 2: those doors decide no version, they only fail to ask.
+
+Raised as ticket `09` and closed **wontfix**. There are no version 2 documents to
+have a diagnostic about, and nobody hand-authors a snapshot; this ticket was
+worth doing because a Space *directory* is the one thing a human writes by hand
+and so the one place a bad diagnostic reaches someone who can act on it.
 
 ### What proves it
 
