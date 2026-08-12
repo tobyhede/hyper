@@ -49,6 +49,7 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
   const authoring = createSpaceAuthoring({
     session: spaceSession,
     navigation,
+    currentSpace,
     initialPlacement,
   });
   // React Flow knows node ids as plain strings, and asks this per pointer frame.

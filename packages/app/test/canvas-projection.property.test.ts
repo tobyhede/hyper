@@ -36,26 +36,33 @@ const graphArb = (pool: string[]) =>
     edges: cards.slice(0, -1).map((from, index) => ({ from, to: cards[index + 1]! })),
   }));
 
-/** A Space of several overlapping Graphs, plus a Layout positioning its Cards. */
+/**
+ * One Layout owning several overlapping Graphs and positioning every Card they
+ * connect.
+ *
+ * A Graph is a nested owned value of its Layout (ADR 0040), so the Cards are
+ * derived from the Graphs and then written as the Layout's membership — which is
+ * exactly what closes every owned Edge over the Cards the Layout positions.
+ */
 const layoutSpaceArb = cardIdPool.chain((pool) =>
   fc.array(graphArb(pool), { minLength: 2, maxLength: 4 }).map((graphs) => {
     const cards = [...new Set(graphs.flatMap((graph) => graph.cards))];
     return {
       file: {
-        version: 2,
+        version: 1,
         id: '00000000-0000-4000-8000-000000000001',
         title: 'Generated',
-        graphs: graphs.map((graph, index) => ({
-          id: uuidFrom(index + 100),
-          title: `Graph ${index}`,
-          edges: graph.edges,
-        })),
         layouts: [
           {
             id: LAYOUT_ID,
             title: 'Working',
             kind: 'positioned',
             positions: Object.fromEntries(cards.map((id, index) => [id, { x: index * 400, y: 0 }])),
+            graphs: graphs.map((graph, index) => ({
+              id: uuidFrom(index + 100),
+              title: `Graph ${index}`,
+              edges: graph.edges,
+            })),
           },
         ],
       },

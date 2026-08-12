@@ -10,18 +10,38 @@ beforeAll(() => {
   HTMLElement.prototype.scrollIntoView = () => undefined;
 });
 
+/**
+ * Two Layouts, each owning the initial empty Graph a Layout is created with
+ * (ADR 0040). The selector reads only `id` and `title`; the Graphs are here
+ * because a Layout that owns none is not a Layout, not because this component
+ * has anything to say about them.
+ */
 const layouts: readonly Layout[] = [
   {
     id: uuidSchema.parse('11111111-1111-4111-8111-111111111111'),
     title: 'Workshop',
     kind: 'positioned',
     positions: {},
+    graphs: [
+      {
+        id: uuidSchema.parse('11111111-1111-4111-8111-1111111111a1'),
+        title: 'Graph 1',
+        edges: [],
+      },
+    ],
   },
   {
     id: uuidSchema.parse('22222222-2222-4222-8222-222222222222'),
     title: 'Overview',
     kind: 'positioned',
     positions: {},
+    graphs: [
+      {
+        id: uuidSchema.parse('22222222-2222-4222-8222-2222222222a2'),
+        title: 'Graph 1',
+        edges: [],
+      },
+    ],
   },
 ];
 

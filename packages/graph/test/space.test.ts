@@ -57,6 +57,33 @@ describe('loadSpace', () => {
     expect(result.space.layouts).toHaveLength(1);
   });
 
+  /**
+   * Creating a Layout creates its initial empty active Graph in the same Edit
+   * (ADR 0040), and converting the Flow view returns exactly that (ADR 0045), so
+   * a Layout whose only Graph holds no Edges is the first thing a conversion
+   * writes. Closure is vacuous over an empty Edge set, not exempt from.
+   */
+  it('loads a Layout whose only Graph holds no Edges', () => {
+    const result = loadSpace(
+      {
+        ...validInput,
+        layouts: [
+          {
+            ...WORKING,
+            graphs: [
+              { id: uuid('00000000-0000-4000-8000-000000000004'), title: 'Graph 1', edges: [] },
+            ],
+          },
+        ],
+      },
+      validCards,
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.space.graphs).toHaveLength(1);
+    expect(getGraph(result.space, uuid('00000000-0000-4000-8000-000000000004'))?.edges).toEqual([]);
+  });
+
   it('builds each card from its file, body included', () => {
     const result = loadSpace(validInput, validCards);
     if (!result.ok) throw new Error('expected a valid space');

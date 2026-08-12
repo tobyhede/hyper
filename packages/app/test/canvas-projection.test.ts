@@ -15,18 +15,23 @@ const LAYOUT = uuidSchema.parse('00000000-0000-4000-8000-000000000008');
 
 const CARDS = [cardFile(CARD_A), cardFile(CARD_B)];
 
-const TWO_GRAPHS = [
-  { id: DRAWN_GRAPH, title: 'Drawn', edges: [{ from: CARD_A, to: CARD_B }] },
-  { id: OTHER_GRAPH, title: 'Other', edges: [{ from: CARD_B, to: CARD_A }] },
-];
+const DRAWN = { id: DRAWN_GRAPH, title: 'Drawn', edges: [{ from: CARD_A, to: CARD_B }] };
+const OTHER = { id: OTHER_GRAPH, title: 'Other', edges: [{ from: CARD_B, to: CARD_A }] };
 
-/** An authored Layout, selected instead of an Algorithmic View. */
-const POSITIONED_LAYOUT = {
+/**
+ * An authored Layout over both Cards, owning the Graphs it is handed.
+ *
+ * A Graph is a nested owned value of exactly one Layout (ADR 0040), so a Space
+ * that holds Graphs is a Space that holds a Layout — and this one positions both
+ * Cards, which is what closes every owned Edge over its membership.
+ */
+const layoutOwning = (...graphs: readonly object[]) => ({
   id: LAYOUT,
   title: 'Working',
   kind: 'positioned',
   positions: { [CARD_A]: { x: 0, y: 0 }, [CARD_B]: { x: 400, y: 0 } },
-};
+  graphs,
+});
 
 /** Nothing activated, nothing selected, nothing dragged. */
 const AT_REST: CanvasInteraction = {
@@ -39,7 +44,7 @@ const AT_REST: CanvasInteraction = {
 
 function spaceWith(extra: Record<string, unknown> = {}): Space {
   const result = loadSpace(
-    { version: 2, id: '00000000-0000-4000-8000-000000000001', title: 'T', graphs: [], ...extra },
+    { version: 1, id: '00000000-0000-4000-8000-000000000001', title: 'T', ...extra },
     CARDS,
   );
   if (!result.ok) throw new Error(result.errors.map((e) => e.message).join(', '));
@@ -74,7 +79,7 @@ describe('canvasProjection', () => {
   });
 
   it('emphasises the Active Graph without hiding the rest of the Space', async () => {
-    const space = spaceWith({ graphs: TWO_GRAPHS });
+    const space = spaceWith({ layouts: [layoutOwning(DRAWN, OTHER)] });
 
     const equal = await projectThrough(space);
     const emphasised = await projectThrough(space, { ...AT_REST, activeGraphId: DRAWN_GRAPH });
@@ -86,7 +91,7 @@ describe('canvasProjection', () => {
   });
 
   it('colours the authoring handles as the Active Graph, and as the first slot without one', async () => {
-    const space = spaceWith({ graphs: [{ ...TWO_GRAPHS[0], color: '#123456' }] });
+    const space = spaceWith({ layouts: [layoutOwning({ ...DRAWN, color: '#123456' })] });
 
     const active = await projectThrough(space, { ...AT_REST, activeGraphId: DRAWN_GRAPH });
     const none = await projectThrough(spaceWith());
@@ -98,7 +103,7 @@ describe('canvasProjection', () => {
   });
 
   it('recedes the Edges of every Graph but the Active one', async () => {
-    const space = spaceWith({ graphs: TWO_GRAPHS });
+    const space = spaceWith({ layouts: [layoutOwning(DRAWN, OTHER)] });
 
     const { edges } = await projectThrough(space, { ...AT_REST, activeGraphId: DRAWN_GRAPH });
 
@@ -109,7 +114,7 @@ describe('canvasProjection', () => {
   });
 
   it('names the traversal position, the authoring selection and what Presenting draws', async () => {
-    const space = spaceWith({ graphs: [TWO_GRAPHS[0]] });
+    const space = spaceWith({ layouts: [layoutOwning(DRAWN)] });
 
     const { nodes } = await projectThrough(space, {
       ...AT_REST,
@@ -127,7 +132,7 @@ describe('canvasProjection', () => {
   });
 
   it('drops routed Edge geometry once a Card has been dragged out of the arrangement', async () => {
-    const space = spaceWith({ graphs: [TWO_GRAPHS[0]] });
+    const space = spaceWith({ layouts: [layoutOwning(DRAWN)] });
 
     const settled = await projectThrough(space);
     const dragged = await projectThrough(space, { ...AT_REST, moved: true });
@@ -136,8 +141,8 @@ describe('canvasProjection', () => {
     expect(dragged.edges[0]?.data?.['points']).toBeUndefined();
   });
 
-  it('draws every Graph the Space holds under a selected Layout', async () => {
-    const space = spaceWith({ graphs: TWO_GRAPHS, layouts: [POSITIONED_LAYOUT] });
+  it('draws every Graph a selected Layout owns', async () => {
+    const space = spaceWith({ layouts: [layoutOwning(DRAWN, OTHER)] });
 
     const { visibleGraphs, nodes, edges } = await projectThrough(space, AT_REST, {
       kind: 'layout',
@@ -145,7 +150,7 @@ describe('canvasProjection', () => {
     });
 
     // Graphs, Edges and handles are derived separately and must agree on the
-    // same set; a Layout no longer narrows any of the three.
+    // same set — the Graphs this Layout owns (ADR 0040), which here is both.
     expect(visibleGraphs.map((graph) => graph.id)).toEqual([DRAWN_GRAPH, OTHER_GRAPH]);
     expect(edges.map((edge) => edge.data?.['graphId']).sort()).toEqual(
       [DRAWN_GRAPH, OTHER_GRAPH].sort(),

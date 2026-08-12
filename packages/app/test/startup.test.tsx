@@ -13,7 +13,7 @@ const OTHER_CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
 
 const snapshot: SpaceSnapshot = spaceSnapshotSchema.parse({
   id: SPACE_ID,
-  document: { version: 2, title: 'Stored space', graphs: [] },
+  document: { version: 1, title: 'Stored space' },
   cards: [
     {
       id: CARD_ID,
@@ -24,7 +24,7 @@ const snapshot: SpaceSnapshot = spaceSnapshotSchema.parse({
 
 const otherSnapshot: SpaceSnapshot = spaceSnapshotSchema.parse({
   id: OTHER_SPACE_ID,
-  document: { version: 2, title: 'Exact selected space', graphs: [] },
+  document: { version: 1, title: 'Exact selected space' },
   cards: [
     {
       id: OTHER_CARD_ID,
@@ -272,7 +272,8 @@ it('renders complete startup failure details instead of leaving an empty root', 
       await startApplication(root, () =>
         Promise.reject(
           new Error(
-            'The bundled space failed to import:\n  - version: Invalid literal value, expected 2',
+            'The bundled space failed to import:\n' +
+              '  - Space document version 2 is not supported; this build reads version 1',
           ),
         ),
       );
@@ -284,7 +285,7 @@ it('renders complete startup failure details instead of leaving an empty root', 
     ).toBeVisible();
     expect(alert).toHaveTextContent('The space could not be opened.');
     expect(alert).toHaveTextContent(
-      'The bundled space failed to import: - version: Invalid literal value, expected 2',
+      'The bundled space failed to import: - Space document version 2 is not supported; this build reads version 1',
     );
     expect(container.querySelector('.react-flow')).not.toBeInTheDocument();
   } finally {

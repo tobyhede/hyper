@@ -14,22 +14,22 @@ const ALIAS_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000006');
 const SECOND_ALIAS_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000007');
 
 /**
- * Two Cards on one Graph in an authored Layout, so the graph opens on a
- * Positioned renderer with a placement already installed and presenting has a
- * traversal to run.
+ * Two Cards on one Graph the Layout owns, so the graph opens on a Positioned
+ * renderer with a placement already installed and presenting has a traversal to
+ * run.
  */
 const snapshot: SpaceSnapshot = spaceSnapshotSchema.parse({
   id: SPACE_ID,
   document: {
-    version: 2,
+    version: 1,
     title: 'Workspace',
-    graphs: [{ id: GRAPH_ID, title: 'Graph', edges: [{ from: CARD_ID, to: OTHER_CARD_ID }] }],
     layouts: [
       {
         id: LAYOUT_ID,
         title: 'Layout',
         kind: 'positioned',
         positions: { [CARD_ID]: { x: 10, y: 20 }, [OTHER_CARD_ID]: { x: 300, y: 20 } },
+        graphs: [{ id: GRAPH_ID, title: 'Graph', edges: [{ from: CARD_ID, to: OTHER_CARD_ID }] }],
       },
     ],
     defaultView: LAYOUT_ID,
