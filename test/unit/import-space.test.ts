@@ -135,12 +135,12 @@ describe('importSingleSpace', () => {
     // first-public document and never enters (ADR 0040).
     //
     // Import parses against `importSpaceFileSchema`, which runs ahead of domain
-    // intake, so it asks `unsupportedDocumentVersion` before that schema can
-    // answer for the keys that moved — the same gate `loadSpace` asks, so the
-    // CLI says of a version 2 directory exactly what intake says, once. What
-    // that gate is and where it lives is pinned in `read-single-space.test.ts`;
-    // what matters here is that the version is the whole of the refusal and
-    // nothing reaches the repository.
+    // intake, so it asks `documentRefusal` before that schema can answer for the
+    // keys that moved — the same composed gate `loadSpace` asks, so the CLI says
+    // of a version 2 directory exactly what intake says, once. What that gate is
+    // and where it lives is pinned in `read-single-space.test.ts`; what matters
+    // here is that the version is the whole of the refusal and nothing reaches
+    // the repository.
     const directory = await makeTemporaryDirectory();
     await writeFile(
       join(directory, 'space.json'),
