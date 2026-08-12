@@ -24,7 +24,7 @@ import {
   type AuthoringResult,
   type SpaceAuthoring,
 } from '../src/space-authoring';
-import { resolveView, type RendererSelection } from '../src/view';
+import { resolveRenderer, type RendererSelection } from '../src/renderer';
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const CARD_A = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
@@ -180,7 +180,7 @@ function attachAuthoring(
     return result.space;
   };
   const navigation = createNavigation(currentSpace, renderer);
-  const resolved = resolveView(currentSpace(), renderer);
+  const resolved = resolveRenderer(currentSpace(), renderer);
   const authoring = createSpaceAuthoring({
     session,
     navigation,
@@ -906,7 +906,7 @@ describe('Space Authoring', () => {
       { id: MINTED_GRAPH_ID, title: 'Graph 1', edges: [{ from: CARD_A, to: CARD_A }] },
     ]);
     expect(
-      resolveView(currentSpace(), { kind: 'layout', layoutId: LAYOUT_ID }).visibleGraphIds,
+      resolveRenderer(currentSpace(), { kind: 'layout', layoutId: LAYOUT_ID }).visibleGraphIds,
     ).toEqual([MINTED_GRAPH_ID]);
   });
 

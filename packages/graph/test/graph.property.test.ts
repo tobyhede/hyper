@@ -90,7 +90,7 @@ describe('graph validation properties', () => {
         );
         // Still a card of the space — nothing about it went missing.
         expect(file.cards.some((c) => c.id === evicted)).toBe(true);
-        expect(errors.some((e) => e.kind === 'layout-position-unknown-card')).toBe(false);
+        expect(errors.some((e) => e.kind === 'layout-member-missing-card')).toBe(false);
       }),
     );
   });

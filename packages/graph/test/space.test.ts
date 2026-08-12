@@ -352,7 +352,7 @@ describe('loadSpace: layouts', () => {
     expect(
       result.errors.some(
         (e) =>
-          e.kind === 'layout-position-unknown-card' &&
+          e.kind === 'layout-member-missing-card' &&
           e.ref === uuid('00000000-0000-4000-8000-000000000099'),
       ),
     ).toBe(true);

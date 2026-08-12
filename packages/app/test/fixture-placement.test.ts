@@ -2,7 +2,7 @@ import { expect, it } from 'vitest';
 import { loadSpace, type CardFile, type Space } from '@project/graph';
 import { elkStrategy } from '@project/react-flow-adapter';
 import { canvasProjection } from '../src/canvas-projection';
-import { resolveView } from '../src/view';
+import { resolveRenderer } from '../src/renderer';
 import fixtureJson from '../fixture/space.json';
 
 /**
@@ -44,7 +44,7 @@ function loadFixture(): Space {
 
 /** Where ELK puts each fixture Card, through the same seam the canvas uses. */
 async function arrangeFixture(space: Space): Promise<Map<string, { x: number; y: number }>> {
-  const { strategyGraph } = canvasProjection(space, resolveView(space));
+  const { strategyGraph } = canvasProjection(space, resolveRenderer(space));
   const laidOut = await elkStrategy()(strategyGraph);
   return new Map(
     laidOut.cards.map((card) => [card.id as string, { x: card.x ?? NaN, y: card.y ?? NaN }]),

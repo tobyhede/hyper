@@ -398,7 +398,7 @@ it('takes the adopted renderer’s own Active Graph over the one that was emphas
  * pair Navigation may not hold — the Active Graph would ride into the next Edit
  * as that Layout's `activeGraph`, which intake rejects outright.
  *
- * Constructible against a real Space rather than a hand-built `ResolvedView`:
+ * Constructible against a real Space rather than a hand-built `ResolvedRenderer`:
  * `GRAPH_ONE` exists and is drawn by the Flow view, and `LAYOUT` simply does not
  * own it. Edit completion cannot reach it, because the pair it passes is the one
  * it wrote into the snapshot a line earlier.

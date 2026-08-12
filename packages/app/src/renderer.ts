@@ -187,17 +187,17 @@ export type ViewLayout =
        * A selected Layout has no counterpart to this — it is not converted, it
        * is updated in place, and its graphs keep the identities it owns.
        *
-       * The minter comes from the caller because `resolveView` is a free
+       * The minter comes from the caller because `resolveRenderer` is a free
        * function seven call sites reach, only one of which converts: the module
        * that mints — Space Authoring — took the dependency once when it was
        * composed, and hands it to the conversion it is already performing. A
-       * parameter on `resolveView` instead would repeat it at six Navigation
+       * parameter on `resolveRenderer` instead would repeat it at six Navigation
        * call sites that never mint anything.
        */
       readonly convert: (positions: Placement, newGraphId: () => GraphId) => ConvertedLayout;
     };
 
-interface ResolvedViewBase {
+interface ResolvedRendererBase {
   /** A declared Layout's id, or a built-in view's. */
   id: string;
   /** Arranges the cards this renderer shows. */
@@ -207,7 +207,7 @@ interface ResolvedViewBase {
    * are its position keys, or every card in the Space under an Algorithmic View
    * (ADR 0040, ADR 0045).
    *
-   * The Card half of what {@link ResolvedViewBase.visibleGraphIds} answers for
+   * The Card half of what {@link ResolvedRendererBase.visibleGraphIds} answers for
    * graphs, and the same argument for it being a field: which cards a view takes
    * from its space is the View's call (ADR 0005). The render path does not read
    * it yet — the omitted-Card fallback band still draws a card a Layout leaves
@@ -229,7 +229,7 @@ interface ResolvedViewBase {
   activeGraphId: GraphId | null;
 }
 
-export type ResolvedView = ResolvedViewBase & ViewLayout;
+export type ResolvedRenderer = ResolvedRendererBase & ViewLayout;
 
 /** The one renderer currently navigating a Space (ADR 0031). */
 export type RendererSelection =
@@ -265,7 +265,7 @@ function resolveSubject(space: Space, layout: Layout | null): ViewSubject {
 function resolveGraphs(
   space: Space,
   layout: Layout | null,
-): Pick<ResolvedView, 'visibleGraphIds' | 'activeGraphId'> {
+): Pick<ResolvedRenderer, 'visibleGraphIds' | 'activeGraphId'> {
   const visibleGraphIds = (layout?.graphs ?? space.graphs).map((graph) => graph.id);
   return {
     visibleGraphIds,
@@ -286,7 +286,7 @@ function resolveGraphs(
  * Navigation asks this, and a Navigation that computed its own answer would
  * disagree with the renderer the moment the two sets differ again.
  */
-export const viewShowsGraph = (view: ResolvedView, graphId: GraphId): boolean =>
+export const rendererShowsGraph = (view: ResolvedRenderer, graphId: GraphId): boolean =>
   view.visibleGraphIds.includes(graphId);
 
 /** Resolve the Space default into the initial renderer selection. */
@@ -297,10 +297,10 @@ export function defaultRenderer(space: Space): RendererSelection {
     : { kind: 'layout', layoutId: requested };
 }
 
-export function resolveView(
+export function resolveRenderer(
   space: Space,
   selection: RendererSelection = defaultRenderer(space),
-): ResolvedView {
+): ResolvedRenderer {
   if (selection.kind === 'layout') {
     const layout = getLayout(space, selection.layoutId);
     if (layout === undefined) {

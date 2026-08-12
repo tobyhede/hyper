@@ -12,7 +12,7 @@ import {
   type AuthoringResult,
   type SpaceAuthoring,
 } from '../src/space-authoring';
-import type { RendererSelection } from '../src/view';
+import type { RendererSelection } from '../src/renderer';
 import { completeDrag, moving, node, settled } from './render-adapter-fixtures';
 
 const CARD_A = uuidSchema.parse('00000000-0000-4000-8000-000000000002');

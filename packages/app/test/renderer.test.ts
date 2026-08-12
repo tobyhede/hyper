@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { uuidSchema } from '@project/core';
 import { buildLayoutStrategyGraph, loadSpace, Placement, type Space } from '@project/graph';
 import { CARD_SIZE } from '../src/card';
-import { convertView, resolveView, type ViewSubject } from '../src/view';
+import { convertView, resolveRenderer, type ViewSubject } from '../src/renderer';
 import { cardFile } from './card-files';
 
 const CARDS = [
@@ -72,7 +72,7 @@ function spaceWith(extra: Record<string, unknown> = {}): Space {
 
 /** Run a resolved view's strategy over its space, so we test what it *does*. */
 async function arrange(space: Space) {
-  const view = resolveView(space);
+  const view = resolveRenderer(space);
   const graph = buildLayoutStrategyGraph(
     space.cards.map((c) => c.id),
     new Map(),
@@ -83,11 +83,11 @@ async function arrange(space: Space) {
   return Object.fromEntries(laid.cards.map((c) => [c.id, { x: c.x, y: c.y }]));
 }
 
-describe('resolveView', () => {
+describe('resolveRenderer', () => {
   it('resolves an explicitly selected Algorithmic View without changing the Space default', async () => {
     const space = spaceWith({ defaultView: '00000000-0000-4000-8000-000000000022' });
 
-    const view = resolveView(space, { kind: 'view', view: 'grid' });
+    const view = resolveRenderer(space, { kind: 'view', view: 'grid' });
 
     expect(view.id).toBe('grid');
     expect(view.layout).toBeNull();
@@ -106,7 +106,7 @@ describe('resolveView', () => {
   it('resolves an explicitly selected Positioned Layout without changing the Space default', async () => {
     const space = spaceWith({ defaultView: 'grid' });
 
-    const view = resolveView(space, {
+    const view = resolveRenderer(space, {
       kind: 'layout',
       layoutId: uuidSchema.parse('00000000-0000-4000-8000-000000000022'),
     });
@@ -129,7 +129,7 @@ describe('resolveView', () => {
 
   it('rejects a selected Layout that the Space does not own', () => {
     expect(() =>
-      resolveView(spaceWith(), {
+      resolveRenderer(spaceWith(), {
         kind: 'layout',
         layoutId: uuidSchema.parse('00000000-0000-4000-8000-000000000099'),
       }),
@@ -137,13 +137,15 @@ describe('resolveView', () => {
   });
 
   it('falls back to the graph-driven Flow View when a Space names no View', () => {
-    const view = resolveView(spaceWith());
+    const view = resolveRenderer(spaceWith());
     expect(view.id).toBe('flow');
     expect(view.layout).toBeNull();
   });
 
   it('resolves a declared Layout and carries its authored placement', () => {
-    const view = resolveView(spaceWith({ defaultView: '00000000-0000-4000-8000-000000000022' }));
+    const view = resolveRenderer(
+      spaceWith({ defaultView: '00000000-0000-4000-8000-000000000022' }),
+    );
     expect(view.id).toBe('00000000-0000-4000-8000-000000000022');
     expect(view.layout?.positions).toEqual(POSITIONS);
   });
@@ -159,20 +161,20 @@ describe('resolveView', () => {
 
   it('resolves the built-in grid, which is automatic and so carries no Layout', async () => {
     const space = spaceWith({ defaultView: 'grid' });
-    expect(resolveView(space).layout).toBeNull();
+    expect(resolveRenderer(space).layout).toBeNull();
     // The grid's own arithmetic, not ELK's: first card at the origin.
     expect((await arrange(space))['00000000-0000-4000-8000-000000000002']).toEqual({ x: 0, y: 0 });
   });
 
   it('ignores a declared Layout the space does not open in', () => {
-    const view = resolveView(spaceWith());
+    const view = resolveRenderer(spaceWith());
     expect(view.id).toBe('flow');
     expect(view.layout).toBeNull();
   });
 
   it('shows every graph and opens on the first under an Algorithmic View', () => {
     const space = spaceWith({ layouts: [WORKING_TWO] });
-    const view = resolveView(space);
+    const view = resolveRenderer(space);
     expect(view.visibleGraphIds).toEqual([
       '00000000-0000-4000-8000-000000000004',
       '00000000-0000-4000-8000-000000000020',
@@ -188,7 +190,7 @@ describe('resolveView', () => {
       layouts: [WORKING_TWO],
       defaultView: '00000000-0000-4000-8000-000000000022',
     });
-    const view = resolveView(space);
+    const view = resolveRenderer(space);
     expect(view.layout?.id).toBe('00000000-0000-4000-8000-000000000022');
     expect(view.visibleGraphIds).toEqual([
       '00000000-0000-4000-8000-000000000004',
@@ -202,7 +204,7 @@ describe('resolveView', () => {
       layouts: [{ ...WORKING_TWO, activeGraph: '00000000-0000-4000-8000-000000000020' }],
       defaultView: '00000000-0000-4000-8000-000000000022',
     });
-    const view = resolveView(space);
+    const view = resolveRenderer(space);
     expect(view.visibleGraphIds).toEqual([
       '00000000-0000-4000-8000-000000000004',
       '00000000-0000-4000-8000-000000000020',
@@ -213,7 +215,7 @@ describe('resolveView', () => {
   it('has no active graph in a space with no Layouts (ADR 0015)', () => {
     // A Layout owns at least one Graph (ADR 0040), so "no graphs" and "no
     // Layouts" are now the same state — and it is where editing starts.
-    const view = resolveView(spaceWith({ layouts: [] }));
+    const view = resolveRenderer(spaceWith({ layouts: [] }));
     expect(view.visibleGraphIds).toEqual([]);
     expect(view.activeGraphId).toBeNull();
   });
@@ -242,7 +244,7 @@ describe('resolveView', () => {
       ],
       defaultView: '00000000-0000-4000-8000-000000000035',
     });
-    expect(resolveView(space).layout?.id).toBe('00000000-0000-4000-8000-000000000035');
+    expect(resolveRenderer(space).layout?.id).toBe('00000000-0000-4000-8000-000000000035');
     expect((await arrange(space))['00000000-0000-4000-8000-000000000002']).toEqual({ x: 7, y: 9 });
   });
 
@@ -254,7 +256,7 @@ describe('resolveView', () => {
       layouts: [WORKING, SECOND],
       defaultView: '00000000-0000-4000-8000-000000000022',
     });
-    const view = resolveView(space);
+    const view = resolveRenderer(space);
 
     expect(view.layout?.id).toBe('00000000-0000-4000-8000-000000000022');
     expect(view.visibleGraphIds).toEqual(['00000000-0000-4000-8000-000000000004']);
@@ -266,7 +268,7 @@ describe('resolveView', () => {
     // flattened across the Layouts that own them (ADR 0045) — derived, never
     // stored, and closed for free because every endpoint is a Space Card.
     const space = spaceWith({ layouts: [WORKING, SECOND] });
-    const view = resolveView(space);
+    const view = resolveRenderer(space);
 
     expect(view.id).toBe('flow');
     expect(view.visibleGraphIds).toEqual([
@@ -284,7 +286,7 @@ describe('resolveView', () => {
       defaultView: '00000000-0000-4000-8000-000000000022',
     });
 
-    expect(resolveView(space).activeGraphId).toBe('00000000-0000-4000-8000-000000000004');
+    expect(resolveRenderer(space).activeGraphId).toBe('00000000-0000-4000-8000-000000000004');
   });
 });
 
@@ -292,7 +294,7 @@ describe('the Card subject a View names', () => {
   it('gives an Algorithmic View every Card the Space holds', () => {
     // Its subject is the Space's Cards (ADR 0045), which is also why it draws
     // the flatten: every Edge endpoint of every Graph is one of them.
-    expect(resolveView(spaceWith({ layouts: [WORKING, SECOND] })).cardIds).toEqual([
+    expect(resolveRenderer(spaceWith({ layouts: [WORKING, SECOND] })).cardIds).toEqual([
       '00000000-0000-4000-8000-000000000002',
       '00000000-0000-4000-8000-000000000003',
     ]);
@@ -320,7 +322,7 @@ describe('the Card subject a View names', () => {
       defaultView: '00000000-0000-4000-8000-000000000022',
     });
 
-    expect(resolveView(space).cardIds).toEqual(['00000000-0000-4000-8000-000000000002']);
+    expect(resolveRenderer(space).cardIds).toEqual(['00000000-0000-4000-8000-000000000002']);
   });
 });
 
@@ -339,7 +341,7 @@ describe('converting a View into a Layout', () => {
     // Flow's choice among legal outputs, not the boundary's rule (ADR 0045): a
     // copy of the emphasised Graph would satisfy both obligations and is how two
     // Graphs carrying one title start diverging in silence.
-    const view = resolveView(spaceWith({ layouts: [WORKING, SECOND] }));
+    const view = resolveRenderer(spaceWith({ layouts: [WORKING, SECOND] }));
     expect(view.convert).not.toBeNull();
 
     const converted = view.convert?.(onScreen, mintGraph);
@@ -359,14 +361,16 @@ describe('converting a View into a Layout', () => {
     const space = spaceWith({
       layouts: [{ ...WORKING, graphs: [{ ...MAIN, title: 'Graph 4' }] }],
     });
-    expect(resolveView(space).convert?.(onScreen, mintGraph).graphs[0]?.title).toBe('Graph 5');
+    expect(resolveRenderer(space).convert?.(onScreen, mintGraph).graphs[0]?.title).toBe('Graph 5');
   });
 
   it('has nothing to convert once a Layout is selected', () => {
     // A Layout is not converted — it is updated in place, and its Graphs keep
     // the identities it already owns. `layout` and `convert` are the two sides
     // of one answer.
-    const view = resolveView(spaceWith({ defaultView: '00000000-0000-4000-8000-000000000022' }));
+    const view = resolveRenderer(
+      spaceWith({ defaultView: '00000000-0000-4000-8000-000000000022' }),
+    );
     expect(view.layout).not.toBeNull();
     expect(view.convert).toBeNull();
   });
@@ -374,7 +378,7 @@ describe('converting a View into a Layout', () => {
   it('converts a Space with no Layouts at all, where there is no Graph to carry over', () => {
     // Zero Graphs in, one or more out (ADR 0045). This is the state a new Space
     // starts in, and the first Card an author moves has to leave it.
-    const converted = resolveView(spaceWith({ layouts: [] })).convert?.(onScreen, mintGraph);
+    const converted = resolveRenderer(spaceWith({ layouts: [] })).convert?.(onScreen, mintGraph);
     expect(converted?.graphs).toHaveLength(1);
     expect(converted?.graphs[0]?.title).toBe('Graph 1');
   });

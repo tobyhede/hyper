@@ -4,7 +4,7 @@ import { loadSpace, type Space } from '@project/graph';
 import type { CardFlowNode } from '@project/react-flow-adapter';
 import { canvasProjection, type CanvasInteraction } from '../src/canvas-projection';
 import { GRAPH_PALETTE } from '../src/colors';
-import { resolveView, type RendererSelection } from '../src/view';
+import { resolveRenderer, type RendererSelection } from '../src/renderer';
 import { cardFile } from './card-files';
 
 const CARD_A = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
@@ -57,7 +57,7 @@ async function projectThrough(
   interaction: CanvasInteraction = AT_REST,
   selection?: RendererSelection,
 ) {
-  const view = resolveView(space, selection);
+  const view = resolveRenderer(space, selection);
   const projection = canvasProjection(space, view);
   const laidOut = await view.strategy(projection.strategyGraph);
   return { ...projection, ...projection.project(laidOut, interaction) };

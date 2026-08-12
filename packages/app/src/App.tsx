@@ -18,7 +18,7 @@ import { usePlacementRendering } from './placement-rendering';
 import { cardSizeVars } from './card';
 import { createNavigation } from './navigation';
 import { createWorkingSpaceReader } from './snapshot';
-import { defaultRenderer, resolveView, type RendererSelection } from './view';
+import { defaultRenderer, resolveRenderer, type RendererSelection } from './renderer';
 import { SpaceCanvas } from './components/SpaceCanvas';
 import { OpenCard } from './components/OpenCard';
 import { PlacementFailure } from './components/PlacementFailure';
@@ -38,7 +38,7 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
   // graphs are shown and which of them opens active (ADR 0026), so it has to
   // resolve before the store is built.
   const initialRenderer = defaultRenderer(space);
-  const initialView = resolveView(space, initialRenderer);
+  const initialView = resolveRenderer(space, initialRenderer);
   const navigation = createNavigation(currentSpace, initialRenderer, space);
 
   // Live nodes hold whichever arrangement is on screen. A positioned view also
@@ -97,7 +97,7 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
     );
     const layouts = rendererSpace.layouts;
     const view = useMemo(
-      () => resolveView(rendererSpace, selectedRenderer),
+      () => resolveRenderer(rendererSpace, selectedRenderer),
       [rendererSpace, selectedRenderer],
     );
     // Everything the canvas draws, derived once from the Space and the view.
@@ -197,7 +197,7 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
     // snapshot Navigation will not consult is one decision with two sources of
     // truth.
     const chooseRenderer = useCallback((selection: RendererSelection) => {
-      const resolved = resolveView(currentSpace(), selection);
+      const resolved = resolveRenderer(currentSpace(), selection);
       navigation.selectRenderer(selection);
       useRenderAdapter
         .getState()

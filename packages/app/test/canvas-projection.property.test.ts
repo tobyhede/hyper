@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { uuidSchema } from '@project/core';
 import { loadSpace, type CardFile } from '@project/graph';
 import { canvasProjection } from '../src/canvas-projection';
-import { resolveView } from '../src/view';
+import { resolveRenderer } from '../src/renderer';
 import { cardFile } from './card-files';
 
 /**
@@ -75,7 +75,7 @@ async function projectThroughLayout(generated: { file: unknown; cardFiles: CardF
   const result = loadSpace(generated.file, generated.cardFiles);
   if (!result.ok) throw new Error(`generated space should load: ${JSON.stringify(result.errors)}`);
 
-  const view = resolveView(result.space, { kind: 'layout', layoutId: LAYOUT_ID });
+  const view = resolveRenderer(result.space, { kind: 'layout', layoutId: LAYOUT_ID });
   const projection = canvasProjection(result.space, view);
   const laidOut = await view.strategy(projection.strategyGraph);
   return projection.project(laidOut, {

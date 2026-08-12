@@ -2,7 +2,7 @@ import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import { uuidSchema, type Graph, type GraphId } from '@project/core';
 import { Placement } from '@project/graph';
-import { convertView, type ConvertedLayout, type ViewSubject } from '../src/view';
+import { convertView, type ConvertedLayout, type ViewSubject } from '../src/renderer';
 
 /**
  * ADR 0045's two obligations, over every view that could ever be written.

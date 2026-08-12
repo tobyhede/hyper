@@ -19,7 +19,7 @@ import {
 import type { Navigation, NavigationState } from './navigation';
 import { updatePositionedLayout } from './snapshot';
 import { nextNumberedTitle } from './titles';
-import { defaultRenderer, resolveView, type RendererSelection } from './view';
+import { defaultRenderer, resolveRenderer, type RendererSelection } from './renderer';
 
 export type AuthoringCompletion =
   | {
@@ -167,7 +167,7 @@ interface SpaceAuthoringDependencies {
    * The same reader Navigation is given, so both resolve a view against one
    * `Space` identity and one parse. Authoring needs it because which Layout an
    * Edit writes, and what that Layout owns, is the *View's* answer now — and
-   * `resolveView` takes a Space (ADR 0045).
+   * `resolveRenderer` takes a Space (ADR 0045).
    */
   readonly currentSpace: () => Space;
   readonly initialPlacement?: Placement | null;
@@ -448,11 +448,11 @@ export function createSpaceAuthoring({
     const renderer = navigationState.selectedRenderer;
     const space = currentSpace();
     // A selected Layout the Space no longer holds is not an Edit. Checked before
-    // resolving, because `resolveView` answers that case by throwing.
+    // resolving, because `resolveRenderer` answers that case by throwing.
     if (renderer.kind === 'layout' && getLayout(space, renderer.layoutId) === undefined) {
       return null;
     }
-    const view = resolveView(space, renderer);
+    const view = resolveRenderer(space, renderer);
     let createdCardId: CardId | undefined;
     let connection: { readonly from: CardId; readonly to: CardId } | null = null;
     let completedPlacement = reportedPlacement;
@@ -723,7 +723,7 @@ export function createSpaceAuthoring({
         .join('\n')}`;
     }
     const renderer = defaultRenderer(accepted.space);
-    const resolved = resolveView(accepted.space, renderer);
+    const resolved = resolveRenderer(accepted.space, renderer);
     const acceptedPlacement =
       resolved.layout === null ? null : Placement.fromLayout(resolved.layout);
     installTogether(() => {

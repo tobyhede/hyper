@@ -3,11 +3,11 @@ import { getCard, getGraph, outgoingEdges, graphStartCard, type Space } from '@p
 import { createObservableState, type ObserverErrorReporter } from '@project/persistence';
 import {
   DEFAULT_VIEW_ID,
-  resolveView,
-  viewShowsGraph,
+  resolveRenderer,
+  rendererShowsGraph,
   type RendererSelection,
-  type ResolvedView,
-} from './view';
+  type ResolvedRenderer,
+} from './renderer';
 
 export interface Move {
   readonly cardId: CardId;
@@ -139,7 +139,7 @@ function baseOf(state: NavigationState): NavigationBase {
  * being retained, which is the one thing that separates this from
  * `selectRenderer`: there is no earlier Algorithmic View to return to.
  */
-function openedState(selection: RendererSelection, view: ResolvedView): NavigationState {
+function openedState(selection: RendererSelection, view: ResolvedRenderer): NavigationState {
   return {
     selectedRenderer: selection,
     selectedView: selection.kind === 'view' ? selection.view : DEFAULT_VIEW_ID,
@@ -156,7 +156,7 @@ export function createNavigation(
   options: NavigationOptions = {},
 ): Navigation {
   const observable = createObservableState(
-    openedState(initialRenderer, resolveView(initialSpace, initialRenderer)),
+    openedState(initialRenderer, resolveRenderer(initialSpace, initialRenderer)),
     options.reportObserverError ?? reportToConsole,
   );
   // Whatever navigation is doing, it goes on doing: a change to the fields both
@@ -173,7 +173,7 @@ export function createNavigation(
     getState: observable.getState,
     subscribe: observable.subscribe,
     selectRenderer: (selection) => {
-      const view = resolveView(currentSpace(), selection);
+      const view = resolveRenderer(currentSpace(), selection);
       observable.publish({
         ...baseOf(observable.getState()),
         selectedRenderer: selection,
@@ -196,7 +196,7 @@ export function createNavigation(
     // once it stopped naming `traversalHistory` it stopped clearing Traversal history, and
     // history from a Space that was gone rode across under a `mode` saying there was none.
     openFresh: (selection) => {
-      observable.publish(openedState(selection, resolveView(currentSpace(), selection)));
+      observable.publish(openedState(selection, resolveRenderer(currentSpace(), selection)));
     },
     // Resolve first so navigation can never name a renderer the current Space
     // does not hold. Unlike explicit selection, adopting the Layout an Edit just
@@ -234,8 +234,8 @@ export function createNavigation(
     // precisely the check that a Layout's named `activeGraph` is a Graph it
     // owns. An absent Active Graph names nothing and is exempt.
     continueInRenderer: (selection, activeGraphId) => {
-      const view = resolveView(currentSpace(), selection);
-      if (activeGraphId !== null && !viewShowsGraph(view, activeGraphId)) {
+      const view = resolveRenderer(currentSpace(), selection);
+      if (activeGraphId !== null && !rendererShowsGraph(view, activeGraphId)) {
         throw new Error(`The adopted renderer does not show the active Graph ${activeGraphId}.`);
       }
       setState({
@@ -264,7 +264,7 @@ export function createNavigation(
     // exist" and "does not show" are different mistakes by the caller and each
     // says which.
     //
-    // The visible set is read off `resolveView` rather than recomputed here:
+    // The visible set is read off `resolveRenderer` rather than recomputed here:
     // one place answers which Graphs a view draws (ADR 0026), and two would
     // disagree the moment the answers differ.
     //
@@ -288,7 +288,7 @@ export function createNavigation(
       if (getGraph(space, graphId) === undefined) {
         throw new Error(`The Graph ${graphId} does not exist.`);
       }
-      if (!viewShowsGraph(resolveView(space, state.selectedRenderer), graphId)) {
+      if (!rendererShowsGraph(resolveRenderer(space, state.selectedRenderer), graphId)) {
         throw new Error(`The selected renderer does not show the Graph ${graphId}.`);
       }
       observable.publish({

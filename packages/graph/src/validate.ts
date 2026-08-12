@@ -28,7 +28,7 @@ export type SpaceReferenceErrorKind =
   | 'duplicate-card-id'
   | 'duplicate-graph-id'
   | 'duplicate-layout-id'
-  | 'layout-position-unknown-card'
+  | 'layout-member-missing-card'
   | 'layout-unknown-graph'
   | 'unresolved-default-view'
   | 'unresolved-graph-edge'
@@ -120,7 +120,7 @@ export function validateReferences(space: Referenceable): SpaceReferenceError[] 
       members.add(cardId);
       if (!cardIds.has(cardId)) {
         errors.push({
-          kind: 'layout-position-unknown-card',
+          kind: 'layout-member-missing-card',
           ref: cardId,
           message: `Layout "${layout.id}" positions missing card "${cardId}"`,
         });

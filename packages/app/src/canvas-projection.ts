@@ -16,7 +16,7 @@ import {
 } from '@project/react-flow-adapter';
 import { CARD_HEIGHT, CARD_SIZE } from './card';
 import { activeGraphColor, graphColorMap } from './colors';
-import type { ResolvedView } from './view';
+import type { ResolvedRenderer } from './renderer';
 
 /**
  * What the canvas draws, derived from a Space and the view rendering it.
@@ -66,7 +66,7 @@ export interface PendingCanvasProjection {
   project(laidOut: LayoutStrategyGraph, interaction: CanvasInteraction): CanvasNodesAndEdges;
 }
 
-export function canvasProjection(space: Space, view: ResolvedView): PendingCanvasProjection {
+export function canvasProjection(space: Space, view: ResolvedRenderer): PendingCanvasProjection {
   const colors = graphColorMap(space);
   // Which Graphs the renderer draws, resolved from the Layout that filtered them
   // (ADR 0026). Membership is the view's decision (ADR 0005), which is why it
