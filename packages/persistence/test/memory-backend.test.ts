@@ -21,7 +21,7 @@ const MISSING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000099');
 const loaded: LoadedSpace = {
   snapshot: {
     id: SPACE_ID,
-    document: { version: 2, title: 'One', graphs: [] },
+    document: { version: 1, title: 'One' },
     cards: [{ id: CARD_ID, document: { title: 'A', kind: 'markdown', body: 'Original' } }],
   },
   revision: 3n,
@@ -81,24 +81,44 @@ describe('MemorySpaceBackend', () => {
       document: { title: 'B', kind: 'markdown' as const, body: 'B' },
     };
     const invalidSnapshots = [
+      // A graph reaches intake only through the layout that owns it (ADR 0040),
+      // so both graph rules are broken inside one, over its own members.
       {
         ...loaded.snapshot,
         document: {
           ...loaded.snapshot.document,
-          graphs: [{ id: GRAPH_ID, title: 'Dangling', edges: [{ from: CARD_ID, to: MISSING_ID }] }],
+          layouts: [
+            {
+              id: LAYOUT_ID,
+              title: 'Owner',
+              kind: 'positioned' as const,
+              positions: { [CARD_ID]: { x: 0, y: 0 } },
+              graphs: [
+                { id: GRAPH_ID, title: 'Dangling', edges: [{ from: CARD_ID, to: MISSING_ID }] },
+              ],
+            },
+          ],
         },
       },
       {
         ...loaded.snapshot,
         document: {
           ...loaded.snapshot.document,
-          graphs: [
+          layouts: [
             {
-              id: GRAPH_ID,
-              title: 'Duplicate Edge',
-              edges: [
-                { from: CARD_ID, to: CARD_B },
-                { from: CARD_ID, to: CARD_B },
+              id: LAYOUT_ID,
+              title: 'Owner',
+              kind: 'positioned' as const,
+              positions: { [CARD_ID]: { x: 0, y: 0 }, [CARD_B]: { x: 300, y: 0 } },
+              graphs: [
+                {
+                  id: GRAPH_ID,
+                  title: 'Duplicate Edge',
+                  edges: [
+                    { from: CARD_ID, to: CARD_B },
+                    { from: CARD_ID, to: CARD_B },
+                  ],
+                },
               ],
             },
           ],
@@ -127,6 +147,15 @@ describe('MemorySpaceBackend', () => {
               title: 'Broken positions',
               kind: 'positioned' as const,
               positions: { [MISSING_ID]: { x: 0, y: 0 } },
+              // A member, so the edge rule is satisfied and only the position's
+              // own reference fails — one rule per snapshot, as above.
+              graphs: [
+                {
+                  id: GRAPH_ID,
+                  title: 'Over the placed card',
+                  edges: [{ from: MISSING_ID, to: MISSING_ID }],
+                },
+              ],
             },
           ],
           defaultView: LAYOUT_ID,
@@ -142,6 +171,13 @@ describe('MemorySpaceBackend', () => {
               title: 'Placed',
               kind: 'positioned' as const,
               positions: { [CARD_ID]: { x: 0, y: 0 } },
+              graphs: [
+                {
+                  id: GRAPH_ID,
+                  title: 'Over the placed card',
+                  edges: [{ from: CARD_ID, to: CARD_ID }],
+                },
+              ],
             },
           ],
           defaultView: MISSING_ID,

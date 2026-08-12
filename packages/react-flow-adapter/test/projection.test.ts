@@ -6,6 +6,7 @@ import {
   loadSpace,
   type Space,
 } from '@project/graph';
+import type { SpaceFile } from '@project/core';
 import { projectCardNodes, projectGraphEdges, type GraphEmphasis } from '../src/index';
 import { aliasFile, cardFile } from './card-files';
 import { uuid } from './uuid';
@@ -22,11 +23,49 @@ function load(
   return result.space;
 }
 
-const space = load({
-  version: 2,
-  id: '00000000-0000-4000-8000-000000000001',
-  title: 'Test',
-  graphs: [
+/**
+ * A version 1 space document over the given graphs.
+ *
+ * A graph is an owned value of the layout that holds it now (ADR 0040), and
+ * every edge endpoint must be a card of *that* layout, so the one layout below
+ * takes membership of every card the graphs touch. The positions are arbitrary
+ * — nothing in this file reads them — and what they express here is membership,
+ * which is what a layout's position keys are.
+ *
+ * Returned as `SpaceFile` rather than as `unknown`, although `loadSpace` takes
+ * `unknown` and would accept either. The literal is the whole point: typed, the
+ * next change to the aggregate fails here at `tsc`; untyped, it checks against
+ * nothing and fails at runtime instead — which is exactly how these fixtures
+ * came to be a version behind.
+ */
+function spaceFile(
+  graphs: readonly { id: string; title: string; edges: readonly { from: string; to: string }[] }[],
+): SpaceFile {
+  const members = [...new Set(graphs.flatMap(({ edges }) => edges.flatMap((e) => [e.from, e.to])))];
+  return {
+    version: 1,
+    id: uuid('00000000-0000-4000-8000-000000000001'),
+    title: 'Test',
+    layouts: [
+      {
+        id: uuid('00000000-0000-4000-8000-000000000050'),
+        title: 'Only layout',
+        kind: 'positioned',
+        positions: Object.fromEntries(
+          members.map((id, index) => [uuid(id), { x: index * 300, y: 0 }]),
+        ),
+        graphs: graphs.map(({ id, title, edges }) => ({
+          id: uuid(id),
+          title,
+          edges: edges.map(({ from, to }) => ({ from: uuid(from), to: uuid(to) })),
+        })),
+      },
+    ],
+  };
+}
+
+const space = load(
+  spaceFile([
     {
       id: '00000000-0000-4000-8000-000000000004',
       title: 'Main',
@@ -47,8 +86,8 @@ const space = load({
         },
       ],
     },
-  ],
-});
+  ]),
+);
 
 const colors = {
   '00000000-0000-4000-8000-000000000004': '#111111',
@@ -69,23 +108,18 @@ describe('projectCardNodes', () => {
 
   it("carries a card's description when it has one, and omits it otherwise", () => {
     const described = load(
-      {
-        version: 2,
-        id: '00000000-0000-4000-8000-000000000001',
-        title: 'Test',
-        graphs: [
-          {
-            id: '00000000-0000-4000-8000-000000000004',
-            title: 'Main',
-            edges: [
-              {
-                from: '00000000-0000-4000-8000-000000000002',
-                to: '00000000-0000-4000-8000-000000000003',
-              },
-            ],
-          },
-        ],
-      },
+      spaceFile([
+        {
+          id: '00000000-0000-4000-8000-000000000004',
+          title: 'Main',
+          edges: [
+            {
+              from: '00000000-0000-4000-8000-000000000002',
+              to: '00000000-0000-4000-8000-000000000003',
+            },
+          ],
+        },
+      ]),
       [
         {
           path: 'cards/a.md',
@@ -158,11 +192,8 @@ describe('projectCardNodes', () => {
     // A third Graph that never touches card A, so "every Graph" is distinguishable
     // from "every Graph this card is already on". A self-edge is authored structure
     // (ADR 0032), which is the cheapest way to keep it away from A.
-    const withThirdGraph = load({
-      version: 2,
-      id: '00000000-0000-4000-8000-000000000001',
-      title: 'Test',
-      graphs: [
+    const withThirdGraph = load(
+      spaceFile([
         {
           id: '00000000-0000-4000-8000-000000000004',
           title: 'Main',
@@ -183,8 +214,8 @@ describe('projectCardNodes', () => {
             },
           ],
         },
-      ],
-    });
+      ]),
+    );
     const palette = {
       '00000000-0000-4000-8000-000000000004': '#111111',
       '00000000-0000-4000-8000-000000000031': '#333333',
@@ -311,23 +342,18 @@ describe('projectCardNodes', () => {
 
   it('marks an alias node with the title of the card it shows', () => {
     const withAlias = load(
-      {
-        version: 2,
-        id: '00000000-0000-4000-8000-000000000001',
-        title: 'Test',
-        graphs: [
-          {
-            id: '00000000-0000-4000-8000-000000000004',
-            title: 'Main',
-            edges: [
-              {
-                from: '00000000-0000-4000-8000-000000000002',
-                to: '00000000-0000-4000-8000-000000000007',
-              },
-            ],
-          },
-        ],
-      },
+      spaceFile([
+        {
+          id: '00000000-0000-4000-8000-000000000004',
+          title: 'Main',
+          edges: [
+            {
+              from: '00000000-0000-4000-8000-000000000002',
+              to: '00000000-0000-4000-8000-000000000007',
+            },
+          ],
+        },
+      ]),
       [
         cardFile('00000000-0000-4000-8000-000000000002', 'Card A'),
         aliasFile(
@@ -462,18 +488,15 @@ describe('non-incident graph anchors versus the authoring handles', () => {
   const cardA = '00000000-0000-4000-8000-000000000002';
   const cardB = '00000000-0000-4000-8000-000000000003';
 
-  const singleGraphSpace = load({
-    version: 2,
-    id: '00000000-0000-4000-8000-000000000001',
-    title: 'One graph',
-    graphs: [
+  const singleGraphSpace = load(
+    spaceFile([
       {
         id: '00000000-0000-4000-8000-000000000004',
         title: 'Only',
         edges: [{ from: cardA, to: cardA }],
       },
-    ],
-  });
+    ]),
+  );
 
   it('places a lone non-incident anchor exactly on the authoring handle centre', () => {
     const handlesByCard = buildCardHandles(singleGraphSpace);

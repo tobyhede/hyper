@@ -34,24 +34,30 @@ const read = (loaded: LoadedSpace): LoadedSpace =>
     snapshot: { ...loaded.snapshot, cards: [...loaded.snapshot.cards].sort(ascendingById) },
   });
 
+/**
+ * A layout's own id and the ids of the graphs it owns are minted in one pass,
+ * because a graph is reached only through its owner now (ADR 0040) — there is no
+ * space-level collection left to walk instead. `resolveImport` in
+ * `PostgresSpaceRepository` mints the same way and for the same reason; the
+ * shared contract holds the two to it.
+ */
 const identifyImport = (input: ImportSpace): SpaceSnapshot => {
-  const layouts = input.document.layouts?.map(({ id, ...layout }) => ({
+  const { layouts: importedLayouts, ...document } = input.document;
+  const layouts = importedLayouts?.map(({ id, graphs, ...layout }) => ({
     ...layout,
     id: id ?? newUuid(),
+    graphs: graphs.map(({ id: graphId, ...graph }) => ({ ...graph, id: graphId ?? newUuid() })),
   }));
   return {
     id: input.id ?? newUuid(),
+    // The document is carried through rather than rebuilt field by field, so a
+    // version this build does not read reaches domain intake and is rejected
+    // there. Rebuilding it stamped `version` with a constant, which quietly
+    // rewrote an unsupported document into a supported one — the one thing a
+    // double of an insert-only importer must not do.
     document: {
-      version: 2,
-      title: input.document.title,
-      graphs: input.document.graphs.map(({ id, ...graph }) => ({
-        ...graph,
-        id: id ?? newUuid(),
-      })),
+      ...document,
       ...(layouts === undefined ? {} : { layouts }),
-      ...(input.document.defaultView === undefined
-        ? {}
-        : { defaultView: input.document.defaultView }),
     },
     cards: input.cards.map(({ id, ...card }) => ({ ...card, id: id ?? newUuid() })),
   };

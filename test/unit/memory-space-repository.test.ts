@@ -14,7 +14,7 @@ const OTHER_CARD_ID = uuidSchema.parse('44444444-4444-4444-8444-444444444444');
 
 const importSpace = (id: UUID, cardId: UUID, title: string): ImportSpace => ({
   id,
-  document: { version: 2, title, graphs: [] },
+  document: { version: 1, title },
   cards: [
     {
       id: cardId,

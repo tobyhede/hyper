@@ -61,8 +61,18 @@ export interface Navigation {
   readonly selectRenderer: (selection: RendererSelection) => void;
   /** Open a replacement Space as new navigation, retaining no prior reading state. */
   readonly openFresh: (selection: RendererSelection) => void;
-  /** Adopt a renderer created by an Edit without interrupting the current navigation. */
-  readonly continueInRenderer: (selection: RendererSelection) => void;
+  /**
+   * Adopt a renderer created by an Edit, and the Active Graph that goes with it,
+   * without interrupting the current navigation.
+   *
+   * The two arrive together because under ADR 0040 they are one answer: a Layout
+   * owns its Graphs, so the Graph a Layout opens on is a fact about that Layout
+   * and not something Navigation carries across from the renderer before it.
+   */
+  readonly continueInRenderer: (
+    selection: RendererSelection,
+    activeGraphId: GraphId | null,
+  ) => void;
   readonly activateGraph: (graphId: GraphId) => void;
   readonly openCard: (cardId: CardId) => void;
   readonly closeCard: () => void;
@@ -192,13 +202,20 @@ export function createNavigation(
     // does not hold. Unlike explicit selection, adopting the Layout an Edit just
     // created is not navigation and must not interrupt a traversal.
     //
+    // **The Active Graph arrives with the renderer rather than surviving it.**
+    // Under ADR 0040 a Layout owns its Graphs, so the two are one answer and the
+    // Edit is what knows it: converting an Algorithmic View mints a Graph the
+    // new Layout owns, while the Graph that was merely emphasised on that view
+    // belongs to some other Layout and cannot come across. Carrying the previous
+    // Active Graph over and checking it — which is what this did while every
+    // renderer drew every Graph — now refuses the ordinary first conversion.
+    //
     // The refusal below is `activateGraph`'s, from the other side. What either
     // one protects is the *pair* — the selected renderer and the Active Graph —
     // and there is no third writer of it: `openedState` and `selectRenderer`
-    // resolve both together, `activateGraph` writes the Graph, and this writes
-    // the renderer. Leaving one of the two writers unguarded is the asymmetry
-    // this guard was added to close, one level along, and the state it admits is
-    // the same dead Edit: an Active Graph the renderer does not show rides into
+    // resolve both together, `activateGraph` writes the Graph against the
+    // selected renderer, and this writes both. The state either one keeps out is
+    // the same dead Edit: an Active Graph the renderer does not draw rides into
     // `updatePositionedLayout` as the Layout's `activeGraph`, which intake
     // rejects outright.
     //
@@ -207,24 +224,24 @@ export function createNavigation(
     // asked, and this call is the one that must not interrupt a traversal: the
     // history being presented belongs to the Graph that was active, so silently
     // naming another strands `moves()` on Edges out of Cards nothing is
-    // presenting. Refusing leaves the traversal exactly as it was.
+    // presenting. Refusing leaves the traversal exactly as it was. Taking the
+    // Graph as an argument is not that repair — the caller states its answer and
+    // is held to it, rather than having one invented for it.
     //
     // Its only caller is Edit completion, which cannot reach the refusal: the
-    // Layout it hands over names Navigation's own Active Graph as `activeGraph`,
-    // and the snapshot carrying it passed domain intake — which is precisely the
-    // check that a named `activeGraph` is a Graph the Space holds, and every
-    // renderer draws those. An absent Active Graph names nothing and is exempt.
-    continueInRenderer: (selection) => {
-      const state = observable.getState();
+    // pair it passes is the Layout it wrote and that Layout's own `activeGraph`,
+    // in a snapshot domain intake accepted a line earlier — and intake is
+    // precisely the check that a Layout's named `activeGraph` is a Graph it
+    // owns. An absent Active Graph names nothing and is exempt.
+    continueInRenderer: (selection, activeGraphId) => {
       const view = resolveView(currentSpace(), selection);
-      if (state.activeGraphId !== null && !viewShowsGraph(view, state.activeGraphId)) {
-        throw new Error(
-          `The adopted renderer does not show the active Graph ${state.activeGraphId}.`,
-        );
+      if (activeGraphId !== null && !viewShowsGraph(view, activeGraphId)) {
+        throw new Error(`The adopted renderer does not show the active Graph ${activeGraphId}.`);
       }
       setState({
         selectedRenderer: selection,
         ...(selection.kind === 'view' ? { selectedView: selection.view } : {}),
+        activeGraphId,
       });
     },
     // Resolved first, for the same reason a renderer is: Navigation may not name
@@ -240,12 +257,12 @@ export function createNavigation(
     // rather than at the gesture that caused it. This is the authoritative copy
     // of that reasoning; the tests point at it rather than restating it.
     //
-    // **The second refusal is subsumed by the first today, and is still here.**
-    // `visibleGraphIds` is every Graph in the Space, so nothing that exists can
-    // fail to be drawn and only the first refusal can fire. It is kept because
-    // "does not exist" and "does not show" are different mistakes by the caller,
-    // and the seam that answers the second is the one ADR 0040 makes narrow
-    // again — a Layout will draw the Graphs it owns.
+    // **The two refusals are separate again.** They were the same check while
+    // every renderer drew every Graph in the Space; under ADR 0040 a Layout
+    // draws only the Graphs it *owns*, so a Graph that plainly exists — because
+    // a second Layout owns it — is one this renderer does not show. "Does not
+    // exist" and "does not show" are different mistakes by the caller and each
+    // says which.
     //
     // The visible set is read off `resolveView` rather than recomputed here:
     // one place answers which Graphs a view draws (ADR 0026), and two would
@@ -282,18 +299,26 @@ export function createNavigation(
     },
     openCard: (cardId) => setState({ openedCardId: cardId }),
     closeCard: () => setState({ openedCardId: null }),
-    // Two refusals, and only the first is reachable. **No active Graph** is the
-    // one the author can produce, and it is exactly what `GraphSelector`
-    // disables its control on, so the two now agree: `graphStartCard` answers
-    // every schema-valid Graph, cyclic ones included, so a Graph that is active
-    // can always be presented. These used to be one guard, and a fully cyclic
-    // Graph fell through the gap between them — the control read `Present`,
+    // Two refusals, and **both are reachable**. Each is a state with no Card to
+    // begin at, and `GraphSelector` disables its control on exactly the union of
+    // them, so the two agree — which is what stops either from being a click the
+    // control accepts and silently drops. They used to be one guard, and a fully
+    // cyclic Graph fell through the gap between them: the control read `Present`,
     // stayed enabled, and swallowed the click.
     //
-    // The **edge-less Graph** below is the one `graphSchema` forbids
-    // (`edges.min(1)`). Its `undefined` is admitted by the type and not by the
-    // domain; the guard is here because the type still needs answering, not
-    // because presenting has anything to decline.
+    // **No active Graph** is the state a Space with no Layouts is in, since a
+    // Layout is what owns Graphs (ADR 0040).
+    //
+    // The **edge-less Graph** below was once the shape `graphSchema` forbade,
+    // and its guard was type ceremony. It is now ordinary: creating a Layout
+    // creates its initial Active Graph *empty* in the same Edit (ADR 0040), and
+    // the Flow view converts by returning exactly that (ADR 0045), so every
+    // Layout a plain Card drag produces sits here until the author draws an
+    // Edge. `graphStartCard` has no answer for such a Graph. Presenting has
+    // something real to decline.
+    //
+    // Between them, a Graph that is active *and* holds an Edge can always be
+    // presented — cyclic ones included (ADR 0032).
     present: () => {
       const state = observable.getState();
       const graph =

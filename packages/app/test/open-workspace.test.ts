@@ -9,10 +9,11 @@ const OTHER_SPACE_ID = '00000000-0000-4000-8000-000000000003';
 const GRAPH_ID = '00000000-0000-4000-8000-000000000004';
 const MISSING_CARD_A = '00000000-0000-4000-8000-000000000005';
 const MISSING_CARD_B = '00000000-0000-4000-8000-000000000006';
+const LAYOUT_ID = '00000000-0000-4000-8000-000000000007';
 
 const storedSnapshot: SpaceSnapshot = {
   id: uuidSchema.parse(SPACE_ID),
-  document: { version: 2, title: 'Stored space', graphs: [] },
+  document: { version: 1, title: 'Stored space' },
   cards: [
     {
       id: uuidSchema.parse(CARD_ID),
@@ -70,16 +71,27 @@ describe('openStoredWorkspace', () => {
         snapshot: {
           id: uuidSchema.parse(SPACE_ID),
           document: {
-            version: 2,
+            version: 1,
             title: 'Invalid stored space',
-            graphs: [
+            // A Layout owning a Graph whose Edge names neither of the Cards it
+            // positions — and it positions none (ADR 0040), so both endpoints
+            // fail closure and both are reported.
+            layouts: [
               {
-                id: uuidSchema.parse(GRAPH_ID),
-                title: 'Dangling graph',
-                edges: [
+                id: uuidSchema.parse(LAYOUT_ID),
+                title: 'Layout',
+                kind: 'positioned',
+                positions: {},
+                graphs: [
                   {
-                    from: uuidSchema.parse(MISSING_CARD_A),
-                    to: uuidSchema.parse(MISSING_CARD_B),
+                    id: uuidSchema.parse(GRAPH_ID),
+                    title: 'Dangling graph',
+                    edges: [
+                      {
+                        from: uuidSchema.parse(MISSING_CARD_A),
+                        to: uuidSchema.parse(MISSING_CARD_B),
+                      },
+                    ],
                   },
                 ],
               },
@@ -94,8 +106,8 @@ describe('openStoredWorkspace', () => {
 
     await expect(openStoredWorkspace(backend, uuidSchema.parse(SPACE_ID))).rejects.toThrow(
       `The backend returned an invalid space:\n` +
-        `  - Graph "${GRAPH_ID}" edge 0 references missing card "${MISSING_CARD_A}" as its from\n` +
-        `  - Graph "${GRAPH_ID}" edge 0 references missing card "${MISSING_CARD_B}" as its to`,
+        `  - Graph "${GRAPH_ID}" edge 0 names "${MISSING_CARD_A}" as its from, which is not a card of its layout "${LAYOUT_ID}"\n` +
+        `  - Graph "${GRAPH_ID}" edge 0 names "${MISSING_CARD_B}" as its to, which is not a card of its layout "${LAYOUT_ID}"`,
     );
   });
 });
@@ -103,7 +115,7 @@ describe('openStoredWorkspace', () => {
 describe('openImportedWorkspace', () => {
   it('opens a valid import through the memory backend and session seam', async () => {
     const opened = await openImportedWorkspace(
-      { version: 2, id: SPACE_ID, title: 'New space', graphs: [] },
+      { version: 1, id: SPACE_ID, title: 'New space' },
       cardFiles,
     );
 
@@ -113,13 +125,17 @@ describe('openImportedWorkspace', () => {
   });
 
   it('rejects an unsupported version with the complete validation detail', async () => {
+    // Version 2 is the disposable pre-release shape, rejected by name rather
+    // than migrated (ADR 0040) — one error naming the version that arrived,
+    // instead of the cascade its space-level `graphs` would earn.
     await expect(
       openImportedWorkspace(
-        { version: 1, id: SPACE_ID, title: 'Legacy space', graphs: [] },
+        { version: 2, id: SPACE_ID, title: 'Legacy space', graphs: [] },
         cardFiles,
       ),
     ).rejects.toThrow(
-      'The bundled space failed to import:\n  - version: Invalid literal value, expected 2',
+      'The bundled space failed to import:\n' +
+        '  - Space document version 2 is not supported; this build reads version 1',
     );
   });
 });

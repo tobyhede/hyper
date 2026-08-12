@@ -15,20 +15,23 @@ const CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 const LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
 const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
 const MISSING_CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
+const OWNED_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000006');
 
 const snapshot = (title: string, cardTitle: string, x: number, y: number): SpaceSnapshot =>
   spaceSnapshotSchema.parse({
     id: SPACE_ID,
     document: {
-      version: 2,
+      version: 1,
       title,
-      graphs: [],
       layouts: [
         {
           id: LAYOUT_ID,
           title: 'Layout',
           kind: 'positioned',
           positions: { [CARD_ID]: { x, y } },
+          // A Layout owns at least one Graph (ADR 0040), and one Card has
+          // nothing to connect — so the Graph it opens on holds no Edges.
+          graphs: [{ id: OWNED_GRAPH_ID, title: 'Graph', edges: [] }],
         },
       ],
       defaultView: LAYOUT_ID,
@@ -40,6 +43,31 @@ const snapshot = (title: string, cardTitle: string, x: number, y: number): Space
       },
     ],
   });
+
+/**
+ * The same Space with its Layout owning a Graph that reaches a Card the Space
+ * does not hold — the unloadable snapshot every test below is about.
+ *
+ * An Edge is closed over the Cards its owning Layout positions (ADR 0040), so
+ * the dangling endpoint lives inside the Layout rather than beside it, and
+ * intake names it there.
+ */
+const withDanglingGraph = (base: SpaceSnapshot, title: string): SpaceSnapshot => ({
+  ...base,
+  document: {
+    ...base.document,
+    title,
+    layouts: (base.document.layouts ?? []).map((layout) => ({
+      ...layout,
+      graphs: [{ id: GRAPH_ID, title: 'Graph', edges: [{ from: CARD_ID, to: MISSING_CARD_ID }] }],
+      // Named outright rather than carried through: replacing the owned Graphs
+      // would otherwise strand an inherited `activeGraph` on an id this Layout
+      // no longer holds, and the snapshot would be unloadable for two reasons
+      // where these tests are about one.
+      activeGraph: GRAPH_ID,
+    })),
+  },
+});
 
 const runtime = (value: SpaceSnapshot) => {
   const loaded = loadSpaceSnapshot(value);
@@ -116,14 +144,7 @@ describe('Workspace conflict recovery', () => {
    */
   const refusedRemote = async (): Promise<{ local: SpaceSnapshot; session: SpaceSession }> => {
     const local = snapshot('Local workspace', 'Local card', 10, 20);
-    const dangling: SpaceSnapshot = {
-      ...local,
-      document: {
-        ...local.document,
-        title: 'Remote workspace',
-        graphs: [{ id: GRAPH_ID, title: 'Graph', edges: [{ from: CARD_ID, to: MISSING_CARD_ID }] }],
-      },
-    };
+    const dangling = withDanglingGraph(local, 'Remote workspace');
     const control = new MemorySpaceBackendTestControl();
     control.queueResult({
       kind: 'conflict',
@@ -182,14 +203,7 @@ describe('Workspace conflict recovery', () => {
    */
   it('drops a refusal once a different remote snapshot is the one in conflict', async () => {
     const local = snapshot('Local workspace', 'Local card', 10, 20);
-    const dangling: SpaceSnapshot = {
-      ...local,
-      document: {
-        ...local.document,
-        title: 'Broken remote',
-        graphs: [{ id: GRAPH_ID, title: 'Graph', edges: [{ from: CARD_ID, to: MISSING_CARD_ID }] }],
-      },
-    };
+    const dangling = withDanglingGraph(local, 'Broken remote');
     const loadable = snapshot('Remote workspace', 'Remote card', 900, 700);
     const control = new MemorySpaceBackendTestControl();
     control.queueResult({
@@ -257,13 +271,7 @@ describe('Workspace conflict recovery', () => {
 describe('Workspace failure reporting', () => {
   it('names a working snapshot that stopped loading instead of blanking the page', () => {
     const valid = snapshot('Workspace', 'Card', 10, 20);
-    const dangling: SpaceSnapshot = {
-      ...valid,
-      document: {
-        ...valid.document,
-        graphs: [{ id: GRAPH_ID, title: 'Graph', edges: [{ from: CARD_ID, to: MISSING_CARD_ID }] }],
-      },
-    };
+    const dangling = withDanglingGraph(valid, valid.document.title);
     const session = openSpaceSession(new MemorySpaceBackend(), {
       snapshot: dangling,
       revision: 0n,

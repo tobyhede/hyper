@@ -1,7 +1,7 @@
 import type { Edge, Node, NodeHandle } from '@xyflow/react';
 import { MarkerType, Position } from '@xyflow/react';
 import type { CardId, LayoutPosition, GraphId } from '@project/core';
-import { resolveContentCard } from '@project/graph';
+import { inHandleId, outHandleId, resolveContentCard } from '@project/graph';
 import type {
   CardHandleSet,
   LayoutStrategyCard,
@@ -191,7 +191,7 @@ function declaredHandles(
     ...graphIds.map((graphId, index): NodeHandle => {
       const handle = targetByGraph.get(graphId);
       return {
-        id: handle?.id ?? `${graphId}::in`,
+        id: handle?.id ?? inHandleId(graphId),
         type: 'target',
         position: Position.Left,
         x: -portRadius,
@@ -203,7 +203,7 @@ function declaredHandles(
     ...graphIds.map((graphId, index): NodeHandle => {
       const handle = sourceByGraph.get(graphId);
       return {
-        id: handle?.id ?? `${graphId}::out`,
+        id: handle?.id ?? outHandleId(graphId),
         type: 'source',
         position: Position.Right,
         x: card.width - portRadius,

@@ -17,7 +17,11 @@ than migrated.
 
 `01` is a standalone prefactor and lands on `main` by itself.
 
-`02`–`06` share one branch, and `pnpm verify` is **red from `02` until `04`**.
+`02` opens with a behaviour-preserving commit that gives the handle-id format one
+producer, verified green on its own before anything structural moves.
+
+From the commit after that, `02`–`06` share one branch and `pnpm verify` is
+**red until `04`**.
 That is not a defect to fix in passing. `pnpm typecheck` runs one program
 spanning every package's `src` and `test`, so no partial migration typechecks,
 and the version 1 shape has no compatibility form to hide behind. Each of those

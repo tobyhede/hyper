@@ -6,16 +6,30 @@ const snapshot = (title: string): SpaceSnapshot =>
   spaceSnapshotSchema.parse({
     id: '00000000-0000-4000-8000-000000000001',
     document: {
-      version: 2,
+      version: 1,
       title,
-      graphs: [
+      // The Graph is a nested owned value of the Layout that positions both the
+      // Cards its Edge names (ADR 0040) — a Space holds Graphs by holding a
+      // Layout, and nowhere else.
+      layouts: [
         {
-          id: '00000000-0000-4000-8000-000000000004',
-          title: 'Main',
-          edges: [
+          id: '00000000-0000-4000-8000-000000000005',
+          title: 'Working',
+          kind: 'positioned',
+          positions: {
+            '00000000-0000-4000-8000-000000000002': { x: 0, y: 0 },
+            '00000000-0000-4000-8000-000000000003': { x: 400, y: 0 },
+          },
+          graphs: [
             {
-              from: '00000000-0000-4000-8000-000000000002',
-              to: '00000000-0000-4000-8000-000000000003',
+              id: '00000000-0000-4000-8000-000000000004',
+              title: 'Main',
+              edges: [
+                {
+                  from: '00000000-0000-4000-8000-000000000002',
+                  to: '00000000-0000-4000-8000-000000000003',
+                },
+              ],
             },
           ],
         },
@@ -61,8 +75,9 @@ it('revalidates when the session installs a different working snapshot', () => {
 });
 
 it('throws the validation failure every time an invalid snapshot is read', () => {
-  // A Graph naming Cards the snapshot does not carry: valid wire shape, invalid
-  // aggregate, so this fails domain intake rather than the schema.
+  // A Layout positioning — and a Graph naming — Cards the snapshot does not
+  // carry: valid wire shape, invalid aggregate, so this fails domain intake
+  // rather than the schema.
   const base = snapshot('Space');
   const dangling: SpaceSnapshot = { ...base, cards: [] };
   const readWorkingSpace = createWorkingSpaceReader();

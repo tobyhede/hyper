@@ -67,15 +67,28 @@ const spaceFileArb = cardIdPool.chain((pool) =>
   fc.array(graphArb(pool), { minLength: 1, maxLength: 4 }).map((graphs) => {
     const visited = [...new Set(graphs.flatMap((r) => r.cards))];
     return {
+      // One layout owning every generated graph, taking membership of every card
+      // they touch: a graph is an owned value of its layout (ADR 0040) and its
+      // edges are closed over that layout's members.
       file: {
-        version: 2,
+        version: 1,
         id: '00000000-0000-4000-8000-000000000001',
         title: 'Generated',
-        graphs: graphs.map((graph, index) => ({
-          id: uuidFrom(index + 100),
-          title: `Graph ${index}`,
-          edges: graph.edges,
-        })),
+        layouts: [
+          {
+            id: '00000000-0000-4000-8000-000000000050',
+            title: 'Only layout',
+            kind: 'positioned',
+            positions: Object.fromEntries(
+              visited.map((id, index) => [id, { x: index * 300, y: 0 }]),
+            ),
+            graphs: graphs.map((graph, index) => ({
+              id: uuidFrom(index + 100),
+              title: `Graph ${index}`,
+              edges: graph.edges,
+            })),
+          },
+        ],
       },
       cardFiles: visited.map((id) => cardFile(id)),
     };

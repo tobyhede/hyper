@@ -48,7 +48,7 @@ describe('PostgresSpaceRepository import decoding', () => {
 
   it('rejects a malformed import with prose rather than a serialized Zod dump', async () => {
     const result = await repository.importSpaces(
-      [{ document: { version: 2, title: 7, graphs: [] }, cards: [] } as never],
+      [{ document: { version: 1, title: 7 }, cards: [] } as never],
       'insert',
     );
 
@@ -63,7 +63,7 @@ describe('PostgresSpaceRepository import decoding', () => {
     const result = await repository.importSpaces(
       [
         {
-          document: { version: 9, title: 7, graphs: 'no', layouts: 4 },
+          document: { version: 9, title: 7, layouts: 4, defaultView: 7 },
           cards: [{ document: { title: 5, kind: 'nope', body: 3 } }],
         } as never,
       ],
@@ -95,7 +95,7 @@ describe('PostgresSpaceRepository import decoding', () => {
   it('describes one malformed document the same way for the CLI and for the wire', async () => {
     const malformed = {
       id: SPACE_ID,
-      document: { version: 9, title: 7, graphs: 'no', layouts: 4 },
+      document: { version: 9, title: 7, layouts: 4, defaultView: 7 },
       cards: [{ id: CARD_ID, document: { title: 5, kind: 'nope', body: 3 } }],
     };
 
@@ -117,10 +117,10 @@ describe('PostgresSpaceRepository import decoding', () => {
   const documentFailingIn = (paths: 1 | 3 | 4 | 5): unknown => ({
     id: SPACE_ID,
     document: {
-      version: paths === 1 ? 2 : 9,
+      version: paths === 1 ? 1 : 9,
       title: 7,
-      graphs: paths === 1 ? [] : 'no',
-      ...(paths >= 4 ? { layouts: 4 } : {}),
+      ...(paths >= 3 ? { layouts: 4 } : {}),
+      ...(paths >= 4 ? { defaultView: 7 } : {}),
     },
     cards: paths >= 5 ? [{ id: CARD_ID, document: { title: 5, kind: 'nope', body: 3 } }] : [],
   });
@@ -180,46 +180,53 @@ describe('PostgresSpaceRepository import decoding', () => {
   it('folds no acronym and no capitalised identifier out of a Zod message', () => {
     const malformed: readonly unknown[] = [
       // A bad UUID, in each position one can occupy.
-      { id: 'not-a-uuid', document: { version: 2, title: 'T', graphs: [] }, cards: [] },
+      { id: 'not-a-uuid', document: { version: 1, title: 'T' }, cards: [] },
       {
         id: SPACE_ID,
-        document: { version: 2, title: 'T', graphs: [] },
+        document: { version: 1, title: 'T' },
         cards: [{ id: 'nope', document: { title: 'C', kind: 'markdown', body: '' } }],
       },
       {
         id: SPACE_ID,
         document: {
-          version: 2,
+          version: 1,
           title: 'T',
-          graphs: [{ id: SPACE_ID, title: 'R', edges: [{ from: 'x', to: 'y' }] }],
+          layouts: [
+            {
+              id: SPACE_ID,
+              title: 'L',
+              kind: 'positioned',
+              positions: {},
+              graphs: [{ id: SPACE_ID, title: 'R', edges: [{ from: 'x', to: 'y' }] }],
+            },
+          ],
         },
         cards: [],
       },
       // A bad literal version, and wrong-typed fields.
-      { id: SPACE_ID, document: { version: 9, title: 'T', graphs: [] }, cards: [] },
-      { id: SPACE_ID, document: { version: 2, title: 7, graphs: 'no', layouts: 4 }, cards: [] },
+      { id: SPACE_ID, document: { version: 9, title: 'T' }, cards: [] },
+      { id: SPACE_ID, document: { version: 1, title: 7, layouts: 4, defaultView: 7 }, cards: [] },
       // Discriminated-union failures, on a card's kind and on a layout's.
       {
         id: SPACE_ID,
-        document: { version: 2, title: 'T', graphs: [] },
+        document: { version: 1, title: 'T' },
         cards: [{ id: CARD_ID, document: { title: 'C', kind: 'Nope', body: '' } }],
       },
       {
         id: SPACE_ID,
         document: {
-          version: 2,
+          version: 1,
           title: 'T',
-          graphs: [],
-          layouts: [{ id: SPACE_ID, title: 'L', kind: 'Weird', positions: {} }],
+          layouts: [{ id: SPACE_ID, title: 'L', kind: 'Weird', positions: {}, graphs: [] }],
         },
         cards: [],
       },
       // The bounded strings, the refinement, and the one union that is not
       // discriminated — each writes a different sentence.
-      { id: SPACE_ID, document: { version: 2, title: '', graphs: [] }, cards: [] },
+      { id: SPACE_ID, document: { version: 1, title: '' }, cards: [] },
       {
         id: SPACE_ID,
-        document: { version: 2, title: 'T', graphs: [] },
+        document: { version: 1, title: 'T' },
         cards: [
           {
             id: CARD_ID,
@@ -233,10 +240,10 @@ describe('PostgresSpaceRepository import decoding', () => {
       },
       {
         id: SPACE_ID,
-        document: { version: 2, title: 'T', graphs: [], defaultView: 'SpaceCanvas' },
+        document: { version: 1, title: 'T', defaultView: 'SpaceCanvas' },
         cards: [],
       },
-      { id: SPACE_ID, document: { version: 2, title: 'T', graphs: [], defaultView: 7 }, cards: [] },
+      { id: SPACE_ID, document: { version: 1, title: 'T', defaultView: 7 }, cards: [] },
       // And the root-path renders, where neither schema sees an object at all.
       'nope',
       42,
@@ -270,7 +277,7 @@ describe('PostgresSpaceRepository import decoding', () => {
   it('leaves a card kind legible in the summary it prints', async () => {
     const cli = await cliMessage({
       id: SPACE_ID,
-      document: { version: 2, title: 'T', graphs: [] },
+      document: { version: 1, title: 'T' },
       cards: [{ id: CARD_ID, document: { title: 'C', kind: 'Nope', body: '' } }],
     });
 

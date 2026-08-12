@@ -8,25 +8,75 @@ import {
   spaceFileSchema,
 } from '../src/index';
 
-const validSpaceFile = {
-  version: 2,
-  id: '00000000-0000-4000-8000-000000000001',
-  title: 'Test deck',
-  graphs: [
-    {
-      id: '00000000-0000-4000-8000-000000000004',
-      title: 'Main',
-      edges: [
-        {
-          from: '00000000-0000-4000-8000-000000000002',
-          to: '00000000-0000-4000-8000-000000000003',
-        },
-      ],
-    },
+const MAIN = {
+  id: '00000000-0000-4000-8000-000000000004',
+  title: 'Main',
+  edges: [
+    { from: '00000000-0000-4000-8000-000000000002', to: '00000000-0000-4000-8000-000000000003' },
   ],
 };
 
+/** The Layout that owns `MAIN`; positions are its Card membership (ADR 0040). */
+const WORKING = {
+  id: '00000000-0000-4000-8000-000000000010',
+  title: 'Working',
+  kind: 'positioned',
+  positions: {
+    '00000000-0000-4000-8000-000000000002': { x: 0, y: 0 },
+    '00000000-0000-4000-8000-000000000003': { x: 320, y: -40 },
+  },
+  graphs: [MAIN],
+};
+
+const validSpaceFile = {
+  version: 1,
+  id: '00000000-0000-4000-8000-000000000001',
+  title: 'Test deck',
+  layouts: [WORKING],
+};
+
+/** A layout carrying one graph, for cases that vary only the graph. */
+const withGraphs = (graphs: unknown[]) => ({
+  ...validSpaceFile,
+  layouts: [{ ...WORKING, graphs }],
+});
+
 describe('space file schema', () => {
+  it('nests a Graph under the Layout that owns it, with no Space-level collection', () => {
+    // ADR 0040: a Graph is an owned value of one Layout. The Space-level array
+    // is gone, so a file carrying one is rejected rather than half-read.
+    const file = spaceFileSchema.parse({
+      version: 1,
+      id: '00000000-0000-4000-8000-000000000001',
+      title: 'Test deck',
+      layouts: [
+        {
+          id: '00000000-0000-4000-8000-000000000010',
+          title: 'Working',
+          positions: {
+            '00000000-0000-4000-8000-000000000002': { x: 0, y: 0 },
+            '00000000-0000-4000-8000-000000000003': { x: 320, y: -40 },
+          },
+          graphs: [
+            {
+              id: '00000000-0000-4000-8000-000000000004',
+              title: 'Main',
+              edges: [
+                {
+                  from: '00000000-0000-4000-8000-000000000002',
+                  to: '00000000-0000-4000-8000-000000000003',
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+
+    expect('graphs' in file).toBe(false);
+    expect(file.layouts?.[0]?.graphs.map((graph) => graph.title)).toEqual(['Main']);
+  });
+
   it('requires the space to name itself', () => {
     // Required today; ADR 0019 makes ids optional and generated on load, and
     // this is the assertion that will change when it does.
@@ -43,7 +93,7 @@ describe('space file schema', () => {
   it('parses a valid space file', () => {
     const file = spaceFileSchema.parse(validSpaceFile);
     expect(file.title).toBe('Test deck');
-    expect(file.graphs).toHaveLength(1);
+    expect(file.layouts?.[0]?.graphs).toHaveLength(1);
   });
 
   it('holds no cards — a card exists because its file does (ADR 0020)', () => {
@@ -58,12 +108,15 @@ describe('space file schema', () => {
     expect(result.success && 'cards' in result.data).toBe(false);
   });
 
-  it('rejects version 1 and slug identity throughout the version 2 format', () => {
+  it('rejects version 2, which put the graphs beside the layouts instead of in them', () => {
+    // The disposable pre-release shape. Hyper is unreleased, so it has no
+    // compatibility claim on the first-public one and is rejected, not migrated
+    // (ADR 0040). `loadSpace` says so in one error; here it is the literal.
     const result = spaceFileSchema.safeParse({
-      version: 1,
-      id: 'space',
+      version: 2,
+      id: '00000000-0000-4000-8000-000000000001',
       title: 'Old space',
-      graphs: [{ id: 'main', title: 'Main', edges: [{ from: 'a', to: 'b' }] }],
+      graphs: [MAIN],
       layouts: [
         {
           id: '00000000-0000-4000-8000-000000000010',
@@ -72,7 +125,27 @@ describe('space file schema', () => {
           activeGraph: '00000000-0000-4000-8000-000000000004',
         },
       ],
-      defaultView: '00000000-0000-4000-8000-000000000010',
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues.some((issue) => issue.path.join('.') === 'version')).toBe(true);
+    }
+  });
+
+  it('rejects slug identity everywhere an id appears', () => {
+    const result = spaceFileSchema.safeParse({
+      version: 1,
+      id: 'space',
+      title: 'Old space',
+      layouts: [
+        {
+          id: 'working',
+          title: 'Working',
+          positions: { a: { x: 0, y: 0 } },
+          graphs: [{ id: 'main', title: 'Main', edges: [{ from: 'a', to: 'b' }] }],
+        },
+      ],
+      defaultView: 'working',
     });
     expect(result.success).toBe(false);
   });
@@ -95,32 +168,45 @@ describe('space file schema', () => {
     expect(result.success && 'edges' in result.data).toBe(false);
   });
 
-  it('accepts a space file with no graphs — a new space has no structure yet', () => {
-    // ADR 0015. It renders; it cannot be presented. The `min(1)` this replaces
-    // was inherited from `paths.min(1)` in the Graph rename, never decided.
-    const result = spaceFileSchema.safeParse({ ...validSpaceFile, graphs: [] });
+  it('accepts a space file with no layouts — a new space has no structure yet', () => {
+    // ADR 0015. It renders; it cannot be presented. A Layout owns at least one
+    // Graph (ADR 0040), so having no Layouts is what having no Graphs now is.
+    const { layouts: _layouts, ...withoutLayouts } = validSpaceFile;
+    expect(spaceFileSchema.safeParse(withoutLayouts).success).toBe(true);
+    expect(spaceFileSchema.safeParse({ ...validSpaceFile, layouts: [] }).success).toBe(true);
+  });
+
+  it('rejects a layout that owns no graphs — one is the fewest it is created with', () => {
+    // Creating a Layout creates its initial Graph in the same Edit, and Graph
+    // management cannot delete the last (ADR 0040), so none is a state no
+    // gesture produces.
+    expect(spaceFileSchema.safeParse(withGraphs([])).success).toBe(false);
+  });
+
+  it('requires the graphs key on a layout, so a dropped array is a shape error', () => {
+    const { graphs: _graphs, ...withoutGraphs } = WORKING;
+    expect(spaceFileSchema.safeParse({ ...validSpaceFile, layouts: [withoutGraphs] }).success).toBe(
+      false,
+    );
+  });
+
+  it('accepts a graph with no edges — a Layout mints its initial Graph empty', () => {
+    // Creating a Layout creates its initial empty Active Graph in the same Edit
+    // (ADR 0040), and the Flow view converts by returning exactly that (ADR
+    // 0045), so an edge-less Graph is a state the product produces on the first
+    // Card the author moves. Deleting the last Edge of a Graph leaves the same
+    // shape. The superseded rule read a Graph as minted *by* drawing an Edge.
+    const result = spaceFileSchema.safeParse(
+      withGraphs([{ id: '00000000-0000-4000-8000-000000000004', title: 'Main', edges: [] }]),
+    );
     expect(result.success).toBe(true);
-  });
-
-  it('still requires the graphs key itself, so a dropped array is a shape error', () => {
-    const { graphs: _graphs, ...withoutGraphs } = validSpaceFile;
-    expect(spaceFileSchema.safeParse(withoutGraphs).success).toBe(false);
-  });
-
-  it('rejects a graph with no edges — a Graph is its Edges (ADR 0032)', () => {
-    const result = spaceFileSchema.safeParse({
-      ...validSpaceFile,
-      graphs: [{ id: '00000000-0000-4000-8000-000000000004', title: 'Main', edges: [] }],
-    });
-    expect(result.success).toBe(false);
   });
 
   it('accepts a graph that forks and merges — shape puts no limit on either', () => {
     // Edge-set uniqueness and resolved endpoints need the whole Graph/Space in
     // view, so it lives in `@project/graph`; nothing here should reject a graph.
-    const result = spaceFileSchema.safeParse({
-      ...validSpaceFile,
-      graphs: [
+    const result = spaceFileSchema.safeParse(
+      withGraphs([
         {
           id: '00000000-0000-4000-8000-000000000004',
           title: 'Main',
@@ -143,8 +229,8 @@ describe('space file schema', () => {
             },
           ],
         },
-      ],
-    });
+      ]),
+    );
     expect(result.success).toBe(true);
   });
 
@@ -154,10 +240,9 @@ describe('space file schema', () => {
       { to: '00000000-0000-4000-8000-000000000003' },
       { from: '00000000-0000-4000-8000-000000000002', to: '' },
     ]) {
-      const result = spaceFileSchema.safeParse({
-        ...validSpaceFile,
-        graphs: [{ id: '00000000-0000-4000-8000-000000000004', title: 'Main', edges: [edge] }],
-      });
+      const result = spaceFileSchema.safeParse(
+        withGraphs([{ id: '00000000-0000-4000-8000-000000000004', title: 'Main', edges: [edge] }]),
+      );
       expect(result.success).toBe(false);
     }
   });
@@ -246,18 +331,11 @@ describe('card frontmatter schema', () => {
 });
 
 describe('space file layouts', () => {
-  const working = {
-    id: '00000000-0000-4000-8000-000000000010',
-    title: 'Working',
-    kind: 'positioned',
-    positions: {
-      '00000000-0000-4000-8000-000000000002': { x: 0, y: 0 },
-      '00000000-0000-4000-8000-000000000003': { x: 320, y: -40 },
-    },
-  };
+  const working = WORKING;
 
   it('parses a file that declares no layouts — the hand-authored case', () => {
-    const file = spaceFileSchema.parse(validSpaceFile);
+    const { layouts: _layouts, ...withoutLayouts } = validSpaceFile;
+    const file = spaceFileSchema.parse(withoutLayouts);
     expect(file.layouts).toBeUndefined();
     expect(file.defaultView).toBeUndefined();
   });
@@ -275,7 +353,14 @@ describe('space file layouts', () => {
   it('defaults a layout with no kind to positioned, so one can be hand-written', () => {
     const file = spaceFileSchema.parse({
       ...validSpaceFile,
-      layouts: [{ id: '00000000-0000-4000-8000-000000000010', title: 'Working', positions: {} }],
+      layouts: [
+        {
+          id: '00000000-0000-4000-8000-000000000010',
+          title: 'Working',
+          positions: {},
+          graphs: [MAIN],
+        },
+      ],
     });
     expect(file.layouts?.[0]?.kind).toBe('positioned');
   });
@@ -313,20 +398,33 @@ describe('space file layouts', () => {
     const result = spaceFileSchema.safeParse({
       ...validSpaceFile,
       layouts: [
-        { id: '00000000-0000-4000-8000-000000000098', title: 'Auto', kind: 'elk', positions: {} },
+        {
+          id: '00000000-0000-4000-8000-000000000098',
+          title: 'Auto',
+          kind: 'elk',
+          positions: {},
+          graphs: [MAIN],
+        },
       ],
     });
     expect(result.success).toBe(false);
   });
 
-  it('rejects a layout that names the graphs it draws', () => {
-    // Every renderer draws every graph, so a layout has nothing to say about
-    // which. Rejecting rather than stripping is the point: a file carrying the
-    // retired filter said "draw only these", and reading it as "draw all of
-    // them" in silence is the one answer the author did not write.
+  it('rejects a layout whose graphs are ids rather than owned values', () => {
+    // The version 2 filter, which named the graphs a layout drew. It shares a
+    // key with the collection a layout now owns, so the shape check is what
+    // tells them apart — a file saying "draw only these" is not one owning them.
     const result = spaceFileSchema.safeParse({
       ...validSpaceFile,
       layouts: [{ ...working, graphs: ['00000000-0000-4000-8000-000000000011'] }],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects a key the layout does not declare, rather than stripping it', () => {
+    const result = spaceFileSchema.safeParse({
+      ...validSpaceFile,
+      layouts: [{ ...working, hidden: ['00000000-0000-4000-8000-000000000011'] }],
     });
     expect(result.success).toBe(false);
   });

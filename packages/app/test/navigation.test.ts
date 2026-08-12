@@ -18,53 +18,80 @@ function traversalHistoryOf(state: NavigationState): readonly CardId[] {
 
 const GRAPH_ONE = uuid('00000000-0000-4000-8000-000000000031');
 const GRAPH_TWO = uuid('00000000-0000-4000-8000-000000000032');
+const FIRST_LAYOUT = uuid('00000000-0000-4000-8000-000000000040');
 const LAYOUT = uuid('00000000-0000-4000-8000-000000000041');
+const CARD_A = uuid('00000000-0000-4000-8000-000000000002');
+const CARD_B = uuid('00000000-0000-4000-8000-000000000003');
+const CARD_C = uuid('00000000-0000-4000-8000-000000000004');
 
+/**
+ * Two Layouts, each owning one Graph over its own Cards (ADR 0040).
+ *
+ * Two rather than one deliberately: it is what makes the flatten an Algorithmic
+ * View draws differ from what either Layout draws, so both of Navigation's
+ * "does not show" refusals name a real state rather than an impossible one.
+ */
 function fixture(): Space {
   const result = loadSpace(
     {
-      version: 2,
+      version: 1,
       id: uuid('00000000-0000-4000-8000-000000000001'),
       title: 'Fixture',
-      graphs: [
-        {
-          id: GRAPH_ONE,
-          title: 'One',
-          edges: [
-            {
-              from: uuid('00000000-0000-4000-8000-000000000002'),
-              to: uuid('00000000-0000-4000-8000-000000000003'),
-            },
-          ],
-        },
-        {
-          id: GRAPH_TWO,
-          title: 'Two',
-          edges: [
-            {
-              from: uuid('00000000-0000-4000-8000-000000000003'),
-              to: uuid('00000000-0000-4000-8000-000000000004'),
-            },
-          ],
-        },
-      ],
       layouts: [
+        {
+          id: FIRST_LAYOUT,
+          title: 'First graph',
+          positions: { [CARD_A]: { x: 0, y: 0 }, [CARD_B]: { x: 320, y: 0 } },
+          graphs: [{ id: GRAPH_ONE, title: 'One', edges: [{ from: CARD_A, to: CARD_B }] }],
+        },
         {
           id: LAYOUT,
           title: 'Second graph',
-          positions: {},
+          positions: { [CARD_B]: { x: 0, y: 200 }, [CARD_C]: { x: 320, y: 200 } },
+          graphs: [{ id: GRAPH_TWO, title: 'Two', edges: [{ from: CARD_B, to: CARD_C }] }],
           activeGraph: GRAPH_TWO,
         },
       ],
     },
-    [
-      cardFile(uuid('00000000-0000-4000-8000-000000000002')),
-      cardFile(uuid('00000000-0000-4000-8000-000000000003')),
-      cardFile(uuid('00000000-0000-4000-8000-000000000004')),
-    ],
+    [cardFile(CARD_A), cardFile(CARD_B), cardFile(CARD_C)],
   );
   if (!result.ok) throw new Error('fixture should load');
   return result.space;
+}
+
+/**
+ * One Layout owning the given Graphs over the given Cards, which is the fewest
+ * moving parts a Space with any structure at all has under ADR 0040. Every Card
+ * named is a member, so the Layout's Edges are closed over it by construction.
+ */
+function spaceOwning(
+  title: string,
+  graphs: readonly { id: UUID; title: string; edges: readonly { from: UUID; to: UUID }[] }[],
+  cards: readonly { id: UUID; title?: string }[],
+): Space {
+  const loaded = loadSpace(
+    {
+      version: 1,
+      id: uuid('00000000-0000-4000-8000-000000000001'),
+      title,
+      layouts: [
+        {
+          id: FIRST_LAYOUT,
+          title: 'Only',
+          positions: Object.fromEntries(
+            cards.map((card, index) => [card.id, { x: index * 320, y: 0 }]),
+          ),
+          graphs,
+        },
+      ],
+    },
+    cards.map((card) =>
+      card.title === undefined ? cardFile(card.id) : cardFile(card.id, card.title),
+    ),
+  );
+  if (!loaded.ok)
+    throw new Error(`${title} should load: ${loaded.errors.map((e) => e.message).join('; ')}`);
+  return loaded.space;
 }
 
 it('selects a renderer and its active Graph without changing the Space', () => {
@@ -121,23 +148,35 @@ it('traverses an Edge from the changing working Space without installing a copy'
   const navigation = createNavigation(() => working, { kind: 'view', view: 'flow' });
   navigation.present();
 
+  // The same Space with a second Edge out of A, authored into the Graph the
+  // first Layout owns — which means C joins that Layout's membership too.
   const changed = loadSpace(
     {
-      version: 2,
+      version: 1,
       id: working.id,
       title: working.title,
-      graphs: [
+      layouts: [
         {
-          id: GRAPH_ONE,
-          title: 'One',
-          edges: [
-            { from: cardA, to: cardB },
-            { from: cardA, to: cardC },
+          id: FIRST_LAYOUT,
+          title: 'First graph',
+          positions: {
+            [cardA]: { x: 0, y: 0 },
+            [cardB]: { x: 320, y: 0 },
+            [cardC]: { x: 640, y: 0 },
+          },
+          graphs: [
+            {
+              id: GRAPH_ONE,
+              title: 'One',
+              edges: [
+                { from: cardA, to: cardB },
+                { from: cardA, to: cardC },
+              ],
+            },
           ],
         },
-        working.graphs[1]!,
+        working.layouts[1]!,
       ],
-      layouts: working.layouts,
     },
     [cardFile(cardA), cardFile(cardB), cardFile(cardC, 'New destination')],
   );
@@ -162,17 +201,12 @@ it('traverses an Edge from the changing working Space without installing a copy'
  */
 it('presents a fully cyclic Graph, which has no entry Card', () => {
   const card = uuid('00000000-0000-4000-8000-000000000002');
-  const loaded = loadSpace(
-    {
-      version: 2,
-      id: uuid('00000000-0000-4000-8000-000000000001'),
-      title: 'Loop',
-      graphs: [{ id: GRAPH_ONE, title: 'Loop', edges: [{ from: card, to: card }] }],
-    },
-    [cardFile(card)],
+  const space = spaceOwning(
+    'Loop',
+    [{ id: GRAPH_ONE, title: 'Loop', edges: [{ from: card, to: card }] }],
+    [{ id: card }],
   );
-  if (!loaded.ok) throw new Error('loop should load');
-  const navigation = createNavigation(() => loaded.space, { kind: 'view', view: 'flow' });
+  const navigation = createNavigation(() => space, { kind: 'view', view: 'flow' });
 
   navigation.present();
 
@@ -196,26 +230,21 @@ it('presents a fully cyclic Graph, which has no entry Card', () => {
 it('reads the last Card when Traversal history returns to one it has already visited', () => {
   const cardA = uuid('00000000-0000-4000-8000-000000000002');
   const cardB = uuid('00000000-0000-4000-8000-000000000003');
-  const loaded = loadSpace(
-    {
-      version: 2,
-      id: uuid('00000000-0000-4000-8000-000000000001'),
-      title: 'Cycle',
-      graphs: [
-        {
-          id: GRAPH_ONE,
-          title: 'Cycle',
-          edges: [
-            { from: cardA, to: cardB },
-            { from: cardB, to: cardA },
-          ],
-        },
-      ],
-    },
-    [cardFile(cardA), cardFile(cardB)],
+  const space = spaceOwning(
+    'Cycle',
+    [
+      {
+        id: GRAPH_ONE,
+        title: 'Cycle',
+        edges: [
+          { from: cardA, to: cardB },
+          { from: cardB, to: cardA },
+        ],
+      },
+    ],
+    [{ id: cardA }, { id: cardB }],
   );
-  if (!loaded.ok) throw new Error('cycle should load');
-  const navigation = createNavigation(() => loaded.space, { kind: 'view', view: 'flow' });
+  const navigation = createNavigation(() => space, { kind: 'view', view: 'flow' });
 
   navigation.present();
   navigation.advance();
@@ -317,11 +346,10 @@ it('refuses to activate a Graph the current Space does not hold', () => {
 });
 
 /*
- * This used to adopt `LAYOUT` while active on `GRAPH_ONE` — the very pair
- * `activateGraph` now refuses — and the renderer half of that pair is written
- * here. The Graph is activated first so the adopted Layout is one that shows it,
- * which is also the only shape Edit completion can produce: the Layout it hands
- * over names the current Active Graph as its own `activeGraph`.
+ * Adopting the renderer an Edit wrote carries its Active Graph with it, because
+ * under ADR 0040 a Layout and the Graph it opens on are one answer the Edit
+ * produced — a conversion mints the Graph the new Layout owns, and the Graph
+ * that was merely emphasised on the Algorithmic View belongs to somebody else.
  *
  * What the test is for is unchanged, and is the thing `selectRenderer` does not
  * do: adopting the Layout an Edit created continues the traversal rather than
@@ -334,7 +362,7 @@ it('continues the current Traversal history when an Edit converts the renderer t
   navigation.present();
   const traversalHistory = traversalHistoryOf(navigation.getState());
 
-  navigation.continueInRenderer({ kind: 'layout', layoutId: LAYOUT });
+  navigation.continueInRenderer({ kind: 'layout', layoutId: LAYOUT }, GRAPH_TWO);
 
   expect(navigation.getState()).toMatchObject({
     selectedRenderer: { kind: 'layout', layoutId: LAYOUT },
@@ -344,66 +372,89 @@ it('continues the current Traversal history when an Edit converts the renderer t
   expect(traversalHistoryOf(navigation.getState())).toBe(traversalHistory);
 });
 
-/*
- * Replacing the working Space can make Navigation's retained Active Graph
- * absent from the renderer an Edit asks it to adopt. Refusing is what keeps the
- * selected renderer and Active Graph as one valid pair; it also leaves the
- * current traversal untouched rather than silently moving it to another Graph.
+/**
+ * The shape every conversion has, and the reason the Active Graph is an argument
+ * rather than something carried over. The Flow view is emphasising `GRAPH_ONE`,
+ * which the Layout the Edit wrote does not own; what the Layout does own is the
+ * Graph that same Edit minted, and adopting it replaces the emphasis rather than
+ * being refused for disagreeing with it (ADR 0045).
  */
-it('refuses to adopt a renderer that does not show the retained active Graph', () => {
-  let working = fixture();
-  const navigation = createNavigation(() => working, { kind: 'view', view: 'flow' });
+it('takes the adopted renderer’s own Active Graph over the one that was emphasised', () => {
+  const space = fixture();
+  const navigation = createNavigation(() => space, { kind: 'view', view: 'flow' });
+  expect(navigation.getState().activeGraphId).toBe(GRAPH_ONE);
+
+  navigation.continueInRenderer({ kind: 'layout', layoutId: LAYOUT }, GRAPH_TWO);
+
+  expect(navigation.getState()).toMatchObject({
+    selectedRenderer: { kind: 'layout', layoutId: LAYOUT },
+    activeGraphId: GRAPH_TWO,
+  });
+});
+
+/**
+ * The refusal that ADR 0040 restored. A Layout draws only the Graphs it owns, so
+ * an Edit handing over a Layout and a Graph that Layout does not own has named a
+ * pair Navigation may not hold — the Active Graph would ride into the next Edit
+ * as that Layout's `activeGraph`, which intake rejects outright.
+ *
+ * Constructible against a real Space rather than a hand-built `ResolvedView`:
+ * `GRAPH_ONE` exists and is drawn by the Flow view, and `LAYOUT` simply does not
+ * own it. Edit completion cannot reach it, because the pair it passes is the one
+ * it wrote into the snapshot a line earlier.
+ */
+it('refuses to adopt a renderer that does not draw the Graph handed with it', () => {
+  const space = fixture();
+  const navigation = createNavigation(() => space, { kind: 'view', view: 'flow' });
   navigation.present();
   const before = navigation.getState();
 
-  const replacement = loadSpace(
-    {
-      version: 2,
-      id: working.id,
-      title: working.title,
-      graphs: [working.graphs[1]!],
-      layouts: working.layouts,
-    },
-    [
-      cardFile(uuid('00000000-0000-4000-8000-000000000002')),
-      cardFile(uuid('00000000-0000-4000-8000-000000000003')),
-      cardFile(uuid('00000000-0000-4000-8000-000000000004')),
-    ],
-  );
-  if (!replacement.ok) throw new Error('replacement fixture should load');
-  working = replacement.space;
+  expect(() =>
+    navigation.continueInRenderer({ kind: 'layout', layoutId: LAYOUT }, GRAPH_ONE),
+  ).toThrow(/does not show the active Graph/);
+  expect(navigation.getState()).toBe(before);
+});
 
-  expect(() => navigation.continueInRenderer({ kind: 'layout', layoutId: LAYOUT })).toThrow(
-    /does not show the active Graph/,
-  );
+/**
+ * The same refusal from the other side, and the second one ticket 01 left
+ * unreachable. Activating is never an Edit (ADR 0028), so it cannot mint the
+ * Graph it is handed — nor move it into the selected Layout. `GraphSelector` is
+ * fed the visible Graphs, so this is a caller's mistake rather than an author's.
+ */
+it('refuses to activate a Graph the selected Layout does not own', () => {
+  const space = fixture();
+  const navigation = createNavigation(() => space, { kind: 'layout', layoutId: LAYOUT });
+  const before = navigation.getState();
+  expect(before.activeGraphId).toBe(GRAPH_TWO);
+
+  expect(() => navigation.activateGraph(GRAPH_ONE)).toThrow(/does not show the Graph/);
   expect(navigation.getState()).toBe(before);
 });
 
 /*
- * A Space with no Graphs has no Active Graph, and no renderer can fail to show
- * one that was never named. Edit completion adopts the Layout it wrote before
- * activating the Graph it minted, so this is the state the guard is in when the
- * very first connection converts an Algorithmic View.
+ * A Space with no Layouts has no Graphs at all (ADR 0040), so there is no Active
+ * Graph and no renderer can fail to draw one that was never named. This is the
+ * state Edit completion is in when the very first Card an author moves converts
+ * an Algorithmic View — except that the conversion has by then minted the Graph,
+ * which is why the pair below is the *only* way the null case is reached.
  */
 it('adopts a renderer with no active Graph to name', () => {
   const loaded = loadSpace(
     {
-      version: 2,
+      version: 1,
       id: uuid('00000000-0000-4000-8000-000000000001'),
       title: 'Empty',
-      graphs: [],
-      layouts: [{ id: LAYOUT, title: 'Only', positions: {} }],
     },
-    [cardFile(uuid('00000000-0000-4000-8000-000000000002'))],
+    [cardFile(CARD_A)],
   );
   if (!loaded.ok) throw new Error('empty fixture should load');
   const navigation = createNavigation(() => loaded.space, { kind: 'view', view: 'flow' });
   expect(navigation.getState().activeGraphId).toBeNull();
 
-  navigation.continueInRenderer({ kind: 'layout', layoutId: LAYOUT });
+  navigation.continueInRenderer({ kind: 'view', view: 'grid' }, null);
 
   expect(navigation.getState()).toMatchObject({
-    selectedRenderer: { kind: 'layout', layoutId: LAYOUT },
+    selectedRenderer: { kind: 'view', view: 'grid' },
     activeGraphId: null,
   });
 });
@@ -465,9 +516,9 @@ it('refuses a renderer the current Space does not hold, leaving navigation untou
   );
   expect(navigation.getState()).toBe(before);
 
-  expect(() => navigation.continueInRenderer({ kind: 'layout', layoutId: missing })).toThrow(
-    /does not exist/,
-  );
+  expect(() =>
+    navigation.continueInRenderer({ kind: 'layout', layoutId: missing }, GRAPH_ONE),
+  ).toThrow(/does not exist/);
   expect(navigation.getState()).toBe(before);
 });
 
@@ -521,25 +572,20 @@ it('reads the working Space once per moves() call, whatever the branching', () =
   const cardA = uuid('00000000-0000-4000-8000-000000000002');
   const cardB = uuid('00000000-0000-4000-8000-000000000003');
   const cardC = uuid('00000000-0000-4000-8000-000000000004');
-  const loaded = loadSpace(
-    {
-      version: 2,
-      id: uuid('00000000-0000-4000-8000-000000000001'),
-      title: 'Fork',
-      graphs: [
-        {
-          id: GRAPH_ONE,
-          title: 'Fork',
-          edges: [
-            { from: cardA, to: cardB },
-            { from: cardA, to: cardC },
-          ],
-        },
-      ],
-    },
-    [cardFile(cardA), cardFile(cardB), cardFile(cardC)],
+  const forked = spaceOwning(
+    'Fork',
+    [
+      {
+        id: GRAPH_ONE,
+        title: 'Fork',
+        edges: [
+          { from: cardA, to: cardB },
+          { from: cardA, to: cardC },
+        ],
+      },
+    ],
+    [{ id: cardA }, { id: cardB }, { id: cardC }],
   );
-  if (!loaded.ok) throw new Error('fork should load');
   // Reading the Space costs a full parse and reindex of the working snapshot,
   // and `moves()` runs during every App render — including the per-pointer-frame
   // renders a drag produces. One read per call, not one per outgoing Edge.
@@ -547,10 +593,10 @@ it('reads the working Space once per moves() call, whatever the branching', () =
   const navigation = createNavigation(
     () => {
       reads += 1;
-      return loaded.space;
+      return forked;
     },
     { kind: 'view', view: 'flow' },
-    loaded.space,
+    forked,
   );
   navigation.present();
 
@@ -590,26 +636,21 @@ it('traverses a fork, retreats along Traversal history, and reselects the Edge t
   const cardA = uuid('00000000-0000-4000-8000-000000000002');
   const cardB = uuid('00000000-0000-4000-8000-000000000003');
   const cardC = uuid('00000000-0000-4000-8000-000000000004');
-  const loaded = loadSpace(
-    {
-      version: 2,
-      id: uuid('00000000-0000-4000-8000-000000000001'),
-      title: 'Fork',
-      graphs: [
-        {
-          id: GRAPH_ONE,
-          title: 'Fork',
-          edges: [
-            { from: cardA, to: cardB },
-            { from: cardA, to: cardC },
-          ],
-        },
-      ],
-    },
-    [cardFile(cardA), cardFile(cardB), cardFile(cardC)],
+  const forked = spaceOwning(
+    'Fork',
+    [
+      {
+        id: GRAPH_ONE,
+        title: 'Fork',
+        edges: [
+          { from: cardA, to: cardB },
+          { from: cardA, to: cardC },
+        ],
+      },
+    ],
+    [{ id: cardA }, { id: cardB }, { id: cardC }],
   );
-  if (!loaded.ok) throw new Error('fork should load');
-  const navigation = createNavigation(() => loaded.space, { kind: 'view', view: 'flow' });
+  const navigation = createNavigation(() => forked, { kind: 'view', view: 'flow' });
   navigation.present();
 
   navigation.selectBranch(-1);

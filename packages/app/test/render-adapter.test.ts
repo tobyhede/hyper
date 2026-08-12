@@ -119,31 +119,42 @@ function sessionBackedAdapter(
   const authoring = createSpaceAuthoring({
     session,
     navigation,
+    currentSpace,
     ...(initialPlacement !== undefined ? { initialPlacement } : {}),
   });
   return { session, authoring, store: createRenderAdapter(authoring) };
 }
 
-/** A Space whose Layout places Card A alone, leaving B and C unplaced. */
+/**
+ * A Space whose Layout places Cards A and B, leaving C unplaced.
+ *
+ * The Layout's position keys are its Card membership and every Edge of a Graph
+ * it owns is closed over them (ADR 0040), so the omitted Card is one the Graph
+ * never names — C, which the projection still draws and which no Edit here may
+ * quietly author.
+ */
 function sparsePositionedAdapter() {
   const snapshot: SpaceSnapshot = {
     id: SPACE_ID,
     document: {
-      version: 2,
+      version: 1,
       title: 'Space',
-      graphs: [
-        {
-          id: GRAPH_ID,
-          title: 'Main',
-          edges: [{ from: uuidSchema.parse(CARD_A), to: uuidSchema.parse(CARD_B) }],
-        },
-      ],
       layouts: [
         {
           id: LAYOUT_ID,
           title: 'Layout 1',
           kind: 'positioned',
-          positions: { [uuidSchema.parse(CARD_A)]: { x: 10, y: 20 } },
+          positions: {
+            [uuidSchema.parse(CARD_A)]: { x: 10, y: 20 },
+            [uuidSchema.parse(CARD_B)]: { x: 300, y: 20 },
+          },
+          graphs: [
+            {
+              id: GRAPH_ID,
+              title: 'Main',
+              edges: [{ from: uuidSchema.parse(CARD_A), to: uuidSchema.parse(CARD_B) }],
+            },
+          ],
         },
       ],
       defaultView: LAYOUT_ID,
@@ -166,7 +177,10 @@ function sparsePositionedAdapter() {
   return sessionBackedAdapter(
     snapshot,
     { kind: 'layout', layoutId: LAYOUT_ID },
-    Placement.fromEntries([[CARD_A, { x: 10, y: 20 }]]),
+    Placement.fromEntries([
+      [CARD_A, { x: 10, y: 20 }],
+      [CARD_B, { x: 300, y: 20 }],
+    ]),
   );
 }
 
@@ -175,15 +189,8 @@ function storedSpaceAdapter() {
   const snapshot: SpaceSnapshot = {
     id: SPACE_ID,
     document: {
-      version: 2,
+      version: 1,
       title: 'Space',
-      graphs: [
-        {
-          id: GRAPH_ID,
-          title: 'Main',
-          edges: [{ from: uuidSchema.parse(CARD_A), to: uuidSchema.parse(CARD_B) }],
-        },
-      ],
       layouts: [
         {
           id: LAYOUT_ID,
@@ -193,6 +200,13 @@ function storedSpaceAdapter() {
             [uuidSchema.parse(CARD_A)]: { x: 10, y: 20 },
             [uuidSchema.parse(CARD_B)]: { x: 300, y: 20 },
           },
+          graphs: [
+            {
+              id: GRAPH_ID,
+              title: 'Main',
+              edges: [{ from: uuidSchema.parse(CARD_A), to: uuidSchema.parse(CARD_B) }],
+            },
+          ],
         },
       ],
       defaultView: LAYOUT_ID,
@@ -347,8 +361,10 @@ describe('render adapter', () => {
         .connectCards(uuidSchema.parse(CARD_B), uuidSchema.parse(CARD_A), SPARSE_PROJECTED),
     ).toBe(true);
 
+    // C was rendered and is still not a member of this Layout.
     expect(session.getState().working.document.layouts?.[0]?.positions).toEqual({
       [CARD_A]: { x: 10, y: 20 },
+      [CARD_B]: { x: 300, y: 20 },
     });
   });
 
@@ -374,18 +390,14 @@ describe('render adapter', () => {
     vi.spyOn(crypto, 'randomUUID').mockReturnValue(
       LAYOUT_ID as ReturnType<typeof crypto.randomUUID>,
     );
+    // No Layout, so no Graph either: a Graph is a nested owned value and a Space
+    // with nothing to own one holds none (ADR 0040). Converting is what gives
+    // this Space both.
     const snapshot: SpaceSnapshot = {
       id: SPACE_ID,
       document: {
-        version: 2,
+        version: 1,
         title: 'Space',
-        graphs: [
-          {
-            id: GRAPH_ID,
-            title: 'Main',
-            edges: [{ from: uuidSchema.parse(CARD_A), to: uuidSchema.parse(CARD_B) }],
-          },
-        ],
       },
       cards: [
         {
@@ -415,11 +427,12 @@ describe('render adapter', () => {
     const { session, store } = sparsePositionedAdapter();
     store.getState().syncProjection(SPARSE_PROJECTED, []);
 
-    completeDrag(store, CARD_B, 400, 120);
+    completeDrag(store, CARD_C, 400, 120);
 
     expect(session.getState().working.document.layouts?.[0]?.positions).toEqual({
       [CARD_A]: { x: 10, y: 20 },
-      [CARD_B]: { x: 400, y: 120 },
+      [CARD_B]: { x: 300, y: 20 },
+      [CARD_C]: { x: 400, y: 120 },
     });
   });
 
@@ -442,7 +455,10 @@ describe('render adapter', () => {
     store.getState().changeNodes(settled(CARD_A, 10, 20));
 
     expect(authoring.authoredPlacement()).toEqual(
-      Placement.fromEntries([[CARD_A, { x: 10, y: 20 }]]),
+      Placement.fromEntries([
+        [CARD_A, { x: 10, y: 20 }],
+        [CARD_B, { x: 300, y: 20 }],
+      ]),
     );
   });
 
@@ -459,6 +475,7 @@ describe('render adapter', () => {
 
     expect(session.getState().working.document.layouts?.[0]?.positions).toEqual({
       [CARD_A]: { x: 10, y: 20 },
+      [CARD_B]: { x: 300, y: 20 },
       [CREATED_CARD_ID]: { x: 420, y: 360 },
     });
   });

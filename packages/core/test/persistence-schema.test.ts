@@ -10,15 +10,15 @@ const LAYOUT_ID = '00000000-0000-4000-8000-000000000005';
 const identified = {
   id: SPACE_ID,
   document: {
-    version: 2,
+    version: 1,
     title: 'Test space',
-    graphs: [{ id: GRAPH_ID, title: 'Main', edges: [{ from: CARD_A, to: CARD_B }] }],
     layouts: [
       {
         id: LAYOUT_ID,
         title: 'Working',
         kind: 'positioned' as const,
-        positions: { [CARD_A]: { x: 0, y: 0 } },
+        positions: { [CARD_A]: { x: 0, y: 0 }, [CARD_B]: { x: 320, y: 0 } },
+        graphs: [{ id: GRAPH_ID, title: 'Main', edges: [{ from: CARD_A, to: CARD_B }] }],
       },
     ],
     defaultView: LAYOUT_ID,
@@ -29,32 +29,42 @@ const identified = {
   ],
 };
 
+/** The one layout, and the one graph it owns. */
+const layout = identified.document.layouts[0]!;
+const graph = layout.graphs[0]!;
+
+/** The same aggregate with its one layout replaced. */
+const withLayout = (next: unknown) => ({
+  ...identified,
+  document: { ...identified.document, layouts: [next] },
+});
+
 describe('import space schema', () => {
   it('keeps references UUID-only when import entity ids are absent', () => {
     const parsed = importSpaceFileSchema.parse({
-      version: 2,
+      version: 1,
       title: 'Import input',
-      graphs: [
-        {
-          title: 'Generated graph',
-          edges: [{ from: CARD_A, to: CARD_B }],
-        },
-      ],
       layouts: [
         {
           title: 'Generated layout',
           positions: { [CARD_A]: { x: 0, y: 0 } },
+          graphs: [{ title: 'Generated graph', edges: [{ from: CARD_A, to: CARD_B }] }],
         },
       ],
     });
 
     expect(parsed.id).toBeUndefined();
-    expect(parsed.graphs[0]?.id).toBeUndefined();
     expect(parsed.layouts?.[0]?.id).toBeUndefined();
+    expect(parsed.layouts?.[0]?.graphs[0]?.id).toBeUndefined();
     expect(
       importSpaceFileSchema.safeParse({
         ...parsed,
-        graphs: [{ ...parsed.graphs[0], edges: [{ from: 'card-a', to: CARD_B }] }],
+        layouts: [
+          {
+            ...parsed.layouts?.[0],
+            graphs: [{ title: 'Generated graph', edges: [{ from: 'card-a', to: CARD_B }] }],
+          },
+        ],
       }).success,
     ).toBe(false);
   });
@@ -63,11 +73,11 @@ describe('import space schema', () => {
     const input = {
       document: {
         ...identified.document,
-        graphs: [{ ...identified.document.graphs[0], id: undefined }],
         layouts: [
           {
             title: 'Working',
             positions: { [CARD_A]: { x: 0, y: 0 } },
+            graphs: [{ ...graph, id: undefined }],
           },
         ],
       },
@@ -77,23 +87,32 @@ describe('import space schema', () => {
     const parsed = importSpaceSchema.parse(input);
     expect(parsed.document.layouts?.[0]?.kind).toBe('positioned');
     expect(parsed.id).toBeUndefined();
-    expect(parsed.document.graphs[0]?.id).toBeUndefined();
+    expect(parsed.document.layouts?.[0]?.id).toBeUndefined();
+    expect(parsed.document.layouts?.[0]?.graphs[0]?.id).toBeUndefined();
     expect(parsed.cards.at(-1)?.id).toBeUndefined();
   });
 
   /**
-   * The import shape relaxes identity and nothing else. A layout that names the
-   * graphs it draws is refused here too, so an authored directory carrying the
-   * retired filter cannot enter through the CLI what the space file rejects.
+   * The import shape relaxes identity and nothing else. Ownership is not
+   * relaxed: a layout that names graph *ids* — the version 2 filter, which
+   * shares this key — cannot enter through the CLI what the space file rejects,
+   * and neither can one owning none.
    */
-  it('rejects an imported layout that names the graphs it draws', () => {
+  it('rejects an imported layout whose graphs are ids rather than owned values', () => {
+    expect(importSpaceSchema.safeParse(withLayout({ ...layout, graphs: [GRAPH_ID] })).success).toBe(
+      false,
+    );
+  });
+
+  it('rejects an imported layout that owns no graphs', () => {
+    expect(importSpaceSchema.safeParse(withLayout({ ...layout, graphs: [] })).success).toBe(false);
+  });
+
+  it('rejects a version 2 document, whose graphs sat beside its layouts', () => {
     expect(
       importSpaceSchema.safeParse({
         ...identified,
-        document: {
-          ...identified.document,
-          layouts: [{ ...identified.document.layouts[0], graphs: [GRAPH_ID] }],
-        },
+        document: { ...identified.document, version: 2 },
       }).success,
     ).toBe(false);
   });
@@ -101,20 +120,8 @@ describe('import space schema', () => {
   it('rejects a non-UUID whenever an import entity id is explicit', () => {
     for (const input of [
       { ...identified, id: 'space' },
-      {
-        ...identified,
-        document: {
-          ...identified.document,
-          graphs: [{ ...identified.document.graphs[0], id: 'main' }],
-        },
-      },
-      {
-        ...identified,
-        document: {
-          ...identified.document,
-          layouts: [{ ...identified.document.layouts[0], id: 'working' }],
-        },
-      },
+      withLayout({ ...layout, graphs: [{ ...graph, id: 'main' }] }),
+      withLayout({ ...layout, id: 'working' }),
       { ...identified, cards: [{ ...identified.cards[0], id: 'a' }] },
     ]) {
       expect(importSpaceSchema.safeParse(input).success).toBe(false);
@@ -127,14 +134,13 @@ describe('space snapshot schema', () => {
     expect(spaceSnapshotSchema.parse(identified)).toEqual(identified);
     expect(spaceSnapshotSchema.safeParse({ ...identified, id: undefined }).success).toBe(false);
     expect(
-      spaceSnapshotSchema.safeParse({
-        ...identified,
-        document: {
-          ...identified.document,
-          graphs: [{ ...identified.document.graphs[0], id: undefined }],
-        },
-      }).success,
+      spaceSnapshotSchema.safeParse(
+        withLayout({ ...layout, graphs: [{ ...graph, id: undefined }] }),
+      ).success,
     ).toBe(false);
+    expect(spaceSnapshotSchema.safeParse(withLayout({ ...layout, id: undefined })).success).toBe(
+      false,
+    );
     expect(
       spaceSnapshotSchema.safeParse({
         ...identified,

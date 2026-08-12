@@ -46,16 +46,51 @@ const SECOND_CARD_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000011');
 const OTHER_CARD_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000012');
 const MISSING_CARD_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000013');
 const GRAPH_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000020');
+const LAYOUT_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000021');
 
 const card = (id: UUID, title: string) => ({
   id,
   document: { title, kind: 'markdown' as const, body: title },
 });
 
+/**
+ * A Space with cards and no structure — no layouts, and so no graphs, which is
+ * one statement under version 1 (ADR 0040). Most of this suite is about
+ * identity, rollback and revisions rather than about structure, so the cases
+ * that need a graph build a layout to own it rather than every case carrying an
+ * empty collection.
+ */
 const space = (id: UUID, title: string, cardIds: readonly UUID[]): SpaceSnapshot => ({
   id,
-  document: { version: 2, title, graphs: [] },
+  document: { version: 1, title },
   cards: cardIds.map((cardId) => card(cardId, `${title} card`)),
+});
+
+/**
+ * A Space whose one layout owns one graph with one edge out of the layout.
+ *
+ * Under version 1 an edge endpoint must name a card of the layout that owns the
+ * graph, so "dangling" is now a membership failure rather than a space-wide
+ * lookup miss — and a graph can only reach domain intake through a layout, so
+ * the failure cannot be built without one.
+ */
+const spaceWithDanglingEdge = (id: UUID, title: string, memberId: UUID): SpaceSnapshot => ({
+  ...space(id, title, [memberId]),
+  document: {
+    version: 1,
+    title,
+    layouts: [
+      {
+        id: LAYOUT_ID,
+        title: 'Dangling',
+        kind: 'positioned',
+        positions: { [memberId]: { x: 0, y: 0 } },
+        graphs: [
+          { id: GRAPH_ID, title: 'Dangling', edges: [{ from: memberId, to: MISSING_CARD_ID }] },
+        ],
+      },
+    ],
+  },
 });
 
 const retitled = (snapshot: SpaceSnapshot, title: string): SpaceSnapshot => ({
@@ -141,15 +176,7 @@ export const spaceRepositoryContract = (
     await withHarness(async (repository) => {
       const first = space(SPACE_ID, 'One', [CARD_ID]);
       await seed(repository, first);
-      const dangling: SpaceSnapshot = {
-        ...first,
-        document: {
-          ...first.document,
-          graphs: [
-            { id: GRAPH_ID, title: 'Dangling', edges: [{ from: CARD_ID, to: MISSING_CARD_ID }] },
-          ],
-        },
-      };
+      const dangling = spaceWithDanglingEdge(SPACE_ID, 'One', CARD_ID);
 
       await expect(repository.commitSpace(dangling, 0n)).resolves.toMatchObject({
         kind: 'rejected',
@@ -327,20 +354,7 @@ export const spaceRepositoryContract = (
   it(`${name} refuses an import that fails domain intake, storing none of the batch`, async () => {
     await withHarness(async (repository) => {
       const valid = space(SPACE_ID, 'Must roll back', [CARD_ID]);
-      const dangling: SpaceSnapshot = {
-        ...space(OTHER_SPACE_ID, 'Dangling', [OTHER_CARD_ID]),
-        document: {
-          version: 2,
-          title: 'Dangling',
-          graphs: [
-            {
-              id: GRAPH_ID,
-              title: 'Dangling',
-              edges: [{ from: OTHER_CARD_ID, to: MISSING_CARD_ID }],
-            },
-          ],
-        },
-      };
+      const dangling = spaceWithDanglingEdge(OTHER_SPACE_ID, 'Dangling', OTHER_CARD_ID);
 
       await expect(repository.importSpaces([valid, dangling], 'insert')).resolves.toMatchObject({
         kind: 'rejected',
@@ -360,16 +374,7 @@ export const spaceRepositoryContract = (
    */
   it(`${name} answers a batch that is both duplicated and domain-invalid with the duplicate`, async () => {
     await withHarness(async (repository) => {
-      const dangling: SpaceSnapshot = {
-        ...space(SPACE_ID, 'Dangling', [CARD_ID]),
-        document: {
-          version: 2,
-          title: 'Dangling',
-          graphs: [
-            { id: GRAPH_ID, title: 'Dangling', edges: [{ from: CARD_ID, to: MISSING_CARD_ID }] },
-          ],
-        },
-      };
+      const dangling = spaceWithDanglingEdge(SPACE_ID, 'Dangling', CARD_ID);
       const repeated = space(SPACE_ID, 'Repeat', [OTHER_CARD_ID]);
 
       await expect(repository.importSpaces([dangling, repeated], 'insert')).resolves.toMatchObject({
@@ -401,18 +406,33 @@ export const spaceRepositoryContract = (
     });
   });
 
+  /*
+   * A graph id is minted where the graph now lives — under the layout that owns
+   * it — and in the same pass as that layout's own id, before the snapshot faces
+   * domain intake and before the first card is written. Two id-less layouts,
+   * because minting under one owner reads the same whether the pass walks
+   * layouts or flattens them, and only a second owner tells those apart.
+   */
   it(`${name} mints every identity an import leaves out, keeping the explicit ones`, async () => {
     await withHarness(async (repository) => {
       const input: ImportSpace = {
         document: {
-          version: 2,
+          version: 1,
           title: 'Partly identified',
-          graphs: [{ title: 'Explicit cards', edges: [{ from: CARD_ID, to: SECOND_CARD_ID }] }],
           layouts: [
             {
               title: 'Minted layout',
               kind: 'positioned',
-              positions: { [CARD_ID]: { x: 4, y: 8 } },
+              positions: { [CARD_ID]: { x: 4, y: 8 }, [SECOND_CARD_ID]: { x: 12, y: 16 } },
+              graphs: [{ title: 'Explicit cards', edges: [{ from: CARD_ID, to: SECOND_CARD_ID }] }],
+            },
+            {
+              title: 'Second minted layout',
+              kind: 'positioned',
+              positions: { [CARD_ID]: { x: 0, y: 0 } },
+              graphs: [
+                { id: GRAPH_ID, title: 'Explicit graph', edges: [{ from: CARD_ID, to: CARD_ID }] },
+              ],
             },
           ],
         },
@@ -430,16 +450,23 @@ export const spaceRepositoryContract = (
       if (only === undefined) throw new Error('Import returned no Space');
 
       const minted = only.snapshot.cards.find(({ id }) => id !== CARD_ID && id !== SECOND_CARD_ID);
-      const graph = only.snapshot.document.graphs[0];
-      const layout = only.snapshot.document.layouts?.[0];
+      const [layout, second] = only.snapshot.document.layouts ?? [];
       if (minted === undefined) throw new Error('The id-less card kept no identity');
-      if (graph === undefined || layout === undefined) throw new Error('Structure was not stored');
+      if (layout === undefined || second === undefined) throw new Error('Structure was not stored');
+      const graph = layout.graphs[0];
+      if (graph === undefined) throw new Error('The layout owns no graph');
 
-      const identities = [only.snapshot.id, minted.id, graph.id, layout.id];
+      const identities = [only.snapshot.id, minted.id, graph.id, layout.id, second.id];
       for (const id of identities) expect(uuidSchema.safeParse(id).success).toBe(true);
       expect(new Set(identities).size).toBe(identities.length);
       expect(graph.edges).toEqual([{ from: CARD_ID, to: SECOND_CARD_ID }]);
-      expect(layout.positions).toEqual({ [CARD_ID]: { x: 4, y: 8 } });
+      expect(layout.positions).toEqual({
+        [CARD_ID]: { x: 4, y: 8 },
+        [SECOND_CARD_ID]: { x: 12, y: 16 },
+      });
+      // The explicit graph id is kept, and kept under its own owner rather than
+      // pooled with the minted one.
+      expect(second.graphs.map(({ id }) => id)).toEqual([GRAPH_ID]);
       await expect(repository.loadSpace(only.snapshot.id)).resolves.toEqual(only);
     });
   });

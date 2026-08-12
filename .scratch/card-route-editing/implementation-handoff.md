@@ -163,7 +163,7 @@ Each work package leaves `pnpm verify` green; packages that change graph/UI
 behavior also leave the complete Playwright suite green. Do not combine adjacent
 packages merely because both touch the same files.
 
-### 1. Pure domain vocabulary rename
+### 1. Pure domain vocabulary rename — **done**
 
 Apply ADR 0041 without changing behavior or ownership. Rename Route→Graph,
 Walk→Traversal history, the built-in Graph Algorithmic View→Flow,
@@ -176,7 +176,17 @@ Gate: unchanged E2E behavior plus a repository scan with no current-domain old
 names. Any temporary pre-version-1 aggregate shape is an internal commit state,
 not a supported compatibility document.
 
-### 2. First-public aggregate foundation
+### 2. First-public aggregate foundation — **done**
+
+Built by `.scratch/first-public-aggregate/`, tickets `01`–`07`. Everything below
+holds in the tree, including the three named proofs: the View-boundary property
+test (`packages/app/test/view.property.test.ts`), the duplicate-Graph-id load
+error naming both owners (`packages/graph/test/validate.test.ts`), and the
+fixture's Flow view drawing all four Graphs across its two Layouts
+(`packages/app/e2e/overview.spec.ts`). The one thing deferred on purpose is the
+omitted-Card fallback band, which package 5 below deletes together with its
+replacement. AGENTS.md and `CONTEXT.md` describe the built state; ticket `06`
+carries the bars.
 
 Implement ADR 0040 directly in version 1: explicit Layout membership through
 position keys, non-empty ordered Layout-owned Graphs, scoped Graph lookup,

@@ -4,39 +4,47 @@ import type { BuiltInViewId, Card, Layout, LayoutPosition, Graph, UUID } from '@
 import { validateReferences } from '../src/validate';
 import { alias, card, uuid } from './card-files';
 
-// A mutable space-file shape: these tests deliberately construct broken graphs
-// (which loadSpace would reject) and hand them straight to validateReferences.
+const A = uuid('00000000-0000-4000-8000-000000000002');
+const B = uuid('00000000-0000-4000-8000-000000000003');
+const WORKING = uuid('00000000-0000-4000-8000-000000000022');
+const MAIN = uuid('00000000-0000-4000-8000-000000000004');
+
+/**
+ * A mutable space-file shape: these tests deliberately construct broken layouts
+ * (which `loadSpace` would reject on shape) and hand them straight to
+ * `validateReferences`. There is no space-level `graphs` — a graph is reached
+ * through the layout that owns it (ADR 0040).
+ */
 function baseSpaceFile(): {
   title: string;
   cards: Card[];
-  graphs: Graph[];
-  layouts?: Layout[];
+  layouts: Layout[];
   defaultView?: BuiltInViewId | UUID;
 } {
   return {
     title: 'Test',
-    cards: [
-      card(uuid('00000000-0000-4000-8000-000000000002')),
-      card(uuid('00000000-0000-4000-8000-000000000003')),
-    ],
-    graphs: [
-      {
-        id: uuid('00000000-0000-4000-8000-000000000004'),
-        title: 'Main',
-        edges: [
-          {
-            from: uuid('00000000-0000-4000-8000-000000000002'),
-            to: uuid('00000000-0000-4000-8000-000000000003'),
-          },
-        ],
-      },
+    cards: [card(A), card(B)],
+    layouts: [
+      layout(WORKING, { [A]: { x: 0, y: 0 }, [B]: { x: 320, y: 0 } }, [
+        { id: MAIN, title: 'Main', edges: [{ from: A, to: B }] },
+      ]),
     ],
   };
 }
 
-function layout(id: UUID, positions: Partial<Record<UUID, LayoutPosition>>): Layout {
-  return { id, title: id, kind: 'positioned', positions };
+function layout(
+  id: UUID,
+  positions: Partial<Record<UUID, LayoutPosition>>,
+  graphs: Graph[] = [{ id: uuid('00000000-0000-4000-8000-0000000000f0'), title: id, edges: [] }],
+): Layout {
+  return { id, title: id, kind: 'positioned', positions, graphs };
 }
+
+/** The one layout `baseSpaceFile` declares. */
+const working = (space: ReturnType<typeof baseSpaceFile>): Layout => space.layouts[0]!;
+
+/** The graph that layout owns. */
+const main = (space: ReturnType<typeof baseSpaceFile>): Graph => working(space).graphs[0]!;
 
 describe('validateReferences', () => {
   it('reports no errors for a consistent space', () => {
@@ -45,38 +53,20 @@ describe('validateReferences', () => {
 
   it('accepts a valid single-hop alias to a markdown card', () => {
     const m = baseSpaceFile();
-    m.cards.push(
-      alias(
-        uuid('00000000-0000-4000-8000-000000000007'),
-        'A, again',
-        uuid('00000000-0000-4000-8000-000000000002'),
-      ),
-    );
+    m.cards.push(alias(uuid('00000000-0000-4000-8000-000000000007'), 'A, again', A));
     expect(validateReferences(m)).toEqual([]);
-  });
-
-  it('detects an unresolved edge endpoint, naming which end it was', () => {
-    const m = baseSpaceFile();
-    m.graphs[0]!.edges[0]!.to = uuid('00000000-0000-4000-8000-000000000098');
-    const errors = validateReferences(m);
-    const error = errors.find((e) => e.kind === 'unresolved-graph-edge');
-    expect(error?.ref).toBe(uuid('00000000-0000-4000-8000-000000000098'));
-    expect(error?.message).toContain('as its to');
   });
 
   it('accepts a graph that closes a cycle (ADR 0032)', () => {
     const m = baseSpaceFile();
     // A → B → A: presenting decides how to traverse the authored loop.
-    m.graphs[0]!.edges.push({
-      from: uuid('00000000-0000-4000-8000-000000000003'),
-      to: uuid('00000000-0000-4000-8000-000000000002'),
-    });
+    main(m).edges.push({ from: B, to: A });
     expect(validateReferences(m)).toEqual([]);
   });
 
   it('rejects an exact duplicate Edge within one Graph', () => {
     const m = baseSpaceFile();
-    m.graphs[0]!.edges.push({ ...m.graphs[0]!.edges[0]! });
+    main(m).edges.push({ ...main(m).edges[0]! });
 
     expect(validateReferences(m)).toContainEqual({
       kind: 'duplicate-graph-edge',
@@ -88,103 +78,66 @@ describe('validateReferences', () => {
 
   it('accepts a self-edge', () => {
     const m = baseSpaceFile();
-    m.graphs[0]!.edges.push({
-      from: uuid('00000000-0000-4000-8000-000000000003'),
-      to: uuid('00000000-0000-4000-8000-000000000003'),
-    });
+    main(m).edges.push({ from: B, to: B });
     expect(validateReferences(m)).toEqual([]);
   });
 
   it('accepts a cycle in a disconnected component', () => {
     const m = baseSpaceFile();
-    m.cards.push(
-      card(uuid('00000000-0000-4000-8000-000000000005')),
-      card(uuid('00000000-0000-4000-8000-000000000006')),
-    );
-    m.graphs[0]!.edges.push(
-      {
-        from: uuid('00000000-0000-4000-8000-000000000005'),
-        to: uuid('00000000-0000-4000-8000-000000000006'),
-      },
-      {
-        from: uuid('00000000-0000-4000-8000-000000000006'),
-        to: uuid('00000000-0000-4000-8000-000000000005'),
-      },
-    );
+    const c = uuid('00000000-0000-4000-8000-000000000005');
+    const d = uuid('00000000-0000-4000-8000-000000000006');
+    m.cards.push(card(c), card(d));
+    working(m).positions[c] = { x: 0, y: 200 };
+    working(m).positions[d] = { x: 320, y: 200 };
+    main(m).edges.push({ from: c, to: d }, { from: d, to: c });
     expect(validateReferences(m)).toEqual([]);
   });
 
   it('accepts a fork and a merge', () => {
     const m = baseSpaceFile();
-    m.cards.push(
-      card(uuid('00000000-0000-4000-8000-000000000005')),
-      card(uuid('00000000-0000-4000-8000-000000000006')),
-    );
-    // a forks to b and c, which merge back into d. `d` is reachable two ways,
+    const c = uuid('00000000-0000-4000-8000-000000000005');
+    const d = uuid('00000000-0000-4000-8000-000000000006');
+    m.cards.push(card(c), card(d));
+    working(m).positions[c] = { x: 0, y: 200 };
+    working(m).positions[d] = { x: 320, y: 200 };
+    // A forks to B and C, which merge back into D. `D` is reachable two ways,
     // which is exactly what a merge is.
-    m.graphs[0]!.edges = [
-      {
-        from: uuid('00000000-0000-4000-8000-000000000002'),
-        to: uuid('00000000-0000-4000-8000-000000000003'),
-      },
-      {
-        from: uuid('00000000-0000-4000-8000-000000000002'),
-        to: uuid('00000000-0000-4000-8000-000000000005'),
-      },
-      {
-        from: uuid('00000000-0000-4000-8000-000000000003'),
-        to: uuid('00000000-0000-4000-8000-000000000006'),
-      },
-      {
-        from: uuid('00000000-0000-4000-8000-000000000005'),
-        to: uuid('00000000-0000-4000-8000-000000000006'),
-      },
+    main(m).edges = [
+      { from: A, to: B },
+      { from: A, to: c },
+      { from: B, to: d },
+      { from: c, to: d },
     ];
     expect(validateReferences(m)).toEqual([]);
   });
 
-  it('allows the same Edge in different Graphs', () => {
+  it('allows the same Edge in two Graphs one layout owns', () => {
     const m = baseSpaceFile();
-    m.graphs.push({
+    working(m).graphs.push({
       id: uuid('00000000-0000-4000-8000-000000000030'),
       title: 'Alt',
-      edges: [
-        {
-          from: uuid('00000000-0000-4000-8000-000000000002'),
-          to: uuid('00000000-0000-4000-8000-000000000003'),
-        },
-      ],
+      edges: [{ from: A, to: B }],
     });
     expect(validateReferences(m)).toEqual([]);
   });
 
   it('allows two graphs to disagree about order', () => {
-    // main goes a → b and alt goes b → a. Their union has a cycle, which a
+    // Main goes A → B and Alt goes B → A. Their union has a cycle, which a
     // renderer must tolerate (ADR 0032).
     const m = baseSpaceFile();
-    m.graphs.push({
+    working(m).graphs.push({
       id: uuid('00000000-0000-4000-8000-000000000030'),
       title: 'Alt',
-      edges: [
-        {
-          from: uuid('00000000-0000-4000-8000-000000000003'),
-          to: uuid('00000000-0000-4000-8000-000000000002'),
-        },
-      ],
+      edges: [{ from: B, to: A }],
     });
     expect(validateReferences(m)).toEqual([]);
   });
 
   it('detects duplicate card ids', () => {
     const m = baseSpaceFile();
-    m.cards.push(card(uuid('00000000-0000-4000-8000-000000000002'), 'A dup'));
+    m.cards.push(card(A, 'A dup'));
     const errors = validateReferences(m);
-    expect(
-      errors.some(
-        (e) =>
-          e.kind === 'duplicate-card-id' && e.ref === uuid('00000000-0000-4000-8000-000000000002'),
-      ),
-    ).toBe(true);
+    expect(errors.some((e) => e.kind === 'duplicate-card-id' && e.ref === A)).toBe(true);
   });
 
   it('reports an alias whose target resolves to no card', () => {
@@ -223,13 +176,7 @@ describe('validateReferences', () => {
 
   it('reports an alias whose target is itself an alias (chains are single-hop)', () => {
     const m = baseSpaceFile();
-    m.cards.push(
-      alias(
-        '00000000-0000-4000-8000-000000000010',
-        'First',
-        '00000000-0000-4000-8000-000000000002',
-      ),
-    );
+    m.cards.push(alias('00000000-0000-4000-8000-000000000010', 'First', A));
     m.cards.push(
       alias(
         '00000000-0000-4000-8000-000000000011',
@@ -248,29 +195,108 @@ describe('validateReferences', () => {
   });
 });
 
+describe('validateReferences: an Edge is closed over its own Layout (ADR 0040)', () => {
+  it('reports an endpoint naming a card the space does not hold, naming which end', () => {
+    const m = baseSpaceFile();
+    main(m).edges[0]!.to = uuid('00000000-0000-4000-8000-000000000098');
+    const errors = validateReferences(m);
+    const error = errors.find((e) => e.kind === 'unresolved-graph-edge');
+    expect(error?.ref).toBe(uuid('00000000-0000-4000-8000-000000000098'));
+    expect(error?.message).toContain('as its to');
+  });
+
+  it('reports an endpoint naming a real card the owning layout omits', () => {
+    // The failure the space-wide check could not see: `C` is a perfectly good
+    // Space card, but this layout does not position it, so it is not a member
+    // and an edge here cannot reach it. One rule, no conditions.
+    const m = baseSpaceFile();
+    const c = uuid('00000000-0000-4000-8000-000000000005');
+    m.cards.push(card(c));
+    main(m).edges.push({ from: B, to: c });
+
+    const errors = validateReferences(m);
+    const error = errors.find((e) => e.kind === 'unresolved-graph-edge');
+    expect(error?.ref).toBe(c);
+    expect(error?.message).toContain(WORKING);
+  });
+
+  it('reports an endpoint naming a card only a second layout holds', () => {
+    const m = baseSpaceFile();
+    const c = uuid('00000000-0000-4000-8000-000000000005');
+    m.cards.push(card(c));
+    m.layouts.push(
+      layout(uuid('00000000-0000-4000-8000-000000000023'), { [c]: { x: 0, y: 0 } }, [
+        { id: uuid('00000000-0000-4000-8000-000000000031'), title: 'Aside', edges: [] },
+      ]),
+    );
+    main(m).edges.push({ from: A, to: c });
+
+    expect(validateReferences(m).some((e) => e.kind === 'unresolved-graph-edge')).toBe(true);
+  });
+});
+
+describe('validateReferences: a Graph id is unique across the Space (ADR 0045)', () => {
+  it('reports one id held by two layouts, naming both owners', () => {
+    // Ownership is layout-scoped; the *id* is not. The flatten keys colour,
+    // `<graphId>::out`/`::in` handles and activation on the id alone, and
+    // `graphsById` is a `new Map` that would drop one of the pair in silence.
+    const m = baseSpaceFile();
+    const second = uuid('00000000-0000-4000-8000-000000000023');
+    m.layouts.push(
+      layout(second, { [A]: { x: 0, y: 200 } }, [{ id: MAIN, title: 'Main again', edges: [] }]),
+    );
+
+    const errors = validateReferences(m);
+    const error = errors.find((e) => e.kind === 'duplicate-graph-id');
+    expect(error?.ref).toBe(MAIN);
+    expect(error?.message).toContain(WORKING);
+    expect(error?.message).toContain(second);
+  });
+
+  it('reports one id repeated inside a single layout, naming that layout once', () => {
+    const m = baseSpaceFile();
+    working(m).graphs.push({ id: MAIN, title: 'Main again', edges: [] });
+
+    const error = validateReferences(m).find((e) => e.kind === 'duplicate-graph-id');
+    expect(error?.ref).toBe(MAIN);
+    // Not "in layouts X and X": one owner is one place to look, and repeating
+    // it would send an author hunting a second layout that does not exist.
+    expect(error?.message).toContain(`twice in layout "${WORKING}"`);
+    expect(error?.message).not.toContain('layouts');
+  });
+
+  it('accepts two layouts owning distinct graphs over the same cards', () => {
+    const m = baseSpaceFile();
+    m.layouts.push(
+      layout(
+        uuid('00000000-0000-4000-8000-000000000023'),
+        { [A]: { x: 0, y: 200 }, [B]: { x: 320, y: 200 } },
+        [
+          {
+            id: uuid('00000000-0000-4000-8000-000000000031'),
+            title: 'Aside',
+            edges: [{ from: B, to: A }],
+          },
+        ],
+      ),
+    );
+
+    expect(validateReferences(m)).toEqual([]);
+  });
+});
+
 describe('validateReferences: layouts (ADR 0025)', () => {
   it('accepts a space that declares no layouts at all', () => {
-    expect(validateReferences(baseSpaceFile())).toEqual([]);
+    expect(validateReferences({ cards: [card(A)] })).toEqual([]);
   });
 
   it('accepts a layout that positions every card', () => {
-    const m = baseSpaceFile();
-    m.layouts = [
-      layout(uuid('00000000-0000-4000-8000-000000000022'), {
-        [uuid('00000000-0000-4000-8000-000000000002')]: { x: 0, y: 0 },
-        [uuid('00000000-0000-4000-8000-000000000003')]: { x: 320, y: 0 },
-      }),
-    ];
-    expect(validateReferences(m)).toEqual([]);
+    expect(validateReferences(baseSpaceFile())).toEqual([]);
   });
 
-  it('accepts a layout that omits cards — positions are sparse by design', () => {
+  it('accepts a layout that omits cards — a card it leaves out is not in it', () => {
     const m = baseSpaceFile();
-    m.layouts = [
-      layout(uuid('00000000-0000-4000-8000-000000000022'), {
-        [uuid('00000000-0000-4000-8000-000000000002')]: { x: 0, y: 0 },
-      }),
-    ];
+    m.cards.push(card(uuid('00000000-0000-4000-8000-000000000005')));
     expect(validateReferences(m)).toEqual([]);
   });
 
@@ -278,12 +304,7 @@ describe('validateReferences: layouts (ADR 0025)', () => {
     // The dangling position a deleted card leaves behind. Omitting a card is
     // fine; naming one that is gone is not — the asymmetry is the whole rule.
     const m = baseSpaceFile();
-    m.layouts = [
-      layout(uuid('00000000-0000-4000-8000-000000000022'), {
-        [uuid('00000000-0000-4000-8000-000000000002')]: { x: 0, y: 0 },
-        [uuid('00000000-0000-4000-8000-000000000099')]: { x: 10, y: 10 },
-      }),
-    ];
+    working(m).positions[uuid('00000000-0000-4000-8000-000000000099')] = { x: 10, y: 10 };
     const errors = validateReferences(m);
     expect(
       errors.some(
@@ -296,26 +317,18 @@ describe('validateReferences: layouts (ADR 0025)', () => {
 
   it('reports duplicate layout ids, which an index would silently collapse', () => {
     const m = baseSpaceFile();
-    m.layouts = [
-      layout(uuid('00000000-0000-4000-8000-000000000022'), {}),
-      layout(uuid('00000000-0000-4000-8000-000000000022'), {
-        [uuid('00000000-0000-4000-8000-000000000002')]: { x: 1, y: 1 },
-      }),
-    ];
+    m.layouts.push(
+      layout(WORKING, { [A]: { x: 1, y: 1 } }, [
+        { id: uuid('00000000-0000-4000-8000-000000000031'), title: 'Other', edges: [] },
+      ]),
+    );
     const errors = validateReferences(m);
-    expect(
-      errors.some(
-        (e) =>
-          e.kind === 'duplicate-layout-id' &&
-          e.ref === uuid('00000000-0000-4000-8000-000000000022'),
-      ),
-    ).toBe(true);
+    expect(errors.some((e) => e.kind === 'duplicate-layout-id' && e.ref === WORKING)).toBe(true);
   });
 
   it('accepts a defaultView naming a declared layout', () => {
     const m = baseSpaceFile();
-    m.layouts = [layout(uuid('00000000-0000-4000-8000-000000000022'), {})];
-    m.defaultView = uuid('00000000-0000-4000-8000-000000000022');
+    m.defaultView = WORKING;
     expect(validateReferences(m)).toEqual([]);
   });
 
@@ -329,7 +342,6 @@ describe('validateReferences: layouts (ADR 0025)', () => {
 
   it('reports a defaultView naming neither a layout nor a built-in', () => {
     const m = baseSpaceFile();
-    m.layouts = [layout(uuid('00000000-0000-4000-8000-000000000022'), {})];
     m.defaultView = uuid('00000000-0000-4000-8000-000000000099');
     const errors = validateReferences(m);
     expect(
@@ -343,47 +355,30 @@ describe('validateReferences: layouts (ADR 0025)', () => {
 });
 
 describe('validateReferences: the graph a Layout opens active (ADR 0026)', () => {
-  /** Two graphs, so the active one is a choice rather than the only answer. */
+  /** Two graphs in the one layout, so the active one is a choice. */
   function twoGraphs() {
     const m = baseSpaceFile();
-    m.graphs.push({
+    working(m).graphs.push({
       id: uuid('00000000-0000-4000-8000-000000000020'),
       title: 'Aside',
-      edges: [
-        {
-          from: uuid('00000000-0000-4000-8000-000000000003'),
-          to: uuid('00000000-0000-4000-8000-000000000002'),
-        },
-      ],
+      edges: [{ from: B, to: A }],
     });
     return m;
   }
 
   it('accepts a layout that names none — the first graph is active', () => {
+    expect(validateReferences(twoGraphs())).toEqual([]);
+  });
+
+  it('accepts any graph the layout owns as the active one', () => {
     const m = twoGraphs();
-    m.layouts = [layout(uuid('00000000-0000-4000-8000-000000000022'), {})];
+    working(m).activeGraph = uuid('00000000-0000-4000-8000-000000000020');
     expect(validateReferences(m)).toEqual([]);
   });
 
-  it('accepts any graph the space holds as the active one', () => {
+  it('reports an activeGraph no layout has', () => {
     const m = twoGraphs();
-    m.layouts = [
-      {
-        ...layout(uuid('00000000-0000-4000-8000-000000000022'), {}),
-        activeGraph: uuid('00000000-0000-4000-8000-000000000020'),
-      },
-    ];
-    expect(validateReferences(m)).toEqual([]);
-  });
-
-  it('reports an activeGraph the space does not have', () => {
-    const m = twoGraphs();
-    m.layouts = [
-      {
-        ...layout(uuid('00000000-0000-4000-8000-000000000022'), {}),
-        activeGraph: uuid('00000000-0000-4000-8000-000000000099'),
-      },
-    ];
+    working(m).activeGraph = uuid('00000000-0000-4000-8000-000000000099');
     const errors = validateReferences(m);
     expect(
       errors.some(
@@ -394,15 +389,26 @@ describe('validateReferences: the graph a Layout opens active (ADR 0026)', () =>
     ).toBe(true);
   });
 
+  it('reports an activeGraph a *second* layout owns — ownership, not existence', () => {
+    // The graph resolves in the space, so a space-wide check would pass it. It
+    // is not this layout's to open on, which is what ownership makes checkable.
+    const m = baseSpaceFile();
+    const elsewhere = uuid('00000000-0000-4000-8000-000000000031');
+    m.layouts.push(
+      layout(uuid('00000000-0000-4000-8000-000000000023'), { [A]: { x: 0, y: 200 } }, [
+        { id: elsewhere, title: 'Aside', edges: [] },
+      ]),
+    );
+    working(m).activeGraph = elsewhere;
+
+    const errors = validateReferences(m);
+    expect(errors.some((e) => e.kind === 'layout-unknown-graph' && e.ref === elsewhere)).toBe(true);
+  });
+
   it('names the layout in the message, since the id alone does not say where', () => {
     const m = twoGraphs();
-    m.layouts = [
-      {
-        ...layout(uuid('00000000-0000-4000-8000-000000000022'), {}),
-        activeGraph: uuid('00000000-0000-4000-8000-000000000099'),
-      },
-    ];
+    working(m).activeGraph = uuid('00000000-0000-4000-8000-000000000099');
     const [error] = validateReferences(m);
-    expect(error?.message).toContain('"00000000-0000-4000-8000-000000000022"');
+    expect(error?.message).toContain(`"${WORKING}"`);
   });
 });

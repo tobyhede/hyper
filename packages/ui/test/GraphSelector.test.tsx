@@ -10,18 +10,26 @@ beforeAll(() => {
   HTMLElement.prototype.scrollIntoView = () => undefined;
 });
 
+const CARD_A = uuidSchema.parse('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
+const CARD_B = uuidSchema.parse('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb');
+
+/**
+ * Two Graphs that hold an Edge each, so both can be presented. Emptiness is what
+ * the Present control is dead on, so a fixture that was empty everywhere could
+ * not tell the enabled case from the disabled one.
+ */
 const graphs: readonly Graph[] = [
   {
     id: uuidSchema.parse('11111111-1111-4111-8111-111111111111'),
     title: 'Long graph',
     color: '#6ea8fe',
-    edges: [],
+    edges: [{ from: CARD_A, to: CARD_B }],
   },
   {
     id: uuidSchema.parse('22222222-2222-4222-8222-222222222222'),
     title: 'Short graph',
     color: '#f4a259',
-    edges: [],
+    edges: [{ from: CARD_B, to: CARD_A }],
   },
 ];
 
@@ -157,6 +165,37 @@ describe('GraphSelector', () => {
 
     expect(onActivate).toHaveBeenCalledOnce();
     expect(onActivate).toHaveBeenCalledWith(graphs[0]?.id);
+  });
+
+  /**
+   * A Layout is created with its initial Active Graph empty (ADR 0040), so this
+   * is the state every conversion out of an Algorithmic View leaves behind until
+   * the author draws an Edge. `graphStartCard` has no answer for it, so
+   * `present()` would return having changed nothing — the control must say so
+   * rather than accept a click and do nothing.
+   */
+  it('cannot present an active Graph that holds no Edges', () => {
+    const empty: Graph = {
+      id: uuidSchema.parse('33333333-3333-4333-8333-333333333333'),
+      title: 'Graph 1',
+      edges: [],
+    };
+    const onPresent = vi.fn();
+    render(
+      <GraphSelector
+        graphs={[empty]}
+        colorByGraphId={{}}
+        activeGraphId={empty.id}
+        onActivate={() => undefined}
+        onPresent={onPresent}
+        onExitPresenting={() => undefined}
+      />,
+    );
+
+    const present = screen.getByRole('button', { name: 'Present this Graph' });
+    expect(present).toBeDisabled();
+    fireEvent.click(present);
+    expect(onPresent).not.toHaveBeenCalled();
   });
 
   it('exits presenting through the Overview action', () => {

@@ -88,14 +88,14 @@ describe('hyper CLI', () => {
     await mkdir(join(directory, 'cards'));
     await writeFile(
       join(directory, 'space.json'),
-      JSON.stringify({ version: 2, id: spaceId, title, graphs: [] }),
+      JSON.stringify({ version: 1, id: spaceId, title }),
     );
     return directory;
   };
 
   const seedSpace = async (spaceId: UUID, title: string): Promise<void> => {
     const result = await repository.importSpaces(
-      [{ id: spaceId, document: { version: 2, title, graphs: [] }, cards: [] }],
+      [{ id: spaceId, document: { version: 1, title }, cards: [] }],
       'insert',
     );
     if (result.kind !== 'imported') throw new Error(`Could not seed space ${spaceId}`);
@@ -111,7 +111,7 @@ describe('hyper CLI', () => {
     await mkdir(directory);
     await writeFile(
       join(directory, 'space.json'),
-      JSON.stringify({ version: 2, id: spaceId, title, graphs: [] }),
+      JSON.stringify({ version: 1, id: spaceId, title }),
     );
   };
 
@@ -146,9 +146,8 @@ describe('hyper CLI', () => {
     const stored = await repository.loadSpace(IMPORTED_SPACE_ID);
     expect(stored?.revision).toBe(0n);
     expect(stored?.snapshot.document).toEqual({
-      version: 2,
+      version: 1,
       title: 'CLI imported talk',
-      graphs: [],
     });
     expect(stored?.snapshot.cards).toHaveLength(1);
     expect(uuidSchema.safeParse(stored?.snapshot.cards[0]?.id).success).toBe(true);
@@ -162,7 +161,7 @@ describe('hyper CLI', () => {
   it('exports through the real command and records the projected PostgreSQL revision', async () => {
     const snapshot = {
       id: IMPORTED_SPACE_ID,
-      document: { version: 2 as const, title: 'CLI exported talk', graphs: [] },
+      document: { version: 1 as const, title: 'CLI exported talk' },
       cards: [
         {
           id: EXPORTED_CARD_ID,
@@ -218,7 +217,7 @@ describe('hyper CLI', () => {
     expect(stored).toEqual({
       snapshot: {
         id: created.id,
-        document: { version: 2, title: 'New space', graphs: [] },
+        document: { version: 1, title: 'New space' },
         cards: [
           {
             id: stored?.snapshot.cards[0]?.id,

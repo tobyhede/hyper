@@ -1,6 +1,12 @@
 import { cp, lstat, mkdir, mkdtemp, readdir, rename, rm, stat, writeFile } from 'node:fs/promises';
 import { basename, dirname, join, resolve } from 'node:path';
-import { spaceSnapshotSchema, type Card, type SpaceFile, type UUID } from '@project/core';
+import {
+  SPACE_FILE_VERSION,
+  spaceSnapshotSchema,
+  type Card,
+  type SpaceFile,
+  type UUID,
+} from '@project/core';
 import { loadSpaceSnapshot, serializeCardFile } from '@project/graph';
 import type { LoadedSpace } from '@project/persistence';
 import { readSingleSpace } from '../import/read-single-space';
@@ -9,26 +15,57 @@ import type { SpaceRepository } from '../persistence/space-repository';
 const compareOrdinal = (left: string, right: string): number =>
   left < right ? -1 : left > right ? 1 : 0;
 
+/**
+ * A layout's graphs, rebuilt key by key and emitted in the order the layout
+ * holds them.
+ *
+ * Ordering is the one thing this does *not* impose, and the asymmetry with the
+ * positions beside it comes from how the document is stored. `jsonb` reorders
+ * an object's keys on write and preserves an array's order. A layout's
+ * positions are an object, so the order they were written in is gone by the
+ * time they are read back and the sort below is what gives them one again —
+ * without it a re-export of untouched content produces a diff. Its graphs are
+ * an array, so their order survives storage intact; it is also authored content
+ * (ADR 0040) — order is what the graph selector offers and what the
+ * absent-`activeGraph` fallback resolves against — so sorting them here would
+ * rewrite the space on its way to disk.
+ *
+ * Every nested value is rebuilt from a literal rather than carried through, for
+ * the same reason: what `jsonb` hands back is key-ordered however it likes, and
+ * a spread would export that order.
+ */
+const canonicalGraphs = (
+  graphs: NonNullable<SpaceFile['layouts']>[number]['graphs'],
+): NonNullable<SpaceFile['layouts']>[number]['graphs'] =>
+  graphs.map((graph) => ({
+    id: graph.id,
+    title: graph.title,
+    ...(graph.color === undefined ? {} : { color: graph.color }),
+    edges: graph.edges.map(({ from, to }) => ({ from, to })),
+  }));
+
 const canonicalSpaceFile = ({ snapshot }: LoadedSpace): SpaceFile => {
   const layouts = snapshot.document.layouts?.map((layout) => ({
     id: layout.id,
     title: layout.title,
     kind: layout.kind,
     positions: Object.fromEntries(
-      Object.entries(layout.positions).sort(([left], [right]) => compareOrdinal(left, right)),
+      Object.entries(layout.positions)
+        .sort(([left], [right]) => compareOrdinal(left, right))
+        // The point is rebuilt too, not passed through: a stored `{"y":…,"x":…}`
+        // would otherwise export in that order. An absent value cannot come off
+        // a parsed document — the optionality is the `Partial<Record>` the
+        // schema's key branding produces — and dropping it matches what
+        // `JSON.stringify` already did with one.
+        .flatMap(([id, point]) => (point === undefined ? [] : [[id, { x: point.x, y: point.y }]])),
     ),
+    graphs: canonicalGraphs(layout.graphs),
     ...(layout.activeGraph === undefined ? {} : { activeGraph: layout.activeGraph }),
   }));
   return {
-    version: 2,
+    version: SPACE_FILE_VERSION,
     id: snapshot.id,
     title: snapshot.document.title,
-    graphs: snapshot.document.graphs.map((graph) => ({
-      id: graph.id,
-      title: graph.title,
-      ...(graph.color === undefined ? {} : { color: graph.color }),
-      edges: graph.edges.map(({ from, to }) => ({ from, to })),
-    })),
     ...(layouts === undefined ? {} : { layouts }),
     ...(snapshot.document.defaultView === undefined
       ? {}
