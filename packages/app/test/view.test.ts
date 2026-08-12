@@ -327,6 +327,9 @@ describe('the Card subject a View names', () => {
 describe('converting a View into a Layout', () => {
   const A = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
   const B = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
+  const MINTED_GRAPH = uuidSchema.parse('00000000-0000-4000-8000-0000000000aa');
+  /** The one id Flow's conversion mints, supplied rather than mocked (ADR 0016). */
+  const mintGraph = () => MINTED_GRAPH;
   const onScreen = Placement.fromEntries([
     [A, { x: 40, y: 10 }],
     [B, { x: 400, y: 250 }],
@@ -339,11 +342,12 @@ describe('converting a View into a Layout', () => {
     const view = resolveView(spaceWith({ layouts: [WORKING, SECOND] }));
     expect(view.convert).not.toBeNull();
 
-    const converted = view.convert?.(onScreen);
+    const converted = view.convert?.(onScreen, mintGraph);
 
     expect(converted?.graphs).toHaveLength(1);
     expect(converted?.graphs[0]?.edges).toEqual([]);
     expect(converted?.graphs[0]?.title).toBe('Graph 1');
+    expect(converted?.graphs[0]?.id).toBe(MINTED_GRAPH);
     expect(view.visibleGraphIds).not.toContain(converted?.graphs[0]?.id);
     expect(Placement.toPositions(converted?.positions ?? Placement.empty())).toEqual({
       [A]: { x: 40, y: 10 },
@@ -355,7 +359,7 @@ describe('converting a View into a Layout', () => {
     const space = spaceWith({
       layouts: [{ ...WORKING, graphs: [{ ...MAIN, title: 'Graph 4' }] }],
     });
-    expect(resolveView(space).convert?.(onScreen).graphs[0]?.title).toBe('Graph 5');
+    expect(resolveView(space).convert?.(onScreen, mintGraph).graphs[0]?.title).toBe('Graph 5');
   });
 
   it('has nothing to convert once a Layout is selected', () => {
@@ -370,7 +374,7 @@ describe('converting a View into a Layout', () => {
   it('converts a Space with no Layouts at all, where there is no Graph to carry over', () => {
     // Zero Graphs in, one or more out (ADR 0045). This is the state a new Space
     // starts in, and the first Card an author moves has to leave it.
-    const converted = resolveView(spaceWith({ layouts: [] })).convert?.(onScreen);
+    const converted = resolveView(spaceWith({ layouts: [] })).convert?.(onScreen, mintGraph);
     expect(converted?.graphs).toHaveLength(1);
     expect(converted?.graphs[0]?.title).toBe('Graph 1');
   });
@@ -394,6 +398,15 @@ describe('the conversion boundary', () => {
     [A, { x: 0, y: 0 }],
     [B, { x: 1, y: 1 }],
   ]);
+  /**
+   * Every View below writes its returned identities down rather than minting
+   * them, so this is only here to satisfy the boundary's signature. Refusing to
+   * call it is itself part of what each one is testing: a View that reuses a
+   * source identity reached for one it was never given.
+   */
+  const mintUnused = () => {
+    throw new Error('This View mints nothing.');
+  };
 
   it('refuses a View that returns a source Graph’s identity', () => {
     expect(() =>
@@ -406,6 +419,7 @@ describe('the conversion boundary', () => {
         }),
         subject,
         onScreen,
+        mintUnused,
       ),
     ).toThrow(/fresh identity/i);
   });
@@ -425,6 +439,7 @@ describe('the conversion boundary', () => {
         }),
         subject,
         onScreen,
+        mintUnused,
       ),
     ).toThrow(/closed/i);
   });
@@ -442,6 +457,7 @@ describe('the conversion boundary', () => {
         }),
         subject,
         onScreen,
+        mintUnused,
       ),
     ).toThrow(/fresh identity/i);
   });
@@ -464,6 +480,7 @@ describe('the conversion boundary', () => {
       }),
       subject,
       onScreen,
+      mintUnused,
     );
 
     expect(Placement.toPositions(converted.positions)).toEqual({ [A]: { x: 0, y: 0 } });

@@ -1,9 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Position, type Edge } from '@xyflow/react';
-import { uuidSchema, type LayoutPosition, type SpaceSnapshot } from '@project/core';
+import { uuidSchema, type LayoutPosition, type SpaceSnapshot, type UUID } from '@project/core';
 import { loadSpaceSnapshot, Placement } from '@project/graph';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
 import type { CardFlowNode } from '@project/react-flow-adapter';
+import { mintingIds } from './minting';
 import { createNavigation } from '../src/navigation';
 import { createRenderAdapter, type RenderAdapter } from '../src/render-adapter';
 import {
@@ -104,6 +105,8 @@ function sessionBackedAdapter(
   initialPlacement?: Placement,
   /** A newer stored state, so the first commit conflicts rather than settling. */
   stored?: SpaceSnapshot,
+  /** The ids this workspace's Edits mint, supplied rather than mocked. */
+  newId?: () => UUID,
 ) {
   const loaded = { snapshot, revision: 0n, exportedRevision: null };
   const backend = new MemorySpaceBackend([
@@ -121,6 +124,7 @@ function sessionBackedAdapter(
     navigation,
     currentSpace,
     ...(initialPlacement !== undefined ? { initialPlacement } : {}),
+    ...(newId !== undefined ? { newId } : {}),
   });
   return { session, authoring, store: createRenderAdapter(authoring) };
 }
@@ -133,7 +137,7 @@ function sessionBackedAdapter(
  * never names — C, which the projection still draws and which no Edit here may
  * quietly author.
  */
-function sparsePositionedAdapter() {
+function sparsePositionedAdapter(newId?: () => UUID) {
   const snapshot: SpaceSnapshot = {
     id: SPACE_ID,
     document: {
@@ -181,6 +185,8 @@ function sparsePositionedAdapter() {
       [CARD_A, { x: 10, y: 20 }],
       [CARD_B, { x: 300, y: 20 }],
     ]),
+    undefined,
+    newId,
   );
 }
 
@@ -387,9 +393,6 @@ describe('render adapter', () => {
   });
 
   it('captures every projected Card when an Algorithmic View converts', () => {
-    vi.spyOn(crypto, 'randomUUID').mockReturnValue(
-      LAYOUT_ID as ReturnType<typeof crypto.randomUUID>,
-    );
     // No Layout, so no Graph either: a Graph is a nested owned value and a Space
     // with nothing to own one holds none (ADR 0040). Converting is what gives
     // this Space both.
@@ -410,7 +413,14 @@ describe('render adapter', () => {
         },
       ],
     };
-    const { session, store } = sessionBackedAdapter(snapshot, { kind: 'view', view: 'flow' });
+    // Converting mints the Layout's Graph before the Layout itself.
+    const { session, store } = sessionBackedAdapter(
+      snapshot,
+      { kind: 'view', view: 'flow' },
+      undefined,
+      undefined,
+      mintingIds(GRAPH_ID, LAYOUT_ID),
+    );
 
     store.getState().syncProjection(PROJECTED, []);
     expect(
@@ -463,10 +473,7 @@ describe('render adapter', () => {
   });
 
   it('adds a newly created Card without placing other omitted Cards', () => {
-    vi.spyOn(crypto, 'randomUUID').mockReturnValue(
-      CREATED_CARD_ID as ReturnType<typeof crypto.randomUUID>,
-    );
-    const { session, store } = sparsePositionedAdapter();
+    const { session, store } = sparsePositionedAdapter(mintingIds(CREATED_CARD_ID));
     store.getState().syncProjection(SPARSE_PROJECTED, []);
 
     expect(store.getState().createConnectedCard(uuidSchema.parse(CARD_A), { x: 420, y: 360 })).toBe(

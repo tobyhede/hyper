@@ -172,6 +172,27 @@ interface SpaceAuthoringDependencies {
   readonly currentSpace: () => Space;
   readonly initialPlacement?: Placement | null;
   readonly reportObserverError?: ObserverErrorReporter;
+  /**
+   * Mints the identity of every Card, Layout and Graph a completed Edit creates.
+   *
+   * Taken here, once, rather than at each `newUuid()` call inside the derivation,
+   * so a test supplies the ids it is about to assert on instead of reaching past
+   * the module to mock `crypto.randomUUID` — which ADR 0016 rejected on its own
+   * terms: a constant collides across a property test's cases so it needs a
+   * counter, at which point a generator exists anyway; `randomUUID` is an
+   * unseedable CSPRNG, so controlling it means owning it; and a global mock stops
+   * working in silence the day the implementation moves to v7 and reads the clock
+   * as well as the entropy pool.
+   *
+   * It is also what makes {@link deriveCompletedEdit} the pure core its own
+   * comment claims: minting from the ambient CSPRNG was the one thing left in
+   * there that a second call could not reproduce.
+   *
+   * One function for all three kinds, because they are one type — the ids of
+   * different entity kinds may legally share a UUID (ADR 0030) — and because
+   * what a test needs to say is *which ids this Edit mints, in order*.
+   */
+  readonly newId?: () => UUID;
 }
 
 function isSupportedCardEdit(previous: CardDocument, next: CardDocument): boolean {
@@ -234,6 +255,7 @@ export function createSpaceAuthoring({
   currentSpace,
   initialPlacement = null,
   reportObserverError = (error) => console.error('SpaceAuthoring observer failed', error),
+  newId = newUuid,
 }: SpaceAuthoringDependencies): SpaceAuthoring {
   let placement: Placement | null = initialPlacement;
   let replacementEpoch = 0;
@@ -450,7 +472,7 @@ export function createSpaceAuthoring({
       snapshot = { ...snapshot, cards };
     } else if (completion.kind === 'create-and-connect') {
       if (!canCreateConnectedCard(completion.from)) return null;
-      createdCardId = newUuid();
+      createdCardId = newId();
       connection = { from: completion.from, to: createdCardId };
       completedPlacement = Placement.place(completedPlacement, createdCardId, completion.position);
       snapshot = {
@@ -481,9 +503,9 @@ export function createSpaceAuthoring({
     let ownedGraphs: readonly Graph[];
     let activeGraphId: GraphId | null;
     if (view.layout === null) {
-      const converted = view.convert(completedPlacement);
+      const converted = view.convert(completedPlacement, newId);
       completedPlacement = converted.positions;
-      layoutId = newUuid();
+      layoutId = newId();
       layoutTitle = nextLayoutTitle(snapshot);
       ownedGraphs = converted.graphs;
       // The first Graph a conversion returns is the one the new Layout opens
