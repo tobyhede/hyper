@@ -128,6 +128,11 @@ second answer to "which version is supported", and deciding where that lives is
 not an integration ticket's call. `test/unit/import-space.test.ts` now pins the
 behaviour as it is, with the difference written beside it.
 
+> **Superseded by ticket `08`.** That question was answered by making the gate
+> one offered function — `documentRefusal` — which intake and the file
+> importer both ask; the paragraph above describes the tree before it. Left
+> as written, since a resolved ticket records what was true when it was.
+
 ### Guidance reconciled
 
 - **AGENTS.md** — branch note deleted. ADR 0040 and ADR 0045 now read *built*,

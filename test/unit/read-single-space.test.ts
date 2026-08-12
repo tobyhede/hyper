@@ -1,6 +1,7 @@
 import { chmod, mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
+import { loadSpace } from '@project/graph';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   SpaceImportFileError,
@@ -10,6 +11,35 @@ import {
 
 const SPACE_ID = '00000000-0000-4000-8000-000000000001';
 const ROOT_CARD_ID = '00000000-0000-4000-8000-000000000002';
+const GRAPH_ID = '00000000-0000-4000-8000-000000000003';
+const LAYOUT_ID = '00000000-0000-4000-8000-000000000004';
+
+/**
+ * The disposable pre-release shape: graphs declared beside the layouts rather
+ * than owned by them (ADR 0040). Under version 1 each of its layouts is missing
+ * the graphs it now owns and carries a key the schema does not recognise, so a
+ * shape check reached on its own answers a cascade in which nothing says which
+ * version arrived.
+ */
+const versionTwoDocument = {
+  version: 2,
+  id: SPACE_ID,
+  title: 'Pre-release talk',
+  graphs: [{ id: GRAPH_ID, title: 'Main', edges: [] }],
+  layouts: [{ id: LAYOUT_ID, title: 'Working', positions: {} }],
+};
+
+/**
+ * A version 1 document carrying the retired space-level `graphs` — hand-edited,
+ * or written by a stale producer, so it holds both shapes at once. Its version
+ * is current, so nothing answers it before the key itself does.
+ */
+const retiredGraphsDocument = {
+  version: 1,
+  id: SPACE_ID,
+  title: 'Talk',
+  graphs: [{ id: GRAPH_ID, title: 'Main', edges: [] }],
+};
 
 const temporaryDirectories: string[] = [];
 
@@ -206,6 +236,123 @@ describe('readSingleSpace', () => {
     expect(thrown.kind).toBe('parsing');
     expect(thrown.diagnostics.join('\n')).toContain(spaceFile);
     expect(thrown.diagnostics.join('\n')).toContain('layouts.0.graphs.0.edges.0.from');
+  });
+
+  it('answers a version it cannot read once, ahead of every key that moved', async () => {
+    const temporaryDirectory = await makeTemporaryDirectory();
+    const talkDirectory = join(temporaryDirectory, 'talk');
+    await mkdir(talkDirectory);
+
+    const spaceFile = join(talkDirectory, 'space.json');
+    await writeFile(spaceFile, JSON.stringify(versionTwoDocument));
+    // A document of a version this build cannot read is not a document to
+    // report the files of, either: nothing here is worth saying until the
+    // version is.
+    await writeFile(join(talkDirectory, 'broken.md'), 'No frontmatter here.\n');
+
+    const thrown = await captureError(() => readSingleSpace(talkDirectory));
+
+    expect(thrown).toBeInstanceOf(SpaceImportFileError);
+    if (!(thrown instanceof SpaceImportFileError)) return;
+    expect(thrown.kind).toBe('parsing');
+    expect(thrown.diagnostics).toHaveLength(1);
+    expect(thrown.diagnostics[0]).toContain(spaceFile);
+    expect(thrown.diagnostics[0]).toContain('version 2');
+  });
+
+  // Root ignores the mode bits and reads the file anyway, which would fail this
+  // rather than exercise it — the same reason the deterministic-order test above
+  // is skipped there.
+  it.skipIf(process.getuid?.() === 0)(
+    'refuses the document ahead of a card it could not even read',
+    async () => {
+      // The refusal is decided from the space file alone, so an unreadable card
+      // cannot answer ahead of it. A reader told to fix a file permission, who
+      // then discovers the document was never going to load anyway, has been
+      // sent to do work for nothing.
+      const temporaryDirectory = await makeTemporaryDirectory();
+      const talkDirectory = join(temporaryDirectory, 'talk');
+      await mkdir(talkDirectory);
+
+      const spaceFile = join(talkDirectory, 'space.json');
+      const unreadableCard = join(talkDirectory, 'a.md');
+      await writeFile(spaceFile, JSON.stringify(versionTwoDocument));
+      await writeFile(unreadableCard, '---\ntitle: A\n---\nA body\n');
+      await chmod(unreadableCard, 0o000);
+
+      const thrown = await captureError(() => readSingleSpace(talkDirectory));
+
+      expect(thrown).toBeInstanceOf(SpaceImportFileError);
+      if (!(thrown instanceof SpaceImportFileError)) return;
+      expect(thrown.kind).toBe('parsing');
+      expect(thrown.diagnostics).toHaveLength(1);
+      expect(thrown.diagnostics[0]).toContain('version 2');
+    },
+  );
+
+  it('reports an unreadable space file ahead of any refusal it cannot decide', async () => {
+    // The mirror of the case above, and the reason the refusal is not simply
+    // hoisted above every read: with no space file there is no document, so a
+    // read failure is the only thing there is to say.
+    const temporaryDirectory = await makeTemporaryDirectory();
+    const talkDirectory = join(temporaryDirectory, 'talk');
+    await mkdir(talkDirectory);
+    await mkdir(join(talkDirectory, 'space.json'));
+
+    const thrown = await captureError(() => readSingleSpace(talkDirectory));
+
+    expect(thrown).toBeInstanceOf(SpaceImportFileError);
+    if (!(thrown instanceof SpaceImportFileError)) return;
+    expect(thrown.kind).toBe('discovery');
+  });
+
+  it('refuses a retired space-level graphs key rather than stripping it', async () => {
+    // `importSpaceFileSchema` is a plain Zod object, so an undeclared key is
+    // dropped. For the retired `cards` and `edges` that is right — they carried
+    // nothing the rest of the document does not say. A space-level `graphs`
+    // carried the whole topology (ADR 0040), so stripping it discards exactly
+    // what the author wrote and imports a Space that looks complete.
+    const temporaryDirectory = await makeTemporaryDirectory();
+    const talkDirectory = join(temporaryDirectory, 'talk');
+    await mkdir(talkDirectory);
+
+    const spaceFile = join(talkDirectory, 'space.json');
+    await writeFile(spaceFile, JSON.stringify(retiredGraphsDocument));
+
+    const thrown = await captureError(() => readSingleSpace(talkDirectory));
+
+    expect(thrown).toBeInstanceOf(SpaceImportFileError);
+    if (!(thrown instanceof SpaceImportFileError)) return;
+    expect(thrown.kind).toBe('parsing');
+    expect(thrown.diagnostics).toHaveLength(1);
+    expect(thrown.diagnostics[0]).toContain(spaceFile);
+    expect(thrown.diagnostics[0]).toContain('`graphs`');
+  });
+
+  // The acceptance criterion behind both checks above, and the one that makes
+  // them survive a *third* pre-parse refusal being added at intake: a document
+  // intake refuses before parsing is refused here in the same words. The two
+  // doors ask one composed `documentRefusal`, so neither can come to know about
+  // a refusal the other does not — which is exactly how the retired `graphs`
+  // key came to be stripped here while intake rejected it.
+  it.each([
+    ['a version it cannot read', versionTwoDocument],
+    ['a retired space-level graphs key', retiredGraphsDocument],
+  ])('says of %s exactly what domain intake says', async (_case, document) => {
+    const temporaryDirectory = await makeTemporaryDirectory();
+    const talkDirectory = join(temporaryDirectory, 'talk');
+    await mkdir(talkDirectory);
+    await writeFile(join(talkDirectory, 'space.json'), JSON.stringify(document));
+
+    const thrown = await captureError(() => readSingleSpace(talkDirectory));
+    const intake = loadSpace(document, []);
+
+    expect(intake.ok).toBe(false);
+    if (intake.ok) return;
+    expect(thrown).toBeInstanceOf(SpaceImportFileError);
+    if (!(thrown instanceof SpaceImportFileError)) return;
+    expect(intake.errors).toHaveLength(1);
+    expect(thrown.diagnostics[0]).toContain(intake.errors[0]?.message);
   });
 });
 

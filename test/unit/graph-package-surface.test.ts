@@ -36,6 +36,7 @@ import * as graphPackage from '@project/graph';
  */
 const OFFERED_VALUES = [
   'Placement',
+  'documentRefusal',
   'buildCardHandles',
   'buildLayoutStrategyGraph',
   'buildGraphRenderEdges',

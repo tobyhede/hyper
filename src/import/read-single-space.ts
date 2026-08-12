@@ -6,7 +6,7 @@ import {
   type ImportSpace,
   type ImportSpaceFile,
 } from '@project/core';
-import { parseImportCardFile } from '@project/graph';
+import { documentRefusal, parseImportCardFile } from '@project/graph';
 
 type SpaceImportFileErrorKind = 'discovery' | 'parsing';
 
@@ -98,15 +98,50 @@ export const readSingleSpace = async (inputPath: string): Promise<ImportSpace> =
     }
   });
 
+  // Read apart from the cards, and before the read failures are answered,
+  // because the refusal below is decided from this document alone. An
+  // unparseable space file leaves `spaceJson` undefined, which `documentRefusal`
+  // answers `null` for — so a bad JSON diagnostic still travels with the card
+  // files' own, as it always did.
+  let spaceJson: unknown = undefined;
+  let spaceJsonDiagnostic: string | undefined;
+  if (spaceText !== undefined) {
+    try {
+      spaceJson = JSON.parse(spaceText);
+    } catch (error) {
+      spaceJsonDiagnostic = `${spaceFile}: ${String(error)}`;
+    }
+  }
+
+  // One answer, and nothing behind it — not the cards, and not even a file that
+  // could not be read. `documentRefusal`'s docblock is where the argument for
+  // one composed gate lives; two things are only true at this call site.
+  //
+  // It is asked before `importSpaceFileSchema`, which runs ahead of domain
+  // intake, or that schema answers first: a cascade of moved keys for a version
+  // it cannot read, and silence for a retired space-level `graphs`.
+  //
+  // And it is asked before the read failures below, because a document refused
+  // outright was never going to load. Answering the unreadable card first sends
+  // its author to fix a file permission and only then tells them the work was
+  // pointless. The mirror holds and is why this is not hoisted above the read
+  // itself: with no space file there is no document, so `documentRefusal`
+  // decides nothing and the read failure is the only thing there is to say.
+  const refusal = documentRefusal(spaceJson);
+  if (refusal !== null) {
+    throw new SpaceImportFileError('parsing', [`${spaceFile}: ${refusal.message}`]);
+  }
+
   if (readDiagnostics.length > 0 || spaceText === undefined) {
     throw new SpaceImportFileError('discovery', readDiagnostics);
   }
 
   const diagnostics: string[] = [];
   let parsedSpaceFile: ImportSpaceFile | undefined;
-  try {
-    const json: unknown = JSON.parse(spaceText);
-    const parsed = importSpaceFileSchema.safeParse(json);
+  if (spaceJsonDiagnostic !== undefined) {
+    diagnostics.push(spaceJsonDiagnostic);
+  } else {
+    const parsed = importSpaceFileSchema.safeParse(spaceJson);
     if (parsed.success) {
       parsedSpaceFile = parsed.data;
     } else {
@@ -116,8 +151,6 @@ export const readSingleSpace = async (inputPath: string): Promise<ImportSpace> =
         ),
       );
     }
-  } catch (error) {
-    diagnostics.push(`${spaceFile}: ${String(error)}`);
   }
 
   const cards = cardPaths.flatMap((path, index) => {

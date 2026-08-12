@@ -134,13 +134,13 @@ describe('importSingleSpace', () => {
     // inside them. Hyper is unreleased, so it has no compatibility claim on the
     // first-public document and never enters (ADR 0040).
     //
-    // Import parses the file against `importSpaceFileSchema`, which is ahead of
-    // domain intake, so what refuses here is the `version` literal rather than
-    // `loadSpace`'s named `unsupported-version` error. The version is still the
-    // first thing said, and nothing reaches the repository — but unlike intake,
-    // which reads the declared version *before* parsing precisely so it answers
-    // once, this path also emits the cascade of keys that moved. Asserted as it
-    // is rather than as it should be.
+    // Import parses against `importSpaceFileSchema`, which runs ahead of domain
+    // intake, so it asks `documentRefusal` before that schema can answer for the
+    // keys that moved — the same composed gate `loadSpace` asks, so the CLI says
+    // of a version 2 directory exactly what intake says, once. What that gate is
+    // and where it lives is pinned in `read-single-space.test.ts`; what matters
+    // here is that the version is the whole of the refusal and nothing reaches
+    // the repository.
     const directory = await makeTemporaryDirectory();
     await writeFile(
       join(directory, 'space.json'),
@@ -158,7 +158,35 @@ describe('importSingleSpace', () => {
 
     expect(error).toBeInstanceOf(SpaceImportFileError);
     expect((error as SpaceImportFileError).kind).toBe('parsing');
-    expect((error as SpaceImportFileError).diagnostics[0]).toContain('version');
+    expect((error as SpaceImportFileError).diagnostics).toHaveLength(1);
+    expect((error as SpaceImportFileError).diagnostics[0]).toContain('version 2');
+    expect(repository.imports).toEqual([]);
+  });
+
+  it('refuses a retired space-level graphs key rather than importing what survives it', async () => {
+    // The regression this exists for is not a bad diagnostic — it is a
+    // successful import. `importSpaceFileSchema` is a plain Zod object, so it
+    // dropped the retired key and handed the repository a Space missing its
+    // whole topology, reported as imported (issue `10`). Refusing is what the
+    // test above proves; what this adds is that nothing reaches the repository.
+    const directory = await makeTemporaryDirectory();
+    await writeFile(
+      join(directory, 'space.json'),
+      JSON.stringify({
+        version: 1,
+        id: SPACE_ID,
+        title: 'Talk',
+        graphs: [{ id: GRAPH_ID, title: 'Main', edges: [] }],
+      }),
+    );
+    const repository = new RecordingRepository({ kind: 'imported', spaces: [storedSpace] });
+
+    const error = await captureError(() => importSingleSpace(directory, repository));
+
+    expect(error).toBeInstanceOf(SpaceImportFileError);
+    expect((error as SpaceImportFileError).kind).toBe('parsing');
+    expect((error as SpaceImportFileError).diagnostics).toHaveLength(1);
+    expect((error as SpaceImportFileError).diagnostics[0]).toContain('`graphs`');
     expect(repository.imports).toEqual([]);
   });
 

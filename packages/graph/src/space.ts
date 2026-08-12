@@ -68,13 +68,16 @@ export interface Space {
   readonly [SPACE_INTAKE]: true;
 }
 
+/** What a document declaring a version this build does not read earns. */
+type UnsupportedVersionError = { kind: 'unsupported-version'; message: string };
+
 /**
  * Why a load failed: a bad shape, a card file that will not parse, or a
  * reference that does not resolve.
  */
 export type SpaceError =
   | { kind: 'invalid-shape'; message: string }
-  | { kind: 'unsupported-version'; message: string }
+  | UnsupportedVersionError
   | { kind: 'retired-space-graphs'; message: string }
   | CardFileError
   | SpaceReferenceError;
@@ -88,8 +91,12 @@ export type SpaceError =
  * answers a cascade in which nothing says which version arrived. A version this
  * cannot read at all (absent, not a number) is left to the shape check, whose
  * message for it is already the right one.
+ *
+ * It is *the* answer to which version this build reads, and a second one would
+ * drift from it — which is why every door asks it through {@link documentRefusal}
+ * rather than deciding a version of its own.
  */
-function unsupportedVersion(document: unknown): SpaceError | null {
+function unsupportedDocumentVersion(document: unknown): UnsupportedVersionError | null {
   if (typeof document !== 'object' || document === null) return null;
   const declared: unknown = (document as { version?: unknown }).version;
   if (typeof declared !== 'number' || declared === SPACE_FILE_VERSION) return null;
@@ -103,7 +110,7 @@ function unsupportedVersion(document: unknown): SpaceError | null {
  * The one error a document carrying the retired space-level `graphs` earns, or
  * `null` when it does not carry one.
  *
- * Read before parsing, beside {@link unsupportedVersion}, because
+ * Read before parsing, beside {@link unsupportedDocumentVersion}, because
  * `spaceFileSchema` is a plain object and Zod *strips* a key it does not
  * declare. That is the right answer for the retired `cards` and `edges` keys:
  * they carried nothing the rest of the document does not already say — a card
@@ -135,6 +142,37 @@ function retiredSpaceGraphs(document: unknown): SpaceError | null {
   };
 }
 
+/**
+ * The one error a document earns *before* its shape is parsed, or `null` to let
+ * the ordinary shape check speak. Version first, so a version 2 document is
+ * answered by its version rather than by the shape it happens to carry.
+ *
+ * **Offered, and composed rather than named one at a time — that composition is
+ * the point.** Both checks above exist because the schema's own answer for these
+ * documents misleads: a cascade of moved keys in one case, a silently stripped
+ * topology in the other. Any door that parses ahead of intake needs *all* of
+ * them, and a door that reaches for them individually gets the ones its author
+ * knew about. `readSingleSpace` asked the version check alone and imported a
+ * Space with its whole `graphs` array dropped, looking complete (ticket `10`);
+ * ticket `08` is where it came to ask the version check at all. One function is
+ * what makes the next check added here reach the importer without anyone
+ * remembering to carry it there.
+ *
+ * **This docblock is where that argument is written out** — the index clause,
+ * the importer and both tickets point here rather than restating it.
+ *
+ * Three doors ask it: the two intakes below, and `readSingleSpace`, which parses
+ * against import schemas that run ahead of intake (ADR 0030). The snapshot
+ * decoders do not — they parse `spaceSnapshotSchema` first, so they refuse a
+ * version 2 snapshot by cascade rather than by name. Deliberate, not an
+ * oversight: there are no version 2 documents, and a directory is the only one a
+ * human writes by hand. Issue `09` is the wontfix that says so. If it ever
+ * matters, ask this earlier there; never decide a version somewhere new.
+ */
+export function documentRefusal(document: unknown): SpaceError | null {
+  return unsupportedDocumentVersion(document) ?? retiredSpaceGraphs(document);
+}
+
 export type LoadSpaceResult = { ok: true; space: Space } | { ok: false; errors: SpaceError[] };
 
 export type LoadSpaceSnapshotResult =
@@ -149,10 +187,8 @@ export type LoadSpaceSnapshotResult =
  * stays synchronous. Reading the bytes belongs to the caller, as it always did.
  */
 export function loadSpace(input: unknown, cardFiles: readonly CardFile[]): LoadSpaceResult {
-  const wrongVersion = unsupportedVersion(input);
-  if (wrongVersion !== null) return { ok: false, errors: [wrongVersion] };
-  const retired = retiredSpaceGraphs(input);
-  if (retired !== null) return { ok: false, errors: [retired] };
+  const refusal = documentRefusal(input);
+  if (refusal !== null) return { ok: false, errors: [refusal] };
 
   const parsed = spaceFileSchema.safeParse(input);
   if (!parsed.success) {
@@ -203,10 +239,8 @@ export function loadSpace(input: unknown, cardFiles: readonly CardFile[]): LoadS
 export function loadSpaceSnapshot(input: unknown): LoadSpaceSnapshotResult {
   const storedDocument =
     typeof input === 'object' && input !== null ? (input as { document?: unknown }).document : null;
-  const wrongVersion = unsupportedVersion(storedDocument);
-  if (wrongVersion !== null) return { ok: false, errors: [wrongVersion] };
-  const retired = retiredSpaceGraphs(storedDocument);
-  if (retired !== null) return { ok: false, errors: [retired] };
+  const refusal = documentRefusal(storedDocument);
+  if (refusal !== null) return { ok: false, errors: [refusal] };
 
   const parsed = spaceSnapshotSchema.safeParse(input);
   if (!parsed.success) {
