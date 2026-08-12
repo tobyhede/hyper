@@ -1,11 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
-import { uuidSchema, type Graph, type SpaceSnapshot } from '@project/core';
+import { uuidSchema, type Graph, type SpaceSnapshot, type UUID } from '@project/core';
 import { loadSpaceSnapshot, Placement } from '@project/graph';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
 import { GRAPH_PALETTE } from '../src/colors';
 import { createNavigation } from '../src/navigation';
 import { createSpaceAuthoring, type SpaceAuthoring } from '../src/space-authoring';
 import { createRendererResolver, type RendererSelection } from '../src/renderer';
+import { mintingIds } from './minting';
 
 /**
  * The semantic operations Space Authoring gained for the complete Card and
@@ -28,10 +29,13 @@ const OTHER_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
 const LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000021');
 const OTHER_LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000022');
 const MINTED = uuidSchema.parse('00000000-0000-4000-8000-000000000031');
+/** The second identity an Edit mints, for the tests that create twice. */
+const SECOND_MINTED = uuidSchema.parse('00000000-0000-4000-8000-000000000032');
 /**
  * The Graph identity a conversion mints. It comes from the resolver rather than
  * from Authoring's own minter: ADR 0045 puts identity at the conversion
- * boundary, which the resolver closes over.
+ * boundary, which the resolver closes over — so a converting test names it here
+ * and does *not* name a Graph id among the ids it hands `mintingIds`.
  */
 const MINTED_GRAPH = uuidSchema.parse('00000000-0000-4000-8000-000000000041');
 const UNKNOWN_CARD = uuidSchema.parse('00000000-0000-4000-8000-000000000099');
@@ -93,6 +97,9 @@ function testResolver() {
 function open(
   snapshot: SpaceSnapshot = positionedSnapshot,
   renderer: RendererSelection = { kind: 'layout', layoutId: LAYOUT_ID },
+  // The ids this Edit will mint, named by the test that asserts on them rather
+  // than taken from the ambient generator (ADR 0016, and `./minting`).
+  newId: () => UUID = mintingIds(MINTED),
 ) {
   const loaded = { snapshot, revision: 0n, exportedRevision: null };
   const session = openSpaceSession(new MemorySpaceBackend([loaded]), loaded);
@@ -103,7 +110,13 @@ function open(
   };
   const resolveRenderer = testResolver();
   const navigation = createNavigation(currentSpace, resolveRenderer, renderer);
-  const authoring = createSpaceAuthoring({ session, navigation, currentSpace, resolveRenderer });
+  const authoring = createSpaceAuthoring({
+    session,
+    navigation,
+    currentSpace,
+    resolveRenderer,
+    newId,
+  });
   return { session, navigation, authoring };
 }
 
@@ -116,8 +129,8 @@ const place = (authoring: SpaceAuthoring, entries: Record<string, [number, numbe
   );
 };
 
-const openPositioned = () => {
-  const opened = open();
+const openPositioned = (newId?: () => UUID) => {
+  const opened = newId === undefined ? open() : open(positionedSnapshot, undefined, newId);
   place(opened.authoring, {
     [CARD_A]: [10, 20],
     [CARD_B]: [300, 40],
@@ -125,8 +138,8 @@ const openPositioned = () => {
   return opened;
 };
 
-const openAutomatic = () => {
-  const opened = open(automaticSnapshot, { kind: 'view', view: 'flow' });
+const openAutomatic = (newId: () => UUID = mintingIds(MINTED)) => {
+  const opened = open(automaticSnapshot, { kind: 'view', view: 'flow' }, newId);
   place(opened.authoring, {
     [CARD_A]: [10, 20],
     [CARD_B]: [300, 40],
@@ -136,7 +149,6 @@ const openAutomatic = () => {
 
 describe('Add Card', () => {
   it('creates one neutrally titled detached Card at the anchor it was given', () => {
-    vi.spyOn(crypto, 'randomUUID').mockReturnValue(MINTED as ReturnType<typeof crypto.randomUUID>);
     const { authoring, session } = openPositioned();
 
     expect(authoring.complete({ kind: 'created-card', anchor: CENTRE })).toEqual({
@@ -158,7 +170,10 @@ describe('Add Card', () => {
   });
 
   it('steps off an anchor another Card already occupies rather than stacking exactly', () => {
-    const { authoring, session } = openPositioned();
+    // Two creations, so two ids. The old global mock answered both with one
+    // constant and the duplicate went unnoticed; naming them is what makes the
+    // second creation a real one.
+    const { authoring, session } = openPositioned(mintingIds(MINTED, SECOND_MINTED));
 
     authoring.complete({ kind: 'created-card', anchor: CENTRE });
     authoring.complete({ kind: 'created-card', anchor: CENTRE });
@@ -173,10 +188,7 @@ describe('Add Card', () => {
   });
 
   it('converts an Algorithmic View in the same Edit, leaving the Cards on screen where they are', () => {
-    vi.spyOn(crypto, 'randomUUID')
-      .mockReturnValueOnce(MINTED as ReturnType<typeof crypto.randomUUID>)
-      .mockReturnValue(LAYOUT_ID as ReturnType<typeof crypto.randomUUID>);
-    const { authoring, session, navigation } = openAutomatic();
+    const { authoring, session, navigation } = openAutomatic(mintingIds(MINTED, LAYOUT_ID));
 
     expect(authoring.complete({ kind: 'created-card', anchor: CENTRE })).toEqual({
       kind: 'completed',
@@ -261,7 +273,6 @@ describe('Edit Card', () => {
 
 describe('Add Alias', () => {
   it('creates and places an Alias on its Target, taking the Target title when none was typed', () => {
-    vi.spyOn(crypto, 'randomUUID').mockReturnValue(MINTED as ReturnType<typeof crypto.randomUUID>);
     const { authoring, session } = openPositioned();
 
     expect(authoring.complete({ kind: 'created-alias', target: CARD_A, anchor: CENTRE })).toEqual({
@@ -277,7 +288,6 @@ describe('Add Alias', () => {
   });
 
   it('keeps a title the author already entered', () => {
-    vi.spyOn(crypto, 'randomUUID').mockReturnValue(MINTED as ReturnType<typeof crypto.randomUUID>);
     const { authoring, session } = openPositioned();
 
     authoring.complete({
@@ -327,7 +337,6 @@ describe('Add Alias', () => {
 
 describe('Add Graph', () => {
   it('appends, colours and activates one empty Graph without touching the others', () => {
-    vi.spyOn(crypto, 'randomUUID').mockReturnValue(MINTED as ReturnType<typeof crypto.randomUUID>);
     const { authoring, session, navigation } = openPositioned();
 
     expect(authoring.complete({ kind: 'added-graph' })).toEqual({
@@ -345,7 +354,7 @@ describe('Add Graph', () => {
   });
 
   it('is literal and repeatable, so an already empty active Graph does not swallow it', () => {
-    const { authoring, session } = openPositioned();
+    const { authoring, session } = openPositioned(mintingIds(MINTED, SECOND_MINTED));
 
     authoring.complete({ kind: 'added-graph' });
     authoring.complete({ kind: 'added-graph' });
@@ -358,10 +367,7 @@ describe('Add Graph', () => {
   });
 
   it('uses the requested Graph as a converted Layout initial Graph rather than adding a second', () => {
-    vi.spyOn(crypto, 'randomUUID').mockReturnValue(
-      LAYOUT_ID as ReturnType<typeof crypto.randomUUID>,
-    );
-    const { authoring, session, navigation } = openAutomatic();
+    const { authoring, session, navigation } = openAutomatic(mintingIds(LAYOUT_ID));
 
     expect(authoring.complete({ kind: 'added-graph' })).toEqual({
       kind: 'completed',
@@ -877,10 +883,7 @@ describe('Delete Card from Space', () => {
   });
 
   it('converts an Algorithmic View and then applies the deletion to what it produced', () => {
-    vi.spyOn(crypto, 'randomUUID').mockReturnValue(
-      LAYOUT_ID as ReturnType<typeof crypto.randomUUID>,
-    );
-    const { authoring, session } = openAutomatic();
+    const { authoring, session } = openAutomatic(mintingIds(LAYOUT_ID));
 
     expect(authoring.complete({ kind: 'deleted-card', cardId: CARD_B })).toEqual({
       kind: 'completed',
