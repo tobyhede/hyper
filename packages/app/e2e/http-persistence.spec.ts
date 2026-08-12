@@ -156,7 +156,10 @@ test('a stale browser reports conflict and accepts the remote workspace without 
     await expect(acceptedCard).toBeVisible();
     await settled(stalePage);
     expect(await positionOf(acceptedCard)).toEqual(remotePosition);
-    await expect(stalePage.getByTestId('graph-selector')).toContainText('Long');
+    // A fresh Navigation over the stored Space, not the emphasis this page was
+    // left in: the accepted Space opens in the Layout the *other* page's drag
+    // converted, and the Graph that conversion minted is its first.
+    await expect(stalePage.getByTestId('graph-selector')).toContainText('Graph 1');
     await expect(stalePage.getByTestId('presenting-chrome')).not.toBeVisible();
     expect(
       await mountedGraphArea!.evaluate(

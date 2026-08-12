@@ -11,13 +11,14 @@ This file sits here rather than in `fixture/` on purpose. A space is a directory
 there would be scanned as one and fail to parse for want of frontmatter.
 
 Each space is a directory: `space.json` holding structure — `version`, `id`,
-`title`, `graphs` — and one markdown file per card, either beside it or under
-`cards/`. The fixture uses both locations (`a.md` at the top, the rest in
-`cards/`) so the two-location scan is exercised by the space the app actually
-loads.
+`title`, `layouts` and an optional `defaultView` — and one markdown file per
+card, either beside it or under `cards/`. The fixture uses both locations
+(`a.md` at the top, the rest in `cards/`) so the two-location scan is exercised
+by the space the app actually loads.
 
 Two **disconnected collections** in one space, sharing no cards, which ELK lays
-out as separate bands:
+out as separate bands — and, because a Graph is a nested owned value of the
+Layout that holds it (ADR 0040), **two Layouts**:
 
 ```
 Collection 1   Long   A → B → C → D → A′
@@ -25,6 +26,27 @@ Collection 1   Long   A → B → C → D → A′
                Short  A → B → C
 Collection 2   Echo   E → F → G → H → E′
 ```
+
+Each Layout's position keys are its Card membership, and every Edge it owns is
+closed over that membership — which is why the split follows the collections
+rather than being drawn anywhere else. Between them the two hold every Card
+once, so nothing is left over and nothing is in both.
+
+Their positions are **seeded from one ELK run over the whole fixture**, so
+selecting a Layout draws its Cards where Flow already had them and first paint
+did not move when they were declared. That is checked rather than claimed:
+`packages/app/test/fixture-placement.test.ts` re-runs `elkStrategy` over the
+fixture and compares every seeded position, so a change to the ELK options that
+would silently rearrange the fixture fails there.
+
+`defaultView` is **absent**, so the fixture still opens in Flow. Flow's subject
+is the Space's Cards, so it draws the flatten of every Graph across both
+Layouts (ADR 0045) — the one place in the tree where that flatten crosses a
+Layout boundary, and the reason the split is two Layouts rather than one.
+
+`example/` is one connected collection of seven Cards, so its three Graphs are
+owned by a **single** Layout. Nothing renders it, so its positions are a plain
+deterministic grid rather than an ELK arrangement.
 
 Each collection returns to its start via an **alias** (`A′` of `A`, `E′` of `E`).
 That deliberately exercises alias rendering while keeping this fixture acyclic
@@ -63,7 +85,9 @@ Between them the shape exercises every behaviour the e2e suite covers:
   selection.
 - **Scroll inside the frame (issue 05).** `D` is long enough to overflow the 16:9
   panel at a small viewport.
-- **Overlay counts.** 10 cards, 13 edges (4 + 3 + 2 + 4), 26 handles, 4 graphs.
+- **Overlay counts.** 10 cards, 13 edges (4 + 3 + 2 + 4), 26 handles, 4 graphs —
+  what the Flow view draws over both Layouts. A *selected* Layout draws only the
+  Graphs it owns: 9 edges for Collection 1, 4 for Collection 2.
 
 The counts above are shape-dependent: change a Graph and the e2e counts change
 with it, deliberately.

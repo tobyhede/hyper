@@ -14,6 +14,7 @@ import {
   nodeByTitle,
   openCard,
   positionOf,
+  selectLayout,
   settled,
   viewportTransform,
 } from './graph';
@@ -229,8 +230,9 @@ test('editing through an Alias updates its target and survives reload', async ({
 /**
  * Dragging a card writes its placement into the Layout.
  *
- * The fixture declares no Layout, so its first edit converts the resolved
- * automatic arrangement into one (ADR 0025). What this asserts is the point of
+ * The fixture names no `defaultView`, so it opens in Flow however many Layouts
+ * it declares, and this first edit converts the resolved automatic arrangement
+ * into a Layout of its own (ADR 0025). What this asserts is the point of
  * the whole pivot: a card goes where you put it and *nothing else moves*. Three
  * spike increments failed exactly here — a global optimiser reshuffled the rest
  * of the graph on every edit, so a drop landed somewhere arbitrary.
@@ -347,7 +349,12 @@ test('connecting from Flow and Grid converts atomically without moving Cards', a
       await source.hover();
       await connectHandles(page, sourceHandle, targetHandle);
 
-      await expect(page.locator('.react-flow__edge')).toHaveCount(FIXTURE_EDGE_COUNT + index + 1);
+      // Conversion produces a Layout owning one fresh, empty Graph (ADR 0045),
+      // and this Edge is what the same Edit puts in it. The renderer is now that
+      // Layout, which draws the Graphs it owns and only those — so the fixture's
+      // thirteen are off screen rather than lost, and one Edge is the whole of
+      // what this view has to draw.
+      await expect(page.locator('.react-flow__edge')).toHaveCount(1);
       await expect(persistence).toHaveAttribute('data-revision', String(index + 1));
       await expect(persistence).toHaveText('Persisted');
       await expect(page.getByTestId('layout-selector')).toContainText(`Layout ${index + 1}`);
@@ -377,7 +384,9 @@ test('creating from an Algorithmic View freezes existing Cards and places Card 1
   for (const [id, position] of Object.entries(before)) {
     expect(after[id], `card ${id} moved`).toEqual(position);
   }
-  await expect(page.locator('.react-flow__edge')).toHaveCount(FIXTURE_EDGE_COUNT + 1);
+  // The converted Layout owns one fresh Graph and this Edge is all it holds, so
+  // the Graphs the fixture's own two Layouts own are not drawn here.
+  await expect(page.locator('.react-flow__edge')).toHaveCount(1);
   await expect(page.getByTestId('layout-selector')).toContainText('Layout 1');
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
   await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
@@ -390,7 +399,7 @@ test('creating from an Algorithmic View freezes existing Cards and places Card 1
   await expect(nodeByTitle(page, 'Card 1')).toBeVisible();
   await settled(page);
   await expect(page.getByTestId('layout-selector')).toContainText('Layout 1');
-  await expect(page.locator('.react-flow__edge')).toHaveCount(FIXTURE_EDGE_COUNT + 1);
+  await expect(page.locator('.react-flow__edge')).toHaveCount(1);
 });
 
 test('editing an existing Layout updates it instead of creating another one', async ({ page }) => {
@@ -417,11 +426,22 @@ test('editing an existing Layout updates it instead of creating another one', as
   await expect(page.getByRole('option', { name: 'Layout 1' })).toHaveCount(1);
 });
 
+/**
+ * Dragged in an authored Layout, because that is where a Card and the Edges
+ * around it stay together.
+ *
+ * A drag on an Algorithmic View converts it, and Flow converts by returning one
+ * fresh *empty* Graph (ADR 0045) — so the Layout the drag produces has no Edge
+ * left to watch. The fixture's own `Collection 1` owns Long, Mid and Short over
+ * the spine, so dragging A there updates that Layout in place and its Edges are
+ * still drawn around the Card that moved.
+ */
 test('edges follow a card that has been dragged', async ({ page }) => {
   await page.goto('/');
+  await expect(page.locator('.react-flow__edge-path').first()).toHaveAttribute('d', /L/);
+  await selectLayout(page, 'Collection 1');
   const a = nodeByTitle(page, 'A').first();
   await expect(a).toBeVisible();
-  await expect(page.locator('.react-flow__edge-path').first()).toHaveAttribute('d', /L/);
 
   const edgePath = () =>
     page
@@ -437,9 +457,9 @@ test('edges follow a card that has been dragged', async ({ page }) => {
   // masquerading as an edge that did not redraw.
   expect((await positionOf(a)).y).toBeGreaterThan(from.y + 100);
 
-  // The routed geometry described the arrangement the layout computed, so it is
-  // stale the moment a card leaves it. The edge is redrawn between where the
-  // cards now are.
+  // Whatever geometry the arrangement computed described where the cards were,
+  // so it is stale the moment one leaves it. The edge is redrawn between where
+  // the cards now are.
   await expect.poll(edgePath).not.toBe(before);
 });
 
@@ -469,7 +489,12 @@ test('a selected Card exposes four circular handles coloured as the active Graph
   const a = nodeByTitle(page, 'A').first();
   await expect(a).toBeVisible();
   await expect(page.locator('.react-flow__edge-path').first()).toHaveAttribute('d', /L/);
-  await dragBy(page, a, 0, 180);
+  await settled(page);
+  // Selecting is all this needs, and it keeps the Active Graph the fixture's
+  // own first one — a drag here would convert the View and activate the empty
+  // Graph the conversion mints, leaving no Edge to read a colour from.
+  await a.click();
+  await expect(a).toHaveClass(/selected/);
 
   const handles = a.locator('.rf-card-node__authoring-handle--source');
   await expect(handles).toHaveCount(4);
@@ -514,6 +539,13 @@ test('drawing between existing Cards persists one active-Graph Edge and selects 
   const targetHandles = page.locator('.rf-card-node__authoring-handle--target');
   await expect(sourceHandle).toHaveCSS('opacity', '1');
   await expect(targetHandle).toHaveCSS('opacity', '0');
+  // The Graph this Edge will join is the one conversion minted, and it is what
+  // colours both the handle and the preview (ADR 0033). Read off the handle
+  // rather than written down, so the assertion below is that the two agree
+  // rather than that either matches a palette entry a test knows by heart.
+  const activeGraphColor = await sourceHandle.evaluate(
+    (element) => getComputedStyle(element).backgroundColor,
+  );
 
   await connectHandles(page, sourceHandle, targetHandle, async () => {
     // Every Card offers a target on every side while a connection is in flight,
@@ -522,11 +554,13 @@ test('drawing between existing Cards persists one active-Graph Edge and selects 
     await expect(targetHandles).toHaveCount(FIXTURE_CARD_COUNT * AUTHORING_HANDLE_SIDES);
     const preview = page.locator('.react-flow__connection-path');
     await expect(preview).toBeVisible();
-    await expect(preview).toHaveCSS('stroke', 'rgb(110, 168, 254)');
+    await expect(preview).toHaveCSS('stroke', activeGraphColor);
     await expect(preview).toHaveAttribute('marker-end', /url/);
   });
 
-  await expect(page.locator('.react-flow__edge')).toHaveCount(FIXTURE_EDGE_COUNT + 1);
+  // One Edge, because the selected Layout draws the Graphs it owns and the one
+  // it owns is the empty Graph conversion minted a moment ago.
+  await expect(page.locator('.react-flow__edge')).toHaveCount(1);
   await expect(
     page.getByLabel(
       'Edge from 00000000-0000-4000-8000-000000000002 to 00000000-0000-4000-8000-000000000008',
@@ -549,9 +583,9 @@ test('an authored Edge is immediately available when presenting the Graph', asyn
   await expect(target).toBeVisible();
   await expect(page.locator('.react-flow__edge-path').first()).toHaveAttribute('d', /L/);
 
-  // Convert the Algorithmic View through the public placement gesture before
-  // authoring E → A on Long. That Edge makes E the Graph's only entry Card:
-  // A was the old entry, but now has an incoming Edge.
+  // Convert the Algorithmic View through the public placement gesture, then
+  // author E → A into the empty Graph that conversion minted. It is that
+  // Graph's only Edge, so E is where presenting it begins.
   await dragBy(page, source, 0, -100);
   const persistence = page.getByTestId('persistence-status');
   await expect(persistence).toHaveAttribute('data-revision', '1');
@@ -588,15 +622,30 @@ test('an Edge drawn from the presented Card is a move the presenter can take now
   const A = '00000000-0000-4000-8000-000000000002';
   await page.goto('/');
   const a = nodeByTitle(page, 'A').first();
+  const b = nodeByTitle(page, 'B').first();
   await expect(a).toBeVisible();
   await expect(page.locator('.react-flow__edge-path').first()).toHaveAttribute('d', /L/);
 
   // Authoring completes an Edge only in a selected Layout, so convert the
-  // Algorithmic View through the public placement gesture first.
+  // Algorithmic View through the public placement gesture first. Conversion
+  // mints an *empty* Graph (ADR 0045), which cannot be presented at all, so
+  // A → B is what gives this Graph something to traverse.
   await dragBy(page, a, 0, -100);
   const persistence = page.getByTestId('persistence-status');
   await expect(persistence).toHaveAttribute('data-revision', '1');
   await settled(page);
+  await connectHandles(
+    page,
+    authoringHandle(a, 'source', 'right'),
+    authoringHandle(b, 'target', 'left'),
+  );
+  await expect(persistence).toHaveAttribute('data-revision', '2');
+  await settled(page);
+  // Drawing an Edge selects its target (B), and a Card's source handles are the
+  // hovered or selected Card's. The gesture below is made from the presented
+  // Card, so A has to be the selected one going in.
+  await a.click();
+  await expect(a).toHaveClass(/selected/);
 
   await page.getByTestId('present-button').click();
   await expect(page.getByTestId('presenting-chrome')).toBeVisible();
@@ -617,8 +666,12 @@ test('an Edge drawn from the presented Card is a move the presenter can take now
     authoringHandle(activeCard(page), 'target', 'left'),
   );
 
-  await expect(page.getByLabel(`Edge from ${A} to ${A}`)).toBeVisible();
-  await expect(persistence).toHaveAttribute('data-revision', '2');
+  // Attached rather than visible: with one Graph on the Card its inbound and
+  // outbound handles sit at the same height, so a self-Edge is a flat line whose
+  // box has no height — which Playwright reads as hidden. The moves below are
+  // what prove it was authored.
+  await expect(page.getByLabel(`Edge from ${A} to ${A}`)).toBeAttached();
+  await expect(persistence).toHaveAttribute('data-revision', '3');
   await expect(persistence).toHaveText('Persisted');
 
   // The chrome enumerates the active Card's outgoing Edges, so the Edge just
@@ -626,9 +679,21 @@ test('an Edge drawn from the presented Card is a move the presenter can take now
   await expect(moves).toHaveText(['B', 'A']);
 });
 
-test('drawing an existing Edge from an Algorithmic View does not convert or persist', async ({
+/**
+ * An Edge the emphasised Graph already holds is not a duplicate here.
+ *
+ * A → B is Long's first Edge and Long is emphasised on load, so this used to be
+ * the refusal case. It is not one any more: on an Algorithmic View the Edge
+ * joins the fresh, empty Graph conversion mints rather than the Graph being
+ * emphasised (ADR 0045), so it is that Graph's *first* Edge and there is nothing
+ * to duplicate. The refusal now belongs to a selected Layout, whose Active Graph
+ * is one an Edit can genuinely repeat an Edge in — asserted below, live.
+ */
+test('drawing an Edge the emphasised Graph already holds converts rather than refusing', async ({
   page,
 }) => {
+  const A = '00000000-0000-4000-8000-000000000002';
+  const B = '00000000-0000-4000-8000-000000000003';
   await page.goto('/');
   const source = nodeByTitle(page, 'A').first();
   const target = nodeByTitle(page, 'B').first();
@@ -646,14 +711,30 @@ test('drawing an existing Edge from an Algorithmic View does not convert or pers
     authoringHandle(target, 'target', 'left'),
   );
 
-  // The Edge was refused, so nothing here will ever announce itself — the
-  // assertions below are all negative and need the barrier to mean anything.
-  await quiescent(page);
-  await expect(page.locator('.react-flow__edge')).toHaveCount(FIXTURE_EDGE_COUNT);
-  await expect(persistence).toHaveAttribute('data-revision', '0');
+  // Attached rather than visible: A and B are on the same ELK row, so this Edge
+  // is a dead-horizontal line with a zero-height box, which Playwright reads as
+  // hidden.
+  await expect(page.getByLabel(`Edge from ${A} to ${B}`)).toBeAttached();
+  await expect(page.locator('.react-flow__edge')).toHaveCount(1);
+  await expect(persistence).toHaveAttribute('data-revision', '1');
   await expect(persistence).toHaveText('Persisted');
-  await expect(page.getByTestId('layout-selector')).toContainText('None');
+  await expect(page.getByTestId('layout-selector')).toContainText('Layout 1');
+  // Conversion copies what is on screen; nothing moves at the moment of it.
   expect(await allPositions(page)).toEqual(before);
+
+  // Drawn a second time, in the Layout that now owns the Graph holding it, it is
+  // the duplicate the rule is about — refused, with nothing persisted. The
+  // assertions are negative, so they need the barrier to mean anything.
+  await source.hover();
+  await connectHandles(
+    page,
+    authoringHandle(source, 'source', 'right'),
+    authoringHandle(target, 'target', 'left'),
+  );
+  await quiescent(page);
+  await expect(page.locator('.react-flow__edge')).toHaveCount(1);
+  await expect(persistence).toHaveAttribute('data-revision', '1');
+  await expect(persistence).toHaveText('Persisted');
 });
 
 /**
@@ -689,7 +770,9 @@ test('a second connection drawn in the same session resolves its handles', async
     authoringHandle(a, 'source', 'right'),
     authoringHandle(e, 'target', 'top'),
   );
-  await expect(page.locator('.react-flow__edge')).toHaveCount(FIXTURE_EDGE_COUNT + 1);
+  // The renderer is the Layout this Edit converted into, so it draws its own
+  // Graph and nothing else — one Edge, then two.
+  await expect(page.locator('.react-flow__edge')).toHaveCount(1);
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '2');
   await settled(page);
 
@@ -698,7 +781,7 @@ test('a second connection drawn in the same session resolves its handles', async
     authoringHandle(e, 'source', 'right'),
     authoringHandle(f, 'target', 'top'),
   );
-  await expect(page.locator('.react-flow__edge')).toHaveCount(FIXTURE_EDGE_COUNT + 2);
+  await expect(page.locator('.react-flow__edge')).toHaveCount(2);
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '3');
   await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
 });
@@ -709,18 +792,24 @@ test('changing the active Graph recolours authoring handles without persisting o
   await page.goto('/');
   const source = nodeByTitle(page, 'A').first();
   await expect(page.locator('.react-flow__edge-path').first()).toHaveAttribute('d', /L/);
-  await dragBy(page, source, 0, -100);
+  await settled(page);
   const persistence = page.getByTestId('persistence-status');
-  await expect(persistence).toHaveAttribute('data-revision', '1');
+  await expect(persistence).toHaveAttribute('data-revision', '0');
+  // On the Algorithmic View, whose subject is the Space's Cards, all four
+  // Graphs are drawn and all four can be activated — a converted Layout owns
+  // only the one Graph its conversion minted, so there would be nothing to
+  // change to.
+  await source.hover();
   const handle = source.locator('.rf-card-node__authoring-handle--source').first();
   const longColour = await handle.evaluate((element) => getComputedStyle(element).backgroundColor);
 
   await page.getByTestId('graph-selector').click();
   await page.getByRole('option', { name: 'Mid' }).click();
 
+  await source.hover();
   await expect(handle).not.toHaveCSS('background-color', longColour);
   await expect(page.locator('.react-flow__edge')).toHaveCount(FIXTURE_EDGE_COUNT);
-  await expect(persistence).toHaveAttribute('data-revision', '1');
+  await expect(persistence).toHaveAttribute('data-revision', '0');
   await expect(persistence).toHaveText('Persisted');
 });
 
@@ -860,12 +949,20 @@ test('the graph does not advertise an Edge keyboard action it cannot receive', a
  * itself as valid for the whole drag. React Flow asks `isValidConnection` during
  * the gesture for exactly this, and drives the handle's own `valid` state from
  * the answer.
+ *
+ * It is a rule about the Active Graph of a *selected Layout*: on an Algorithmic
+ * View the Edge joins the Graph conversion mints, so no Edge drawn there can
+ * duplicate anything (ADR 0045). The drag and the first connection below are
+ * what put this Space in the state the rule is about.
  */
 test('a duplicate Edge is marked invalid while the drag is still live', async ({ page }) => {
   await page.goto('/');
   const source = nodeByTitle(page, 'A').first();
   await expect(source).toBeVisible();
   await expect(page.locator('.react-flow__edge-path').first()).toHaveAttribute('d', /L/);
+  await settled(page);
+  await dragBy(page, source, 0, -100);
+  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
   await settled(page);
 
   const startDrag = async () => {
@@ -882,7 +979,15 @@ test('a duplicate Edge is marked invalid while the drag is still live', async ({
     return handle;
   };
 
-  // A→B is already an Edge of the active Graph; A→E is not.
+  // Author A→B into the Layout's own Graph, so the Active Graph now holds it.
+  await startDrag();
+  await expect(await dragOnto('B')).toHaveClass(/valid/);
+  await page.mouse.up();
+  await expect(page.locator('.react-flow__edge')).toHaveCount(1);
+  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '2');
+  await settled(page);
+
+  // A→B is now an Edge of the Active Graph; A→E is not.
   await startDrag();
   const overDuplicate = await dragOnto('B');
   // Wait for React Flow to mark the handle as the drag's current target before
@@ -892,13 +997,13 @@ test('a duplicate Edge is marked invalid while the drag is still live', async ({
   await expect(overDuplicate).toHaveClass(/connectingto/);
   await expect(overDuplicate).not.toHaveClass(/valid/);
   await page.mouse.up();
-  await expect(page.locator('.react-flow__edge')).toHaveCount(FIXTURE_EDGE_COUNT);
+  await expect(page.locator('.react-flow__edge')).toHaveCount(1);
 
   await startDrag();
   await expect(await dragOnto('E')).toHaveClass(/valid/);
   await page.mouse.up();
-  await expect(page.locator('.react-flow__edge')).toHaveCount(FIXTURE_EDGE_COUNT + 1);
-  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
+  await expect(page.locator('.react-flow__edge')).toHaveCount(2);
+  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '3');
 });
 
 /**
@@ -909,7 +1014,7 @@ test('a duplicate Edge is marked invalid while the drag is still live', async ({
  * on success. The author saw a save and got nothing.
  *
  * The pane closing with the renderer is what removes the window. The fixture
- * declares no Layout, so it opens on `Graph` — selecting that again is not a
+ * names no `defaultView`, so it opens on `Flow` — selecting that again is not a
  * change and the selector reports nothing. `Grid` is the other Algorithmic View,
  * and it installs no placement until its strategy resolves, which is the state
  * this is about.

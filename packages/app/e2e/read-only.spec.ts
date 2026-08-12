@@ -1,13 +1,7 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { expect, test } from './fixtures';
-import {
-  authoringHandle,
-  connectToEmptyWithAlt,
-  FIXTURE_EDGE_COUNT,
-  nodeByTitle,
-  settled,
-} from './graph';
+import { authoringHandle, connectToEmptyWithAlt, nodeByTitle, settled } from './graph';
 
 /** The fixture's A, used as the source of the created Card's Edge. */
 const CARD_A = '00000000-0000-4000-8000-000000000002';
@@ -47,7 +41,9 @@ test('database persistence never writes structural edits back to imported author
   // was drawn, so a commit that recorded a placement and dropped the Edge fails
   // here rather than passing as "persisted".
   await expect(page.getByLabel(`Edge from ${CARD_A} to ${createdId}`)).toBeVisible();
-  await expect(page.locator('.react-flow__edge')).toHaveCount(FIXTURE_EDGE_COUNT + 1);
+  // The Alt-drop converted the Algorithmic View, and the Layout it produced owns
+  // one fresh Graph holding exactly this Edge (ADR 0045).
+  await expect(page.locator('.react-flow__edge')).toHaveCount(1);
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
   await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
 

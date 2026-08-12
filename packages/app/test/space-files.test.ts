@@ -12,10 +12,12 @@ import exampleJson from '../example/space.json';
  * test that the card files are still authored correctly — a missing fence or an
  * unquoted title in a card's frontmatter fails here.
  *
- * `layouts` and `defaultView` are additive (ADR 0013): every file written before
- * they existed must still load, and both of these declare neither. The fixture is
- * separately proven by the app booting, but `example/` is dormant and nothing
- * else would notice it breaking.
+ * Both declare Layouts, because both hold Graphs and a Layout is what owns one
+ * (ADR 0040). Neither names a `defaultView`, so both still open in Flow — which
+ * is what makes the fixture's Space-subject flatten, across two Layouts, the
+ * thing the app and the e2e suite actually exercise. The fixture is separately
+ * proven by the app booting; `example/` is dormant and nothing else would notice
+ * it breaking.
  */
 
 const spaceDirs = import.meta.glob<string>(['../fixture/**/*.md', '../example/**/*.md'], {
@@ -32,21 +34,51 @@ function cardFiles(dir: string): CardFile[] {
 }
 
 describe.each([
-  ['fixture', fixtureJson, 10],
-  ['example', exampleJson, 7],
-])('%s/', (name, json, cardCount) => {
-  it('loads unchanged, declaring no layouts', () => {
+  // The fixture is two disconnected collections sharing no cards, so it splits
+  // into two Layouts; the example is one connected collection, so its three
+  // Graphs are owned by one.
+  ['fixture', fixtureJson, { cards: 10, layouts: 2, graphs: 4 }],
+  ['example', exampleJson, { cards: 7, layouts: 1, graphs: 3 }],
+])('%s/', (name, json, expected) => {
+  it('loads as a version 1 Space whose Layouts own every Graph, and opens in Flow', () => {
     const result = loadSpace(json, cardFiles(name));
     expect(result.ok).toBe(true);
     if (!result.ok) throw new Error(result.errors.map((e) => e.message).join('\n'));
-    expect(result.space.layouts).toEqual([]);
+    expect(result.space.layouts).toHaveLength(expected.layouts);
+    // `space.graphs` is the flatten across those Layouts, never a stored
+    // collection beside them (ADR 0045).
+    expect(result.space.graphs).toHaveLength(expected.graphs);
+    // Absent, so neither space opens in an authored Layout — the Algorithmic
+    // View draws the flatten instead.
     expect(result.space.defaultView).toBeUndefined();
+  });
+
+  it("each Layout's position keys are exactly the Cards its own Graphs connect", () => {
+    const result = loadSpace(json, cardFiles(name));
+    if (!result.ok) throw new Error(result.errors.map((e) => e.message).join('\n'));
+
+    // Membership *is* the position map (ADR 0040), and `loadSpace` has already
+    // refused an Edge endpoint that is not a member. What it cannot refuse is a
+    // member no Edge reaches, which in these two spaces would be a Card
+    // stranded in a Layout it does not belong to.
+    for (const layout of result.space.layouts) {
+      const connected = new Set(
+        layout.graphs.flatMap((graph) => graph.edges.flatMap((edge) => [edge.from, edge.to])),
+      );
+      expect(new Set(Object.keys(layout.positions))).toEqual(connected);
+    }
+
+    // Every Card is in exactly one Layout, so nothing is left over and nothing
+    // is in both.
+    const memberships = result.space.layouts.flatMap((layout) => Object.keys(layout.positions));
+    expect(memberships).toHaveLength(expected.cards);
+    expect(new Set(memberships).size).toBe(expected.cards);
   });
 
   it('finds every card with kind-appropriate content', () => {
     const result = loadSpace(json, cardFiles(name));
     if (!result.ok) throw new Error(result.errors.map((e) => e.message).join('\n'));
-    expect(result.space.cards).toHaveLength(cardCount);
+    expect(result.space.cards).toHaveLength(expected.cards);
     // An alias shows its target's content, so it has no body of its own (ADR
     // 0009); every markdown card carries one.
     for (const card of result.space.cards) {

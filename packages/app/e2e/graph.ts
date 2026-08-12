@@ -43,13 +43,24 @@ const markdownFileCount = (directory: string): number =>
 export const FIXTURE_CARD_COUNT =
   markdownFileCount(fixtureDir) + markdownFileCount(`${fixtureDir}/cards`);
 
-/** Graphs are a space's only structure, so every Edge the graph draws is one of
- *  a Graph's authored `{from, to}` pairs. */
+/**
+ * Graphs are a Layout's only connection structure, so every Edge the overview
+ * draws is one of a Graph's authored `{from, to}` pairs — summed across every
+ * Layout, because a Graph is a nested owned value of the one that holds it (ADR
+ * 0040) and the fixture spreads four Graphs over two Layouts.
+ *
+ * This is the count an Algorithmic View draws, which is the flatten across those
+ * Layouts (ADR 0045). A *selected* Layout draws only the Graphs it owns, so it
+ * is not the number to assert after a conversion.
+ */
 export const FIXTURE_EDGE_COUNT = (
   JSON.parse(readFileSync(`${fixtureDir}/space.json`, 'utf8')) as {
-    graphs: readonly { edges: readonly unknown[] }[];
+    layouts: readonly { graphs: readonly { edges: readonly unknown[] }[] }[];
   }
-).graphs.reduce((total, graph) => total + graph.edges.length, 0);
+).layouts.reduce(
+  (total, layout) => total + layout.graphs.reduce((edges, graph) => edges + graph.edges.length, 0),
+  0,
+);
 
 /** Authoring presents one handle per side of a Card, source and target alike —
  *  four sides, graph-independent (ADR 0033). */
@@ -87,6 +98,19 @@ export function activeCard(page: Page): Locator {
 export async function openCard(node: Locator, title: string): Promise<void> {
   await node.hover();
   await node.getByRole('button', { name: `Edit Card ${title}` }).click();
+}
+
+/**
+ * Select one of the Space's authored Layouts by title.
+ *
+ * The fixture declares two (`fixture/space.json`), so unlike every earlier
+ * version of this suite a test can open one without authoring it first —
+ * which is the only way to drag a Card in a Layout that already owns Edges.
+ */
+export async function selectLayout(page: Page, title: string): Promise<void> {
+  await page.getByTestId('layout-selector').click();
+  await page.getByRole('option', { name: title, exact: true }).click();
+  await expect(page.getByTestId('layout-selector')).toContainText(title);
 }
 
 /** Where React Flow has actually put a node, in flow coordinates. */

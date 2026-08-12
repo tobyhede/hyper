@@ -194,7 +194,17 @@ test('Alt empty-drop creates, connects and selects Card 2 at the previewed posit
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '2');
 });
 
-test('Alt empty-drop mints the first Graph in a selected positioned Layout', async ({ page }) => {
+/**
+ * A selected Layout always has a Graph to author into.
+ *
+ * Creating a Layout creates its initial Active Graph in the same Edit (ADR
+ * 0040), so the seeded Layout owns one from the start — empty, exactly as a
+ * conversion leaves it. What the drop does is put the Layout's *first Edge* in
+ * the Graph it already owns, rather than minting a second one beside it.
+ */
+test('Alt empty-drop authors the first Edge into the Graph a selected Layout owns', async ({
+  page,
+}) => {
   const seeded = await seedNewSpaceLayout(page);
   const persistedRevision = String(BigInt(seeded.revision) + 1n);
   await page.goto('/');
@@ -202,7 +212,8 @@ test('Alt empty-drop mints the first Graph in a selected positioned Layout', asy
   const sourceCard = nodeByTitle(page, 'Card 1');
   await expect(sourceCard).toBeVisible();
   await expect(page.getByTestId('layout-selector')).toContainText('Authored Layout');
-  await expect(page.getByTestId('graph-selector')).toContainText('None');
+  await expect(page.getByTestId('graph-selector')).toContainText('Graph 1');
+  await expect(page.locator('.react-flow__edge')).toHaveCount(0);
   await settled(page);
   await sourceCard.hover();
 
