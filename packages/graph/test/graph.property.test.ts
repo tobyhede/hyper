@@ -145,15 +145,17 @@ describe('what intake builds, over generated documents', () => {
 
   it('never accepts a repeated graph id, wherever the repeat sits', () => {
     fc.assert(
-      fc.property(layoutsArb, fc.nat(), (layouts, raw) => {
+      fc.property(layoutsArb, fc.nat(), fc.nat(), (layouts, rawTarget, rawHost) => {
         const { file, cards } = documentFrom(layouts);
         const all = file.layouts.flatMap((layout) =>
           layout.graphs.map((graph) => ({ layout, graph })),
         );
-        const target = all[raw % all.length]!;
-        // Repeat the chosen id inside a layout picked by the same draw, so the
-        // repeat lands sometimes in its own owner and sometimes in another.
-        const host = file.layouts[raw % file.layouts.length]!;
+        const target = all[rawTarget % all.length]!;
+        // The host layout is an independent draw, so the repeat lands in its own
+        // owner and in another layout across the run. Deriving both from one
+        // draw correlates them — with one graph per layout the two indices are
+        // then always equal, and a cross-layout repeat is never generated.
+        const host = file.layouts[rawHost % file.layouts.length]!;
         host.graphs.push({ ...target.graph, title: 'Repeat' });
 
         const result = loadSpace(file, cards);

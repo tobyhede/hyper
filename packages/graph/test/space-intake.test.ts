@@ -29,6 +29,9 @@ const WORKING = uuid('00000000-0000-4000-8000-000000000022');
 const SECOND = uuid('00000000-0000-4000-8000-000000000023');
 const MAIN = uuid('00000000-0000-4000-8000-000000000004');
 const ASIDE = uuid('00000000-0000-4000-8000-000000000020');
+/** A third graph, owned by a second layout, so the flatten crosses one. */
+const THIRD = uuid('00000000-0000-4000-8000-000000000021');
+/** Held back from every fixture: the id of something no space below holds. */
 const ABSENT = uuid('00000000-0000-4000-8000-000000000099');
 
 /** What both loaders are handed: a document's structure, and the cards under it. */
@@ -135,7 +138,7 @@ describe.each([
               graph(MAIN, 'Main', [{ from: A, to: B }]),
               graph(ASIDE, 'Aside', [{ from: B, to: A }]),
             ]),
-            layout(SECOND, { [A]: { x: 0, y: 200 } }, [graph(ABSENT, 'Third')]),
+            layout(SECOND, { [A]: { x: 0, y: 200 } }, [graph(THIRD, 'Third')]),
           ],
         }),
       );

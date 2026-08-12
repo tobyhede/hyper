@@ -538,6 +538,19 @@ Delete direct tests of `validateReferences`, `get*`, `convertView`, private View
 policies and private registry shape when their behavior is covered through the
 new module interfaces.
 
+**One exception, accepted after implementation: the conversion boundary itself.**
+`convertSubject` and `checkSubject` stay exported and are property-tested
+directly, over generated hostile policies and subjects. Flow and Grid select the
+whole Space and answer one empty Graph, so neither can break an obligation —
+"invalid policy output consumes no identities" and "all Graph ids are fresh
+against source and siblings" have nothing to exercise them through a composed
+resolver, and ADR 0045 states those obligations about the boundary rather than
+about the two Views behind it. Everything else in the list above still goes
+only through the composed deterministic resolver, the built-in registry is still
+private, and no View registration seam was added. The trade, the alternatives
+weighed and what would close it are recorded in
+`issues/01-the-conversion-boundary-is-exported-for-its-property-test.md`.
+
 Gate: `pnpm verify` green with coverage thresholds preserved or improved.
 
 ### Step 4 — documentation and final integration

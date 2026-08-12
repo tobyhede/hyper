@@ -7,6 +7,7 @@ import {
   convertSubject,
   RendererInvariantError,
   type GraphWithoutId,
+  type RendererInvariantReason,
   type RendererSubject,
   type ViewGraphPolicy,
 } from '../src/renderer';
@@ -128,6 +129,34 @@ const repeatsAnEdge = (answer: readonly GraphWithoutId[]): boolean =>
       return false;
     });
   });
+
+/**
+ * Which refusals an output has earned, and which of them the boundary is
+ * entitled to report.
+ *
+ * The conversion order is fixed (the handoff's §4): the Placement is checked
+ * before the policy is even run, an empty answer before anything is read out of
+ * it, and identity last of all. So the first two are single answers — an output
+ * that also repeats an Edge has not been looked at yet, and saying so would be
+ * a guess. Closure and duplication are *one* step of that order, and the
+ * handoff fixes no order between them, so an output breaking both may be
+ * refused for either.
+ *
+ * An empty list means the output breaks nothing, which is what makes this an
+ * assertion rather than a restatement: a refusal with nothing to refuse fails.
+ */
+const earnedRefusals = (
+  subject: RendererSubject,
+  placement: Placement,
+  answer: readonly GraphWithoutId[],
+): readonly RendererInvariantReason[] => {
+  if (!matchesSubject(subject, placement)) return ['placement-does-not-match-subject'];
+  if (answer.length === 0) return ['empty-graph-output'];
+  const earned: RendererInvariantReason[] = [];
+  if (breaksClosure(answer, placement)) earned.push('graph-edge-outside-placement');
+  if (repeatsAnEdge(answer)) earned.push('duplicate-graph-edge');
+  return earned;
+};
 
 /** An identity source that never repeats, so freshness is about the boundary. */
 function counter(start = 0x900): { newGraphId: () => GraphId; used: () => number } {
@@ -254,14 +283,13 @@ describe('the conversion boundary, over every View that could be written', () =>
         } catch (error) {
           // A refusal is always a correct outcome: the boundary throws rather
           // than repairing, because a View that broke an obligation is wrong and
-          // the Edit calling it has nothing to fall back to.
+          // the Edit calling it has nothing to fall back to. What it must not do
+          // is refuse for a reason this output did not earn — a message sending
+          // its author to the wrong rule is worse than no message.
           expect(error).toBeInstanceOf(RendererInvariantError);
-          expect(
-            !matchesSubject(subject, placement) ||
-              answer.length === 0 ||
-              breaksClosure(answer, placement) ||
-              repeatsAnEdge(answer),
-          ).toBe(true);
+          expect(earnedRefusals(subject, placement, answer)).toContain(
+            (error as RendererInvariantError).reason,
+          );
           return;
         }
 
@@ -320,8 +348,43 @@ describe('the conversion boundary, over every View that could be written', () =>
             newGraphId: identity.newGraphId,
             rendererId: GENERATED_VIEW,
           }),
-        ).toThrow();
+        ).toThrow(RendererInvariantError);
         expect(identity.used()).toBe(0);
+      }),
+    );
+  });
+
+  it('reports a colliding identity source rather than drawing again', () => {
+    // Over every legal output, not just one: whatever a View returns, an
+    // identity source that hands back an id the Space already holds is a fault,
+    // and a second draw would paper over it — the next id might be free, and the
+    // conversion would succeed while the source stayed broken. So the first
+    // collision is the answer, and there is exactly one draw to show for it.
+    fc.assert(
+      fc.property(legalScenario, ({ subject, placement, answer }) => {
+        let drawn = 0;
+        const collide = (): GraphId => {
+          drawn += 1;
+          return SOURCE_GRAPH;
+        };
+
+        let refusal: unknown;
+        try {
+          convertSubject({
+            space: SPACE,
+            subject,
+            policy: asPolicy(answer),
+            placement,
+            newGraphId: collide,
+            rendererId: GENERATED_VIEW,
+          });
+        } catch (error) {
+          refusal = error;
+        }
+
+        expect(refusal).toBeInstanceOf(RendererInvariantError);
+        expect((refusal as RendererInvariantError).reason).toBe('graph-id-not-fresh');
+        expect(drawn).toBe(1);
       }),
     );
   });

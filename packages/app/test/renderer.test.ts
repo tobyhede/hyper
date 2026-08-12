@@ -114,6 +114,25 @@ function asView(space: Space, selection?: Parameters<ResolveRenderer>[1]): Resol
   return renderer;
 }
 
+/**
+ * Call something that must refuse, and answer the refusal it made.
+ *
+ * One call, not two: a `toThrow` followed by a `try`/`catch` that reads the
+ * reason runs the subject twice, and the second run is where the reading
+ * happens — so a refusal that stopped being reproducible, or a `catch` that was
+ * never entered, would take the reason assertion with it silently. Failing here
+ * when nothing throws is the whole point.
+ */
+function refusal(act: () => unknown): RendererInvariantError {
+  try {
+    act();
+  } catch (error) {
+    expect(error).toBeInstanceOf(RendererInvariantError);
+    return error as RendererInvariantError;
+  }
+  throw new Error('expected a RendererInvariantError, and nothing was thrown');
+}
+
 /** Run a resolved renderer's strategy over its space, so we test what it *does*. */
 async function arrange(space: Space) {
   const renderer = resolver()(space);
@@ -180,19 +199,17 @@ describe('resolving a renderer', () => {
   });
 
   it('refuses a selected Layout that the Space does not own', () => {
-    const refusal = () =>
+    const refused = refusal(() =>
       resolver()(spaceWith(), {
         kind: 'layout',
         layoutId: uuidSchema.parse('00000000-0000-4000-8000-000000000099'),
-      });
+      }),
+    );
 
-    expect(refusal).toThrow(RendererInvariantError);
-    expect(refusal).toThrow('The selected Layout 00000000-0000-4000-8000-000000000099 does not');
-    try {
-      refusal();
-    } catch (error) {
-      expect((error as RendererInvariantError).reason).toBe('renderer-not-found');
-    }
+    expect(refused.reason).toBe('renderer-not-found');
+    expect(refused.message).toContain(
+      'The selected Layout 00000000-0000-4000-8000-000000000099 does not',
+    );
   });
 
   it('falls back to the graph-driven Flow View when a Space names no View', () => {
@@ -221,7 +238,12 @@ describe('resolving a renderer', () => {
   });
 
   it('ignores a declared Layout the space does not open in', () => {
-    expect(asView(spaceWith()).id).toBe('flow');
+    // `spaceWith()` declares `WORKING`. Naming no `defaultView` is what opens the
+    // Space in a View regardless, so the Layout is there to be resolved and is
+    // not what resolution answers.
+    const space = spaceWith();
+    expect(space.layouts.map((layout) => layout.id)).toEqual([WORKING.id]);
+    expect(resolver()(space).kind).toBe('view');
   });
 });
 
@@ -357,12 +379,11 @@ describe('converting a View into a Layout’s Graphs', () => {
   it('refuses a Placement that is not exactly the subject’s Cards', () => {
     const view = asView(spaceWith());
     const short = Placement.fromEntries([[A, { x: 0, y: 0 }]]);
-    expect(() => view.convert(short)).toThrow(RendererInvariantError);
-    try {
-      view.convert(short);
-    } catch (error) {
-      expect((error as RendererInvariantError).reason).toBe('placement-does-not-match-subject');
-    }
+
+    const refused = refusal(() => view.convert(short));
+
+    expect(refused.reason).toBe('placement-does-not-match-subject');
+    expect(refused.message).toContain('not its subject');
   });
 
   it('refuses a Placement of the right size naming a different Card', () => {
@@ -371,7 +392,8 @@ describe('converting a View into a Layout’s Graphs', () => {
       [A, { x: 0, y: 0 }],
       [uuidSchema.parse('00000000-0000-4000-8000-000000000099'), { x: 1, y: 1 }],
     ]);
-    expect(() => view.convert(wrong)).toThrow(/not its subject/);
+
+    expect(refusal(() => view.convert(wrong)).reason).toBe('placement-does-not-match-subject');
   });
 
   it('reports a colliding identity source rather than drawing again', () => {
@@ -383,12 +405,7 @@ describe('converting a View into a Layout’s Graphs', () => {
     const renderer = resolve(spaceWith());
     if (renderer.kind !== 'view') throw new Error('expected a View renderer');
 
-    expect(() => renderer.convert(onScreen)).toThrow(RendererInvariantError);
-    try {
-      renderer.convert(onScreen);
-    } catch (error) {
-      expect((error as RendererInvariantError).reason).toBe('graph-id-not-fresh');
-    }
+    expect(refusal(() => renderer.convert(onScreen)).reason).toBe('graph-id-not-fresh');
   });
 
   it('is unaffected by which Graph the author was emphasising', () => {
