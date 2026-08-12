@@ -9,7 +9,7 @@ const CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 const OTHER_SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
 const snapshot: SpaceSnapshot = {
   id: SPACE_ID,
-  document: { version: 2, title: 'One', graphs: [] },
+  document: { version: 1, title: 'One' },
   cards: [{ id: CARD_ID, document: { title: 'A', kind: 'markdown', body: '' } }],
 };
 

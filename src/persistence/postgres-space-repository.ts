@@ -2,6 +2,7 @@ import {
   cardDocumentSchema,
   importSpaceSchema,
   newUuid,
+  SPACE_FILE_VERSION,
   spaceDocumentSchema,
   spaceSnapshotSchema,
   uuidSchema,
@@ -225,18 +226,24 @@ const validateSnapshotIdentities = (snapshot: SpaceSnapshot): void => {
  * the space document (ADR 0030) — so no column default can reach them, and
  * cards are minted here too, so the whole snapshot can be validated before the
  * first card is written.
+ *
+ * A layout's id and the ids of the graphs it owns are minted in the **same
+ * pass**, because under version 1 a graph is reached only through its owner
+ * (ADR 0040): there is no space-level collection to walk beside the layouts.
+ * That the pass runs before `parseSnapshotShape` and before the first card write
+ * is what keeps a rejection rolling the complete batch back.
  */
 const resolveImport = (input: ImportSpace, reservedSpaceId: UUID): SpaceSnapshot => {
   const layouts = input.document.layouts?.map((layout) => ({
     ...layout,
     id: layout.id ?? newUuid(),
+    graphs: layout.graphs.map((graph) => ({ ...graph, id: graph.id ?? newUuid() })),
   }));
 
   return parseSnapshotShape({
     id: input.id ?? reservedSpaceId,
     document: {
       ...input.document,
-      graphs: input.document.graphs.map((graph) => ({ ...graph, id: graph.id ?? newUuid() })),
       ...(layouts === undefined ? {} : { layouts }),
     },
     cards: input.cards.map((card) => ({ ...card, id: card.id ?? newUuid() })),
@@ -446,12 +453,16 @@ export class PostgresSpaceRepository implements SpaceRepository {
         for (const importInput of accepted) {
           let space;
           try {
+            // A placeholder document, replaced below once the space id it is
+            // being inserted to reserve is known. It carries no graph
+            // collection, because a space has none until a layout exists to own
+            // one (ADR 0040) — under version 2 this was an empty space-level
+            // array, and there is no longer a key for it to be empty in.
             space = await orm.public.Space.create({
               ...(importInput.id === undefined ? {} : { id: importInput.id }),
               document: toJsonValue({
-                version: 2,
+                version: SPACE_FILE_VERSION,
                 title: importInput.document.title,
-                graphs: [],
               }),
               revision: 0,
             });

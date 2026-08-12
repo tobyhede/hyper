@@ -71,7 +71,7 @@ const storedSpace = (
 ): LoadedSpace => ({
   snapshot: {
     id,
-    document: { version: 2, title, graphs: [] },
+    document: { version: 1, title },
     cards: [
       {
         id: cardId,
@@ -132,7 +132,7 @@ describe('resolveDatabaseStartup', () => {
     expect(result.space).toEqual({
       snapshot: {
         id: result.space.snapshot.id,
-        document: { version: 2, title: 'New space', graphs: [] },
+        document: { version: 1, title: 'New space' },
         cards: [
           {
             id: cardId,

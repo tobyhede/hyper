@@ -1,6 +1,12 @@
 import { cp, lstat, mkdir, mkdtemp, readdir, rename, rm, stat, writeFile } from 'node:fs/promises';
 import { basename, dirname, join, resolve } from 'node:path';
-import { spaceSnapshotSchema, type Card, type SpaceFile, type UUID } from '@project/core';
+import {
+  SPACE_FILE_VERSION,
+  spaceSnapshotSchema,
+  type Card,
+  type SpaceFile,
+  type UUID,
+} from '@project/core';
 import { loadSpaceSnapshot, serializeCardFile } from '@project/graph';
 import type { LoadedSpace } from '@project/persistence';
 import { readSingleSpace } from '../import/read-single-space';
@@ -8,6 +14,29 @@ import type { SpaceRepository } from '../persistence/space-repository';
 
 const compareOrdinal = (left: string, right: string): number =>
   left < right ? -1 : left > right ? 1 : 0;
+
+/**
+ * A layout's graphs, emitted in the order the layout holds them.
+ *
+ * Ordering is the one thing this does *not* impose, and the asymmetry with the
+ * positions beside it is deliberate. A layout's graphs are ordered authored
+ * content (ADR 0040) — order is what the graph selector offers and what the
+ * absent-`activeGraph` fallback resolves against — so sorting them here would
+ * rewrite the space on its way to disk. The position map has no such order to
+ * lose: it is a record, and `Object.entries` reads whatever insertion order the
+ * stored JSON happened to have, so the sort is what makes a re-export produce no
+ * diff. Determinism comes from the key order within each graph, which is this
+ * literal.
+ */
+const canonicalGraphs = (
+  graphs: NonNullable<SpaceFile['layouts']>[number]['graphs'],
+): NonNullable<SpaceFile['layouts']>[number]['graphs'] =>
+  graphs.map((graph) => ({
+    id: graph.id,
+    title: graph.title,
+    ...(graph.color === undefined ? {} : { color: graph.color }),
+    edges: graph.edges.map(({ from, to }) => ({ from, to })),
+  }));
 
 const canonicalSpaceFile = ({ snapshot }: LoadedSpace): SpaceFile => {
   const layouts = snapshot.document.layouts?.map((layout) => ({
@@ -17,18 +46,13 @@ const canonicalSpaceFile = ({ snapshot }: LoadedSpace): SpaceFile => {
     positions: Object.fromEntries(
       Object.entries(layout.positions).sort(([left], [right]) => compareOrdinal(left, right)),
     ),
+    graphs: canonicalGraphs(layout.graphs),
     ...(layout.activeGraph === undefined ? {} : { activeGraph: layout.activeGraph }),
   }));
   return {
-    version: 2,
+    version: SPACE_FILE_VERSION,
     id: snapshot.id,
     title: snapshot.document.title,
-    graphs: snapshot.document.graphs.map((graph) => ({
-      id: graph.id,
-      title: graph.title,
-      ...(graph.color === undefined ? {} : { color: graph.color }),
-      edges: graph.edges.map(({ from, to }) => ({ from, to })),
-    })),
     ...(layouts === undefined ? {} : { layouts }),
     ...(snapshot.document.defaultView === undefined
       ? {}

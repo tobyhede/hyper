@@ -10,7 +10,7 @@ const CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 const loaded: LoadedSpace = {
   snapshot: {
     id: SPACE_ID,
-    document: { version: 2, title: 'One', graphs: [] },
+    document: { version: 1, title: 'One' },
     cards: [{ id: CARD_ID, document: { title: 'A', kind: 'markdown', body: 'Original' } }],
   },
   revision: 3n,

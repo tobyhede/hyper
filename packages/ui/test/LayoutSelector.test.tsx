@@ -10,18 +10,39 @@ beforeAll(() => {
   HTMLElement.prototype.scrollIntoView = () => undefined;
 });
 
+const CARD_ID = uuidSchema.parse('33333333-3333-4333-8333-333333333333');
+
+/**
+ * A layout owns at least one graph (ADR 0040), so the smallest one the selector
+ * can be handed carries a graph over one member. The selector reads neither —
+ * it lists titles — but the type is the aggregate's and is not relaxed for it.
+ */
 const layouts: readonly Layout[] = [
   {
     id: uuidSchema.parse('11111111-1111-4111-8111-111111111111'),
     title: 'Workshop',
     kind: 'positioned',
-    positions: {},
+    positions: { [CARD_ID]: { x: 0, y: 0 } },
+    graphs: [
+      {
+        id: uuidSchema.parse('44444444-4444-4444-8444-444444444444'),
+        title: 'Workshop graph',
+        edges: [{ from: CARD_ID, to: CARD_ID }],
+      },
+    ],
   },
   {
     id: uuidSchema.parse('22222222-2222-4222-8222-222222222222'),
     title: 'Overview',
     kind: 'positioned',
-    positions: {},
+    positions: { [CARD_ID]: { x: 0, y: 0 } },
+    graphs: [
+      {
+        id: uuidSchema.parse('55555555-5555-4555-8555-555555555555'),
+        title: 'Overview graph',
+        edges: [{ from: CARD_ID, to: CARD_ID }],
+      },
+    ],
   },
 ];
 

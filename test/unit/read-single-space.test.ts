@@ -43,10 +43,7 @@ describe('readSingleSpace', () => {
     await mkdir(join(talkDirectory, 'notes'));
 
     const spaceFile = join(talkDirectory, 'space.json');
-    await writeFile(
-      spaceFile,
-      JSON.stringify({ version: 2, id: SPACE_ID, title: 'Talk', graphs: [] }),
-    );
+    await writeFile(spaceFile, JSON.stringify({ version: 1, id: SPACE_ID, title: 'Talk' }));
     await writeFile(join(talkDirectory, 'a.md'), '---\ntitle: A\n---\nA body\n');
     await writeFile(
       join(cardsDirectory, 'detail.md'),
@@ -62,7 +59,7 @@ describe('readSingleSpace', () => {
 
     const expected = {
       id: SPACE_ID,
-      document: { version: 2, title: 'Talk', graphs: [] },
+      document: { version: 1, title: 'Talk' },
       cards: [
         { document: { title: 'A', kind: 'markdown', body: 'A body\n' } },
         { document: { title: 'Detail', kind: 'markdown', body: 'Detail body\n' } },
@@ -96,7 +93,7 @@ describe('readSingleSpace', () => {
       const nestedCard = join(cardsDirectory, 'z.md');
       await writeFile(
         join(talkDirectory, 'space.json'),
-        JSON.stringify({ version: 2, title: 'Talk', graphs: [] }),
+        JSON.stringify({ version: 1, title: 'Talk' }),
       );
       await writeFile(rootCard, '---\ntitle: A\n---\nA body\n');
       await writeFile(nestedCard, '---\ntitle: Z\n---\nZ body\n');
@@ -184,12 +181,19 @@ describe('readSingleSpace', () => {
     await writeFile(
       spaceFile,
       JSON.stringify({
-        version: 2,
+        version: 1,
         title: 'Talk',
-        graphs: [
+        layouts: [
           {
-            title: 'Graph',
-            edges: [{ from: 'not-a-uuid', to: ROOT_CARD_ID }],
+            title: 'Layout',
+            kind: 'positioned',
+            positions: { [ROOT_CARD_ID]: { x: 0, y: 0 } },
+            graphs: [
+              {
+                title: 'Graph',
+                edges: [{ from: 'not-a-uuid', to: ROOT_CARD_ID }],
+              },
+            ],
           },
         ],
       }),
@@ -201,7 +205,7 @@ describe('readSingleSpace', () => {
     if (!(thrown instanceof SpaceImportFileError)) return;
     expect(thrown.kind).toBe('parsing');
     expect(thrown.diagnostics.join('\n')).toContain(spaceFile);
-    expect(thrown.diagnostics.join('\n')).toContain('graphs.0.edges.0.from');
+    expect(thrown.diagnostics.join('\n')).toContain('layouts.0.graphs.0.edges.0.from');
   });
 });
 
@@ -229,18 +233,9 @@ describe('readImportBatch', () => {
     await mkdir(first);
     await mkdir(second);
     await mkdir(nested, { recursive: true });
-    await writeFile(
-      join(first, 'space.json'),
-      JSON.stringify({ version: 2, title: 'First', graphs: [] }),
-    );
-    await writeFile(
-      join(second, 'space.json'),
-      JSON.stringify({ version: 2, title: 'Second', graphs: [] }),
-    );
-    await writeFile(
-      join(nested, 'space.json'),
-      JSON.stringify({ version: 2, title: 'Nested', graphs: [] }),
-    );
+    await writeFile(join(first, 'space.json'), JSON.stringify({ version: 1, title: 'First' }));
+    await writeFile(join(second, 'space.json'), JSON.stringify({ version: 1, title: 'Second' }));
+    await writeFile(join(nested, 'space.json'), JSON.stringify({ version: 1, title: 'Nested' }));
 
     const batch = await readImportBatch(collection);
 

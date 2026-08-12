@@ -76,8 +76,13 @@ describe('graph validation properties', () => {
       fc.property(idsArb, fc.nat(), (ids, raw) => {
         const file = spaceFileFromIds(ids);
         const evicted = cardId(ids[raw % ids.length]!);
-        const positions = file.layouts[0]!.positions;
-        delete positions[evicted];
+        const layout = file.layouts[0]!;
+        // Rebuilt without the key rather than deleted out of it: dropping a
+        // position *is* dropping the membership, and a filtered rebuild says so
+        // in one expression.
+        layout.positions = Object.fromEntries(
+          Object.entries(layout.positions).filter(([id]) => id !== evicted),
+        );
 
         const errors = validateReferences(file);
         expect(errors.some((e) => e.kind === 'unresolved-graph-edge' && e.ref === evicted)).toBe(

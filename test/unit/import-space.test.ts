@@ -23,7 +23,7 @@ const GRAPH_ID = uuidSchema.parse('44444444-4444-4444-8444-444444444444');
 
 const storedSnapshot: SpaceSnapshot = {
   id: SPACE_ID,
-  document: { version: 2, title: 'Stored talk', graphs: [] },
+  document: { version: 1, title: 'Stored talk' },
   cards: [
     {
       id: CARD_ID,
@@ -41,7 +41,7 @@ const storedSpace: LoadedSpace = {
 const otherStoredSpace: LoadedSpace = {
   snapshot: {
     id: OTHER_SPACE_ID,
-    document: { version: 2, title: 'Other stored talk', graphs: [] },
+    document: { version: 1, title: 'Other stored talk' },
     cards: [],
   },
   revision: 0n,
@@ -96,7 +96,7 @@ const writeValidSpace = async (): Promise<string> => {
   await mkdir(join(directory, 'cards'));
   await writeFile(
     join(directory, 'space.json'),
-    JSON.stringify({ version: 2, id: SPACE_ID, title: 'Imported talk', graphs: [] }),
+    JSON.stringify({ version: 1, id: SPACE_ID, title: 'Imported talk' }),
   );
   await writeFile(join(directory, 'cards', 'opening.md'), '---\ntitle: Opening\n---\nHello.\n');
   return directory;
@@ -140,7 +140,7 @@ describe('importSingleSpace', () => {
       [
         {
           id: SPACE_ID,
-          document: { version: 2, title: 'Imported talk', graphs: [] },
+          document: { version: 1, title: 'Imported talk' },
           cards: [
             {
               document: { title: 'Opening', kind: 'markdown', body: 'Hello.\n' },
@@ -216,7 +216,7 @@ describe('importSpaceBatch', () => {
     await mkdir(invalid);
     await writeFile(
       join(valid, 'space.json'),
-      JSON.stringify({ version: 2, id: SPACE_ID, title: 'Valid', graphs: [] }),
+      JSON.stringify({ version: 1, id: SPACE_ID, title: 'Valid' }),
     );
     await writeFile(join(invalid, 'space.json'), '{ invalid JSON');
     const repository = new RecordingRepository({ kind: 'imported', spaces: [storedSpace] });
@@ -235,11 +235,11 @@ describe('importSpaceBatch', () => {
     await mkdir(second);
     await writeFile(
       join(first, 'space.json'),
-      JSON.stringify({ version: 2, id: SPACE_ID, title: 'First', graphs: [] }),
+      JSON.stringify({ version: 1, id: SPACE_ID, title: 'First' }),
     );
     await writeFile(
       join(second, 'space.json'),
-      JSON.stringify({ version: 2, id: OTHER_SPACE_ID, title: 'Second', graphs: [] }),
+      JSON.stringify({ version: 1, id: OTHER_SPACE_ID, title: 'Second' }),
     );
     const repository = new RecordingRepository({
       kind: 'imported',

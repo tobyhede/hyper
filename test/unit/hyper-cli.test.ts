@@ -23,7 +23,7 @@ const THIRD_SPACE_ID = uuidSchema.parse('55555555-5555-4555-8555-555555555555');
 const storedSpace: LoadedSpace = {
   snapshot: {
     id: SPACE_ID,
-    document: { version: 2, title: 'Stored talk', graphs: [] },
+    document: { version: 1, title: 'Stored talk' },
     cards: [
       {
         id: CARD_ID,
@@ -90,10 +90,7 @@ const makeTemporaryDirectory = async (): Promise<string> => {
 const writeValidSpace = async (id: UUID = SPACE_ID, title = 'Imported talk'): Promise<string> => {
   const directory = await makeTemporaryDirectory();
   await mkdir(join(directory, 'cards'));
-  await writeFile(
-    join(directory, 'space.json'),
-    JSON.stringify({ version: 2, id, title, graphs: [] }),
-  );
+  await writeFile(join(directory, 'space.json'), JSON.stringify({ version: 1, id, title }));
   await writeFile(join(directory, 'cards', 'opening.md'), '---\ntitle: Opening\n---\nHello.\n');
   return directory;
 };
@@ -132,7 +129,7 @@ describe('runHyper', () => {
     expect(output.stdout).toEqual([`Exported space ${SPACE_ID} at revision 0 to ${destination}\n`]);
     expect(output.stderr).toEqual([]);
     await expect(readFile(join(destination, 'space.json'), 'utf8')).resolves.toBe(
-      `${JSON.stringify({ version: 2, id: SPACE_ID, title: 'Stored talk', graphs: [] }, null, 2)}\n`,
+      `${JSON.stringify({ version: 1, id: SPACE_ID, title: 'Stored talk' }, null, 2)}\n`,
     );
     await expect(readFile(join(destination, 'cards', `${CARD_ID}.md`), 'utf8')).resolves.toBe(
       `---\nid: ${CARD_ID}\ntitle: Stored card\nkind: markdown\n---\n\nStored body.\n`,
@@ -351,21 +348,13 @@ describe('runHyper', () => {
     );
   });
 
-  it('writes deterministic fully identified files that re-enter through version 2 intake', async () => {
+  it('writes deterministic fully identified files that re-enter through version 1 intake', async () => {
     const destination = join(await makeTemporaryDirectory(), 'exported');
     const snapshot: SpaceSnapshot = {
       id: SPACE_ID,
       document: {
-        version: 2,
+        version: 1,
         title: 'Canonical: talk',
-        graphs: [
-          {
-            id: GRAPH_ID,
-            title: 'Main graph',
-            color: '#123456',
-            edges: [{ from: CARD_ID, to: THIRD_SPACE_ID }],
-          },
-        ],
         layouts: [
           {
             id: OTHER_SPACE_ID,
@@ -375,6 +364,14 @@ describe('runHyper', () => {
               [THIRD_SPACE_ID]: { x: 30, y: 40 },
               [CARD_ID]: { x: 10, y: 20 },
             },
+            graphs: [
+              {
+                id: GRAPH_ID,
+                title: 'Main graph',
+                color: '#123456',
+                edges: [{ from: CARD_ID, to: THIRD_SPACE_ID }],
+              },
+            ],
             activeGraph: GRAPH_ID,
           },
         ],
@@ -577,11 +574,11 @@ describe('runHyper', () => {
     await mkdir(second);
     await writeFile(
       join(first, 'space.json'),
-      JSON.stringify({ version: 2, id: OTHER_SPACE_ID, title: 'First imported', graphs: [] }),
+      JSON.stringify({ version: 1, id: OTHER_SPACE_ID, title: 'First imported' }),
     );
     await writeFile(
       join(second, 'space.json'),
-      JSON.stringify({ version: 2, id: THIRD_SPACE_ID, title: 'Second imported', graphs: [] }),
+      JSON.stringify({ version: 1, id: THIRD_SPACE_ID, title: 'Second imported' }),
     );
     const output = captureIo();
     const repository = new MemorySpaceRepository([storedSpace]);
@@ -662,6 +659,62 @@ describe('runHyper', () => {
     },
   );
 
+  /*
+   * The three cases above stub the repository's verdict, so they prove the CLI
+   * prints what it is handed. This one produces the fault for real: a directory
+   * whose two layouts own one graph id, read off disk, identified, and put
+   * through domain intake by a real repository. That error is new to version 1
+   * — a graph id is unique across the space although one layout owns it (ADR
+   * 0045) — and the only part of it an author can act on is which two layouts
+   * collided, so both ids have to survive the trip to stderr.
+   */
+  it('reports a graph id two layouts own, naming both of them', async () => {
+    const directory = await makeTemporaryDirectory();
+    await mkdir(join(directory, 'cards'));
+    await writeFile(
+      join(directory, 'cards', 'opening.md'),
+      `---\nid: ${CARD_ID}\ntitle: Opening\n---\nHello.\n`,
+    );
+    await writeFile(
+      join(directory, 'space.json'),
+      JSON.stringify({
+        version: 1,
+        id: SPACE_ID,
+        title: 'Two owners',
+        layouts: [
+          {
+            id: OTHER_SPACE_ID,
+            title: 'First owner',
+            kind: 'positioned',
+            positions: { [CARD_ID]: { x: 0, y: 0 } },
+            graphs: [{ id: GRAPH_ID, title: 'Shared', edges: [{ from: CARD_ID, to: CARD_ID }] }],
+          },
+          {
+            id: THIRD_SPACE_ID,
+            title: 'Second owner',
+            kind: 'positioned',
+            positions: { [CARD_ID]: { x: 10, y: 10 } },
+            graphs: [{ id: GRAPH_ID, title: 'Shared', edges: [{ from: CARD_ID, to: CARD_ID }] }],
+          },
+        ],
+      }),
+    );
+    const output = captureIo();
+
+    const exitCode = await runHyper([directory], {
+      repository: new MemorySpaceRepository(),
+      io: output.io,
+    });
+
+    expect(exitCode).toBe(1);
+    expect(output.stdout).toEqual([]);
+    const stderr = output.stderr.join('');
+    expect(stderr).toContain('Domain validation failed');
+    expect(stderr).toContain(GRAPH_ID);
+    expect(stderr).toContain(OTHER_SPACE_ID);
+    expect(stderr).toContain(THIRD_SPACE_ID);
+  });
+
   it('reports a taken space identity as an identity failure, never a revision conflict', async () => {
     // The regression this guards: a taken id used to surface as a primary-key
     // violation classified `conflict`, which the CLI printed as "Revision
@@ -725,11 +778,11 @@ describe('runHyper', () => {
     await mkdir(second);
     await writeFile(
       join(first, 'space.json'),
-      JSON.stringify({ version: 2, id: SPACE_ID, title: 'First imported', graphs: [] }),
+      JSON.stringify({ version: 1, id: SPACE_ID, title: 'First imported' }),
     );
     await writeFile(
       join(second, 'space.json'),
-      JSON.stringify({ version: 2, id: OTHER_SPACE_ID, title: 'Second imported', graphs: [] }),
+      JSON.stringify({ version: 1, id: OTHER_SPACE_ID, title: 'Second imported' }),
     );
     const output = captureIo();
     const repository = new MemorySpaceRepository();
