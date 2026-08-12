@@ -9,8 +9,7 @@
  * here with nothing importing them. Functions are named one at a time, and a
  * helper no consumer needs to write stays in its module. Usually it sits behind
  * an offered form that calls it — `graphCardIds` calls `cardIdsForGraphs`,
- * `graphStartCard` calls `graphEntryCards`, while `buildCardHandles` and
- * `buildGraphRenderEdges` both call `outHandleId`/`inHandleId`. It runs the
+ * `graphStartCard` calls `graphEntryCards`. It runs the
  * other way for `filterHandlesByGraph`, the single-Graph specialisation written
  * on the offered `filterHandlesByGraphs`. And it does not hold at all for
  * `incomingEdges`: nothing calls it but its own test, so it is unoffered for
@@ -66,11 +65,19 @@ export { Placement } from './placement';
 
 export { positionedStrategy } from './positioned';
 
+// `inHandleId` and `outHandleId` are offered although no consumer *has* to name
+// a handle id: they mint the `<graphId>::out`/`::in` format, and a second
+// producer of it is the defect. `react-flow-adapter` declares a handle for a
+// Graph not yet incident to a Card, so it needs the format for an id nothing
+// here has built yet — one module owns it, and that is what makes the
+// prohibition on owner-qualifying a Graph reference checkable by reading one.
 export {
   buildCardHandles,
   buildGraphRenderEdges,
   filterHandlesByGraphs,
   graphCardIds,
+  inHandleId,
+  outHandleId,
 } from './graph-rendering';
 export type { CardHandleSet, GraphRenderEdge, GraphRenderHandleRef } from './graph-rendering';
 
