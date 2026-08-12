@@ -63,9 +63,15 @@ export function graphEntryCards(graph: Graph): CardId[] {
  * loop. Whether a traversal can reach every Card of a disconnected Graph is a
  * separate question, and the fallback does not answer it.
  *
- * `undefined` is left only for a Graph with no Edges, which `graphSchema`
- * forbids. If a graph ever wants to name its own start, that is a field on the
- * graph and a change here.
+ * `undefined` is left for a graph with no edges, and that is a **normal** state
+ * rather than an unreachable one: creating a layout creates its initial active
+ * graph empty in the same edit (ADR 0040), so every layout converted out of an
+ * algorithmic view is in it until the author draws something. `graphSchema`
+ * used to forbid it and no longer does. Callers must answer it — presenting
+ * refuses, and the control that offers presenting is disabled — because a graph
+ * with no edges has nowhere to begin, not because the type demands a branch.
+ * If a graph ever wants to name its own start, that is a field on the graph and
+ * a change here.
  */
 export function graphStartCard(graph: Graph): CardId | undefined {
   return graphEntryCards(graph)[0] ?? graph.edges[0]?.from;

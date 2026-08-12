@@ -16,6 +16,14 @@ export interface HttpLoadedSpace {
 export const SEEDED_LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000099');
 
 /**
+ * The Graph that Layout owns. A Layout owns at least one (ADR 0040), and seeding
+ * one that is empty is what a conversion would have produced — the seeded Layout
+ * stands in for the Layout an author's first edit creates, so it starts with
+ * nothing authored into it.
+ */
+export const SEEDED_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000098');
+
+/**
  * Seed the opened Space with a single positioned Layout, then read it back.
  *
  * What it buys a test is an app that opens in an authored Layout rather than an
@@ -49,6 +57,7 @@ export async function seedPositionedLayout(
           title,
           kind: 'positioned',
           positions: positionsFor(loaded.snapshot),
+          graphs: [{ id: SEEDED_GRAPH_ID, title: 'Graph 1', edges: [] }],
         },
       ],
       defaultView: SEEDED_LAYOUT_ID,

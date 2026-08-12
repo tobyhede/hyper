@@ -190,11 +190,16 @@ describe('space file schema', () => {
     );
   });
 
-  it('rejects a graph with no edges — a Graph is its Edges (ADR 0032)', () => {
+  it('accepts a graph with no edges — a Layout mints its initial Graph empty', () => {
+    // Creating a Layout creates its initial empty Active Graph in the same Edit
+    // (ADR 0040), and the Flow view converts by returning exactly that (ADR
+    // 0045), so an edge-less Graph is a state the product produces on the first
+    // Card the author moves. Deleting the last Edge of a Graph leaves the same
+    // shape. The superseded rule read a Graph as minted *by* drawing an Edge.
     const result = spaceFileSchema.safeParse(
       withGraphs([{ id: '00000000-0000-4000-8000-000000000004', title: 'Main', edges: [] }]),
     );
-    expect(result.success).toBe(false);
+    expect(result.success).toBe(true);
   });
 
   it('accepts a graph that forks and merges — shape puts no limit on either', () => {

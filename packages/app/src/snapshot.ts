@@ -1,4 +1,10 @@
-import type { GraphId, SpaceSnapshot, UUID } from '@project/core';
+import {
+  SPACE_FILE_VERSION,
+  type Graph,
+  type GraphId,
+  type SpaceSnapshot,
+  type UUID,
+} from '@project/core';
 import { loadSpaceSnapshot, Placement, type Space } from '@project/graph';
 
 /**
@@ -33,13 +39,19 @@ export const createWorkingSpaceReader = (): ((snapshot: SpaceSnapshot) => Space)
   };
 };
 
-/** Convert the validated runtime aggregate into the complete persistence seam. */
+/**
+ * Convert the validated runtime aggregate into the complete persistence seam.
+ *
+ * `space.graphs` is deliberately not written: it is a *derived* flatten across
+ * the layouts that own them (ADR 0040, ADR 0045), and the document has no
+ * space-level collection for it to go back into. Every graph reaches the wire
+ * inside the layout that owns it, which `space.layouts` already carries.
+ */
 export const snapshotFromSpace = (space: Space): SpaceSnapshot => ({
   id: space.id,
   document: {
-    version: 2,
+    version: SPACE_FILE_VERSION,
     title: space.title,
-    graphs: [...space.graphs],
     ...(space.layouts.length > 0 ? { layouts: [...space.layouts] } : {}),
     ...(space.defaultView !== undefined ? { defaultView: space.defaultView } : {}),
   },
@@ -54,6 +66,15 @@ export interface PositionedLayoutEdit {
   readonly layoutId: UUID;
   readonly title: string;
   readonly positions: Placement;
+  /**
+   * The graphs this Layout owns after the Edit, in author order (ADR 0040).
+   *
+   * Replaced whole rather than merged, for the same reason the positions are:
+   * the editor holds the whole truth of them. A graph is a nested owned value
+   * of exactly one Layout, so there is nowhere else for this Edit's graphs to
+   * be written and nothing at the space level left to reconcile them with.
+   */
+  readonly graphs: readonly Graph[];
   /** The Graph the Layout opens on. */
   readonly activeGraphId: GraphId | null;
 }
@@ -61,7 +82,7 @@ export interface PositionedLayoutEdit {
 /** Fold a completed placement edit into a complete authoritative snapshot. */
 export const updatePositionedLayout = (
   base: SpaceSnapshot,
-  { layoutId, title, positions, activeGraphId }: PositionedLayoutEdit,
+  { layoutId, title, positions, graphs, activeGraphId }: PositionedLayoutEdit,
 ): SpaceSnapshot => {
   const existing = (base.document.layouts ?? []).find((layout) => layout.id === layoutId);
   const layout = {
@@ -69,6 +90,7 @@ export const updatePositionedLayout = (
     title,
     kind: 'positioned' as const,
     positions: Placement.toPositions(positions),
+    graphs: [...graphs],
     // An Edit with no active Graph says nothing about the authored one, so the
     // existing value carries through. Only a named Graph replaces it.
     ...(activeGraphId !== null

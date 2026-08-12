@@ -136,13 +136,18 @@ export const graphSchema = z.object({
   // Optional CSS color for this graph's edges; falls back to a palette by order.
   color: z.string().min(1).optional(),
   /**
-   * At least one. A graph is a set of edges, so a graph with none connects
-   * nothing and draws nothing — and drawing an edge is the gesture that mints a
-   * graph in the first place (ADR 0033), so one is the fewest a graph is ever
-   * created with. A card may appear as the `from` of several edges (a fork) and
-   * the `to` of several (a merge); nothing here constrains that.
+   * Possibly none. A graph *is* its edges, but it is no longer minted by
+   * drawing one: creating a layout creates its initial empty active graph in
+   * the same edit (ADR 0040), and the Flow view converts by returning exactly
+   * that — one fresh graph holding no edges (ADR 0045). Deleting a graph's last
+   * edge leaves the same shape, and graph management may not delete the graph
+   * itself to avoid it. The superseded rule read ADR 0033's connect gesture as
+   * the only way a graph came into being, which ADR 0040 replaced.
+   *
+   * A card may appear as the `from` of several edges (a fork) and the `to` of
+   * several (a merge); nothing here constrains that.
    */
-  edges: z.array(graphEdgeSchema).min(1),
+  edges: z.array(graphEdgeSchema),
 });
 
 /** Where a positioned layout puts a card, in the layout's own coordinate space. */

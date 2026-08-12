@@ -2,12 +2,13 @@ import {
   newUuid,
   type CardDocument,
   type CardId,
+  type Graph,
   type GraphId,
   type LayoutPosition,
   type SpaceSnapshot,
   type UUID,
 } from '@project/core';
-import { loadSpaceSnapshot, Placement } from '@project/graph';
+import { getLayout, loadSpaceSnapshot, Placement, type Space } from '@project/graph';
 import {
   createNonThrowingReporter,
   createObservableState,
@@ -17,6 +18,7 @@ import {
 } from '@project/persistence';
 import type { Navigation, NavigationState } from './navigation';
 import { updatePositionedLayout } from './snapshot';
+import { nextNumberedTitle } from './titles';
 import { defaultRenderer, resolveView, type RendererSelection } from './view';
 
 export type AuthoringCompletion =
@@ -112,10 +114,18 @@ export interface SpaceAuthoring {
 interface CompletedEdit {
   readonly snapshot: SpaceSnapshot;
   readonly placement: Placement;
-  /** The Graph this same Edit minted, which Navigation must therefore activate. */
-  readonly mintedGraphId: GraphId | null;
   /** The Layout this Edit wrote, which Navigation continues in. */
   readonly nextRenderer: RendererSelection;
+  /**
+   * The Active Graph of that Layout, which Navigation adopts along with it.
+   *
+   * Not "the Graph this Edit minted": under ADR 0040 a Layout owns its Graphs,
+   * so which one is active is a fact about the Layout this Edit wrote and not a
+   * separate consequence. A conversion answers the Graph it minted, an Edit on a
+   * selected Layout answers the one already active there, and the two reach
+   * Navigation the same way.
+   */
+  readonly nextActiveGraphId: GraphId | null;
   readonly createdCardId?: CardId;
 }
 
@@ -145,29 +155,17 @@ interface QueuedCompletion extends ReportedCompletion {
 interface SpaceAuthoringDependencies {
   readonly session: SpaceSession;
   readonly navigation: Navigation;
+  /**
+   * The validated aggregate behind the session's working snapshot.
+   *
+   * The same reader Navigation is given, so both resolve a view against one
+   * `Space` identity and one parse. Authoring needs it because which Layout an
+   * Edit writes, and what that Layout owns, is the *View's* answer now — and
+   * `resolveView` takes a Space (ADR 0045).
+   */
+  readonly currentSpace: () => Space;
   readonly initialPlacement?: Placement | null;
   readonly reportObserverError?: ObserverErrorReporter;
-}
-
-/**
- * The next `<Prefix> N` above the highest one already taken.
- *
- * One past the highest rather than one past the count, so deleting the middle
- * of a numbered set never mints a title that is already in use. Unnumbered
- * titles an author wrote contribute nothing. `BigInt` because the number comes
- * from a title and has no bound; the prefixes are the three literals below, so
- * the built pattern carries nothing to escape.
- */
-function nextNumberedTitle(prefix: string, titles: Iterable<string>): string {
-  const numbered = new RegExp(`^${prefix} ([1-9]\\d*)$`);
-  let highest = 0n;
-  for (const title of titles) {
-    const match = numbered.exec(title);
-    if (match?.[1] === undefined) continue;
-    const number = BigInt(match[1]);
-    if (number > highest) highest = number;
-  }
-  return `${prefix} ${highest + 1n}`;
 }
 
 function isSupportedCardEdit(previous: CardDocument, next: CardDocument): boolean {
@@ -184,12 +182,6 @@ const nextLayoutTitle = (snapshot: SpaceSnapshot): string =>
   nextNumberedTitle(
     'Layout',
     (snapshot.document.layouts ?? []).map((layout) => layout.title),
-  );
-
-const nextGraphTitle = (snapshot: SpaceSnapshot): string =>
-  nextNumberedTitle(
-    'Graph',
-    snapshot.document.graphs.map((graph) => graph.title),
   );
 
 export const nextCardTitle = (snapshot: SpaceSnapshot): string =>
@@ -233,6 +225,7 @@ const sameSnapshot = (left: SpaceSnapshot, right: SpaceSnapshot): boolean => sam
 export function createSpaceAuthoring({
   session,
   navigation,
+  currentSpace,
   initialPlacement = null,
   reportObserverError = (error) => console.error('SpaceAuthoring observer failed', error),
 }: SpaceAuthoringDependencies): SpaceAuthoring {
@@ -311,26 +304,87 @@ export function createSpaceAuthoring({
     if (installing === 0) publish();
   });
 
-  const canConnect = (from: CardId, to: CardId): boolean => {
-    if (placement === null) return false;
-    const snapshot = session.getState().working;
-    if (!snapshot.cards.some((card) => card.id === from)) return false;
-    if (!snapshot.cards.some((card) => card.id === to)) return false;
-    const graphId = navigation.getState().activeGraphId;
-    if (graphId === null) return snapshot.document.graphs.length === 0;
-    const graph = snapshot.document.graphs.find((candidate) => candidate.id === graphId);
-    return graph !== undefined && !graph.edges.some((edge) => edge.from === from && edge.to === to);
+  /**
+   * The Graph a connection drawn right now would land in, or `null` when the
+   * Edit would mint one.
+   *
+   * **Only a selected Layout has an answer.** An Algorithmic View is *converted*
+   * by the Edit (ADR 0025), and the Layout that conversion produces owns a Graph
+   * the View mints on the way out (ADR 0045) — so the Edge joins a Graph that
+   * does not exist yet, whatever Graph the author happens to be emphasising.
+   * That emphasis belongs to some other Layout and is not where the Edge goes.
+   *
+   * A Layout the Space no longer holds answers `null` too: it names no Graph,
+   * and the completion that follows refuses for that reason rather than this one.
+   */
+  const targetGraph = (): Graph | null => {
+    const { selectedRenderer, activeGraphId } = navigation.getState();
+    if (selectedRenderer.kind === 'view') return null;
+    const layout = (session.getState().working.document.layouts ?? []).find(
+      (candidate) => candidate.id === selectedRenderer.layoutId,
+    );
+    return layout?.graphs.find((graph) => graph.id === activeGraphId) ?? null;
   };
 
+  /**
+   * Whether a Card is one an Edge this gesture authors may name at all.
+   *
+   * Two conditions, and the second is ADR 0040's closure read forwards. A Card
+   * of the Space is not necessarily a Card of the Layout the Edit writes: a
+   * Layout's members **are** its position keys, and the completed placement is
+   * what those keys are about to become. An Edge naming a Card outside it
+   * derives a Space intake rejects, and `deriveCompletedEdit` answers an
+   * unloadable Space by throwing — right for a bug, wrong for a gesture the
+   * author can make. While the omitted-Card fallback band still draws a Card its
+   * Layout leaves out, they can: refusing here is what keeps that a refusal.
+   *
+   * Reading the installed placement rather than the stored Layout is deliberate.
+   * It is the same value the completion reports, so the preview and the
+   * completion cannot disagree; and it is the only one that answers on an
+   * Algorithmic View, which has no Layout to consult and whose conversion
+   * returns exactly these Cards.
+   */
+  const connectable = (cardId: CardId): boolean =>
+    placement !== null &&
+    placement.has(cardId) &&
+    session.getState().working.cards.some((card) => card.id === cardId);
+
+  /**
+   * Whether an Edge from one Card to another is one this gesture may author.
+   *
+   * The duplicate refusal is **conditional on a selected Layout**, and that is
+   * not an omission on the other branch. An exact duplicate within one Graph is
+   * what intake rejects (ADR 0032), so it can only be a duplicate of an Edge in
+   * the Graph the Edge is about to join — and on an Algorithmic View that Graph
+   * is the empty one conversion is about to mint, which holds nothing to
+   * duplicate. Refusing there would refuse the *first* connection an author
+   * draws on a Space that already has Graphs, silently and with no way to tell
+   * why.
+   */
+  const canConnect = (from: CardId, to: CardId): boolean => {
+    if (!connectable(from) || !connectable(to)) return false;
+    if (navigation.getState().selectedRenderer.kind === 'view') return true;
+    const graph = targetGraph();
+    return graph !== null && !graph.edges.some((edge) => edge.from === from && edge.to === to);
+  };
+
+  /**
+   * The mirror of the above for an Option/Alt empty drop, which authors a Card
+   * and the Edge reaching it in one Edit (ADR 0033).
+   *
+   * No duplicate is possible against a Card that does not exist yet, so what is
+   * left is whether the Edge has a Graph to land in: on an Algorithmic View,
+   * conversion mints one, so the answer is simply true; on a selected Layout,
+   * the Active Graph must be one that Layout owns.
+   *
+   * The signature is `(from: CardId) => boolean` and stays that way —
+   * `connection-gesture` consumes it as its `accepts` capability, asked per
+   * pointer frame by both the live preview and the release.
+   */
   const canCreateConnectedCard = (from: CardId): boolean => {
-    if (placement === null) return false;
-    const snapshot = session.getState().working;
-    if (!snapshot.cards.some((card) => card.id === from)) return false;
-    const graphId = navigation.getState().activeGraphId;
-    return (
-      (graphId === null && snapshot.document.graphs.length === 0) ||
-      snapshot.document.graphs.some((graph) => graph.id === graphId)
-    );
+    if (!connectable(from)) return false;
+    if (navigation.getState().selectedRenderer.kind === 'view') return true;
+    return targetGraph() !== null;
   };
 
   /**
@@ -356,8 +410,14 @@ export function createSpaceAuthoring({
     let snapshot = session.getState().working;
     const previousSnapshot = snapshot;
     const navigationState = navigation.getState();
-    let activeGraphId = navigationState.activeGraphId;
-    let mintedGraphId: GraphId | null = null;
+    const renderer = navigationState.selectedRenderer;
+    const space = currentSpace();
+    // A selected Layout the Space no longer holds is not an Edit. Checked before
+    // resolving, because `resolveView` answers that case by throwing.
+    if (renderer.kind === 'layout' && getLayout(space, renderer.layoutId) === undefined) {
+      return null;
+    }
+    const view = resolveView(space, renderer);
     let createdCardId: CardId | undefined;
     let connection: { readonly from: CardId; readonly to: CardId } | null = null;
     let completedPlacement = reportedPlacement;
@@ -395,49 +455,50 @@ export function createSpaceAuthoring({
       if (!canConnect(completion.from, completion.to)) return null;
       connection = { from: completion.from, to: completion.to };
     }
-    if (connection !== null) {
-      if (activeGraphId === null) {
-        mintedGraphId = newUuid();
-        activeGraphId = mintedGraphId;
-        snapshot = {
-          ...snapshot,
-          document: {
-            ...snapshot.document,
-            graphs: [
-              ...snapshot.document.graphs,
-              {
-                id: mintedGraphId,
-                title: nextGraphTitle(snapshot),
-                edges: [connection],
-              },
-            ],
-          },
-        };
-      } else {
-        const graphIndex = snapshot.document.graphs.findIndex(
-          (graph) => graph.id === activeGraphId,
-        );
-        const graph = snapshot.document.graphs[graphIndex];
-        if (graph === undefined) return null;
-        const graphs = [...snapshot.document.graphs];
-        graphs[graphIndex] = {
-          ...graph,
-          edges: [...graph.edges, connection],
-        };
-        snapshot = { ...snapshot, document: { ...snapshot.document, graphs } };
-      }
+    // Which Layout this Edit writes, and what it owns afterwards.
+    //
+    // The two branches are the whole of ADR 0025's "editing an Algorithmic View
+    // converts it", now that a Graph is an owned value (ADR 0040). Converting
+    // asks the *View* for the Layout's content, because that is where the choice
+    // lives (ADR 0045) — Flow answers a fresh empty Graph, and `convertView` has
+    // already held that answer to closure and fresh identity. A selected Layout
+    // is not converted: it keeps its id, its title and the Graph identities it
+    // already owns, and the Edit writes into them.
+    let layoutId: UUID;
+    let layoutTitle: string;
+    let ownedGraphs: readonly Graph[];
+    let activeGraphId: GraphId | null;
+    if (view.layout === null) {
+      const converted = view.convert(completedPlacement);
+      completedPlacement = converted.positions;
+      layoutId = newUuid();
+      layoutTitle = nextLayoutTitle(snapshot);
+      ownedGraphs = converted.graphs;
+      // The first Graph a conversion returns is the one the new Layout opens
+      // on — the same rule an absent `activeGraph` is read by (ADR 0026), taken
+      // here rather than left to be resolved because what is written down must
+      // not depend on Graph order (ADR 0028). The Graph the author was merely
+      // emphasising belongs to another Layout and does not come across.
+      activeGraphId = converted.graphs[0].id;
+    } else {
+      layoutId = view.layout.id;
+      layoutTitle = view.layout.title;
+      ownedGraphs = view.layout.graphs;
+      activeGraphId = navigationState.activeGraphId;
     }
-    const renderer = navigationState.selectedRenderer;
-    const layoutId: UUID = renderer.kind === 'view' ? newUuid() : renderer.layoutId;
-    const existing =
-      renderer.kind === 'layout'
-        ? (snapshot.document.layouts ?? []).find((layout) => layout.id === renderer.layoutId)
-        : undefined;
-    if (renderer.kind === 'layout' && existing === undefined) return null;
+    if (connection !== null) {
+      const graphIndex = ownedGraphs.findIndex((graph) => graph.id === activeGraphId);
+      const graph = ownedGraphs[graphIndex];
+      if (graph === undefined) return null;
+      const graphs = [...ownedGraphs];
+      graphs[graphIndex] = { ...graph, edges: [...graph.edges, connection] };
+      ownedGraphs = graphs;
+    }
     const next = updatePositionedLayout(snapshot, {
       layoutId,
-      title: existing?.title ?? nextLayoutTitle(snapshot),
+      title: layoutTitle,
       positions: completedPlacement,
+      graphs: ownedGraphs,
       activeGraphId,
     });
     if (sameSnapshot(previousSnapshot, next)) return null;
@@ -452,7 +513,7 @@ export function createSpaceAuthoring({
     return {
       snapshot: next,
       placement: completedPlacement,
-      mintedGraphId,
+      nextActiveGraphId: activeGraphId,
       nextRenderer: { kind: 'layout', layoutId },
       ...(createdCardId !== undefined ? { createdCardId } : {}),
     };
@@ -478,14 +539,15 @@ export function createSpaceAuthoring({
    * never took, and for a created Card, a position for a Card that does not
    * exist. That is the strand `b091623` inverted this order to close.
    *
-   * **The renderer is adopted before the minted Graph is activated**, because
-   * Navigation's guards resolve the *selected* renderer and this Edit's answer
-   * is `nextRenderer`. Activating first asked the renderer the Edit began in,
-   * which is not the renderer the Edit produced, and it only ever agreed by
-   * accident: an outgoing Layout happens to share the id of the Layout written
-   * back into it, and an outgoing Algorithmic View draws every Graph so any
-   * answer passed. Neither accident is a reason, and the second hides the case
-   * that would break.
+   * **The renderer is adopted with the Active Graph that belongs to it**, and
+   * the ordering that used to be spread over two Navigation calls is now inside
+   * one. It has not been relaxed — the Graph is still resolved against the
+   * renderer *this Edit produced* rather than the one it began in, which is the
+   * whole of what that ordering bought. What changed is that a Layout owns its
+   * Graphs (ADR 0040), so the pair is one answer and the intermediate state
+   * where the renderer has moved and the Graph has not is no longer merely
+   * awkward: on a conversion it names a Layout beside a Graph some *other*
+   * Layout owns, which is exactly the pair Navigation refuses.
    *
    * In that order the three statements below refuse nothing, and each for a
    * reason this Edit established rather than by having no guard to trip:
@@ -493,12 +555,10 @@ export function createSpaceAuthoring({
    * - `install` decides nothing and reads nothing.
    * - `continueInRenderer` resolves a Layout `updatePositionedLayout` wrote into
    *   the snapshot `submit` just installed, and refuses only a Layout that does
-   *   not show the current Active Graph — which every renderer draws, on a
-   *   snapshot `loadSpaceSnapshot` accepted a line earlier. A null Active Graph
-   *   names nothing and is exempt.
-   * - `activateGraph` resolves that same adopted Layout, which shows the minted
-   *   Graph because it is in the snapshot's Graphs and a renderer draws all of
-   *   them.
+   *   not draw the Active Graph handed with it — which is that Layout's own
+   *   `activeGraph`, in a snapshot `loadSpaceSnapshot` accepted a line earlier,
+   *   and intake is precisely the check that a Layout's `activeGraph` is one it
+   *   owns. A null Active Graph names nothing and is exempt.
    *
    * Re-checking any of that *here* would add a branch that cannot be taken, and
    * this repo deletes those rather than keeps them. The guards live in
@@ -509,8 +569,7 @@ export function createSpaceAuthoring({
     installTogether(() => {
       session.submit(edit.snapshot);
       install(edit.placement);
-      navigation.continueInRenderer(edit.nextRenderer);
-      if (edit.mintedGraphId !== null) navigation.activateGraph(edit.mintedGraphId);
+      navigation.continueInRenderer(edit.nextRenderer, edit.nextActiveGraphId);
     });
   };
 

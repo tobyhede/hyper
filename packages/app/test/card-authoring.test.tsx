@@ -14,22 +14,22 @@ const ALIAS_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000006');
 const SECOND_ALIAS_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000007');
 
 /**
- * Two Cards on one Graph in an authored Layout, so the graph opens on a
- * Positioned renderer with a placement already installed and presenting has a
- * traversal to run.
+ * Two Cards on one Graph the Layout owns, so the graph opens on a Positioned
+ * renderer with a placement already installed and presenting has a traversal to
+ * run.
  */
 const snapshot: SpaceSnapshot = spaceSnapshotSchema.parse({
   id: SPACE_ID,
   document: {
-    version: 2,
+    version: 1,
     title: 'Workspace',
-    graphs: [{ id: GRAPH_ID, title: 'Graph', edges: [{ from: CARD_ID, to: OTHER_CARD_ID }] }],
     layouts: [
       {
         id: LAYOUT_ID,
         title: 'Layout',
         kind: 'positioned',
         positions: { [CARD_ID]: { x: 10, y: 20 }, [OTHER_CARD_ID]: { x: 300, y: 20 } },
+        graphs: [{ id: GRAPH_ID, title: 'Graph', edges: [{ from: CARD_ID, to: OTHER_CARD_ID }] }],
       },
     ],
     defaultView: LAYOUT_ID,
@@ -154,6 +154,50 @@ describe('authoring a Card title on the graph', () => {
     fireEvent.keyDown(input, { key: 'Enter' });
 
     expect(cardTitleOf(session, CARD_ID)).toBe('Renamed A');
+    await settled(session);
+  });
+});
+
+/**
+ * The gap between `present()`'s refusal and the control that calls it, at the one
+ * place it now opens.
+ *
+ * Dropping a Graph's minimum Edge count made an empty Graph legal, and ADR 0040
+ * made it *ordinary*: converting an Algorithmic View mints a Layout whose one
+ * Active Graph holds nothing, so this is the state the author is in immediately
+ * after their first edit on the Flow view. `graphStartCard` has no answer for
+ * such a Graph, so `present()` returns having changed nothing — and an enabled
+ * control would read `Present` and swallow the click, which is verbatim the
+ * defect a fully cyclic Graph produced before its guard was split out.
+ *
+ * Neither half proves this on its own: the refusal is in Navigation and the
+ * enablement is in `GraphSelector`, and what went wrong was that they disagreed.
+ */
+describe('presenting after a conversion', () => {
+  const noLayouts: SpaceSnapshot = spaceSnapshotSchema.parse({
+    ...snapshot,
+    document: { version: 1, title: 'Workspace' },
+  });
+
+  it('offers no Present action while the converted Layout’s Graph is empty', async () => {
+    const session = mount(noLayouts);
+    // Nothing to present before the conversion either: a Space with no Layouts
+    // has no Graphs at all, so there is no Active Graph.
+    expect(await screen.findByTestId('present-button')).toBeDisabled();
+
+    fireEvent.doubleClick(await screen.findByRole('heading', { name: 'A' }));
+    const input = screen.getByRole('textbox', { name: 'Card title' });
+    fireEvent.change(input, { target: { value: 'Renamed A' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+
+    // The Edit converted: there is a Layout now, and it is active on the empty
+    // Graph the conversion minted for it.
+    await waitFor(() =>
+      expect(session.getState().working.document.layouts?.[0]?.graphs).toEqual([
+        expect.objectContaining({ edges: [] }),
+      ]),
+    );
+    expect(screen.getByTestId('present-button')).toBeDisabled();
     await settled(session);
   });
 });

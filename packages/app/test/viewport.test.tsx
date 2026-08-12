@@ -23,20 +23,23 @@ import { mountWorkspace } from '../src/Workspace';
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 const LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
+const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
 
 const snapshot = (title: string, cardTitle: string, x: number, y: number): SpaceSnapshot =>
   spaceSnapshotSchema.parse({
     id: SPACE_ID,
     document: {
-      version: 2,
+      version: 1,
       title,
-      graphs: [],
       layouts: [
         {
           id: LAYOUT_ID,
           title: 'Layout',
           kind: 'positioned',
           positions: { [CARD_ID]: { x, y } },
+          // A Layout owns at least one Graph (ADR 0040); this one holds no
+          // Edges, which is all a single-Card Space has to connect.
+          graphs: [{ id: GRAPH_ID, title: 'Main', edges: [] }],
         },
       ],
       defaultView: LAYOUT_ID,

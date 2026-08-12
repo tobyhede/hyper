@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { uuidSchema } from '@project/core';
-import { buildLayoutStrategyGraph, loadSpace, type Space } from '@project/graph';
+import { buildLayoutStrategyGraph, loadSpace, Placement, type Space } from '@project/graph';
 import { CARD_SIZE } from '../src/card';
-import { resolveView } from '../src/view';
+import { convertView, resolveView, type ViewSubject } from '../src/view';
 import { cardFile } from './card-files';
 
 const CARDS = [
@@ -180,9 +180,10 @@ describe('resolveView', () => {
     expect(view.activeGraphId).toBe('00000000-0000-4000-8000-000000000004');
   });
 
-  it('shows every graph under a selected Layout too', () => {
-    // A Layout draws every Graph the Space holds. It once named a subset, and
-    // the answer is now the same one an Algorithmic View gives.
+  it('shows both graphs under a selected Layout that owns both', () => {
+    // The two answers coincide here because this Layout owns every Graph the
+    // Space holds — not because a Layout draws them all. The case below, where a
+    // second Layout owns `Aside`, is what separates them.
     const space = spaceWith({
       layouts: [WORKING_TWO],
       defaultView: '00000000-0000-4000-8000-000000000022',
@@ -284,5 +285,187 @@ describe('resolveView', () => {
     });
 
     expect(resolveView(space).activeGraphId).toBe('00000000-0000-4000-8000-000000000004');
+  });
+});
+
+describe('the Card subject a View names', () => {
+  it('gives an Algorithmic View every Card the Space holds', () => {
+    // Its subject is the Space's Cards (ADR 0045), which is also why it draws
+    // the flatten: every Edge endpoint of every Graph is one of them.
+    expect(resolveView(spaceWith({ layouts: [WORKING, SECOND] })).cardIds).toEqual([
+      '00000000-0000-4000-8000-000000000002',
+      '00000000-0000-4000-8000-000000000003',
+    ]);
+  });
+
+  it('gives a selected Layout its own members, which are its position keys', () => {
+    const space = spaceWith({
+      layouts: [
+        {
+          ...WORKING,
+          positions: { '00000000-0000-4000-8000-000000000002': { x: 40, y: 10 } },
+          graphs: [
+            {
+              ...MAIN,
+              edges: [
+                {
+                  from: '00000000-0000-4000-8000-000000000002',
+                  to: '00000000-0000-4000-8000-000000000002',
+                },
+              ],
+            },
+          ],
+        },
+      ],
+      defaultView: '00000000-0000-4000-8000-000000000022',
+    });
+
+    expect(resolveView(space).cardIds).toEqual(['00000000-0000-4000-8000-000000000002']);
+  });
+});
+
+describe('converting a View into a Layout', () => {
+  const A = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
+  const B = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
+  const onScreen = Placement.fromEntries([
+    [A, { x: 40, y: 10 }],
+    [B, { x: 400, y: 250 }],
+  ]);
+
+  it('answers a fresh empty Graph, numbered above the Graphs it was showing', () => {
+    // Flow's choice among legal outputs, not the boundary's rule (ADR 0045): a
+    // copy of the emphasised Graph would satisfy both obligations and is how two
+    // Graphs carrying one title start diverging in silence.
+    const view = resolveView(spaceWith({ layouts: [WORKING, SECOND] }));
+    expect(view.convert).not.toBeNull();
+
+    const converted = view.convert?.(onScreen);
+
+    expect(converted?.graphs).toHaveLength(1);
+    expect(converted?.graphs[0]?.edges).toEqual([]);
+    expect(converted?.graphs[0]?.title).toBe('Graph 1');
+    expect(view.visibleGraphIds).not.toContain(converted?.graphs[0]?.id);
+    expect(Placement.toPositions(converted?.positions ?? Placement.empty())).toEqual({
+      [A]: { x: 40, y: 10 },
+      [B]: { x: 400, y: 250 },
+    });
+  });
+
+  it('numbers the minted Graph above the highest already taken', () => {
+    const space = spaceWith({
+      layouts: [{ ...WORKING, graphs: [{ ...MAIN, title: 'Graph 4' }] }],
+    });
+    expect(resolveView(space).convert?.(onScreen).graphs[0]?.title).toBe('Graph 5');
+  });
+
+  it('has nothing to convert once a Layout is selected', () => {
+    // A Layout is not converted — it is updated in place, and its Graphs keep
+    // the identities it already owns. `layout` and `convert` are the two sides
+    // of one answer.
+    const view = resolveView(spaceWith({ defaultView: '00000000-0000-4000-8000-000000000022' }));
+    expect(view.layout).not.toBeNull();
+    expect(view.convert).toBeNull();
+  });
+
+  it('converts a Space with no Layouts at all, where there is no Graph to carry over', () => {
+    // Zero Graphs in, one or more out (ADR 0045). This is the state a new Space
+    // starts in, and the first Card an author moves has to leave it.
+    const converted = resolveView(spaceWith({ layouts: [] })).convert?.(onScreen);
+    expect(converted?.graphs).toHaveLength(1);
+    expect(converted?.graphs[0]?.title).toBe('Graph 1');
+  });
+});
+
+/**
+ * The two obligations of ADR 0045, which sit at this boundary and nowhere else.
+ * They are checked against a View written to break them, because a boundary
+ * proved only by the Views that already satisfy it is not proved at all.
+ */
+describe('the conversion boundary', () => {
+  const A = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
+  const B = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
+  const ABSENT = uuidSchema.parse('00000000-0000-4000-8000-000000000099');
+  const SOURCE_GRAPH = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
+  const subject: ViewSubject = {
+    cardIds: [A, B],
+    graphs: [{ id: SOURCE_GRAPH, title: 'Main', edges: [{ from: A, to: B }] }],
+  };
+  const onScreen = Placement.fromEntries([
+    [A, { x: 0, y: 0 }],
+    [B, { x: 1, y: 1 }],
+  ]);
+
+  it('refuses a View that returns a source Graph’s identity', () => {
+    expect(() =>
+      convertView(
+        (source) => ({
+          positions: onScreen,
+          graphs: [
+            { id: SOURCE_GRAPH, title: 'Copied', edges: [...(source.graphs[0]?.edges ?? [])] },
+          ],
+        }),
+        subject,
+        onScreen,
+      ),
+    ).toThrow(/fresh identity/i);
+  });
+
+  it('refuses a View whose returned Edge names a Card it did not return', () => {
+    expect(() =>
+      convertView(
+        () => ({
+          positions: onScreen,
+          graphs: [
+            {
+              id: uuidSchema.parse('00000000-0000-4000-8000-000000000077'),
+              title: 'Pruned',
+              edges: [{ from: A, to: ABSENT }],
+            },
+          ],
+        }),
+        subject,
+        onScreen,
+      ),
+    ).toThrow(/closed/i);
+  });
+
+  it('refuses a View that hands two of its Graphs one identity', () => {
+    const repeated = uuidSchema.parse('00000000-0000-4000-8000-000000000078');
+    expect(() =>
+      convertView(
+        () => ({
+          positions: onScreen,
+          graphs: [
+            { id: repeated, title: 'One', edges: [] },
+            { id: repeated, title: 'Two', edges: [] },
+          ],
+        }),
+        subject,
+        onScreen,
+      ),
+    ).toThrow(/fresh identity/i);
+  });
+
+  it('passes a View that prunes its subject and keeps its Edges closed', () => {
+    // A View may return fewer Cards than it was showing. What it may not do is
+    // keep an Edge whose endpoint it dropped — the defect ADR 0045 records from
+    // the review of PR #39.
+    const pruned = Placement.fromEntries([[A, { x: 0, y: 0 }]]);
+    const converted = convertView(
+      () => ({
+        positions: pruned,
+        graphs: [
+          {
+            id: uuidSchema.parse('00000000-0000-4000-8000-000000000079'),
+            title: 'Pruned',
+            edges: [{ from: A, to: A }],
+          },
+        ],
+      }),
+      subject,
+      onScreen,
+    );
+
+    expect(Placement.toPositions(converted.positions)).toEqual({ [A]: { x: 0, y: 0 } });
   });
 });
