@@ -310,7 +310,11 @@ Examples: `/examples/grouping/sub-flows` (free); `/examples/grouping/selection-g
 
 **The Cards View must not become a sub flow.** Recorded with its reasons in `.scratch/card-route-editing/issues/09`.
 
-**ELK does not currently do the hierarchy.** `elkStrategy` builds a flat graph. Arranging a Layout that contains an expanded Space Card needs ELK's compound-node support, which is real adapter work. §3.6's Dagre caveat is about Dagre and does not transfer.
+**The current adapter does not model hierarchy.** `elkStrategy` builds a flat
+graph. The pinned elkjs 0.12.0 API accepts nested `ElkNode.children`, and its
+layered engine includes compound-graph support. Arranging a Layout that contains
+an expanded Space Card therefore requires the adapter to use ELK's compound-node
+support. §3.6's Dagre caveat is about Dagre and does not transfer.
 
 ### 8.4 `llms-full.txt` is incomplete
 

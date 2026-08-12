@@ -98,6 +98,8 @@ absent Cards return to the viewport, which is what ADR 0040's retirement was
 about. A visible container makes membership more legible than the old band did,
 which is why this is worth recording rather than dismissing.
 
-Sub flows are kept for the Space Card, where the containment is real rather than
-a UI convenience — `.scratch/space-cards/issues/01-render-a-space-card-as-a-sub-flow.md`.
-The mechanism and its constraints are in `.scratch/react-flow-guidance/findings.md` §8.
+Sub flows remain a candidate for a future Space Card, where containment may be
+real rather than a UI convenience —
+`.scratch/space-cards/issues/01-render-a-space-card-as-a-sub-flow.md`. That
+choice follows the unresolved Space Card kind and reference decision. The
+mechanism and its constraints are in `.scratch/react-flow-guidance/findings.md` §8.
