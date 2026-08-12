@@ -134,13 +134,13 @@ describe('importSingleSpace', () => {
     // inside them. Hyper is unreleased, so it has no compatibility claim on the
     // first-public document and never enters (ADR 0040).
     //
-    // Import parses the file against `importSpaceFileSchema`, which is ahead of
-    // domain intake, so what refuses here is the `version` literal rather than
-    // `loadSpace`'s named `unsupported-version` error. The version is still the
-    // first thing said, and nothing reaches the repository — but unlike intake,
-    // which reads the declared version *before* parsing precisely so it answers
-    // once, this path also emits the cascade of keys that moved. Asserted as it
-    // is rather than as it should be.
+    // Import parses against `importSpaceFileSchema`, which runs ahead of domain
+    // intake, so it asks `unsupportedDocumentVersion` before that schema can
+    // answer for the keys that moved — the same gate `loadSpace` asks, so the
+    // CLI says of a version 2 directory exactly what intake says, once. What
+    // that gate is and where it lives is pinned in `read-single-space.test.ts`;
+    // what matters here is that the version is the whole of the refusal and
+    // nothing reaches the repository.
     const directory = await makeTemporaryDirectory();
     await writeFile(
       join(directory, 'space.json'),
@@ -158,7 +158,8 @@ describe('importSingleSpace', () => {
 
     expect(error).toBeInstanceOf(SpaceImportFileError);
     expect((error as SpaceImportFileError).kind).toBe('parsing');
-    expect((error as SpaceImportFileError).diagnostics[0]).toContain('version');
+    expect((error as SpaceImportFileError).diagnostics).toHaveLength(1);
+    expect((error as SpaceImportFileError).diagnostics[0]).toContain('version 2');
     expect(repository.imports).toEqual([]);
   });
 

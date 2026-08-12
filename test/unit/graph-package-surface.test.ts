@@ -51,6 +51,7 @@ const OFFERED_VALUES = [
   'graphCardIds',
   'graphStartCard',
   'serializeCardFile',
+  'unsupportedDocumentVersion',
 ] as const;
 
 const OFFERED_TYPES = [
@@ -75,6 +76,7 @@ const OFFERED_TYPES = [
   'GraphRenderHandleRef',
   'Space',
   'SpaceError',
+  'UnsupportedVersionError',
 ] as const;
 
 /** What the index declares, split the way the index declares it. */

@@ -6,7 +6,11 @@ import {
   type ImportSpace,
   type ImportSpaceFile,
 } from '@project/core';
-import { parseImportCardFile } from '@project/graph';
+import {
+  parseImportCardFile,
+  unsupportedDocumentVersion,
+  type UnsupportedVersionError,
+} from '@project/graph';
 
 type SpaceImportFileErrorKind = 'discovery' | 'parsing';
 
@@ -104,20 +108,38 @@ export const readSingleSpace = async (inputPath: string): Promise<ImportSpace> =
 
   const diagnostics: string[] = [];
   let parsedSpaceFile: ImportSpaceFile | undefined;
+  let wrongVersion: UnsupportedVersionError | null = null;
   try {
     const json: unknown = JSON.parse(spaceText);
-    const parsed = importSpaceFileSchema.safeParse(json);
-    if (parsed.success) {
-      parsedSpaceFile = parsed.data;
-    } else {
-      diagnostics.push(
-        ...parsed.error.issues.map(
-          (issue) => `${spaceFile}: ${issue.path.join('.') || '(space)'}: ${issue.message}`,
-        ),
-      );
+    // Asked before the import schema, and asked *here* rather than answered
+    // here: this is the same gate domain intake reads, so the two doors a
+    // document arrives by cannot come to disagree about which version this
+    // build supports. The import schemas run ahead of intake, so without it a
+    // version 2 directory earns the version diagnostic plus every key that
+    // moved — the cascade the gate exists to prevent, arriving at the one
+    // reader hand-authoring the document.
+    wrongVersion = unsupportedDocumentVersion(json);
+    if (wrongVersion === null) {
+      const parsed = importSpaceFileSchema.safeParse(json);
+      if (parsed.success) {
+        parsedSpaceFile = parsed.data;
+      } else {
+        diagnostics.push(
+          ...parsed.error.issues.map(
+            (issue) => `${spaceFile}: ${issue.path.join('.') || '(space)'}: ${issue.message}`,
+          ),
+        );
+      }
     }
   } catch (error) {
     diagnostics.push(`${spaceFile}: ${String(error)}`);
+  }
+
+  // One answer, and nothing behind it: a document of a version this build
+  // cannot read is not a document whose cards are worth reporting either, which
+  // is what intake says by answering exactly one error.
+  if (wrongVersion !== null) {
+    throw new SpaceImportFileError('parsing', [`${spaceFile}: ${wrongVersion.message}`]);
   }
 
   const cards = cardPaths.flatMap((path, index) => {

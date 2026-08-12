@@ -55,13 +55,16 @@ export interface Space {
   readonly layoutByGraphId: ReadonlyMap<GraphId, Layout>;
 }
 
+/** What a document declaring a version this build does not read earns. */
+export type UnsupportedVersionError = { kind: 'unsupported-version'; message: string };
+
 /**
  * Why a load failed: a bad shape, a card file that will not parse, or a
  * reference that does not resolve.
  */
 export type SpaceError =
   | { kind: 'invalid-shape'; message: string }
-  | { kind: 'unsupported-version'; message: string }
+  | UnsupportedVersionError
   | { kind: 'retired-space-graphs'; message: string }
   | CardFileError
   | SpaceReferenceError;
@@ -75,8 +78,14 @@ export type SpaceError =
  * answers a cascade in which nothing says which version arrived. A version this
  * cannot read at all (absent, not a number) is left to the shape check, whose
  * message for it is already the right one.
+ *
+ * Offered rather than private, because it is *the* answer to which version this
+ * build reads and a second one would drift from it. Every door a document
+ * arrives by asks here: domain intake below, and the file importer, which parses
+ * against schemas that run ahead of intake and would otherwise answer that
+ * cascade to the one reader hand-authoring the document (ADR 0030).
  */
-function unsupportedVersion(document: unknown): SpaceError | null {
+export function unsupportedDocumentVersion(document: unknown): UnsupportedVersionError | null {
   if (typeof document !== 'object' || document === null) return null;
   const declared: unknown = (document as { version?: unknown }).version;
   if (typeof declared !== 'number' || declared === SPACE_FILE_VERSION) return null;
@@ -90,7 +99,7 @@ function unsupportedVersion(document: unknown): SpaceError | null {
  * The one error a document carrying the retired space-level `graphs` earns, or
  * `null` when it does not carry one.
  *
- * Read before parsing, beside {@link unsupportedVersion}, because
+ * Read before parsing, beside {@link unsupportedDocumentVersion}, because
  * `spaceFileSchema` is a plain object and Zod *strips* a key it does not
  * declare. That is the right answer for the retired `cards` and `edges` keys:
  * they carried nothing the rest of the document does not already say — a card
@@ -136,7 +145,7 @@ export type LoadSpaceSnapshotResult =
  * stays synchronous. Reading the bytes belongs to the caller, as it always did.
  */
 export function loadSpace(input: unknown, cardFiles: readonly CardFile[]): LoadSpaceResult {
-  const wrongVersion = unsupportedVersion(input);
+  const wrongVersion = unsupportedDocumentVersion(input);
   if (wrongVersion !== null) return { ok: false, errors: [wrongVersion] };
   const retired = retiredSpaceGraphs(input);
   if (retired !== null) return { ok: false, errors: [retired] };
@@ -190,7 +199,7 @@ export function loadSpace(input: unknown, cardFiles: readonly CardFile[]): LoadS
 export function loadSpaceSnapshot(input: unknown): LoadSpaceSnapshotResult {
   const storedDocument =
     typeof input === 'object' && input !== null ? (input as { document?: unknown }).document : null;
-  const wrongVersion = unsupportedVersion(storedDocument);
+  const wrongVersion = unsupportedDocumentVersion(storedDocument);
   if (wrongVersion !== null) return { ok: false, errors: [wrongVersion] };
   const retired = retiredSpaceGraphs(storedDocument);
   if (retired !== null) return { ok: false, errors: [retired] };

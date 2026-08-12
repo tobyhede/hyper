@@ -1,6 +1,7 @@
 import { chmod, mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
+import { loadSpace } from '@project/graph';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   SpaceImportFileError,
@@ -10,6 +11,23 @@ import {
 
 const SPACE_ID = '00000000-0000-4000-8000-000000000001';
 const ROOT_CARD_ID = '00000000-0000-4000-8000-000000000002';
+const GRAPH_ID = '00000000-0000-4000-8000-000000000003';
+const LAYOUT_ID = '00000000-0000-4000-8000-000000000004';
+
+/**
+ * The disposable pre-release shape: graphs declared beside the layouts rather
+ * than owned by them (ADR 0040). Under version 1 each of its layouts is missing
+ * the graphs it now owns and carries a key the schema does not recognise, so a
+ * shape check reached on its own answers a cascade in which nothing says which
+ * version arrived.
+ */
+const versionTwoDocument = {
+  version: 2,
+  id: SPACE_ID,
+  title: 'Pre-release talk',
+  graphs: [{ id: GRAPH_ID, title: 'Main', edges: [] }],
+  layouts: [{ id: LAYOUT_ID, title: 'Working', positions: {} }],
+};
 
 const temporaryDirectories: string[] = [];
 
@@ -206,6 +224,49 @@ describe('readSingleSpace', () => {
     expect(thrown.kind).toBe('parsing');
     expect(thrown.diagnostics.join('\n')).toContain(spaceFile);
     expect(thrown.diagnostics.join('\n')).toContain('layouts.0.graphs.0.edges.0.from');
+  });
+
+  it('answers a version it cannot read once, ahead of every key that moved', async () => {
+    const temporaryDirectory = await makeTemporaryDirectory();
+    const talkDirectory = join(temporaryDirectory, 'talk');
+    await mkdir(talkDirectory);
+
+    const spaceFile = join(talkDirectory, 'space.json');
+    await writeFile(spaceFile, JSON.stringify(versionTwoDocument));
+    // A document of a version this build cannot read is not a document to
+    // report the files of, either: nothing here is worth saying until the
+    // version is.
+    await writeFile(join(talkDirectory, 'broken.md'), 'No frontmatter here.\n');
+
+    const thrown = await captureError(() => readSingleSpace(talkDirectory));
+
+    expect(thrown).toBeInstanceOf(SpaceImportFileError);
+    if (!(thrown instanceof SpaceImportFileError)) return;
+    expect(thrown.kind).toBe('parsing');
+    expect(thrown.diagnostics).toHaveLength(1);
+    expect(thrown.diagnostics[0]).toContain(spaceFile);
+    expect(thrown.diagnostics[0]).toContain('version 2');
+  });
+
+  it('says of that version exactly what domain intake says', async () => {
+    // The acceptance criterion behind the check above: one place in the tree
+    // answers which version is supported, so the door a human hand-authoring a
+    // space directory walks through and the one every other space arrives by
+    // cannot come to disagree about it.
+    const temporaryDirectory = await makeTemporaryDirectory();
+    const talkDirectory = join(temporaryDirectory, 'talk');
+    await mkdir(talkDirectory);
+    await writeFile(join(talkDirectory, 'space.json'), JSON.stringify(versionTwoDocument));
+
+    const thrown = await captureError(() => readSingleSpace(talkDirectory));
+    const intake = loadSpace(versionTwoDocument, []);
+
+    expect(intake.ok).toBe(false);
+    if (intake.ok) return;
+    expect(thrown).toBeInstanceOf(SpaceImportFileError);
+    if (!(thrown instanceof SpaceImportFileError)) return;
+    expect(intake.errors).toHaveLength(1);
+    expect(thrown.diagnostics[0]).toContain(intake.errors[0]?.message);
   });
 });
 
