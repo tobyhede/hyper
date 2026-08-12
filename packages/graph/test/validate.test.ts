@@ -1,10 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { BuiltInViewId, Card, Layout, LayoutPosition, Graph, UUID } from '@project/core';
 // The whole module is internal: `loadSpace` is the one intake that runs it.
-import { validateReferences, type SpaceReferenceError } from '../src/validate';
+import { validateReferences } from '../src/validate';
 import { alias, card, uuid } from './card-files';
-
-const errorKinds = (errors: readonly SpaceReferenceError[]): string[] => errors.map((e) => e.kind);
 
 // A mutable space-file shape: these tests deliberately construct broken graphs
 // (which loadSpace would reject) and hand them straight to validateReferences.
@@ -344,8 +342,8 @@ describe('validateReferences: layouts (ADR 0025)', () => {
   });
 });
 
-describe('validateReferences: the graphs a Layout names (ADR 0026)', () => {
-  /** Two graphs, so a filter has something to leave out. */
+describe('validateReferences: the graph a Layout opens active (ADR 0026)', () => {
+  /** Two graphs, so the active one is a choice rather than the only answer. */
   function twoGraphs() {
     const m = baseSpaceFile();
     m.graphs.push({
@@ -361,25 +359,13 @@ describe('validateReferences: the graphs a Layout names (ADR 0026)', () => {
     return m;
   }
 
-  it('accepts a layout that names neither — every graph shown, the first active', () => {
+  it('accepts a layout that names none — the first graph is active', () => {
     const m = twoGraphs();
     m.layouts = [layout(uuid('00000000-0000-4000-8000-000000000022'), {})];
     expect(validateReferences(m)).toEqual([]);
   });
 
-  it('accepts a filter and an active graph inside it', () => {
-    const m = twoGraphs();
-    m.layouts = [
-      {
-        ...layout(uuid('00000000-0000-4000-8000-000000000022'), {}),
-        graphs: [uuid('00000000-0000-4000-8000-000000000004')],
-        activeGraph: uuid('00000000-0000-4000-8000-000000000004'),
-      },
-    ];
-    expect(validateReferences(m)).toEqual([]);
-  });
-
-  it('accepts an active graph with no filter — every graph is visible', () => {
+  it('accepts any graph the space holds as the active one', () => {
     const m = twoGraphs();
     m.layouts = [
       {
@@ -388,27 +374,6 @@ describe('validateReferences: the graphs a Layout names (ADR 0026)', () => {
       },
     ];
     expect(validateReferences(m)).toEqual([]);
-  });
-
-  it('reports a filter naming a graph the space does not have', () => {
-    const m = twoGraphs();
-    m.layouts = [
-      {
-        ...layout(uuid('00000000-0000-4000-8000-000000000022'), {}),
-        graphs: [
-          uuid('00000000-0000-4000-8000-000000000004'),
-          uuid('00000000-0000-4000-8000-000000000099'),
-        ],
-      },
-    ];
-    const errors = validateReferences(m);
-    expect(
-      errors.some(
-        (e) =>
-          e.kind === 'layout-unknown-graph' &&
-          e.ref === uuid('00000000-0000-4000-8000-000000000099'),
-      ),
-    ).toBe(true);
   });
 
   it('reports an activeGraph the space does not have', () => {
@@ -429,59 +394,12 @@ describe('validateReferences: the graphs a Layout names (ADR 0026)', () => {
     ).toBe(true);
   });
 
-  it('reports an activeGraph the layout filters out, though both ids resolve', () => {
-    // The one check that relates the two fields rather than resolving either
-    // against the space. Activating moves emphasis within the visible set, so a
-    // layout opening active on a graph it hides has asked for an unreachable
-    // state — and it is an error even though "aside" is a perfectly real graph.
-    const m = twoGraphs();
-    m.layouts = [
-      {
-        ...layout(uuid('00000000-0000-4000-8000-000000000022'), {}),
-        graphs: [uuid('00000000-0000-4000-8000-000000000004')],
-        activeGraph: uuid('00000000-0000-4000-8000-000000000020'),
-      },
-    ];
-    const errors = validateReferences(m);
-    expect(
-      errors.some(
-        (e) =>
-          e.kind === 'layout-active-graph-not-shown' &&
-          e.ref === uuid('00000000-0000-4000-8000-000000000020'),
-      ),
-    ).toBe(true);
-    // Not also reported as unknown: it resolves, it is just not shown.
-    expect(errorKinds(errors)).not.toContain('layout-unknown-graph');
-  });
-
-  it('reports an empty filter with an active graph, rather than treating it as absent', () => {
-    // A layout showing no graphs is legal shape; naming an active one is not,
-    // because the visible set it must belong to is empty. Absent means all —
-    // empty means none, and the two must not collapse.
-    const m = twoGraphs();
-    m.layouts = [
-      {
-        ...layout(uuid('00000000-0000-4000-8000-000000000022'), {}),
-        graphs: [],
-        activeGraph: uuid('00000000-0000-4000-8000-000000000004'),
-      },
-    ];
-    const errors = validateReferences(m);
-    expect(
-      errors.some(
-        (e) =>
-          e.kind === 'layout-active-graph-not-shown' &&
-          e.ref === uuid('00000000-0000-4000-8000-000000000004'),
-      ),
-    ).toBe(true);
-  });
-
   it('names the layout in the message, since the id alone does not say where', () => {
     const m = twoGraphs();
     m.layouts = [
       {
         ...layout(uuid('00000000-0000-4000-8000-000000000022'), {}),
-        graphs: [uuid('00000000-0000-4000-8000-000000000099')],
+        activeGraph: uuid('00000000-0000-4000-8000-000000000099'),
       },
     ];
     const [error] = validateReferences(m);

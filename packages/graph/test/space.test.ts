@@ -212,6 +212,25 @@ describe('loadSpace: layouts', () => {
     expect(result.space.layouts).toEqual([]);
   });
 
+  /**
+   * The one intake refuses a stale authored file outright rather than reading
+   * the retired filter as a layout that draws everything. Shape, not reference:
+   * the key is unrecognised, so no reference check ever runs over it.
+   */
+  it('rejects a layout that names the graphs it draws', () => {
+    const result = loadSpace(
+      {
+        ...validInput,
+        layouts: [{ ...working, graphs: [uuid('00000000-0000-4000-8000-000000000004')] }],
+      },
+      validCards,
+    );
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.errors.every((error) => error.kind === 'invalid-shape')).toBe(true);
+    expect(result.errors.some((error) => error.message.includes('graphs'))).toBe(true);
+  });
+
   it('rejects a layout positioning a card that does not exist', () => {
     const result = loadSpace(
       {

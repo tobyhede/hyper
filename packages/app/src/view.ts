@@ -23,9 +23,9 @@ import { elkStrategy } from '@project/react-flow-adapter';
  * spec and deliberately not built, so today the chain is two links long.
  *
  * A view also answers which graphs it shows and which of them opens active
- * (ADR 0026). Both are read off the resolved Layout, and both have a fallback,
- * so the answer exists for every space — including one with no Layout and one
- * with no graphs at all.
+ * (ADR 0026). Every view shows every graph; the active one is read off the
+ * resolved Layout and falls back, so the answer exists for every space —
+ * including one with no Layout and one with no graphs at all.
  *
  * This lives in `app` rather than `graph` because resolving a view means
  * choosing a strategy, and `elkStrategy` lives in the adapter — `graph` may not
@@ -54,10 +54,10 @@ export interface ResolvedView {
    */
   layout: Layout | null;
   /**
-   * The graphs this view draws — a Layout's filter, or every graph (ADR 0026).
-   * Authored view scope, decided once by whoever wrote the Layout, and never
-   * touched by activating a graph. Which graphs a view shows is the View's call
-   * (ADR 0005), and this is the View making it.
+   * The graphs this view draws: every graph in the Space, for every view today.
+   * It stays a field rather than collapsing into `space.graphs` at each reader
+   * because which graphs a view shows is the View's call (ADR 0005) — this is
+   * the one place that answers it, and ADR 0040 gives a Layout its own answer.
    */
   visibleGraphIds: readonly GraphId[];
   /**
@@ -74,18 +74,18 @@ export type RendererSelection =
   | { readonly kind: 'layout'; readonly layoutId: UUID };
 
 /**
- * Which graphs a Layout shows and which of them opens active.
+ * Which graphs a view draws and which of them opens active.
  *
- * A read, never a write: an author's space needs neither field, and the answers
- * are computed rather than filled in. What the app *saves* names the active
- * graph outright, which is a different rule and lives in `persist.ts` (ADR 0028).
+ * A read, never a write: an author's space needs neither answer written down,
+ * and both are computed rather than filled in. What the app *saves* names the
+ * active graph outright, which is a different rule and lives in `snapshot.ts`
+ * (ADR 0028).
  */
 function resolveGraphs(
   space: Space,
   layout: Layout | null,
 ): Pick<ResolvedView, 'visibleGraphIds' | 'activeGraphId'> {
-  const all = space.graphs.map((graph) => graph.id);
-  const visibleGraphIds = layout?.graphs ?? all;
+  const visibleGraphIds = space.graphs.map((graph) => graph.id);
   return {
     visibleGraphIds,
     // `loadSpace` has already checked that a named `activeGraph` is one of these,
@@ -101,7 +101,7 @@ function resolveGraphs(
  * it so the question and the one answer to it sit in the same module (ADR 0026).
  * It reads `visibleGraphIds` rather than deciding visibility a second time —
  * Navigation asks this, and a Navigation that computed its own answer would
- * disagree with the renderer the moment a Layout filters.
+ * disagree with the renderer the moment the two sets differ again.
  */
 export const viewShowsGraph = (view: ResolvedView, graphId: GraphId): boolean =>
   view.visibleGraphIds.includes(graphId);
@@ -132,8 +132,8 @@ export function resolveView(
   }
 
   const strategy = BUILT_IN_STRATEGIES[selection.view]();
-  // A built-in view carries no Layout and so filters nothing: every graph shows,
-  // and the first is active.
+  // A built-in view carries no Layout, so it has no authored active graph to
+  // read: every graph shows, and the first is active.
   return {
     id: selection.view,
     strategy,

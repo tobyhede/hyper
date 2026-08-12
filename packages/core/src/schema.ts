@@ -130,36 +130,33 @@ export const layoutPositionSchema = z.object({
  * not exist; that is a reference error, checked in `@project/graph` where the
  * whole space is in view.
  *
- * It also points at graphs: which it shows, and which of those is active (ADR
- * 0026). Both are optional and independent, and the dependency runs one way —
- * geometry references topology, never the reverse. A Graph stays a peer of
- * Layout under the Space and knows nothing about where it is drawn.
+ * It also points at one graph: the one that is active when it opens (ADR 0026).
+ * The dependency runs one way — geometry references topology, never the
+ * reverse. A Graph stays a peer of Layout under the Space and knows nothing
+ * about where it is drawn.
+ *
+ * **Strict, unlike every other object here.** A layout used to carry `graphs`,
+ * a filter naming the graphs it drew, and every renderer now draws every graph.
+ * Stripping the retired key would read a file that said "draw only these" as
+ * one that says "draw all of them", which is the single answer its author did
+ * not write; rejecting says so instead.
  */
-export const positionedLayoutSchema = z.object({
-  id: idSchema,
-  title: z.string().min(1),
-  kind: z.literal('positioned'),
-  positions: z.record(idSchema, layoutPositionSchema),
-  /**
-   * The graphs this layout *shows* — a filter, absent meaning every graph (ADR
-   * 0026). Authored view scope: one arrangement does not suit every graph, and
-   * a layout arranged for some should not draw the ones it was not arranged
-   * for. Activating a graph moves emphasis within this set and never changes
-   * it — *selection is emphasis, not filtering, and the filter is the Layout's*.
-   */
-  graphs: z.array(idSchema).optional(),
-  /**
-   * Which visible graph is active when this layout opens. Absent, the **first
-   * visible graph** is (ADR 0026) — resolved on read, so a hand-authored space
-   * needs nothing here, while a file the app wrote names it outright rather
-   * than depending on graph order (ADR 0028).
-   *
-   * Independent of `graphs`: a layout may filter without naming an active
-   * graph, or name one without filtering. That it names a *visible* graph is a
-   * relation between the two fields and is checked in `@project/graph`.
-   */
-  activeGraph: idSchema.optional(),
-});
+export const positionedLayoutSchema = z
+  .object({
+    id: idSchema,
+    title: z.string().min(1),
+    kind: z.literal('positioned'),
+    positions: z.record(idSchema, layoutPositionSchema),
+    /**
+     * Which graph is active when this layout opens. Absent, the **first graph**
+     * is (ADR 0026) — resolved on read, so a hand-authored space needs nothing
+     * here, while a file the app wrote names it outright rather than depending
+     * on graph order (ADR 0028). That it names a graph the space holds needs
+     * the whole space in view and is checked in `@project/graph`.
+     */
+    activeGraph: idSchema.optional(),
+  })
+  .strict();
 
 /**
  * A layout carried by the space file, discriminated by `kind`. Every Layout is

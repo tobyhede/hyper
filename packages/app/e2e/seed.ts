@@ -12,24 +12,19 @@ export interface HttpLoadedSpace {
   readonly exportedRevision: string | null;
 }
 
-/**
- * The Layout id every graph-filter scenario seeds. One shared constant because
- * two tests asserting against two different literals that happen to match reads
- * as coincidence.
- */
-export const FILTERED_LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000099');
+/** The Layout id every seeded scenario writes, so no test asserts against a literal of its own. */
+export const SEEDED_LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000099');
 
 /**
- * Seed the opened Space with a single Layout whose graph filter is empty, then
- * read it back.
+ * Seed the opened Space with a single positioned Layout, then read it back.
  *
- * A Layout carrying `graphs: []` draws no Graph at all (ADR 0026), which is the
- * state both the empty-filter and the suppressed-creation scenarios need. This
- * goes through the same HTTP boundary the browser uses rather than reaching past
- * it, so the seeded revision is one the app will actually observe — hence the
- * read-back: the caller asserts against the revision the commit produced.
+ * What it buys a test is an app that opens in an authored Layout rather than an
+ * Algorithmic View. This goes through the same HTTP boundary the browser uses
+ * rather than reaching past it, so the seeded revision is one the app will
+ * actually observe — hence the read-back: the caller asserts against the
+ * revision the commit produced.
  */
-export async function seedGraphLessLayout(
+export async function seedPositionedLayout(
   page: Page,
   title: string,
   positionsFor: (snapshot: SpaceSnapshot) => Record<string, { x: number; y: number }>,
@@ -50,14 +45,13 @@ export async function seedGraphLessLayout(
       ...loaded.snapshot.document,
       layouts: [
         {
-          id: FILTERED_LAYOUT_ID,
+          id: SEEDED_LAYOUT_ID,
           title,
           kind: 'positioned',
           positions: positionsFor(loaded.snapshot),
-          graphs: [],
         },
       ],
-      defaultView: FILTERED_LAYOUT_ID,
+      defaultView: SEEDED_LAYOUT_ID,
     },
   };
   const commitResponse = await page.request.put(`/api/spaces/${spaceId}`, {
@@ -69,14 +63,3 @@ export async function seedGraphLessLayout(
   expect(seededResponse.ok()).toBe(true);
   return (await seededResponse.json()) as HttpLoadedSpace;
 }
-
-/** Every Card on a five-wide grid, so a multi-Card fixture stays legible. */
-export const allCardsOnAGrid = (
-  snapshot: SpaceSnapshot,
-): Record<string, { x: number; y: number }> =>
-  Object.fromEntries(
-    snapshot.cards.map((card, index) => [
-      card.id,
-      { x: (index % 5) * 320, y: Math.floor(index / 5) * 200 },
-    ]),
-  );

@@ -17,7 +17,6 @@ const canonicalSpaceFile = ({ snapshot }: LoadedSpace): SpaceFile => {
     positions: Object.fromEntries(
       Object.entries(layout.positions).sort(([left], [right]) => compareOrdinal(left, right)),
     ),
-    ...(layout.graphs === undefined ? {} : { graphs: layout.graphs }),
     ...(layout.activeGraph === undefined ? {} : { activeGraph: layout.activeGraph }),
   }));
   return {

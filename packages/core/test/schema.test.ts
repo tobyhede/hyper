@@ -69,7 +69,6 @@ describe('space file schema', () => {
           id: '00000000-0000-4000-8000-000000000010',
           title: 'Working',
           positions: { '00000000-0000-4000-8000-000000000002': { x: 0, y: 0 } },
-          graphs: ['00000000-0000-4000-8000-000000000004'],
           activeGraph: '00000000-0000-4000-8000-000000000004',
         },
       ],
@@ -320,80 +319,48 @@ describe('space file layouts', () => {
     expect(result.success).toBe(false);
   });
 
-  it('parses the graphs a layout shows and the one it opens active', () => {
-    const file = spaceFileSchema.parse({
-      ...validSpaceFile,
-      layouts: [
-        {
-          ...working,
-          graphs: ['00000000-0000-4000-8000-000000000011', '00000000-0000-4000-8000-000000000012'],
-          activeGraph: '00000000-0000-4000-8000-000000000012',
-        },
-      ],
-    });
-    expect(file.layouts?.[0]?.graphs).toEqual([
-      '00000000-0000-4000-8000-000000000011',
-      '00000000-0000-4000-8000-000000000012',
-    ]);
-    expect(file.layouts?.[0]?.activeGraph).toBe('00000000-0000-4000-8000-000000000012');
-  });
-
-  it('leaves both absent — every graph shown, the first of them active', () => {
-    // Absent is the meaningful case, not a missing field to be filled in: it is
-    // how a layout says "all of them" and defers the active one (ADR 0026).
-    const file = spaceFileSchema.parse({ ...validSpaceFile, layouts: [working] });
-    expect(file.layouts?.[0]?.graphs).toBeUndefined();
-    expect(file.layouts?.[0]?.activeGraph).toBeUndefined();
-  });
-
-  it('takes either without the other — the two are independent', () => {
-    const filtered = spaceFileSchema.parse({
+  it('rejects a layout that names the graphs it draws', () => {
+    // Every renderer draws every graph, so a layout has nothing to say about
+    // which. Rejecting rather than stripping is the point: a file carrying the
+    // retired filter said "draw only these", and reading it as "draw all of
+    // them" in silence is the one answer the author did not write.
+    const result = spaceFileSchema.safeParse({
       ...validSpaceFile,
       layouts: [{ ...working, graphs: ['00000000-0000-4000-8000-000000000011'] }],
     });
-    expect(filtered.layouts?.[0]?.activeGraph).toBeUndefined();
-
-    const named = spaceFileSchema.parse({
-      ...validSpaceFile,
-      layouts: [{ ...working, activeGraph: '00000000-0000-4000-8000-000000000011' }],
-    });
-    expect(named.layouts?.[0]?.graphs).toBeUndefined();
+    expect(result.success).toBe(false);
   });
 
-  it('accepts an empty graphs list — a layout that shows none', () => {
-    // Not the same as absent, which means all. Shape allows it; whether it is
-    // sensible is the author's business.
+  it('parses the graph a layout opens active', () => {
     const file = spaceFileSchema.parse({
       ...validSpaceFile,
-      layouts: [{ ...working, graphs: [] }],
+      layouts: [{ ...working, activeGraph: '00000000-0000-4000-8000-000000000012' }],
     });
-    expect(file.layouts?.[0]?.graphs).toEqual([]);
+    expect(file.layouts?.[0]?.activeGraph).toBe('00000000-0000-4000-8000-000000000012');
   });
 
-  it('rejects graph references that are not ids', () => {
-    for (const layout of [
-      { ...working, graphs: [''] },
-      { ...working, graphs: '00000000-0000-4000-8000-000000000011' },
-      { ...working, activeGraph: '' },
-    ]) {
-      expect(spaceFileSchema.safeParse({ ...validSpaceFile, layouts: [layout] }).success).toBe(
-        false,
-      );
-    }
+  it('leaves it absent — the first graph is active', () => {
+    // Absent is the meaningful case, not a missing field to be filled in: it is
+    // how a layout defers the active graph (ADR 0026).
+    const file = spaceFileSchema.parse({ ...validSpaceFile, layouts: [working] });
+    expect(file.layouts?.[0]?.activeGraph).toBeUndefined();
+  });
+
+  it('rejects an activeGraph that is not an id', () => {
+    expect(
+      spaceFileSchema.safeParse({
+        ...validSpaceFile,
+        layouts: [{ ...working, activeGraph: '' }],
+      }).success,
+    ).toBe(false);
   });
 
   it('accepts an activeGraph no graph has — resolution is a reference check', () => {
-    // Shape only, as everywhere here. That it names a real graph, and one this
-    // layout shows, needs the whole space in view (@project/graph).
+    // Shape only, as everywhere here. That it names a real graph needs the whole
+    // space in view (@project/graph).
     const file = spaceFileSchema.parse({
       ...validSpaceFile,
-      layouts: [
-        {
-          ...working,
-          graphs: ['00000000-0000-4000-8000-000000000011'],
-          activeGraph: '00000000-0000-4000-8000-000000000099',
-        },
-      ],
+      layouts: [{ ...working, activeGraph: '00000000-0000-4000-8000-000000000099' }],
     });
     expect(file.layouts?.[0]?.activeGraph).toBe('00000000-0000-4000-8000-000000000099');
   });

@@ -7,15 +7,15 @@ import { resolveView } from '../src/view';
 import { cardFile } from './card-files';
 
 /**
- * That a filtered projection still resolves its own handles.
+ * That a Layout's projection resolves its own handles.
  *
  * React Flow warning #008 fires when an Edge names a handle that does not
  * resolve on the node it points at. `projection.property.test.ts` in the adapter
  * pins that for `projectCardNodes` and `projectGraphEdges` given *consistent*
  * inputs; what it cannot see is whether anything feeds them consistently. This
- * module is what does, and the case that can break it is a Layout that draws
- * only some of the Space's Graphs: handles and Edges are filtered separately,
- * and filtering one without the other renders a canvas with unattached Edges.
+ * module is what does, and it derives handles and Edges from the visible Graphs
+ * separately — so a Space of several overlapping Graphs is where the two can
+ * disagree and render a canvas with unattached Edges.
  */
 
 const LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-0000000000ff');
@@ -36,45 +36,32 @@ const graphArb = (pool: string[]) =>
     edges: cards.slice(0, -1).map((from, index) => ({ from, to: cards[index + 1]! })),
   }));
 
-/** A Space of several Graphs, plus a Layout drawing a non-empty subset of them. */
-const filteredSpaceArb = cardIdPool.chain((pool) =>
-  fc
-    .array(graphArb(pool), { minLength: 2, maxLength: 4 })
-    .chain((graphs) =>
-      fc
-        .shuffledSubarray(
-          graphs.map((_, index) => uuidFrom(index + 100)),
-          { minLength: 1 },
-        )
-        .map((drawn) => ({ graphs, drawn })),
-    )
-    .map(({ graphs, drawn }) => {
-      const cards = [...new Set(graphs.flatMap((graph) => graph.cards))];
-      return {
-        file: {
-          version: 2,
-          id: '00000000-0000-4000-8000-000000000001',
-          title: 'Generated',
-          graphs: graphs.map((graph, index) => ({
-            id: uuidFrom(index + 100),
-            title: `Graph ${index}`,
-            edges: graph.edges,
-          })),
-          layouts: [
-            {
-              id: LAYOUT_ID,
-              title: 'Filtering',
-              kind: 'positioned',
-              positions: Object.fromEntries(
-                cards.map((id, index) => [id, { x: index * 400, y: 0 }]),
-              ),
-              graphs: drawn,
-            },
-          ],
-        },
-        cardFiles: cards.map((id) => cardFile(id)),
-      };
-    }),
+/** A Space of several overlapping Graphs, plus a Layout positioning its Cards. */
+const layoutSpaceArb = cardIdPool.chain((pool) =>
+  fc.array(graphArb(pool), { minLength: 2, maxLength: 4 }).map((graphs) => {
+    const cards = [...new Set(graphs.flatMap((graph) => graph.cards))];
+    return {
+      file: {
+        version: 2,
+        id: '00000000-0000-4000-8000-000000000001',
+        title: 'Generated',
+        graphs: graphs.map((graph, index) => ({
+          id: uuidFrom(index + 100),
+          title: `Graph ${index}`,
+          edges: graph.edges,
+        })),
+        layouts: [
+          {
+            id: LAYOUT_ID,
+            title: 'Working',
+            kind: 'positioned',
+            positions: Object.fromEntries(cards.map((id, index) => [id, { x: index * 400, y: 0 }])),
+          },
+        ],
+      },
+      cardFiles: cards.map((id) => cardFile(id)),
+    };
+  }),
 );
 
 async function projectThroughLayout(generated: { file: unknown; cardFiles: CardFile[] }) {
@@ -96,7 +83,7 @@ async function projectThroughLayout(generated: { file: unknown; cardFiles: CardF
 describe('canvasProjection handle invariants', () => {
   it('every drawn Edge names handles that exist on the Cards it connects', async () => {
     await fc.assert(
-      fc.asyncProperty(filteredSpaceArb, async (generated) => {
+      fc.asyncProperty(layoutSpaceArb, async (generated) => {
         const { nodes, edges } = await projectThroughLayout(generated);
 
         const handleIds = new Map(
@@ -109,7 +96,7 @@ describe('canvasProjection handle invariants', () => {
           ]),
         );
 
-        // Not vacuous: the Layout draws at least one Graph, and every Graph has
+        // Not vacuous: the Space holds at least two Graphs, and every Graph has
         // at least one Edge.
         expect(edges.length).toBeGreaterThan(0);
 
