@@ -14,13 +14,24 @@ The app's authoring cluster took roughly twenty of the thirty commits before the
 review. The recurring shape was a rule that belonged in one place living in
 several, and being re-fixed each time it broke somewhere new. Placement was the
 worst case — five fixes to one concept, two of them 43 minutes apart. These three
-are the same shape at smaller scale. `01` and `03` are now resolved; `02`
-remains open.
+are the same shape at smaller scale. All four issues are resolved; `04` was
+split out of `02` and closed at the extracted component's rendered-behaviour
+seam.
 
 ## Issues
 
 - `01` — one observable-state module; three publishers disagree (resolved)
-- `02` — a seam for authoring gestures, so `GraphView` is testable off-browser
+- `02` — a seam for authoring gestures, so the canvas is testable off-browser
+  (resolved). Filed against `GraphView.tsx`, which ADR 0041 renamed to
+  `SpaceCanvas.tsx`; re-measured at `562b06c`. Closed by
+  `app/src/connection-gesture.ts`, one rule asked by both the live preview and
+  the release — which had spelled it out separately, against different inputs,
+  with nothing pinning that they agreed. Behaviour unchanged. Its
+  `placement-failure` half was resolved earlier by `ab9873c`; its `Arranging…`
+  half became `04`. The twenty-prop complaint was ruled out of scope.
+- `04` — the "Arranging…" live region is asserted nowhere (resolved). The
+  extracted `PlacementPending` component pins the `status` role and visible
+  text. It deliberately does not claim to cover `App` selecting that branch.
 - `03` — `NavigationState` permits states that mean nothing (resolved). Filed as
   "`Navigation` is shallow"; verification did not support that reading. The
   module is deep — some 56 lines of it are comments recording ADR interactions
