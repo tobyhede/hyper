@@ -22,13 +22,27 @@ import { nextNumberedTitle } from './titles';
 import { defaultRenderer, resolveView, type RendererSelection } from './view';
 
 export type AuthoringCompletion =
-  | { readonly kind: 'settled-card-movement' }
-  | { readonly kind: 'connected-cards'; readonly from: CardId; readonly to: CardId }
-  | { readonly kind: 'edited-card'; readonly cardId: CardId }
+  | {
+      readonly kind: 'settled-card-movement';
+      readonly rendered: Placement;
+      readonly placed: readonly CardId[];
+    }
+  | {
+      readonly kind: 'connected-cards';
+      readonly from: CardId;
+      readonly to: CardId;
+      readonly rendered: Placement;
+    }
+  | {
+      readonly kind: 'edited-card';
+      readonly cardId: CardId;
+      readonly document: CardDocument;
+    }
   | {
       readonly kind: 'create-and-connect';
       readonly from: CardId;
       readonly position: LayoutPosition;
+      readonly rendered: Placement;
     };
 
 export type AuthoringResult =
@@ -75,15 +89,8 @@ export interface SpaceAuthoring {
    */
   readonly authoredPlacement: () => Placement | null;
   readonly subscribe: (listener: () => void) => () => void;
-  readonly installPlacement: (placement: Placement | null) => void;
-  /**
-   * Install an editor's completed Card value before it reports the Edit.
-   *
-   * One hand-off, not a standing entry: the value is consumed by the
-   * `edited-card` completion that carries it, whether or not that produced an
-   * Edit. An editor that installs and then never reports leaves nothing behind.
-   */
-  readonly installCardDocument: (cardId: CardId, document: CardDocument) => void;
+  readonly reportRendered: (rendered: Placement) => void;
+  readonly replacePlacement: (placement: Placement | null) => void;
   readonly canConnect: (from: CardId, to: CardId) => boolean;
   readonly canCreateConnectedCard: (from: CardId) => boolean;
   readonly complete: (completion: AuthoringCompletion) => AuthoringResult;
@@ -133,14 +140,13 @@ interface CompletedEdit {
  * Everything a completion is derived from: the report itself, and the editor
  * state read at the moment it was made.
  *
- * The three travel together from `complete` to the derivation, and a queued one
+ * The two travel together from `complete` to the derivation, and a queued one
  * has to hold them until the drain reaches it, so they are one value rather than
- * three parameters repeated at each hand-off.
+ * two parameters repeated at each hand-off.
  */
 interface ReportedCompletion {
   readonly completion: AuthoringCompletion;
   readonly placement: Placement | null;
-  readonly cardDocuments: ReadonlyMap<CardId, CardDocument>;
 }
 
 /** A `ReportedCompletion` waiting behind the Edit that was installing when it arrived. */
@@ -230,7 +236,6 @@ export function createSpaceAuthoring({
   reportObserverError = (error) => console.error('SpaceAuthoring observer failed', error),
 }: SpaceAuthoringDependencies): SpaceAuthoring {
   let placement: Placement | null = initialPlacement;
-  const cardDocuments = new Map<CardId, CardDocument>();
   let replacementEpoch = 0;
   let installing = 0;
 
@@ -246,6 +251,13 @@ export function createSpaceAuthoring({
   const install = (nextPlacement: Placement | null): void => {
     if (Placement.equals(placement, nextPlacement)) return;
     placement = nextPlacement;
+  };
+
+  const mergeBase = (): Placement | null =>
+    navigation.getState().selectedRenderer.kind === 'layout' ? placement : null;
+
+  const reportRendered = (rendered: Placement): void => {
+    install(Placement.next(mergeBase(), rendered, []));
   };
 
   const snapshotState = (): SpaceAuthoringState => ({
@@ -404,7 +416,6 @@ export function createSpaceAuthoring({
   const deriveCompletedEdit = ({
     completion,
     placement: reportedPlacement,
-    cardDocuments: reportedCardDocuments,
   }: ReportedCompletion): CompletedEdit | null => {
     if (reportedPlacement === null) return null;
     let snapshot = session.getState().working;
@@ -422,11 +433,10 @@ export function createSpaceAuthoring({
     let connection: { readonly from: CardId; readonly to: CardId } | null = null;
     let completedPlacement = reportedPlacement;
     if (completion.kind === 'edited-card') {
-      const document = reportedCardDocuments.get(completion.cardId);
+      const { document } = completion;
       const cardIndex = snapshot.cards.findIndex((card) => card.id === completion.cardId);
       const card = snapshot.cards[cardIndex];
       if (
-        document === undefined ||
         card === undefined ||
         !isSupportedCardEdit(card.document, document) ||
         sameValue(card.document, document)
@@ -585,18 +595,19 @@ export function createSpaceAuthoring({
   let completing = false;
   const queued: QueuedCompletion[] = [];
   const complete = (completion: AuthoringCompletion): AuthoringResult => {
+    const completedPlacement =
+      completion.kind === 'edited-card'
+        ? placement
+        : Placement.next(
+            mergeBase(),
+            completion.rendered,
+            completion.kind === 'settled-card-movement' ? completion.placed : [],
+          );
+    install(completedPlacement);
     const reported: ReportedCompletion = {
       completion,
-      placement,
-      cardDocuments: new Map(cardDocuments),
+      placement: completedPlacement,
     };
-    // An installed Card value is one hand-off, consumed by the report that
-    // carries it — including a queued one, which took its copy above. Left
-    // standing by a completion that produced no Edit it becomes state waiting to
-    // be applied by whatever `edited-card` arrives next: a rename the author
-    // abandoned, landing on a Space they have since changed. Copied first, so
-    // the completion this call reports still reads what it installed.
-    if (completion.kind === 'edited-card') cardDocuments.delete(completion.cardId);
     if (completing) {
       queued.push({ ...reported, replacementEpoch });
       return { kind: 'queued' };
@@ -694,7 +705,6 @@ export function createSpaceAuthoring({
     installTogether(() => {
       session.acceptRemote();
       install(acceptedPlacement);
-      cardDocuments.clear();
       navigation.openFresh(renderer);
       replacementEpoch += 1;
     });
@@ -703,11 +713,10 @@ export function createSpaceAuthoring({
 
   return {
     getState: observable.getState,
-    authoredPlacement: () =>
-      navigation.getState().selectedRenderer.kind === 'layout' ? placement : null,
+    authoredPlacement: () => mergeBase(),
     subscribe: observable.subscribe,
-    installPlacement: install,
-    installCardDocument: (cardId, document) => cardDocuments.set(cardId, document),
+    reportRendered,
+    replacePlacement: install,
     canConnect,
     canCreateConnectedCard,
     complete,

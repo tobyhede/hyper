@@ -1,5 +1,12 @@
+import fc from 'fast-check';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { uuidSchema, type Graph, type GraphId, type SpaceSnapshot } from '@project/core';
+import {
+  uuidSchema,
+  type CardDocument,
+  type Graph,
+  type GraphId,
+  type SpaceSnapshot,
+} from '@project/core';
 import { loadSpaceSnapshot, Placement } from '@project/graph';
 import {
   MemorySpaceBackend,
@@ -9,7 +16,11 @@ import {
   type SpaceSession,
 } from '@project/persistence';
 import { createNavigation, type Navigation, type NavigationState } from '../src/navigation';
-import { createSpaceAuthoring, type AuthoringResult } from '../src/space-authoring';
+import {
+  createSpaceAuthoring,
+  type AuthoringResult,
+  type SpaceAuthoring,
+} from '../src/space-authoring';
 import { resolveView, type RendererSelection } from '../src/view';
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
@@ -84,6 +95,55 @@ interface LoadedFixture {
   snapshot: SpaceSnapshot;
   revision: bigint;
   exportedRevision: bigint | null;
+}
+
+type CompletionWithoutGeometry =
+  | { readonly kind: 'settled-card-movement' }
+  | { readonly kind: 'connected-cards'; readonly from: typeof CARD_A; readonly to: typeof CARD_A }
+  | {
+      readonly kind: 'edited-card';
+      readonly cardId: typeof CARD_A;
+      readonly document: CardDocument;
+    }
+  | {
+      readonly kind: 'create-and-connect';
+      readonly from: typeof CARD_A;
+      readonly position: { readonly x: number; readonly y: number };
+    };
+
+const renderedByAuthoring = new WeakMap<SpaceAuthoring, Placement>();
+
+/** Install setup geometry while remembering what a later completion reports. */
+function replacePlacementForTest(authoring: SpaceAuthoring, rendered: Placement): void {
+  renderedByAuthoring.set(authoring, rendered);
+  authoring.replacePlacement(rendered);
+}
+
+/**
+ * Keep the existing cases focused on their Edit outcome while the geometry
+ * each completed authoring fact now requires travels through the real interface.
+ *
+ * A movement here names every rendered Card as placed, while the render adapter
+ * names only the Cards the gesture moved. Cases that depend on that distinction
+ * call `SpaceAuthoring.complete` directly.
+ */
+function complete(
+  authoring: SpaceAuthoring,
+  completion: CompletionWithoutGeometry,
+): AuthoringResult {
+  if (completion.kind === 'edited-card') return authoring.complete(completion);
+  const rendered = renderedByAuthoring.get(authoring) ?? authoring.authoredPlacement();
+  if (rendered === null) {
+    throw new Error('Test completion needs rendered placement');
+  }
+  if (completion.kind === 'settled-card-movement') {
+    return authoring.complete({
+      ...completion,
+      rendered,
+      placed: [...rendered.keys()],
+    });
+  }
+  return authoring.complete({ ...completion, rendered });
 }
 
 /**
@@ -163,7 +223,8 @@ const openRefusalFixture = () => {
     ],
   };
   const opened = openAuthoring(aliased, { kind: 'layout', layoutId: LAYOUT_ID });
-  opened.authoring.installPlacement(
+  replacePlacementForTest(
+    opened.authoring,
     Placement.fromEntries([
       [CARD_A, { x: 10, y: 20 }],
       [CARD_B, { x: 300, y: 40 }],
@@ -210,13 +271,14 @@ const openConflictedAgainstStoredSpace = async () => {
     { kind: 'layout', layoutId: LAYOUT_ID },
     (error) => reported.push(error),
   );
-  authoring.installPlacement(
+  replacePlacementForTest(
+    authoring,
     Placement.fromEntries([
       [CARD_A, { x: 500, y: 600 }],
       [CARD_B, { x: 300, y: 40 }],
     ]),
   );
-  authoring.complete({ kind: 'settled-card-movement' });
+  complete(authoring, { kind: 'settled-card-movement' });
   await vi.waitFor(() => expect(authoring.getState().session.persistence.kind).toBe('conflicted'));
   return { authoring, remote, reported };
 };
@@ -229,19 +291,20 @@ describe('Space Authoring', () => {
       LAYOUT_ID as ReturnType<typeof crypto.randomUUID>,
     );
     const { authoring, session, navigation } = openAuthoring();
-    authoring.installPlacement(
+    replacePlacementForTest(
+      authoring,
       Placement.fromEntries([
         [CARD_A, { x: 10, y: 20 }],
         [CARD_B, { x: 300, y: 40 }],
       ]),
     );
-    authoring.installCardDocument(CARD_A, {
-      title: 'Renamed A',
-      kind: 'markdown',
-      body: 'A',
-    });
-
-    expect(authoring.complete({ kind: 'edited-card', cardId: CARD_A })).toEqual({
+    expect(
+      authoring.complete({
+        kind: 'edited-card',
+        cardId: CARD_A,
+        document: { title: 'Renamed A', kind: 'markdown', body: 'A' },
+      }),
+    ).toEqual({
       kind: 'completed',
     });
 
@@ -260,36 +323,32 @@ describe('Space Authoring', () => {
     expect(navigation.getState().selectedRenderer).toEqual({ kind: 'layout', layoutId: LAYOUT_ID });
   });
 
-  /**
-   * An installed Card value is one hand-off, not a standing entry. An editor
-   * installs its authoritative value *before* it reports the Edit, so the value
-   * belongs to that report and to nothing after it. Left behind by a completion
-   * that produced no Edit, it becomes state waiting to be applied by whatever
-   * `edited-card` arrives next — a rename the author had abandoned, landing on a
-   * Space they have since changed.
-   */
-  it('does not leave a Card value behind for the next completion to apply', () => {
+  it('binds a Card value to the completion that reports it', () => {
     const { authoring, session } = openAuthoring();
-    authoring.installCardDocument(CARD_A, {
-      title: 'Abandoned rename',
-      kind: 'markdown',
-      body: 'A',
-    });
     // No placement: an Algorithmic View has nothing to write the Edit into yet.
-    expect(authoring.complete({ kind: 'edited-card', cardId: CARD_A })).toEqual({
-      kind: 'no-edit',
-    });
+    expect(
+      complete(authoring, {
+        kind: 'edited-card',
+        cardId: CARD_A,
+        document: { title: 'Abandoned rename', kind: 'markdown', body: 'A' },
+      }),
+    ).toEqual({ kind: 'no-edit' });
 
-    authoring.installPlacement(
+    replacePlacementForTest(
+      authoring,
       Placement.fromEntries([
         [CARD_A, { x: 10, y: 20 }],
         [CARD_B, { x: 300, y: 40 }],
       ]),
     );
 
-    expect(authoring.complete({ kind: 'edited-card', cardId: CARD_A })).toEqual({
-      kind: 'no-edit',
-    });
+    expect(
+      complete(authoring, {
+        kind: 'edited-card',
+        cardId: CARD_A,
+        document: automaticSnapshot.cards[0]!.document,
+      }),
+    ).toEqual({ kind: 'no-edit' });
     expect(session.getState().working.cards).toEqual(automaticSnapshot.cards);
   });
 
@@ -302,18 +361,21 @@ describe('Space Authoring', () => {
       loaded,
       { kind: 'view', view: 'flow' },
     );
-    authoring.installPlacement(
+    replacePlacementForTest(
+      authoring,
       Placement.fromEntries([
         [CARD_A, { x: 10, y: 20 }],
         [CARD_B, { x: 300, y: 40 }],
       ]),
     );
     const before = session.getState().working;
-    authoring.installCardDocument(CARD_A, automaticSnapshot.cards[0]!.document);
-
-    expect(authoring.complete({ kind: 'edited-card', cardId: CARD_A })).toEqual({
-      kind: 'no-edit',
-    });
+    expect(
+      complete(authoring, {
+        kind: 'edited-card',
+        cardId: CARD_A,
+        document: automaticSnapshot.cards[0]!.document,
+      }),
+    ).toEqual({ kind: 'no-edit' });
     expect(session.getState().working).toBe(before);
     expect(control.attempts).toEqual([]);
     expect(minted).not.toHaveBeenCalled();
@@ -327,16 +389,18 @@ describe('Space Authoring', () => {
       loaded,
       { kind: 'layout', layoutId: LAYOUT_ID },
     );
-    authoring.installCardDocument(CARD_A, {
-      title: 'A',
-      description: 'Edited in place',
-      kind: 'markdown',
-      body: '# Edited',
-    });
-
-    expect(authoring.complete({ kind: 'edited-card', cardId: CARD_A })).toEqual({
-      kind: 'completed',
-    });
+    expect(
+      complete(authoring, {
+        kind: 'edited-card',
+        cardId: CARD_A,
+        document: {
+          title: 'A',
+          description: 'Edited in place',
+          kind: 'markdown',
+          body: '# Edited',
+        },
+      }),
+    ).toEqual({ kind: 'completed' });
 
     expect(control.attempts).toHaveLength(1);
     expect(control.attempts[0]?.snapshot.cards[0]?.document).toEqual({
@@ -366,21 +430,20 @@ describe('Space Authoring', () => {
       kind: 'layout',
       layoutId: LAYOUT_ID,
     });
-    authoring.installPlacement(
+    replacePlacementForTest(
+      authoring,
       Placement.fromEntries([
         [CARD_A, { x: 10, y: 20 }],
         [CARD_B, { x: 300, y: 40 }],
       ]),
     );
-    authoring.installCardDocument(CARD_B, {
-      title: 'Reframed A',
-      kind: 'alias',
-      target: CARD_A,
-    });
-
-    expect(authoring.complete({ kind: 'edited-card', cardId: CARD_B })).toEqual({
-      kind: 'completed',
-    });
+    expect(
+      complete(authoring, {
+        kind: 'edited-card',
+        cardId: CARD_B,
+        document: { title: 'Reframed A', kind: 'alias', target: CARD_A },
+      }),
+    ).toEqual({ kind: 'completed' });
     expect(session.getState().working.cards).toEqual([
       positionedSnapshot.cards[0],
       { id: CARD_B, document: { title: 'Reframed A', kind: 'alias', target: CARD_A } },
@@ -395,15 +458,13 @@ describe('Space Authoring', () => {
     // a Space that loads and `isSupportedCardEdit` is the only thing that can
     // refuse it. Pointed at the Alias instead, the Alias chain would be rejected
     // by intake and the failure would say nothing about the guard under test.
-    authoring.installCardDocument(CARD_A, {
-      title: 'Converted A',
-      kind: 'alias',
-      target: CARD_C,
-    });
-
-    expect(authoring.complete({ kind: 'edited-card', cardId: CARD_A })).toEqual({
-      kind: 'no-edit',
-    });
+    expect(
+      complete(authoring, {
+        kind: 'edited-card',
+        cardId: CARD_A,
+        document: { title: 'Converted A', kind: 'alias', target: CARD_C },
+      }),
+    ).toEqual({ kind: 'no-edit' });
     expect(session.getState().working).toBe(before);
   });
 
@@ -417,15 +478,13 @@ describe('Space Authoring', () => {
     const { authoring, session } = openRefusalFixture();
     const before = session.getState().working;
 
-    authoring.installCardDocument(CARD_B, {
-      title: 'A again',
-      kind: 'alias',
-      target: CARD_C,
-    });
-
-    expect(authoring.complete({ kind: 'edited-card', cardId: CARD_B })).toEqual({
-      kind: 'no-edit',
-    });
+    expect(
+      complete(authoring, {
+        kind: 'edited-card',
+        cardId: CARD_B,
+        document: { title: 'A again', kind: 'alias', target: CARD_C },
+      }),
+    ).toEqual({ kind: 'no-edit' });
     expect(session.getState().working).toBe(before);
   });
 
@@ -433,16 +492,18 @@ describe('Space Authoring', () => {
     const { authoring, session } = openRefusalFixture();
     const before = session.getState().working;
 
-    authoring.installCardDocument(CARD_B, {
-      title: 'A again',
-      description: 'Alias metadata is not content',
-      kind: 'alias',
-      target: CARD_A,
-    });
-
-    expect(authoring.complete({ kind: 'edited-card', cardId: CARD_B })).toEqual({
-      kind: 'no-edit',
-    });
+    expect(
+      complete(authoring, {
+        kind: 'edited-card',
+        cardId: CARD_B,
+        document: {
+          title: 'A again',
+          description: 'Alias metadata is not content',
+          kind: 'alias',
+          target: CARD_A,
+        },
+      }),
+    ).toEqual({ kind: 'no-edit' });
     expect(session.getState().working).toBe(before);
   });
 
@@ -457,14 +518,15 @@ describe('Space Authoring', () => {
       .mockReturnValueOnce(MINTED_GRAPH_ID as ReturnType<typeof crypto.randomUUID>)
       .mockReturnValue(LAYOUT_ID as ReturnType<typeof crypto.randomUUID>);
     const { authoring, session, navigation } = openAuthoring();
-    authoring.installPlacement(
+    replacePlacementForTest(
+      authoring,
       Placement.fromEntries([
         [CARD_A, { x: 10, y: 20 }],
         [CARD_B, { x: 300, y: 40 }],
       ]),
     );
 
-    expect(authoring.complete({ kind: 'settled-card-movement' })).toEqual({ kind: 'completed' });
+    expect(complete(authoring, { kind: 'settled-card-movement' })).toEqual({ kind: 'completed' });
 
     expect(session.getState().working.document.layouts).toEqual([
       {
@@ -496,7 +558,8 @@ describe('Space Authoring', () => {
       kind: 'layout',
       layoutId: LAYOUT_ID,
     });
-    authoring.installPlacement(
+    replacePlacementForTest(
+      authoring,
       Placement.fromEntries([
         [CARD_A, { x: 10, y: 20 }],
         [CARD_B, { x: 300, y: 40 }],
@@ -504,7 +567,7 @@ describe('Space Authoring', () => {
     );
 
     expect(authoring.canConnect(CARD_B, CARD_A)).toBe(true);
-    expect(authoring.complete({ kind: 'connected-cards', from: CARD_B, to: CARD_A })).toEqual({
+    expect(complete(authoring, { kind: 'connected-cards', from: CARD_B, to: CARD_A })).toEqual({
       kind: 'completed',
     });
     expect(graphsOf(session.getState().working)[0]?.edges).toEqual([
@@ -513,7 +576,7 @@ describe('Space Authoring', () => {
     ]);
 
     expect(authoring.canConnect(CARD_B, CARD_A)).toBe(false);
-    expect(authoring.complete({ kind: 'connected-cards', from: CARD_B, to: CARD_A })).toEqual({
+    expect(complete(authoring, { kind: 'connected-cards', from: CARD_B, to: CARD_A })).toEqual({
       kind: 'no-edit',
     });
   });
@@ -544,7 +607,8 @@ describe('Space Authoring', () => {
       },
       { kind: 'view', view: 'flow' },
     );
-    authoring.installPlacement(
+    replacePlacementForTest(
+      authoring,
       Placement.fromEntries([
         [CARD_A, { x: 10, y: 20 }],
         [CARD_B, { x: 300, y: 40 }],
@@ -553,7 +617,7 @@ describe('Space Authoring', () => {
     expect(navigation.getState().activeGraphId).toBe(GRAPH_ID);
 
     expect(authoring.canConnect(CARD_A, CARD_B)).toBe(true);
-    expect(authoring.complete({ kind: 'connected-cards', from: CARD_A, to: CARD_B })).toEqual({
+    expect(complete(authoring, { kind: 'connected-cards', from: CARD_A, to: CARD_B })).toEqual({
       kind: 'completed',
     });
 
@@ -610,7 +674,8 @@ describe('Space Authoring', () => {
       ],
     };
     const { authoring, session } = openAuthoring(sparse, { kind: 'layout', layoutId: LAYOUT_ID });
-    authoring.installPlacement(
+    replacePlacementForTest(
+      authoring,
       Placement.fromEntries([
         [CARD_A, { x: 10, y: 20 }],
         [CARD_B, { x: 300, y: 40 }],
@@ -619,11 +684,11 @@ describe('Space Authoring', () => {
     const before = session.getState().working;
 
     expect(authoring.canConnect(CARD_A, CARD_C)).toBe(false);
-    expect(authoring.complete({ kind: 'connected-cards', from: CARD_A, to: CARD_C })).toEqual({
+    expect(complete(authoring, { kind: 'connected-cards', from: CARD_A, to: CARD_C })).toEqual({
       kind: 'no-edit',
     });
     expect(authoring.canConnect(CARD_C, CARD_A)).toBe(false);
-    expect(authoring.complete({ kind: 'connected-cards', from: CARD_C, to: CARD_A })).toEqual({
+    expect(complete(authoring, { kind: 'connected-cards', from: CARD_C, to: CARD_A })).toEqual({
       kind: 'no-edit',
     });
     expect(authoring.canCreateConnectedCard(CARD_C)).toBe(false);
@@ -670,7 +735,8 @@ describe('Space Authoring', () => {
       loaded,
       { kind: 'view', view: 'flow' },
     );
-    authoring.installPlacement(
+    replacePlacementForTest(
+      authoring,
       Placement.fromEntries([
         [CARD_A, { x: 10, y: 20 }],
         [CARD_B, { x: 300, y: 40 }],
@@ -685,7 +751,7 @@ describe('Space Authoring', () => {
     expect(control.attempts).toEqual([]);
 
     expect(authoring.canConnect(CARD_B, CARD_A)).toBe(true);
-    expect(authoring.complete({ kind: 'connected-cards', from: CARD_B, to: CARD_A })).toEqual({
+    expect(complete(authoring, { kind: 'connected-cards', from: CARD_B, to: CARD_A })).toEqual({
       kind: 'completed',
     });
 
@@ -735,12 +801,12 @@ describe('Space Authoring', () => {
       kind: 'layout',
       layoutId: LAYOUT_ID,
     });
-    authoring.installPlacement(Placement.fromEntries([[CARD_A, { x: 10, y: 20 }]]));
+    replacePlacementForTest(authoring, Placement.fromEntries([[CARD_A, { x: 10, y: 20 }]]));
 
     expect(graphsOf(session.getState().working)).toEqual([
       { id: MINTED_GRAPH_ID, title: 'Graph 1', edges: [] },
     ]);
-    expect(authoring.complete({ kind: 'connected-cards', from: CARD_A, to: CARD_A })).toEqual({
+    expect(complete(authoring, { kind: 'connected-cards', from: CARD_A, to: CARD_A })).toEqual({
       kind: 'completed',
     });
 
@@ -801,14 +867,10 @@ describe('Space Authoring', () => {
         throw new Error('Edit completion must not activate separately.');
       },
     };
-    const authoring = createSpaceAuthoring({
-      session,
-      navigation,
-      currentSpace,
-      initialPlacement: Placement.fromEntries([[CARD_A, { x: 10, y: 20 }]]),
-    });
+    const authoring = createSpaceAuthoring({ session, navigation, currentSpace });
+    replacePlacementForTest(authoring, Placement.fromEntries([[CARD_A, { x: 10, y: 20 }]]));
 
-    expect(authoring.complete({ kind: 'connected-cards', from: CARD_A, to: CARD_A })).toEqual({
+    expect(complete(authoring, { kind: 'connected-cards', from: CARD_A, to: CARD_A })).toEqual({
       kind: 'completed',
     });
 
@@ -839,11 +901,11 @@ describe('Space Authoring', () => {
       cards: [{ id: CARD_A, document: { title: 'Card 1', kind: 'markdown', body: '' } }],
     };
     const { authoring, session } = openAuthoring(graphLess);
-    authoring.installPlacement(Placement.fromEntries([[CARD_A, { x: 120, y: 240 }]]));
+    replacePlacementForTest(authoring, Placement.fromEntries([[CARD_A, { x: 120, y: 240 }]]));
 
     expect(authoring.canCreateConnectedCard(CARD_A)).toBe(true);
     expect(
-      authoring.complete({
+      complete(authoring, {
         kind: 'create-and-connect',
         from: CARD_A,
         position: { x: 420, y: 360 },
@@ -885,7 +947,7 @@ describe('Space Authoring', () => {
     });
     expect(authoring.canConnect(CREATED_CARD_ID, CARD_A)).toBe(true);
     expect(
-      authoring.complete({ kind: 'connected-cards', from: CREATED_CARD_ID, to: CARD_A }),
+      complete(authoring, { kind: 'connected-cards', from: CREATED_CARD_ID, to: CARD_A }),
     ).toEqual({ kind: 'completed' });
     expect(graphsOf(session.getState().working)[0]?.edges).toHaveLength(2);
   });
@@ -914,7 +976,8 @@ describe('Space Authoring', () => {
       kind: 'layout',
       layoutId: LAYOUT_ID,
     });
-    authoring.installPlacement(
+    replacePlacementForTest(
+      authoring,
       Placement.fromEntries([
         [CARD_A, { x: 10, y: 20 }],
         [CARD_B, { x: 300, y: 40 }],
@@ -925,13 +988,14 @@ describe('Space Authoring', () => {
     authoring.subscribe(() => {
       if (reentered) return;
       reentered = true;
-      authoring.installPlacement(
+      replacePlacementForTest(
+        authoring,
         Placement.fromEntries([
           [CARD_A, { x: 10, y: 20 }],
           [CARD_B, { x: 500, y: 400 }],
         ]),
       );
-      reentrantResult = authoring.complete({ kind: 'settled-card-movement' });
+      reentrantResult = complete(authoring, { kind: 'settled-card-movement' });
     });
     const observed: number[] = [];
     authoring.subscribe(() => {
@@ -939,7 +1003,7 @@ describe('Space Authoring', () => {
       observed.push(layout?.positions[CARD_B]?.x ?? -1);
     });
 
-    authoring.complete({ kind: 'connected-cards', from: CARD_B, to: CARD_A });
+    complete(authoring, { kind: 'connected-cards', from: CARD_B, to: CARD_A });
 
     expect(observed).toEqual([300, 500]);
     // The answer the reentrant caller got, not just its effect: a completion
@@ -963,16 +1027,17 @@ describe('Space Authoring', () => {
       if (reentered) return;
       reentered = true;
       // A placement naming a Card the Space does not hold cannot become a Layout.
-      authoring.installPlacement(
+      replacePlacementForTest(
+        authoring,
         Placement.fromEntries([
           [CARD_A, { x: 10, y: 20 }],
           [UNKNOWN_CARD, { x: 700, y: 800 }],
         ]),
       );
-      authoring.complete({ kind: 'settled-card-movement' });
+      complete(authoring, { kind: 'settled-card-movement' });
     });
 
-    expect(authoring.complete({ kind: 'connected-cards', from: CARD_B, to: CARD_A })).toEqual({
+    expect(complete(authoring, { kind: 'connected-cards', from: CARD_B, to: CARD_A })).toEqual({
       kind: 'completed',
     });
 
@@ -990,7 +1055,8 @@ describe('Space Authoring', () => {
       LAYOUT_ID as ReturnType<typeof crypto.randomUUID>,
     );
     const { authoring } = openAuthoring();
-    authoring.installPlacement(
+    replacePlacementForTest(
+      authoring,
       Placement.fromEntries([
         [CARD_A, { x: 10, y: 20 }],
         [CARD_B, { x: 300, y: 40 }],
@@ -1008,12 +1074,12 @@ describe('Space Authoring', () => {
       });
     });
 
-    authoring.complete({ kind: 'connected-cards', from: CARD_B, to: CARD_A });
+    complete(authoring, { kind: 'connected-cards', from: CARD_B, to: CARD_A });
 
     expect(observed).toEqual([{ defaultView: LAYOUT_ID, renderer: LAYOUT_ID }]);
   });
 
-  it('treats unavailable placement, duplicate Edges and stale Card identities as no Edit', () => {
+  it('requires rendered placement and treats duplicate Edges and stale Card identities as no Edit', () => {
     // On the selected Layout, so the duplicate below has a Graph to be a
     // duplicate *of*. On an Algorithmic View the Edge would join the Graph the
     // conversion mints, which holds nothing — that case is the "offers an Edge
@@ -1024,19 +1090,20 @@ describe('Space Authoring', () => {
     });
     const staleCard = uuidSchema.parse('00000000-0000-4000-8000-000000000099');
 
-    expect(authoring.complete({ kind: 'settled-card-movement' })).toEqual({ kind: 'no-edit' });
-    authoring.installPlacement(
+    expect(authoring.canConnect(CARD_A, CARD_B)).toBe(false);
+    replacePlacementForTest(
+      authoring,
       Placement.fromEntries([
         [CARD_A, { x: 10, y: 20 }],
         [CARD_B, { x: 300, y: 40 }],
       ]),
     );
     expect(authoring.canConnect(CARD_A, CARD_B)).toBe(false);
-    expect(authoring.complete({ kind: 'connected-cards', from: CARD_A, to: CARD_B })).toEqual({
+    expect(complete(authoring, { kind: 'connected-cards', from: CARD_A, to: CARD_B })).toEqual({
       kind: 'no-edit',
     });
     expect(authoring.canConnect(CARD_A, staleCard)).toBe(false);
-    expect(authoring.complete({ kind: 'connected-cards', from: CARD_A, to: staleCard })).toEqual({
+    expect(complete(authoring, { kind: 'connected-cards', from: CARD_A, to: staleCard })).toEqual({
       kind: 'no-edit',
     });
     expect(session.getState().working).toEqual(positionedSnapshot);
@@ -1077,22 +1144,24 @@ describe('Space Authoring', () => {
     };
     const navigation = createNavigation(currentSpace, { kind: 'layout', layoutId: LAYOUT_ID });
     const authoring = createSpaceAuthoring({ session, navigation, currentSpace });
-    authoring.installPlacement(
+    replacePlacementForTest(
+      authoring,
       Placement.fromEntries([
         [CARD_A, { x: 100, y: 200 }],
         [CARD_B, { x: 300, y: 40 }],
       ]),
     );
-    authoring.complete({ kind: 'settled-card-movement' });
+    complete(authoring, { kind: 'settled-card-movement' });
     await vi.waitFor(() => expect(authoring.getState().session.persistence.kind).toBe('failed'));
 
-    authoring.installPlacement(
+    replacePlacementForTest(
+      authoring,
       Placement.fromEntries([
         [CARD_A, { x: 500, y: 600 }],
         [CARD_B, { x: 300, y: 40 }],
       ]),
     );
-    expect(authoring.complete({ kind: 'settled-card-movement' })).toEqual({ kind: 'completed' });
+    expect(complete(authoring, { kind: 'settled-card-movement' })).toEqual({ kind: 'completed' });
     expect(authoring.getState().session.persistence.kind).toBe('failed');
 
     authoring.retryPersistence();
@@ -1125,7 +1194,7 @@ describe('Space Authoring', () => {
       layoutId: LAYOUT_ID,
     });
 
-    authoring.installPlacement(Placement.fromEntries([[CARD_A, { x: 10, y: 20 }]]));
+    replacePlacementForTest(authoring, Placement.fromEntries([[CARD_A, { x: 10, y: 20 }]]));
 
     // One accessor, answering the value that is actually installed. A second
     // copy carried on the published state could only disagree with this, since
@@ -1137,13 +1206,80 @@ describe('Space Authoring', () => {
     // `usePlacementRendering` rebuilds the positioned strategy whenever this map
     // changes identity and re-runs layout, so a fresh copy would re-arrange a
     // settled graph on every projection.
-    authoring.installPlacement(Placement.fromEntries([[CARD_A, { x: 10, y: 20 }]]));
+    replacePlacementForTest(authoring, Placement.fromEntries([[CARD_A, { x: 10, y: 20 }]]));
     expect(authoring.authoredPlacement()).toBe(installed);
 
     // Only an authored Layout supplies positions; an Algorithmic View computes
     // its own, so it must answer null however much placement is installed.
     navigation.selectRenderer({ kind: 'view', view: 'flow' });
     expect(authoring.authoredPlacement()).toBeNull();
+  });
+
+  it('adopts every rendered Card on conversion and only placed Cards in a Layout', () => {
+    vi.spyOn(crypto, 'randomUUID').mockReturnValue(
+      LAYOUT_ID as ReturnType<typeof crypto.randomUUID>,
+    );
+
+    fc.assert(
+      fc.property(
+        fc.record({
+          baseAX: fc.integer(),
+          baseAY: fc.integer(),
+          baseBX: fc.integer(),
+          baseBY: fc.integer(),
+          renderedAX: fc.integer(),
+          renderedAY: fc.integer(),
+          renderedBX: fc.integer(),
+          renderedBY: fc.integer(),
+        }),
+        ({ baseAX, baseAY, baseBX, baseBY, renderedAX, renderedAY, renderedBX, renderedBY }) => {
+          const base = Placement.fromEntries([
+            [CARD_A, { x: baseAX, y: baseAY }],
+            [CARD_B, { x: baseBX, y: baseBY }],
+          ]);
+          const rendered = Placement.fromEntries([
+            [CARD_A, { x: renderedAX, y: renderedAY }],
+            [CARD_B, { x: renderedBX, y: renderedBY }],
+          ]);
+
+          const converting = openAuthoring();
+          converting.authoring.reportRendered(rendered);
+          converting.authoring.complete({
+            kind: 'settled-card-movement',
+            rendered,
+            placed: [CARD_A],
+          });
+          expect(converting.session.getState().working.document.layouts?.[0]?.positions).toEqual({
+            [CARD_A]: { x: renderedAX, y: renderedAY },
+            [CARD_B]: { x: renderedBX, y: renderedBY },
+          });
+
+          const loaded = { snapshot: positionedSnapshot, revision: 0n, exportedRevision: null };
+          const backend = new MemorySpaceBackend([loaded]);
+          const authoring = attachAuthoring(backend, loaded, {
+            kind: 'layout',
+            layoutId: LAYOUT_ID,
+          });
+          fc.pre(renderedAX !== 10 || renderedAY !== 20 || baseBX !== 300 || baseBY !== 40);
+          authoring.authoring.replacePlacement(base);
+          authoring.authoring.complete({
+            kind: 'settled-card-movement',
+            rendered,
+            placed: [CARD_A],
+          });
+          expect(authoring.session.getState().working.document.layouts?.[0]?.positions).toEqual({
+            [CARD_A]: { x: renderedAX, y: renderedAY },
+            [CARD_B]: { x: baseBX, y: baseBY },
+          });
+          expect(authoring.authoring.authoredPlacement()).toEqual(
+            Placement.fromEntries([
+              [CARD_A, { x: renderedAX, y: renderedAY }],
+              [CARD_B, { x: baseBX, y: baseBY }],
+            ]),
+          );
+        },
+      ),
+    );
   });
 
   it('releases its session and navigation subscriptions when disposed', () => {
@@ -1198,14 +1334,15 @@ describe('Space Authoring', () => {
       layoutId: LAYOUT_ID,
     });
     const before = session.getState().working;
-    authoring.installPlacement(
+    replacePlacementForTest(
+      authoring,
       Placement.fromEntries([
         [CARD_A, { x: 10, y: 20 }],
         [CARD_B, { x: 300, y: 40 }],
       ]),
     );
 
-    expect(authoring.complete({ kind: 'settled-card-movement' })).toEqual({ kind: 'no-edit' });
+    expect(complete(authoring, { kind: 'settled-card-movement' })).toEqual({ kind: 'no-edit' });
     expect(session.getState().working).toBe(before);
   });
 
@@ -1254,7 +1391,8 @@ describe('Space Authoring', () => {
       ],
     };
     const { authoring, session } = openAuthoring(numbered);
-    authoring.installPlacement(
+    replacePlacementForTest(
+      authoring,
       Placement.fromEntries([
         [CARD_A, { x: 10, y: 20 }],
         [CARD_B, { x: 300, y: 40 }],
@@ -1262,7 +1400,7 @@ describe('Space Authoring', () => {
     );
 
     expect(
-      authoring.complete({ kind: 'create-and-connect', from: CARD_A, position: { x: 5, y: 6 } }),
+      complete(authoring, { kind: 'create-and-connect', from: CARD_A, position: { x: 5, y: 6 } }),
     ).toEqual({ kind: 'completed', createdCardId: CREATED_CARD_ID });
 
     expect(session.getState().working.cards.at(-1)?.document.title).toBe('Card 10');
@@ -1306,7 +1444,8 @@ describe('Space Authoring', () => {
         throw new Error('reporter failed');
       },
     });
-    authoring.installPlacement(
+    replacePlacementForTest(
+      authoring,
       Placement.fromEntries([
         [CARD_A, { x: 10, y: 20 }],
         [CARD_B, { x: 300, y: 40 }],
@@ -1320,11 +1459,11 @@ describe('Space Authoring', () => {
       authoring.subscribe(() => {
         if (done) return;
         done = true;
-        authoring.complete({ kind: 'connected-cards', ...edge });
+        complete(authoring, { kind: 'connected-cards', ...edge });
       });
     }
 
-    expect(authoring.complete({ kind: 'connected-cards', from: CARD_B, to: CARD_A })).toEqual({
+    expect(complete(authoring, { kind: 'connected-cards', from: CARD_B, to: CARD_A })).toEqual({
       kind: 'completed',
     });
 
@@ -1349,7 +1488,8 @@ describe('Space Authoring', () => {
       kind: 'layout',
       layoutId: LAYOUT_ID,
     });
-    authoring.installPlacement(
+    replacePlacementForTest(
+      authoring,
       Placement.fromEntries([
         [CARD_A, { x: 90, y: 90 }],
         [CARD_B, { x: 300, y: 40 }],
@@ -1358,7 +1498,7 @@ describe('Space Authoring', () => {
     const reported = authoring.authoredPlacement();
     const workingBefore = session.getState().working;
 
-    expect(authoring.complete({ kind: 'settled-card-movement' })).toEqual({ kind: 'completed' });
+    expect(complete(authoring, { kind: 'settled-card-movement' })).toEqual({ kind: 'completed' });
 
     expect(authoring.authoredPlacement()).toBe(reported);
     expect(session.getState().working).not.toBe(workingBefore);
@@ -1416,14 +1556,14 @@ describe('Space Authoring', () => {
       queuedOnce = true;
       // Queued behind the Edit publishing right now, and the only thing that
       // puts the created Card into a placement.
-      authoring.complete({
+      complete(authoring, {
         kind: 'create-and-connect',
         from: CARD_A,
         position: { x: 700, y: 800 },
       });
     });
 
-    expect(authoring.complete({ kind: 'connected-cards', from: CARD_B, to: CARD_A })).toEqual({
+    expect(complete(authoring, { kind: 'connected-cards', from: CARD_B, to: CARD_A })).toEqual({
       kind: 'completed',
     });
 
@@ -1463,7 +1603,8 @@ describe('Space Authoring', () => {
     };
     const navigation = createNavigation(currentSpace, { kind: 'layout', layoutId: LAYOUT_ID });
     const authoring = createSpaceAuthoring({ session, navigation, currentSpace });
-    authoring.installPlacement(
+    replacePlacementForTest(
+      authoring,
       Placement.fromEntries([
         [CARD_A, { x: 10, y: 20 }],
         [CARD_B, { x: 300, y: 40 }],
@@ -1476,9 +1617,9 @@ describe('Space Authoring', () => {
 
     // Containment is the drain's job, not this function's: the Edit the caller
     // made itself still fails in the caller's hands.
-    expect(() => authoring.complete({ kind: 'connected-cards', from: CARD_B, to: CARD_A })).toThrow(
-      'submit failed',
-    );
+    expect(() =>
+      complete(authoring, { kind: 'connected-cards', from: CARD_B, to: CARD_A }),
+    ).toThrow('submit failed');
 
     expect(graphsOf(session.getState().working)[0]?.edges).toEqual([
       { from: CARD_A, to: CARD_B },
@@ -1527,18 +1668,14 @@ describe('Space Authoring', () => {
         throw new Error('adoption failed');
       },
     };
-    const authoring = createSpaceAuthoring({
-      session,
-      navigation,
-      currentSpace,
-      initialPlacement: Placement.fromEntries([[CARD_A, { x: 10, y: 20 }]]),
-    });
+    const authoring = createSpaceAuthoring({ session, navigation, currentSpace });
+    replacePlacementForTest(authoring, Placement.fromEntries([[CARD_A, { x: 10, y: 20 }]]));
     const published: NavigationState[] = [];
     authoring.subscribe(() => published.push(authoring.getState().navigation));
 
-    expect(() => authoring.complete({ kind: 'connected-cards', from: CARD_A, to: CARD_A })).toThrow(
-      'adoption failed',
-    );
+    expect(() =>
+      complete(authoring, { kind: 'connected-cards', from: CARD_A, to: CARD_A }),
+    ).toThrow('adoption failed');
 
     // The session took the Edit; Navigation refused it and is still on the View
     // the Edit began in. That is the half-applied state, and the publication in
@@ -1585,7 +1722,8 @@ describe('Space Authoring', () => {
       currentSpace,
       reportObserverError: (error) => reported.push(error),
     });
-    authoring.installPlacement(
+    replacePlacementForTest(
+      authoring,
       Placement.fromEntries([
         [CARD_A, { x: 10, y: 20 }],
         [CARD_B, { x: 300, y: 40 }],
@@ -1601,13 +1739,13 @@ describe('Space Authoring', () => {
       authoring.subscribe(() => {
         if (done) return;
         done = true;
-        authoring.complete({ kind: 'connected-cards', ...edge });
+        complete(authoring, { kind: 'connected-cards', ...edge });
       });
     }
 
     // The Edit that drained the queue is not charged the failure of one it
     // drained — it had already installed and published by then.
-    expect(authoring.complete({ kind: 'connected-cards', from: CARD_B, to: CARD_A })).toEqual({
+    expect(complete(authoring, { kind: 'connected-cards', from: CARD_B, to: CARD_A })).toEqual({
       kind: 'completed',
     });
 
@@ -1687,7 +1825,8 @@ describe('Space Authoring', () => {
       activateGraph: () => undefined,
     } as unknown as Navigation;
     const authoring = createSpaceAuthoring({ session, navigation, currentSpace });
-    authoring.installPlacement(
+    replacePlacementForTest(
+      authoring,
       Placement.fromEntries([
         [CARD_A, { x: 10, y: 20 }],
         [CARD_B, { x: 300, y: 40 }],
@@ -1695,7 +1834,7 @@ describe('Space Authoring', () => {
     );
     const before = session.getState().working;
 
-    expect(authoring.complete({ kind: 'settled-card-movement' })).toEqual({ kind: 'no-edit' });
+    expect(complete(authoring, { kind: 'settled-card-movement' })).toEqual({ kind: 'no-edit' });
     expect(session.getState().working).toBe(before);
   });
 
@@ -1713,25 +1852,27 @@ describe('Space Authoring', () => {
       { snapshot: positioned, revision: 0n, exportedRevision: null },
       { kind: 'layout', layoutId: LAYOUT_ID },
     );
-    authoring.installPlacement(
+    replacePlacementForTest(
+      authoring,
       Placement.fromEntries([
         [CARD_A, { x: 100, y: 200 }],
         [CARD_B, { x: 300, y: 40 }],
       ]),
     );
-    authoring.complete({ kind: 'settled-card-movement' });
+    complete(authoring, { kind: 'settled-card-movement' });
     await vi.waitFor(() =>
       expect(authoring.getState().session.persistence.kind).toBe('conflicted'),
     );
 
-    authoring.installPlacement(
+    replacePlacementForTest(
+      authoring,
       Placement.fromEntries([
         [CARD_A, { x: 500, y: 600 }],
         [CARD_B, { x: 300, y: 40 }],
       ]),
     );
 
-    expect(authoring.complete({ kind: 'settled-card-movement' })).toEqual({ kind: 'completed' });
+    expect(complete(authoring, { kind: 'settled-card-movement' })).toEqual({ kind: 'completed' });
     expect(authoring.getState().session.working.document.layouts?.[0]?.positions[CARD_A]).toEqual({
       x: 500,
       y: 600,
@@ -1795,36 +1936,37 @@ describe('Space Authoring', () => {
       { snapshot: positioned, revision: 3n, exportedRevision: null },
       { kind: 'layout', layoutId: LAYOUT_ID },
     );
-    authoring.installPlacement(
+    replacePlacementForTest(
+      authoring,
       Placement.fromEntries([
         [CARD_A, { x: 100, y: 200 }],
         [CARD_B, { x: 300, y: 40 }],
       ]),
     );
-    authoring.complete({ kind: 'settled-card-movement' });
+    complete(authoring, { kind: 'settled-card-movement' });
     await vi.waitFor(() =>
       expect(authoring.getState().session.persistence.kind).toBe('conflicted'),
     );
-    authoring.installPlacement(
+    replacePlacementForTest(
+      authoring,
       Placement.fromEntries([
         [CARD_A, { x: 500, y: 600 }],
         [CARD_B, { x: 300, y: 40 }],
       ]),
     );
-    authoring.complete({ kind: 'settled-card-movement' });
+    complete(authoring, { kind: 'settled-card-movement' });
     navigation.selectRenderer({ kind: 'view', view: 'grid' });
     navigation.present();
     navigation.openCard(CARD_B);
-    authoring.installCardDocument(CARD_A, {
-      title: 'Stale local title',
-      kind: 'markdown',
-      body: 'stale local body',
-    });
 
     expect(authoring.acceptStoredSpace()).toBeNull();
-    expect(authoring.complete({ kind: 'edited-card', cardId: CARD_A })).toEqual({
-      kind: 'no-edit',
-    });
+    expect(
+      complete(authoring, {
+        kind: 'edited-card',
+        cardId: CARD_A,
+        document: remote.cards[0]!.document,
+      }),
+    ).toEqual({ kind: 'no-edit' });
 
     // The counter the render adapter watches to drop stale local placement.
     expect(authoring.getState().replacementEpoch).toBe(1);
@@ -1868,7 +2010,7 @@ describe('Space Authoring', () => {
       authoring.subscribe(() => late.push('notified'));
     });
 
-    expect(authoring.complete({ kind: 'connected-cards', from: CARD_B, to: CARD_A })).toEqual({
+    expect(complete(authoring, { kind: 'connected-cards', from: CARD_B, to: CARD_A })).toEqual({
       kind: 'completed',
     });
     expect(subscribed).toBe(true);
@@ -1917,13 +2059,14 @@ describe('Space Authoring', () => {
       { snapshot: positionedSnapshot, revision: 3n, exportedRevision: null },
       { kind: 'layout', layoutId: LAYOUT_ID },
     );
-    authoring.installPlacement(
+    replacePlacementForTest(
+      authoring,
       Placement.fromEntries([
         [CARD_A, { x: 500, y: 600 }],
         [CARD_B, { x: 300, y: 40 }],
       ]),
     );
-    authoring.complete({ kind: 'settled-card-movement' });
+    complete(authoring, { kind: 'settled-card-movement' });
     await vi.waitFor(() =>
       expect(authoring.getState().session.persistence.kind).toBe('conflicted'),
     );
@@ -1965,13 +2108,14 @@ describe('Space Authoring', () => {
       { snapshot: positionedSnapshot, revision: 3n, exportedRevision: null },
       { kind: 'layout', layoutId: LAYOUT_ID },
     );
-    authoring.installPlacement(
+    replacePlacementForTest(
+      authoring,
       Placement.fromEntries([
         [CARD_A, { x: 500, y: 600 }],
         [CARD_B, { x: 300, y: 40 }],
       ]),
     );
-    authoring.complete({ kind: 'settled-card-movement' });
+    complete(authoring, { kind: 'settled-card-movement' });
     await vi.waitFor(() =>
       expect(authoring.getState().session.persistence.kind).toBe('conflicted'),
     );
@@ -1981,7 +2125,7 @@ describe('Space Authoring', () => {
     session.subscribe(() => {
       if (reentered) return;
       reentered = true;
-      authoring.complete({ kind: 'settled-card-movement' });
+      complete(authoring, { kind: 'settled-card-movement' });
     });
     const published: { title: string; replacementEpoch: number }[] = [];
     authoring.subscribe(() =>
@@ -2021,23 +2165,25 @@ describe('Space Authoring', () => {
       reentered = true;
       // Queued against the local Space, and then that Space is replaced while
       // this completion waits behind the publication it was made from.
-      authoring.installPlacement(
+      replacePlacementForTest(
+        authoring,
         Placement.fromEntries([
           [CARD_A, { x: 111, y: 222 }],
           [CARD_B, { x: 300, y: 40 }],
         ]),
       );
-      queuedResult = authoring.complete({ kind: 'settled-card-movement' });
+      queuedResult = complete(authoring, { kind: 'settled-card-movement' });
       refusal = authoring.acceptStoredSpace();
     });
 
-    authoring.installPlacement(
+    replacePlacementForTest(
+      authoring,
       Placement.fromEntries([
         [CARD_A, { x: 700, y: 800 }],
         [CARD_B, { x: 300, y: 40 }],
       ]),
     );
-    expect(authoring.complete({ kind: 'settled-card-movement' })).toEqual({ kind: 'completed' });
+    expect(complete(authoring, { kind: 'settled-card-movement' })).toEqual({ kind: 'completed' });
 
     // Both asserted so the test cannot go vacuous: a completion that ran instead
     // of queueing, or an accept that refused, would leave nothing to discard and
@@ -2073,13 +2219,14 @@ describe('Space Authoring', () => {
     authoring.subscribe(() => {
       if (replaced) return;
       replaced = true;
-      authoring.installPlacement(
+      replacePlacementForTest(
+        authoring,
         Placement.fromEntries([
           [CARD_A, { x: 111, y: 222 }],
           [CARD_B, { x: 300, y: 40 }],
         ]),
       );
-      authoring.complete({ kind: 'settled-card-movement' });
+      complete(authoring, { kind: 'settled-card-movement' });
       authoring.acceptStoredSpace();
     });
     // Subscribed second, so its first notification is the one accepting
@@ -2089,22 +2236,24 @@ describe('Space Authoring', () => {
     authoring.subscribe(() => {
       if (afterwards) return;
       afterwards = true;
-      authoring.installPlacement(
+      replacePlacementForTest(
+        authoring,
         Placement.fromEntries([
           [CARD_A, { x: 40, y: 50 }],
           [CARD_B, { x: 600, y: 500 }],
         ]),
       );
-      queuedAfterwards = authoring.complete({ kind: 'settled-card-movement' });
+      queuedAfterwards = complete(authoring, { kind: 'settled-card-movement' });
     });
 
-    authoring.installPlacement(
+    replacePlacementForTest(
+      authoring,
       Placement.fromEntries([
         [CARD_A, { x: 700, y: 800 }],
         [CARD_B, { x: 300, y: 40 }],
       ]),
     );
-    expect(authoring.complete({ kind: 'settled-card-movement' })).toEqual({ kind: 'completed' });
+    expect(complete(authoring, { kind: 'settled-card-movement' })).toEqual({ kind: 'completed' });
 
     expect(queuedAfterwards).toEqual({ kind: 'queued' });
     expect(authoring.getState().replacementEpoch).toBe(1);
@@ -2161,13 +2310,14 @@ describe('Space Authoring', () => {
         [CARD_B, { x: 300, y: 40 }],
       ]),
     });
-    authoring.installPlacement(
+    replacePlacementForTest(
+      authoring,
       Placement.fromEntries([
         [CARD_A, { x: 500, y: 600 }],
         [CARD_B, { x: 300, y: 40 }],
       ]),
     );
-    authoring.complete({ kind: 'settled-card-movement' });
+    complete(authoring, { kind: 'settled-card-movement' });
     await vi.waitFor(() =>
       expect(authoring.getState().session.persistence.kind).toBe('conflicted'),
     );

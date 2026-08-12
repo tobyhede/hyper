@@ -140,7 +140,7 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
     // the selected renderer — only worked because every install happened to be
     // followed by an unrelated notification. This component already re-renders
     // on both stores, and a render-time read cannot be stale at the render that
-    // uses it. `installPlacement` keeps the map's identity when the value is
+    // uses it. `replacePlacement` keeps the map's identity when the value is
     // unchanged, so this does not defeat the memo below.
     const authoredPositions = authoring.authoredPlacement();
     const selectedCardId = useRenderAdapter((s) => s.selectedCardId);
@@ -280,7 +280,6 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
           ? 'A Card title is required.'
           : (parsed.error.issues[0]?.message ?? 'The Card title is invalid.');
       }
-      authoring.installCardDocument(cardId.data, parsed.data);
       // The result is deliberately not inspected, and that is not an oversight.
       // `no-edit` here means the title did not change, which is the editor's
       // ordinary close. Authoring's other refusals need a state no author can
@@ -289,7 +288,7 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
       // Layout cannot coincide with a drawn Card, because the affordance is
       // rendered by the same projection that installs the placement. `queued`
       // is an Edit that will still be performed.
-      authoring.complete({ kind: 'edited-card', cardId: cardId.data });
+      authoring.complete({ kind: 'edited-card', cardId: cardId.data, document: parsed.data });
       return null;
     }, []);
 
@@ -328,8 +327,7 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
     const openedContent = openedCard ? resolveContentCard(rendererSpace, openedCard.id) : undefined;
     const completeOpenedCard = useCallback((completed: ResolvedContentCard): void => {
       const { id, ...document } = completed;
-      authoring.installCardDocument(id, document);
-      authoring.complete({ kind: 'edited-card', cardId: id });
+      authoring.complete({ kind: 'edited-card', cardId: id, document });
     }, []);
 
     /**
