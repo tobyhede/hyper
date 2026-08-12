@@ -83,50 +83,51 @@ const violatesFreshIdentity = (source: ViewSubject, converted: ConvertedLayout):
   });
 };
 
+/**
+ * A subject, the placement on screen, and one answer a view could give for
+ * them — drawn as one arbitrary rather than sampled inside the property.
+ *
+ * `conversion` depends on both, which is what `chain` is for. Sampling it from
+ * a generated seed instead put the answer outside the arbitrary, so fast-check
+ * could shrink the seed but not the conversion, and a counterexample shrank to
+ * an unrelated answer rather than a smaller one.
+ */
+const scenario = fc.tuple(subject, placement).chain(([source, onScreen]) =>
+  fc.record({
+    source: fc.constant(source),
+    onScreen: fc.constant(onScreen),
+    answer: conversion(source, onScreen),
+  }),
+);
+
 describe('the conversion boundary, over every view that could be written', () => {
   it('lets through no output that breaks closure or reuses a source identity', () => {
     fc.assert(
-      fc.property(
-        subject,
-        placement,
-        fc.integer({ min: 0, max: 2 ** 31 - 1 }),
-        (source, onScreen, seed) => {
-          const answer = fc.sample(conversion(source, onScreen), { numRuns: 1, seed })[0];
-          expect(answer).toBeDefined();
-          if (answer === undefined) return;
+      fc.property(scenario, ({ source, onScreen, answer }) => {
+        let returned: ConvertedLayout;
+        try {
+          returned = convertView(() => answer, source, onScreen);
+        } catch {
+          // A refusal is always a correct outcome: the boundary throws rather
+          // than repairing, because a view that broke an obligation is wrong
+          // and the Edit calling it has nothing to fall back to.
+          expect(violatesClosure(answer) || violatesFreshIdentity(source, answer)).toBe(true);
+          return;
+        }
 
-          let returned: ConvertedLayout;
-          try {
-            returned = convertView(() => answer, source, onScreen);
-          } catch {
-            // A refusal is always a correct outcome: the boundary throws rather
-            // than repairing, because a view that broke an obligation is wrong
-            // and the Edit calling it has nothing to fall back to.
-            expect(violatesClosure(answer) || violatesFreshIdentity(source, answer)).toBe(true);
-            return;
-          }
-
-          expect(violatesClosure(returned)).toBe(false);
-          expect(violatesFreshIdentity(source, returned)).toBe(false);
-        },
-      ),
+        expect(violatesClosure(returned)).toBe(false);
+        expect(violatesFreshIdentity(source, returned)).toBe(false);
+      }),
     );
   });
 
   it('refuses every output that breaks one, rather than only some of them', () => {
     fc.assert(
-      fc.property(
-        subject,
-        placement,
-        fc.integer({ min: 0, max: 2 ** 31 - 1 }),
-        (source, onScreen, seed) => {
-          const answer = fc.sample(conversion(source, onScreen), { numRuns: 1, seed })[0];
-          if (answer === undefined) return;
-          fc.pre(violatesClosure(answer) || violatesFreshIdentity(source, answer));
+      fc.property(scenario, ({ source, onScreen, answer }) => {
+        fc.pre(violatesClosure(answer) || violatesFreshIdentity(source, answer));
 
-          expect(() => convertView(() => answer, source, onScreen)).toThrow();
-        },
-      ),
+        expect(() => convertView(() => answer, source, onScreen)).toThrow();
+      }),
     );
   });
 });

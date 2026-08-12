@@ -200,6 +200,18 @@ describe('presenting after a conversion', () => {
     expect(screen.getByTestId('present-button')).toBeDisabled();
     await settled(session);
   });
+
+  it('offers Present on a Layout whose Active Graph holds an Edge', async () => {
+    // The other half of the same control, and the reason it is here: the test
+    // above passes just as well against a Present that is disabled always, so
+    // on its own it cannot tell "refuses an empty Graph" from "refuses
+    // everything". `snapshot`'s Layout owns one Graph with one Edge, which is
+    // the smallest presentable Space.
+    const session = mount(snapshot);
+
+    expect(await screen.findByTestId('present-button')).toBeEnabled();
+    await settled(session);
+  });
 });
 
 /** Open Card A, which is to say edit it (ADR 0037). */

@@ -46,7 +46,7 @@ Layout boundary, and the reason the split is two Layouts rather than one.
 
 `example/` is one connected collection of seven Cards, so its three Graphs are
 owned by a **single** Layout. Nothing renders it, so its positions are a plain
-deterministic grid rather than an ELK arrangement.
+deterministic grid rather than an ELK run.
 
 Each collection returns to its start via an **alias** (`A′` of `A`, `E′` of `E`).
 That deliberately exercises alias rendering while keeping this fixture acyclic

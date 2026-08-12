@@ -76,10 +76,22 @@ Two HIGH review findings sat in the PostgreSQL integration suite, invisible to
 `pnpm test` and unrunnable at the time for want of a database: a stale positions
 assertion, and an `allIdlessImport` fixture that had gained an explicit Card id
 while the test imported it twice, so the second import would hit a primary-key
-conflict. The fixture was rewritten rather than patched — its "all id-less"
-premise is unreachable under version 1, since a Layout needs a Graph, a Graph an
-Edge, and an Edge a real Card id. Both were later verified green against a live
-database.
+conflict. The fixture was rewritten rather than patched, because the conflict is
+the point: a Card id supplied explicitly cannot be imported twice, so a fixture
+that names one and is imported twice is asserting something it cannot get. It
+became a factory taking the one identity that must be explicit, called with two
+different Cards, which keeps what the test was for — every omitted id gets a
+fresh identity per import, and nothing is memoized across two structurally
+identical imports.
+
+An earlier version of this note claimed the "all id-less" premise was
+*unreachable* under version 1, because a Layout needs a Graph, a Graph an Edge
+and an Edge a real Card id. That is wrong: ticket 03 removed `edges.min(1)`, so
+an owned Graph may hold no Edges (ADR 0040, ADR 0045) and forces no Card id. A
+wholly id-less import is reachable; it is the double import of an explicit id
+that is not.
+
+Both were later verified green against a live database.
 
 The determinism test could not discriminate what it claimed, because both
 exports read the same in-memory object. It now exports two repositories holding

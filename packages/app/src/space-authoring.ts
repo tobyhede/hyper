@@ -332,9 +332,11 @@ export function createSpaceAuthoring({
   const targetGraph = (): Graph | null => {
     const { selectedRenderer, activeGraphId } = navigation.getState();
     if (selectedRenderer.kind === 'view') return null;
-    const layout = (session.getState().working.document.layouts ?? []).find(
-      (candidate) => candidate.id === selectedRenderer.layoutId,
-    );
+    // Through `currentSpace()` and its index rather than scanning the working
+    // document, so ownership is resolved the one way the derivation resolves it
+    // (ADR 0040). Two walks over the same layouts would be two answers to
+    // "which Layout is selected" the moment either learned something.
+    const layout = getLayout(currentSpace(), selectedRenderer.layoutId);
     return layout?.graphs.find((graph) => graph.id === activeGraphId) ?? null;
   };
 

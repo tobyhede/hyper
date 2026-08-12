@@ -60,6 +60,11 @@ const withDanglingGraph = (base: SpaceSnapshot, title: string): SpaceSnapshot =>
     layouts: (base.document.layouts ?? []).map((layout) => ({
       ...layout,
       graphs: [{ id: GRAPH_ID, title: 'Graph', edges: [{ from: CARD_ID, to: MISSING_CARD_ID }] }],
+      // Named outright rather than carried through: replacing the owned Graphs
+      // would otherwise strand an inherited `activeGraph` on an id this Layout
+      // no longer holds, and the snapshot would be unloadable for two reasons
+      // where these tests are about one.
+      activeGraph: GRAPH_ID,
     })),
   },
 });
