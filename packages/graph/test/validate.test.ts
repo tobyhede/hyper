@@ -253,11 +253,16 @@ describe('validateReferences: a Graph id is unique across the Space (ADR 0045)',
     expect(error?.message).toContain(second);
   });
 
-  it('reports one id repeated inside a single layout', () => {
+  it('reports one id repeated inside a single layout, naming that layout once', () => {
     const m = baseSpaceFile();
     working(m).graphs.push({ id: MAIN, title: 'Main again', edges: [] });
 
-    expect(validateReferences(m).some((e) => e.kind === 'duplicate-graph-id')).toBe(true);
+    const error = validateReferences(m).find((e) => e.kind === 'duplicate-graph-id');
+    expect(error?.ref).toBe(MAIN);
+    // Not "in layouts X and X": one owner is one place to look, and repeating
+    // it would send an author hunting a second layout that does not exist.
+    expect(error?.message).toContain(`twice in layout "${WORKING}"`);
+    expect(error?.message).not.toContain('layouts');
   });
 
   it('accepts two layouts owning distinct graphs over the same cards', () => {

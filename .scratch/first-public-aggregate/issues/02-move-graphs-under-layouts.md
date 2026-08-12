@@ -193,6 +193,26 @@ Keeping `space.graphs` as a derived flatten is what held the blast radius down �
 colour assignment, handle derivation, render Edge derivation, the canvas
 projection and Navigation all read it and none changed.
 
+**Two acceptance criteria were missing and the implementation covered them
+anyway** — recorded here because a later reader should not conclude from the
+criteria that they were out of scope.
+
+The criteria list three reference rules and not the one that matters most for
+the narrowing this ticket does: once a selected Layout resolves to the Graphs it
+*owns*, a Layout whose `activeGraph` names another Layout's Graph would pass
+intake with an Active Graph absent from its own visible set — exactly what the
+`layout-active-graph-not-shown` error deleted in `01` used to cover, and `01`
+named this ticket as where that coverage belongs. It is implemented, folded into
+`layout-unknown-graph` rather than resurrected as a second kind: one rule — a
+Layout's Active Graph must be one it owns — instead of exists-plus-is-shown.
+
+The duplicate-id criterion asks for "a named load error identifying both
+owners", which is under-specified when both owners are the same Layout. That
+case was caught but its message read `in layouts "X" and "X"`, sending an author
+after a second owner that does not exist; it now says `twice in layout "X"`, and
+the test asserts the message rather than only the error kind, which is what let
+the degenerate wording survive.
+
 Review found two defects. `edges: z.array(...).min(1)` still forbade the empty
 Graph ADRs 0040 and 0045 require, which made ticket 03's central deliverable
 unrepresentable; that was fixed in 03 rather than by reopening this branch

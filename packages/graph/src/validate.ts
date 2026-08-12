@@ -97,7 +97,14 @@ export function validateReferences(space: Referenceable): SpaceReferenceError[] 
       errors.push({
         kind: 'duplicate-graph-id',
         ref: graph.id,
-        message: `Duplicate graph id "${graph.id}" in layouts "${owner.id}" and "${layout.id}"`,
+        // Naming one layout twice would send an author looking for a second
+        // owner that does not exist, so the same-owner repeat says so instead.
+        // Both are the same fault — an id that is not unique across the space —
+        // and the fix differs only in where to look.
+        message:
+          owner.id === layout.id
+            ? `Duplicate graph id "${graph.id}" twice in layout "${layout.id}"`
+            : `Duplicate graph id "${graph.id}" in layouts "${owner.id}" and "${layout.id}"`,
       });
     }
   }
