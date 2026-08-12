@@ -31,6 +31,24 @@ const snapshot: SpaceSnapshot = {
 };
 
 describe('loadSpaceSnapshot', () => {
+  it('rejects a stored document that still carries a Space-level graphs array', () => {
+    // The same pre-parse check `loadSpace` runs, reached through the other
+    // intake — so a stale producer cannot commit one either. A commit validates
+    // through here, so this is what stops it becoming stored state.
+    const result = loadSpaceSnapshot({
+      ...snapshot,
+      document: {
+        ...snapshot.document,
+        graphs: [{ id: GRAPH_ID, title: 'Main', edges: [] }],
+      },
+    });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.errors).toHaveLength(1);
+    expect(result.errors[0]?.kind).toBe('retired-space-graphs');
+  });
+
   it('reports an invalid persistence shape without constructing a Space', () => {
     const result = loadSpaceSnapshot({ ...snapshot, id: 'space' });
     expect(result.ok).toBe(false);

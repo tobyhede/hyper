@@ -62,6 +62,7 @@ export interface Space {
 export type SpaceError =
   | { kind: 'invalid-shape'; message: string }
   | { kind: 'unsupported-version'; message: string }
+  | { kind: 'retired-space-graphs'; message: string }
   | CardFileError
   | SpaceReferenceError;
 
@@ -85,6 +86,42 @@ function unsupportedVersion(document: unknown): SpaceError | null {
   };
 }
 
+/**
+ * The one error a document carrying the retired space-level `graphs` earns, or
+ * `null` when it does not carry one.
+ *
+ * Read before parsing, beside {@link unsupportedVersion}, because
+ * `spaceFileSchema` is a plain object and Zod *strips* a key it does not
+ * declare. That is the right answer for the retired `cards` and `edges` keys:
+ * they carried nothing the rest of the document does not already say — a card
+ * exists because its file does, an edge because a graph holds it — so dropping
+ * them loses nothing. A space-level `graphs` carried the whole topology (ADR
+ * 0040), so stripping it in silence discards exactly what its author wrote and
+ * yields a space that loads looking complete.
+ *
+ * Here rather than declared in the schema, and not by making the schema
+ * `.strict()`. Strict would reject `cards` and `edges` too, taking that
+ * deliberate leniency with it. Declaring the key — as `z.never()` or
+ * `z.undefined()` — puts it in the inferred document type, and Hono maps an
+ * always-undefined property to `never` when it infers the JSON response, so the
+ * RPC contract stops matching the schema it is checked against
+ * (`space-http-app-types.test.ts`). The pre-parse hook has neither cost, and it
+ * is already where the version answer lives.
+ *
+ * A version 2 document is answered by its version before this is reached; what
+ * this catches is a version 1 document, hand-edited or written by a stale
+ * producer, that carries both shapes at once.
+ */
+function retiredSpaceGraphs(document: unknown): SpaceError | null {
+  if (typeof document !== 'object' || document === null) return null;
+  if (!('graphs' in document)) return null;
+  return {
+    kind: 'retired-space-graphs',
+    message:
+      'This document carries a space-level `graphs` array, which is retired: a Layout owns the Graphs it draws (ADR 0040)',
+  };
+}
+
 export type LoadSpaceResult = { ok: true; space: Space } | { ok: false; errors: SpaceError[] };
 
 export type LoadSpaceSnapshotResult =
@@ -101,6 +138,8 @@ export type LoadSpaceSnapshotResult =
 export function loadSpace(input: unknown, cardFiles: readonly CardFile[]): LoadSpaceResult {
   const wrongVersion = unsupportedVersion(input);
   if (wrongVersion !== null) return { ok: false, errors: [wrongVersion] };
+  const retired = retiredSpaceGraphs(input);
+  if (retired !== null) return { ok: false, errors: [retired] };
 
   const parsed = spaceFileSchema.safeParse(input);
   if (!parsed.success) {
@@ -153,6 +192,8 @@ export function loadSpaceSnapshot(input: unknown): LoadSpaceSnapshotResult {
     typeof input === 'object' && input !== null ? (input as { document?: unknown }).document : null;
   const wrongVersion = unsupportedVersion(storedDocument);
   if (wrongVersion !== null) return { ok: false, errors: [wrongVersion] };
+  const retired = retiredSpaceGraphs(storedDocument);
+  if (retired !== null) return { ok: false, errors: [retired] };
 
   const parsed = spaceSnapshotSchema.safeParse(input);
   if (!parsed.success) {

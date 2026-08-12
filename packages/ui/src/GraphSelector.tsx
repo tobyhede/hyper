@@ -36,10 +36,12 @@ export function GraphSelector({
       aria-label="Graph controls"
       className="inline-flex items-stretch overflow-hidden rounded-[6px] border border-[var(--border)] bg-[var(--panel-2)]"
     >
-      <Select
-        {...(activeGraphId === null ? {} : { value: activeGraphId })}
-        onValueChange={onActivate}
-      >
+      {/*
+        Controlled across the empty state — see `LayoutSelector` for the whole
+        argument. A Space with no Layout owns no Graph either (ADR 0040), so this
+        starts null and the first conversion gives it an id.
+      */}
+      <Select value={activeGraphId ?? ''} onValueChange={onActivate}>
         <SelectorTrigger
           accessibleName="Active Graph"
           testId="graph-selector"
