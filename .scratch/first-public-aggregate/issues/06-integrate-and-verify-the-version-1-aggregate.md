@@ -1,7 +1,7 @@
 # Integrate and verify the version 1 aggregate
 
 Status: ready-for-agent
-Blocked by: 03, 05
+Blocked by: 03, 05, 07
 
 ## What to build
 
