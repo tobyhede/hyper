@@ -1,6 +1,6 @@
 import fc from 'fast-check';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { uuidSchema, type SpaceSnapshot } from '@project/core';
+import { uuidSchema, type CardDocument, type SpaceSnapshot } from '@project/core';
 import { loadSpaceSnapshot, Placement } from '@project/graph';
 import {
   MemorySpaceBackend,
@@ -70,7 +70,11 @@ interface LoadedFixture {
 type CompletionWithoutGeometry =
   | { readonly kind: 'settled-card-movement' }
   | { readonly kind: 'connected-cards'; readonly from: typeof CARD_A; readonly to: typeof CARD_A }
-  | { readonly kind: 'edited-card'; readonly cardId: typeof CARD_A }
+  | {
+      readonly kind: 'edited-card';
+      readonly cardId: typeof CARD_A;
+      readonly document: CardDocument;
+    }
   | {
       readonly kind: 'create-and-connect';
       readonly from: typeof CARD_A;
@@ -257,13 +261,13 @@ describe('Space Authoring', () => {
         [CARD_B, { x: 300, y: 40 }],
       ]),
     );
-    authoring.installCardDocument(CARD_A, {
-      title: 'Renamed A',
-      kind: 'markdown',
-      body: 'A',
-    });
-
-    expect(complete(authoring, { kind: 'edited-card', cardId: CARD_A })).toEqual({
+    expect(
+      authoring.complete({
+        kind: 'edited-card',
+        cardId: CARD_A,
+        document: { title: 'Renamed A', kind: 'markdown', body: 'A' },
+      }),
+    ).toEqual({
       kind: 'completed',
     });
 
@@ -282,25 +286,16 @@ describe('Space Authoring', () => {
     expect(navigation.getState().selectedRenderer).toEqual({ kind: 'layout', layoutId: LAYOUT_ID });
   });
 
-  /**
-   * An installed Card value is one hand-off, not a standing entry. An editor
-   * installs its authoritative value *before* it reports the Edit, so the value
-   * belongs to that report and to nothing after it. Left behind by a completion
-   * that produced no Edit, it becomes state waiting to be applied by whatever
-   * `edited-card` arrives next — a rename the author had abandoned, landing on a
-   * Space they have since changed.
-   */
-  it('does not leave a Card value behind for the next completion to apply', () => {
+  it('binds a Card value to the completion that reports it', () => {
     const { authoring, session } = openAuthoring();
-    authoring.installCardDocument(CARD_A, {
-      title: 'Abandoned rename',
-      kind: 'markdown',
-      body: 'A',
-    });
     // No placement: an Algorithmic View has nothing to write the Edit into yet.
-    expect(complete(authoring, { kind: 'edited-card', cardId: CARD_A })).toEqual({
-      kind: 'no-edit',
-    });
+    expect(
+      complete(authoring, {
+        kind: 'edited-card',
+        cardId: CARD_A,
+        document: { title: 'Abandoned rename', kind: 'markdown', body: 'A' },
+      }),
+    ).toEqual({ kind: 'no-edit' });
 
     replacePlacementForTest(
       authoring,
@@ -310,9 +305,13 @@ describe('Space Authoring', () => {
       ]),
     );
 
-    expect(complete(authoring, { kind: 'edited-card', cardId: CARD_A })).toEqual({
-      kind: 'no-edit',
-    });
+    expect(
+      complete(authoring, {
+        kind: 'edited-card',
+        cardId: CARD_A,
+        document: automaticSnapshot.cards[0]!.document,
+      }),
+    ).toEqual({ kind: 'no-edit' });
     expect(session.getState().working.cards).toEqual(automaticSnapshot.cards);
   });
 
@@ -333,11 +332,13 @@ describe('Space Authoring', () => {
       ]),
     );
     const before = session.getState().working;
-    authoring.installCardDocument(CARD_A, automaticSnapshot.cards[0]!.document);
-
-    expect(complete(authoring, { kind: 'edited-card', cardId: CARD_A })).toEqual({
-      kind: 'no-edit',
-    });
+    expect(
+      complete(authoring, {
+        kind: 'edited-card',
+        cardId: CARD_A,
+        document: automaticSnapshot.cards[0]!.document,
+      }),
+    ).toEqual({ kind: 'no-edit' });
     expect(session.getState().working).toBe(before);
     expect(control.attempts).toEqual([]);
     expect(minted).not.toHaveBeenCalled();
@@ -351,16 +352,18 @@ describe('Space Authoring', () => {
       loaded,
       { kind: 'layout', layoutId: LAYOUT_ID },
     );
-    authoring.installCardDocument(CARD_A, {
-      title: 'A',
-      description: 'Edited in place',
-      kind: 'markdown',
-      body: '# Edited',
-    });
-
-    expect(complete(authoring, { kind: 'edited-card', cardId: CARD_A })).toEqual({
-      kind: 'completed',
-    });
+    expect(
+      complete(authoring, {
+        kind: 'edited-card',
+        cardId: CARD_A,
+        document: {
+          title: 'A',
+          description: 'Edited in place',
+          kind: 'markdown',
+          body: '# Edited',
+        },
+      }),
+    ).toEqual({ kind: 'completed' });
 
     expect(control.attempts).toHaveLength(1);
     expect(control.attempts[0]?.snapshot.cards[0]?.document).toEqual({
@@ -397,15 +400,13 @@ describe('Space Authoring', () => {
         [CARD_B, { x: 300, y: 40 }],
       ]),
     );
-    authoring.installCardDocument(CARD_B, {
-      title: 'Reframed A',
-      kind: 'alias',
-      target: CARD_A,
-    });
-
-    expect(complete(authoring, { kind: 'edited-card', cardId: CARD_B })).toEqual({
-      kind: 'completed',
-    });
+    expect(
+      complete(authoring, {
+        kind: 'edited-card',
+        cardId: CARD_B,
+        document: { title: 'Reframed A', kind: 'alias', target: CARD_A },
+      }),
+    ).toEqual({ kind: 'completed' });
     expect(session.getState().working.cards).toEqual([
       positionedSnapshot.cards[0],
       { id: CARD_B, document: { title: 'Reframed A', kind: 'alias', target: CARD_A } },
@@ -420,15 +421,13 @@ describe('Space Authoring', () => {
     // a Space that loads and `isSupportedCardEdit` is the only thing that can
     // refuse it. Pointed at the Alias instead, the Alias chain would be rejected
     // by intake and the failure would say nothing about the guard under test.
-    authoring.installCardDocument(CARD_A, {
-      title: 'Converted A',
-      kind: 'alias',
-      target: CARD_C,
-    });
-
-    expect(complete(authoring, { kind: 'edited-card', cardId: CARD_A })).toEqual({
-      kind: 'no-edit',
-    });
+    expect(
+      complete(authoring, {
+        kind: 'edited-card',
+        cardId: CARD_A,
+        document: { title: 'Converted A', kind: 'alias', target: CARD_C },
+      }),
+    ).toEqual({ kind: 'no-edit' });
     expect(session.getState().working).toBe(before);
   });
 
@@ -442,15 +441,13 @@ describe('Space Authoring', () => {
     const { authoring, session } = openRefusalFixture();
     const before = session.getState().working;
 
-    authoring.installCardDocument(CARD_B, {
-      title: 'A again',
-      kind: 'alias',
-      target: CARD_C,
-    });
-
-    expect(complete(authoring, { kind: 'edited-card', cardId: CARD_B })).toEqual({
-      kind: 'no-edit',
-    });
+    expect(
+      complete(authoring, {
+        kind: 'edited-card',
+        cardId: CARD_B,
+        document: { title: 'A again', kind: 'alias', target: CARD_C },
+      }),
+    ).toEqual({ kind: 'no-edit' });
     expect(session.getState().working).toBe(before);
   });
 
@@ -458,16 +455,18 @@ describe('Space Authoring', () => {
     const { authoring, session } = openRefusalFixture();
     const before = session.getState().working;
 
-    authoring.installCardDocument(CARD_B, {
-      title: 'A again',
-      description: 'Alias metadata is not content',
-      kind: 'alias',
-      target: CARD_A,
-    });
-
-    expect(complete(authoring, { kind: 'edited-card', cardId: CARD_B })).toEqual({
-      kind: 'no-edit',
-    });
+    expect(
+      complete(authoring, {
+        kind: 'edited-card',
+        cardId: CARD_B,
+        document: {
+          title: 'A again',
+          description: 'Alias metadata is not content',
+          kind: 'alias',
+          target: CARD_A,
+        },
+      }),
+    ).toEqual({ kind: 'no-edit' });
     expect(session.getState().working).toBe(before);
   });
 
@@ -1718,16 +1717,15 @@ describe('Space Authoring', () => {
     navigation.selectRenderer({ kind: 'view', view: 'grid' });
     navigation.present();
     navigation.openCard(CARD_B);
-    authoring.installCardDocument(CARD_A, {
-      title: 'Stale local title',
-      kind: 'markdown',
-      body: 'stale local body',
-    });
 
     expect(authoring.acceptStoredSpace()).toBeNull();
-    expect(complete(authoring, { kind: 'edited-card', cardId: CARD_A })).toEqual({
-      kind: 'no-edit',
-    });
+    expect(
+      complete(authoring, {
+        kind: 'edited-card',
+        cardId: CARD_A,
+        document: remote.cards[0]!.document,
+      }),
+    ).toEqual({ kind: 'no-edit' });
 
     // The counter the render adapter watches to drop stale local placement.
     expect(authoring.getState().replacementEpoch).toBe(1);
