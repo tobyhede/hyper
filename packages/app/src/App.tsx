@@ -22,6 +22,7 @@ import { defaultRenderer, resolveView, type RendererSelection } from './view';
 import { SpaceCanvas } from './components/SpaceCanvas';
 import { OpenCard } from './components/OpenCard';
 import { PlacementFailure } from './components/PlacementFailure';
+import { PlacementPending } from './components/PlacementPending';
 import { PresentingChrome } from './components/PresentingChrome';
 
 export const createApp = ({ space, spaceSession }: OpenedSpace) => {
@@ -512,9 +513,7 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
               />
             </ReactFlowProvider>
           ) : (
-            <div className="placement-status" role="status">
-              Arranging…
-            </div>
+            <PlacementPending />
           )}
 
           {presenting && (

@@ -33,6 +33,7 @@ import {
 } from '@project/react-flow-adapter';
 import { activeGraphColor } from '../colors';
 import { CARD_SIZE } from '../card';
+import { newCardDrop, type ConnectionGesture, type DropTarget } from '../connection-gesture';
 import { MAX_ZOOM, OVERVIEW_FIT } from '../camera';
 import { OverviewCamera, PresentingCamera } from './cameras';
 
@@ -63,27 +64,23 @@ const ARIA_LABEL_CONFIG = {
 } as const;
 
 /**
- * The empty canvas an Alt-drop may author a Card on: inside the renderer, clear
- * of every node. Both class names are React Flow's published theming API.
+ * Which `DropTarget` the element under the pointer is. Both class names are
+ * React Flow's published theming API.
  *
- * The live preview and the release must ask the same question. The preview's
- * point is tracked from `onMouseMove`, which is bound to the React Flow element
- * and therefore stops firing the moment the pointer leaves it — so a pointer
- * that departs over the toolbar leaves the last eligible point standing. Judging
- * the release by that stale point authored a Card wherever the pointer happened
- * to be let go, off-canvas and far from the preview the author could see.
+ * This is the DOM half of the question only — a connection target in range
+ * outranks it, and both callers apply that precedence before asking
+ * `newCardDrop`. Why neither half is sufficient alone is written out in
+ * `connection-gesture.ts`.
  *
  * React Flow's own `connectionState.isValid` does not answer this: it is `null`
  * — falsy — whenever no handle is in range, which is exactly what a release over
  * the toolbar produces. The canonical add-node-on-edge-drop example would author
  * a Card there too.
  */
-function isEmptyCanvasTarget(target: EventTarget | null): boolean {
-  return (
-    target instanceof Element &&
-    target.closest('.react-flow__renderer') !== null &&
-    target.closest('.react-flow__node') === null
-  );
+function dropTargetOf(target: EventTarget | null): DropTarget {
+  if (!(target instanceof Element)) return 'off-canvas';
+  if (target.closest('.react-flow__renderer') === null) return 'off-canvas';
+  return target.closest('.react-flow__node') === null ? 'empty-canvas' : 'card';
 }
 
 /**
@@ -94,14 +91,22 @@ function isEmptyCanvasTarget(target: EventTarget | null): boolean {
  * viewport subscription to stay put under pan and zoom. Tracking the point in
  * `SpaceCanvas`'s own state instead re-rendered the whole flow on every pointer
  * frame of a connection.
+ *
+ * Both eligibility and position come from `newCardDrop`, which the release asks
+ * as well: the ghost cannot appear where a release would refuse, and cannot land
+ * anywhere but where a release would put it. Each selector stays primitive —
+ * returning the assembled gesture from one `useConnection` would hand the store
+ * a fresh object every frame.
  */
 function NewCardPreview({
   title,
-  active,
+  modifierHeld,
+  pointerOver,
   acceptsNewCardTarget,
 }: {
   title: string;
-  active: boolean;
+  modifierHeld: boolean;
+  pointerOver: DropTarget;
   acceptsNewCardTarget: (from: string) => boolean;
 }) {
   const endpoint = useConnection((connection) => (connection.inProgress ? connection.to : null));
@@ -111,19 +116,19 @@ function NewCardPreview({
   const sourceId = useConnection((connection) =>
     connection.inProgress ? connection.fromNode.id : null,
   );
-  if (
-    !active ||
-    endpoint === null ||
-    overNode ||
-    sourceId === null ||
-    !acceptsNewCardTarget(sourceId)
-  ) {
-    return null;
-  }
-  const position = {
-    x: endpoint.x - CARD_SIZE.width / 2,
-    y: endpoint.y - CARD_SIZE.height / 2,
-  };
+  const gesture: ConnectionGesture =
+    endpoint === null || sourceId === null
+      ? { kind: 'idle' }
+      : {
+          kind: 'dragging',
+          sourceId,
+          point: endpoint,
+          over: overNode ? 'connection-target' : pointerOver,
+          modifierHeld,
+        };
+  const drop = newCardDrop(gesture, acceptsNewCardTarget);
+  if (drop === null) return null;
+  const position = drop.position;
 
   return (
     <ViewportPortal>
@@ -211,11 +216,12 @@ export function SpaceCanvas({
   activeGraphCardIds,
 }: SpaceCanvasProps) {
   const connectionGesture = useRef(false);
-  const [modifierCreatesCard, setModifierCreatesCard] = useState(false);
+  const [modifierHeld, setModifierHeld] = useState(false);
   const [selectedEdgeIds, setSelectedEdgeIds] = useState<ReadonlySet<string>>(() => new Set());
-  // A boolean, not a point: React bails out of an unchanged state write, so a
-  // pointer moving across empty canvas no longer re-renders the flow per frame.
-  const [overEmptyCanvas, setOverEmptyCanvas] = useState(false);
+  // Where the pointer is, not the point it is at: React bails out of an
+  // unchanged state write, so a pointer moving across empty canvas no longer
+  // re-renders the flow per frame.
+  const [pointerOver, setPointerOver] = useState<DropTarget>('off-canvas');
   const [editingTitleCardId, setEditingTitleCardId] = useState<string | null>(null);
   const { screenToFlowPosition } = useReactFlow();
   // One rule for every authoring control drawn on a Card — the title editor and
@@ -240,7 +246,7 @@ export function SpaceCanvas({
   useEffect(() => {
     const updateModifier = (event: KeyboardEvent) => {
       if (connectionGesture.current && event.key === 'Alt') {
-        setModifierCreatesCard(event.type === 'keydown');
+        setModifierHeld(event.type === 'keydown');
       }
     };
     window.addEventListener('keydown', updateModifier);
@@ -271,35 +277,38 @@ export function SpaceCanvas({
 
   const handleConnectStart = useCallback<OnConnectStart>((event) => {
     connectionGesture.current = true;
-    setOverEmptyCanvas(false);
-    setModifierCreatesCard('altKey' in event && event.altKey);
+    setPointerOver('off-canvas');
+    setModifierHeld('altKey' in event && event.altKey);
   }, []);
 
   const handleConnectEnd = useCallback<OnConnectEnd>(
     (event, connection) => {
-      const createsCard =
-        connection.fromNode !== null &&
-        connection.toNode === null &&
-        acceptsNewCardTarget(connection.fromNode.id) &&
-        'altKey' in event &&
-        'clientX' in event &&
-        event.altKey &&
-        // Resolved from the point rather than read off the event: `event.target`
-        // is only the released-over element because `XYHandle` happens not to
-        // capture the pointer, which is an implementation detail rather than a
-        // documented guarantee. `elementFromPoint` is what React Flow itself
-        // uses to resolve a drop target.
-        isEmptyCanvasTarget(document.elementFromPoint(event.clientX, event.clientY));
-      if (createsCard) {
-        const pointer = screenToFlowPosition({ x: event.clientX, y: event.clientY });
-        onCreateConnectedCard(connection.fromNode.id, {
-          x: pointer.x - CARD_SIZE.width / 2,
-          y: pointer.y - CARD_SIZE.height / 2,
-        });
-      }
+      const drop =
+        connection.fromNode === null || !('altKey' in event) || !('clientX' in event)
+          ? null
+          : newCardDrop(
+              {
+                kind: 'dragging',
+                sourceId: connection.fromNode.id,
+                point: screenToFlowPosition({ x: event.clientX, y: event.clientY }),
+                over:
+                  connection.toNode !== null
+                    ? 'connection-target'
+                    : // Resolved from the point rather than read off the event:
+                      // `event.target` is only the released-over element because
+                      // `XYHandle` happens not to capture the pointer, which is
+                      // an implementation detail rather than a documented
+                      // guarantee. `elementFromPoint` is what React Flow itself
+                      // uses to resolve a drop target.
+                      dropTargetOf(document.elementFromPoint(event.clientX, event.clientY)),
+                modifierHeld: event.altKey,
+              },
+              acceptsNewCardTarget,
+            );
+      if (drop !== null) onCreateConnectedCard(drop.sourceId, drop.position);
       onConnectEnd();
-      setModifierCreatesCard(false);
-      setOverEmptyCanvas(false);
+      setModifierHeld(false);
+      setPointerOver('off-canvas');
       // Lowered here rather than deferred past the pointer-up node click React
       // Flow dispatches after this callback. That deferral existed so the click
       // ending a connection drag could not open the Card just connected to; a
@@ -318,9 +327,9 @@ export function SpaceCanvas({
 
   const handleMouseMove = useCallback((event: MouseEvent<HTMLDivElement>) => {
     if (!connectionGesture.current) return;
-    const empty = isEmptyCanvasTarget(event.target);
-    setOverEmptyCanvas(empty);
-    if (empty) setModifierCreatesCard(event.altKey);
+    const over = dropTargetOf(event.target);
+    setPointerOver(over);
+    if (over === 'empty-canvas') setModifierHeld(event.altKey);
   }, []);
 
   const handleKeyDown = useCallback(
@@ -479,7 +488,8 @@ export function SpaceCanvas({
       <PresentingCamera activeCardId={activeCardId} />
       <NewCardPreview
         title={newCardTitle}
-        active={modifierCreatesCard && overEmptyCanvas}
+        modifierHeld={modifierHeld}
+        pointerOver={pointerOver}
         acceptsNewCardTarget={acceptsNewCardTarget}
       />
     </ReactFlow>
