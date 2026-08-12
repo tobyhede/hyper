@@ -16,17 +16,23 @@ const compareOrdinal = (left: string, right: string): number =>
   left < right ? -1 : left > right ? 1 : 0;
 
 /**
- * A layout's graphs, emitted in the order the layout holds them.
+ * A layout's graphs, rebuilt key by key and emitted in the order the layout
+ * holds them.
  *
  * Ordering is the one thing this does *not* impose, and the asymmetry with the
- * positions beside it is deliberate. A layout's graphs are ordered authored
- * content (ADR 0040) — order is what the graph selector offers and what the
+ * positions beside it comes from how the document is stored. `jsonb` reorders
+ * an object's keys on write and preserves an array's order. A layout's
+ * positions are an object, so the order they were written in is gone by the
+ * time they are read back and the sort below is what gives them one again —
+ * without it a re-export of untouched content produces a diff. Its graphs are
+ * an array, so their order survives storage intact; it is also authored content
+ * (ADR 0040) — order is what the graph selector offers and what the
  * absent-`activeGraph` fallback resolves against — so sorting them here would
- * rewrite the space on its way to disk. The position map has no such order to
- * lose: it is a record, and `Object.entries` reads whatever insertion order the
- * stored JSON happened to have, so the sort is what makes a re-export produce no
- * diff. Determinism comes from the key order within each graph, which is this
- * literal.
+ * rewrite the space on its way to disk.
+ *
+ * Every nested value is rebuilt from a literal rather than carried through, for
+ * the same reason: what `jsonb` hands back is key-ordered however it likes, and
+ * a spread would export that order.
  */
 const canonicalGraphs = (
   graphs: NonNullable<SpaceFile['layouts']>[number]['graphs'],
@@ -44,7 +50,14 @@ const canonicalSpaceFile = ({ snapshot }: LoadedSpace): SpaceFile => {
     title: layout.title,
     kind: layout.kind,
     positions: Object.fromEntries(
-      Object.entries(layout.positions).sort(([left], [right]) => compareOrdinal(left, right)),
+      Object.entries(layout.positions)
+        .sort(([left], [right]) => compareOrdinal(left, right))
+        // The point is rebuilt too, not passed through: a stored `{"y":…,"x":…}`
+        // would otherwise export in that order. An absent value cannot come off
+        // a parsed document — the optionality is the `Partial<Record>` the
+        // schema's key branding produces — and dropping it matches what
+        // `JSON.stringify` already did with one.
+        .flatMap(([id, point]) => (point === undefined ? [] : [[id, { x: point.x, y: point.y }]])),
     ),
     graphs: canonicalGraphs(layout.graphs),
     ...(layout.activeGraph === undefined ? {} : { activeGraph: layout.activeGraph }),

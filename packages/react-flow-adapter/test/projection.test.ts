@@ -6,6 +6,7 @@ import {
   loadSpace,
   type Space,
 } from '@project/graph';
+import type { SpaceFile } from '@project/core';
 import { projectCardNodes, projectGraphEdges, type GraphEmphasis } from '../src/index';
 import { aliasFile, cardFile } from './card-files';
 import { uuid } from './uuid';
@@ -30,22 +31,34 @@ function load(
  * takes membership of every card the graphs touch. The positions are arbitrary
  * — nothing in this file reads them — and what they express here is membership,
  * which is what a layout's position keys are.
+ *
+ * Returned as `SpaceFile` rather than as `unknown`, although `loadSpace` takes
+ * `unknown` and would accept either. The literal is the whole point: typed, the
+ * next change to the aggregate fails here at `tsc`; untyped, it checks against
+ * nothing and fails at runtime instead — which is exactly how these fixtures
+ * came to be a version behind.
  */
 function spaceFile(
   graphs: readonly { id: string; title: string; edges: readonly { from: string; to: string }[] }[],
-): unknown {
+): SpaceFile {
   const members = [...new Set(graphs.flatMap(({ edges }) => edges.flatMap((e) => [e.from, e.to])))];
   return {
     version: 1,
-    id: '00000000-0000-4000-8000-000000000001',
+    id: uuid('00000000-0000-4000-8000-000000000001'),
     title: 'Test',
     layouts: [
       {
-        id: '00000000-0000-4000-8000-000000000050',
+        id: uuid('00000000-0000-4000-8000-000000000050'),
         title: 'Only layout',
         kind: 'positioned',
-        positions: Object.fromEntries(members.map((id, index) => [id, { x: index * 300, y: 0 }])),
-        graphs,
+        positions: Object.fromEntries(
+          members.map((id, index) => [uuid(id), { x: index * 300, y: 0 }]),
+        ),
+        graphs: graphs.map(({ id, title, edges }) => ({
+          id: uuid(id),
+          title,
+          edges: edges.map(({ from, to }) => ({ from: uuid(from), to: uuid(to) })),
+        })),
       },
     ],
   };

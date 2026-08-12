@@ -129,20 +129,70 @@ describe('canonical export', () => {
   });
 
   /**
-   * Byte-identical, not merely equivalent. The canonical directory is what a
-   * version-controlled Space *is*, so a re-export of content nothing has touched
-   * must produce no diff — which means the exporter, not the stored order,
-   * decides every ordering it emits: the position keys within a Layout, the key
-   * order within each Graph, and the card files.
+   * The same Space under a different insertion order, which is the only input
+   * that can fail this.
+   *
+   * `jsonb` reorders an object's keys on write, so two databases holding
+   * identical content can hand back objects whose keys arrive in different
+   * orders — and a re-export must still produce no diff, because a canonical
+   * directory is what a version-controlled Space *is*. Exporting one object
+   * twice cannot show that: identical bytes would follow from `JSON.stringify`
+   * alone, whatever ordering the exporter does or does not impose.
+   *
+   * So every object below is permuted against `storedSpace`: the document's
+   * keys, each layout's, each graph's, each edge's, the position map's, each
+   * *point's*, and the card array's. Only the exporter rebuilding all of them
+   * makes the two agree.
    */
-  it('re-exports unchanged content byte-identically', async () => {
-    const repository = new MemorySpaceRepository([storedSpace]);
+  const shuffledStoredSpace: LoadedSpace = {
+    revision: 7n,
+    exportedRevision: null,
+    snapshot: {
+      cards: [
+        { id: CARD_A, document: { kind: 'markdown', body: 'A body.\n', title: 'A' } },
+        { id: CARD_E, document: { body: 'E body.\n', title: 'E', kind: 'markdown' } },
+        { id: CARD_B, document: { title: 'B', body: 'B body.\n', kind: 'markdown' } },
+        { id: CARD_F, document: { kind: 'markdown', title: 'F', body: 'F body.\n' } },
+      ],
+      id: SPACE_ID,
+      document: {
+        title: 'Stored talk',
+        layouts: [
+          {
+            kind: 'positioned',
+            activeGraph: LONG_GRAPH_ID,
+            graphs: [
+              {
+                color: '#22aa88',
+                edges: [{ to: CARD_A, from: CARD_B }],
+                title: 'Short',
+                id: SHORT_GRAPH_ID,
+              },
+              { edges: [{ to: CARD_B, from: CARD_A }], id: LONG_GRAPH_ID, title: 'Long' },
+            ],
+            title: 'Spine',
+            positions: { [CARD_A]: { y: 0, x: 0 }, [CARD_B]: { y: 0, x: 260 } },
+            id: SPINE_LAYOUT_ID,
+          },
+          {
+            title: 'Echo',
+            positions: { [CARD_F]: { y: 200, x: 260 }, [CARD_E]: { y: 200, x: 0 } },
+            graphs: [{ title: 'Echo', edges: [{ to: CARD_F, from: CARD_E }], id: ECHO_GRAPH_ID }],
+            id: ECHO_LAYOUT_ID,
+            kind: 'positioned',
+          },
+        ],
+        version: 1,
+      },
+    },
+  };
+
+  it('exports one Space identically however its stored objects were ordered', async () => {
     const first = join(await makeTemporaryDirectory(), 'exported');
     const second = join(await makeTemporaryDirectory(), 'exported');
 
-    await exportSpace(repository, SPACE_ID, first);
-    await exportSpace(repository, SPACE_ID, first);
-    await exportSpace(repository, SPACE_ID, second);
+    await exportSpace(new MemorySpaceRepository([storedSpace]), SPACE_ID, first);
+    await exportSpace(new MemorySpaceRepository([shuffledStoredSpace]), SPACE_ID, second);
 
     await expect(readFile(join(first, 'space.json'), 'utf8')).resolves.toBe(
       await readFile(join(second, 'space.json'), 'utf8'),
@@ -152,6 +202,22 @@ describe('canonical export', () => {
         await readFile(join(second, 'cards', `${cardId}.md`), 'utf8'),
       );
     }
+  });
+
+  /**
+   * Separate from the ordering above: this is the staged, validated replacement
+   * running over a destination it has already written, which is the path an
+   * author actually repeats.
+   */
+  it('re-exports over its own output without changing a byte', async () => {
+    const repository = new MemorySpaceRepository([storedSpace]);
+    const destination = join(await makeTemporaryDirectory(), 'exported');
+
+    await exportSpace(repository, SPACE_ID, destination);
+    const afterFirst = await readFile(join(destination, 'space.json'), 'utf8');
+    await exportSpace(repository, SPACE_ID, destination);
+
+    await expect(readFile(join(destination, 'space.json'), 'utf8')).resolves.toBe(afterFirst);
   });
 
   it('exports a directory that imports back as the Space it came from', async () => {

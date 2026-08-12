@@ -53,6 +53,7 @@ const MIXED_SECOND_CARD_ID = uuidSchema.parse('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbb
 const UNRESOLVED_CARD_ID = uuidSchema.parse('cccccccc-cccc-4ccc-8ccc-cccccccccccc');
 const ORDERED_SPACE_ID = uuidSchema.parse('dddddddd-dddd-4ddd-8ddd-dddddddddddd');
 const ALL_IDLESS_CARD_ID = uuidSchema.parse('ffffffff-ffff-4fff-8fff-ffffffffffff');
+const SECOND_IDLESS_CARD_ID = uuidSchema.parse('fefefefe-fefe-4fef-8fef-fefefefefefe');
 const LAYOUT_ID = uuidSchema.parse('0a0a0a0a-0a0a-4a0a-8a0a-0a0a0a0a0a0a');
 const OTHER_LAYOUT_ID = uuidSchema.parse('0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b');
 const ORDERED_CARD_IDS = [
@@ -141,7 +142,18 @@ const mixedImport: ImportSpace = {
   ],
 };
 
-const allIdlessImport: ImportSpace = {
+/**
+ * Every id an import may leave out, left out — which under version 1 is
+ * everything except the card an edge names.
+ *
+ * A layout owns at least one graph, a graph holds at least one edge, and an
+ * edge names its endpoints by id, so a card an edge reaches cannot be id-less
+ * and still be reachable: there would be no value to write in the edge. The
+ * card id is therefore the one identity supplied, and it is a parameter because
+ * cards are rows — a second import reusing it would collide on the primary key
+ * and be rejected, which is a different fact from the one below.
+ */
+const idlessImport = (cardId: UUID): ImportSpace => ({
   document: {
     version: 1,
     title: 'All generated identities',
@@ -149,23 +161,18 @@ const allIdlessImport: ImportSpace = {
       {
         title: 'Generated layout',
         kind: 'positioned',
-        positions: { [ALL_IDLESS_CARD_ID]: { x: 0, y: 0 } },
-        graphs: [
-          {
-            title: 'Generated graph',
-            edges: [{ from: ALL_IDLESS_CARD_ID, to: ALL_IDLESS_CARD_ID }],
-          },
-        ],
+        positions: { [cardId]: { x: 0, y: 0 } },
+        graphs: [{ title: 'Generated graph', edges: [{ from: cardId, to: cardId }] }],
       },
     ],
   },
   cards: [
     {
-      id: ALL_IDLESS_CARD_ID,
+      id: cardId,
       document: { title: 'Generated only card', kind: 'markdown', body: 'Generated.' },
     },
   ],
-};
+});
 
 describe('PostgresSpaceRepository', () => {
   const repository = new PostgresSpaceRepository(db);
@@ -565,36 +572,45 @@ describe('PostgresSpaceRepository', () => {
       new Set([MIXED_FIRST_CARD_ID, MIXED_SECOND_CARD_ID, generatedCard.id]),
     );
     expect(graph.edges).toEqual([{ from: MIXED_FIRST_CARD_ID, to: MIXED_SECOND_CARD_ID }]);
-    expect(layout.positions).toEqual({ [MIXED_FIRST_CARD_ID]: { x: 40, y: 80 } });
+    expect(layout.positions).toEqual({
+      [MIXED_FIRST_CARD_ID]: { x: 40, y: 80 },
+      [MIXED_SECOND_CARD_ID]: { x: 300, y: 80 },
+    });
     await expect(repository.loadSpace(stored.snapshot.id)).resolves.toEqual(stored);
   });
 
-  it('allocates disjoint identities for repeated all-id-less imports', async () => {
-    const first = await repository.importSpaces([allIdlessImport]);
+  it('mints a fresh identity per import for every id the input omits', async () => {
+    const first = await repository.importSpaces([idlessImport(ALL_IDLESS_CARD_ID)]);
     trackImported(first);
     expect(first.kind).toBe('imported');
     if (first.kind !== 'imported') {
       throw new Error(first.message);
     }
 
-    const second = await repository.importSpaces([allIdlessImport]);
+    const second = await repository.importSpaces([idlessImport(SECOND_IDLESS_CARD_ID)]);
     trackImported(second);
     expect(second.kind).toBe('imported');
     if (second.kind !== 'imported') {
       throw new Error(second.message);
     }
 
-    const identities = (stored: LoadedSpace): UUID[] => [
-      stored.snapshot.id,
-      stored.snapshot.cards[0]!.id,
-      stored.snapshot.document.layouts![0]!.id,
-    ];
-    const firstIds = identities(first.spaces[0]!);
-    const secondIds = identities(second.spaces[0]!);
+    // The three the input omitted, and the graph is reached through its owner
+    // because that is where the minting now happens. The card id is deliberately
+    // not among them: it was supplied, so asserting it was minted would assert
+    // the opposite of what the fixture says.
+    const minted = (stored: LoadedSpace): UUID[] => {
+      const layout = stored.snapshot.document.layouts![0]!;
+      return [stored.snapshot.id, layout.id, layout.graphs[0]!.id];
+    };
+    const firstIds = minted(first.spaces[0]!);
+    const secondIds = minted(second.spaces[0]!);
     for (const id of [...firstIds, ...secondIds]) {
       expect(uuidSchema.safeParse(id).success).toBe(true);
     }
+    // Six, so nothing is memoized across imports of identical structure.
     expect(new Set([...firstIds, ...secondIds]).size).toBe(6);
+    expect([...firstIds, ...secondIds]).not.toContain(ALL_IDLESS_CARD_ID);
+    expect([...firstIds, ...secondIds]).not.toContain(SECOND_IDLESS_CARD_ID);
   });
 
   it('rejects reuse of explicit cards by a generated space and rolls back the batch', async () => {
