@@ -63,6 +63,24 @@ export const snapshotFromSpace = (space: Space): SpaceSnapshot => ({
 });
 
 /**
+ * The graphs a Card has left, with every Edge incident to it gone.
+ *
+ * A Card that is not a member of a Layout cannot be an endpoint of a Graph that
+ * Layout owns (ADR 0040), so this is what both removals owe: Remove from
+ * Layout, which applies it to the one Layout the Edit writes, and Delete Card
+ * from Space, which applies it to every Layout through
+ * {@link withCardRemovedFromLayouts}. One rule, in one place, so the two
+ * scopes of the same deletion cannot come to disagree about what an incident
+ * Edge is. The graphs themselves stay, empty ones included: deleting a graph is
+ * its own action.
+ */
+export const withoutIncidentEdges = (graphs: readonly Graph[], cardId: CardId): Graph[] =>
+  graphs.map((graph) => ({
+    ...graph,
+    edges: graph.edges.filter((edge) => edge.from !== cardId && edge.to !== cardId),
+  }));
+
+/**
  * The snapshot with one Card gone from every Layout: its membership, its
  * position and every Edge incident to it, in every Graph every Layout owns.
  *
@@ -97,10 +115,7 @@ export const withCardRemovedFromLayouts = (base: SpaceSnapshot, cardId: CardId):
         positions: Object.fromEntries(
           Object.entries(layout.positions).filter(([id]) => id !== cardId),
         ),
-        graphs: layout.graphs.map((graph) => ({
-          ...graph,
-          edges: graph.edges.filter((edge) => edge.from !== cardId && edge.to !== cardId),
-        })),
+        graphs: withoutIncidentEdges(layout.graphs, cardId),
       })),
     },
   };

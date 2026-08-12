@@ -1,6 +1,6 @@
 import fc from 'fast-check';
 import { expect, it } from 'vitest';
-import { uuidSchema, type Graph, type Layout, type SpaceSnapshot } from '@project/core';
+import { uuidSchema, type Card, type Graph, type Layout, type SpaceSnapshot } from '@project/core';
 import { loadSpaceSnapshot, Placement } from '@project/graph';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
 import { GRAPH_PALETTE } from '../src/colors';
@@ -104,6 +104,19 @@ const anchor = fc.record({
 const operation = fc.oneof(
   fc.record({ op: fc.constant('created-card' as const), anchor }),
   fc.record({ op: fc.constant('created-alias' as const), card: index, anchor }),
+  /**
+   * Card editing, including retargeting an Alias — the one operation that can
+   * reach the Alias rules from *both* sides, since `retarget` may name a Card
+   * that has since become an Alias, been deleted, or is the Alias itself. The
+   * title is generated blank sometimes on purpose: an empty one must refuse
+   * rather than reach intake.
+   */
+  fc.record({
+    op: fc.constant('edited-card' as const),
+    card: index,
+    title: fc.oneof(fc.constant(''), fc.constant('  '), fc.string({ maxLength: 8 })),
+    retarget: fc.option(index, { nil: undefined }),
+  }),
   fc.record({ op: fc.constant('added-card-to-layout' as const), card: index, anchor }),
   fc.record({ op: fc.constant('removed-card-from-layout' as const), card: index }),
   fc.record({ op: fc.constant('deleted-card' as const), card: index }),
@@ -216,7 +229,7 @@ it('keeps the working Space loadable through any sequence of semantic operations
 /** Turn generated indices into the identities the live Space actually holds. */
 function resolve(
   generated: GeneratedOperation,
-  cards: readonly { readonly id: string }[],
+  cards: readonly Card[],
   graphs: readonly Graph[],
 ): AuthoringCompletion {
   const cardId = uuidSchema.parse(
@@ -225,6 +238,31 @@ function resolve(
   const graph = 'graph' in generated ? pick(graphs, generated.graph) : undefined;
   const graphId = uuidSchema.parse(graph?.id ?? NOTHING);
   switch (generated.op) {
+    case 'edited-card': {
+      const card = pick(cards, generated.card);
+      if (card === undefined) {
+        return {
+          kind: 'edited-card',
+          cardId,
+          document: { title: generated.title, kind: 'markdown', body: '' },
+        };
+      }
+      const { id: _id, ...document } = card;
+      const retargeted =
+        generated.retarget === undefined ? undefined : pick(cards, generated.retarget);
+      return {
+        kind: 'edited-card',
+        cardId: card.id,
+        document:
+          document.kind === 'alias'
+            ? {
+                ...document,
+                title: generated.title,
+                target: uuidSchema.parse(retargeted?.id ?? document.target),
+              }
+            : { ...document, title: generated.title },
+      };
+    }
     case 'created-card':
       return { kind: 'created-card', anchor: generated.anchor };
     case 'created-alias':

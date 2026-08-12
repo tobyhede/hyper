@@ -200,6 +200,65 @@ describe('Add Card', () => {
   });
 });
 
+describe('Edit Card', () => {
+  /**
+   * A blank title is refused *at the interface*, not only at the field that
+   * typed it. Intake rejects an empty title, and this derivation reports an
+   * unloadable Space by throwing — so without this the author's own mistake
+   * arrives as an exception, which the transient-authoring contract forbids.
+   */
+  it('refuses an empty Card title rather than throwing on intake', () => {
+    const { authoring, session } = openPositioned();
+    const before = session.getState().working;
+
+    expect(
+      authoring.complete({
+        kind: 'edited-card',
+        cardId: CARD_A,
+        document: { title: '', kind: 'markdown', body: 'A' },
+      }),
+    ).toEqual({ kind: 'refused', reason: 'A Card title is required.' });
+    expect(session.getState().working).toBe(before);
+  });
+
+  it('refuses a title that is only whitespace, which the schema would accept', () => {
+    const { authoring, session } = openPositioned();
+    const before = session.getState().working;
+
+    // `z.string().min(1)` counts characters and a space is one, so this would
+    // be stored and draw as a Card with no name at all.
+    expect(
+      authoring.complete({
+        kind: 'edited-card',
+        cardId: CARD_A,
+        document: { title: '   ', kind: 'markdown', body: 'A' },
+      }),
+    ).toEqual({ kind: 'refused', reason: 'A Card title is required.' });
+    expect(session.getState().working).toBe(before);
+  });
+
+  it('stores a trimmed title, and reads one that only gained padding as unchanged', () => {
+    const { authoring, session } = openPositioned();
+
+    expect(
+      authoring.complete({
+        kind: 'edited-card',
+        cardId: CARD_A,
+        document: { title: '  Renamed  ', kind: 'markdown', body: 'A' },
+      }),
+    ).toEqual({ kind: 'completed' });
+    expect(session.getState().working.cards[0]?.document.title).toBe('Renamed');
+
+    expect(
+      authoring.complete({
+        kind: 'edited-card',
+        cardId: CARD_A,
+        document: { title: 'Renamed ', kind: 'markdown', body: 'A' },
+      }),
+    ).toEqual({ kind: 'unchanged' });
+  });
+});
+
 describe('Add Alias', () => {
   it('creates and places an Alias on its Target, taking the Target title when none was typed', () => {
     vi.spyOn(crypto, 'randomUUID').mockReturnValue(MINTED as ReturnType<typeof crypto.randomUUID>);
@@ -842,6 +901,62 @@ describe('Delete Card from Space', () => {
       kind: 'refused',
       reason: 'This Card is no longer part of the Space.',
     });
+  });
+});
+
+describe('Keep local', () => {
+  /**
+   * The pair to Retry, and the same rule: it commits the *newest* complete
+   * working Space rather than the snapshot that first hit the conflict. The
+   * Edit made while the conflict stood is what proves it — assembling the
+   * snapshot in the caller is exactly how that Edit gets dropped.
+   */
+  it('commits the newest working Space, including Edits made during the conflict', async () => {
+    const remote: SpaceSnapshot = {
+      ...positionedSnapshot,
+      document: { ...positionedSnapshot.document, title: 'Stored' },
+    };
+    const backend = new MemorySpaceBackend([
+      { snapshot: remote, revision: 4n, exportedRevision: null },
+    ]);
+    const local = { snapshot: positionedSnapshot, revision: 3n, exportedRevision: null };
+    const session = openSpaceSession(backend, local);
+    const currentSpace = () => {
+      const result = loadSpaceSnapshot(session.getState().working);
+      if (!result.ok) throw new Error(result.errors.map((error) => error.message).join('; '));
+      return result.space;
+    };
+    const resolveRenderer = testResolver();
+    const navigation = createNavigation(currentSpace, resolveRenderer, {
+      kind: 'layout',
+      layoutId: LAYOUT_ID,
+    });
+    const authoring = createSpaceAuthoring({ session, navigation, currentSpace, resolveRenderer });
+    place(authoring, { [CARD_A]: [10, 20], [CARD_B]: [300, 40] });
+
+    authoring.complete({ kind: 'renamed-graph', graphId: GRAPH_ID, title: 'Before conflict' });
+    await vi.waitFor(() => expect(session.getState().persistence.kind).toBe('conflicted'));
+
+    // A later Edit, legal while the conflict stands.
+    expect(authoring.complete({ kind: 'added-graph' })).toMatchObject({ kind: 'completed' });
+
+    authoring.keepLocalWork();
+    await vi.waitFor(() => expect(session.getState().persistence.kind).toBe('settled'));
+
+    const stored = await backend.loadSpace(SPACE_ID);
+    expect(graphsOf(stored!.snapshot).map((graph) => graph.title)).toEqual([
+      'Before conflict',
+      'Graph 1',
+    ]);
+  });
+
+  it('does nothing outside a conflict', () => {
+    const { authoring, session } = openPositioned();
+    const before = session.getState();
+
+    authoring.keepLocalWork();
+
+    expect(session.getState()).toBe(before);
   });
 });
 

@@ -19,7 +19,11 @@ import {
 } from '@project/persistence';
 import { nextGraphColor } from './colors';
 import type { Navigation, NavigationState } from './navigation';
-import { updatePositionedLayout, withCardRemovedFromLayouts } from './snapshot';
+import {
+  updatePositionedLayout,
+  withCardRemovedFromLayouts,
+  withoutIncidentEdges,
+} from './snapshot';
 import { nextCardTitle, nextGraphTitle, nextLayoutTitle } from './titles';
 import { defaultRenderer, type RendererSelection, type ResolveRenderer } from './renderer';
 
@@ -164,6 +168,18 @@ export interface SpaceAuthoring {
   readonly canCreateConnectedCard: (from: CardId) => boolean;
   readonly complete: (completion: AuthoringCompletion) => AuthoringResult;
   readonly retryPersistence: () => void;
+  /**
+   * Commit the newest local work against the revision the conflict named,
+   * keeping every Edit made since the commit that hit it.
+   *
+   * The snapshot is read here rather than handed in, which is the whole reason
+   * this exists beside `session.resolveConflict`: the caller is a button in a
+   * toolbar, and a button that assembles a snapshot is a button that can commit
+   * a stale one. Retry and Keep local both take the *newest* working Space, so
+   * Edits an author went on making while the conflict stood are included rather
+   * than silently dropped.
+   */
+  readonly keepLocalWork: () => void;
   /** Replace local work with the current stored Space, or explain why it was refused. */
   readonly acceptStoredSpace: () => string | null;
   /**
@@ -315,15 +331,13 @@ const freeAnchor = (placement: Placement, anchor: LayoutPosition): LayoutPositio
   return at;
 };
 
-/** Where an exact Edge sits in a Graph, or -1. An exact duplicate is invalid, so there is at most one. */
-const indexOfEdge = (edges: readonly GraphEdge[], edge: GraphEdge): number =>
-  edges.findIndex((candidate) => candidate.from === edge.from && candidate.to === edge.to);
+/** Two Edges are the same Edge when they join the same Cards the same way (ADR 0032). */
+const sameEdge = (left: GraphEdge, right: GraphEdge): boolean =>
+  left.from === right.from && left.to === right.to;
 
-const withoutIncidentEdges = (graphs: readonly Graph[], cardId: CardId): readonly Graph[] =>
-  graphs.map((graph) => ({
-    ...graph,
-    edges: graph.edges.filter((edge) => edge.from !== cardId && edge.to !== cardId),
-  }));
+/** Where an Edge sits in a Graph, or -1. An exact duplicate is invalid, so there is at most one. */
+const indexOfEdge = (edges: readonly GraphEdge[], edge: GraphEdge): number =>
+  edges.findIndex((candidate) => sameEdge(candidate, edge));
 
 /**
  * The operations with no answer at all until a Layout is selected, and what to
@@ -345,6 +359,47 @@ const LAYOUT_ONLY: Partial<Record<AuthoringCompletion['kind'], string>> = {
   'reconnected-edge': 'Select a Layout to edit its Edges.',
   'deleted-edge': 'Select a Layout to edit its Edges.',
 };
+
+/**
+ * Why a Card document's Alias Target may not be authored, or `null`.
+ *
+ * One rule for both the Alias that is being created and the one being
+ * retargeted, because they are the same question asked at two moments. It
+ * duplicates what `validateReferences` already enforces, and deliberately:
+ * intake reports by failing the whole snapshot, which this derivation answers
+ * by throwing, and an author choosing the wrong Target has made a mistake that
+ * deserves a sentence rather than an exception. A markdown document has no
+ * Target and nothing to refuse.
+ */
+const aliasTargetRefusal = (space: Space, document: CardDocument): string | null => {
+  if (document.kind !== 'alias') return null;
+  const target = space.lookup.card(document.target);
+  if (target === undefined) return 'That Target is no longer part of the Space.';
+  // Single-hop by construction (ADR 0009): the Target must own its content, so
+  // an Alias pointing at an Alias — including at itself — is refused here.
+  if (target.kind === 'alias') return 'An Alias must target a Card that owns its content.';
+  return null;
+};
+
+/**
+ * A Card an Edit is creating, held rather than placed.
+ *
+ * A conversion is checked against a Placement whose Cards are exactly the
+ * renderer's subject, and the subject is a fact about the Space as it *is* — a
+ * Card this Edit adds is in neither. So the position waits here and is applied
+ * after conversion, which changes nothing about what gets written: the Layout is
+ * built from the placement further down either way.
+ */
+interface CreatedCard {
+  readonly id: CardId;
+  readonly position: LayoutPosition;
+  /**
+   * Step off a position another Card already occupies exactly. A gesture that
+   * dropped on empty canvas aimed at its point and keeps it; a Card created from
+   * a menu has no aimed-at point and would otherwise stack.
+   */
+  readonly avoidingOverlap: boolean;
+}
 
 /** The Aliases pointing at a Card, which are what block deleting it from the Space. */
 const incomingAliases = (cards: SnapshotCards, cardId: CardId): SnapshotCards =>
@@ -605,8 +660,8 @@ export function createSpaceAuthoring({
     // *before* conversion rather than after it. An Algorithmic View has no
     // membership to add to and no Graph to manage, and converting first would
     // mint a Layout whose only purpose was to fail the next line.
-    const withoutLayout = LAYOUT_ONLY[completion.kind];
-    if (selection.kind === 'view' && withoutLayout !== undefined) return refuse(withoutLayout);
+    const layoutRequired = LAYOUT_ONLY[completion.kind];
+    if (selection.kind === 'view' && layoutRequired !== undefined) return refuse(layoutRequired);
     const renderer = resolveRenderer(space, selection);
     /**
      * What this Edit does to the placement, held rather than applied.
@@ -618,81 +673,69 @@ export function createSpaceAuthoring({
      * about what gets written: the Layout is built from the placement further
      * down either way.
      */
-    let createdCard: {
-      readonly id: CardId;
-      readonly position: LayoutPosition;
-      /**
-       * Step off a position another Card already occupies exactly. A gesture
-       * that dropped on empty canvas aimed at its point and keeps it; a Card
-       * created from a menu has no aimed-at point and would otherwise stack.
-       */
-      readonly avoidingOverlap: boolean;
-    } | null = null;
+    let createdCard: CreatedCard | null = null;
     let unplacedCardId: CardId | undefined;
-    let createdCardId: CardId | undefined;
     let deletedCardId: CardId | undefined;
     let connection: GraphEdge | null = null;
     let completedPlacement = reportedPlacement;
+    // The one way a Card is added: mint it, place it at a free anchor, append it.
+    // Add Card and Add Alias differ in the document they carry and in nothing
+    // else — neither creates an Edge, and neither adds a Graph to a Layout that
+    // already has one.
+    // Returns rather than assigns: `createdCard` is read further down, and a
+    // `let` written only from inside a closure keeps its initial narrowing.
+    const createCard = (
+      document: CardDocument,
+      at: LayoutPosition,
+      avoidingOverlap = true,
+    ): CreatedCard => {
+      const id = newId();
+      snapshot = { ...snapshot, cards: [...snapshot.cards, { id, document }] };
+      return { id, position: at, avoidingOverlap };
+    };
     if (completion.kind === 'edited-card') {
-      const { document } = completion;
       const cardIndex = snapshot.cards.findIndex((card) => card.id === completion.cardId);
       const card = snapshot.cards[cardIndex];
       if (card === undefined) return refuse('This Card is no longer part of the Space.');
       // Kind is fixed for a Card's lifetime, and changing it is out of scope for
       // version 1. Everything else the editor holds — title, description, and an
       // Alias's Target — is one ordinary Edit of this Card.
-      if (card.document.kind !== document.kind) {
+      if (card.document.kind !== completion.document.kind) {
         return refuse('A Card keeps the kind it was created with.');
       }
+      // Trimmed and refused *here* rather than only at the surface that typed
+      // it. A blank title is the empty case wearing different bytes, and intake
+      // answers an empty one by failing — which this derivation reports by
+      // throwing, and an author's mistake may not throw. Every caller of this
+      // operation is covered by one rule instead of each remembering it.
+      const title = completion.document.title.trim();
+      if (title.length === 0) return refuse('A Card title is required.');
+      const document: CardDocument = { ...completion.document, title };
       if (sameValue(card.document, document)) return UNCHANGED;
-      if (document.kind === 'alias') {
-        const target = space.lookup.card(document.target);
-        if (target === undefined) return refuse('That Target is no longer part of the Space.');
-        if (target.kind === 'alias') {
-          return refuse('An Alias must target a Card that owns its content.');
-        }
-      }
+      const refusal = aliasTargetRefusal(space, document);
+      if (refusal !== null) return refuse(refusal);
       const cards = [...snapshot.cards];
       cards[cardIndex] = { id: card.id, document };
       snapshot = { ...snapshot, cards };
     } else if (completion.kind === 'created-card') {
-      createdCardId = newId();
-      createdCard = { id: createdCardId, position: completion.anchor, avoidingOverlap: true };
-      snapshot = {
-        ...snapshot,
-        cards: [
-          ...snapshot.cards,
-          {
-            id: createdCardId,
-            document: { title: nextCardTitle(snapshot), kind: 'markdown', body: '' },
-          },
-        ],
-      };
+      createdCard = createCard(
+        { title: nextCardTitle(snapshot), kind: 'markdown', body: '' },
+        completion.anchor,
+      );
     } else if (completion.kind === 'created-alias') {
-      const target = space.lookup.card(completion.target);
-      if (target === undefined) return refuse('That Target is no longer part of the Space.');
-      if (target.kind === 'alias') {
-        return refuse('An Alias must target a Card that owns its content.');
-      }
-      // An empty title takes the Target's as a convenient initial value; text the
-      // author already entered is never overwritten.
+      // An empty title takes the Target's as a convenient initial value; text
+      // the author already entered is never overwritten. `??` cannot express
+      // this — the empty string is a value the picker really sends, and the
+      // whole point is that it does not count as one.
       const entered = completion.title?.trim() ?? '';
-      createdCardId = newId();
-      createdCard = { id: createdCardId, position: completion.anchor, avoidingOverlap: true };
-      snapshot = {
-        ...snapshot,
-        cards: [
-          ...snapshot.cards,
-          {
-            id: createdCardId,
-            document: {
-              title: entered.length > 0 ? entered : target.title,
-              kind: 'alias',
-              target: completion.target,
-            },
-          },
-        ],
+      const document: CardDocument = {
+        title: entered.length > 0 ? entered : (space.lookup.card(completion.target)?.title ?? ''),
+        kind: 'alias',
+        target: completion.target,
       };
+      const refusal = aliasTargetRefusal(space, document);
+      if (refusal !== null) return refuse(refusal);
+      createdCard = createCard(document, completion.anchor);
     } else if (completion.kind === 'added-card-to-layout') {
       if (space.lookup.card(completion.cardId) === undefined) {
         return refuse('This Card is no longer part of the Space.');
@@ -739,19 +782,15 @@ export function createSpaceAuthoring({
     } else if (completion.kind === 'create-and-connect') {
       const refusal = connectRefusal(completion.from, null);
       if (refusal !== null) return refuse(refusal);
-      createdCardId = newId();
-      createdCard = { id: createdCardId, position: completion.position, avoidingOverlap: false };
-      connection = { from: completion.from, to: createdCardId };
-      snapshot = {
-        ...snapshot,
-        cards: [
-          ...snapshot.cards,
-          {
-            id: createdCardId,
-            document: { title: nextCardTitle(snapshot), kind: 'markdown', body: '' },
-          },
-        ],
-      };
+      // The drop point is aimed at, so it is kept exactly: the gesture only
+      // offers an empty-canvas release, and stepping off it would move the Card
+      // away from where the author watched the preview sit.
+      createdCard = createCard(
+        { title: nextCardTitle(snapshot), kind: 'markdown', body: '' },
+        completion.position,
+        false,
+      );
+      connection = { from: completion.from, to: createdCard.id };
     } else if (completion.kind === 'connected-cards') {
       const refusal = connectRefusal(completion.from, completion.to);
       if (refusal !== null) return refuse(refusal);
@@ -880,7 +919,7 @@ export function createSpaceAuthoring({
         // Dragging an endpoint back where it came from is the author saying
         // nothing, which is why this is answered before eligibility: a Card that
         // is already this Edge's endpoint is by definition in this Layout.
-        if (indexOfEdge([completion.edge], reconnected) !== -1) return UNCHANGED;
+        if (sameEdge(completion.edge, reconnected)) return UNCHANGED;
         if (!completedPlacement.has(completion.cardId)) {
           return refuse('An Edge can only join Cards in this Layout.');
         }
@@ -924,7 +963,7 @@ export function createSpaceAuthoring({
         placement: completedPlacement,
         nextActiveGraphId: activeGraphId,
         nextRenderer: { kind: 'layout', layoutId },
-        ...(createdCardId !== undefined ? { createdCardId } : {}),
+        ...(createdCard !== null ? { createdCardId: createdCard.id } : {}),
         ...(createdGraphId !== undefined ? { createdGraphId } : {}),
       },
     };
@@ -1131,6 +1170,9 @@ export function createSpaceAuthoring({
     canCreateConnectedCard,
     complete,
     retryPersistence: session.retry,
+    // Read at the moment the author asks, never captured earlier. `session`
+    // ignores the call outside a conflict, so there is nothing to check here.
+    keepLocalWork: () => session.resolveConflict(session.getState().working),
     acceptStoredSpace,
     dispose: () => {
       unsubscribeSession();

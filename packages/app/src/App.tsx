@@ -464,6 +464,17 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
             >
               Accept remote
             </Button>
+            <Button
+              variant="default"
+              data-testid="persistence-keep-local"
+              // The other half of the pair, and the one that keeps the author's
+              // work: it recommits the newest local Space against the revision
+              // the conflict named. Authoring reads that snapshot itself, so
+              // Edits made while the conflict stood are included.
+              onClick={authoring.keepLocalWork}
+            >
+              Keep local
+            </Button>
             {remoteRefusal === null ? null : (
               <span
                 role="alert"

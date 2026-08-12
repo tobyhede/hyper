@@ -258,9 +258,27 @@ Retargeting an Alias is an ordinary `edited-card`, since the Card editor is the
 one canonical place a Target changes; only Card **kind** is now refused.
 `replacementEpoch` was already in place from ADR 0042's earlier work.
 
+Keep local became `SpaceAuthoring.keepLocalWork`, which reads the newest working
+snapshot itself rather than taking one — the caller-assembled snapshot this
+package exists to remove. The conflict controls had no Keep local at all before
+it, only Accept remote, so the one button beside it landed here too.
+
 Three supporting seams moved with it: `Placement.remove` (construction stays
 closed), `withCardRemovedFromLayouts` for the all-Layout deletion cascade, and
 `nextGraphColor`, which both Graph-creating gestures now store through.
+
+**One deliberate departure from an accepted prototype.** The Graph management
+surface says authoring "rotates through the palette by the new Graph's appended
+Layout-order position". It rotates by the count of Graphs in the **Space**
+instead. That prototype was written before ADR 0045 settled the Space-subject
+flatten, and under the flatten a Layout-local rotation gives the first Graph of
+every Layout the same colour — in the one view that draws them all together, so
+they collide exactly where the palette exists to tell them apart. The
+prototype's intent, that authoring assign distinct rotating colours, is what is
+built; only the thing being counted changed. Graph titles number Space-wide for
+the same reason, which is also what `freshGraphConversion` already did. Nothing
+else in that prototype is affected, and `Graph.color` stays optional in the
+domain with `graphColorMap` resolving a fallback for imported Graphs.
 Proofs are `packages/app/test/space-authoring-operations.test.ts` for the
 transitions and their refusals, and `packages/app/test/space-authoring.property.test.ts`,
 which drives hostile sequences of every operation and holds each to two bars:
