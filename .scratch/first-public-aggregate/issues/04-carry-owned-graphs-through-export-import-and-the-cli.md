@@ -1,6 +1,6 @@
 # Carry owned Graphs through export, import and the CLI
 
-Status: ready-for-agent
+Status: resolved
 Blocked by: 02
 
 ## What to build
@@ -45,11 +45,43 @@ after — always stop it.
 
 ## Acceptance criteria
 
-- [ ] Export produces version 1 with Layout-owned Graphs, and a re-export of
+- [x] Export produces version 1 with Layout-owned Graphs, and a re-export of
       unchanged content is byte-identical.
-- [ ] Import mints missing Layout and Graph ids together; an existing identity
+- [x] Import mints missing Layout and Graph ids together; an existing identity
       rejects and rolls back the complete batch as before.
-- [ ] A new Space carries one Card, no Layout and no Graph, and still opens.
-- [ ] The CLI surfaces the duplicate-Graph-id error naming both owners.
-- [ ] Repository, backend and HTTP contract tests carry the version 1 shape.
-- [ ] PostgreSQL integration green against a live database.
+- [x] A new Space carries one Card, no Layout and no Graph, and still opens.
+- [x] The CLI surfaces the duplicate-Graph-id error naming both owners.
+- [x] Repository, backend and HTTP contract tests carry the version 1 shape.
+- [x] PostgreSQL integration green against a live database.
+
+## Answer
+
+Done in `88da920`, with review findings fixed in `ff9ffe7`.
+
+Export emits version 1 with each Layout's Graphs nested, and settles two
+orderings differently on purpose: position keys are **sorted**, Graph order is
+**carried through**. The reason is storage, not style — jsonb reorders object
+keys on write and preserves array order, so a position map loses its order and
+must be given one back while an array of Graphs does not. Every nested value is
+rebuilt from a key literal rather than spread, which is the general form of the
+rule; review caught the one value still passed by reference (the `{x,y}` point)
+and it was rebuilt.
+
+Import mints a missing Graph id under its Layout in the same pass as the Layout
+id, before shape validation and before the first Card is written, so an existing
+identity still rejects and rolls the whole batch back. A new Space has no Layout
+and therefore no Graph — those are now one state.
+
+Two HIGH review findings sat in the PostgreSQL integration suite, invisible to
+`pnpm test` and unrunnable at the time for want of a database: a stale positions
+assertion, and an `allIdlessImport` fixture that had gained an explicit Card id
+while the test imported it twice, so the second import would hit a primary-key
+conflict. The fixture was rewritten rather than patched — its "all id-less"
+premise is unreachable under version 1, since a Layout needs a Graph, a Graph an
+Edge, and an Edge a real Card id. Both were later verified green against a live
+database.
+
+The determinism test could not discriminate what it claimed, because both
+exports read the same in-memory object. It now exports two repositories holding
+the same Space with every object permuted and compares bytes, mutation-checked
+by reverting the point rebuild.
