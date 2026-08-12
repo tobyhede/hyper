@@ -11,6 +11,7 @@ import {
   gridStrategy,
   Placement,
   positionedStrategy,
+  repeatedGraphEdges,
   type LayoutStrategy,
   type ResolvedLayout,
   type Space,
@@ -174,8 +175,11 @@ export interface SubjectConversion {
   readonly policy: ViewGraphPolicy;
   readonly placement: Placement;
   readonly newGraphId: () => GraphId;
-  /** What a refusal names: a built-in View's id, where the resolver calls this. */
-  readonly renderer: string;
+  /**
+   * Which renderer a refusal names, in the same closed vocabulary a selection
+   * and `space.defaultView` are written in: a built-in View's id, or a Layout's.
+   */
+  readonly rendererId: BuiltInViewId | UUID;
 }
 
 /**
@@ -202,7 +206,7 @@ export function convertSubject({
   policy,
   placement,
   newGraphId,
-  renderer,
+  rendererId,
 }: SubjectConversion): ViewConversion {
   if (
     placement.size !== subject.cards.length ||
@@ -210,7 +214,7 @@ export function convertSubject({
   ) {
     throw new RendererInvariantError(
       'placement-does-not-match-subject',
-      `The renderer ${renderer} was converted with a Placement of ${placement.size} Card(s) that is not its subject of ${subject.cards.length}.`,
+      `The renderer ${rendererId} was converted with a Placement of ${placement.size} Card(s) that is not its subject of ${subject.cards.length}.`,
     );
   }
 
@@ -221,27 +225,30 @@ export function convertSubject({
   if (head === undefined) {
     throw new RendererInvariantError(
       'empty-graph-output',
-      `The renderer ${renderer} returned no Graph, and a Layout owns at least one.`,
+      `The renderer ${rendererId} returned no Graph, and a Layout owns at least one.`,
     );
   }
 
   for (const graph of chosen) {
-    const seen = new Set<string>();
-    for (const edge of graph.edges) {
+    // What counts as the same Edge twice is the domain's answer and not this
+    // module's (ADR 0032), so it is asked of `@project/graph` — the same call
+    // intake makes when it refuses a document holding one. Read inside the loop
+    // so the first thing wrong with an Edge is still what a View is told about,
+    // in the order its own Edges are in.
+    const repeats = repeatedGraphEdges(graph.edges);
+    for (const [index, edge] of graph.edges.entries()) {
       if (!placement.has(edge.from) || !placement.has(edge.to)) {
         throw new RendererInvariantError(
           'graph-edge-outside-placement',
-          `The renderer ${renderer} returned an Edge from ${edge.from} to ${edge.to}, which is not closed over the Cards of the Layout it is creating.`,
+          `The renderer ${rendererId} returned an Edge from ${edge.from} to ${edge.to}, which is not closed over the Cards of the Layout it is creating.`,
         );
       }
-      const key = `${edge.from}\0${edge.to}`;
-      if (seen.has(key)) {
+      if (repeats.has(index)) {
         throw new RendererInvariantError(
           'duplicate-graph-edge',
-          `The renderer ${renderer} returned the Edge from ${edge.from} to ${edge.to} twice in one Graph.`,
+          `The renderer ${rendererId} returned the Edge from ${edge.from} to ${edge.to} twice in one Graph.`,
         );
       }
-      seen.add(key);
     }
   }
 
@@ -253,7 +260,7 @@ export function convertSubject({
     if (taken.has(graphId)) {
       throw new RendererInvariantError(
         'graph-id-not-fresh',
-        `The renderer ${renderer} was given the Graph identity ${graphId}, which is already in use.`,
+        `The renderer ${rendererId} was given the Graph identity ${graphId}, which is already in use.`,
       );
     }
     taken.add(graphId);
@@ -331,9 +338,17 @@ const BUILT_IN_VIEWS: Readonly<Record<BuiltInViewId, BuiltInViewDefinition>> = {
  * order rather than in the map's insertion order — the same stable order every
  * other Card list in the app is in, so two subjects over one Layout can never
  * disagree about sequence.
+ *
+ * The members are passed in rather than read again here, because the resolver
+ * needs the very same map for `positionedStrategy` and building a Layout's
+ * positions twice per resolve is work nothing asked for. Sharing it is safe in
+ * the one direction that matters: a `Placement` is read-only, and this reads.
  */
-function layoutSubject(space: Space, resolved: ResolvedLayout): RendererSubject {
-  const members = Placement.fromLayout(resolved.layout);
+function layoutSubject(
+  space: Space,
+  resolved: ResolvedLayout,
+  members: Placement,
+): RendererSubject {
   return {
     cards: space.cards.filter((card) => members.has(card.id)),
     graphs: resolved.layout.graphs,
@@ -353,19 +368,23 @@ function layoutSubject(space: Space, resolved: ResolvedLayout): RendererSubject 
  * through them is not proved at all. `renderer.property.test.ts` pushes
  * generated subjects through it.
  */
-export function checkSubject(space: Space, id: string, subject: RendererSubject): RendererSubject {
+export function checkSubject(
+  space: Space,
+  rendererId: BuiltInViewId | UUID,
+  subject: RendererSubject,
+): RendererSubject {
   const cardIds = new Set<CardId>();
   for (const card of subject.cards) {
     if (space.lookup.card(card.id) !== card) {
       throw new RendererInvariantError(
         'invalid-subject',
-        `The renderer ${id} selected a Card ${card.id} that is not the Space's own value.`,
+        `The renderer ${rendererId} selected a Card ${card.id} that is not the Space's own value.`,
       );
     }
     if (cardIds.has(card.id)) {
       throw new RendererInvariantError(
         'invalid-subject',
-        `The renderer ${id} selected the Card ${card.id} twice.`,
+        `The renderer ${rendererId} selected the Card ${card.id} twice.`,
       );
     }
     cardIds.add(card.id);
@@ -376,13 +395,13 @@ export function checkSubject(space: Space, id: string, subject: RendererSubject)
     if (space.lookup.graph(graph.id)?.graph !== graph) {
       throw new RendererInvariantError(
         'invalid-subject',
-        `The renderer ${id} selected a Graph ${graph.id} that is not the Space's own value.`,
+        `The renderer ${rendererId} selected a Graph ${graph.id} that is not the Space's own value.`,
       );
     }
     if (graphIds.has(graph.id)) {
       throw new RendererInvariantError(
         'invalid-subject',
-        `The renderer ${id} selected the Graph ${graph.id} twice.`,
+        `The renderer ${rendererId} selected the Graph ${graph.id} twice.`,
       );
     }
     graphIds.add(graph.id);
@@ -432,15 +451,16 @@ export function createRendererResolver({
           `The selected Layout ${selection.layoutId} does not exist.`,
         );
       }
+      const members = Placement.fromLayout(resolvedLayout.layout);
       return {
         kind: 'layout',
         resolvedLayout,
         subject: checkSubject(
           space,
           resolvedLayout.layout.id,
-          layoutSubject(space, resolvedLayout),
+          layoutSubject(space, resolvedLayout, members),
         ),
-        strategy: positionedStrategy(Placement.fromLayout(resolvedLayout.layout)),
+        strategy: positionedStrategy(members),
       };
     }
 
@@ -460,7 +480,7 @@ export function createRendererResolver({
           policy: definition.graphPolicy,
           placement: rendered,
           newGraphId,
-          renderer: selection.view,
+          rendererId: selection.view,
         }),
     };
   };

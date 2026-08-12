@@ -447,6 +447,13 @@ export function createSpaceAuthoring({
     const space = currentSpace();
     // A selected Layout the Space no longer holds is not an Edit. Checked before
     // resolving, because the resolver answers that case by throwing.
+    //
+    // Not the thing ADR 0045 forbids, which is turning a *thrown*
+    // `RendererInvariantError` into `no-edit` — there is no catch here and a
+    // renderer that refuses still takes the Edit down with it. This asks a
+    // question of the Space instead, and the answer is an author's state rather
+    // than a defect: the Layout this gesture was aimed at is gone, so there is
+    // nothing to write it into.
     if (selection.kind === 'layout' && space.lookup.layout(selection.layoutId) === undefined) {
       return null;
     }

@@ -1,6 +1,6 @@
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
-import { uuidSchema, type GraphId } from '@project/core';
+import { uuidSchema, type BuiltInViewId, type GraphId } from '@project/core';
 import { loadSpace, Placement, type Space } from '@project/graph';
 import {
   checkSubject,
@@ -31,6 +31,14 @@ import { cardFile } from './card-files';
  */
 
 const uuid = (n: number): string => `00000000-0000-4000-8000-${n.toString(16).padStart(12, '0')}`;
+
+/**
+ * Which renderer a refusal below names. Nothing here turns on it — a message is
+ * the only thing that reads it — but the boundary takes the closed vocabulary a
+ * selection is written in, so a generated View borrows a built-in id rather than
+ * inventing a spelling no selection could hold.
+ */
+const GENERATED_VIEW: BuiltInViewId = 'flow';
 
 const cardId = fc.integer({ min: 2, max: 7 }).map((n) => uuidSchema.parse(uuid(n)));
 
@@ -217,10 +225,12 @@ describe('the subject check, over every selector that could be written', () => {
     fc.assert(
       fc.property(hostileSubject, (subject) => {
         if (!isSelection(subject)) {
-          expect(() => checkSubject(SPACE, 'generated', subject)).toThrow(RendererInvariantError);
+          expect(() => checkSubject(SPACE, GENERATED_VIEW, subject)).toThrow(
+            RendererInvariantError,
+          );
           return;
         }
-        expect(checkSubject(SPACE, 'generated', subject)).toBe(subject);
+        expect(checkSubject(SPACE, GENERATED_VIEW, subject)).toBe(subject);
       }),
     );
   });
@@ -239,7 +249,7 @@ describe('the conversion boundary, over every View that could be written', () =>
             policy: asPolicy(answer),
             placement,
             newGraphId: identity.newGraphId,
-            renderer: 'generated',
+            rendererId: GENERATED_VIEW,
           });
         } catch (error) {
           // A refusal is always a correct outcome: the boundary throws rather
@@ -282,7 +292,7 @@ describe('the conversion boundary, over every View that could be written', () =>
             policy: asPolicy(answer),
             placement,
             newGraphId: counter().newGraphId,
-            renderer: 'generated',
+            rendererId: GENERATED_VIEW,
           }),
         ).toThrow(RendererInvariantError);
       }),
@@ -308,7 +318,7 @@ describe('the conversion boundary, over every View that could be written', () =>
             policy: asPolicy(answer),
             placement,
             newGraphId: identity.newGraphId,
-            renderer: 'generated',
+            rendererId: GENERATED_VIEW,
           }),
         ).toThrow();
         expect(identity.used()).toBe(0);
@@ -326,7 +336,7 @@ describe('the conversion boundary, over every View that could be written', () =>
           policy: asPolicy(answer),
           placement,
           newGraphId: identity.newGraphId,
-          renderer: 'generated',
+          rendererId: GENERATED_VIEW,
         });
         expect(identity.used()).toBe(converted.graphs.length);
       }),

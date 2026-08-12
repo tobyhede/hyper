@@ -37,6 +37,8 @@ const LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000021');
 const MINTED_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000008');
 /** The Layout id a conversion mints when the Space already holds one. */
 const CONVERTED_LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000031');
+/** What a *second* conversion of one Algorithmic View would mint, and must not. */
+const COMPETING_LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000032');
 const CREATED_CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
 
 /** A Card identity no fixture Space holds, so any Layout naming it fails intake. */
@@ -1066,6 +1068,65 @@ describe('Space Authoring', () => {
     // The answer the reentrant caller got, not just its effect: a completion
     // made from inside publication is queued rather than run there.
     expect(reentrantResult).toEqual({ kind: 'queued' });
+  });
+
+  /**
+   * The case the queue's other test cannot reach: what a queued completion is
+   * an Edit *to* when the Edit ahead of it converted an Algorithmic View.
+   *
+   * A completion carries the interaction and its rendered geometry and never a
+   * `ResolvedRenderer`, so the drain resolves one against the Space and the
+   * selection as they stand — by which time the conversion has installed its
+   * Layout and Navigation has moved to it. Retaining the renderer instead would
+   * convert a second time, and the two Layouts would each hold half the
+   * author's work with nothing to say which is the Space's.
+   */
+  it('applies a completion queued behind a conversion to the Layout that conversion created', () => {
+    // Two identities rather than one repeated: a second conversion then shows up
+    // as the second Layout it would really be, instead of overwriting the first.
+    const { authoring, session, navigation } = openAuthoring(undefined, undefined, {
+      newId: mintingIds(CONVERTED_LAYOUT_ID, COMPETING_LAYOUT_ID),
+    });
+    replacePlacementForTest(
+      authoring,
+      Placement.fromEntries([
+        [CARD_A, { x: 10, y: 20 }],
+        [CARD_B, { x: 300, y: 40 }],
+      ]),
+    );
+    let reentered = false;
+    let reentrantResult: AuthoringResult | null = null;
+    authoring.subscribe(() => {
+      if (reentered) return;
+      reentered = true;
+      replacePlacementForTest(
+        authoring,
+        Placement.fromEntries([
+          [CARD_A, { x: 10, y: 20 }],
+          [CARD_B, { x: 500, y: 400 }],
+        ]),
+      );
+      reentrantResult = complete(authoring, { kind: 'settled-card-movement' });
+    });
+
+    complete(authoring, { kind: 'settled-card-movement' });
+
+    expect(reentrantResult).toEqual({ kind: 'queued' });
+    const { working } = session.getState();
+    // One Layout and one Graph, both from the first Edit: the queued one found
+    // them by re-resolving rather than minting a competing pair of its own.
+    expect(working.document.layouts?.map((layout) => layout.id)).toEqual([CONVERTED_LAYOUT_ID]);
+    expect(graphsOf(working).map((graph) => graph.id)).toEqual([MINTED_GRAPH_ID]);
+    // And it is the queued gesture's geometry that survives, written into that
+    // same Layout rather than into a second one.
+    expect(working.document.layouts?.[0]?.positions).toEqual({
+      [CARD_A]: { x: 10, y: 20 },
+      [CARD_B]: { x: 500, y: 400 },
+    });
+    expect(navigation.getState().selectedRenderer).toEqual({
+      kind: 'layout',
+      layoutId: CONVERTED_LAYOUT_ID,
+    });
   });
 
   it('reports a failed queued completion instead of charging it to the Edit that drained it', () => {

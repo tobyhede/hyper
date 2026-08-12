@@ -6,6 +6,7 @@ import {
   type Layout,
   type UUID,
 } from '@project/core';
+import { repeatedGraphEdges } from './graph-edges';
 
 /**
  * The cards and layouts a reference check reads. Structural so it accepts both
@@ -175,7 +176,9 @@ export function validateReferences(space: Referenceable): SpaceReferenceError[] 
     // an author which they have is the difference between hunting for a deleted
     // card and adding a member.
     for (const graph of layout.graphs) {
-      const firstEdgeIndex = new Map<string, number>();
+      // Asked once, up front, and read inside the loop below so a graph's
+      // diagnostics still arrive in edge order rather than in two passes.
+      const repeats = repeatedGraphEdges(graph.edges);
       graph.edges.forEach((edge, index) => {
         for (const end of ['from', 'to'] as const) {
           if (members.has(edge[end])) continue;
@@ -194,11 +197,8 @@ export function validateReferences(space: Referenceable): SpaceReferenceError[] 
           );
         }
 
-        const edgeKey = `${edge.from}\0${edge.to}`;
-        const firstIndex = firstEdgeIndex.get(edgeKey);
-        if (firstIndex === undefined) {
-          firstEdgeIndex.set(edgeKey, index);
-        } else {
+        const firstIndex = repeats.get(index);
+        if (firstIndex !== undefined) {
           const ref = `${edge.from} → ${edge.to}`;
           errors.push({
             kind: 'duplicate-graph-edge',

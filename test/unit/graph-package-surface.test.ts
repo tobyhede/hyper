@@ -50,6 +50,7 @@ const OFFERED_VALUES = [
   'parseCardFile',
   'parseImportCardFile',
   'positionedStrategy',
+  'repeatedGraphEdges',
   'resolveContentCard',
   'graphCardIds',
   'graphStartCard',
