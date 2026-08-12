@@ -50,14 +50,35 @@ some and missing others impossible rather than merely discouraged.
 
 ## What proves it
 
-`test/unit/read-single-space.test.ts` — the retired key earns one diagnostic
-naming it, and the message-identity test is now `it.each` over both refusals:
-*a document intake refuses before parsing is refused here in the same words*.
-That generalisation is the guard. A third refusal added at intake and not
-composed in fails there, rather than being discovered by someone importing a
-directory and quietly losing what they wrote.
+- `test/unit/read-single-space.test.ts` — the retired key earns one diagnostic
+  naming it, and the message-identity test is `it.each` over both refusals: *a
+  document intake refuses before parsing is refused here in the same words*.
+  That generalisation is the guard. A third refusal added at intake and not
+  composed in fails there, rather than being discovered by someone importing a
+  directory and quietly losing what they wrote.
+- `test/unit/import-space.test.ts` — nothing reaches the repository. The
+  regression was never a bad diagnostic; it was a *successful import* of a Space
+  missing its topology, so the assertion that matters at the CLI seam is
+  `repository.imports` staying empty.
+
+All three were checked to bite rather than merely pass: with `documentRefusal`
+temporarily reduced to the version check alone — exactly the pre-fix state — they
+fail, and the rest of both suites stays green.
+
+## Also settled here
+
+**The refusal is answered before a card that could not be read.** Ticket `08`
+left it the other way round; the reasoning is in that ticket, corrected. Both
+directions are tested, including the mirror: an unreadable *space file* still
+answers as discovery, because with no document the gate decides nothing.
+
+**The version 2 literal stays duplicated between the two test suites**, against
+the reviewer's Duplicated Code call. It is a *frozen* literal — version 2 is
+disposable history and can never change — so the usual cost of duplication, two
+places to edit, cannot be paid. A test that reads standalone is worth more than
+deduplicating a constant nothing will ever touch.
 
 ## Bars
 
-- `pnpm verify` — 96 test files, 961 tests.
+- `pnpm verify` — 96 test files, 964 tests.
 - `pnpm e2e` — 72 passed.

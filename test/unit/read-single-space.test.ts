@@ -260,6 +260,52 @@ describe('readSingleSpace', () => {
     expect(thrown.diagnostics[0]).toContain('version 2');
   });
 
+  // Root ignores the mode bits and reads the file anyway, which would fail this
+  // rather than exercise it — the same reason the deterministic-order test above
+  // is skipped there.
+  it.skipIf(process.getuid?.() === 0)(
+    'refuses the document ahead of a card it could not even read',
+    async () => {
+      // The refusal is decided from the space file alone, so an unreadable card
+      // cannot answer ahead of it. A reader told to fix a file permission, who
+      // then discovers the document was never going to load anyway, has been
+      // sent to do work for nothing.
+      const temporaryDirectory = await makeTemporaryDirectory();
+      const talkDirectory = join(temporaryDirectory, 'talk');
+      await mkdir(talkDirectory);
+
+      const spaceFile = join(talkDirectory, 'space.json');
+      const unreadableCard = join(talkDirectory, 'a.md');
+      await writeFile(spaceFile, JSON.stringify(versionTwoDocument));
+      await writeFile(unreadableCard, '---\ntitle: A\n---\nA body\n');
+      await chmod(unreadableCard, 0o000);
+
+      const thrown = await captureError(() => readSingleSpace(talkDirectory));
+
+      expect(thrown).toBeInstanceOf(SpaceImportFileError);
+      if (!(thrown instanceof SpaceImportFileError)) return;
+      expect(thrown.kind).toBe('parsing');
+      expect(thrown.diagnostics).toHaveLength(1);
+      expect(thrown.diagnostics[0]).toContain('version 2');
+    },
+  );
+
+  it('reports an unreadable space file ahead of any refusal it cannot decide', async () => {
+    // The mirror of the case above, and the reason the refusal is not simply
+    // hoisted above every read: with no space file there is no document, so a
+    // read failure is the only thing there is to say.
+    const temporaryDirectory = await makeTemporaryDirectory();
+    const talkDirectory = join(temporaryDirectory, 'talk');
+    await mkdir(talkDirectory);
+    await mkdir(join(talkDirectory, 'space.json'));
+
+    const thrown = await captureError(() => readSingleSpace(talkDirectory));
+
+    expect(thrown).toBeInstanceOf(SpaceImportFileError);
+    if (!(thrown instanceof SpaceImportFileError)) return;
+    expect(thrown.kind).toBe('discovery');
+  });
+
   it('refuses a retired space-level graphs key rather than stripping it', async () => {
     // `importSpaceFileSchema` is a plain Zod object, so an undeclared key is
     // dropped. For the retired `cards` and `edges` that is right — they carried

@@ -163,6 +163,33 @@ describe('importSingleSpace', () => {
     expect(repository.imports).toEqual([]);
   });
 
+  it('refuses a retired space-level graphs key rather than importing what survives it', async () => {
+    // The regression this exists for is not a bad diagnostic — it is a
+    // successful import. `importSpaceFileSchema` is a plain Zod object, so it
+    // dropped the retired key and handed the repository a Space missing its
+    // whole topology, reported as imported (issue `10`). Refusing is what the
+    // test above proves; what this adds is that nothing reaches the repository.
+    const directory = await makeTemporaryDirectory();
+    await writeFile(
+      join(directory, 'space.json'),
+      JSON.stringify({
+        version: 1,
+        id: SPACE_ID,
+        title: 'Talk',
+        graphs: [{ id: GRAPH_ID, title: 'Main', edges: [] }],
+      }),
+    );
+    const repository = new RecordingRepository({ kind: 'imported', spaces: [storedSpace] });
+
+    const error = await captureError(() => importSingleSpace(directory, repository));
+
+    expect(error).toBeInstanceOf(SpaceImportFileError);
+    expect((error as SpaceImportFileError).kind).toBe('parsing');
+    expect((error as SpaceImportFileError).diagnostics).toHaveLength(1);
+    expect((error as SpaceImportFileError).diagnostics[0]).toContain('`graphs`');
+    expect(repository.imports).toEqual([]);
+  });
+
   it('imports one completely read aggregate and returns the repository stored space', async () => {
     const directory = await writeValidSpace();
     const repository = new RecordingRepository({ kind: 'imported', spaces: [storedSpace] });

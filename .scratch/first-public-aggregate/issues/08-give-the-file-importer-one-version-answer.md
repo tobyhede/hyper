@@ -68,13 +68,19 @@ this build cannot read is not a document whose files are worth reporting either,
 and `loadSpace` says so by answering exactly one error. The `read-single-space`
 test writes a broken card beside the version 2 space file to pin that.
 
-Their bytes are still read, because the gate sits after the one `allSettled` that
-reads the whole directory. So a version 2 directory containing an *unreadable*
-card answers the read failure rather than the version. Left as it is, and stated
-here rather than discovered later: a read failure is not a worse answer to the
-same question, it is the import saying it could not see what it was asked to
-import, and moving the gate above the reads costs the single settled read whose
-deterministic failure order is itself pinned. Nothing tests that corner.
+Their bytes are still read — one `allSettled` over the whole directory, whose
+deterministic failure order is pinned — but the refusal is decided from the space
+file alone and answered *before* those read failures are. So a version 2
+directory containing an unreadable card answers the version, not the card.
+
+> Originally left the other way round, with the read failure winning, and the
+> reasoning written here was that a read failure is the import saying it could
+> not see what it was asked to import. That is true of the **space file** and
+> not of a card: with no space file there is no document and the gate decides
+> nothing, but a card cannot change what the space file already says. Answering
+> the card first sends its author to fix a file permission and only then tells
+> them the document was never going to load. Both directions are now tested —
+> the corner this paragraph admitted nothing covered.
 
 ### The two alternatives, and why not
 
