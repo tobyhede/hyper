@@ -44,7 +44,11 @@ const withGraphs = (graphs: unknown[]) => ({
 describe('space file schema', () => {
   it('nests a Graph under the Layout that owns it, with no Space-level collection', () => {
     // ADR 0040: a Graph is an owned value of one Layout. The Space-level array
-    // is gone, so a file carrying one is rejected rather than half-read.
+    // is gone, and a file carrying one is rejected rather than half-read — by
+    // `loadSpace`, not here. This schema is a plain object, so it *strips* a key
+    // it does not declare, and declaring the retired one would put it in the
+    // inferred document type the HTTP contract is checked against. The rejection
+    // is a pre-parse check beside the version answer; `space.test.ts` covers it.
     const file = spaceFileSchema.parse({
       version: 1,
       id: '00000000-0000-4000-8000-000000000001',

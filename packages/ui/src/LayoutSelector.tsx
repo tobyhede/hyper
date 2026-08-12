@@ -14,8 +14,20 @@ export interface LayoutSelectorProps {
 export function LayoutSelector({ layouts, value, active, onValueChange }: LayoutSelectorProps) {
   const selected = layouts.find((layout) => layout.id === value);
 
+  // Controlled across the empty state, never uncontrolled.
+  //
+  // A Space has no Layout until an author's first edit converts one into being
+  // (ADR 0025), so `value` starts null and becomes an id — and omitting the prop
+  // for null made that ordinary transition flip Radix from uncontrolled to
+  // controlled. It warns, and the half of the transition that matters is silent:
+  // while uncontrolled it keeps selection state of its own, which the app is no
+  // longer the source of truth for.
+  //
+  // The empty string is Radix's own spelling of "nothing selected" — a
+  // `SelectItem` may not carry it, which is what reserves it for this. The
+  // trigger renders its own label, so nothing here depends on a match.
   return (
-    <Select {...(value === null ? {} : { value })} onValueChange={onValueChange}>
+    <Select value={value ?? ''} onValueChange={onValueChange}>
       <SelectorTrigger
         accessibleName="Choose layout"
         testId="layout-selector"

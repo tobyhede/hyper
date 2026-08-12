@@ -34,6 +34,42 @@ const graphs: readonly Graph[] = [
 ];
 
 describe('GraphSelector', () => {
+  it('stays controlled when the first conversion mints a Space its Graph', () => {
+    // A Space with no Layout owns no Graph either (ADR 0040), so `activeGraphId`
+    // starts null and the conversion that creates the Layout mints the Graph it
+    // becomes. Omitting the prop for null made that flip Radix from uncontrolled
+    // to controlled — a warning, and selection state Radix keeps that the app is
+    // no longer the source of truth for.
+    const warnings: string[] = [];
+    vi.spyOn(console, 'warn').mockImplementation((first: unknown) => {
+      warnings.push(String(first));
+    });
+
+    const { rerender } = render(
+      <GraphSelector
+        graphs={[]}
+        colorByGraphId={{}}
+        activeGraphId={null}
+        onActivate={vi.fn()}
+        onPresent={vi.fn()}
+        onExitPresenting={vi.fn()}
+      />,
+    );
+    rerender(
+      <GraphSelector
+        graphs={graphs}
+        colorByGraphId={{ [graphs[0]!.id]: '#6ea8fe' }}
+        activeGraphId={graphs[0]!.id}
+        onActivate={vi.fn()}
+        onPresent={vi.fn()}
+        onExitPresenting={vi.fn()}
+      />,
+    );
+
+    expect(warnings).toEqual([]);
+    expect(screen.getByRole('combobox', { name: 'Active Graph' })).toHaveTextContent('Long graph');
+  });
+
   it('requires an exit action for every presenting state', () => {
     expectTypeOf<GraphSelectorProps['onExitPresenting']>().toEqualTypeOf<() => void>();
   });
