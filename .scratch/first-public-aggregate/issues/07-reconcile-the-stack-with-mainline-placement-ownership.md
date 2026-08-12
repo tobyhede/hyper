@@ -1,6 +1,6 @@
 # Reconcile the stack with mainline placement ownership
 
-Status: ready-for-agent
+Status: resolved
 Blocked by: 05
 
 ## Why this exists
@@ -85,15 +85,123 @@ None of these is negotiable, and each is pinned by a test that must survive:
 
 ## Acceptance criteria
 
-- [ ] `origin/main` is merged into the stack, with the combined shape above
+- [x] `origin/main` is merged into the stack, with the combined shape above
       rather than a hunk-by-hunk resolution.
-- [ ] `initialPlacement` is gone; placement arrives through `replacePlacement`
-      and `reportRendered`.
-- [ ] Every `AuthoringCompletion` carries its own `rendered`, and `edited-card`
+- [x] ~~`initialPlacement` is gone~~; placement arrives through `replacePlacement`
+      and `reportRendered`. `installPlacement` is what went; `initialPlacement`
+      never left `main` and stays. See the Answer.
+- [x] Every `AuthoringCompletion` carries its own `rendered`, and `edited-card`
       its `document`.
-- [ ] The `currentSpace` dependency and the View conversion boundary survive.
-- [ ] Every guarantee listed above still has a test, and the fault-injection
+- [x] The `currentSpace` dependency and the View conversion boundary survive.
+- [x] Every guarantee listed above still has a test, and the fault-injection
       coverage is no weaker than either side had.
-- [ ] `pnpm verify` green.
-- [ ] `pnpm e2e` green.
-- [ ] PostgreSQL integration green, and the database stopped afterwards.
+- [x] `pnpm verify` green.
+- [x] `pnpm e2e` green.
+- [x] PostgreSQL integration green, and the database stopped afterwards.
+
+## Answer
+
+Merged as `ab8dd89`. The combined shape is the one this ticket describes, with
+one correction below.
+
+### The shape
+
+Mainline owns *how* a completion reports itself. Every `AuthoringCompletion`
+except `edited-card` carries `rendered: Placement`; `edited-card` carries its
+`document: CardDocument`; `ReportedCompletion` is two fields, not three;
+`installPlacement`/`installCardDocument` are gone in favour of
+`replacePlacement`/`reportRendered`; and `reportRendered` merges against
+`mergeBase()`, which is `null` unless a Layout is selected.
+
+This stack owns *what* a completion means. `currentSpace`, the View conversion
+boundary, the Layout-owned Graph an Edit writes into, `nextActiveGraphId` on
+`CompletedEdit`, the single `continueInRenderer(selection, activeGraphId)`, and
+both connection predicates including `connectable`'s membership check are
+untouched.
+
+### The one correction: `initialPlacement` did not go anywhere
+
+The acceptance criterion "`initialPlacement` is gone" rests on a misreading, and
+it is checkable: `git show origin/main:packages/app/src/space-authoring.ts`
+declares `initialPlacement?: Placement | null` on `SpaceAuthoringDependencies`
+and seeds `let placement = initialPlacement`, and `attachAuthoring` in mainline's
+own test file still passes it. What PR #55 removed and replaced is
+**`installPlacement` → `replacePlacement`**, which is the rename the "survives
+beside the `replacePlacement` that replaced it" sentence is about.
+
+So it stays. It is a construction seed for a value `createApp` already knows —
+the opened Layout's own map — and deleting it would buy nothing but a
+construct-then-mutate `createSpaceAuthoring` in `App.tsx` and at every test call
+site. What the criterion was reaching for is true: the only *runtime* writers of
+placement are `replacePlacement` and `reportRendered`, and no editor installs
+anything ahead of reporting an Edit.
+
+Mainline did move several individual test call sites off `initialPlacement` onto
+`replacePlacementForTest`, because its `complete` helper needs the rendered map
+in a `WeakMap` to hand back. Those moves are kept; they are not the dependency
+going away.
+
+### `connectable` reads the raw placement, not `mergeBase()`
+
+Worth writing down because it looks like an oversight. `mergeBase()` answers
+`null` on an Algorithmic View, so a membership check asked through it would
+refuse every connection on a View — including the first one, which is the
+gesture that converts. The predicate reads the installed `placement` field for
+exactly the reason its own comment already gave: it is the only value that
+answers on a View, and it is still the value the completion derives from, since
+`complete` installs the completed placement before `deriveCompletedEdit` asks.
+
+### The ten test conflicts
+
+Eight are the same decision twice over — mainline renamed a mechanism, this
+stack changed a fixture or an assertion, and both apply: `replacePlacementForTest`
+and the `complete(authoring, …)` helper over this stack's version-1 snapshots,
+`graphsOf` flatten, `currentSpace` dependency and Layout-owned expectations. Two
+are substantive:
+
+- **"treats unavailable placement, duplicate Edges and stale Card identities as
+  no Edit"** keeps this stack's `positionedSnapshot` fixture and its comment,
+  because the duplicate refusal is conditional on a selected Layout — on a View
+  the Edge joins the empty Graph conversion mints and there is nothing to be a
+  duplicate of. It takes mainline's name, *"requires rendered placement and
+  treats duplicate Edges and stale Card identities as no Edit"*, because the
+  placement half is now asserted through `canConnect` rather than through a
+  completion with no geometry.
+- **"refuses to connect with no active Graph while the Space already holds
+  Graphs"** is dropped, not adapted. Its premise is a Layout whose `graphs`
+  filter hides every Space-level Graph; ticket `01` deleted the filter and `02`
+  deleted the collection, and under ADR 0040 a Layout always owns at least one
+  Graph. The reachable remainder — a selected Layout the Space no longer holds —
+  already has its own test.
+
+Three further sweeps outside the conflict markers: three stack-authored tests
+auto-merged cleanly onto the *old* interface (`installPlacement`, bare
+`authoring.complete`) and were moved onto the new one.
+
+### Fault-injection coverage
+
+No weaker than either side. Kept: a throwing `submit` (three cases), a throwing
+reporter, a throwing `acceptRemote`. Mainline's *"publishes what the
+collaborators hold when activating the minted Graph throws"* is superseded by
+this stack's *"…when adopting the written Layout throws"*, which injects into
+`continueInRenderer` — the one call — while a second stub asserts `activateGraph`
+throws if Edit completion ever reaches it at all. That is strictly stronger than
+mainline's, not a substitution. The `reportedPlacement === null` refusal still
+has a test, through `edited-card` in "binds a Card value to the completion that
+reports it".
+
+Net test count for the file: 42 on `main`, 43 on the stack, 44 merged.
+
+### Bars
+
+- `pnpm verify` — green. 96 test files, 950 tests, all files 93.87% statements.
+- `pnpm e2e` — green. 72 passed in 54.1s.
+- `pnpm postgres:up && pnpm test:integration:postgres` — green. 3 files, 52
+  tests. Database stopped with `pnpm postgres:down` afterwards.
+
+### Not done here
+
+`CONTEXT.md`, the ADR build statuses, the handoff and the AGENTS.md branch note
+remain ticket `06`'s. Nothing in this reconciliation changed a rule any of them
+states — the AGENTS.md completion-sequence bullet already describes the single
+`continueInRenderer`, and it describes it correctly after the merge.
