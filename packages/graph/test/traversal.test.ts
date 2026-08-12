@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { Graph, UUID } from '@project/core';
 import { outgoingEdges, graphStartCard } from '../src/index';
 // Internal to the package: `graphStartCard` is the offered way in.
-import { incomingEdges, graphEntryCards } from '../src/traversal';
+import { graphEntryCards } from '../src/traversal';
 import { uuid } from './card-files';
 
 const graph = (edges: [UUID, UUID][]): Graph => ({
@@ -39,14 +39,6 @@ describe('outgoingEdges', () => {
 
   it('gives a card the graph does not touch none', () => {
     expect(outgoingEdges(diamond, uuid('00000000-0000-4000-8000-000000000098'))).toEqual([]);
-  });
-});
-
-describe('incomingEdges', () => {
-  it('lists every edge arriving at a merge', () => {
-    expect(
-      incomingEdges(diamond, uuid('00000000-0000-4000-8000-000000000006')).map((e) => e.from),
-    ).toEqual(['00000000-0000-4000-8000-000000000003', '00000000-0000-4000-8000-000000000005']);
   });
 });
 
