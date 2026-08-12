@@ -8,7 +8,7 @@ import { PlacementPending } from '../src/components/PlacementPending';
  * this test covers only the status the pending branch renders.
  */
 describe('pending placement', () => {
-  it('announces that arrangement is in progress', () => {
+  it('announces that the strategy is arranging Cards', () => {
     render(<PlacementPending />);
 
     expect(screen.getByRole('status')).toHaveTextContent('Arranging…');
