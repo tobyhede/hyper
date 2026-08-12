@@ -1,6 +1,6 @@
 # Delete the Layout graphs filter
 
-Status: ready-for-agent
+Status: resolved
 Blocked by: None — can start immediately
 
 ## What to build
@@ -39,16 +39,44 @@ lands on `main` before the branch that `02`–`06` share.
 
 ## Acceptance criteria
 
-- [ ] A Layout has no `graphs` key in the normal or import schema.
-- [ ] A document that carries one is rejected as an unrecognised key rather than
+- [x] A Layout has no `graphs` key in the normal or import schema.
+- [x] A document that carries one is rejected as an unrecognised key rather than
       silently ignored, so a stale authored file is not read as drawing
       everything by accident.
-- [ ] `activeGraph` naming a Graph the Space does not hold is still a named
+- [x] `activeGraph` naming a Graph the Space does not hold is still a named
       reference error; the "does not show" error is gone.
-- [ ] `resolveGraphs` answers every Graph in the Space for both a selected
+- [x] `resolveGraphs` answers every Graph in the Space for both a selected
       Layout and an Algorithmic View.
-- [ ] The placement edit carries no minted-Graph argument, and no caller passes
+- [x] The placement edit carries no minted-Graph argument, and no caller passes
       one.
-- [ ] Tests that asserted filtering are deleted rather than adapted — there is
+- [x] Tests that asserted filtering are deleted rather than adapted — there is
       no filter left to assert against.
-- [ ] `pnpm verify` and `pnpm e2e` green.
+- [x] `pnpm verify` and `pnpm e2e` green.
+
+## Answer
+
+Done in `4a954a1`. A Layout no longer names the Graphs it draws; every renderer
+draws every Graph in the Space, which is what selection-is-emphasis already
+meant everywhere else. `visibleGraphIds` survives as the seam and becomes
+load-bearing again in `02`, where it answers a Layout's owned Graphs.
+
+Two decisions worth carrying forward.
+
+`positionedLayoutSchema` is now `.strict()` rather than guarding the one retired
+key. Stripping `graphs` silently would read a file saying "draw only these" as
+one saying "draw all of them" — the single answer its author did not write. It
+is the only strict object in `schema.ts`; the asymmetry is documented at the
+point of surprise, and `.extend()` carries the mode into the import variant, so
+that is pinned rather than assumed.
+
+About fifteen tests were deleted rather than adapted, because there is no filter
+left to assert against. Two were kept and adapted instead: a canvas-projection
+property test whose subject is the React Flow #008 handle-resolution invariant
+rather than filtering, and the e2e covering Alt empty-drop minting into an
+existing Layout, whose seeded empty filter was inert scaffolding.
+
+Review found no Spec defects. Its one substantive Standards finding is that two
+Navigation guards are now unreachable and their tests went with the filter,
+leaving both `throw` sites uncovered. The guards stay — AGENTS.md is explicit
+that the invariant lives in Navigation — and ticket `02` makes the state
+constructible again, which is where the coverage belongs.
