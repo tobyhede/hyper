@@ -280,7 +280,7 @@ export function createRenderAdapter(authoring: SpaceAuthoring): RenderAdapter {
       // behind another Edit, or thrown on an invalid Space — must not leave a
       // connection drawn for an Edge the Space never gained. Only `completed`
       // says it did: a queued Edit runs against whatever Space the Edit ahead of
-      // it installs and can still answer `no-edit` there, and if it does land the
+      // it installs and can still be refused there, and if it does land the
       // projection that follows it draws the Edge anyway.
       if (
         authoring.complete({

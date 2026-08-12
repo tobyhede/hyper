@@ -17,6 +17,7 @@ import {
   type SpaceBackend,
   type SpaceSession,
 } from '@project/persistence';
+import { GRAPH_PALETTE } from '../src/colors';
 import { mintingIds } from './minting';
 import { createNavigation, type Navigation, type NavigationState } from '../src/navigation';
 import {
@@ -259,7 +260,7 @@ function openAuthoring(
  *
  * The separate target is what lets the refusal tests below name their reason:
  * every Alias edit they attempt produces a Space that *loads*, so the only thing
- * that can answer `no-edit` is the guard each one is about. Aimed at the Alias
+ * that can refuse is the guard each one is about. Aimed at the Alias
  * instead, a guard removed would leave `loadSpaceSnapshot` to reject the chain
  * and the test to fail by throwing — still red, but red about the validator
  * rather than about the refusal it is named for.
@@ -366,6 +367,7 @@ describe('Space Authoring', () => {
       [CARD_A]: { x: 10, y: 20 },
       [CARD_B]: { x: 300, y: 40 },
     });
+    expect(session.getState().working.document.layouts?.[0]?.graphs[0]?.id).toBe(MINTED_GRAPH_ID);
     // Written *and* selected. A conversion that stored the Layout without
     // repointing the renderer leaves the graph drawing the Algorithmic View it
     // just replaced, so the next placement would be computed rather than read
@@ -376,13 +378,18 @@ describe('Space Authoring', () => {
   it('binds a Card value to the completion that reports it', () => {
     const { authoring, session } = openAuthoring();
     // No placement: an Algorithmic View has nothing to write the Edit into yet.
+    // A refusal rather than `unchanged`, because the author's rename is real and
+    // the reason it cannot land is context they can be told about.
     expect(
       complete(authoring, {
         kind: 'edited-card',
         cardId: CARD_A,
         document: { title: 'Abandoned rename', kind: 'markdown', body: 'A' },
       }),
-    ).toEqual({ kind: 'no-edit' });
+    ).toEqual({
+      kind: 'refused',
+      reason: 'This view has not finished arranging, so there is nowhere to write yet.',
+    });
 
     replacePlacementForTest(
       authoring,
@@ -398,7 +405,7 @@ describe('Space Authoring', () => {
         cardId: CARD_A,
         document: automaticSnapshot.cards[0]!.document,
       }),
-    ).toEqual({ kind: 'no-edit' });
+    ).toEqual({ kind: 'unchanged' });
     expect(session.getState().working.cards).toEqual(automaticSnapshot.cards);
   });
 
@@ -429,7 +436,7 @@ describe('Space Authoring', () => {
         cardId: CARD_A,
         document: automaticSnapshot.cards[0]!.document,
       }),
-    ).toEqual({ kind: 'no-edit' });
+    ).toEqual({ kind: 'unchanged' });
     expect(session.getState().working).toBe(before);
     expect(control.attempts).toEqual([]);
     expect(minted).not.toHaveBeenCalled();
@@ -509,28 +516,28 @@ describe('Space Authoring', () => {
     const before = session.getState().working;
 
     // Targets `CARD_C`, which owns its content, so this conversion would produce
-    // a Space that loads and `isSupportedCardEdit` is the only thing that can
-    // refuse it. Pointed at the Alias instead, the Alias chain would be rejected
-    // by intake and the failure would say nothing about the guard under test.
+    // a Space that loads and the kind guard is the only thing that can refuse
+    // it. Pointed at the Alias instead, the Alias chain would be rejected by
+    // intake and the failure would say nothing about the guard under test.
     expect(
       complete(authoring, {
         kind: 'edited-card',
         cardId: CARD_A,
         document: { title: 'Converted A', kind: 'alias', target: CARD_C },
       }),
-    ).toEqual({ kind: 'no-edit' });
+    ).toEqual({ kind: 'refused', reason: 'A Card keeps the kind it was created with.' });
     expect(session.getState().working).toBe(before);
   });
 
   /**
-   * Where an Alias points is structure, not the content it shows, and Card
-   * editing does not author structure. Both changes below produce a Space that
-   * loads — `CARD_C` owns its content and the description is valid — so the only
-   * thing that can refuse them is the guard under test.
+   * Retargeting is an ordinary Edit of the Alias, made through the same Card
+   * editor as its title (ADR 0009, the Alias prototype's Frame 4) — the Card
+   * editor is the one canonical place a Target changes, so it is the completion
+   * that carries it. The Alias keeps its id, its own title and its position; the
+   * old Target keeps everything.
    */
-  it("refuses moving an Alias's target through Card editing", () => {
+  it("replaces an Alias's Target while preserving its identity and title", () => {
     const { authoring, session } = openRefusalFixture();
-    const before = session.getState().working;
 
     expect(
       complete(authoring, {
@@ -538,13 +545,44 @@ describe('Space Authoring', () => {
         cardId: CARD_B,
         document: { title: 'A again', kind: 'alias', target: CARD_C },
       }),
-    ).toEqual({ kind: 'no-edit' });
+    ).toEqual({ kind: 'completed' });
+
+    expect(session.getState().working.cards).toEqual([
+      { id: CARD_A, document: { title: 'A', kind: 'markdown', body: 'A' } },
+      { id: CARD_B, document: { title: 'A again', kind: 'alias', target: CARD_C } },
+      { id: CARD_C, document: { title: 'C', kind: 'markdown', body: 'C' } },
+    ]);
+    expect(session.getState().working.document.layouts?.[0]?.positions).toEqual({
+      [CARD_A]: { x: 10, y: 20 },
+      [CARD_B]: { x: 300, y: 40 },
+      [CARD_C]: { x: 600, y: 40 },
+    });
+    expect(graphsOf(session.getState().working)).toEqual([MAIN_GRAPH]);
+  });
+
+  it('refuses an Alias Target that does not own its content', () => {
+    const { authoring, session } = openRefusalFixture();
+    const before = session.getState().working;
+
+    // `CARD_B` is itself the Alias, so this asks for a chain. Intake rejects one
+    // too, but by then the Edit has already been derived — refusing here is what
+    // keeps a reachable authoring mistake an author-facing sentence rather than
+    // the throw a broken invariant gets.
+    expect(
+      complete(authoring, {
+        kind: 'edited-card',
+        cardId: CARD_B,
+        document: { title: 'A again', kind: 'alias', target: CARD_B },
+      }),
+    ).toEqual({
+      kind: 'refused',
+      reason: 'An Alias must target a Card that owns its content.',
+    });
     expect(session.getState().working).toBe(before);
   });
 
-  it('refuses adding a description to an Alias through Card editing', () => {
+  it('edits an Alias description without touching its Target', () => {
     const { authoring, session } = openRefusalFixture();
-    const before = session.getState().working;
 
     expect(
       complete(authoring, {
@@ -552,13 +590,21 @@ describe('Space Authoring', () => {
         cardId: CARD_B,
         document: {
           title: 'A again',
-          description: 'Alias metadata is not content',
+          description: 'Where the introduction returns',
           kind: 'alias',
           target: CARD_A,
         },
       }),
-    ).toEqual({ kind: 'no-edit' });
-    expect(session.getState().working).toBe(before);
+    ).toEqual({ kind: 'completed' });
+    expect(session.getState().working.cards[1]).toEqual({
+      id: CARD_B,
+      document: {
+        title: 'A again',
+        description: 'Where the introduction returns',
+        kind: 'alias',
+        target: CARD_A,
+      },
+    });
   });
 
   /**
@@ -592,7 +638,10 @@ describe('Space Authoring', () => {
           [CARD_A]: { x: 10, y: 20 },
           [CARD_B]: { x: 300, y: 40 },
         },
-        graphs: [{ id: MINTED_GRAPH_ID, title: 'Graph 1', edges: [] }],
+        // Coloured on the way out: a Graph a conversion mints stores the same
+        // rotating palette choice Add Graph would have given it, so the two
+        // creation gestures do not produce different Graph properties.
+        graphs: [{ id: MINTED_GRAPH_ID, title: 'Graph 1', color: GRAPH_PALETTE[0], edges: [] }],
         activeGraph: MINTED_GRAPH_ID,
       },
     ]);
@@ -632,7 +681,8 @@ describe('Space Authoring', () => {
 
     expect(authoring.canConnect(CARD_B, CARD_A)).toBe(false);
     expect(complete(authoring, { kind: 'connected-cards', from: CARD_B, to: CARD_A })).toEqual({
-      kind: 'no-edit',
+      kind: 'refused',
+      reason: 'These Cards are already connected in this Graph.',
     });
   });
 
@@ -682,7 +732,15 @@ describe('Space Authoring', () => {
     // `Graph 1`, not `Graph 2`: the numbering runs above the highest `Graph N`
     // already taken, and `Main` is a title an author wrote rather than a number.
     expect(layouts[1]?.graphs).toEqual([
-      { id: MINTED_GRAPH_ID, title: 'Graph 1', edges: [{ from: CARD_A, to: CARD_B }] },
+      {
+        id: MINTED_GRAPH_ID,
+        title: 'Graph 1',
+        // The first palette slot, although the Space already holds `Main`: the
+        // rotation is Layout-local, and a conversion creates the Layout, so its
+        // initial Graph occupies the first position in it.
+        color: GRAPH_PALETTE[0],
+        edges: [{ from: CARD_A, to: CARD_B }],
+      },
     ]);
     expect(layouts[1]?.activeGraph).toBe(MINTED_GRAPH_ID);
     expect(navigation.getState().activeGraphId).toBe(MINTED_GRAPH_ID);
@@ -738,11 +796,13 @@ describe('Space Authoring', () => {
 
     expect(authoring.canConnect(CARD_A, CARD_C)).toBe(false);
     expect(complete(authoring, { kind: 'connected-cards', from: CARD_A, to: CARD_C })).toEqual({
-      kind: 'no-edit',
+      kind: 'refused',
+      reason: 'A connection can only join Cards in this Layout.',
     });
     expect(authoring.canConnect(CARD_C, CARD_A)).toBe(false);
     expect(complete(authoring, { kind: 'connected-cards', from: CARD_C, to: CARD_A })).toEqual({
-      kind: 'no-edit',
+      kind: 'refused',
+      reason: 'A connection can only join Cards in this Layout.',
     });
     expect(authoring.canCreateConnectedCard(CARD_C)).toBe(false);
     expect(session.getState().working).toBe(before);
@@ -939,7 +999,12 @@ describe('Space Authoring', () => {
     });
     // The Graph is inside the Layout that owns it, and that Layout draws it.
     expect(session.getState().working.document.layouts?.[0]?.graphs).toEqual([
-      { id: MINTED_GRAPH_ID, title: 'Graph 1', edges: [{ from: CARD_A, to: CARD_A }] },
+      {
+        id: MINTED_GRAPH_ID,
+        title: 'Graph 1',
+        color: GRAPH_PALETTE[0],
+        edges: [{ from: CARD_A, to: CARD_A }],
+      },
     ]);
     expect(
       resolveRenderer(currentSpace(), { kind: 'layout', layoutId: LAYOUT_ID }).subject.graphs.map(
@@ -988,6 +1053,7 @@ describe('Space Authoring', () => {
               {
                 id: MINTED_GRAPH_ID,
                 title: 'Graph 1',
+                color: GRAPH_PALETTE[0],
                 edges: [{ from: CARD_A, to: CREATED_CARD_ID }],
               },
             ],
@@ -1217,11 +1283,13 @@ describe('Space Authoring', () => {
     );
     expect(authoring.canConnect(CARD_A, CARD_B)).toBe(false);
     expect(complete(authoring, { kind: 'connected-cards', from: CARD_A, to: CARD_B })).toEqual({
-      kind: 'no-edit',
+      kind: 'refused',
+      reason: 'These Cards are already connected in this Graph.',
     });
     expect(authoring.canConnect(CARD_A, staleCard)).toBe(false);
     expect(complete(authoring, { kind: 'connected-cards', from: CARD_A, to: staleCard })).toEqual({
-      kind: 'no-edit',
+      kind: 'refused',
+      reason: 'A connection can only join Cards in this Layout.',
     });
     expect(session.getState().working).toEqual(positionedSnapshot);
   });
@@ -1464,7 +1532,7 @@ describe('Space Authoring', () => {
       ]),
     );
 
-    expect(complete(authoring, { kind: 'settled-card-movement' })).toEqual({ kind: 'no-edit' });
+    expect(complete(authoring, { kind: 'settled-card-movement' })).toEqual({ kind: 'unchanged' });
     expect(session.getState().working).toBe(before);
   });
 
@@ -1980,7 +2048,10 @@ describe('Space Authoring', () => {
     );
     const before = session.getState().working;
 
-    expect(complete(authoring, { kind: 'settled-card-movement' })).toEqual({ kind: 'no-edit' });
+    expect(complete(authoring, { kind: 'settled-card-movement' })).toEqual({
+      kind: 'refused',
+      reason: 'This Layout is no longer part of the Space.',
+    });
     expect(session.getState().working).toBe(before);
   });
 
@@ -2112,7 +2183,7 @@ describe('Space Authoring', () => {
         cardId: CARD_A,
         document: remote.cards[0]!.document,
       }),
-    ).toEqual({ kind: 'no-edit' });
+    ).toEqual({ kind: 'unchanged' });
 
     // The counter the render adapter watches to drop stale local placement.
     expect(authoring.getState().replacementEpoch).toBe(1);
@@ -2139,7 +2210,7 @@ describe('Space Authoring', () => {
 
   it('notifies the listeners subscribed when publication began, not those added during it', () => {
     // `attachAuthoring`, not `openAuthoring`: the Edit has to actually complete.
-    // Without an installed placement this returns `no-edit` before publishing,
+    // Without an installed placement this refuses before publishing,
     // the outer listener never runs, and `late` is empty however `publish`
     // iterates — an assertion that cannot fail. `completed` and `subscribed` are
     // asserted for the same reason: they are what stop it going vacuous again.

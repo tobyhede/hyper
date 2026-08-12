@@ -13,11 +13,17 @@ import type { UUID } from '@project/core';
  * `SpaceAuthoring` takes its minter when it is composed, so a test names the ids
  * it is about to assert on.
  *
- * The last id repeats, which is what the `.mockReturnValueOnce(…)` chains ending
- * in `.mockReturnValue(…)` used to say. A test whose subject *is* minting names
- * every id instead of leaning on that.
+ * Exhaustion throws: every completed Edit must name every identity it expects
+ * to mint. That makes an accidental extra mint observable at the public
+ * operation instead of silently reusing an identity and failing later at
+ * snapshot intake.
  */
 export const mintingIds = (...ids: readonly [UUID, ...UUID[]]): (() => UUID) => {
   let next = 0;
-  return () => ids[Math.min(next++, ids.length - 1)]!;
+  return () => {
+    const id = ids[next++];
+    if (id === undefined)
+      throw new Error('The completed Edit minted more identities than expected.');
+    return id;
+  };
 };

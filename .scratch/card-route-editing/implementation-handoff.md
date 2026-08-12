@@ -237,7 +237,7 @@ identity, a test that a Space carrying one Graph id in two Layouts is a named
 load error rather than a silently shortened index, and an E2E proving the
 fixture's Flow view still draws all four Graphs across its two Layouts.
 
-### 3. Deep semantic authoring interface
+### 3. Deep semantic authoring interface — **done**
 
 Add the final semantic operations and shared completed/unchanged/refused result
 vocabulary behind Space Authoring. Keep pure derivation before installation,
@@ -247,6 +247,43 @@ operation-specific snapshot assembly in callers.
 
 Gate: interface-level tests cover every domain transition, conversion/no-op/
 refusal, cascades, latest-working Retry/Keep local and atomic replacement.
+
+Built. `AuthoringCompletion` now names every transition in the matrix above —
+Add Card, Add Alias, Add to Layout, Remove from Layout, Delete Card from Space,
+Add Graph, Graph title and colour, Delete Graph, Reconnect and Delete Edge
+alongside the movement, connect and Card-edit gestures that were already there —
+and `AuthoringResult` distinguishes `completed` (naming a created Card or Graph),
+`unchanged` and `refused` (carrying the author-facing reason) from `queued`.
+Retargeting an Alias is an ordinary `edited-card`, since the Card editor is the
+one canonical place a Target changes; only Card **kind** is now refused.
+`replacementEpoch` was already in place from ADR 0042's earlier work.
+
+Keep local became `SpaceAuthoring.keepLocalWork`, which reads the newest working
+snapshot itself rather than taking one — the caller-assembled snapshot this
+package exists to remove. The conflict controls had no Keep local at all before
+it, only Accept remote, so the one button beside it landed here too.
+
+Three supporting seams moved with it: `Placement.remove` (construction stays
+closed), `withCardRemovedFromLayouts` for the all-Layout deletion cascade, and
+`nextGraphColor`, which both Graph-creating gestures now store through.
+
+Graph colours rotate by the new Graph's appended Layout-order position, as the
+accepted Graph management prototype specifies. A conversion therefore gives
+the new Layout's initial Graph the first palette colour, regardless of the
+Graphs its Algorithmic View was drawing. Graph titles still number Space-wide,
+which is also what `freshGraphConversion` already did. `Graph.color` stays
+optional in the domain, with `graphColorMap` resolving a fallback for imported
+Graphs.
+Proofs are `packages/app/test/space-authoring-operations.test.ts` for the
+transitions and their refusals, and `packages/app/test/space-authoring.property.test.ts`,
+which drives hostile sequences of every operation and holds each to two bars:
+the working Space passes domain intake after every step, and an operation that
+is not an Edit leaves the working snapshot's identity untouched.
+
+Nothing here is reachable by an author yet — every operation still needs the
+surface its later package builds. Packages 5 and 6 wire Cards View, membership
+and Graph management to what is now behind the interface, and the fallback band
+stays until package 5 replaces it.
 
 ### 4. Card and Alias creation
 

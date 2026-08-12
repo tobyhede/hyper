@@ -295,13 +295,13 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
           : (parsed.error.issues[0]?.message ?? 'The Card title is invalid.');
       }
       // The result is deliberately not inspected, and that is not an oversight.
-      // `no-edit` here means the title did not change, which is the editor's
-      // ordinary close. Authoring's other refusals need a state no author can
-      // reach from this control: `isSupportedCardEdit` only ever sees a title
-      // change, and the two that turn on a missing placement or a vanished
-      // Layout cannot coincide with a drawn Card, because the affordance is
-      // rendered by the same projection that installs the placement. `queued`
-      // is an Edit that will still be performed.
+      // `unchanged` here means the title did not change, which is the editor's
+      // ordinary close. Authoring's refusals need a state no author can reach
+      // from this control: a rename never changes kind or an Alias Target, and
+      // the two that turn on a missing placement or a vanished Layout cannot
+      // coincide with a drawn Card, because the affordance is rendered by the
+      // same projection that installs the placement. `queued` is an Edit that
+      // will still be performed.
       authoring.complete({ kind: 'edited-card', cardId: cardId.data, document: parsed.data });
       return null;
     }, []);
@@ -463,6 +463,17 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
               }}
             >
               Accept remote
+            </Button>
+            <Button
+              variant="default"
+              data-testid="persistence-keep-local"
+              // The other half of the pair, and the one that keeps the author's
+              // work: it recommits the newest local Space against the revision
+              // the conflict named. Authoring reads that snapshot itself, so
+              // Edits made while the conflict stood are included.
+              onClick={authoring.keepLocalWork}
+            >
+              Keep local
             </Button>
             {remoteRefusal === null ? null : (
               <span

@@ -3,6 +3,7 @@ import {
   type CardDocument,
   type CardId,
   type Graph,
+  type GraphEdge,
   type GraphId,
   type LayoutPosition,
   type SpaceSnapshot,
@@ -16,11 +17,29 @@ import {
   type SpaceSession,
   type SpaceSessionState,
 } from '@project/persistence';
+import { nextGraphColor } from './colors';
 import type { Navigation, NavigationState } from './navigation';
-import { updatePositionedLayout } from './snapshot';
-import { nextCardTitle, nextLayoutTitle } from './titles';
+import {
+  updatePositionedLayout,
+  withCardRemovedFromLayouts,
+  withoutIncidentEdges,
+} from './snapshot';
+import { nextCardTitle, nextGraphTitle, nextLayoutTitle } from './titles';
 import { defaultRenderer, type RendererSelection, type ResolveRenderer } from './renderer';
 
+/** Which end of an Edge a reconnection replaces. */
+export type EdgeEndpoint = 'from' | 'to';
+
+/**
+ * One completed authored fact, as the interaction that finished knows it.
+ *
+ * Identities and the settled value, never a plan: the interaction says what it
+ * finished, and every read of current state, every eligibility question and the
+ * whole derivation of the next Space happen on this side of the seam. Three
+ * kinds carry `rendered` because a pointer gesture is the only thing that knows
+ * where React Flow has drawn the Cards; the rest are written into the placement
+ * already installed.
+ */
 export type AuthoringCompletion =
   | {
       readonly kind: 'settled-card-movement';
@@ -43,11 +62,65 @@ export type AuthoringCompletion =
       readonly from: CardId;
       readonly position: LayoutPosition;
       readonly rendered: Placement;
-    };
+    }
+  /** Add Card: a detached Markdown Card at the visible centre, neutrally titled. */
+  | { readonly kind: 'created-card'; readonly anchor: LayoutPosition }
+  /**
+   * Add Alias: created only once its Target is chosen, because an Alias without
+   * one is not a valid Card. An empty title takes the Target's.
+   */
+  | {
+      readonly kind: 'created-alias';
+      readonly target: CardId;
+      readonly title?: string;
+      readonly anchor: LayoutPosition;
+    }
+  /** Add to Layout: membership and a first position for a Card already in the Space. */
+  | {
+      readonly kind: 'added-card-to-layout';
+      readonly cardId: CardId;
+      readonly anchor: LayoutPosition;
+    }
+  /** Remove from Layout: membership, position and incident Edges, in this Layout only. */
+  | { readonly kind: 'removed-card-from-layout'; readonly cardId: CardId }
+  /** Delete Card from Space: the same removal, cascaded through every Layout. */
+  | { readonly kind: 'deleted-card'; readonly cardId: CardId }
+  | { readonly kind: 'added-graph' }
+  | { readonly kind: 'renamed-graph'; readonly graphId: GraphId; readonly title: string }
+  | { readonly kind: 'recolored-graph'; readonly graphId: GraphId; readonly color: string }
+  | { readonly kind: 'deleted-graph'; readonly graphId: GraphId }
+  | {
+      readonly kind: 'reconnected-edge';
+      readonly graphId: GraphId;
+      readonly edge: GraphEdge;
+      readonly endpoint: EdgeEndpoint;
+      readonly cardId: CardId;
+    }
+  | { readonly kind: 'deleted-edge'; readonly graphId: GraphId; readonly edge: GraphEdge };
 
+/**
+ * What a semantic operation answers: the three outcomes every one of them
+ * shares, plus the ordering answer only a reentrant caller sees.
+ *
+ * `unchanged` and `refused` are deliberately distinct, and neither is an error.
+ * Unchanged is the value the author already authored — a rename to the stored
+ * title, a swatch already chosen, a drag returned to where it began — and the
+ * surface's ordinary close. Refused is an operation that cannot happen now:
+ * stale context, or a domain rule the author has run into. It carries the
+ * sentence that surface shows, because only Authoring knows which rule it was.
+ *
+ * A broken invariant is neither. It throws, or is reported through the
+ * non-throwing reporter — dressing a programming defect as a refusal would put
+ * it in front of the author as their own mistake.
+ */
 export type AuthoringResult =
-  | { readonly kind: 'completed'; readonly createdCardId?: CardId }
-  | { readonly kind: 'no-edit' }
+  | {
+      readonly kind: 'completed';
+      readonly createdCardId?: CardId;
+      readonly createdGraphId?: GraphId;
+    }
+  | { readonly kind: 'unchanged' }
+  | { readonly kind: 'refused'; readonly reason: string }
   | { readonly kind: 'queued' };
 
 /**
@@ -95,6 +168,18 @@ export interface SpaceAuthoring {
   readonly canCreateConnectedCard: (from: CardId) => boolean;
   readonly complete: (completion: AuthoringCompletion) => AuthoringResult;
   readonly retryPersistence: () => void;
+  /**
+   * Commit the newest local work against the revision the conflict named,
+   * keeping every Edit made since the commit that hit it.
+   *
+   * The snapshot is read here rather than handed in, which is the whole reason
+   * this exists beside `session.resolveConflict`: the caller is a button in a
+   * toolbar, and a button that assembles a snapshot is a button that can commit
+   * a stale one. Retry and Keep local both take the *newest* working Space, so
+   * Edits an author went on making while the conflict stood are included rather
+   * than silently dropped.
+   */
+  readonly keepLocalWork: () => void;
   /** Replace local work with the current stored Space, or explain why it was refused. */
   readonly acceptStoredSpace: () => string | null;
   /**
@@ -134,7 +219,24 @@ interface CompletedEdit {
    */
   readonly nextActiveGraphId: GraphId | null;
   readonly createdCardId?: CardId;
+  readonly createdGraphId?: GraphId;
 }
+
+/**
+ * What the pure core answers: a complete Edit, or one of the two outcomes that
+ * are not Edits.
+ *
+ * The same three names {@link AuthoringResult} carries, so the shell hands the
+ * last two straight back rather than translating between two vocabularies for
+ * the same distinction.
+ */
+type DerivedCompletion =
+  | { readonly kind: 'completed'; readonly edit: CompletedEdit }
+  | { readonly kind: 'unchanged' }
+  | { readonly kind: 'refused'; readonly reason: string };
+
+const UNCHANGED = { kind: 'unchanged' } as const;
+const refuse = (reason: string): DerivedCompletion => ({ kind: 'refused', reason });
 
 /**
  * Everything a completion is derived from: the report itself, and the editor
@@ -204,15 +306,110 @@ interface SpaceAuthoringDependencies {
   readonly newId?: () => UUID;
 }
 
-function isSupportedCardEdit(previous: CardDocument, next: CardDocument): boolean {
-  if (previous.kind !== next.kind) return false;
-  if (previous.kind === 'markdown') return next.kind === 'markdown';
-  return (
-    next.kind === 'alias' &&
-    previous.target === next.target &&
-    previous.description === next.description
-  );
+/** The Cards a snapshot carries, in the shape a snapshot carries them. */
+type SnapshotCards = SpaceSnapshot['cards'];
+
+/**
+ * How far a Card creation steps when the anchor it was given is taken, and in
+ * which direction.
+ *
+ * A visible stack rather than collision avoidance: existing Cards never move,
+ * and partial overlap of the 260×146 Front is deliberate. Only an *exact*
+ * anchor collision steps, which is what a repeated centre-add produces and a
+ * pointer drop essentially never does.
+ */
+const STACK_STEP = 24;
+
+const freeAnchor = (placement: Placement, anchor: LayoutPosition): LayoutPosition => {
+  const taken = new Set([...placement.values()].map(({ x, y }) => `${x},${y}`));
+  let at = anchor;
+  // Terminates: each step is a distinct point on one diagonal, and the taken
+  // set is finite, so at most one step per placed Card can be occupied.
+  for (let step = 1; taken.has(`${at.x},${at.y}`); step += 1) {
+    at = { x: anchor.x + STACK_STEP * step, y: anchor.y + STACK_STEP * step };
+  }
+  return at;
+};
+
+/** Two Edges are the same Edge when they join the same Cards the same way (ADR 0032). */
+const sameEdge = (left: GraphEdge, right: GraphEdge): boolean =>
+  left.from === right.from && left.to === right.to;
+
+/** Where an Edge sits in a Graph, or -1. An exact duplicate is invalid, so there is at most one. */
+const indexOfEdge = (edges: readonly GraphEdge[], edge: GraphEdge): number =>
+  edges.findIndex((candidate) => sameEdge(candidate, edge));
+
+/**
+ * The operations with no answer at all until a Layout is selected, and what to
+ * tell the author who reached one from an Algorithmic View.
+ *
+ * The matrix's "not applicable / not available without a Layout" rows. Every
+ * *other* operation crosses an Algorithmic View by converting it (ADR 0025);
+ * these cannot, because each names something a Layout owns — its membership,
+ * one of its Graphs, or an Edge in one — and a view that has not been converted
+ * owns none of it. Add Graph is deliberately absent: it converts, and the Graph
+ * it asked for becomes the new Layout's initial one.
+ */
+const LAYOUT_ONLY: Partial<Record<AuthoringCompletion['kind'], string>> = {
+  'added-card-to-layout': 'Select a Layout to add an existing Card to it.',
+  'removed-card-from-layout': 'Select a Layout to remove a Card from it.',
+  'renamed-graph': 'Select a Layout to manage its Graphs.',
+  'recolored-graph': 'Select a Layout to manage its Graphs.',
+  'deleted-graph': 'Select a Layout to manage its Graphs.',
+  'reconnected-edge': 'Select a Layout to edit its Edges.',
+  'deleted-edge': 'Select a Layout to edit its Edges.',
+};
+
+/**
+ * Why a Card document's Alias Target may not be authored, or `null`.
+ *
+ * One rule for both the Alias that is being created and the one being
+ * retargeted, because they are the same question asked at two moments. It
+ * duplicates what `validateReferences` already enforces, and deliberately:
+ * intake reports by failing the whole snapshot, which this derivation answers
+ * by throwing, and an author choosing the wrong Target has made a mistake that
+ * deserves a sentence rather than an exception. A markdown document has no
+ * Target and nothing to refuse.
+ */
+const aliasTargetRefusal = (space: Space, document: CardDocument): string | null => {
+  if (document.kind !== 'alias') return null;
+  const target = space.lookup.card(document.target);
+  if (target === undefined) return 'That Target is no longer part of the Space.';
+  // Single-hop by construction (ADR 0009): the Target must own its content, so
+  // an Alias pointing at an Alias — including at itself — is refused here.
+  if (target.kind === 'alias') return 'An Alias must target a Card that owns its content.';
+  return null;
+};
+
+/**
+ * A Card an Edit is creating, held rather than placed.
+ *
+ * A conversion is checked against a Placement whose Cards are exactly the
+ * renderer's subject, and the subject is a fact about the Space as it *is* — a
+ * Card this Edit adds is in neither. So the position waits here and is applied
+ * after conversion, which changes nothing about what gets written: the Layout is
+ * built from the placement further down either way.
+ */
+interface CreatedCard {
+  readonly id: CardId;
+  readonly position: LayoutPosition;
+  /**
+   * Step off a position another Card already occupies exactly. A gesture that
+   * dropped on empty canvas aimed at its point and keeps it; a Card created from
+   * a menu has no aimed-at point and would otherwise stack.
+   */
+  readonly avoidingOverlap: boolean;
 }
+
+/** The Aliases pointing at a Card, which are what block deleting it from the Space. */
+const incomingAliases = (cards: SnapshotCards, cardId: CardId): SnapshotCards =>
+  cards.filter((card) => card.document.kind === 'alias' && card.document.target === cardId);
+
+/** A title normalized for authorship, or `null` when it contains no name. */
+const trimmedNonBlankTitle = (title: string): string | null => {
+  const trimmed = title.trim();
+  return trimmed.length === 0 ? null : trimmed;
+};
 
 /**
  * Structural equality over the JSON values a snapshot is built from.
@@ -384,7 +581,13 @@ export function createSpaceAuthoring({
     session.getState().working.cards.some((card) => card.id === cardId);
 
   /**
-   * Whether an Edge from one Card to another is one this gesture may author.
+   * Why an Edge this gesture would author cannot be authored, or `null`.
+   *
+   * One answer for the live preview, the release and the completed Edit, so a
+   * gesture the canvas offers cannot be one the completion silently drops — and
+   * the completion says *which* rule it hit, which a boolean could not.
+   * `to === null` is the Option/Alt empty drop, whose target Card does not exist
+   * yet (ADR 0033).
    *
    * The duplicate refusal is **conditional on a selected Layout**, and that is
    * not an omission on the other branch. An exact duplicate within one Graph is
@@ -393,33 +596,32 @@ export function createSpaceAuthoring({
    * is the empty one conversion is about to mint, which holds nothing to
    * duplicate. Refusing there would refuse the *first* connection an author
    * draws on a Space that already has Graphs, silently and with no way to tell
-   * why.
+   * why. A created Card cannot duplicate anything either, which is the whole of
+   * why the two callers below differ.
    */
-  const canConnect = (from: CardId, to: CardId): boolean => {
-    if (!connectable(from) || !connectable(to)) return false;
-    if (navigation.getState().selectedRenderer.kind === 'view') return true;
+  const connectRefusal = (from: CardId, to: CardId | null): string | null => {
+    if (!connectable(from) || (to !== null && !connectable(to))) {
+      return 'A connection can only join Cards in this Layout.';
+    }
+    if (navigation.getState().selectedRenderer.kind === 'view') return null;
     const graph = targetGraph();
-    return graph !== null && !graph.edges.some((edge) => edge.from === from && edge.to === to);
+    if (graph === null) return 'This Layout has no active Graph for the connection to join.';
+    if (to !== null && indexOfEdge(graph.edges, { from, to }) !== -1) {
+      return 'These Cards are already connected in this Graph.';
+    }
+    return null;
   };
 
+  const canConnect = (from: CardId, to: CardId): boolean => connectRefusal(from, to) === null;
+
   /**
-   * The mirror of the above for an Option/Alt empty drop, which authors a Card
-   * and the Edge reaching it in one Edit (ADR 0033).
-   *
-   * No duplicate is possible against a Card that does not exist yet, so what is
-   * left is whether the Edge has a Graph to land in: on an Algorithmic View,
-   * conversion mints one, so the answer is simply true; on a selected Layout,
-   * the Active Graph must be one that Layout owns.
+   * The mirror of the above for an Option/Alt empty drop.
    *
    * The signature is `(from: CardId) => boolean` and stays that way —
    * `connection-gesture` consumes it as its `accepts` capability, asked per
    * pointer frame by both the live preview and the release.
    */
-  const canCreateConnectedCard = (from: CardId): boolean => {
-    if (!connectable(from)) return false;
-    if (navigation.getState().selectedRenderer.kind === 'view') return true;
-    return targetGraph() !== null;
-  };
+  const canCreateConnectedCard = (from: CardId): boolean => connectRefusal(from, null) === null;
 
   /**
    * Derive the complete next state of every collaborator, or refuse.
@@ -430,16 +632,19 @@ export function createSpaceAuthoring({
    * caller to execute but a value with no decisions left in it — which is what
    * lets the shell below be a sequence of statements rather than a transaction.
    *
-   * `null` is a refusal, and refusing is not a failure: an Edit that changes
+   * Neither `unchanged` nor `refused` is a failure: an Edit that changes
    * nothing, names a Card the Space no longer holds, or targets a Layout that
-   * has gone is simply not an Edit. Producing an unloadable Space *is* a
-   * failure, and it throws — here, where the collaborators are all still level.
+   * has gone is simply not an Edit, and the two say which of those it was.
+   * Producing an unloadable Space *is* a failure, and it throws — here, where
+   * the collaborators are all still level.
    */
   const deriveCompletedEdit = ({
     completion,
     placement: reportedPlacement,
-  }: ReportedCompletion): CompletedEdit | null => {
-    if (reportedPlacement === null) return null;
+  }: ReportedCompletion): DerivedCompletion => {
+    if (reportedPlacement === null) {
+      return refuse('This view has not finished arranging, so there is nowhere to write yet.');
+    }
     let snapshot = session.getState().working;
     const previousSnapshot = snapshot;
     const navigationState = navigation.getState();
@@ -449,58 +654,152 @@ export function createSpaceAuthoring({
     // resolving, because the resolver answers that case by throwing.
     //
     // Not the thing ADR 0045 forbids, which is turning a *thrown*
-    // `RendererInvariantError` into `no-edit` — there is no catch here and a
+    // `RendererInvariantError` into a refusal — there is no catch here and a
     // renderer that refuses still takes the Edit down with it. This asks a
     // question of the Space instead, and the answer is an author's state rather
     // than a defect: the Layout this gesture was aimed at is gone, so there is
     // nothing to write it into.
     if (selection.kind === 'layout' && space.lookup.layout(selection.layoutId) === undefined) {
-      return null;
+      return refuse('This Layout is no longer part of the Space.');
     }
+    // The operations with no answer at all before a Layout exists, refused
+    // *before* conversion rather than after it. An Algorithmic View has no
+    // membership to add to and no Graph to manage, and converting first would
+    // mint a Layout whose only purpose was to fail the next line.
+    const layoutRequired = LAYOUT_ONLY[completion.kind];
+    if (selection.kind === 'view' && layoutRequired !== undefined) return refuse(layoutRequired);
     const renderer = resolveRenderer(space, selection);
     /**
-     * The Card an Edit is creating, held rather than placed.
+     * What this Edit does to the placement, held rather than applied.
      *
      * A conversion is checked against a Placement whose Cards are exactly the
      * renderer's subject, and the subject is a fact about the Space as it *is* —
-     * a Card this Edit is about to add is in neither. So the position waits here
-     * and is placed after conversion, which changes nothing about what gets
-     * written: the Layout is built from the placement further down either way.
+     * a Card this Edit adds is in neither, and one it removes is in both. So
+     * both wait here and are applied after conversion, which changes nothing
+     * about what gets written: the Layout is built from the placement further
+     * down either way.
      */
-    let createdCard: { readonly id: CardId; readonly position: LayoutPosition } | null = null;
-    let connection: { readonly from: CardId; readonly to: CardId } | null = null;
+    let createdCard: CreatedCard | null = null;
+    let unplacedCardId: CardId | undefined;
+    let deletedCardId: CardId | undefined;
+    let connection: GraphEdge | null = null;
     let completedPlacement = reportedPlacement;
+    // The one way a Card is added: mint it, place it at a free anchor, append it.
+    // Add Card and Add Alias differ in the document they carry and in nothing
+    // else — neither creates an Edge, and neither adds a Graph to a Layout that
+    // already has one.
+    // Returns rather than assigns: `createdCard` is read further down, and a
+    // `let` written only from inside a closure keeps its initial narrowing.
+    const createCard = (
+      document: CardDocument,
+      at: LayoutPosition,
+      avoidingOverlap = true,
+    ): CreatedCard => {
+      const id = newId();
+      snapshot = { ...snapshot, cards: [...snapshot.cards, { id, document }] };
+      return { id, position: at, avoidingOverlap };
+    };
     if (completion.kind === 'edited-card') {
-      const { document } = completion;
       const cardIndex = snapshot.cards.findIndex((card) => card.id === completion.cardId);
       const card = snapshot.cards[cardIndex];
-      if (
-        card === undefined ||
-        !isSupportedCardEdit(card.document, document) ||
-        sameValue(card.document, document)
-      ) {
-        return null;
+      if (card === undefined) return refuse('This Card is no longer part of the Space.');
+      // Kind is fixed for a Card's lifetime, and changing it is out of scope for
+      // version 1. Everything else the editor holds — title, description, and an
+      // Alias's Target — is one ordinary Edit of this Card.
+      if (card.document.kind !== completion.document.kind) {
+        return refuse('A Card keeps the kind it was created with.');
       }
+      // Trimmed and refused *here* rather than only at the surface that typed
+      // it. A blank title is the empty case wearing different bytes, and intake
+      // answers an empty one by failing — which this derivation reports by
+      // throwing, and an author's mistake may not throw. Every caller of this
+      // operation is covered by one rule instead of each remembering it.
+      const title = trimmedNonBlankTitle(completion.document.title);
+      if (title === null) return refuse('A Card title is required.');
+      const document: CardDocument = { ...completion.document, title };
+      if (sameValue(card.document, document)) return UNCHANGED;
+      const refusal = aliasTargetRefusal(space, document);
+      if (refusal !== null) return refuse(refusal);
       const cards = [...snapshot.cards];
       cards[cardIndex] = { id: card.id, document };
       snapshot = { ...snapshot, cards };
-    } else if (completion.kind === 'create-and-connect') {
-      if (!canCreateConnectedCard(completion.from)) return null;
-      const createdCardId = newId();
-      createdCard = { id: createdCardId, position: completion.position };
-      connection = { from: completion.from, to: createdCardId };
+    } else if (completion.kind === 'created-card') {
+      createdCard = createCard(
+        { title: nextCardTitle(snapshot), kind: 'markdown', body: '' },
+        completion.anchor,
+      );
+    } else if (completion.kind === 'created-alias') {
+      // An empty title takes the Target's as a convenient initial value; text
+      // the author already entered is never overwritten. `??` cannot express
+      // this — the empty string is a value the picker really sends, and the
+      // whole point is that it does not count as one.
+      const entered = completion.title?.trim() ?? '';
+      const document: CardDocument = {
+        title: entered.length > 0 ? entered : (space.lookup.card(completion.target)?.title ?? ''),
+        kind: 'alias',
+        target: completion.target,
+      };
+      const refusal = aliasTargetRefusal(space, document);
+      if (refusal !== null) return refuse(refusal);
+      createdCard = createCard(document, completion.anchor);
+    } else if (completion.kind === 'added-card-to-layout') {
+      if (space.lookup.card(completion.cardId) === undefined) {
+        return refuse('This Card is no longer part of the Space.');
+      }
+      if (completedPlacement.has(completion.cardId)) {
+        return refuse('This Card is already in this Layout.');
+      }
+      // Membership and a position, and nothing else: a re-added Card is detached,
+      // and the Edges it once had are never inferred back.
+      completedPlacement = Placement.place(
+        completedPlacement,
+        completion.cardId,
+        freeAnchor(completedPlacement, completion.anchor),
+      );
+    } else if (completion.kind === 'removed-card-from-layout') {
+      if (!completedPlacement.has(completion.cardId)) {
+        return refuse('This Card is not in this Layout.');
+      }
+      unplacedCardId = completion.cardId;
+      completedPlacement = Placement.remove(completedPlacement, completion.cardId);
+    } else if (completion.kind === 'deleted-card') {
+      if (space.lookup.card(completion.cardId) === undefined) {
+        return refuse('This Card is no longer part of the Space.');
+      }
+      // An Alias whose Target vanished is not a Card intake accepts, so the Space
+      // cannot lose one out from under its Aliases. Removing that Card from a
+      // single Layout is never blocked this way — only deleting it outright.
+      const incoming = incomingAliases(snapshot.cards, completion.cardId);
+      if (incoming.length > 0) {
+        return refuse(
+          `Retarget or delete the Aliases of this Card first: ${incoming
+            .map((alias) => alias.document.title)
+            .join(', ')}.`,
+        );
+      }
+      // Deferred like a creation, and for the same reason: conversion is checked
+      // against the Space as it stands, and this Card is still in it.
+      unplacedCardId = completion.cardId;
+      deletedCardId = completion.cardId;
       snapshot = {
         ...snapshot,
-        cards: [
-          ...snapshot.cards,
-          {
-            id: createdCardId,
-            document: { title: nextCardTitle(snapshot), kind: 'markdown', body: '' },
-          },
-        ],
+        cards: snapshot.cards.filter((card) => card.id !== completion.cardId),
       };
+    } else if (completion.kind === 'create-and-connect') {
+      const refusal = connectRefusal(completion.from, null);
+      if (refusal !== null) return refuse(refusal);
+      // The drop point is aimed at, so it is kept exactly: the gesture only
+      // offers an empty-canvas release, and stepping off it would move the Card
+      // away from where the author watched the preview sit.
+      createdCard = createCard(
+        { title: nextCardTitle(snapshot), kind: 'markdown', body: '' },
+        completion.position,
+        false,
+      );
+      connection = { from: completion.from, to: createdCard.id };
     } else if (completion.kind === 'connected-cards') {
-      if (!canConnect(completion.from, completion.to)) return null;
+      const refusal = connectRefusal(completion.from, completion.to);
+      if (refusal !== null) return refuse(refusal);
       connection = { from: completion.from, to: completion.to };
     }
     // Which Layout this Edit writes, and what it owns afterwards.
@@ -516,6 +815,7 @@ export function createSpaceAuthoring({
     let layoutTitle: string;
     let ownedGraphs: readonly Graph[];
     let activeGraphId: GraphId | null;
+    let createdGraphId: GraphId | undefined;
     if (renderer.kind === 'view') {
       const converted = renderer.convert(completedPlacement);
       layoutId = newId();
@@ -527,6 +827,10 @@ export function createSpaceAuthoring({
       // not depend on Graph order (ADR 0028). The Graph the author was merely
       // emphasising belongs to another Layout and does not come across.
       activeGraphId = converted.graphs[0].id;
+      // Add Graph *is* the conversion here. The new Layout's initial Graph is
+      // the Graph the author asked for, rather than a predecessor the requested
+      // one gets appended behind (ADR 0040).
+      if (completion.kind === 'added-graph') createdGraphId = activeGraphId;
     } else {
       const { layout } = renderer.resolvedLayout;
       layoutId = layout.id;
@@ -534,31 +838,122 @@ export function createSpaceAuthoring({
       ownedGraphs = layout.graphs;
       activeGraphId = navigationState.activeGraphId;
     }
-    // Placed only now: conversion is over the Space as it stands, and this Card
-    // is what the Edit adds to it.
+    // Applied only now: conversion is over the Space as it stands, and these are
+    // what the Edit adds to it and takes away.
     if (createdCard !== null) {
       completedPlacement = Placement.place(
         completedPlacement,
         createdCard.id,
-        createdCard.position,
+        createdCard.avoidingOverlap
+          ? freeAnchor(completedPlacement, createdCard.position)
+          : createdCard.position,
       );
+    }
+    if (deletedCardId !== undefined) {
+      completedPlacement = Placement.remove(completedPlacement, deletedCardId);
     }
     if (connection !== null) {
       const graphIndex = ownedGraphs.findIndex((graph) => graph.id === activeGraphId);
       const graph = ownedGraphs[graphIndex];
-      if (graph === undefined) return null;
+      if (graph === undefined) {
+        return refuse('This Layout has no active Graph for the connection to join.');
+      }
       const graphs = [...ownedGraphs];
       graphs[graphIndex] = { ...graph, edges: [...graph.edges, connection] };
       ownedGraphs = graphs;
+    } else if (unplacedCardId !== undefined) {
+      // A Card that has left this Layout cannot be an endpoint of a Graph this
+      // Layout owns (ADR 0040), so its incident Edges leave with it. The Graphs
+      // themselves stay, empty ones included: deletion is their own action.
+      ownedGraphs = withoutIncidentEdges(ownedGraphs, unplacedCardId);
+    } else if (completion.kind === 'added-graph' && renderer.kind === 'layout') {
+      const graph: Graph = {
+        id: newId(),
+        title: nextGraphTitle(space.graphs),
+        color: nextGraphColor(ownedGraphs.length),
+        edges: [],
+      };
+      ownedGraphs = [...ownedGraphs, graph];
+      activeGraphId = graph.id;
+      createdGraphId = graph.id;
+    } else if (
+      completion.kind === 'renamed-graph' ||
+      completion.kind === 'recolored-graph' ||
+      completion.kind === 'deleted-graph' ||
+      completion.kind === 'reconnected-edge' ||
+      completion.kind === 'deleted-edge'
+    ) {
+      const graphIndex = ownedGraphs.findIndex((graph) => graph.id === completion.graphId);
+      const graph = ownedGraphs[graphIndex];
+      // Ownership, not existence: a Graph a *second* Layout owns exists and is
+      // still not one this Edit may write (ADR 0040).
+      if (graph === undefined) return refuse('That Graph is not one this Layout owns.');
+      const replacing = (next: Graph): readonly Graph[] =>
+        ownedGraphs.map((existing, index) => (index === graphIndex ? next : existing));
+      if (completion.kind === 'renamed-graph') {
+        // Trimmed, for the reason a Card title is: `z.string().min(1)` counts
+        // characters, so blank is the empty case wearing different bytes.
+        const title = trimmedNonBlankTitle(completion.title);
+        if (title === null) return refuse('A Graph title is required.');
+        if (title === graph.title) return UNCHANGED;
+        ownedGraphs = replacing({ ...graph, title });
+      } else if (completion.kind === 'recolored-graph') {
+        if (completion.color === graph.color) return UNCHANGED;
+        ownedGraphs = replacing({ ...graph, color: completion.color });
+      } else if (completion.kind === 'deleted-graph') {
+        // Every Layout resolves an Active Graph, so the last one cannot go
+        // (ADR 0040). Removing its Edges is the author's way to empty it.
+        if (ownedGraphs.length === 1) return refuse('A Layout keeps at least one Graph.');
+        ownedGraphs = ownedGraphs.filter((_, index) => index !== graphIndex);
+        // Order among the survivors is untouched, and the first of them becomes
+        // active when the deleted Graph was the one being emphasised.
+        if (activeGraphId === graph.id) activeGraphId = ownedGraphs[0]?.id ?? null;
+      } else if (completion.kind === 'deleted-edge') {
+        const edgeIndex = indexOfEdge(graph.edges, completion.edge);
+        if (edgeIndex === -1) return refuse('That Edge is no longer in this Graph.');
+        ownedGraphs = replacing({
+          ...graph,
+          edges: graph.edges.filter((_, index) => index !== edgeIndex),
+        });
+      } else {
+        const edgeIndex = indexOfEdge(graph.edges, completion.edge);
+        if (edgeIndex === -1) return refuse('That Edge is no longer in this Graph.');
+        const reconnected: GraphEdge =
+          completion.endpoint === 'from'
+            ? { from: completion.cardId, to: completion.edge.to }
+            : { from: completion.edge.from, to: completion.cardId };
+        // Dragging an endpoint back where it came from is the author saying
+        // nothing, which is why this is answered before eligibility: a Card that
+        // is already this Edge's endpoint is by definition in this Layout.
+        if (sameEdge(completion.edge, reconnected)) return UNCHANGED;
+        if (!completedPlacement.has(completion.cardId)) {
+          return refuse('An Edge can only join Cards in this Layout.');
+        }
+        if (indexOfEdge(graph.edges, reconnected) !== -1) {
+          return refuse('These Cards are already connected in this Graph.');
+        }
+        // In place, so reconnecting does not reorder a Graph's Edges — that order
+        // is what a branching Card's moves are offered in (ADR 0024).
+        ownedGraphs = replacing({
+          ...graph,
+          edges: graph.edges.map((edge, index) => (index === edgeIndex ? reconnected : edge)),
+        });
+      }
     }
-    const next = updatePositionedLayout(snapshot, {
-      layoutId,
-      title: layoutTitle,
-      positions: completedPlacement,
-      graphs: ownedGraphs,
-      activeGraphId,
-    });
-    if (sameSnapshot(previousSnapshot, next)) return null;
+    const next = updatePositionedLayout(
+      // The cascade first, then this Layout written whole over the top of it.
+      // Delete Card from Space is one Edit over every Layout (ADR 0040), and the
+      // current one is simply the Layout this Edit was also going to write.
+      deletedCardId === undefined ? snapshot : withCardRemovedFromLayouts(snapshot, deletedCardId),
+      {
+        layoutId,
+        title: layoutTitle,
+        positions: completedPlacement,
+        graphs: ownedGraphs,
+        activeGraphId,
+      },
+    );
+    if (sameSnapshot(previousSnapshot, next)) return UNCHANGED;
     const loaded = loadSpaceSnapshot(next);
     if (!loaded.ok) {
       throw new Error(
@@ -568,11 +963,15 @@ export function createSpaceAuthoring({
       );
     }
     return {
-      snapshot: next,
-      placement: completedPlacement,
-      nextActiveGraphId: activeGraphId,
-      nextRenderer: { kind: 'layout', layoutId },
-      ...(createdCard !== null ? { createdCardId: createdCard.id } : {}),
+      kind: 'completed',
+      edit: {
+        snapshot: next,
+        placement: completedPlacement,
+        nextActiveGraphId: activeGraphId,
+        nextRenderer: { kind: 'layout', layoutId },
+        ...(createdCard !== null ? { createdCardId: createdCard.id } : {}),
+        ...(createdGraphId !== undefined ? { createdGraphId } : {}),
+      },
     };
   };
 
@@ -631,25 +1030,34 @@ export function createSpaceAuthoring({
   };
 
   const performCompletion = (reported: ReportedCompletion): AuthoringResult => {
-    const edit = deriveCompletedEdit(reported);
-    if (edit === null) return { kind: 'no-edit' };
-    installCompletedEdit(edit);
-    return edit.createdCardId === undefined
-      ? { kind: 'completed' }
-      : { kind: 'completed', createdCardId: edit.createdCardId };
+    const derived = deriveCompletedEdit(reported);
+    // `unchanged` and `refused` are already the answer — the core and the
+    // interface share one vocabulary rather than translating between two.
+    if (derived.kind !== 'completed') return derived;
+    const { createdCardId, createdGraphId } = derived.edit;
+    installCompletedEdit(derived.edit);
+    return {
+      kind: 'completed',
+      ...(createdCardId !== undefined ? { createdCardId } : {}),
+      ...(createdGraphId !== undefined ? { createdGraphId } : {}),
+    };
   };
 
   let completing = false;
   const queued: QueuedCompletion[] = [];
   const complete = (completion: AuthoringCompletion): AuthoringResult => {
+    // A pointer gesture reports where React Flow has drawn the Cards, and that
+    // report is merged under `Placement.next`'s rules. Every other operation is
+    // written into the placement already installed — there is no second source
+    // of geometry for a rename or a deletion to disagree with.
     const completedPlacement =
-      completion.kind === 'edited-card'
-        ? placement
-        : Placement.next(
+      'rendered' in completion
+        ? Placement.next(
             mergeBase(),
             completion.rendered,
             completion.kind === 'settled-card-movement' ? completion.placed : [],
-          );
+          )
+        : placement;
     install(completedPlacement);
     const reported: ReportedCompletion = {
       completion,
@@ -768,6 +1176,9 @@ export function createSpaceAuthoring({
     canCreateConnectedCard,
     complete,
     retryPersistence: session.retry,
+    // Read at the moment the author asks, never captured earlier. `session`
+    // ignores the call outside a conflict, so there is nothing to check here.
+    keepLocalWork: () => session.resolveConflict(session.getState().working),
     acceptStoredSpace,
     dispose: () => {
       unsubscribeSession();

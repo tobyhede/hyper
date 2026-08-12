@@ -1,5 +1,6 @@
 import {
   SPACE_FILE_VERSION,
+  type CardId,
   type Graph,
   type GraphId,
   type SpaceSnapshot,
@@ -60,6 +61,65 @@ export const snapshotFromSpace = (space: Space): SpaceSnapshot => ({
     document,
   })),
 });
+
+/**
+ * The graphs a Card has left, with every Edge incident to it gone.
+ *
+ * A Card that is not a member of a Layout cannot be an endpoint of a Graph that
+ * Layout owns (ADR 0040), so this is what both removals owe: Remove from
+ * Layout, which applies it to the one Layout the Edit writes, and Delete Card
+ * from Space, which applies it to every Layout through
+ * {@link withCardRemovedFromLayouts}. One rule, in one place, so the two
+ * scopes of the same deletion cannot come to disagree about what an incident
+ * Edge is. The graphs themselves stay, empty ones included: deleting a graph is
+ * its own action.
+ */
+export const withoutIncidentEdges = (graphs: readonly Graph[], cardId: CardId): Graph[] =>
+  graphs.map((graph) => ({
+    ...graph,
+    edges: graph.edges.filter((edge) => edge.from !== cardId && edge.to !== cardId),
+  }));
+
+/**
+ * The snapshot with one Card gone from every Layout: its membership, its
+ * position and every Edge incident to it, in every Graph every Layout owns.
+ *
+ * The cascade half of Delete Card from Space, and the one write in this module
+ * that is not about a single Layout — which is exactly why it is here rather
+ * than folded into {@link updatePositionedLayout}. The Card itself stays in
+ * `cards`: this answers what the Layouts hold, and removing the Card is the
+ * caller's own statement in the same Edit. Empty Graphs and empty Layouts
+ * remain, because deleting a Card is not an instruction to delete either
+ * (ADR 0040).
+ *
+ * Answers the snapshot it was given when no Layout held the Card, so a deletion
+ * that only ever affected the current Layout — which the caller writes
+ * separately — does not rebuild every other Layout to say nothing about them.
+ */
+export const withCardRemovedFromLayouts = (base: SpaceSnapshot, cardId: CardId): SpaceSnapshot => {
+  const layouts = base.document.layouts ?? [];
+  const affected = layouts.some(
+    (layout) =>
+      Object.hasOwn(layout.positions, cardId) ||
+      layout.graphs.some((graph) =>
+        graph.edges.some((edge) => edge.from === cardId || edge.to === cardId),
+      ),
+  );
+  if (!affected) return base;
+  return {
+    ...base,
+    document: {
+      ...base.document,
+      layouts: layouts.map((layout) => ({
+        ...layout,
+        positions: Object.fromEntries(
+          Object.entries(layout.positions).filter(([id]) => id !== cardId),
+        ),
+        graphs: withoutIncidentEdges(layout.graphs, cardId),
+      })),
+    },
+  };
+};
 
 /** Everything a completed Edit writes into one Layout. */
 export interface PositionedLayoutEdit {

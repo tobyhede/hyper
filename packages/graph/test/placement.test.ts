@@ -195,6 +195,30 @@ describe('Placement.place', () => {
   });
 });
 
+describe('Placement.remove', () => {
+  it('drops one Card from the placement and leaves the rest where they are', () => {
+    // Removing a Card from a Layout removes its membership, and membership *is*
+    // the position key (ADR 0040) — so this is the whole of what that Edit does
+    // to the map.
+    const authored = at({
+      '00000000-0000-4000-8000-000000000002': [10, 20],
+      '00000000-0000-4000-8000-000000000003': [300, 40],
+    });
+
+    expect(asObject(Placement.remove(authored, CARD_A))).toEqual({
+      [CARD_B]: { x: 300, y: 40 },
+    });
+  });
+
+  it('answers the placement it was given when the Card was never in it', () => {
+    // Identity, not just equality: an unchanged placement keeps the one it has,
+    // so a projection that reports it does not re-arrange a settled graph.
+    const authored = at({ '00000000-0000-4000-8000-000000000002': [10, 20] });
+
+    expect(Placement.remove(authored, CARD_C)).toBe(authored);
+  });
+});
+
 describe('Placement.empty', () => {
   it('hands each caller its own map rather than one shared instance', () => {
     // Space Authoring installs the Placement it is handed without copying it, so
@@ -218,6 +242,7 @@ describe('Placement immutability', () => {
 
     Placement.next(authored, rendered, [CARD_A, CARD_B]);
     Placement.place(authored, CARD_C, { x: 1, y: 2 });
+    Placement.remove(authored, CARD_A);
 
     expect(asObject(authored)).toEqual({ [CARD_A]: { x: 10, y: 20 } });
     expect(asObject(rendered)).toEqual({
