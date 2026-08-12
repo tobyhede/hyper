@@ -345,6 +345,41 @@ it('continues the current Traversal history when an Edit converts the renderer t
 });
 
 /*
+ * Replacing the working Space can make Navigation's retained Active Graph
+ * absent from the renderer an Edit asks it to adopt. Refusing is what keeps the
+ * selected renderer and Active Graph as one valid pair; it also leaves the
+ * current traversal untouched rather than silently moving it to another Graph.
+ */
+it('refuses to adopt a renderer that does not show the retained active Graph', () => {
+  let working = fixture();
+  const navigation = createNavigation(() => working, { kind: 'view', view: 'flow' });
+  navigation.present();
+  const before = navigation.getState();
+
+  const replacement = loadSpace(
+    {
+      version: 2,
+      id: working.id,
+      title: working.title,
+      graphs: [working.graphs[1]!],
+      layouts: working.layouts,
+    },
+    [
+      cardFile(uuid('00000000-0000-4000-8000-000000000002')),
+      cardFile(uuid('00000000-0000-4000-8000-000000000003')),
+      cardFile(uuid('00000000-0000-4000-8000-000000000004')),
+    ],
+  );
+  if (!replacement.ok) throw new Error('replacement fixture should load');
+  working = replacement.space;
+
+  expect(() => navigation.continueInRenderer({ kind: 'layout', layoutId: LAYOUT })).toThrow(
+    /does not show the active Graph/,
+  );
+  expect(navigation.getState()).toBe(before);
+});
+
+/*
  * A Space with no Graphs has no Active Graph, and no renderer can fail to show
  * one that was never named. Edit completion adopts the Layout it wrote before
  * activating the Graph it minted, so this is the state the guard is in when the
