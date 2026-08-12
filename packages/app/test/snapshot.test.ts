@@ -13,6 +13,8 @@ const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
 const LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000021');
 const OTHER_LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000022');
 const OTHER_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000023');
+/** A Card no Layout in these fixtures places or connects. */
+const UNHELD_CARD = uuidSchema.parse('00000000-0000-4000-8000-000000000099');
 
 const MAIN: Graph = { id: GRAPH_ID, title: 'Main', edges: [{ from: CARD_A, to: CARD_B }] };
 
@@ -229,5 +231,5 @@ it('cascades a deleted Card out of every Layout that held it', () => {
 });
 
 it('answers the snapshot it was given when no Layout held the Card', () => {
-  expect(withCardRemovedFromLayouts(snapshot, OTHER_LAYOUT_ID)).toBe(snapshot);
+  expect(withCardRemovedFromLayouts(snapshot, UNHELD_CARD)).toBe(snapshot);
 });

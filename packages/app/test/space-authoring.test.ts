@@ -367,6 +367,7 @@ describe('Space Authoring', () => {
       [CARD_A]: { x: 10, y: 20 },
       [CARD_B]: { x: 300, y: 40 },
     });
+    expect(session.getState().working.document.layouts?.[0]?.graphs[0]?.id).toBe(MINTED_GRAPH_ID);
     // Written *and* selected. A conversion that stored the Layout without
     // repointing the renderer leaves the graph drawing the Algorithmic View it
     // just replaced, so the next placement would be computed rather than read
