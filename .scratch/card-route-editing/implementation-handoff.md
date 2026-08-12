@@ -74,7 +74,7 @@ The key architecture is fixed:
 | Remove from Layout | Remove membership, position and every incident Edge from every Graph in that Layout | Not available without a Layout | Card stays in Space and other Layouts; empty Graphs remain |
 | Delete Card from Space | Delete Card and cascade Remove from Layout through every Layout | Convert uniformly when invoked through an Algorithmic View, then apply the Space deletion | Incoming Aliases block non-Alias deletion; deleting Alias leaves Target |
 | Delete Graph | Remove exactly one Layout-owned Graph and activate first survivor | Not available without a Layout | Disabled for final Graph; Cards and other Graphs unchanged |
-| Activate Graph | No Edit | No Graph to activate | Navigation only; every Graph remains drawn |
+| Activate Graph | No Edit | Emphasis only over the flattened Graphs; converts nothing, and a later connecting Edit still joins the new Layout's own initial Graph | Navigation only; every Graph remains drawn |
 | Select View/Layout | No Edit | Selection itself never converts | Navigation only; authored default changes only with a later Edit |
 | Graph navigation / Present | No Edit | Presenting unavailable from Algorithmic View | Traversal history is transient and separate per interaction |
 
