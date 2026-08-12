@@ -105,9 +105,9 @@ export function cardIdsForGraphs(space: Space, graphIds: readonly GraphId[]): Ca
   };
 
   for (const graphId of graphIds) {
-    const graph = space.graphsById.get(graphId);
-    if (!graph) continue;
-    for (const edge of graph.edges) {
+    const owned = space.lookup.graph(graphId);
+    if (!owned) continue;
+    for (const edge of owned.graph.edges) {
       add(edge.from);
       add(edge.to);
     }

@@ -40,6 +40,11 @@ export type {
   ParseImportCardFileResult,
 } from './card-file';
 
+// The rule for "the same Edge twice in one Graph" (ADR 0032), offered because
+// the app's ADR 0045 conversion boundary refuses one before it can reach a
+// document, and intake's own refusal must be the same answer.
+export { repeatedGraphEdges } from './graph-edges';
+
 export { gridStrategy } from './grid';
 export type { GridStrategyOptions } from './grid';
 
@@ -53,8 +58,11 @@ export type {
   LayoutStrategy,
 } from './layout';
 
-export { getCard, getLayout, getGraph, getGraphOwner, resolveContentCard } from './lookup';
-export type { ResolvedContentCard } from './lookup';
+// `resolveContentCard` is the only function here: identity lookup is reached
+// through `space.lookup`, which the Space carries, so the shallow `get*` pairs
+// that used to sit beside it have no callers left to name.
+export { resolveContentCard } from './lookup';
+export type { OwnedGraph, ResolvedContentCard, ResolvedLayout, SpaceLookup } from './lookup';
 
 export { newSpace } from './new-space';
 export type { NewSpace } from './new-space';

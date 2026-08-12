@@ -267,7 +267,7 @@ describe('the vocabulary that guard reads', () => {
     const bound = [
       `for (const id of duplicates(space.graphs.map((${initial}) => ${initial}.id))) {`,
       `const graphIds = new Set(space.graphs.map((${initial}) => ${initial}.id));`,
-      `graphsById: new Map(input.graphs.map((${initial}) => [${initial}.id, ${initial}])),`,
+      `const byId = new Map(input.graphs.map((${initial}) => [${initial}.id, ${initial}]));`,
       // A single parameter needs no parentheses, and Prettier removes them at
       // the repo's width often enough that this is the form a new one arrives in.
       `const ids = space.graphs.map(${initial} => ${initial}.id);`,

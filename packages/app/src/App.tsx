@@ -1,16 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { ReactFlowProvider } from '@xyflow/react';
 import { AppShell, Button, LayoutSelector, GraphSelector, ViewSelector } from '@project/ui';
-import { cardDocumentSchema, uuidSchema, type LayoutPosition } from '@project/core';
+import { cardDocumentSchema, newUuid, uuidSchema, type LayoutPosition } from '@project/core';
 import {
-  getCard,
   Placement,
   graphCardIds,
   resolveContentCard,
   type ResolvedContentCard,
 } from '@project/graph';
 import type { OpenedSpace } from './space';
-import { createSpaceAuthoring, nextCardTitle } from './space-authoring';
+import { createSpaceAuthoring } from './space-authoring';
 import { createRenderAdapter } from './render-adapter';
 import { canvasProjection } from './canvas-projection';
 import { canvasContent } from './canvas-content';
@@ -18,7 +17,8 @@ import { usePlacementRendering } from './placement-rendering';
 import { cardSizeVars } from './card';
 import { createNavigation } from './navigation';
 import { createWorkingSpaceReader } from './snapshot';
-import { defaultRenderer, resolveView, type RendererSelection } from './view';
+import { nextCardTitle } from './titles';
+import { createRendererResolver, defaultRenderer, type RendererSelection } from './renderer';
 import { SpaceCanvas } from './components/SpaceCanvas';
 import { OpenCard } from './components/OpenCard';
 import { PlacementFailure } from './components/PlacementFailure';
@@ -32,24 +32,33 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
   // same `Space` identity, which is what the render memos below hang on.
   const readWorkingSpace = createWorkingSpaceReader();
   const currentSpace = () => readWorkingSpace(spaceSession.getState().working);
-  // Which view this space opens in, and the strategy that arranges it. The fixture
-  // declares no view, so this resolves to the graph-driven ELK graph — exactly
-  // what the hardcoded `elkStrategy()` here used to do. It also answers which
-  // graphs are shown and which of them opens active (ADR 0026), so it has to
-  // resolve before the store is built.
-  const initialRenderer = defaultRenderer(space);
-  const initialView = resolveView(space, initialRenderer);
-  const navigation = createNavigation(currentSpace, initialRenderer, space);
+  // **One resolver for the whole composition**, handed to every collaborator
+  // that needs one. Nondeterminism is injected here rather than reached for
+  // inside a domain operation: a converted Graph's identity comes from
+  // `newGraphId`, so a test composes a deterministic resolver instead of mocking
+  // a global, and nothing downstream has to name identity minting at all.
+  const resolveRenderer = createRendererResolver({ newGraphId: newUuid });
+  // Which renderer this space opens in, and the strategy that arranges it. The
+  // fixture declares no view, so this resolves to the graph-driven ELK graph —
+  // exactly what the hardcoded `elkStrategy()` here used to do. It also answers
+  // which graphs are drawn and which of them opens active (ADR 0026), so it has
+  // to resolve before the store is built.
+  const initialSelection = defaultRenderer(space);
+  const initialRenderer = resolveRenderer(space, initialSelection);
+  const navigation = createNavigation(currentSpace, resolveRenderer, initialSelection, space);
 
-  // Live nodes hold whichever arrangement is on screen. A positioned view also
-  // supplies its already-authored, possibly sparse Layout map; an automatic view
-  // starts null and is promoted only by a completed edit (ADR 0025).
+  // Live nodes hold whichever arrangement is on screen. A selected Layout also
+  // supplies its already-authored, possibly sparse map; a View starts null and
+  // is promoted only by a completed edit (ADR 0025).
   const initialPlacement =
-    initialView.layout === null ? null : Placement.fromLayout(initialView.layout);
+    initialRenderer.kind === 'view'
+      ? null
+      : Placement.fromLayout(initialRenderer.resolvedLayout.layout);
   const authoring = createSpaceAuthoring({
     session: spaceSession,
     navigation,
     currentSpace,
+    resolveRenderer,
     initialPlacement,
   });
   // React Flow knows node ids as plain strings, and asks this per pointer frame.
@@ -96,14 +105,17 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
       [sessionState.working],
     );
     const layouts = rendererSpace.layouts;
-    const view = useMemo(
-      () => resolveView(rendererSpace, selectedRenderer),
+    const renderer = useMemo(
+      () => resolveRenderer(rendererSpace, selectedRenderer),
       [rendererSpace, selectedRenderer],
     );
-    // Everything the canvas draws, derived once from the Space and the view.
+    // Everything the canvas draws, derived once from the Space and the renderer.
     // Memoized on those two alone: the interaction state below changes far more
     // often, and it is `project` that reads it rather than this.
-    const projection = useMemo(() => canvasProjection(rendererSpace, view), [rendererSpace, view]);
+    const projection = useMemo(
+      () => canvasProjection(rendererSpace, renderer),
+      [rendererSpace, renderer],
+    );
 
     const { activeGraphId, openedCardId } = navigationState;
     const activateGraph = navigation.activateGraph;
@@ -147,7 +159,7 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
     const moved = useRenderAdapter((s) => s.moved);
     const placement = usePlacementRendering(
       projection.strategyGraph,
-      view.strategy,
+      renderer.strategy,
       authoredPositions,
     );
     const laidOut = placement.kind === 'ready' ? placement.strategyGraph : null;
@@ -197,11 +209,13 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
     // snapshot Navigation will not consult is one decision with two sources of
     // truth.
     const chooseRenderer = useCallback((selection: RendererSelection) => {
-      const resolved = resolveView(currentSpace(), selection);
+      const resolved = resolveRenderer(currentSpace(), selection);
       navigation.selectRenderer(selection);
       useRenderAdapter
         .getState()
-        .selectRenderer(resolved.layout === null ? null : Placement.fromLayout(resolved.layout));
+        .selectRenderer(
+          resolved.kind === 'view' ? null : Placement.fromLayout(resolved.resolvedLayout.layout),
+        );
     }, []);
 
     // Leaving while persistence is not settled asks first. The handler is absent
@@ -323,7 +337,7 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
       [openCard, editableCardIds, openedCardId],
     );
 
-    const openedCard = openedCardId ? getCard(rendererSpace, openedCardId) : undefined;
+    const openedCard = openedCardId ? rendererSpace.lookup.card(openedCardId) : undefined;
     const openedContent = openedCard ? resolveContentCard(rendererSpace, openedCard.id) : undefined;
     const completeOpenedCard = useCallback((completed: ResolvedContentCard): void => {
       const { id, ...document } = completed;

@@ -1,13 +1,12 @@
 import type { BuiltInViewId, CardId, GraphId } from '@project/core';
-import { getCard, getGraph, outgoingEdges, graphStartCard, type Space } from '@project/graph';
+import { outgoingEdges, graphStartCard, type Space } from '@project/graph';
 import { createObservableState, type ObserverErrorReporter } from '@project/persistence';
 import {
   DEFAULT_VIEW_ID,
-  resolveView,
-  viewShowsGraph,
   type RendererSelection,
-  type ResolvedView,
-} from './view';
+  type ResolvedRenderer,
+  type ResolveRenderer,
+} from './renderer';
 
 export interface Move {
   readonly cardId: CardId;
@@ -98,9 +97,26 @@ function outgoingEdgesFrom(
   graphId: GraphId | null,
   cardId: CardId | null | undefined,
 ) {
-  const graph = graphId !== null ? getGraph(space, graphId) : undefined;
-  return graph !== undefined && cardId != null ? outgoingEdges(graph, cardId) : [];
+  const owned = graphId !== null ? space.lookup.graph(graphId) : undefined;
+  return owned !== undefined && cardId != null ? outgoingEdges(owned.graph, cardId) : [];
 }
+
+/**
+ * Whether a renderer draws a Graph — its subject's membership test, and the
+ * whole of it (ADR 0045).
+ *
+ * Read off the subject rather than decided a second time. Which Graphs a
+ * renderer draws is the renderer's answer, and a Navigation that computed its
+ * own would disagree with it the moment the two sets differ again.
+ */
+const rendererShowsGraph = (renderer: ResolvedRenderer, graphId: GraphId): boolean =>
+  renderer.subject.graphs.some((graph) => graph.id === graphId);
+
+/** The Graph a renderer opens on: a Layout's own Active Graph, or a View's default. */
+const openingGraphId = (renderer: ResolvedRenderer): GraphId | null =>
+  renderer.kind === 'layout'
+    ? renderer.resolvedLayout.activeGraph.id
+    : (renderer.defaultActiveGraph?.id ?? null);
 
 /**
  * The Card at the end of Traversal history, read in place.
@@ -139,24 +155,25 @@ function baseOf(state: NavigationState): NavigationBase {
  * being retained, which is the one thing that separates this from
  * `selectRenderer`: there is no earlier Algorithmic View to return to.
  */
-function openedState(selection: RendererSelection, view: ResolvedView): NavigationState {
+function openedState(selection: RendererSelection, renderer: ResolvedRenderer): NavigationState {
   return {
     selectedRenderer: selection,
     selectedView: selection.kind === 'view' ? selection.view : DEFAULT_VIEW_ID,
     mode: 'overview',
-    activeGraphId: view.activeGraphId,
+    activeGraphId: openingGraphId(renderer),
     openedCardId: null,
   };
 }
 
 export function createNavigation(
   currentSpace: () => Space,
+  resolveRenderer: ResolveRenderer,
   initialRenderer: RendererSelection,
   initialSpace: Space = currentSpace(),
   options: NavigationOptions = {},
 ): Navigation {
   const observable = createObservableState(
-    openedState(initialRenderer, resolveView(initialSpace, initialRenderer)),
+    openedState(initialRenderer, resolveRenderer(initialSpace, initialRenderer)),
     options.reportObserverError ?? reportToConsole,
   );
   // Whatever navigation is doing, it goes on doing: a change to the fields both
@@ -173,12 +190,12 @@ export function createNavigation(
     getState: observable.getState,
     subscribe: observable.subscribe,
     selectRenderer: (selection) => {
-      const view = resolveView(currentSpace(), selection);
+      const renderer = resolveRenderer(currentSpace(), selection);
       observable.publish({
         ...baseOf(observable.getState()),
         selectedRenderer: selection,
         ...(selection.kind === 'view' ? { selectedView: selection.view } : {}),
-        activeGraphId: view.activeGraphId,
+        activeGraphId: openingGraphId(renderer),
         mode: 'overview',
         // An opened Card closes with the renderer it was opened over. This once
         // retained it, because opening was reading and a re-arrangement beneath
@@ -196,7 +213,7 @@ export function createNavigation(
     // once it stopped naming `traversalHistory` it stopped clearing Traversal history, and
     // history from a Space that was gone rode across under a `mode` saying there was none.
     openFresh: (selection) => {
-      observable.publish(openedState(selection, resolveView(currentSpace(), selection)));
+      observable.publish(openedState(selection, resolveRenderer(currentSpace(), selection)));
     },
     // Resolve first so navigation can never name a renderer the current Space
     // does not hold. Unlike explicit selection, adopting the Layout an Edit just
@@ -220,7 +237,7 @@ export function createNavigation(
     // rejects outright.
     //
     // **Re-resolving instead of refusing was the wrong repair.** Falling back to
-    // the adopted view's own Active Graph moves the emphasis without being
+    // the adopted renderer's own Active Graph moves the emphasis without being
     // asked, and this call is the one that must not interrupt a traversal: the
     // history being presented belongs to the Graph that was active, so silently
     // naming another strands `moves()` on Edges out of Cards nothing is
@@ -234,8 +251,8 @@ export function createNavigation(
     // precisely the check that a Layout's named `activeGraph` is a Graph it
     // owns. An absent Active Graph names nothing and is exempt.
     continueInRenderer: (selection, activeGraphId) => {
-      const view = resolveView(currentSpace(), selection);
-      if (activeGraphId !== null && !viewShowsGraph(view, activeGraphId)) {
+      const renderer = resolveRenderer(currentSpace(), selection);
+      if (activeGraphId !== null && !rendererShowsGraph(renderer, activeGraphId)) {
         throw new Error(`The adopted renderer does not show the active Graph ${activeGraphId}.`);
       }
       setState({
@@ -264,9 +281,9 @@ export function createNavigation(
     // exist" and "does not show" are different mistakes by the caller and each
     // says which.
     //
-    // The visible set is read off `resolveView` rather than recomputed here:
-    // one place answers which Graphs a view draws (ADR 0026), and two would
-    // disagree the moment the answers differ.
+    // The visible set is read off the resolved renderer's subject rather than
+    // recomputed here: one place answers which Graphs a renderer draws (ADR
+    // 0026, ADR 0045), and two would disagree the moment the answers differ.
     //
     // Both refusals throw, and deliberately alike. Neither is reachable through
     // the product — `GraphSelector` is fed the visible Graphs — so each is a
@@ -285,10 +302,10 @@ export function createNavigation(
     activateGraph: (graphId) => {
       const state = observable.getState();
       const space = currentSpace();
-      if (getGraph(space, graphId) === undefined) {
+      if (space.lookup.graph(graphId) === undefined) {
         throw new Error(`The Graph ${graphId} does not exist.`);
       }
-      if (!viewShowsGraph(resolveView(space, state.selectedRenderer), graphId)) {
+      if (!rendererShowsGraph(resolveRenderer(space, state.selectedRenderer), graphId)) {
         throw new Error(`The selected renderer does not show the Graph ${graphId}.`);
       }
       observable.publish({
@@ -321,10 +338,10 @@ export function createNavigation(
     // presented — cyclic ones included (ADR 0032).
     present: () => {
       const state = observable.getState();
-      const graph =
-        state.activeGraphId === null ? undefined : getGraph(currentSpace(), state.activeGraphId);
-      if (graph === undefined) return;
-      const start = graphStartCard(graph);
+      const owned =
+        state.activeGraphId === null ? undefined : currentSpace().lookup.graph(state.activeGraphId);
+      if (owned === undefined) return;
+      const start = graphStartCard(owned.graph);
       if (start === undefined) return;
       observable.publish({
         ...baseOf(state),
@@ -416,7 +433,7 @@ export function createNavigation(
       return outgoingEdgesFrom(space, state.activeGraphId, currentCard(state.traversalHistory)).map(
         (edge, index) => ({
           cardId: edge.to,
-          title: getCard(space, edge.to)?.title ?? edge.to,
+          title: space.lookup.card(edge.to)?.title ?? edge.to,
           selected: index === state.branchIndex,
         }),
       );
