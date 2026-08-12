@@ -1,9 +1,15 @@
 import { expect, it } from 'vitest';
+import { uuidSchema } from '@project/core';
 import { loadSpace, type CardFile, type Space } from '@project/graph';
 import { elkStrategy } from '@project/react-flow-adapter';
 import { canvasProjection } from '../src/canvas-projection';
-import { resolveRenderer } from '../src/renderer';
+import { createRendererResolver } from '../src/renderer';
 import fixtureJson from '../fixture/space.json';
+
+/** One composed resolver; the fixture names no View, so nothing here converts. */
+const resolveRenderer = createRendererResolver({
+  newGraphId: () => uuidSchema.parse('00000000-0000-4000-8000-0000000000ff'),
+});
 
 /**
  * The fixture's authored positions are ELK's own arrangement of it.

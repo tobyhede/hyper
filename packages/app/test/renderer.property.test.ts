@@ -1,143 +1,334 @@
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
-import { uuidSchema, type Graph, type GraphId } from '@project/core';
-import { Placement } from '@project/graph';
-import { convertView, type ConvertedLayout, type ViewSubject } from '../src/renderer';
+import { uuidSchema, type GraphId } from '@project/core';
+import { loadSpace, Placement, type Space } from '@project/graph';
+import {
+  checkSubject,
+  convertSubject,
+  RendererInvariantError,
+  type GraphWithoutId,
+  type RendererSubject,
+  type ViewGraphPolicy,
+} from '../src/renderer';
+import { cardFile } from './card-files';
 
 /**
- * ADR 0045's two obligations, over every view that could ever be written.
+ * ADR 0045's obligations, over every View that could ever be written.
  *
  * The point is not that Flow and Grid satisfy them — they are three lines each
  * and could be read. It is that the obligations hold at the *boundary*, so a
- * view nobody has designed yet cannot get past it having broken one. So the
- * generator here produces deliberately hostile conversions: ones that keep a
- * source graph's identity, ones that prune a card and keep the edge into it,
- * ones that reuse one identity twice. Whatever a view returns, what leaves
- * `convertView` is either an exception or a value satisfying both rules.
+ * View nobody has designed yet cannot get past it having broken one. So the
+ * generator here produces deliberately hostile policies: ones that keep an Edge
+ * whose Card was never in the Placement, ones that repeat an Edge, ones that
+ * return nothing at all. Whatever a policy answers, what leaves
+ * `convertSubject` is either a `RendererInvariantError` or a value satisfying
+ * every rule.
+ *
+ * Source-identity reuse is **absent from this list on purpose**: a policy
+ * returns `GraphWithoutId`, so it cannot name an identity at all. The obligation
+ * ADR 0040 claimed is unrepresentable rather than checked, and what is left to
+ * prove about identity is that the minting side is fresh.
  */
 
 const uuid = (n: number): string => `00000000-0000-4000-8000-${n.toString(16).padStart(12, '0')}`;
 
-const cardId = fc.integer({ min: 1, max: 12 }).map((n) => uuidSchema.parse(uuid(n)));
-const graphId = fc.integer({ min: 100, max: 112 }).map((n) => uuidSchema.parse(uuid(n)));
+const cardId = fc.integer({ min: 2, max: 7 }).map((n) => uuidSchema.parse(uuid(n)));
 
 const point = fc.record({
   x: fc.integer({ min: -1000, max: 1000 }),
   y: fc.integer({ min: -1000, max: 1000 }),
 });
 
-const placement = fc
-  .uniqueArray(fc.tuple(cardId, point), {
-    selector: ([id]) => id,
-    minLength: 1,
-    maxLength: 6,
-  })
-  .map((entries) => Placement.fromEntries(entries));
+/**
+ * A Space over the Cards the generators draw from, with one Layout owning one
+ * Graph — so `space.graphs` is non-empty and freshness has something to be
+ * fresh against.
+ */
+const SOURCE_GRAPH = uuidSchema.parse(uuid(0x400));
 
-const graph = (ids: fc.Arbitrary<GraphId>): fc.Arbitrary<Graph> =>
-  fc.record({
-    id: ids,
-    title: fc.string({ minLength: 1, maxLength: 8 }),
-    edges: fc.array(fc.record({ from: cardId, to: cardId }), { maxLength: 4 }),
-  });
+function sourceSpace(): Space {
+  const ids = [2, 3, 4, 5, 6, 7].map((n) => uuid(n));
+  const result = loadSpace(
+    {
+      version: 1,
+      id: uuid(1),
+      title: 'Generated',
+      layouts: [
+        {
+          id: uuid(0x500),
+          title: 'Working',
+          kind: 'positioned',
+          positions: Object.fromEntries(ids.map((id, index) => [id, { x: index * 320, y: 0 }])),
+          graphs: [{ id: SOURCE_GRAPH, title: 'Main', edges: [{ from: ids[0], to: ids[1] }] }],
+        },
+      ],
+    },
+    ids.map((id) => cardFile(id)),
+  );
+  if (!result.ok) throw new Error(result.errors.map((error) => error.message).join('; '));
+  return result.space;
+}
 
-const subject: fc.Arbitrary<ViewSubject> = fc.record({
-  cardIds: fc.uniqueArray(cardId, { maxLength: 6 }),
-  graphs: fc.uniqueArray(graph(graphId), { selector: (g) => g.id, maxLength: 3 }),
+const SPACE = sourceSpace();
+
+/** A subject drawn from the Space's own values, which is what `checkSubject` guarantees. */
+const subjectArb: fc.Arbitrary<RendererSubject> = fc
+  .uniqueArray(cardId, { minLength: 1, maxLength: 6 })
+  .map((ids) => ({
+    cards: SPACE.cards.filter((card) => ids.includes(card.id)),
+    graphs: SPACE.graphs,
+  }));
+
+const graphContent: fc.Arbitrary<GraphWithoutId> = fc.record({
+  title: fc.string({ minLength: 1, maxLength: 8 }),
+  edges: fc.array(fc.record({ from: cardId, to: cardId }), { maxLength: 4 }),
 });
 
 /**
- * A view's answer, drawn from the whole space of them rather than the legal
- * part: its graph identities may collide with the subject's or with each other,
- * and its edges may name cards it did not return.
+ * A policy's answer, drawn from the whole space of them rather than the legal
+ * part: its Edges may name Cards the Placement does not hold, it may repeat one,
+ * and it may be empty — which the type forbids and a JavaScript policy can still
+ * do.
  */
-const conversion = (source: ViewSubject, onScreen: Placement): fc.Arbitrary<ConvertedLayout> => {
-  const anyGraphId = fc.oneof(
-    graphId,
-    ...(source.graphs.length > 0 ? [fc.constantFrom(...source.graphs.map((g) => g.id))] : []),
-  );
-  return fc.record({
-    positions: fc.oneof(fc.constant(onScreen), placement),
-    // Built as head-and-tail rather than as an array with a minimum length, so
-    // the non-empty tuple the interface asks for is what the generator produces
-    // rather than something a cast asserts about it.
-    graphs: fc
-      .tuple(graph(anyGraphId), fc.array(graph(anyGraphId), { maxLength: 2 }))
-      .map(([first, rest]): readonly [Graph, ...Graph[]] => [first, ...rest]),
-  });
-};
+const answerArb = fc.oneof(
+  { weight: 9, arbitrary: fc.array(graphContent, { minLength: 1, maxLength: 3 }) },
+  { weight: 1, arbitrary: fc.constant<GraphWithoutId[]>([]) },
+);
 
-const violatesClosure = (converted: ConvertedLayout): boolean =>
-  converted.graphs.some((g) =>
-    g.edges.some(
-      (edge) => !converted.positions.has(edge.from) || !converted.positions.has(edge.to),
-    ),
+const placementArb = fc
+  .uniqueArray(fc.tuple(cardId, point), { selector: ([id]) => id, minLength: 1, maxLength: 6 })
+  .map((entries) => Placement.fromEntries(entries));
+
+const asPolicy = (answer: readonly GraphWithoutId[]): ViewGraphPolicy =>
+  (() => answer) as unknown as ViewGraphPolicy;
+
+const matchesSubject = (subject: RendererSubject, placement: Placement): boolean =>
+  placement.size === subject.cards.length && subject.cards.every((card) => placement.has(card.id));
+
+const breaksClosure = (answer: readonly GraphWithoutId[], placement: Placement): boolean =>
+  answer.some((graph) =>
+    graph.edges.some((edge) => !placement.has(edge.from) || !placement.has(edge.to)),
   );
 
-const violatesFreshIdentity = (source: ViewSubject, converted: ConvertedLayout): boolean => {
-  const taken = new Set<GraphId>(source.graphs.map((g) => g.id));
-  return converted.graphs.some((g) => {
-    if (taken.has(g.id)) return true;
-    taken.add(g.id);
-    return false;
+const repeatsAnEdge = (answer: readonly GraphWithoutId[]): boolean =>
+  answer.some((graph) => {
+    const seen = new Set<string>();
+    return graph.edges.some((edge) => {
+      const key = `${edge.from}\0${edge.to}`;
+      if (seen.has(key)) return true;
+      seen.add(key);
+      return false;
+    });
   });
-};
+
+/** An identity source that never repeats, so freshness is about the boundary. */
+function counter(start = 0x900): { newGraphId: () => GraphId; used: () => number } {
+  let next = start;
+  let used = 0;
+  return {
+    newGraphId: () => {
+      next += 1;
+      used += 1;
+      return uuidSchema.parse(uuid(next));
+    },
+    used: () => used,
+  };
+}
+
+/** A Placement whose Cards are exactly a subject's — the shape conversion accepts. */
+const placementOver = (subject: RendererSubject): fc.Arbitrary<Placement> =>
+  fc
+    .array(point, { minLength: subject.cards.length, maxLength: subject.cards.length })
+    .map((points) =>
+      Placement.fromEntries(subject.cards.map((card, index) => [card.id, points[index]!])),
+    );
 
 /**
- * A subject, the placement on screen, and one answer a view could give for
- * them — drawn as one arbitrary rather than sampled inside the property.
+ * A subject, a Placement and one answer a policy could give for them.
  *
- * `conversion` depends on both, which is what `chain` is for. Sampling it from
- * a generated seed instead put the answer outside the arbitrary, so fast-check
- * could shrink the seed but not the conversion, and a counterexample shrank to
- * an unrelated answer rather than a smaller one.
+ * The Placement is drawn half from the whole space of them and half from the
+ * subject's own Cards. Left to chance alone the two almost never coincide, and
+ * every case would be refused at the first check with the closure and duplicate
+ * rules below it never reached.
  */
-const scenario = fc.tuple(subject, placement).chain(([source, onScreen]) =>
+const scenario = subjectArb.chain((subject) =>
   fc.record({
-    source: fc.constant(source),
-    onScreen: fc.constant(onScreen),
-    answer: conversion(source, onScreen),
+    subject: fc.constant(subject),
+    placement: fc.oneof(placementArb, placementOver(subject)),
+    answer: answerArb,
   }),
 );
 
-/**
- * Every generated view answers with an output fixed in advance, so none of them
- * mints. Throwing rather than returning a spare id keeps that true: a generated
- * view that reached for the minter would be answering with something the
- * scenario did not generate, and the case would stop being about the output
- * under test.
- */
-const mintUnused = (): never => {
-  throw new Error('A generated View mints nothing.');
-};
+/** The same, drawn only from what the boundary accepts. */
+const legalScenario = subjectArb.chain((subject) => {
+  const memberId = fc.constantFrom(...subject.cards.map((card) => card.id));
+  return fc.record({
+    subject: fc.constant(subject),
+    placement: placementOver(subject),
+    answer: fc.array(
+      fc.record({
+        title: fc.string({ minLength: 1, maxLength: 8 }),
+        edges: fc.uniqueArray(fc.record({ from: memberId, to: memberId }), {
+          selector: (edge) => `${edge.from}\0${edge.to}`,
+          maxLength: 4,
+        }),
+      }),
+      { minLength: 1, maxLength: 3 },
+    ),
+  });
+});
 
-describe('the conversion boundary, over every view that could be written', () => {
-  it('lets through no output that breaks closure or reuses a source identity', () => {
+describe('the subject check, over every selector that could be written', () => {
+  /**
+   * A subject drawn from the whole space of them: the Space's own values, clones
+   * of them that compare equal and are not the same object, and repeats.
+   */
+  const hostileSubject = fc
+    .record({
+      cards: fc.array(
+        fc.oneof(
+          fc.constantFrom(...SPACE.cards),
+          fc.constantFrom(...SPACE.cards).map((card) => ({ ...card })),
+        ),
+        { maxLength: 5 },
+      ),
+      graphs: fc.array(
+        fc.oneof(
+          fc.constantFrom(...SPACE.graphs),
+          fc.constantFrom(...SPACE.graphs).map((graph) => ({ ...graph })),
+        ),
+        { maxLength: 3 },
+      ),
+    })
+    .map((subject): RendererSubject => subject);
+
+  const isSelection = (subject: RendererSubject): boolean => {
+    const cardIds = new Set(subject.cards.map((card) => card.id));
+    const graphIds = new Set(subject.graphs.map((graph) => graph.id));
+    return (
+      cardIds.size === subject.cards.length &&
+      graphIds.size === subject.graphs.length &&
+      subject.cards.every((card) => SPACE.lookup.card(card.id) === card) &&
+      subject.graphs.every((graph) => SPACE.lookup.graph(graph.id)?.graph === graph)
+    );
+  };
+
+  it('accepts a selection of the Space and refuses everything else', () => {
     fc.assert(
-      fc.property(scenario, ({ source, onScreen, answer }) => {
-        let returned: ConvertedLayout;
+      fc.property(hostileSubject, (subject) => {
+        if (!isSelection(subject)) {
+          expect(() => checkSubject(SPACE, 'generated', subject)).toThrow(RendererInvariantError);
+          return;
+        }
+        expect(checkSubject(SPACE, 'generated', subject)).toBe(subject);
+      }),
+    );
+  });
+});
+
+describe('the conversion boundary, over every View that could be written', () => {
+  it('lets through no output that breaks a rule', () => {
+    fc.assert(
+      fc.property(scenario, ({ subject, placement, answer }) => {
+        const identity = counter();
+        let converted;
         try {
-          returned = convertView(() => answer, source, onScreen, mintUnused);
-        } catch {
+          converted = convertSubject({
+            space: SPACE,
+            subject,
+            policy: asPolicy(answer),
+            placement,
+            newGraphId: identity.newGraphId,
+            renderer: 'generated',
+          });
+        } catch (error) {
           // A refusal is always a correct outcome: the boundary throws rather
-          // than repairing, because a view that broke an obligation is wrong
-          // and the Edit calling it has nothing to fall back to.
-          expect(violatesClosure(answer) || violatesFreshIdentity(source, answer)).toBe(true);
+          // than repairing, because a View that broke an obligation is wrong and
+          // the Edit calling it has nothing to fall back to.
+          expect(error).toBeInstanceOf(RendererInvariantError);
+          expect(
+            !matchesSubject(subject, placement) ||
+              answer.length === 0 ||
+              breaksClosure(answer, placement) ||
+              repeatsAnEdge(answer),
+          ).toBe(true);
           return;
         }
 
-        expect(violatesClosure(returned)).toBe(false);
-        expect(violatesFreshIdentity(source, returned)).toBe(false);
+        expect(converted.graphs.length).toBeGreaterThan(0);
+        expect(breaksClosure(converted.graphs, placement)).toBe(false);
+        expect(repeatsAnEdge(converted.graphs)).toBe(false);
+        const ids = converted.graphs.map((graph) => graph.id);
+        expect(new Set(ids).size).toBe(ids.length);
+        expect(ids).not.toContain(SOURCE_GRAPH);
       }),
     );
   });
 
   it('refuses every output that breaks one, rather than only some of them', () => {
     fc.assert(
-      fc.property(scenario, ({ source, onScreen, answer }) => {
-        fc.pre(violatesClosure(answer) || violatesFreshIdentity(source, answer));
+      fc.property(scenario, ({ subject, placement, answer }) => {
+        fc.pre(
+          !matchesSubject(subject, placement) ||
+            answer.length === 0 ||
+            breaksClosure(answer, placement) ||
+            repeatsAnEdge(answer),
+        );
 
-        expect(() => convertView(() => answer, source, onScreen, mintUnused)).toThrow();
+        expect(() =>
+          convertSubject({
+            space: SPACE,
+            subject,
+            policy: asPolicy(answer),
+            placement,
+            newGraphId: counter().newGraphId,
+            renderer: 'generated',
+          }),
+        ).toThrow(RendererInvariantError);
+      }),
+    );
+  });
+
+  it('consumes no identity for an output it was going to refuse', () => {
+    // Validation runs whole before the first id is minted, so a refused
+    // conversion leaves the identity source exactly where it found it.
+    fc.assert(
+      fc.property(scenario, ({ subject, placement, answer }) => {
+        fc.pre(
+          !matchesSubject(subject, placement) ||
+            answer.length === 0 ||
+            breaksClosure(answer, placement) ||
+            repeatsAnEdge(answer),
+        );
+        const identity = counter();
+        expect(() =>
+          convertSubject({
+            space: SPACE,
+            subject,
+            policy: asPolicy(answer),
+            placement,
+            newGraphId: identity.newGraphId,
+            renderer: 'generated',
+          }),
+        ).toThrow();
+        expect(identity.used()).toBe(0);
+      }),
+    );
+  });
+
+  it('mints exactly one identity per returned Graph when it accepts', () => {
+    fc.assert(
+      fc.property(legalScenario, ({ subject, placement, answer }) => {
+        const identity = counter();
+        const converted = convertSubject({
+          space: SPACE,
+          subject,
+          policy: asPolicy(answer),
+          placement,
+          newGraphId: identity.newGraphId,
+          renderer: 'generated',
+        });
+        expect(identity.used()).toBe(converted.graphs.length);
       }),
     );
   });

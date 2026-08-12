@@ -53,8 +53,11 @@ export type {
   LayoutStrategy,
 } from './layout';
 
-export { getCard, getLayout, getGraph, getGraphOwner, resolveContentCard } from './lookup';
-export type { ResolvedContentCard } from './lookup';
+// `resolveContentCard` is the only function here: identity lookup is reached
+// through `space.lookup`, which the Space carries, so the shallow `get*` pairs
+// that used to sit beside it have no callers left to name.
+export { resolveContentCard } from './lookup';
+export type { OwnedGraph, ResolvedContentCard, ResolvedLayout, SpaceLookup } from './lookup';
 
 export { newSpace } from './new-space';
 export type { NewSpace } from './new-space';

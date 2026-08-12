@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { SpaceSnapshot } from '@project/core';
-import { getCard, getGraph, loadSpaceSnapshot } from '../src/index';
+import { loadSpaceSnapshot } from '../src/index';
 import { uuid } from './card-files';
 
 const SPACE_ID = uuid('00000000-0000-4000-8000-000000000001');
@@ -89,9 +89,9 @@ describe('loadSpaceSnapshot', () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.space.id).toBe(SPACE_ID);
-    const card = getCard(result.space, CARD_A);
+    const card = result.space.lookup.card(CARD_A);
     expect(card?.kind === 'markdown' && card.body).toBe('Body A');
-    expect(getGraph(result.space, GRAPH_ID)?.title).toBe('Main');
+    expect(result.space.lookup.graph(GRAPH_ID)?.graph.title).toBe('Main');
   });
 
   it('returns the parsed snapshot accepted by intake', () => {

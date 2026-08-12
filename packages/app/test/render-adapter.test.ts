@@ -12,7 +12,7 @@ import {
   type AuthoringResult,
   type SpaceAuthoring,
 } from '../src/space-authoring';
-import type { RendererSelection } from '../src/renderer';
+import { createRendererResolver, type RendererSelection } from '../src/renderer';
 import { completeDrag, moving, node, settled } from './render-adapter-fixtures';
 
 const CARD_A = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
@@ -118,11 +118,15 @@ function sessionBackedAdapter(
     if (!result.ok) throw new Error(result.errors.map((error) => error.message).join('; '));
     return result.space;
   };
-  const navigation = createNavigation(currentSpace, renderer);
+  const resolveRenderer = createRendererResolver({
+    newGraphId: () => uuidSchema.parse('00000000-0000-4000-8000-0000000000ff'),
+  });
+  const navigation = createNavigation(currentSpace, resolveRenderer, renderer);
   const authoring = createSpaceAuthoring({
     session,
     navigation,
     currentSpace,
+    resolveRenderer,
     ...(initialPlacement !== undefined ? { initialPlacement } : {}),
     ...(newId !== undefined ? { newId } : {}),
   });

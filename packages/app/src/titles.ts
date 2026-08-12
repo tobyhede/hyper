@@ -1,10 +1,20 @@
+import type { Graph, SpaceSnapshot } from '@project/core';
+
 /**
  * The neutral titles the app mints for structure the author did not name.
  *
  * It sits in its own module because two collaborators mint them and neither may
  * import the other: a View names the Graph it returns on conversion (ADR 0045),
  * and Space Authoring names the Layout and the Card an Edit creates. Putting the
- * rule beside either one would make `view.ts` and `space-authoring.ts` circular.
+ * rule beside either one would make `renderer.ts` and `space-authoring.ts`
+ * circular.
+ *
+ * Three named operations rather than one helper taking a prefix. What a caller
+ * knows is *what it is naming*; the `<Prefix> N` arithmetic and the prefix
+ * literal are this module's, so no call site can spell "Layout" a second way or
+ * number one kind of thing differently from another. This is a deterministic
+ * rule and stays one — it is not injected, because there is nothing about it a
+ * test would want to replace.
  */
 
 /**
@@ -13,10 +23,10 @@
  * One past the highest rather than one past the count, so deleting the middle
  * of a numbered set never mints a title that is already in use. Unnumbered
  * titles an author wrote contribute nothing. `BigInt` because the number comes
- * from a title and has no bound; the prefixes are literals at each call site, so
+ * from a title and has no bound; the prefixes are literals in this module, so
  * the built pattern carries nothing to escape.
  */
-export function nextNumberedTitle(prefix: string, titles: Iterable<string>): string {
+function nextNumberedTitle(prefix: string, titles: Iterable<string>): string {
   const numbered = new RegExp(`^${prefix} ([1-9]\\d*)$`);
   let highest = 0n;
   for (const title of titles) {
@@ -27,3 +37,29 @@ export function nextNumberedTitle(prefix: string, titles: Iterable<string>): str
   }
   return `${prefix} ${highest + 1n}`;
 }
+
+/** What an Edit calls the Card it creates. */
+export const nextCardTitle = (snapshot: SpaceSnapshot): string =>
+  nextNumberedTitle(
+    'Card',
+    snapshot.cards.map((card) => card.document.title),
+  );
+
+/** What an Edit calls the Layout a converted View produces (ADR 0025). */
+export const nextLayoutTitle = (snapshot: SpaceSnapshot): string =>
+  nextNumberedTitle(
+    'Layout',
+    (snapshot.document.layouts ?? []).map((layout) => layout.title),
+  );
+
+/**
+ * What a View calls a Graph it returns on conversion (ADR 0045).
+ *
+ * Numbered above the Graphs it was showing rather than above every Graph in the
+ * Space, because the subject is what the author can see.
+ */
+export const nextGraphTitle = (graphs: readonly Graph[]): string =>
+  nextNumberedTitle(
+    'Graph',
+    graphs.map((graph) => graph.title),
+  );

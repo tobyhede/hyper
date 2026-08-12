@@ -8,7 +8,7 @@ import {
   type SpaceSnapshot,
   type UUID,
 } from '@project/core';
-import { getLayout, loadSpaceSnapshot, Placement, type Space } from '@project/graph';
+import { loadSpaceSnapshot, Placement, type Space } from '@project/graph';
 import {
   createNonThrowingReporter,
   createObservableState,
@@ -18,8 +18,8 @@ import {
 } from '@project/persistence';
 import type { Navigation, NavigationState } from './navigation';
 import { updatePositionedLayout } from './snapshot';
-import { nextNumberedTitle } from './titles';
-import { defaultRenderer, resolveRenderer, type RendererSelection } from './renderer';
+import { nextCardTitle, nextLayoutTitle } from './titles';
+import { defaultRenderer, type RendererSelection, type ResolveRenderer } from './renderer';
 
 export type AuthoringCompletion =
   | {
@@ -164,12 +164,21 @@ interface SpaceAuthoringDependencies {
   /**
    * The validated aggregate behind the session's working snapshot.
    *
-   * The same reader Navigation is given, so both resolve a view against one
-   * `Space` identity and one parse. Authoring needs it because which Layout an
-   * Edit writes, and what that Layout owns, is the *View's* answer now — and
-   * `resolveRenderer` takes a Space (ADR 0045).
+   * The same reader Navigation is given, so both resolve a renderer against one
+   * `Space` identity and one parse — and both read entity context through that
+   * Space's own `lookup`.
    */
   readonly currentSpace: () => Space;
+  /**
+   * The composition's one renderer resolver, shared with App rendering and
+   * Navigation.
+   *
+   * Authoring needs it because which Layout an Edit writes, and what that Layout
+   * owns, is the *renderer's* answer (ADR 0045) — and a converted Graph's
+   * identity comes from the resolver's composition rather than from a global,
+   * which is what lets a test drive conversion deterministically.
+   */
+  readonly resolveRenderer: ResolveRenderer;
   readonly initialPlacement?: Placement | null;
   readonly reportObserverError?: ObserverErrorReporter;
   /**
@@ -204,18 +213,6 @@ function isSupportedCardEdit(previous: CardDocument, next: CardDocument): boolea
     previous.description === next.description
   );
 }
-
-const nextLayoutTitle = (snapshot: SpaceSnapshot): string =>
-  nextNumberedTitle(
-    'Layout',
-    (snapshot.document.layouts ?? []).map((layout) => layout.title),
-  );
-
-export const nextCardTitle = (snapshot: SpaceSnapshot): string =>
-  nextNumberedTitle(
-    'Card',
-    snapshot.cards.map((card) => card.document.title),
-  );
 
 /**
  * Structural equality over the JSON values a snapshot is built from.
@@ -253,6 +250,7 @@ export function createSpaceAuthoring({
   session,
   navigation,
   currentSpace,
+  resolveRenderer,
   initialPlacement = null,
   reportObserverError = (error) => console.error('SpaceAuthoring observer failed', error),
   newId = newUuid,
@@ -354,12 +352,12 @@ export function createSpaceAuthoring({
   const targetGraph = (): Graph | null => {
     const { selectedRenderer, activeGraphId } = navigation.getState();
     if (selectedRenderer.kind === 'view') return null;
-    // Through `currentSpace()` and its index rather than scanning the working
-    // document, so ownership is resolved the one way the derivation resolves it
-    // (ADR 0040). Two walks over the same layouts would be two answers to
-    // "which Layout is selected" the moment either learned something.
-    const layout = getLayout(currentSpace(), selectedRenderer.layoutId);
-    return layout?.graphs.find((graph) => graph.id === activeGraphId) ?? null;
+    // Through `currentSpace().lookup` rather than scanning the working document,
+    // so ownership is resolved the one way the derivation resolves it (ADR
+    // 0040). Two walks over the same layouts would be two answers to "which
+    // Layout is selected" the moment either learned something.
+    const resolved = currentSpace().lookup.layout(selectedRenderer.layoutId);
+    return resolved?.layout.graphs.find((graph) => graph.id === activeGraphId) ?? null;
   };
 
   /**
@@ -445,15 +443,24 @@ export function createSpaceAuthoring({
     let snapshot = session.getState().working;
     const previousSnapshot = snapshot;
     const navigationState = navigation.getState();
-    const renderer = navigationState.selectedRenderer;
+    const selection = navigationState.selectedRenderer;
     const space = currentSpace();
     // A selected Layout the Space no longer holds is not an Edit. Checked before
-    // resolving, because `resolveRenderer` answers that case by throwing.
-    if (renderer.kind === 'layout' && getLayout(space, renderer.layoutId) === undefined) {
+    // resolving, because the resolver answers that case by throwing.
+    if (selection.kind === 'layout' && space.lookup.layout(selection.layoutId) === undefined) {
       return null;
     }
-    const view = resolveRenderer(space, renderer);
-    let createdCardId: CardId | undefined;
+    const renderer = resolveRenderer(space, selection);
+    /**
+     * The Card an Edit is creating, held rather than placed.
+     *
+     * A conversion is checked against a Placement whose Cards are exactly the
+     * renderer's subject, and the subject is a fact about the Space as it *is* —
+     * a Card this Edit is about to add is in neither. So the position waits here
+     * and is placed after conversion, which changes nothing about what gets
+     * written: the Layout is built from the placement further down either way.
+     */
+    let createdCard: { readonly id: CardId; readonly position: LayoutPosition } | null = null;
     let connection: { readonly from: CardId; readonly to: CardId } | null = null;
     let completedPlacement = reportedPlacement;
     if (completion.kind === 'edited-card') {
@@ -472,9 +479,9 @@ export function createSpaceAuthoring({
       snapshot = { ...snapshot, cards };
     } else if (completion.kind === 'create-and-connect') {
       if (!canCreateConnectedCard(completion.from)) return null;
-      createdCardId = newId();
+      const createdCardId = newId();
+      createdCard = { id: createdCardId, position: completion.position };
       connection = { from: completion.from, to: createdCardId };
-      completedPlacement = Placement.place(completedPlacement, createdCardId, completion.position);
       snapshot = {
         ...snapshot,
         cards: [
@@ -493,18 +500,17 @@ export function createSpaceAuthoring({
     //
     // The two branches are the whole of ADR 0025's "editing an Algorithmic View
     // converts it", now that a Graph is an owned value (ADR 0040). Converting
-    // asks the *View* for the Layout's content, because that is where the choice
-    // lives (ADR 0045) — Flow answers a fresh empty Graph, and `convertView` has
-    // already held that answer to closure and fresh identity. A selected Layout
-    // is not converted: it keeps its id, its title and the Graph identities it
-    // already owns, and the Edit writes into them.
+    // asks the *View* for the Layout's Graphs, because that is where the choice
+    // lives (ADR 0045) — Flow answers a fresh empty one, and the renderer has
+    // already held that answer to closure, non-emptiness and fresh identity. A
+    // selected Layout is not converted: it keeps its id, its title and the Graph
+    // identities it already owns, and the Edit writes into them.
     let layoutId: UUID;
     let layoutTitle: string;
     let ownedGraphs: readonly Graph[];
     let activeGraphId: GraphId | null;
-    if (view.layout === null) {
-      const converted = view.convert(completedPlacement, newId);
-      completedPlacement = converted.positions;
+    if (renderer.kind === 'view') {
+      const converted = renderer.convert(completedPlacement);
       layoutId = newId();
       layoutTitle = nextLayoutTitle(snapshot);
       ownedGraphs = converted.graphs;
@@ -515,10 +521,20 @@ export function createSpaceAuthoring({
       // emphasising belongs to another Layout and does not come across.
       activeGraphId = converted.graphs[0].id;
     } else {
-      layoutId = view.layout.id;
-      layoutTitle = view.layout.title;
-      ownedGraphs = view.layout.graphs;
+      const { layout } = renderer.resolvedLayout;
+      layoutId = layout.id;
+      layoutTitle = layout.title;
+      ownedGraphs = layout.graphs;
       activeGraphId = navigationState.activeGraphId;
+    }
+    // Placed only now: conversion is over the Space as it stands, and this Card
+    // is what the Edit adds to it.
+    if (createdCard !== null) {
+      completedPlacement = Placement.place(
+        completedPlacement,
+        createdCard.id,
+        createdCard.position,
+      );
     }
     if (connection !== null) {
       const graphIndex = ownedGraphs.findIndex((graph) => graph.id === activeGraphId);
@@ -549,7 +565,7 @@ export function createSpaceAuthoring({
       placement: completedPlacement,
       nextActiveGraphId: activeGraphId,
       nextRenderer: { kind: 'layout', layoutId },
-      ...(createdCardId !== undefined ? { createdCardId } : {}),
+      ...(createdCard !== null ? { createdCardId: createdCard.id } : {}),
     };
   };
 
@@ -722,14 +738,14 @@ export function createSpaceAuthoring({
         .map((error) => `  - ${error.message}`)
         .join('\n')}`;
     }
-    const renderer = defaultRenderer(accepted.space);
-    const resolved = resolveRenderer(accepted.space, renderer);
+    const selection = defaultRenderer(accepted.space);
+    const resolved = resolveRenderer(accepted.space, selection);
     const acceptedPlacement =
-      resolved.layout === null ? null : Placement.fromLayout(resolved.layout);
+      resolved.kind === 'view' ? null : Placement.fromLayout(resolved.resolvedLayout.layout);
     installTogether(() => {
       session.acceptRemote();
       install(acceptedPlacement);
-      navigation.openFresh(renderer);
+      navigation.openFresh(selection);
       replacementEpoch += 1;
     });
     return null;

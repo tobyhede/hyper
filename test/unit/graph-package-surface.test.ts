@@ -23,6 +23,13 @@ import * as graphPackage from '@project/graph';
  * it in the same `SpaceError` union and is offered, so what separates them is
  * the module each belongs to and not how a consumer reaches it.
  *
+ * `lookup` offers exactly one function. Identity resolution is reached through
+ * `space.lookup`, which the Space carries, so the shallow `get*` pairs that used
+ * to be listed here have no callers left to name — and `buildSpaceLookup` is
+ * intake's, called by `space` and by nothing outside the package. Its
+ * contextual types come with the module, which is why `ResolvedLayout`,
+ * `OwnedGraph` and `SpaceLookup` are listed below.
+ *
  * Adding a name here is the deliberate act this guard exists to require. It is
  * not a restatement of the index: these are the names, the index is where they
  * come from, and the assertions below hold the two together.
@@ -33,10 +40,6 @@ const OFFERED_VALUES = [
   'buildLayoutStrategyGraph',
   'buildGraphRenderEdges',
   'filterHandlesByGraphs',
-  'getCard',
-  'getLayout',
-  'getGraph',
-  'getGraphOwner',
   'gridStrategy',
   'inHandleId',
   'loadSpace',
@@ -71,10 +74,13 @@ const OFFERED_TYPES = [
   'NewSpace',
   'ParseCardFileResult',
   'ParseImportCardFileResult',
+  'OwnedGraph',
   'ResolvedContentCard',
+  'ResolvedLayout',
   'GraphRenderHandleRef',
   'Space',
   'SpaceError',
+  'SpaceLookup',
 ] as const;
 
 /** What the index declares, split the way the index declares it. */

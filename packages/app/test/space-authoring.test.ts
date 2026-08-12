@@ -24,7 +24,7 @@ import {
   type AuthoringResult,
   type SpaceAuthoring,
 } from '../src/space-authoring';
-import { resolveRenderer, type RendererSelection } from '../src/renderer';
+import { createRendererResolver, type RendererSelection } from '../src/renderer';
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const CARD_A = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
@@ -167,6 +167,33 @@ interface AuthoringOptions {
   readonly newId?: () => UUID;
 }
 
+/**
+ * The composition's renderer resolver, with its own nondeterministic input
+ * supplied the same way `newId` is: at composition, never by mocking a global.
+ *
+ * Two seams rather than one, because they are minted in two places. The Card
+ * and Layout ids of a completed Edit come from `newId`, which Space Authoring
+ * took when it was composed; a converted Graph's identity is minted inside the
+ * conversion boundary, which the resolver closes over (ADR 0045), so the
+ * resolver is what takes that one.
+ *
+ * A fresh sequence per composition, because a Space that is converted twice
+ * needs two identities and the boundary refuses a repeat outright.
+ */
+function testResolver() {
+  let minted = 0;
+  return createRendererResolver({
+    newGraphId: () => {
+      minted += 1;
+      return minted === 1
+        ? MINTED_GRAPH_ID
+        : uuidSchema.parse(
+            `00000000-0000-4000-8000-${(0xa00 + minted).toString(16).padStart(12, '0')}`,
+          );
+    },
+  });
+}
+
 function attachAuthoring(
   backend: SpaceBackend,
   loaded: LoadedFixture,
@@ -179,13 +206,16 @@ function attachAuthoring(
     if (!result.ok) throw new Error(result.errors.map((error) => error.message).join('; '));
     return result.space;
   };
-  const navigation = createNavigation(currentSpace, renderer);
+  const resolveRenderer = testResolver();
+  const navigation = createNavigation(currentSpace, resolveRenderer, renderer);
   const resolved = resolveRenderer(currentSpace(), renderer);
   const authoring = createSpaceAuthoring({
     session,
     navigation,
     currentSpace,
-    initialPlacement: resolved.layout === null ? null : Placement.fromLayout(resolved.layout),
+    resolveRenderer,
+    initialPlacement:
+      resolved.kind === 'view' ? null : Placement.fromLayout(resolved.resolvedLayout.layout),
     ...(reportObserverError !== undefined ? { reportObserverError } : {}),
     ...(newId !== undefined ? { newId } : {}),
   });
@@ -205,7 +235,8 @@ function openAuthoring(
     if (!result.ok) throw new Error(result.errors.map((error) => error.message).join('; '));
     return result.space;
   };
-  const navigation = createNavigation(currentSpace, renderer);
+  const resolveRenderer = testResolver();
+  const navigation = createNavigation(currentSpace, resolveRenderer, renderer);
   return {
     backend,
     session,
@@ -214,6 +245,7 @@ function openAuthoring(
       session,
       navigation,
       currentSpace,
+      resolveRenderer,
       ...(reportObserverError !== undefined ? { reportObserverError } : {}),
       ...(newId !== undefined ? { newId } : {}),
     }),
@@ -534,10 +566,10 @@ describe('Space Authoring', () => {
    * there is no Space level left for a Graph to be written to.
    */
   it('converts an Algorithmic View into a Layout owning one fresh empty Graph', () => {
-    // The Graph before the Layout: the conversion is asked for the Layout's
-    // content first, and it is the View that mints the Graph.
+    // Only the Layout: this Edit mints no Card, and the Graph its conversion
+    // returns is identified by the resolver composed above.
     const { authoring, session, navigation } = openAuthoring(undefined, undefined, {
-      newId: mintingIds(MINTED_GRAPH_ID, LAYOUT_ID),
+      newId: mintingIds(LAYOUT_ID),
     });
     replacePlacementForTest(
       authoring,
@@ -624,7 +656,7 @@ describe('Space Authoring', () => {
         document: { ...positionedSnapshot.document, defaultView: undefined },
       },
       { kind: 'view', view: 'flow' },
-      { newId: mintingIds(MINTED_GRAPH_ID, CONVERTED_LAYOUT_ID) },
+      { newId: mintingIds(CONVERTED_LAYOUT_ID) },
     );
     replacePlacementForTest(
       authoring,
@@ -750,7 +782,7 @@ describe('Space Authoring', () => {
       new MemorySpaceBackend([loaded], control),
       loaded,
       { kind: 'view', view: 'flow' },
-      { newId: mintingIds(MINTED_GRAPH_ID, CONVERTED_LAYOUT_ID) },
+      { newId: mintingIds(CONVERTED_LAYOUT_ID) },
     );
     replacePlacementForTest(
       authoring,
@@ -870,7 +902,8 @@ describe('Space Authoring', () => {
       if (!result.ok) throw new Error(result.errors.map((error) => error.message).join('; '));
       return result.space;
     };
-    const real = createNavigation(currentSpace, { kind: 'view', view: 'flow' });
+    const resolveRenderer = testResolver();
+    const real = createNavigation(currentSpace, resolveRenderer, { kind: 'view', view: 'flow' });
     const adopted: { renderer: RendererSelection; graphId: GraphId | null }[] = [];
     const navigation: Navigation = {
       ...real,
@@ -886,7 +919,8 @@ describe('Space Authoring', () => {
       session,
       navigation,
       currentSpace,
-      newId: mintingIds(MINTED_GRAPH_ID, LAYOUT_ID),
+      resolveRenderer,
+      newId: mintingIds(LAYOUT_ID),
     });
     replacePlacementForTest(authoring, Placement.fromEntries([[CARD_A, { x: 10, y: 20 }]]));
 
@@ -906,19 +940,23 @@ describe('Space Authoring', () => {
       { id: MINTED_GRAPH_ID, title: 'Graph 1', edges: [{ from: CARD_A, to: CARD_A }] },
     ]);
     expect(
-      resolveRenderer(currentSpace(), { kind: 'layout', layoutId: LAYOUT_ID }).visibleGraphIds,
+      resolveRenderer(currentSpace(), { kind: 'layout', layoutId: LAYOUT_ID }).subject.graphs.map(
+        (graph) => graph.id,
+      ),
     ).toEqual([MINTED_GRAPH_ID]);
   });
 
   it('creates the Card, first Graph, Edge and Layout as one Edit with internal identities', () => {
-    // Card, then Graph, then Layout — the order the one Edit mints them in.
+    // Card, then Layout — the order the one Edit mints them in. The Graph is
+    // not in this list: the conversion boundary identifies it, from the
+    // resolver's own minter.
     const graphLess: SpaceSnapshot = {
       id: SPACE_ID,
       document: { version: 1, title: 'New space' },
       cards: [{ id: CARD_A, document: { title: 'Card 1', kind: 'markdown', body: '' } }],
     };
     const { authoring, session } = openAuthoring(graphLess, undefined, {
-      newId: mintingIds(CREATED_CARD_ID, MINTED_GRAPH_ID, LAYOUT_ID),
+      newId: mintingIds(CREATED_CARD_ID, LAYOUT_ID),
     });
     replacePlacementForTest(authoring, Placement.fromEntries([[CARD_A, { x: 120, y: 240 }]]));
 
@@ -1160,8 +1198,12 @@ describe('Space Authoring', () => {
       if (!result.ok) throw new Error(result.errors.map((error) => error.message).join('; '));
       return result.space;
     };
-    const navigation = createNavigation(currentSpace, { kind: 'layout', layoutId: LAYOUT_ID });
-    const authoring = createSpaceAuthoring({ session, navigation, currentSpace });
+    const resolveRenderer = testResolver();
+    const navigation = createNavigation(currentSpace, resolveRenderer, {
+      kind: 'layout',
+      layoutId: LAYOUT_ID,
+    });
+    const authoring = createSpaceAuthoring({ session, navigation, currentSpace, resolveRenderer });
     replacePlacementForTest(
       authoring,
       Placement.fromEntries([
@@ -1260,7 +1302,7 @@ describe('Space Authoring', () => {
           // it is the collision ADR 0016 names as the reason a global mock ends
           // up needing a generator anyway.
           const converting = openAuthoring(undefined, undefined, {
-            newId: mintingIds(MINTED_GRAPH_ID, LAYOUT_ID),
+            newId: mintingIds(LAYOUT_ID),
           });
           converting.authoring.reportRendered(rendered);
           converting.authoring.complete({
@@ -1410,7 +1452,7 @@ describe('Space Authoring', () => {
     // took an id from the real generator — invisible, because the assertions are
     // about titles.
     const { authoring, session } = openAuthoring(numbered, undefined, {
-      newId: mintingIds(CREATED_CARD_ID, MINTED_GRAPH_ID, LAYOUT_ID),
+      newId: mintingIds(CREATED_CARD_ID, LAYOUT_ID),
     });
     replacePlacementForTest(
       authoring,
@@ -1451,12 +1493,17 @@ describe('Space Authoring', () => {
       if (!result.ok) throw new Error(result.errors.map((error) => error.message).join('; '));
       return result.space;
     };
-    const navigation = createNavigation(currentSpace, { kind: 'view', view: 'flow' });
+    const resolveRenderer = testResolver();
+    const navigation = createNavigation(currentSpace, resolveRenderer, {
+      kind: 'view',
+      view: 'flow',
+    });
     const reported: unknown[] = [];
     const authoring = createSpaceAuthoring({
       session,
       navigation,
       currentSpace,
+      resolveRenderer,
       reportObserverError: (error) => {
         reported.push(error);
         throw new Error('reporter failed');
@@ -1554,12 +1601,17 @@ describe('Space Authoring', () => {
       if (!result.ok) throw new Error(result.errors.map((error) => error.message).join('; '));
       return result.space;
     };
-    const navigation = createNavigation(currentSpace, { kind: 'layout', layoutId: LAYOUT_ID });
+    const resolveRenderer = testResolver();
+    const navigation = createNavigation(currentSpace, resolveRenderer, {
+      kind: 'layout',
+      layoutId: LAYOUT_ID,
+    });
     const reported: unknown[] = [];
     const authoring = createSpaceAuthoring({
       session,
       navigation,
       currentSpace,
+      resolveRenderer,
       initialPlacement: Placement.fromEntries([
         [CARD_A, { x: 10, y: 20 }],
         [CARD_B, { x: 300, y: 40 }],
@@ -1618,8 +1670,12 @@ describe('Space Authoring', () => {
       if (!result.ok) throw new Error(result.errors.map((error) => error.message).join('; '));
       return result.space;
     };
-    const navigation = createNavigation(currentSpace, { kind: 'layout', layoutId: LAYOUT_ID });
-    const authoring = createSpaceAuthoring({ session, navigation, currentSpace });
+    const resolveRenderer = testResolver();
+    const navigation = createNavigation(currentSpace, resolveRenderer, {
+      kind: 'layout',
+      layoutId: LAYOUT_ID,
+    });
+    const authoring = createSpaceAuthoring({ session, navigation, currentSpace, resolveRenderer });
     replacePlacementForTest(
       authoring,
       Placement.fromEntries([
@@ -1675,7 +1731,8 @@ describe('Space Authoring', () => {
       if (!result.ok) throw new Error(result.errors.map((error) => error.message).join('; '));
       return result.space;
     };
-    const real = createNavigation(currentSpace, { kind: 'view', view: 'flow' });
+    const resolveRenderer = testResolver();
+    const real = createNavigation(currentSpace, resolveRenderer, { kind: 'view', view: 'flow' });
     const navigation: Navigation = {
       ...real,
       continueInRenderer: () => {
@@ -1686,7 +1743,8 @@ describe('Space Authoring', () => {
       session,
       navigation,
       currentSpace,
-      newId: mintingIds(MINTED_GRAPH_ID, LAYOUT_ID),
+      resolveRenderer,
+      newId: mintingIds(LAYOUT_ID),
     });
     replacePlacementForTest(authoring, Placement.fromEntries([[CARD_A, { x: 10, y: 20 }]]));
     const published: NavigationState[] = [];
@@ -1730,12 +1788,17 @@ describe('Space Authoring', () => {
       if (!result.ok) throw new Error(result.errors.map((error) => error.message).join('; '));
       return result.space;
     };
-    const navigation = createNavigation(currentSpace, { kind: 'view', view: 'flow' });
+    const resolveRenderer = testResolver();
+    const navigation = createNavigation(currentSpace, resolveRenderer, {
+      kind: 'view',
+      view: 'flow',
+    });
     const reported: unknown[] = [];
     const authoring = createSpaceAuthoring({
       session,
       navigation,
       currentSpace,
+      resolveRenderer,
       reportObserverError: (error) => reported.push(error),
       newId: mintingIds(LAYOUT_ID),
     });
@@ -1841,7 +1904,12 @@ describe('Space Authoring', () => {
       continueInRenderer: () => undefined,
       activateGraph: () => undefined,
     } as unknown as Navigation;
-    const authoring = createSpaceAuthoring({ session, navigation, currentSpace });
+    const authoring = createSpaceAuthoring({
+      session,
+      navigation,
+      currentSpace,
+      resolveRenderer: testResolver(),
+    });
     replacePlacementForTest(
       authoring,
       Placement.fromEntries([
@@ -2091,11 +2159,12 @@ describe('Space Authoring', () => {
 
     const refusal = authoring.acceptStoredSpace();
 
-    // One closure rule with no conditions (ADR 0040): an endpoint naming no Card
-    // at all fails for the same reason as one naming a Card another Layout holds,
-    // so the message names the owning Layout rather than saying "missing".
+    // Every refusal intake makes reaches the author verbatim, and it says which
+    // of the two closure failures this is: the Card is not in the Space at all,
+    // rather than in it and outside this Layout (ADR 0040). The two send an
+    // author to different places.
     expect(refusal).toBe(
-      `The remote space is invalid and was not accepted:\n  - Graph "${GRAPH_ID}" edge 0 names "${UNKNOWN_CARD}" as its to, which is not a card of its layout "${LAYOUT_ID}"`,
+      `The remote space is invalid and was not accepted:\n  - Graph "${GRAPH_ID}" edge 0 names "${UNKNOWN_CARD}" as its to, which the space does not hold`,
     );
     expect(authoring.getState().replacementEpoch).toBe(before.replacementEpoch);
     expect(authoring.getState().session).toEqual(before.session);
@@ -2317,11 +2386,16 @@ describe('Space Authoring', () => {
       if (!result.ok) throw new Error(result.errors.map((error) => error.message).join('; '));
       return result.space;
     };
-    const navigation = createNavigation(currentSpace, { kind: 'layout', layoutId: LAYOUT_ID });
+    const resolveRenderer = testResolver();
+    const navigation = createNavigation(currentSpace, resolveRenderer, {
+      kind: 'layout',
+      layoutId: LAYOUT_ID,
+    });
     const authoring = createSpaceAuthoring({
       session,
       navigation,
       currentSpace,
+      resolveRenderer,
       initialPlacement: Placement.fromEntries([
         [CARD_A, { x: 10, y: 20 }],
         [CARD_B, { x: 300, y: 40 }],

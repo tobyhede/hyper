@@ -1,8 +1,34 @@
 import { expect, expectTypeOf, it, vi } from 'vitest';
 import { uuidSchema, type CardId, type GraphId, type UUID } from '@project/core';
 import { loadSpace, type Space } from '@project/graph';
-import { createNavigation, type NavigationState } from '../src/navigation';
+import { createNavigation, type NavigationState, type NavigationOptions } from '../src/navigation';
+import { createRendererResolver, type RendererSelection } from '../src/renderer';
 import { cardFile } from './card-files';
+
+/**
+ * Navigation over one composed resolver, the way `createApp` composes it.
+ *
+ * The identity source is deterministic and never used: nothing Navigation does
+ * converts a View (ADR 0028). It is supplied because the resolver takes one at
+ * composition, which is the point — Navigation names no identity minting at all.
+ */
+const resolveRenderer = createRendererResolver({
+  newGraphId: () => uuid('00000000-0000-4000-8000-0000000000ff'),
+});
+
+const navigationFor = (
+  currentSpace: () => Space,
+  initialRenderer: RendererSelection,
+  initialSpace?: Space,
+  options?: NavigationOptions,
+) =>
+  createNavigation(
+    currentSpace,
+    resolveRenderer,
+    initialRenderer,
+    initialSpace ?? currentSpace(),
+    options ?? {},
+  );
 
 const uuid = (value: string): UUID => uuidSchema.parse(value);
 
@@ -96,7 +122,7 @@ function spaceOwning(
 
 it('selects a renderer and its active Graph without changing the Space', () => {
   const space = fixture();
-  const navigation = createNavigation(() => space, { kind: 'view', view: 'flow' });
+  const navigation = navigationFor(() => space, { kind: 'view', view: 'flow' });
   navigation.present();
 
   navigation.selectRenderer({ kind: 'layout', layoutId: LAYOUT });
@@ -132,7 +158,7 @@ it('selects a renderer and its active Graph without changing the Space', () => {
  */
 it('closes an opened Card when the renderer changes, so no editor outlives its placement', () => {
   const space = fixture();
-  const navigation = createNavigation(() => space, { kind: 'view', view: 'flow' });
+  const navigation = navigationFor(() => space, { kind: 'view', view: 'flow' });
   navigation.openCard(uuid('00000000-0000-4000-8000-000000000002'));
 
   navigation.selectRenderer({ kind: 'layout', layoutId: LAYOUT });
@@ -145,7 +171,7 @@ it('traverses an Edge from the changing working Space without installing a copy'
   const cardB = uuid('00000000-0000-4000-8000-000000000003');
   const cardC = uuid('00000000-0000-4000-8000-000000000004');
   let working = fixture();
-  const navigation = createNavigation(() => working, { kind: 'view', view: 'flow' });
+  const navigation = navigationFor(() => working, { kind: 'view', view: 'flow' });
   navigation.present();
 
   // The same Space with a second Edge out of A, authored into the Graph the
@@ -206,7 +232,7 @@ it('presents a fully cyclic Graph, which has no entry Card', () => {
     [{ id: GRAPH_ONE, title: 'Loop', edges: [{ from: card, to: card }] }],
     [{ id: card }],
   );
-  const navigation = createNavigation(() => space, { kind: 'view', view: 'flow' });
+  const navigation = navigationFor(() => space, { kind: 'view', view: 'flow' });
 
   navigation.present();
 
@@ -244,7 +270,7 @@ it('reads the last Card when Traversal history returns to one it has already vis
     ],
     [{ id: cardA }, { id: cardB }],
   );
-  const navigation = createNavigation(() => space, { kind: 'view', view: 'flow' });
+  const navigation = navigationFor(() => space, { kind: 'view', view: 'flow' });
 
   navigation.present();
   navigation.advance();
@@ -280,7 +306,7 @@ it('reads the last Card when Traversal history returns to one it has already vis
  */
 it('leaves no Traversal history behind when presenting ends', () => {
   const space = fixture();
-  const navigation = createNavigation(() => space, { kind: 'view', view: 'flow' });
+  const navigation = navigationFor(() => space, { kind: 'view', view: 'flow' });
   navigation.present();
   navigation.advance();
 
@@ -303,7 +329,7 @@ it('leaves no Traversal history behind when presenting ends', () => {
  */
 it('stands on a Card for as long as it is presenting', () => {
   const space = fixture();
-  const navigation = createNavigation(() => space, { kind: 'view', view: 'flow' });
+  const navigation = navigationFor(() => space, { kind: 'view', view: 'flow' });
 
   navigation.present();
 
@@ -316,7 +342,7 @@ it('stands on a Card for as long as it is presenting', () => {
 
 it('activating a Graph ends the current Traversal history without changing the Space', () => {
   const space = fixture();
-  const navigation = createNavigation(() => space, { kind: 'view', view: 'flow' });
+  const navigation = navigationFor(() => space, { kind: 'view', view: 'flow' });
   navigation.present();
 
   navigation.activateGraph(GRAPH_TWO);
@@ -331,7 +357,7 @@ it('activating a Graph ends the current Traversal history without changing the S
 
 it('refuses to activate a Graph the current Space does not hold', () => {
   const space = fixture();
-  const navigation = createNavigation(() => space, { kind: 'view', view: 'flow' });
+  const navigation = navigationFor(() => space, { kind: 'view', view: 'flow' });
   navigation.present();
   const before = navigation.getState();
 
@@ -357,7 +383,7 @@ it('refuses to activate a Graph the current Space does not hold', () => {
  */
 it('continues the current Traversal history when an Edit converts the renderer to a Layout', () => {
   const space = fixture();
-  const navigation = createNavigation(() => space, { kind: 'view', view: 'flow' });
+  const navigation = navigationFor(() => space, { kind: 'view', view: 'flow' });
   navigation.activateGraph(GRAPH_TWO);
   navigation.present();
   const traversalHistory = traversalHistoryOf(navigation.getState());
@@ -381,7 +407,7 @@ it('continues the current Traversal history when an Edit converts the renderer t
  */
 it('takes the adopted renderer’s own Active Graph over the one that was emphasised', () => {
   const space = fixture();
-  const navigation = createNavigation(() => space, { kind: 'view', view: 'flow' });
+  const navigation = navigationFor(() => space, { kind: 'view', view: 'flow' });
   expect(navigation.getState().activeGraphId).toBe(GRAPH_ONE);
 
   navigation.continueInRenderer({ kind: 'layout', layoutId: LAYOUT }, GRAPH_TWO);
@@ -398,14 +424,14 @@ it('takes the adopted renderer’s own Active Graph over the one that was emphas
  * pair Navigation may not hold — the Active Graph would ride into the next Edit
  * as that Layout's `activeGraph`, which intake rejects outright.
  *
- * Constructible against a real Space rather than a hand-built `ResolvedRenderer`:
+ * Constructible against a real Space rather than a hand-built renderer:
  * `GRAPH_ONE` exists and is drawn by the Flow view, and `LAYOUT` simply does not
  * own it. Edit completion cannot reach it, because the pair it passes is the one
  * it wrote into the snapshot a line earlier.
  */
 it('refuses to adopt a renderer that does not draw the Graph handed with it', () => {
   const space = fixture();
-  const navigation = createNavigation(() => space, { kind: 'view', view: 'flow' });
+  const navigation = navigationFor(() => space, { kind: 'view', view: 'flow' });
   navigation.present();
   const before = navigation.getState();
 
@@ -423,7 +449,7 @@ it('refuses to adopt a renderer that does not draw the Graph handed with it', ()
  */
 it('refuses to activate a Graph the selected Layout does not own', () => {
   const space = fixture();
-  const navigation = createNavigation(() => space, { kind: 'layout', layoutId: LAYOUT });
+  const navigation = navigationFor(() => space, { kind: 'layout', layoutId: LAYOUT });
   const before = navigation.getState();
   expect(before.activeGraphId).toBe(GRAPH_TWO);
 
@@ -448,7 +474,7 @@ it('adopts a renderer with no active Graph to name', () => {
     [cardFile(CARD_A)],
   );
   if (!loaded.ok) throw new Error('empty fixture should load');
-  const navigation = createNavigation(() => loaded.space, { kind: 'view', view: 'flow' });
+  const navigation = navigationFor(() => loaded.space, { kind: 'view', view: 'flow' });
   expect(navigation.getState().activeGraphId).toBeNull();
 
   navigation.continueInRenderer({ kind: 'view', view: 'grid' }, null);
@@ -461,7 +487,7 @@ it('adopts a renderer with no active Graph to name', () => {
 
 it('notifies subscribers synchronously until they unsubscribe', () => {
   const space = fixture();
-  const navigation = createNavigation(() => space, { kind: 'view', view: 'flow' });
+  const navigation = navigationFor(() => space, { kind: 'view', view: 'flow' });
   const seen: (GraphId | null)[] = [];
   // The seam `useSyncExternalStore` drives. It must notify during the call that
   // changed the state — React reads `getState` straight after and would
@@ -482,7 +508,7 @@ it('notifies subscribers synchronously until they unsubscribe', () => {
 it('contains a failing subscriber and still notifies the ones behind it', () => {
   const space = fixture();
   const reported: unknown[] = [];
-  const navigation = createNavigation(() => space, { kind: 'view', view: 'flow' }, space, {
+  const navigation = navigationFor(() => space, { kind: 'view', view: 'flow' }, space, {
     reportObserverError: (error) => reported.push(error),
   });
   const observerError = new Error('observer failed');
@@ -504,7 +530,7 @@ it('contains a failing subscriber and still notifies the ones behind it', () => 
 it('refuses a renderer the current Space does not hold, leaving navigation untouched', () => {
   const space = fixture();
   const missing = uuid('00000000-0000-4000-8000-000000000099');
-  const navigation = createNavigation(() => space, { kind: 'view', view: 'flow' });
+  const navigation = navigationFor(() => space, { kind: 'view', view: 'flow' });
   navigation.present();
   const before = navigation.getState();
 
@@ -525,7 +551,7 @@ it('refuses a renderer the current Space does not hold, leaving navigation untou
 it('opens and closes Cards, and closes an opened Card when presenting starts', () => {
   const space = fixture();
   const card = uuid('00000000-0000-4000-8000-000000000003');
-  const navigation = createNavigation(() => space, { kind: 'view', view: 'flow' });
+  const navigation = navigationFor(() => space, { kind: 'view', view: 'flow' });
 
   navigation.openCard(card);
   expect(navigation.getState().openedCardId).toBe(card);
@@ -552,7 +578,7 @@ it('opens and closes Cards, and closes an opened Card when presenting starts', (
 it('opens a replacement Space as new navigation, retaining no reading state', () => {
   const space = fixture();
   const card = uuid('00000000-0000-4000-8000-000000000003');
-  const navigation = createNavigation(() => space, { kind: 'view', view: 'grid' });
+  const navigation = navigationFor(() => space, { kind: 'view', view: 'grid' });
   navigation.present();
   navigation.advance();
   navigation.openCard(card);
@@ -590,7 +616,7 @@ it('reads the working Space once per moves() call, whatever the branching', () =
   // and `moves()` runs during every App render — including the per-pointer-frame
   // renders a drag produces. One read per call, not one per outgoing Edge.
   let reads = 0;
-  const navigation = createNavigation(
+  const navigation = navigationFor(
     () => {
       reads += 1;
       return forked;
@@ -623,7 +649,7 @@ it('reads the working Space once per moves() call, whatever the branching', () =
 it('answers no moves outside Traversal history without reading the working Space', () => {
   const space = fixture();
   const currentSpace = vi.fn(() => space);
-  const navigation = createNavigation(currentSpace, { kind: 'view', view: 'flow' });
+  const navigation = navigationFor(currentSpace, { kind: 'view', view: 'flow' });
 
   const before = currentSpace.mock.calls.length;
   const moves = navigation.moves();
@@ -650,7 +676,7 @@ it('traverses a fork, retreats along Traversal history, and reselects the Edge t
     ],
     [{ id: cardA }, { id: cardB }, { id: cardC }],
   );
-  const navigation = createNavigation(() => forked, { kind: 'view', view: 'flow' });
+  const navigation = navigationFor(() => forked, { kind: 'view', view: 'flow' });
   navigation.present();
 
   navigation.selectBranch(-1);

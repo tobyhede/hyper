@@ -53,7 +53,7 @@ describe('openStoredWorkspace', () => {
     const opened = await openStoredWorkspace(backend, uuidSchema.parse(SPACE_ID));
 
     expect(opened.space.title).toBe('Stored space');
-    expect(opened.space.cardsById.get(uuidSchema.parse(CARD_ID))?.title).toBe('Start here');
+    expect(opened.space.lookup.card(uuidSchema.parse(CARD_ID))?.title).toBe('Start here');
     expect(opened.spaceSession.getState().acknowledgedRevision).toBe(revision);
   });
 
@@ -106,8 +106,8 @@ describe('openStoredWorkspace', () => {
 
     await expect(openStoredWorkspace(backend, uuidSchema.parse(SPACE_ID))).rejects.toThrow(
       `The backend returned an invalid space:\n` +
-        `  - Graph "${GRAPH_ID}" edge 0 names "${MISSING_CARD_A}" as its from, which is not a card of its layout "${LAYOUT_ID}"\n` +
-        `  - Graph "${GRAPH_ID}" edge 0 names "${MISSING_CARD_B}" as its to, which is not a card of its layout "${LAYOUT_ID}"`,
+        `  - Graph "${GRAPH_ID}" edge 0 names "${MISSING_CARD_A}" as its from, which the space does not hold\n` +
+        `  - Graph "${GRAPH_ID}" edge 0 names "${MISSING_CARD_B}" as its to, which the space does not hold`,
     );
   });
 });

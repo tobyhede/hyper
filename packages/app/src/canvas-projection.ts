@@ -19,9 +19,9 @@ import { activeGraphColor, graphColorMap } from './colors';
 import type { ResolvedRenderer } from './renderer';
 
 /**
- * What the canvas draws, derived from a Space and the view rendering it.
+ * What the canvas draws, derived from a Space and the renderer drawing it.
  *
- * Everything here is a pure function of the Space, the resolved view and the
+ * Everything here is a pure function of the Space, the resolved renderer and the
  * interaction state — no store, no React, no DOM. It is split in two because an
  * arrangement is asynchronous: the outer call answers everything a strategy
  * needs and everything the canvas draws *around* the cards, and `project` turns
@@ -53,7 +53,7 @@ export interface PendingCanvasProjection {
   readonly strategyGraph: LayoutStrategyGraph;
   /** Every visible Graph's resolved colour. */
   readonly colors: Readonly<Record<string, string>>;
-  /** The Graphs this view draws, in the Space's authored order. */
+  /** The Graphs this renderer draws — its subject's, in authored order. */
   readonly visibleGraphs: readonly Graph[];
   /**
    * The arrangement, coloured by the interaction state.
@@ -66,19 +66,32 @@ export interface PendingCanvasProjection {
   project(laidOut: LayoutStrategyGraph, interaction: CanvasInteraction): CanvasNodesAndEdges;
 }
 
-export function canvasProjection(space: Space, view: ResolvedRenderer): PendingCanvasProjection {
+export function canvasProjection(
+  space: Space,
+  renderer: ResolvedRenderer,
+): PendingCanvasProjection {
   const colors = graphColorMap(space);
-  // Which Graphs the renderer draws, resolved from the Layout that filtered them
-  // (ADR 0026). Membership is the view's decision (ADR 0005), which is why it
-  // arrives on the resolved view rather than being decided here.
-  const visible = new Set<GraphId>(view.visibleGraphIds);
-  const visibleGraphs = space.graphs.filter((graph) => visible.has(graph.id));
-  const handles = filterHandlesByGraphs(buildCardHandles(space), view.visibleGraphIds);
+  // Which Graphs the renderer draws: its subject's, exactly (ADR 0045). They are
+  // the Space's own values, so the projection below draws the same Graphs the
+  // renderer was resolved over rather than a set derived a second way here.
+  const visibleGraphs = renderer.subject.graphs;
+  const drawnGraphIds = visibleGraphs.map((graph) => graph.id);
+  const visible = new Set<GraphId>(drawnGraphIds);
+  const handles = filterHandlesByGraphs(buildCardHandles(space), drawnGraphIds);
   const edges = buildGraphRenderEdges(space).filter((edge) => visible.has(edge.graphId));
-  // Every card, not just the graph-visited ones. A Space may have cards and no
-  // graphs at all (ADR 0015) — deriving the card set from the graphs would draw
-  // a new Space as an empty canvas, which is the one thing it must not do. Which
-  // cards a view draws was always the View's call, not the layout's (ADR 0005).
+  // Every Card in the Space, and **deliberately not `renderer.subject.cards`**.
+  //
+  // This is the one deferred read of the fallback-band exception (AGENTS.md).
+  // `positionedStrategy` still draws a Card a selected Layout omits, in a band
+  // below everything the Layout places, and until package 5 builds Cards View,
+  // Add to Layout and Remove from Layout that band is the only surface such a
+  // Card can be reached through. Narrowing this to the subject now would take it
+  // off screen with nothing to replace it. Package 5 swaps this line for the
+  // subject when it deletes the band.
+  //
+  // A Space may also have Cards and no Graphs at all (ADR 0015), so the set can
+  // never be derived from the Graphs either — that would draw a new Space as an
+  // empty canvas.
   const cardIds = space.cards.map((card) => card.id);
   const strategyGraph = buildLayoutStrategyGraph(cardIds, handles, edges, CARD_SIZE);
 

@@ -1,235 +1,116 @@
 import {
   isBuiltInViewId,
   type BuiltInViewId,
+  type Card,
   type CardId,
   type Graph,
-  type Layout,
   type GraphId,
   type UUID,
 } from '@project/core';
 import {
-  getLayout,
   gridStrategy,
   Placement,
   positionedStrategy,
   type LayoutStrategy,
+  type ResolvedLayout,
   type Space,
 } from '@project/graph';
 import { elkStrategy } from '@project/react-flow-adapter';
-import { nextNumberedTitle } from './titles';
+import { nextGraphTitle } from './titles';
 
 /**
- * Which view a space opens in, and what that means for arranging and editing.
+ * What is currently drawing a Space, and what editing it means.
  *
- * The chain is `space.defaultView` → viewer default → the graph-driven flow.
- * The middle link has no surface yet: a viewer-level preference is named in the
- * spec and deliberately not built, so today the chain is two links long.
+ * A renderer is one of two things and never both: an application-supplied
+ * **View**, which computes placement and gains a Layout by being edited (ADR
+ * 0025), or an authored **Layout**, which is updated in place. Discriminating
+ * them is what removes the pair of nullable fields that used to encode it —
+ * `layout` and `convert`, exactly one of which was ever non-null — and it is why
+ * this module is not named after either variant.
  *
- * A view also answers which graphs it shows and which of them opens active
- * (ADR 0026). What it shows follows from its subject: a selected Layout draws
- * the graphs it owns, an Algorithmic View over the Space's cards draws the
- * flatten across every Layout (ADR 0040, ADR 0045). The active one is read off
- * the resolved Layout and falls back, so the answer exists for every space —
- * including one with no Layout, which is one with no graphs at all.
- *
- * This lives in `app` rather than `graph` because resolving a view means
- * choosing a strategy, and `elkStrategy` lives in the adapter — `graph` may not
- * reach for it. Composition is exactly this file's job.
+ * It lives in `app` rather than `graph` because resolving a renderer means
+ * choosing a strategy, and `elkStrategy` lives in the adapter, which `graph` may
+ * not reach. Composition is exactly this file's job.
  */
 
 /** Where a space opens when it names no view of its own. */
 export const DEFAULT_VIEW_ID: BuiltInViewId = 'flow';
 
-const BUILT_IN_STRATEGIES: Record<BuiltInViewId, () => LayoutStrategy> = {
-  flow: elkStrategy,
-  grid: gridStrategy,
-};
-
 /**
- * The subject a view renders: its cards, and the graphs over them (ADR 0045).
+ * What a renderer draws: exact Cards and exact Graphs, taken from one Space.
  *
- * *Zero* or more graphs, deliberately — a new space is one card and no graphs
- * (ADR 0018) and still has to render. The asymmetry with {@link ConvertedLayout}
- * below, which requires one or more, is the whole cardinality rule.
+ * Values rather than ids, because every obligation stated over a subject is
+ * about the things themselves — an Edge endpoint is checked against the Cards
+ * this carries, and a conversion's freshness against the Graphs it carries. A
+ * caller that needs an id reads one off; a caller handed ids could not go the
+ * other way without a lookup, and would then be free to look one up in a
+ * different Space.
+ *
+ * *Zero* or more Graphs, deliberately: a new Space is one Card and no Graphs
+ * (ADR 0018) and still renders. The asymmetry with {@link ViewConversion}, which
+ * carries one or more, is the whole cardinality rule of ADR 0045.
+ *
+ * Transparent and unbranded. It is a selection over a Space, checked where it is
+ * produced; nothing downstream reconstructs one.
  */
-export interface ViewSubject {
-  readonly cardIds: readonly CardId[];
+export interface RendererSubject {
+  readonly cards: readonly Card[];
   readonly graphs: readonly Graph[];
 }
 
 /**
- * What a view hands back on conversion: everything a Layout is made of.
+ * What a View hands back on conversion: one or more Graphs, each already
+ * carrying a fresh identity this module minted.
  *
- * Both halves travel together because both obligations are stated over the
- * *returned* pair — an edge endpoint is checked against the cards this value
- * carries, not against the subject the view was given. A view that prunes its
- * subject is legal; one that prunes a card and keeps an edge into it is not.
+ * Graphs and nothing else. The Placement conversion is given is the completed
+ * one Space Authoring already holds, so returning it would hand the caller its
+ * own value back and invite a second, disagreeing copy.
  *
- * The graphs are a non-empty tuple rather than an array, so "one or more" is a
- * thing a view cannot get wrong rather than a thing the boundary has to catch.
- * The first is the one the new Layout opens active on, which is the same rule an
- * absent `activeGraph` is read by (ADR 0026).
+ * A non-empty tuple rather than an array, so "one or more" is a thing a caller
+ * cannot get wrong rather than a thing it has to check. The first is the one the
+ * new Layout opens active on, which is the same rule an absent `activeGraph` is
+ * read by (ADR 0026).
  */
-export interface ConvertedLayout {
-  readonly positions: Placement;
+export interface ViewConversion {
   readonly graphs: readonly [Graph, ...Graph[]];
 }
 
-/**
- * A view's own conversion, before the boundary has checked it.
- *
- * What a view does between its two sides is its own business (ADR 0045): it may
- * return the graphs it was showing, a fresh empty one, or a pruned projection.
- * {@link convertView} is what holds every one of those to the two obligations.
- */
-export type ViewConversion = (
-  subject: ViewSubject,
-  positions: Placement,
-  newGraphId: () => GraphId,
-) => ConvertedLayout;
-
-/**
- * ADR 0045's conversion boundary: a view's own answer, held to the two
- * obligations that bind every view, present and future.
- *
- * **Closure.** Every edge endpoint of every returned graph is among the returned
- * cards. ADR 0040 states this as an invariant of a Layout; stating it here is
- * what makes it hold for Layouts nobody has designed a view for yet, and it
- * closes the gap review of PR #39 found — a view that selected a subset of its
- * source graph's cards and converted produced edges naming non-members.
- *
- * **Fresh identity.** No returned graph carries an identity already in use.
- * This is the mechanism ADR 0040's ownership claimed and did not supply: it is
- * what makes it impossible for any view to hand two Layouts one graph. It is
- * checked against the subject's graphs, which for a converting view is every
- * graph in the space — the flatten — so it is also what keeps a graph id unique
- * across the space (ADR 0045). Two returned graphs sharing one identity fail it
- * for the same reason; `graphsById` is a `new Map` and would drop one in
- * silence.
- *
- * Both throw rather than refusing. Neither is an author's mistake or a state
- * the product can reach — they are a view implementation that is wrong, and the
- * Edit that called it has nothing to fall back to.
- */
-export function convertView(
-  choose: ViewConversion,
-  subject: ViewSubject,
-  positions: Placement,
-  newGraphId: () => GraphId,
-): ConvertedLayout {
-  const converted = choose(subject, positions, newGraphId);
-  const taken = new Set<GraphId>(subject.graphs.map((graph) => graph.id));
-  for (const graph of converted.graphs) {
-    if (taken.has(graph.id)) {
-      throw new Error(
-        `A View returned the Graph ${graph.id}, which is not a fresh identity it may own.`,
-      );
-    }
-    taken.add(graph.id);
-    for (const edge of graph.edges) {
-      if (!converted.positions.has(edge.from) || !converted.positions.has(edge.to)) {
-        throw new Error(
-          `A View returned the Graph ${graph.id} with an Edge from ${edge.from} to ${edge.to}, which is not closed over the Cards it returned.`,
-        );
-      }
-    }
-  }
-  return converted;
-}
-
-/**
- * What an Algorithmic View returns on conversion: one fresh graph holding no
- * edges, numbered above the graphs it was showing.
- *
- * This is the **view's choice** among legal outputs and not a rule of the
- * boundary (ADR 0045) — a copy of the graph the author was emphasising would
- * satisfy both obligations just as well. It is not what this view does, because
- * a copy is how two graphs carrying one title begin diverging in silence. An
- * author surprised once by finding their edge in a new graph has been surprised;
- * an author whose two "Onboarding" graphs drifted apart over a month has been
- * harmed.
- */
-const freshGraphConversion: ViewConversion = (subject, positions, newGraphId) => ({
-  positions,
-  graphs: [
-    {
-      id: newGraphId(),
-      title: nextNumberedTitle(
-        'Graph',
-        subject.graphs.map((graph) => graph.title),
-      ),
-      edges: [],
-    },
-  ],
-});
-
-/**
- * Whether this view already has a Layout, or gets one by being edited.
- *
- * A union rather than two independent nullable fields, because exactly one of
- * the two holds and nothing should have to defend against the pair that cannot
- * happen. Neither side is a permission: every view is editable, and an automatic
- * one gets a Layout by being edited (ADR 0025). What this answers is whether
- * Edit completion updates a Layout the author named or creates one.
- */
-export type ViewLayout =
-  | {
-      readonly layout: Layout;
-      readonly convert: null;
-    }
-  | {
-      readonly layout: null;
-      /**
-       * Convert this view into the content of a new Layout: the cards it was
-       * showing with their positions, plus one or more graphs, each already held
-       * to ADR 0045's two obligations by {@link convertView}.
-       *
-       * A selected Layout has no counterpart to this — it is not converted, it
-       * is updated in place, and its graphs keep the identities it owns.
-       *
-       * The minter comes from the caller because `resolveRenderer` is a free
-       * function seven call sites reach, only one of which converts: the module
-       * that mints — Space Authoring — took the dependency once when it was
-       * composed, and hands it to the conversion it is already performing. A
-       * parameter on `resolveRenderer` instead would repeat it at six Navigation
-       * call sites that never mint anything.
-       */
-      readonly convert: (positions: Placement, newGraphId: () => GraphId) => ConvertedLayout;
-    };
-
-interface ResolvedRendererBase {
-  /** A declared Layout's id, or a built-in view's. */
-  id: string;
-  /** Arranges the cards this renderer shows. */
-  strategy: LayoutStrategy;
+/** An application-supplied View: it computes placement, and editing converts it. */
+export interface ResolvedViewRenderer {
+  readonly kind: 'view';
+  readonly id: BuiltInViewId;
+  readonly title: string;
+  readonly subject: RendererSubject;
+  readonly strategy: LayoutStrategy;
   /**
-   * The cards of this view's subject: a selected Layout's own members, which
-   * are its position keys, or every card in the Space under an Algorithmic View
-   * (ADR 0040, ADR 0045).
+   * The Graph this View opens on when Navigation opens or explicitly selects it,
+   * or `null` in a Space with no Graphs (ADR 0015).
    *
-   * The Card half of what {@link ResolvedRendererBase.visibleGraphIds} answers for
-   * graphs, and the same argument for it being a field: which cards a view takes
-   * from its space is the View's call (ADR 0005). The render path does not read
-   * it yet — the omitted-Card fallback band still draws a card a Layout leaves
-   * out, and package 5 of the handoff replaces the band and its readers together.
+   * A default and not an answer about the current state: `continueInRenderer`
+   * carries the Active Graph a completed Edit produced and must never quietly
+   * replace it with this (ADR 0040). A Layout has no counterpart here because
+   * `resolvedLayout.activeGraph` already is one.
    */
-  cardIds: readonly CardId[];
+  readonly defaultActiveGraph: Graph | null;
   /**
-   * The graphs this view draws: the ones a selected Layout owns, or the Space
-   * flatten under an Algorithmic View. It stays a field rather than collapsing
-   * into `space.graphs` at each reader because which graphs a view shows is the
-   * View's call (ADR 0005), and the two answers now differ.
+   * Convert this View into the Graphs of a new Layout (ADR 0025, ADR 0045).
+   *
+   * Synchronous, and it takes the completed rendered Placement so the two
+   * obligations can be checked against the Cards the Layout will actually hold.
    */
-  visibleGraphIds: readonly GraphId[];
-  /**
-   * Which visible graph opens active, or `null` in a space with no graphs
-   * (ADR 0015). The fallback to the first visible graph lives here rather than
-   * in the store, so there is one place that answers it (ADR 0026).
-   */
-  activeGraphId: GraphId | null;
+  readonly convert: (rendered: Placement) => ViewConversion;
 }
 
-export type ResolvedRenderer = ResolvedRendererBase & ViewLayout;
+/** An authored Layout: it is not converted, it is updated in place. */
+export interface ResolvedLayoutRenderer {
+  readonly kind: 'layout';
+  /** The canonical value `space.lookup.layout` answers with, Active Graph included. */
+  readonly resolvedLayout: ResolvedLayout;
+  readonly subject: RendererSubject;
+  readonly strategy: LayoutStrategy;
+}
+
+export type ResolvedRenderer = ResolvedViewRenderer | ResolvedLayoutRenderer;
 
 /** The one renderer currently navigating a Space (ADR 0031). */
 export type RendererSelection =
@@ -237,57 +118,291 @@ export type RendererSelection =
   | { readonly kind: 'layout'; readonly layoutId: UUID };
 
 /**
- * Which graphs a view draws and which of them opens active.
+ * Why a renderer refused, and every one of them is a defect rather than an
+ * author's mistake.
  *
- * A selected Layout draws the graphs **it owns** (ADR 0040); an Algorithmic
- * View, whose subject is the Space's cards, draws every graph in the Space —
- * the flatten across every Layout, which `Space.graphs` already is (ADR 0045).
- * Those are two subjects, not two kinds of view.
- *
- * A read, never a write: an author's space needs neither answer written down,
- * and both are computed rather than filled in. What the app *saves* names the
- * active graph outright, which is a different rule and lives in `snapshot.ts`
- * (ADR 0028).
+ * A View that breaks an obligation is wrong, and the Edit that called it has
+ * nothing to fall back to; a selection naming a Layout that is gone is a caller
+ * that failed to check. So these throw, and Space Authoring must **not** turn
+ * one into `no-edit` — a refusal is a thing the author did, and none of these
+ * is.
  */
-function resolveSubject(space: Space, layout: Layout | null): ViewSubject {
-  return {
-    // A Layout's position keys **are** its Card membership (ADR 0040); an
-    // Algorithmic View's subject is the Space's Cards, which is what makes its
-    // flatten closed for free — every endpoint of every Graph is one of them.
-    cardIds:
-      layout === null
-        ? space.cards.map((card) => card.id)
-        : [...Placement.fromLayout(layout).keys()],
-    graphs: layout?.graphs ?? space.graphs,
-  };
+export type RendererInvariantReason =
+  | 'renderer-not-found'
+  | 'invalid-subject'
+  | 'placement-does-not-match-subject'
+  | 'empty-graph-output'
+  | 'graph-edge-outside-placement'
+  | 'duplicate-graph-edge'
+  | 'graph-id-not-fresh';
+
+export class RendererInvariantError extends Error {
+  readonly reason: RendererInvariantReason;
+
+  constructor(reason: RendererInvariantReason, message: string) {
+    super(message);
+    this.name = 'RendererInvariantError';
+    this.reason = reason;
+  }
 }
 
-function resolveGraphs(
+/**
+ * A Graph's content with no identity on it — what a View policy decides.
+ *
+ * Identity is the shared module's to mint, so a policy cannot return a source
+ * Graph's id however plainly its author meant *that* Graph (ADR 0045). The
+ * obligation ADR 0040 claimed and did not supply is here made unrepresentable
+ * rather than checked: a future View may copy or prune Graph content freely, and
+ * still cannot hand two Layouts one Graph.
+ */
+export type GraphWithoutId = Omit<Graph, 'id'>;
+
+/**
+ * A View's own choice of what a conversion produces, over its subject and the
+ * Placement being converted. Pure, and identity-free.
+ */
+export type ViewGraphPolicy = (
   space: Space,
-  layout: Layout | null,
-): Pick<ResolvedRenderer, 'visibleGraphIds' | 'activeGraphId'> {
-  const visibleGraphIds = (layout?.graphs ?? space.graphs).map((graph) => graph.id);
+  subject: RendererSubject,
+  placement: Placement,
+) => readonly [GraphWithoutId, ...GraphWithoutId[]];
+
+/** Everything one conversion is decided from. See {@link convertSubject}. */
+export interface SubjectConversion {
+  readonly space: Space;
+  readonly subject: RendererSubject;
+  readonly policy: ViewGraphPolicy;
+  readonly placement: Placement;
+  readonly newGraphId: () => GraphId;
+  /** What a refusal names: a built-in View's id, where the resolver calls this. */
+  readonly renderer: string;
+}
+
+/**
+ * ADR 0045's conversion boundary, in the fixed order the obligations depend on.
+ *
+ * The Placement is checked against the subject *first*, because everything after
+ * it is stated over the Cards the new Layout will hold and a Placement that is
+ * not those Cards makes each later check answer a different question. The policy
+ * runs next, its output is checked whole, and only then are identities minted —
+ * so an output that was going to be refused consumes none. A minted id that
+ * collides is reported rather than retried: a colliding identity source is a
+ * fault, and silently drawing again would hide it.
+ *
+ * **It is exported so a View nobody has designed yet can be pushed through it.**
+ * Flow and Grid are three lines each and could be read; what makes the
+ * obligations mean anything is that they hold at the boundary, over policies
+ * written to break them. `renderer.property.test.ts` generates exactly those.
+ * The `createRendererResolver` below is the only caller in the app, and the
+ * private registry is still the only way to select a View.
+ */
+export function convertSubject({
+  space,
+  subject,
+  policy,
+  placement,
+  newGraphId,
+  renderer,
+}: SubjectConversion): ViewConversion {
+  if (
+    placement.size !== subject.cards.length ||
+    subject.cards.some((card) => !placement.has(card.id))
+  ) {
+    throw new RendererInvariantError(
+      'placement-does-not-match-subject',
+      `The renderer ${renderer} was converted with a Placement of ${placement.size} Card(s) that is not its subject of ${subject.cards.length}.`,
+    );
+  }
+
+  // Widened deliberately: the tuple is what a policy promises, and this is the
+  // one place that does not take the promise on trust.
+  const chosen: readonly GraphWithoutId[] = policy(space, subject, placement);
+  const [head, ...tail] = chosen;
+  if (head === undefined) {
+    throw new RendererInvariantError(
+      'empty-graph-output',
+      `The renderer ${renderer} returned no Graph, and a Layout owns at least one.`,
+    );
+  }
+
+  for (const graph of chosen) {
+    const seen = new Set<string>();
+    for (const edge of graph.edges) {
+      if (!placement.has(edge.from) || !placement.has(edge.to)) {
+        throw new RendererInvariantError(
+          'graph-edge-outside-placement',
+          `The renderer ${renderer} returned an Edge from ${edge.from} to ${edge.to}, which is not closed over the Cards of the Layout it is creating.`,
+        );
+      }
+      const key = `${edge.from}\0${edge.to}`;
+      if (seen.has(key)) {
+        throw new RendererInvariantError(
+          'duplicate-graph-edge',
+          `The renderer ${renderer} returned the Edge from ${edge.from} to ${edge.to} twice in one Graph.`,
+        );
+      }
+      seen.add(key);
+    }
+  }
+
+  // Fresh against the whole Space, not merely against the subject: a Graph id is
+  // unique across the Space although one Layout owns it (ADR 0045).
+  const taken = new Set<GraphId>(space.graphs.map((graph) => graph.id));
+  const identify = (graph: GraphWithoutId): Graph => {
+    const graphId = newGraphId();
+    if (taken.has(graphId)) {
+      throw new RendererInvariantError(
+        'graph-id-not-fresh',
+        `The renderer ${renderer} was given the Graph identity ${graphId}, which is already in use.`,
+      );
+    }
+    taken.add(graphId);
+    return { ...graph, id: graphId };
+  };
+
+  return { graphs: [identify(head), ...tail.map(identify)] };
+}
+
+interface BuiltInViewDefinition {
+  readonly title: string;
+  readonly selectSubject: (space: Space) => RendererSubject;
+  readonly createStrategy: () => LayoutStrategy;
+  readonly graphPolicy: ViewGraphPolicy;
+}
+
+/**
+ * Every Card in the Space, and every Graph in it — the flatten across the
+ * Layouts that own them (ADR 0045).
+ *
+ * This is what makes an Algorithmic View's Graph collection closed for free:
+ * every Edge endpoint of every Graph is a Card of some Layout and therefore a
+ * Card of the Space.
+ */
+const spaceSubject = (space: Space): RendererSubject => ({
+  cards: space.cards,
+  graphs: space.graphs,
+});
+
+/**
+ * One fresh Graph holding no Edges, numbered above the Graphs being shown.
+ *
+ * The **View's choice** among legal outputs and not a rule of the boundary (ADR
+ * 0045) — a copy of the Graph the author was emphasising would satisfy every
+ * obligation just as well. It is not what these Views do, because a copy is how
+ * two Graphs carrying one title begin diverging in silence. An author surprised
+ * once by finding their Edge in a new Graph has been surprised; an author whose
+ * two "Onboarding" Graphs drifted apart over a month has been harmed.
+ *
+ * It needs no input Graph, which is what lets either View render a new Space
+ * with none: the empty Graph exists only because an Edit is creating a Layout,
+ * and a Layout's Graph collection is non-empty (ADR 0040).
+ */
+const freshEmptyGraph: ViewGraphPolicy = (_space, subject) => [
+  { title: nextGraphTitle(subject.graphs), edges: [] },
+];
+
+/**
+ * The built-in Views, closed.
+ *
+ * Private on purpose. Public View registration is future work — persisted View
+ * ids and what happens when a plugin is missing are undecided — and a seam
+ * exposed before either question is answered would be a guess. Two definitions
+ * behind one internal shape is enough to keep the shape honest.
+ */
+const BUILT_IN_VIEWS: Readonly<Record<BuiltInViewId, BuiltInViewDefinition>> = {
+  flow: {
+    title: 'Flow',
+    selectSubject: spaceSubject,
+    createStrategy: elkStrategy,
+    graphPolicy: freshEmptyGraph,
+  },
+  grid: {
+    title: 'Grid',
+    selectSubject: spaceSubject,
+    createStrategy: gridStrategy,
+    graphPolicy: freshEmptyGraph,
+  },
+};
+
+/**
+ * A Layout's subject: its own Card members, and the Graphs it owns.
+ *
+ * Members are the Layout's position keys (ADR 0040), listed in `space.cards`
+ * order rather than in the map's insertion order — the same stable order every
+ * other Card list in the app is in, so two subjects over one Layout can never
+ * disagree about sequence.
+ */
+function layoutSubject(space: Space, resolved: ResolvedLayout): RendererSubject {
+  const members = Placement.fromLayout(resolved.layout);
   return {
-    visibleGraphIds,
-    // `loadSpace` has already checked that a named `activeGraph` is one this
-    // Layout owns, so the `??` is the absent case and not a repair of a bad
-    // reference. The fallback runs over what the view draws — a Layout falling
-    // back to the Space's first graph would open active on one it does not own.
-    activeGraphId: layout?.activeGraph ?? visibleGraphIds[0] ?? null,
+    cards: space.cards.filter((card) => members.has(card.id)),
+    graphs: resolved.layout.graphs,
   };
 }
 
 /**
- * Whether a resolved view draws a Graph.
+ * Hold a subject to being a selection over the source Space, and answer it.
  *
- * The membership test for the set `resolveGraphs` answers, and it lives beside
- * it so the question and the one answer to it sit in the same module (ADR 0026).
- * It reads `visibleGraphIds` rather than deciding visibility a second time —
- * Navigation asks this, and a Navigation that computed its own answer would
- * disagree with the renderer the moment the two sets differ again.
+ * Exact values, no duplicates. It is cheap and it is what stops a subject
+ * selector — including one written for a View nobody has designed yet — from
+ * synthesising an authored entity, cloning one, or listing a Card twice and
+ * making every downstream count wrong.
+ *
+ * Exported for the same reason `convertSubject` is: Flow and Grid both select
+ * the whole Space and could not break this if they tried, so a guard proved only
+ * through them is not proved at all. `renderer.property.test.ts` pushes
+ * generated subjects through it.
  */
-export const rendererShowsGraph = (view: ResolvedRenderer, graphId: GraphId): boolean =>
-  view.visibleGraphIds.includes(graphId);
+export function checkSubject(space: Space, id: string, subject: RendererSubject): RendererSubject {
+  const cardIds = new Set<CardId>();
+  for (const card of subject.cards) {
+    if (space.lookup.card(card.id) !== card) {
+      throw new RendererInvariantError(
+        'invalid-subject',
+        `The renderer ${id} selected a Card ${card.id} that is not the Space's own value.`,
+      );
+    }
+    if (cardIds.has(card.id)) {
+      throw new RendererInvariantError(
+        'invalid-subject',
+        `The renderer ${id} selected the Card ${card.id} twice.`,
+      );
+    }
+    cardIds.add(card.id);
+  }
+
+  const graphIds = new Set<GraphId>();
+  for (const graph of subject.graphs) {
+    if (space.lookup.graph(graph.id)?.graph !== graph) {
+      throw new RendererInvariantError(
+        'invalid-subject',
+        `The renderer ${id} selected a Graph ${graph.id} that is not the Space's own value.`,
+      );
+    }
+    if (graphIds.has(graph.id)) {
+      throw new RendererInvariantError(
+        'invalid-subject',
+        `The renderer ${id} selected the Graph ${graph.id} twice.`,
+      );
+    }
+    graphIds.add(graph.id);
+  }
+
+  return subject;
+}
+
+export interface RendererResolverDependencies {
+  /**
+   * Where a converted Graph's identity comes from.
+   *
+   * Injected at composition rather than taken per call, so the operation stays
+   * in domain language and a test can compose a deterministic resolver instead
+   * of mocking a global.
+   */
+  readonly newGraphId: () => GraphId;
+}
+
+export type ResolveRenderer = (space: Space, selection?: RendererSelection) => ResolvedRenderer;
 
 /** Resolve the Space default into the initial renderer selection. */
 export function defaultRenderer(space: Space): RendererSelection {
@@ -297,37 +412,56 @@ export function defaultRenderer(space: Space): RendererSelection {
     : { kind: 'layout', layoutId: requested };
 }
 
-export function resolveRenderer(
-  space: Space,
-  selection: RendererSelection = defaultRenderer(space),
-): ResolvedRenderer {
-  if (selection.kind === 'layout') {
-    const layout = getLayout(space, selection.layoutId);
-    if (layout === undefined) {
-      throw new Error(`The selected Layout ${selection.layoutId} does not exist.`);
+/**
+ * Compose the one resolver this app resolves renderers with.
+ *
+ * There is exactly one per composition, shared by App rendering, Navigation and
+ * Space Authoring. A second would be a second source of minted identities, and
+ * the whole point of taking `newGraphId` here is that a deterministic one can be
+ * supplied in one place.
+ */
+export function createRendererResolver({
+  newGraphId,
+}: RendererResolverDependencies): ResolveRenderer {
+  return (space, selection = defaultRenderer(space)) => {
+    if (selection.kind === 'layout') {
+      const resolvedLayout = space.lookup.layout(selection.layoutId);
+      if (resolvedLayout === undefined) {
+        throw new RendererInvariantError(
+          'renderer-not-found',
+          `The selected Layout ${selection.layoutId} does not exist.`,
+        );
+      }
+      return {
+        kind: 'layout',
+        resolvedLayout,
+        subject: checkSubject(
+          space,
+          resolvedLayout.layout.id,
+          layoutSubject(space, resolvedLayout),
+        ),
+        strategy: positionedStrategy(Placement.fromLayout(resolvedLayout.layout)),
+      };
     }
-    return {
-      id: layout.id,
-      strategy: positionedStrategy(Placement.fromLayout(layout)),
-      layout,
-      cardIds: resolveSubject(space, layout).cardIds,
-      convert: null,
-      ...resolveGraphs(space, layout),
-    };
-  }
 
-  const strategy = BUILT_IN_STRATEGIES[selection.view]();
-  const subject = resolveSubject(space, null);
-  // A built-in view carries no Layout, so it has no authored active graph to
-  // read: every graph shows, and the first is active. Editing it converts it,
-  // and the subject resolved here is what that conversion is over.
-  return {
-    id: selection.view,
-    strategy,
-    layout: null,
-    cardIds: subject.cardIds,
-    convert: (positions, newGraphId) =>
-      convertView(freshGraphConversion, subject, positions, newGraphId),
-    ...resolveGraphs(space, null),
+    const definition = BUILT_IN_VIEWS[selection.view];
+    const subject = checkSubject(space, selection.view, definition.selectSubject(space));
+    return {
+      kind: 'view',
+      id: selection.view,
+      title: definition.title,
+      subject,
+      strategy: definition.createStrategy(),
+      defaultActiveGraph: subject.graphs[0] ?? null,
+      convert: (rendered) =>
+        convertSubject({
+          space,
+          subject,
+          policy: definition.graphPolicy,
+          placement: rendered,
+          newGraphId,
+          renderer: selection.view,
+        }),
+    };
   };
 }

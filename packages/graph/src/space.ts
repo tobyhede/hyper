@@ -4,22 +4,35 @@ import {
   spaceSnapshotSchema,
   type Card,
   type BuiltInViewId,
-  type CardId,
   type Layout,
   type Graph,
-  type GraphId,
   type SpaceSnapshot,
   type UUID,
 } from '@project/core';
 import { parseCardFile, type CardFile, type CardFileError } from './card-file';
+import { buildSpaceLookup, type SpaceLookup } from './lookup';
 import { validateReferences, type SpaceReferenceError } from './validate';
+
+/** The intake brand's carrier. See {@link Space} for what it means. */
+declare const SPACE_INTAKE: unique symbol;
 
 /**
  * A Space: the validated, indexed top-level domain value (ADR 0010). It carries
- * the same data as the file it was loaded from, plus an index, so lookups are
- * O(1). A Space exists only as the output of {@link loadSpace}, so its
- * consistency is guaranteed by construction — nothing can hand-build an
- * unvalidated one.
+ * the same data as the file it was loaded from, plus a lookup, so resolution is
+ * O(1). A Space exists only as the output of {@link loadSpace} or
+ * {@link loadSpaceSnapshot}, so its consistency is guaranteed by construction.
+ *
+ * **The brand is what makes that a guarantee rather than a convention.** It is
+ * a private unique symbol, so nothing outside this module can write an object
+ * literal that typechecks as a Space — a value that only looks like one has not
+ * been through the reference check, and the type now says so. It is
+ * compiler-only: no such property exists at runtime, and nothing may start
+ * reading one.
+ *
+ * `lookup` is an ordinary enumerable runtime property, and deliberately so. A
+ * Space is a runtime value and never the persistence representation — what gets
+ * stored is projected back to a `SpaceSnapshot`, which names the fields it wants
+ * rather than serializing this.
  */
 export interface Space {
   /** What names this space (ADR 0019). Not its title, and not its file path. */
@@ -33,6 +46,9 @@ export interface Space {
    * 0040), and this is the collection a view whose subject is the space's cards
    * draws. Closed for free, since every edge endpoint is a card of some layout
    * and so a card of the space.
+   *
+   * The exact nested values, never copies: a graph read off here and one read
+   * through `lookup.graph` are the same object.
    */
   readonly graphs: readonly Graph[];
   /**
@@ -43,16 +59,13 @@ export interface Space {
   readonly layouts: readonly Layout[];
   /** Which view this space opens in — a layout's id or a built-in view's. */
   readonly defaultView: BuiltInViewId | UUID | undefined;
-  readonly cardsById: ReadonlyMap<CardId, Card>;
-  readonly graphsById: ReadonlyMap<GraphId, Graph>;
-  readonly layoutsById: ReadonlyMap<UUID, Layout>;
   /**
-   * Which layout owns each graph — what the flatten above loses. Total over
-   * `graphs`, and unambiguous because a repeated graph id is a load error: the
-   * id is unique across the space although ownership is layout-scoped (ADR
-   * 0045).
+   * Contextual entity resolution — the only one. The Maps behind it are closed
+   * over and appear nowhere on this value, so no caller can index the space a
+   * second way or hold a collection that disagrees with this one.
    */
-  readonly layoutByGraphId: ReadonlyMap<GraphId, Layout>;
+  readonly lookup: SpaceLookup;
+  readonly [SPACE_INTAKE]: true;
 }
 
 /**
@@ -242,24 +255,42 @@ function buildSpace(input: {
   // authored order. Derived and never stored (ADR 0045) — it exists so the
   // readers that key colour, handles, render edge ids and activation on a graph
   // id alone keep reading one collection while ownership sits on the layout.
-  // The reference check above has already refused a repeated id, so `new Map`
-  // here can drop nothing.
+  // The reference check above has already refused a repeated id, so the lookup
+  // built below can drop nothing.
   const graphs = layouts.flatMap((layout) => layout.graphs);
-  const space: Space = {
-    id: input.id,
-    title: input.title,
-    cards,
-    graphs,
-    layouts,
-    defaultView: input.defaultView,
-    cardsById: new Map(cards.map((card) => [card.id, card])),
-    graphsById: new Map(graphs.map((graph) => [graph.id, graph])),
-    layoutsById: new Map(layouts.map((l) => [l.id, l])),
-    layoutByGraphId: new Map(
-      layouts.flatMap((layout) =>
-        layout.graphs.map((graph): [GraphId, Layout] => [graph.id, layout]),
-      ),
-    ),
+  const built = buildSpaceLookup({ cards, layouts });
+  if (!built.ok) {
+    return {
+      ok: false,
+      errors: [
+        {
+          kind: 'invalid-shape',
+          message: `layouts: layout "${built.layoutWithoutGraph}" owns no graph`,
+        },
+      ],
+    };
+  }
+  return {
+    ok: true,
+    space: intake({
+      id: input.id,
+      title: input.title,
+      cards,
+      graphs,
+      layouts,
+      defaultView: input.defaultView,
+      lookup: built.lookup,
+    }),
   };
-  return { ok: true, space };
 }
+
+/**
+ * The one place a Space is minted, and the whole of what the brand costs.
+ *
+ * It sits here rather than at each loader because `buildSpace` is the function
+ * that has just run the reference check the brand asserts. The argument is the
+ * Space without it, so the cast can add nothing else: every field is still
+ * checked against the declared shape, and the only thing being asserted is that
+ * this value came through intake.
+ */
+const intake = (space: Omit<Space, typeof SPACE_INTAKE>): Space => space as Space;

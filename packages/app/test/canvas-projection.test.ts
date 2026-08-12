@@ -4,7 +4,12 @@ import { loadSpace, type Space } from '@project/graph';
 import type { CardFlowNode } from '@project/react-flow-adapter';
 import { canvasProjection, type CanvasInteraction } from '../src/canvas-projection';
 import { GRAPH_PALETTE } from '../src/colors';
-import { resolveRenderer, type RendererSelection } from '../src/renderer';
+import { createRendererResolver, type RendererSelection } from '../src/renderer';
+
+/** One composed resolver; nothing here converts, so its identity source is never used. */
+const resolveRenderer = createRendererResolver({
+  newGraphId: () => uuidSchema.parse('00000000-0000-4000-8000-0000000000ff'),
+});
 import { cardFile } from './card-files';
 
 const CARD_A = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
