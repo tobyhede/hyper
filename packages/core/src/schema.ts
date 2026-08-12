@@ -246,8 +246,12 @@ export function isBuiltInViewId(id: string): id is BuiltInViewId {
  * `graphs` array beside layouts that owned none. Hyper is unreleased, so it has
  * no compatibility claim on this one and is rejected rather than migrated (ADR
  * 0040). A named constant rather than a literal inlined in one schema, because
- * `loadSpace` reads the declared version *before* parsing to say so in one
- * error instead of one per key that moved.
+ * `unsupportedDocumentVersion` in `@project/graph` reads the declared version
+ * *before* the schema parses — at domain intake and at the file importer both —
+ * to say so in one error instead of one per key that moved. The literal below
+ * is the shape check for a version that is absent or not a number, which that
+ * gate deliberately declines to speak for; it is not a second answer to which
+ * version this build reads.
  */
 export const SPACE_FILE_VERSION = 1;
 

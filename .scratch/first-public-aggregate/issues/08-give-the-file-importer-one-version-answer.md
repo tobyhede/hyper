@@ -56,10 +56,18 @@ their behaviour is unchanged by construction rather than by re-testing.
 `importSpaceFileSchema`, and a non-null answer throws one `parsing` diagnostic —
 `<space file>: <the gate's sentence>` — without parsing the cards.
 
-Not migrating the cards is deliberate and matches intake: a document of a version
+Not *parsing* the cards is deliberate and matches intake: a document of a version
 this build cannot read is not a document whose files are worth reporting either,
 and `loadSpace` says so by answering exactly one error. The `read-single-space`
 test writes a broken card beside the version 2 space file to pin that.
+
+Their bytes are still read, because the gate sits after the one `allSettled` that
+reads the whole directory. So a version 2 directory containing an *unreadable*
+card answers the read failure rather than the version. Left as it is, and stated
+here rather than discovered later: a read failure is not a worse answer to the
+same question, it is the import saying it could not see what it was asked to
+import, and moving the gate above the reads costs the single settled read whose
+deterministic failure order is itself pinned. Nothing tests that corner.
 
 ### The two alternatives, and why not
 
@@ -79,6 +87,17 @@ test writes a broken card beside the version 2 space file to pin that.
 The `version` literal on `spaceFileSchema` stays. It is not a second answer: it
 reads the same `SPACE_FILE_VERSION`, and it is the shape check for a version that
 is absent or not a number, which the gate deliberately declines to speak for.
+
+### What this does not reach
+
+`decodeSnapshot` (`packages/persistence/src/http-protocol.ts`) and
+`parseSnapshotShape` (`src/persistence/postgres-space-repository.ts`) parse
+`spaceSnapshotSchema` before `loadSpaceSnapshot` is reached, so a version 2
+snapshot is refused at those two doors by cascade rather than by name — the same
+defect this ticket fixed, one door over. It is out of scope here (the ticket names
+the file importer) and it is not the same severity: no human hand-authors a
+snapshot. Raised as ticket `09`. It does **not** cost acceptance criterion 2 —
+those doors decide no version, they only fail to ask.
 
 ### What proves it
 
@@ -105,9 +124,18 @@ is absent or not a number, which the gate deliberately declines to speak for.
 ### Docs
 
 AGENTS.md's ADR 0030 entry replaced its "by name at intake and on the `version`
-literal at the schemas ahead of it" sentence with the one gate, who asks it, why
-the importer throws before reading cards, and the standing prohibition on a third
-answer. No ADR: the decision is reversible, unsurprising, and records a placement
-inside ADR 0030's existing rejection rule rather than a new trade-off. No
-CONTEXT.md change — `version` is on its _Avoid_ list as domain vocabulary and
-this adds none.
+literal at the schemas ahead of it" sentence with the one gate, who asks it, the
+two doors that still do not, and the standing prohibition on a third answer.
+`packages/core/src/schema.ts`'s `SPACE_FILE_VERSION` docblock said the constant
+was named for `loadSpace`'s pre-parse read; it now names the gate and says what
+the literal beside it is for. Ticket `06`'s "the file importer does not share
+intake's pre-parse check" paragraph gained a superseded note rather than an edit,
+since a resolved ticket records what was true when it was written.
+
+No ADR: the decision is reversible, unsurprising, and records a placement inside
+ADR 0030's existing rejection rule rather than a new trade-off. No CONTEXT.md
+change either — but not for the reason first written here. `version` appears on
+an _Avoid_ list belonging to **Replacement epoch**, which rejects it as a name for
+*that counter* and says nothing about document versions. The real reason is that
+this ticket introduces no domain vocabulary: `unsupportedDocumentVersion` is a
+function, and the glossary names concepts.

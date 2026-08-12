@@ -111,13 +111,11 @@ export const readSingleSpace = async (inputPath: string): Promise<ImportSpace> =
   let wrongVersion: UnsupportedVersionError | null = null;
   try {
     const json: unknown = JSON.parse(spaceText);
-    // Asked before the import schema, and asked *here* rather than answered
-    // here: this is the same gate domain intake reads, so the two doors a
-    // document arrives by cannot come to disagree about which version this
-    // build supports. The import schemas run ahead of intake, so without it a
-    // version 2 directory earns the version diagnostic plus every key that
-    // moved — the cascade the gate exists to prevent, arriving at the one
-    // reader hand-authoring the document.
+    // Asked rather than answered here — `unsupportedDocumentVersion`'s docblock
+    // is where the one-gate argument is written out. What is only true at this
+    // call site is the ordering: `importSpaceFileSchema` runs ahead of domain
+    // intake, so the gate has to be asked before it, or the version arrives
+    // buried under every key that moved.
     wrongVersion = unsupportedDocumentVersion(json);
     if (wrongVersion === null) {
       const parsed = importSpaceFileSchema.safeParse(json);
@@ -135,9 +133,17 @@ export const readSingleSpace = async (inputPath: string): Promise<ImportSpace> =
     diagnostics.push(`${spaceFile}: ${String(error)}`);
   }
 
-  // One answer, and nothing behind it: a document of a version this build
-  // cannot read is not a document whose cards are worth reporting either, which
-  // is what intake says by answering exactly one error.
+  // Thrown out here rather than where it is decided: a throw inside that `try`
+  // is caught by its own sibling `catch`, which turns it into a second
+  // `${spaceFile}: …` diagnostic and lets card parsing carry on — the opposite
+  // of the one answer this exists to give. That is why the answer is carried
+  // out on a binding instead of thrown where it is known.
+  //
+  // One answer, and nothing behind it: the cards were read but are not parsed,
+  // matching intake, which answers exactly one error for a version it cannot
+  // read. A *read* failure still precedes this — an import that could not see
+  // the files it was asked to import has not got as far as a document to have a
+  // version.
   if (wrongVersion !== null) {
     throw new SpaceImportFileError('parsing', [`${spaceFile}: ${wrongVersion.message}`]);
   }

@@ -83,8 +83,8 @@ export type { CardHandleSet, GraphRenderEdge, GraphRenderHandleRef } from './gra
 
 // `unsupportedDocumentVersion` is offered although `loadSpace` asks it on every
 // caller's behalf: the file importer parses against import schemas that run
-// ahead of intake, so it has to ask before they answer, and the alternative is a
-// second answer to which version this build reads.
+// ahead of intake, so it has to ask before they answer. Its docblock is where
+// the argument for one gate lives.
 export { loadSpace, loadSpaceSnapshot, unsupportedDocumentVersion } from './space';
 export type {
   LoadSpaceResult,

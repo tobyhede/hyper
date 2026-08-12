@@ -80,10 +80,20 @@ export type SpaceError =
  * message for it is already the right one.
  *
  * Offered rather than private, because it is *the* answer to which version this
- * build reads and a second one would drift from it. Every door a document
- * arrives by asks here: domain intake below, and the file importer, which parses
- * against schemas that run ahead of intake and would otherwise answer that
- * cascade to the one reader hand-authoring the document (ADR 0030).
+ * build reads and a second one would drift from it. **This docblock is where
+ * that argument is written out** — the index clause, the importer and ticket 08
+ * point here rather than restating it.
+ *
+ * Three doors ask it: the two intakes below, and `readSingleSpace`, which parses
+ * against import schemas that run ahead of intake and would otherwise answer
+ * that cascade to the one reader hand-authoring a Space directory (ADR 0030).
+ * Two doors do **not**, and knowing which is the point of writing it here:
+ * `decodeSnapshot` and `parseSnapshotShape` parse `spaceSnapshotSchema` before
+ * `loadSpaceSnapshot` is ever reached, so a version 2 snapshot is still refused
+ * there — by cascade rather than by name. That is diagnostic quality on a door
+ * no human hand-authors, tracked as issue `09` under
+ * `.scratch/first-public-aggregate/`. Answer it by asking this gate earlier, not
+ * by deciding a version somewhere new.
  */
 export function unsupportedDocumentVersion(document: unknown): UnsupportedVersionError | null {
   if (typeof document !== 'object' || document === null) return null;
