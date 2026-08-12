@@ -32,6 +32,7 @@ const EDGE: Edge = {
 };
 
 interface InstallRecord {
+  readonly kind: 'reported' | 'replaced';
   readonly placement: ReadonlyMap<string, LayoutPosition> | null;
   /** What the adapter's own state held at the moment the effect ran. */
   readonly nodesAtCall: readonly CardFlowNode[] | null;
@@ -56,10 +57,18 @@ function authoringSpy({
     authoredPlacement: () => null,
     subscribe: () => () => undefined,
     reportRendered: (placement: ReadonlyMap<string, LayoutPosition>) => {
-      installs.push({ placement, nodesAtCall: adapter?.getState().projection?.nodes ?? null });
+      installs.push({
+        kind: 'reported',
+        placement,
+        nodesAtCall: adapter?.getState().projection?.nodes ?? null,
+      });
     },
     replacePlacement: (placement: ReadonlyMap<string, LayoutPosition> | null) => {
-      installs.push({ placement, nodesAtCall: adapter?.getState().projection?.nodes ?? null });
+      installs.push({
+        kind: 'replaced',
+        placement,
+        nodesAtCall: adapter?.getState().projection?.nodes ?? null,
+      });
     },
     canConnect: () => canConnect,
     canCreateConnectedCard: () => canCreateConnectedCard,
@@ -222,13 +231,20 @@ describe('render adapter', () => {
   });
 
   it('drops the published Graph Edges with their nodes when the renderer changes', () => {
-    const store = adapter();
+    const spy = authoringSpy();
+    const store = createRenderAdapter(spy.authoring);
+    spy.attach(store);
     store.getState().syncProjection(PROJECTED, [EDGE]);
     expect(store.getState().projection?.edges).toEqual([EDGE]);
 
     store.getState().selectRenderer(null);
 
     expect(store.getState().projection).toBeNull();
+    expect(spy.installs.at(-1)).toEqual({
+      kind: 'replaced',
+      placement: null,
+      nodesAtCall: null,
+    });
   });
 
   it('keeps the published Graph Edges through a change that concerns only nodes', () => {
@@ -310,6 +326,7 @@ describe('render adapter', () => {
     // the adapter still held its previous state, so anything the effect
     // notified read the projection from before the one it was told about.
     expect(spy.installs).toHaveLength(1);
+    expect(spy.installs[0]?.kind).toBe('reported');
     expect(spy.installs[0]?.nodesAtCall?.map((entry) => entry.id)).toEqual([CARD_A, CARD_B]);
     expect(spy.installs[0]?.placement).toEqual(
       Placement.fromEntries([

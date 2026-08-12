@@ -266,8 +266,8 @@ export function createRenderAdapter(authoring: SpaceAuthoring): RenderAdapter {
       if (projection === null || !authoring.canConnect(from, to)) {
         return false;
       }
-      // Report the placement from the live nodes, and publish the reconciled
-      // ones below — deliberately two different lists. `placementFromNodes`
+      // Complete with the placement read from the live nodes, and publish the
+      // reconciled ones below — deliberately two different lists. `placementFromNodes`
       // reads positions only, and `reconcile` takes every surviving Card's
       // position from its live node, so the two agree on every Card already on
       // screen. They diverge only for a Card the projection has gained and the
@@ -275,6 +275,7 @@ export function createRenderAdapter(authoring: SpaceAuthoring): RenderAdapter {
       // `syncProjection` until a strategy resolves. That Card has no resolved
       // position yet, and authoring the origin it is standing on is exactly
       // what a sparse Layout exists to avoid.
+      //
       // Complete first. A completion that has not happened — refused, queued
       // behind another Edit, or thrown on an invalid Space — must not leave a
       // connection drawn for an Edge the Space never gained. Only `completed`

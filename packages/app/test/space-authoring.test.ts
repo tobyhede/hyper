@@ -92,6 +92,10 @@ function replacePlacementForTest(authoring: SpaceAuthoring, rendered: Placement)
 /**
  * Keep the existing cases focused on their Edit outcome while the geometry
  * each completed authoring fact now requires travels through the real interface.
+ *
+ * A movement here names every rendered Card as placed, while the render adapter
+ * names only the Cards the gesture moved. Cases that depend on that distinction
+ * call `SpaceAuthoring.complete` directly.
  */
 function complete(
   authoring: SpaceAuthoring,
@@ -1003,6 +1007,7 @@ describe('Space Authoring', () => {
             kind: 'layout',
             layoutId: LAYOUT_ID,
           });
+          fc.pre(renderedAX !== 10 || renderedAY !== 20 || baseBX !== 300 || baseBY !== 40);
           authoring.authoring.replacePlacement(base);
           authoring.authoring.complete({
             kind: 'settled-card-movement',
