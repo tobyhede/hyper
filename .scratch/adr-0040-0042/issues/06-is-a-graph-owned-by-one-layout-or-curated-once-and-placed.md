@@ -1,6 +1,6 @@
 # Is a Graph owned by one Layout, or curated once and placed in several?
 
-Status: ready-for-human
+Status: resolved
 
 Surfaced by: analysing issue `02`, which turns out to be a symptom of this
 
@@ -109,3 +109,21 @@ ADR receives no edit but its status line, so the likely shape is a new ADR
 that refines or supersedes 0040 rather than a rewrite of it. Issue `01`
 raises the same tension about editing 0041's body and is unresolved; the two
 want answering together.
+
+## Answer
+
+**Layout-owned. ADR 0040's model stands, and the premise it asserted is confirmed as a decision: Hyper has no requirement for one Graph, one identity, to appear in two Layouts.**
+
+The framing that carries it: a Layout is the surface a collection of Cards and Graphs is authored on, so what is authored there belongs to it. That is ADR 0040's own "Routes are authored only through a Layout" said in the direction that makes the ownership follow rather than be stipulated. It is deliberately *not* the word "view" — a View is application-supplied and carries no authored positions (`CONTEXT.md` Layout `_Avoid_`), while a Layout is authored data the Space holds.
+
+**One correction to this ticket, which its later readers should not inherit.** The claim that "ADR 0040 does not make that argument… the product consequence is never weighed" is too strong. 0040's "Why ownership follows authoring" section names the rejected model, states the reuse claim outright, gives a concrete failure of sharing, and accepts the cost in a sentence: "The price is deliberate duplication when two Layouts need initially identical narratives; subsequent edits are independent." What it does is *assert* the no-requirement premise rather than argue it. That is a narrower defect than an unargued decision, and it is what this answer settles.
+
+0040's failure argument for sharing survived scrutiny and is the reason the decision went this way rather than the model-size one this ticket leads with. Under sharing, Remove from Layout either leaves an Edge whose endpoint is absent from that Layout or mutates a shared Graph and changes every other Layout drawing it. Both horns are wrong before any UI exists, so "how the change is communicated" is not the second-order problem it looks like.
+
+**The ticket's structural argument for sharing does not hold.** The join is in the shared model, not the owned one: `layouts[].graphs` is `z.array(idSchema)` (`packages/core/src/schema.ts:150`), an id list into a Space-level collection, which is a many-to-many join expressed in JSON. Ownership makes it containment and deletes the join, the dangling-id check, and the "does `activeGraph` name a *visible* Graph" cross-field rule with it. What ownership genuinely costs is an extra hop to *enumerate* — "the Graphs of a Space" stops being stored — and no operation in the tree wanted that list except a Space-subject View, which ADR 0045 answers by flattening.
+
+**The 1:1 alternative was raised and rejected.** A Layout holding exactly one Graph does not remove the hard rendering case, because ADR 0032 permits cycles inside a single Graph and `.scratch/multiple-routes/findings.md` shows a back-edge follows from a cycle in one Graph just as it does from two Graphs disagreeing. It also discards a measured capability — the fixture's Long/Mid/Short over one spine, three narratives through one arrangement, which the spike rendered with zero back-edges — and forces one full arrangement per narrative, which is more duplication than either model under discussion.
+
+**The constraint this ticket said must survive, survives.** Sharing is not permitted, so nothing draws a Graph naming a Card it does not place, and the fallback band goes as ADR 0040 requires. The two halves stayed coupled.
+
+**What was written.** ADR 0045 (*A View takes Cards and Graphs and returns a Layout*) refines 0040: one View interface over an open subject, with closure and fresh-identity as boundary obligations, and a Space-Card subject drawing every Graph flattened across Layouts. It resolves issue `02` as a consequence. `CONTEXT.md`'s Layout and View entries and package 2 of `.scratch/card-route-editing/implementation-handoff.md` were updated to match. Issue `01` was resolved separately and its precedent — that 0041's body was edited only under explicit authorisation on the exact text — did not need invoking here, because 0045 is a new ADR rather than a rewrite.

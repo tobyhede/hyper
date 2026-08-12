@@ -276,3 +276,46 @@ A non-incident anchor's fallback offset is `((index + 1) / (routeIds.length + 1)
 - ~~`nodes` is fed from two sources (`liveNodes ?? projectedNodes` in `App.tsx`), because `canvasContent` reports `arrangement` before `syncNodes` has run.~~ **Closed.** `canvasContent` no longer treats a `ready` placement as an arrangement — only live nodes are one — so the canvas waits for the editor to take the placement and the node array has one owner. The ownership filter in `editor.ts` stays: it is what stops an unowned node's `dimensions` change from re-measuring forever.
 - ~~`onEdgesChange` is absent while `elementsSelectable` is true.~~ **Closed, the other way.** Rather than `selectable: false`, the handler is wired and filters to `select` changes alone, dropping structural ones — which is what makes React Flow's Edge deletion inert through the controlled path rather than only through `deleteKeyCode={null}`. Edge selection is therefore real and observable (`.react-flow__edge.selected`), and `editing.spec.ts` selects an Edge to prove Backspace and Delete remove nothing.
 - Edges stay `edgesFocusable={false}`, so the Edge assistive description names no key. Selecting an Edge leads nowhere, and putting every Edge in the tab order would sit inert stops between a keyboard user and the next Card. Advertising a keypress an Edge cannot receive is the same defect as the delete claim in §7.3, and is answered the same way — correct the instruction, do not build the interaction it names. Covered by `editing.spec.ts`, "does not advertise an Edge keyboard action it cannot receive".
+
+## 8. Multiple canvases and nesting — 2026-08-12
+
+Asked because a Space Card should plausibly render the Space it points at, and because a canvas-rendered Cards View was proposed. Sources: `/learn/layouting/sub-flows`, `/examples`, and the `ReactFlowProvider` guide, fetched directly.
+
+### 8.1 Two React Flow instances interacting is undocumented
+
+The `ReactFlowProvider` guide names it — "You are working with multiple flows on a page" — and says nothing else. No store-isolation detail, no `useReactFlow`/`useStore` scoping guidance, and its own example shows a single flow with external sidebar access.
+
+There is **no example, free or Pro, of dragging between two instances or of an edge across them.** The examples index confirms it. The nearest thing is `/examples/interaction/drag-and-drop` — "Drag and drop outside of the React Flow pane with native HTML Drag and Drop API" — which is a plain HTML source into one canvas, and is already what the Cards View design specifies (`screenToFlowPosition` included).
+
+So two instances side by side is fine; interaction *between* them is territory we would be inventing.
+
+### 8.2 Sub flows are the documented way to nest, and they are one canvas
+
+> "A sub flow is a flow inside a node. It can be a separate flow or a flow that is connected with other nodes outside of its parent."
+
+Not a second instance: nodes inside one canvas, one store, one viewport.
+
+- `parentId` on the child; the child's position is relative to the parent, where `{ x: 0, y: 0 }` is the parent's top-left corner.
+- `extent: 'parent'` confines the child. Without it, "You can drag or position the child outside of its parent". Warning #005 fires if `extent` is set without `parentId` (§3.6).
+- The `group` node type is conventional, not required — "you can use any other type as well".
+- **Parent nodes must appear before their children** in `nodes`/`defaultNodes` "to get processed correctly". A projection-order constraint.
+- Moving the parent moves the children.
+- Cross-boundary edges are allowed: "we can connect nodes within a group and create connections that go from a sub flow to an outer node."
+
+Examples: `/examples/grouping/sub-flows` (free); `/examples/grouping/selection-grouping`, `/examples/grouping/parent-child-relation` and `/examples/layout/expand-collapse` are Pro. Detaching a child from its parent by drag is therefore a Pro example, not a free feature.
+
+### 8.3 What this means here
+
+**Cross-boundary edges are a place the library permits what the domain forbids.** ADR 0040 closes every Edge over its owning Layout's Card set, and a nested Space's Cards are not members of the outer Layout. If a Space Card is ever rendered as a sub flow, that gesture has to be refused deliberately rather than discovered.
+
+**The Cards View must not become a sub flow.** Recorded with its reasons in `.scratch/card-route-editing/issues/09`.
+
+**The current adapter does not model hierarchy.** `elkStrategy` builds a flat
+graph. The pinned elkjs 0.12.0 API accepts nested `ElkNode.children`, and its
+layered engine includes compound-graph support. Arranging a Layout that contains
+an expanded Space Card therefore requires the adapter to use ELK's compound-node
+support. §3.6's Dagre caveat is about Dagre and does not transfer.
+
+### 8.4 `llms-full.txt` is incomplete
+
+Its extraction reported nesting as absent — no `parentId`, no sub flows, no group mechanics — while `/learn/layouting/sub-flows` exists and §3.6 above already quotes it. It remains the right first stop for breadth. For a specific mechanism, fetch the page.

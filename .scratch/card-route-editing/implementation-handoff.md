@@ -16,7 +16,7 @@ When two records appear to disagree, use this order:
 
 1. `CONTEXT.md` for current ubiquitous language.
 2. The newest accepted ADR that refines or supersedes an older one, especially
-   ADRs 0040, 0041 and 0042.
+   ADRs 0040, 0041, 0042 and 0045.
 3. The complete keyboard specification.
 4. The operation-specific accepted prototypes.
 5. This handoff for cross-operation sequencing and proof obligations.
@@ -40,6 +40,15 @@ The key architecture is fixed:
 - Graph management cannot delete the final Graph.
 - An Algorithmic View has no authored Layout or Graph. Its first Edit converts
   the rendered Cards and positions into a new Layout without moving them.
+- A View is one interface over an open subject (ADR 0045), not a set of kinds.
+  In: Cards and zero or more Graphs. Out, on conversion: those Cards with
+  positions, and one or more Graphs, which may hold no Edges. Every returned
+  Graph's Edge endpoints are among the returned Cards, and every returned Graph
+  carries a fresh identity owned by the new Layout.
+- A View whose subject is the Space's Cards draws every Graph in the Space,
+  flattened across its Layouts. The flatten is derived and never stored.
+- A Graph belongs to one Layout, and its id is unique across the whole Space.
+  Intake rejects a Space where one Graph id appears twice, naming both owners.
 - A View is application-supplied and not a synonym for the canvas. Flow and
   Grid are Algorithmic Views; Cards View is a distinct collection View;
   `SpaceCanvas` is rendering composition.
@@ -65,7 +74,7 @@ The key architecture is fixed:
 | Remove from Layout | Remove membership, position and every incident Edge from every Graph in that Layout | Not available without a Layout | Card stays in Space and other Layouts; empty Graphs remain |
 | Delete Card from Space | Delete Card and cascade Remove from Layout through every Layout | Convert uniformly when invoked through an Algorithmic View, then apply the Space deletion | Incoming Aliases block non-Alias deletion; deleting Alias leaves Target |
 | Delete Graph | Remove exactly one Layout-owned Graph and activate first survivor | Not available without a Layout | Disabled for final Graph; Cards and other Graphs unchanged |
-| Activate Graph | No Edit | No Graph to activate | Navigation only; every Graph remains drawn |
+| Activate Graph | No Edit | Emphasis only over the flattened Graphs; converts nothing, and a later connecting Edit still joins the new Layout's own initial Graph | Navigation only; every Graph remains drawn |
 | Select View/Layout | No Edit | Selection itself never converts | Navigation only; authored default changes only with a later Edit |
 | Graph navigation / Present | No Edit | Presenting unavailable from Algorithmic View | Traversal history is transient and separate per interaction |
 
@@ -171,14 +180,52 @@ not a supported compatibility document.
 
 Implement ADR 0040 directly in version 1: explicit Layout membership through
 position keys, non-empty ordered Layout-owned Graphs, scoped Graph lookup,
-Edge closure over Layout Cards, initial empty Active Graph, and no omitted-Card
-fallback band. Update normal/import schemas, indexed Space intake, View/renderer
+Edge closure over Layout Cards, and the initial empty Active Graph. **Leave the
+omitted-Card fallback band in place until package 5**, which builds its
+replacement: between the two, a Card a Layout omits would render nowhere and
+Cards View would not yet exist to add it back, so the band is briefly the only
+surface that can reach it. Update normal/import schemas, indexed Space intake, View/renderer
 resolution, canonical export, PostgreSQL decoding, HTTP snapshots, CLI
 diagnostics, fixtures and all repository contracts. Reject version 2 and old
 keys rather than migrating them.
 
+Implement ADR 0045 in the same package, because it is the same document shape.
+`ResolvedView` gains an explicit Card subject and a conversion result — Cards
+with positions plus one or more Graphs — and the two boundary obligations are
+enforced there rather than in any View. `resolveGraphs` in
+`packages/app/src/view.ts` stops reading a Layout's `graphs` filter, which no
+longer exists, and answers a Space-Card subject by flattening every Layout's
+Graphs. Keep this seam distinct from `LayoutStrategy`, which still only
+arranges. The Flow view returns a fresh empty Graph on conversion; that is this
+View's choice among legal outputs, so put it in the View and not in the
+boundary.
+
+The tracked fixture rolls forward as **two** Layouts — Long/Mid/Short over the
+A–D spine, and Echo — because Graphs nest under Layouts in version 1 and a
+Space cannot otherwise hold them. Seed both position maps from one ELK run over
+the current fixture so first paint is unchanged, and leave `defaultView` absent
+so Flow still renders it. Two Layouts rather than one is deliberate: it is the
+only place in the tree where the flatten crosses a Layout boundary, and one
+Layout would leave that rule untested. AGENTS.md's line explaining that ELK
+renders the fixture because it declares no Layout becomes wrong here — the
+reason becomes the absent `defaultView`.
+
+Graph ids stay unique across the Space even though every Graph is owned by one
+Layout (ADR 0045), because the flatten keys colour, handles, Edge ids and
+activation on the id alone. Add the duplicate check to `loadSpace` beside the
+existing Card-id one and have it name both owning Layouts; the index it protects
+is `graphsById`, which is built with `new Map` and would otherwise drop one
+Graph in silence. Do not answer this by owner-qualifying Graph references
+through the render pipeline — that alternative is weighed and rejected in the
+ADR, and it costs the `<graphId>::out`/`::in` scheme that two libraries depend
+on.
+
 Gate: schema/reference property tests, deterministic export tests, HTTP/backend
-contracts, PostgreSQL integration and database-free E2E on the new shape.
+contracts, PostgreSQL integration and database-free E2E on the new shape. Add a
+property test that no View output can violate closure or reuse a source Graph
+identity, a test that a Space carrying one Graph id in two Layouts is a named
+load error rather than a silently shortened index, and an E2E proving the
+fixture's Flow view still draws all four Graphs across its two Layouts.
 
 ### 3. Deep semantic authoring interface
 
@@ -204,8 +251,13 @@ one conversion and no creation on cancelled Alias.
 
 Build Cards View with the shared Card Front, search, center-stack placement,
 external React Flow drag, Add to Layout and Remove from Layout. Delete the
-fallback-band implementation and tests rather than adapting it. Preserve the
-closed Placement construction seam.
+fallback-band implementation and tests rather than adapting it — `positioned.ts`
+loses its unplaced-grid arithmetic and the projection stops drawing a Card the
+Placement omits, and the two guards that exist only to stop the band's
+fabricated coordinates becoming authored data (`placement.ts` and
+`render-adapter.ts`) go with it. Package 2 deliberately leaves the band standing
+so removal and replacement land together. Preserve the closed Placement
+construction seam.
 
 Gate: property tests for membership/incident-Edge cascade, component Command
 behavior, and browser proof for pan/zoom drop geometry, cancellation, click

@@ -70,3 +70,36 @@ Sidebar, preserving its state. Closing and reopening in one Layout preserves
 Search and scroll; switching Layouts retains Search but resets results to the
 top; another Space or reload starts closed and clear. Touch dragging remains
 outside this effort.
+
+## Comments
+
+**2026-08-12 — Should the Cards View be a React Flow sub flow instead of a
+Sidebar? No.** Asked while researching whether Views could be canvases. A sub
+flow is "a flow inside a node", so this would make the Cards View a group node
+on the main canvas holding the absent Cards as children. Four decided properties
+of this design break on contact:
+
+- The Answer above says the Sidebar "never move[s] the camera". A canvas node
+  pans and zooms with the camera by definition.
+- `fitView` computes bounds over nodes, so a palette node changes the framing of
+  every Layout and every presenting move unless every bounds computation learns
+  to exclude it — and the projection then carries a node that is not a domain
+  Card.
+- The Sidebar is a shadcn Command with a search field, focus rules and Escape
+  precedence. Inside a zoomable surface that input renders at whatever zoom the
+  canvas is at; at the fixture's 0.55 overview it is unusable.
+- Detaching a child from its parent by drag is React Flow's Pro
+  `parent-child-relation` example, not the free feature set, so the core gesture
+  would be hand-rolled anyway — which is what the documented HTML-drag path
+  already avoids.
+
+Underneath those it re-creates the retired fallback band inside a box: the
+absent Cards return to the viewport, which is what ADR 0040's retirement was
+about. A visible container makes membership more legible than the old band did,
+which is why this is worth recording rather than dismissing.
+
+Sub flows remain a candidate for a future Space Card, where containment may be
+real rather than a UI convenience —
+`.scratch/space-cards/issues/01-render-a-space-card-as-a-sub-flow.md`. That
+choice follows the unresolved Space Card kind and reference decision. The
+mechanism and its constraints are in `.scratch/react-flow-guidance/findings.md` §8.
