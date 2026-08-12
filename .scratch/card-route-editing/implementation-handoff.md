@@ -180,8 +180,11 @@ not a supported compatibility document.
 
 Implement ADR 0040 directly in version 1: explicit Layout membership through
 position keys, non-empty ordered Layout-owned Graphs, scoped Graph lookup,
-Edge closure over Layout Cards, initial empty Active Graph, and no omitted-Card
-fallback band. Update normal/import schemas, indexed Space intake, View/renderer
+Edge closure over Layout Cards, and the initial empty Active Graph. **Leave the
+omitted-Card fallback band in place until package 5**, which builds its
+replacement: between the two, a Card a Layout omits would render nowhere and
+Cards View would not yet exist to add it back, so the band is briefly the only
+surface that can reach it. Update normal/import schemas, indexed Space intake, View/renderer
 resolution, canonical export, PostgreSQL decoding, HTTP snapshots, CLI
 diagnostics, fixtures and all repository contracts. Reject version 2 and old
 keys rather than migrating them.
@@ -248,8 +251,13 @@ one conversion and no creation on cancelled Alias.
 
 Build Cards View with the shared Card Front, search, center-stack placement,
 external React Flow drag, Add to Layout and Remove from Layout. Delete the
-fallback-band implementation and tests rather than adapting it. Preserve the
-closed Placement construction seam.
+fallback-band implementation and tests rather than adapting it — `positioned.ts`
+loses its unplaced-grid arithmetic and the projection stops drawing a Card the
+Placement omits, and the two guards that exist only to stop the band's
+fabricated coordinates becoming authored data (`placement.ts` and
+`render-adapter.ts`) go with it. Package 2 deliberately leaves the band standing
+so removal and replacement land together. Preserve the closed Placement
+construction seam.
 
 Gate: property tests for membership/incident-Edge cascade, component Command
 behavior, and browser proof for pan/zoom drop geometry, cancellation, click
