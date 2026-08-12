@@ -79,8 +79,10 @@ The key architecture is fixed:
 | Graph navigation / Present | No Edit | Presenting unavailable from Algorithmic View | Traversal history is transient and separate per interaction |
 
 Every structural transition mints identities inside the operation that succeeds.
-No cancelled gesture reserves an id. Graph ids resolve within their owning
-Layout, Layout ids within their Space, and identities of different kinds may
+No cancelled gesture reserves an id. Graph ids resolve **across the Space** —
+ADR 0045 moved that scope, and line 50 above already said so; ownership is
+still the Layout's. Layout ids resolve within their Space, and identities of
+different kinds may
 share a UUID.
 
 ## Interaction and focus matrix
@@ -180,8 +182,8 @@ not a supported compatibility document.
 
 Built by `.scratch/first-public-aggregate/`, tickets `01`–`07`. Everything below
 holds in the tree, including the three named proofs: the View-boundary property
-test (`packages/app/test/view.property.test.ts`), the duplicate-Graph-id load
-error naming both owners (`packages/graph/test/validate.test.ts`), and the
+test (`packages/app/test/renderer.property.test.ts`), the duplicate-Graph-id load
+error naming both owners (`packages/graph/test/space-intake.test.ts`), and the
 fixture's Flow view drawing all four Graphs across its two Layouts
 (`packages/app/e2e/overview.spec.ts`). The one thing deferred on purpose is the
 omitted-Card fallback band, which package 5 below deletes together with its
@@ -202,10 +204,13 @@ keys rather than migrating them.
 Implement ADR 0045 in the same package, because it is the same document shape.
 `ResolvedView` gains an explicit Card subject and a conversion result — Cards
 with positions plus one or more Graphs — and the two boundary obligations are
-enforced there rather than in any View. `resolveGraphs` in
+enforced there rather than in any View. Graph resolution in
 `packages/app/src/view.ts` stops reading a Layout's `graphs` filter, which no
 longer exists, and answers a Space-Card subject by flattening every Layout's
-Graphs. Keep this seam distinct from `LayoutStrategy`, which still only
+Graphs. **As built** (PR #62), the module is `packages/app/src/renderer.ts`,
+the type is the discriminated `ResolvedViewRenderer | ResolvedLayoutRenderer`
+carrying a `RendererSubject`, and there is no `resolveGraphs` — the subject
+answers which Graphs are drawn. Keep this seam distinct from `LayoutStrategy`, which still only
 arranges. The Flow view returns a fresh empty Graph on conversion; that is this
 View's choice among legal outputs, so put it in the View and not in the
 boundary.
@@ -271,7 +276,8 @@ Graph colours rotate by the new Graph's appended Layout-order position, as the
 accepted Graph management prototype specifies. A conversion therefore gives
 the new Layout's initial Graph the first palette colour, regardless of the
 Graphs its Algorithmic View was drawing. Graph titles still number Space-wide,
-which is also what `freshGraphConversion` already did. `Graph.color` stays
+which is also what the conversion's Graph policy (built as `freshEmptyGraph` in
+`packages/app/src/renderer.ts`) already did. `Graph.color` stays
 optional in the domain, with `graphColorMap` resolving a fallback for imported
 Graphs.
 Proofs are `packages/app/test/space-authoring-operations.test.ts` for the

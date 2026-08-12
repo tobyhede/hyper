@@ -643,7 +643,7 @@ describe('render adapter', () => {
 
   /*
    * A queued completion has not happened yet: the Edit it is queued behind
-   * decides the Space it will run against, and it can still answer `no-edit`
+   * decides the Space it will run against, and it can still answer `unchanged`
    * there. Drawing the connection now publishes it for an Edge the Space has
    * not gained — the same failure as a refusal, one turn later. If the queued
    * Edit does land, the projection that follows it draws the Edge anyway.

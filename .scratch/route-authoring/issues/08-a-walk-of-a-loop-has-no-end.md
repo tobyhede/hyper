@@ -143,3 +143,24 @@ before the code (`docs/agents/workflow.md`).
   presentation does not reach back into the domain — remaking ADR 0023's
   exception for cycles is the specific thing to avoid.
 - Layout or edge routing for cyclic Edges in the overview.
+
+## Comments
+
+**2026-08-13 — verification sweep. Behaviour unchanged; one stated pick-up
+trigger has since fired unspent.**
+
+The described behaviour survives the rename (`walk` → `traversalHistory`,
+`Route` → `Graph`) intact: `advance` still appends unconditionally with the
+no-outgoing-Edge case as the only guard (`packages/app/src/navigation.ts:
+374-384`), nothing bounds the history, `presenting-end` still renders only on
+`moves.length === 0` (`components/PresentingChrome.tsx:35-38`), and the camera
+effect is still keyed on `activeCardId` (`components/cameras.tsx:101-118`), so
+a self-Edge still moves nothing on screen. The presenter still cannot tell a
+repeat from a first arrival.
+
+Worth recording: the ticket named "a second reason to touch `moves()`" as the
+cheap moment to take this. `moves()` has since been rewritten for branch
+selection and single-read resolution (`navigation.ts:429-441`, with
+`selectBranch` at :407-421) **without** the question being answered. The
+trigger fired and was not spent, so the next one should be taken deliberately
+rather than waited for.

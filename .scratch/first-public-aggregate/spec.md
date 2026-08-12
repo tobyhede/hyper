@@ -1,5 +1,13 @@
 # First-public version 1 aggregate
 
+**Status: delivered.** Every ticket below is resolved (`09` wontfix) and merged
+— PRs #56, #57, #61, #62. The body stays in future tense as the record of what
+was planned; read it as history, not as a queue. Four tickets were added after
+this file's Order block was written and are not listed there: `07` reconcile
+with mainline placement ownership, `08` give the file importer one version
+answer, `09` ask the version gate at the snapshot doors (wontfix), `10` ask
+every pre-parse refusal at the import door.
+
 Package 2 of `.scratch/card-route-editing/implementation-handoff.md`, broken
 into tickets. Read that document's package 2 section and ADRs 0040, 0041, 0042
 and 0045 before starting any of them.
