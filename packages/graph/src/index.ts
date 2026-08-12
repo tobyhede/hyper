@@ -81,17 +81,13 @@ export {
 } from './graph-rendering';
 export type { CardHandleSet, GraphRenderEdge, GraphRenderHandleRef } from './graph-rendering';
 
-// `unsupportedDocumentVersion` is offered although `loadSpace` asks it on every
-// caller's behalf: the file importer parses against import schemas that run
-// ahead of intake, so it has to ask before they answer. Its docblock is where
-// the argument for one gate lives.
-export { loadSpace, loadSpaceSnapshot, unsupportedDocumentVersion } from './space';
-export type {
-  LoadSpaceResult,
-  LoadSpaceSnapshotResult,
-  Space,
-  SpaceError,
-  UnsupportedVersionError,
-} from './space';
+// `documentRefusal` is offered although `loadSpace` asks it on every caller's
+// behalf: the file importer parses against import schemas that run ahead of
+// intake, so it has to ask before they answer. It is offered *composed*, and
+// the checks it composes stay private — a caller that could name them
+// individually could take some and miss others, which is the defect. Its
+// docblock is where that argument lives.
+export { documentRefusal, loadSpace, loadSpaceSnapshot } from './space';
+export type { LoadSpaceResult, LoadSpaceSnapshotResult, Space, SpaceError } from './space';
 
 export { outgoingEdges, graphStartCard } from './traversal';

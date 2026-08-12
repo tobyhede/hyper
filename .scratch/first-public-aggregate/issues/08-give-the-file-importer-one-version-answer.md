@@ -47,6 +47,13 @@ That is a design decision about where a version is decided, not a repair.
 
 ## Answer
 
+> **Refined by ticket `10`, in this same branch.** Everything below holds, except
+> the name and shape of what is offered: `unsupportedDocumentVersion` went back
+> to private and `@project/graph` now offers the *composed* `documentRefusal`,
+> which asks it and the retired-`graphs` check together. `10` has why — this
+> ticket gave the importer one of intake's two pre-parse checks, and the door
+> reaching for them individually is what left the other behind.
+
 **One gate, offered from `@project/graph`, asked by both doors.** The private
 `unsupportedVersion` in `packages/graph/src/space.ts` became the exported
 `unsupportedDocumentVersion`, returning a named `UnsupportedVersionError | null`.

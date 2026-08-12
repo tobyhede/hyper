@@ -6,11 +6,7 @@ import {
   type ImportSpace,
   type ImportSpaceFile,
 } from '@project/core';
-import {
-  parseImportCardFile,
-  unsupportedDocumentVersion,
-  type UnsupportedVersionError,
-} from '@project/graph';
+import { documentRefusal, parseImportCardFile, type SpaceError } from '@project/graph';
 
 type SpaceImportFileErrorKind = 'discovery' | 'parsing';
 
@@ -108,16 +104,17 @@ export const readSingleSpace = async (inputPath: string): Promise<ImportSpace> =
 
   const diagnostics: string[] = [];
   let parsedSpaceFile: ImportSpaceFile | undefined;
-  let wrongVersion: UnsupportedVersionError | null = null;
+  let refusal: SpaceError | null = null;
   try {
     const json: unknown = JSON.parse(spaceText);
-    // Asked rather than answered here — `unsupportedDocumentVersion`'s docblock
-    // is where the one-gate argument is written out. What is only true at this
-    // call site is the ordering: `importSpaceFileSchema` runs ahead of domain
-    // intake, so the gate has to be asked before it, or the version arrives
-    // buried under every key that moved.
-    wrongVersion = unsupportedDocumentVersion(json);
-    if (wrongVersion === null) {
+    // Asked rather than answered here — `documentRefusal`'s docblock is where
+    // the argument for one composed gate is written out. What is only true at
+    // this call site is the ordering: `importSpaceFileSchema` runs ahead of
+    // domain intake, so it has to be asked before that parse, or the schema
+    // answers first — with a cascade of moved keys for a version it cannot
+    // read, and by silently dropping a retired space-level `graphs`.
+    refusal = documentRefusal(json);
+    if (refusal === null) {
       const parsed = importSpaceFileSchema.safeParse(json);
       if (parsed.success) {
         parsedSpaceFile = parsed.data;
@@ -140,12 +137,12 @@ export const readSingleSpace = async (inputPath: string): Promise<ImportSpace> =
   // out on a binding instead of thrown where it is known.
   //
   // One answer, and nothing behind it: the cards were read but are not parsed,
-  // matching intake, which answers exactly one error for a version it cannot
-  // read. A *read* failure still precedes this — an import that could not see
-  // the files it was asked to import has not got as far as a document to have a
-  // version.
-  if (wrongVersion !== null) {
-    throw new SpaceImportFileError('parsing', [`${spaceFile}: ${wrongVersion.message}`]);
+  // matching intake, which answers exactly one error for a document it refuses
+  // outright. A *read* failure still precedes this — an import that could not
+  // see the files it was asked to import has not got as far as a document to
+  // refuse.
+  if (refusal !== null) {
+    throw new SpaceImportFileError('parsing', [`${spaceFile}: ${refusal.message}`]);
   }
 
   const cards = cardPaths.flatMap((path, index) => {

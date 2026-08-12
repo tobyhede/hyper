@@ -29,6 +29,18 @@ const versionTwoDocument = {
   layouts: [{ id: LAYOUT_ID, title: 'Working', positions: {} }],
 };
 
+/**
+ * A version 1 document carrying the retired space-level `graphs` — hand-edited,
+ * or written by a stale producer, so it holds both shapes at once. Its version
+ * is current, so nothing answers it before the key itself does.
+ */
+const retiredGraphsDocument = {
+  version: 1,
+  id: SPACE_ID,
+  title: 'Talk',
+  graphs: [{ id: GRAPH_ID, title: 'Main', edges: [] }],
+};
+
 const temporaryDirectories: string[] = [];
 
 const makeTemporaryDirectory = async (): Promise<string> => {
@@ -248,18 +260,46 @@ describe('readSingleSpace', () => {
     expect(thrown.diagnostics[0]).toContain('version 2');
   });
 
-  it('says of that version exactly what domain intake says', async () => {
-    // The acceptance criterion behind the check above: one place in the tree
-    // answers which version is supported, so the door a human hand-authoring a
-    // space directory walks through and the one every other space arrives by
-    // cannot come to disagree about it.
+  it('refuses a retired space-level graphs key rather than stripping it', async () => {
+    // `importSpaceFileSchema` is a plain Zod object, so an undeclared key is
+    // dropped. For the retired `cards` and `edges` that is right — they carried
+    // nothing the rest of the document does not say. A space-level `graphs`
+    // carried the whole topology (ADR 0040), so stripping it discards exactly
+    // what the author wrote and imports a Space that looks complete.
     const temporaryDirectory = await makeTemporaryDirectory();
     const talkDirectory = join(temporaryDirectory, 'talk');
     await mkdir(talkDirectory);
-    await writeFile(join(talkDirectory, 'space.json'), JSON.stringify(versionTwoDocument));
+
+    const spaceFile = join(talkDirectory, 'space.json');
+    await writeFile(spaceFile, JSON.stringify(retiredGraphsDocument));
 
     const thrown = await captureError(() => readSingleSpace(talkDirectory));
-    const intake = loadSpace(versionTwoDocument, []);
+
+    expect(thrown).toBeInstanceOf(SpaceImportFileError);
+    if (!(thrown instanceof SpaceImportFileError)) return;
+    expect(thrown.kind).toBe('parsing');
+    expect(thrown.diagnostics).toHaveLength(1);
+    expect(thrown.diagnostics[0]).toContain(spaceFile);
+    expect(thrown.diagnostics[0]).toContain('`graphs`');
+  });
+
+  // The acceptance criterion behind both checks above, and the one that makes
+  // them survive a *third* pre-parse refusal being added at intake: a document
+  // intake refuses before parsing is refused here in the same words. The two
+  // doors ask one composed `documentRefusal`, so neither can come to know about
+  // a refusal the other does not — which is exactly how the retired `graphs`
+  // key came to be stripped here while intake rejected it.
+  it.each([
+    ['a version it cannot read', versionTwoDocument],
+    ['a retired space-level graphs key', retiredGraphsDocument],
+  ])('says of %s exactly what domain intake says', async (_case, document) => {
+    const temporaryDirectory = await makeTemporaryDirectory();
+    const talkDirectory = join(temporaryDirectory, 'talk');
+    await mkdir(talkDirectory);
+    await writeFile(join(talkDirectory, 'space.json'), JSON.stringify(document));
+
+    const thrown = await captureError(() => readSingleSpace(talkDirectory));
+    const intake = loadSpace(document, []);
 
     expect(intake.ok).toBe(false);
     if (intake.ok) return;

@@ -8,7 +8,7 @@ version gate and, in doing so, made it checkable which doors still do not ask it
 
 ## What was seen
 
-`unsupportedDocumentVersion` in `@project/graph` is the one answer to which
+`documentRefusal` in `@project/graph` is the one composed answer to which
 document version this build reads, and three doors ask it before the schema that
 would otherwise answer: `loadSpace`, `loadSpaceSnapshot`, `readSingleSpace`.
 
@@ -39,7 +39,7 @@ them. That argument does not carry here.
 
 A real corpus of version 2 documents — a database predating the version 1
 aggregate that someone actually has to migrate off. If that appears, the fix is
-to ask `unsupportedDocumentVersion` on the snapshot's `document` at both
+to ask `documentRefusal` on the snapshot's `document` at both
 decoders, never to decide a version inside either one or to put the check on
 `spaceSnapshotSchema`. The two decoders share a failure format on purpose
 (`test/unit/postgres-import-decoding.test.ts` holds them to it), so neither moves
