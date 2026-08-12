@@ -1,11 +1,13 @@
 import fc from 'fast-check';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
+  newUuid,
   uuidSchema,
   type CardDocument,
   type Graph,
   type GraphId,
   type SpaceSnapshot,
+  type UUID,
 } from '@project/core';
 import { loadSpaceSnapshot, Placement } from '@project/graph';
 import {
@@ -15,6 +17,7 @@ import {
   type SpaceBackend,
   type SpaceSession,
 } from '@project/persistence';
+import { mintingIds } from './minting';
 import { createNavigation, type Navigation, type NavigationState } from '../src/navigation';
 import {
   createSpaceAuthoring,
@@ -152,11 +155,23 @@ function complete(
  * placement. `openAuthoring` below leaves that null on purpose, for the tests
  * that install one themselves.
  */
+/**
+ * What a test supplies to the composition instead of reaching past it.
+ *
+ * `newId` is the replacement for `vi.spyOn(crypto, 'randomUUID')`, which
+ * controlled the ambient generator rather than the module that mints from it.
+ * ADR 0016 rejected that for `loadSpace` and the grounds are the same here.
+ */
+interface AuthoringOptions {
+  readonly reportObserverError?: (error: unknown) => void;
+  readonly newId?: () => UUID;
+}
+
 function attachAuthoring(
   backend: SpaceBackend,
   loaded: LoadedFixture,
   renderer: RendererSelection,
-  reportObserverError?: (error: unknown) => void,
+  { reportObserverError, newId }: AuthoringOptions = {},
 ) {
   const session = openSpaceSession(backend, loaded);
   const currentSpace = () => {
@@ -172,6 +187,7 @@ function attachAuthoring(
     currentSpace,
     initialPlacement: resolved.layout === null ? null : Placement.fromLayout(resolved.layout),
     ...(reportObserverError !== undefined ? { reportObserverError } : {}),
+    ...(newId !== undefined ? { newId } : {}),
   });
   return { backend, session, navigation, authoring };
 }
@@ -179,7 +195,7 @@ function attachAuthoring(
 function openAuthoring(
   snapshot: SpaceSnapshot = automaticSnapshot,
   renderer: RendererSelection = { kind: 'view', view: 'flow' },
-  reportObserverError?: (error: unknown) => void,
+  { reportObserverError, newId }: AuthoringOptions = {},
 ) {
   const loaded = { snapshot, revision: 0n, exportedRevision: null };
   const backend = new MemorySpaceBackend([loaded]);
@@ -199,6 +215,7 @@ function openAuthoring(
       navigation,
       currentSpace,
       ...(reportObserverError !== undefined ? { reportObserverError } : {}),
+      ...(newId !== undefined ? { newId } : {}),
     }),
   };
 }
@@ -269,7 +286,7 @@ const openConflictedAgainstStoredSpace = async () => {
     backend,
     { snapshot: positionedSnapshot, revision: 3n, exportedRevision: null },
     { kind: 'layout', layoutId: LAYOUT_ID },
-    (error) => reported.push(error),
+    { reportObserverError: (error) => reported.push(error) },
   );
   replacePlacementForTest(
     authoring,
@@ -287,10 +304,9 @@ describe('Space Authoring', () => {
   afterEach(() => vi.restoreAllMocks());
 
   it('renames a Card and converts the Algorithmic View from the completed placement', () => {
-    vi.spyOn(crypto, 'randomUUID').mockReturnValue(
-      LAYOUT_ID as ReturnType<typeof crypto.randomUUID>,
-    );
-    const { authoring, session, navigation } = openAuthoring();
+    const { authoring, session, navigation } = openAuthoring(undefined, undefined, {
+      newId: mintingIds(LAYOUT_ID),
+    });
     replacePlacementForTest(
       authoring,
       Placement.fromEntries([
@@ -353,13 +369,17 @@ describe('Space Authoring', () => {
   });
 
   it('treats an unchanged Card as no Edit before converting or submitting', () => {
-    const minted = vi.spyOn(crypto, 'randomUUID');
+    // Counting this workspace's own minting, rather than every call the process
+    // makes to the ambient generator: what the refusal has to leave untouched is
+    // the identity *this* Edit would have created.
+    const minted = vi.fn(newUuid);
     const control = new MemorySpaceBackendTestControl();
     const loaded = { snapshot: automaticSnapshot, revision: 0n, exportedRevision: null };
     const { authoring, session } = attachAuthoring(
       new MemorySpaceBackend([loaded], control),
       loaded,
       { kind: 'view', view: 'flow' },
+      { newId: minted },
     );
     replacePlacementForTest(
       authoring,
@@ -514,10 +534,11 @@ describe('Space Authoring', () => {
    * there is no Space level left for a Graph to be written to.
    */
   it('converts an Algorithmic View into a Layout owning one fresh empty Graph', () => {
-    vi.spyOn(crypto, 'randomUUID')
-      .mockReturnValueOnce(MINTED_GRAPH_ID as ReturnType<typeof crypto.randomUUID>)
-      .mockReturnValue(LAYOUT_ID as ReturnType<typeof crypto.randomUUID>);
-    const { authoring, session, navigation } = openAuthoring();
+    // The Graph before the Layout: the conversion is asked for the Layout's
+    // content first, and it is the View that mints the Graph.
+    const { authoring, session, navigation } = openAuthoring(undefined, undefined, {
+      newId: mintingIds(MINTED_GRAPH_ID, LAYOUT_ID),
+    });
     replacePlacementForTest(
       authoring,
       Placement.fromEntries([
@@ -595,9 +616,6 @@ describe('Space Authoring', () => {
    * exactly this Edge, and it neither blocks the gesture nor receives it.
    */
   it('offers an Edge the emphasised Graph already holds, and lands it in the minted one', () => {
-    vi.spyOn(crypto, 'randomUUID')
-      .mockReturnValueOnce(MINTED_GRAPH_ID as ReturnType<typeof crypto.randomUUID>)
-      .mockReturnValue(CONVERTED_LAYOUT_ID as ReturnType<typeof crypto.randomUUID>);
     // A Space whose only Layout owns `Main`, opened in the Flow view rather than
     // in that Layout — so the flatten draws `Main`, and it is what is emphasised.
     const { authoring, session, navigation } = openAuthoring(
@@ -606,6 +624,7 @@ describe('Space Authoring', () => {
         document: { ...positionedSnapshot.document, defaultView: undefined },
       },
       { kind: 'view', view: 'flow' },
+      { newId: mintingIds(MINTED_GRAPH_ID, CONVERTED_LAYOUT_ID) },
     );
     replacePlacementForTest(
       authoring,
@@ -706,9 +725,6 @@ describe('Space Authoring', () => {
    * the new Layout owns (ADR 0045). Emphasis does not choose where an Edge lands.
    */
   it('submits nothing on activation, and lands the next Edge in the minted Graph', () => {
-    vi.spyOn(crypto, 'randomUUID')
-      .mockReturnValueOnce(MINTED_GRAPH_ID as ReturnType<typeof crypto.randomUUID>)
-      .mockReturnValue(CONVERTED_LAYOUT_ID as ReturnType<typeof crypto.randomUUID>);
     const ASIDE_LAYOUT = uuidSchema.parse('00000000-0000-4000-8000-000000000041');
     const ASIDE_GRAPH = uuidSchema.parse('00000000-0000-4000-8000-000000000042');
     const twoLayouts: SpaceSnapshot = {
@@ -734,6 +750,7 @@ describe('Space Authoring', () => {
       new MemorySpaceBackend([loaded], control),
       loaded,
       { kind: 'view', view: 'flow' },
+      { newId: mintingIds(MINTED_GRAPH_ID, CONVERTED_LAYOUT_ID) },
     );
     replacePlacementForTest(
       authoring,
@@ -778,7 +795,7 @@ describe('Space Authoring', () => {
    * what the unused-mint assertion below says.
    */
   it('adds the first Edge to the Layout’s own initial empty Graph', () => {
-    const minted = vi.spyOn(crypto, 'randomUUID');
+    const minted = vi.fn(newUuid);
     const emptyGraph: SpaceSnapshot = {
       id: SPACE_ID,
       document: {
@@ -797,10 +814,11 @@ describe('Space Authoring', () => {
       },
       cards: [{ id: CARD_A, document: { title: 'Card 1', kind: 'markdown', body: '' } }],
     };
-    const { authoring, session, navigation } = openAuthoring(emptyGraph, {
-      kind: 'layout',
-      layoutId: LAYOUT_ID,
-    });
+    const { authoring, session, navigation } = openAuthoring(
+      emptyGraph,
+      { kind: 'layout', layoutId: LAYOUT_ID },
+      { newId: minted },
+    );
     replacePlacementForTest(authoring, Placement.fromEntries([[CARD_A, { x: 10, y: 20 }]]));
 
     expect(graphsOf(session.getState().working)).toEqual([
@@ -840,9 +858,6 @@ describe('Space Authoring', () => {
    * Graph it carries is the one the new Layout owns.
    */
   it('adopts the Layout the Edit created together with the Graph that Layout owns', () => {
-    vi.spyOn(crypto, 'randomUUID')
-      .mockReturnValueOnce(MINTED_GRAPH_ID as ReturnType<typeof crypto.randomUUID>)
-      .mockReturnValue(LAYOUT_ID as ReturnType<typeof crypto.randomUUID>);
     const structureLess: SpaceSnapshot = {
       id: SPACE_ID,
       document: { version: 1, title: 'New space' },
@@ -867,7 +882,12 @@ describe('Space Authoring', () => {
         throw new Error('Edit completion must not activate separately.');
       },
     };
-    const authoring = createSpaceAuthoring({ session, navigation, currentSpace });
+    const authoring = createSpaceAuthoring({
+      session,
+      navigation,
+      currentSpace,
+      newId: mintingIds(MINTED_GRAPH_ID, LAYOUT_ID),
+    });
     replacePlacementForTest(authoring, Placement.fromEntries([[CARD_A, { x: 10, y: 20 }]]));
 
     expect(complete(authoring, { kind: 'connected-cards', from: CARD_A, to: CARD_A })).toEqual({
@@ -891,16 +911,15 @@ describe('Space Authoring', () => {
   });
 
   it('creates the Card, first Graph, Edge and Layout as one Edit with internal identities', () => {
-    vi.spyOn(crypto, 'randomUUID')
-      .mockReturnValueOnce(CREATED_CARD_ID as ReturnType<typeof crypto.randomUUID>)
-      .mockReturnValueOnce(MINTED_GRAPH_ID as ReturnType<typeof crypto.randomUUID>)
-      .mockReturnValueOnce(LAYOUT_ID as ReturnType<typeof crypto.randomUUID>);
+    // Card, then Graph, then Layout — the order the one Edit mints them in.
     const graphLess: SpaceSnapshot = {
       id: SPACE_ID,
       document: { version: 1, title: 'New space' },
       cards: [{ id: CARD_A, document: { title: 'Card 1', kind: 'markdown', body: '' } }],
     };
-    const { authoring, session } = openAuthoring(graphLess);
+    const { authoring, session } = openAuthoring(graphLess, undefined, {
+      newId: mintingIds(CREATED_CARD_ID, MINTED_GRAPH_ID, LAYOUT_ID),
+    });
     replacePlacementForTest(authoring, Placement.fromEntries([[CARD_A, { x: 120, y: 240 }]]));
 
     expect(authoring.canCreateConnectedCard(CARD_A)).toBe(true);
@@ -1020,7 +1039,7 @@ describe('Space Authoring', () => {
       new MemorySpaceBackend([loaded]),
       loaded,
       { kind: 'layout', layoutId: LAYOUT_ID },
-      (error) => failures.push(error),
+      { reportObserverError: (error) => failures.push(error) },
     );
     let reentered = false;
     authoring.subscribe(() => {
@@ -1051,10 +1070,9 @@ describe('Space Authoring', () => {
   });
 
   it('publishes once after the optimistic Space and navigation consequences are installed', () => {
-    vi.spyOn(crypto, 'randomUUID').mockReturnValue(
-      LAYOUT_ID as ReturnType<typeof crypto.randomUUID>,
-    );
-    const { authoring } = openAuthoring();
+    const { authoring } = openAuthoring(undefined, undefined, {
+      newId: mintingIds(LAYOUT_ID),
+    });
     replacePlacementForTest(
       authoring,
       Placement.fromEntries([
@@ -1216,10 +1234,6 @@ describe('Space Authoring', () => {
   });
 
   it('adopts every rendered Card on conversion and only placed Cards in a Layout', () => {
-    vi.spyOn(crypto, 'randomUUID').mockReturnValue(
-      LAYOUT_ID as ReturnType<typeof crypto.randomUUID>,
-    );
-
     fc.assert(
       fc.property(
         fc.record({
@@ -1242,7 +1256,12 @@ describe('Space Authoring', () => {
             [CARD_B, { x: renderedBX, y: renderedBY }],
           ]);
 
-          const converting = openAuthoring();
+          // A fresh minter per case, which is what a constant mock could not be:
+          // it is the collision ADR 0016 names as the reason a global mock ends
+          // up needing a generator anyway.
+          const converting = openAuthoring(undefined, undefined, {
+            newId: mintingIds(MINTED_GRAPH_ID, LAYOUT_ID),
+          });
           converting.authoring.reportRendered(rendered);
           converting.authoring.complete({
             kind: 'settled-card-movement',
@@ -1347,9 +1366,6 @@ describe('Space Authoring', () => {
   });
 
   it('numbers a new Layout and Card above the highest existing number', () => {
-    vi.spyOn(crypto, 'randomUUID')
-      .mockReturnValueOnce(CREATED_CARD_ID as ReturnType<typeof crypto.randomUUID>)
-      .mockReturnValueOnce(LAYOUT_ID as ReturnType<typeof crypto.randomUUID>);
     const numbered: SpaceSnapshot = {
       ...automaticSnapshot,
       document: {
@@ -1390,7 +1406,12 @@ describe('Space Authoring', () => {
         { id: CARD_B, document: { title: 'Intro', kind: 'markdown', body: '' } },
       ],
     };
-    const { authoring, session } = openAuthoring(numbered);
+    // Card, Graph, Layout. The mock this replaced named only two, so the Layout
+    // took an id from the real generator — invisible, because the assertions are
+    // about titles.
+    const { authoring, session } = openAuthoring(numbered, undefined, {
+      newId: mintingIds(CREATED_CARD_ID, MINTED_GRAPH_ID, LAYOUT_ID),
+    });
     replacePlacementForTest(
       authoring,
       Placement.fromEntries([
@@ -1414,9 +1435,6 @@ describe('Space Authoring', () => {
    * report that says they are gone.
    */
   it('contains a reporter that throws while reporting a failed queued completion', () => {
-    vi.spyOn(crypto, 'randomUUID').mockReturnValue(
-      LAYOUT_ID as ReturnType<typeof crypto.randomUUID>,
-    );
     const loaded = { snapshot: automaticSnapshot, revision: 0n, exportedRevision: null };
     const real = openSpaceSession(new MemorySpaceBackend([loaded]), loaded);
     let submits = 0;
@@ -1443,6 +1461,7 @@ describe('Space Authoring', () => {
         reported.push(error);
         throw new Error('reporter failed');
       },
+      newId: mintingIds(LAYOUT_ID),
     });
     replacePlacementForTest(
       authoring,
@@ -1519,9 +1538,6 @@ describe('Space Authoring', () => {
    * Space does not hold cannot come from anywhere else.
    */
   it('keeps the placement level with the session when a queued submit fails', () => {
-    vi.spyOn(crypto, 'randomUUID').mockReturnValue(
-      CREATED_CARD_ID as ReturnType<typeof crypto.randomUUID>,
-    );
     const loaded = { snapshot: positionedSnapshot, revision: 0n, exportedRevision: null };
     const real = openSpaceSession(new MemorySpaceBackend([loaded]), loaded);
     let submits = 0;
@@ -1549,6 +1565,7 @@ describe('Space Authoring', () => {
         [CARD_B, { x: 300, y: 40 }],
       ]),
       reportObserverError: (error) => reported.push(error),
+      newId: mintingIds(CREATED_CARD_ID),
     });
     let queuedOnce = false;
     authoring.subscribe(() => {
@@ -1646,9 +1663,6 @@ describe('Space Authoring', () => {
    * Edit produced.
    */
   it('publishes what the collaborators hold when adopting the written Layout throws', () => {
-    vi.spyOn(crypto, 'randomUUID')
-      .mockReturnValueOnce(MINTED_GRAPH_ID as ReturnType<typeof crypto.randomUUID>)
-      .mockReturnValue(LAYOUT_ID as ReturnType<typeof crypto.randomUUID>);
     const graphLess: SpaceSnapshot = {
       id: SPACE_ID,
       document: { version: 1, title: 'New space' },
@@ -1668,7 +1682,12 @@ describe('Space Authoring', () => {
         throw new Error('adoption failed');
       },
     };
-    const authoring = createSpaceAuthoring({ session, navigation, currentSpace });
+    const authoring = createSpaceAuthoring({
+      session,
+      navigation,
+      currentSpace,
+      newId: mintingIds(MINTED_GRAPH_ID, LAYOUT_ID),
+    });
     replacePlacementForTest(authoring, Placement.fromEntries([[CARD_A, { x: 10, y: 20 }]]));
     const published: NavigationState[] = [];
     authoring.subscribe(() => published.push(authoring.getState().navigation));
@@ -1694,9 +1713,6 @@ describe('Space Authoring', () => {
   });
 
   it('reports the completions a failed drain discards', () => {
-    vi.spyOn(crypto, 'randomUUID').mockReturnValue(
-      LAYOUT_ID as ReturnType<typeof crypto.randomUUID>,
-    );
     const loaded = { snapshot: automaticSnapshot, revision: 0n, exportedRevision: null };
     const backend = new MemorySpaceBackend([loaded]);
     const real = openSpaceSession(backend, loaded);
@@ -1721,6 +1737,7 @@ describe('Space Authoring', () => {
       navigation,
       currentSpace,
       reportObserverError: (error) => reported.push(error),
+      newId: mintingIds(LAYOUT_ID),
     });
     replacePlacementForTest(
       authoring,
@@ -1759,9 +1776,9 @@ describe('Space Authoring', () => {
 
   it('contains a rejected asynchronous observer instead of letting it escape', async () => {
     const reported: unknown[] = [];
-    const { authoring, navigation } = openAuthoring(automaticSnapshot, undefined, (error) =>
-      reported.push(error),
-    );
+    const { authoring, navigation } = openAuthoring(automaticSnapshot, undefined, {
+      reportObserverError: (error) => reported.push(error),
+    });
     // `subscribe` takes `() => void`, and TypeScript's void-return bivariance
     // lets an async listener through without complaint. Its rejection never
     // reaches the try/catch around the call, and Node answers an unhandled
@@ -1778,9 +1795,9 @@ describe('Space Authoring', () => {
 
   it('contains a throwing observer and still notifies the ones behind it', () => {
     const reported: unknown[] = [];
-    const { authoring, navigation } = openAuthoring(automaticSnapshot, undefined, (error) =>
-      reported.push(error),
-    );
+    const { authoring, navigation } = openAuthoring(automaticSnapshot, undefined, {
+      reportObserverError: (error) => reported.push(error),
+    });
     const observerFailed = new Error('observer failed');
     const notified: string[] = [];
     // The synchronous twin of the rejection above. An observer that throws must

@@ -100,13 +100,24 @@ const scenario = fc.tuple(subject, placement).chain(([source, onScreen]) =>
   }),
 );
 
+/**
+ * Every generated view answers with an output fixed in advance, so none of them
+ * mints. Throwing rather than returning a spare id keeps that true: a generated
+ * view that reached for the minter would be answering with something the
+ * scenario did not generate, and the case would stop being about the output
+ * under test.
+ */
+const mintUnused = (): never => {
+  throw new Error('A generated View mints nothing.');
+};
+
 describe('the conversion boundary, over every view that could be written', () => {
   it('lets through no output that breaks closure or reuses a source identity', () => {
     fc.assert(
       fc.property(scenario, ({ source, onScreen, answer }) => {
         let returned: ConvertedLayout;
         try {
-          returned = convertView(() => answer, source, onScreen);
+          returned = convertView(() => answer, source, onScreen, mintUnused);
         } catch {
           // A refusal is always a correct outcome: the boundary throws rather
           // than repairing, because a view that broke an obligation is wrong
@@ -126,7 +137,7 @@ describe('the conversion boundary, over every view that could be written', () =>
       fc.property(scenario, ({ source, onScreen, answer }) => {
         fc.pre(violatesClosure(answer) || violatesFreshIdentity(source, answer));
 
-        expect(() => convertView(() => answer, source, onScreen)).toThrow();
+        expect(() => convertView(() => answer, source, onScreen, mintUnused)).toThrow();
       }),
     );
   });

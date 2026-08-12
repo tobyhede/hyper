@@ -1,6 +1,5 @@
 import {
   isBuiltInViewId,
-  newUuid,
   type BuiltInViewId,
   type CardId,
   type Graph,
@@ -83,7 +82,11 @@ export interface ConvertedLayout {
  * return the graphs it was showing, a fresh empty one, or a pruned projection.
  * {@link convertView} is what holds every one of those to the two obligations.
  */
-export type ViewConversion = (subject: ViewSubject, positions: Placement) => ConvertedLayout;
+export type ViewConversion = (
+  subject: ViewSubject,
+  positions: Placement,
+  newGraphId: () => GraphId,
+) => ConvertedLayout;
 
 /**
  * ADR 0045's conversion boundary: a view's own answer, held to the two
@@ -112,8 +115,9 @@ export function convertView(
   choose: ViewConversion,
   subject: ViewSubject,
   positions: Placement,
+  newGraphId: () => GraphId,
 ): ConvertedLayout {
-  const converted = choose(subject, positions);
+  const converted = choose(subject, positions, newGraphId);
   const taken = new Set<GraphId>(subject.graphs.map((graph) => graph.id));
   for (const graph of converted.graphs) {
     if (taken.has(graph.id)) {
@@ -145,11 +149,11 @@ export function convertView(
  * an author whose two "Onboarding" graphs drifted apart over a month has been
  * harmed.
  */
-const freshGraphConversion: ViewConversion = (subject, positions) => ({
+const freshGraphConversion: ViewConversion = (subject, positions, newGraphId) => ({
   positions,
   graphs: [
     {
-      id: newUuid(),
+      id: newGraphId(),
       title: nextNumberedTitle(
         'Graph',
         subject.graphs.map((graph) => graph.title),
@@ -182,8 +186,15 @@ export type ViewLayout =
        *
        * A selected Layout has no counterpart to this — it is not converted, it
        * is updated in place, and its graphs keep the identities it owns.
+       *
+       * The minter comes from the caller because `resolveView` is a free
+       * function seven call sites reach, only one of which converts: the module
+       * that mints — Space Authoring — took the dependency once when it was
+       * composed, and hands it to the conversion it is already performing. A
+       * parameter on `resolveView` instead would repeat it at six Navigation
+       * call sites that never mint anything.
        */
-      readonly convert: (positions: Placement) => ConvertedLayout;
+      readonly convert: (positions: Placement, newGraphId: () => GraphId) => ConvertedLayout;
     };
 
 interface ResolvedViewBase {
@@ -315,7 +326,8 @@ export function resolveView(
     strategy,
     layout: null,
     cardIds: subject.cardIds,
-    convert: (positions) => convertView(freshGraphConversion, subject, positions),
+    convert: (positions, newGraphId) =>
+      convertView(freshGraphConversion, subject, positions, newGraphId),
     ...resolveGraphs(space, null),
   };
 }
