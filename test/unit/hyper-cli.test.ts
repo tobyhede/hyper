@@ -115,7 +115,7 @@ afterEach(async () => {
 });
 
 describe('runHyper', () => {
-  it('exports one stored space to the canonical version 2 directory', async () => {
+  it('exports one stored space to the canonical version 1 directory', async () => {
     const parent = await makeTemporaryDirectory();
     const destination = join(parent, 'exported');
     const output = captureIo();

@@ -4,7 +4,7 @@ A local prototype that proves one idea:
 
 > A technical deck can be authored as Markdown cards on a spatial graph, then presented as a curated Graph through that graph.
 
-Content can be authored in version-controlled files and imported into the live persistence model. A space directory holds a space file naming the graphs, plus one Markdown file per card. [React Flow](https://reactflow.dev) draws **every** Graph at once, each in its own colour, and [elkjs](https://github.com/kieler/elkjs) lays them out automatically (layered, left→right). A Card exposes an outbound handle for each Graph with an outgoing Edge and an inbound handle for each Graph with an incoming Edge (the "multiple handles" approach). Choosing a Graph in the toolbar emphasises it without hiding the others.
+Content can be authored in version-controlled files and imported into the live persistence model. A space directory holds a space file naming the layouts and the graphs each one owns, plus one Markdown file per card. [React Flow](https://reactflow.dev) draws **every** Graph at once, each in its own colour, and [elkjs](https://github.com/kieler/elkjs) lays them out automatically (layered, left→right). A Card exposes an outbound handle for each Graph with an outgoing Edge and an inbound handle for each Graph with an incoming Edge (the "multiple handles" approach). Choosing a Graph in the toolbar emphasises it without hiding the others.
 
 **Presenting is the same canvas, closer in.** There is no deck and no second surface ([ADR 0024](docs/adr/0024-presenting-is-traversing-a-route.md)): pressing Present moves React Flow's camera to the Graph's first card and draws that card's content rendered. Arrow keys traverse the Graph's edges — Right follows the selected one, Left goes back along the path taken, Up and Down choose among a fork's branches without moving the camera ([ADR 0027](docs/adr/0027-presenting-is-the-graph-canvas-under-camera-control.md)).
 
@@ -88,29 +88,30 @@ A space is a **space directory**: a space file (`space.json`) plus one Markdown 
 
 ```json
 {
-  "version": 2,
+  "version": 1,
   "id": "00000000-0000-4000-8000-000000000041",
   "title": "Graph-Native Technical Presentations",
-  "graphs": [
-    {
-      "id": "00000000-0000-4000-8000-000000000004",
-      "title": "Main walkthrough",
-      "color": "#6ea8fe",
-      "edges": [
-        {
-          "from": "00000000-0000-4000-8000-000000000027",
-          "to": "00000000-0000-4000-8000-000000000043"
-        }
-      ]
-    }
-  ],
   "layouts": [
     {
       "id": "00000000-0000-4000-8000-000000000048",
       "title": "Working",
       "positions": {
-        "00000000-0000-4000-8000-000000000027": { "x": 0, "y": 0 }
+        "00000000-0000-4000-8000-000000000027": { "x": 0, "y": 0 },
+        "00000000-0000-4000-8000-000000000043": { "x": 340, "y": 0 }
       },
+      "graphs": [
+        {
+          "id": "00000000-0000-4000-8000-000000000004",
+          "title": "Main walkthrough",
+          "color": "#6ea8fe",
+          "edges": [
+            {
+              "from": "00000000-0000-4000-8000-000000000027",
+              "to": "00000000-0000-4000-8000-000000000043"
+            }
+          ]
+        }
+      ],
       "activeGraph": "00000000-0000-4000-8000-000000000004"
     }
   ],
@@ -120,9 +121,10 @@ A space is a **space directory**: a space file (`space.json`) plus one Markdown 
 
 | Key | Meaning |
 | --- | --- |
-| `id`, `title` | What names the space. In version 2 every explicit id is a UUID; an import may omit ids for the persistence layer to allocate. The id is not the title and not the file name. |
-| `graphs` | Named walkthroughs, each an `id`, `title`, optional `color`, and a set of `{ from, to }` **edges** between card ids ([ADR 0032](docs/adr/0032-routes-may-contain-cycles.md)). Forks, merges, disconnected components, cycles and self-edges are legal; an exact duplicate Edge within one Graph is not. Graphs are a space's only structure ([ADR 0007](docs/adr/0007-routes-are-the-only-structure.md)), and the drawn edges and handles are derived from these. The collection may be empty — a space with no graphs renders and cannot be presented ([ADR 0015](docs/adr/0015-a-space-may-have-no-routes.md)). |
-| `layouts` | Optional authored card-to-position maps ([ADR 0014](docs/adr/0014-layout-is-the-authored-data-strategy-is-the-behaviour.md)). Positions are sparse — a layout may omit cards but may not name one the space lacks. A layout also names the graphs it shows (`graphs`, a filter; absent means all) and which of them opens **active** (`activeGraph`; absent means the first visible one) — [ADR 0026](docs/adr/0026-a-route-is-active-and-the-layout-may-name-it.md). |
+| `version` | `1` is the first-public shape. Version 2 was the disposable pre-release one, which carried a space-level `graphs` array beside layouts that owned none; Hyper is unreleased, so it is rejected by name rather than migrated ([ADR 0040](docs/adr/0040-layouts-own-card-membership-and-routes.md)). |
+| `id`, `title` | What names the space. Every explicit id is a UUID; an import may omit ids for the persistence layer to allocate. The id is not the title and not the file name. |
+| `layouts` | Optional authored card-to-position maps ([ADR 0014](docs/adr/0014-layout-is-the-authored-data-strategy-is-the-behaviour.md)). A layout's position keys **are** its card membership: sparse relative to the space — it may omit cards, but may not name one the space lacks. Each layout owns a non-empty ordered `graphs` collection and may name which of them opens **active** (`activeGraph`; absent means the first it owns) — [ADR 0026](docs/adr/0026-a-route-is-active-and-the-layout-may-name-it.md). A space with no layouts has no graphs, which is what a **new space** is: it renders and cannot be presented ([ADR 0015](docs/adr/0015-a-space-may-have-no-routes.md)). |
+| `layouts[].graphs` | Named walkthroughs, each an `id`, `title`, optional `color`, and a set of `{ from, to }` **edges** between cards **of that layout** ([ADR 0032](docs/adr/0032-routes-may-contain-cycles.md)). Forks, merges, disconnected components, cycles and self-edges are legal; an exact duplicate Edge within one Graph is not, and an endpoint naming a card the owning layout omits is a load error. A graph belongs to exactly one layout, and there is no space-level collection beside them ([ADR 0040](docs/adr/0040-layouts-own-card-membership-and-routes.md)); its id is nonetheless unique across the whole space, because a view drawing every graph flattened across layouts keys colour, handles and activation on that id alone ([ADR 0045](docs/adr/0045-a-view-takes-cards-and-graphs-and-returns-a-layout.md)). The edge set may be empty. Graphs are a layout's only connection structure ([ADR 0007](docs/adr/0007-routes-are-the-only-structure.md)), and the drawn edges and handles are derived from them. |
 | `defaultView` | Which view the space opens in: a declared layout's id, or a built-in automatic one (`flow`, `grid`). A declared layout wins a name collision. |
 
 ### Graphs as color-coded flows
@@ -183,7 +185,7 @@ Design rules kept throughout: domain logic stays out of React components, React 
 ## Current limitations
 
 - **Card authoring is intentionally narrow.** Markdown source, titles and descriptions are editable, while visual editing, freehand drawing and whiteboard shapes are not built. Card, placement and Edge edits commit through the HTTP persistence session: under `pnpm dev` they land in PostgreSQL and outlive the page, and under `pnpm dev:new` they survive a browser reload but not a server restart.
-- **The app never touches files.** The browser lists, opens and commits Spaces under `/api/spaces` and nothing else; file discovery and parsing are server-side CLI and import concerns. There is no write-back and no file picker. Canonical file export belongs to the `hyper` CLI ([ADR 0030](docs/adr/0030-postgres-is-the-live-write-model.md)), which regenerates a deterministic version 2 space directory from the database and records the revision it projected.
+- **The app never touches files.** The browser lists, opens and commits Spaces under `/api/spaces` and nothing else; file discovery and parsing are server-side CLI and import concerns. There is no write-back and no file picker. Canonical file export belongs to the `hyper` CLI ([ADR 0030](docs/adr/0030-postgres-is-the-live-write-model.md)), which regenerates a deterministic version 1 space directory from the database and records the revision it projected.
 - **Overlay legibility.** The graph draws every Graph at once. Only **compatible** graphs — the union of their edges is acyclic — lay out cleanly as parallel forward paths; two graphs disagreeing about the order of cards they share force a backward edge, drawn as a routed channel. See [`.scratch/multiple-routes/findings.md`](.scratch/multiple-routes/findings.md).
 - **Cards are a fixed shape.** A card draws its title, so every card is the same size — declared once in `packages/app/src/card.ts` as a 16:9 ratio and consumed by both the layout and the stylesheet. Content adapts to the card, not the reverse, which is why measured DOM sizes are not fed into ELK.
 - **Structural authoring is partial.** Dragging between spatial handles draws an Edge, and the first one mints and activates `Graph 1` ([ADR 0033](docs/adr/0033-route-authoring-uses-spatial-route-coloured-handles.md)). Option/Alt plus an empty drop atomically creates and connects a blank `Card N`. There is no detached Card creation, and deleting Cards, Edges or Graphs is deliberately disabled until those operations can complete through the same persisted-Edit lifecycle. Broader Graph management is also unbuilt.

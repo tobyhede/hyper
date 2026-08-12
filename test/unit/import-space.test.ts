@@ -129,6 +129,39 @@ describe('importSingleSpace', () => {
     expect(repository.imports).toEqual([]);
   });
 
+  it('refuses a version 2 space directory rather than migrating it', async () => {
+    // The disposable pre-release shape: graphs beside the layouts instead of
+    // inside them. Hyper is unreleased, so it has no compatibility claim on the
+    // first-public document and never enters (ADR 0040).
+    //
+    // Import parses the file against `importSpaceFileSchema`, which is ahead of
+    // domain intake, so what refuses here is the `version` literal rather than
+    // `loadSpace`'s named `unsupported-version` error. The version is still the
+    // first thing said, and nothing reaches the repository — but unlike intake,
+    // which reads the declared version *before* parsing precisely so it answers
+    // once, this path also emits the cascade of keys that moved. Asserted as it
+    // is rather than as it should be.
+    const directory = await makeTemporaryDirectory();
+    await writeFile(
+      join(directory, 'space.json'),
+      JSON.stringify({
+        version: 2,
+        id: SPACE_ID,
+        title: 'Pre-release talk',
+        graphs: [{ id: GRAPH_ID, title: 'Main', edges: [] }],
+        layouts: [{ id: '55555555-5555-4555-8555-555555555555', title: 'Working', positions: {} }],
+      }),
+    );
+    const repository = new RecordingRepository({ kind: 'imported', spaces: [storedSpace] });
+
+    const error = await captureError(() => importSingleSpace(directory, repository));
+
+    expect(error).toBeInstanceOf(SpaceImportFileError);
+    expect((error as SpaceImportFileError).kind).toBe('parsing');
+    expect((error as SpaceImportFileError).diagnostics[0]).toContain('version');
+    expect(repository.imports).toEqual([]);
+  });
+
   it('imports one completely read aggregate and returns the repository stored space', async () => {
     const directory = await writeValidSpace();
     const repository = new RecordingRepository({ kind: 'imported', spaces: [storedSpace] });
