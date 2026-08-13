@@ -9,12 +9,9 @@
  * here with nothing importing them. Functions are named one at a time, and a
  * helper no consumer needs to write stays in its module. Usually it sits behind
  * an offered form that calls it — `graphCardIds` calls `cardIdsForGraphs`,
- * `graphStartCard` calls `graphEntryCards`. It runs the
- * other way for `filterHandlesByGraph`, the single-Graph specialisation written
- * on the offered `filterHandlesByGraphs`. And it does not hold at all for
- * `incomingEdges`: nothing calls it but its own test, so it is unoffered for
- * want of a caller rather than behind one, and stays in `traversal` as
- * `outgoingEdges`'s mirror.
+ * `graphStartCard` calls `graphEntryCards`. It runs the other way for
+ * `filterHandlesByGraph`, the single-Graph specialisation written on the offered
+ * `filterHandlesByGraphs`.
  *
  * Two modules are absent whole for that reason and not by oversight.
  * `frontmatter` is how `card-file` reads a fence, and `parseCardFile` is the

@@ -1,6 +1,6 @@
 # `incomingEdges` has no caller
 
-Status: needs-triage
+Status: resolved
 
 Surfaced by: review of PR #46, while correcting the curation doc that named it
 
@@ -50,8 +50,61 @@ there are none.
 
 ## Acceptance
 
-- [ ] `incomingEdges` is either removed with its test, or kept with a recorded
+- [x] `incomingEdges` is either removed with its test, or kept with a recorded
       reason a reader can find from the module.
-- [ ] The curation doc at the top of `packages/graph/src/index.ts` matches
+- [x] The curation doc at the top of `packages/graph/src/index.ts` matches
       whichever answer is taken.
-- [ ] `pnpm verify` green.
+- [x] `pnpm verify` green.
+
+## Answer
+
+**Removed, not kept.** `incomingEdges` is gone from
+`packages/graph/src/traversal.ts`, and its `describe` block and its import from
+`../src/traversal` are gone from `packages/graph/test/traversal.test.ts`. The
+`diamond` fixture stays — `outgoingEdges` and `graphEntryCards` both read it.
+
+The "keep it" argument was that ADR 0040's Remove-from-Layout cascade removes
+"every incident Edge", so the cascade was the plausible first caller. That
+cascade has since been built, and it did not call this. `withoutIncidentEdges`
+in `packages/app/src/snapshot.ts` filters both directions in one pass over each
+Graph's edges — it never asks for the arriving edges as a list, because it does
+not want a list, it wants the edges that remain:
+
+```ts
+edges: graph.edges.filter((edge) => edge.from !== cardId && edge.to !== cardId);
+```
+
+Two calls returning arrays nothing keeps would be a worse way to write that, so
+the predicted caller arrived and declined. With it decided the other way, the
+remaining case was symmetry with `outgoingEdges`, which this ticket already
+recorded as not a reason on its own.
+
+What moved:
+
+- `packages/graph/src/traversal.ts` — the function and its one-line doc.
+- `packages/graph/test/traversal.test.ts` — the `describe('incomingEdges')`
+  block and the name in the internal import.
+- `packages/graph/src/index.ts` — the curation doc's third clause, which existed
+  only to explain a name that was unoffered "for want of a caller rather than
+  behind one". Every hidden helper the paragraph still names now sits behind an
+  offered form, in one of the two senses it distinguishes, so the exception it
+  was written to record has nothing left to except.
+
+Nothing else changed, and nothing else needed to:
+
+- `test/unit/graph-package-surface.test.ts` never listed it — it was not on the
+  index — so the surface guard is untouched and still passes.
+- `traversal.ts`'s module doc block needed no edit. It says these are "the reads
+  that traversal supports — what a Card's moves are, and where a traversal can
+  begin", which this ticket noted `incomingEdges` was neither of. Deleting the
+  function is what makes that sentence true rather than something to correct.
+- `docs/adr/0041-graph-is-the-first-public-name-for-route.md:113` still names it.
+  ADRs are append-only records of what was decided when, and 0041's rename
+  listing is accurate about the tree it renamed. Not edited.
+- `.scratch/graph-rename/issues/02-…` and
+  `.scratch/package-hygiene/issues/02-…` also still name it. Both are resolved
+  tickets recording decisions taken while it existed, and `02` in this directory
+  is the one that deferred the question here by name. Rewriting either would
+  falsify the record that produced this ticket. Not edited.
+
+Behaviour-preserving, as predicted: there were no callers.

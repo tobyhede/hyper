@@ -18,11 +18,6 @@ export function outgoingEdges(graph: Graph, cardId: CardId): GraphEdge[] {
   return graph.edges.filter((edge) => edge.from === cardId);
 }
 
-/** The edges arriving at a card. */
-export function incomingEdges(graph: Graph, cardId: CardId): GraphEdge[] {
-  return graph.edges.filter((edge) => edge.to === cardId);
-}
-
 /**
  * The Cards a traversal can start from: those an Edge leaves but none arrives at, in
  * the order the author's edges first mention them.
