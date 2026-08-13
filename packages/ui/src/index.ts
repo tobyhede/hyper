@@ -16,6 +16,7 @@ export {
   CommandItem,
   CommandList,
 } from './Command';
+export { Dialog, DialogContent, DialogOverlay } from './Dialog';
 export { FALLBACK_GRAPH_COLOR, GraphLegend } from './GraphLegend';
 export type { GraphLegendProps } from './GraphLegend';
 export { GraphSelector } from './GraphSelector';

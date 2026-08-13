@@ -23,7 +23,8 @@ export const PANE_INITIAL_FOCUS = `[${PANE_INITIAL_FOCUS_ATTRIBUTE}]`;
  * Declare a field the pane's initial focus.
  *
  * `false` answers no props at all, which leaves the attribute off and the pane
- * on its ordinary fallback — its first focusable, in document order.
+ * on the primitive's own answer — the first tabbable inside the dialog, which is
+ * what Radix's `FocusScope` focuses when `onOpenAutoFocus` is left alone.
  */
 export const paneInitialFocus = (declared: boolean): Record<string, string> =>
   declared ? { [PANE_INITIAL_FOCUS_ATTRIBUTE]: '' } : {};

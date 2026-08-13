@@ -338,8 +338,9 @@ describe('authoring an opened Card', () => {
   /**
    * Escape cancels, and the pane closes with it — there is no reading state
    * behind the editor to fall back to (ADR 0037). What matters is that the draft
-   * is discarded rather than committed, and that the window listener does not
-   * also fire.
+   * is discarded rather than committed: Escape is an alias of Cancel on this
+   * surface, and the field it was pressed in takes no first press of its own
+   * (ADR 0048).
    */
   it('cancels the edit on Escape without committing the draft', async () => {
     const session = mount();
@@ -397,6 +398,12 @@ describe('authoring an opened Card', () => {
    * Reachable from the keyboard: the pane traps nothing, so `Enter` on a node
    * behind it opens that Card (`SpaceCanvas`'s handler only declines while
    * presenting).
+   *
+   * The node is found by its test id rather than by its heading, because the
+   * pane hides the graph behind it from the accessibility tree (`hideOthers`,
+   * ADR 0047) and a role query answers only what is in that tree. Dispatching
+   * onto the element is still the point: this is a keypress reaching a node the
+   * author cannot see.
    */
   it('never carries one Card’s draft onto another', async () => {
     const session = mount();
@@ -405,9 +412,7 @@ describe('authoring an opened Card', () => {
       target: { value: 'A rewritten' },
     });
 
-    const other = (await screen.findByRole('heading', { name: 'B' })).closest('.react-flow__node');
-    if (other === null) throw new Error('Card B is not drawn as a node');
-    fireEvent.keyDown(other, { key: 'Enter' });
+    fireEvent.keyDown(screen.getByTestId(`rf__node-${OTHER_CARD_ID}`), { key: 'Enter' });
 
     // Whatever the pane shows, it must not be A's draft under B's id.
     expect(screen.getByRole('textbox', { name: 'Title' })).toHaveValue('A');
@@ -421,11 +426,11 @@ describe('authoring an opened Card', () => {
   });
 
   /**
-   * Two handlers answer Escape — the form's own cancel, and the window listener
-   * `App` registers while a Card is open — and which one runs depends on where
-   * the key lands. Outside the fields only the listener does. Both close without
-   * committing, so the pane behaves the same either way; this is what says so,
-   * since the form's `stopPropagation` makes it easy to assume otherwise.
+   * One owner answers Escape wherever it is pressed, which is what replaced two.
+   * The form used to take it and stop it propagating, because a window listener
+   * `App` registered would otherwise have answered the same keypress; the Dialog
+   * now listens once, on the document, so a press on the backdrop and a press in
+   * a field reach the same place.
    */
   it('closes without committing when Escape is pressed outside the fields', async () => {
     const session = mount();

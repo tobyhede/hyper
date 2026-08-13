@@ -6,6 +6,7 @@ import { OpenCard } from '../src/components/OpenCard';
 const CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 const ALIAS_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
 const SECOND_ALIAS_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
+const OTHER_CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
 
 const markdown = (over: { description?: string; body?: string } = {}) => ({
   id: CARD_ID,
@@ -186,13 +187,13 @@ describe('the opened Card', () => {
    * pane is about, and the qualified `Description of A` names the other one.
    */
   it('renames the occurrence it was opened through', () => {
-    const onRename = vi.fn(() => null);
+    const onEdit = vi.fn(() => null);
     const onComplete = vi.fn();
     render(
       <OpenCard
         through={{ id: ALIAS_ID, title: 'A again', kind: 'alias', target: CARD_ID }}
         content={markdown()}
-        occurrence={{ onRename, targets: [], onRetarget: vi.fn() }}
+        occurrence={{ targets: [], onEdit }}
         onComplete={onComplete}
         onCancel={vi.fn()}
       />,
@@ -202,26 +203,53 @@ describe('the opened Card', () => {
     expect(title).toHaveValue('A again');
 
     fireEvent.change(title, { target: { value: 'Recap' } });
-    fireEvent.keyDown(title, { key: 'Enter' });
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
 
-    expect(onRename).toHaveBeenCalledWith('Recap');
-    // A different edit subject from the fields under it, so renaming the Alias
-    // completes nothing against the Card that owns the content.
-    expect(onComplete).not.toHaveBeenCalled();
+    expect(onEdit).toHaveBeenCalledWith({ title: 'Recap', target: CARD_ID });
+    // A different edit subject from the fields under it, so the Alias's Edit
+    // names the Alias and the content's names the Card that owns the content.
+    expect(onComplete).toHaveBeenCalledWith(expect.objectContaining({ id: CARD_ID, title: 'A' }));
   });
 
   /**
-   * The sentence belongs to Authoring, which is the only thing that knows which
-   * rule was hit (ADR 0042), so the field's job is to put it where the author is
-   * looking and tie it to the control that produced it.
+   * Nothing on this pane commits before `Done` (ADR 0048), and the occurrence's
+   * Title is where that used to be untrue: it settled on blur and on Enter, so
+   * an author who tabbed past it had authored a Card.
    */
-  it('shows the Space’s refusal of a rename beside the title it refused', () => {
-    const onRename = vi.fn(() => 'A Card title is required.');
+  it('pends the occurrence’s title until Done', () => {
+    const onEdit = vi.fn(() => null);
     render(
       <OpenCard
         through={{ id: ALIAS_ID, title: 'A again', kind: 'alias', target: CARD_ID }}
         content={markdown()}
-        occurrence={{ onRename, targets: [], onRetarget: vi.fn() }}
+        occurrence={{ targets: [], onEdit }}
+        onComplete={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    );
+    const title = screen.getByRole('textbox', { name: 'Title' });
+
+    fireEvent.change(title, { target: { value: 'Recap' } });
+    fireEvent.blur(title);
+
+    expect(onEdit).not.toHaveBeenCalled();
+    expect(title).toHaveValue('Recap');
+  });
+
+  /**
+   * The sentence belongs to Authoring, which is the only thing that knows which
+   * rule was hit (ADR 0042), so the pane's job is to put it where the author is
+   * looking. It is drawn once for the pair of fields rather than tied to either:
+   * `Done` submits the Title and the Target as one Edit, and naming one of them
+   * would send an author to the wrong field half the time.
+   */
+  it('shows the Space’s refusal of the occurrence’s Edit, and withdraws it on the next attempt', () => {
+    const onEdit = vi.fn(() => 'A Card title is required.');
+    render(
+      <OpenCard
+        through={{ id: ALIAS_ID, title: 'A again', kind: 'alias', target: CARD_ID }}
+        content={markdown()}
+        occurrence={{ targets: [], onEdit }}
         onComplete={vi.fn()}
         onCancel={vi.fn()}
       />,
@@ -229,40 +257,39 @@ describe('the opened Card', () => {
     const title = screen.getByRole('textbox', { name: 'Title' });
 
     fireEvent.change(title, { target: { value: '   ' } });
-    fireEvent.keyDown(title, { key: 'Enter' });
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
 
     expect(screen.getByRole('alert')).toHaveTextContent('A Card title is required.');
-    expect(title).toHaveAttribute('aria-invalid', 'true');
-    expect(title).toHaveAccessibleDescription('A Card title is required.');
+
+    // The message describes the attempt that produced it, and editing either
+    // field begins a different one.
+    fireEvent.change(title, { target: { value: 'Recap' } });
+
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
   /**
-   * The rule the graph's in-place rename already follows: an author who types a
-   * title and reaches for another control has said what they want, and blur is
-   * the only signal there is. A draft equal to the stored title is not submitted
-   * at all — Authoring would answer `unchanged`, which is the same nothing.
+   * A refused occurrence leaves the content Card unauthored, which is the whole
+   * reason both fields are validated before either Edit is made: one press must
+   * not half-apply.
    */
-  it('commits a renamed occurrence on blur, and an untouched one never', () => {
-    const onRename = vi.fn(() => null);
+  it('completes nothing on the content Card when the occurrence is refused', () => {
+    const onComplete = vi.fn();
+    const onCancel = vi.fn();
     render(
       <OpenCard
         through={{ id: ALIAS_ID, title: 'A again', kind: 'alias', target: CARD_ID }}
         content={markdown()}
-        occurrence={{ onRename, targets: [], onRetarget: vi.fn() }}
-        onComplete={vi.fn()}
-        onCancel={vi.fn()}
+        occurrence={{ targets: [], onEdit: () => 'This Card is no longer part of the Space.' }}
+        onComplete={onComplete}
+        onCancel={onCancel}
       />,
     );
-    const title = screen.getByRole('textbox', { name: 'Title' });
 
-    fireEvent.blur(title);
-    expect(onRename).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
 
-    fireEvent.change(title, { target: { value: 'Recap' } });
-    fireEvent.blur(title);
-
-    expect(onRename).toHaveBeenCalledOnce();
-    expect(onRename).toHaveBeenCalledWith('Recap');
+    expect(onComplete).not.toHaveBeenCalled();
+    expect(onCancel).not.toHaveBeenCalled();
   });
 
   /**
@@ -308,7 +335,7 @@ describe('the opened Card', () => {
       <OpenCard
         through={{ id: ALIAS_ID, title: 'A again', kind: 'alias', target: CARD_ID }}
         content={markdown()}
-        occurrence={{ onRename: vi.fn(), targets: [], onRetarget: vi.fn() }}
+        occurrence={{ targets: [], onEdit: vi.fn() }}
         onComplete={vi.fn()}
         onCancel={vi.fn()}
       />,
@@ -316,6 +343,137 @@ describe('the opened Card', () => {
 
     expect(screen.getByRole('textbox', { name: 'Title' })).toHaveFocus();
     expect(screen.getByRole('combobox', { name: 'Target' })).not.toHaveFocus();
+  });
+
+  /**
+   * Issue `17`, with its assertion the other way up.
+   *
+   * Choosing a Target used to commit an `edited-card` Edit on the spot: the
+   * Space changed, the pane's content owner became the new Target, and the
+   * content editor — keyed so that no draft is ever shown under another Card's
+   * identity — remounted and reseeded over whatever had been typed into it. The
+   * Target now pends to `Done` like every other field (ADR 0048), so the two
+   * ids the key is built from cannot move while the pane is open.
+   *
+   * The fields keep naming the Card they are still authoring, too: a pending
+   * Target does not preview.
+   */
+  it('keeps the content draft when a different Target is chosen', () => {
+    const onEdit = vi.fn(() => null);
+    const onComplete = vi.fn();
+    render(
+      <OpenCard
+        through={{ id: ALIAS_ID, title: 'A again', kind: 'alias', target: CARD_ID }}
+        content={markdown()}
+        occurrence={{
+          targets: [
+            { id: CARD_ID, title: 'A', kind: 'markdown', body: '**A** source' },
+            { id: OTHER_CARD_ID, title: 'B', kind: 'markdown', body: '**B** source' },
+          ],
+          onEdit,
+        }}
+        onComplete={onComplete}
+        onCancel={vi.fn()}
+      />,
+    );
+    fireEvent.change(screen.getByRole('textbox', { name: 'Markdown source of A' }), {
+      target: { value: 'A paragraph nobody asked to lose' },
+    });
+
+    fireEvent.click(screen.getByRole('option', { name: 'Markdown Card B' }));
+
+    expect(onEdit).not.toHaveBeenCalled();
+    expect(screen.getByRole('textbox', { name: 'Markdown source of A' })).toHaveValue(
+      'A paragraph nobody asked to lose',
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+
+    expect(onEdit).toHaveBeenCalledWith({ title: 'A again', target: OTHER_CARD_ID });
+    // Written to the Card the pane was authoring all along, not to the Target
+    // the Alias is about to point at.
+    expect(onComplete).toHaveBeenCalledWith({
+      id: CARD_ID,
+      title: 'A',
+      kind: 'markdown',
+      body: 'A paragraph nobody asked to lose',
+    });
+  });
+
+  /** Four fields, one press, and one Edit each for the two Cards they author. */
+  it('completes the occurrence and the content from one Done', () => {
+    const onEdit = vi.fn(() => null);
+    const onComplete = vi.fn();
+    const onCancel = vi.fn();
+    render(
+      <OpenCard
+        through={{ id: ALIAS_ID, title: 'A again', kind: 'alias', target: CARD_ID }}
+        content={markdown()}
+        occurrence={{
+          targets: [
+            { id: CARD_ID, title: 'A', kind: 'markdown', body: '**A** source' },
+            { id: OTHER_CARD_ID, title: 'B', kind: 'markdown', body: '**B** source' },
+          ],
+          onEdit,
+        }}
+        onComplete={onComplete}
+        onCancel={onCancel}
+      />,
+    );
+
+    fireEvent.change(screen.getByRole('textbox', { name: 'Title' }), {
+      target: { value: 'Recap' },
+    });
+    fireEvent.click(screen.getByRole('option', { name: 'Markdown Card B' }));
+    fireEvent.change(screen.getByRole('textbox', { name: 'Description of A' }), {
+      target: { value: 'A caption' },
+    });
+    fireEvent.change(screen.getByRole('textbox', { name: 'Markdown source of A' }), {
+      target: { value: 'New body' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+
+    expect(onEdit).toHaveBeenCalledOnce();
+    expect(onEdit).toHaveBeenCalledWith({ title: 'Recap', target: OTHER_CARD_ID });
+    expect(onComplete).toHaveBeenCalledOnce();
+    expect(onComplete).toHaveBeenCalledWith({
+      id: CARD_ID,
+      title: 'A',
+      description: 'A caption',
+      kind: 'markdown',
+      body: 'New body',
+    });
+    expect(onCancel).toHaveBeenCalledOnce();
+  });
+
+  /** And Cancel before Done authors neither of them. */
+  it('authors neither Card when the pane is cancelled', () => {
+    const onEdit = vi.fn(() => null);
+    const onComplete = vi.fn();
+    render(
+      <OpenCard
+        through={{ id: ALIAS_ID, title: 'A again', kind: 'alias', target: CARD_ID }}
+        content={markdown()}
+        occurrence={{
+          targets: [
+            { id: CARD_ID, title: 'A', kind: 'markdown', body: '**A** source' },
+            { id: OTHER_CARD_ID, title: 'B', kind: 'markdown', body: '**B** source' },
+          ],
+          onEdit,
+        }}
+        onComplete={onComplete}
+        onCancel={vi.fn()}
+      />,
+    );
+
+    fireEvent.change(screen.getByRole('textbox', { name: 'Title' }), {
+      target: { value: 'Recap' },
+    });
+    fireEvent.click(screen.getByRole('option', { name: 'Markdown Card B' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+
+    expect(onEdit).not.toHaveBeenCalled();
+    expect(onComplete).not.toHaveBeenCalled();
   });
 
   /**
@@ -506,17 +664,23 @@ describe('the opened Card', () => {
     expect(onComplete).not.toHaveBeenCalled();
   });
 
-  it('cancels on Escape without letting it reach the window', () => {
+  /**
+   * Escape is an alias of Cancel and reaches it through the Dialog rather than
+   * through a handler of this component's (ADR 0048). The field it was pressed
+   * in is not offered a first press of its own — that gesture exists on the
+   * pane, with a label on it.
+   */
+  it('cancels on Escape from a field holding a draft', () => {
     const onCancel = vi.fn();
-    const outside = vi.fn();
-    window.addEventListener('keydown', outside);
-    render(<OpenCard card={markdown()} onComplete={vi.fn()} onCancel={onCancel} />);
+    const onComplete = vi.fn();
+    render(<OpenCard card={markdown()} onComplete={onComplete} onCancel={onCancel} />);
+    const source = screen.getByRole('textbox', { name: 'Markdown source' });
 
-    fireEvent.keyDown(screen.getByRole('textbox', { name: 'Markdown source' }), { key: 'Escape' });
+    fireEvent.change(source, { target: { value: 'abandoned' } });
+    fireEvent.keyDown(source, { key: 'Escape' });
 
     expect(onCancel).toHaveBeenCalledOnce();
-    expect(outside).not.toHaveBeenCalled();
-    window.removeEventListener('keydown', outside);
+    expect(onComplete).not.toHaveBeenCalled();
   });
 });
 
@@ -526,13 +690,29 @@ describe('the opened Card', () => {
  * nothing stopping `Tab` walking out of it into the Card nodes still behind it —
  * which announce "Press enter or space to open a Card" and, until `App` declined
  * it, did exactly that to the Card being typed into.
+ *
+ * All of it is `@radix-ui/react-dialog`'s now (ADR 0047), so what is asserted
+ * here is the composition rather than the mechanism: the name this pane gives
+ * the primitive, and that the defaults it depends on really are switched on.
  */
 describe('the opened Card as a dialog', () => {
-  it('is a modal dialog named for the Card it authors', () => {
+  /**
+   * `aria-modal` is deliberately absent, and this is the assertion that used to
+   * insist on it.
+   *
+   * Radix does not write it. Its modality is `hideOthers` — `aria-hidden` on
+   * everything outside the content, asserted below — which is the remedy for
+   * `aria-modal`'s own history of being ignored or of hiding content that should
+   * still be reachable. Carrying both would be a hand-rolled attribute beside a
+   * primitive that has already answered the question (ADR 0047), so the pane
+   * takes the primitive's answer and this names the trade rather than reversing
+   * it.
+   */
+  it('is a dialog named for the Card it authors', () => {
     render(<OpenCard card={markdown()} onComplete={vi.fn()} onCancel={vi.fn()} />);
 
     const dialog = screen.getByRole('dialog');
-    expect(dialog).toHaveAttribute('aria-modal', 'true');
+    expect(dialog).not.toHaveAttribute('aria-modal');
     expect(dialog).toHaveAccessibleName('A');
   });
 
@@ -557,6 +737,12 @@ describe('the opened Card as a dialog', () => {
     expect(screen.getByRole('dialog')).toHaveAccessibleName('A again — editing content on A');
   });
 
+  /**
+   * The wrap `FocusScope`'s `loop` gives it. jsdom implements no sequential
+   * navigation, so pressing `Tab` here runs the primitive's handler and moves
+   * nothing by itself — a break that left the wraps intact would pass this. The
+   * containment proper is `editing.spec`, in a browser that moves focus.
+   */
   it('keeps Tab inside itself, wrapping from the last control to the first', () => {
     render(<OpenCard card={markdown()} onComplete={vi.fn()} onCancel={vi.fn()} />);
     const title = screen.getByRole('textbox', { name: 'Title' });
@@ -571,28 +757,21 @@ describe('the opened Card as a dialog', () => {
   });
 
   /**
-   * The pointer half of the same containment.
-   *
-   * jsdom moves no focus on a mousedown, so the outcome this protects is only
-   * observable in `editing.spec`, where a browser does. What is assertable here
-   * is the discrimination the handler makes, which is the part a change is
-   * likely to get wrong: the default is prevented wherever taking it would put
-   * focus on something outside the pane's control — the backdrop, the panel
-   * itself — and left alone on the controls, or clicking a field would not put
-   * the caret in it.
+   * The graph behind a modal surface is not there, as far as a screen reader is
+   * concerned. `hideOthers` is the primitive's, and it is a default this
+   * composition depends on rather than an incidental: the hand-rolled pane could
+   * not have it, because React Flow measures its nodes and `inert` would have
+   * taken them out of the layout.
    */
-  it('prevents only the mousedown that would take focus off its controls', () => {
+  it('hides everything behind it from assistive technology', () => {
+    const behind = document.createElement('div');
+    behind.setAttribute('data-testid', 'behind-the-pane');
+    document.body.append(behind);
+
     render(<OpenCard card={markdown()} onComplete={vi.fn()} onCancel={vi.fn()} />);
 
-    // `fireEvent` answers false when the default was prevented.
-    expect(fireEvent.mouseDown(screen.getByTestId('open-card'))).toBe(false);
-    expect(fireEvent.mouseDown(screen.getByRole('dialog'))).toBe(false);
-    expect(fireEvent.mouseDown(screen.getByText('Title'))).toBe(false);
-    expect(fireEvent.mouseDown(screen.getByRole('textbox', { name: 'Title' }))).toBe(true);
-    expect(fireEvent.mouseDown(screen.getByRole('textbox', { name: 'Markdown source' }))).toBe(
-      true,
-    );
-    expect(fireEvent.mouseDown(screen.getByRole('button', { name: 'Done' }))).toBe(true);
+    expect(behind).toHaveAttribute('aria-hidden', 'true');
+    behind.remove();
   });
 
   /**

@@ -288,19 +288,19 @@ describe('Add Alias', () => {
   });
 
   /**
-   * Escape is consumed by exactly one topmost owner. The search field is a draft
-   * and takes the first; only then may the surface take the next.
+   * Escape is an alias of Cancel and closes the surface from wherever it is
+   * pressed (ADR 0048). A field holding a draft no longer buys a press of its
+   * own — the search used to clear itself first, and the title used to restore
+   * to empty first, and both were second unlabelled copies of the button beside
+   * them. Nothing is created either way, so the loss is the two keystrokes an
+   * author was spending to leave.
    */
-  it('spends the first Escape on the search draft and the second on the surface', async () => {
+  it('closes on Escape from a field holding a draft, creating nothing', async () => {
     const session = mount();
     await openAliasCreation();
     const search = screen.getByRole('combobox', { name: 'Target' });
     fireEvent.change(search, { target: { value: 'A' } });
-
-    fireEvent.keyDown(search, { key: 'Escape' });
-
-    expect(search).toHaveValue('');
-    expect(screen.getByTestId('new-alias')).toBeVisible();
+    fireEvent.change(screen.getByTestId('new-alias-title'), { target: { value: 'Recap' } });
 
     fireEvent.keyDown(search, { key: 'Escape' });
 
@@ -309,39 +309,7 @@ describe('Add Alias', () => {
     await settled(session);
   });
 
-  /**
-   * The title field is a draft like the search beside it, and the contract does
-   * not exempt it: "a field draft consumes the first Escape without closing its
-   * containing surface; a second Escape may then close that surface".
-   *
-   * Its stored value is the empty string — there is no Alias yet for it to have
-   * been read off — so restoring it is clearing it, and the pane stays open on a
-   * Target still unchosen.
-   */
-  it('spends the first Escape on the Alias title draft and the second on the surface', async () => {
-    const session = mount();
-    await openAliasCreation();
-    const title = screen.getByTestId('new-alias-title');
-    fireEvent.change(title, { target: { value: 'Recap' } });
-
-    fireEvent.keyDown(title, { key: 'Escape' });
-
-    expect(title).toHaveValue('');
-    expect(screen.getByTestId('new-alias')).toBeVisible();
-
-    fireEvent.keyDown(title, { key: 'Escape' });
-
-    expect(screen.queryByTestId('new-alias')).not.toBeInTheDocument();
-    expect(cardTitles(session)).toEqual(['A', 'B']);
-    await settled(session);
-  });
-
-  /**
-   * The other half of the same rule, and the one that stops it being read as
-   * "Escape never closes from a field": an untouched field owns no draft, so it
-   * hands the gesture on and the surface closes on the first press.
-   */
-  it('closes on one Escape from a title field the author never typed in', async () => {
+  it('closes on Escape from a title field the author never typed in', async () => {
     const session = mount();
     await openAliasCreation();
 
@@ -403,7 +371,7 @@ describe('Add Alias', () => {
     const title = screen.getByRole('textbox', { name: 'Title' });
     expect(title).toHaveValue('A');
     fireEvent.change(title, { target: { value: 'Recap' } });
-    fireEvent.keyDown(title, { key: 'Enter' });
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
 
     expect(cardsOf(session)[2]?.document).toEqual({
       title: 'Recap',
@@ -419,13 +387,10 @@ describe('Add Alias', () => {
   });
 
   /**
-   * Cancel cancels the rename too, and the pointer path is where that is hard.
-   *
-   * The Title commits on blur, and a mousedown on Cancel blurs it — `<button>`
-   * is exempt from the pane's focus containment, deliberately — so the blur
-   * lands before the click that closes the pane. Without care the author
-   * presses Cancel and the rename is committed anyway, with the pane gone
-   * before they could see it happen.
+   * Cancel abandons the rename, which is now the ordinary case rather than the
+   * hard one: nothing on this pane commits before `Done` (ADR 0048), so a blur
+   * on the way to Cancel authors nothing and the marker that used to tell that
+   * blur apart from every other one has no work left to do.
    */
   it('does not commit the occurrence rename when the pane is cancelled', async () => {
     const session = mount();
@@ -448,14 +413,12 @@ describe('Add Alias', () => {
   });
 
   /**
-   * The occurrence's Title is the one field on this pane whose Escape has two
-   * answers to give, because it is the only one holding a draft against a
-   * stored value: "Dirty field restores value before surface closes".
-   *
-   * Restoring has to leave the Alias unwritten as well as the field — a rename
-   * commits on Enter and on blur, and a cancelled draft is neither.
+   * Escape discards the rename and closes, in one press: it is Cancel's meaning
+   * with a key on it, and the field beneath it holds no separate claim on the
+   * gesture (ADR 0048). The Alias itself is not a draft and does not come back
+   * with it — it was created the moment the Target was chosen.
    */
-  it('spends the first Escape on the Alias rename draft and the second on the pane', async () => {
+  it('discards the Alias rename draft and closes on one Escape', async () => {
     const session = mount();
     await openAliasCreation();
     fireEvent.click(screen.getByRole('option', { name: 'Markdown Card A' }));
@@ -465,37 +428,34 @@ describe('Add Alias', () => {
 
     fireEvent.keyDown(title, { key: 'Escape' });
 
-    expect(title).toHaveValue('A');
-    expect(screen.getByTestId('open-card')).toBeVisible();
-    expect(cardsOf(session)[2]?.document).toEqual({ title: 'A', kind: 'alias', target: CARD_ID });
-
-    fireEvent.keyDown(title, { key: 'Escape' });
-
     expect(screen.queryByTestId('open-card')).not.toBeInTheDocument();
     expect(cardsOf(session)[2]?.document).toEqual({ title: 'A', kind: 'alias', target: CARD_ID });
     await settled(session);
   });
 
   /**
-   * A refused rename leaves the field dirty *and* erroring, so the restore has
-   * to take the message with it — an alert naming a draft that is no longer on
-   * screen outlives the thing it describes.
+   * A refused occurrence Edit is reported at `Done`, where the attempt was made,
+   * and withdrawn as soon as a field changes — the message describes an attempt,
+   * and editing begins a different one.
    */
-  it('clears a refused rename’s message when Escape restores the draft', async () => {
+  it('reports a refused rename at Done and withdraws it on the next edit', async () => {
     const session = mount();
     await openAliasCreation();
     fireEvent.click(screen.getByRole('option', { name: 'Markdown Card A' }));
     await screen.findByText('Opened through A');
     const title = screen.getByRole('textbox', { name: 'Title' });
+
     fireEvent.change(title, { target: { value: '   ' } });
-    fireEvent.keyDown(title, { key: 'Enter' });
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+
     expect(screen.getByRole('alert')).toHaveTextContent('A Card title is required.');
-
-    fireEvent.keyDown(title, { key: 'Escape' });
-
-    expect(title).toHaveValue('A');
-    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    // Refused, so nothing was authored on either Card and the pane stays open.
     expect(screen.getByTestId('open-card')).toBeVisible();
+    expect(cardsOf(session)[2]?.document).toEqual({ title: 'A', kind: 'alias', target: CARD_ID });
+
+    fireEvent.change(title, { target: { value: 'Recap' } });
+
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     await settled(session);
   });
 
@@ -629,6 +589,9 @@ describe('retargeting an Alias', () => {
 
     fireEvent.click(await screen.findByRole('button', { name: 'Edit Card A again' }));
     fireEvent.click(screen.getByRole('option', { name: 'Markdown Card B' }));
+    // The Target pends like every other field on this pane (ADR 0048), so the
+    // retarget is authored by Done and not by the selection.
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
 
     expect(cardsOf(session)).toContainEqual({
       id: ALIAS_ID,

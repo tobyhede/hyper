@@ -369,7 +369,7 @@ Issue [`15`](issues/15-frame-5-alias-modifier-gestures-are-unowned.md) has since
 split them: **body drag is package 4b**, and **connection drop is out of scope**
 and listed as such below.
 
-### 4a. Card pane corrections — Radix Dialog and one submit
+### 4a. Card pane corrections — Radix Dialog and one submit — built
 
 Corrective work on what package 4 built, ahead of 4b and 5. `CardPane` composes
 `@radix-ui/react-dialog` instead of hand-rolling its focus trap, pointer
@@ -387,6 +387,26 @@ Alias and `edited-card` on the content Card. Ticket and acceptance:
 Gate: `pnpm verify` plus `pnpm e2e` — the dialog swap is focus and pointer
 behaviour over a live canvas, and Radix's modal layer sets `pointer-events:
 none` outside its content, which jsdom cannot falsify.
+
+**What the build settled beyond the ticket.** That `pointer-events` warning was
+the one thing the swap could not absorb quietly: the pane is `absolute` inside
+the graph area, so the header sat *outside* the backdrop and went inert while
+still looking available. `hideOthers` had already taken it out of the
+accessibility tree, and neither can be applied by halves, so the pane became
+modal over the whole app — `.card-pane` is `position: fixed` and the header is
+dimmed with everything else. The cost is that a renderer cannot be chosen and a
+persistence conflict cannot be resolved from under an open pane; both of those
+discarded the draft silently before, so they are now asked for out loud.
+`editing.spec`'s renderer-change guard moved to `navigation.test.ts`, where
+`selectRenderer` clearing the opened Card actually lives, and the e2e in its
+place watches the app go behind the pane and come back.
+
+Two smaller ones. `aria-modal` is gone from the pane, because Radix does not
+write it and `hideOthers` is its modality — carrying both would be a hand-rolled
+attribute beside a primitive that has answered the question. And
+`PANE_CANCEL_ATTRIBUTE` was **deleted rather than rehomed**: it told a
+blur-on-the-way-to-Cancel apart from every other blur, and no field in a pane
+commits on blur any more.
 
 ### 4b. Alias body drag
 

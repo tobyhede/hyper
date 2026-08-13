@@ -552,20 +552,21 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
     );
     const openedAlias = openedCard?.kind === 'alias' ? openedCard : undefined;
     /**
-     * Authoring the Alias itself — one ordinary Card Edit, on whichever of its
-     * two fields the author touched, and the operation package 3 already built
-     * for both. Everything the change does not name rides through in the stored
-     * document: the Alias keeps its id, its positions and its incident Edges.
+     * Authoring the Alias itself — one ordinary Card Edit over both of its
+     * fields, and the operation package 3 already built for it. Everything the
+     * change does not name rides through in the stored document: the Alias keeps
+     * its id, its positions and its incident Edges.
      *
-     * One helper rather than two, because a rename and a retarget differ only in
-     * which key the change carries. Their *subjects* are what has to stay apart,
-     * and that separation is the pane's: these fields write to the Alias, the
-     * ones under them write to the Card that owns its content.
+     * One call rather than two, because a rename and a retarget differ only in
+     * which key the change carries and the pane's one `Done` settles them
+     * together (ADR 0048). Their *subjects* are what has to stay apart, and that
+     * separation is the pane's: these fields write to the Alias, the ones under
+     * them write to the Card that owns its content.
      */
     const editAlias = useCallback(
       (
         alias: Extract<Card, { kind: 'alias' }>,
-        change: { readonly title: string } | { readonly target: CardId },
+        change: { readonly title: string; readonly target: CardId },
       ): string | null => {
         const { id, ...document } = alias;
         const result = authoring.complete({
@@ -602,19 +603,13 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
         ?.focus();
     }, [openedCardId, presenting]);
 
-    // Escape closes an opened Card. Registered ahead of the traversal controls and
-    // returning early while a card is open, so the two never fight over Escape.
-    useEffect(() => {
-      if (!openedCardId) return;
-      const onKeyDown = (event: KeyboardEvent) => {
-        if (event.key === 'Escape') {
-          event.preventDefault();
-          closeCard();
-        }
-      };
-      window.addEventListener('keydown', onKeyDown);
-      return () => window.removeEventListener('keydown', onKeyDown);
-    }, [openedCardId, closeCard]);
+    // Escape closes an opened Card, and there is no listener here for it: the
+    // pane is a Radix Dialog and dismissal is the primitive's (ADR 0047), which
+    // is what reaches `closeCard` through `onCancel`. This used to be a window
+    // listener registered the whole time a Card was open, which meant one
+    // keypress had two owners — the reason the content editor had to stop the
+    // event propagating, and the reason a field could claim a first Escape by
+    // stopping it first. Both of those are gone with it (ADR 0048).
 
     // Traversing the graph (ADR 0027). Right commits the selected edge, Left traverses
     // back, Up and Down move the selection among a fork's outgoing edges without
@@ -833,9 +828,9 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
                   ? {}
                   : {
                       occurrence: {
-                        onRename: (title: string) => editAlias(openedAlias, { title }),
                         targets: aliasTargets,
-                        onRetarget: (target: CardId) => editAlias(openedAlias, { target }),
+                        onEdit: (change: { title: string; target: CardId }) =>
+                          editAlias(openedAlias, change),
                       },
                     })}
                 onComplete={completeOpenedCard}

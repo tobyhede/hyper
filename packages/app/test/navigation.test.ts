@@ -548,6 +548,28 @@ it('refuses a renderer the current Space does not hold, leaving navigation untou
   expect(navigation.getState()).toBe(before);
 });
 
+/**
+ * An opened Card closes with the renderer it was opened over.
+ *
+ * Opening is editing (ADR 0037), and an Algorithmic View installs no placement
+ * until its strategy resolves — so an Edit completed while a pane hung over an
+ * arranging graph is refused for having nowhere to write, with the pane closing
+ * on `Done` exactly as it does on success. The author saw a save and got
+ * nothing. This used to be held by `editing.spec`, driving the View selector
+ * with a Card open; the pane is a modal Dialog now and the toolbar is behind it,
+ * so the rule is asserted where it lives.
+ */
+it('closes an opened Card with the renderer it was opened over', () => {
+  const space = fixture();
+  const card = uuid('00000000-0000-4000-8000-000000000003');
+  const navigation = navigationFor(() => space, { kind: 'view', view: 'flow' });
+  navigation.openCard(card);
+
+  navigation.selectRenderer({ kind: 'view', view: 'grid' });
+
+  expect(navigation.getState().openedCardId).toBeNull();
+});
+
 it('opens and closes Cards, and closes an opened Card when presenting starts', () => {
   const space = fixture();
   const card = uuid('00000000-0000-4000-8000-000000000003');

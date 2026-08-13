@@ -1011,34 +1011,44 @@ test('a duplicate Edge is marked invalid while the drag is still live', async ({
 });
 
 /**
- * An opened Card is an editor, and an editor needs somewhere to write. Changing
- * the renderer underneath one left it on screen over a graph that was still
- * arranging, and an Edit completed in that window is refused for having no
- * placement to write into — with the pane closing on `Done` exactly as it does
- * on success. The author saw a save and got nothing.
+ * The app is behind the pane, and the toolbar is part of the app.
  *
- * The pane closing with the renderer is what removes the window. The fixture
- * names no `defaultView`, so it opens on `Flow` — selecting that again is not a
- * change and the selector reports nothing. `Grid` is the other Algorithmic View,
- * and it installs no placement until its strategy resolves, which is the state
- * this is about.
+ * This replaces a test that changed the renderer *from under* an open editor and
+ * checked the pane closed with it — the guard against an editor stranded over a
+ * graph that is still arranging, whose Edit is refused for having no placement
+ * while `Done` closes the pane either way. `Navigation.selectRenderer` still
+ * clears the opened Card and `navigation.test.ts` holds it; what changed is that
+ * the gesture can no longer be made. A modal Dialog takes pointer events off
+ * everything outside its content (ADR 0047), and the backdrop is fixed to the
+ * viewport so the header is dimmed rather than left looking available.
+ *
+ * The second half is the regression that would be silent in jsdom: the app has
+ * to come back. Radix restores `pointer-events` on unmount, and a modal that
+ * leaves the body inert is a known way for that to go wrong.
  */
-test('changing the renderer closes an opened Card rather than stranding its editor', async ({
-  page,
-}) => {
+test('an opened Card puts the app behind it, and gives it back on close', async ({ page }) => {
   await page.goto('/');
   const card = nodeByTitle(page, 'A').first();
   await settled(page);
   await openCard(card, 'A');
+  await page
+    .getByRole('textbox', { name: 'Markdown source' })
+    .fill('Typed into a pane the toolbar cannot reach');
 
-  const source = page.getByRole('textbox', { name: 'Markdown source' });
-  await expect(source).toBeVisible();
-  await source.fill('Typed into a pane about to lose its placement');
+  const viewSelector = page.getByTestId('view-selector');
+  await expect(viewSelector).toBeVisible();
+  // Visible, dimmed by the backdrop, and answering nothing: the modality is the
+  // primitive's and it covers the chrome as well as the graph.
+  await expect(async () => {
+    await viewSelector.click({ trial: true, timeout: 250 });
+  }).rejects.toThrow();
 
-  await page.getByTestId('view-selector').click();
-  await page.getByRole('option', { name: 'Grid' }).click();
-
+  await page.getByRole('button', { name: 'Cancel' }).click();
   await expect(page.getByTestId('open-card')).toHaveCount(0);
+
+  await viewSelector.click();
+  await page.getByRole('option', { name: 'Grid' }).click();
+  await settled(page);
   // Nothing was written, and nothing was persisted from the abandoned draft.
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '0');
 });
@@ -1079,17 +1089,20 @@ test('an opened Card keeps Tab inside it, so the graph behind cannot take focus'
 });
 
 /**
- * The same containment, and the pointer gesture that traversed straight out of it.
+ * The same containment, after the pointer gesture that used to traverse straight
+ * out of it — and the one place Radix's containment reads differently from the
+ * hand-roll it replaced.
  *
- * `containTab` is bound to the panel, so it only ever sees a `Tab` pressed while
- * focus is already inside. A mousedown on anything unfocusable moves focus to
- * `<body>`, and from there the handler never fires at all: `Tab` traverses the
- * document from the top, into the toolbar and on to the Card nodes the pane
- * covers. Two surfaces are unfocusable and always clickable — the backdrop,
- * which is visible at every viewport because the panel letterboxes inside it,
- * and the panel's own padding and gaps. Both were confirmed to escape before
- * this was fixed; neither is reachable from the test above, which only ever
- * presses `Tab` from a field it focused first.
+ * A mousedown on anything unfocusable moves focus to `<body>`, and the old pane
+ * answered that by cancelling the default, so focus never left. `FocusScope`
+ * lets it leave and pulls it back on the way in: a `focusout` whose
+ * `relatedTarget` is null is deliberately ignored, because that is also what a
+ * lost window looks like, and a `focusin` anywhere outside the content is
+ * redirected to the last element inside it. So the property is not "focus never
+ * leaves" but "focus cannot come to rest outside" — which is the one that
+ * matters, since a Card node answers `Enter` by opening itself and `<body>` does
+ * not. The backdrop and the panel's own padding are the two surfaces that reach
+ * this; both were confirmed to escape before any of it existed.
  */
 test('an opened Card keeps Tab inside it after a click that focuses nothing', async ({ page }) => {
   await page.goto('/');
@@ -1103,25 +1116,39 @@ test('an opened Card keeps Tab inside it after a click that focuses nothing', as
   // The overlay's top-left corner is inside its 2rem padding, so it is backdrop
   // whatever the viewport does to the panel it letterboxes.
   await page.locator('.card-pane').click({ position: { x: 4, y: 4 } });
-  expect(await withinPane(), 'focus left the pane when the backdrop was clicked').toBe(true);
   await page.keyboard.press('Tab');
   expect(await withinPane(), 'focus left the pane on the Tab after a backdrop click').toBe(true);
 
-  // And the panel's own corner, which is its 1rem padding ring — inside the
-  // pane, and no more focusable than the backdrop.
+  // And the panel's own corner, which is its 1rem padding ring. `Content` is
+  // `tabIndex={-1}`, so this one focuses the panel itself and never leaves.
   await page.locator('.card-pane__panel').click({ position: { x: 4, y: 4 } });
   expect(await withinPane(), 'focus left the pane when its padding was clicked').toBe(true);
   await page.keyboard.press('Tab');
   expect(await withinPane(), 'focus left the pane on the Tab after a padding click').toBe(true);
 
-  // A click on a control still focuses it, which is what the prevention must not
-  // cost: it is prevented only where the default would take focus out of here.
+  // A click on a control still focuses it, which nothing here may cost.
   await page.getByRole('textbox', { name: 'Markdown source' }).click();
   await expect(page.getByRole('textbox', { name: 'Markdown source' })).toBeFocused();
-  // Including through a label's text, which focuses its field by click rather
-  // than by mousedown.
+  // Including through a label's text, which focuses its field by click.
   await page.getByText('Description', { exact: true }).click();
   await expect(page.getByRole('textbox', { name: 'Description' })).toBeFocused();
+
+  // The backdrop is not a way out, either: outside dismissal is declined so the
+  // one exit that does not commit stays the button that says Cancel (ADR 0048).
+  await page.locator('.card-pane').click({ position: { x: 4, y: 4 } });
+  await expect(page.getByTestId('open-card')).toBeVisible();
+
+  // A scrollbar inside the pane can be dragged. The old containment cancelled
+  // the mousedown default on everything that was not a control, the pane's own
+  // scrollbars included, so dragging one did nothing.
+  const draggable = await page.evaluate(() => {
+    const fields = document.querySelector<HTMLElement>('.card-pane__fields');
+    if (fields === null) return false;
+    const down = new MouseEvent('mousedown', { bubbles: true, cancelable: true });
+    fields.dispatchEvent(down);
+    return !down.defaultPrevented;
+  });
+  expect(draggable, 'a mousedown inside the pane was cancelled').toBe(true);
 });
 
 /**
@@ -1213,10 +1240,8 @@ test('cancelling the Alias Target picker creates nothing', async ({ page }) => {
   await expect(search).toBeFocused();
   await search.fill('A');
 
-  // The field draft takes the first Escape, the surface the second.
-  await search.press('Escape');
-  await expect(search).toHaveValue('');
-  await expect(page.getByTestId('new-alias')).toBeVisible();
+  // One press, from a field holding a draft: Escape is Cancel's alias and the
+  // field takes no first press of its own (ADR 0048).
   await search.press('Escape');
 
   await expect(page.getByTestId('new-alias')).toHaveCount(0);
@@ -1228,20 +1253,22 @@ test('cancelling the Alias Target picker creates nothing', async ({ page }) => {
 });
 
 /**
- * The pane's controls stay reachable when the pane cannot fit its content.
+ * The pane's actions stay put when the pane cannot fit its content.
  *
  * `.card-pane__panel` is a fixed 16/9 frame that clips, and its width is clamped
  * by viewport height — so on a short or narrow window the panel is smaller than
  * what is in it. The opened-Card editor survives that because its Markdown field
  * absorbs the squeeze, but the Alias creation pane has no such field: heading,
- * Title, list, hint and actions are all fixed. With the frame clipping and
- * nothing inside it scrolling, Cancel and the refusal line simply fall off the
- * bottom, and a wheel over the panel does nothing because `overflow: hidden`
- * takes no wheel.
+ * Title, list, hint and actions are all fixed.
+ *
+ * This once wheeled 600px to reach `Cancel`, and that wheel was the standing
+ * evidence for a defect: the actions were inside the scrolling region, so they
+ * scrolled away with the fields. Reaching them at rest is what the fix means,
+ * and the wheel went with it.
  *
  * 500px is below the ~620px where clipping begins, measured against this pane.
  */
-test('keeps the Alias pane’s controls reachable on a short viewport', async ({ page }) => {
+test('keeps the Alias pane’s actions in place on a short viewport', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 500 });
   await page.goto('/');
   await expect(nodeByTitle(page, 'A').first()).toBeVisible();
@@ -1249,27 +1276,23 @@ test('keeps the Alias pane’s controls reachable on a short viewport', async ({
 
   await page.getByTestId('add-card-menu').click();
   await page.getByRole('menuitem', { name: 'Add Alias' }).click();
-  const panel = page.locator('.card-pane__panel');
-  await expect(panel).toBeVisible();
-  const box = await panel.boundingBox();
-  if (box === null) throw new Error('the pane has no box');
-
-  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-  await page.mouse.wheel(0, 600);
+  await expect(page.locator('.card-pane__panel')).toBeVisible();
 
   await expect(page.getByRole('button', { name: 'Cancel' })).toBeInViewport();
+  // And the fields above them really are the part that moved out of reach: the
+  // region holding them is what scrolls.
+  const scrolls = await page.evaluate(() => {
+    const fields = document.querySelector('.card-pane__fields');
+    return fields !== null && fields.scrollHeight > fields.clientHeight;
+  });
+  expect(scrolls, 'the pane fits at 500px, so this proves nothing').toBe(true);
 });
 
 /**
- * The same two-stage rule, on the field beside that picker.
- *
- * The Title holds a draft exactly as the search does and the contract exempts
- * neither, so a typed title has to survive the press that would otherwise take
- * the pane down with it. What it restores to is the empty string — there is no
- * Alias yet to have read a title off — which makes restoring and clearing one
- * act here, and the surface goes only on the press after.
+ * The Title beside that picker holds a draft and takes no press of its own for
+ * it: Escape is the pane's, with a label on it.
  */
-test('the Alias title draft takes its own first Escape', async ({ page }) => {
+test('the Alias title draft is discarded by Escape, in one press', async ({ page }) => {
   await page.goto('/');
   await expect(nodeByTitle(page, 'A').first()).toBeVisible();
   await settled(page);
@@ -1279,10 +1302,6 @@ test('the Alias title draft takes its own first Escape', async ({ page }) => {
   await page.getByRole('menuitem', { name: 'Add Alias' }).click();
   const title = page.getByTestId('new-alias-title');
   await title.fill('Recap');
-
-  await title.press('Escape');
-  await expect(title).toHaveValue('');
-  await expect(page.getByTestId('new-alias')).toBeVisible();
 
   await title.press('Escape');
 
@@ -1346,31 +1365,29 @@ test('an Alias is renamed in the editor its creation leaves open', async ({ page
   await expect(title).toBeFocused();
   await expect(title).toHaveValue('B');
   await title.fill('Recap');
+  // Enter in a single-line field submits the form it is in, which on this pane
+  // is `Done` — the platform's own rule, and the one ADR 0048 leaves standing
+  // now that the field commits nothing by itself.
   await title.press('Enter');
 
+  await expect(page.getByTestId('open-card')).toHaveCount(0);
   await expect(nodeByTitle(page, 'Recap')).toHaveCount(1);
   // The Target keeps its own: one Card called B, the one that was always there.
   await expect(nodeByTitle(page, 'B')).toHaveCount(1);
+  await quiescent(page);
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '2');
   await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
-
-  // Closing the pane completes nothing further, and the rename outlives it.
-  await page.getByRole('button', { name: 'Cancel' }).click();
-  await expect(page.getByTestId('open-card')).toHaveCount(0);
-  await quiescent(page);
-  await expect(nodeByTitle(page, 'Recap')).toHaveCount(1);
-  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '2');
 });
 
 /**
- * And the rename is a draft, so Escape restores it rather than closing the pane
- * out from under it: "Dirty field restores value before surface closes".
+ * And the rename is a draft, so Escape discards it and closes — one press, and
+ * the same thing `Cancel` beside it does (ADR 0048).
  *
  * The Alias itself is not a draft and does not come back with it — it was
  * created the moment the Target was chosen, one revision earlier — so this is
  * also the test that the two are told apart.
  */
-test('an Alias rename draft takes its own first Escape', async ({ page }) => {
+test('an Alias rename draft is discarded by Escape, in one press', async ({ page }) => {
   await page.goto('/');
   await expect(nodeByTitle(page, 'A').first()).toBeVisible();
   await settled(page);
@@ -1383,14 +1400,54 @@ test('an Alias rename draft takes its own first Escape', async ({ page }) => {
   await title.fill('Recap');
 
   await title.press('Escape');
-  await expect(title).toHaveValue('B');
-  await expect(page.getByTestId('open-card')).toBeVisible();
-
-  await title.press('Escape');
 
   await expect(page.getByTestId('open-card')).toHaveCount(0);
   await quiescent(page);
   await expect(nodeByTitle(page, 'Recap')).toHaveCount(0);
   await expect(nodeByTitle(page, 'B')).toHaveCount(2);
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
+});
+
+/**
+ * Issue `17`, in the browser: retargeting an open Alias must not destroy the
+ * body being typed into it.
+ *
+ * The mechanism was exact — `onSelect` committed an Edit, the Space changed, the
+ * pane's content owner became the new Target, and the content editor remounted
+ * over the draft, keyed so that no draft is ever shown under another Card's
+ * identity. The Target pends to `Done` now, so neither id moves while the pane
+ * is open, and the fields go on naming the Card they are still authoring.
+ */
+test('retargeting an open Alias keeps the body typed into it', async ({ page }) => {
+  await page.goto('/');
+  const alias = nodeByTitle(page, 'A′').first();
+  await expect(alias).toBeVisible();
+  await settled(page);
+
+  await openCard(alias, 'A′');
+  const source = page.getByRole('textbox', { name: 'Markdown source of A', exact: true });
+  await source.fill('A paragraph nobody asked to lose');
+
+  await page.getByRole('combobox', { name: 'Target' }).fill('B');
+  await page.getByRole('option', { name: 'Markdown Card B' }).click();
+
+  // Still A's editor, still holding what was typed into it, and still saying so.
+  await expect(
+    page.getByRole('textbox', { name: 'Markdown source of A', exact: true }),
+  ).toHaveValue('A paragraph nobody asked to lose');
+  await expect(page.getByText('Editing content on A')).toBeVisible();
+  await quiescent(page);
+  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '0');
+
+  await page.getByRole('button', { name: 'Done' }).click();
+
+  // Both Edits, on both Cards: the Alias points at B, and A keeps the paragraph.
+  await expect(page.getByTestId('open-card')).toHaveCount(0);
+  // The Alias keeps its own title and now names B underneath it. Scoped to the
+  // node, because the fixture returns to the start of both its collections.
+  await expect(alias.getByTestId('alias-marker')).toHaveText('B');
+  await openCard(nodeByTitle(page, 'A').first(), 'A');
+  await expect(page.getByRole('textbox', { name: 'Markdown source' })).toHaveValue(
+    'A paragraph nobody asked to lose',
+  );
 });

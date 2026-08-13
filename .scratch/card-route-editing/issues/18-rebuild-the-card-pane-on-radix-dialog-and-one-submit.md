@@ -1,6 +1,6 @@
 # Rebuild the Card pane on Radix Dialog, with one submit over its fields
 
-Status: ready-for-agent
+Status: done
 
 Type: task
 
@@ -133,18 +133,56 @@ Left for the build: `OpenCard.tsx`'s comment at the content-editor key, which
 still points at issue `17` and should point at ADR 0048; and AGENTS.md's
 `CardPane` and primitives descriptions once the swap lands.
 
+## What the build settled that the ticket left open
+
+Three decisions the ticket asked for and could not take in advance.
+
+**The modal layer could not be absorbed quietly, and the answer was to widen the
+modality rather than to punch a hole in it.** `.card-pane` was `absolute` inside
+the graph area, so the header sat outside the backdrop — and Radix takes
+`pointer-events` off everything outside its content and `hideOthers` takes it out
+of the accessibility tree, neither by halves. Leaving it there gave an
+undimmed toolbar that answered nothing. Re-enabling pointer events on the header
+was weighed and rejected: it would have restored a mouse-only capability that
+assistive technology still could not reach, and every path it restored — change
+the renderer, resolve a persistence conflict — already discarded the open
+draft silently. So `.card-pane` is `position: fixed` and the app is behind the
+pane. `editing.spec`'s "changing the renderer closes an opened Card" moved to
+`navigation.test.ts`, which is where `selectRenderer` clearing the opened Card
+lives; the e2e in its place watches the app go behind the pane and come back,
+which is the `pointer-events`-not-restored regression jsdom cannot see.
+
+**`aria-modal` is gone.** Radix 1.1.23 does not write it — `hideOthers` is its
+modality — and adding it back would be a hand-rolled attribute beside a
+primitive that has already answered the question (ADR 0047). The assertion that
+insisted on it now names the trade.
+
+**The pane-cancel marker was deleted rather than rehomed.** `PANE_CANCEL_ATTRIBUTE`
+and `abandonsThePane` existed so a field committing on blur could tell the blur
+on its way to `Cancel` apart from every other one. With all four fields pending
+to `Done`, no field in a pane commits on blur, so there is nothing for either
+pane's `Cancel` to carry. The acceptance line below is checked as "one home, and
+that home is nowhere".
+
+Also worth knowing for the next pane: `hideOthers` means a role query cannot see
+the graph while a pane is open, so a test reaching a node behind one goes by test
+id. And Enter in a single-line field now submits the form, which is the
+platform's rule and means `Done` — the Alias rename tests press it deliberately.
+
 ## Acceptance
 
-- [ ] `CardPane` composes `@radix-ui/react-dialog`, or a recorded interrogated
+- [x] `CardPane` composes `@radix-ui/react-dialog`, or a recorded interrogated
       reason says why it cannot.
-- [ ] `containTab`, `containFocus` and the initial-focus effect are deleted, not
+- [x] `containTab`, `containFocus` and the initial-focus effect are deleted, not
       kept beside the primitive.
-- [ ] Four fields, one Done, one Cancel; Escape reaches neither by a handler of
-      this repo's.
-- [ ] The three in-pane field Escapes are gone; `CardTitleEditor`'s is not.
-- [ ] Retarget under a dirty content draft preserves the draft.
-- [ ] The actions do not scroll with the fields, `editing.spec.ts`'s 600px wheel
+- [x] Four fields, one Done, one Cancel; Escape reaches neither by a handler of
+      this repo's. `App`'s window listener went with them.
+- [x] The three in-pane field Escapes are gone; `CardTitleEditor`'s is not.
+- [x] Retarget under a dirty content draft preserves the draft — unit and E2E.
+- [x] The actions do not scroll with the fields, `editing.spec.ts`'s 600px wheel
       is deleted, and `styles.css`'s comment about them is true.
-- [ ] A scrollbar inside the pane can be dragged.
-- [ ] The pane-cancel marker has one home, and both panes' `Cancel` carry it.
-- [ ] `pnpm verify` and `pnpm e2e` both green, output reported.
+- [x] A scrollbar inside the pane can be dragged — asserted as a mousedown inside
+      the pane that nothing cancels.
+- [x] The pane-cancel marker has one home, and both panes' `Cancel` carry it —
+      resolved by deletion; see above.
+- [x] `pnpm verify` and `pnpm e2e` both green, output reported.
