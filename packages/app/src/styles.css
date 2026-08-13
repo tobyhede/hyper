@@ -588,7 +588,7 @@ body {
 /* ---- Opened card ---- */
 /* A card opened for authoring. The graph shows titles (ADR 0006); this is where
    a card's content is edited (ADR 0037). */
-.open-card {
+.card-pane {
   position: absolute;
   inset: 0;
   z-index: 40;
@@ -603,7 +603,7 @@ body {
    card opened or presented share a silhouette. The width is clamped by the
    viewport's height as well as its width, so the frame letterboxes on a viewport
    that is not 16:9 rather than silently changing the shape of the content. */
-.open-card__panel {
+.card-pane__panel {
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 12px;
@@ -621,7 +621,7 @@ body {
 /* Content scrolls within the frame, so the actions never scroll away — the step
    controls have to stay reachable at any point in a long card. */
 
-.open-card__editor {
+.card-pane__editor {
   display: flex;
   flex: 1;
   min-height: 0;
@@ -629,7 +629,7 @@ body {
   gap: 0.75rem;
 }
 
-.open-card__delegation {
+.card-pane__delegation {
   display: flex;
   justify-content: space-between;
   gap: 1rem;
@@ -637,12 +637,12 @@ body {
   font-size: 0.8rem;
 }
 
-.open-card__delegation span:last-child {
+.card-pane__delegation span:last-child {
   color: var(--text);
   font-weight: 600;
 }
 
-.open-card__field {
+.card-pane__field {
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
@@ -650,8 +650,8 @@ body {
   font-size: 0.8rem;
 }
 
-.open-card__field input,
-.open-card__field textarea {
+.card-pane__field input,
+.card-pane__field textarea {
   border: 1px solid var(--border);
   border-radius: 6px;
   padding: 0.55rem 0.65rem;
@@ -660,12 +660,12 @@ body {
   font: inherit;
 }
 
-.open-card__field--source {
+.card-pane__field--source {
   flex: 1;
   min-height: 0;
 }
 
-.open-card__field textarea {
+.card-pane__field textarea {
   flex: 1;
   min-height: 8rem;
   resize: none;
@@ -673,12 +673,12 @@ body {
   line-height: 1.5;
 }
 
-.open-card__field-error {
+.card-pane__field-error {
   color: #fca5a5;
   font-size: 0.8rem;
 }
 
-.open-card__hint {
+.card-pane__hint {
   margin: 0;
   color: var(--muted);
   font-size: 0.78rem;
@@ -687,7 +687,7 @@ body {
 
 /* The Alias Target, above the content the Target owns: the field that decides
    *which* Card is being shown comes before the fields that author it. */
-.open-card__retarget {
+.card-pane__retarget {
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
@@ -726,7 +726,7 @@ body {
   line-height: 1.35;
 }
 
-.open-card__actions {
+.card-pane__actions {
   display: flex;
   justify-content: flex-end;
   gap: 0.5rem;

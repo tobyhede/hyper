@@ -1060,7 +1060,7 @@ test('an opened Card keeps Tab inside it, so the graph behind cannot take focus'
   await expect(page.getByRole('textbox', { name: 'Title' })).toBeFocused();
 
   const withinPane = () =>
-    page.evaluate(() => document.activeElement?.closest('.open-card__panel') !== null);
+    page.evaluate(() => document.activeElement?.closest('.card-pane__panel') !== null);
 
   // More presses than the pane has controls, so a leak shows as focus landing on
   // the toolbar or a Card rather than wrapping back to the first field.
@@ -1094,18 +1094,18 @@ test('an opened Card keeps Tab inside it after a click that focuses nothing', as
   await expect(page.getByRole('textbox', { name: 'Title' })).toBeFocused();
 
   const withinPane = () =>
-    page.evaluate(() => document.activeElement?.closest('.open-card__panel') !== null);
+    page.evaluate(() => document.activeElement?.closest('.card-pane__panel') !== null);
 
   // The overlay's top-left corner is inside its 2rem padding, so it is backdrop
   // whatever the viewport does to the panel it letterboxes.
-  await page.locator('.open-card').click({ position: { x: 4, y: 4 } });
+  await page.locator('.card-pane').click({ position: { x: 4, y: 4 } });
   expect(await withinPane(), 'focus left the pane when the backdrop was clicked').toBe(true);
   await page.keyboard.press('Tab');
   expect(await withinPane(), 'focus left the pane on the Tab after a backdrop click').toBe(true);
 
   // And the panel's own corner, which is its 1rem padding ring — inside the
   // pane, and no more focusable than the backdrop.
-  await page.locator('.open-card__panel').click({ position: { x: 4, y: 4 } });
+  await page.locator('.card-pane__panel').click({ position: { x: 4, y: 4 } });
   expect(await withinPane(), 'focus left the pane when its padding was clicked').toBe(true);
   await page.keyboard.press('Tab');
   expect(await withinPane(), 'focus left the pane on the Tab after a padding click').toBe(true);

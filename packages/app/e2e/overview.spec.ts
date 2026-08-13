@@ -266,7 +266,7 @@ test('cards are drawn at exactly the size the layout placed them at', async ({ p
 
 test('the card frame is 16:9, and letterboxes rather than reshaping content', async ({ page }) => {
   const ratio = async () => {
-    const box = (await page.locator('.open-card__panel').boundingBox())!;
+    const box = (await page.locator('.card-pane__panel').boundingBox())!;
     return box.width / box.height;
   };
 
@@ -307,11 +307,11 @@ test('content that exceeds the frame scrolls inside it, keeping controls reachab
   expect(await content.evaluate((el) => el.scrollHeight > el.clientHeight)).toBe(true);
 
   // The frame kept its ratio rather than growing to fit.
-  const panel = (await page.locator('.open-card__panel').boundingBox())!;
+  const panel = (await page.locator('.card-pane__panel').boundingBox())!;
   expect(panel.width / panel.height).toBeCloseTo(16 / 9, 1);
 
   // Actions stay inside the frame, so step controls never scroll away.
-  const actions = (await page.locator('.open-card__actions').boundingBox())!;
+  const actions = (await page.locator('.card-pane__actions').boundingBox())!;
   expect(actions.y + actions.height).toBeLessThanOrEqual(panel.y + panel.height + 1);
 });
 

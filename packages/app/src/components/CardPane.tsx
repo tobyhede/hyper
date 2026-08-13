@@ -152,10 +152,10 @@ export function CardPane({ ariaLabel, testId, children }: CardPaneProps) {
   }, []);
 
   return (
-    <div className="open-card" data-testid={testId} onMouseDown={containFocus}>
+    <div className="card-pane" data-testid={testId} onMouseDown={containFocus}>
       <div
         ref={panel}
-        className="open-card__panel"
+        className="card-pane__panel"
         role="dialog"
         aria-modal="true"
         aria-label={ariaLabel}

@@ -56,12 +56,12 @@ export function NewAlias({ targets, refusal, onCreate, onCancel }: NewAliasProps
 
   return (
     <CardPane ariaLabel="New Alias" testId="new-alias">
-      <div className="open-card__editor" onKeyDown={close}>
-        <div className="open-card__delegation">
+      <div className="card-pane__editor" onKeyDown={close}>
+        <div className="card-pane__delegation">
           <span>New Alias</span>
           <span>An Alias shows another Card’s content at a second position.</span>
         </div>
-        <label className="open-card__field">
+        <label className="card-pane__field">
           <span>Title</span>
           <input
             data-testid="new-alias-title"
@@ -78,15 +78,15 @@ export function NewAlias({ targets, refusal, onCreate, onCancel }: NewAliasProps
           emptyMessage="An Alias needs a Card that owns its content, and this Space has none yet."
         />
         {refusal === null ? (
-          <p className="open-card__hint">
+          <p className="card-pane__hint">
             Choosing a Target creates the Alias. Leave the title empty to take the Target’s.
           </p>
         ) : (
-          <span role="alert" className="open-card__field-error">
+          <span role="alert" className="card-pane__field-error">
             {refusal}
           </span>
         )}
-        <div className="open-card__actions">
+        <div className="card-pane__actions">
           <Button type="button" variant="secondary" onClick={onCancel}>
             Cancel
           </Button>

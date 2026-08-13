@@ -102,7 +102,7 @@ function MarkdownCardEditor({
 
   return (
     <form
-      className="open-card__editor"
+      className="card-pane__editor"
       onSubmit={submit}
       // Escape is the editor's own cancel, and it has to be taken here rather
       // than left to bubble: the window listener that closes an opened Card
@@ -119,10 +119,10 @@ function MarkdownCardEditor({
     >
       {titleEditable && (
         <>
-          <label className="open-card__field">
+          <label className="card-pane__field">
             <span>Title</span>
             <input
-              className="open-card__title-input"
+              className="card-pane__title-input"
               aria-invalid={titleError !== null}
               aria-describedby={titleError === null ? undefined : 'open-card-title-error'}
               value={title}
@@ -133,13 +133,13 @@ function MarkdownCardEditor({
             />
           </label>
           {titleError !== null && (
-            <span id="open-card-title-error" role="alert" className="open-card__field-error">
+            <span id="open-card-title-error" role="alert" className="card-pane__field-error">
               {titleError}
             </span>
           )}
         </>
       )}
-      <label className="open-card__field">
+      <label className="card-pane__field">
         <span>{titleEditable ? 'Description' : `Description of ${card.title}`}</span>
         <input
           aria-invalid={descriptionError !== null}
@@ -152,15 +152,15 @@ function MarkdownCardEditor({
         />
       </label>
       {descriptionError !== null && (
-        <span id="open-card-description-error" role="alert" className="open-card__field-error">
+        <span id="open-card-description-error" role="alert" className="card-pane__field-error">
           {descriptionError}
         </span>
       )}
-      <label className="open-card__field open-card__field--source">
+      <label className="card-pane__field card-pane__field--source">
         <span>{titleEditable ? 'Markdown source' : `Markdown source of ${card.title}`}</span>
         <textarea value={body} onChange={(event) => setBody(event.currentTarget.value)} />
       </label>
-      <div className="open-card__actions">
+      <div className="card-pane__actions">
         <Button type="button" variant="secondary" onClick={onCancel}>
           Cancel
         </Button>
@@ -328,13 +328,13 @@ export function OpenCard(props: OpenCardProps) {
       }
     >
       {delegated && (
-        <div className="open-card__delegation">
+        <div className="card-pane__delegation">
           <span>Opened through {opened.title}</span>
           <span>Editing content on {content.title}</span>
         </div>
       )}
       {retarget !== undefined && (
-        <div className="open-card__retarget">
+        <div className="card-pane__retarget">
           <CardPicker
             label="Target"
             cards={retarget.targets}
@@ -346,7 +346,7 @@ export function OpenCard(props: OpenCardProps) {
             emptyMessage="This Space holds no other Card that owns its content."
           />
           {retargetRefusal !== null && (
-            <span role="alert" className="open-card__field-error">
+            <span role="alert" className="card-pane__field-error">
               {retargetRefusal}
             </span>
           )}
