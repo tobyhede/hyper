@@ -291,6 +291,17 @@ body {
   text-align: center;
 }
 
+/* The kind glyph and the title on one line, so a Card's kind is read with its
+   name rather than hunted for. Markdown draws no glyph, so the row collapses to
+   the title alone and the common Card is unchanged. */
+.card__heading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  max-width: 100%;
+}
+
 .card--node .card__title {
   margin: 0;
   font-size: 1.05rem;
@@ -386,19 +397,17 @@ body {
 }
 
 /* An alias names the card it redraws, so a redraw reads as a deliberate return
-   rather than repetition — and stays legible even when titles match. */
+   rather than repetition — and stays legible even when titles match. The kind
+   glyph that used to lead this line now sits beside the title, where it names
+   the Card rather than the line. */
 .card__alias-of {
   margin: 0;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.3rem;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: 0.8rem;
   color: var(--muted, #8a94a6);
-}
-
-.card__alias-of svg {
-  flex: none;
-  opacity: 0.8;
 }
 
 .card__title {
@@ -667,6 +676,54 @@ body {
 .open-card__field-error {
   color: #fca5a5;
   font-size: 0.8rem;
+}
+
+.open-card__hint {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
+/* The Alias Target, above the content the Target owns: the field that decides
+   *which* Card is being shown comes before the fields that author it. */
+.open-card__retarget {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 0.75rem;
+}
+
+/* ---- Choosing a Card by searching for it ---- */
+/* The Command list's own keyboard model is cmdk's; this is only the palette. */
+
+.card-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.card-picker__label {
+  color: var(--muted);
+}
+
+.card-picker__title {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.card-picker__unavailable {
+  margin: 0;
+  border: 1px dashed var(--border);
+  border-radius: 6px;
+  padding: 0.55rem 0.65rem;
+  color: var(--muted);
+  line-height: 1.35;
 }
 
 .open-card__actions {

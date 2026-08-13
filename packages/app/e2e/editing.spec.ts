@@ -1145,3 +1145,108 @@ test('closing an opened Card returns focus to the Card, not the document', async
   await page.keyboard.press('Enter');
   await expect(page.getByTestId('open-card')).toBeVisible();
 });
+
+/**
+ * Add Card from an Algorithmic View: one conversion, and the naming that
+ * follows it.
+ *
+ * The fixture opens in Flow because it declares no `defaultView`, so this is the
+ * ordinary first Edit an author makes. Two things are being watched that a unit
+ * test cannot see: that the conversion happens exactly once — the fixture's own
+ * two Layouts plus one, not two — and that the created Card really is under the
+ * caret, in a browser where focus is the browser's to give.
+ */
+test('Add Card converts an Algorithmic View once and names the Card in place', async ({ page }) => {
+  await page.goto('/');
+  await expect(nodeByTitle(page, 'A').first()).toBeVisible();
+  await settled(page);
+  const before = await allPositions(page);
+  const addCard = page.getByTestId('add-card');
+  await expect(addCard).toBeEnabled();
+
+  await addCard.click();
+
+  const title = page.getByRole('textbox', { name: 'Card title' });
+  await expect(title).toBeFocused();
+  await expect(title).toHaveValue('Card 1');
+  await expect(page.getByTestId('layout-selector')).toContainText('Layout 1');
+  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
+  // Converting moves nothing: the Cards on screen keep the positions the View
+  // computed for them (ADR 0025).
+  const after = await allPositions(page);
+  for (const [id, position] of Object.entries(before)) {
+    expect(after[id], `card ${id} moved`).toEqual(position);
+  }
+
+  await title.fill('Consequences');
+  await title.press('Enter');
+
+  await expect(nodeByTitle(page, 'Consequences')).toBeVisible();
+  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '2');
+  // One conversion, so one new Layout beside the two the fixture declares.
+  await page.getByTestId('layout-selector').click();
+  await expect(page.getByRole('option')).toHaveCount(3);
+  await page.keyboard.press('Escape');
+});
+
+/**
+ * The Alias creation state is local and creates nothing (ADR 0042).
+ *
+ * Cancelling it must leave the Space exactly as it was — no Card, no conversion,
+ * no commit — and must leave focus somewhere an author can carry on from. The
+ * revision assertion needs `quiescent`: "still 0" passes instantly against a
+ * commit that has not happened yet.
+ */
+test('cancelling the Alias Target picker creates nothing', async ({ page }) => {
+  await page.goto('/');
+  await expect(nodeByTitle(page, 'A').first()).toBeVisible();
+  await settled(page);
+  const nodes = await page.locator('.react-flow__node').count();
+
+  await page.getByTestId('add-card-menu').click();
+  await page.getByRole('menuitem', { name: 'Add Alias' }).click();
+  const search = page.getByRole('combobox', { name: 'Target' });
+  await expect(search).toBeFocused();
+  await search.fill('A');
+
+  // The field draft takes the first Escape, the surface the second.
+  await search.press('Escape');
+  await expect(search).toHaveValue('');
+  await expect(page.getByTestId('new-alias')).toBeVisible();
+  await search.press('Escape');
+
+  await expect(page.getByTestId('new-alias')).toHaveCount(0);
+  await quiescent(page);
+  await expect(page.locator('.react-flow__node')).toHaveCount(nodes);
+  await expect(page.getByTestId('layout-selector')).toContainText('None');
+  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '0');
+  await expect(page.getByTestId('add-card-menu')).toBeFocused();
+});
+
+/**
+ * Choosing a Target is the creation, and the editor stays open on what it made.
+ */
+test('choosing a Target creates the Alias and leaves its editor open', async ({ page }) => {
+  await page.goto('/');
+  await expect(nodeByTitle(page, 'A').first()).toBeVisible();
+  await settled(page);
+  const nodes = await page.locator('.react-flow__node').count();
+
+  await page.getByTestId('add-card-menu').click();
+  await page.getByRole('menuitem', { name: 'Add Alias' }).click();
+  await page.getByRole('combobox', { name: 'Target' }).fill('B');
+  await page.getByRole('option', { name: 'Markdown Card B' }).click();
+
+  // The pane it is now on is the delegated editor over the Card that owns the
+  // content, which is what opening an Alias has always given (ADR 0039).
+  await expect(page.getByTestId('new-alias')).toHaveCount(0);
+  await expect(page.getByText('Opened through B')).toBeVisible();
+  await expect(page.getByText('Editing content on B')).toBeVisible();
+  await page.getByRole('button', { name: 'Cancel' }).click();
+
+  // An empty title takes the Target's, so the Alias is a second Card called B.
+  await expect(page.locator('.react-flow__node')).toHaveCount(nodes + 1);
+  await expect(nodeByTitle(page, 'B')).toHaveCount(2);
+  await expect(page.getByTestId('layout-selector')).toContainText('Layout 1');
+  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
+});

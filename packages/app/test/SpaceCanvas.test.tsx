@@ -24,6 +24,7 @@ const cardNode = (title: string, id: typeof CARD_ID = CARD_ID, selected = false)
   data: {
     cardId: id,
     title,
+    kind: 'markdown',
     active: false,
     selectedForAuthoring: false,
     showContent: false,
@@ -38,15 +39,21 @@ const cardNode = (title: string, id: typeof CARD_ID = CARD_ID, selected = false)
 interface Harness {
   readonly view: RenderResult;
   readonly openCard: ReturnType<typeof vi.fn>;
+  readonly addCard: ReturnType<typeof vi.fn>;
   /** Re-render with Card authoring on or off, everything else unchanged. */
   readonly setTitleEditing: (enabled: boolean) => void;
+  /** Re-render as a completed creation would, naming the Card to be named. */
+  readonly setNameOnCreation: (cardId: string | null) => void;
 }
 
 /** A SpaceCanvas whose title Edit always refuses, so a draft can be left unsettled. */
 function mountGraph(nodes: CardFlowNode[] = [cardNode('A')]): Harness {
   const openCard = vi.fn();
+  const addCard = vi.fn();
   const editableCardIds = new Set(nodes.map((node) => node.id));
-  const graph = (titleEditingEnabled: boolean) => (
+  let titleEditing = true;
+  let named: string | null = null;
+  const graph = () => (
     <ReactFlowProvider>
       <SpaceCanvas
         nodes={nodes}
@@ -54,7 +61,7 @@ function mountGraph(nodes: CardFlowNode[] = [cardNode('A')]): Harness {
         activeCardId={null}
         presenting={false}
         editable={true}
-        titleEditingEnabled={titleEditingEnabled}
+        titleEditingEnabled={titleEditing}
         onNodesChange={() => undefined}
         onConnect={() => undefined}
         acceptsConnection={() => false}
@@ -62,6 +69,8 @@ function mountGraph(nodes: CardFlowNode[] = [cardNode('A')]): Harness {
         onConnectEnd={() => undefined}
         onCreateConnectedCard={() => undefined}
         newCardTitle="Card 2"
+        onAddCard={addCard}
+        nameOnCreation={named}
         onOpenCard={openCard}
         onCompleteCardTitle={() => 'A Card needs a title'}
         editableCardIds={editableCardIds}
@@ -72,11 +81,19 @@ function mountGraph(nodes: CardFlowNode[] = [cardNode('A')]): Harness {
       />
     </ReactFlowProvider>
   );
-  const view = render(graph(true));
+  const view = render(graph());
   return {
     view,
     openCard,
-    setTitleEditing: (enabled) => view.rerender(graph(enabled)),
+    addCard,
+    setTitleEditing: (enabled) => {
+      titleEditing = enabled;
+      view.rerender(graph());
+    },
+    setNameOnCreation: (cardId) => {
+      named = cardId;
+      view.rerender(graph());
+    },
   };
 }
 
@@ -288,5 +305,93 @@ describe('withdrawing title editing', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Edit Card A' }));
 
     expect(openCard).toHaveBeenCalledWith(CARD_ID);
+  });
+});
+
+/**
+ * `C` is the only unmodified authoring shortcut there is, so the whole of what
+ * makes it safe is *where* it is answered: on React Flow's own wrapper, which a
+ * key pressed anywhere else in the app never reaches.
+ */
+describe('the C shortcut', () => {
+  it('adds a Card from a focused Card', () => {
+    const { addCard } = mountGraph();
+
+    fireEvent.keyDown(nodeOf(CARD_ID), { key: 'c' });
+
+    expect(addCard).toHaveBeenCalledTimes(1);
+  });
+
+  /**
+   * A `c` typed into a field is a letter, not a command. The inline editor stops
+   * its own key events before they reach the graph, which is why this asserts
+   * through the editor rather than through a bare input: the guard covers
+   * whatever text entry the canvas gains next.
+   */
+  it('is a letter while the caret is in the title editor', () => {
+    const { addCard } = mountGraph();
+    fireEvent.doubleClick(screen.getByRole('heading', { name: 'A' }));
+
+    fireEvent.keyDown(screen.getByRole('textbox', { name: 'Card title' }), { key: 'c' });
+
+    expect(addCard).not.toHaveBeenCalled();
+  });
+
+  /**
+   * A modifier makes the key a browser or OS shortcut, and a repeat is one press
+   * held down. Neither is a command, and the default stays with whoever else
+   * wanted it.
+   */
+  it('ignores a modified press and a key repeat', () => {
+    const { addCard } = mountGraph();
+    const node = nodeOf(CARD_ID);
+
+    fireEvent.keyDown(node, { key: 'c', metaKey: true });
+    fireEvent.keyDown(node, { key: 'c', ctrlKey: true });
+    fireEvent.keyDown(node, { key: 'c', repeat: true });
+
+    expect(addCard).not.toHaveBeenCalled();
+  });
+
+  it('is withdrawn along with every other Card authoring control', () => {
+    const { addCard, setTitleEditing } = mountGraph();
+
+    setTitleEditing(false);
+    fireEvent.keyDown(nodeOf(CARD_ID), { key: 'c' });
+
+    expect(addCard).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * A created Card is named in place, in the editor that already exists for
+ * renaming one — so creation needs no second surface, and the author is left
+ * typing over a neutral `Card N` rather than hunting for where to.
+ */
+describe('naming a created Card', () => {
+  it('opens the title editor on the Card a completed creation names', () => {
+    const { setNameOnCreation } = mountGraph();
+
+    setNameOnCreation(CARD_ID);
+
+    const input = screen.getByRole('textbox', { name: 'Card title' });
+    expect(input).toHaveValue('A');
+    expect(input).toHaveFocus();
+  });
+
+  /**
+   * The identity is what says a Card has just been created, so the same one
+   * arriving again is not a second creation. Reopening on it would put an editor
+   * over a Card nobody asked to rename — after an Escape, over the very Card the
+   * author had just declined to name.
+   */
+  it('does not reopen the editor when nothing new was created', () => {
+    const { setNameOnCreation } = mountGraph();
+    setNameOnCreation(CARD_ID);
+    fireEvent.keyDown(screen.getByRole('textbox', { name: 'Card title' }), { key: 'Escape' });
+
+    setNameOnCreation(CARD_ID);
+
+    expect(screen.queryByRole('textbox', { name: 'Card title' })).not.toBeInTheDocument();
   });
 });

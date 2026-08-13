@@ -181,6 +181,20 @@ export interface SpaceCanvasProps {
   onCreateConnectedCard: (sourceId: string, position: LayoutPosition) => void;
   /** Exact neutral title shown by the transient empty-drop preview. */
   newCardTitle: string;
+  /**
+   * Create a detached Card at the visible centre — the graph-focused `C`, whose
+   * toolbar twin lives outside this component.
+   */
+  onAddCard: () => void;
+  /**
+   * The Card a completed creation asks to be named, or `null`.
+   *
+   * The identity, not a flag: each creation mints a fresh one, so a *change* is
+   * what says a Card has just been created — which is how the naming
+   * continuation survives being a prop rather than a command. A remount takes
+   * nothing with it, because the initial state is whatever arrives with it.
+   */
+  nameOnCreation: string | null;
   /** Opening a card is a view gesture; the graph only reports which was picked. */
   onOpenCard: (cardId: string) => void;
   /** Complete one locally validated title draft, or return its field error. */
@@ -207,6 +221,8 @@ export function SpaceCanvas({
   onConnectEnd,
   onCreateConnectedCard,
   newCardTitle,
+  onAddCard,
+  nameOnCreation,
   onOpenCard,
   onCompleteCardTitle,
   editableCardIds,
@@ -241,6 +257,18 @@ export function SpaceCanvas({
   if (cardAuthoringWasEnabled !== canAuthorCards) {
     setCardAuthoringWasEnabled(canAuthorCards);
     if (!canAuthorCards) setEditingTitleCardId(null);
+  }
+
+  // A created Card is named in place, in the editor that already exists for
+  // renaming one. Adjusted during render for the same reason as the reset above
+  // — React's documented way to react to a changed input, without the second
+  // render an effect would cost — and driven by the identity changing rather
+  // than by a request being raised and cleared, so nothing has to be handed
+  // back once the naming is over.
+  const [lastCreatedCardId, setLastCreatedCardId] = useState(nameOnCreation);
+  if (lastCreatedCardId !== nameOnCreation) {
+    setLastCreatedCardId(nameOnCreation);
+    if (nameOnCreation !== null) setEditingTitleCardId(nameOnCreation);
   }
 
   useEffect(() => {
@@ -334,16 +362,39 @@ export function SpaceCanvas({
 
   const handleKeyDown = useCallback(
     (event: ReactKeyboardEvent<HTMLDivElement>) => {
-      if (presenting || (event.key !== 'Enter' && event.key !== ' ')) return;
-      if (!(event.target instanceof Element)) return;
-      const card = event.target.closest<HTMLElement>('.react-flow__node[data-id]');
-      if (card === null || !event.currentTarget.contains(card)) return;
-      const cardId = card.dataset['id'];
-      if (cardId === undefined) return;
+      if (presenting || !(event.target instanceof Element)) return;
+      if (event.key === 'Enter' || event.key === ' ') {
+        const card = event.target.closest<HTMLElement>('.react-flow__node[data-id]');
+        if (card === null || !event.currentTarget.contains(card)) return;
+        const cardId = card.dataset['id'];
+        if (cardId === undefined) return;
+        event.preventDefault();
+        onOpenCard(cardId);
+        return;
+      }
+      // `C` adds a Card, and it is the only unmodified authoring shortcut there
+      // is. Answered here rather than on the window, so "graph focused" is a
+      // fact about where the event came from rather than a guess: this handler
+      // sits on React Flow's own wrapper, so a key pressed in the toolbar, in a
+      // pane over the graph or in the Cards View never reaches it.
+      //
+      // Three exclusions, and each names a different way the key is not a
+      // command. A modifier makes it a browser or OS shortcut. A repeat is one
+      // press held down, and a command runs once per press. And a text control
+      // is somewhere the author is *typing* a c — the inline title editor stops
+      // its own key events before they get here, so this covers whatever text
+      // entry the canvas gains next rather than a case that exists today.
+      if (event.key !== 'c' && event.key !== 'C') return;
+      if (event.repeat || event.metaKey || event.ctrlKey || event.altKey) return;
+      if (event.target.closest('input, textarea, [contenteditable="true"]') !== null) return;
+      // The default is prevented only where the command can actually run
+      // (`AGENTS.md`'s keyboard contract), so a `c` typed while authoring is
+      // withdrawn is left to whatever else would have had it.
+      if (!canAuthorCards) return;
       event.preventDefault();
-      onOpenCard(cardId);
+      onAddCard();
     },
-    [presenting, onOpenCard],
+    [presenting, onOpenCard, canAuthorCards, onAddCard],
   );
 
   // `F2` renames the selected Card, and this is the *only* handler that answers

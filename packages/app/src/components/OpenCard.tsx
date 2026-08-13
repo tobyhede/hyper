@@ -1,40 +1,9 @@
-import {
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-  type ComponentType,
-  type FormEvent,
-  type KeyboardEvent as ReactKeyboardEvent,
-  type MouseEvent as ReactMouseEvent,
-} from 'react';
-import { markdownCardSchema, type Card } from '@project/core';
+import { useState, type ComponentType, type FormEvent } from 'react';
+import { markdownCardSchema, type Card, type CardId } from '@project/core';
 import type { ResolvedContentCard } from '@project/graph';
 import { Button } from '@project/ui';
-
-/**
- * Exactly the three element kinds the pane contains, all of them always enabled
- * and always tabbable. Links, explicit `tabindex` and a `disabled` filter would
- * each guard a state no editor here can reach; add them back alongside whatever
- * introduces one.
- *
- * One selector, because the two things it answers have to agree: what `Tab`
- * cycles through, and what a mousedown is allowed to move focus onto. A control
- * missing from one list and present in the other is either unreachable by
- * keyboard or a way out of the pane by pointer.
- */
-const PANE_FOCUSABLE = 'input, textarea, button';
-
-/**
- * Everything inside the pane a `Tab` can land on, in document order.
- *
- * Queried on each `Tab` rather than cached: the editor grows and loses field
- * errors as an author types, and a cached list would send focus to a node that
- * has since been unmounted.
- */
-const focusableWithin = (root: HTMLElement): readonly HTMLElement[] => [
-  ...root.querySelectorAll<HTMLElement>(PANE_FOCUSABLE),
-];
+import { CardPane } from './CardPane';
+import { CardPicker } from './CardPicker';
 
 /**
  * `Content` rather than `Card`, which is the domain type imported above: a
@@ -235,6 +204,22 @@ interface DirectOpen {
   readonly card: ResolvedContentCard;
   readonly through?: never;
   readonly content?: never;
+  readonly retarget?: never;
+}
+
+/**
+ * Changing which Card an occurrence points at, from the editor it was opened in.
+ *
+ * Offered by the caller rather than derived from the opened Card's kind, for the
+ * same reason delegation itself is declared below: an occurrence that resolves
+ * its content elsewhere is not necessarily one whose pointer an author may move.
+ * Absent, the pane shows no Target field.
+ */
+interface Retarget {
+  /** The Cards this occurrence may point at — non-Alias Cards (ADR 0009). */
+  readonly targets: readonly Card[];
+  /** Retarget, answering the sentence to show when the Space refused it. */
+  readonly onRetarget: (target: CardId) => string | null;
 }
 
 /**
@@ -251,6 +236,12 @@ interface DelegatedOpen {
   readonly through: Card;
   /** The Card that owns the content reached through the occurrence above. */
   readonly content: ResolvedContentCard;
+  /**
+   * The one canonical place an Alias Target changes (ADR 0009's storyboard).
+   * Optional, because delegation and retargeting are different capabilities:
+   * the pane draws the field when it is given one and nothing when it is not.
+   */
+  readonly retarget?: Retarget;
   readonly card?: never;
 }
 
@@ -290,9 +281,9 @@ export type OpenCardProps = {
  * non-difference is gone, along with the action that crossed it — and so, now,
  * is the component, which outlived its last caller by one release.
  *
- * A modal dialog, because it covers the graph and the graph stays focusable:
- * React Flow measures its nodes and keeps them in the tab order, so `inert` is
- * not available and the containment is this component's own.
+ * The surface it is drawn on — the covering panel and its focus containment —
+ * is `CardPane`, shared with the Alias creation state. What is left here is
+ * what the pane is *for*: which Card is being authored, and by which editor.
  *
  * Source, still — not rendered prose. ADR 0011 removed the reading pane's
  * Markdown renderer so a card could not read one way and present another, and
@@ -304,7 +295,6 @@ export type OpenCardProps = {
  */
 export function OpenCard(props: OpenCardProps) {
   const { onComplete, onCancel } = props;
-  const panel = useRef<HTMLDivElement>(null);
   // The one place the variant is read. A direct open is one Card being its own
   // content, so the pair below cannot disagree; a delegated one carries two,
   // and `delegated` is what the caller declared rather than a `kind` this
@@ -313,129 +303,68 @@ export function OpenCard(props: OpenCardProps) {
     props.through === undefined
       ? { delegated: false, opened: props.card, content: props.card }
       : { delegated: true, opened: props.through, content: props.content };
-
-  /**
-   * The pane takes focus while it is open. Where focus goes when it *closes* is
-   * not this component's to decide — see `App`, which returns it to the Card.
-   *
-   * Restoring from here was tried and is wrong twice over. The obvious capture,
-   * `document.activeElement` on mount, is the control that opened the Card — and
-   * the app unmounts that control while a Card is open, since `titleEditingEnabled`
-   * goes false and the affordance goes with it, so by closing time the captured
-   * element is detached and focus lands on `<body>`. Worse, a cleanup that only
-   * restores is not idempotent, which `StrictMode` requires rather than prefers:
-   * React double-invokes effects as mount → cleanup → mount, so the restore ran
-   * *immediately* after opening, moved focus to a control about to be removed,
-   * and left the pane with no focus at all — `containTab` never fired, because it
-   * is bound to the panel.
-   *
-   * Focus is taken here rather than by `autoFocus` on the field for that same
-   * reason: `autoFocus` fires once, on the real mount, so it cannot answer a
-   * simulated cleanup that follows it. Taking focus in the setup half can.
-   */
-  useEffect(() => {
-    const pane = panel.current;
-    if (pane !== null) focusableWithin(pane)[0]?.focus();
-  }, []);
-
-  /**
-   * Keep `Tab` inside the pane.
-   *
-   * The graph behind is not `inert` — React Flow needs its nodes measurable, and
-   * a node keeps `tabIndex=0` outside presenting — so without this, `Tab` walks
-   * out of the editor onto Cards that answer `Enter` by opening themselves.
-   * Wrapping at both ends is the whole of it; the pane's controls are few and
-   * always present.
-   */
-  const containTab = useCallback((event: ReactKeyboardEvent<HTMLDivElement>): void => {
-    if (event.key !== 'Tab' || panel.current === null) return;
-    const focusable = focusableWithin(panel.current);
-    const first = focusable[0];
-    const last = focusable[focusable.length - 1];
-    if (first === undefined || last === undefined) return;
-    // The handler sits on the panel, so the active element is always inside it.
-    const active = document.activeElement;
-    if (event.shiftKey && active === first) {
-      event.preventDefault();
-      last.focus();
-    } else if (!event.shiftKey && active === last) {
-      event.preventDefault();
-      first.focus();
-    }
-  }, []);
-
-  /**
-   * Keep the pointer from putting focus where `containTab` cannot see it.
-   *
-   * `containTab` is bound to the panel, so it only ever answers a `Tab` pressed
-   * while focus is already inside — and a mousedown on anything unfocusable
-   * moves focus to `<body>`, where it never fires at all. `Tab` then walks the
-   * document from the top, into the toolbar and on to the Card nodes the pane
-   * covers, which is the escape the containment exists to close. Two surfaces
-   * reach it: the backdrop, always visible because the panel letterboxes inside
-   * it, and the panel's own padding and gaps.
-   *
-   * Preventing the default leaves focus where it already was, which is the one
-   * answer that needs no opinion about where it should go instead. It is
-   * prevented only where the default would take focus *out* of the pane: a
-   * mousedown on a control keeps its default, or clicking a field would not put
-   * the caret in it. A label's text is not a control and is prevented, and the
-   * field still focuses — a label focuses what it names on `click`, which this
-   * does not cancel. The cost is that the pane's static text no longer
-   * drag-selects; it is two spans of banner and three field labels.
-   */
-  const containFocus = useCallback((event: ReactMouseEvent<HTMLDivElement>): void => {
-    const target = event.target;
-    if (target instanceof Element && target.closest(PANE_FOCUSABLE) !== null) return;
-    event.preventDefault();
-  }, []);
+  const retarget = props.through === undefined ? undefined : props.retarget;
+  const [retargetRefusal, setRetargetRefusal] = useState<string | null>(null);
 
   return (
-    <div className="open-card" data-testid="open-card" onMouseDown={containFocus}>
-      <div
-        ref={panel}
-        className="open-card__panel"
-        role="dialog"
-        aria-modal="true"
-        // Named for the Card, which is the only thing distinguishing one opened
-        // Card from another. Directly opened, that title is also the first
-        // field, so a screen reader hears the name and then lands on the
-        // control that changes it.
-        //
-        // Delegated, the two Cards are different Cards and the name has to say
-        // both: named only for the content owner, opening `A′` announced a
-        // dialog called `A`, which is neither what the author opened nor
-        // something this pane lets them rename. The delegation banner is the
-        // only other signal and it is plain text, so a reader landing on
-        // Description hears no name at all for the occurrence it came from.
-        // `aria-describedby` onto that banner was the alternative and it fixes
-        // the wrong half: a description is heard after the name, and the name
-        // would still be a Card the author did not open.
-        aria-label={
-          delegated ? `${opened.title} — editing content on ${content.title}` : content.title
-        }
-        onKeyDown={containTab}
-      >
-        {delegated && (
-          <div className="open-card__delegation">
-            <span>Opened through {opened.title}</span>
-            <span>Editing content on {content.title}</span>
-          </div>
-        )}
-        {/* Keyed by opened occurrence and content owner, because the draft is
-            seeded once and then owned by the editor. Reusing one would carry a
-            previous Card's draft under the next Card's identity. */}
-        <ResolvedContentEditor
-          key={`${opened.id}:${content.id}`}
-          card={content}
-          titleEditable={!delegated}
-          onComplete={(completed) => {
-            onComplete(completed);
-            onCancel();
-          }}
-          onCancel={onCancel}
-        />
-      </div>
-    </div>
+    <CardPane
+      testId="open-card"
+      // Named for the Card, which is the only thing distinguishing one opened
+      // Card from another. Directly opened, that title is also the first
+      // field, so a screen reader hears the name and then lands on the
+      // control that changes it.
+      //
+      // Delegated, the two Cards are different Cards and the name has to say
+      // both: named only for the content owner, opening `A′` announced a
+      // dialog called `A`, which is neither what the author opened nor
+      // something this pane lets them rename. The delegation banner is the
+      // only other signal and it is plain text, so a reader landing on
+      // Description hears no name at all for the occurrence it came from.
+      // `aria-describedby` onto that banner was the alternative and it fixes
+      // the wrong half: a description is heard after the name, and the name
+      // would still be a Card the author did not open.
+      ariaLabel={
+        delegated ? `${opened.title} — editing content on ${content.title}` : content.title
+      }
+    >
+      {delegated && (
+        <div className="open-card__delegation">
+          <span>Opened through {opened.title}</span>
+          <span>Editing content on {content.title}</span>
+        </div>
+      )}
+      {retarget !== undefined && (
+        <div className="open-card__retarget">
+          <CardPicker
+            label="Target"
+            cards={retarget.targets}
+            selectedId={content.id}
+            onSelect={(target) => setRetargetRefusal(retarget.onRetarget(target))}
+            // Escape past an empty search is the pane's to answer, exactly as
+            // it is in every other field here.
+            onCancel={onCancel}
+            emptyMessage="This Space holds no other Card that owns its content."
+          />
+          {retargetRefusal !== null && (
+            <span role="alert" className="open-card__field-error">
+              {retargetRefusal}
+            </span>
+          )}
+        </div>
+      )}
+      {/* Keyed by opened occurrence and content owner, because the draft is
+          seeded once and then owned by the editor. Reusing one would carry a
+          previous Card's draft under the next Card's identity. */}
+      <ResolvedContentEditor
+        key={`${opened.id}:${content.id}`}
+        card={content}
+        titleEditable={!delegated}
+        onComplete={(completed) => {
+          onComplete(completed);
+          onCancel();
+        }}
+        onCancel={onCancel}
+      />
+    </CardPane>
   );
 }

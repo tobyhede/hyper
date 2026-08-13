@@ -1,6 +1,6 @@
 import type { Edge, Node, NodeHandle } from '@xyflow/react';
 import { MarkerType, Position } from '@xyflow/react';
-import type { CardId, LayoutPosition, GraphId } from '@project/core';
+import type { Card, CardId, LayoutPosition, GraphId } from '@project/core';
 import { inHandleId, outHandleId, resolveContentCard } from '@project/graph';
 import type {
   CardHandleSet,
@@ -48,6 +48,16 @@ export type CardHandle = {
 export type CardNodeData = {
   cardId: CardId;
   title: string;
+  /**
+   * What kind of Card this is, drawn as a persistent glyph on the Front.
+   *
+   * Carried rather than derived from `aliasOf` below. The two answer different
+   * questions — one is the Card's kind, the other is the title of the Card an
+   * occurrence redraws — and reading the first off the second answers by proxy,
+   * which is exactly what goes wrong for the next kind that resolves its
+   * content elsewhere.
+   */
+  kind: Card['kind'];
   /** Local Card-authoring controls supplied by the application composition. */
   titleEditingEnabled?: boolean;
   /** Whether this Card owns content to edit — an Alias does not. */
@@ -288,6 +298,7 @@ export function projectCardNodes(
       data: {
         cardId: card.id,
         title: card.title,
+        kind: card.kind,
         // The card's own description, drawn under the title (ADR 0006). Omit when
         // absent; never inherited through an alias.
         ...(card.description !== undefined ? { description: card.description } : {}),

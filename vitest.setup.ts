@@ -119,6 +119,34 @@ if (typeof window !== 'undefined' && !('DOMMatrixReadOnly' in window)) {
 }
 
 /**
+ * jsdom has no layout, and so no `scrollIntoView` — cmdk calls one on the item
+ * its arrow keys make active.
+ *
+ * A no-op is the whole of the right answer here: nothing in a headless DOM
+ * scrolls, so there is no behaviour to simulate, and the alternative is every
+ * test that renders a Command list carrying the same three-line stub. It is
+ * defined only where the real method is missing, so a future environment that
+ * implements it keeps its own.
+ *
+ * On `Element` rather than `HTMLElement`, because that is where the DOM declares
+ * it and where cmdk's item lives either way. Asked with `in` for the same reason
+ * the `DOMMatrixReadOnly` stub above is: the DOM types say the method is always
+ * there, so comparing it against `undefined` is a condition the compiler — and
+ * the lint rule over it — can prove pointless, while the environment this runs
+ * in is exactly the one where it is not.
+ */
+if (typeof Element !== 'undefined' && !('scrollIntoView' in Element.prototype)) {
+  // Defined rather than assigned, again as above: the `in` check narrows the
+  // prototype to `never` in the branch where the property is missing, which is
+  // the only branch that wants to write it.
+  Object.defineProperty(Element.prototype, 'scrollIntoView', {
+    configurable: true,
+    writable: true,
+    value: () => undefined,
+  });
+}
+
+/**
  * jsdom measures every element as 0x0, and d3-zoom divides by that.
  *
  * `XYPanZoom` caches d3-zoom's extent from the pane's `getBoundingClientRect()`

@@ -291,7 +291,7 @@ surface its later package builds. Packages 5 and 6 wire Cards View, membership
 and Graph management to what is now behind the interface, and the fallback band
 stays until package 5 replaces it.
 
-### 4. Card and Alias creation
+### 4. Card and Alias creation — **done**
 
 Build detached Add Card and its inline neutral-title continuation, Add Alias's
 pre-Edit Target picker, persistent kind icons, Alias-target visibility and
@@ -299,6 +299,43 @@ retargeting. Reuse the existing Card editor and Combobox composition.
 
 Gate: component focus/cancellation tests and E2E from Algorithmic View proving
 one conversion and no creation on cancelled Alias.
+
+Built. **There was no Combobox to reuse** — `@project/ui` had Radix Select and
+nothing else in that family — so this package introduces the two primitives the
+proof matrix names: a shadcn `Command` over cmdk, which package 5's Cards View
+reuses, and a Radix `DropdownMenu` behind `AddCardControl`. That control is a
+**split button**, because Add Card completes an Edit on one activation and Add
+Alias cannot: an Alias without a Target is not a valid Card, so it opens a
+creation state instead. The Card editor half of the sentence held: `OpenCard` is
+reused, with its covering panel and focus containment extracted to `CardPane`
+and shared with the creation state.
+
+`C` is answered on React Flow's own wrapper rather than on the window, so
+"graph focused" is where the event came from rather than a guess. Creation's
+naming continuation reaches the existing inline title editor through
+`nameOnCreation`, an identity whose *change* says a Card was just created —
+so a remount carries nothing and no request has to be handed back. The title
+editor now returns focus to its Card on Enter and Escape, which is what keeps
+the whole gesture off `<body>`; a blur is deliberately excluded, since taking
+focus back from wherever the author clicked would be a steal.
+
+Retargeting is an ordinary `edited-card` of the Alias, offered as an optional
+`retarget` on `OpenCard`'s delegated variant — declared by the caller for the
+same reason delegation itself is, rather than read off the opened Card's kind.
+Choosing a Target commits, so there is no unconfirmed Target to hold across a
+confirmation step.
+
+Three primitive behaviours are worth knowing before package 5 reuses them, and
+they are recorded in AGENTS.md rather than here: a modal Radix menu steals focus
+from a surface its item opens, `onCloseAutoFocus` steals it again a tick later,
+and cmdk's default filter scores the item `value` — which here is a UUID.
+
+**Not built, and deliberately**: the storyboard's Frame 5 modifier-drag Alias
+gestures. Both are pointer-only accelerators whose keyboard path is the control
+this package built, and the connection-drop half would need a sixteenth
+completion — create an Alias *and* an Edge — that package 3 did not build. That
+is interface work, not surface, so it returns to the authoring interface rather
+than being improvised in the canvas.
 
 ### 5. Cards View and Layout membership
 

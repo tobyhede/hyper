@@ -1,7 +1,21 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { ReactFlowProvider } from '@xyflow/react';
-import { AppShell, Button, LayoutSelector, GraphSelector, ViewSelector } from '@project/ui';
-import { cardDocumentSchema, newUuid, uuidSchema, type LayoutPosition } from '@project/core';
+import {
+  AddCardControl,
+  AppShell,
+  Button,
+  LayoutSelector,
+  GraphSelector,
+  ViewSelector,
+} from '@project/ui';
+import {
+  cardDocumentSchema,
+  newUuid,
+  uuidSchema,
+  type Card,
+  type CardId,
+  type LayoutPosition,
+} from '@project/core';
 import {
   Placement,
   graphCardIds,
@@ -20,6 +34,8 @@ import { createWorkingSpaceReader } from './snapshot';
 import { nextCardTitle } from './titles';
 import { createRendererResolver, defaultRenderer, type RendererSelection } from './renderer';
 import { SpaceCanvas } from './components/SpaceCanvas';
+import { CanvasCentre, type VisibleCentre } from './components/CanvasCentre';
+import { NewAlias } from './components/NewAlias';
 import { OpenCard } from './components/OpenCard';
 import { PlacementFailure } from './components/PlacementFailure';
 import { PlacementPending } from './components/PlacementPending';
@@ -94,6 +110,17 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
     // by an effect, which would render the stale sentence against the new
     // conflict for the commit before it ran.
     const [refusal, setRefusal] = useState<{ revision: bigint; message: string } | null>(null);
+    /**
+     * The Alias creation state: editor-local, and nothing else (ADR 0042).
+     *
+     * There is no draft Card here and nothing reserved in the Space — an Alias
+     * without a Target is not a valid Card, so what is open is a surface rather
+     * than a partial entity. Closing it creates nothing.
+     */
+    const [creatingAlias, setCreatingAlias] = useState(false);
+    const [aliasRefusal, setAliasRefusal] = useState<string | null>(null);
+    /** The Card a completed creation asks the canvas to open its name editor on. */
+    const [createdCardId, setCreatedCardId] = useState<CardId | null>(null);
     const conflictRevision =
       sessionState.persistence.kind === 'conflicted'
         ? sessionState.persistence.current.revision
@@ -271,6 +298,117 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
       });
     }, []);
 
+    /**
+     * Where a Card created from a control rather than a pointer goes.
+     *
+     * Read at the gesture, never captured earlier: an author who pans between
+     * opening the Alias picker and choosing a Target is looking somewhere else
+     * by the time the Card is placed, and the whole point of the visible centre
+     * is that it is where they are looking now.
+     */
+    const visibleCentre = useRef<VisibleCentre | null>(null);
+    const reportVisibleCentre = useCallback((centre: VisibleCentre) => {
+      visibleCentre.current = centre;
+    }, []);
+    // The origin is unreachable in practice — the control is withdrawn until an
+    // arrangement resolves, and the reporter is mounted with it — but a created
+    // Card must land *somewhere*, and a refusal would be the wrong answer to a
+    // question about geometry.
+    const centreAnchor = (): LayoutPosition => visibleCentre.current?.() ?? { x: 0, y: 0 };
+
+    /**
+     * Add Card: one completed Edit, and then the naming continuation.
+     *
+     * The result is deliberately not inspected beyond the created identity.
+     * Both refusals this operation can produce turn on state the control cannot
+     * be in — there is no placement before an arrangement resolves, and the
+     * control is withdrawn until one has, while a Layout that has gone would
+     * have taken the canvas drawing it with it. `queued` is an Edit that will
+     * still be performed, and the projection that follows it draws the Card.
+     */
+    const addCard = useCallback(() => {
+      const created = authoring.complete({ kind: 'created-card', anchor: centreAnchor() });
+      if (created.kind !== 'completed' || created.createdCardId === undefined) return;
+      // Selected as well as named: the storyboard's created Card is the selected
+      // one, so continued authoring — a connection, a second Card — carries on
+      // from it.
+      useRenderAdapter.getState().selectCard(created.createdCardId);
+      setCreatedCardId(created.createdCardId);
+    }, []);
+
+    /**
+     * Add Alias: the Target choice *is* the creation (ADR 0009's storyboard).
+     *
+     * A refusal keeps the surface open with its reason, because both of them are
+     * about the Target the author just chose — it has left the Space, or it is
+     * an Alias itself — and closing would take away the field that answers them.
+     */
+    const createAlias = useCallback(
+      (target: CardId, title: string) => {
+        const created = authoring.complete({
+          kind: 'created-alias',
+          target,
+          // Exactly as typed, empty string included: an empty title is how
+          // Authoring is told to take the Target's own.
+          title,
+          anchor: centreAnchor(),
+        });
+        if (created.kind === 'refused') {
+          setAliasRefusal(created.reason);
+          return;
+        }
+        setCreatingAlias(false);
+        setAliasRefusal(null);
+        if (created.kind !== 'completed' || created.createdCardId === undefined) return;
+        useRenderAdapter.getState().selectCard(created.createdCardId);
+        // The editor stays open on the Alias that now exists, which is where the
+        // author already was.
+        openCard(created.createdCardId);
+      },
+      [openCard],
+    );
+
+    /**
+     * Leaving the Alias creation state, having created nothing.
+     *
+     * Focus goes back to the control the menu was opened from — Radix's own
+     * destination when a menu closes, arriving here by the same reasoning rather
+     * than as a second opinion. Only a *cancelled* creation restores it: a
+     * completed one hands focus to the editor now open on the Alias, and taking
+     * it back would be a steal.
+     *
+     * It has to wait for the render that closes the pane. The control is
+     * disabled while the pane is open — one authoring surface at a time — and a
+     * disabled button cannot take focus, so restoring inside the handler
+     * silently does nothing and leaves focus on `<body>`.
+     */
+    const restoringAddCardFocus = useRef(false);
+    const cancelAlias = useCallback(() => {
+      restoringAddCardFocus.current = true;
+      setCreatingAlias(false);
+      setAliasRefusal(null);
+    }, []);
+    useEffect(() => {
+      if (creatingAlias || !restoringAddCardFocus.current) return;
+      restoringAddCardFocus.current = false;
+      document.querySelector<HTMLElement>('[data-testid="add-card-menu"]')?.focus();
+    }, [creatingAlias]);
+
+    /**
+     * Presenting closes the Alias creation state, creating nothing.
+     *
+     * Navigation already does this for an opened Card — `present` clears
+     * `openedCardId` — but this surface is App's own, and the toolbar it is
+     * started from is not covered by the pane. Keyed on the fact rather than
+     * wrapped around the control, so a second way into presenting cannot leave a
+     * creation state open over a presentation.
+     */
+    useEffect(() => {
+      if (!presenting) return;
+      setCreatingAlias(false);
+      setAliasRefusal(null);
+    }, [presenting]);
+
     const createConnectedCard = useCallback((sourceId: string, position: LayoutPosition) => {
       const cardId = useRenderAdapter
         .getState()
@@ -343,6 +481,38 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
       const { id, ...document } = completed;
       authoring.complete({ kind: 'edited-card', cardId: id, document });
     }, []);
+
+    /**
+     * Every Card an Alias may name.
+     *
+     * The single-hop rule read forwards (ADR 0009): a Target must own its
+     * content, so an Alias never appears — including the one being retargeted,
+     * which is what stops a chain from being offered rather than refused. The
+     * Space's own Cards, not the Layout's: an Alias points at content, and
+     * content is not a thing a Layout owns.
+     */
+    const aliasTargets = useMemo(
+      () => rendererSpace.cards.filter((card) => card.kind !== 'alias'),
+      [rendererSpace],
+    );
+    const openedAlias = openedCard?.kind === 'alias' ? openedCard : undefined;
+    /**
+     * Retargeting is an ordinary Card Edit of the Alias — the same operation a
+     * rename is, on a different field. The Alias keeps its id, its title, its
+     * positions and its incident Edges, because none of them is named here.
+     */
+    const retargetAlias = useCallback(
+      (alias: Extract<Card, { kind: 'alias' }>, target: CardId): string | null => {
+        const { id, ...document } = alias;
+        const result = authoring.complete({
+          kind: 'edited-card',
+          cardId: id,
+          document: { ...document, target },
+        });
+        return result.kind === 'refused' ? result.reason : null;
+      },
+      [],
+    );
 
     /**
      * Closing an opened Card returns focus to that Card.
@@ -437,6 +607,14 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
           presenting={presenting}
           onExitPresenting={exitPresenting}
         />
+        {/* Withdrawn on exactly the conditions the graph's own Card authoring
+            is: nothing to place before an arrangement resolves, nothing to
+            author while presenting, and one authoring surface at a time. */}
+        <AddCardControl
+          onAddCard={addCard}
+          onAddAlias={() => setCreatingAlias(true)}
+          disabled={!editable || presenting || openedCardId !== null || creatingAlias}
+        />
         {sessionState.persistence.kind === 'failed' ? (
           <Button
             variant="default"
@@ -508,6 +686,12 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
             <PlacementFailure error={canvas.error} />
           ) : canvas.kind === 'arrangement' ? (
             <ReactFlowProvider>
+              {/* Inside the provider and outside the canvas: it reads React
+                  Flow's viewport for controls that live in the toolbar and in
+                  the panes over the graph, and it is deliberately not keyed by
+                  the replacement epoch — the getter it reports describes the
+                  viewport, which a replaced Space does not invalidate. */}
+              <CanvasCentre report={reportVisibleCentre} />
               <SpaceCanvas
                 // Keyed on the replacement epoch, so accepting the stored Space
                 // takes the canvas's local editing state with it. The render
@@ -529,6 +713,8 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
                 onConnectEnd={finishConnection}
                 onCreateConnectedCard={createConnectedCard}
                 newCardTitle={nextCardTitle(sessionState.working)}
+                onAddCard={addCard}
+                nameOnCreation={createdCardId}
                 onOpenCard={openCardForEditing}
                 onCompleteCardTitle={completeCardTitle}
                 editableCardIds={editableCardIds}
@@ -566,10 +752,31 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
               <OpenCard
                 through={openedCard}
                 content={openedContent}
+                // The Target field is offered because this occurrence is an
+                // Alias, which is a Card whose pointer an author may move —
+                // not because the pane delegates, which is the weaker fact the
+                // variant above already records.
+                {...(openedAlias === undefined
+                  ? {}
+                  : {
+                      retarget: {
+                        targets: aliasTargets,
+                        onRetarget: (target: CardId) => retargetAlias(openedAlias, target),
+                      },
+                    })}
                 onComplete={completeOpenedCard}
                 onCancel={closeCard}
               />
             ))}
+
+          {creatingAlias && openedCardId === null && (
+            <NewAlias
+              targets={aliasTargets}
+              refusal={aliasRefusal}
+              onCreate={createAlias}
+              onCancel={cancelAlias}
+            />
+          )}
         </div>
       </AppShell>
     );
