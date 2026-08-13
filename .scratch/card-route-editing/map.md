@@ -93,11 +93,21 @@ out of it and both are worth reading before touching the Card pane:
   content editor never remounts under an open draft. All three answers this
   ticket offered guarded a consequence of committing a form field on touch.
 
-One ticket is open, and it is the work those decisions imply:
+Two tickets are open. The first is the work those decisions imply:
 
 - [Rebuild the Card pane on Radix Dialog, with one submit over its
   fields](issues/18-rebuild-the-card-pane-on-radix-dialog-and-one-submit.md) —
   `ready-for-agent`, package **4a**, sequenced before 4b and 5.
+
+The second is a disagreement between a decision and the code that predates it,
+surfaced by rebasing package 7 onto 4a:
+
+- [Three pane fields still take their own
+  Escape](issues/19-three-pane-fields-still-take-their-own-escape.md) —
+  `needs-triage`. ADR 0048 says a pane's fields do not intercept Escape; the
+  Alias title, the Alias rename and the Target search each still do, with nine
+  tests holding them to the withdrawn rule. Both halves are package 4's, and
+  which way it resolves is a decision rather than a fix.
 
 ## Out of scope
 
