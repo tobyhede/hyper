@@ -863,16 +863,21 @@ describe('Edge eligibility', () => {
     ).toEqual({ kind: 'refused', reason: 'That Graph is not one this Layout owns.' });
   });
 
-  it('refuses an Edge the Graph no longer holds', () => {
+  /**
+   * The completion has to re-ask the rule, and this is the case where dropping
+   * it would go unnoticed: an Edge the Graph no longer holds indexes at `-1`, so
+   * the `map` that writes the reconnection replaces nothing and the Edit answers
+   * as though it had — `unchanged` when the snapshot is otherwise untouched,
+   * `completed` when writing the Layout back settles something else, and the
+   * refusal the author is owed never said either way.
+   */
+  it('refuses an Edge the Graph no longer holds, and completes the same way', () => {
     const { authoring } = openPositioned();
+    const absent = { ...RECONNECT, edge: { from: CARD_B, to: CARD_A }, cardId: CARD_A } as const;
 
-    expect(
-      authoring.edgeEligibility({
-        ...RECONNECT,
-        edge: { from: CARD_B, to: CARD_A },
-        cardId: CARD_A,
-      }),
-    ).toEqual({ kind: 'refused', reason: 'That Edge is no longer in this Graph.' });
+    const refusal = { kind: 'refused', reason: 'That Edge is no longer in this Graph.' };
+    expect(authoring.edgeEligibility(absent)).toEqual(refusal);
+    expect(authoring.complete({ ...absent, kind: 'reconnected-edge' })).toEqual(refusal);
   });
 
   /**

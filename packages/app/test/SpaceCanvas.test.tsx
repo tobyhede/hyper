@@ -45,6 +45,8 @@ interface Harness {
   readonly setTitleEditing: (enabled: boolean) => void;
   /** Re-render as a completed creation would, naming the Card to be named. */
   readonly setNameOnCreation: (cardId: string | null) => void;
+  /** Re-render with nothing changed at all, the way a parent's render does. */
+  readonly rerender: () => void;
 }
 
 /**
@@ -129,6 +131,7 @@ function mountGraph(nodes: CardFlowNode[] = [cardNode('A')]): Harness {
       named = cardId;
       view.rerender(graph());
     },
+    rerender: () => view.rerender(graph()),
   };
 }
 
@@ -464,5 +467,27 @@ describe('naming a created Card', () => {
     setNameOnCreation(CARD_ID);
 
     expect(screen.queryByRole('textbox', { name: 'Card title' })).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * `useKeyPress` keys both its `useMemo` and its listener `useEffect` on the
+ * `deleteKeyCode` **value**, so a fresh array per render tears down and
+ * re-attaches `keydown`/`keyup` on `document` — and, since the prop reaches the
+ * `memo`'d `GraphView` and `FlowRenderer` on the way, defeats both of those too,
+ * once per frame of a Card drag.
+ *
+ * Asserted on the listener rather than on the array: the pair of keys is already
+ * pinned by value in `edge-authoring-react.test.tsx`, and a value assertion is
+ * exactly what stayed green while the canvas spread the array into a new one.
+ */
+describe("React Flow's delete keys", () => {
+  it('does not re-subscribe the document listener on an unchanged re-render', () => {
+    const { rerender } = mountGraph();
+    const listen = vi.spyOn(document, 'addEventListener');
+
+    rerender();
+
+    expect(listen.mock.calls.filter(([type]) => type === 'keydown')).toEqual([]);
   });
 });

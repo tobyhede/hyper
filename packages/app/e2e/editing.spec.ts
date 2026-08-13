@@ -1139,11 +1139,17 @@ test('the Edge editor moves an endpoint and keeps the Edge in its Graph', async 
   const selected = await selectAnEdge(page);
   await page.getByRole('button', { name: 'Edit this Edge' }).click();
   await page.getByRole('combobox', { name: 'To' }).click();
-  // Any Card of this Layout the result would not duplicate. `hasNot` matches a
-  // *descendant*, and the primitive marks the option element itself — so
-  // filtering that way excludes nothing and the choice below was eligible only
-  // by luck. cmdk writes `data-disabled` on **every** row, `"false"` included,
-  // so the attribute's absence is not the test either; its value is.
+  // How an *eligible* row is named, which is the only way to name one: cmdk
+  // writes `data-disabled` on **every** row, `"false"` included, so the
+  // attribute's absence says nothing and only its value distinguishes them.
+  // `hasNot` is no use either — it matches a *descendant*, and the primitive
+  // marks the option element itself.
+  //
+  // Here the filter excludes nothing, and that is the fixture rather than the
+  // rule: every Graph in it is a line, so no endpoint this list offers would
+  // duplicate an existing Edge, and self-Edges, cycles and the endpoint the Edge
+  // already names are all eligible (ADR 0032, ADR 0042). It is load-bearing at
+  // the keyboard Connect picker below, where B is disabled as a duplicate.
   const option = page.locator('[role="option"][data-disabled="false"]');
   await option.last().click();
 

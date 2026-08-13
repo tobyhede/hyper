@@ -1288,7 +1288,15 @@ describe('Space Authoring', () => {
     });
     const staleCard = uuidSchema.parse('00000000-0000-4000-8000-000000000099');
 
-    expect(offersConnection(authoring, CARD_A, CARD_B)).toBe(false);
+    // The reason, asked directly. A boolean here cannot fail for its own
+    // reason: this Graph already holds A→B, so the duplicate rule answers
+    // `false` too and the pre-placement refusal this case is named for could go
+    // unnoticed. `complete` is no use before a placement — the helper above has
+    // nothing to report as rendered — so eligibility is where the question goes.
+    expect(authoring.edgeEligibility({ kind: 'connect', from: CARD_A, to: CARD_B })).toEqual({
+      kind: 'refused',
+      reason: 'A connection can only join Cards in this Layout.',
+    });
     replacePlacementForTest(
       authoring,
       Placement.fromEntries([

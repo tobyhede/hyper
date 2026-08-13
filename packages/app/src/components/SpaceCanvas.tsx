@@ -289,7 +289,11 @@ export function SpaceCanvas({
     return () => window.removeEventListener('keydown', beginSelectedTitleEdit);
   }, [canAuthorCards, nodes]);
 
+  // The operations, not the surface holding them: `useEdgeAuthoring` answers a
+  // fresh object literal per render while each of these is stable, and a hook
+  // that depended on the object would be rebuilt every time.
   const beginConnectFrom = edgeSurface.beginConnectFrom;
+  const deleteEdges = edgeSurface.deleteEdges;
   const editableNodes = useMemo(
     () =>
       nodes.map((node) => ({
@@ -352,12 +356,12 @@ export function SpaceCanvas({
       // Card deletion is package 8's. Until it lands the request is declined
       // whole, incident Edges included — dropping the Edges of a Card that is
       // not going anywhere would be a deletion the author never asked for.
-      if (requestedNodes.length === 0) edgeSurface.deleteEdges(requestedEdges);
+      if (requestedNodes.length === 0) deleteEdges(requestedEdges);
       // A promise because React Flow awaits this, and `false` because a
       // completed Edit — not React Flow — supplies the next projection.
       return Promise.resolve(false);
     },
-    [edgeSurface],
+    [deleteEdges],
   );
 
   const {
@@ -398,7 +402,10 @@ export function SpaceCanvas({
       onMouseMove={onMouseMove}
       edgesReconnectable={edgesReconnectable}
       edgesFocusable={edgesFocusable}
-      deleteKeyCode={[...deleteKeyCode]}
+      // Passed through rather than copied: `useKeyPress` has this value in the
+      // dependency array of its listener effect, so a fresh array per render
+      // re-attaches React Flow's `keydown`/`keyup` on `document`.
+      deleteKeyCode={deleteKeyCode}
       multiSelectionKeyCode={multiSelectionKeyCode}
       selectionKeyCode={selectionKeyCode}
       selectionOnDrag={selectionOnDrag}

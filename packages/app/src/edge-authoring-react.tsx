@@ -66,8 +66,16 @@ export interface EdgeOwnedReactFlowProps {
   readonly edgesReconnectable: false;
   /** Focusability is per-Edge too: only the Active Graph's Edges are tab stops. */
   readonly edgesFocusable: false;
-  /** React Flow defaults to Backspace alone; Delete is the other half of the pair. */
-  readonly deleteKeyCode: readonly ['Backspace', 'Delete'];
+  /**
+   * React Flow defaults to Backspace alone; Delete is the other half of the pair.
+   *
+   * Mutable, and that is the point: React Flow's `KeyCode` will not take a
+   * `readonly` array, so a `readonly` declaration here forces the canvas to copy
+   * it — and `useKeyPress` keys both its `useMemo` and its listener `useEffect`
+   * on this value, so a copy per render re-attaches `keydown`/`keyup` on
+   * `document` and defeats the two `memo`s the prop passes through.
+   */
+  readonly deleteKeyCode: ['Backspace', 'Delete'];
   /** Version 1 authors one element at a time (Edge Authoring design). */
   readonly multiSelectionKeyCode: null;
   readonly selectionKeyCode: null;
@@ -115,7 +123,8 @@ export interface EdgeAuthoringInput {
 
 const EDGE_TYPES: EdgeTypes = { routed: AuthorableEdge };
 
-const DELETE_KEYS = ['Backspace', 'Delete'] as const;
+/** One shared instance, for the identity `useKeyPress` reads. See the prop above. */
+const DELETE_KEYS: ['Backspace', 'Delete'] = ['Backspace', 'Delete'];
 
 /**
  * Which `DropTarget` the element under the pointer is. Both class names are
