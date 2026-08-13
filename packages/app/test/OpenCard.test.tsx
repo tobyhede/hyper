@@ -51,157 +51,79 @@ beforeAll(() => {
 afterAll(() => vi.unstubAllGlobals());
 
 describe('the opened Card', () => {
-  it('edits resolved Markdown through an Alias while keeping the delegation visible', () => {
-    const onComplete = completes();
+  it('edits only Alias metadata when opened through an Alias', () => {
+    const onEdit = vi.fn(() => null);
     render(
       <OpenCard
         through={{ id: ALIAS_ID, title: 'A again', kind: 'alias', target: CARD_ID }}
-        content={markdown({ description: 'Shared caption' })}
-        onComplete={onComplete}
+        occurrence={{ targets: [], onEdit }}
         onCancel={vi.fn()}
       />,
     );
 
-    expect(screen.getByText('Opened through A again')).toBeVisible();
-    expect(screen.getByText('Editing content on A')).toBeVisible();
-    expect(screen.queryByRole('textbox', { name: 'Title' })).not.toBeInTheDocument();
-    expect(screen.getByRole('textbox', { name: 'Description of A' })).toHaveValue('Shared caption');
-    expect(screen.getByRole('textbox', { name: 'Markdown source of A' })).toHaveValue(
-      '**A** source',
-    );
-    expect(screen.queryByLabelText(/target/i)).not.toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: 'Title' })).toHaveValue('A again');
+    expect(screen.getByRole('combobox', { name: 'Target' })).toBeInTheDocument();
+    expect(screen.queryByRole('textbox', { name: /Description/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('textbox', { name: /Markdown source/ })).not.toBeInTheDocument();
     expect(screen.queryByLabelText(/kind/i)).not.toBeInTheDocument();
-
-    fireEvent.change(screen.getByRole('textbox', { name: 'Markdown source of A' }), {
-      target: { value: 'Shared source rewritten' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
-
-    expect(onComplete).toHaveBeenCalledWith({
-      id: CARD_ID,
-      title: 'A',
-      description: 'Shared caption',
-      kind: 'markdown',
-      body: 'Shared source rewritten',
-    });
   });
 
-  /**
-   * An Alias carries a description of its own and the graph draws it, so `A′`
-   * can show one caption while this pane edits another Card's. Labelled plainly
-   * "Description", the field said nothing about which of the two an author was
-   * about to overwrite. Directly opened there is only one Card and the plain
-   * labels are the right ones — the qualifier answers a question that only the
-   * delegated case asks.
-   */
-  it('says whose description and source a delegated open authors', () => {
+  /** Target content belongs on the Target's own editor, never this form. */
+  it('offers no fields belonging to the Target', () => {
     render(
       <OpenCard
         through={{ id: ALIAS_ID, title: 'A again', kind: 'alias', target: CARD_ID }}
-        content={markdown({ description: 'Shared caption' })}
-        onComplete={completes()}
+        occurrence={{ targets: [], onEdit: vi.fn(() => null) }}
         onCancel={vi.fn()}
       />,
     );
 
-    expect(screen.getByRole('textbox', { name: 'Description of A' })).toHaveValue('Shared caption');
-    expect(screen.getByRole('textbox', { name: 'Markdown source of A' })).toHaveValue(
-      '**A** source',
-    );
-    expect(screen.queryByRole('textbox', { name: 'Description' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('textbox', { name: 'Markdown source' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('textbox', { name: /Description/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('textbox', { name: /Markdown source/ })).not.toBeInTheDocument();
   });
 
-  /**
-   * A delegated open draws neither the title field nor the node that reports a
-   * refused title, so this pane can neither author a title nor say anything
-   * about one. `min(1)` counts characters and a space is one, so a stored title
-   * of spaces passes the schema at rest and arrives here intact — and trimming
-   * what the author cannot see turned `Done` into a no-op that reported nothing,
-   * because the refusal was written into a node this pane does not render. The
-   * target's title was validated when it was stored, so it cannot fail now.
-   */
-  it('completes a delegated edit whose target title is only whitespace', () => {
-    const onComplete = completes();
+  /** Done has exactly one edit subject: the Alias. */
+  it('completes an Alias edit without completing its Target', () => {
+    const onEdit = vi.fn(() => null);
+    const onCancel = vi.fn();
     render(
       <OpenCard
         through={{ id: ALIAS_ID, title: 'A again', kind: 'alias', target: CARD_ID }}
-        content={{ ...markdown(), title: '   ' }}
-        onComplete={onComplete}
-        onCancel={vi.fn()}
-      />,
-    );
-
-    // Matched loosely because the qualifier names a Card whose title is the
-    // whitespace this test is about, and an accessible name is whitespace-
-    // normalised: the label reads "Markdown source of" and nothing follows it.
-    fireEvent.change(screen.getByRole('textbox', { name: /^Markdown source/ }), {
-      target: { value: 'Rewritten through the Alias' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
-
-    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
-    expect(onComplete).toHaveBeenCalledWith({
-      id: CARD_ID,
-      title: '   ',
-      kind: 'markdown',
-      body: 'Rewritten through the Alias',
-    });
-  });
-
-  /**
-   * A refusal has to land somewhere the author can see it, and a delegated open
-   * draws no title field and no node to report a refused title. Reporting one
-   * there reported it nowhere: `Done` did nothing and said nothing — the same
-   * silent no-op the trimming rule above was written to remove, reached from
-   * the other side.
-   *
-   * Nothing can reach it today, and this test has to manufacture the state to
-   * assert on it: a stored Card's title has already passed this exact rule,
-   * because `markdownCardDocumentSchema` *is* `markdownCardSchema` less its id,
-   * and the delegated path passes the stored title straight through. That is an
-   * equality between two schemas which nothing enforces, and the day it stops
-   * holding the symptom is a button that does nothing. So the refusal falls
-   * through to the generic message wherever it cannot be reported in place.
-   */
-  it('says something when a delegated edit is refused for its target’s title', () => {
-    const onComplete = completes();
-    render(
-      <OpenCard
-        through={{ id: ALIAS_ID, title: 'A again', kind: 'alias', target: CARD_ID }}
-        content={{ ...markdown(), title: '' }}
-        onComplete={onComplete}
-        onCancel={vi.fn()}
+        occurrence={{ targets: [], onEdit }}
+        onCancel={onCancel}
       />,
     );
 
     fireEvent.click(screen.getByRole('button', { name: 'Done' }));
 
-    expect(screen.getByRole('alert')).toHaveTextContent('The Card could not be completed.');
-    expect(onComplete).not.toHaveBeenCalled();
+    expect(onEdit).toHaveBeenCalledWith({ title: 'A again', target: CARD_ID });
+    expect(onCancel).toHaveBeenCalledOnce();
   });
 
-  /**
-   * The occurrence's own title, which the pane could not reach at all.
-   *
-   * `titleEditable` was `!delegated`, so opening an Alias drew no Title field —
-   * and the storyboard's Frame 4 draws one, holding the Alias's own title beside
-   * its Target. It bites hardest straight after creation, where an Alias that
-   * took its Target's title lands the author in the one pane that cannot tell
-   * the two Cards apart by name.
-   *
-   * Plain `Title`, like the `Target` beside it: unqualified names the Card this
-   * pane is about, and the qualified `Description of A` names the other one.
-   */
+  /** A refused Alias Edit leaves its two metadata drafts on screen. */
+  it('keeps the Alias pane open when its edit is refused', () => {
+    const onCancel = vi.fn();
+    render(
+      <OpenCard
+        through={{ id: ALIAS_ID, title: 'A again', kind: 'alias', target: CARD_ID }}
+        occurrence={{ targets: [], onEdit: () => 'This Alias could not be completed.' }}
+        onCancel={onCancel}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+
+    expect(screen.getByRole('alert')).toHaveTextContent('This Alias could not be completed.');
+    expect(onCancel).not.toHaveBeenCalled();
+  });
+
+  /** The Title field belongs to the Alias the author opened. */
   it('renames the occurrence it was opened through', () => {
     const onEdit = vi.fn(() => null);
-    const onComplete = completes();
     render(
       <OpenCard
         through={{ id: ALIAS_ID, title: 'A again', kind: 'alias', target: CARD_ID }}
-        content={markdown()}
         occurrence={{ targets: [], onEdit }}
-        onComplete={onComplete}
         onCancel={vi.fn()}
       />,
     );
@@ -213,9 +135,6 @@ describe('the opened Card', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Done' }));
 
     expect(onEdit).toHaveBeenCalledWith({ title: 'Recap', target: CARD_ID });
-    // A different edit subject from the fields under it, so the Alias's Edit
-    // names the Alias and the content's names the Card that owns the content.
-    expect(onComplete).toHaveBeenCalledWith(expect.objectContaining({ id: CARD_ID, title: 'A' }));
   });
 
   /**
@@ -228,9 +147,7 @@ describe('the opened Card', () => {
     render(
       <OpenCard
         through={{ id: ALIAS_ID, title: 'A again', kind: 'alias', target: CARD_ID }}
-        content={markdown()}
         occurrence={{ targets: [], onEdit }}
-        onComplete={completes()}
         onCancel={vi.fn()}
       />,
     );
@@ -255,9 +172,7 @@ describe('the opened Card', () => {
     render(
       <OpenCard
         through={{ id: ALIAS_ID, title: 'A again', kind: 'alias', target: CARD_ID }}
-        content={markdown()}
         occurrence={{ targets: [], onEdit }}
-        onComplete={completes()}
         onCancel={vi.fn()}
       />,
     );
@@ -275,37 +190,23 @@ describe('the opened Card', () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
-  /**
-   * A refused occurrence leaves the content Card unauthored, which is the whole
-   * reason both fields are validated before either Edit is made: one press must
-   * not half-apply on anything the pane could have seen coming.
-   */
-  it('completes nothing on the content Card when the occurrence is refused', () => {
-    const onComplete = completes();
+  /** A refusal keeps the Alias metadata form open. */
+  it('keeps the pane open when the Alias edit is refused', () => {
     const onCancel = vi.fn();
     render(
       <OpenCard
         through={{ id: ALIAS_ID, title: 'A again', kind: 'alias', target: CARD_ID }}
-        content={markdown()}
         occurrence={{ targets: [], onEdit: () => 'This Card is no longer part of the Space.' }}
-        onComplete={onComplete}
         onCancel={onCancel}
       />,
     );
 
     fireEvent.click(screen.getByRole('button', { name: 'Done' }));
 
-    expect(onComplete).not.toHaveBeenCalled();
     expect(onCancel).not.toHaveBeenCalled();
   });
 
-  /**
-   * The other half of that press, which the pane cannot see coming: only making
-   * the Edit answers whether the Space takes it. The result was discarded here,
-   * so `Done` closed the pane over a refusal exactly as it does over a success
-   * and the draft went down with it — the silent no-op ADR 0042 exists to
-   * prevent, and a half-applied press now that `Done` authors two Cards.
-   */
+  /** A content Card refusal keeps that Card's draft and explanation visible. */
   it('keeps the pane open and says why when the Space refuses the content Card', () => {
     const onCancel = vi.fn();
     render(
@@ -379,9 +280,7 @@ describe('the opened Card', () => {
     render(
       <OpenCard
         through={{ id: ALIAS_ID, title: 'A again', kind: 'alias', target: CARD_ID }}
-        content={markdown()}
         occurrence={{ targets: [], onEdit: vi.fn() }}
-        onComplete={completes()}
         onCancel={vi.fn()}
       />,
     );
@@ -390,26 +289,12 @@ describe('the opened Card', () => {
     expect(screen.getByRole('combobox', { name: 'Target' })).not.toHaveFocus();
   });
 
-  /**
-   * Issue `17`, with its assertion the other way up.
-   *
-   * Choosing a Target used to commit an `edited-card` Edit on the spot: the
-   * Space changed, the pane's content owner became the new Target, and the
-   * content editor — keyed so that no draft is ever shown under another Card's
-   * identity — remounted and reseeded over whatever had been typed into it. The
-   * Target now pends to `Done` like every other field (ADR 0048), so the two
-   * ids the key is built from cannot move while the pane is open.
-   *
-   * The fields keep naming the Card they are still authoring, too: a pending
-   * Target does not preview.
-   */
-  it('keeps the content draft when a different Target is chosen', () => {
+  /** Target selection pends to Done with the Alias title (ADR 0048). */
+  it('pends a different Target until Done', () => {
     const onEdit = vi.fn(() => null);
-    const onComplete = completes();
     render(
       <OpenCard
         through={{ id: ALIAS_ID, title: 'A again', kind: 'alias', target: CARD_ID }}
-        content={markdown()}
         occurrence={{
           targets: [
             { id: CARD_ID, title: 'A', kind: 'markdown', body: '**A** source' },
@@ -417,43 +302,26 @@ describe('the opened Card', () => {
           ],
           onEdit,
         }}
-        onComplete={onComplete}
         onCancel={vi.fn()}
       />,
     );
-    fireEvent.change(screen.getByRole('textbox', { name: 'Markdown source of A' }), {
-      target: { value: 'A paragraph nobody asked to lose' },
-    });
 
     fireEvent.click(screen.getByRole('option', { name: 'Markdown Card B' }));
 
     expect(onEdit).not.toHaveBeenCalled();
-    expect(screen.getByRole('textbox', { name: 'Markdown source of A' })).toHaveValue(
-      'A paragraph nobody asked to lose',
-    );
 
     fireEvent.click(screen.getByRole('button', { name: 'Done' }));
 
     expect(onEdit).toHaveBeenCalledWith({ title: 'A again', target: OTHER_CARD_ID });
-    // Written to the Card the pane was authoring all along, not to the Target
-    // the Alias is about to point at.
-    expect(onComplete).toHaveBeenCalledWith({
-      id: CARD_ID,
-      title: 'A',
-      kind: 'markdown',
-      body: 'A paragraph nobody asked to lose',
-    });
   });
 
-  /** Four fields, one press, and one Edit each for the two Cards they author. */
-  it('completes the occurrence and the content from one Done', () => {
+  /** Two fields, one press, and one Edit on the Alias they author. */
+  it('completes the Alias title and Target from one Done', () => {
     const onEdit = vi.fn(() => null);
-    const onComplete = completes();
     const onCancel = vi.fn();
     render(
       <OpenCard
         through={{ id: ALIAS_ID, title: 'A again', kind: 'alias', target: CARD_ID }}
-        content={markdown()}
         occurrence={{
           targets: [
             { id: CARD_ID, title: 'A', kind: 'markdown', body: '**A** source' },
@@ -461,7 +329,6 @@ describe('the opened Card', () => {
           ],
           onEdit,
         }}
-        onComplete={onComplete}
         onCancel={onCancel}
       />,
     );
@@ -470,35 +337,19 @@ describe('the opened Card', () => {
       target: { value: 'Recap' },
     });
     fireEvent.click(screen.getByRole('option', { name: 'Markdown Card B' }));
-    fireEvent.change(screen.getByRole('textbox', { name: 'Description of A' }), {
-      target: { value: 'A caption' },
-    });
-    fireEvent.change(screen.getByRole('textbox', { name: 'Markdown source of A' }), {
-      target: { value: 'New body' },
-    });
     fireEvent.click(screen.getByRole('button', { name: 'Done' }));
 
     expect(onEdit).toHaveBeenCalledOnce();
     expect(onEdit).toHaveBeenCalledWith({ title: 'Recap', target: OTHER_CARD_ID });
-    expect(onComplete).toHaveBeenCalledOnce();
-    expect(onComplete).toHaveBeenCalledWith({
-      id: CARD_ID,
-      title: 'A',
-      description: 'A caption',
-      kind: 'markdown',
-      body: 'New body',
-    });
     expect(onCancel).toHaveBeenCalledOnce();
   });
 
-  /** And Cancel before Done authors neither of them. */
-  it('authors neither Card when the pane is cancelled', () => {
+  /** Cancel before Done does not author the Alias. */
+  it('does not author the Alias when the pane is cancelled', () => {
     const onEdit = vi.fn(() => null);
-    const onComplete = completes();
     render(
       <OpenCard
         through={{ id: ALIAS_ID, title: 'A again', kind: 'alias', target: CARD_ID }}
-        content={markdown()}
         occurrence={{
           targets: [
             { id: CARD_ID, title: 'A', kind: 'markdown', body: '**A** source' },
@@ -506,7 +357,6 @@ describe('the opened Card', () => {
           ],
           onEdit,
         }}
-        onComplete={onComplete}
         onCancel={vi.fn()}
       />,
     );
@@ -518,7 +368,6 @@ describe('the opened Card', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
 
     expect(onEdit).not.toHaveBeenCalled();
-    expect(onComplete).not.toHaveBeenCalled();
   });
 
   /**
@@ -550,16 +399,8 @@ describe('the opened Card', () => {
     expect(screen.getByRole('textbox', { name: 'Markdown source' })).toHaveValue('**B** source');
   });
 
-  /**
-   * The case the editor is keyed by *both* ids for. Two Aliases of one Card
-   * resolve to the same content, so the content's id cannot tell one open from
-   * the other, and keying on it alone reuses the first Alias's editor — draft
-   * and all — under the second Alias's name. It is the same defect as the test
-   * above, arrived at from the other side: there the identity changed and the
-   * draft did not, here the content is genuinely shared and only the occurrence
-   * differs.
-   */
-  it('never carries a draft between two Aliases of the same Card', () => {
+  /** A metadata draft belongs to the Alias identity that seeded it. */
+  it('never carries a metadata draft between two Aliases', () => {
     const first = { id: ALIAS_ID, title: 'A again', kind: 'alias' as const, target: CARD_ID };
     const second = {
       id: SECOND_ALIAS_ID,
@@ -567,26 +408,15 @@ describe('the opened Card', () => {
       kind: 'alias' as const,
       target: CARD_ID,
     };
-    const view = render(
-      <OpenCard through={first} content={markdown()} onComplete={completes()} onCancel={vi.fn()} />,
-    );
-    fireEvent.change(screen.getByRole('textbox', { name: 'Markdown source of A' }), {
-      target: { value: 'Typed through the first Alias' },
+    const occurrence = { targets: [] as const, onEdit: vi.fn(() => null) };
+    const view = render(<OpenCard through={first} occurrence={occurrence} onCancel={vi.fn()} />);
+    fireEvent.change(screen.getByRole('textbox', { name: 'Title' }), {
+      target: { value: 'Draft for the first Alias' },
     });
 
-    view.rerender(
-      <OpenCard
-        through={second}
-        content={markdown()}
-        onComplete={completes()}
-        onCancel={vi.fn()}
-      />,
-    );
+    view.rerender(<OpenCard through={second} occurrence={occurrence} onCancel={vi.fn()} />);
 
-    expect(screen.getByText('Opened through A once more')).toBeVisible();
-    expect(screen.getByRole('textbox', { name: 'Markdown source of A' })).toHaveValue(
-      '**A** source',
-    );
+    expect(screen.getByRole('textbox', { name: 'Title' })).toHaveValue('A once more');
   });
 
   it('completes one whole Card from all three fields', () => {
@@ -766,25 +596,17 @@ describe('the opened Card as a dialog', () => {
     expect(dialog).toHaveAccessibleName('A');
   });
 
-  /**
-   * Named for the Card it authors *and* the occurrence it was opened through,
-   * because when those differ neither one alone is the answer to "which dialog
-   * is this?". Named only for the content owner, opening `A′` announced a dialog
-   * called `A` — a Card the author never asked for and cannot see the name of,
-   * on a surface whose one other signal of the delegation is a banner that
-   * names nothing to a screen reader.
-   */
-  it('names the occurrence it was opened through and the Card it authors', () => {
+  /** The dialog is named for its one edit subject. */
+  it('names the Alias it authors', () => {
     render(
       <OpenCard
         through={{ id: ALIAS_ID, title: 'A again', kind: 'alias', target: CARD_ID }}
-        content={markdown()}
-        onComplete={completes()}
+        occurrence={{ targets: [], onEdit: vi.fn(() => null) }}
         onCancel={vi.fn()}
       />,
     );
 
-    expect(screen.getByRole('dialog')).toHaveAccessibleName('A again — editing content on A');
+    expect(screen.getByRole('dialog')).toHaveAccessibleName('A again');
   });
 
   /**

@@ -315,7 +315,7 @@ test('content that exceeds the frame scrolls inside it, keeping controls reachab
   expect(actions.y + actions.height).toBeLessThanOrEqual(panel.y + panel.height + 1);
 });
 
-test('an alias node names the card it redraws and opens its target content', async ({ page }) => {
+test('an alias node names the card it redraws and opens its own metadata', async ({ page }) => {
   await page.goto('/');
 
   // A′ is an alias of A. It is drawn as its own node, carrying its own title, with
@@ -326,13 +326,9 @@ test('an alias node names the card it redraws and opens its target content', asy
   await expect(recap.getByTestId('alias-marker')).toHaveText('A');
 
   await openCard(recap, 'A′');
-  await expect(page.getByText('Opened through A′')).toBeVisible();
-  await expect(page.getByText('Editing content on A')).toBeVisible();
-  // The delegated fields name the Card they author; A′'s own description is
-  // still the one drawn on the graph, and nothing here writes it.
-  await expect(
-    page.getByRole('textbox', { name: 'Markdown source of A', exact: true }),
-  ).toHaveValue(/entry point/);
+  await expect(page.getByRole('textbox', { name: 'Title' })).toHaveValue('A′');
+  await expect(page.getByRole('combobox', { name: 'Target' })).toBeVisible();
+  await expect(page.getByRole('textbox', { name: /Markdown source/ })).toHaveCount(0);
   await page.getByRole('button', { name: 'Cancel' }).click();
 
   // Its own title is still authored, inline on the graph.

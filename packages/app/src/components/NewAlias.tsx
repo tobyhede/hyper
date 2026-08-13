@@ -65,9 +65,8 @@ export function NewAlias({ targets, refusal, onCreate, onCancel, onRefusalStale 
             absorb the squeeze, so on a short window its heading, Title, list and
             hint together are taller than the frame. */}
         <div className="card-pane__fields">
-          {/* Not the delegation banner: that one names two Cards, and here there
-              is one Card and it does not exist yet. The kind is stated rather
-              than offered, because a Card keeps the kind it was created with. */}
+          {/* The kind is stated rather than offered, because a Card keeps the
+              kind it was created with. */}
           <div className="card-pane__heading">
             <span>New Alias</span>
             <span>An Alias shows another Card’s content at a second position.</span>

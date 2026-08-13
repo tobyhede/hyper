@@ -29,7 +29,7 @@ _Avoid_: node, slide, page, tile, subgraph. For the content: prose (it may be a 
 **Alias**:
 A card that shows another card's **content**: the same content appearing again elsewhere in the space, with a single source of truth, so editing the target changes every place it appears. An alias carries its own title — only content is shared. An alias may target any non-alias card kind, including a Markdown card or a space card, but never another alias: aliasing is a single hop, so an alias never points at itself and alias chains cannot form.
 
-Authoring an alias itself changes only its title, and it is renamed where it is drawn. Opening an alias preserves that occurrence as the opened context and delegates content authoring to the card it targets. The surface identifies both cards, exposes the target's content rather than the alias's metadata, and completes the target edit at its single source of truth, so every alias shows the change. Changing which card an alias targets is a separate alias-authoring operation, not editing the content it shows.
+Authoring an alias changes its title or which Card it targets, and it is renamed where it is drawn. Opening an alias exposes only that metadata. It does not author the target's content; the target Card must be opened explicitly to edit that content at its single source of truth, so every alias then shows the change.
 _Avoid_: reference, link (an alias shows content, it does not merely jump), copy, transclusion, mirror.
 
 ## Graphs

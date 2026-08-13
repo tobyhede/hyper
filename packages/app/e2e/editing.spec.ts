@@ -178,57 +178,27 @@ test('opened Markdown editing persists source and description without moving Car
   );
 });
 
-test('editing through an Alias updates its target and survives reload', async ({ page }) => {
+test('editing an Alias updates only its metadata and survives reload', async ({ page }) => {
   await page.goto('/');
-  const target = nodeByTitle(page, 'A').first();
   const alias = nodeByTitle(page, 'A′').first();
   await expect(alias).toBeVisible();
   await settled(page);
   const before = await allPositions(page);
 
   await openCard(alias, 'A′');
-  await expect(page.getByText('Opened through A′')).toBeVisible();
-  await expect(page.getByText('Editing content on A')).toBeVisible();
-  // The Title is the *occurrence's* own, and this line is what says so: it read
-  // `toHaveCount(0)` and pinned a pane that could not rename the Alias it was
-  // opened on at all. What it was guarding — that no field here renames the Card
-  // that owns the content — is the value, not the absence.
   await expect(page.getByRole('textbox', { name: 'Title' })).toHaveValue('A′');
-  // Named for the Card they author, exactly, because A′ carries a description of
-  // its own on the graph behind this pane and these fields do not write it.
-  await page
-    .getByRole('textbox', { name: 'Description of A', exact: true })
-    .fill('Shared through every occurrence');
-  await page
-    .getByRole('textbox', { name: 'Markdown source of A', exact: true })
-    .fill('One shared source');
+  await expect(page.getByRole('textbox', { name: /Description/ })).toHaveCount(0);
+  await expect(page.getByRole('textbox', { name: /Markdown source/ })).toHaveCount(0);
+  await page.getByRole('textbox', { name: 'Title' }).fill('Recap');
   await page.getByRole('button', { name: 'Done' }).click();
 
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
   await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
   expect(await allPositions(page)).toEqual(before);
-  await expect(nodeByTitle(page, 'A′').first()).toBeVisible();
-
-  await openCard(target, 'A');
-  await expect(page.getByRole('textbox', { name: 'Description' })).toHaveValue(
-    'Shared through every occurrence',
-  );
-  await expect(page.getByRole('textbox', { name: 'Markdown source' })).toHaveValue(
-    'One shared source',
-  );
-  await page.getByRole('button', { name: 'Cancel' }).click();
-
-  await openCard(nodeByTitle(page, 'A′').first(), 'A′');
-  await expect(
-    page.getByRole('textbox', { name: 'Markdown source of A', exact: true }),
-  ).toHaveValue('One shared source');
-  await page.getByRole('button', { name: 'Cancel' }).click();
+  await expect(nodeByTitle(page, 'Recap').first().getByTestId('alias-marker')).toHaveText('A');
 
   await page.reload();
-  await openCard(nodeByTitle(page, 'A′').first(), 'A′');
-  await expect(
-    page.getByRole('textbox', { name: 'Markdown source of A', exact: true }),
-  ).toHaveValue('One shared source');
+  await expect(nodeByTitle(page, 'Recap').first()).toBeVisible();
 });
 
 /**
@@ -1325,11 +1295,9 @@ test('choosing a Target creates the Alias and leaves its editor open', async ({ 
   await page.getByRole('combobox', { name: 'Target' }).fill('B');
   await page.getByRole('option', { name: 'Markdown Card B' }).click();
 
-  // The pane it is now on is the delegated editor over the Card that owns the
-  // content, which is what opening an Alias has always given (ADR 0039).
+  // The pane it is now on authors the Alias that creation just made.
   await expect(page.getByTestId('new-alias')).toHaveCount(0);
-  await expect(page.getByText('Opened through B')).toBeVisible();
-  await expect(page.getByText('Editing content on B')).toBeVisible();
+  await expect(page.getByRole('dialog', { name: 'B' })).toBeVisible();
   await page.getByRole('button', { name: 'Cancel' }).click();
 
   // An empty title takes the Target's, so the Alias is a second Card called B.
@@ -1408,46 +1376,29 @@ test('an Alias rename draft is discarded by Escape, in one press', async ({ page
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
 });
 
-/**
- * Issue `17`, in the browser: retargeting an open Alias must not destroy the
- * body being typed into it.
- *
- * The mechanism was exact — `onSelect` committed an Edit, the Space changed, the
- * pane's content owner became the new Target, and the content editor remounted
- * over the draft, keyed so that no draft is ever shown under another Card's
- * identity. The Target pends to `Done` now, so neither id moves while the pane
- * is open, and the fields go on naming the Card they are still authoring.
- */
-test('retargeting an open Alias keeps the body typed into it', async ({ page }) => {
+/** Title and Target are one pending Alias edit (ADRs 0048 and 0049). */
+test('retargeting an open Alias keeps its metadata draft until Done', async ({ page }) => {
   await page.goto('/');
   const alias = nodeByTitle(page, 'A′').first();
   await expect(alias).toBeVisible();
   await settled(page);
 
   await openCard(alias, 'A′');
-  const source = page.getByRole('textbox', { name: 'Markdown source of A', exact: true });
-  await source.fill('A paragraph nobody asked to lose');
+  const title = page.getByRole('textbox', { name: 'Title' });
+  await title.fill('Retargeted');
 
   await page.getByRole('combobox', { name: 'Target' }).fill('B');
   await page.getByRole('option', { name: 'Markdown Card B' }).click();
 
-  // Still A's editor, still holding what was typed into it, and still saying so.
-  await expect(
-    page.getByRole('textbox', { name: 'Markdown source of A', exact: true }),
-  ).toHaveValue('A paragraph nobody asked to lose');
-  await expect(page.getByText('Editing content on A')).toBeVisible();
+  await expect(title).toHaveValue('Retargeted');
+  await expect(page.getByRole('textbox', { name: /Markdown source/ })).toHaveCount(0);
   await quiescent(page);
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '0');
 
   await page.getByRole('button', { name: 'Done' }).click();
 
-  // Both Edits, on both Cards: the Alias points at B, and A keeps the paragraph.
   await expect(page.getByTestId('open-card')).toHaveCount(0);
-  // The Alias keeps its own title and now names B underneath it. Scoped to the
-  // node, because the fixture returns to the start of both its collections.
-  await expect(alias.getByTestId('alias-marker')).toHaveText('B');
-  await openCard(nodeByTitle(page, 'A').first(), 'A');
-  await expect(page.getByRole('textbox', { name: 'Markdown source' })).toHaveValue(
-    'A paragraph nobody asked to lose',
-  );
+  const retargeted = nodeByTitle(page, 'Retargeted').first();
+  await expect(retargeted).toBeVisible();
+  await expect(retargeted.getByTestId('alias-marker')).toHaveText('B');
 });

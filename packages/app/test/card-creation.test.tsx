@@ -345,10 +345,9 @@ describe('Add Alias', () => {
     const created = cardsOf(session)[2]!;
     expect(created.document).toEqual({ title: 'A', kind: 'alias', target: CARD_ID });
     expect(layoutsOf(session)[0]?.positions[created.id]).toBeDefined();
-    // "The editor remains open on the now-authored Alias", which for an Alias is
-    // the delegated editor over the content its Target owns.
+    // The editor remains open on the now-authored Alias's metadata.
     expect(screen.queryByTestId('new-alias')).not.toBeInTheDocument();
-    expect(await screen.findByText('Opened through A')).toBeVisible();
+    expect(await screen.findByRole('dialog', { name: 'A' })).toBeVisible();
     await settled(session);
   });
 
@@ -357,16 +356,14 @@ describe('Add Alias', () => {
    * creation just did to them.
    *
    * An empty title takes the Target's, so the Space now holds two Cards called
-   * `A` — and the editor that stays open is the delegated one, which drew no
-   * Title field at all. The rename had to be reachable from where the author
-   * already is, and it has to reach the *Alias*: the Card that owns the content
-   * keeps its own title.
+   * `A`. The editor creation leaves open must let the author distinguish it by
+   * renaming the Alias without changing its Target.
    */
   it('renames the Alias from the editor creation leaves open', async () => {
     const session = mount();
     await openAliasCreation();
     fireEvent.click(screen.getByRole('option', { name: 'Markdown Card A' }));
-    await screen.findByText('Opened through A');
+    await screen.findByRole('dialog', { name: 'A' });
 
     const title = screen.getByRole('textbox', { name: 'Title' });
     expect(title).toHaveValue('A');
@@ -396,7 +393,7 @@ describe('Add Alias', () => {
     const session = mount();
     await openAliasCreation();
     fireEvent.click(screen.getByRole('option', { name: 'Markdown Card A' }));
-    await screen.findByText('Opened through A');
+    await screen.findByRole('dialog', { name: 'A' });
     const title = screen.getByRole('textbox', { name: 'Title' });
     fireEvent.change(title, { target: { value: 'Recap' } });
     const cancel = screen.getByRole('button', { name: 'Cancel' });
@@ -422,7 +419,7 @@ describe('Add Alias', () => {
     const session = mount();
     await openAliasCreation();
     fireEvent.click(screen.getByRole('option', { name: 'Markdown Card A' }));
-    await screen.findByText('Opened through A');
+    await screen.findByRole('dialog', { name: 'A' });
     const title = screen.getByRole('textbox', { name: 'Title' });
     fireEvent.change(title, { target: { value: 'Recap' } });
 
@@ -442,7 +439,7 @@ describe('Add Alias', () => {
     const session = mount();
     await openAliasCreation();
     fireEvent.click(screen.getByRole('option', { name: 'Markdown Card A' }));
-    await screen.findByText('Opened through A');
+    await screen.findByRole('dialog', { name: 'A' });
     const title = screen.getByRole('textbox', { name: 'Title' });
 
     fireEvent.change(title, { target: { value: '   ' } });
@@ -607,18 +604,16 @@ describe('retargeting an Alias', () => {
    * 0039 warns about. The check is that the pane's *own* editor still writes
    * where it always did.
    */
-  it('leaves the content editor authoring the content owner', async () => {
+  it('does not offer the Target’s content for editing', async () => {
     const session = mount(aliased);
 
     fireEvent.click(await screen.findByRole('button', { name: 'Edit Card A again' }));
-    fireEvent.change(screen.getByRole('textbox', { name: 'Markdown source of A' }), {
-      target: { value: 'Written through the Alias' },
-    });
+    expect(screen.queryByRole('textbox', { name: /Markdown source/ })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Done' }));
 
     expect(cardsOf(session)).toContainEqual({
       id: CARD_ID,
-      document: { title: 'A', kind: 'markdown', body: 'Written through the Alias' },
+      document: { title: 'A', kind: 'markdown', body: 'A source' },
     });
     await settled(session);
   });

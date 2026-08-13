@@ -30,16 +30,7 @@ type ContentDraft = MarkdownDraft;
  * `Content` rather than `Card`, which is the domain type imported above: a
  * parameter shadowing it reads as that type at every use and is not one.
  */
-type ContentFieldsProps<Content extends ResolvedContentCard, Draft extends ContentDraft> = {
-  readonly card: Content;
-  /**
-   * Whether the title is authored here as well. False when the content was
-   * reached through another occurrence, which keeps its own title on the graph
-   * and is not the Card this group writes to. The remaining fields then name the
-   * Card they author, because the occurrence behind the pane carries a title and
-   * a description of its own that they do not touch.
-   */
-  readonly titleEditable: boolean;
+type ContentFieldsProps<Draft extends ContentDraft> = {
   readonly draft: Draft;
   readonly onChange: (draft: Draft) => void;
 };
@@ -48,22 +39,19 @@ type ContentFieldsProps<Content extends ResolvedContentCard, Draft extends Conte
  * A content kind's field group: fields that hold nothing, a seed, and one pure
  * validation the pane's single `Done` runs (ADR 0048).
  *
- * The group used to be an editor that owned the `<form>`, the submit and the
- * actions, with the occurrence's own fields rendered above and outside it. One
- * Done over all four fields means the pane owns the form, so what a content kind
- * supplies is values and validity — never a completion of its own.
+ * The pane owns the `<form>`, submit and actions, so a content kind supplies
+ * values and validity — never a completion of its own.
  */
 interface ContentFieldGroup<Content extends ResolvedContentCard, Draft extends ContentDraft> {
   /** The pending values the pane opens with. */
   readonly seed: (card: Content) => Draft;
-  readonly Fields: ComponentType<ContentFieldsProps<Content, Draft>>;
+  readonly Fields: ComponentType<ContentFieldsProps<Draft>>;
   /**
    * Validate at `Done`: the whole Card to complete, or the draft carrying the
    * refusals to draw.
    */
   readonly settle: (
     card: Content,
-    titleEditable: boolean,
     draft: Draft,
   ) =>
     { readonly ok: true; readonly card: Content } | { readonly ok: false; readonly draft: Draft };
@@ -88,21 +76,14 @@ const markdownFields: ContentFieldGroup<MarkdownCard, MarkdownDraft> = {
     descriptionError: null,
   }),
 
-  settle: (card, titleEditable, draft) => {
+  settle: (card, draft) => {
     // Both trimmed, and for the same reason the graph's inline editor trims:
     // `min(1)` counts characters and a space is one, so a title of spaces draws
     // as nothing and a description of spaces leaves a caption that says nothing
     // and no field left to clear. The body is *not* trimmed — leading and
     // trailing whitespace there is Markdown the author wrote.
     //
-    // The title is trimmed only where it is authored. A delegated open renders
-    // no title field and no node to report a refused title, so trimming a stored
-    // title of spaces — which `min(1)` accepts at rest, and an import can
-    // therefore store — refused the whole edit into a node this pane does not
-    // draw: `Done` did nothing, said nothing, and left no way to find out why.
-    // What the author cannot see, they cannot have broken; the stored title was
-    // validated when it was stored, so passing it through cannot fail here.
-    const named = titleEditable ? draft.title.trim() : card.title;
+    const named = draft.title.trim();
     const caption = draft.description.trim();
     const parsed = markdownCardSchema.safeParse({
       id: card.id,
@@ -123,55 +104,39 @@ const markdownFields: ContentFieldGroup<MarkdownCard, MarkdownDraft> = {
         : named.length === 0
           ? 'A Card title is required.'
           : forTitle.message;
-    // A refusal has to land somewhere the author can see it. The title's own
-    // node is the right home for a title issue — but only where the title is
-    // authored here, because a delegated open draws neither that field nor that
-    // node, so a title issue reported there is reported nowhere and `Done` goes
-    // quiet. That is the same silent no-op the trimming rule above removed,
-    // reached from the other side, and nothing can reach it today:
-    // `markdownCardDocumentSchema` *is* `markdownCardSchema` less its id, so a
-    // stored title has already passed this exact rule and the delegated path
-    // passes it straight through. What makes it unreachable is an equality
-    // between two schemas that nothing enforces, and the day they diverge the
-    // symptom is a button that does nothing — so a refusal with nowhere of its
-    // own to go falls through to the generic message.
-    const reportedInPlace = titleEditable && forTitle !== undefined;
     return {
       ok: false,
       draft: {
         ...draft,
         titleError,
         descriptionError:
-          forDescription?.message ?? (reportedInPlace ? null : 'The Card could not be completed.'),
+          forDescription?.message ??
+          (forTitle === undefined ? 'The Card could not be completed.' : null),
       },
     };
   },
 
-  Fields: ({ card, titleEditable, draft, onChange }) => (
+  Fields: ({ draft, onChange }) => (
     <>
-      {titleEditable && (
-        <>
-          <label className="card-pane__field">
-            <span>Title</span>
-            <input
-              className="card-pane__title-input"
-              aria-invalid={draft.titleError !== null}
-              aria-describedby={draft.titleError === null ? undefined : 'open-card-title-error'}
-              value={draft.title}
-              onChange={(event) =>
-                onChange({ ...draft, title: event.currentTarget.value, titleError: null })
-              }
-            />
-          </label>
-          {draft.titleError !== null && (
-            <span id="open-card-title-error" role="alert" className="card-pane__field-error">
-              {draft.titleError}
-            </span>
-          )}
-        </>
+      <label className="card-pane__field">
+        <span>Title</span>
+        <input
+          className="card-pane__title-input"
+          aria-invalid={draft.titleError !== null}
+          aria-describedby={draft.titleError === null ? undefined : 'open-card-title-error'}
+          value={draft.title}
+          onChange={(event) =>
+            onChange({ ...draft, title: event.currentTarget.value, titleError: null })
+          }
+        />
+      </label>
+      {draft.titleError !== null && (
+        <span id="open-card-title-error" role="alert" className="card-pane__field-error">
+          {draft.titleError}
+        </span>
       )}
       <label className="card-pane__field">
-        <span>{titleEditable ? 'Description' : `Description of ${card.title}`}</span>
+        <span>Description</span>
         <input
           aria-invalid={draft.descriptionError !== null}
           aria-describedby={
@@ -189,7 +154,7 @@ const markdownFields: ContentFieldGroup<MarkdownCard, MarkdownDraft> = {
         </span>
       )}
       <label className="card-pane__field card-pane__field--source">
-        <span>{titleEditable ? 'Markdown source' : `Markdown source of ${card.title}`}</span>
+        <span>Markdown source</span>
         <textarea
           value={draft.body}
           onChange={(event) => onChange({ ...draft, body: event.currentTarget.value })}
@@ -218,17 +183,11 @@ interface DirectOpen {
   readonly through?: never;
   readonly content?: never;
   readonly occurrence?: never;
+  readonly onComplete: (card: ResolvedContentCard) => string | null;
 }
 
 /**
- * Authoring the occurrence itself, from the editor it was opened in.
- *
- * `through` below names the Card the content was reached through; this is what
- * may be authored *on* it — its own title, and which Card it points at. Offered
- * by the caller rather than derived from the opened Card's kind, for the same
- * reason delegation itself is declared: an occurrence that resolves its content
- * elsewhere is not necessarily one whose title and pointer an author may move.
- * Absent, the pane authors the content and nothing else.
+ * Authoring the Alias itself: its title, and which Card it points at.
  *
  * One capability rather than two optional props, because both are offered on
  * exactly one fact — this occurrence is an Alias (ADR 0009) — and a caller able
@@ -245,91 +204,42 @@ interface OccurrenceAuthoring {
    * **One call carrying both**, because both fields pend to the pane's one
    * `Done` (ADR 0048) and an Alias whose title and Target both moved is one
    * authored fact. Two calls would be two Edits and two commits over one press.
-   * Its own edit subject: the fields under it are the content owner's, so this
-   * completes nothing there.
+   * This capability completes nothing on the Target.
    */
   readonly onEdit: (change: { readonly title: string; readonly target: CardId }) => string | null;
 }
 
 /**
- * A Card opened through another occurrence of its content — an Alias today
- * (ADR 0039), and whatever later kind resolves its content elsewhere.
+ * An Alias opened on its own metadata.
  */
-interface DelegatedOpen {
-  /**
-   * The authored Card whose occurrence was opened; an Alias remains intact
-   * here. Named for what the pane says — "Opened through A again" — because
-   * that is the relation this prop records: the Card the author reached the
-   * content *through*, which keeps its own title on the graph.
-   */
-  readonly through: Card;
-  /** The Card that owns the content reached through the occurrence above. */
-  readonly content: ResolvedContentCard;
-  /**
-   * The one canonical place an Alias's own title and Target change (ADR 0009's
-   * storyboard). Optional, because delegation and authoring the occurrence are
-   * different capabilities: the pane draws the two fields when it is given one
-   * and nothing when it is not.
-   */
-  readonly occurrence?: OccurrenceAuthoring;
+interface AliasOpen {
+  /** The Alias whose own metadata this pane authors. */
+  readonly through: Extract<Card, { kind: 'alias' }>;
+  /** The one canonical capability for changing its title and Target. */
+  readonly occurrence: OccurrenceAuthoring;
   readonly card?: never;
+  readonly onComplete?: never;
 }
 
 /**
- * What the pane was opened on, in exactly one of its two forms.
- *
- * This was two independent props — `opened: Card` and `content:
- * ResolvedContentCard` — with the relation `content === resolveContentCard(
- * space, opened.id)` holding only because every caller happened to establish
- * it. Any two Cards typechecked, and a mismatched pair silently authored a Card
- * the author never opened. A direct open now names one Card, so that pair
- * cannot be written down.
- *
- * The second thing the union buys is that **delegation is declared, not
- * derived**. `opened.kind === 'alias'` answered the question by proxy and would
- * answer it wrong for any later Card kind whose content resolves elsewhere: the
- * pane would draw a Title field, that field would rename the *content* owner,
- * and the graph behind it would go on drawing the *opened* Card's title — two
- * cards' titles, one field, which is exactly the negative ADR 0039 records.
- * Callers pick a variant from the relation — whether the Card that was opened
- * is the Card that owns its content — never from the opened Card's kind.
+ * What the pane was opened on, in exactly one of its two forms. A content Card
+ * carries its completion; an Alias carries only the capability that authors
+ * its metadata. The props cannot express content authoring through an Alias.
  */
 export type OpenCardProps = {
-  /**
-   * Complete the one whole Card that owns the resolved content, answering the
-   * sentence to show when the Space refused it — the same contract as
-   * `OccurrenceAuthoring.onEdit`, because both halves of one `Done` have to be
-   * able to say no in a way the author can see.
-   */
-  readonly onComplete: (card: ResolvedContentCard) => string | null;
   /** Close without completing. */
   readonly onCancel: () => void;
-} & (DirectOpen | DelegatedOpen);
+} & (DirectOpen | AliasOpen);
 
 /**
- * Everything the pane is holding, and the one submit that settles all of it.
- *
- * Four fields pend here — the occurrence's Title and Target, and the content
- * kind's own group — and `Done` commits them together (ADR 0048). Nothing
- * commits on blur, on Enter or on a picker's selection, which is what lets an
- * author retarget an Alias without the content editor beneath being remounted
- * out from under a paragraph they were typing.
- *
- * Keyed by the caller on the pair of ids, so a different open is a different
- * form and no draft is ever shown under another Card's identity.
+ * The content Card's form. Every field belongs to that one Card.
  */
 function CardEditorForm({
-  opened,
   content,
-  delegated,
-  occurrence,
   onComplete,
   onCancel,
 }: {
-  readonly opened: Card;
   readonly content: ResolvedContentCard;
-  readonly delegated: boolean;
-  readonly occurrence: OccurrenceAuthoring | undefined;
   readonly onComplete: (card: ResolvedContentCard) => string | null;
   readonly onCancel: () => void;
 }) {
@@ -340,58 +250,17 @@ function CardEditorForm({
   // and the place to answer it rather than to widen it away.
   const group = CONTENT_FIELDS[content.kind];
   const [draft, setDraft] = useState<ContentDraft>(() => group.seed(content));
-  const [occurrenceTitle, setOccurrenceTitle] = useState(opened.title);
-  const [target, setTarget] = useState<CardId>(content.id);
-  /**
-   * The Space's refusal of the occurrence's Edit, drawn once for the pair.
-   *
-   * Not tied to either field by `aria-describedby`: `Done` submits the Title and
-   * the Target as one Edit, so the sentence describes both and naming one of
-   * them would send an author to the wrong field half the time. The content
-   * group's own refusals stay linked to their fields, where each one really does
-   * belong to one value.
-   */
-  const [occurrenceRefusal, setOccurrenceRefusal] = useState<string | null>(null);
-  /**
-   * And the Space's refusal of the content Card's Edit, which is the other half
-   * of the same press and has nowhere else to be said — the content group's own
-   * error nodes belong to values it validated itself.
-   */
   const [contentRefusal, setContentRefusal] = useState<string | null>(null);
 
   /**
-   * Validate locally, then author — in that order, so a refusal this pane can
-   * see for itself stops both Edits before either is made.
-   *
-   * Two completions and no more (ADR 0048): `edited-card` on the occurrence, and
-   * `edited-card` on the Card that owns the content. The occurrence goes first
-   * because it is the pane's top half; nothing about it can invalidate the Card
-   * underneath, which the Alias merely points at.
-   *
-   * **What that does not buy is atomicity across the two.** There is no dry run
-   * for a completion, so the Space's own refusal of the second is only knowable
-   * by making the first — and the two Edits are two commits either way (ADR
-   * 0030). What is guaranteed is that neither goes unreported: both answer the
-   * sentence they were refused with, the pane stays open holding every draft,
-   * and the message says which half stands.
+   * Validate locally, then author the one Card this pane owns.
    */
   const submit = (event: FormEvent<HTMLFormElement>): void => {
     event.preventDefault();
-    const settled = group.settle(content, !delegated, draft);
+    const settled = group.settle(content, draft);
     if (!settled.ok) {
       setDraft(settled.draft);
       return;
-    }
-    if (occurrence !== undefined) {
-      // Submitted whatever the author left there, including values equal to the
-      // stored ones: Authoring answers `unchanged`, which is the same nothing,
-      // and comparing here would be a second copy of a rule that already exists
-      // where the Space is.
-      const refusal = occurrence.onEdit({ title: occurrenceTitle, target });
-      if (refusal !== null) {
-        setOccurrenceRefusal(refusal);
-        return;
-      }
     }
     const refusal = onComplete(settled.card);
     if (refusal !== null) {
@@ -408,54 +277,7 @@ function CardEditorForm({
           this clips at a fixed 16/9 whose width is clamped by viewport height —
           so on a short window there is more here than fits. */}
       <div className="card-pane__fields">
-        {delegated && (
-          <div className="card-pane__delegation">
-            <span>Opened through {opened.title}</span>
-            <span>Editing content on {content.title}</span>
-          </div>
-        )}
-        {occurrence !== undefined && (
-          // The occurrence's own two fields, above the content the Target owns:
-          // what this Card is called and *which* Card it shows come before the
-          // fields that author that Card (ADR 0009's Frame 4).
-          <div className="card-pane__occurrence">
-            <label className="card-pane__field">
-              <span>Title</span>
-              <input
-                className="card-pane__title-input"
-                value={occurrenceTitle}
-                onChange={(event) => {
-                  setOccurrenceTitle(event.currentTarget.value);
-                  setOccurrenceRefusal(null);
-                }}
-              />
-            </label>
-            <CardPicker
-              label="Target"
-              cards={occurrence.targets}
-              selectedId={target}
-              // Frame 4 asks for no focus change, so the pane's ordinary rule
-              // holds and the open lands on the Title above this.
-              initialFocus={false}
-              onSelect={(chosen) => {
-                setTarget(chosen);
-                setOccurrenceRefusal(null);
-              }}
-              emptyMessage="This Space holds no other Card that owns its content."
-            />
-            {occurrenceRefusal !== null && (
-              <span role="alert" className="card-pane__field-error">
-                {occurrenceRefusal}
-              </span>
-            )}
-          </div>
-        )}
-        {/* A pending Target does not preview: these fields go on authoring the
-            Card the occurrence points at *today*, and their labels go on naming
-            it, until Done moves the pointer and closes the pane. */}
         <group.Fields
-          card={content}
-          titleEditable={!delegated}
           draft={draft}
           onChange={(next) => {
             setDraft(next);
@@ -471,6 +293,75 @@ function CardEditorForm({
           {contentRefusal}
         </span>
       )}
+      <div className="card-pane__actions">
+        <Button type="button" variant="secondary" onClick={onCancel}>
+          Cancel
+        </Button>
+        <Button type="submit" variant="default">
+          Done
+        </Button>
+      </div>
+    </form>
+  );
+}
+
+/** The Alias pane authors one Card too: the Alias, never its Target. */
+function AliasEditorForm({
+  alias,
+  occurrence,
+  onCancel,
+}: {
+  readonly alias: Extract<Card, { kind: 'alias' }>;
+  readonly occurrence: OccurrenceAuthoring;
+  readonly onCancel: () => void;
+}) {
+  const [title, setTitle] = useState(alias.title);
+  const [target, setTarget] = useState<CardId>(alias.target);
+  const [refusal, setRefusal] = useState<string | null>(null);
+
+  const submit = (event: FormEvent<HTMLFormElement>): void => {
+    event.preventDefault();
+    const reason = occurrence.onEdit({ title, target });
+    if (reason !== null) {
+      setRefusal(reason);
+      return;
+    }
+    onCancel();
+  };
+
+  return (
+    <form className="card-pane__editor" onSubmit={submit}>
+      <div className="card-pane__fields">
+        <div className="card-pane__occurrence">
+          <label className="card-pane__field">
+            <span>Title</span>
+            <input
+              className="card-pane__title-input"
+              value={title}
+              onChange={(event) => {
+                setTitle(event.currentTarget.value);
+                setRefusal(null);
+              }}
+            />
+          </label>
+          <CardPicker
+            label="Target"
+            cards={occurrence.targets}
+            selectedId={target}
+            initialFocus={false}
+            onSelect={(chosen) => {
+              setTarget(chosen);
+              setRefusal(null);
+            }}
+            emptyMessage="This Space holds no other Card that owns its content."
+          />
+          {refusal !== null && (
+            <span role="alert" className="card-pane__field-error">
+              {refusal}
+            </span>
+          )}
+        </div>
+      </div>
       <div className="card-pane__actions">
         <Button type="button" variant="secondary" onClick={onCancel}>
           Cancel
@@ -502,21 +393,13 @@ function CardEditorForm({
  * Markdown renderer so a card could not read one way and present another, and
  * that half holds: presenting remains the one place a card is drawn rendered.
  *
- * A directly opened Card authors its title here and on the graph, with only one
- * surface visible at a time. An Alias keeps its own title on the graph and this
- * surface identifies, but does not rename, the Card whose content it delegates.
+ * A content Card authors its title, description and content. An Alias authors
+ * only its own title and Target; its Target must be opened separately to author
+ * that Card's content.
  */
 export function OpenCard(props: OpenCardProps) {
-  const { onComplete, onCancel } = props;
-  // The one place the variant is read. A direct open is one Card being its own
-  // content, so the pair below cannot disagree; a delegated one carries two,
-  // and `delegated` is what the caller declared rather than a `kind` this
-  // component reads back off a Card.
-  const { delegated, opened, content } =
-    props.through === undefined
-      ? { delegated: false, opened: props.card, content: props.card }
-      : { delegated: true, opened: props.through, content: props.content };
-  const occurrence = props.through === undefined ? undefined : props.occurrence;
+  const { onCancel } = props;
+  const opened = props.through ?? props.card;
 
   return (
     <CardPane
@@ -526,39 +409,23 @@ export function OpenCard(props: OpenCardProps) {
       // Card from another. Directly opened, that title is also the first
       // field, so a screen reader hears the name and then lands on the
       // control that changes it.
-      //
-      // Delegated, the two Cards are different Cards and the name has to say
-      // both: named only for the content owner, opening `A′` announced a
-      // dialog called `A`, which is neither what the author opened nor
-      // something this pane lets them rename. The delegation banner is the
-      // only other signal and it is plain text, so a reader landing on
-      // Description hears no name at all for the occurrence it came from.
-      // `aria-describedby` onto that banner was the alternative and it fixes
-      // the wrong half: a description is heard after the name, and the name
-      // would still be a Card the author did not open.
-      ariaLabel={
-        delegated ? `${opened.title} — editing content on ${content.title}` : content.title
-      }
+      ariaLabel={opened.title}
     >
-      {/* Keyed by opened occurrence and content owner, because every draft this
-          form holds is seeded once and then owned by it. Reusing one would carry
-          a previous Card's draft under the next Card's identity, and a draft
-          surviving into another Card's fields is committed to that Card on Done.
-          Two tests hold the key for that reason.
-
-          Nothing an author does to this pane changes either id any more: the
-          Target pends to `Done`, which closes the pane, so a retarget no longer
-          remounts the fields underneath it (ADR 0048). Do not answer the next
-          remount by relaxing the key — the early commit was the defect. */}
-      <CardEditorForm
-        key={`${opened.id}:${content.id}`}
-        opened={opened}
-        content={content}
-        delegated={delegated}
-        occurrence={occurrence}
-        onComplete={onComplete}
-        onCancel={onCancel}
-      />
+      {props.through === undefined ? (
+        <CardEditorForm
+          key={props.card.id}
+          content={props.card}
+          onComplete={props.onComplete}
+          onCancel={onCancel}
+        />
+      ) : (
+        <AliasEditorForm
+          key={props.through.id}
+          alias={props.through}
+          occurrence={props.occurrence}
+          onCancel={onCancel}
+        />
+      )}
     </CardPane>
   );
 }

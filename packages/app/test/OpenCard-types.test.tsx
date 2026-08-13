@@ -25,22 +25,25 @@ type Handlers = {
   onCancel: () => void;
 };
 
+type AliasHandlers = {
+  through: Extract<Card, { kind: 'alias' }>;
+  occurrence: {
+    targets: readonly Card[];
+    onEdit: (change: { title: string; target: typeof CARD_ID }) => string | null;
+  };
+  onCancel: () => void;
+};
+
 it('takes an open in exactly one of its two forms', () => {
   // Directly opened: one Card, which owns the content it is about to author.
   expectTypeOf<Handlers & { card: ResolvedContentCard }>().toExtend<OpenCardProps>();
-  // Delegated: the occurrence that was opened, and the Card whose content it
-  // reaches. Two Cards, and the props say which is which.
-  expectTypeOf<
-    Handlers & { through: Card; content: ResolvedContentCard }
-  >().toExtend<OpenCardProps>();
+  // Alias metadata: one Alias and the capability that authors it.
+  expectTypeOf<AliasHandlers>().toExtend<OpenCardProps>();
 });
 
 /**
- * The pair `opened: Card` and `content: ResolvedContentCard` used to be two
- * independent props, and nothing related them: any two Cards typechecked, and a
- * pair that did not satisfy `content === resolveContentCard(space, opened.id)`
- * authored a Card the author never opened. A direct open now names one Card, so
- * the mismatched pair cannot be written down at all.
+ * A direct editor names its one content Card; a second content identity cannot
+ * ride along as an extra prop.
  */
 it('cannot be handed two Cards without being told which was opened', () => {
   expectTypeOf<
@@ -49,20 +52,25 @@ it('cannot be handed two Cards without being told which was opened', () => {
 });
 
 /**
- * Delegation is the discriminant, not something read back off `Card.kind`.
- * `opened.kind === 'alias'` answered the same question by proxy, and would
- * answer it wrong for any later kind that resolves its content elsewhere: the
- * pane would draw a Title field renaming the *content* owner while the graph
- * behind it draws the *opened* Card's title. That is the negative ADR 0039
- * exists to prevent, and it is now unrepresentable rather than merely avoided.
+ * An Alias editor requires the Alias-authoring capability and accepts no Target
+ * content completion.
  */
 it('will not take a delegated open apart', () => {
-  // An occurrence with nothing to delegate to is half a pair.
+  // An Alias with no authoring capability is incomplete.
   expectTypeOf<Handlers & { through: Card }>().not.toExtend<OpenCardProps>();
-  // Content with nothing it was opened through is the other half.
+  // Target content is not part of the Alias editor at all.
   expectTypeOf<Handlers & { content: ResolvedContentCard }>().not.toExtend<OpenCardProps>();
   // Neither half, which is what a caller that forgot the Card entirely writes.
   expectTypeOf<Handlers>().not.toExtend<OpenCardProps>();
+});
+
+it('cannot complete Target content from an Alias editor', () => {
+  expectTypeOf<
+    AliasHandlers & {
+      content: ResolvedContentCard;
+      onComplete: (card: ResolvedContentCard) => string | null;
+    }
+  >().not.toExtend<OpenCardProps>();
 });
 
 /**
