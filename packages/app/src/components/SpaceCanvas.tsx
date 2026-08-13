@@ -148,6 +148,16 @@ function NewCardPreview({
   );
 }
 
+/**
+ * The one unmodified authoring shortcut, named where it is bound.
+ *
+ * Exported so the control that announces it to a screen reader takes the key
+ * from the handler that answers it rather than from a literal beside it: the
+ * announcement and the binding are one fact, and two copies of it can drift
+ * without anything failing.
+ */
+export const ADD_CARD_KEY = 'C';
+
 export interface SpaceCanvasProps {
   nodes: CardFlowNode[];
   edges: Edge[];
@@ -384,7 +394,7 @@ export function SpaceCanvas({
       // is somewhere the author is *typing* a c — the inline title editor stops
       // its own key events before they get here, so this covers whatever text
       // entry the canvas gains next rather than a case that exists today.
-      if (event.key !== 'c' && event.key !== 'C') return;
+      if (event.key.toUpperCase() !== ADD_CARD_KEY) return;
       if (event.repeat || event.metaKey || event.ctrlKey || event.altKey) return;
       if (event.target.closest('input, textarea, [contenteditable="true"]') !== null) return;
       // The default is prevented only where the command can actually run

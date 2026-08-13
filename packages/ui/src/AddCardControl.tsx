@@ -11,6 +11,16 @@ export interface AddCardControlProps {
   /** Whether Card authoring is available at all right now. */
   readonly disabled?: boolean;
   /**
+   * The key that performs Add Card, for the control that performs it to
+   * announce — `'C'` today, and absent where a caller binds nothing.
+   *
+   * Named by the caller rather than written here, because the binding itself
+   * lives there: this package is presentation-agnostic and cannot see the
+   * handler, so a literal would be an accessible promise it has no way to keep
+   * and no way to notice breaking when the key moves.
+   */
+  readonly keyShortcut?: string;
+  /**
    * The menu trigger, offered so a caller can put focus back on it.
    *
    * `onCloseAutoFocus` below declines Radix's own restore for the close that
@@ -43,6 +53,7 @@ export function AddCardControl({
   onAddCard,
   onAddAlias,
   disabled = false,
+  keyShortcut,
   menuTriggerRef,
 }: AddCardControlProps) {
   /**
@@ -66,9 +77,10 @@ export function AddCardControl({
       <Button
         variant="secondary"
         data-testid="add-card"
-        // `C` is the only unmodified authoring shortcut, so the control that
-        // performs it is the one that names it.
-        aria-keyshortcuts="C"
+        // The control that performs the shortcut is the one that announces it.
+        // `undefined` leaves the attribute off entirely, which is the honest
+        // answer for a caller that binds no key.
+        aria-keyshortcuts={keyShortcut}
         disabled={disabled}
         onClick={onAddCard}
         className="gap-[0.35rem] rounded-r-none"

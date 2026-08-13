@@ -22,6 +22,17 @@ export type VisibleCentre = () => LayoutPosition;
  * already are — the same store the cameras read, rather than a second
  * measurement of the same DOM that could disagree with it.
  *
+ * **`screenToFlowPosition` was the documented alternative and was weighed.** It
+ * is the right call wherever a client point exists — `SpaceCanvas` uses it for
+ * exactly that — and its arithmetic is the same `(point - pan) / zoom` written
+ * below. The centre of the viewport is not such a point, though: reaching it
+ * means measuring the pane with `getBoundingClientRect` and handing back the
+ * middle, which is the second measurement this deliberately avoids, and the two
+ * genuinely disagree — the store's `width`/`height` come from `offsetWidth` and
+ * `offsetHeight` with React Flow's own `500` fallback, while the rect is live
+ * and transform-affected. Converting a point we would have to derive from the
+ * store anyway buys a documented name and costs the agreement.
+ *
  * It is a component only because a hook needs somewhere to live inside
  * `ReactFlowProvider`. It draws nothing.
  *

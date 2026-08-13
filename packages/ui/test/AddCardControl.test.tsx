@@ -46,13 +46,29 @@ describe('AddCardControl', () => {
     expect(screen.queryByRole('menu')).not.toBeInTheDocument();
   });
 
-  /** `C` is the only unmodified authoring shortcut, and it is announced here. */
-  it('announces the Add Card shortcut on the control that performs it', () => {
-    render(<AddCardControl onAddCard={vi.fn()} onAddAlias={vi.fn()} />);
+  /**
+   * The shortcut is announced on the control that performs it — but it is the
+   * caller's to name, because the caller is where the key is actually bound.
+   * A literal here would be this package asserting a binding it cannot see.
+   */
+  it('announces the shortcut its caller says performs it', () => {
+    render(<AddCardControl onAddCard={vi.fn()} onAddAlias={vi.fn()} keyShortcut="C" />);
 
     expect(screen.getByRole('button', { name: 'Add Card' })).toHaveAttribute(
       'aria-keyshortcuts',
       'C',
+    );
+  });
+
+  /**
+   * And announces none where the caller names none. An `aria-keyshortcuts` a
+   * caller never claimed is a promise to a screen reader that nothing keeps.
+   */
+  it('announces no shortcut where its caller names none', () => {
+    render(<AddCardControl onAddCard={vi.fn()} onAddAlias={vi.fn()} />);
+
+    expect(screen.getByRole('button', { name: 'Add Card' })).not.toHaveAttribute(
+      'aria-keyshortcuts',
     );
   });
 

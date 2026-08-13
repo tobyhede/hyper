@@ -33,7 +33,7 @@ import { createNavigation } from './navigation';
 import { createWorkingSpaceReader } from './snapshot';
 import { nextCardTitle } from './titles';
 import { createRendererResolver, defaultRenderer, type RendererSelection } from './renderer';
-import { SpaceCanvas } from './components/SpaceCanvas';
+import { ADD_CARD_KEY, SpaceCanvas } from './components/SpaceCanvas';
 import { CanvasCentre, type VisibleCentre } from './components/CanvasCentre';
 import { NewAlias } from './components/NewAlias';
 import { OpenCard } from './components/OpenCard';
@@ -319,16 +319,42 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
     /**
      * Add Card: one completed Edit, and then the naming continuation.
      *
-     * The result is deliberately not inspected beyond the created identity.
-     * Both refusals this operation can produce turn on state the control cannot
-     * be in — there is no placement before an arrangement resolves, and the
-     * control is withdrawn until one has, while a Layout that has gone would
-     * have taken the canvas drawing it with it. `queued` is an Edit that will
-     * still be performed, and the projection that follows it draws the Card.
+     * **This is the one operation whose refusal no surface shows, and that is a
+     * decision rather than an oversight** — the asymmetry with `createAlias`
+     * below is the thing to read, so here is why it stands. A refusal carries a
+     * sentence for the author (ADR 0042), which is worth showing exactly where
+     * the author can act on it: the Alias pane keeps its own open because both
+     * of its refusals are about the Target just chosen, and the field that
+     * answers them is on screen. Add Card takes no input at all. It completes on
+     * one activation, from a toolbar button and a keystroke, and leaves nothing
+     * standing that a sentence could correct.
+     *
+     * Both refusals it can produce also turn on state the control is already
+     * withdrawn in. `disabled` on `AddCardControl` and `canAuthorCards` in
+     * `SpaceCanvas` are both gated on `editable`, which is `hasArrangement` —
+     * and no arrangement is the first refusal ("nowhere to write yet"). The
+     * second is a Layout that has left the Space, which would have taken the
+     * canvas drawing it, and `editable` with it. Neither is reachable from
+     * either path, so a surface built for them could not be exercised, and an
+     * untestable surface for an unreachable state is worth less than this
+     * paragraph.
+     *
+     * What that argument does *not* license is a catch-all, so each outcome is
+     * named below. If Add Card ever grows an input — a kind, a title, a
+     * placement mode — it grows a surface with it, and the refusal goes there.
      */
     const addCard = useCallback(() => {
       const created = authoring.complete({ kind: 'created-card', anchor: centreAnchor() });
-      if (created.kind !== 'completed' || created.createdCardId === undefined) return;
+      // Each outcome named rather than caught. `refused` is the paragraph
+      // above. `queued` is an Edit that will still be performed, whose
+      // projection draws the Card without help from here. `unchanged` this
+      // operation cannot answer — it mints unconditionally — but the shared
+      // completion union carries it, so it is narrowed rather than asserted
+      // away, and the day one of these grows an answer the compiler asks here.
+      if (created.kind === 'refused') return;
+      if (created.kind === 'queued') return;
+      if (created.kind === 'unchanged') return;
+      if (created.createdCardId === undefined) return;
       // Selected as well as named: the storyboard's created Card is the selected
       // one, so continued authoring — a connection, a second Card — carries on
       // from it.
@@ -625,6 +651,9 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
           onAddCard={addCard}
           onAddAlias={() => setCreatingAlias(true)}
           disabled={!editable || presenting || openedCardId !== null || creatingAlias}
+          // Taken from the canvas that binds it, so the announcement cannot
+          // outlive the key.
+          keyShortcut={ADD_CARD_KEY}
           menuTriggerRef={addCardMenu}
         />
         {sessionState.persistence.kind === 'failed' ? (

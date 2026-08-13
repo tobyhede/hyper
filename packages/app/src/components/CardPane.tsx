@@ -6,6 +6,7 @@ import {
   type MouseEvent as ReactMouseEvent,
   type ReactNode,
 } from 'react';
+import { PANE_INITIAL_FOCUS } from './pane-focus';
 
 /**
  * Exactly the three element kinds a pane contains, all of them always enabled
@@ -25,13 +26,6 @@ import {
 const PANE_FOCUSABLE = 'input, textarea, button';
 
 /**
- * Where focus goes when the pane opens, when the first focusable is the wrong
- * answer. The Alias creation state opens on its Target picker, which the
- * storyboard draws *below* the title it is more urgent than.
- */
-const PANE_INITIAL_FOCUS = '[data-pane-focus]';
-
-/**
  * Everything inside the pane a `Tab` can land on, in document order.
  *
  * Queried on each `Tab` rather than cached: an editor grows and loses field
@@ -48,6 +42,19 @@ export interface CardPaneProps {
    * Card; both names where it was reached through an occurrence.
    */
   readonly ariaLabel: string;
+  /**
+   * What this pane is, for a test to find it by — `open-card`, `new-alias`.
+   *
+   * **The pane's own name, not this component's, and the split is deliberate.**
+   * The chrome is `card-pane`: the class on the element below, the block in
+   * `styles.css`, the prefix on every field class inside. What that chrome is
+   * holding is one of two panes, and a selector saying `card-pane` could not
+   * tell them apart — which is the whole job of a test id. The same rule puts
+   * `open-card-title-error` on an error span whose class is
+   * `card-pane__field-error`: `OpenCard` and `NewAlias` each prefix their own
+   * ids with their own name, and both are current vocabulary. An `open-card`
+   * here is not a `card-pane` rename left half-finished.
+   */
   readonly testId: string;
   readonly children: ReactNode;
 }

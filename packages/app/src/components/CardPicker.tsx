@@ -9,6 +9,7 @@ import {
   CommandItem,
   CommandList,
 } from '@project/ui';
+import { paneInitialFocus } from './pane-focus';
 
 export interface CardPickerProps {
   /** What the field is called — **Target** for an Alias (ADR 0009). */
@@ -106,9 +107,9 @@ export function CardPicker({
         <CommandInput
           id={fieldId}
           // Declared only where the surface said this field is what it opens
-          // on; `undefined` leaves the attribute off, so `CardPane` falls back
+          // on; the helper answers nothing otherwise, so `CardPane` falls back
           // to its first focusable.
-          data-pane-focus={initialFocus ? '' : undefined}
+          {...paneInitialFocus(initialFocus)}
           data-testid="card-picker-search"
           placeholder="Search"
           value={search}
