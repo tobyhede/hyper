@@ -1228,6 +1228,38 @@ test('cancelling the Alias Target picker creates nothing', async ({ page }) => {
 });
 
 /**
+ * The same two-stage rule, on the field beside that picker.
+ *
+ * The Title holds a draft exactly as the search does and the contract exempts
+ * neither, so a typed title has to survive the press that would otherwise take
+ * the pane down with it. What it restores to is the empty string — there is no
+ * Alias yet to have read a title off — which makes restoring and clearing one
+ * act here, and the surface goes only on the press after.
+ */
+test('the Alias title draft takes its own first Escape', async ({ page }) => {
+  await page.goto('/');
+  await expect(nodeByTitle(page, 'A').first()).toBeVisible();
+  await settled(page);
+  const nodes = await page.locator('.react-flow__node').count();
+
+  await page.getByTestId('add-card-menu').click();
+  await page.getByRole('menuitem', { name: 'Add Alias' }).click();
+  const title = page.getByTestId('new-alias-title');
+  await title.fill('Recap');
+
+  await title.press('Escape');
+  await expect(title).toHaveValue('');
+  await expect(page.getByTestId('new-alias')).toBeVisible();
+
+  await title.press('Escape');
+
+  await expect(page.getByTestId('new-alias')).toHaveCount(0);
+  await quiescent(page);
+  await expect(page.locator('.react-flow__node')).toHaveCount(nodes);
+  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '0');
+});
+
+/**
  * Choosing a Target is the creation, and the editor stays open on what it made.
  */
 test('choosing a Target creates the Alias and leaves its editor open', async ({ page }) => {
@@ -1295,4 +1327,37 @@ test('an Alias is renamed in the editor its creation leaves open', async ({ page
   await quiescent(page);
   await expect(nodeByTitle(page, 'Recap')).toHaveCount(1);
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '2');
+});
+
+/**
+ * And the rename is a draft, so Escape restores it rather than closing the pane
+ * out from under it: "Dirty field restores value before surface closes".
+ *
+ * The Alias itself is not a draft and does not come back with it — it was
+ * created the moment the Target was chosen, one revision earlier — so this is
+ * also the test that the two are told apart.
+ */
+test('an Alias rename draft takes its own first Escape', async ({ page }) => {
+  await page.goto('/');
+  await expect(nodeByTitle(page, 'A').first()).toBeVisible();
+  await settled(page);
+
+  await page.getByTestId('add-card-menu').click();
+  await page.getByRole('menuitem', { name: 'Add Alias' }).click();
+  await page.getByRole('combobox', { name: 'Target' }).fill('B');
+  await page.getByRole('option', { name: 'Markdown Card B' }).click();
+  const title = page.getByRole('textbox', { name: 'Title' });
+  await title.fill('Recap');
+
+  await title.press('Escape');
+  await expect(title).toHaveValue('B');
+  await expect(page.getByTestId('open-card')).toBeVisible();
+
+  await title.press('Escape');
+
+  await expect(page.getByTestId('open-card')).toHaveCount(0);
+  await quiescent(page);
+  await expect(nodeByTitle(page, 'Recap')).toHaveCount(0);
+  await expect(nodeByTitle(page, 'B')).toHaveCount(2);
+  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
 });

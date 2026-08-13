@@ -266,6 +266,49 @@ describe('Add Alias', () => {
     await settled(session);
   });
 
+  /**
+   * The title field is a draft like the search beside it, and the contract does
+   * not exempt it: "a field draft consumes the first Escape without closing its
+   * containing surface; a second Escape may then close that surface".
+   *
+   * Its stored value is the empty string — there is no Alias yet for it to have
+   * been read off — so restoring it is clearing it, and the pane stays open on a
+   * Target still unchosen.
+   */
+  it('spends the first Escape on the Alias title draft and the second on the surface', async () => {
+    const session = mount();
+    await openAliasCreation();
+    const title = screen.getByTestId('new-alias-title');
+    fireEvent.change(title, { target: { value: 'Recap' } });
+
+    fireEvent.keyDown(title, { key: 'Escape' });
+
+    expect(title).toHaveValue('');
+    expect(screen.getByTestId('new-alias')).toBeVisible();
+
+    fireEvent.keyDown(title, { key: 'Escape' });
+
+    expect(screen.queryByTestId('new-alias')).not.toBeInTheDocument();
+    expect(cardTitles(session)).toEqual(['A', 'B']);
+    await settled(session);
+  });
+
+  /**
+   * The other half of the same rule, and the one that stops it being read as
+   * "Escape never closes from a field": an untouched field owns no draft, so it
+   * hands the gesture on and the surface closes on the first press.
+   */
+  it('closes on one Escape from a title field the author never typed in', async () => {
+    const session = mount();
+    await openAliasCreation();
+
+    fireEvent.keyDown(screen.getByTestId('new-alias-title'), { key: 'Escape' });
+
+    expect(screen.queryByTestId('new-alias')).not.toBeInTheDocument();
+    expect(cardTitles(session)).toEqual(['A', 'B']);
+    await settled(session);
+  });
+
   it('opens on the Target picker, which searches non-Alias Cards by title', async () => {
     const session = mount(aliased);
     await openAliasCreation();
@@ -329,6 +372,58 @@ describe('Add Alias', () => {
       kind: 'markdown',
       body: 'A source',
     });
+    await settled(session);
+  });
+
+  /**
+   * The occurrence's Title is the one field on this pane whose Escape has two
+   * answers to give, because it is the only one holding a draft against a
+   * stored value: "Dirty field restores value before surface closes".
+   *
+   * Restoring has to leave the Alias unwritten as well as the field — a rename
+   * commits on Enter and on blur, and a cancelled draft is neither.
+   */
+  it('spends the first Escape on the Alias rename draft and the second on the pane', async () => {
+    const session = mount();
+    await openAliasCreation();
+    fireEvent.click(screen.getByRole('option', { name: 'Markdown Card A' }));
+    await screen.findByText('Opened through A');
+    const title = screen.getByRole('textbox', { name: 'Title' });
+    fireEvent.change(title, { target: { value: 'Recap' } });
+
+    fireEvent.keyDown(title, { key: 'Escape' });
+
+    expect(title).toHaveValue('A');
+    expect(screen.getByTestId('open-card')).toBeVisible();
+    expect(cardsOf(session)[2]?.document).toEqual({ title: 'A', kind: 'alias', target: CARD_ID });
+
+    fireEvent.keyDown(title, { key: 'Escape' });
+
+    expect(screen.queryByTestId('open-card')).not.toBeInTheDocument();
+    expect(cardsOf(session)[2]?.document).toEqual({ title: 'A', kind: 'alias', target: CARD_ID });
+    await settled(session);
+  });
+
+  /**
+   * A refused rename leaves the field dirty *and* erroring, so the restore has
+   * to take the message with it — an alert naming a draft that is no longer on
+   * screen outlives the thing it describes.
+   */
+  it('clears a refused rename’s message when Escape restores the draft', async () => {
+    const session = mount();
+    await openAliasCreation();
+    fireEvent.click(screen.getByRole('option', { name: 'Markdown Card A' }));
+    await screen.findByText('Opened through A');
+    const title = screen.getByRole('textbox', { name: 'Title' });
+    fireEvent.change(title, { target: { value: '   ' } });
+    fireEvent.keyDown(title, { key: 'Enter' });
+    expect(screen.getByRole('alert')).toHaveTextContent('A Card title is required.');
+
+    fireEvent.keyDown(title, { key: 'Escape' });
+
+    expect(title).toHaveValue('A');
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.getByTestId('open-card')).toBeVisible();
     await settled(session);
   });
 

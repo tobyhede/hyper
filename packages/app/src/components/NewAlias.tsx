@@ -43,15 +43,38 @@ export function NewAlias({ targets, refusal, onCreate, onCancel }: NewAliasProps
   /**
    * Escape closes the creation state, creating nothing.
    *
-   * The picker takes the first Escape while it holds search text and stops it
-   * there, so this only ever answers the one that is left — the surface's own,
-   * which is the ordering the keyboard contract asks for.
+   * Both fields take their own first Escape and stop it there — the picker
+   * while it holds search text, the title below while it holds a draft — so
+   * this only ever answers the one that is left, which is the surface's own.
+   * That ordering is the keyboard contract's: a field draft consumes the first
+   * Escape without closing the surface containing it, and a second may then
+   * close that surface.
    */
   const close = (event: ReactKeyboardEvent<HTMLDivElement>): void => {
     if (event.key !== 'Escape') return;
     event.preventDefault();
     event.stopPropagation();
     onCancel();
+  };
+
+  /**
+   * The title's own first Escape, restoring the value the pane opened with.
+   *
+   * That value is the empty string and not a stored one: no Alias exists yet to
+   * have read a title off, so "restore" and "clear" are the same act here. It
+   * is bound to the field rather than folded into `close` because which owner a
+   * keypress belongs to is decided by where it was pressed — an Escape from the
+   * Cancel button beside this field is the surface's even while a draft stands.
+   *
+   * A field with nothing to restore does not consume anything: the event is
+   * left to reach `close` on the wrapper, which is what makes an untouched pane
+   * close on one press.
+   */
+  const restoreTitle = (event: ReactKeyboardEvent<HTMLInputElement>): void => {
+    if (event.key !== 'Escape' || title.length === 0) return;
+    event.preventDefault();
+    event.stopPropagation();
+    setTitle('');
   };
 
   return (
@@ -70,6 +93,7 @@ export function NewAlias({ targets, refusal, onCreate, onCancel }: NewAliasProps
             data-testid="new-alias-title"
             value={title}
             onChange={(event) => setTitle(event.currentTarget.value)}
+            onKeyDown={restoreTitle}
           />
         </label>
         <CardPicker

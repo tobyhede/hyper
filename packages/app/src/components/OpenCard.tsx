@@ -239,11 +239,13 @@ interface OccurrenceAuthoring {
  * The occurrence's own title — the Alias's, never the content owner's.
  *
  * Committed on Enter and on blur, which is the rule the graph's in-place rename
- * already follows (`CardTitleEditor`), and cancelled by an Escape that unmounts
- * the field before a blur can reach it. It is deliberately not carried by the
- * pane's `Done`: that button completes the *content* Card, and the Target beside
- * this field already commits the moment it is chosen, so the occurrence's two
- * fields settle as they are edited and the content editor keeps its own submit.
+ * already follows (`CardTitleEditor`), and cancelled by an Escape that restores
+ * the stored title where there is a draft to restore — and only then, on a
+ * second press, closes the pane out from over it. It is deliberately not
+ * carried by the pane's `Done`: that button completes the *content* Card, and
+ * the Target beside this field already commits the moment it is chosen, so the
+ * occurrence's two fields settle as they are edited and the content editor
+ * keeps its own submit.
  *
  * A draft equal to the stored title is not submitted at all. Authoring would
  * answer `unchanged`, which is the same nothing — this only spares the round
@@ -292,6 +294,17 @@ function OccurrenceTitleEditor({
             // be consumed by one owner.
             event.preventDefault();
             event.stopPropagation();
+            // Which owner that is depends on whether this field is holding
+            // anything: "Dirty field restores value before surface closes". A
+            // draft takes the first Escape and puts back what the Card is
+            // stored as — the message from a refused rename with it, since an
+            // alert describing a draft outlives it otherwise — and only a field
+            // with nothing to restore hands the gesture on to the pane.
+            if (draft !== title) {
+              setDraft(title);
+              setError(null);
+              return;
+            }
             onCancel();
           }}
         />
