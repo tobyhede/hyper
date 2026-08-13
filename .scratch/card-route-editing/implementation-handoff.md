@@ -291,11 +291,18 @@ surface its later package builds. Packages 5 and 6 wire Cards View, membership
 and Graph management to what is now behind the interface, and the fallback band
 stays until package 5 replaces it.
 
-### 4. Card and Alias creation — **done**
+### 4. Card and Alias creation — **done**, less the Frame 5 gestures
 
 Build detached Add Card and its inline neutral-title continuation, Add Alias's
 pre-Edit Target picker, persistent kind icons, Alias-target visibility and
 retargeting. Reuse the existing Card editor and Combobox composition.
+
+**Read "done" against the scope sentence above, which does not name the
+storyboard's Frame 5 modifier-drag gestures.** They are accepted behaviour, they
+are unbuilt, and no package owns them — see the paragraph below and issue
+[`15`](issues/15-frame-5-alias-modifier-gestures-are-unowned.md). Package 10's
+closing gate counts matrix rows and Add Alias's row is satisfied, so nothing
+downstream will notice their absence on this package's behalf.
 
 Gate: component focus/cancellation tests and E2E from Algorithmic View proving
 one conversion and no creation on cancelled Alias.
@@ -329,11 +336,22 @@ keyboard focus" governs *placement* — the interaction matrix marks it on Add t
 Layout, whose pointer path ends at a placed Card and not in a field — while Add
 Card's own row names the title input for both paths.
 
-Retargeting is an ordinary `edited-card` of the Alias, offered as an optional
-`retarget` on `OpenCard`'s delegated variant — declared by the caller for the
+Renaming and retargeting are each an ordinary `edited-card` of the Alias, and
+they arrive together: one optional `occurrence` on `OpenCard`'s delegated
+variant, carrying `onRename`, `targets` and `onRetarget`, rather than two
+independent props. Both are offered on exactly one fact — this occurrence is an
+Alias — and a caller able to supply the Target without the Title could build a
+pane that retargets an Alias it cannot rename. Declared by the caller for the
 same reason delegation itself is, rather than read off the opened Card's kind.
 Choosing a Target commits, so there is no unconfirmed Target to hold across a
-confirmation step.
+confirmation step; the Title commits on Enter and on blur, and Escape restores a
+dirty draft before the pane will close.
+
+That the delegated pane authors the occurrence's own Title at all runs against
+ADR 0039, which said it renames nothing. **ADR 0046 records the refinement** —
+0039 rejected a field authoring the *Target* from a pane reached through the
+Alias, and this one authors the Alias — and 0039 carries the `Refined by: 0046`
+back-link. Do not read the built pane against 0039 alone.
 
 Three primitive behaviours are worth knowing before package 5 reuses them, and
 they are recorded in AGENTS.md rather than here: a modal Radix menu steals focus
