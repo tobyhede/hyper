@@ -16,6 +16,13 @@ export interface NewAliasProps {
    */
   readonly onCreate: (target: CardId, title: string) => void;
   readonly onCancel: () => void;
+  /**
+   * The refusal above describes an attempt, and editing either field begins a
+   * different one — so the message stops describing anything on screen and is
+   * withdrawn. Announced rather than cleared here because the refusal is the
+   * caller's state: this pane knows *when* it went stale and never what it said.
+   */
+  readonly onRefusalStale: () => void;
 }
 
 /**
@@ -37,7 +44,7 @@ export interface NewAliasProps {
  * become an Alias — a Card keeps the kind it was created with — so the pane says
  * which kind it is creating rather than offering a control that changes it.
  */
-export function NewAlias({ targets, refusal, onCreate, onCancel }: NewAliasProps) {
+export function NewAlias({ targets, refusal, onCreate, onCancel, onRefusalStale }: NewAliasProps) {
   const [title, setTitle] = useState('');
 
   /**
@@ -79,7 +86,16 @@ export function NewAlias({ targets, refusal, onCreate, onCancel }: NewAliasProps
 
   return (
     <CardPane ariaLabel="New Alias" testId="new-alias">
-      <div className="card-pane__editor" onKeyDown={close}>
+      {/* One `onChange` for both fields rather than two handlers, because React
+          bubbles change through its own tree and cmdk's input is not somewhere
+          this pane can bind: `CardPicker` owns the search and exposes no change
+          of its own. Editing either field is the same fact — the refused attempt
+          is over. */}
+      <div
+        className="card-pane__editor"
+        onKeyDown={close}
+        onChange={refusal === null ? undefined : onRefusalStale}
+      >
         {/* Not the delegation banner: that one names two Cards, and here there
             is one Card and it does not exist yet. The kind is stated rather
             than offered, because a Card keeps the kind it was created with. */}

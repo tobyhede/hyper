@@ -143,7 +143,13 @@ export function CardPicker({
           value={search}
           onValueChange={setSearch}
         />
-        <CommandList data-testid="card-picker-results">
+        {/* cmdk names the listbox itself, and defaults that name to
+            `Suggestions` (its `List` takes `label` with exactly that fallback,
+            pinned at 1.1.1). The root's `label` above names the *combobox* — a
+            different element, and cmdk's `aria-labelledby` on the input is what
+            carries it — so without this the Target picker's results announce as
+            a generic suggestion list on every pane that draws one. */}
+        <CommandList label={label} data-testid="card-picker-results">
           {/* One empty affordance for both ways of having nothing to show, and
               it is the primitive's own. `Command.Empty` renders on a filtered
               count of zero, which with no Card registered is true of every

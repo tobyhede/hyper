@@ -237,11 +237,22 @@ export function createRenderAdapter(authoring: SpaceAuthoring): RenderAdapter {
       const beforeById = new Map(projection.nodes.map((node) => [node.id, node.position]));
       const nodes = applyNodeChanges(relevant, projection.nodes);
       const selectedNode = nodes.find((node) => node.selected);
+      // A selection held for a Card the projection has not drawn yet is a seed
+      // waiting for `reconcile`, and reading it off the live nodes would erase
+      // it. Authoring selects a Card in the same tick it creates it, one render
+      // before the projection that first draws it — and React Flow measures
+      // whatever it renders, so a `dimensions` change reaches here inside that
+      // window. Only a Card that *is* drawn can be reported unselected.
+      const pendingSeed = state.selectedCardId !== null && !owned.has(state.selectedCardId);
       // The same erasure again, read the same way. Parsing here instead would
       // put a throw on the per-pointer-frame path for a failure the other two
       // readings agree cannot happen — and `App` already uses `safeParse` at its
       // own React Flow boundary precisely so a mid-drag throw is impossible.
-      const selectedCardId = selectedNode ? (selectedNode.id as CardId) : null;
+      const selectedCardId = selectedNode
+        ? (selectedNode.id as CardId)
+        : pendingSeed
+          ? state.selectedCardId
+          : null;
       const afterById = new Map(nodes.map((node) => [node.id, node.position]));
       const positionChanges = relevant.filter(
         (change): change is NodePositionChange => change.type === 'position',

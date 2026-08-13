@@ -307,7 +307,7 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
      * is that it is where they are looking now.
      */
     const visibleCentre = useRef<VisibleCentre | null>(null);
-    const reportVisibleCentre = useCallback((centre: VisibleCentre) => {
+    const reportVisibleCentre = useCallback((centre: VisibleCentre | null) => {
       visibleCentre.current = centre;
     }, []);
     // The origin is unreachable in practice — the control is withdrawn until an
@@ -426,6 +426,11 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
      */
     const addCardMenu = useRef<HTMLButtonElement>(null);
     const restoringAddCardFocus = useRef(false);
+    // A refusal outlives the attempt that produced it unless something withdraws
+    // it. Success, cancellation and presenting all did; editing the pane's own
+    // fields did not, so an alert describing a rejected Target stayed under a
+    // title the author had since rewritten.
+    const clearAliasRefusal = useCallback(() => setAliasRefusal(null), []);
     const cancelAlias = useCallback(() => {
       restoringAddCardFocus.current = true;
       setCreatingAlias(false);
@@ -511,11 +516,18 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
         // one — but the pane traps no focus, and `Enter` on a node still behind
         // it asked to open that Card, swapping the pane's subject out from under
         // a draft in progress. Declining here matches what the pointer can do.
-        if (openedCardId !== null) return;
+        //
+        // The Alias creation pane covers it identically, and is declined for the
+        // same reason rather than closed: an unfinished creation state is the
+        // author's, and a keypress that landed behind the pane is not a request
+        // to discard it. Opening anyway used to leave `creatingAlias` set while
+        // the pane hid itself on `openedCardId`, so closing the Card brought a
+        // surface back that the author had never returned to.
+        if (openedCardId !== null || creatingAlias) return;
         const cardId = uuidSchema.safeParse(cardIdInput);
         if (cardId.success && editableCardIds.has(cardId.data)) openCard(cardId.data);
       },
-      [openCard, editableCardIds, openedCardId],
+      [openCard, editableCardIds, openedCardId, creatingAlias],
     );
 
     const openedCard = openedCardId ? rendererSpace.lookup.card(openedCardId) : undefined;
@@ -761,7 +773,11 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
                 activeCardId={activeCardId}
                 presenting={presenting}
                 editable={editable}
-                titleEditingEnabled={openedCardId === null}
+                // Both panes cover the graph, so both withdraw everything on it.
+                // The toolbar's Add Card already reads the pair; this read only
+                // the opened Card, so `C` and the inline title editor stayed
+                // live behind an open Alias creation pane.
+                titleEditingEnabled={openedCardId === null && !creatingAlias}
                 onNodesChange={changeNodes}
                 onConnect={connectCards}
                 acceptsConnection={acceptsGraphConnection}
@@ -833,6 +849,7 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
               refusal={aliasRefusal}
               onCreate={createAlias}
               onCancel={cancelAlias}
+              onRefusalStale={clearAliasRefusal}
             />
           )}
         </div>

@@ -379,6 +379,24 @@ describe('the C shortcut', () => {
 
     expect(addCard).not.toHaveBeenCalled();
   });
+
+  /**
+   * React Flow's own `<Controls>` renders *inside* the wrapper this shortcut is
+   * bound to, so its buttons are somewhere a `c` can be pressed while the graph
+   * is still the event's path. A button is not text entry, but it is a control
+   * answering keys of its own, and the F2 guard beside this one already says so
+   * — the two disagreed, and the narrower one is a canvas that adds a Card when
+   * the author meant to press Zoom in.
+   */
+  it('is a keypress on a canvas control rather than a command', () => {
+    const { addCard } = mountGraph();
+
+    const zoomIn = document.querySelector('.react-flow__controls-zoomin');
+    if (!(zoomIn instanceof HTMLElement)) throw new Error('React Flow drew no zoom control');
+    fireEvent.keyDown(zoomIn, { key: 'c' });
+
+    expect(addCard).not.toHaveBeenCalled();
+  });
 });
 
 /**

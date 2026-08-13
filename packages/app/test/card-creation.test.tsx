@@ -707,3 +707,65 @@ describe('presenting while the Alias creation state is open', () => {
     await settled(session);
   });
 });
+
+/**
+ * The Alias creation pane is a modal surface, and everything the graph offers
+ * has to be withdrawn behind it.
+ *
+ * The toolbar already knows this — its Add Card control is disabled on
+ * `creatingAlias` as well as on an opened Card — and the canvas was told only
+ * about the opened Card. Both panes cover the graph the same way, so both have
+ * to withdraw the same affordances.
+ */
+describe('the graph behind the Alias creation pane', () => {
+  it('answers no Add Card shortcut while the pane is open', async () => {
+    const session = mount();
+    await openAliasCreation();
+
+    fireEvent.keyDown(screen.getByTestId(`rf__node-${CARD_ID}`), { key: 'c' });
+
+    expect(cardTitles(session)).toEqual(['A', 'B']);
+    await settled(session);
+  });
+
+  /**
+   * `openCardForEditing` declines a second open while a Card is open, on the
+   * stated grounds that the pane covers the graph so a pointer could not reach
+   * one either. The Alias pane covers it identically.
+   *
+   * Declining rather than clearing `creatingAlias`: the author's unfinished
+   * creation state is theirs, and an `Enter` landing behind the pane is not a
+   * request to discard it. Without this the Card opened, the Alias pane hid
+   * itself on `openedCardId`, and closing the Card brought it back.
+   */
+  it('declines to open a Card, leaving the pane exactly as it was', async () => {
+    const session = mount();
+    await openAliasCreation();
+    fireEvent.change(screen.getByTestId('new-alias-title'), { target: { value: 'Recap' } });
+
+    fireEvent.keyDown(screen.getByTestId(`rf__node-${CARD_ID}`), { key: 'Enter' });
+
+    expect(screen.queryByTestId('open-card')).not.toBeInTheDocument();
+    expect(screen.getByTestId('new-alias')).toBeVisible();
+    expect(screen.getByTestId('new-alias-title')).toHaveValue('Recap');
+    await settled(session);
+  });
+});
+
+/**
+ * cmdk's List takes a `label` and defaults it to `Suggestions` (confirmed in
+ * the pinned 1.1.1 dist). The root's `label` names the combobox, not the
+ * listbox beside it, so without this the Target picker's results announce as a
+ * generic suggestion list on every pane that draws one.
+ */
+describe('the Target picker’s results list', () => {
+  it('is named for the field it belongs to', async () => {
+    const session = mount();
+    await openAliasCreation();
+
+    expect(screen.getByRole('listbox', { name: 'Target' })).toBeInTheDocument();
+
+    fireEvent.keyDown(screen.getByTestId('new-alias-title'), { key: 'Escape' });
+    await settled(session);
+  });
+});

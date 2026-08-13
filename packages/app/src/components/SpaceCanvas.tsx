@@ -158,6 +158,23 @@ function NewCardPreview({
  */
 export const ADD_CARD_KEY = 'C';
 
+/**
+ * Where an unmodified letter is somebody else's, not the canvas's command.
+ *
+ * One selector for both shortcuts, because the two answers have to agree: `C`
+ * and `F2` are pressed on the same tree, and a control missing from one list and
+ * present in the other makes the same element a command target for one key and
+ * not for the other. They disagreed — `C` named only text entry — and React
+ * Flow's own `<Controls>` renders *inside* the wrapper both are bound to, so a
+ * `c` with Zoom in focused added a Card.
+ *
+ * `button` and `select` are here for a different reason from `input`,
+ * `textarea` and `contenteditable`: those are places an author is typing the
+ * letter, while a button is a control with a keyboard model of its own that the
+ * canvas must not shadow. Both are cases where the key was not aimed here.
+ */
+const NOT_A_CANVAS_COMMAND = 'input, textarea, select, button, [contenteditable="true"]';
+
 export interface SpaceCanvasProps {
   nodes: CardFlowNode[];
   edges: Edge[];
@@ -402,7 +419,7 @@ export function SpaceCanvas({
       // Without this the toolbar announces `aria-keyshortcuts="C"`, which ARIA
       // defines as the unmodified key, while the canvas answers Shift+C too.
       if (event.repeat || event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) return;
-      if (event.target.closest('input, textarea, [contenteditable="true"]') !== null) return;
+      if (event.target.closest(NOT_A_CANVAS_COMMAND) !== null) return;
       // The default is prevented only where the command can actually run
       // (`AGENTS.md`'s keyboard contract), so a `c` typed while authoring is
       // withdrawn is left to whatever else would have had it.
@@ -423,10 +440,7 @@ export function SpaceCanvas({
     if (!canAuthorCards) return;
     const beginSelectedTitleEdit = (event: KeyboardEvent): void => {
       if (event.key !== 'F2') return;
-      if (
-        event.target instanceof Element &&
-        event.target.closest('input, textarea, select, button, [contenteditable="true"]') !== null
-      ) {
+      if (event.target instanceof Element && event.target.closest(NOT_A_CANVAS_COMMAND) !== null) {
         return;
       }
       const selected = nodes.find((node) => node.selected);
