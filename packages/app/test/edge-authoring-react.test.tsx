@@ -226,13 +226,26 @@ function mountCanvas(
   { covered = false, presenting = false }: { covered?: boolean; presenting?: boolean } = {},
 ) {
   const composed = compose();
-  const view = render(
+  const canvas = (paneOpen: boolean) => (
     <ReactFlowProvider>
       {beside}
-      <CanvasHarness {...composed} covered={covered} presenting={presenting} />
-    </ReactFlowProvider>,
+      <CanvasHarness {...composed} covered={paneOpen} presenting={presenting} />
+    </ReactFlowProvider>
   );
-  return { ...composed, view };
+  const view = render(canvas(covered));
+  return {
+    ...composed,
+    view,
+    /**
+     * Open or close the pane over the *same* canvas.
+     *
+     * A fresh mount is not the same question: `SpaceCanvas` adjusts state during
+     * render when its authoring flag flips, and Edge Authoring's surfaces are
+     * derived from an `enabled` that has to come back. Only a re-render asks
+     * whether they do.
+     */
+    setCovered: (paneOpen: boolean) => view.rerender(canvas(paneOpen)),
+  };
 }
 
 /** The composition `App` performs, narrowed to what an Edge test needs. */
@@ -493,7 +506,10 @@ describe('a pane covering the graph', () => {
   });
 
   it('offers both again once the pane closes', () => {
-    mountCanvas();
+    const { setCovered } = mountCanvas(null, { covered: true });
+    expect(screen.queryAllByRole('button', { name: /^Connect from/ })).toEqual([]);
+
+    setCovered(false);
 
     expect(screen.queryAllByRole('button', { name: /^Connect from/ })).not.toEqual([]);
     expect(edgeElement(`${GRAPH_ID}::0`)).toHaveAttribute('tabindex', '0');

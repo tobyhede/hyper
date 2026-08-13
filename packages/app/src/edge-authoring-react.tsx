@@ -116,11 +116,16 @@ export interface EdgeAuthoringInput {
   readonly subjectCards: readonly Card[];
   readonly newCardTitle: string;
   /**
-   * Edge authoring is withdrawn before an arrangement resolves, while a modal
-   * pane covers the graph, and while presenting — the same three conditions the
-   * Card controls are withdrawn on, and the canvas passes one value to both.
-   * The pane was missing here, which left the Connect control hidden and its
-   * gesture live; see `SpaceCanvas`'s `canAuthorOnCanvas`.
+   * Edge authoring is withdrawn before a placement resolves, while a modal pane
+   * covers the graph, and while presenting — the same three conditions the Card
+   * controls are withdrawn on, and the canvas passes one value to both. The pane
+   * was missing here, which left the Connect control hidden and its gesture
+   * live; see `SpaceCanvas`'s `canAuthorOnCanvas`.
+   *
+   * *Placement*, not Layout: an Algorithmic View has no Layout and its Cards are
+   * authorable the moment its strategy resolves — editing one is what creates a
+   * Layout (ADR 0025), so requiring one here would withdraw authoring from the
+   * only surface that can produce it.
    */
   readonly enabled: boolean;
   readonly onSelectCard: (cardId: CardId) => void;
