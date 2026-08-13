@@ -298,6 +298,40 @@ describe('Add Alias', () => {
     await settled(session);
   });
 
+  /**
+   * The pane an author is left standing in has to be able to undo the one thing
+   * creation just did to them.
+   *
+   * An empty title takes the Target's, so the Space now holds two Cards called
+   * `A` — and the editor that stays open is the delegated one, which drew no
+   * Title field at all. The rename had to be reachable from where the author
+   * already is, and it has to reach the *Alias*: the Card that owns the content
+   * keeps its own title.
+   */
+  it('renames the Alias from the editor creation leaves open', async () => {
+    const session = mount();
+    await openAliasCreation();
+    fireEvent.click(screen.getByRole('option', { name: 'Markdown Card A' }));
+    await screen.findByText('Opened through A');
+
+    const title = screen.getByRole('textbox', { name: 'Title' });
+    expect(title).toHaveValue('A');
+    fireEvent.change(title, { target: { value: 'Recap' } });
+    fireEvent.keyDown(title, { key: 'Enter' });
+
+    expect(cardsOf(session)[2]?.document).toEqual({
+      title: 'Recap',
+      kind: 'alias',
+      target: CARD_ID,
+    });
+    expect(cardsOf(session)[0]?.document).toEqual({
+      title: 'A',
+      kind: 'markdown',
+      body: 'A source',
+    });
+    await settled(session);
+  });
+
   it('keeps a title the author entered instead of the Target’s', async () => {
     const session = mount();
     await openAliasCreation();
@@ -385,6 +419,25 @@ describe('retargeting an Alias', () => {
       id: CARD_ID,
       document: { title: 'A', kind: 'markdown', body: 'Written through the Alias' },
     });
+    await settled(session);
+  });
+
+  /**
+   * Opening an Alias is not opening a search box.
+   *
+   * The picker declared itself the pane's initial focus wherever it was drawn,
+   * so every open of an existing Alias put the caret in the Target field — a
+   * gesture the author had not made, on the one field that changes which Card
+   * they are looking at. The creation state keeps that focus, because it opens
+   * *on* its Target; here the pane's ordinary first field is the answer.
+   */
+  it('opens on the Alias’s own title, leaving the Target where it was', async () => {
+    const session = mount(aliased);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit Card A again' }));
+
+    expect(screen.getByRole('textbox', { name: 'Title' })).toHaveFocus();
+    expect(screen.getByRole('combobox', { name: 'Target' })).not.toHaveFocus();
     await settled(session);
   });
 

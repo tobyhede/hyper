@@ -189,7 +189,11 @@ test('editing through an Alias updates its target and survives reload', async ({
   await openCard(alias, 'A′');
   await expect(page.getByText('Opened through A′')).toBeVisible();
   await expect(page.getByText('Editing content on A')).toBeVisible();
-  await expect(page.getByRole('textbox', { name: 'Title' })).toHaveCount(0);
+  // The Title is the *occurrence's* own, and this line is what says so: it read
+  // `toHaveCount(0)` and pinned a pane that could not rename the Alias it was
+  // opened on at all. What it was guarding — that no field here renames the Card
+  // that owns the content — is the value, not the absence.
+  await expect(page.getByRole('textbox', { name: 'Title' })).toHaveValue('A′');
   // Named for the Card they author, exactly, because A′ carries a description of
   // its own on the graph behind this pane and these fields do not write it.
   await page
@@ -1249,4 +1253,46 @@ test('choosing a Target creates the Alias and leaves its editor open', async ({ 
   await expect(nodeByTitle(page, 'B')).toHaveCount(2);
   await expect(page.getByTestId('layout-selector')).toContainText('Layout 1');
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
+});
+
+/**
+ * The whole gesture, and the reason the Title field had to exist.
+ *
+ * An empty title takes the Target's, so creation leaves two Cards called `B` and
+ * the author standing in the one pane that could not tell them apart — no Title
+ * field, and the fields it did draw belonging to the other Card. Renaming has to
+ * be reachable from where the author already is, has to reach the *Alias*, and
+ * has to leave the Target's own title alone.
+ *
+ * Frame 4's focus rule rides along: this pane opens on its first field, and the
+ * Target picker no longer takes the caret off it.
+ */
+test('an Alias is renamed in the editor its creation leaves open', async ({ page }) => {
+  await page.goto('/');
+  await expect(nodeByTitle(page, 'A').first()).toBeVisible();
+  await settled(page);
+
+  await page.getByTestId('add-card-menu').click();
+  await page.getByRole('menuitem', { name: 'Add Alias' }).click();
+  await page.getByRole('combobox', { name: 'Target' }).fill('B');
+  await page.getByRole('option', { name: 'Markdown Card B' }).click();
+
+  const title = page.getByRole('textbox', { name: 'Title' });
+  await expect(title).toBeFocused();
+  await expect(title).toHaveValue('B');
+  await title.fill('Recap');
+  await title.press('Enter');
+
+  await expect(nodeByTitle(page, 'Recap')).toHaveCount(1);
+  // The Target keeps its own: one Card called B, the one that was always there.
+  await expect(nodeByTitle(page, 'B')).toHaveCount(1);
+  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '2');
+  await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
+
+  // Closing the pane completes nothing further, and the rename outlives it.
+  await page.getByRole('button', { name: 'Cancel' }).click();
+  await expect(page.getByTestId('open-card')).toHaveCount(0);
+  await quiescent(page);
+  await expect(nodeByTitle(page, 'Recap')).toHaveCount(1);
+  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '2');
 });

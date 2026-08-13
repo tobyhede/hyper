@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useRef, type Ref } from 'react';
 import * as DropdownMenuPrimitive from '@radix-ui/react-dropdown-menu';
 import { Button } from './Button';
 import { AliasIcon, ChevronDownIcon, PlusIcon } from './icons';
@@ -10,6 +10,17 @@ export interface AddCardControlProps {
   readonly onAddAlias: () => void;
   /** Whether Card authoring is available at all right now. */
   readonly disabled?: boolean;
+  /**
+   * The menu trigger, offered so a caller can put focus back on it.
+   *
+   * `onCloseAutoFocus` below declines Radix's own restore for the close that
+   * opens a surface, which leaves the surface's owner holding the other half:
+   * cancelling it has to return focus here, and only that owner knows when the
+   * pane is gone and this button is enabled again. Named rather than forwarded
+   * from the root, because it is this half of a split control — the half the
+   * menu was opened from — and not the pair.
+   */
+  readonly menuTriggerRef?: Ref<HTMLButtonElement>;
 }
 
 /**
@@ -28,7 +39,12 @@ export interface AddCardControlProps {
  * closing returns focus to the trigger — which is what a cancelled Alias
  * creation state relies on having somewhere to go back to.
  */
-export function AddCardControl({ onAddCard, onAddAlias, disabled = false }: AddCardControlProps) {
+export function AddCardControl({
+  onAddCard,
+  onAddAlias,
+  disabled = false,
+  menuTriggerRef,
+}: AddCardControlProps) {
   /**
    * Whether this close is a chosen item rather than a dismissal.
    *
@@ -70,6 +86,7 @@ export function AddCardControl({ onAddCard, onAddAlias, disabled = false }: AddC
       <DropdownMenuPrimitive.Root modal={false}>
         <DropdownMenuPrimitive.Trigger asChild>
           <Button
+            ref={menuTriggerRef}
             variant="secondary"
             data-testid="add-card-menu"
             // The glyph is `aria-hidden`, so this is the trigger's only

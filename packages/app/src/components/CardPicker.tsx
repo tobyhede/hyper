@@ -17,6 +17,20 @@ export interface CardPickerProps {
   readonly cards: readonly Card[];
   /** The Card the field currently names, marked in the list. */
   readonly selectedId: CardId | null;
+  /**
+   * Whether this field is where the pane puts focus when it opens.
+   *
+   * Answered by the caller rather than assumed here, because the same picker
+   * means different things in the two surfaces that draw it. The Alias creation
+   * state opens *on* its Target (ADR 0009's Frame 1) and says so; inside an
+   * opened Alias the Target is one field among several and the pane's ordinary
+   * rule — the first focusable — is the right answer. Declared unconditionally,
+   * it took the caret off the Title above it on every open.
+   *
+   * Required rather than defaulted, so the next surface to reach for this
+   * decides rather than inherits.
+   */
+  readonly initialFocus: boolean;
   readonly onSelect: (cardId: CardId) => void;
   /**
    * Escape with no search text: the field draft is already empty, so the
@@ -53,6 +67,7 @@ export function CardPicker({
   label,
   cards,
   selectedId,
+  initialFocus,
   onSelect,
   onCancel,
   emptyMessage,
@@ -90,8 +105,10 @@ export function CardPicker({
       >
         <CommandInput
           id={fieldId}
-          // The picker is what the surface opens on, so it is what takes focus.
-          data-pane-focus=""
+          // Declared only where the surface said this field is what it opens
+          // on; `undefined` leaves the attribute off, so `CardPane` falls back
+          // to its first focusable.
+          data-pane-focus={initialFocus ? '' : undefined}
           data-testid="card-picker-search"
           placeholder="Search"
           value={search}

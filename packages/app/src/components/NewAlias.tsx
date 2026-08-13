@@ -57,7 +57,10 @@ export function NewAlias({ targets, refusal, onCreate, onCancel }: NewAliasProps
   return (
     <CardPane ariaLabel="New Alias" testId="new-alias">
       <div className="card-pane__editor" onKeyDown={close}>
-        <div className="card-pane__delegation">
+        {/* Not the delegation banner: that one names two Cards, and here there
+            is one Card and it does not exist yet. The kind is stated rather
+            than offered, because a Card keeps the kind it was created with. */}
+        <div className="card-pane__heading">
           <span>New Alias</span>
           <span>An Alias shows another Card’s content at a second position.</span>
         </div>
@@ -73,6 +76,10 @@ export function NewAlias({ targets, refusal, onCreate, onCancel }: NewAliasProps
           label="Target"
           cards={targets}
           selectedId={null}
+          // "It opens the normal Card editor in an Alias creation state with
+          // **Target** focused" (ADR 0009's Frame 1): the Target is what this
+          // surface is for, and the title above it is optional.
+          initialFocus
           onSelect={(target) => onCreate(target, title)}
           onCancel={onCancel}
           emptyMessage="An Alias needs a Card that owns its content, and this Space has none yet."

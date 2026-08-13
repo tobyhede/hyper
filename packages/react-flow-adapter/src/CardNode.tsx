@@ -33,12 +33,28 @@ function CardTitleEditor({ cardId, title, onComplete, onCancel }: CardTitleEdito
   const input = useRef<HTMLInputElement>(null);
   const closingByKey = useRef(false);
 
+  // Focus on mount whichever control opened this editor, pointer or keyboard.
+  // A created Card enters here with its neutral title *selected*, and an
+  // unfocused input has no selection an author can type over — so the accepted
+  // prototype's separate sentence about keyboard activation restates that
+  // requirement rather than restricting it to the keyboard path. "Pointer
+  // placement selects without forcing keyboard focus" is about placement
+  // gestures, which end at a placed Card rather than in a field.
   useEffect(() => {
     input.current?.focus();
     input.current?.select();
   }, []);
 
-  const complete = (): void => setError(onComplete?.(draft) ?? null);
+  /**
+   * Submit the draft and show whatever came back, answering the refusal so a
+   * caller can tell an accepted completion from a refused one — which is the
+   * only thing the two exits disagree about.
+   */
+  const complete = (): string | null => {
+    const refusal = onComplete?.(draft) ?? null;
+    setError(refusal);
+    return refusal;
+  };
 
   /**
    * Enter and Escape both leave the editor, and neither may leave focus on
@@ -88,12 +104,10 @@ function CardTitleEditor({ cardId, title, onComplete, onCancel }: CardTitleEdito
           event.stopPropagation();
           if (event.key === 'Enter') {
             event.preventDefault();
-            const refusal = onComplete?.(draft) ?? null;
-            setError(refusal);
             // A refused draft keeps the editor open, so focus stays in the
             // field with the message beside it rather than leaving for a Card
             // whose name the author has not settled.
-            if (refusal === null) returnFocusToCard();
+            if (complete() === null) returnFocusToCard();
           } else if (event.key === 'Escape') {
             event.preventDefault();
             returnFocusToCard();

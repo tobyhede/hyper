@@ -319,6 +319,16 @@ editor now returns focus to its Card on Enter and Escape, which is what keeps
 the whole gesture off `<body>`; a blur is deliberately excluded, since taking
 focus back from wherever the author clicked would be a steal.
 
+That editor takes focus on mount whichever control created the Card, pointer or
+keyboard. The Card creation prototype requires the neutral `Card N` title to be
+**selected**, and an unfocused input has no selection an author can type over,
+so the sentence beside it naming keyboard activation of the toolbar action or
+`C` restates the stronger requirement rather than restricting it to the keyboard
+path. The keyboard contract's "pointer placement selects without forcing
+keyboard focus" governs *placement* — the interaction matrix marks it on Add to
+Layout, whose pointer path ends at a placed Card and not in a field — while Add
+Card's own row names the title input for both paths.
+
 Retargeting is an ordinary `edited-card` of the Alias, offered as an optional
 `retarget` on `OpenCard`'s delegated variant — declared by the caller for the
 same reason delegation itself is, rather than read off the opened Card's kind.
@@ -335,7 +345,10 @@ gestures. Both are pointer-only accelerators whose keyboard path is the control
 this package built, and the connection-drop half would need a sixteenth
 completion — create an Alias *and* an Edge — that package 3 did not build. That
 is interface work, not surface, so it returns to the authoring interface rather
-than being improvised in the canvas.
+than being improvised in the canvas. No later package picks either half up, so
+where they go is issue
+[`15`](issues/15-frame-5-alias-modifier-gestures-are-unowned.md)'s question and
+not this paragraph's.
 
 ### 5. Cards View and Layout membership
 

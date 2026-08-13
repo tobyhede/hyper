@@ -380,8 +380,10 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
      * It has to wait for the render that closes the pane. The control is
      * disabled while the pane is open — one authoring surface at a time — and a
      * disabled button cannot take focus, so restoring inside the handler
-     * silently does nothing and leaves focus on `<body>`.
+     * silently does nothing and leaves focus on `<body>`. The button is only
+     * disabled and never unmounted, so the ref still holds it when the wait ends.
      */
+    const addCardMenu = useRef<HTMLButtonElement>(null);
     const restoringAddCardFocus = useRef(false);
     const cancelAlias = useCallback(() => {
       restoringAddCardFocus.current = true;
@@ -391,7 +393,7 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
     useEffect(() => {
       if (creatingAlias || !restoringAddCardFocus.current) return;
       restoringAddCardFocus.current = false;
-      document.querySelector<HTMLElement>('[data-testid="add-card-menu"]')?.focus();
+      addCardMenu.current?.focus();
     }, [creatingAlias]);
 
     /**
@@ -497,17 +499,26 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
     );
     const openedAlias = openedCard?.kind === 'alias' ? openedCard : undefined;
     /**
-     * Retargeting is an ordinary Card Edit of the Alias — the same operation a
-     * rename is, on a different field. The Alias keeps its id, its title, its
-     * positions and its incident Edges, because none of them is named here.
+     * Authoring the Alias itself — one ordinary Card Edit, on whichever of its
+     * two fields the author touched, and the operation package 3 already built
+     * for both. Everything the change does not name rides through in the stored
+     * document: the Alias keeps its id, its positions and its incident Edges.
+     *
+     * One helper rather than two, because a rename and a retarget differ only in
+     * which key the change carries. Their *subjects* are what has to stay apart,
+     * and that separation is the pane's: these fields write to the Alias, the
+     * ones under them write to the Card that owns its content.
      */
-    const retargetAlias = useCallback(
-      (alias: Extract<Card, { kind: 'alias' }>, target: CardId): string | null => {
+    const editAlias = useCallback(
+      (
+        alias: Extract<Card, { kind: 'alias' }>,
+        change: { readonly title: string } | { readonly target: CardId },
+      ): string | null => {
         const { id, ...document } = alias;
         const result = authoring.complete({
           kind: 'edited-card',
           cardId: id,
-          document: { ...document, target },
+          document: { ...document, ...change },
         });
         return result.kind === 'refused' ? result.reason : null;
       },
@@ -614,6 +625,7 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
           onAddCard={addCard}
           onAddAlias={() => setCreatingAlias(true)}
           disabled={!editable || presenting || openedCardId !== null || creatingAlias}
+          menuTriggerRef={addCardMenu}
         />
         {sessionState.persistence.kind === 'failed' ? (
           <Button
@@ -752,16 +764,18 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
               <OpenCard
                 through={openedCard}
                 content={openedContent}
-                // The Target field is offered because this occurrence is an
-                // Alias, which is a Card whose pointer an author may move —
-                // not because the pane delegates, which is the weaker fact the
-                // variant above already records.
+                // The Title and Target fields are offered because this
+                // occurrence is an Alias, which is a Card with a title and a
+                // pointer of its own that an author may move — not because the
+                // pane delegates, which is the weaker fact the variant above
+                // already records.
                 {...(openedAlias === undefined
                   ? {}
                   : {
-                      retarget: {
+                      occurrence: {
+                        onRename: (title: string) => editAlias(openedAlias, { title }),
                         targets: aliasTargets,
-                        onRetarget: (target: CardId) => retargetAlias(openedAlias, target),
+                        onRetarget: (target: CardId) => editAlias(openedAlias, { target }),
                       },
                     })}
                 onComplete={completeOpenedCard}

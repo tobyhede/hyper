@@ -204,22 +204,105 @@ interface DirectOpen {
   readonly card: ResolvedContentCard;
   readonly through?: never;
   readonly content?: never;
-  readonly retarget?: never;
+  readonly occurrence?: never;
 }
 
 /**
- * Changing which Card an occurrence points at, from the editor it was opened in.
+ * Authoring the occurrence itself, from the editor it was opened in.
  *
- * Offered by the caller rather than derived from the opened Card's kind, for the
- * same reason delegation itself is declared below: an occurrence that resolves
- * its content elsewhere is not necessarily one whose pointer an author may move.
- * Absent, the pane shows no Target field.
+ * `through` below names the Card the content was reached through; this is what
+ * may be authored *on* it — its own title, and which Card it points at. Offered
+ * by the caller rather than derived from the opened Card's kind, for the same
+ * reason delegation itself is declared: an occurrence that resolves its content
+ * elsewhere is not necessarily one whose title and pointer an author may move.
+ * Absent, the pane authors the content and nothing else.
+ *
+ * One capability rather than two optional props, because both are offered on
+ * exactly one fact — this occurrence is an Alias (ADR 0009) — and a caller able
+ * to supply the Target without the Title is a caller able to rebuild the pane
+ * that could retarget an Alias it could not rename.
  */
-interface Retarget {
+interface OccurrenceAuthoring {
+  /**
+   * Rename the occurrence, answering the sentence to show when the Space
+   * refused it. Its own edit subject: the title is the occurrence's and the
+   * fields under it are the content owner's, so this completes nothing there.
+   */
+  readonly onRename: (title: string) => string | null;
   /** The Cards this occurrence may point at — non-Alias Cards (ADR 0009). */
   readonly targets: readonly Card[];
   /** Retarget, answering the sentence to show when the Space refused it. */
   readonly onRetarget: (target: CardId) => string | null;
+}
+
+/**
+ * The occurrence's own title — the Alias's, never the content owner's.
+ *
+ * Committed on Enter and on blur, which is the rule the graph's in-place rename
+ * already follows (`CardTitleEditor`), and cancelled by an Escape that unmounts
+ * the field before a blur can reach it. It is deliberately not carried by the
+ * pane's `Done`: that button completes the *content* Card, and the Target beside
+ * this field already commits the moment it is chosen, so the occurrence's two
+ * fields settle as they are edited and the content editor keeps its own submit.
+ *
+ * A draft equal to the stored title is not submitted at all. Authoring would
+ * answer `unchanged`, which is the same nothing — this only spares the round
+ * trip a blur makes every time an author tabs past an untouched field.
+ */
+function OccurrenceTitleEditor({
+  title,
+  onRename,
+  onCancel,
+}: {
+  readonly title: string;
+  readonly onRename: (title: string) => string | null;
+  readonly onCancel: () => void;
+}) {
+  const [draft, setDraft] = useState(title);
+  const [error, setError] = useState<string | null>(null);
+
+  const complete = (): void => {
+    setError(draft === title ? null : onRename(draft));
+  };
+
+  return (
+    <>
+      <label className="card-pane__field">
+        <span>Title</span>
+        <input
+          className="card-pane__title-input"
+          aria-invalid={error !== null}
+          aria-describedby={error === null ? undefined : 'open-card-occurrence-title-error'}
+          value={draft}
+          onChange={(event) => {
+            setDraft(event.currentTarget.value);
+            setError(null);
+          }}
+          onBlur={complete}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter') {
+              event.preventDefault();
+              complete();
+              return;
+            }
+            if (event.key !== 'Escape') return;
+            // Taken here rather than left to bubble, for the reason the content
+            // editor takes it: the window listener that closes an opened Card is
+            // registered the whole time one is open, and one keypress may only
+            // be consumed by one owner.
+            event.preventDefault();
+            event.stopPropagation();
+            onCancel();
+          }}
+        />
+      </label>
+      {error !== null && (
+        <span id="open-card-occurrence-title-error" role="alert" className="card-pane__field-error">
+          {error}
+        </span>
+      )}
+    </>
+  );
 }
 
 /**
@@ -237,11 +320,12 @@ interface DelegatedOpen {
   /** The Card that owns the content reached through the occurrence above. */
   readonly content: ResolvedContentCard;
   /**
-   * The one canonical place an Alias Target changes (ADR 0009's storyboard).
-   * Optional, because delegation and retargeting are different capabilities:
-   * the pane draws the field when it is given one and nothing when it is not.
+   * The one canonical place an Alias's own title and Target change (ADR 0009's
+   * storyboard). Optional, because delegation and authoring the occurrence are
+   * different capabilities: the pane draws the two fields when it is given one
+   * and nothing when it is not.
    */
-  readonly retarget?: Retarget;
+  readonly occurrence?: OccurrenceAuthoring;
   readonly card?: never;
 }
 
@@ -303,7 +387,7 @@ export function OpenCard(props: OpenCardProps) {
     props.through === undefined
       ? { delegated: false, opened: props.card, content: props.card }
       : { delegated: true, opened: props.through, content: props.content };
-  const retarget = props.through === undefined ? undefined : props.retarget;
+  const occurrence = props.through === undefined ? undefined : props.occurrence;
   const [retargetRefusal, setRetargetRefusal] = useState<string | null>(null);
 
   return (
@@ -333,13 +417,28 @@ export function OpenCard(props: OpenCardProps) {
           <span>Editing content on {content.title}</span>
         </div>
       )}
-      {retarget !== undefined && (
-        <div className="card-pane__retarget">
+      {occurrence !== undefined && (
+        // The occurrence's own two fields, above the content the Target owns:
+        // what this Card is called and *which* Card it shows come before the
+        // fields that author that Card (ADR 0009's Frame 4).
+        <div className="card-pane__occurrence">
+          {/* Keyed by the occurrence, so a second Alias of the same content
+              cannot inherit the first one's draft — the same reason the content
+              editor below is keyed by both ids. */}
+          <OccurrenceTitleEditor
+            key={opened.id}
+            title={opened.title}
+            onRename={occurrence.onRename}
+            onCancel={onCancel}
+          />
           <CardPicker
             label="Target"
-            cards={retarget.targets}
+            cards={occurrence.targets}
             selectedId={content.id}
-            onSelect={(target) => setRetargetRefusal(retarget.onRetarget(target))}
+            // Frame 4 asks for no focus change, so the pane's ordinary rule
+            // holds and the open lands on the Title above this.
+            initialFocus={false}
+            onSelect={(target) => setRetargetRefusal(occurrence.onRetarget(target))}
             // Escape past an empty search is the pane's to answer, exactly as
             // it is in every other field here.
             onCancel={onCancel}

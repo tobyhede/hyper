@@ -147,6 +147,98 @@ describe('the opened Card', () => {
   });
 
   /**
+   * The occurrence's own title, which the pane could not reach at all.
+   *
+   * `titleEditable` was `!delegated`, so opening an Alias drew no Title field —
+   * and the storyboard's Frame 4 draws one, holding the Alias's own title beside
+   * its Target. It bites hardest straight after creation, where an Alias that
+   * took its Target's title lands the author in the one pane that cannot tell
+   * the two Cards apart by name.
+   *
+   * Plain `Title`, like the `Target` beside it: unqualified names the Card this
+   * pane is about, and the qualified `Description of A` names the other one.
+   */
+  it('renames the occurrence it was opened through', () => {
+    const onRename = vi.fn(() => null);
+    const onComplete = vi.fn();
+    render(
+      <OpenCard
+        through={{ id: ALIAS_ID, title: 'A again', kind: 'alias', target: CARD_ID }}
+        content={markdown()}
+        occurrence={{ onRename, targets: [], onRetarget: vi.fn() }}
+        onComplete={onComplete}
+        onCancel={vi.fn()}
+      />,
+    );
+
+    const title = screen.getByRole('textbox', { name: 'Title' });
+    expect(title).toHaveValue('A again');
+
+    fireEvent.change(title, { target: { value: 'Recap' } });
+    fireEvent.keyDown(title, { key: 'Enter' });
+
+    expect(onRename).toHaveBeenCalledWith('Recap');
+    // A different edit subject from the fields under it, so renaming the Alias
+    // completes nothing against the Card that owns the content.
+    expect(onComplete).not.toHaveBeenCalled();
+  });
+
+  /**
+   * The sentence belongs to Authoring, which is the only thing that knows which
+   * rule was hit (ADR 0042), so the field's job is to put it where the author is
+   * looking and tie it to the control that produced it.
+   */
+  it('shows the Space’s refusal of a rename beside the title it refused', () => {
+    const onRename = vi.fn(() => 'A Card title is required.');
+    render(
+      <OpenCard
+        through={{ id: ALIAS_ID, title: 'A again', kind: 'alias', target: CARD_ID }}
+        content={markdown()}
+        occurrence={{ onRename, targets: [], onRetarget: vi.fn() }}
+        onComplete={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    );
+    const title = screen.getByRole('textbox', { name: 'Title' });
+
+    fireEvent.change(title, { target: { value: '   ' } });
+    fireEvent.keyDown(title, { key: 'Enter' });
+
+    expect(screen.getByRole('alert')).toHaveTextContent('A Card title is required.');
+    expect(title).toHaveAttribute('aria-invalid', 'true');
+    expect(title).toHaveAccessibleDescription('A Card title is required.');
+  });
+
+  /**
+   * The rule the graph's in-place rename already follows: an author who types a
+   * title and reaches for another control has said what they want, and blur is
+   * the only signal there is. A draft equal to the stored title is not submitted
+   * at all — Authoring would answer `unchanged`, which is the same nothing.
+   */
+  it('commits a renamed occurrence on blur, and an untouched one never', () => {
+    const onRename = vi.fn(() => null);
+    render(
+      <OpenCard
+        through={{ id: ALIAS_ID, title: 'A again', kind: 'alias', target: CARD_ID }}
+        content={markdown()}
+        occurrence={{ onRename, targets: [], onRetarget: vi.fn() }}
+        onComplete={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    );
+    const title = screen.getByRole('textbox', { name: 'Title' });
+
+    fireEvent.blur(title);
+    expect(onRename).not.toHaveBeenCalled();
+
+    fireEvent.change(title, { target: { value: 'Recap' } });
+    fireEvent.blur(title);
+
+    expect(onRename).toHaveBeenCalledOnce();
+    expect(onRename).toHaveBeenCalledWith('Recap');
+  });
+
+  /**
    * There was a reading state in front of this, and it drew the same bytes in
    * the same order — a `<pre>` of source against a `<textarea>` of source. The
    * action that crossed between them was the only thing the boundary had.
@@ -172,6 +264,31 @@ describe('the opened Card', () => {
     render(<OpenCard card={markdown()} onComplete={vi.fn()} onCancel={vi.fn()} />);
 
     expect(screen.getByRole('textbox', { name: 'Title' })).toHaveFocus();
+  });
+
+  /**
+   * Retargeting asks for no focus change (ADR 0009's Frame 4), so the pane's
+   * ordinary rule holds and the first field is where an open lands.
+   *
+   * The picker used to declare itself the pane's initial focus wherever it was
+   * drawn, which is right for the Alias creation state — that surface opens *on*
+   * its Target — and wrong here, where the Target is one field among several.
+   * Every open of an existing Alias arrived with the caret in a search box the
+   * author had not asked for.
+   */
+  it('opens an Alias on its own title rather than on the Target picker', () => {
+    render(
+      <OpenCard
+        through={{ id: ALIAS_ID, title: 'A again', kind: 'alias', target: CARD_ID }}
+        content={markdown()}
+        occurrence={{ onRename: vi.fn(), targets: [], onRetarget: vi.fn() }}
+        onComplete={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole('textbox', { name: 'Title' })).toHaveFocus();
+    expect(screen.getByRole('combobox', { name: 'Target' })).not.toHaveFocus();
   });
 
   /**
