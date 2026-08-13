@@ -86,4 +86,5 @@ Tracking both paths is deliberate. An ordinary `git worktree add` populates only
 The set:
 
 - Used regularly: `improve-codebase-architecture`, `grilling`, `domain-modeling`, `codebase-design`.
-- Installed, not yet exercised: `to-spec`, `to-tickets`, `tdd`, `code-review`, `research`, `grill-me`, `grill-with-docs`, `diagnosing-bugs`, `handoff`, `implement`, `resolving-merge-conflicts`, `teach`, `triage`, `wayfinder`, `writing-great-skills`.
+- Installed, not yet exercised: `to-spec`, `to-tickets`, `tdd`, `research`, `grill-me`, `grill-with-docs`, `diagnosing-bugs`, `handoff`, `implement`, `resolving-merge-conflicts`, `teach`, `triage`, `wayfinder`, `writing-great-skills`.
+- Deliberately **not** installed: `code-review`. Its vendored name collided with Claude Code's built-in `/code-review`, and a skill of that name shadows the built-in rather than sitting beside it. The built-in is what we want — it reviews the current diff (or a PR/branch target) at a chosen effort level, posts inline comments with `--comment`, applies findings with `--fix`, and runs `ultra` as a multi-agent cloud review. Don't let the installer re-add the vendored one; if its two-axis Standards/Spec framing is ever wanted, vendor it under a different name.
