@@ -37,14 +37,6 @@ async function quiescent(page: Page): Promise<void> {
 }
 
 /**
- * Click one focusable Edge, and answer the accessible name it carries.
- *
- * Only the Active Graph's Edges are selectable, and an Edge is an SVG path a few
- * pixels wide, so the point is found by walking the geometry and hit-testing:
- * `elementFromPoint` answers null outside the viewport and `closest` answers null
- * off an Edge, so both are checked rather than assumed.
- */
-/**
  * A point on the pane far enough from every handle that React Flow resolves no
  * connection target — `connectionRadius` is 20 at the pinned 12.11.2, so a
  * release nearer than that reads as aiming at a handle rather than at canvas.
@@ -52,10 +44,13 @@ async function quiescent(page: Page): Promise<void> {
 async function emptyCanvasPoint(page: Page): Promise<{ x: number; y: number }> {
   const pane = await boxOf(page.locator('.react-flow__pane'), 'the React Flow pane');
   const point = { x: pane.x + 24, y: pane.y + 24 };
-  const clear = await page.evaluate(
-    (at) => document.elementFromPoint(at.x, at.y)?.closest('.react-flow__node') === null,
-    point,
-  );
+  const clear = await page.evaluate((at) => {
+    // Optional chaining would turn a null hit into `undefined`, which is neither
+    // `=== null` nor `!== null` in the way either check reads — so the element is
+    // required first and only then asked what it is under.
+    const hit = document.elementFromPoint(at.x, at.y);
+    return hit !== null && hit.closest('.react-flow__node') === null;
+  }, point);
   expect(clear, 'the chosen point is over a Card rather than empty canvas').toBe(true);
   return point;
 }
@@ -77,10 +72,10 @@ async function dragEndpointTo(
 ): Promise<void> {
   const anchor = await boxOf(edge.locator(`.react-flow__edgeupdater-${end}`), `the ${end} anchor`);
   const from = { x: anchor.x + anchor.width / 2, y: anchor.y + anchor.height / 2 };
-  const onAnchor = await page.evaluate(
-    (at) => document.elementFromPoint(at.x, at.y)?.closest('.react-flow__edgeupdater') !== null,
-    from,
-  );
+  const onAnchor = await page.evaluate((at) => {
+    const hit = document.elementFromPoint(at.x, at.y);
+    return hit !== null && hit.closest('.react-flow__edgeupdater') !== null;
+  }, from);
   expect(onAnchor, `the ${end} reconnect anchor is covered at its own centre`).toBe(true);
 
   await page.mouse.move(from.x, from.y);
@@ -118,6 +113,14 @@ async function reconnectOnto(
   }
 }
 
+/**
+ * Click one focusable Edge, and answer the accessible name it carries.
+ *
+ * Only the Active Graph's Edges are selectable, and an Edge is an SVG path a few
+ * pixels wide, so the point is found by walking the geometry and hit-testing:
+ * `elementFromPoint` answers null outside the viewport and `closest` answers null
+ * off an Edge, so both are checked rather than assumed.
+ */
 async function selectAnEdge(page: Page): Promise<string> {
   const point = await page
     .locator('.react-flow__edge[tabindex] .react-flow__edge-path')
@@ -1446,11 +1449,7 @@ test('a Card offers a keyboard Connect control that authors an Edge', async ({ p
   await source.getByRole('button', { name: 'Connect from A' }).click();
   await expect(page.getByTestId('connect-target-picker')).toBeVisible();
   await page.getByRole('combobox', { name: 'Connect to' }).click();
-  await page
-    .getByRole('option')
-    .filter({ hasNot: page.locator('[data-disabled]') })
-    .last()
-    .click();
+  await page.locator('[role="option"]:not([data-disabled])').last().click();
 
   await expect(page.locator('.react-flow__edge')).toHaveCount(drawn + 1);
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');

@@ -125,9 +125,15 @@ function EdgeEndpointFields({
   commands: EdgeAuthoringCommands;
 }) {
   const { edge } = subject;
-  // Read once per render of the open editor rather than per keystroke: the
-  // choices are a function of the Space, and the Space cannot change while a
-  // synchronous pick is being made.
+  // Read once when the editor opens — Radix unmounts its content on close, so
+  // this is per-open rather than per-render.
+  //
+  // A Space that changes while the editor stands therefore leaves the list
+  // stale, and that is the design's own answer rather than an oversight: "the
+  // completion can still return `refused` if the Space changed while the picker
+  // was open". Recomputing would move the rows under a pointer already on its
+  // way to one, and would still not make the pick safe — only the completion's
+  // re-validation does that.
   const [from] = useState(() => commands.endpointChoices(subject, 'from'));
   const [to] = useState(() => commands.endpointChoices(subject, 'to'));
 
