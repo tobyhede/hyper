@@ -63,6 +63,13 @@ export interface CardPickerProps {
  * the surface consume the next. Clearing the search is that first consumption —
  * which is also, for a retarget, what "restore the current Target" means, since
  * an unfiltered list is the one showing it.
+ *
+ * **The list is always rendered, including with nothing in it.** cmdk mints the
+ * list's id on the Command root and puts it on the input as `aria-controls`,
+ * beside a hardcoded `aria-expanded="true"` — so a field drawn without its list
+ * is an expanded combobox pointing at an element that does not exist. Swapping
+ * the list out for a paragraph did exactly that. Emptiness is a matter for
+ * `Command.Empty` inside the list, never for whether the list is there.
  */
 export function CardPicker({
   label,
@@ -75,6 +82,8 @@ export function CardPicker({
 }: CardPickerProps) {
   const [search, setSearch] = useState('');
   const fieldId = useId();
+  /** Nothing to offer at all, as against a search that happened to match none. */
+  const unavailable = cards.length === 0;
 
   const cancel = (event: ReactKeyboardEvent<HTMLDivElement>): void => {
     if (event.key !== 'Escape') return;
@@ -115,22 +124,26 @@ export function CardPicker({
           value={search}
           onValueChange={setSearch}
         />
-        {cards.length === 0 ? (
-          <p className="card-picker__unavailable" role="status">
-            {emptyMessage}
-          </p>
-        ) : (
-          <CommandList data-testid="card-picker-results">
-            <CommandEmpty>No Card matches that search.</CommandEmpty>
-            {cards.map((card) => (
-              <CommandItem key={card.id} value={card.id} onSelect={() => onSelect(card.id)}>
-                <CardKindIcon kind={card.kind} />
-                <span className="card-picker__title">{card.title}</span>
-                {card.id === selectedId && <CheckIcon />}
-              </CommandItem>
-            ))}
-          </CommandList>
-        )}
+        <CommandList data-testid="card-picker-results">
+          {/* One empty affordance for both ways of having nothing to show, and
+              it is the primitive's own. `Command.Empty` renders on a filtered
+              count of zero, which with no Card registered is true of every
+              search including the empty one — so a hand-rolled paragraph for
+              the unavailable case would stack above this rather than replace
+              it. The class is the only thing that differs: a Space that cannot
+              hold an Alias yet is explained in a box, and a search that matched
+              nothing is a quiet line. */}
+          <CommandEmpty className={unavailable ? 'card-picker__unavailable' : undefined}>
+            {unavailable ? emptyMessage : 'No Card matches that search.'}
+          </CommandEmpty>
+          {cards.map((card) => (
+            <CommandItem key={card.id} value={card.id} onSelect={() => onSelect(card.id)}>
+              <CardKindIcon kind={card.kind} />
+              <span className="card-picker__title">{card.title}</span>
+              {card.id === selectedId && <CheckIcon />}
+            </CommandItem>
+          ))}
+        </CommandList>
       </Command>
     </div>
   );

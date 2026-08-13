@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { uuidSchema } from '@project/core';
 import { OpenCard } from '../src/components/OpenCard';
 
@@ -14,6 +14,33 @@ const markdown = (over: { description?: string; body?: string } = {}) => ({
   kind: 'markdown' as const,
   body: over.body ?? '**A** source',
 });
+
+/**
+ * cmdk's list measures itself, and jsdom ships no `ResizeObserver`.
+ *
+ * The occurrence tests below pass no Target, which used to mean no list was
+ * rendered and nothing measured anything. The picker now draws its list
+ * whatever it holds — an expanded combobox has to point at one — so this file
+ * needs the stub every other cmdk-mounting test already carries.
+ */
+beforeAll(() => {
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      observe(): void {
+        return undefined;
+      }
+      unobserve(): void {
+        return undefined;
+      }
+      disconnect(): void {
+        return undefined;
+      }
+    },
+  );
+});
+
+afterAll(() => vi.unstubAllGlobals());
 
 describe('the opened Card', () => {
   it('edits resolved Markdown through an Alias while keeping the delegation visible', () => {

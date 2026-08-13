@@ -67,6 +67,19 @@ const aliased: SpaceSnapshot = spaceSnapshotSchema.parse({
   ],
 });
 
+/**
+ * A Space with nothing an Alias could name.
+ *
+ * A Space of only Aliases is not a Space that loads — every Target would have to
+ * resolve to a non-Alias — so the only way to reach an empty Target picker is a
+ * Space with no Cards at all.
+ */
+const noCards: SpaceSnapshot = spaceSnapshotSchema.parse({
+  id: SPACE_ID,
+  document: { version: 1, title: 'Workspace' },
+  cards: [],
+});
+
 /** A Space with no Layout at all, so the Flow Algorithmic View draws it (ADR 0025). */
 const noLayouts: SpaceSnapshot = spaceSnapshotSchema.parse({
   ...snapshot,
@@ -444,23 +457,42 @@ describe('Add Alias', () => {
 
   /**
    * An Alias needs a Card that owns its content, and a Space may not have one.
-   * A Space of only Aliases is not a Space that loads — every Target would have
-   * to resolve to a non-Alias — so the case is a Space with no Cards at all.
+   *
+   * The message is cmdk's own empty affordance rather than a paragraph beside
+   * it, which is what keeps it to one: `Command.Empty` renders whenever the
+   * filtered count is zero, and with no Card registered that is true of every
+   * search — so a hand-rolled explanation next to it would stack under "No Card
+   * matches that search" rather than replace it.
    */
   it('explains itself when the Space holds no eligible Card', async () => {
-    const session = mount(
-      spaceSnapshotSchema.parse({
-        id: SPACE_ID,
-        document: { version: 1, title: 'Workspace' },
-        cards: [],
-      }),
-    );
+    const session = mount(noCards);
     await openAliasCreation();
 
-    expect(screen.getByRole('status')).toHaveTextContent(
+    expect(screen.getByTestId('card-picker-results')).toHaveTextContent(
       'An Alias needs a Card that owns its content, and this Space has none yet.',
     );
+    expect(screen.queryByText('No Card matches that search.')).not.toBeInTheDocument();
     expect(screen.queryByRole('option')).not.toBeInTheDocument();
+    await settled(session);
+  });
+
+  /**
+   * cmdk mints the list's id on the Command root and puts it on the input as
+   * `aria-controls`, alongside a hardcoded `aria-expanded="true"`. Drawing the
+   * field without its list therefore leaves an expanded combobox pointing at an
+   * element that is not in the document — which is what a standalone paragraph
+   * in place of the list used to do, on the one screen it was drawn: Alias
+   * creation in an empty Space.
+   */
+  it('keeps the combobox pointing at a list that exists with nothing to list', async () => {
+    const session = mount(noCards);
+    await openAliasCreation();
+    const search = screen.getByRole('combobox', { name: 'Target' });
+
+    const listId = search.getAttribute('aria-controls');
+
+    expect(listId).not.toBeNull();
+    expect(document.getElementById(listId ?? '')).toBe(screen.getByTestId('card-picker-results'));
     await settled(session);
   });
 });
