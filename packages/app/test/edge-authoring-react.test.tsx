@@ -725,6 +725,62 @@ describe('withdrawing Edge authoring', () => {
 });
 
 /**
+ * Escape cancels exactly one topmost surface, and the picker's open list is a
+ * surface above the connection draft.
+ *
+ * **A portal is not an escape from the React tree.** Radix renders the list
+ * through `createPortal`, so nothing in the DOM puts it inside the picker — but
+ * React dispatches synthetic events along the *fiber* tree, so a keydown in the
+ * portalled content still reaches the container's `onKeyDown`. Radix's own
+ * Escape handling calls `preventDefault` and never `stopPropagation`, so without
+ * the `data-state` guard one press would close the list and cancel the
+ * connection together, and an author who opened the list to look would have no
+ * way back out that kept the gesture.
+ *
+ * The two layers are told apart by the trigger's `data-state` alone, and this is
+ * what holds that fact to the primitive underneath it: the guard was written
+ * against a Radix `Select` and the picker is now shadcn's Combobox — a Popover
+ * over cmdk. Both stamp `data-state` because both triggers are Radix triggers,
+ * which was an argument in a comment until this ran it.
+ *
+ * **This is the only test of the rule itself, and Chromium reaches the same two
+ * stages without it.** Measured against the fixture: Radix closes from a
+ * document capture listener, and the microtask checkpoint the browser performs
+ * *between* listeners commits that close before React's delegated listener runs
+ * — by which time the cmdk input is detached and React has already stripped its
+ * fiber, so nothing dispatches and the handler is never asked. jsdom has no such
+ * checkpoint, dispatching a whole event in one JS frame, which is what puts the
+ * press in front of the guard here. So the browser's two stages are the e2e's to
+ * pin (`editing.spec.ts`), and this is what will matter the next time the
+ * primitive moves to one that answers Escape from React rather than from the
+ * document.
+ */
+describe('Escape in the keyboard target picker', () => {
+  it('closes the open list first and cancels the connection only on the press after', () => {
+    const { edgeAuthoring, session } = mountCanvas();
+    const before = session.getState().working;
+    act(() => edgeAuthoring.beginKeyboardConnect(CARD_A));
+    const trigger = screen.getByRole('combobox', { name: 'Connect to' });
+
+    fireEvent.click(trigger);
+    expect(screen.getByRole('combobox', { name: 'Search' })).toBeVisible();
+    fireEvent.keyDown(screen.getByRole('combobox', { name: 'Search' }), { key: 'Escape' });
+
+    // The list has gone and the gesture has not.
+    expect(screen.queryByRole('combobox', { name: 'Search' })).not.toBeInTheDocument();
+    expect(screen.getByTestId('connect-target-picker')).toBeVisible();
+    expect(edgeAuthoring.getState().draft).toEqual({ kind: 'keyboard-connect', from: CARD_A });
+
+    fireEvent.keyDown(trigger, { key: 'Escape' });
+
+    expect(screen.queryByTestId('connect-target-picker')).not.toBeInTheDocument();
+    expect(edgeAuthoring.getState().draft).toBeNull();
+    // Cancelling authors nothing: the same working snapshot, not an equal one.
+    expect(session.getState().working).toBe(before);
+  });
+});
+
+/**
  * Every refusal reaches a surface, including the one with no draft left.
  *
  * A refusal is retained beside the draft that ran into it, and a keyboard draft
