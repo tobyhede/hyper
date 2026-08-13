@@ -40,6 +40,28 @@ lines 138-145). The two fields that branch added copied its shape, which is how
 it was found; those two are fixed and this one is left, because fixing it is not
 a like-for-like change.
 
+## Two more ways in, added by the same branch
+
+The four compliant editors above are compliant *about their own field*, which is
+all the contract asks of them. But a field that has nothing to restore hands
+Escape on to the surface, and on the opened-Card pane that surface closes over
+the other two drafts. So the pane now has three clean-field exits, not one:
+
+- `MarkdownCardEditor`'s own form handler, above — the only one this ticket
+  originally named.
+- The **Target picker** on a delegated open (`OpenCard.tsx:455-457`,
+  `CardPicker.tsx:88-101`). Click into Target, type nothing, press Escape: the
+  search is clean, so the picker yields, and the pane closes over a dirty
+  Markdown source on the first press.
+- The **occurrence Title** (`OpenCard.tsx:303-308`), on the same rule, when the
+  title itself is untouched.
+
+Neither new one is a defect *in that field* — both do exactly what the
+field-scoped rule says. They are two more demonstrations that the rule is
+field-scoped while the consequence is pane-scoped, which is the question below.
+Whatever answer criterion 2 takes has to be applied at all three, or the pane
+keeps an exit that behaves unlike its neighbours.
+
 ## Why this is not `ready-for-agent`
 
 Two accepted records disagree, and neither is obviously the survivor.
@@ -94,7 +116,9 @@ Nothing else in the suite is affected.
       amended rather than left standing — a new ADR if ADR 0037's reasoning is
       being refined, an amendment to the keyboard contract if it is not.
 - [ ] If the two-stage rule wins, the restore's scope is decided explicitly:
-      the focused field, or all three drafts on the pane.
+      the focused field, or all three drafts on the pane. Whichever is chosen is
+      applied at all three clean-field exits above, not only at
+      `MarkdownCardEditor`'s.
 - [ ] `card-authoring.test.tsx:344` is rewritten to whichever behaviour is
       chosen, with the pristine-field case kept as its own test so "Escape never
       closes" cannot be read into it.

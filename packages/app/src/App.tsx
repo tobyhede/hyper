@@ -383,9 +383,24 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
           setAliasRefusal(created.reason);
           return;
         }
+        // The surface comes down only where the continuations below will run,
+        // which is why the narrowing precedes it rather than following it.
+        // `queued` is an Edit that lands later from the drain, and it cannot
+        // honour "the editor stays open on the Alias that now exists" — so it
+        // must not take the creation pane with it either, or an empty title
+        // leaves the author holding two identically titled Cards and no
+        // surface to rename either from. `unchanged` this operation cannot
+        // answer: it mints, or it refuses.
+        //
+        // Neither is reachable from here today. `queued` needs a completion
+        // raised from inside an install window, and this one is a cmdk
+        // selection at the top of its own stack. Named rather than trusted to
+        // stay that way, as Add Card names its own.
+        if (created.kind === 'queued') return;
+        if (created.kind === 'unchanged') return;
+        if (created.createdCardId === undefined) return;
         setCreatingAlias(false);
         setAliasRefusal(null);
-        if (created.kind !== 'completed' || created.createdCardId === undefined) return;
         useRenderAdapter.getState().selectCard(created.createdCardId);
         // The editor stays open on the Alias that now exists, which is where the
         // author already was.

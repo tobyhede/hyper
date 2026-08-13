@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react';
-import { beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { AddCardControl } from '../src/index';
 
 /**
@@ -26,6 +26,13 @@ beforeAll(() => {
     },
   );
 });
+
+/**
+ * Only the global. The three prototype assignments above are left standing, as
+ * they are in every other file that makes them — restoring one file's and not
+ * the other eleven's would read as a rule nobody follows.
+ */
+afterAll(() => vi.unstubAllGlobals());
 
 describe('AddCardControl', () => {
   /**
