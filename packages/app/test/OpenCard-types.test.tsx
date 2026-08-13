@@ -21,7 +21,7 @@ const noop = vi.fn();
 
 /** The half of the props that never varies, kept out of every assertion below. */
 type Handlers = {
-  onComplete: (card: ResolvedContentCard) => void;
+  onComplete: (card: ResolvedContentCard) => string | null;
   onCancel: () => void;
 };
 

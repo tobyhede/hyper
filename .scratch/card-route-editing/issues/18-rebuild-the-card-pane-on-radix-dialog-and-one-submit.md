@@ -164,6 +164,16 @@ to `Done`, no field in a pane commits on blur, so there is nothing for either
 pane's `Cancel` to carry. The acceptance line below is checked as "one home, and
 that home is nowhere".
 
+**A fourth, found by the review of this branch.** `completeOpenedCard` discarded
+its `AuthoringResult`, so `Done` closed the pane whether the content Card's Edit
+landed or not. That predates this ticket, but two Edits over one press turn it
+from a silent no-op into a *half*-applied one — the occurrence authored, the
+content refused, the draft gone with the surface. It now answers its refusal the
+way `onEdit` does, and the pane stays open holding every draft. Atomicity across
+the two is still not available and is no longer claimed: there is no dry run for
+a completion, so the Space's refusal of the second is only knowable by making
+the first.
+
 Also worth knowing for the next pane: `hideOthers` means a role query cannot see
 the graph while a pane is open, so a test reaching a node behind one goes by test
 id. And Enter in a single-line field now submits the form, which is the

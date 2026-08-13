@@ -94,13 +94,13 @@ export function CardPicker({
     <div className="card-picker">
       {/* Not a `<label>`, because it cannot be one that works. cmdk spreads the
           caller's props and then writes its own `id` over them, so a `for`
-          minted here names an element that never exists — and an orphan label
-          is worse than none: the pane's focus containment prevents the
-          mousedown default on it, on the stated grounds that a label focuses
-          what it names, so the click did nothing at all. The real label is
-          cmdk's own, rendered visually hidden from the `label` prop below and
-          referenced by `aria-labelledby`, which is what gives the field its
-          accessible name. This is the visible echo of it. */}
+          minted here names an element that never exists — an orphan label,
+          which announces a field it cannot name and focuses nothing when
+          clicked. `card-creation.test.tsx` asserts there are none anywhere on
+          the pane for that reason. The real label is cmdk's own, rendered
+          visually hidden from the `label` prop below and referenced by
+          `aria-labelledby`, which is what gives the field its accessible name.
+          This is the visible echo of it. */}
       <span className="card-picker__label">{label}</span>
       <Command
         label={label}

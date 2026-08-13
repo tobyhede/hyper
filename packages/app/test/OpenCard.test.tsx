@@ -8,6 +8,13 @@ const ALIAS_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
 const SECOND_ALIAS_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
 const OTHER_CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
 
+/**
+ * An `onComplete` that accepts. It answers the sentence the Space refused the
+ * content Card with, or `null` — so a bare `vi.fn()` reports `undefined`, which
+ * is neither, and every `Done` would read as a refusal that kept the pane open.
+ */
+const completes = () => vi.fn(() => null);
+
 const markdown = (over: { description?: string; body?: string } = {}) => ({
   id: CARD_ID,
   title: 'A',
@@ -45,7 +52,7 @@ afterAll(() => vi.unstubAllGlobals());
 
 describe('the opened Card', () => {
   it('edits resolved Markdown through an Alias while keeping the delegation visible', () => {
-    const onComplete = vi.fn();
+    const onComplete = completes();
     render(
       <OpenCard
         through={{ id: ALIAS_ID, title: 'A again', kind: 'alias', target: CARD_ID }}
@@ -92,7 +99,7 @@ describe('the opened Card', () => {
       <OpenCard
         through={{ id: ALIAS_ID, title: 'A again', kind: 'alias', target: CARD_ID }}
         content={markdown({ description: 'Shared caption' })}
-        onComplete={vi.fn()}
+        onComplete={completes()}
         onCancel={vi.fn()}
       />,
     );
@@ -115,7 +122,7 @@ describe('the opened Card', () => {
    * target's title was validated when it was stored, so it cannot fail now.
    */
   it('completes a delegated edit whose target title is only whitespace', () => {
-    const onComplete = vi.fn();
+    const onComplete = completes();
     render(
       <OpenCard
         through={{ id: ALIAS_ID, title: 'A again', kind: 'alias', target: CARD_ID }}
@@ -158,7 +165,7 @@ describe('the opened Card', () => {
    * through to the generic message wherever it cannot be reported in place.
    */
   it('says something when a delegated edit is refused for its target’s title', () => {
-    const onComplete = vi.fn();
+    const onComplete = completes();
     render(
       <OpenCard
         through={{ id: ALIAS_ID, title: 'A again', kind: 'alias', target: CARD_ID }}
@@ -188,7 +195,7 @@ describe('the opened Card', () => {
    */
   it('renames the occurrence it was opened through', () => {
     const onEdit = vi.fn(() => null);
-    const onComplete = vi.fn();
+    const onComplete = completes();
     render(
       <OpenCard
         through={{ id: ALIAS_ID, title: 'A again', kind: 'alias', target: CARD_ID }}
@@ -223,7 +230,7 @@ describe('the opened Card', () => {
         through={{ id: ALIAS_ID, title: 'A again', kind: 'alias', target: CARD_ID }}
         content={markdown()}
         occurrence={{ targets: [], onEdit }}
-        onComplete={vi.fn()}
+        onComplete={completes()}
         onCancel={vi.fn()}
       />,
     );
@@ -250,7 +257,7 @@ describe('the opened Card', () => {
         through={{ id: ALIAS_ID, title: 'A again', kind: 'alias', target: CARD_ID }}
         content={markdown()}
         occurrence={{ targets: [], onEdit }}
-        onComplete={vi.fn()}
+        onComplete={completes()}
         onCancel={vi.fn()}
       />,
     );
@@ -271,10 +278,10 @@ describe('the opened Card', () => {
   /**
    * A refused occurrence leaves the content Card unauthored, which is the whole
    * reason both fields are validated before either Edit is made: one press must
-   * not half-apply.
+   * not half-apply on anything the pane could have seen coming.
    */
   it('completes nothing on the content Card when the occurrence is refused', () => {
-    const onComplete = vi.fn();
+    const onComplete = completes();
     const onCancel = vi.fn();
     render(
       <OpenCard
@@ -293,6 +300,44 @@ describe('the opened Card', () => {
   });
 
   /**
+   * The other half of that press, which the pane cannot see coming: only making
+   * the Edit answers whether the Space takes it. The result was discarded here,
+   * so `Done` closed the pane over a refusal exactly as it does over a success
+   * and the draft went down with it — the silent no-op ADR 0042 exists to
+   * prevent, and a half-applied press now that `Done` authors two Cards.
+   */
+  it('keeps the pane open and says why when the Space refuses the content Card', () => {
+    const onCancel = vi.fn();
+    render(
+      <OpenCard
+        card={markdown()}
+        onComplete={() => 'This view has not finished arranging, so there is nowhere to write yet.'}
+        onCancel={onCancel}
+      />,
+    );
+
+    fireEvent.change(screen.getByRole('textbox', { name: 'Markdown source' }), {
+      target: { value: 'A paragraph nobody asked to lose' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'This view has not finished arranging, so there is nowhere to write yet.',
+    );
+    expect(onCancel).not.toHaveBeenCalled();
+    expect(screen.getByRole('textbox', { name: 'Markdown source' })).toHaveValue(
+      'A paragraph nobody asked to lose',
+    );
+
+    // And it describes an attempt, so editing begins a different one.
+    fireEvent.change(screen.getByRole('textbox', { name: 'Markdown source' }), {
+      target: { value: 'Rewritten' },
+    });
+
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  /**
    * There was a reading state in front of this, and it drew the same bytes in
    * the same order — a `<pre>` of source against a `<textarea>` of source. The
    * action that crossed between them was the only thing the boundary had.
@@ -301,7 +346,7 @@ describe('the opened Card', () => {
     render(
       <OpenCard
         card={markdown({ description: 'Where every graph begins' })}
-        onComplete={vi.fn()}
+        onComplete={completes()}
         onCancel={vi.fn()}
       />,
     );
@@ -315,7 +360,7 @@ describe('the opened Card', () => {
   });
 
   it('opens with the title focused, which is what an author names first', () => {
-    render(<OpenCard card={markdown()} onComplete={vi.fn()} onCancel={vi.fn()} />);
+    render(<OpenCard card={markdown()} onComplete={completes()} onCancel={vi.fn()} />);
 
     expect(screen.getByRole('textbox', { name: 'Title' })).toHaveFocus();
   });
@@ -336,7 +381,7 @@ describe('the opened Card', () => {
         through={{ id: ALIAS_ID, title: 'A again', kind: 'alias', target: CARD_ID }}
         content={markdown()}
         occurrence={{ targets: [], onEdit: vi.fn() }}
-        onComplete={vi.fn()}
+        onComplete={completes()}
         onCancel={vi.fn()}
       />,
     );
@@ -360,7 +405,7 @@ describe('the opened Card', () => {
    */
   it('keeps the content draft when a different Target is chosen', () => {
     const onEdit = vi.fn(() => null);
-    const onComplete = vi.fn();
+    const onComplete = completes();
     render(
       <OpenCard
         through={{ id: ALIAS_ID, title: 'A again', kind: 'alias', target: CARD_ID }}
@@ -403,7 +448,7 @@ describe('the opened Card', () => {
   /** Four fields, one press, and one Edit each for the two Cards they author. */
   it('completes the occurrence and the content from one Done', () => {
     const onEdit = vi.fn(() => null);
-    const onComplete = vi.fn();
+    const onComplete = completes();
     const onCancel = vi.fn();
     render(
       <OpenCard
@@ -449,7 +494,7 @@ describe('the opened Card', () => {
   /** And Cancel before Done authors neither of them. */
   it('authors neither Card when the pane is cancelled', () => {
     const onEdit = vi.fn(() => null);
-    const onComplete = vi.fn();
+    const onComplete = completes();
     render(
       <OpenCard
         through={{ id: ALIAS_ID, title: 'A again', kind: 'alias', target: CARD_ID }}
@@ -494,12 +539,12 @@ describe('the opened Card', () => {
       kind: 'markdown' as const,
       body: '**B** source',
     };
-    const view = render(<OpenCard card={markdown()} onComplete={vi.fn()} onCancel={vi.fn()} />);
+    const view = render(<OpenCard card={markdown()} onComplete={completes()} onCancel={vi.fn()} />);
     fireEvent.change(screen.getByRole('textbox', { name: 'Markdown source' }), {
       target: { value: 'A rewritten' },
     });
 
-    view.rerender(<OpenCard card={other} onComplete={vi.fn()} onCancel={vi.fn()} />);
+    view.rerender(<OpenCard card={other} onComplete={completes()} onCancel={vi.fn()} />);
 
     expect(screen.getByRole('textbox', { name: 'Title' })).toHaveValue('B');
     expect(screen.getByRole('textbox', { name: 'Markdown source' })).toHaveValue('**B** source');
@@ -523,14 +568,19 @@ describe('the opened Card', () => {
       target: CARD_ID,
     };
     const view = render(
-      <OpenCard through={first} content={markdown()} onComplete={vi.fn()} onCancel={vi.fn()} />,
+      <OpenCard through={first} content={markdown()} onComplete={completes()} onCancel={vi.fn()} />,
     );
     fireEvent.change(screen.getByRole('textbox', { name: 'Markdown source of A' }), {
       target: { value: 'Typed through the first Alias' },
     });
 
     view.rerender(
-      <OpenCard through={second} content={markdown()} onComplete={vi.fn()} onCancel={vi.fn()} />,
+      <OpenCard
+        through={second}
+        content={markdown()}
+        onComplete={completes()}
+        onCancel={vi.fn()}
+      />,
     );
 
     expect(screen.getByText('Opened through A once more')).toBeVisible();
@@ -540,7 +590,7 @@ describe('the opened Card', () => {
   });
 
   it('completes one whole Card from all three fields', () => {
-    const onComplete = vi.fn();
+    const onComplete = completes();
     const onCancel = vi.fn();
     render(<OpenCard card={markdown()} onComplete={onComplete} onCancel={onCancel} />);
 
@@ -571,7 +621,7 @@ describe('the opened Card', () => {
    * trims. The body is not trimmed: whitespace there is Markdown.
    */
   it('refuses a blank title and keeps it local', () => {
-    const onComplete = vi.fn();
+    const onComplete = completes();
     render(<OpenCard card={markdown()} onComplete={onComplete} onCancel={vi.fn()} />);
     const title = screen.getByRole('textbox', { name: 'Title' });
 
@@ -585,7 +635,7 @@ describe('the opened Card', () => {
   });
 
   it('stores a title and description without the whitespace around them', () => {
-    const onComplete = vi.fn();
+    const onComplete = completes();
     render(
       <OpenCard
         card={markdown({ body: ' spaced body ' })}
@@ -612,7 +662,7 @@ describe('the opened Card', () => {
   });
 
   it('removes a description the author blanked', () => {
-    const onComplete = vi.fn();
+    const onComplete = completes();
     render(
       <OpenCard
         card={markdown({ description: 'Original' })}
@@ -635,7 +685,7 @@ describe('the opened Card', () => {
   });
 
   it('links a description error to its field and completes once it is valid', () => {
-    const onComplete = vi.fn();
+    const onComplete = completes();
     render(<OpenCard card={markdown()} onComplete={onComplete} onCancel={vi.fn()} />);
     const description = screen.getByRole('textbox', { name: 'Description' });
 
@@ -651,7 +701,7 @@ describe('the opened Card', () => {
   });
 
   it('cancels without completing', () => {
-    const onComplete = vi.fn();
+    const onComplete = completes();
     const onCancel = vi.fn();
     render(<OpenCard card={markdown()} onComplete={onComplete} onCancel={onCancel} />);
 
@@ -672,7 +722,7 @@ describe('the opened Card', () => {
    */
   it('cancels on Escape from a field holding a draft', () => {
     const onCancel = vi.fn();
-    const onComplete = vi.fn();
+    const onComplete = completes();
     render(<OpenCard card={markdown()} onComplete={onComplete} onCancel={onCancel} />);
     const source = screen.getByRole('textbox', { name: 'Markdown source' });
 
@@ -709,7 +759,7 @@ describe('the opened Card as a dialog', () => {
    * it.
    */
   it('is a dialog named for the Card it authors', () => {
-    render(<OpenCard card={markdown()} onComplete={vi.fn()} onCancel={vi.fn()} />);
+    render(<OpenCard card={markdown()} onComplete={completes()} onCancel={vi.fn()} />);
 
     const dialog = screen.getByRole('dialog');
     expect(dialog).not.toHaveAttribute('aria-modal');
@@ -729,7 +779,7 @@ describe('the opened Card as a dialog', () => {
       <OpenCard
         through={{ id: ALIAS_ID, title: 'A again', kind: 'alias', target: CARD_ID }}
         content={markdown()}
-        onComplete={vi.fn()}
+        onComplete={completes()}
         onCancel={vi.fn()}
       />,
     );
@@ -744,7 +794,7 @@ describe('the opened Card as a dialog', () => {
    * containment proper is `editing.spec`, in a browser that moves focus.
    */
   it('keeps Tab inside itself, wrapping from the last control to the first', () => {
-    render(<OpenCard card={markdown()} onComplete={vi.fn()} onCancel={vi.fn()} />);
+    render(<OpenCard card={markdown()} onComplete={completes()} onCancel={vi.fn()} />);
     const title = screen.getByRole('textbox', { name: 'Title' });
     const done = screen.getByRole('button', { name: 'Done' });
 
@@ -768,7 +818,7 @@ describe('the opened Card as a dialog', () => {
     behind.setAttribute('data-testid', 'behind-the-pane');
     document.body.append(behind);
 
-    render(<OpenCard card={markdown()} onComplete={vi.fn()} onCancel={vi.fn()} />);
+    render(<OpenCard card={markdown()} onComplete={completes()} onCancel={vi.fn()} />);
 
     expect(behind).toHaveAttribute('aria-hidden', 'true');
     behind.remove();
@@ -786,7 +836,7 @@ describe('the opened Card as a dialog', () => {
    * against a browser that actually moves it.
    */
   it('takes focus onto its first field when it opens', () => {
-    render(<OpenCard card={markdown()} onComplete={vi.fn()} onCancel={vi.fn()} />);
+    render(<OpenCard card={markdown()} onComplete={completes()} onCancel={vi.fn()} />);
 
     expect(screen.getByRole('textbox', { name: 'Title' })).toHaveFocus();
   });

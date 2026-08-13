@@ -532,9 +532,21 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
 
     const openedCard = openedCardId ? rendererSpace.lookup.card(openedCardId) : undefined;
     const openedContent = openedCard ? resolveContentCard(rendererSpace, openedCard.id) : undefined;
-    const completeOpenedCard = useCallback((completed: ResolvedContentCard): void => {
+    /**
+     * Authoring the Card that owns the content, answering the sentence to show
+     * when the Space refused it.
+     *
+     * The result was discarded here, and the pane closed on `Done` whether the
+     * Edit landed or not — the same silent no-op ADR 0042 exists to prevent,
+     * with the draft going down with the surface. It matters more now that
+     * `Done` authors two Cards: the occurrence's Edit is made first, so a
+     * swallowed refusal on this one is a *half*-applied press. Reported, the
+     * pane stays open saying which half failed.
+     */
+    const completeOpenedCard = useCallback((completed: ResolvedContentCard): string | null => {
       const { id, ...document } = completed;
-      authoring.complete({ kind: 'edited-card', cardId: id, document });
+      const result = authoring.complete({ kind: 'edited-card', cardId: id, document });
+      return result.kind === 'refused' ? result.reason : null;
     }, []);
 
     /**

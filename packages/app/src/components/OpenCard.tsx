@@ -295,8 +295,13 @@ interface DelegatedOpen {
  * is the Card that owns its content — never from the opened Card's kind.
  */
 export type OpenCardProps = {
-  /** Complete the one whole Card that owns the resolved content. */
-  readonly onComplete: (card: ResolvedContentCard) => void;
+  /**
+   * Complete the one whole Card that owns the resolved content, answering the
+   * sentence to show when the Space refused it — the same contract as
+   * `OccurrenceAuthoring.onEdit`, because both halves of one `Done` have to be
+   * able to say no in a way the author can see.
+   */
+  readonly onComplete: (card: ResolvedContentCard) => string | null;
   /** Close without completing. */
   readonly onCancel: () => void;
 } & (DirectOpen | DelegatedOpen);
@@ -325,7 +330,7 @@ function CardEditorForm({
   readonly content: ResolvedContentCard;
   readonly delegated: boolean;
   readonly occurrence: OccurrenceAuthoring | undefined;
-  readonly onComplete: (card: ResolvedContentCard) => void;
+  readonly onComplete: (card: ResolvedContentCard) => string | null;
   readonly onCancel: () => void;
 }) {
   // The one dynamic dispatch, and deliberately uncast. With one resolved content
@@ -347,15 +352,28 @@ function CardEditorForm({
    * belong to one value.
    */
   const [occurrenceRefusal, setOccurrenceRefusal] = useState<string | null>(null);
+  /**
+   * And the Space's refusal of the content Card's Edit, which is the other half
+   * of the same press and has nowhere else to be said — the content group's own
+   * error nodes belong to values it validated itself.
+   */
+  const [contentRefusal, setContentRefusal] = useState<string | null>(null);
 
   /**
-   * Validate everything, then author it — in that order, because two Edits over
-   * one press must not half-apply on a refusal the pane could have seen coming.
+   * Validate locally, then author — in that order, so a refusal this pane can
+   * see for itself stops both Edits before either is made.
    *
    * Two completions and no more (ADR 0048): `edited-card` on the occurrence, and
    * `edited-card` on the Card that owns the content. The occurrence goes first
    * because it is the pane's top half; nothing about it can invalidate the Card
    * underneath, which the Alias merely points at.
+   *
+   * **What that does not buy is atomicity across the two.** There is no dry run
+   * for a completion, so the Space's own refusal of the second is only knowable
+   * by making the first — and the two Edits are two commits either way (ADR
+   * 0030). What is guaranteed is that neither goes unreported: both answer the
+   * sentence they were refused with, the pane stays open holding every draft,
+   * and the message says which half stands.
    */
   const submit = (event: FormEvent<HTMLFormElement>): void => {
     event.preventDefault();
@@ -375,7 +393,11 @@ function CardEditorForm({
         return;
       }
     }
-    onComplete(settled.card);
+    const refusal = onComplete(settled.card);
+    if (refusal !== null) {
+      setContentRefusal(refusal);
+      return;
+    }
     onCancel();
   };
 
@@ -431,8 +453,24 @@ function CardEditorForm({
         {/* A pending Target does not preview: these fields go on authoring the
             Card the occurrence points at *today*, and their labels go on naming
             it, until Done moves the pointer and closes the pane. */}
-        <group.Fields card={content} titleEditable={!delegated} draft={draft} onChange={setDraft} />
+        <group.Fields
+          card={content}
+          titleEditable={!delegated}
+          draft={draft}
+          onChange={(next) => {
+            setDraft(next);
+            setContentRefusal(null);
+          }}
+        />
       </div>
+      {/* Outside the scrolling fields, beside the button that produced it: this
+          one refuses the whole press, so it must not be somewhere an author has
+          to scroll to find out why `Done` did nothing. */}
+      {contentRefusal !== null && (
+        <span role="alert" className="card-pane__field-error">
+          {contentRefusal}
+        </span>
+      )}
       <div className="card-pane__actions">
         <Button type="button" variant="secondary" onClick={onCancel}>
           Cancel

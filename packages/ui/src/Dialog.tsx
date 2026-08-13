@@ -12,11 +12,20 @@ import * as DialogPrimitive from '@radix-ui/react-dialog';
  * these re-exports buy is the boundary — the primitive layer stays in `ui`
  * (AGENTS.md), so `app` composes a Dialog without naming Radix.
  *
- * `Portal` is deliberately absent. The pane's overlay is positioned against the
- * app's own container, and a Portal to `document.body` would resolve `inset: 0`
- * against the initial containing block instead. Radix does not require one, and
- * its own scrollable-overlay recipe nests `Content` inside `Overlay`, which is
- * how the pane keeps the frame it letterboxes in.
+ * `Portal` is deliberately absent, and the reason is *not* positioning: the one
+ * overlay drawn with this is `position: fixed`, so it resolves against the
+ * initial containing block wherever in the tree it sits. It is absent because
+ * nothing needs it — Radix does not require one, and leaving the surface in the
+ * app's own tree is what lets the app keep deciding where it renders. The cost
+ * to know about: a `transform`, `filter`, `backdrop-filter`, `will-change` or
+ * `contain: paint` on any ancestor makes a fixed descendant resolve against
+ * *that* element instead, and the overlay would quietly stop covering the
+ * viewport. A Portal is the answer if that ever happens; it is not needed
+ * pre-emptively.
+ *
+ * Radix's own scrollable-overlay recipe nests `Content` inside `Overlay`, which
+ * is how the pane keeps the frame it letterboxes in — two siblings could not be
+ * centred one inside the other.
  *
  * Pinned to an exact version for the reason React Flow is: this primitive owns
  * focus and dismissal, and the app depends on behaviour verified against the

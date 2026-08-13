@@ -731,8 +731,8 @@ body {
      ordinary case. At 8rem this field alone overflowed the delegated pane by
      17–64px at *every* window size, a maximised one included, because the
      occurrence's Title and Target sit above it and the floor would not yield.
-     The scroll added to `.card-pane__editor` is the fallback for a genuinely
-     small window, not the normal state of a full-screen editor. */
+     The scroll on `.card-pane__fields` is the fallback for a genuinely small
+     window, not the normal state of a full-screen editor. */
   min-height: 4rem;
   resize: none;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
