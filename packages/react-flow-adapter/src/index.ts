@@ -5,7 +5,13 @@ import { RoutedEdge } from './RoutedEdge';
 export * from './projection';
 export * from './elk';
 export { CardNode } from './CardNode';
-export { RoutedEdge, type RoutedEdgeData } from './RoutedEdge';
+export {
+  RoutedEdge,
+  routedEdgeGeometry,
+  type RoutedEdgeData,
+  type RoutedEdgeGeometry,
+  type RoutedFlowEdge,
+} from './RoutedEdge';
 export { GraphHud } from './GraphHud';
 export { GraphConnectionLine } from './GraphConnectionLine';
 export type { GraphHudProps } from './GraphHud';

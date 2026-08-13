@@ -7,9 +7,12 @@ import type { CardFlowNode } from '@project/react-flow-adapter';
 import { mintingIds } from './minting';
 import { createNavigation } from '../src/navigation';
 import { createRenderAdapter, type RenderAdapter } from '../src/render-adapter';
+import { createConnectionCompletion } from '../src/connection-completion';
 import {
   createSpaceAuthoring,
   type AuthoringResult,
+  type EdgeEligibility,
+  type EdgeProposal,
   type SpaceAuthoring,
 } from '../src/space-authoring';
 import { createRendererResolver, type RendererSelection } from '../src/renderer';
@@ -26,10 +29,16 @@ const CREATED_CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000006')
 const PROJECTED = [node(CARD_A, 10, 20), node(CARD_B, 300, 20)];
 const SPARSE_PROJECTED = [...PROJECTED, node(CARD_C, 600, 20)];
 
+/**
+ * One projected Graph Edge, in the shape `projectGraphEdges` builds: the id is
+ * keyed on the Edge's position in its Graph, and `data.graphId` is what the
+ * adapter reads to recover the domain Edge behind it.
+ */
 const EDGE: Edge = {
-  id: '00000000-0000-4000-8000-000000000004:A->B',
+  id: `${GRAPH_ID}::0`,
   source: CARD_A,
   target: CARD_B,
+  data: { graphId: GRAPH_ID },
 };
 
 interface InstallRecord {
@@ -39,17 +48,14 @@ interface InstallRecord {
   readonly nodesAtCall: readonly CardFlowNode[] | null;
 }
 
-/** What Authoring answers about an Edit before the adapter attempts it. */
+/** What Authoring answers about an Edge gesture before the coordinator attempts it. */
 interface AuthoringCapabilities {
-  readonly canConnect?: boolean;
-  readonly canCreateConnectedCard?: boolean;
+  /** The proposal kind this Authoring refuses; every other kind is eligible. */
+  readonly refusing?: EdgeProposal['kind'];
 }
 
 /** A Space Authoring that records what it was told, without a session behind it. */
-function authoringSpy({
-  canConnect = true,
-  canCreateConnectedCard = true,
-}: AuthoringCapabilities = {}) {
+function authoringSpy({ refusing }: AuthoringCapabilities = {}) {
   const installs: InstallRecord[] = [];
   const completions: unknown[] = [];
   let adapter: RenderAdapter | null = null;
@@ -71,8 +77,10 @@ function authoringSpy({
         nodesAtCall: adapter?.getState().projection?.nodes ?? null,
       });
     },
-    canConnect: () => canConnect,
-    canCreateConnectedCard: () => canCreateConnectedCard,
+    edgeEligibility: (proposal: EdgeProposal): EdgeEligibility =>
+      proposal.kind === refusing
+        ? { kind: 'refused', reason: 'This gesture is refused by the test.' }
+        : { kind: 'eligible' },
     complete: (completion: unknown): AuthoringResult => {
       completions.push(completion);
       return { kind: 'completed' };
@@ -92,6 +100,21 @@ function authoringSpy({
 
 function adapter(): RenderAdapter {
   return createRenderAdapter(authoringSpy().authoring);
+}
+
+/**
+ * The connection completion coordinator over one adapter and one Authoring.
+ *
+ * Tested here rather than beside Edge Authoring because what it owns is an
+ * *ordering* between those two — complete first, reconcile only on a real Edit
+ * — and neither pointers nor keys appear in it.
+ */
+function connections(
+  store: RenderAdapter,
+  authoring: SpaceAuthoring,
+  reportInvariant: (error: unknown) => void = () => undefined,
+) {
+  return createConnectionCompletion({ adapter: store, authoring, reportInvariant });
 }
 
 /**
@@ -283,34 +306,125 @@ describe('render adapter', () => {
   });
 
   it("takes React Flow's own selection change as the Card selected for authoring", () => {
-    // The other path into `selectedCardId`: `selectCard` is the explicit store
+    // The other path into the selection: `selectCard` is the explicit store
     // action, this is React Flow reporting an ordinary click. Both read a node
     // id as a Card identity, and only the first was covered.
     const store = adapter();
     store.getState().syncProjection(PROJECTED, [EDGE]);
 
     store.getState().changeNodes([{ type: 'select', id: CARD_A, selected: true }]);
-    expect(store.getState().selectedCardId).toBe(CARD_A);
+    expect(store.getState().selection).toEqual({ kind: 'card', cardId: CARD_A });
 
     store.getState().changeNodes([{ type: 'select', id: CARD_A, selected: false }]);
-    expect(store.getState().selectedCardId).toBeNull();
+    expect(store.getState().selection).toEqual({ kind: 'none' });
+  });
+
+  /*
+   * **One React Flow selection action produces two callback batches.** It selects
+   * the new subject and then deselects the other kind, and the second batch names
+   * a subject the union has already moved past. Reading the last change would
+   * answer `none` for a click that plainly selected something — which is why the
+   * union is folded additively rather than derived from the resulting arrays.
+   */
+  describe("React Flow's select-then-cross-kind-deselect order", () => {
+    const selectingEdge = (store: RenderAdapter) =>
+      store.getState().changeEdges([{ type: 'select', id: EDGE.id, selected: true }]);
+
+    it('keeps a newly selected Edge when the Card deselection arrives after it', () => {
+      const store = adapter();
+      store.getState().syncProjection(PROJECTED, [EDGE]);
+      store.getState().changeNodes([{ type: 'select', id: CARD_A, selected: true }]);
+
+      selectingEdge(store);
+      store.getState().changeNodes([{ type: 'select', id: CARD_A, selected: false }]);
+
+      expect(store.getState().selection).toEqual({
+        kind: 'edge',
+        graphId: GRAPH_ID,
+        edge: { from: CARD_A, to: CARD_B },
+      });
+    });
+
+    it('keeps a newly selected Card when the Edge deselection arrives after it', () => {
+      const store = adapter();
+      store.getState().syncProjection(PROJECTED, [EDGE]);
+      selectingEdge(store);
+
+      store.getState().changeNodes([{ type: 'select', id: CARD_B, selected: true }]);
+      store.getState().changeEdges([{ type: 'select', id: EDGE.id, selected: false }]);
+
+      expect(store.getState().selection).toEqual({ kind: 'card', cardId: CARD_B });
+    });
+
+    it('clears the Card React Flow still holds selected when an Edge takes the selection', () => {
+      // The controlled node array is what React Flow's Delete key reads, so a
+      // Card left `selected` there would be deleted alongside the Edge the
+      // author actually named.
+      const store = adapter();
+      store.getState().syncProjection(PROJECTED, [EDGE]);
+      store.getState().changeNodes([{ type: 'select', id: CARD_A, selected: true }]);
+
+      selectingEdge(store);
+
+      expect(store.getState().projection?.nodes.every((node) => node.selected !== true)).toBe(true);
+    });
+  });
+
+  /*
+   * The focus-to-selection bridge React Flow does not supply: focusing an Edge
+   * selects nothing there, so Tab-to-Edge then Delete would act on whatever was
+   * selected before.
+   */
+  it('installs a focused Edge as the selected subject', () => {
+    const store = adapter();
+    store.getState().syncProjection(PROJECTED, [EDGE]);
+
+    store.getState().selectEdge(GRAPH_ID, { from: CARD_A, to: CARD_B });
+
+    expect(store.getState().selection).toEqual({
+      kind: 'edge',
+      graphId: GRAPH_ID,
+      edge: { from: CARD_A, to: CARD_B },
+    });
+  });
+
+  /*
+   * An Edge id is `<graphId>::<index>` and re-indexes whenever a Graph loses an
+   * Edge, so the selection names the domain Edge instead. A deselection reported
+   * for an id this projection no longer draws names no subject at all, and must
+   * not clear a selection the author has since made.
+   */
+  it('ignores a selection change for an Edge this projection does not draw', () => {
+    const store = adapter();
+    store.getState().syncProjection(PROJECTED, [EDGE]);
+    store.getState().selectCard(uuidSchema.parse(CARD_A));
+
+    store.getState().changeEdges([{ type: 'select', id: 'gone::0', selected: false }]);
+
+    expect(store.getState().selection).toEqual({ kind: 'card', cardId: CARD_A });
   });
 
   /**
-   * The seeding `reconcile` performs has a window in front of it, and a node
-   * change landing inside that window used to close it.
+   * A Card selected before the projection draws it is selected in React Flow's
+   * own node array once it does.
    *
    * Authoring selects a Card in the same tick it creates it, one render before
-   * the projection that first draws it — so `selectCard` records the id while no
-   * live node carries `selected`. React Flow measures anything it renders and
-   * reports a `dimensions` change for it, which is enough to reach `changeNodes`
-   * before that projection lands. Reading the selection off the live nodes then
-   * finds none, writes `null` over the id, and `reconcile` seeds nothing: the
-   * Card arrives unselected, which is the exact failure the seeding exists to
-   * prevent, and `F2` stops working until a click repairs it.
+   * the projection that first draws it — so `selectCard` records the subject
+   * while no live node carries `selected`, and `selecting` maps over nodes that
+   * do not include it yet. A projection carries no selection of its own either:
+   * `projectCardNodes` sets `data.selectedForAuthoring` and never the node's
+   * `selected`. So unless the sync folds the union back in, the Card arrives
+   * unselected and stays that way — it *reads* as selected, since
+   * `selectedForAuthoring` is right, while React Flow holds no selected node at
+   * all. `F2` asks React Flow, so `F2` is what stops working, until any click
+   * repairs it. Add Card, Add Alias and create-and-connect all land here.
    *
-   * A selection this store holds for a Card the projection has not drawn yet is
-   * therefore left alone. Only a Card that *is* drawn can be reported unselected.
+   * The `dimensions` change is the window in front of it: React Flow measures
+   * anything it renders, so `changeNodes` is reached before that projection
+   * lands. Under the additive union that cannot erase the subject — a
+   * `dimensions` change is not a `select` change and `selectChanges` drops it —
+   * and this pins that too, since the model this replaced *did* erase it by
+   * re-deriving the selection from the live node array.
    */
   it('keeps a selection seeded for a Card the projection has not drawn yet', () => {
     const store = adapter();
@@ -321,9 +435,28 @@ describe('render adapter', () => {
       .getState()
       .changeNodes([{ type: 'dimensions', id: CARD_A, dimensions: { width: 260, height: 146 } }]);
 
-    expect(store.getState().selectedCardId).toBe(CREATED_CARD_ID);
+    expect(store.getState().selection).toEqual({ kind: 'card', cardId: CREATED_CARD_ID });
 
     store.getState().syncProjection([...PROJECTED, node(CREATED_CARD_ID, 900, 20)], [EDGE]);
+
+    const seeded = store.getState().projection?.nodes.find((each) => each.id === CREATED_CARD_ID);
+    expect(seeded?.selected).toBe(true);
+  });
+
+  /**
+   * The same seeding on the other path a created Card arrives by.
+   *
+   * A completed create-and-connect publishes, Authoring selects the Card it has
+   * just minted, and the projection carrying that Card reaches the store through
+   * `mergeProjected` rather than `syncProjection`. Two call sites, one rule —
+   * and this is the one the Edge Authoring seam uses.
+   */
+  it('seeds a selection for a Card that arrives through a merged projection', () => {
+    const store = adapter();
+    store.getState().syncProjection(PROJECTED, [EDGE]);
+
+    store.getState().selectCard(CREATED_CARD_ID);
+    store.getState().mergeProjected([...PROJECTED, node(CREATED_CARD_ID, 900, 20)]);
 
     const seeded = store.getState().projection?.nodes.find((each) => each.id === CREATED_CARD_ID);
     expect(seeded?.selected).toBe(true);
@@ -395,14 +528,16 @@ describe('render adapter', () => {
   });
 
   it('preserves unplaced Cards when an existing Layout is edited', () => {
-    const { session, store } = sparsePositionedAdapter();
+    const { session, store, authoring } = sparsePositionedAdapter();
 
     store.getState().syncProjection(SPARSE_PROJECTED, []);
     expect(
-      store
-        .getState()
-        .connectCards(uuidSchema.parse(CARD_B), uuidSchema.parse(CARD_A), SPARSE_PROJECTED),
-    ).toBe(true);
+      connections(store, authoring).connect(
+        uuidSchema.parse(CARD_B),
+        uuidSchema.parse(CARD_A),
+        SPARSE_PROJECTED,
+      ),
+    ).toBe(CARD_A);
 
     // C was rendered and is still not a member of this Layout.
     expect(session.getState().working.document.layouts?.[0]?.positions).toEqual({
@@ -423,8 +558,12 @@ describe('render adapter', () => {
 
     store.getState().syncProjection(PROJECTED, []);
     expect(
-      store.getState().connectCards(uuidSchema.parse(CARD_A), uuidSchema.parse(CARD_B), null),
-    ).toBe(true);
+      connections(store, spy.authoring).connect(
+        uuidSchema.parse(CARD_A),
+        uuidSchema.parse(CARD_B),
+        null,
+      ),
+    ).toBe(CARD_B);
 
     expect(store.getState().projection?.nodes.map((node) => node.id)).toEqual([CARD_A, CARD_B]);
   });
@@ -451,7 +590,7 @@ describe('render adapter', () => {
       ],
     };
     // Converting mints the Layout's Graph before the Layout itself.
-    const { session, store } = sessionBackedAdapter(
+    const { session, store, authoring } = sessionBackedAdapter(
       snapshot,
       { kind: 'view', view: 'flow' },
       undefined,
@@ -461,8 +600,12 @@ describe('render adapter', () => {
 
     store.getState().syncProjection(PROJECTED, []);
     expect(
-      store.getState().connectCards(uuidSchema.parse(CARD_B), uuidSchema.parse(CARD_A), PROJECTED),
-    ).toBe(true);
+      connections(store, authoring).connect(
+        uuidSchema.parse(CARD_B),
+        uuidSchema.parse(CARD_A),
+        PROJECTED,
+      ),
+    ).toBe(CARD_A);
 
     expect(session.getState().working.document.layouts?.[0]?.positions).toEqual({
       [CARD_A]: { x: 10, y: 20 },
@@ -510,12 +653,16 @@ describe('render adapter', () => {
   });
 
   it('adds a newly created Card without placing other omitted Cards', () => {
-    const { session, store } = sparsePositionedAdapter(mintingIds(CREATED_CARD_ID));
+    const { session, store, authoring } = sparsePositionedAdapter(mintingIds(CREATED_CARD_ID));
     store.getState().syncProjection(SPARSE_PROJECTED, []);
 
-    expect(store.getState().createConnectedCard(uuidSchema.parse(CARD_A), { x: 420, y: 360 })).toBe(
-      CREATED_CARD_ID,
-    );
+    expect(
+      connections(store, authoring).createAndConnect(
+        uuidSchema.parse(CARD_A),
+        { x: 420, y: 360 },
+        null,
+      ),
+    ).toBe(CREATED_CARD_ID);
 
     expect(session.getState().working.document.layouts?.[0]?.positions).toEqual({
       [CARD_A]: { x: 10, y: 20 },
@@ -525,13 +672,13 @@ describe('render adapter', () => {
   });
 
   /*
-   * Authoring owns eligibility; the adapter only asks. A refusal has to stop
+   * Authoring owns eligibility; the coordinator only asks. A refusal has to stop
    * before the placement install, because installing is what converts an
    * Algorithmic View into a Layout (ADR 0025) — a gesture Authoring rejected
    * would otherwise still author one as a side effect.
    */
   it('installs and completes nothing for a connection Authoring refuses', () => {
-    const spy = authoringSpy({ canConnect: false });
+    const spy = authoringSpy({ refusing: 'connect' });
     const store = createRenderAdapter(spy.authoring);
     spy.attach(store);
     store.getState().syncProjection(PROJECTED, []);
@@ -539,8 +686,12 @@ describe('render adapter', () => {
     const installedBefore = spy.installs.length;
 
     expect(
-      store.getState().connectCards(uuidSchema.parse(CARD_A), uuidSchema.parse(CARD_B), PROJECTED),
-    ).toBe(false);
+      connections(store, spy.authoring).connect(
+        uuidSchema.parse(CARD_A),
+        uuidSchema.parse(CARD_B),
+        PROJECTED,
+      ),
+    ).toBeNull();
 
     expect(spy.completions).toEqual([]);
     expect(spy.installs).toHaveLength(installedBefore);
@@ -548,14 +699,18 @@ describe('render adapter', () => {
   });
 
   it('installs and completes nothing for a created Card Authoring refuses', () => {
-    const spy = authoringSpy({ canCreateConnectedCard: false });
+    const spy = authoringSpy({ refusing: 'create-and-connect' });
     const store = createRenderAdapter(spy.authoring);
     spy.attach(store);
     store.getState().syncProjection(PROJECTED, []);
     const installedBefore = spy.installs.length;
 
     expect(
-      store.getState().createConnectedCard(uuidSchema.parse(CARD_A), { x: 420, y: 360 }),
+      connections(store, spy.authoring).createAndConnect(
+        uuidSchema.parse(CARD_A),
+        { x: 420, y: 360 },
+        null,
+      ),
     ).toBeNull();
 
     expect(spy.completions).toEqual([]);
@@ -665,7 +820,11 @@ describe('render adapter', () => {
     const projected = PROJECTED.map((card) => ({ ...card, className: 'connected' }));
 
     expect(() =>
-      store.getState().connectCards(uuidSchema.parse(CARD_A), uuidSchema.parse(CARD_B), projected),
+      connections(store, failing).connect(
+        uuidSchema.parse(CARD_A),
+        uuidSchema.parse(CARD_B),
+        projected,
+      ),
     ).toThrow('Authoring produced an invalid Space');
 
     expect(store.getState().projection).toBe(published);
@@ -675,13 +834,15 @@ describe('render adapter', () => {
   });
 
   /*
-   * A queued completion has not happened yet: the Edit it is queued behind
-   * decides the Space it will run against, and it can still answer `unchanged`
-   * there. Drawing the connection now publishes it for an Edge the Space has
-   * not gained — the same failure as a refusal, one turn later. If the queued
-   * Edit does land, the projection that follows it draws the Edge anyway.
+   * `queued` is Authoring's answer to a completion made from inside its own
+   * publication, and a React Flow event is never that — it arrives from the
+   * browser's event loop with no Edit on the stack. So reaching it here is an
+   * invariant violation rather than an interaction outcome: it is reported, and
+   * the gesture ends having drawn nothing. Taking the canvas down mid-drag would
+   * be the wrong answer to a diagnostic, and if the queued Edit does land, the
+   * projection that follows it draws the Edge anyway.
    */
-  it('leaves the projected connection uncommitted when the completion is queued', () => {
+  it('reports and draws nothing when a completion at the React Flow seam is queued', () => {
     const spy = authoringSpy();
     const queueing: SpaceAuthoring = {
       ...spy.authoring,
@@ -691,11 +852,17 @@ describe('render adapter', () => {
     store.getState().syncProjection(PROJECTED, []);
     const published = store.getState().projection;
     const projected = PROJECTED.map((card) => ({ ...card, className: 'connected' }));
+    const reported: unknown[] = [];
 
     expect(
-      store.getState().connectCards(uuidSchema.parse(CARD_A), uuidSchema.parse(CARD_B), projected),
-    ).toBe(false);
+      connections(store, queueing, (error) => reported.push(error)).connect(
+        uuidSchema.parse(CARD_A),
+        uuidSchema.parse(CARD_B),
+        projected,
+      ),
+    ).toBeNull();
 
+    expect(reported).toHaveLength(1);
     expect(store.getState().projection).toBe(published);
     expect(store.getState().projection?.nodes.every((card) => card.className !== 'connected')).toBe(
       true,
@@ -718,7 +885,7 @@ describe('render adapter', () => {
     expect(authoring.acceptStoredSpace()).toBeNull();
 
     expect(store.getState().projection).toBeNull();
-    expect(store.getState().selectedCardId).toBeNull();
+    expect(store.getState().selection).toEqual({ kind: 'none' });
     expect(store.getState().moved).toBe(false);
   });
 });

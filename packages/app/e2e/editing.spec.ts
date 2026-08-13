@@ -36,6 +36,37 @@ async function quiescent(page: Page): Promise<void> {
   await page.waitForTimeout(250);
 }
 
+/**
+ * Click one focusable Edge, and answer the accessible name it carries.
+ *
+ * Only the Active Graph's Edges are selectable, and an Edge is an SVG path a few
+ * pixels wide, so the point is found by walking the geometry and hit-testing:
+ * `elementFromPoint` answers null outside the viewport and `closest` answers null
+ * off an Edge, so both are checked rather than assumed.
+ */
+async function selectAnEdge(page: Page): Promise<string> {
+  const point = await page
+    .locator('.react-flow__edge[tabindex] .react-flow__edge-path')
+    .evaluateAll((paths) => {
+      for (const path of paths) {
+        const geometry = path as SVGPathElement;
+        const transform = geometry.getScreenCTM();
+        if (transform === null) continue;
+        const length = geometry.getTotalLength();
+        for (const fraction of [0.5, 0.25, 0.75, 0.4, 0.6]) {
+          const at = geometry.getPointAtLength(length * fraction).matrixTransform(transform);
+          const hit = document.elementFromPoint(at.x, at.y)?.closest('.react-flow__edge');
+          if (hit) return { x: at.x, y: at.y };
+        }
+      }
+      throw new Error('No focusable Edge has a clickable point.');
+    });
+  await page.mouse.click(point.x, point.y);
+  const selected = page.locator('.react-flow__edge.selected');
+  await expect(selected).toHaveCount(1);
+  return (await selected.getAttribute('aria-label')) ?? '';
+}
+
 test('inline title editing persists without moving or opening the Card', async ({ page }) => {
   await page.goto('/');
   const card = nodeByTitle(page, 'A').first();
@@ -565,11 +596,9 @@ test('drawing between existing Cards persists one active-Graph Edge and selects 
   // One Edge, because the selected Layout draws the Graphs it owns and the one
   // it owns is the empty Graph conversion minted a moment ago.
   await expect(page.locator('.react-flow__edge')).toHaveCount(1);
-  await expect(
-    page.getByLabel(
-      'Edge from 00000000-0000-4000-8000-000000000002 to 00000000-0000-4000-8000-000000000008',
-    ),
-  ).toBeVisible();
+  // An Edge names its Cards and its Graph for a screen reader. Matched loosely
+  // on the Graph, whose neutral title depends on how many the Space already had.
+  await expect(page.getByLabel(/^Edge from A to E in /)).toBeVisible();
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '2');
   await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
   await expect(target.locator('.rf-card-node__authoring-handle--source').first()).toHaveCSS(
@@ -601,11 +630,7 @@ test('an authored Edge is immediately available when presenting the Graph', asyn
     authoringHandle(target, 'target', 'top'),
   );
 
-  await expect(
-    page.getByLabel(
-      'Edge from 00000000-0000-4000-8000-000000000008 to 00000000-0000-4000-8000-000000000002',
-    ),
-  ).toBeVisible();
+  await expect(page.getByLabel(/^Edge from E to A in /)).toBeVisible();
   await expect(persistence).toHaveAttribute('data-revision', '2');
   await expect(persistence).toHaveText('Persisted');
 
@@ -674,7 +699,7 @@ test('an Edge drawn from the presented Card is a move the presenter can take now
   // outbound handles sit at the same height, so a self-Edge is a flat line whose
   // box has no height — which Playwright reads as hidden. The moves below are
   // what prove it was authored.
-  await expect(page.getByLabel(`Edge from ${A} to ${A}`)).toBeAttached();
+  await expect(page.getByLabel(new RegExp(`^Edge from A to A in `))).toBeAttached();
   await expect(persistence).toHaveAttribute('data-revision', '3');
   await expect(persistence).toHaveText('Persisted');
 
@@ -696,8 +721,6 @@ test('an Edge drawn from the presented Card is a move the presenter can take now
 test('drawing an Edge the emphasised Graph already holds converts rather than refusing', async ({
   page,
 }) => {
-  const A = '00000000-0000-4000-8000-000000000002';
-  const B = '00000000-0000-4000-8000-000000000003';
   await page.goto('/');
   const source = nodeByTitle(page, 'A').first();
   const target = nodeByTitle(page, 'B').first();
@@ -718,7 +741,7 @@ test('drawing an Edge the emphasised Graph already holds converts rather than re
   // Attached rather than visible: A and B are on the same ELK row, so this Edge
   // is a dead-horizontal line with a zero-height box, which Playwright reads as
   // hidden.
-  await expect(page.getByLabel(`Edge from ${A} to ${B}`)).toBeAttached();
+  await expect(page.getByLabel(new RegExp(`^Edge from A to B in `))).toBeAttached();
   await expect(page.locator('.react-flow__edge')).toHaveCount(1);
   await expect(persistence).toHaveAttribute('data-revision', '1');
   await expect(persistence).toHaveText('Persisted');
@@ -843,106 +866,267 @@ test('clicking a Card authoring handle neither opens the Card nor draws an Edge'
 });
 
 /**
- * React Flow deletes on Backspace by default, and Hyper has no delete Edit.
+ * The Delete key acts on the selected Edge through `onBeforeDelete`.
  *
- * The graph is a projection of the authoritative Space. A default that removes a
- * Card from the live node array without a completed Edit puts the canvas into a
- * local, unpersisted state the Space never agreed to — and drops the Card's
- * Edges on the floor, since no `onEdgesChange` receives them.
+ * React Flow's own document-level handler finds the selection and asks; Hyper
+ * answers `false` so nothing is removed locally, and the completed Space Edit
+ * supplies the next projection. That indirection is the point — a local removal
+ * would put the canvas in a state the Space never agreed to.
+ *
+ * `deleteKeyCode` is `['Backspace', 'Delete']`: React Flow defaults to Backspace
+ * alone, so both keys are exercised.
  */
-test('Backspace with a Card selected removes nothing', async ({ page }) => {
+for (const key of ['Backspace', 'Delete'] as const) {
+  test(`${key} removes the selected Edge from its Graph and nothing else`, async ({ page }) => {
+    await page.goto('/');
+    await expect(nodeByTitle(page, 'A').first()).toBeVisible();
+    await expect(page.locator('.react-flow__edge-path').first()).toHaveAttribute('d', /L/);
+    // An Edge belongs to a Layout's Graph, so an Edge Edit needs one selected.
+    await selectLayout(page, 'Collection 1');
+    await settled(page);
+    const drawn = await page.locator('.react-flow__edge').count();
+    const persistence = page.getByTestId('persistence-status');
+    await expect(persistence).toHaveAttribute('data-revision', '0');
+
+    await selectAnEdge(page);
+    await page.keyboard.press(key);
+
+    await expect(page.locator('.react-flow__edge')).toHaveCount(drawn - 1);
+    await expect(page.locator('.react-flow__node')).toHaveCount(FIXTURE_CARD_COUNT);
+    await expect(persistence).toHaveAttribute('data-revision', '1');
+    await expect(persistence).toHaveText('Persisted');
+  });
+}
+
+/**
+ * A Card deletion and an Edge deletion arrive through the same callback.
+ *
+ * React Flow gathers every deletable Edge incident to a requested node *before*
+ * calling `onBeforeDelete`, so without the canvas dispatcher one Card removal
+ * would look like several independent Edge deletions — and would drop those
+ * Edges while the Card stayed. Card deletion is package 8's, so the whole
+ * payload is declined here; what this pins is that the Edges went with it.
+ */
+test('Backspace with a Card selected removes neither the Card nor its Edges', async ({ page }) => {
   await page.goto('/');
   const card = nodeByTitle(page, 'A').first();
   await expect(card).toBeVisible();
   await expect(page.locator('.react-flow__edge-path').first()).toHaveAttribute('d', /L/);
+  await selectLayout(page, 'Collection 1');
   await settled(page);
+  const drawn = await page.locator('.react-flow__edge').count();
 
-  // Selecting is all a click does now (ADR 0036), so there is no opened Card to
-  // close before the keys under test are pressed.
   const cardBox = (await card.boundingBox())!;
   await page.mouse.click(cardBox.x + cardBox.width / 2, cardBox.y + cardBox.height / 2);
   await expect(card).toHaveClass(/selected/);
-  await expect(page.getByTestId('open-card')).toHaveCount(0);
 
   await page.keyboard.press('Backspace');
   await page.keyboard.press('Delete');
+  await quiescent(page);
 
   await expect(page.locator('.react-flow__node')).toHaveCount(FIXTURE_CARD_COUNT);
-  await expect(page.locator('.react-flow__edge')).toHaveCount(FIXTURE_EDGE_COUNT);
-  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '0');
-});
-
-test('Backspace with an Edge selected removes nothing', async ({ page }) => {
-  await page.goto('/');
-  await expect(nodeByTitle(page, 'A').first()).toBeVisible();
-  const edge = page.locator('.react-flow__edge').first();
-  await expect(edge.locator('.react-flow__edge-path')).toHaveAttribute('d', /L/);
-  await settled(page);
-
-  const edgePoint = await page.locator('.react-flow__edge-path').evaluateAll((paths) => {
-    for (const path of paths) {
-      const geometry = path as SVGPathElement;
-      const transform = geometry.getScreenCTM();
-      if (transform === null) continue;
-      const length = geometry.getTotalLength();
-      for (const fraction of [0.25, 0.5, 0.75]) {
-        const point = geometry.getPointAtLength(length * fraction).matrixTransform(transform);
-        // `elementFromPoint` answers null outside the viewport and `closest`
-        // answers null off an edge, but optional chaining turns the first into
-        // `undefined` — so `!== null` accepted a point covering no edge at all
-        // and the click below landed on the pane.
-        const hit = document.elementFromPoint(point.x, point.y)?.closest('.react-flow__edge');
-        if (hit) return { x: point.x, y: point.y };
-      }
-    }
-    throw new Error('No rendered Edge has a clickable point.');
-  });
-  await page.mouse.click(edgePoint.x, edgePoint.y);
-  await expect(page.locator('.react-flow__edge.selected')).toHaveCount(1);
-  await page.keyboard.press('Backspace');
-  await page.keyboard.press('Delete');
-
-  await expect(page.locator('.react-flow__node')).toHaveCount(FIXTURE_CARD_COUNT);
-  await expect(page.locator('.react-flow__edge')).toHaveCount(FIXTURE_EDGE_COUNT);
+  await expect(page.locator('.react-flow__edge')).toHaveCount(drawn);
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '0');
 });
 
 /**
- * React Flow's default assistive description offers a delete Hyper has not built.
+ * The assistive description names the keys that actually do something.
  *
- * Sighted users never meet the claim; a screen reader reads it out as the way to
- * work with a Card. The keyboard behaviour is inert either way — a removal is
- * undone by the next projection sync — so the instruction is the whole defect.
+ * React Flow's defaults offer "press delete to remove it" for both kinds. For an
+ * Edge that is now true and the description says so; for a Card it is not —
+ * removing one is package 8's — so the Card keeps a description that names only
+ * opening and moving. Sighted users never meet either claim; a screen reader
+ * reads it out as the way to work with the graph.
  */
-test('the graph does not advertise a delete action it does not implement', async ({ page }) => {
+test('the graph advertises the Edge delete it implements and no Card delete', async ({ page }) => {
   await page.goto('/');
   await expect(nodeByTitle(page, 'A').first()).toBeVisible();
 
   await expect(page.locator('[id^="react-flow__node-desc"]')).not.toContainText(/delete/i);
   await expect(page.locator('[id^="react-flow__node-desc"]')).toContainText(/open a Card/i);
-  await expect(page.locator('[id^="react-flow__edge-desc"]')).not.toContainText(/delete/i);
+  await expect(page.locator('[id^="react-flow__edge-desc"]')).toContainText(/delete/i);
 });
 
 /**
- * The Edge description must not offer a key an Edge cannot receive.
+ * Only the Active Graph's Edges are tab stops, and each is named for a reader.
  *
- * `edgesFocusable={false}` keeps Edges out of the tab order, which is the right
- * call — selecting one leads nowhere, so putting every Edge in the graph between
- * a keyboard user and the next Card would be noise. So any "press …" instruction
- * on an Edge names a key the only people who hear it can never deliver — the same
- * defect as the delete claim above, answered the same way: correct the
- * instruction rather than build the interaction it names.
- *
- * A Card is the opposite case — `nodesFocusable` is true and each key named there
- * does something — so its description keeps its instructions.
+ * An Edge belonging to another Graph the Layout draws is there to be seen —
+ * putting every Edge in the graph into the tab order would place inert stops
+ * between a keyboard author and the ones they can act on.
  */
-test('the graph does not advertise an Edge keyboard action it cannot receive', async ({ page }) => {
+test('only Active Graph Edges are focusable, and focus selects the one reached', async ({
+  page,
+}) => {
   await page.goto('/');
   await expect(nodeByTitle(page, 'A').first()).toBeVisible();
-  await expect(page.locator('.react-flow__edge').first()).toBeAttached();
+  await selectLayout(page, 'Collection 1');
+  await settled(page);
 
-  await expect(page.locator('.react-flow__edge').first()).not.toHaveAttribute('tabindex');
-  await expect(page.locator('[id^="react-flow__edge-desc"]')).not.toContainText(/press/i);
+  const activeGraph = page.getByTestId('graph-selector');
+  const activeTitle = ((await activeGraph.textContent()) ?? '').trim();
+  const focusable = page.locator('.react-flow__edge[tabindex]');
+  await expect(focusable.first()).toBeAttached();
+  const names = await focusable.evaluateAll((edges) =>
+    edges.map((edge) => edge.getAttribute('aria-label') ?? ''),
+  );
+  expect(names.length).toBeGreaterThan(0);
+  for (const name of names) {
+    expect(name).toMatch(/^Edge from .+ to .+ in .+$/);
+    expect(name.endsWith(` in ${activeTitle}`), `${name} is not in ${activeTitle}`).toBe(true);
+  }
+  // Every other Edge the Layout draws is out of the tab order entirely.
+  expect(await page.locator('.react-flow__edge:not([tabindex])').count()).toBeGreaterThan(0);
+
+  // React Flow does not select an Edge that receives focus; Hyper bridges that,
+  // so the Delete key acts on the Edge a keyboard author reached.
+  await focusable.first().focus();
+  await expect(focusable.first()).toHaveClass(/selected/);
+});
+
+/**
+ * React Flow's native Edge Escape clears the selection and calls `blur()`, which
+ * can leave focus on `body` — not an authoring context, and not somewhere a
+ * workspace command can be issued from. Hyper repairs that and only that: focus
+ * already taken by another control is left alone.
+ */
+test('Escape on a focused Edge leaves focus on the canvas rather than the document', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await expect(nodeByTitle(page, 'A').first()).toBeVisible();
+  await selectLayout(page, 'Collection 1');
+  await settled(page);
+
+  const edge = page.locator('.react-flow__edge[tabindex]').first();
+  await edge.focus();
+  await expect(edge).toHaveClass(/selected/);
+
+  await page.keyboard.press('Escape');
+
+  await expect(page.locator('.react-flow__edge.selected')).toHaveCount(0);
+  await expect
+    .poll(() => page.evaluate(() => document.activeElement?.tagName ?? 'NONE'))
+    .not.toBe('BODY');
+});
+
+/**
+ * The toolbar an Edge draws for itself, and the two commands on it.
+ *
+ * It is rendered through `EdgeLabelRenderer`, so it is ordinary DOM over the
+ * canvas rather than SVG, and it appears on the selected Edge alone.
+ */
+test('a selected Edge offers a toolbar that deletes it and opens its endpoint editor', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await expect(nodeByTitle(page, 'A').first()).toBeVisible();
+  await expect(page.locator('.react-flow__edge-path').first()).toHaveAttribute('d', /L/);
+  await selectLayout(page, 'Collection 1');
+  await settled(page);
+  const drawn = await page.locator('.react-flow__edge').count();
+  await expect(page.getByRole('button', { name: 'Delete this Edge' })).toHaveCount(0);
+
+  await selectAnEdge(page);
+  await expect(page.getByRole('button', { name: 'Delete this Edge' })).toBeVisible();
+
+  // The endpoints, as the keyboard reaches them: two pickers over this Layout's
+  // Cards, each showing the Card the Edge currently names.
+  await page.getByRole('button', { name: 'Edit this Edge' }).click();
+  await expect(page.getByRole('combobox', { name: 'From' })).toBeVisible();
+  await expect(page.getByRole('combobox', { name: 'To' })).toBeVisible();
+  await page.keyboard.press('Escape');
+
+  await page.getByRole('button', { name: 'Delete this Edge' }).click();
+
+  await expect(page.locator('.react-flow__edge')).toHaveCount(drawn - 1);
+  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
+  await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
+});
+
+/**
+ * Moving an endpoint from the keyboard, through the same picker the pointer drag
+ * has no use for.
+ *
+ * The completion is Space Authoring's and the Edge keeps its Graph — what this
+ * proves is that the picker reaches it and the projection redraws from the
+ * completed Space rather than from a local React Flow change.
+ */
+test('the Edge editor moves an endpoint and keeps the Edge in its Graph', async ({ page }) => {
+  await page.goto('/');
+  await expect(nodeByTitle(page, 'A').first()).toBeVisible();
+  await expect(page.locator('.react-flow__edge-path').first()).toHaveAttribute('d', /L/);
+  await selectLayout(page, 'Collection 1');
+  await settled(page);
+  const drawn = await page.locator('.react-flow__edge').count();
+
+  const selected = await selectAnEdge(page);
+  await page.getByRole('button', { name: 'Edit this Edge' }).click();
+  await page.getByRole('combobox', { name: 'To' }).click();
+  // Any Card of this Layout other than the one this endpoint already names, and
+  // not one the result would duplicate — a disabled option says which.
+  const option = page.getByRole('option').filter({ hasNot: page.locator('[data-disabled]') });
+  await option.last().click();
+
+  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
+  await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
+  // Replaced, not removed: the Graph still draws as many Edges as before.
+  await expect(page.locator('.react-flow__edge')).toHaveCount(drawn);
+  await expect(page.getByLabel(selected, { exact: true })).toHaveCount(0);
+});
+
+/**
+ * A selected Edge's reconnect anchors sit over the Card's four authoring handles
+ * where they overlap, and the anchors have to win.
+ *
+ * Reconnection is per-Edge and narrowed to the *selected* one for exactly this
+ * reason: `edgesReconnectable` left globally true would put two transparent
+ * anchors permanently live on every Edge, over every Card's handles.
+ */
+test('reconnect anchors exist only on the selected Edge', async ({ page }) => {
+  await page.goto('/');
+  await expect(nodeByTitle(page, 'A').first()).toBeVisible();
+  await expect(page.locator('.react-flow__edge-path').first()).toHaveAttribute('d', /L/);
+  await selectLayout(page, 'Collection 1');
+  await settled(page);
+  const anchors = page.locator('.react-flow__edgeupdater');
+  await expect(anchors).toHaveCount(0);
+
+  await selectAnEdge(page);
+
+  // Two per Edge, source and target, and on one Edge only.
+  await expect(anchors).toHaveCount(2);
+});
+
+/**
+ * The keyboard's way into an Edge: a real control on the Card, then a picker.
+ *
+ * The four spatial handles are drag affordances and reach no keyboard author, so
+ * a Card that can be connected from carries one tab stop that opens a target
+ * list over this Layout's Cards.
+ */
+test('a Card offers a keyboard Connect control that authors an Edge', async ({ page }) => {
+  await page.goto('/');
+  const source = nodeByTitle(page, 'A').first();
+  await expect(source).toBeVisible();
+  await expect(page.locator('.react-flow__edge-path').first()).toHaveAttribute('d', /L/);
+  await selectLayout(page, 'Collection 1');
+  await settled(page);
+  const drawn = await page.locator('.react-flow__edge').count();
+
+  await source.hover();
+  await source.getByRole('button', { name: 'Connect from A' }).click();
+  await expect(page.getByTestId('connect-target-picker')).toBeVisible();
+  await page.getByRole('combobox', { name: 'Connect to' }).click();
+  await page
+    .getByRole('option')
+    .filter({ hasNot: page.locator('[data-disabled]') })
+    .last()
+    .click();
+
+  await expect(page.locator('.react-flow__edge')).toHaveCount(drawn + 1);
+  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
+  await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
+  await expect(page.getByTestId('connect-target-picker')).toHaveCount(0);
 });
 
 /**

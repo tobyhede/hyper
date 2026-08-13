@@ -97,10 +97,10 @@ share a UUID.
 | Edit Graph | Manager Title/Colour | Vertical Tabs and normal fields | Title restores; swatch selection is immediate | Edited control / Graph tab |
 | Connect | Four spatial handles | One tab-stop Connect control → Select Graph Target | Cancel returns source Card | Target Card |
 | Reconnect | React Flow endpoint drag | Edge popover From/To Combobox | Restore original Edge | Edited Edge |
-| Delete Edge | Endpoint empty-canvas drop or Edge action | Focused Active-Graph Edge Delete/Backspace | Cancelled drag restores Edge | Source Card |
+| Delete Edge | Endpoint empty-canvas drop or Edge action | React Flow Delete/Backspace on the sole selected Active-Graph Edge | Cancelled drag restores Edge | Retain an existing focused control; if removal destroys focus, use the source Card, then canvas as fallback |
 | Add to Layout | Card Front click or external drag from Cards View | Command item Enter | Invalid/outside drop leaves Card absent | Added Card; pointer selects without forced focus |
 | Move Card | React Flow drag | Native Arrow/Shift+Arrow rules | Cancelled gesture restores authored projection | Card |
-| Remove from Layout | Card editor armed button | Focused Card Delete/Backspace twice | Escape/target/focus change disarms | Matching Cards View item when visible, otherwise canvas |
+| Remove from Layout | Card editor armed button | Selected Card Delete/Backspace twice | Escape/target/focus change disarms | Matching Cards View item when visible, otherwise canvas |
 | Delete Card | Card editor armed button | Same visible button | Escape/target/focus change disarms | Canvas |
 | Delete Graph | Graph manager armed button | Same visible button | Escape/target/focus change disarms | First surviving Active Graph |
 
@@ -428,11 +428,84 @@ uses the requested Graph as the initial Graph.
 Gate: manager primitive/focus tests, authoring interface tests for order and
 last-Graph protection, and E2E confirming all Graphs remain drawn.
 
-### 7. Complete Edge lifecycle
+### 7. Complete Edge lifecycle — **done**
 
-Add the keyboard target picker, Active-Graph Edge focusability, Edge popover,
-endpoint reconnection and deletion. Retain four Graph-independent pointer
-handles and declarative handle geometry. Do not add `useUpdateNodeInternals`.
+Built. `packages/app/src/edge-authoring.ts` holds the module's own state — one
+draft, its refusal, and the focus continuation a completed projection owes —
+and `edge-authoring-react.tsx` is its React interface, answering
+`{ edges, edgeTypes, reactFlowProps, layer, provide }` plus the Edge half of the
+canvas's `onBeforeDelete` dispatch. `connection-completion.ts` is the completion
+coordinator the render adapter's two connection methods became.
+`connection-gesture.ts` and its two shallow tests are gone; `newCardDrop` moved
+into Edge Authoring with its priced preview trade-off intact.
+
+Four things the design left open resolved this way:
+
+- **The commands context wraps `<ReactFlow>`, not `layer`.** React Flow renders
+  Edges as a sibling of the children it is given, so a provider inside the layer
+  reaches no Edge. `surface.provide(children)` puts it outside without
+  `SpaceCanvas` learning that a context exists.
+- **The canvas needs `tabIndex={-1}`.** React Flow's pane carries no `tabindex`,
+  so the Escape repair had nothing to focus. Negative, so the canvas never
+  becomes a tab stop.
+- **The Edge picker is a Radix Select, not cmdk.** `@project/ui` gained
+  `CardPicker` and a shadcn-style `Popover`; the Combobox package 4 will bring is
+  the richer surface, and this is the same primitive the existing toolbar
+  selectors use.
+- **The Card's keyboard Connect control lives in `CardNode`**, beside the Edit
+  affordance and offered on the same hover, focus and selection rules.
+
+`edgeEligibility` replaced `canConnect` and `canCreateConnectedCard`, and
+`reconnectOutcome` is shared by eligibility and the completion so the two cannot
+drift. Proofs: `space-authoring-operations.test.ts` (`Edge eligibility`),
+`edge-authoring.test.ts`, `edge-authoring-react.test.tsx`,
+`render-adapter.test.ts` for the additive selection order, and the Edge
+lifecycle scenarios in `editing.spec.ts`.
+
+The original brief follows.
+
+Build the accepted Edge Authoring module in
+`edge-authoring-design.md`. It owns the complete Edge interaction lifecycle and
+the React Flow/DOM translation for that lifecycle. Add the keyboard target
+picker, Active-Graph Edge focusability, `EdgeToolbar` popover, endpoint
+reconnection and selection-based deletion. Retain four Graph-independent
+pointer handles and declarative handle geometry. Do not add
+`useUpdateNodeInternals`.
+
+Keep the render adapter authoritative for the projected nodes and Edges, Card
+movement, and the discriminated `none | card | edge` selection. Keep Space
+Authoring authoritative for eligibility and every semantic Edit. Edge Authoring
+owns neither copy. It consumes them through their existing interfaces.
+
+Use React Flow's controlled `onNodesChange` and `onEdgesChange` streams for
+selection. Disable its modifier multi-selection and selection rectangle. Keep
+its native Edge Tab order, reconnect callbacks and selection-based Delete key,
+configured as `['Backspace', 'Delete']`. Add the justified focus-to-selection
+bridge for Edges and repair native Edge Escape only when it leaves focus on
+`body`; do not add Edge focus panning.
+Route an Edge delete through `onBeforeDelete`, prevent a local React Flow
+removal, and let the completed Space Edit publish the next projection. A thin
+canvas dispatcher routes a payload with nodes to Card Authoring and ignores its
+incident Edges; only an Edge-only payload goes to Edge Authoring.
+
+React Flow hides the Edge during its reconnect drag. At `onReconnectEnd`, it
+renders whichever controlled projection is then current: the original Edge or
+the completed replacement. Make only the selected Active Graph Edge
+reconnectable, carry the original Edge in the eligibility proposal, and
+browser-test its endpoint anchor against overlapping Card authoring handles.
+
+Replace `connection-gesture` with Edge Authoring, but retain its priced preview
+trade-off: preview reads container-local pointer state and release performs the
+authoritative DOM hit-test. Do not add document-level per-frame
+`elementFromPoint` without measuring that cost. Replace the current
+render-adapter connection methods with one completion coordinator behind Edge
+Authoring so rendered Placement, completion and projection reconciliation keep
+their existing order.
+
+Rewrite `SpaceCanvas`'s ARIA explanation, `deleteKeyCode={null}` and
+`edgesFocusable={false}` together when the capability lands. Until then, those
+comments correctly describe the unbuilt surface; after the properties change,
+they would become misleading standing guidance.
 
 Gate: duplicate/self/cycle properties, projection tests, real-browser
 consecutive connection and warning-008 checks, pointer/keyboard parity and

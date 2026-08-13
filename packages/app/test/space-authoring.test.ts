@@ -4,6 +4,7 @@ import {
   newUuid,
   uuidSchema,
   type CardDocument,
+  type CardId,
   type Graph,
   type GraphId,
   type SpaceSnapshot,
@@ -26,6 +27,20 @@ import {
   type SpaceAuthoring,
 } from '../src/space-authoring';
 import { createRendererResolver, type RendererSelection } from '../src/renderer';
+
+/**
+ * The eligibility query, asked in the shape the two connecting gestures ask it.
+ *
+ * One proposal-shaped answer replaced the pair of boolean queries, and these
+ * read it back as the booleans the assertions below are written in — the point
+ * being that the preview and the completion consult one policy, not that the
+ * question is shaped differently.
+ */
+const offersConnection = (authoring: SpaceAuthoring, from: CardId, to: CardId): boolean =>
+  authoring.edgeEligibility({ kind: 'connect', from, to }).kind === 'eligible';
+
+const offersEmptyDrop = (authoring: SpaceAuthoring, from: CardId): boolean =>
+  authoring.edgeEligibility({ kind: 'create-and-connect', from }).kind === 'eligible';
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const CARD_A = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
@@ -670,7 +685,7 @@ describe('Space Authoring', () => {
       ]),
     );
 
-    expect(authoring.canConnect(CARD_B, CARD_A)).toBe(true);
+    expect(offersConnection(authoring, CARD_B, CARD_A)).toBe(true);
     expect(complete(authoring, { kind: 'connected-cards', from: CARD_B, to: CARD_A })).toEqual({
       kind: 'completed',
     });
@@ -679,7 +694,7 @@ describe('Space Authoring', () => {
       { from: CARD_B, to: CARD_A },
     ]);
 
-    expect(authoring.canConnect(CARD_B, CARD_A)).toBe(false);
+    expect(offersConnection(authoring, CARD_B, CARD_A)).toBe(false);
     expect(complete(authoring, { kind: 'connected-cards', from: CARD_B, to: CARD_A })).toEqual({
       kind: 'refused',
       reason: 'These Cards are already connected in this Graph.',
@@ -719,7 +734,7 @@ describe('Space Authoring', () => {
     );
     expect(navigation.getState().activeGraphId).toBe(GRAPH_ID);
 
-    expect(authoring.canConnect(CARD_A, CARD_B)).toBe(true);
+    expect(offersConnection(authoring, CARD_A, CARD_B)).toBe(true);
     expect(complete(authoring, { kind: 'connected-cards', from: CARD_A, to: CARD_B })).toEqual({
       kind: 'completed',
     });
@@ -794,17 +809,17 @@ describe('Space Authoring', () => {
     );
     const before = session.getState().working;
 
-    expect(authoring.canConnect(CARD_A, CARD_C)).toBe(false);
+    expect(offersConnection(authoring, CARD_A, CARD_C)).toBe(false);
     expect(complete(authoring, { kind: 'connected-cards', from: CARD_A, to: CARD_C })).toEqual({
       kind: 'refused',
       reason: 'A connection can only join Cards in this Layout.',
     });
-    expect(authoring.canConnect(CARD_C, CARD_A)).toBe(false);
+    expect(offersConnection(authoring, CARD_C, CARD_A)).toBe(false);
     expect(complete(authoring, { kind: 'connected-cards', from: CARD_C, to: CARD_A })).toEqual({
       kind: 'refused',
       reason: 'A connection can only join Cards in this Layout.',
     });
-    expect(authoring.canCreateConnectedCard(CARD_C)).toBe(false);
+    expect(offersEmptyDrop(authoring, CARD_C)).toBe(false);
     expect(session.getState().working).toBe(before);
   });
 
@@ -861,7 +876,7 @@ describe('Space Authoring', () => {
     expect(session.getState().working).toBe(before);
     expect(control.attempts).toEqual([]);
 
-    expect(authoring.canConnect(CARD_B, CARD_A)).toBe(true);
+    expect(offersConnection(authoring, CARD_B, CARD_A)).toBe(true);
     expect(complete(authoring, { kind: 'connected-cards', from: CARD_B, to: CARD_A })).toEqual({
       kind: 'completed',
     });
@@ -1027,7 +1042,7 @@ describe('Space Authoring', () => {
     });
     replacePlacementForTest(authoring, Placement.fromEntries([[CARD_A, { x: 120, y: 240 }]]));
 
-    expect(authoring.canCreateConnectedCard(CARD_A)).toBe(true);
+    expect(offersEmptyDrop(authoring, CARD_A)).toBe(true);
     expect(
       complete(authoring, {
         kind: 'create-and-connect',
@@ -1070,7 +1085,7 @@ describe('Space Authoring', () => {
         },
       ],
     });
-    expect(authoring.canConnect(CREATED_CARD_ID, CARD_A)).toBe(true);
+    expect(offersConnection(authoring, CREATED_CARD_ID, CARD_A)).toBe(true);
     expect(
       complete(authoring, { kind: 'connected-cards', from: CREATED_CARD_ID, to: CARD_A }),
     ).toEqual({ kind: 'completed' });
@@ -1273,7 +1288,7 @@ describe('Space Authoring', () => {
     });
     const staleCard = uuidSchema.parse('00000000-0000-4000-8000-000000000099');
 
-    expect(authoring.canConnect(CARD_A, CARD_B)).toBe(false);
+    expect(offersConnection(authoring, CARD_A, CARD_B)).toBe(false);
     replacePlacementForTest(
       authoring,
       Placement.fromEntries([
@@ -1281,12 +1296,12 @@ describe('Space Authoring', () => {
         [CARD_B, { x: 300, y: 40 }],
       ]),
     );
-    expect(authoring.canConnect(CARD_A, CARD_B)).toBe(false);
+    expect(offersConnection(authoring, CARD_A, CARD_B)).toBe(false);
     expect(complete(authoring, { kind: 'connected-cards', from: CARD_A, to: CARD_B })).toEqual({
       kind: 'refused',
       reason: 'These Cards are already connected in this Graph.',
     });
-    expect(authoring.canConnect(CARD_A, staleCard)).toBe(false);
+    expect(offersConnection(authoring, CARD_A, staleCard)).toBe(false);
     expect(complete(authoring, { kind: 'connected-cards', from: CARD_A, to: staleCard })).toEqual({
       kind: 'refused',
       reason: 'A connection can only join Cards in this Layout.',

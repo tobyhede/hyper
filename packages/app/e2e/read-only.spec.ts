@@ -3,9 +3,6 @@ import { fileURLToPath } from 'node:url';
 import { expect, test } from './fixtures';
 import { authoringHandle, connectToEmptyWithAlt, nodeByTitle, settled } from './graph';
 
-/** The fixture's A, used as the source of the created Card's Edge. */
-const CARD_A = '00000000-0000-4000-8000-000000000002';
-
 const fixtureDir = fileURLToPath(new URL('../fixture', import.meta.url));
 const readFixture = (directory = fixtureDir, prefix = ''): Record<string, string> =>
   Object.fromEntries(
@@ -40,7 +37,7 @@ test('database persistence never writes structural edits back to imported author
   // A revision bump only proves *something* committed. Name the connection that
   // was drawn, so a commit that recorded a placement and dropped the Edge fails
   // here rather than passing as "persisted".
-  await expect(page.getByLabel(`Edge from ${CARD_A} to ${createdId}`)).toBeVisible();
+  await expect(page.getByLabel(/^Edge from A to Card 1 in /)).toBeVisible();
   // The Alt-drop converted the Algorithmic View, and the Layout it produced owns
   // one fresh Graph holding exactly this Edge (ADR 0045).
   await expect(page.locator('.react-flow__edge')).toHaveCount(1);

@@ -322,7 +322,12 @@ body {
 
 /* A square icon button in the Card's corner. Sized in its own right rather than
    from its content, so the glyph cannot drag the box out of square, and kept
-   clear of the title. */
+   clear of the title.
+
+   The Connect control is the same box in the opposite corner: the keyboard's
+   way into an Edge, since the four spatial handles are drag affordances. Both
+   appear and withdraw on the same hover, focus and selection rules. */
+.card__connect,
 .card__edit {
   position: absolute;
   top: 0.4rem;
@@ -346,16 +351,91 @@ body {
     border-color 100ms ease;
 }
 
+.card__connect {
+  right: auto;
+  left: 0.4rem;
+}
+
+.card__connect:hover,
 .card__edit:hover {
   border-color: var(--accent);
   color: var(--text);
 }
 
+.react-flow__node:hover .card__connect,
 .react-flow__node:hover .card__edit,
+.card__connect:focus-visible,
 .card__edit:focus-visible,
+.rf-card-node__inner[data-selected='true'] .card__connect,
 .rf-card-node__inner[data-selected='true'] .card__edit {
   opacity: 1;
   pointer-events: auto;
+}
+
+/* Controls drawn beside a selected Edge, portalled into React Flow's own
+   `EdgeLabelRenderer` layer so they pan and zoom with the canvas. `pointer-events`
+   is off on that layer by default and has to be restored per control. */
+.edge-toolbar {
+  position: absolute;
+  pointer-events: all;
+}
+
+.edge-toolbar__anchor {
+  display: inline-flex;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel);
+  box-shadow: 0 6px 20px rgb(0 0 0 / 45%);
+}
+
+.edge-toolbar__button {
+  border: 0;
+  border-left: 1px solid var(--border);
+  padding: 0.2rem 0.5rem;
+  background: transparent;
+  color: var(--text);
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.edge-toolbar__button:first-child {
+  border-left: 0;
+}
+
+.edge-toolbar__button:hover {
+  background: var(--border);
+}
+
+.edge-editor__fields {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.edge-editor__refusal,
+.edge-connect-picker__refusal {
+  color: var(--danger, #f08c8c);
+  font-size: 0.75rem;
+}
+
+/* The keyboard connection's target picker. Screen-fixed rather than drawn at the
+   source Card: it opens from a control the author has just activated, and the
+   Card it belongs to may be anywhere in the viewport. */
+.edge-connect-picker {
+  position: absolute;
+  top: 0.75rem;
+  left: 50%;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.5rem;
+  background: var(--panel);
+  box-shadow: 0 12px 40px rgb(0 0 0 / 50%);
+  transform: translateX(-50%);
 }
 
 .card__title-editor {

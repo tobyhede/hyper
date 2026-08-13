@@ -2,151 +2,55 @@ import {
   useCallback,
   useEffect,
   useMemo,
-  useRef,
   useState,
   type KeyboardEvent as ReactKeyboardEvent,
-  type MouseEvent,
 } from 'react';
 import {
   Background,
   Controls,
   ReactFlow,
-  ViewportPortal,
-  useConnection,
-  useReactFlow,
   type Edge,
-  type EdgeChange,
-  type IsValidConnection,
-  type OnConnect,
-  type OnConnectEnd,
-  type OnConnectStart,
+  type OnBeforeDelete,
   type OnEdgesChange,
   type OnNodesChange,
 } from '@xyflow/react';
-import type { LayoutPosition, Graph } from '@project/core';
+import type { Card, CardId, Graph, GraphEdge, GraphId } from '@project/core';
 import {
-  edgeTypes,
   nodeTypes,
   GraphConnectionLine,
   GraphHud,
   type CardFlowNode,
 } from '@project/react-flow-adapter';
 import { activeGraphColor } from '../colors';
-import { CARD_SIZE } from '../card';
-import { newCardDrop, type ConnectionGesture, type DropTarget } from '../connection-gesture';
+import { useEdgeAuthoring } from '../edge-authoring-react';
+import type { EdgeAuthoring } from '../edge-authoring';
+import type { CanvasSelection } from '../render-adapter';
 import { MAX_ZOOM, OVERVIEW_FIT } from '../camera';
 import { OverviewCamera, PresentingCamera } from './cameras';
 
 /**
- * What the graph tells assistive technology it can do — minus the delete.
+ * What the graph tells assistive technology it can do.
  *
  * React Flow's defaults offer "Press delete to remove it" for both a node and an
- * edge. Hyper has no delete Edit: the key is inert, because a removal applied to
- * the live node array is undone by the next projection sync. Sighted users never
- * meet the claim; a screen reader reads it out as the way to work with a Card.
+ * edge. **Only the Edge half is true.** Deleting an Edge is built (package 7)
+ * and routed through `onBeforeDelete` into a completed Space Edit; deleting a
+ * Card from a Layout or from the Space is package 8's, and until it lands the
+ * key is inert for a node — a removal applied to the live node array is undone
+ * by the next projection sync. Sighted users never meet the claim; a screen
+ * reader reads it out as the way to work with a Card.
  *
  * Both node keys are set because React Flow picks between them on
  * `disableKeyboardA11y`, and the one it names `keyboardDisabled` is the one an
  * ordinary keyboard-enabled graph gets.
- *
- * The Edge description names no key, because `edgesFocusable` is false and an
- * Edge therefore never reaches the tab order to receive one. Selecting an Edge
- * leads nowhere — nothing acts on the selection — so opening the tab order to
- * every Edge in the graph would put inert stops between a keyboard user and the
- * next Card. A Card is the opposite case, and keeps its instructions.
  */
 const ARIA_LABEL_CONFIG = {
   'node.a11yDescription.default':
     'Press enter or space to open a Card, the arrow keys to move it, and escape to cancel.',
   'node.a11yDescription.keyboardDisabled':
     'Press enter or space to open a Card, the arrow keys to move it, and escape to cancel.',
-  'edge.a11yDescription.default': 'An Edge a Graph draws from one Card to the next.',
+  'edge.a11yDescription.default':
+    'Press backspace or delete to remove this Edge from its Graph, or escape to deselect it.',
 } as const;
-
-/**
- * Which `DropTarget` the element under the pointer is. Both class names are
- * React Flow's published theming API.
- *
- * This is the DOM half of the question only — a connection target in range
- * outranks it, and both callers apply that precedence before asking
- * `newCardDrop`. Why neither half is sufficient alone is written out in
- * `connection-gesture.ts`.
- *
- * React Flow's own `connectionState.isValid` does not answer this: it is `null`
- * — falsy — whenever no handle is in range, which is exactly what a release over
- * the toolbar produces. The canonical add-node-on-edge-drop example would author
- * a Card there too.
- */
-function dropTargetOf(target: EventTarget | null): DropTarget {
-  if (!(target instanceof Element)) return 'off-canvas';
-  if (target.closest('.react-flow__renderer') === null) return 'off-canvas';
-  return target.closest('.react-flow__node') === null ? 'empty-canvas' : 'card';
-}
-
-/**
- * The Card an Alt-drop would author, drawn where it would land.
- *
- * The endpoint comes from `useConnection`, which converts it to flow coordinates
- * before handing it over — so this needs no `screenToFlowPosition` and no
- * viewport subscription to stay put under pan and zoom. Tracking the point in
- * `SpaceCanvas`'s own state instead re-rendered the whole flow on every pointer
- * frame of a connection.
- *
- * Both eligibility and position come from `newCardDrop`, which the release asks
- * as well: the ghost cannot appear where a release would refuse, and cannot land
- * anywhere but where a release would put it. Each selector stays primitive —
- * returning the assembled gesture from one `useConnection` would hand the store
- * a fresh object every frame.
- */
-function NewCardPreview({
-  title,
-  modifierHeld,
-  pointerOver,
-  acceptsNewCardTarget,
-}: {
-  title: string;
-  modifierHeld: boolean;
-  pointerOver: DropTarget;
-  acceptsNewCardTarget: (from: string) => boolean;
-}) {
-  const endpoint = useConnection((connection) => (connection.inProgress ? connection.to : null));
-  const overNode = useConnection(
-    (connection) => connection.inProgress && connection.toNode !== null,
-  );
-  const sourceId = useConnection((connection) =>
-    connection.inProgress ? connection.fromNode.id : null,
-  );
-  const gesture: ConnectionGesture =
-    endpoint === null || sourceId === null
-      ? { kind: 'idle' }
-      : {
-          kind: 'dragging',
-          sourceId,
-          point: endpoint,
-          over: overNode ? 'connection-target' : pointerOver,
-          modifierHeld,
-        };
-  const drop = newCardDrop(gesture, acceptsNewCardTarget);
-  if (drop === null) return null;
-  const position = drop.position;
-
-  return (
-    <ViewportPortal>
-      <div
-        className="new-card-preview"
-        data-testid="new-card-preview"
-        style={{
-          transform: `translate(${position.x}px, ${position.y}px)`,
-          width: CARD_SIZE.width,
-        }}
-      >
-        <article className="card card--node">
-          <h2 className="card__title">{title}</h2>
-        </article>
-      </div>
-    </ViewportPortal>
-  );
-}
 
 /**
  * The one unmodified authoring shortcut, named where it is bound.
@@ -178,6 +82,8 @@ const NOT_A_CANVAS_COMMAND = 'input, textarea, select, button, [contenteditable=
 export interface SpaceCanvasProps {
   nodes: CardFlowNode[];
   edges: Edge[];
+  /** The next projection, merged in by a completed connection so its Edge draws. */
+  projectedNodes: readonly CardFlowNode[] | null;
   /** The Card the traversal has reached, or `null` in overview. */
   activeCardId: string | null;
   presenting: boolean;
@@ -192,20 +98,14 @@ export interface SpaceCanvasProps {
   /** Card authoring is unavailable while another in-place surface owns focus. */
   titleEditingEnabled: boolean;
   onNodesChange: OnNodesChange<CardFlowNode>;
-  /** A completed React Flow gesture; incomplete connection state stays local. */
-  onConnect: OnConnect;
-  /**
-   * Whether an Edge between these two Cards is acceptable as things stand. Asked
-   * during the drag so a target that cannot take the Edge says so before the
-   * author lets go, and asked again by the editor on release.
-   */
-  acceptsConnection: (from: string, to: string) => boolean;
-  /** Whether this Card may create and connect a new Card on an Alt/Option empty-drop. */
-  acceptsNewCardTarget: (from: string) => boolean;
-  /** Runs before React Flow clears its transient connection state. */
-  onConnectEnd: () => void;
-  /** Complete an explicit modifier empty-drop at the preview's top-left position. */
-  onCreateConnectedCard: (sourceId: string, position: LayoutPosition) => void;
+  onEdgesChange: OnEdgesChange;
+  /** The whole Edge interaction lifecycle, which this canvas composes rather than interprets. */
+  edgeAuthoring: EdgeAuthoring;
+  selection: CanvasSelection;
+  onSelectCard: (cardId: CardId) => void;
+  onSelectEdge: (graphId: GraphId, edge: GraphEdge) => void;
+  /** The Cards this renderer's subject holds — what an Edge picker may offer. */
+  subjectCards: readonly Card[];
   /** Exact neutral title shown by the transient empty-drop preview. */
   newCardTitle: string;
   /**
@@ -237,16 +137,18 @@ export interface SpaceCanvasProps {
 export function SpaceCanvas({
   nodes,
   edges,
+  projectedNodes,
   activeCardId,
   presenting,
   editable,
   titleEditingEnabled,
   onNodesChange,
-  onConnect,
-  acceptsConnection,
-  acceptsNewCardTarget,
-  onConnectEnd,
-  onCreateConnectedCard,
+  onEdgesChange,
+  edgeAuthoring,
+  selection,
+  onSelectCard,
+  onSelectEdge,
+  subjectCards,
   newCardTitle,
   onAddCard,
   nameOnCreation,
@@ -258,15 +160,7 @@ export function SpaceCanvas({
   activeGraphId,
   activeGraphCardIds,
 }: SpaceCanvasProps) {
-  const connectionGesture = useRef(false);
-  const [modifierHeld, setModifierHeld] = useState(false);
-  const [selectedEdgeIds, setSelectedEdgeIds] = useState<ReadonlySet<string>>(() => new Set());
-  // Where the pointer is, not the point it is at: React bails out of an
-  // unchanged state write, so a pointer moving across empty canvas no longer
-  // re-renders the flow per frame.
-  const [pointerOver, setPointerOver] = useState<DropTarget>('off-canvas');
   const [editingTitleCardId, setEditingTitleCardId] = useState<string | null>(null);
-  const { screenToFlowPosition } = useReactFlow();
   // One rule for every authoring control drawn on a Card — the title editor and
   // the Card affordance are offered and withdrawn together.
   const canAuthorCards = editable && titleEditingEnabled && !presenting;
@@ -298,24 +192,23 @@ export function SpaceCanvas({
     if (nameOnCreation !== null) setEditingTitleCardId(nameOnCreation);
   }
 
-  useEffect(() => {
-    const updateModifier = (event: KeyboardEvent) => {
-      if (connectionGesture.current && event.key === 'Alt') {
-        setModifierHeld(event.type === 'keydown');
-      }
-    };
-    window.addEventListener('keydown', updateModifier);
-    window.addEventListener('keyup', updateModifier);
-    return () => {
-      window.removeEventListener('keydown', updateModifier);
-      window.removeEventListener('keyup', updateModifier);
-    };
-  }, []);
+  const edgeSurface = useEdgeAuthoring({
+    authoring: edgeAuthoring,
+    edges,
+    projectedNodes,
+    selection,
+    activeGraphId: (activeGraphId as GraphId | null) ?? null,
+    graphs,
+    subjectCards,
+    newCardTitle,
+    enabled: editable && !presenting,
+    onSelectCard,
+    onSelectEdge,
+  });
 
   // Every handler and object below is memoized because React Flow's own docs
   // carry a warning about it: props recreated each render can drive it into a
-  // re-render loop. `onMouseMove` is the hot one — it runs per pointer frame
-  // during a connection.
+  // re-render loop.
   //
   // `editableNodes` is the known exception, and memoized does not mean cheap
   // there: it rebuilds every node's wrapper whenever `nodes` changes identity,
@@ -325,67 +218,11 @@ export function SpaceCanvas({
   // needs a per-node cache or the callbacks moved into context — more machinery
   // than a ten-Card fixture asks for, so read it as a measured exception rather
   // than an oversight.
-  const isValidConnection = useCallback<IsValidConnection>(
-    (connection) => acceptsConnection(connection.source, connection.target),
-    [acceptsConnection],
-  );
-
-  const handleConnectStart = useCallback<OnConnectStart>((event) => {
-    connectionGesture.current = true;
-    setPointerOver('off-canvas');
-    setModifierHeld('altKey' in event && event.altKey);
-  }, []);
-
-  const handleConnectEnd = useCallback<OnConnectEnd>(
-    (event, connection) => {
-      const drop =
-        connection.fromNode === null || !('altKey' in event) || !('clientX' in event)
-          ? null
-          : newCardDrop(
-              {
-                kind: 'dragging',
-                sourceId: connection.fromNode.id,
-                point: screenToFlowPosition({ x: event.clientX, y: event.clientY }),
-                over:
-                  connection.toNode !== null
-                    ? 'connection-target'
-                    : // Resolved from the point rather than read off the event:
-                      // `event.target` is only the released-over element because
-                      // `XYHandle` happens not to capture the pointer, which is
-                      // an implementation detail rather than a documented
-                      // guarantee. `elementFromPoint` is what React Flow itself
-                      // uses to resolve a drop target.
-                      dropTargetOf(document.elementFromPoint(event.clientX, event.clientY)),
-                modifierHeld: event.altKey,
-              },
-              acceptsNewCardTarget,
-            );
-      if (drop !== null) onCreateConnectedCard(drop.sourceId, drop.position);
-      onConnectEnd();
-      setModifierHeld(false);
-      setPointerOver('off-canvas');
-      // Lowered here rather than deferred past the pointer-up node click React
-      // Flow dispatches after this callback. That deferral existed so the click
-      // ending a connection drag could not open the Card just connected to; a
-      // drag release produces a `click`, and no click opens a Card at all
-      // (ADR 0036). The flag itself stays — the Alt listener and the
-      // empty-canvas hover tracking read it, and neither concerns clicks.
-      connectionGesture.current = false;
-    },
-    [screenToFlowPosition, onCreateConnectedCard, onConnectEnd, acceptsNewCardTarget],
-  );
 
   // No pointer gesture on a Card's body opens it (ADR 0036). A click is left to
   // React Flow, which selects; the double click belongs to the title, which
   // centres in a Card and would otherwise be competing with the Card underneath
   // it for the same pixels. Opening is the affordance and the keyboard.
-
-  const handleMouseMove = useCallback((event: MouseEvent<HTMLDivElement>) => {
-    if (!connectionGesture.current) return;
-    const over = dropTargetOf(event.target);
-    setPointerOver(over);
-    if (over === 'empty-canvas') setModifierHeld(event.altKey);
-  }, []);
 
   const handleKeyDown = useCallback(
     (event: ReactKeyboardEvent<HTMLDivElement>) => {
@@ -452,17 +289,21 @@ export function SpaceCanvas({
     return () => window.removeEventListener('keydown', beginSelectedTitleEdit);
   }, [canAuthorCards, nodes]);
 
+  const beginConnectFrom = edgeSurface.beginConnectFrom;
   const editableNodes = useMemo(
     () =>
       nodes.map((node) => ({
         ...node,
         data: {
           ...node.data,
-          // Two controls, two flags. The title's double click is offered on
-          // every Card; the affordance only on one that owns content to edit.
+          // Three controls, three flags. The title's double click is offered on
+          // every Card; the affordance only on one that owns content to edit;
+          // the Connect control wherever an Edge may begin.
           titleEditingEnabled: canAuthorCards,
           cardEditingEnabled: canAuthorCards && editableCardIds.has(node.id),
+          connectingEnabled: canAuthorCards,
           editingTitle: canAuthorCards && node.id === editingTitleCardId,
+          onBeginConnect: () => beginConnectFrom(node.id),
           onEditCard: () => onOpenCard(node.id),
           onBeginTitleEditing: () => setEditingTitleCardId(node.id),
           onCompleteTitleEditing: (title: string) => {
@@ -473,7 +314,15 @@ export function SpaceCanvas({
           onCancelTitleEditing: () => setEditingTitleCardId(null),
         },
       })),
-    [nodes, canAuthorCards, editableCardIds, editingTitleCardId, onCompleteCardTitle, onOpenCard],
+    [
+      nodes,
+      canAuthorCards,
+      editableCardIds,
+      editingTitleCardId,
+      onCompleteCardTitle,
+      onOpenCard,
+      beginConnectFrom,
+    ],
   );
 
   const connectionLineStyle = useMemo(
@@ -484,43 +333,82 @@ export function SpaceCanvas({
     [activeGraphId, colorByGraphId],
   );
 
-  const selectableEdges = useMemo(
-    () => edges.map((edge) => ({ ...edge, selected: selectedEdgeIds.has(edge.id) })),
-    [edges, selectedEdgeIds],
-  );
-  const handleEdgesChange = useCallback<OnEdgesChange>(
-    (changes) => {
-      const selections = changes.filter(
-        (change): change is Extract<EdgeChange<Edge>, { type: 'select' }> =>
-          change.type === 'select',
-      );
-      if (selections.length === 0) return;
-      setSelectedEdgeIds((selected) => {
-        const currentEdgeIds = new Set(edges.map((edge) => edge.id));
-        const next = new Set([...selected].filter((id) => currentEdgeIds.has(id)));
-        for (const change of selections) {
-          if (change.selected) next.add(change.id);
-          else next.delete(change.id);
-        }
-        return next;
-      });
+  /**
+   * Dispatch one deletion request, and never apply it locally.
+   *
+   * React Flow calls `onBeforeDelete` once for the *combined* payload, having
+   * already gathered every deletable Edge incident to a requested node. So a
+   * payload carrying nodes is a Card deletion whose Edges are consequences, not
+   * several independent Edge deletions — routing on that shape is event
+   * translation, not a deletion rule.
+   *
+   * Returning `false` for the whole payload is what keeps the Space
+   * authoritative: React Flow removes nothing, and the completed Edit supplies
+   * the next controlled projection. A refusal therefore leaves the Edge exactly
+   * where it was, with its reason on the surface that asked.
+   */
+  const beforeDelete = useCallback<OnBeforeDelete<CardFlowNode>>(
+    ({ nodes: requestedNodes, edges: requestedEdges }) => {
+      // Card deletion is package 8's. Until it lands the request is declined
+      // whole, incident Edges included — dropping the Edges of a Card that is
+      // not going anywhere would be a deletion the author never asked for.
+      if (requestedNodes.length === 0) edgeSurface.deleteEdges(requestedEdges);
+      // A promise because React Flow awaits this, and `false` because a
+      // completed Edit — not React Flow — supplies the next projection.
+      return Promise.resolve(false);
     },
-    [edges],
+    [edgeSurface],
   );
 
-  return (
+  const {
+    onConnect,
+    onConnectStart,
+    onConnectEnd,
+    isValidConnection,
+    onReconnectStart,
+    onReconnect,
+    onReconnectEnd,
+    onMouseMove,
+    edgesReconnectable,
+    edgesFocusable,
+    deleteKeyCode,
+    multiSelectionKeyCode,
+    selectionKeyCode,
+    selectionOnDrag,
+  } = edgeSurface.reactFlowProps;
+
+  return edgeSurface.provide(
     <ReactFlow
       nodes={editableNodes}
-      edges={selectableEdges}
+      edges={edgeSurface.edges}
       nodeTypes={nodeTypes}
-      edgeTypes={edgeTypes}
+      edgeTypes={edgeSurface.edgeTypes}
       onNodesChange={onNodesChange}
-      onEdgesChange={handleEdgesChange}
+      onEdgesChange={onEdgesChange}
+      onBeforeDelete={beforeDelete}
+      // Edge Authoring's own properties, named one by one rather than spread, so
+      // no property order below can silently replace one of its handlers.
       onConnect={onConnect}
+      onConnectStart={onConnectStart}
+      onConnectEnd={onConnectEnd}
       isValidConnection={isValidConnection}
-      onConnectStart={handleConnectStart}
-      onConnectEnd={handleConnectEnd}
+      onReconnectStart={onReconnectStart}
+      onReconnect={onReconnect}
+      onReconnectEnd={onReconnectEnd}
+      onMouseMove={onMouseMove}
+      edgesReconnectable={edgesReconnectable}
+      edgesFocusable={edgesFocusable}
+      deleteKeyCode={[...deleteKeyCode]}
+      multiSelectionKeyCode={multiSelectionKeyCode}
+      selectionKeyCode={selectionKeyCode}
+      selectionOnDrag={selectionOnDrag}
       onKeyDown={handleKeyDown}
+      // Programmatically focusable, and deliberately not a tab stop. React Flow's
+      // native Edge Escape calls `blur()`, which leaves focus on `body` — not an
+      // authoring context — and its pane carries no `tabindex`, so there is
+      // nothing for the repair to focus without this. Negative, so the canvas
+      // never becomes a stop a keyboard author has to pass through.
+      tabIndex={-1}
       fitView
       fitViewOptions={OVERVIEW_FIT}
       // Double click on a title renames the Card (ADR 0036); opening is reached
@@ -537,18 +425,12 @@ export function SpaceCanvas({
       elementsSelectable={!presenting}
       nodesConnectable={editable && !presenting}
       ariaLabelConfig={ARIA_LABEL_CONFIG}
-      // Deletion is not built. React Flow's default would apply a removal to the
-      // live node array with no completed Edit behind it — inert today only
-      // because the next projection sync restores the Card.
-      deleteKeyCode={null}
       // No `connectionMode`: the default is Strict, and every legal drop here is
       // already source-to-target. Loose only adds source-to-source, which the
       // authoring handles refuse via `isConnectableEnd` and the graph ports via
       // `pointer-events: none` — so it advertised a capability the design forbids.
       connectionLineStyle={connectionLineStyle}
       connectionLineComponent={GraphConnectionLine}
-      onMouseMove={handleMouseMove}
-      edgesFocusable={false}
       minZoom={0.2}
       // Presenting draws one card full-screen, which is far closer than React
       // Flow's default ceiling of 2. See `MAX_ZOOM` — without it the camera sits
@@ -567,12 +449,7 @@ export function SpaceCanvas({
       )}
       <OverviewCamera presenting={presenting} />
       <PresentingCamera activeCardId={activeCardId} />
-      <NewCardPreview
-        title={newCardTitle}
-        modifierHeld={modifierHeld}
-        pointerOver={pointerOver}
-        acceptsNewCardTarget={acceptsNewCardTarget}
-      />
-    </ReactFlow>
+      {edgeSurface.layer}
+    </ReactFlow>,
   );
 }

@@ -3,7 +3,8 @@ import { SelectTrigger } from './Select';
 
 export interface SelectorTriggerProps {
   accessibleName: string;
-  glyph: ReactNode;
+  /** Absent on a selector whose choices are told apart by their titles alone. */
+  glyph?: ReactNode;
   label: string;
   activeLayout?: boolean;
   className?: string;

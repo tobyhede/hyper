@@ -14,6 +14,8 @@ import {
   uuidSchema,
   type Card,
   type CardId,
+  type GraphEdge,
+  type GraphId,
   type LayoutPosition,
 } from '@project/core';
 import {
@@ -24,7 +26,9 @@ import {
 } from '@project/graph';
 import type { OpenedSpace } from './space';
 import { createSpaceAuthoring } from './space-authoring';
-import { createRenderAdapter } from './render-adapter';
+import { createRenderAdapter, selectedCardOf } from './render-adapter';
+import { createConnectionCompletion } from './connection-completion';
+import { createEdgeAuthoring } from './edge-authoring';
 import { canvasProjection } from './canvas-projection';
 import { canvasContent } from './canvas-content';
 import { usePlacementRendering } from './placement-rendering';
@@ -77,19 +81,15 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
     resolveRenderer,
     initialPlacement,
   });
-  // React Flow knows node ids as plain strings, and asks this per pointer frame.
-  // An id that is not a Card identity is not a connection to accept — answering
-  // false is the honest reading, and a throw mid-drag would be the wrong one.
-  const acceptsGraphConnection = (from: string, to: string): boolean => {
-    const source = uuidSchema.safeParse(from);
-    const target = uuidSchema.safeParse(to);
-    return source.success && target.success && authoring.canConnect(source.data, target.data);
-  };
-  const acceptsNewCardTarget = (from: string): boolean => {
-    const source = uuidSchema.safeParse(from);
-    return source.success && authoring.canCreateConnectedCard(source.data);
-  };
   const useRenderAdapter = createRenderAdapter(authoring);
+  // The Edge lifecycle, composed once beside the two collaborators it consumes.
+  // It owns neither: the render adapter stays authoritative for the projection
+  // and the canvas selection, Space Authoring for eligibility and every Edit.
+  const edgeAuthoring = createEdgeAuthoring({
+    authoring,
+    adapter: useRenderAdapter,
+    connections: createConnectionCompletion({ adapter: useRenderAdapter, authoring }),
+  });
 
   function App() {
     const authoringState = useSyncExternalStore(authoring.subscribe, authoring.getState);
@@ -182,7 +182,8 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
     // uses it. `replacePlacement` keeps the map's identity when the value is
     // unchanged, so this does not defeat the memo below.
     const authoredPositions = authoring.authoredPlacement();
-    const selectedCardId = useRenderAdapter((s) => s.selectedCardId);
+    const selection = useRenderAdapter((s) => s.selection);
+    const selectedCardId = selectedCardOf(selection);
     const moved = useRenderAdapter((s) => s.moved);
     const placement = usePlacementRendering(
       projection.strategyGraph,
@@ -218,6 +219,7 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
 
     const liveProjection = useRenderAdapter((s) => s.projection);
     const changeNodes = useRenderAdapter((s) => s.changeNodes);
+    const changeEdges = useRenderAdapter((s) => s.changeEdges);
     // There is an arrangement to drag once the layout has resolved and the store
     // has taken it. Not a permission — every view is editable (ADR 0025) — but it
     // is false for the frame before the first placement resolves, and again after
@@ -225,7 +227,6 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
     const hasArrangement = liveProjection !== null;
     const canvas = canvasContent(placement, hasArrangement);
     const editable = hasArrangement;
-    const completedConnectionTarget = useRef<string | null>(null);
 
     // One decision resolved from one Space, applied in an order that cannot
     // leave the two collaborators disagreeing. Both steps that may refuse the
@@ -265,37 +266,15 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
       [rendererSpace, activeGraphId],
     );
 
-    const connectCards = useCallback(
-      (connection: { source: string; target: string }) => {
-        // Issue 04 owns Graph minting. An existing Graph can be edited from every
-        // resolved renderer; an Algorithmic View converts using exactly the live
-        // Card positions the author connected between (ADR 0025).
-        // Null while a replacement arrangement resolves. The canvas keeps drawing
-        // the one on screen through that window — deliberately, so a gesture is
-        // never interrupted — so a connection is reachable with no fresh
-        // projection to hand over, and the store keeps its live nodes rather than
-        // reconciling against nothing.
-        const completed = useRenderAdapter
-          .getState()
-          .connectCards(
-            uuidSchema.parse(connection.source),
-            uuidSchema.parse(connection.target),
-            projected?.nodes ?? null,
-          );
-        if (completed) {
-          completedConnectionTarget.current = connection.target;
-        }
-      },
-      [projected],
-    );
+    // The two selection writes the canvas makes that are not React Flow's own —
+    // continuing at a connected Card, and the focus-to-selection bridge for an
+    // Edge. Both are plain store writes with nothing to decide.
+    const selectCard = useCallback((cardId: CardId) => {
+      useRenderAdapter.getState().selectCard(cardId);
+    }, []);
 
-    const finishConnection = useCallback(() => {
-      const target = completedConnectionTarget.current;
-      completedConnectionTarget.current = null;
-      if (target === null) return;
-      requestAnimationFrame(() => {
-        useRenderAdapter.getState().selectCard(uuidSchema.parse(target));
-      });
+    const selectEdge = useCallback((graphId: GraphId, edge: GraphEdge) => {
+      useRenderAdapter.getState().selectEdge(graphId, edge);
     }, []);
 
     /**
@@ -456,13 +435,6 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
       setCreatingAlias(false);
       setAliasRefusal(null);
     }, [presenting]);
-
-    const createConnectedCard = useCallback((sourceId: string, position: LayoutPosition) => {
-      const cardId = useRenderAdapter
-        .getState()
-        .createConnectedCard(uuidSchema.parse(sourceId), position);
-      if (cardId !== null) completedConnectionTarget.current = cardId;
-    }, []);
 
     const completeCardTitle = useCallback((cardIdInput: string, title: string): string | null => {
       const cardId = uuidSchema.safeParse(cardIdInput);
@@ -770,6 +742,12 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
                 key={authoringState.replacementEpoch}
                 nodes={liveProjection?.nodes ?? []}
                 edges={liveProjection?.edges ?? []}
+                // Null while a replacement arrangement resolves. The canvas keeps
+                // drawing the one on screen through that window — deliberately, so
+                // a gesture is never interrupted — so a connection is reachable
+                // with no fresh projection to hand over, and the store keeps its
+                // live nodes rather than reconciling against nothing.
+                projectedNodes={projected?.nodes ?? null}
                 activeCardId={activeCardId}
                 presenting={presenting}
                 editable={editable}
@@ -779,11 +757,12 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
                 // live behind an open Alias creation pane.
                 titleEditingEnabled={openedCardId === null && !creatingAlias}
                 onNodesChange={changeNodes}
-                onConnect={connectCards}
-                acceptsConnection={acceptsGraphConnection}
-                acceptsNewCardTarget={acceptsNewCardTarget}
-                onConnectEnd={finishConnection}
-                onCreateConnectedCard={createConnectedCard}
+                onEdgesChange={changeEdges}
+                edgeAuthoring={edgeAuthoring}
+                selection={selection}
+                onSelectCard={selectCard}
+                onSelectEdge={selectEdge}
+                subjectCards={renderer.subject.cards}
                 newCardTitle={nextCardTitle(sessionState.working)}
                 onAddCard={addCard}
                 nameOnCreation={createdCardId}

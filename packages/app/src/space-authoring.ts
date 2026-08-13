@@ -31,6 +31,45 @@ import { defaultRenderer, type RendererSelection, type ResolveRenderer } from '.
 export type EdgeEndpoint = 'from' | 'to';
 
 /**
+ * An Edge gesture stated in domain terms, before anything has been authored.
+ *
+ * The shape both halves of an Edge interaction are asked in: the live preview
+ * asks {@link SpaceAuthoring.edgeEligibility} and the release asks `complete`,
+ * over one value the surface built once. A gesture the canvas offers therefore
+ * cannot be one the Edit silently drops — and, because a proposal carries
+ * reconnect's *original* Edge and the endpoint being replaced, returning that
+ * endpoint to the Card it came from is eligible rather than looking like an
+ * Edge that already exists.
+ *
+ * `create-and-connect` names no target because the Option/Alt empty drop has
+ * none yet (ADR 0033); the Card it would author is minted by the Edit.
+ */
+export type EdgeProposal =
+  | { readonly kind: 'connect'; readonly from: CardId; readonly to: CardId }
+  | { readonly kind: 'create-and-connect'; readonly from: CardId }
+  | {
+      readonly kind: 'reconnect';
+      readonly graphId: GraphId;
+      readonly edge: GraphEdge;
+      readonly endpoint: EdgeEndpoint;
+      readonly cardId: CardId;
+    };
+
+/**
+ * Whether a proposal may be offered, and why not.
+ *
+ * Two states rather than three: a reconnect returning an endpoint to its
+ * original Card is **eligible**, and settles as `unchanged` when it completes.
+ * Eligibility answers what the author may still do, not what the Edit will
+ * turn out to have changed — a picker that greyed out the Card an endpoint
+ * already names would show the current value as the one forbidden choice.
+ */
+export type EdgeEligibility =
+  { readonly kind: 'eligible' } | { readonly kind: 'refused'; readonly reason: string };
+
+const ELIGIBLE = { kind: 'eligible' } as const;
+
+/**
  * One completed authored fact, as the interaction that finished knows it.
  *
  * Identities and the settled value, never a plan: the interaction says what it
@@ -164,8 +203,16 @@ export interface SpaceAuthoring {
   readonly subscribe: (listener: () => void) => () => void;
   readonly reportRendered: (rendered: Placement) => void;
   readonly replacePlacement: (placement: Placement | null) => void;
-  readonly canConnect: (from: CardId, to: CardId) => boolean;
-  readonly canCreateConnectedCard: (from: CardId) => boolean;
+  /**
+   * Whether an Edge gesture may be offered as things stand, and why not.
+   *
+   * The one eligibility query for every Edge path — connect, create-and-connect
+   * and reconnect — asked by the live preview, by React Flow's
+   * `isValidConnection` during a drag, and by a picker deciding which Cards to
+   * disable. Completion validates the same proposal again, because the Space can
+   * change while a preview or a picker is open.
+   */
+  readonly edgeEligibility: (proposal: EdgeProposal) => EdgeEligibility;
   readonly complete: (completion: AuthoringCompletion) => AuthoringResult;
   readonly retryPersistence: () => void;
   /**
@@ -350,14 +397,60 @@ const indexOfEdge = (edges: readonly GraphEdge[], edge: GraphEdge): number =>
  * owns none of it. Add Graph is deliberately absent: it converts, and the Graph
  * it asked for becomes the new Layout's initial one.
  */
+const LAYOUT_REQUIRED_FOR_EDGES = 'Select a Layout to edit its Edges.';
+
 const LAYOUT_ONLY: Partial<Record<AuthoringCompletion['kind'], string>> = {
   'added-card-to-layout': 'Select a Layout to add an existing Card to it.',
   'removed-card-from-layout': 'Select a Layout to remove a Card from it.',
   'renamed-graph': 'Select a Layout to manage its Graphs.',
   'recolored-graph': 'Select a Layout to manage its Graphs.',
   'deleted-graph': 'Select a Layout to manage its Graphs.',
-  'reconnected-edge': 'Select a Layout to edit its Edges.',
-  'deleted-edge': 'Select a Layout to edit its Edges.',
+  'reconnected-edge': LAYOUT_REQUIRED_FOR_EDGES,
+  'deleted-edge': LAYOUT_REQUIRED_FOR_EDGES,
+};
+
+/** A Graph named by an operation that this Layout turns out not to own. */
+const UNOWNED_GRAPH = 'That Graph is not one this Layout owns.';
+
+/** What a reconnected endpoint settles to, before anything has been written. */
+type ReconnectOutcome =
+  | { readonly kind: 'edge'; readonly edge: GraphEdge }
+  | { readonly kind: 'unchanged' }
+  | { readonly kind: 'refused'; readonly reason: string };
+
+/**
+ * The one reconnection rule, asked by eligibility and again by the Edit.
+ *
+ * Both callers need the same four answers and one of them needs the resulting
+ * Edge, so this returns it rather than a boolean the completion would have to
+ * recompute. The order is deliberate: **unchanged is decided before
+ * membership**, because a Card that is already this Edge's endpoint is by
+ * definition in this Layout, and asking the placement first would refuse a
+ * dragged endpoint dropped back where it started on a Layout still arranging.
+ */
+const reconnectOutcome = (
+  graph: Graph | undefined,
+  proposal: { readonly edge: GraphEdge; readonly endpoint: EdgeEndpoint; readonly cardId: CardId },
+  placement: Placement,
+): ReconnectOutcome => {
+  // Ownership, not existence: a Graph a *second* Layout owns exists and is
+  // still not one this Edit may write (ADR 0040).
+  if (graph === undefined) return { kind: 'refused', reason: UNOWNED_GRAPH };
+  if (indexOfEdge(graph.edges, proposal.edge) === -1) {
+    return { kind: 'refused', reason: 'That Edge is no longer in this Graph.' };
+  }
+  const reconnected: GraphEdge =
+    proposal.endpoint === 'from'
+      ? { from: proposal.cardId, to: proposal.edge.to }
+      : { from: proposal.edge.from, to: proposal.cardId };
+  if (sameEdge(proposal.edge, reconnected)) return UNCHANGED;
+  if (!placement.has(proposal.cardId)) {
+    return { kind: 'refused', reason: 'An Edge can only join Cards in this Layout.' };
+  }
+  if (indexOfEdge(graph.edges, reconnected) !== -1) {
+    return { kind: 'refused', reason: 'These Cards are already connected in this Graph.' };
+  }
+  return { kind: 'edge', edge: reconnected };
 };
 
 /**
@@ -612,16 +705,47 @@ export function createSpaceAuthoring({
     return null;
   };
 
-  const canConnect = (from: CardId, to: CardId): boolean => connectRefusal(from, to) === null;
+  /** The Graph a Layout-owned Edge operation names, resolved through ownership. */
+  const ownedGraph = (graphId: GraphId): Graph | undefined => {
+    const { selectedRenderer } = navigation.getState();
+    if (selectedRenderer.kind === 'view') return undefined;
+    return currentSpace()
+      .lookup.layout(selectedRenderer.layoutId)
+      ?.layout.graphs.find((graph) => graph.id === graphId);
+  };
 
   /**
-   * The mirror of the above for an Option/Alt empty drop.
+   * The one eligibility answer for every Edge gesture.
    *
-   * The signature is `(from: CardId) => boolean` and stays that way —
-   * `connection-gesture` consumes it as its `accepts` capability, asked per
-   * pointer frame by both the live preview and the release.
+   * Each branch asks exactly the rule its completion asks — `connectRefusal`
+   * for the two connecting gestures, `reconnectOutcome` for the third — so the
+   * preview and the Edit cannot drift apart. Nothing here mints, installs or
+   * publishes: it is a question about the Space as it stands, and the Space can
+   * still change before the completion asks again.
    */
-  const canCreateConnectedCard = (from: CardId): boolean => connectRefusal(from, null) === null;
+  const edgeEligibility = (proposal: EdgeProposal): EdgeEligibility => {
+    if (proposal.kind !== 'reconnect') {
+      const refusal = connectRefusal(
+        proposal.from,
+        proposal.kind === 'connect' ? proposal.to : null,
+      );
+      return refusal === null ? ELIGIBLE : { kind: 'refused', reason: refusal };
+    }
+    // Reconnection has no answer at all without a Layout, and refusing here
+    // rather than converting is the same rule `LAYOUT_ONLY` states for the
+    // completion: an Algorithmic View owns no Edge to move an endpoint of.
+    if (navigation.getState().selectedRenderer.kind === 'view') {
+      return { kind: 'refused', reason: LAYOUT_REQUIRED_FOR_EDGES };
+    }
+    if (placement === null) {
+      return {
+        kind: 'refused',
+        reason: 'This view has not finished arranging, so there is nowhere to write yet.',
+      };
+    }
+    const outcome = reconnectOutcome(ownedGraph(proposal.graphId), proposal, placement);
+    return outcome.kind === 'refused' ? outcome : ELIGIBLE;
+  };
 
   /**
    * Derive the complete next state of every collaborator, or refuse.
@@ -887,7 +1011,7 @@ export function createSpaceAuthoring({
       const graph = ownedGraphs[graphIndex];
       // Ownership, not existence: a Graph a *second* Layout owns exists and is
       // still not one this Edit may write (ADR 0040).
-      if (graph === undefined) return refuse('That Graph is not one this Layout owns.');
+      if (graph === undefined) return refuse(UNOWNED_GRAPH);
       const replacing = (next: Graph): readonly Graph[] =>
         ownedGraphs.map((existing, index) => (index === graphIndex ? next : existing));
       if (completion.kind === 'renamed-graph') {
@@ -916,27 +1040,17 @@ export function createSpaceAuthoring({
           edges: graph.edges.filter((_, index) => index !== edgeIndex),
         });
       } else {
+        // The same rule `edgeEligibility` offered the gesture under, asked again
+        // because the Space can have changed since — and answering with the
+        // resulting Edge rather than a boolean, so there is nothing to rederive.
+        const outcome = reconnectOutcome(graph, completion, completedPlacement);
+        if (outcome.kind !== 'edge') return outcome;
         const edgeIndex = indexOfEdge(graph.edges, completion.edge);
-        if (edgeIndex === -1) return refuse('That Edge is no longer in this Graph.');
-        const reconnected: GraphEdge =
-          completion.endpoint === 'from'
-            ? { from: completion.cardId, to: completion.edge.to }
-            : { from: completion.edge.from, to: completion.cardId };
-        // Dragging an endpoint back where it came from is the author saying
-        // nothing, which is why this is answered before eligibility: a Card that
-        // is already this Edge's endpoint is by definition in this Layout.
-        if (sameEdge(completion.edge, reconnected)) return UNCHANGED;
-        if (!completedPlacement.has(completion.cardId)) {
-          return refuse('An Edge can only join Cards in this Layout.');
-        }
-        if (indexOfEdge(graph.edges, reconnected) !== -1) {
-          return refuse('These Cards are already connected in this Graph.');
-        }
         // In place, so reconnecting does not reorder a Graph's Edges — that order
         // is what a branching Card's moves are offered in (ADR 0024).
         ownedGraphs = replacing({
           ...graph,
-          edges: graph.edges.map((edge, index) => (index === edgeIndex ? reconnected : edge)),
+          edges: graph.edges.map((edge, index) => (index === edgeIndex ? outcome.edge : edge)),
         });
       }
     }
@@ -1172,8 +1286,7 @@ export function createSpaceAuthoring({
     subscribe: observable.subscribe,
     reportRendered,
     replacePlacement: install,
-    canConnect,
-    canCreateConnectedCard,
+    edgeEligibility,
     complete,
     retryPersistence: session.retry,
     // Read at the moment the author asks, never captured earlier. `session`

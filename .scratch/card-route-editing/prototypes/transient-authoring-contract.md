@@ -73,7 +73,7 @@ derived from the fully installed preceding state.
 | Add to Layout | External drag or active Cards View item | Eligible empty-canvas drop or center-add | Card remains absent from that Layout |
 | Move Card | React Flow drag frames | Settled position differs from authored position | Restore/project authored position if cancelled |
 | Remove from Layout | Armed Card consequence | Second activation | Disarm and keep Card plus Edges |
-| Delete Edge | None after focused command | Command or eligible endpoint empty-drop | Cancelled endpoint drag restores Edge |
+| Delete Edge | None after selection command | Command or eligible endpoint empty-drop | Cancelled endpoint drag restores Edge |
 | Delete Graph | Armed Graph consequence | Second activation | Disarm and keep Graph |
 | Delete Card from Space | Armed aggregate consequence | Second activation | Disarm and keep Card everywhere |
 

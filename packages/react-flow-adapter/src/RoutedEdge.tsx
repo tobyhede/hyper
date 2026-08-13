@@ -34,24 +34,75 @@ function polyline(points: LayoutPosition[]): string {
   return points.map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x} ${point.y}`).join(' ');
 }
 
-export function RoutedEdge({
-  id,
+/** Where a routed polyline reads as its middle: the bend nearest half its length. */
+function polylineMidpoint(points: LayoutPosition[]): LayoutPosition {
+  const lengths = points.map((point, index) => {
+    const previous = points[index - 1];
+    if (previous === undefined) return 0;
+    return Math.hypot(point.x - previous.x, point.y - previous.y);
+  });
+  const total = lengths.reduce((sum, length) => sum + length, 0);
+  let travelled = 0;
+  for (const [index, length] of lengths.entries()) {
+    const previous = points[index - 1];
+    const point = points[index];
+    if (previous === undefined || point === undefined) continue;
+    if (travelled + length >= total / 2) {
+      const along = length === 0 ? 0 : (total / 2 - travelled) / length;
+      return {
+        x: previous.x + (point.x - previous.x) * along,
+        y: previous.y + (point.y - previous.y) * along,
+      };
+    }
+    travelled += length;
+  }
+  return points[0] ?? { x: 0, y: 0 };
+}
+
+/** An Edge's drawn path and the point a label or toolbar sits at. */
+export interface RoutedEdgeGeometry {
+  readonly path: string;
+  readonly labelX: number;
+  readonly labelY: number;
+}
+
+/**
+ * The one decision about how a routed Edge is drawn, and where its middle is.
+ *
+ * Exported because an application may compose a richer Edge over this one —
+ * selection controls, a toolbar — and such an Edge needs the same midpoint the
+ * path implies. Recomputing it beside the composition would be a second answer
+ * to "is this Edge routed", and the two would disagree the first time a layout
+ * stopped placing sections.
+ */
+export function routedEdgeGeometry({
   data,
-  markerEnd,
-  style,
   sourceX,
   sourceY,
   sourcePosition,
   targetX,
   targetY,
   targetPosition,
-}: EdgeProps<RoutedFlowEdge>) {
+}: EdgeProps<RoutedFlowEdge>): RoutedEdgeGeometry {
   const points = data?.points;
+  if (points && points.length >= 2) {
+    const middle = polylineMidpoint(points);
+    return { path: polyline(points), labelX: middle.x, labelY: middle.y };
+  }
+  const [path, labelX, labelY] = getBezierPath({
+    sourceX,
+    sourceY,
+    sourcePosition,
+    targetX,
+    targetY,
+    targetPosition,
+  });
+  return { path, labelX, labelY };
+}
 
-  const path =
-    points && points.length >= 2
-      ? polyline(points)
-      : getBezierPath({ sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition })[0];
+export function RoutedEdge(props: EdgeProps<RoutedFlowEdge>) {
+  const { id, markerEnd, style } = props;
+  const { path } = routedEdgeGeometry(props);
 
   return (
     <BaseEdge

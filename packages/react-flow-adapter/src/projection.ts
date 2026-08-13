@@ -63,6 +63,13 @@ export type CardNodeData = {
   /** Whether this Card owns content to edit — an Alias does not. */
   cardEditingEnabled?: boolean;
   editingTitle?: boolean;
+  /**
+   * Whether this Card offers the one tab-stop control that begins an Edge from
+   * the keyboard. The four spatial handles are a pointer affordance and reach no
+   * keyboard author, so a Card that can be connected from needs a real control.
+   */
+  connectingEnabled?: boolean;
+  onBeginConnect?: () => void;
   onEditCard?: () => void;
   onBeginTitleEditing?: () => void;
   onCompleteTitleEditing?: (title: string) => string | null;

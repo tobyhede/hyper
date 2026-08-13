@@ -154,6 +154,28 @@ export const AliasIcon = ({ size = 14 }: { size?: number }) => (
   </svg>
 );
 
+/**
+ * Inlined lucide `arrow-right-from-line`, for the control that starts a
+ * connection from the Card it is drawn on.
+ */
+export const ConnectIcon = ({ size = 12 }: { size?: number }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
+    <path d="M3 5v14" />
+    <path d="M21 12H7" />
+    <path d="m15 18 6-6-6-6" />
+  </svg>
+);
+
 /** A page with lines on it: the Card kind that owns the Markdown it draws. */
 export const MarkdownIcon = ({ size = 14 }: { size?: number }) => (
   <svg

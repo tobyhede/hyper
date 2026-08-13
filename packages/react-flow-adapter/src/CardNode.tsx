@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Handle, Position, useConnection, type NodeProps } from '@xyflow/react';
-import { CardContent, CardKindIcon, EditIcon } from '@project/ui';
+import { CardContent, CardKindIcon, ConnectIcon, EditIcon } from '@project/ui';
 import type { CardFlowNode, CardHandle } from './projection';
 import { AUTHORING_HANDLE_DIAMETER, GRAPH_PORT_DIAMETER } from './authoring-handle';
 
@@ -260,6 +260,27 @@ export function CardNode({ data, selected }: NodeProps<CardFlowNode>) {
             <p className="card__alias-of" data-testid="alias-marker">
               {data.aliasOf}
             </p>
+          )}
+          {/* The keyboard's way into an Edge. The four spatial handles (ADR
+              0033) are drag affordances and reach no keyboard author, so this
+              is the one tab stop that begins a connection — it opens a target
+              picker rather than starting a drag. Same event discipline as the
+              Edit control beside it. */}
+          {data.connectingEnabled && !data.editingTitle && (
+            <button
+              type="button"
+              className="card__connect nodrag nopan"
+              data-testid="connect-from-card"
+              aria-label={`Connect from ${data.title}`}
+              onClick={(event) => {
+                event.stopPropagation();
+                data.onBeginConnect?.();
+              }}
+              onPointerDown={(event) => event.stopPropagation()}
+              onKeyDown={(event) => event.stopPropagation()}
+            >
+              <ConnectIcon />
+            </button>
           )}
           {data.cardEditingEnabled && !data.editingTitle && (
             <button

@@ -49,8 +49,7 @@ delete icon appears.
 
 A second `Delete` or `Backspace` completes one Edit. `Escape`, deselection,
 opening the Card, selecting another Layout, or selecting another target
-disarms it. Multiple selected Cards provide no removal action; bulk removal is
-out of scope.
+disarms it. Multi-selection is disabled; bulk removal is out of scope.
 
 ## Frame 2 — remove atomically, then make re-adding possible
 

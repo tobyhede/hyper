@@ -14,12 +14,18 @@ The justified React Flow deviations are deliberately narrow:
 
 - Card `Enter` and `Space` open the Card, so keyboard focus also selects the
   Card instead of requiring React Flow's separate selection activation.
+- React Flow does not select an Edge on focus. Hyper does, so an Edge reached by
+  Tab becomes the sole selection and the native Delete command has that visible
+  subject.
+- React Flow's Edge Escape can blur to `body`. Hyper restores canvas focus when
+  no other control took focus, because `body` is not a Hyper authoring context.
 - While a Layout is selected, unmodified arrows navigate its Active Graph.
 - React Flow does not provide keyboard connection authoring or endpoint
   reconnection, so Hyper exposes Card pickers for those operations.
 
-React Flow retains Tab order, focusability, automatic focus panning, selection,
-and shifted node movement wherever Hyper has not explicitly replaced them.
+React Flow retains Tab order, focusability, selection, and shifted node
+movement wherever Hyper has not explicitly replaced them. It pans to focused
+Nodes, not focused Edges; Hyper accepts that and adds no Edge focus panning.
 Inactive Graph Edges are individually non-focusable because they are visible
 context rather than authorable objects.
 
@@ -41,8 +47,8 @@ References:
 | Selected Card in a Layout | `Shift` + arrow | Move by React Flow's native four flow units |
 | Selected Card in an Algorithmic View | Arrow | Move by React Flow's native one flow unit and convert |
 | Selected Card in an Algorithmic View | `Shift` + arrow | Move by React Flow's native four flow units and convert |
-| Focused Card | `Delete` / `Backspace` twice | Remove from Layout |
-| Focused active-Graph Edge | `Delete` / `Backspace` | Delete Edge immediately |
+| Selected Card | `Delete` / `Backspace` twice | Remove from Layout |
+| Selected Active Graph Edge | `Delete` / `Backspace` | Delete Edge immediately |
 | Topmost interaction | `Escape` | Cancel or close that interaction only |
 | Presenting | Arrows / `Space` / `Escape` | Retain the existing presentation controls |
 
@@ -126,12 +132,14 @@ and selects the target Card so another connection can continue naturally.
 Escape cancels and restores the source Card. On an Algorithmic View, the same
 operation converts, creates the initial Graph, and adds the Edge atomically.
 
-Only the Active Graph's Edges enter the Tab order. `Enter` or `Space` on one
-opens a minimal shadcn Popover for Edge editing. Its **From** and **To** fields
-reuse the same Layout-Card Combobox; choosing the existing endpoint is a no-op
-and a duplicate result is disabled. `Delete` or `Backspace` deletes the focused
-Edge immediately. Escape uses Popover's normal dismissal and restores Edge
-focus.
+Only the Active Graph's Edges enter the Tab order. Focusing one makes it the
+sole selection, which shows its `EdgeToolbar`. Enter and Space keep React
+Flow's native selection meaning on the Edge. A normal toolbar button opens the
+minimal shadcn Popover for Edge editing. Its **From** and **To** fields reuse the
+same Layout-Card Combobox; choosing the existing endpoint is a no-op and a
+duplicate result is disabled. Package 7 configures React Flow's Delete command
+for both `Delete` and `Backspace`; it deletes the sole selected Edge
+immediately. Escape uses Popover's normal dismissal and restores Edge focus.
 
 React Flow owns pointer endpoint dragging. Keyboard editing uses semantic Card
 selection rather than attempting to simulate pointer geometry.
@@ -166,17 +174,21 @@ reads.
 
 ## Deletion and Escape
 
-Deletion is scoped to the focused selected canvas object. A pointer-selected
-object with focus elsewhere is not deleted, and native text/control deletion
-is never intercepted.
+Deletion follows React Flow selection. Package 7 sets
+`deleteKeyCode={['Backspace', 'Delete']}` because React Flow 12.11.2 defaults to
+Backspace alone. Either key requests deletion of the sole selected canvas
+object by selection, not by focus. React Flow's normal input protection leaves
+native text editing unchanged. Hyper's toolbars use `.nokey`, so their controls
+are protected too. Hyper uses `onBeforeDelete` to complete or refuse the
+semantic Edit before the controlled projection changes.
 
-On a focused Card, the first `Delete` or `Backspace` arms Remove from Layout,
+On a selected Card, the first `Delete` or `Backspace` arms Remove from Layout,
 visually makes the state bold and red, and announces its concise consequence.
 A second Delete or Backspace completes it. Changing focus, target, or selection
-disarms it. Multiple selection does nothing and announces `Bulk removal is not
-available`. A focused active-Graph Edge deletes immediately because its
-consequence is narrow. Delete Card from Space and Delete Graph remain their
-visible two-activation buttons; the latter is unavailable for the last Graph.
+disarms it. Multi-selection is disabled. A selected Active Graph Edge deletes
+immediately because its consequence is narrow. Delete Card from Space and
+Delete Graph remain their visible two-activation buttons; the latter is
+unavailable for the last Graph.
 
 Escape is consumed by exactly one topmost owner:
 
@@ -185,6 +197,11 @@ Escape is consumed by exactly one topmost owner:
 3. Close the open Edge Popover, Graph manager, Cards View, or Card editor.
 4. On the bare graph, clear selection and Traversal history and focus canvas.
 5. During Presenting, exit Presenting.
+
+React Flow's native Edge Escape clears selection but can leave focus on `body`.
+After that handler, Hyper focuses the canvas only if no other control has taken
+focus. This repair is a deliberate deviation: workspace commands require a
+defined graph focus, and `body` names no authoring context.
 
 **Amended by ADR 0048.** This paragraph previously read: "A field draft consumes
 the first Escape without closing its containing surface; a second Escape may
