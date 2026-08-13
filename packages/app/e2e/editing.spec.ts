@@ -1228,6 +1228,39 @@ test('cancelling the Alias Target picker creates nothing', async ({ page }) => {
 });
 
 /**
+ * The pane's controls stay reachable when the pane cannot fit its content.
+ *
+ * `.card-pane__panel` is a fixed 16/9 frame that clips, and its width is clamped
+ * by viewport height — so on a short or narrow window the panel is smaller than
+ * what is in it. The opened-Card editor survives that because its Markdown field
+ * absorbs the squeeze, but the Alias creation pane has no such field: heading,
+ * Title, list, hint and actions are all fixed. With the frame clipping and
+ * nothing inside it scrolling, Cancel and the refusal line simply fall off the
+ * bottom, and a wheel over the panel does nothing because `overflow: hidden`
+ * takes no wheel.
+ *
+ * 500px is below the ~620px where clipping begins, measured against this pane.
+ */
+test('keeps the Alias pane’s controls reachable on a short viewport', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 500 });
+  await page.goto('/');
+  await expect(nodeByTitle(page, 'A').first()).toBeVisible();
+  await settled(page);
+
+  await page.getByTestId('add-card-menu').click();
+  await page.getByRole('menuitem', { name: 'Add Alias' }).click();
+  const panel = page.locator('.card-pane__panel');
+  await expect(panel).toBeVisible();
+  const box = await panel.boundingBox();
+  if (box === null) throw new Error('the pane has no box');
+
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.wheel(0, 600);
+
+  await expect(page.getByRole('button', { name: 'Cancel' })).toBeInViewport();
+});
+
+/**
  * The same two-stage rule, on the field beside that picker.
  *
  * The Title holds a draft exactly as the search does and the contract exempts

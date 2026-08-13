@@ -628,6 +628,15 @@ body {
   min-height: 0;
   flex-direction: column;
   gap: 0.75rem;
+  /* This is the content region the frame's own comment promises scrolls. It had
+     `flex: 1; min-height: 0` and no `overflow`, so nothing did: the panel clips
+     at a fixed 16/9 whose width is clamped by viewport height, and anything
+     taller simply fell off the bottom with no way to reach it — `overflow:
+     hidden` takes no wheel. The opened-Card editor hid that, because its
+     Markdown field absorbs the squeeze; the Alias creation pane has no such
+     field, so at a viewport below ~620px tall (or ~1000px wide) its refusal
+     line and its Cancel button were both unreachable by pointer. */
+  overflow-y: auto;
 }
 
 /* Two Cards on one line: the occurrence the author opened, and the Card whose
@@ -694,7 +703,13 @@ body {
 
 .card-pane__field textarea {
   flex: 1;
-  min-height: 8rem;
+  /* A floor low enough that the pane above it does not have to scroll in the
+     ordinary case. At 8rem this field alone overflowed the delegated pane by
+     17–64px at *every* window size, a maximised one included, because the
+     occurrence's Title and Target sit above it and the floor would not yield.
+     The scroll added to `.card-pane__editor` is the fallback for a genuinely
+     small window, not the normal state of a full-screen editor. */
+  min-height: 4rem;
   resize: none;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   line-height: 1.5;
