@@ -9,7 +9,6 @@ import { cn } from './lib/utils';
  * returning focus to the trigger — none of which is re-implemented here.
  */
 export const Popover = PopoverPrimitive.Root;
-export const PopoverTrigger = PopoverPrimitive.Trigger;
 export const PopoverAnchor = PopoverPrimitive.Anchor;
 
 export const PopoverContent = forwardRef<

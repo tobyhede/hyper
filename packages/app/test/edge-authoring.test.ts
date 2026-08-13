@@ -348,6 +348,35 @@ describe('draft invalidation', () => {
     expect(edges.getState().draft).toBeNull();
   });
 
+  /**
+   * CONTEXT.md's **Selected Edge**: an Edge outside the Active Graph "cannot
+   * remain selected". Activating another Graph is not an Edit and moves no Edge,
+   * but the selection is what the Edge's own toolbar draws from — so leaving it
+   * would keep Delete live on an Edge the canvas has stopped offering.
+   */
+  it('drops a selected Edge the Active Graph has left behind', () => {
+    const { edges, adapter, navigation } = open();
+    adapter.getState().selectEdge(GRAPH_ID, EDGE);
+    expect(edges.getState().draft).toBeNull();
+
+    navigation.activateGraph(OTHER_GRAPH_ID);
+
+    expect(adapter.getState().selection).toEqual({ kind: 'none' });
+  });
+
+  it('keeps a selected Edge whose Graph is still the Active one', () => {
+    const { adapter, authoring } = open();
+    adapter.getState().selectEdge(GRAPH_ID, EDGE);
+
+    authoring.complete({ kind: 'renamed-graph', graphId: OTHER_GRAPH_ID, title: 'Renamed' });
+
+    expect(adapter.getState().selection).toEqual({
+      kind: 'edge',
+      graphId: GRAPH_ID,
+      edge: EDGE,
+    });
+  });
+
   it('cancels a keyboard connection when the canvas selects another Card', () => {
     const { edges, adapter } = open();
     edges.beginKeyboardConnect(CARD_A);
@@ -373,6 +402,53 @@ describe('draft invalidation', () => {
   });
 });
 
+/**
+ * The keyboard path settles differently from the pointer's, and owes one thing
+ * the pointer does not: the picker holding focus unmounts with the draft, so a
+ * completed connection has to say where focus goes.
+ */
+describe('completing a keyboard connection', () => {
+  it('authors the Edge, settles the draft and asks for focus at the target', () => {
+    const { edges, session } = open();
+    edges.beginKeyboardConnect(CARD_B);
+
+    expect(edges.completeKeyboardConnect(CARD_C, PROJECTED)).toBe(CARD_C);
+
+    expect(graphsOf(session.getState().working)[0]?.edges).toEqual([
+      EDGE,
+      { from: CARD_B, to: CARD_C },
+    ]);
+    expect(edges.getState().draft).toBeNull();
+    expect(edges.takeFocusRequest()).toEqual({ kind: 'card', cardId: CARD_C });
+  });
+
+  /**
+   * The picker offered this target, so a refusal means the Space changed while
+   * it was open — which is exactly why completion asks eligibility again. The
+   * draft and its sentence stand so the author can pick another Card.
+   */
+  it('keeps the draft and its reason when the completion is refused', () => {
+    const { edges, session } = open();
+    const before = session.getState().working;
+    edges.beginKeyboardConnect(CARD_A);
+
+    expect(edges.completeKeyboardConnect(CARD_B, PROJECTED)).toBeNull();
+
+    expect(session.getState().working).toBe(before);
+    expect(edges.getState().draft).toEqual({ kind: 'keyboard-connect', from: CARD_A });
+    expect(edges.getState().refusal).toBe('These Cards are already connected in this Graph.');
+  });
+
+  it('does nothing without an open keyboard draft', () => {
+    const { edges, session } = open();
+    const before = session.getState().working;
+
+    expect(edges.completeKeyboardConnect(CARD_C, PROJECTED)).toBeNull();
+
+    expect(session.getState().working).toBe(before);
+  });
+});
+
 describe('completing a pointer connection', () => {
   it('authors the Edge and hands back the Card to continue at', () => {
     const { edges, session } = open();
@@ -384,7 +460,7 @@ describe('completing a pointer connection', () => {
       EDGE,
       { from: CARD_B, to: CARD_C },
     ]);
-    expect(edges.endPointerConnect()).toBe(CARD_C);
+    expect(edges.endPointerDrag()).toBe(CARD_C);
   });
 
   it('reports the refusal and continues at nobody when Authoring declines', () => {
@@ -396,16 +472,47 @@ describe('completing a pointer connection', () => {
 
     expect(session.getState().working).toBe(before);
     expect(edges.getState().refusal).toBe('These Cards are already connected in this Graph.');
-    expect(edges.endPointerConnect()).toBeNull();
+    expect(edges.endPointerDrag()).toBeNull();
   });
 
   it('ends the pointer draft with the drag, whatever it produced', () => {
     const { edges } = open();
     edges.beginPointerConnect(CARD_B);
 
-    edges.endPointerConnect();
+    edges.endPointerDrag();
 
     expect(edges.getState().draft).toBeNull();
+  });
+
+  /**
+   * A refusal normally retains its draft so the author can correct the proposal.
+   * A finished drag is the exception, and it applies to both pointer drafts: the
+   * gesture is over, there is no surface left to correct, and the sentence is the
+   * whole of what the author is told — so the draft goes and the message stays.
+   */
+  it.each([
+    [
+      'a connection',
+      (edges: ReturnType<typeof open>['edges']) => edges.beginPointerConnect(CARD_A),
+    ],
+    [
+      'a reconnection',
+      (edges: ReturnType<typeof open>['edges']) =>
+        edges.beginPointerReconnect(GRAPH_ID, EDGE, 'to'),
+    ],
+  ])('keeps a refusal %s produced after the drag ends', (_name, begin) => {
+    const { edges } = open();
+    begin(edges);
+    // Both refuse for a reason Space Authoring owns: A→B already exists in this
+    // Graph, and this Card is not in this Layout.
+    if (edges.getState().draft?.kind === 'pointer-connect') edges.connect(CARD_A, CARD_B, null);
+    else edges.reconnect('to', uuidSchema.parse('00000000-0000-4000-8000-0000000000aa'));
+    expect(edges.getState().refusal).not.toBeNull();
+
+    edges.endPointerDrag();
+
+    expect(edges.getState().draft).toBeNull();
+    expect(edges.getState().refusal).not.toBeNull();
   });
 });
 

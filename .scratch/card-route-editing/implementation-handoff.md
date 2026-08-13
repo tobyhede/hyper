@@ -462,6 +462,33 @@ drift. Proofs: `space-authoring-operations.test.ts` (`Edge eligibility`),
 `render-adapter.test.ts` for the additive selection order, and the Edge
 lifecycle scenarios in `editing.spec.ts`.
 
+Review found five things and all five are closed:
+
+- **A selected Edge survived an Active Graph change**, leaving its toolbar's
+  Delete live on an Edge the canvas had stopped offering — CONTEXT.md's
+  *Selected Edge* says one "cannot remain selected". Now dropped by a second
+  Edge Authoring subscriber, and the decoration conjoins `selected` with the
+  Active Graph so no frame renders it either way.
+- **Escape did not cancel a keyboard connection.** The picker now takes focus as
+  it opens and answers Escape; Radix owns the first press while its listbox is
+  open, so the two nest as "topmost first".
+- **A completed keyboard connection selected the target without focusing it.**
+  `completeKeyboardConnect` is the operation that owes both, because the picker
+  holding focus unmounts with the draft.
+- **`queued` was silent for reconnect and delete** while the connect paths
+  reported it. Both now report through the same non-throwing sink.
+- **The endpoint empty-canvas drop deleted nothing.** Built, with the connect
+  path's precedence — a connection target in range outranks the element
+  underneath, so a drop that merely missed a handle cancels. Safe because React
+  Flow calls `onReconnectEnd` only from `onPointerUp` in the pinned 12.11.2; its
+  Escape path runs `cancelConnection` without it.
+
+Three duplications the review named are gone too: `edgeSelectionOf` in
+`render-adapter.ts` is now the one translation from a React Flow Edge to the
+domain one, `sameSelection` the one comparison, and a refused *pointer*
+reconnect keeps its sentence the way a refused connection does
+(`endPointerDrag`, one operation for both pointer drafts).
+
 The original brief follows.
 
 Build the accepted Edge Authoring module in

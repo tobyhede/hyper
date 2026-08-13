@@ -3,6 +3,7 @@ import { EdgeLabelRenderer, type EdgeProps } from '@xyflow/react';
 import type { CardId, GraphEdge, GraphId } from '@project/core';
 import { RoutedEdge, routedEdgeGeometry, type RoutedFlowEdge } from '@project/react-flow-adapter';
 import { CardPicker, Popover, PopoverAnchor, PopoverContent } from '@project/ui';
+import { edgeSelectionOf, sameSelection } from '../render-adapter';
 import { EdgeAuthoringContext, type EdgeAuthoringCommands } from './edge-authoring-context';
 
 /**
@@ -50,18 +51,23 @@ function EdgeToolbar({
 export function AuthorableEdge(props: EdgeProps<RoutedFlowEdge>) {
   const commands = useContext(EdgeAuthoringContext);
   const { labelX, labelY } = routedEdgeGeometry(props);
-  const graphId = props.data?.graphId;
-  const edge: GraphEdge = { from: props.source as CardId, to: props.target as CardId };
+  // The same translation the selection mirror and the callbacks use, so this
+  // Edge cannot disagree with them about which Edge it is.
+  const subject = edgeSelectionOf({ ...props, id: props.id });
 
-  if (!props.selected || commands === null || graphId === undefined) {
+  // `selected` is the whole gate. The decoration conjoins it with the Active
+  // Graph, so an Edge outside that Graph never reaches these controls.
+  if (!props.selected || commands === null || subject === null) {
     return <RoutedEdge {...props} />;
   }
-
+  const { graphId, edge } = subject;
   const open =
     commands.editing !== null &&
-    commands.editing.graphId === graphId &&
-    commands.editing.edge.from === edge.from &&
-    commands.editing.edge.to === edge.to;
+    sameSelection(subject, {
+      kind: 'edge',
+      graphId: commands.editing.graphId,
+      edge: commands.editing.edge,
+    });
 
   return (
     <>

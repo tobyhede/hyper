@@ -74,17 +74,24 @@ export function sameSelection(left: CanvasSelection, right: CanvasSelection): bo
 export const selectedCardOf = (selection: CanvasSelection): CardId | null =>
   selection.kind === 'card' ? selection.cardId : null;
 
+/** The Edge subject alone, so a caller that only handles Edges need not narrow. */
+export type EdgeSelection = Extract<CanvasSelection, { kind: 'edge' }>;
+
 /**
- * The domain subject behind a projected React Flow Edge, or `null` for one this
- * projection did not draw.
+ * The domain Edge behind a projected React Flow Edge, or `null` for one carrying
+ * no Graph — which is any Edge this projection did not draw.
  *
- * `source` and `target` are `CardId`s widened to `string` by React Flow's `Edge`
- * type — the same erasure `placementFromNodes` repairs for a node id below.
+ * The **one** place that translation happens. Every surface that acts on an Edge
+ * needs it — the selection mirror here, the decoration and callbacks in Edge
+ * Authoring, the toolbar inside the Edge itself — and three hand-rolled copies
+ * would be three chances to widen `source` and `target` differently.
+ *
+ * They are `CardId`s widened to `string` by React Flow's `Edge` type, the same
+ * erasure `placementFromNodes` repairs for a node id below.
  */
-function edgeSubjectOf(edges: readonly Edge[], edgeId: string): CanvasSelection | null {
-  const edge = edges.find((candidate) => candidate.id === edgeId);
-  const graphId = (edge?.data as RoutedEdgeData | undefined)?.graphId;
-  if (edge === undefined || graphId === undefined) return null;
+export function edgeSelectionOf(edge: Edge): EdgeSelection | null {
+  const graphId = (edge.data as RoutedEdgeData | undefined)?.graphId;
+  if (graphId === undefined) return null;
   return {
     kind: 'edge',
     graphId,
@@ -460,7 +467,8 @@ export function createRenderAdapter(authoring: SpaceAuthoring): RenderAdapter {
       const selection = additiveSelection(
         state.selection,
         selections.flatMap((change) => {
-          const subject = edgeSubjectOf(projection.edges, change.id);
+          const drawn = projection.edges.find((edge) => edge.id === change.id);
+          const subject = drawn === undefined ? null : edgeSelectionOf(drawn);
           // An Edge this projection does not draw. React Flow reports the
           // deselection of an Edge the previous projection held, and there is
           // no subject to compare — dropping it is what stops that stale

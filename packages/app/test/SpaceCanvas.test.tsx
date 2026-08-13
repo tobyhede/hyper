@@ -50,7 +50,7 @@ interface Harness {
 /**
  * An Edge Authoring that answers nothing, so these Card-authoring tests are not
  * also exercising the Edge lifecycle. Its own behaviour is covered by
- * `edge-authoring.test.ts` and `EdgeAuthoring-react.test.tsx`.
+ * `edge-authoring.test.ts` and `edge-authoring-react.test.tsx`.
  */
 const IDLE_EDGE_STATE = { draft: null, refusal: null, focusRequest: null } as const;
 
@@ -65,8 +65,9 @@ function inertEdgeAuthoring(): EdgeAuthoring {
     beginPointerConnect: () => undefined,
     connect: () => null,
     createConnectedCard: () => null,
-    endPointerConnect: () => null,
+    endPointerDrag: () => null,
     beginKeyboardConnect: () => undefined,
+    completeKeyboardConnect: () => null,
     beginPointerReconnect: () => undefined,
     openEdgeEditor: () => undefined,
     reconnect: () => false,

@@ -1,5 +1,6 @@
 import type { CardId, GraphEdge, GraphId, LayoutPosition } from '@project/core';
 import {
+  createNonThrowingReporter,
   createObservableState,
   type ObserverErrorReporter,
   type ObservableState,
@@ -185,10 +186,31 @@ export interface EdgeAuthoring {
     position: LayoutPosition,
     projected: readonly CardFlowNode[] | null,
   ) => CardId | null;
-  /** End the pointer drag, whatever it produced, and hand back what to continue at. */
-  readonly endPointerConnect: () => CardId | null;
+  /**
+   * End whichever pointer drag was in flight, and hand back the Card to continue
+   * at — the target of a completed connection, or `null` for anything else.
+   *
+   * One operation for both pointer drafts because a drag ends the same way
+   * whatever it was doing: **the draft goes and the refusal stays.** A refusal
+   * normally retains its draft so the author can correct the proposal, but a
+   * finished drag leaves no surface to correct — the sentence is the whole of
+   * what they are told, and cancelling would take it away with the draft.
+   */
+  readonly endPointerDrag: () => CardId | null;
 
   readonly beginKeyboardConnect: (from: CardId) => void;
+  /**
+   * Settle the open keyboard connection at a chosen target, answering the Card
+   * to continue at.
+   *
+   * Separate from {@link EdgeAuthoring.connect} because the keyboard path owes
+   * the author a focus move the pointer path does not: the picker holding focus
+   * unmounts with the draft, so without one focus would land on `body`.
+   */
+  readonly completeKeyboardConnect: (
+    to: CardId,
+    projected: readonly CardFlowNode[] | null,
+  ) => CardId | null;
   readonly beginPointerReconnect: (
     graphId: GraphId,
     edge: GraphEdge,
@@ -263,6 +285,9 @@ export function createEdgeAuthoring({
     IDLE,
     reportObserverError,
   );
+  // Invariant violations use the same configured sink, made incapable of
+  // interrupting the interaction they describe.
+  const safelyReport = createNonThrowingReporter(reportObserverError);
 
   const publish = (next: Partial<EdgeAuthoringState>): void => {
     observable.publish({ ...observable.getState(), ...next });
@@ -316,6 +341,13 @@ export function createEdgeAuthoring({
   /**
    * Complete one Edit that carries no rendered Placement, keeping the draft when
    * it is refused so the author can correct the proposal rather than restart it.
+   *
+   * `queued` is an invariant violation here, exactly as it is for the two
+   * connecting gestures: it is Authoring's answer to a completion made from
+   * inside its own publication, and every caller of this reaches it from a
+   * browser event with no Edit on the stack. Reported rather than thrown — a
+   * diagnostic must not take the canvas down under the author's hand — and the
+   * draft is left standing, because nothing has been authored to settle it.
    */
   const completeStructural = (completion: Parameters<SpaceAuthoring['complete']>[0]): boolean => {
     const result = authoring.complete(completion);
@@ -323,10 +355,18 @@ export function createEdgeAuthoring({
       publish({ refusal: result.reason });
       return false;
     }
+    if (result.kind === 'queued') {
+      safelyReport(
+        new Error(
+          `A ${completion.kind} completion was queued behind another Edit. React Flow events cannot be re-entrant.`,
+        ),
+      );
+      return false;
+    }
     // `unchanged` is the author's ordinary close — an endpoint dragged back where
     // it started — and settles the draft exactly as a completion does.
     clearDraft();
-    return result.kind !== 'queued';
+    return true;
   };
 
   /** The Card a finished pointer connection continues at, held across the drag's end. */
@@ -365,6 +405,26 @@ export function createEdgeAuthoring({
     if (draft !== null && !selectionMatchesDraft(selection, draft)) clearDraft();
   });
 
+  /**
+   * Drop a selected Edge the Active Graph has left behind.
+   *
+   * CONTEXT.md's **Selected Edge**: an Edge outside the Active Graph "cannot
+   * remain selected". Activating another Graph is not an Edit and moves no
+   * Edge, so the stored subject is simply no longer one an authoring gesture may
+   * act on — and the Edge's own toolbar reads the selection, so leaving it would
+   * keep Delete live on an Edge the canvas has stopped offering.
+   *
+   * Registered as a second subscriber rather than folded into the draft pass
+   * above, because it answers a different question: that one asks whether the
+   * *interaction* still has a subject, this asks whether the *selection* does.
+   */
+  const unsubscribeSelection = authoring.subscribe(() => {
+    const current = adapter.getState().selection;
+    if (current.kind !== 'edge') return;
+    const active = authoring.getState().navigation.activeGraphId;
+    if (current.graphId !== active) adapter.getState().clearSelection();
+  });
+
   return {
     getState: observable.getState,
     subscribe: observable.subscribe,
@@ -390,18 +450,36 @@ export function createEdgeAuthoring({
       return created;
     },
 
-    endPointerConnect: () => {
+    endPointerDrag: () => {
       const continuation = pendingContinuation;
       pendingContinuation = null;
       const { draft } = observable.getState();
-      // A pointer draft is bounded by its drag. A refusal the release produced
-      // survives it — there is no surface left to correct, and the sentence is
-      // the whole of what the author is told.
-      if (draft?.kind === 'pointer-connect') publish({ draft: null });
+      if (draft?.kind === 'pointer-connect' || draft?.kind === 'pointer-reconnect') {
+        publish({ draft: null });
+      }
       return continuation;
     },
 
     beginKeyboardConnect: (from) => begin({ kind: 'keyboard-connect', from }),
+
+    completeKeyboardConnect: (to, projected) => {
+      const { draft } = observable.getState();
+      if (draft?.kind !== 'keyboard-connect') return null;
+      const completed = connections.connect(draft.from, to, projected);
+      if (completed === null) {
+        // The picker offered this target, so a refusal here means the Space
+        // changed while it was open. The draft stands with its reason, which is
+        // the whole point of asking eligibility again at completion.
+        const refusal = eligibility({ kind: 'connect', from: draft.from, to });
+        publish({ refusal: refusal.kind === 'refused' ? refusal.reason : null });
+        return null;
+      }
+      // "Successful keyboard connection selects and focuses the target Card."
+      // Selection is the canvas's and happens beside this; the focus move is
+      // Hyper's own, because the picker that had focus is about to unmount.
+      publish({ draft: null, refusal: null, focusRequest: { kind: 'card', cardId: completed } });
+      return completed;
+    },
 
     beginPointerReconnect: (graphId, edge, endpoint) =>
       begin({ kind: 'pointer-reconnect', graphId, edge, endpoint }),
@@ -447,6 +525,7 @@ export function createEdgeAuthoring({
     dispose: () => {
       unsubscribeAuthoring();
       unsubscribeAdapter();
+      unsubscribeSelection();
       observable.clearSubscribers();
     },
   };

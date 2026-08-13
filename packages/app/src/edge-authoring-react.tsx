@@ -12,6 +12,7 @@ import {
   useReactFlow,
   type Edge,
   type EdgeTypes,
+  type FinalConnectionState,
   type IsValidConnection,
   type OnConnect,
   type OnConnectEnd,
@@ -20,10 +21,10 @@ import {
 } from '@xyflow/react';
 import type { Card, CardId, Graph, GraphEdge, GraphId } from '@project/core';
 import { uuidSchema } from '@project/core';
-import type { CardFlowNode, RoutedEdgeData } from '@project/react-flow-adapter';
+import type { CardFlowNode } from '@project/react-flow-adapter';
 import { CardPicker, type CardChoice } from '@project/ui';
 import { newCardDrop, type DropTarget, type EdgeAuthoring } from './edge-authoring';
-import type { CanvasSelection } from './render-adapter';
+import { edgeSelectionOf, sameSelection, type CanvasSelection } from './render-adapter';
 import type { EdgeEndpoint } from './space-authoring';
 import { AuthorableEdge } from './components/AuthorableEdge';
 import { EdgeAuthoringContext } from './components/edge-authoring-context';
@@ -43,7 +44,12 @@ export interface EdgeOwnedReactFlowProps {
   readonly isValidConnection: IsValidConnection;
   readonly onReconnectStart: (event: unknown, edge: Edge, handleType: 'source' | 'target') => void;
   readonly onReconnect: OnReconnect;
-  readonly onReconnectEnd: () => void;
+  readonly onReconnectEnd: (
+    event: MouseEvent | TouchEvent,
+    edge: Edge,
+    handleType: 'source' | 'target',
+    connectionState: FinalConnectionState,
+  ) => void;
   readonly onMouseMove: (event: ReactMouseEvent<HTMLDivElement>) => void;
   /** Reconnection is per-Edge, and only the selected Active Graph Edge gets it. */
   readonly edgesReconnectable: false;
@@ -119,13 +125,6 @@ function dropTargetOf(target: EventTarget | null): DropTarget {
   return target.closest('.react-flow__node') === null ? 'empty-canvas' : 'card';
 }
 
-/** The domain Edge behind a projected React Flow Edge, or `null`. */
-function subjectOf(edge: Edge): { graphId: GraphId; edge: GraphEdge } | null {
-  const graphId = (edge.data as RoutedEdgeData | undefined)?.graphId;
-  if (graphId === undefined) return null;
-  return { graphId, edge: { from: edge.source as CardId, to: edge.target as CardId } };
-}
-
 export function useEdgeAuthoring({
   authoring,
   edges,
@@ -174,19 +173,16 @@ export function useEdgeAuthoring({
     };
   }, []);
 
-  const acceptsEmptyDrop = useCallback(
-    (from: string): boolean => {
-      const source = uuidSchema.safeParse(from);
-      // React Flow knows node ids as plain strings and asks per pointer frame.
-      // An id that is not a Card identity is not a connection to accept —
-      // answering false is the honest reading, and a throw mid-drag the wrong one.
-      return (
-        source.success &&
-        latest.current.authoring.accepts({ kind: 'create-and-connect', from: source.data })
-      );
-    },
-    [latest],
-  );
+  const acceptsEmptyDrop = useCallback((from: string): boolean => {
+    const source = uuidSchema.safeParse(from);
+    // React Flow knows node ids as plain strings and asks per pointer frame.
+    // An id that is not a Card identity is not a connection to accept —
+    // answering false is the honest reading, and a throw mid-drag the wrong one.
+    return (
+      source.success &&
+      latest.current.authoring.accepts({ kind: 'create-and-connect', from: source.data })
+    );
+  }, []);
 
   const isValidConnection = useCallback<IsValidConnection>((connection) => {
     const from = uuidSchema.safeParse(connection.source);
@@ -247,7 +243,7 @@ export function useEdgeAuthoring({
           );
         }
       }
-      const continuation = latest.current.authoring.endPointerConnect();
+      const continuation = latest.current.authoring.endPointerDrag();
       setModifierHeld(false);
       setPointerOver('off-canvas');
       connecting.current = false;
@@ -270,7 +266,7 @@ export function useEdgeAuthoring({
 
   const handleReconnectStart = useCallback(
     (_event: unknown, edge: Edge, handleType: 'source' | 'target') => {
-      const subject = subjectOf(edge);
+      const subject = edgeSelectionOf(edge);
       if (subject === null) return;
       latest.current.authoring.beginPointerReconnect(
         subject.graphId,
@@ -281,12 +277,23 @@ export function useEdgeAuthoring({
     [],
   );
 
-  // React Flow's `reconnectEdge` helper is deliberately not called. Hyper applies
-  // no local change: the next controlled projection carries the completed Space,
-  // and until it arrives React Flow re-renders the original Edge.
+  /**
+   * React Flow's `reconnectEdge` helper is deliberately not called. Hyper applies
+   * no local change: the next controlled projection carries the completed Space,
+   * and until it arrives React Flow re-renders the original Edge.
+   *
+   * The endpoint is derived from the proposed connection rather than read from
+   * the draft's `handleType`, because the connection is what actually moved. A
+   * drag moves exactly one end, so a `source` equal to the original's names the
+   * *target* as the end that changed however the gesture began — including when
+   * an endpoint is dropped back where it started, which then reads as unchanged
+   * on the end that did not move and settles the same way.
+   */
+  const proposedReconnection = useRef(false);
   const handleReconnect = useCallback<OnReconnect>((oldEdge, connection) => {
-    const subject = subjectOf(oldEdge);
+    const subject = edgeSelectionOf(oldEdge);
     if (subject === null) return;
+    proposedReconnection.current = true;
     const endpoint: EdgeEndpoint = connection.source === subject.edge.from ? 'to' : 'from';
     const cardId = uuidSchema.safeParse(
       endpoint === 'from' ? connection.source : connection.target,
@@ -294,17 +301,46 @@ export function useEdgeAuthoring({
     if (cardId.success) latest.current.authoring.reconnect(endpoint, cardId.data);
   }, []);
 
-  const handleReconnectEnd = useCallback(() => {
-    // Cancellation and empty-canvas release both end here having authored
-    // nothing; `onReconnect` fired first when the drop was a real endpoint, and
-    // it has already settled the draft.
-    const { draft } = latest.current.authoring.getState();
-    if (draft?.kind === 'pointer-reconnect') latest.current.authoring.cancelDraft();
-  }, []);
+  /**
+   * The end of a reconnect drag, and the one gesture that deletes an Edge with a
+   * pointer alone: **dragging an endpoint onto empty canvas removes it.**
+   *
+   * `onReconnect` fires first whenever the release was aimed at a Card, so a
+   * proposal already made — completed, unchanged or refused — is never a
+   * deletion. What is left is a release that proposed nothing, and the same
+   * precedence the connect path uses decides it: a connection target in range
+   * outranks the element underneath, so a drop that merely *missed* a handle
+   * cancels rather than deleting.
+   *
+   * There is no Escape to confuse this with. In the pinned 12.11.2 React Flow
+   * calls `onReconnectEnd` only from `onPointerUp` — its Escape path runs
+   * `cancelConnection` without it — so reaching here means the author released
+   * the pointer somewhere deliberate.
+   */
+  const handleReconnectEnd = useCallback(
+    (event: MouseEvent | TouchEvent, edge: Edge, _type: unknown, state: FinalConnectionState) => {
+      const proposed = proposedReconnection.current;
+      proposedReconnection.current = false;
+      const subject = edgeSelectionOf(edge);
+      if (!proposed && subject !== null && 'clientX' in event && 'clientY' in event) {
+        const over =
+          state.toNode !== null
+            ? 'connection-target'
+            : dropTargetOf(document.elementFromPoint(event.clientX, event.clientY));
+        if (over === 'empty-canvas') {
+          latest.current.authoring.deleteEdge(subject.graphId, subject.edge);
+        }
+      }
+      // Whatever it produced, the drag is over: the draft goes and a refusal's
+      // sentence stays, exactly as a connection drag ends.
+      latest.current.authoring.endPointerDrag();
+    },
+    [],
+  );
 
   const deleteEdges = useCallback((requested: readonly Edge[]) => {
     for (const edge of requested) {
-      const subject = subjectOf(edge);
+      const subject = edgeSelectionOf(edge);
       if (subject !== null) latest.current.authoring.deleteEdge(subject.graphId, subject.edge);
     }
   }, []);
@@ -367,7 +403,7 @@ export function useEdgeAuthoring({
   const decorated = useMemo(
     () =>
       edges.map((edge): Edge => {
-        const subject = subjectOf(edge);
+        const subject = edgeSelectionOf(edge);
         // An Edge this projection cannot name is drawn and nothing more: not
         // selectable, not focusable, and never a deletion subject.
         if (subject === null) {
@@ -379,12 +415,13 @@ export function useEdgeAuthoring({
             deletable: false,
           };
         }
-        const selected =
-          selection.kind === 'edge' &&
-          selection.graphId === subject.graphId &&
-          selection.edge.from === subject.edge.from &&
-          selection.edge.to === subject.edge.to;
         const interactive = enabled && subject.graphId === activeGraphId;
+        // **Conjoined with `interactive`, not merely compared with the stored
+        // subject.** An Edge outside the Active Graph cannot remain selected
+        // (CONTEXT.md), and this Edge draws its own toolbar from `selected` — so
+        // reading the union alone would keep Delete live on an Edge activation
+        // has just stopped offering, for as long as the union still named it.
+        const selected = interactive && sameSelection(selection, subject);
         return {
           ...edge,
           selected,
@@ -436,6 +473,20 @@ export function useEdgeAuthoring({
   );
 
   const draft = state.draft;
+  const connectTarget = draft?.kind === 'keyboard-connect' ? draft.from : null;
+
+  /**
+   * Give the keyboard target picker focus as it opens.
+   *
+   * The control that opened it is the Card's Connect button, which stays on
+   * screen — so without this the picker would be a surface the author has to
+   * Tab to, and the Escape that cancels it would never reach the container
+   * holding the handler.
+   */
+  useEffect(() => {
+    if (connectTarget === null) return;
+    document.querySelector<HTMLElement>('[data-testid="connect-target"]')?.focus();
+  }, [connectTarget]);
 
   // `editing` is derived *inside* the memo rather than beside it: as a plain
   // render computation it would be a fresh object on every render, so the memo
@@ -454,7 +505,6 @@ export function useEdgeAuthoring({
     [draft, state.refusal, authoring, endpointChoices],
   );
 
-  const connectTarget = draft?.kind === 'keyboard-connect' ? draft.from : null;
   const connectChoices = useMemo((): CardChoice[] => {
     if (connectTarget === null) return [];
     return subjectCards.map((card) => {
@@ -480,7 +530,20 @@ export function useEdgeAuthoring({
         accepts={acceptsEmptyDrop}
       />
       {connectTarget !== null && (
-        <div className="edge-connect-picker nopan nodrag nokey" data-testid="connect-target-picker">
+        <div
+          className="edge-connect-picker nopan nodrag nokey"
+          data-testid="connect-target-picker"
+          // Escape cancels exactly one topmost Edge surface. While the Select's
+          // listbox is open Radix owns the key and closes it — its content is
+          // portalled, so that keydown never reaches here — and the next Escape,
+          // with focus back on the trigger inside this container, cancels the
+          // connection and returns the author to the source Card.
+          onKeyDown={(event) => {
+            if (event.key !== 'Escape') return;
+            event.stopPropagation();
+            authoring.cancelDraft();
+          }}
+        >
           <CardPicker
             label="Connect to"
             testId="connect-target"
@@ -489,15 +552,11 @@ export function useEdgeAuthoring({
             onValueChange={(cardId) => {
               const to = uuidSchema.safeParse(cardId);
               if (!to.success) return;
-              const completed = authoring.connect(
-                connectTarget,
+              const completed = authoring.completeKeyboardConnect(
                 to.data,
                 latest.current.projectedNodes,
               );
-              if (completed !== null) {
-                authoring.endPointerConnect();
-                requestAnimationFrame(() => onSelectCard(completed));
-              }
+              if (completed !== null) requestAnimationFrame(() => onSelectCard(completed));
             }}
           />
           {state.refusal !== null && (
