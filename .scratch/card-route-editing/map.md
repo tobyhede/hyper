@@ -66,6 +66,24 @@ contains the authority order, cross-operation acceptance matrices, complete
 user journey, implementation sequence and proof obligations. Feature
 implementation remains a separate effort.
 
+Two tickets have since been raised by that implementation rather than by
+planning. Neither is a decision this map records, which is why neither is listed
+above: both are `needs-triage`, and what each needs is a maintainer's call about
+scope rather than a resolving session's answer.
+
+- [The Frame 5 Alias modifier gestures are unbuilt and
+  unowned](issues/15-frame-5-alias-modifier-gestures-are-unowned.md) — accepted
+  storyboard behaviour that package 4 declined and that no later package or Out
+  of scope entry claims. Package 10's closing gate counts acceptance-matrix
+  rows, and Add Alias's row is satisfied by the controls package 4 did build, so
+  nothing downstream will notice these go missing.
+- [The content editor's Escape closes the pane over a dirty
+  draft](issues/16-the-content-editors-escape-closes-over-a-dirty-draft.md) —
+  the keyboard contract's two-stage Escape, unbuilt on the opened Card's three
+  content fields since before this effort began. Two accepted records disagree
+  about whether it should be, and the pane holding three drafts rather than one
+  makes the restore's scope a real choice.
+
 ## Out of scope
 
 - Creating or editing nested-Space Cards.
