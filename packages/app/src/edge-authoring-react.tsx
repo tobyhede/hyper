@@ -19,7 +19,7 @@ import {
   type OnConnectStart,
   type OnReconnect,
 } from '@xyflow/react';
-import type { Card, CardId, Graph, GraphId } from '@project/core';
+import type { Card, CardId, Graph, GraphEdge, GraphId } from '@project/core';
 import { uuidSchema } from '@project/core';
 import type { CardFlowNode } from '@project/react-flow-adapter';
 import { CardPicker, type CardChoice } from '@project/ui';
@@ -136,6 +136,31 @@ function dropTargetOf(target: EventTarget | null): DropTarget {
   return target.closest('.react-flow__node') === null ? 'empty-canvas' : 'card';
 }
 
+/**
+ * Which end of a drafted Edge a proposed connection moves, and to which Card.
+ *
+ * **`source` and `target` here are already domain-ordered.** React Flow anchors
+ * a reconnect drag at the *opposite* end and `isValidHandle` normalises the pair
+ * before reporting it, so both anchors produce `{ source: from, target: to }` —
+ * which is why the end that moved is read off the pair rather than off the
+ * `handleType` the drag started with. A `source` equal to the drafted Edge's
+ * `from` therefore names the *target* as the end that changed, however the
+ * gesture began, and an endpoint dropped back where it started reads as
+ * unchanged on the end that did not move.
+ *
+ * One helper because the live validator and the completion must agree: a
+ * disagreement would mark a drop invalid that the Edit would have accepted, or
+ * the reverse.
+ */
+function movedEndpoint(
+  edge: GraphEdge,
+  source: CardId,
+  target: CardId,
+): { readonly endpoint: EdgeEndpoint; readonly cardId: CardId } {
+  const endpoint: EdgeEndpoint = source === edge.from ? 'to' : 'from';
+  return { endpoint, cardId: endpoint === 'from' ? source : target };
+}
+
 export function useEdgeAuthoring({
   authoring,
   edges,
@@ -195,14 +220,37 @@ export function useEdgeAuthoring({
     );
   }, []);
 
+  /**
+   * Whether the drag currently under the pointer may be released here.
+   *
+   * **React Flow has one global validator and consults it during a reconnect
+   * too**, so asking the ordinary connect rule is asking the wrong question
+   * whenever an endpoint is in flight. The case that shows it is an endpoint
+   * dropped back on the Card it came from: as a *connect* proposal that is the
+   * duplicate rule and reads invalid for the whole drag, while as a *reconnect*
+   * proposal it is the endpoint returning to where it started, which
+   * `reconnectOutcome` settles as `unchanged` before the duplicate check is ever
+   * reached. Eligibility already called it offerable; this was the one place
+   * still saying otherwise.
+   *
+   * The endpoint is derived from the proposed connection through the same
+   * helper the completion uses, so the preview and the Edit cannot drift.
+   */
   const isValidConnection = useCallback<IsValidConnection>((connection) => {
     const from = uuidSchema.safeParse(connection.source);
     const to = uuidSchema.safeParse(connection.target);
-    return (
-      from.success &&
-      to.success &&
-      latest.current.authoring.accepts({ kind: 'connect', from: from.data, to: to.data })
-    );
+    if (!from.success || !to.success) return false;
+    const { draft } = latest.current.authoring.getState();
+    if (draft?.kind === 'pointer-reconnect') {
+      const moved = movedEndpoint(draft.edge, from.data, to.data);
+      return latest.current.authoring.accepts({
+        kind: 'reconnect',
+        graphId: draft.graphId,
+        edge: draft.edge,
+        ...moved,
+      });
+    }
+    return latest.current.authoring.accepts({ kind: 'connect', from: from.data, to: to.data });
   }, []);
 
   /**
@@ -327,23 +375,19 @@ export function useEdgeAuthoring({
    * no local change: the next controlled projection carries the completed Space,
    * and until it arrives React Flow re-renders the original Edge.
    *
-   * The endpoint is derived from the proposed connection rather than read from
-   * the draft's `handleType`, because the connection is what actually moved. A
-   * drag moves exactly one end, so a `source` equal to the original's names the
-   * *target* as the end that changed however the gesture began — including when
-   * an endpoint is dropped back where it started, which then reads as unchanged
-   * on the end that did not move and settles the same way.
+   * The endpoint comes from `movedEndpoint`, the same derivation the live
+   * validator uses — so a drop the anchor showed as valid is one this completes.
    */
   const proposedReconnection = useRef(false);
   const handleReconnect = useCallback<OnReconnect>((oldEdge, connection) => {
     const subject = edgeSelectionOf(oldEdge);
     if (subject === null) return;
     proposedReconnection.current = true;
-    const endpoint: EdgeEndpoint = connection.source === subject.edge.from ? 'to' : 'from';
-    const cardId = uuidSchema.safeParse(
-      endpoint === 'from' ? connection.source : connection.target,
-    );
-    if (cardId.success) latest.current.authoring.reconnect(endpoint, cardId.data);
+    const source = uuidSchema.safeParse(connection.source);
+    const target = uuidSchema.safeParse(connection.target);
+    if (!source.success || !target.success) return;
+    const { endpoint, cardId } = movedEndpoint(subject.edge, source.data, target.data);
+    latest.current.authoring.reconnect(endpoint, cardId);
   }, []);
 
   /**
@@ -357,10 +401,19 @@ export function useEdgeAuthoring({
    * outranks the element underneath, so a drop that merely *missed* a handle
    * cancels rather than deleting.
    *
-   * There is no Escape to confuse this with. In the pinned 12.11.2 React Flow
-   * calls `onReconnectEnd` only from `onPointerUp` — its Escape path runs
-   * `cancelConnection` without it — so reaching here means the author released
-   * the pointer somewhere deliberate.
+   * **There is no Escape to confuse this with, because React Flow has no
+   * Escape path for a drag at all.** In the pinned 12.11.2 the only consumers of
+   * that key are the focusable node and edge wrappers, which blur and unselect;
+   * the reconnect anchor is a bare `<circle>` and takes no focus. `XYHandle`
+   * installs `mousemove`/`mouseup` on the document and removes them only from
+   * its own `onPointerUp`, and `cancelConnection` is reached from there or from
+   * the whole flow unmounting — nowhere else. So reaching here means the author
+   * released the pointer somewhere deliberate, and this handler is the only way
+   * a drag can end.
+   *
+   * That is also what makes the guard below safe: the listeners are plain DOM
+   * ones with no React cleanup, so even an Edge that leaves the projection
+   * mid-drag still ends through here.
    */
   const handleReconnectEnd = useCallback(
     (event: MouseEvent | TouchEvent, edge: Edge, _type: unknown, state: FinalConnectionState) => {
@@ -451,11 +504,22 @@ export function useEdgeAuthoring({
   const focusRequest = state.focusRequest;
   useEffect(() => {
     if (focusRequest === null) return;
+    const target = focusTargetOf(focusRequest);
+    // **An Edge request outlives the render that made it.** It is published
+    // synchronously with the Edit, but the projection carrying the Edge that
+    // Edit produced arrives a strategy later — so a request that resolves to
+    // nothing *yet* stays owed rather than being spent on the canvas fallback.
+    // `focusTargetOf` closes over `edges`, so the next projection re-runs this.
+    //
+    // Only Edges wait. A Card and the canvas are already drawn, so for them an
+    // unresolvable request means the element is gone for good, and falling back
+    // is the answer rather than a wait with no end.
+    if (target === null && focusRequest.kind === 'edge') return;
     authoring.takeFocusRequest();
     // Only when the completed projection has left focus nowhere. An author who
     // has already moved to another control keeps it.
     if (document.activeElement !== document.body) return;
-    (focusTargetOf(focusRequest) ?? document.querySelector<HTMLElement>('.react-flow'))?.focus();
+    (target ?? document.querySelector<HTMLElement>('.react-flow'))?.focus();
   }, [focusRequest, authoring, focusTargetOf]);
 
   const cardTitles = useMemo(
@@ -552,7 +616,11 @@ export function useEdgeAuthoring({
     [subjectCards],
   );
 
-  const draft = state.draft;
+  // **Every Edge surface is gated on `enabled`, not on the draft alone.** The
+  // module cancels a draft the moment authoring is withdrawn, but that lands on
+  // a notification and this renders before it — so a picker read only off the
+  // draft is briefly usable over a presentation that has already begun.
+  const draft = enabled ? state.draft : null;
   const connectTarget = draft?.kind === 'keyboard-connect' ? draft.from : null;
 
   /**

@@ -1295,6 +1295,52 @@ test('dragging the source endpoint moves the end the author took hold of', async
 });
 
 /**
+ * An endpoint dragged back where it came from is offered, not marked invalid.
+ *
+ * React Flow consults its one global validator during a reconnect too, so a
+ * validator that always asks the connect rule reads this as the duplicate Edge
+ * it textually is — the anchor shows invalid for the whole drag even though the
+ * Edit would accept it as `unchanged`. Asserted live, mid-drag, because that is
+ * where the wrong answer is visible; the release then changes nothing.
+ */
+test('an endpoint dropped back where it came from stays valid throughout', async ({ page }) => {
+  await page.goto('/');
+  await expect(nodeByTitle(page, 'A').first()).toBeVisible();
+  await expect(page.locator('.react-flow__edge-path').first()).toHaveAttribute('d', /L/);
+  await selectLayout(page, 'Collection 1');
+  await settled(page);
+  const drawn = await page.locator('.react-flow__edge').count();
+
+  const edge = page.locator('.react-flow__edge[aria-label="Edge from A to B in Long"]');
+  await edge.focus();
+  const anchor = await boxOf(edge.locator('.react-flow__edgeupdater-target'), 'the target anchor');
+  const back = authoringHandle(nodeByTitle(page, 'B').first(), 'target', 'left');
+
+  await page.mouse.move(anchor.x + anchor.width / 2, anchor.y + anchor.height / 2);
+  await page.mouse.down();
+  try {
+    await page.mouse.move(anchor.x + anchor.width / 2 + 12, anchor.y + anchor.height / 2, {
+      steps: 3,
+    });
+    await expect(back).toHaveCSS('opacity', '1');
+    await back.hover();
+    // React Flow marks the handle it is over, then whether the drop is allowed.
+    // Waiting for the first is what stops the second passing vacuously.
+    await expect(back).toHaveClass(/connectingto/);
+    await expect(back).toHaveClass(/valid/);
+  } finally {
+    await page.mouse.up();
+  }
+
+  await quiescent(page);
+  await expect(page.locator('.react-flow__edge')).toHaveCount(drawn);
+  await expect(
+    page.locator('.react-flow__edge[aria-label="Edge from A to B in Long"]'),
+  ).toHaveCount(1);
+  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '0');
+});
+
+/**
  * The one pointer gesture that deletes an Edge: an endpoint released on empty
  * canvas. A release that merely *missed* a handle cancels instead, which is what
  * the off-canvas case below is for.

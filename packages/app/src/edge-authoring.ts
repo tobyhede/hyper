@@ -411,17 +411,34 @@ export function createEdgeAuthoring({
   let replacementEpoch = authoring.getState().replacementEpoch;
   let selectedRenderer = authoring.getState().navigation.selectedRenderer;
   let activeGraphId = authoring.getState().navigation.activeGraphId;
+  let presenting = authoring.getState().navigation.mode === 'presenting';
   const unsubscribeAuthoring = authoring.subscribe(() => {
     const state = authoring.getState();
+    const nowPresenting = state.navigation.mode === 'presenting';
     const contextChanged =
       state.replacementEpoch !== replacementEpoch ||
       !sameRenderer(state.navigation.selectedRenderer, selectedRenderer) ||
-      state.navigation.activeGraphId !== activeGraphId;
+      state.navigation.activeGraphId !== activeGraphId ||
+      // Presenting withdraws Edge authoring altogether, so a draft made before
+      // it has no context left to complete in. Cancelled rather than merely
+      // hidden: a picker left standing goes on authoring over the presentation,
+      // and an Edge editor behind it reopens when the author returns.
+      (nowPresenting && !presenting);
     replacementEpoch = state.replacementEpoch;
     selectedRenderer = state.navigation.selectedRenderer;
     activeGraphId = state.navigation.activeGraphId;
-    const { draft } = observable.getState();
-    if (draft === null) return;
+    presenting = nowPresenting;
+    const { draft, refusal } = observable.getState();
+    // **The refusal is invalidated even when no draft is left to carry it.** It
+    // names Cards and a Graph of the Space it was made against, and a *pointer*
+    // gesture's refusal outlives its own draft by design — so without this a
+    // sentence about the replaced Space survives an accepted replacement, which
+    // the handoff's shared case 7 forbids outright ("cancels all target-bound
+    // transients"), and one about another Graph survives activating it.
+    if (draft === null) {
+      if (contextChanged && refusal !== null) publish({ refusal: null });
+      return;
+    }
     if (contextChanged || !subjectSurvives(draft)) {
       // The element the draft was about may have been what held focus, so the
       // author is left somewhere real rather than on `body`.

@@ -479,9 +479,10 @@ Review found five things and all five are closed:
   reported it. Both now report through the same non-throwing sink.
 - **The endpoint empty-canvas drop deleted nothing.** Built, with the connect
   path's precedence — a connection target in range outranks the element
-  underneath, so a drop that merely missed a handle cancels. Safe because React
-  Flow calls `onReconnectEnd` only from `onPointerUp` in the pinned 12.11.2; its
-  Escape path runs `cancelConnection` without it.
+  underneath, so a drop that merely missed a handle cancels. Safe because
+  `onReconnectEnd` is the only way a drag can end: React Flow has no Escape path
+  for a drag, and `XYHandle` removes its document listeners only from its own
+  `onPointerUp`.
 
 Three duplications the review named are gone too: `edgeSelectionOf` in
 `render-adapter.ts` is now the one translation from a React Flow Edge to the
@@ -557,6 +558,41 @@ Three more from that round:
 Most pointer refusals are unreachable by design — `isValidConnection` refuses
 them during the drag — so the alert is proven at the React level rather than in
 a browser test that would be asserting something the product prevents.
+
+**A fourth round, from an external reviewer plus three delegated agents,
+found four more.** Two of the reviewer's four were already fixed by the third
+round; the other two were live, and the round's own review found two hard spec
+violations beside them:
+
+- **`isValidConnection` asked the connect rule during a reconnect drag.** React
+  Flow has one global validator and consults it for both, so an endpoint dropped
+  back on the Card it came from read as the duplicate Edge it textually is —
+  invalid for the whole drag, though the Edit accepts it as `unchanged`. The
+  validator now builds a reconnect proposal from the open draft, and
+  `movedEndpoint` is the one derivation it shares with the completion.
+- **An open Edge draft survived into presentation.** The picker rendered off the
+  draft alone, so it stayed usable over a presentation that had already begun
+  and could author an Edge; a hidden Edge editor reopened afterwards. The module
+  now cancels on entering presenting, and the layer is gated on `enabled` so
+  nothing shows in the render before that lands.
+- **A refusal outlived every invalidation trigger.** The invalidation pass
+  returned early when no draft was left — and a *pointer* refusal outlives its
+  draft by design — so a sentence naming the replaced Space survived an accepted
+  replacement, against shared case 7's "cancels all target-bound transients".
+- **The Edge focus request could not resolve in the commit that published it.**
+  The projection carrying a reconnected Edge arrives a strategy later, so
+  resolving against the projection on screen found nothing and fell back to the
+  canvas rather than the matrix's "Edited Edge". An Edge request now waits for
+  the projection that draws it; a Card or canvas request still resolves at once,
+  because for those an unresolvable request means the element is gone for good.
+
+The reviewer's fifth concern — that Escape during a reconnect leaves the guard
+and draft latched — is **false**, and was traced to a wrong comment of ours
+rather than to the code: React Flow has no Escape path for a drag at all, and
+`XYHandle` removes its document listeners only from its own `onPointerUp`. The
+comment invented that path; `AGENTS.md`, this file and the source now say what
+the pinned release actually does.
+
 
 The original brief follows.
 

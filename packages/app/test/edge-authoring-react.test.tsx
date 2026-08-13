@@ -445,6 +445,74 @@ describe("React Flow's reconnect callback order", () => {
     });
   });
 
+  /**
+   * **React Flow consults the one global validator during a reconnect too**, so
+   * it has to be asked the reconnect question or the anchor reads invalid for
+   * the whole drag.
+   *
+   * Dropping either end of A→B back on its own Card is the case that exposes
+   * it: as a *connect* proposal that is the duplicate rule, and as a *reconnect*
+   * proposal it is the endpoint returning to where it came from, which
+   * `reconnectOutcome` answers `unchanged` before it ever reaches the duplicate
+   * check. Eligibility already treats it as offerable; the validator was the one
+   * place still saying otherwise.
+   */
+  const connectionTo = (source: string, target: string) => ({
+    source,
+    target,
+    sourceHandle: null,
+    targetHandle: null,
+  });
+
+  it.each([
+    ['the target anchor', 'target' as const],
+    ['the source anchor', 'source' as const],
+  ])('accepts an endpoint dropped back where it came from, from %s', (_name, handleType) => {
+    const composed = compose();
+    const { result } = surface(composed);
+    act(() => {
+      result.current.reactFlowProps.onReconnectStart(null, EDGES[0]!, handleType);
+      result.current.reactFlowProps.onConnectStart(new MouseEvent('mousedown'), {
+        nodeId: CARD_B,
+        handleId: null,
+        handleType: 'target',
+      });
+    });
+
+    expect(result.current.reactFlowProps.isValidConnection(connectionTo(CARD_A, CARD_B))).toBe(
+      true,
+    );
+  });
+
+  /** A result that really would duplicate another Edge is still refused. */
+  it('still refuses a reconnection onto a Card the Graph already reaches', () => {
+    const composed = compose();
+    // Aside holds B→C, so moving its `to` onto C is that same Edge again.
+    const asideEdge = EDGES[1]!;
+    const { result } = surface(composed);
+    act(() => {
+      result.current.reactFlowProps.onReconnectStart(null, asideEdge, 'target');
+    });
+
+    expect(result.current.reactFlowProps.isValidConnection(connectionTo(CARD_B, CARD_C))).toBe(
+      true,
+    );
+  });
+
+  /** With no reconnect draft open, the ordinary connect rule still answers. */
+  it('asks the connect rule when no reconnect drag is in flight', () => {
+    const composed = compose();
+    const { result } = surface(composed);
+
+    // A→B already exists in Main, so as a plain connection it is a duplicate.
+    expect(result.current.reactFlowProps.isValidConnection(connectionTo(CARD_A, CARD_B))).toBe(
+      false,
+    );
+    expect(result.current.reactFlowProps.isValidConnection(connectionTo(CARD_B, CARD_C))).toBe(
+      true,
+    );
+  });
+
   it('completes the reconnection rather than silently authoring nothing', () => {
     const composed = compose();
     const { result } = surface(composed);
@@ -537,6 +605,103 @@ describe("React Flow's reconnect callback order", () => {
     });
 
     expect(composed.session.getState().working).toBe(before);
+  });
+});
+
+/**
+ * A focus request for an Edge has to outlive the render that made it.
+ *
+ * The request is published synchronously with the Edit, but the projection
+ * carrying the reconnected Edge arrives a strategy later — so resolving it
+ * against the projection on screen at that moment finds nothing and falls back
+ * to the canvas, landing focus anywhere but the "Edited Edge" the matrix names.
+ */
+describe('focusing an Edge a completed Edit has just produced', () => {
+  const RECONNECTED = { graphId: GRAPH_ID, edge: { from: CARD_A, to: CARD_C } } as const;
+  const reconnectedFlowEdge = flowEdge(`${GRAPH_ID}::0`, GRAPH_ID, CARD_A, CARD_C);
+
+  it('waits for the projection that draws it rather than falling back to the canvas', () => {
+    // The real canvas, because resolving the request is a DOM lookup: the
+    // element only exists once React Flow has drawn the Edge.
+    const { edgeAuthoring, adapter } = mountCanvas();
+    document.body.focus();
+
+    act(() => {
+      edgeAuthoring.openEdgeEditor(SUBJECT);
+      edgeAuthoring.reconnect('to', CARD_C);
+    });
+
+    // The Edit has completed, but the projection still holds the Edge as it
+    // was — so the request is still owed rather than spent on the canvas.
+    expect(edgeAuthoring.getState().focusRequest).toEqual({ kind: 'edge', ...RECONNECTED });
+
+    act(() => adapter.getState().syncProjection(NODES, [reconnectedFlowEdge, EDGES[1]!]));
+
+    expect(edgeAuthoring.getState().focusRequest).toBeNull();
+    expect(document.activeElement).toBe(
+      document.querySelector(`.react-flow__edge[data-id="${GRAPH_ID}::0"]`),
+    );
+  });
+
+  /** A Card or the canvas resolves immediately, so neither is ever left owed. */
+  it('spends a Card request on the render that receives it', () => {
+    const { edgeAuthoring } = mountCanvas();
+
+    act(() => {
+      edgeAuthoring.deleteEdge(SUBJECT);
+    });
+
+    expect(edgeAuthoring.getState().focusRequest).toBeNull();
+  });
+});
+
+/**
+ * Withdrawing Edge authoring withdraws its surfaces in the same render.
+ *
+ * The module cancels an open draft when presenting begins, but that arrives on
+ * a notification and the layer renders before it — so a picker read off the
+ * draft alone stays usable over a presentation that has already started. Both
+ * halves are needed: this one closes the window, and the module's cancellation
+ * is what stops the draft reopening afterwards.
+ */
+describe('withdrawing Edge authoring', () => {
+  const withEnabled = (composed: ReturnType<typeof compose>, enabled: boolean) =>
+    renderHook(
+      () =>
+        useEdgeAuthoring({
+          authoring: composed.edgeAuthoring,
+          edges: EDGES,
+          projectedNodes: null,
+          selection: { kind: 'none' },
+          activeGraphId: GRAPH_ID,
+          graphs: composed.currentSpace().graphs,
+          subjectCards: composed.currentSpace().cards,
+          newCardTitle: 'Card 4',
+          enabled,
+          onSelectCard: NO_OP,
+          onSelectEdge: NO_OP,
+        }),
+      { wrapper: ({ children }) => <ReactFlowProvider>{children}</ReactFlowProvider> },
+    );
+
+  it('draws no keyboard target picker while authoring is withdrawn', () => {
+    const composed = compose();
+    act(() => composed.edgeAuthoring.beginKeyboardConnect(CARD_A));
+
+    const { result } = withEnabled(composed, false);
+    render(<ReactFlowProvider>{result.current.layer}</ReactFlowProvider>);
+
+    expect(screen.queryByTestId('connect-target-picker')).not.toBeInTheDocument();
+  });
+
+  it('draws it again once authoring returns', () => {
+    const composed = compose();
+    act(() => composed.edgeAuthoring.beginKeyboardConnect(CARD_A));
+
+    const { result } = withEnabled(composed, true);
+    render(<ReactFlowProvider>{result.current.layer}</ReactFlowProvider>);
+
+    expect(screen.getByTestId('connect-target-picker')).toBeVisible();
   });
 });
 

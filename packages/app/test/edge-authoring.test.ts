@@ -358,6 +358,51 @@ describe('draft invalidation', () => {
     expect(edges.getState().draft).toBeNull();
   });
 
+  /**
+   * Presenting withdraws Edge authoring, so a draft made before it cannot
+   * survive into it. Left standing, the keyboard picker goes on rendering over
+   * the presentation and can author an Edge the canvas is no longer offering —
+   * and an Edge editor hidden behind it reopens when the author returns.
+   */
+  it('cancels the draft when presenting withdraws Edge authoring', () => {
+    const { edges, navigation } = open();
+    edges.beginKeyboardConnect(CARD_A);
+
+    navigation.present();
+
+    expect(navigation.getState().mode).toBe('presenting');
+    expect(edges.getState().draft).toBeNull();
+  });
+
+  /**
+   * A refusal names Cards and Graphs of the Space it was made against, so the
+   * context that invalidates a draft invalidates the sentence too — and a
+   * *pointer* refusal has no draft left to be cancelled with it. The handoff's
+   * shared case 7 is the hard one: accepting the stored Space "cancels all
+   * target-bound transients", and a sentence naming the replaced Space is one.
+   */
+  it.each([
+    [
+      'the Active Graph changes',
+      ({ navigation }: ReturnType<typeof open>) => navigation.activateGraph(OTHER_GRAPH_ID),
+    ],
+    [
+      'the renderer changes',
+      ({ navigation }: ReturnType<typeof open>) =>
+        navigation.selectRenderer({ kind: 'view', view: 'flow' }),
+    ],
+  ])('clears a refusal left by a finished gesture when %s', (_name, change) => {
+    const opened = open();
+    opened.edges.beginPointerConnect(CARD_A);
+    opened.edges.connect(CARD_A, CARD_B, null);
+    opened.edges.endPointerDrag();
+    expect(opened.edges.getState().refusal).not.toBeNull();
+
+    change(opened);
+
+    expect(opened.edges.getState().refusal).toBeNull();
+  });
+
   it('leaves the draft standing through an unrelated completed Edit', () => {
     const { edges, authoring } = open();
     edges.openEdgeEditor(SUBJECT);
