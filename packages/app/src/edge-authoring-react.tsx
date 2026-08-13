@@ -688,17 +688,30 @@ export function useEdgeAuthoring({
            * **A portal is not an escape from the React tree.** Radix renders
            * the popover through `createPortal`, but React dispatches synthetic
            * events along the *fiber* tree, so a keydown inside the portalled
-           * content still bubbles to this handler — and Radix's own Escape
-           * handling only calls `preventDefault`, never `stopPropagation`. One
-           * press would therefore close the list and cancel the connection
-           * together, leaving no way to back out of the list without losing the
-           * gesture.
+           * content is not out of this handler's reach — and Radix's own Escape
+           * handling only calls `preventDefault`, never `stopPropagation`.
            *
            * The trigger's `data-state` is what separates the two layers: while
            * it reads `open` the press belongs to Radix, and the next one — with
            * the list closed and focus back on the trigger — is this one's. It
-           * survived the move from `Select` to the Combobox composition because
-           * both triggers are Radix triggers and both stamp that attribute.
+           * survived the move from `Select` to the Combobox composition
+           * (`f21d5d3`) because both triggers are Radix triggers and both stamp
+           * that attribute.
+           *
+           * **In Chromium the guard is not what produces those two stages**, and
+           * a claim here that it did was measured and refused. Radix closes from
+           * a document capture listener, and the microtask checkpoint the
+           * browser performs *between* listeners commits that close before
+           * React's delegated listener runs — so the portalled content is
+           * unmounted and its fiber stripped, nothing dispatches, and this
+           * handler is never asked; the trigger already reads `closed`. jsdom
+           * performs no such checkpoint, dispatching a whole event in one frame,
+           * which is the only reason a unit test can see the guard at all.
+           * `editing.spec.ts` passes with the guard removed.
+           *
+           * It stays because it is the rule this handler owns, and it becomes
+           * load-bearing again the moment the picker moves to a primitive that
+           * answers Escape from React rather than from a document listener.
            */
           onKeyDown={(event) => {
             if (event.key !== 'Escape') return;

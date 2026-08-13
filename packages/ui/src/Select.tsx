@@ -18,8 +18,13 @@ export const SelectTrigger = forwardRef<
 >(({ className, children, ...props }, ref) => (
   <SelectPrimitive.Trigger
     ref={ref}
+    // `nokey` here for the other half of the same mechanism: this trigger is
+    // not portalled anywhere, it is drawn in a toolbar that was never inside the
+    // flow to begin with — and a `document` listener does not care. It is a
+    // `button`, so no input tag excludes it, and Backspace pressed on it deleted
+    // whichever Edge the canvas had selected.
     className={cn(
-      'inline-flex items-center justify-between gap-[0.4rem] rounded-[6px] border border-[var(--border)] bg-[var(--panel-2)] px-[0.5rem] py-[0.35rem] text-[0.85rem] text-[var(--text)] transition-colors outline-none focus:border-[var(--accent)] disabled:cursor-not-allowed disabled:opacity-50 data-[placeholder]:text-[var(--text)]',
+      'nokey inline-flex items-center justify-between gap-[0.4rem] rounded-[6px] border border-[var(--border)] bg-[var(--panel-2)] px-[0.5rem] py-[0.35rem] text-[0.85rem] text-[var(--text)] transition-colors outline-none focus:border-[var(--accent)] disabled:cursor-not-allowed disabled:opacity-50 data-[placeholder]:text-[var(--text)]',
       className,
     )}
     {...props}
@@ -43,7 +48,7 @@ export const SelectContent = forwardRef<
       ref={ref}
       position={position}
       className={cn(
-        'relative z-50 max-h-[--radix-select-content-available-height] min-w-[8rem] overflow-hidden rounded-[6px] border border-[var(--border)] bg-[var(--panel)] text-[var(--text)] shadow-[0_12px_40px_rgba(0,0,0,0.5)]',
+        'nokey relative z-50 max-h-[--radix-select-content-available-height] min-w-[8rem] overflow-hidden rounded-[6px] border border-[var(--border)] bg-[var(--panel)] text-[var(--text)] shadow-[0_12px_40px_rgba(0,0,0,0.5)]',
         position === 'popper' && 'data-[side=bottom]:translate-y-1 data-[side=top]:-translate-y-1',
         className,
       )}

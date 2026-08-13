@@ -78,7 +78,7 @@ export function CardCombobox({
         aria-label={label}
         title={label}
         data-testid={testId}
-        className="flex w-full items-center justify-between gap-[7px] rounded-[6px] border border-[var(--border)] bg-[var(--panel-2)] px-[9px] py-[6px] text-[13px] text-[var(--text)] outline-none hover:border-[var(--accent)] focus:border-[var(--accent)]"
+        className="nokey flex w-full items-center justify-between gap-[7px] rounded-[6px] border border-[var(--border)] bg-[var(--panel-2)] px-[9px] py-[6px] text-[13px] text-[var(--text)] outline-none hover:border-[var(--accent)] focus:border-[var(--accent)]"
       >
         <span className="max-w-[9rem] truncate">{chosen?.title ?? placeholder}</span>
         <ChevronDownIcon />

@@ -524,10 +524,17 @@ source handle, and `CardNode` offered only target handles mid-drag, so the
 gesture had nowhere to land. It now reads the role off the drag —
 `connection.fromHandle.type` — which changes nothing for an ordinary connection.
 
-Also from that round: Radix portals through the fiber tree, so the listbox's
-Escape *did* reach the picker's handler and one press closed the list and
-cancelled the connection together; the trigger's `data-state` now separates the
-two layers. A refused toolbar Delete published a sentence no surface rendered.
+Also from that round: the picker's Escape was given a `data-state` guard so the
+open listbox and the connection draft under it each own one press. It was
+written against a Radix `Select` and read as a fix for a press that reached the
+handler through the fiber tree — **which Chromium was later measured not to
+do**. Radix closes from a document capture listener and the browser's
+between-listener microtask checkpoint commits that close first, so the portalled
+content is gone before React's delegated listener runs and the handler is never
+asked; jsdom, which dispatches a whole event in one frame, is where the guard is
+visible at all. The guard stays as the rule the handler owns — see the comment
+on it in `edge-authoring-react.tsx`, which is where that argument is written
+out. A refused toolbar Delete published a sentence no surface rendered.
 And `endpointChoices` spread an `EdgeSelection` into the proposal, whose own
 `kind` silently turned every reconnect question into a connect one — the
 `EdgeSubject` refactor's one sharp edge, now destructured at all four sites and

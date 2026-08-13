@@ -6,6 +6,7 @@ import { uuidSchema, type SpaceSnapshot } from '@project/core';
 import { inHandleId, loadSpaceSnapshot, outHandleId, Placement } from '@project/graph';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
 import type { CardFlowNode } from '@project/react-flow-adapter';
+import { LayoutSelector } from '@project/ui';
 import { createNavigation } from '../src/navigation';
 import { createRenderAdapter, edgeSelectionOf } from '../src/render-adapter';
 import { createConnectionCompletion } from '../src/connection-completion';
@@ -214,10 +215,17 @@ beforeAll(() => {
 
 afterAll(() => vi.unstubAllGlobals());
 
-function mountCanvas() {
+/**
+ * `beside` mounts a control *outside* the flow wrapper, the way the app's
+ * toolbar sits beside the canvas. React Flow's delete listener is on `document`,
+ * so what such a control does with a key press is a fact about this canvas even
+ * though it is not part of it.
+ */
+function mountCanvas(beside: ReactNode = null) {
   const composed = compose();
   const view = render(
     <ReactFlowProvider>
+      {beside}
       <CanvasHarness {...composed} />
     </ReactFlowProvider>,
   );
@@ -393,6 +401,62 @@ describe('the Edge toolbar', () => {
 });
 
 /**
+ * React Flow's delete key reaches the whole page, and `.nokey` only covers what
+ * is beneath it in the DOM.
+ *
+ * `useGlobalKeyHandler` subscribes `deleteKeyCode` through `useKeyPress` with no
+ * target, so the listener is on `document` and nothing about it is scoped to the
+ * flow. Its one exclusion is `isInputDOMNode`, which reads the target's tag and
+ * then walks the target's DOM *ancestors* for `.nokey` — so a control Radix has
+ * portalled to `document.body` has none of the app's above it, however many are
+ * placed inside the flow, and a toolbar control was never inside it at all.
+ *
+ * The Edge the key removes is the *selected* one, which is the same Edge whose
+ * editor is open: the author's own Edge, deleted from under the editor they
+ * opened on it.
+ *
+ * **Asserted on the Space, not on the drawing.** `onBeforeDelete` returns false
+ * and nothing is removed locally, so the Edge stays on screen either way and
+ * only the working snapshot says whether an Edit ran.
+ */
+describe("React Flow's document-level delete key", () => {
+  const DELETE_KEYS = ['Backspace', 'Delete'] as const;
+
+  it.each(DELETE_KEYS)('leaves the Edge standing when %s reaches its own editor', (key) => {
+    const { adapter, session } = mountCanvas();
+    act(() => adapter.getState().selectEdge(SUBJECT));
+    fireEvent.click(screen.getByRole('button', { name: 'Edit this Edge' }));
+
+    // The endpoint trigger — where Radix's focus scope lands as the popover
+    // opens, and a `button role="combobox"`, so neither an input tag nor
+    // `contenteditable` excludes it. Named rather than left to that autofocus,
+    // so this does not turn on `FocusScope` timing.
+    fireEvent.keyDown(screen.getByRole('combobox', { name: 'From' }), { key });
+
+    expect(graphsOf(session.getState().working)[0]?.edges).toEqual([EDGE]);
+  });
+
+  it.each(DELETE_KEYS)('leaves the Edge standing when %s reaches the toolbar', (key) => {
+    // The real control, mounted where the real one is: outside the flow
+    // entirely, with no portal involved and so nothing for a `.nokey` inside the
+    // canvas to reach.
+    const { adapter, session } = mountCanvas(
+      <LayoutSelector
+        layouts={snapshot.document.layouts ?? []}
+        value={LAYOUT_ID}
+        active
+        onValueChange={NO_OP}
+      />,
+    );
+    act(() => adapter.getState().selectEdge(SUBJECT));
+
+    fireEvent.keyDown(screen.getByRole('combobox', { name: 'Choose layout' }), { key });
+
+    expect(graphsOf(session.getState().working)[0]?.edges).toEqual([EDGE]);
+  });
+});
+
+/**
  * React Flow drives a reconnect drag through the *connection* callbacks as well
  * as the reconnect ones, in an order these tests pin because nothing else can.
  *
@@ -465,8 +529,8 @@ describe("React Flow's reconnect callback order", () => {
   });
 
   it.each([
-    ['the target anchor', 'target' as const],
-    ['the source anchor', 'source' as const],
+    ['the source anchor', 'target' as const],
+    ['the target anchor', 'source' as const],
   ])('accepts an endpoint dropped back where it came from, from %s', (_name, handleType) => {
     const composed = compose();
     const { result } = surface(composed);
@@ -728,32 +792,30 @@ describe('withdrawing Edge authoring', () => {
  * Escape cancels exactly one topmost surface, and the picker's open list is a
  * surface above the connection draft.
  *
- * **A portal is not an escape from the React tree.** Radix renders the list
- * through `createPortal`, so nothing in the DOM puts it inside the picker — but
- * React dispatches synthetic events along the *fiber* tree, so a keydown in the
- * portalled content still reaches the container's `onKeyDown`. Radix's own
- * Escape handling calls `preventDefault` and never `stopPropagation`, so without
- * the `data-state` guard one press would close the list and cancel the
- * connection together, and an author who opened the list to look would have no
- * way back out that kept the gesture.
+ * **In Chromium the `data-state` guard is not what produces those two stages**,
+ * and that is the first thing to know about this test. Measured against the
+ * fixture: Radix closes from a document capture listener, and the microtask
+ * checkpoint the browser performs *between* listeners commits that close before
+ * React's delegated listener runs — by which time the cmdk input is detached and
+ * React has stripped its fiber, so nothing dispatches, the handler is never
+ * asked, and the trigger already reads `closed`. `editing.spec.ts` passes with
+ * the guard removed, and the author's two stages are the e2e's to pin.
  *
- * The two layers are told apart by the trigger's `data-state` alone, and this is
- * what holds that fact to the primitive underneath it: the guard was written
- * against a Radix `Select` and the picker is now shadcn's Combobox — a Popover
- * over cmdk. Both stamp `data-state` because both triggers are Radix triggers,
- * which was an argument in a comment until this ran it.
+ * What this pins is the **rule**, in the one environment that can see it. A
+ * portal is no escape from the React tree — Radix renders the list through
+ * `createPortal`, React dispatches synthetic events along the *fiber* tree, and
+ * Radix's own Escape handling calls `preventDefault` and never
+ * `stopPropagation` — and jsdom dispatches a whole event in one frame with no
+ * checkpoint, so here the press really does arrive in front of the guard.
+ * Without it this fails with the picker gone on the first press: one gesture
+ * cancelled by a keystroke the author aimed at a list. That is what will matter
+ * the next time the primitive moves to one answering Escape from React rather
+ * than from the document.
  *
- * **This is the only test of the rule itself, and Chromium reaches the same two
- * stages without it.** Measured against the fixture: Radix closes from a
- * document capture listener, and the microtask checkpoint the browser performs
- * *between* listeners commits that close before React's delegated listener runs
- * — by which time the cmdk input is detached and React has already stripped its
- * fiber, so nothing dispatches and the handler is never asked. jsdom has no such
- * checkpoint, dispatching a whole event in one JS frame, which is what puts the
- * press in front of the guard here. So the browser's two stages are the e2e's to
- * pin (`editing.spec.ts`), and this is what will matter the next time the
- * primitive moves to one that answers Escape from React rather than from the
- * document.
+ * It also holds the guard to the primitive underneath it: it was written against
+ * a Radix `Select` and the picker is now shadcn's Combobox — a Popover over
+ * cmdk. Both stamp `data-state` because both triggers are Radix triggers, which
+ * was an argument in a comment until this ran it.
  */
 describe('Escape in the keyboard target picker', () => {
   it('closes the open list first and cancels the connection only on the press after', () => {
