@@ -6,6 +6,23 @@ import { CardPane } from './CardPane';
 import { CardPicker } from './CardPicker';
 
 /**
+ * The control that abandons the pane, marked so a field which commits on blur
+ * can tell that this particular blur is not a commit.
+ *
+ * `<button>` is in `PANE_FOCUSABLE`, deliberately — the pane's containment lets
+ * a pointer move focus onto its own controls — so a mousedown on Cancel blurs
+ * whatever field the author was in, and it does so *before* the click that
+ * closes the pane. A field that commits on blur therefore commits the very
+ * edit Cancel exists to abandon, and the pane is gone before the author can
+ * see it happen. Both halves of the contract are written here because one small
+ * module owns both ends of it.
+ */
+const PANE_CANCEL_ATTRIBUTE = 'data-pane-cancel';
+const paneCancelProps = { [PANE_CANCEL_ATTRIBUTE]: '' };
+const abandonsThePane = (target: EventTarget | null): boolean =>
+  target instanceof Element && target.closest(`[${PANE_CANCEL_ATTRIBUTE}]`) !== null;
+
+/**
  * `Content` rather than `Card`, which is the domain type imported above: a
  * parameter shadowing it reads as that type at every use and is not one.
  */
@@ -161,7 +178,7 @@ function MarkdownCardEditor({
         <textarea value={body} onChange={(event) => setBody(event.currentTarget.value)} />
       </label>
       <div className="card-pane__actions">
-        <Button type="button" variant="secondary" onClick={onCancel}>
+        <Button type="button" variant="secondary" {...paneCancelProps} onClick={onCancel}>
           Cancel
         </Button>
         <Button type="submit" variant="default">
@@ -280,7 +297,14 @@ function OccurrenceTitleEditor({
             setDraft(event.currentTarget.value);
             setError(null);
           }}
-          onBlur={complete}
+          // A blur on its way to Cancel is not a commit. Every other blur is:
+          // tabbing on, clicking a field below, or leaving the pane entirely
+          // all settle the rename, which is the rule the graph's in-place
+          // rename already follows.
+          onBlur={(event) => {
+            if (abandonsThePane(event.relatedTarget)) return;
+            complete();
+          }}
           onKeyDown={(event) => {
             if (event.key === 'Enter') {
               event.preventDefault();
@@ -466,7 +490,14 @@ export function OpenCard(props: OpenCardProps) {
       )}
       {/* Keyed by opened occurrence and content owner, because the draft is
           seeded once and then owned by the editor. Reusing one would carry a
-          previous Card's draft under the next Card's identity. */}
+          previous Card's draft under the next Card's identity.
+
+          A completed retarget changes `content.id`, so it remounts this editor
+          and discards whatever was typed into it. Do not answer that by
+          relaxing the key — a draft surviving into the new Target's editor is
+          committed to the new Target on Done, which is the worse loss, and two
+          tests hold the key for that reason. What should happen instead is
+          undecided: issue `17` in `.scratch/card-route-editing/issues/`. */}
       <ResolvedContentEditor
         key={`${opened.id}:${content.id}`}
         card={content}

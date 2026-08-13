@@ -201,6 +201,36 @@ describe('Add Card', () => {
     await settled(session);
   });
 
+  /**
+   * The created Card is selected as well as named, and selected in the sense
+   * React Flow means — not only in the sense Authoring does.
+   *
+   * The two are separate notions and the Card is created between them: the
+   * store's `selectedCardId` is set in the same tick as the Edit, one render
+   * before the projection that first draws the new node. A projection carries
+   * no selection of its own, so unless the fold seeds it, the new node arrives
+   * unselected and the two notions disagree for good — the Card reads as
+   * selected on screen while React Flow has no selected node at all. `F2` asks
+   * React Flow, so it is what notices.
+   */
+  it('leaves the created Card selected for F2, not only for authoring', async () => {
+    const session = mount();
+    fireEvent.click(await readyToAuthor());
+    // Out of the naming editor creation opens, so `F2` is answered by the
+    // canvas rather than typed into a field.
+    const naming = await screen.findByRole('textbox', { name: 'Card title' });
+    fireEvent.keyDown(naming, { key: 'Escape' });
+    const created = cardsOf(session)[2]!;
+    const node = document.querySelector(`.react-flow__node[data-id="${created.id}"]`);
+    if (node === null) throw new Error('the created Card is not drawn as a node');
+
+    fireEvent.keyDown(node, { key: 'F2' });
+
+    const renaming = await screen.findByRole('textbox', { name: 'Card title' });
+    expect(renaming).toHaveValue('Card 1');
+    await settled(session);
+  });
+
   /** The toolbar control and `C` are the same operation, reached two ways. */
   it('is reachable with C from the graph', async () => {
     const session = mount();
@@ -389,6 +419,35 @@ describe('Add Alias', () => {
   });
 
   /**
+   * Cancel cancels the rename too, and the pointer path is where that is hard.
+   *
+   * The Title commits on blur, and a mousedown on Cancel blurs it — `<button>`
+   * is exempt from the pane's focus containment, deliberately — so the blur
+   * lands before the click that closes the pane. Without care the author
+   * presses Cancel and the rename is committed anyway, with the pane gone
+   * before they could see it happen.
+   */
+  it('does not commit the occurrence rename when the pane is cancelled', async () => {
+    const session = mount();
+    await openAliasCreation();
+    fireEvent.click(screen.getByRole('option', { name: 'Markdown Card A' }));
+    await screen.findByText('Opened through A');
+    const title = screen.getByRole('textbox', { name: 'Title' });
+    fireEvent.change(title, { target: { value: 'Recap' } });
+    const cancel = screen.getByRole('button', { name: 'Cancel' });
+
+    // The browser's own order: focus moves on mousedown, so the field blurs
+    // before the click arrives.
+    fireEvent.mouseDown(cancel);
+    fireEvent.blur(title, { relatedTarget: cancel });
+    fireEvent.click(cancel);
+
+    expect(screen.queryByTestId('open-card')).not.toBeInTheDocument();
+    expect(cardsOf(session)[2]?.document).toEqual({ title: 'A', kind: 'alias', target: CARD_ID });
+    await settled(session);
+  });
+
+  /**
    * The occurrence's Title is the one field on this pane whose Escape has two
    * answers to give, because it is the only one holding a draft against a
    * stored value: "Dirty field restores value before surface closes".
@@ -473,6 +532,58 @@ describe('Add Alias', () => {
     );
     expect(screen.queryByText('No Card matches that search.')).not.toBeInTheDocument();
     expect(screen.queryByRole('option')).not.toBeInTheDocument();
+    await settled(session);
+  });
+
+  /**
+   * The explanation has to reach the combobox, not merely the screen.
+   *
+   * `Command.Empty` is `role="presentation"` inside the `role="listbox"`, so a
+   * reader who lands on the field hears an expanded combobox with no options
+   * and no reason. A live region does not fix that: this pane mounts with the
+   * message already in it, and a live region inserted already populated is the
+   * least reliably announced form there is. A description does — it is read
+   * when focus arrives, which is where this picker puts it.
+   */
+  it('describes the combobox with the reason there is nothing to choose', async () => {
+    const session = mount(noCards);
+    await openAliasCreation();
+
+    expect(screen.getByRole('combobox', { name: 'Target' })).toHaveAccessibleDescription(
+      'An Alias needs a Card that owns its content, and this Space has none yet.',
+    );
+    await settled(session);
+  });
+
+  /**
+   * And drops it once there is something to choose. `Command.Empty` unmounts on
+   * a non-zero filter count, so a description left pointing at it would name an
+   * element that is no longer there.
+   */
+  it('describes nothing once the Space holds a Card to choose', async () => {
+    const session = mount();
+    await openAliasCreation();
+
+    expect(screen.getByRole('combobox', { name: 'Target' })).not.toHaveAccessibleDescription();
+    await settled(session);
+  });
+
+  /**
+   * cmdk mints its own `id` on the input *after* spreading the caller's props,
+   * so a `for` written here names an element that never exists — and the pane's
+   * focus containment prevents the mousedown default on a label, on the stated
+   * grounds that a label focuses what it names, which such a label does not.
+   * The rule is general, so the assertion is: no orphan labels anywhere.
+   */
+  it('leaves no label pointing at a control that does not exist', async () => {
+    const session = mount();
+    await openAliasCreation();
+
+    const orphans = [...document.querySelectorAll('label[for]')].filter(
+      (label) => document.getElementById(label.getAttribute('for') ?? '') === null,
+    );
+
+    expect(orphans.map((label) => label.textContent)).toEqual([]);
     await settled(session);
   });
 

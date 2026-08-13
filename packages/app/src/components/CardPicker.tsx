@@ -81,9 +81,19 @@ export function CardPicker({
   emptyMessage,
 }: CardPickerProps) {
   const [search, setSearch] = useState('');
-  const fieldId = useId();
   /** Nothing to offer at all, as against a search that happened to match none. */
   const unavailable = cards.length === 0;
+  /**
+   * The empty message's id, so the field can be *described* by it.
+   *
+   * `Command.Empty` is `role="presentation"` inside the `role="listbox"`, so a
+   * reader who lands on the field otherwise hears an expanded combobox with no
+   * options and no reason for it. A live region is the wrong instrument: this
+   * pane mounts with the message already inside it, and a live region inserted
+   * already populated is the least reliably announced form there is. A
+   * description is read when focus arrives, which is where this picker puts it.
+   */
+  const messageId = useId();
 
   const cancel = (event: ReactKeyboardEvent<HTMLDivElement>): void => {
     if (event.key !== 'Escape') return;
@@ -102,9 +112,16 @@ export function CardPicker({
 
   return (
     <div className="card-picker" onKeyDown={cancel}>
-      <label className="card-picker__label" htmlFor={fieldId}>
-        {label}
-      </label>
+      {/* Not a `<label>`, because it cannot be one that works. cmdk spreads the
+          caller's props and then writes its own `id` over them, so a `for`
+          minted here names an element that never exists — and an orphan label
+          is worse than none: the pane's focus containment prevents the
+          mousedown default on it, on the stated grounds that a label focuses
+          what it names, so the click did nothing at all. The real label is
+          cmdk's own, rendered visually hidden from the `label` prop below and
+          referenced by `aria-labelledby`, which is what gives the field its
+          accessible name. This is the visible echo of it. */}
+      <span className="card-picker__label">{label}</span>
       <Command
         label={label}
         filter={(value, query) => {
@@ -114,7 +131,9 @@ export function CardPicker({
         }}
       >
         <CommandInput
-          id={fieldId}
+          // Survives cmdk's spread, unlike `id`, `role` and every `aria-` it
+          // writes for itself.
+          aria-describedby={unavailable ? messageId : undefined}
           // Declared only where the surface said this field is what it opens
           // on; the helper answers nothing otherwise, so `CardPane` falls back
           // to its first focusable.
@@ -133,7 +152,10 @@ export function CardPicker({
               it. The class is the only thing that differs: a Space that cannot
               hold an Alias yet is explained in a box, and a search that matched
               nothing is a quiet line. */}
-          <CommandEmpty className={unavailable ? 'card-picker__unavailable' : undefined}>
+          <CommandEmpty
+            id={messageId}
+            className={unavailable ? 'card-picker__unavailable' : undefined}
+          >
             {unavailable ? emptyMessage : 'No Card matches that search.'}
           </CommandEmpty>
           {cards.map((card) => (
