@@ -1,6 +1,6 @@
 # The Frame 5 Alias modifier gestures are unbuilt and unowned
 
-Status: needs-triage
+Status: resolved
 
 Surfaced by: review of the Card and Alias creation branch against package 4
 
@@ -88,9 +88,39 @@ one of those answers, not a description of the ticket's current state.
 
 ## Acceptance
 
-- [ ] Each half is either assigned to a named work package or listed in the
+- [x] Each half is either assigned to a named work package or listed in the
       handoff's Out of scope, separately, since their costs differ.
-- [ ] If the connection-drop half is kept, the sixteenth completion is named as
+- [x] If the connection-drop half is kept, the sixteenth completion is named as
       interface work with the package that adds it, not left to the canvas.
-- [ ] If either is dropped, the keyboard contract's `Shift` assignment is
+- [x] If either is dropped, the keyboard contract's `Shift` assignment is
       retired with it rather than left specifying a modifier nothing reads.
+
+## Answer
+
+The halves are split, as this ticket asked for.
+
+**Body drag is in scope**, as package **4b**. It needs no new completion:
+`created-alias` already carries a Target, an optional title and an `anchor`, and
+`App.tsx` already dispatches it, so an Alias dropped at a point is that
+completion with a different anchor. The work is what this ticket described —
+a modifier-aware drag on the Card body, a ghost preview, the single resolution
+of an Alias source to its non-Alias Target, and a drop. Whether it also carries
+a `rendered` Placement beside the anchor is settled at build time as a field on
+an existing completion, not as an interface question.
+
+**Connection drop is out of scope for first-public**, and is now listed in the
+handoff's Out of scope with its reason. The judgement is the one this ticket
+framed: it is an accelerator over a matrix row that already has a working
+pointer path and a working keyboard path, and buying it means reopening package
+3's closed authoring interface for a sixteenth completion. An accelerator is not
+a reason to reopen a closed interface.
+
+**The `Shift` assignment is narrowed rather than retired.** The keyboard
+contract said "`Shift` is the Alias creation modifier for both Card-body drag
+and connection empty-drop"; it now names Card-body drag alone, so no modifier is
+specified that nothing reads.
+
+Sequencing: 4b follows package **4a**, the pane corrections that ADRs 0047 and
+0048 require. Both halves of that ordering matter — body drag creates an Alias
+and leaves the author standing in the pane, so it should land on the pane in its
+corrected form rather than on the one being replaced.

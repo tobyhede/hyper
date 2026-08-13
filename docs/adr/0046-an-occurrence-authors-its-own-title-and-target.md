@@ -2,6 +2,7 @@
 
 Status: accepted
 Refines: 0039
+Refined by: 0048
 Related: 0009, 0011, 0036, 0037, 0042
 
 Opening an Alias still brings up the pane filled with the content of the Card it targets, and completing that editor still writes the Target — ADR 0039's single hop, unchanged. What changes is that the pane now draws two fields of its own above that editor: the occurrence's **Title**, and its **Target**. Both author the Alias. Neither touches the Card whose content is below them.

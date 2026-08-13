@@ -1,6 +1,6 @@
 # Retargeting an Alias discards an uncommitted content draft
 
-Status: needs-triage
+Status: resolved
 
 Surfaced by: review of the Card and Alias creation branch
 
@@ -85,10 +85,50 @@ the content of the Card it targets, so a completed retarget must show `B`.
 
 ## Acceptance
 
-- [ ] One of the three answers is chosen and recorded — an ADR if it establishes
+- [x] One of the three answers is chosen and recorded — an ADR if it establishes
       a general rule for uncommitted drafts at an identity change, the handoff
       if it is local to this operation.
-- [ ] Whichever is chosen, a test types into the content editor and then
+- [x] Whichever is chosen, a test types into the content editor and then
       retargets, so the decision is pinned rather than re-derived.
-- [ ] The comment at `OpenCard.tsx`'s content-editor key points at the outcome
+- [x] The comment at `OpenCard.tsx`'s content-editor key points at the outcome
       instead of at this ticket.
+
+## Answer
+
+**None of the three. The retarget stops committing on selection**, and the loss
+this ticket describes stops being reachable. `ADR 0048` records it.
+
+All three answers offered here — confirm, refuse-while-dirty, hold a draft per
+content Card — guard step 1's consequence. None of them asks why step 1 happens
+at all. The Target sits on a pane with **Done** and **Cancel**, and it was the
+only field on that pane that committed the moment it was touched. Every other
+field pends. Pending the Target too means no Edit at selection, so no change to
+the Space, so no change to `content.id`, so no remount and no draft to lose.
+There is nothing left to refuse, confirm or hold.
+
+This deletes the defect rather than answering the question the ticket asked, and
+the question it asked — what an authoring surface owes an author's uncommitted
+work at an identity change — turns out not to arise here, because the identity
+no longer changes under an open draft.
+
+**Steps 3 and 4 are untouched and still right.** A completed retarget must show
+`B`, the key must stay, and the two tests holding it stand. What moved is *when*
+the retarget completes, which is now Done, along with the occurrence Title, the
+Description and the Markdown source. One submit over four fields, and Cancel
+finally means something for all of them.
+
+**What it costs, in full in ADR 0048 and in summary here:** the content editor
+stops owning its `<form>` and its actions, so `CONTENT_EDITORS`' compile-time
+obligation becomes a field group that reports values and validity rather than an
+editor that completes itself. One Done then fires two existing completions on two
+Cards — `edited-card` on the Alias through `editAlias`, `edited-card` on the
+content Card. No sixteenth completion, no reopened interface.
+
+The pending Target does **not** preview: while it is pending, the content editor
+keeps editing the current Target and its labels keep naming that Card. Done
+commits both and closes the pane, so there is no half-retargeted state to
+explain.
+
+The pinning test this ticket asked for still applies, with its assertion
+inverted: type into the content editor, choose a different Target, and the typed
+body is **still there**.

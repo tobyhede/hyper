@@ -152,9 +152,17 @@ target and Graph-target pickers use shadcn Combobox composition rather than a
 second custom picker model.
 
 Pointer-only accelerators do not define keyboard access. `Shift` is the Alias
-creation modifier for both Card-body drag and connection empty-drop. The Add
-Alias control and target picker are the equivalent keyboard path. Option/Alt
-connection empty-drop retains connected Markdown Card creation.
+creation modifier for **Card-body drag**. The Add Alias control and target
+picker are the equivalent keyboard path. Option/Alt connection empty-drop
+retains connected Markdown Card creation.
+
+**Narrowed by issue `15`.** This previously assigned `Shift` to "both Card-body
+drag and connection empty-drop". The connection empty-drop half is out of
+first-public scope — it is an accelerator over a matrix row that already has a
+working pointer and keyboard path, and it would require a sixteenth authoring
+completion, reopening package 3's closed interface. `Shift` therefore specifies
+one gesture, which package 4b builds, rather than one built and one that nothing
+reads.
 
 ## Deletion and Escape
 
@@ -178,9 +186,25 @@ Escape is consumed by exactly one topmost owner:
 4. On the bare graph, clear selection and Traversal history and focus canvas.
 5. During Presenting, exit Presenting.
 
-A field draft consumes the first Escape without closing its containing surface;
-a second Escape may then close that surface. Component primitives retain their
-normal Escape behavior wherever it satisfies this ordering.
+**Amended by ADR 0048.** This paragraph previously read: "A field draft consumes
+the first Escape without closing its containing surface; a second Escape may
+then close that surface." That rule is withdrawn. It was never a primitive's
+behavior — no Radix or shadcn component and no platform behavior reverts a text
+input on Escape, while `Dialog.Content` closes — and inside a pane it was a
+second, unlabelled copy of the **Cancel** button already on screen.
+
+Escape is now decided by the surface, not by the field:
+
+- **In a pane** (the Card editor, the Alias creation state), Escape is an alias
+  of Cancel: it discards every pending field and closes. Fields do not intercept
+  it. Ordering entries 2 through 5 above are unaffected.
+- **In place on the canvas** (the Card Front's title editor), where blur is the
+  commit, Escape reverts the field to its stored value and dismisses the editor
+  — the only way out that does not author.
+
+Every surface has exactly one non-committing exit; which mechanism supplies it
+follows from what that surface's commit trigger is. Component primitives retain
+their normal Escape behavior, which is now the default rather than a tolerance.
 
 ## Focus after completion
 

@@ -1,6 +1,6 @@
 # The content editor's Escape closes the pane over a dirty draft
 
-Status: needs-triage
+Status: resolved
 
 Surfaced by: review of the Card and Alias creation branch against the keyboard
 contract, while fixing the same defect in the two fields that branch added
@@ -112,13 +112,51 @@ Nothing else in the suite is affected.
 
 ## Acceptance
 
-- [ ] The disagreement is settled in favour of one record, and the losing one is
+- [x] The disagreement is settled in favour of one record, and the losing one is
       amended rather than left standing — a new ADR if ADR 0037's reasoning is
       being refined, an amendment to the keyboard contract if it is not.
-- [ ] If the two-stage rule wins, the restore's scope is decided explicitly:
+- [x] If the two-stage rule wins, the restore's scope is decided explicitly:
       the focused field, or all three drafts on the pane. Whichever is chosen is
       applied at all three clean-field exits above, not only at
       `MarkdownCardEditor`'s.
-- [ ] `card-authoring.test.tsx:344` is rewritten to whichever behaviour is
+- [x] `card-authoring.test.tsx:344` is rewritten to whichever behaviour is
       chosen, with the pristine-field case kept as its own test so "Escape never
       closes" cannot be read into it.
+
+## Answer
+
+**The two-stage rule loses. Inside a pane, Escape is an alias of Cancel** — it
+discards every pending field and closes, exactly as the button beside Done does.
+`ADR 0048` records it and the reasoning; `opening-is-editing/01`'s Answer stands,
+and the **keyboard contract is the record amended**.
+
+The argument that settled it is not the authority order this ticket weighed, and
+not the pane's three drafts either. It is that the two-stage rule was never a
+primitive's behaviour. `CardPicker`'s own comment records "cmdk leaves Escape to
+the containing surface" and then derives the search-clear from the contract
+sentence; no Radix component, no shadcn component and no platform behaviour
+reverts a text input on Escape, while `Dialog.Content` closes. Under `ADR 0047`
+that makes it a deviation needing an interrogated reason, and the reason does not
+survive contact with the pane's own **Cancel** button: the labelled discard
+already exists, and the two-stage rule was a second, unlabelled copy of it.
+
+**Scope of the restore: not applicable, because there is no restore.** All three
+clean-field exits this ticket identified are answered the same way and by
+deletion — `MarkdownCardEditor`'s form handler keeps its current behaviour, and
+the field-level Escapes in `CardPicker`, `OccurrenceTitleEditor` and `NewAlias`'s
+Title are removed. Three instances, one invented rule, gone together.
+
+`CardTitleEditor` on the canvas keeps its Escape, and now for a stated reason
+rather than as an exception: it is outside any pane and has no Cancel to be an
+alias of. There, blur is the commit, so Escape reverting the field is the only
+non-committing way out. ADR 0048 states the pairing — every surface has exactly
+one non-committing exit, and which mechanism supplies it is decided by what the
+commit trigger is.
+
+**Test consequence, inverted from what this ticket expected.**
+`card-authoring.test.tsx:344` keeps its current assertion and needs no rewrite.
+What changes are the tests pinning the three removed field Escapes.
+
+The dirty-draft loss this ticket was written about is real and is **not** solved
+here — it is accepted, deliberately, as what Cancel means. Issue `17`'s door onto
+the same loss is the one that was closed, because retarget never announced it.

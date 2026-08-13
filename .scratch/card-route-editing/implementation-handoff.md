@@ -90,9 +90,9 @@ share a UUID.
 | Operation | Pointer-visible path | Keyboard path | Cancellation | Focus after completion |
 | --- | --- | --- | --- | --- |
 | Add Card | Toolbar Add Card | Graph-focused `C` | Creation already complete; title Escape restores neutral title | Title input, then new Card |
-| Edit/open Card | Explicit Card control; title double-click | Card Enter/Space; F2 rename | Dirty field restores value before surface closes | Opened/edited Card |
+| Edit/open Card | Explicit Card control; title double-click | Card Enter/Space; F2 rename | Cancel — or Escape, its alias — discards every pending field and closes (ADR 0048) | Opened/edited Card |
 | Add Alias | Add Card menu → Add Alias → Target picker | Same visible controls and Combobox | Close/Escape before Target creates nothing | Created Alias in editor; close returns Alias Card |
-| Retarget Alias | Target field in Card editor | Same Combobox | Restore current Target | Alias editor/control |
+| Retarget Alias | Target field in Card editor, pending until `Done` | Same Combobox | Cancel/Escape discards the pending Target with the pane's other fields (ADR 0048) | Alias editor/control |
 | Add Graph | Graph manager Add Graph | Visible button in keyboard-accessible manager | Rename Escape keeps Graph and neutral title | New Graph title, then Graph tab |
 | Edit Graph | Manager Title/Colour | Vertical Tabs and normal fields | Title restores; swatch selection is immediate | Edited control / Graph tab |
 | Connect | Four spatial handles | One tab-stop Connect control → Select Graph Target | Cancel returns source Card | Target Card |
@@ -363,10 +363,44 @@ gestures. Both are pointer-only accelerators whose keyboard path is the control
 this package built, and the connection-drop half would need a sixteenth
 completion — create an Alias *and* an Edge — that package 3 did not build. That
 is interface work, not surface, so it returns to the authoring interface rather
-than being improvised in the canvas. No later package picks either half up, so
-where they go is issue
-[`15`](issues/15-frame-5-alias-modifier-gestures-are-unowned.md)'s question and
-not this paragraph's.
+than being improvised in the canvas.
+
+Issue [`15`](issues/15-frame-5-alias-modifier-gestures-are-unowned.md) has since
+split them: **body drag is package 4b**, and **connection drop is out of scope**
+and listed as such below.
+
+### 4a. Card pane corrections — Radix Dialog and one submit
+
+Corrective work on what package 4 built, ahead of 4b and 5. `CardPane` composes
+`@radix-ui/react-dialog` instead of hand-rolling its focus trap, pointer
+containment and initial focus (ADR 0047); the pane owns one `<form>` over four
+pending fields with one `Done` and one `Cancel`, of which Escape is an alias
+(ADR 0048). The Target and the occurrence Title stop committing on touch, which
+is what closes issue [`17`](issues/17-retargeting-an-alias-discards-the-content-draft.md);
+the three in-pane field Escapes are removed, which closes issue
+[`16`](issues/16-the-content-editors-escape-closes-over-a-dirty-draft.md).
+
+No new authoring completion: `Done` fires the existing `edited-card` on the
+Alias and `edited-card` on the content Card. Ticket and acceptance:
+[`18`](issues/18-rebuild-the-card-pane-on-radix-dialog-and-one-submit.md).
+
+Gate: `pnpm verify` plus `pnpm e2e` — the dialog swap is focus and pointer
+behaviour over a live canvas, and Radix's modal layer sets `pointer-events:
+none` outside its content, which jsdom cannot falsify.
+
+### 4b. Alias body drag
+
+The Frame 5 half that is in scope: Shift-dragging a Card body previews an Alias
+ghost, leaves the source Card in place, and drops to create and select the Alias
+at that position. Surface work only — `created-alias` already carries a Target,
+an optional title and an `anchor`, and `App.tsx` already dispatches it. Resolve
+an Alias source to its non-Alias Target in the single hop Frame 5 specifies.
+
+Sequenced after 4a: the gesture leaves the author standing in the pane, which
+should be the corrected pane rather than the one being replaced.
+
+Gate: component test for the modifier gesture and its ghost; E2E proving a drop
+creates one Alias, selects it, and leaves the source Card where it was.
 
 ### 5. Cards View and Layout membership
 
@@ -461,6 +495,15 @@ second suite over implementation details.
 - Bulk authoring and deletion.
 - Touch-specific gestures or external-drag auto-pan.
 - Compatibility parsing or migration from disposable development documents.
+- **The Frame 5 Alias connection empty-drop** — creating an Alias and the active
+  Graph Edge atomically on a modifier-held drop. It is an accelerator over the
+  Add Alias row, which already has a working pointer path and keyboard path, and
+  it needs a sixteenth authoring completion that would reopen package 3's closed
+  interface. An accelerator is not a reason to reopen a closed interface. The
+  keyboard contract's `Shift` assignment is narrowed to Card-body drag to match,
+  so no modifier is specified that nothing reads. Decided in issue
+  [`15`](issues/15-frame-5-alias-modifier-gestures-are-unowned.md); the
+  **body-drag** half of Frame 5 is *in* scope as package 4b.
 
 Any newly discovered requirement outside these bounds returns to planning. An
 implementation convenience does not silently expand the first-public product.

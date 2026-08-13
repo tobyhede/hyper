@@ -99,6 +99,16 @@ target's title. Like every Edit made through an Algorithmic View, retargeting
 converts the rendered Cards and positions into a Layout before applying the
 Card edit; the Target change itself adds no placement or Edge.
 
+**Amended by ADR 0048: the Edit is still atomic, and it is taken at Done.** This
+document previously made selection the completion — "Choosing a Target commits,
+so there is no unconfirmed Target to hold across a confirmation step" — which
+made Target the one field on a pane with Done and Cancel that committed the
+moment it was touched. Committing on select changed the pane's resolved content
+under an open content editor, remounting it and destroying an uncommitted body
+(issue `17`). The Target now pends like every other field on that pane, does not
+preview while pending, and is written by the same single submit. Atomicity was
+never the thing in question; when the author is asked was.
+
 ## Frame 5 — direct creation shortcuts
 
 ```text
