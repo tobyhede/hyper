@@ -172,6 +172,21 @@ export function SpaceCanvas({
 }: SpaceCanvasProps) {
   const [editingTitleCardId, setEditingTitleCardId] = useState<string | null>(null);
   /**
+   * Whether a drag may begin at a Card's authoring handles.
+   *
+   * **The one authoring gesture presenting does not withdraw**, and the reason
+   * is a product decision rather than an oversight: the presenting chrome
+   * enumerates the active Card's outgoing Edges at render time precisely so an
+   * Edge drawn from the presented Card is a move the presenter can take without
+   * leaving the presentation (ADR 0027, and the `moves()` note in `AGENTS.md`).
+   * `editing.spec.ts` authors a self-Edge mid-presentation and asserts the
+   * chrome offers it.
+   *
+   * A pane is different, and so is an unresolved arrangement — one covers the
+   * graph, the other has nowhere to write.
+   */
+  const canConnectOnCanvas = editable && titleEditingEnabled;
+  /**
    * One rule for everything this canvas authors — the Card controls *and* the
    * whole Edge lifecycle.
    *
@@ -190,7 +205,7 @@ export function SpaceCanvas({
    * to close it, and it is the wrong one: it would put a Connect button on every
    * Card behind a modal dialog.
    */
-  const canAuthorOnCanvas = editable && titleEditingEnabled && !presenting;
+  const canAuthorOnCanvas = canConnectOnCanvas && !presenting;
 
   // A withdrawn editor does not come back on its own.
   //
@@ -457,15 +472,18 @@ export function SpaceCanvas({
       nodesDraggable={editable && !presenting}
       nodesFocusable={!presenting}
       elementsSelectable={!presenting}
-      // Deliberately *not* `canAuthorOnCanvas`, unlike everything else here, and
-      // the reason is that it would buy nothing. React Flow's node-level
-      // connectability reaches a custom node as an `isConnectable` prop the node
-      // must forward, and `CardNode` forwards it to neither the graph ports nor
-      // the four authoring handles — so this governs only whether the connection
-      // *line* renders. The four handles are withdrawn by the pane itself, which
-      // covers the whole graph area at `inset: 0`; the drag they would start
-      // cannot begin.
-      nodesConnectable={editable && !presenting}
+      // Half of a pair, and useless without the other half. React Flow resolves
+      // this into `NodeProps.isConnectable` and hands it to the node, enforcing
+      // nothing itself on a handle it did not render — so `CardNode` forwards it
+      // to the four authoring handles, and only then does this line mean
+      // anything beyond whether the connection line draws.
+      //
+      // **Not `canAuthorOnCanvas`**, and the difference is the whole of
+      // `canConnectOnCanvas`: this line read `editable && !presenting` for as
+      // long as it was inert, and the first thing forwarding it did was break
+      // the presented-Card connection `editing.spec.ts` has always asserted. An
+      // expression nothing reads is not a decision that was made.
+      nodesConnectable={canConnectOnCanvas}
       ariaLabelConfig={ARIA_LABEL_CONFIG}
       // No `connectionMode`: the default is Strict, and every legal drop here is
       // already source-to-target. Loose only adds source-to-source, which the

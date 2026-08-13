@@ -84,6 +84,8 @@ const outHandle = (graph: typeof graphId, offsetY: number): CardHandle => ({
 
 interface Overrides {
   selected?: boolean;
+  /** What React Flow answers for this node from `nodesConnectable`/`node.connectable`. */
+  isConnectable?: boolean;
   title?: string;
   kind?: CardNodeData['kind'];
   titleEditingEnabled?: boolean;
@@ -99,6 +101,7 @@ interface Overrides {
 
 function props({
   selected = false,
+  isConnectable = true,
   title = 'A',
   kind = 'markdown',
   titleEditingEnabled = false,
@@ -119,7 +122,7 @@ function props({
     deletable: true,
     dragging: false,
     zIndex: 0,
-    isConnectable: true,
+    isConnectable,
     positionAbsoluteX: 0,
     positionAbsoluteY: 0,
     type: 'card',
@@ -319,6 +322,40 @@ describe('CardNode graph authoring', () => {
     expect(connectable('Connect from', 'end')).toEqual([true, true, true, true]);
     expect(connectable('Connect to', 'end')).toEqual([false, false, false, false]);
   });
+
+  /**
+   * React Flow's connectability switch has to be forwarded, and this is the only
+   * place that can.
+   *
+   * `nodesConnectable` on the flow, and `connectable` on a node, are resolved by
+   * `NodeWrapper` into one answer that arrives here as `NodeProps.isConnectable`
+   * — **advisory to the node**. React Flow enforces nothing on a handle it did
+   * not render itself; its own `DefaultNode` passes the prop straight to both of
+   * its `Handle`s, and a custom node that drops it silently keeps every handle
+   * live while the flow believes they are off.
+   *
+   * The four authoring handles are the only ones that can begin a gesture — the
+   * graph ports are `isConnectable={false}` outright, being invisible attachment
+   * points for overview Edges — so they are what the switch has to reach. Before
+   * this they ignored it, and the flow-level flag governed nothing but whether
+   * the connection *line* rendered. What stood in for it was presentation: CSS
+   * hides the handles while presenting, and a pane's backdrop covers them. A
+   * withdrawal that depends on something being drawn over it is not a withdrawal
+   * — it is the same hidden-control-live-gesture shape as the delete-key holes.
+   */
+  it.each([
+    ['no drag in flight', false, 'Connect from' as const, 'start' as const],
+    ['a drag looking for a target', true, 'Connect to' as const, 'end' as const],
+  ])(
+    'offers no connectable handle when the flow is not connectable, with %s',
+    (_name, inProgress, label, end) => {
+      connection.inProgress = inProgress;
+
+      render(<CardNode {...props({ selected: true, isConnectable: false })} />);
+
+      expect(connectable(label, end)).toEqual([false, false, false, false]);
+    },
+  );
 });
 
 /*

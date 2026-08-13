@@ -143,7 +143,7 @@ function CardTitleEditor({ cardId, title, onComplete, onCancel }: CardTitleEdito
  * lets an Edge completed onto this Card resolve in the render that first makes
  * it incident, before the projection catches up.
  */
-export function CardNode({ data, selected }: NodeProps<CardFlowNode>) {
+export function CardNode({ data, selected, isConnectable }: NodeProps<CardFlowNode>) {
   /**
    * Which handle role the live drag is looking for, or `null` when none is.
    *
@@ -190,8 +190,18 @@ export function CardNode({ data, selected }: NodeProps<CardFlowNode>) {
       position={side}
       className={`rf-card-node__authoring-handle rf-card-node__authoring-handle--${role}`}
       aria-label={`${role === 'source' ? 'Connect from' : 'Connect to'} ${side}`}
-      isConnectableStart={role === 'source' && !connectionInProgress}
-      isConnectableEnd={role === seeking}
+      // `isConnectable` is React Flow's own switch and it only works if a custom
+      // node forwards it: `NodeWrapper` resolves `nodesConnectable` and the
+      // node's own `connectable` into this one prop and hands it over, and
+      // enforces nothing itself on a handle it did not render. Its `DefaultNode`
+      // passes it straight to both `Handle`s, and this is the same forwarding.
+      //
+      // These four are the only handles that can begin a gesture — the graph
+      // ports below are `isConnectable={false}` outright — so dropping it left
+      // the flow-level flag governing nothing but whether the connection line
+      // rendered, with CSS and a pane's backdrop standing in for the withdrawal.
+      isConnectableStart={isConnectable && role === 'source' && !connectionInProgress}
+      isConnectableEnd={isConnectable && role === seeking}
       // A handle is a drag affordance, and a click is not a drag. A press and
       // release inside React Flow's drag threshold starts no connection, so the
       // click reached the Card underneath and opened it to read — from the one

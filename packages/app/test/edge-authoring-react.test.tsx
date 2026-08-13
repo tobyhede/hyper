@@ -221,12 +221,15 @@ afterAll(() => vi.unstubAllGlobals());
  * so what such a control does with a key press is a fact about this canvas even
  * though it is not part of it.
  */
-function mountCanvas(beside: ReactNode = null, { covered = false }: { covered?: boolean } = {}) {
+function mountCanvas(
+  beside: ReactNode = null,
+  { covered = false, presenting = false }: { covered?: boolean; presenting?: boolean } = {},
+) {
   const composed = compose();
   const view = render(
     <ReactFlowProvider>
       {beside}
-      <CanvasHarness {...composed} covered={covered} />
+      <CanvasHarness {...composed} covered={covered} presenting={presenting} />
     </ReactFlowProvider>,
   );
   return { ...composed, view };
@@ -238,9 +241,11 @@ function CanvasHarness({
   edgeAuthoring,
   currentSpace,
   covered,
+  presenting,
 }: Pick<ReturnType<typeof compose>, 'adapter' | 'edgeAuthoring' | 'currentSpace'> & {
   /** A modal pane is open over the graph — what `App` reports as no title editing. */
   readonly covered: boolean;
+  readonly presenting: boolean;
 }) {
   const projection = adapter((state) => state.projection);
   const selection = adapter((state) => state.selection);
@@ -250,7 +255,7 @@ function CanvasHarness({
       edges={projection?.edges ?? []}
       projectedNodes={null}
       activeCardId={null}
-      presenting={false}
+      presenting={presenting}
       editable={true}
       titleEditingEnabled={!covered}
       onNodesChange={adapter.getState().changeNodes}
@@ -492,6 +497,47 @@ describe('a pane covering the graph', () => {
 
     expect(screen.queryAllByRole('button', { name: /^Connect from/ })).not.toEqual([]);
     expect(edgeElement(`${GRAPH_ID}::0`)).toHaveAttribute('tabindex', '0');
+  });
+
+  /**
+   * The handles themselves, not just the control that opens the picker.
+   *
+   * A Card's four authoring handles are rendered unconditionally and withdrawn
+   * only by CSS and by the pane's own backdrop — so before `nodesConnectable`
+   * reached them, a pane hid the affordance while leaving a live drag target
+   * underneath it. React Flow marks a handle it will accept a drag at with
+   * `connectablestart`, which is what this reads: the class is the primitive's
+   * own answer rather than our styling, so it says the gesture is off and not
+   * merely invisible.
+   */
+  it('leaves no handle a drag could start from', () => {
+    mountCanvas(null, { covered: true });
+
+    const handles = document.querySelectorAll('.rf-card-node__authoring-handle');
+    expect(handles.length).toBeGreaterThan(0);
+    expect([...handles].some((handle) => handle.classList.contains('connectablestart'))).toBe(
+      false,
+    );
+  });
+
+  /**
+   * Presenting is the exception, and it is the reason `nodesConnectable` reads
+   * `canConnectOnCanvas` rather than `canAuthorOnCanvas`.
+   *
+   * The presenting chrome enumerates the active Card's outgoing Edges at render
+   * time so an Edge drawn from the presented Card is a move available without
+   * leaving the presentation (ADR 0027). `editing.spec.ts` authors a self-Edge
+   * mid-presentation and asserts exactly that. Withdrawing the handles here
+   * would take the feature with them — which is what happened the first time
+   * `CardNode` was made to honour the flag, because the flag had been carrying
+   * `!presenting` unread for as long as nothing forwarded it.
+   */
+  it('keeps the handles connectable while presenting, where the Edge is a move', () => {
+    mountCanvas(null, { presenting: true });
+
+    const handles = document.querySelectorAll('.rf-card-node__authoring-handle');
+    expect(handles.length).toBeGreaterThan(0);
+    expect([...handles].some((handle) => handle.classList.contains('connectablestart'))).toBe(true);
   });
 
   it.each(['Backspace', 'Delete'] as const)(
