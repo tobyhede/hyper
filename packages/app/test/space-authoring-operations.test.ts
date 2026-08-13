@@ -705,6 +705,199 @@ describe('Edge lifecycle', () => {
   });
 });
 
+/**
+ * The one eligibility query behind every Edge gesture.
+ *
+ * What it buys is that a gesture the canvas offers cannot be one the Edit
+ * silently drops: each case below asks eligibility *and* completes the same
+ * proposal, and the two have to agree. The reasons are asserted verbatim —
+ * only Authoring knows which rule was hit, and that sentence is what the
+ * surface shows.
+ */
+describe('Edge eligibility', () => {
+  const RECONNECT = {
+    kind: 'reconnect',
+    graphId: GRAPH_ID,
+    edge: { from: CARD_A, to: CARD_B },
+    endpoint: 'to',
+  } as const;
+
+  /** What a pointer gesture reports: where React Flow has drawn the Layout's Cards. */
+  const RENDERED = Placement.fromEntries([
+    [CARD_A, { x: 10, y: 20 }],
+    [CARD_B, { x: 300, y: 40 }],
+  ]);
+
+  it('offers a connection the completion accepts', () => {
+    const { authoring } = openPositioned();
+
+    expect(authoring.edgeEligibility({ kind: 'connect', from: CARD_B, to: CARD_A })).toEqual({
+      kind: 'eligible',
+    });
+    expect(
+      authoring.complete({ kind: 'connected-cards', from: CARD_B, to: CARD_A, rendered: RENDERED }),
+    ).toEqual({
+      kind: 'completed',
+    });
+  });
+
+  it('refuses a duplicate with the reason the completion gives', () => {
+    const { authoring } = openPositioned();
+
+    const refusal = { kind: 'refused', reason: 'These Cards are already connected in this Graph.' };
+    expect(authoring.edgeEligibility({ kind: 'connect', from: CARD_A, to: CARD_B })).toEqual(
+      refusal,
+    );
+    expect(
+      authoring.complete({ kind: 'connected-cards', from: CARD_A, to: CARD_B, rendered: RENDERED }),
+    ).toEqual(refusal);
+  });
+
+  it('offers a self-Edge and a cycle, which are legal authored structure', () => {
+    const { authoring } = openPositioned();
+
+    expect(authoring.edgeEligibility({ kind: 'connect', from: CARD_A, to: CARD_A })).toEqual({
+      kind: 'eligible',
+    });
+    expect(authoring.edgeEligibility({ kind: 'connect', from: CARD_B, to: CARD_A })).toEqual({
+      kind: 'eligible',
+    });
+  });
+
+  it('refuses a Card the selected Layout does not hold', () => {
+    const sparse: SpaceSnapshot = {
+      ...positionedSnapshot,
+      cards: [
+        ...positionedSnapshot.cards,
+        { id: CARD_C, document: { title: 'C', kind: 'markdown', body: 'C' } },
+      ],
+    };
+    const { authoring } = open(sparse);
+    place(authoring, { [CARD_A]: [10, 20], [CARD_B]: [300, 40] });
+
+    expect(authoring.edgeEligibility({ kind: 'connect', from: CARD_A, to: CARD_C })).toEqual({
+      kind: 'refused',
+      reason: 'A connection can only join Cards in this Layout.',
+    });
+    expect(authoring.edgeEligibility({ kind: 'create-and-connect', from: CARD_C })).toEqual({
+      kind: 'refused',
+      reason: 'A connection can only join Cards in this Layout.',
+    });
+  });
+
+  /**
+   * An empty drop's Card does not exist yet, so it can duplicate nothing. The
+   * two connecting proposals therefore diverge on exactly one rule, and this is
+   * the case that would go unnoticed if they were folded into one query.
+   */
+  it('offers an empty drop from a Card whose every existing Edge is taken', () => {
+    const { authoring } = openPositioned();
+
+    expect(authoring.edgeEligibility({ kind: 'connect', from: CARD_A, to: CARD_B }).kind).toBe(
+      'refused',
+    );
+    expect(authoring.edgeEligibility({ kind: 'create-and-connect', from: CARD_A })).toEqual({
+      kind: 'eligible',
+    });
+  });
+
+  /**
+   * **Returning an endpoint to the Card it already names is eligible**, and
+   * completes as `unchanged`. Eligibility answers what the author may still do,
+   * not what the Edit will turn out to have changed — a picker that disabled the
+   * current value would show it as the one forbidden choice.
+   */
+  it('offers a reconnection back to the endpoint it came from, which completes unchanged', () => {
+    const { authoring } = openPositioned();
+
+    expect(authoring.edgeEligibility({ ...RECONNECT, cardId: CARD_B })).toEqual({
+      kind: 'eligible',
+    });
+    expect(authoring.complete({ ...RECONNECT, kind: 'reconnected-edge', cardId: CARD_B })).toEqual({
+      kind: 'unchanged',
+    });
+  });
+
+  it('refuses a reconnection onto a Card outside this Layout, and completes the same way', () => {
+    const sparse: SpaceSnapshot = {
+      ...positionedSnapshot,
+      cards: [
+        ...positionedSnapshot.cards,
+        { id: CARD_C, document: { title: 'C', kind: 'markdown', body: 'C' } },
+      ],
+    };
+    const { authoring } = open(sparse);
+    place(authoring, { [CARD_A]: [10, 20], [CARD_B]: [300, 40] });
+
+    const refusal = { kind: 'refused', reason: 'An Edge can only join Cards in this Layout.' };
+    expect(authoring.edgeEligibility({ ...RECONNECT, cardId: CARD_C })).toEqual(refusal);
+    expect(authoring.complete({ ...RECONNECT, kind: 'reconnected-edge', cardId: CARD_C })).toEqual(
+      refusal,
+    );
+  });
+
+  /**
+   * The placement is not the Space. A Card can be drawn — and so be a position
+   * key — while the Space no longer holds it, and an Edge naming one derives a
+   * snapshot intake rejects, which this derivation answers by throwing. So the
+   * reconnect rule asks the same second question a connection does, and refuses
+   * rather than putting a defect in front of the author as their own mistake.
+   */
+  it('refuses a reconnection onto a Card the Space no longer holds', () => {
+    const { authoring } = openPositioned();
+    // Placed, so the Layout would take it — but never a Card of this Space.
+    place(authoring, { [CARD_A]: [10, 20], [CARD_B]: [300, 40], [UNKNOWN_CARD]: [600, 40] });
+
+    const refusal = { kind: 'refused', reason: 'An Edge can only join Cards in this Layout.' };
+    expect(authoring.edgeEligibility({ ...RECONNECT, cardId: UNKNOWN_CARD })).toEqual(refusal);
+    expect(
+      authoring.complete({ ...RECONNECT, kind: 'reconnected-edge', cardId: UNKNOWN_CARD }),
+    ).toEqual(refusal);
+  });
+
+  it('refuses a reconnection naming a Graph this Layout does not own', () => {
+    const { authoring } = openPositioned();
+
+    expect(
+      authoring.edgeEligibility({ ...RECONNECT, graphId: UNKNOWN_GRAPH, cardId: CARD_A }),
+    ).toEqual({ kind: 'refused', reason: 'That Graph is not one this Layout owns.' });
+  });
+
+  /**
+   * The completion has to re-ask the rule, and this is the case where dropping
+   * it would go unnoticed: an Edge the Graph no longer holds indexes at `-1`, so
+   * the `map` that writes the reconnection replaces nothing and the Edit answers
+   * as though it had — `unchanged` when the snapshot is otherwise untouched,
+   * `completed` when writing the Layout back settles something else, and the
+   * refusal the author is owed never said either way.
+   */
+  it('refuses an Edge the Graph no longer holds, and completes the same way', () => {
+    const { authoring } = openPositioned();
+    const absent = { ...RECONNECT, edge: { from: CARD_B, to: CARD_A }, cardId: CARD_A } as const;
+
+    const refusal = { kind: 'refused', reason: 'That Edge is no longer in this Graph.' };
+    expect(authoring.edgeEligibility(absent)).toEqual(refusal);
+    expect(authoring.complete({ ...absent, kind: 'reconnected-edge' })).toEqual(refusal);
+  });
+
+  /**
+   * Reconnection has no answer at all without a Layout — an Algorithmic View
+   * owns no Edge to move an endpoint of — while the two connecting gestures
+   * cross one by converting it (ADR 0025).
+   */
+  it('refuses a reconnection from an Algorithmic View while still offering a connection', () => {
+    const { authoring } = openAutomatic();
+
+    expect(authoring.edgeEligibility({ ...RECONNECT, cardId: CARD_A })).toEqual({
+      kind: 'refused',
+      reason: 'Select a Layout to edit its Edges.',
+    });
+    expect(authoring.edgeEligibility({ kind: 'connect', from: CARD_A, to: CARD_B })).toEqual({
+      kind: 'eligible',
+    });
+  });
+});
+
 describe('Layout membership', () => {
   /** A Space holding a third Card the Layout does not place. */
   const sparse: SpaceSnapshot = {

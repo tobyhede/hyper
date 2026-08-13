@@ -120,7 +120,7 @@ export function AddCardControl({
               openedASurface.current = false;
               event.preventDefault();
             }}
-            className="z-50 min-w-[10rem] rounded-[6px] border border-[var(--border)] bg-[var(--panel)] p-[0.25rem] text-[var(--text)] shadow-[0_12px_40px_rgba(0,0,0,0.5)]"
+            className="nokey z-50 min-w-[10rem] rounded-[6px] border border-[var(--border)] bg-[var(--panel)] p-[0.25rem] text-[var(--text)] shadow-[0_12px_40px_rgba(0,0,0,0.5)]"
           >
             <DropdownMenuPrimitive.Item
               data-testid="add-alias"

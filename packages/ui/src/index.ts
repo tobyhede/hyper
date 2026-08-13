@@ -8,6 +8,8 @@ export { CardContent } from './CardContent';
 export type { CardContentProps } from './CardContent';
 export { CardKindIcon } from './CardKindIcon';
 export type { CardKindIconProps } from './CardKindIcon';
+export { CardCombobox } from './CardCombobox';
+export type { CardChoice, CardComboboxProps } from './CardCombobox';
 export {
   Command,
   CommandEmpty,
@@ -20,6 +22,7 @@ export { FALLBACK_GRAPH_COLOR, GraphLegend } from './GraphLegend';
 export type { GraphLegendProps } from './GraphLegend';
 export { GraphSelector } from './GraphSelector';
 export type { GraphSelectorProps } from './GraphSelector';
+export { Popover, PopoverAnchor, PopoverContent, PopoverTrigger } from './Popover';
 export { SelectorTrigger } from './SelectorTrigger';
 export type { SelectorTriggerProps } from './SelectorTrigger';
 export { LayoutSelector } from './LayoutSelector';
@@ -30,6 +33,7 @@ export {
   AliasIcon,
   CheckIcon,
   ChevronDownIcon,
+  ConnectIcon,
   EditIcon,
   FlowIcon,
   GraphIcon,

@@ -4,6 +4,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { uuidSchema } from '@project/core';
 import type { CardFlowNode } from '@project/react-flow-adapter';
 import { SpaceCanvas } from '../src/components/SpaceCanvas';
+import type { EdgeAuthoring } from '../src/edge-authoring';
 import { CARD_SIZE } from '../src/card';
 
 const CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
@@ -44,6 +45,39 @@ interface Harness {
   readonly setTitleEditing: (enabled: boolean) => void;
   /** Re-render as a completed creation would, naming the Card to be named. */
   readonly setNameOnCreation: (cardId: string | null) => void;
+  /** Re-render with nothing changed at all, the way a parent's render does. */
+  readonly rerender: () => void;
+}
+
+/**
+ * An Edge Authoring that answers nothing, so these Card-authoring tests are not
+ * also exercising the Edge lifecycle. Its own behaviour is covered by
+ * `edge-authoring.test.ts` and `edge-authoring-react.test.tsx`.
+ */
+const IDLE_EDGE_STATE = { draft: null, refusal: null, focusRequest: null } as const;
+
+function inertEdgeAuthoring(): EdgeAuthoring {
+  return {
+    // One identity, because `useSyncExternalStore` re-renders on every changed
+    // snapshot: a fresh object per call is an infinite loop, not a stub detail.
+    getState: () => IDLE_EDGE_STATE,
+    subscribe: () => () => undefined,
+    eligibility: () => ({ kind: 'refused', reason: 'No Layout is selected.' }),
+    accepts: () => false,
+    beginPointerConnect: () => undefined,
+    connect: () => null,
+    createConnectedCard: () => null,
+    endPointerDrag: () => null,
+    beginKeyboardConnect: () => undefined,
+    completeKeyboardConnect: () => null,
+    beginPointerReconnect: () => undefined,
+    openEdgeEditor: () => undefined,
+    reconnect: () => false,
+    deleteEdge: () => false,
+    cancelDraft: () => undefined,
+    takeFocusRequest: () => null,
+    dispose: () => undefined,
+  };
 }
 
 /** A SpaceCanvas whose title Edit always refuses, so a draft can be left unsettled. */
@@ -51,6 +85,7 @@ function mountGraph(nodes: CardFlowNode[] = [cardNode('A')]): Harness {
   const openCard = vi.fn();
   const addCard = vi.fn();
   const editableCardIds = new Set(nodes.map((node) => node.id));
+  const edgeAuthoring = inertEdgeAuthoring();
   let titleEditing = true;
   let named: string | null = null;
   const graph = () => (
@@ -58,16 +93,18 @@ function mountGraph(nodes: CardFlowNode[] = [cardNode('A')]): Harness {
       <SpaceCanvas
         nodes={nodes}
         edges={[]}
+        projectedNodes={null}
         activeCardId={null}
         presenting={false}
         editable={true}
         titleEditingEnabled={titleEditing}
         onNodesChange={() => undefined}
-        onConnect={() => undefined}
-        acceptsConnection={() => false}
-        acceptsNewCardTarget={() => false}
-        onConnectEnd={() => undefined}
-        onCreateConnectedCard={() => undefined}
+        onEdgesChange={() => undefined}
+        edgeAuthoring={edgeAuthoring}
+        selection={{ kind: 'none' }}
+        onSelectCard={() => undefined}
+        onSelectEdge={() => undefined}
+        subjectCards={[]}
         newCardTitle="Card 2"
         onAddCard={addCard}
         nameOnCreation={named}
@@ -94,6 +131,7 @@ function mountGraph(nodes: CardFlowNode[] = [cardNode('A')]): Harness {
       named = cardId;
       view.rerender(graph());
     },
+    rerender: () => view.rerender(graph()),
   };
 }
 
@@ -429,5 +467,27 @@ describe('naming a created Card', () => {
     setNameOnCreation(CARD_ID);
 
     expect(screen.queryByRole('textbox', { name: 'Card title' })).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * `useKeyPress` keys both its `useMemo` and its listener `useEffect` on the
+ * `deleteKeyCode` **value**, so a fresh array per render tears down and
+ * re-attaches `keydown`/`keyup` on `document` — and, since the prop reaches the
+ * `memo`'d `GraphView` and `FlowRenderer` on the way, defeats both of those too,
+ * once per frame of a Card drag.
+ *
+ * Asserted on the listener rather than on the array: the pair of keys is already
+ * pinned by value in `edge-authoring-react.test.tsx`, and a value assertion is
+ * exactly what stayed green while the canvas spread the array into a new one.
+ */
+describe("React Flow's delete keys", () => {
+  it('does not re-subscribe the document listener on an unchanged re-render', () => {
+    const { rerender } = mountGraph();
+    const listen = vi.spyOn(document, 'addEventListener');
+
+    rerender();
+
+    expect(listen.mock.calls.filter(([type]) => type === 'keydown')).toEqual([]);
   });
 });

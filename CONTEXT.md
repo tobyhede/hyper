@@ -146,7 +146,12 @@ _Avoid_: Walk, route, trail, session, playthrough.
 
 **Selected card**:
 The card an authoring gesture will act on, named without being read. It is not opening and not activating: selecting a card shows nothing new and changes nothing about the space, it says *this one*. One card is selected at a time, and it is what reveals the controls drawn on a card and what a keyboard rename acts on. Selecting is not authoring, because it produces no Edit.
+Selecting a Card clears any Selected Edge, and selecting an Edge clears the Selected card: authoring has one selected subject, never a multi-selection.
 _Avoid_: focus (that is the browser's, and a Card may be selected without it), highlight, current Card, Active Card (that belongs to Graph navigation or Presenting).
+
+**Selected Edge**:
+The one Edge an authoring gesture will act on in the Active Graph. Selecting it reveals the controls that reconnect or delete that Edge; it does not author the Edge, activate its Graph, or move keyboard focus by itself. An Edge outside the Active Graph cannot remain selected. Selecting an Edge clears the Selected card, and selecting a Card clears the Selected Edge: authoring has one selected subject, never a multi-selection.
+_Avoid_: Active Edge (Active belongs to the Graph and Card used by Graph navigation or Presenting), focused Edge (focus is the browser's), highlighted Edge.
 
 **Active card**:
 The Card currently reached during Graph navigation or Presenting, whose outgoing Edges are the moves available. It pairs with the **Active Graph**: the Graph names what is being traversed, and the Card names the position in it. Going back reads Traversal history rather than the Graph, because a Card reached by a merge has several Edges in and only the path taken says which one was used.

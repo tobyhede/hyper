@@ -95,12 +95,12 @@ share a UUID.
 | Retarget Alias | Target field in Card editor, pending until `Done` | Same Combobox | Cancel/Escape discards the pending Target with the pane's other fields (ADR 0048) | Alias editor/control |
 | Add Graph | Graph manager Add Graph | Visible button in keyboard-accessible manager | Rename Escape keeps Graph and neutral title | New Graph title, then Graph tab |
 | Edit Graph | Manager Title/Colour | Vertical Tabs and normal fields | Title restores; swatch selection is immediate | Edited control / Graph tab |
-| Connect | Four spatial handles | One tab-stop Connect control → Select Graph Target | Cancel returns source Card | Target Card |
+| Connect | Four spatial handles | One tab-stop Connect control → target Combobox | Cancel returns source Card | Target Card |
 | Reconnect | React Flow endpoint drag | Edge popover From/To Combobox | Restore original Edge | Edited Edge |
-| Delete Edge | Endpoint empty-canvas drop or Edge action | Focused Active-Graph Edge Delete/Backspace | Cancelled drag restores Edge | Source Card |
+| Delete Edge | Endpoint empty-canvas drop or Edge action | React Flow Delete/Backspace on the sole selected Active-Graph Edge | Cancelled drag restores Edge | Retain an existing focused control; if removal destroys focus, use the source Card, then canvas as fallback |
 | Add to Layout | Card Front click or external drag from Cards View | Command item Enter | Invalid/outside drop leaves Card absent | Added Card; pointer selects without forced focus |
 | Move Card | React Flow drag | Native Arrow/Shift+Arrow rules | Cancelled gesture restores authored projection | Card |
-| Remove from Layout | Card editor armed button | Focused Card Delete/Backspace twice | Escape/target/focus change disarms | Matching Cards View item when visible, otherwise canvas |
+| Remove from Layout | Card editor armed button | Selected Card Delete/Backspace twice | Escape/target/focus change disarms | Matching Cards View item when visible, otherwise canvas |
 | Delete Card | Card editor armed button | Same visible button | Escape/target/focus change disarms | Canvas |
 | Delete Graph | Graph manager armed button | Same visible button | Escape/target/focus change disarms | First surviving Active Graph |
 
@@ -428,11 +428,234 @@ uses the requested Graph as the initial Graph.
 Gate: manager primitive/focus tests, authoring interface tests for order and
 last-Graph protection, and E2E confirming all Graphs remain drawn.
 
-### 7. Complete Edge lifecycle
+### 7. Complete Edge lifecycle — **done**
 
-Add the keyboard target picker, Active-Graph Edge focusability, Edge popover,
-endpoint reconnection and deletion. Retain four Graph-independent pointer
-handles and declarative handle geometry. Do not add `useUpdateNodeInternals`.
+Built. `packages/app/src/edge-authoring.ts` holds the module's own state — one
+draft, its refusal, and the focus continuation a completed projection owes —
+and `edge-authoring-react.tsx` is its React interface, answering
+`{ edges, edgeTypes, reactFlowProps, layer, provide }` plus the Edge half of the
+canvas's `onBeforeDelete` dispatch. `connection-completion.ts` is the completion
+coordinator the render adapter's two connection methods became.
+`connection-gesture.ts` and its two shallow tests are gone; `newCardDrop` moved
+into Edge Authoring with its priced preview trade-off intact.
+
+Four things the design left open resolved this way:
+
+- **The commands context wraps `<ReactFlow>`, not `layer`.** React Flow renders
+  Edges as a sibling of the children it is given, so a provider inside the layer
+  reaches no Edge. `surface.provide(children)` puts it outside without
+  `SpaceCanvas` learning that a context exists.
+- **The canvas needs `tabIndex={-1}`.** React Flow's pane carries no `tabindex`,
+  so the Escape repair had nothing to focus. Negative, so the canvas never
+  becomes a tab stop.
+- **The Edge picker is the Combobox, and this was decided twice.** Built first as
+  a Radix Select on the argument that package 4's Combobox did not exist yet and
+  the toolbar selectors use that primitive. By the time this landed package 4 had
+  shipped one — `app`'s `CardPicker`, cmdk through `@project/ui`'s `Command` —
+  and the interaction matrix above had *already* said Combobox for both
+  reconnect endpoints. Two picker models on two primitives is what the rebase
+  found, so the Select was withdrawn: `@project/ui` now has `CardCombobox`,
+  shadcn's own composition of `Popover` over `Command`. The two components that
+  remain are two **presentations** of one model, not two models — `app`'s
+  `CardPicker` is the inline one a pane draws with its list always open, and this
+  is the collapsed one a canvas surface draws behind a trigger. Both are cmdk,
+  so search, the active item, the arrow keys and the `combobox`/`listbox`
+  pairing come from the primitive in both. What the Select was carrying and the
+  Combobox had to keep: a refused choice stays in the list, disabled, with its
+  reason on the row.
+- **The Card's keyboard Connect control lives in `CardNode`**, beside the Edit
+  affordance and offered on the same hover, focus and selection rules.
+
+`edgeEligibility` replaced `canConnect` and `canCreateConnectedCard`, and
+`reconnectOutcome` is shared by eligibility and the completion so the two cannot
+drift. Proofs: `space-authoring-operations.test.ts` (`Edge eligibility`),
+`edge-authoring.test.ts`, `edge-authoring-react.test.tsx`,
+`render-adapter.test.ts` for the additive selection order, and the Edge
+lifecycle scenarios in `editing.spec.ts`.
+
+Review found five things and all five are closed:
+
+- **A selected Edge survived an Active Graph change**, leaving its toolbar's
+  Delete live on an Edge the canvas had stopped offering — CONTEXT.md's
+  *Selected Edge* says one "cannot remain selected". Now dropped by a second
+  Edge Authoring subscriber, and the decoration conjoins `selected` with the
+  Active Graph so no frame renders it either way.
+- **Escape did not cancel a keyboard connection.** The picker now takes focus as
+  it opens and answers Escape; Radix owns the first press while its listbox is
+  open, so the two nest as "topmost first".
+- **A completed keyboard connection selected the target without focusing it.**
+  `completeKeyboardConnect` is the operation that owes both, because the picker
+  holding focus unmounts with the draft.
+- **`queued` was silent for reconnect and delete** while the connect paths
+  reported it. Both now report through the same non-throwing sink.
+- **The endpoint empty-canvas drop deleted nothing.** Built, with the connect
+  path's precedence — a connection target in range outranks the element
+  underneath, so a drop that merely missed a handle cancels. Safe because
+  `onReconnectEnd` is the only way a drag can end: React Flow has no Escape path
+  for a drag, and `XYHandle` removes its document listeners only from its own
+  `onPointerUp`.
+
+Three duplications the review named are gone too: `edgeSelectionOf` in
+`render-adapter.ts` is now the one translation from a React Flow Edge to the
+domain one, `sameSelection` the one comparison, and a refused *pointer*
+reconnect keeps its sentence the way a refused connection does
+(`endPointerDrag`, one operation for both pointer drafts).
+
+**A second review round found that pointer reconnection had never worked**, and
+no unit test could have seen it — they drive `beginPointerReconnect` directly,
+while React Flow drives a reconnect drag through the *connection* callbacks as
+well. `EdgeUpdateAnchors` calls `onReconnectStart` and then the store's
+`onConnectStart`, and on release the store's `onConnectEnd` before
+`onReconnectEnd`. Three defects followed, all now fixed and pinned:
+
+- `beginPointerConnect` **overwrote the reconnect draft**, so `reconnect()`
+  found no drafted Edge and silently authored nothing. A `reconnecting` ref
+  stands both connection handlers down for the drag.
+- With Alt held, the connection release **authored a Card and an Edge from the
+  anchored end** before `onReconnectEnd` deleted the Edge — one gesture, two
+  Edits. The same ref closes it.
+- `handleType` names the endpoint that **stays**, not the one being dragged, so
+  the draft recorded the wrong end and a cancelled drag returned focus to the
+  wrong Card.
+
+Building the browser test the design asked for is what exposed all three, and it
+exposed a fourth in the process: a **source**-endpoint drag looks for a new
+source handle, and `CardNode` offered only target handles mid-drag, so the
+gesture had nowhere to land. It now reads the role off the drag —
+`connection.fromHandle.type` — which changes nothing for an ordinary connection.
+
+Also from that round: the picker's Escape was given a `data-state` guard so the
+open listbox and the connection draft under it each own one press. It was
+written against a Radix `Select` and read as a fix for a press that reached the
+handler through the fiber tree — **which Chromium was later measured not to
+do**. Radix closes from a document capture listener and the browser's
+between-listener microtask checkpoint commits that close first, so the portalled
+content is gone before React's delegated listener runs and the handler is never
+asked; jsdom, which dispatches a whole event in one frame, is where the guard is
+visible at all. The guard stays as the rule the handler owns — see the comment
+on it in `edge-authoring-react.tsx`, which is where that argument is written
+out. A refused toolbar Delete published a sentence no surface rendered.
+And `endpointChoices` spread an `EdgeSelection` into the proposal, whose own
+`kind` silently turned every reconnect question into a connect one — the
+`EdgeSubject` refactor's one sharp edge, now destructured at all four sites and
+guarded by a test that reads the commands context an Edge really gets.
+
+Of the three browser scenarios the design names, `pointer reconnection callback
+order` is now built (with endpoint-delete, off-canvas-restore and the Card-body
+drop beside it). The other two were already proven under different names in
+`new-space.spec.ts`; the one gap there — that the frozen preview is still on
+screen at the moment of an off-canvas release — is now asserted rather than
+assumed.
+
+**A third round found that the reconnect fix had leaked its own flag.**
+`reconnecting` was set at `onReconnectStart` and never cleared, so from the
+first endpoint drag onward the Alt empty-drop and the continue-at-the-target
+selection were dead for the life of the canvas. The suite stayed green because
+`onConnect` is *not* among the handlers stood down: a plain Card-to-Card drag
+still authors its Edge, so a "connect after reconnect" test passes either way.
+The empty-drop is the probe that fails, and `editing.spec.ts` now uses it.
+
+Three more from that round:
+
+- **A completed reconnection left the author on `body`.** The selection names an
+  Edge by value, so a moved endpoint leaves it naming one the Space no longer
+  holds — the reconnected Edge draws unselected and the popover holding focus
+  unmounts with it. `reconnect` now re-selects the reconnected Edge and requests
+  focus on it, which is the matrix's "Focus after completion: Edited Edge".
+  `FocusRequest` gained an `edge` arm, named by subject like every other Edge
+  reference; the React layer resolves it against the projection.
+- **A keyboard connection left a pointer continuation behind.**
+  `pendingContinuation` is drained only by `endPointerDrag`, so the next pointer
+  gesture — including one that authored nothing — collected it and selected a
+  Card it never named. Only the pointer paths hold one now (`holdForDrag`).
+- **A refused pointer gesture said nothing.** Its draft is gone by the time the
+  refusal exists, so the sentence was stored and rendered nowhere. A
+  canvas-level alert says it; the Edge toolbar's copy is gone, which also closes
+  the leak where one Edge showed a sentence from an unrelated gesture.
+
+Most pointer refusals are unreachable by design — `isValidConnection` refuses
+them during the drag — so the alert is proven at the React level rather than in
+a browser test that would be asserting something the product prevents.
+
+**A fourth round, from an external reviewer plus three delegated agents,
+found four more.** Two of the reviewer's four were already fixed by the third
+round; the other two were live, and the round's own review found two hard spec
+violations beside them:
+
+- **`isValidConnection` asked the connect rule during a reconnect drag.** React
+  Flow has one global validator and consults it for both, so an endpoint dropped
+  back on the Card it came from read as the duplicate Edge it textually is —
+  invalid for the whole drag, though the Edit accepts it as `unchanged`. The
+  validator now builds a reconnect proposal from the open draft, and
+  `movedEndpoint` is the one derivation it shares with the completion.
+- **An open Edge draft survived into presentation.** The picker rendered off the
+  draft alone, so it stayed usable over a presentation that had already begun
+  and could author an Edge; a hidden Edge editor reopened afterwards. The module
+  now cancels on entering presenting, and the layer is gated on `enabled` so
+  nothing shows in the render before that lands.
+- **A refusal outlived every invalidation trigger.** The invalidation pass
+  returned early when no draft was left — and a *pointer* refusal outlives its
+  draft by design — so a sentence naming the replaced Space survived an accepted
+  replacement, against shared case 7's "cancels all target-bound transients".
+- **The Edge focus request could not resolve in the commit that published it.**
+  The projection carrying a reconnected Edge arrives a strategy later, so
+  resolving against the projection on screen found nothing and fell back to the
+  canvas rather than the matrix's "Edited Edge". An Edge request now waits for
+  the projection that draws it; a Card or canvas request still resolves at once,
+  because for those an unresolvable request means the element is gone for good.
+
+The reviewer's fifth concern — that Escape during a reconnect leaves the guard
+and draft latched — is **false**, and was traced to a wrong comment of ours
+rather than to the code: React Flow has no Escape path for a drag at all, and
+`XYHandle` removes its document listeners only from its own `onPointerUp`. The
+comment invented that path; `AGENTS.md`, this file and the source now say what
+the pinned release actually does.
+
+
+The original brief follows.
+
+Build the accepted Edge Authoring module in
+`edge-authoring-design.md`. It owns the complete Edge interaction lifecycle and
+the React Flow/DOM translation for that lifecycle. Add the keyboard target
+picker, Active-Graph Edge focusability, `EdgeToolbar` popover, endpoint
+reconnection and selection-based deletion. Retain four Graph-independent
+pointer handles and declarative handle geometry. Do not add
+`useUpdateNodeInternals`.
+
+Keep the render adapter authoritative for the projected nodes and Edges, Card
+movement, and the discriminated `none | card | edge` selection. Keep Space
+Authoring authoritative for eligibility and every semantic Edit. Edge Authoring
+owns neither copy. It consumes them through their existing interfaces.
+
+Use React Flow's controlled `onNodesChange` and `onEdgesChange` streams for
+selection. Disable its modifier multi-selection and selection rectangle. Keep
+its native Edge Tab order, reconnect callbacks and selection-based Delete key,
+configured as `['Backspace', 'Delete']`. Add the justified focus-to-selection
+bridge for Edges and repair native Edge Escape only when it leaves focus on
+`body`; do not add Edge focus panning.
+Route an Edge delete through `onBeforeDelete`, prevent a local React Flow
+removal, and let the completed Space Edit publish the next projection. A thin
+canvas dispatcher routes a payload with nodes to Card Authoring and ignores its
+incident Edges; only an Edge-only payload goes to Edge Authoring.
+
+React Flow hides the Edge during its reconnect drag. At `onReconnectEnd`, it
+renders whichever controlled projection is then current: the original Edge or
+the completed replacement. Make only the selected Active Graph Edge
+reconnectable, carry the original Edge in the eligibility proposal, and
+browser-test its endpoint anchor against overlapping Card authoring handles.
+
+Replace `connection-gesture` with Edge Authoring, but retain its priced preview
+trade-off: preview reads container-local pointer state and release performs the
+authoritative DOM hit-test. Do not add document-level per-frame
+`elementFromPoint` without measuring that cost. Replace the current
+render-adapter connection methods with one completion coordinator behind Edge
+Authoring so rendered Placement, completion and projection reconciliation keep
+their existing order.
+
+Rewrite `SpaceCanvas`'s ARIA explanation, `deleteKeyCode={null}` and
+`edgesFocusable={false}` together when the capability lands. Until then, those
+comments correctly describe the unbuilt surface; after the properties change,
+they would become misleading standing guidance.
 
 Gate: duplicate/self/cycle properties, projection tests, real-browser
 consecutive connection and warning-008 checks, pointer/keyboard parity and

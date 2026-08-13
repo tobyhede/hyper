@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Handle, Position, useConnection, type NodeProps } from '@xyflow/react';
-import { CardContent, CardKindIcon, EditIcon } from '@project/ui';
+import { CardContent, CardKindIcon, ConnectIcon, EditIcon } from '@project/ui';
 import type { CardFlowNode, CardHandle } from './projection';
 import { AUTHORING_HANDLE_DIAMETER, GRAPH_PORT_DIAMETER } from './authoring-handle';
 
@@ -143,8 +143,22 @@ function CardTitleEditor({ cardId, title, onComplete, onCancel }: CardTitleEdito
  * lets an Edge completed onto this Card resolve in the render that first makes
  * it incident, before the projection catches up.
  */
-export function CardNode({ data, selected }: NodeProps<CardFlowNode>) {
-  const connectionInProgress = useConnection((connection) => connection.inProgress);
+export function CardNode({ data, selected, isConnectable }: NodeProps<CardFlowNode>) {
+  /**
+   * Which handle role the live drag is looking for, or `null` when none is.
+   *
+   * A connection drawn from a source handle seeks a target — the ordinary case,
+   * and the whole of what this used to answer. A **source-endpoint
+   * reconnection** inverts it: React Flow anchors the drag at the Edge's
+   * *target* and looks for a new source, so a Card that went on offering only
+   * its target handles left that gesture with nowhere to land. Reading the
+   * anchored end's type is what tells the two apart, and it changes nothing for
+   * an ordinary connection, whose `fromHandle` is a source.
+   */
+  const seeking = useConnection((connection) =>
+    connection.inProgress ? (connection.fromHandle.type === 'target' ? 'source' : 'target') : null,
+  );
+  const connectionInProgress = seeking !== null;
 
   const renderHandle = (handle: CardHandle, type: 'source' | 'target') => (
     <Handle
@@ -176,8 +190,18 @@ export function CardNode({ data, selected }: NodeProps<CardFlowNode>) {
       position={side}
       className={`rf-card-node__authoring-handle rf-card-node__authoring-handle--${role}`}
       aria-label={`${role === 'source' ? 'Connect from' : 'Connect to'} ${side}`}
-      isConnectableStart={role === 'source' && !connectionInProgress}
-      isConnectableEnd={role === 'target' && connectionInProgress}
+      // `isConnectable` is React Flow's own switch and it only works if a custom
+      // node forwards it: `NodeWrapper` resolves `nodesConnectable` and the
+      // node's own `connectable` into this one prop and hands it over, and
+      // enforces nothing itself on a handle it did not render. Its `DefaultNode`
+      // passes it straight to both `Handle`s, and this is the same forwarding.
+      //
+      // These four are the only handles that can begin a gesture — the graph
+      // ports below are `isConnectable={false}` outright — so dropping it left
+      // the flow-level flag governing nothing but whether the connection line
+      // rendered, with CSS and a pane's backdrop standing in for the withdrawal.
+      isConnectableStart={isConnectable && role === 'source' && !connectionInProgress}
+      isConnectableEnd={isConnectable && role === seeking}
       // A handle is a drag affordance, and a click is not a drag. A press and
       // release inside React Flow's drag threshold starts no connection, so the
       // click reached the Card underneath and opened it to read — from the one
@@ -198,6 +222,7 @@ export function CardNode({ data, selected }: NodeProps<CardFlowNode>) {
       data-active={data.active}
       data-selected={selected || data.selectedForAuthoring}
       data-connection-in-progress={connectionInProgress}
+      data-connection-seeking={seeking ?? 'none'}
     >
       {data.targetHandles.map((handle) => renderHandle(handle, 'target'))}
       {AUTHORING_SIDES.map((side) => renderAuthoringHandle(side, 'target'))}
@@ -260,6 +285,27 @@ export function CardNode({ data, selected }: NodeProps<CardFlowNode>) {
             <p className="card__alias-of" data-testid="alias-marker">
               {data.aliasOf}
             </p>
+          )}
+          {/* The keyboard's way into an Edge. The four spatial handles (ADR
+              0033) are drag affordances and reach no keyboard author, so this
+              is the one tab stop that begins a connection — it opens a target
+              picker rather than starting a drag. Same event discipline as the
+              Edit control beside it. */}
+          {data.connectingEnabled && !data.editingTitle && (
+            <button
+              type="button"
+              className="card__connect nodrag nopan"
+              data-testid="connect-from-card"
+              aria-label={`Connect from ${data.title}`}
+              onClick={(event) => {
+                event.stopPropagation();
+                data.onBeginConnect?.();
+              }}
+              onPointerDown={(event) => event.stopPropagation()}
+              onKeyDown={(event) => event.stopPropagation()}
+            >
+              <ConnectIcon />
+            </button>
           )}
           {data.cardEditingEnabled && !data.editingTitle && (
             <button
