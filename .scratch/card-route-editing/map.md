@@ -66,9 +66,9 @@ contains the authority order, cross-operation acceptance matrices, complete
 user journey, implementation sequence and proof obligations. Feature
 implementation remains a separate effort.
 
-Two tickets have since been raised by that implementation rather than by
-planning. Neither is a decision this map records, which is why neither is listed
-above: both are `needs-triage`, and what each needs is a maintainer's call about
+Three tickets have since been raised by that implementation rather than by
+planning. None is a decision this map records, which is why none is listed
+above: all are `needs-triage`, and what each needs is a maintainer's call about
 scope rather than a resolving session's answer.
 
 - [The Frame 5 Alias modifier gestures are unbuilt and
@@ -83,6 +83,12 @@ scope rather than a resolving session's answer.
   content fields since before this effort began. Two accepted records disagree
   about whether it should be, and the pane holding three drafts rather than one
   makes the restore's scope a real choice.
+- [Retargeting an Alias discards the content
+  draft](issues/17-retargeting-an-alias-discards-the-content-draft.md) — a
+  completed retarget remounts the content editor under the new Target's
+  identity, taking an uncommitted draft with it. The remount is right and must
+  stay; what an authoring surface owes an author's uncommitted work at an
+  identity change is what is undecided.
 
 ## Out of scope
 
