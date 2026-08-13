@@ -115,7 +115,13 @@ export interface EdgeAuthoringInput {
   /** The Cards this renderer's subject holds — what a picker may offer. */
   readonly subjectCards: readonly Card[];
   readonly newCardTitle: string;
-  /** Edge authoring is withdrawn before an arrangement resolves and while presenting. */
+  /**
+   * Edge authoring is withdrawn before an arrangement resolves, while a modal
+   * pane covers the graph, and while presenting — the same three conditions the
+   * Card controls are withdrawn on, and the canvas passes one value to both.
+   * The pane was missing here, which left the Connect control hidden and its
+   * gesture live; see `SpaceCanvas`'s `canAuthorOnCanvas`.
+   */
   readonly enabled: boolean;
   readonly onSelectCard: (cardId: CardId) => void;
   readonly onSelectEdge: (subject: EdgeSubject) => void;

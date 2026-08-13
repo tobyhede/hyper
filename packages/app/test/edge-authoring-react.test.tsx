@@ -221,12 +221,12 @@ afterAll(() => vi.unstubAllGlobals());
  * so what such a control does with a key press is a fact about this canvas even
  * though it is not part of it.
  */
-function mountCanvas(beside: ReactNode = null) {
+function mountCanvas(beside: ReactNode = null, { covered = false }: { covered?: boolean } = {}) {
   const composed = compose();
   const view = render(
     <ReactFlowProvider>
       {beside}
-      <CanvasHarness {...composed} />
+      <CanvasHarness {...composed} covered={covered} />
     </ReactFlowProvider>,
   );
   return { ...composed, view };
@@ -237,7 +237,11 @@ function CanvasHarness({
   adapter,
   edgeAuthoring,
   currentSpace,
-}: Pick<ReturnType<typeof compose>, 'adapter' | 'edgeAuthoring' | 'currentSpace'>) {
+  covered,
+}: Pick<ReturnType<typeof compose>, 'adapter' | 'edgeAuthoring' | 'currentSpace'> & {
+  /** A modal pane is open over the graph — what `App` reports as no title editing. */
+  readonly covered: boolean;
+}) {
   const projection = adapter((state) => state.projection);
   const selection = adapter((state) => state.selection);
   return (
@@ -248,7 +252,7 @@ function CanvasHarness({
       activeCardId={null}
       presenting={false}
       editable={true}
-      titleEditingEnabled={true}
+      titleEditingEnabled={!covered}
       onNodesChange={adapter.getState().changeNodes}
       onEdgesChange={adapter.getState().changeEdges}
       edgeAuthoring={edgeAuthoring}
@@ -454,6 +458,57 @@ describe("React Flow's document-level delete key", () => {
 
     expect(graphsOf(session.getState().working)[0]?.edges).toEqual([EDGE]);
   });
+});
+
+/**
+ * A pane over the graph withdraws the Edge lifecycle exactly as it withdraws the
+ * Card controls — one authoring surface at a time.
+ *
+ * `titleEditingEnabled` is named for the first control it took away and means
+ * "no modal pane covers the graph": `App` passes
+ * `openedCardId === null && !creatingAlias`, and both panes are `CardPane` —
+ * `role="dialog" aria-modal="true"`, a backdrop at `inset: 0` over the whole
+ * graph area, and a focus trap. The canvas fed it to every Card control and
+ * *not* to Edge authoring, so the two disagreed about when the graph is
+ * authorable.
+ *
+ * Hidden control, live gesture is the asymmetry that matters, and the delete key
+ * is where it bites. `useGlobalKeyHandler` subscribes `deleteKeyCode` on
+ * `document`, and its one exclusion, `isInputDOMNode`, covers
+ * `INPUT`/`SELECT`/`TEXTAREA`, `contenteditable` and `.nokey` — a pane's `Done`
+ * and `Cancel` are `Button`s with none of those, so a `Backspace` aimed at the
+ * dialog the author is working in deleted the Edge selected behind it.
+ */
+describe('a pane covering the graph', () => {
+  it('withdraws the Edge surface with the Connect control, not after it', () => {
+    mountCanvas(null, { covered: true });
+
+    expect(screen.queryAllByRole('button', { name: /^Connect from/ })).toEqual([]);
+    expect(edgeElement(`${GRAPH_ID}::0`)).not.toHaveAttribute('tabindex');
+  });
+
+  it('offers both again once the pane closes', () => {
+    mountCanvas();
+
+    expect(screen.queryAllByRole('button', { name: /^Connect from/ })).not.toEqual([]);
+    expect(edgeElement(`${GRAPH_ID}::0`)).toHaveAttribute('tabindex', '0');
+  });
+
+  it.each(['Backspace', 'Delete'] as const)(
+    'leaves the selected Edge standing when %s reaches the pane',
+    (key) => {
+      // A pane action button, mounted where the pane is: outside the flow, and
+      // carrying none of the tags or `.nokey` that would exclude it.
+      const { adapter, session } = mountCanvas(<button type="button">Cancel</button>, {
+        covered: true,
+      });
+      act(() => adapter.getState().selectEdge(SUBJECT));
+
+      fireEvent.keyDown(screen.getByRole('button', { name: 'Cancel' }), { key });
+
+      expect(graphsOf(session.getState().working)[0]?.edges).toEqual([EDGE]);
+    },
+  );
 });
 
 /**

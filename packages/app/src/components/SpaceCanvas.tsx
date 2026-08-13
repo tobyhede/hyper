@@ -95,7 +95,17 @@ export interface SpaceCanvasProps {
    * nothing to toggle and nothing to keep in sync.
    */
   editable: boolean;
-  /** Card authoring is unavailable while another in-place surface owns focus. */
+  /**
+   * Whether the graph is uncovered — no modal pane is open over it.
+   *
+   * **Named for the first control it took away, and read by all of them.** `App`
+   * passes `openedCardId === null && !creatingAlias`, and both of those are a
+   * `CardPane`: `role="dialog" aria-modal="true"`, a backdrop across the whole
+   * graph area, and a focus trap. So this says nothing about titles — it says
+   * one authoring surface at a time, the same rule `AddCardControl` is
+   * withdrawn on. The name is stale vocabulary rather than a second concept;
+   * renaming it is its own change (`docs/agents/workflow.md`).
+   */
   titleEditingEnabled: boolean;
   onNodesChange: OnNodesChange<CardFlowNode>;
   onEdgesChange: OnEdgesChange;
@@ -161,23 +171,40 @@ export function SpaceCanvas({
   activeGraphCardIds,
 }: SpaceCanvasProps) {
   const [editingTitleCardId, setEditingTitleCardId] = useState<string | null>(null);
-  // One rule for every authoring control drawn on a Card — the title editor and
-  // the Card affordance are offered and withdrawn together.
-  const canAuthorCards = editable && titleEditingEnabled && !presenting;
+  /**
+   * One rule for everything this canvas authors — the Card controls *and* the
+   * whole Edge lifecycle.
+   *
+   * The three conditions are three ways there is nothing to author: no
+   * arrangement to write into, a modal pane covering the graph, and a
+   * presentation running. `AddCardControl` in the toolbar is withdrawn on
+   * exactly these, and so is every control drawn on a Card.
+   *
+   * **Edge authoring was the one thing reading a shorter rule**, and the gap was
+   * not cosmetic. React Flow subscribes the delete key on `document`, excluding
+   * only inputs and `.nokey`; a pane's `Done` and `Cancel` are neither, so a
+   * `Backspace` aimed at the open dialog deleted whichever Edge was selected
+   * behind it. Hiding the Connect control while leaving the gesture live is the
+   * asymmetry — the two agree here, and `edge-authoring-react.test.tsx` holds
+   * them to it. Loosening the control to match Edge authoring was the other way
+   * to close it, and it is the wrong one: it would put a Connect button on every
+   * Card behind a modal dialog.
+   */
+  const canAuthorOnCanvas = editable && titleEditingEnabled && !presenting;
 
   // A withdrawn editor does not come back on its own.
   //
-  // `canAuthorCards` going false — presenting starts, a Card opens over the graph
+  // `canAuthorOnCanvas` going false — presenting starts, a Card opens over the graph
   // — unmounts the editor along with the only controls that could settle a draft
   // it refused, so the Card it named is forgotten at that moment rather than
   // remembered until editing returns and reopened over a Card nobody asked to
   // rename. Adjusted during render rather than in an effect: this is React's
   // documented way to reset state on a changed input, and an effect would both
   // cost a second render and be rejected by lint.
-  const [cardAuthoringWasEnabled, setCardAuthoringWasEnabled] = useState(canAuthorCards);
-  if (cardAuthoringWasEnabled !== canAuthorCards) {
-    setCardAuthoringWasEnabled(canAuthorCards);
-    if (!canAuthorCards) setEditingTitleCardId(null);
+  const [canvasAuthoringWasEnabled, setCanvasAuthoringWasEnabled] = useState(canAuthorOnCanvas);
+  if (canvasAuthoringWasEnabled !== canAuthorOnCanvas) {
+    setCanvasAuthoringWasEnabled(canAuthorOnCanvas);
+    if (!canAuthorOnCanvas) setEditingTitleCardId(null);
   }
 
   // A created Card is named in place, in the editor that already exists for
@@ -201,7 +228,7 @@ export function SpaceCanvas({
     graphs,
     subjectCards,
     newCardTitle,
-    enabled: editable && !presenting,
+    enabled: canAuthorOnCanvas,
     onSelectCard,
     onSelectEdge,
   });
@@ -260,11 +287,11 @@ export function SpaceCanvas({
       // The default is prevented only where the command can actually run
       // (`AGENTS.md`'s keyboard contract), so a `c` typed while authoring is
       // withdrawn is left to whatever else would have had it.
-      if (!canAuthorCards) return;
+      if (!canAuthorOnCanvas) return;
       event.preventDefault();
       onAddCard();
     },
-    [presenting, onOpenCard, canAuthorCards, onAddCard],
+    [presenting, onOpenCard, canAuthorOnCanvas, onAddCard],
   );
 
   // `F2` renames the selected Card, and this is the *only* handler that answers
@@ -274,7 +301,7 @@ export function SpaceCanvas({
   // handlers for one key means one of them is the unguarded one; don't add a
   // second back.
   useEffect(() => {
-    if (!canAuthorCards) return;
+    if (!canAuthorOnCanvas) return;
     const beginSelectedTitleEdit = (event: KeyboardEvent): void => {
       if (event.key !== 'F2') return;
       if (event.target instanceof Element && event.target.closest(NOT_A_CANVAS_COMMAND) !== null) {
@@ -287,7 +314,7 @@ export function SpaceCanvas({
     };
     window.addEventListener('keydown', beginSelectedTitleEdit);
     return () => window.removeEventListener('keydown', beginSelectedTitleEdit);
-  }, [canAuthorCards, nodes]);
+  }, [canAuthorOnCanvas, nodes]);
 
   // The operations, not the surface holding them: `useEdgeAuthoring` answers a
   // fresh object literal per render while each of these is stable, and a hook
@@ -303,10 +330,10 @@ export function SpaceCanvas({
           // Three controls, three flags. The title's double click is offered on
           // every Card; the affordance only on one that owns content to edit;
           // the Connect control wherever an Edge may begin.
-          titleEditingEnabled: canAuthorCards,
-          cardEditingEnabled: canAuthorCards && editableCardIds.has(node.id),
-          connectingEnabled: canAuthorCards,
-          editingTitle: canAuthorCards && node.id === editingTitleCardId,
+          titleEditingEnabled: canAuthorOnCanvas,
+          cardEditingEnabled: canAuthorOnCanvas && editableCardIds.has(node.id),
+          connectingEnabled: canAuthorOnCanvas,
+          editingTitle: canAuthorOnCanvas && node.id === editingTitleCardId,
           onBeginConnect: () => beginConnectFrom(node.id),
           onEditCard: () => onOpenCard(node.id),
           onBeginTitleEditing: () => setEditingTitleCardId(node.id),
@@ -320,7 +347,7 @@ export function SpaceCanvas({
       })),
     [
       nodes,
-      canAuthorCards,
+      canAuthorOnCanvas,
       editableCardIds,
       editingTitleCardId,
       onCompleteCardTitle,
@@ -430,6 +457,14 @@ export function SpaceCanvas({
       nodesDraggable={editable && !presenting}
       nodesFocusable={!presenting}
       elementsSelectable={!presenting}
+      // Deliberately *not* `canAuthorOnCanvas`, unlike everything else here, and
+      // the reason is that it would buy nothing. React Flow's node-level
+      // connectability reaches a custom node as an `isConnectable` prop the node
+      // must forward, and `CardNode` forwards it to neither the graph ports nor
+      // the four authoring handles — so this governs only whether the connection
+      // *line* renders. The four handles are withdrawn by the pane itself, which
+      // covers the whole graph area at `inset: 0`; the drag they would start
+      // cannot begin.
       nodesConnectable={editable && !presenting}
       ariaLabelConfig={ARIA_LABEL_CONFIG}
       // No `connectionMode`: the default is Strict, and every legal drop here is
