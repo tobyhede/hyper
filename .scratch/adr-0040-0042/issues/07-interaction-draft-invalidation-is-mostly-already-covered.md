@@ -151,7 +151,26 @@ The nearest precedent for the guarantee is `editing.spec.ts:1022`, "changing the
 renderer closes an opened Card rather than stranding its editor" — the same shape
 for a different trigger.
 
-## What is actually left
+## Acceptance
+
+- [ ] A decision on silent discard versus an acknowledgement, recorded here.
+- [ ] A decision on what "focuses the canvas" means, recorded here.
+- [ ] A decision on the two unreachable survivors, recorded here.
+- [ ] AGENTS.md and `03`'s answer no longer say the half is simply unbuilt.
+- [ ] The covered cases are pinned, so they stop holding by accident: an inline
+      title edit, an opened-Card draft and a drag, each open when a stored Space
+      is accepted. This is the ADR's "one shared contract test", which does not
+      exist today.
+
+## Answer
+
+The half is not unbuilt — it is unevenly built, and nothing tests the part that
+works. Two of the four drafts ADR 0042 names have nothing to invalidate: no
+picker and no armed destructive control exist, only their callerless completion
+kinds. The two that do exist are discarded on every replacement already, by a
+subtree unmount nothing tests and a key that is currently redundant. Three
+things are genuinely left in the code, and only the first is a defect an author
+can reach; a fourth item is the prose that sent this investigation the wrong way.
 
 ### 1. Focus after a replacement contradicts the ADR
 
@@ -211,7 +230,17 @@ requestAnimationFrame(() => {
 A replacement landing inside that frame leaves `selectCard` naming a Card from
 the Space that is gone. Same unreachability argument as 2, and the same question.
 
-## The question that needs answering
+### 4. The prose that sends the next reader the wrong way
+
+This part needs no decision. AGENTS.md's "not built" sentence and `03`'s closing
+sentence should say what this ticket establishes instead: that the drafts which
+exist are already discarded, by an unmount nothing tests and one redundant key;
+that the two drafts needing new work do not exist yet; and that what remains is
+focus behaviour plus two survivors behind an unreachable trigger.
+
+## Comments
+
+### The question that needs answering — deferred, and blocking the rest
 
 **When an author's Space is replaced out from under an open draft, what should
 they see?**
@@ -241,23 +270,5 @@ Three separable answers are needed:
   describes, which has some value on its own.
 
 Until the first is answered, building anything here is guessing at product
-behaviour.
-
-## What should change regardless of the answer
-
-AGENTS.md's "not built" sentence and `03`'s closing sentence should say what this
-establishes instead: that the drafts which exist are already discarded, by an
-unmount nothing tests and one redundant key; that the two drafts needing new work
-do not exist yet; and that what remains is focus behaviour plus two survivors
-behind an unreachable trigger.
-
-## Acceptance
-
-- [ ] A decision on silent discard versus an acknowledgement, recorded here.
-- [ ] A decision on what "focuses the canvas" means, recorded here.
-- [ ] A decision on the two unreachable survivors, recorded here.
-- [ ] AGENTS.md and `03`'s answer no longer say the half is simply unbuilt.
-- [ ] The covered cases are pinned, so they stop holding by accident: an inline
-      title edit, an opened-Card draft and a drag, each open when a stored Space
-      is accepted. This is the ADR's "one shared contract test", which does not
-      exist today.
+behaviour. The answer's fourth item is the exception — the prose correction
+stands whichever way these three go, so it does not wait on them.
