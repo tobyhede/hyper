@@ -484,17 +484,36 @@ describe("React Flow's reconnect callback order", () => {
     );
   });
 
-  /** A result that really would duplicate another Edge is still refused. */
-  it('still refuses a reconnection onto a Card the Graph already reaches', () => {
+  /**
+   * A result that really would duplicate another Edge is still refused — the
+   * half of the rule the reconnect proposal must not lose.
+   *
+   * It needs a Graph holding *two* Edges to be reachable at all: with one, every
+   * drop is either the unchanged case or a new pair. So Main gains A→C through
+   * the ordinary connect path first, and moving A→B's `to` onto C is then the
+   * duplicate.
+   */
+  it('refuses a reconnection that would duplicate another Edge in the Graph', () => {
     const composed = compose();
-    // Aside holds B→C, so moving its `to` onto C is that same Edge again.
-    const asideEdge = EDGES[1]!;
-    const { result } = surface(composed);
     act(() => {
-      result.current.reactFlowProps.onReconnectStart(null, asideEdge, 'target');
+      composed.edgeAuthoring.beginPointerConnect(CARD_A);
+      composed.edgeAuthoring.connect(CARD_A, CARD_C, null);
+      composed.edgeAuthoring.endPointerDrag();
     });
+    expect(graphsOf(composed.session.getState().working)[0]?.edges).toEqual([
+      EDGE,
+      { from: CARD_A, to: CARD_C },
+    ]);
 
-    expect(result.current.reactFlowProps.isValidConnection(connectionTo(CARD_B, CARD_C))).toBe(
+    const { result } = surface(composed);
+    act(() => result.current.reactFlowProps.onReconnectStart(null, EDGES[0]!, 'target'));
+
+    expect(result.current.reactFlowProps.isValidConnection(connectionTo(CARD_A, CARD_C))).toBe(
+      false,
+    );
+    // And the endpoint's own Card is still offered, so the refusal is the
+    // duplicate rule rather than the reconnect branch refusing everything.
+    expect(result.current.reactFlowProps.isValidConnection(connectionTo(CARD_A, CARD_B))).toBe(
       true,
     );
   });

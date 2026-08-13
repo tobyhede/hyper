@@ -50,6 +50,14 @@ export function CardPicker({
         <div className="px-[8px] pt-[7px] pb-[5px] font-mono text-[10px] tracking-[0.12em] text-[var(--muted)] uppercase">
           {label}
         </div>
+        {/*
+          A refused choice keeps its place in the list and **says why in the
+          row**. The reason used to live only in `title`, which is a tooltip: it
+          needs a hover a keyboard author never makes, screen readers announce it
+          inconsistently, and a disabled option is exactly the row a pointer is
+          least likely to rest on. `title` stays as a redundant affordance for
+          the truncated case.
+        */}
         {choices.map((choice) => (
           <SelectItem
             key={choice.id}
@@ -58,7 +66,12 @@ export function CardPicker({
             className="px-[8px] py-[7px] text-[13px]"
             {...(choice.refusal !== undefined ? { title: choice.refusal } : {})}
           >
-            {choice.title}
+            <span className="flex flex-col gap-[2px]">
+              <span>{choice.title}</span>
+              {choice.refusal !== undefined && (
+                <span className="text-[11px] text-[var(--muted)]">{choice.refusal}</span>
+              )}
+            </span>
           </SelectItem>
         ))}
       </SelectContent>

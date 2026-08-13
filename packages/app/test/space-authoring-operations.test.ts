@@ -836,6 +836,25 @@ describe('Edge eligibility', () => {
     );
   });
 
+  /**
+   * The placement is not the Space. A Card can be drawn — and so be a position
+   * key — while the Space no longer holds it, and an Edge naming one derives a
+   * snapshot intake rejects, which this derivation answers by throwing. So the
+   * reconnect rule asks the same second question a connection does, and refuses
+   * rather than putting a defect in front of the author as their own mistake.
+   */
+  it('refuses a reconnection onto a Card the Space no longer holds', () => {
+    const { authoring } = openPositioned();
+    // Placed, so the Layout would take it — but never a Card of this Space.
+    place(authoring, { [CARD_A]: [10, 20], [CARD_B]: [300, 40], [UNKNOWN_CARD]: [600, 40] });
+
+    const refusal = { kind: 'refused', reason: 'An Edge can only join Cards in this Layout.' };
+    expect(authoring.edgeEligibility({ ...RECONNECT, cardId: UNKNOWN_CARD })).toEqual(refusal);
+    expect(
+      authoring.complete({ ...RECONNECT, kind: 'reconnected-edge', cardId: UNKNOWN_CARD }),
+    ).toEqual(refusal);
+  });
+
   it('refuses a reconnection naming a Graph this Layout does not own', () => {
     const { authoring } = openPositioned();
 

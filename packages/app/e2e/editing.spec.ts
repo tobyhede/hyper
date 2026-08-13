@@ -1136,9 +1136,10 @@ test('the Edge editor moves an endpoint and keeps the Edge in its Graph', async 
   const selected = await selectAnEdge(page);
   await page.getByRole('button', { name: 'Edit this Edge' }).click();
   await page.getByRole('combobox', { name: 'To' }).click();
-  // Any Card of this Layout other than the one this endpoint already names, and
-  // not one the result would duplicate — a disabled option says which.
-  const option = page.getByRole('option').filter({ hasNot: page.locator('[data-disabled]') });
+  // Any Card of this Layout the result would not duplicate. `hasNot` matches a
+  // *descendant*, and Radix marks the option element itself — so filtering that
+  // way excludes nothing and the choice below was eligible only by luck.
+  const option = page.locator('[role="option"]:not([data-disabled])');
   await option.last().click();
 
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');

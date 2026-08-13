@@ -34,7 +34,8 @@ function polyline(points: LayoutPosition[]): string {
   return points.map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x} ${point.y}`).join(' ');
 }
 
-/** Where a routed polyline reads as its middle: the bend nearest half its length. */
+/** Where a routed polyline reads as its middle: the point half its length along,
+ *  interpolated within whichever segment spans it rather than snapped to a bend. */
 function polylineMidpoint(points: LayoutPosition[]): LayoutPosition {
   const lengths = points.map((point, index) => {
     const previous = points[index - 1];

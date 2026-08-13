@@ -432,6 +432,16 @@ const reconnectOutcome = (
   graph: Graph | undefined,
   proposal: { readonly edge: GraphEdge; readonly endpoint: EdgeEndpoint; readonly cardId: CardId },
   placement: Placement,
+  /**
+   * Whether the Space still holds the Card, which the placement does not answer.
+   *
+   * The same second condition `connectable` applies to a connection, and the
+   * asymmetry was a latent trap rather than a nicety: an Edge naming a Card the
+   * Space has lost derives a snapshot intake rejects, and this derivation answers
+   * an unloadable Space by *throwing* — putting a defect in front of the author
+   * as their own mistake. A picker open across such a deletion is the way there.
+   */
+  holdsCard: (cardId: CardId) => boolean,
 ): ReconnectOutcome => {
   // Ownership, not existence: a Graph a *second* Layout owns exists and is
   // still not one this Edit may write (ADR 0040).
@@ -444,7 +454,9 @@ const reconnectOutcome = (
       ? { from: proposal.cardId, to: proposal.edge.to }
       : { from: proposal.edge.from, to: proposal.cardId };
   if (sameEdge(proposal.edge, reconnected)) return UNCHANGED;
-  if (!placement.has(proposal.cardId)) {
+  // Checked together and after `unchanged`, so an endpoint returned to its own
+  // Card is still eligible on a Layout that has not finished arranging.
+  if (!placement.has(proposal.cardId) || !holdsCard(proposal.cardId)) {
     return { kind: 'refused', reason: 'An Edge can only join Cards in this Layout.' };
   }
   if (indexOfEdge(graph.edges, reconnected) !== -1) {
@@ -746,7 +758,9 @@ export function createSpaceAuthoring({
         reason: 'This view has not finished arranging, so there is nowhere to write yet.',
       };
     }
-    const outcome = reconnectOutcome(ownedGraph(proposal.graphId), proposal, placement);
+    const outcome = reconnectOutcome(ownedGraph(proposal.graphId), proposal, placement, (cardId) =>
+      session.getState().working.cards.some((card) => card.id === cardId),
+    );
     return outcome.kind === 'refused' ? outcome : ELIGIBLE;
   };
 
@@ -1046,7 +1060,9 @@ export function createSpaceAuthoring({
         // The same rule `edgeEligibility` offered the gesture under, asked again
         // because the Space can have changed since — and answering with the
         // resulting Edge rather than a boolean, so there is nothing to rederive.
-        const outcome = reconnectOutcome(graph, completion, completedPlacement);
+        const outcome = reconnectOutcome(graph, completion, completedPlacement, (cardId) =>
+          snapshot.cards.some((card) => card.id === cardId),
+        );
         if (outcome.kind !== 'edge') return outcome;
         const edgeIndex = indexOfEdge(graph.edges, completion.edge);
         // In place, so reconnecting does not reorder a Graph's Edges — that order
