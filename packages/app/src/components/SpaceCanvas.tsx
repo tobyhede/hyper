@@ -395,7 +395,13 @@ export function SpaceCanvas({
       // its own key events before they get here, so this covers whatever text
       // entry the canvas gains next rather than a case that exists today.
       if (event.key.toUpperCase() !== ADD_CARD_KEY) return;
-      if (event.repeat || event.metaKey || event.ctrlKey || event.altKey) return;
+      // `shiftKey` belongs here for a reason the others do not share: matching
+      // case-insensitively is what lets Caps Lock work, and it lets Shift
+      // through in the same breath, since both arrive as `C`. Only the flag
+      // tells them apart — Caps Lock changes the character and never sets it.
+      // Without this the toolbar announces `aria-keyshortcuts="C"`, which ARIA
+      // defines as the unmodified key, while the canvas answers Shift+C too.
+      if (event.repeat || event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) return;
       if (event.target.closest('input, textarea, [contenteditable="true"]') !== null) return;
       // The default is prevented only where the command can actually run
       // (`AGENTS.md`'s keyboard contract), so a `c` typed while authoring is

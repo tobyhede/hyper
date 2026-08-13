@@ -349,8 +349,26 @@ describe('the C shortcut', () => {
     fireEvent.keyDown(node, { key: 'c', metaKey: true });
     fireEvent.keyDown(node, { key: 'c', ctrlKey: true });
     fireEvent.keyDown(node, { key: 'c', repeat: true });
+    fireEvent.keyDown(node, { key: 'c', altKey: true });
+    // Shift is the one a case-insensitive match lets through by construction:
+    // the press arrives as `C`, which is exactly what an unmodified press under
+    // Caps Lock looks like. `aria-keyshortcuts="C"` announces the unmodified
+    // key, and this is the guard that makes that announcement true.
+    fireEvent.keyDown(node, { key: 'C', shiftKey: true });
 
     expect(addCard).not.toHaveBeenCalled();
+  });
+
+  /**
+   * And Caps Lock is not a modifier: it changes the character, never `shiftKey`,
+   * so the shortcut has to keep working with it on.
+   */
+  it('answers an unmodified C typed with Caps Lock on', () => {
+    const { addCard } = mountGraph();
+
+    fireEvent.keyDown(nodeOf(CARD_ID), { key: 'C' });
+
+    expect(addCard).toHaveBeenCalledTimes(1);
   });
 
   it('is withdrawn along with every other Card authoring control', () => {
