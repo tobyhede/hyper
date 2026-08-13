@@ -144,7 +144,21 @@ function CardTitleEditor({ cardId, title, onComplete, onCancel }: CardTitleEdito
  * it incident, before the projection catches up.
  */
 export function CardNode({ data, selected }: NodeProps<CardFlowNode>) {
-  const connectionInProgress = useConnection((connection) => connection.inProgress);
+  /**
+   * Which handle role the live drag is looking for, or `null` when none is.
+   *
+   * A connection drawn from a source handle seeks a target — the ordinary case,
+   * and the whole of what this used to answer. A **source-endpoint
+   * reconnection** inverts it: React Flow anchors the drag at the Edge's
+   * *target* and looks for a new source, so a Card that went on offering only
+   * its target handles left that gesture with nowhere to land. Reading the
+   * anchored end's type is what tells the two apart, and it changes nothing for
+   * an ordinary connection, whose `fromHandle` is a source.
+   */
+  const seeking = useConnection((connection) =>
+    connection.inProgress ? (connection.fromHandle.type === 'target' ? 'source' : 'target') : null,
+  );
+  const connectionInProgress = seeking !== null;
 
   const renderHandle = (handle: CardHandle, type: 'source' | 'target') => (
     <Handle
@@ -177,7 +191,7 @@ export function CardNode({ data, selected }: NodeProps<CardFlowNode>) {
       className={`rf-card-node__authoring-handle rf-card-node__authoring-handle--${role}`}
       aria-label={`${role === 'source' ? 'Connect from' : 'Connect to'} ${side}`}
       isConnectableStart={role === 'source' && !connectionInProgress}
-      isConnectableEnd={role === 'target' && connectionInProgress}
+      isConnectableEnd={role === seeking}
       // A handle is a drag affordance, and a click is not a drag. A press and
       // release inside React Flow's drag threshold starts no connection, so the
       // click reached the Card underneath and opened it to read — from the one
@@ -198,6 +212,7 @@ export function CardNode({ data, selected }: NodeProps<CardFlowNode>) {
       data-active={data.active}
       data-selected={selected || data.selectedForAuthoring}
       data-connection-in-progress={connectionInProgress}
+      data-connection-seeking={seeking ?? 'none'}
     >
       {data.targetHandles.map((handle) => renderHandle(handle, 'target'))}
       {AUTHORING_SIDES.map((side) => renderAuthoringHandle(side, 'target'))}

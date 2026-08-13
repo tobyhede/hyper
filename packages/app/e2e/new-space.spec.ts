@@ -264,6 +264,11 @@ test('an Alt-drop released off the canvas creates no Card', async ({ page }) => 
   // only thing that may author a Card.
   const offCanvas = (await page.getByTestId('persistence-status').boundingBox())!;
   await page.mouse.move(offCanvas.x + offCanvas.width / 2, offCanvas.y + offCanvas.height / 2);
+  // The frozen half, asserted rather than assumed: the preview is *still* on
+  // screen over a point that would author nothing. Without this the test would
+  // pass just as well if the preview correctly vanished, and the disagreement
+  // the two suppliers are priced against would go unmeasured.
+  await expect(page.getByTestId('new-card-preview')).toContainText('Card 2');
   await page.mouse.up();
   await page.keyboard.up('Alt');
 

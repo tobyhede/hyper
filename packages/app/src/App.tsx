@@ -14,8 +14,6 @@ import {
   uuidSchema,
   type Card,
   type CardId,
-  type GraphEdge,
-  type GraphId,
   type LayoutPosition,
 } from '@project/core';
 import {
@@ -26,7 +24,7 @@ import {
 } from '@project/graph';
 import type { OpenedSpace } from './space';
 import { createSpaceAuthoring } from './space-authoring';
-import { createRenderAdapter, selectedCardOf } from './render-adapter';
+import { createRenderAdapter, selectedCardOf, type EdgeSubject } from './render-adapter';
 import { createConnectionCompletion } from './connection-completion';
 import { createEdgeAuthoring } from './edge-authoring';
 import { canvasProjection } from './canvas-projection';
@@ -273,8 +271,8 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
       useRenderAdapter.getState().selectCard(cardId);
     }, []);
 
-    const selectEdge = useCallback((graphId: GraphId, edge: GraphEdge) => {
-      useRenderAdapter.getState().selectEdge(graphId, edge);
+    const selectEdge = useCallback((subject: EdgeSubject) => {
+      useRenderAdapter.getState().selectEdge(subject);
     }, []);
 
     /**

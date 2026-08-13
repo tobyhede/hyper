@@ -17,11 +17,21 @@ import { uuid } from './uuid';
  * longer calls it, so that re-introducing the call is caught here rather than
  * only in a browser.
  */
-const { updateNodeInternals, connection } = vi.hoisted(() => ({
-  updateNodeInternals: vi.fn(),
-  /** The live connection React Flow reports, so a test can put a drag in flight. */
-  connection: { inProgress: false },
-}));
+const { updateNodeInternals, connection } = vi.hoisted(() => {
+  /**
+   * The live connection React Flow reports, so a test can put a drag in flight.
+   *
+   * `fromHandle` is the end the drag is anchored at, and React Flow always
+   * supplies it while `inProgress` — it is what says whether the drag is looking
+   * for a target (an ordinary connection, anchored at a source) or for a source
+   * (a reconnection that took hold of an Edge's `from` end).
+   */
+  const connection: { inProgress: boolean; fromHandle: { type: 'source' | 'target' } } = {
+    inProgress: false,
+    fromHandle: { type: 'source' },
+  };
+  return { updateNodeInternals: vi.fn(), connection };
+});
 
 /** React Flow's `Handle` decides on its own whether a drag may start or end at
  *  it; the stand-in records the two answers it was given. */
@@ -35,7 +45,7 @@ vi.mock('@xyflow/react', async (importOriginal) => {
   return {
     ...actual,
     useUpdateNodeInternals: () => updateNodeInternals,
-    useConnection: (selector: (state: { inProgress: boolean }) => unknown) => selector(connection),
+    useConnection: (selector: (state: typeof connection) => unknown) => selector(connection),
     Handle: ({
       className,
       style,
@@ -58,6 +68,7 @@ vi.mock('@xyflow/react', async (importOriginal) => {
 
 beforeEach(() => {
   connection.inProgress = false;
+  connection.fromHandle.type = 'source';
 });
 
 const graphId = uuid('00000000-0000-4000-8000-000000000010');
@@ -291,6 +302,22 @@ describe('CardNode graph authoring', () => {
 
     expect(connectable('Connect to', 'end')).toEqual([true, true, true, true]);
     expect(connectable('Connect from', 'start')).toEqual([false, false, false, false]);
+  });
+
+  /**
+   * A reconnection that took hold of an Edge's `from` end is anchored at the
+   * Edge's *target*, so it is looking for a new **source**. Offering only target
+   * handles left that gesture with nowhere to land — which is why the role is
+   * read off the drag rather than assumed to be `target`.
+   */
+  it('ends a drag on a source handle while a source endpoint is being moved', () => {
+    connection.inProgress = true;
+    connection.fromHandle.type = 'target';
+
+    render(<CardNode {...props({ selected: true })} />);
+
+    expect(connectable('Connect from', 'end')).toEqual([true, true, true, true]);
+    expect(connectable('Connect to', 'end')).toEqual([false, false, false, false]);
   });
 });
 

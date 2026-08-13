@@ -627,6 +627,24 @@ export function createSpaceAuthoring({
   });
 
   /**
+   * The Graph a Layout-owned Edge operation names, or `undefined` when the
+   * selected Layout is not the one that owns it.
+   *
+   * Asked of `space.lookup.graph`, which answers a Graph *with its owner* — the
+   * index built for exactly this question (ADR 0040), and O(1) rather than a
+   * walk over one Layout's Graphs. Comparing the owner's id is what keeps this
+   * ownership rather than existence: a Graph a second Layout owns resolves here
+   * and is still not one this Edit may write. Graph ids are unique across the
+   * Space (ADR 0045), so there is no second Graph the id could have meant.
+   */
+  const ownedGraph = (graphId: GraphId): Graph | undefined => {
+    const { selectedRenderer } = navigation.getState();
+    if (selectedRenderer.kind === 'view') return undefined;
+    const owned = currentSpace().lookup.graph(graphId);
+    return owned?.owner.layout.id === selectedRenderer.layoutId ? owned.graph : undefined;
+  };
+
+  /**
    * The Graph a connection drawn right now would land in, or `null` when the
    * Edit would mint one.
    *
@@ -640,14 +658,8 @@ export function createSpaceAuthoring({
    * and the completion that follows refuses for that reason rather than this one.
    */
   const targetGraph = (): Graph | null => {
-    const { selectedRenderer, activeGraphId } = navigation.getState();
-    if (selectedRenderer.kind === 'view') return null;
-    // Through `currentSpace().lookup` rather than scanning the working document,
-    // so ownership is resolved the one way the derivation resolves it (ADR
-    // 0040). Two walks over the same layouts would be two answers to "which
-    // Layout is selected" the moment either learned something.
-    const resolved = currentSpace().lookup.layout(selectedRenderer.layoutId);
-    return resolved?.layout.graphs.find((graph) => graph.id === activeGraphId) ?? null;
+    const { activeGraphId } = navigation.getState();
+    return activeGraphId === null ? null : (ownedGraph(activeGraphId) ?? null);
   };
 
   /**
@@ -703,15 +715,6 @@ export function createSpaceAuthoring({
       return 'These Cards are already connected in this Graph.';
     }
     return null;
-  };
-
-  /** The Graph a Layout-owned Edge operation names, resolved through ownership. */
-  const ownedGraph = (graphId: GraphId): Graph | undefined => {
-    const { selectedRenderer } = navigation.getState();
-    if (selectedRenderer.kind === 'view') return undefined;
-    return currentSpace()
-      .lookup.layout(selectedRenderer.layoutId)
-      ?.layout.graphs.find((graph) => graph.id === graphId);
   };
 
   /**

@@ -41,6 +41,8 @@ const MINTED_GRAPH = uuidSchema.parse('00000000-0000-4000-8000-000000000041');
 const UNKNOWN_GRAPH = uuidSchema.parse('00000000-0000-4000-8000-000000000098');
 
 const EDGE = { from: CARD_A, to: CARD_B } as const;
+/** The Graph and Edge an Edge operation is named by, which travel together. */
+const SUBJECT = { graphId: GRAPH_ID, edge: EDGE } as const;
 
 const PROJECTED: CardFlowNode[] = [
   node(CARD_A, 10, 20),
@@ -133,14 +135,14 @@ describe('the one Edge interaction draft', () => {
     edges.beginKeyboardConnect(CARD_A);
     expect(edges.getState().draft).toEqual({ kind: 'keyboard-connect', from: CARD_A });
 
-    edges.openEdgeEditor(GRAPH_ID, EDGE);
+    edges.openEdgeEditor(SUBJECT);
     expect(edges.getState().draft).toEqual({
       kind: 'keyboard-reconnect',
       graphId: GRAPH_ID,
       edge: EDGE,
     });
 
-    edges.beginPointerReconnect(GRAPH_ID, EDGE, 'to');
+    edges.beginPointerReconnect(SUBJECT, 'to');
     expect(edges.getState().draft).toEqual({
       kind: 'pointer-reconnect',
       graphId: GRAPH_ID,
@@ -163,7 +165,7 @@ describe('the one Edge interaction draft', () => {
 
   it('returns focus to the unmoved endpoint when a reconnection is cancelled', () => {
     const { edges } = open();
-    edges.beginPointerReconnect(GRAPH_ID, EDGE, 'to');
+    edges.beginPointerReconnect(SUBJECT, 'to');
 
     edges.cancelDraft();
 
@@ -179,7 +181,7 @@ describe('the one Edge interaction draft', () => {
 describe('a refused proposal', () => {
   it('keeps the draft and the reason Space Authoring gave', () => {
     const { edges } = open();
-    edges.openEdgeEditor(GRAPH_ID, EDGE);
+    edges.openEdgeEditor(SUBJECT);
 
     // A Card outside this Layout, so the rule is Authoring's rather than this
     // module's — which is the point: the sentence comes from where the rule is.
@@ -197,7 +199,7 @@ describe('a refused proposal', () => {
 
   it('clears the refusal when the next draft begins', () => {
     const { edges } = open();
-    edges.openEdgeEditor(GRAPH_ID, EDGE);
+    edges.openEdgeEditor(SUBJECT);
     edges.reconnect('to', uuidSchema.parse('00000000-0000-4000-8000-0000000000aa'));
 
     edges.beginKeyboardConnect(CARD_A);
@@ -207,7 +209,7 @@ describe('a refused proposal', () => {
 
   it('settles the draft when a reconnection completes', () => {
     const { edges, session } = open();
-    edges.openEdgeEditor(GRAPH_ID, EDGE);
+    edges.openEdgeEditor(SUBJECT);
 
     expect(edges.reconnect('to', CARD_C)).toBe(true);
 
@@ -219,7 +221,7 @@ describe('a refused proposal', () => {
   it('settles the draft when a reconnection is unchanged', () => {
     const { edges, session } = open();
     const before = session.getState().working;
-    edges.openEdgeEditor(GRAPH_ID, EDGE);
+    edges.openEdgeEditor(SUBJECT);
 
     expect(edges.reconnect('to', CARD_B)).toBe(true);
 
@@ -232,7 +234,7 @@ describe('deleting an Edge', () => {
   it('removes it from its Graph and asks for focus at the source Card', () => {
     const { edges, session } = open();
 
-    expect(edges.deleteEdge(GRAPH_ID, EDGE)).toBe(true);
+    expect(edges.deleteEdge(SUBJECT)).toBe(true);
 
     expect(graphsOf(session.getState().working)[0]?.edges).toEqual([]);
     expect(edges.takeFocusRequest()).toEqual({ kind: 'card', cardId: CARD_A });
@@ -242,7 +244,7 @@ describe('deleting an Edge', () => {
     const { edges, session } = open();
     const before = session.getState().working;
 
-    expect(edges.deleteEdge(UNKNOWN_GRAPH, EDGE)).toBe(false);
+    expect(edges.deleteEdge({ graphId: UNKNOWN_GRAPH, edge: EDGE })).toBe(false);
 
     expect(session.getState().working).toBe(before);
     expect(edges.getState().refusal).toBe('That Graph is not one this Layout owns.');
@@ -265,7 +267,7 @@ describe('draft invalidation', () => {
 
   it('cancels the draft when the Active Graph changes', () => {
     const { edges, navigation } = open();
-    edges.openEdgeEditor(GRAPH_ID, EDGE);
+    edges.openEdgeEditor(SUBJECT);
 
     navigation.activateGraph(OTHER_GRAPH_ID);
 
@@ -274,7 +276,7 @@ describe('draft invalidation', () => {
 
   it('cancels the draft when the Edge it is about disappears', () => {
     const { edges, authoring } = open();
-    edges.openEdgeEditor(GRAPH_ID, EDGE);
+    edges.openEdgeEditor(SUBJECT);
 
     authoring.complete({ kind: 'deleted-edge', graphId: GRAPH_ID, edge: EDGE });
 
@@ -316,7 +318,7 @@ describe('draft invalidation', () => {
       adapter,
       connections: createConnectionCompletion({ adapter, authoring }),
     });
-    edges.openEdgeEditor(GRAPH_ID, EDGE);
+    edges.openEdgeEditor(SUBJECT);
     // Force the conflict the accept resolves.
     authoring.complete({ kind: 'deleted-edge', graphId: GRAPH_ID, edge: EDGE });
     await vi.waitFor(() => expect(session.getState().persistence.kind).toBe('conflicted'));
@@ -328,7 +330,7 @@ describe('draft invalidation', () => {
 
   it('leaves the draft standing through an unrelated completed Edit', () => {
     const { edges, authoring } = open();
-    edges.openEdgeEditor(GRAPH_ID, EDGE);
+    edges.openEdgeEditor(SUBJECT);
 
     authoring.complete({ kind: 'renamed-graph', graphId: OTHER_GRAPH_ID, title: 'Renamed' });
 
@@ -341,9 +343,9 @@ describe('draft invalidation', () => {
 
   it('cancels the draft when the canvas selects a different Edge', () => {
     const { edges, adapter } = open();
-    edges.openEdgeEditor(GRAPH_ID, EDGE);
+    edges.openEdgeEditor(SUBJECT);
 
-    adapter.getState().selectEdge(OTHER_GRAPH_ID, EDGE);
+    adapter.getState().selectEdge({ graphId: OTHER_GRAPH_ID, edge: EDGE });
 
     expect(edges.getState().draft).toBeNull();
   });
@@ -356,7 +358,7 @@ describe('draft invalidation', () => {
    */
   it('drops a selected Edge the Active Graph has left behind', () => {
     const { edges, adapter, navigation } = open();
-    adapter.getState().selectEdge(GRAPH_ID, EDGE);
+    adapter.getState().selectEdge(SUBJECT);
     expect(edges.getState().draft).toBeNull();
 
     navigation.activateGraph(OTHER_GRAPH_ID);
@@ -366,7 +368,7 @@ describe('draft invalidation', () => {
 
   it('keeps a selected Edge whose Graph is still the Active one', () => {
     const { adapter, authoring } = open();
-    adapter.getState().selectEdge(GRAPH_ID, EDGE);
+    adapter.getState().selectEdge(SUBJECT);
 
     authoring.complete({ kind: 'renamed-graph', graphId: OTHER_GRAPH_ID, title: 'Renamed' });
 
@@ -475,6 +477,22 @@ describe('completing a pointer connection', () => {
     expect(edges.endPointerDrag()).toBeNull();
   });
 
+  /**
+   * A refusal describes the proposal that produced it, so the next completed
+   * connection is the end of it. Leaving it up would put a sentence about an
+   * Edge that was declined beside one the Space has just gained.
+   */
+  it('clears a previous refusal when the next connection completes', () => {
+    const { edges } = open();
+    edges.beginPointerConnect(CARD_A);
+    edges.connect(CARD_A, CARD_B, null);
+    expect(edges.getState().refusal).toBe('These Cards are already connected in this Graph.');
+
+    expect(edges.connect(CARD_A, CARD_C, null)).toBe(CARD_C);
+
+    expect(edges.getState().refusal).toBeNull();
+  });
+
   it('ends the pointer draft with the drag, whatever it produced', () => {
     const { edges } = open();
     edges.beginPointerConnect(CARD_B);
@@ -497,8 +515,7 @@ describe('completing a pointer connection', () => {
     ],
     [
       'a reconnection',
-      (edges: ReturnType<typeof open>['edges']) =>
-        edges.beginPointerReconnect(GRAPH_ID, EDGE, 'to'),
+      (edges: ReturnType<typeof open>['edges']) => edges.beginPointerReconnect(SUBJECT, 'to'),
     ],
   ])('keeps a refusal %s produced after the drag ends', (_name, begin) => {
     const { edges } = open();

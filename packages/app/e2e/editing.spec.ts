@@ -1,4 +1,4 @@
-import type { Page } from '@playwright/test';
+import type { Locator, Page } from '@playwright/test';
 import { expect, test } from './fixtures';
 import {
   activeCard,
@@ -44,6 +44,80 @@ async function quiescent(page: Page): Promise<void> {
  * `elementFromPoint` answers null outside the viewport and `closest` answers null
  * off an Edge, so both are checked rather than assumed.
  */
+/**
+ * A point on the pane far enough from every handle that React Flow resolves no
+ * connection target — `connectionRadius` is 20 at the pinned 12.11.2, so a
+ * release nearer than that reads as aiming at a handle rather than at canvas.
+ */
+async function emptyCanvasPoint(page: Page): Promise<{ x: number; y: number }> {
+  const pane = await boxOf(page.locator('.react-flow__pane'), 'the React Flow pane');
+  const point = { x: pane.x + 24, y: pane.y + 24 };
+  const clear = await page.evaluate(
+    (at) => document.elementFromPoint(at.x, at.y)?.closest('.react-flow__node') === null,
+    point,
+  );
+  expect(clear, 'the chosen point is over a Card rather than empty canvas').toBe(true);
+  return point;
+}
+
+/**
+ * Drag one endpoint of a selected Edge to a screen point.
+ *
+ * The anchors are transparent circles React Flow draws only on a reconnectable
+ * Edge, so the press is asserted to land on one — a Card handle drawn over it
+ * would otherwise read as a reconnection that silently never began. React Flow
+ * starts the connection on the first move after mousedown and can swallow a
+ * single jump, which is why the move is stepped, as in `connectHandles`.
+ */
+async function dragEndpointTo(
+  page: Page,
+  edge: Locator,
+  end: 'source' | 'target',
+  to: { x: number; y: number },
+): Promise<void> {
+  const anchor = await boxOf(edge.locator(`.react-flow__edgeupdater-${end}`), `the ${end} anchor`);
+  const from = { x: anchor.x + anchor.width / 2, y: anchor.y + anchor.height / 2 };
+  const onAnchor = await page.evaluate(
+    (at) => document.elementFromPoint(at.x, at.y)?.closest('.react-flow__edgeupdater') !== null,
+    from,
+  );
+  expect(onAnchor, `the ${end} reconnect anchor is covered at its own centre`).toBe(true);
+
+  await page.mouse.move(from.x, from.y);
+  await page.mouse.down();
+  try {
+    await page.mouse.move(from.x + 12, from.y, { steps: 3 });
+    await page.mouse.move(to.x, to.y, { steps: 6 });
+  } finally {
+    await page.mouse.up();
+  }
+}
+
+/** Drag one endpoint onto a Card's authoring target handle. */
+async function reconnectOnto(
+  page: Page,
+  edge: Locator,
+  end: 'source' | 'target',
+  targetHandle: Locator,
+): Promise<void> {
+  const anchor = await boxOf(edge.locator(`.react-flow__edgeupdater-${end}`), `the ${end} anchor`);
+  const from = { x: anchor.x + anchor.width / 2, y: anchor.y + anchor.height / 2 };
+  await page.mouse.move(from.x, from.y);
+  await page.mouse.down();
+  try {
+    await page.mouse.move(from.x + 12, from.y, { steps: 3 });
+    // Target handles appear only once React Flow has really started the
+    // connection, so this gate is what stops a release that ends a drag which
+    // never began being reported as a missing Edit later.
+    await expect(targetHandle).toHaveCSS('opacity', '1');
+    await expect(targetHandle).toHaveClass(/connectableend/);
+    await targetHandle.hover();
+    expect(await targetHandle.evaluate((element) => element.matches(':hover'))).toBe(true);
+  } finally {
+    await page.mouse.up();
+  }
+}
+
 async function selectAnEdge(page: Page): Promise<string> {
   const point = await page
     .locator('.react-flow__edge[tabindex] .react-flow__edge-path')
@@ -1095,6 +1169,173 @@ test('reconnect anchors exist only on the selected Edge', async ({ page }) => {
 
   // Two per Edge, source and target, and on one Edge only.
   await expect(anchors).toHaveCount(2);
+});
+
+/**
+ * Pointer reconnection, end to end through all three native callbacks.
+ *
+ * The unit tests drive `beginPointerReconnect` directly, so nothing there sees
+ * what React Flow actually does around a reconnect drag: it calls
+ * `onReconnectStart` and then the *store's* `onConnectStart`, and on release the
+ * store's `onConnectEnd` before `onReconnectEnd`. Only a real drag proves the
+ * Edge lifecycle survives being handed those pairs.
+ *
+ * `Long` is A→B→C→D→A′, so moving A→B's target onto D makes A→D, which is no
+ * duplicate.
+ */
+test('dragging an endpoint onto another Card moves it and keeps the Edge in its Graph', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await expect(nodeByTitle(page, 'A').first()).toBeVisible();
+  await expect(page.locator('.react-flow__edge-path').first()).toHaveAttribute('d', /L/);
+  await selectLayout(page, 'Collection 1');
+  await settled(page);
+  const drawn = await page.locator('.react-flow__edge').count();
+  const persistence = page.getByTestId('persistence-status');
+  await expect(persistence).toHaveAttribute('data-revision', '0');
+
+  const edge = page.locator('.react-flow__edge[aria-label="Edge from A to B in Long"]');
+  await edge.focus();
+  await expect(edge).toHaveClass(/selected/);
+
+  await reconnectOnto(
+    page,
+    edge,
+    'target',
+    authoringHandle(nodeByTitle(page, 'D').first(), 'target', 'left'),
+  );
+
+  await expect(
+    page.locator('.react-flow__edge[aria-label="Edge from A to B in Long"]'),
+  ).toHaveCount(0);
+  await expect(
+    page.locator('.react-flow__edge[aria-label="Edge from A to D in Long"]'),
+  ).toHaveCount(1);
+  // Replaced, not added or dropped: the Graph draws exactly as many Edges.
+  await expect(page.locator('.react-flow__edge')).toHaveCount(drawn);
+  await expect(persistence).toHaveAttribute('data-revision', '1');
+  await expect(persistence).toHaveText('Persisted');
+});
+
+/**
+ * The *source* anchor, which React Flow reports through the **opposite** handle's
+ * type — so a mapping read straight off `handleType` names the wrong endpoint.
+ *
+ * `Short` is A→B→C, so moving A→B's source onto C makes C→B, which is no
+ * duplicate of anything Short holds.
+ */
+test('dragging the source endpoint moves the end the author took hold of', async ({ page }) => {
+  await page.goto('/');
+  await expect(nodeByTitle(page, 'A').first()).toBeVisible();
+  await expect(page.locator('.react-flow__edge-path').first()).toHaveAttribute('d', /L/);
+  await selectLayout(page, 'Collection 1');
+  await page.getByTestId('graph-selector').click();
+  await page.getByRole('option', { name: 'Short' }).click();
+  await settled(page);
+
+  const edge = page.locator('.react-flow__edge[aria-label="Edge from A to B in Short"]');
+  await edge.focus();
+  await expect(edge).toHaveClass(/selected/);
+
+  // A source-endpoint drag anchors at the Edge's target and looks for a new
+  // *source*, so the Card offers its source handles for this gesture alone.
+  await reconnectOnto(
+    page,
+    edge,
+    'source',
+    authoringHandle(nodeByTitle(page, 'C').first(), 'source', 'right'),
+  );
+
+  await expect(
+    page.locator('.react-flow__edge[aria-label="Edge from C to B in Short"]'),
+  ).toHaveCount(1);
+  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
+});
+
+/**
+ * The one pointer gesture that deletes an Edge: an endpoint released on empty
+ * canvas. A release that merely *missed* a handle cancels instead, which is what
+ * the off-canvas case below is for.
+ */
+test('dragging an endpoint onto empty canvas deletes the Edge', async ({ page }) => {
+  await page.goto('/');
+  await expect(nodeByTitle(page, 'A').first()).toBeVisible();
+  await expect(page.locator('.react-flow__edge-path').first()).toHaveAttribute('d', /L/);
+  await selectLayout(page, 'Collection 1');
+  await settled(page);
+  const drawn = await page.locator('.react-flow__edge').count();
+
+  const edge = page.locator('.react-flow__edge[aria-label="Edge from A to B in Long"]');
+  await edge.focus();
+  await dragEndpointTo(page, edge, 'target', await emptyCanvasPoint(page));
+
+  await expect(page.locator('.react-flow__edge')).toHaveCount(drawn - 1);
+  await expect(
+    page.locator('.react-flow__edge[aria-label="Edge from A to B in Long"]'),
+  ).toHaveCount(0);
+  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
+});
+
+test('dragging an endpoint off the canvas restores the Edge', async ({ page }) => {
+  await page.goto('/');
+  await expect(nodeByTitle(page, 'A').first()).toBeVisible();
+  await expect(page.locator('.react-flow__edge-path').first()).toHaveAttribute('d', /L/);
+  await selectLayout(page, 'Collection 1');
+  await settled(page);
+  const drawn = await page.locator('.react-flow__edge').count();
+
+  const edge = page.locator('.react-flow__edge[aria-label="Edge from A to B in Long"]');
+  await edge.focus();
+  // The persistence status sits in the toolbar, outside the flow container.
+  const toolbar = await boxOf(page.getByTestId('persistence-status'), 'the persistence status');
+  await dragEndpointTo(page, edge, 'target', {
+    x: toolbar.x + toolbar.width / 2,
+    y: toolbar.y + toolbar.height / 2,
+  });
+
+  await quiescent(page);
+  await expect(page.locator('.react-flow__edge')).toHaveCount(drawn);
+  await expect(
+    page.locator('.react-flow__edge[aria-label="Edge from A to B in Long"]'),
+  ).toHaveCount(1);
+  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '0');
+});
+
+/**
+ * The third `DropTarget` classification, and the reason the DOM half of the
+ * empty-drop rule exists: a release over a Card's *body* is far enough from any
+ * handle that React Flow resolves no target, so without the hit-test an Alt-drop
+ * there would author a Card on top of the one underneath.
+ */
+test('an Alt-drop released over a Card body creates no Card', async ({ page }) => {
+  await page.goto('/');
+  const source = nodeByTitle(page, 'A').first();
+  await expect(source).toBeVisible();
+  await expect(page.locator('.react-flow__edge-path').first()).toHaveAttribute('d', /L/);
+  await settled(page);
+  await source.hover();
+
+  const from = await boxOf(authoringHandle(source, 'source', 'right'), 'the source handle');
+  const over = await boxOf(nodeByTitle(page, 'C').first(), 'Card C');
+  try {
+    await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(from.x + from.width / 2 + 30, from.y + from.height / 2, { steps: 4 });
+    await page.keyboard.down('Alt');
+    // The centre of a 260x146 Card is some 73px from its nearest handle, well
+    // outside React Flow's connection radius of 20 — so `toNode` is null here
+    // and only the DOM says this is a Card.
+    await page.mouse.move(over.x + over.width / 2, over.y + over.height / 2, { steps: 4 });
+    await expect(page.getByTestId('new-card-preview')).toHaveCount(0);
+  } finally {
+    await page.mouse.up();
+    await page.keyboard.up('Alt');
+  }
+
+  await quiescent(page);
+  await expect(page.locator('.react-flow__node')).toHaveCount(FIXTURE_CARD_COUNT);
+  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '0');
 });
 
 /**

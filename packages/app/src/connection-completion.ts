@@ -17,6 +17,23 @@ import type { SpaceAuthoring } from './space-authoring';
  * not interpret a gesture, and Authoring must not know that React Flow has a
  * second node list.
  */
+/**
+ * What a connection attempt came to.
+ *
+ * Three outcomes rather than `CardId | null`, because the caller has to tell a
+ * **refusal** — which owes the author the sentence carried here — from a gesture
+ * that simply had nowhere to land, which owes them nothing and must not wipe a
+ * message already on screen. Answering the reason here is also what keeps
+ * eligibility asked twice per gesture rather than three times: the coordinator
+ * already asked it to decide, so a caller reaching for the sentence afterwards
+ * would be asking the same question of a Space that has since moved.
+ */
+export type ConnectionResult =
+  | { readonly kind: 'completed'; readonly cardId: CardId }
+  | { readonly kind: 'refused'; readonly reason: string }
+  /** No arrangement to write into, or an invariant already reported. */
+  | { readonly kind: 'unavailable' };
+
 export interface ConnectionCompletion {
   /**
    * Author one Edge between two Cards already on screen.
@@ -32,14 +49,16 @@ export interface ConnectionCompletion {
     from: CardId,
     to: CardId,
     projected: readonly CardFlowNode[] | null,
-  ) => CardId | null;
+  ) => ConnectionResult;
   /** Author a Card at an Option/Alt empty drop and the Edge that reaches it. */
   readonly createAndConnect: (
     from: CardId,
     position: LayoutPosition,
     projected: readonly CardFlowNode[] | null,
-  ) => CardId | null;
+  ) => ConnectionResult;
 }
+
+const UNAVAILABLE = { kind: 'unavailable' } as const;
 
 export interface ConnectionCompletionDependencies {
   readonly adapter: RenderAdapter;
@@ -84,46 +103,59 @@ export function createConnectionCompletion({
   const complete = (
     completion: Parameters<SpaceAuthoring['complete']>[0],
     projected: readonly CardFlowNode[] | null,
-  ): { readonly createdCardId?: CardId } | null => {
+    continueAt: (result: { readonly createdCardId?: CardId }) => CardId | undefined,
+  ): ConnectionResult => {
     const result = authoring.complete(completion);
+    if (result.kind === 'refused') return { kind: 'refused', reason: result.reason };
     if (result.kind === 'queued') {
       report(
         new Error(
           `A ${completion.kind} completion was queued behind another Edit. React Flow events cannot be re-entrant.`,
         ),
       );
-      return null;
+      return UNAVAILABLE;
     }
-    if (result.kind !== 'completed') return null;
+    if (result.kind !== 'completed') return UNAVAILABLE;
     // Re-read through the store rather than capturing: completing published,
     // and a listener may have replaced the projection — accepting a stored
     // Space drops it outright.
     if (projected !== null) adapter.getState().mergeProjected(projected);
-    return result;
+    const cardId = continueAt(result);
+    return cardId === undefined ? UNAVAILABLE : { kind: 'completed', cardId };
+  };
+
+  /**
+   * Ask eligibility once, and answer its sentence rather than re-asking for it.
+   *
+   * Completion validates the same proposal again — the Space can change between
+   * the preview and the release — so a refusal can arrive from either, and both
+   * are the same answer to the author.
+   */
+  const eligible = (proposal: Parameters<SpaceAuthoring['edgeEligibility']>[0]): string | null => {
+    const eligibility = authoring.edgeEligibility(proposal);
+    return eligibility.kind === 'refused' ? eligibility.reason : null;
   };
 
   return {
     connect: (from, to, projected) => {
       const rendered = adapter.getState().renderedPlacement();
-      if (rendered === null) return null;
-      if (authoring.edgeEligibility({ kind: 'connect', from, to }).kind !== 'eligible') return null;
-      return complete({ kind: 'connected-cards', from, to, rendered }, projected) === null
-        ? null
-        : to;
+      if (rendered === null) return UNAVAILABLE;
+      const refusal = eligible({ kind: 'connect', from, to });
+      if (refusal !== null) return { kind: 'refused', reason: refusal };
+      return complete({ kind: 'connected-cards', from, to, rendered }, projected, () => to);
     },
 
     createAndConnect: (from, position, projected) => {
       const rendered = adapter.getState().renderedPlacement();
-      if (rendered === null) return null;
-      if (authoring.edgeEligibility({ kind: 'create-and-connect', from }).kind !== 'eligible') {
-        return null;
-      }
+      if (rendered === null) return UNAVAILABLE;
+      const refusal = eligible({ kind: 'create-and-connect', from });
+      if (refusal !== null) return { kind: 'refused', reason: refusal };
       // The dropped Card is placed by `position` inside the completion itself.
-      const completed = complete(
+      return complete(
         { kind: 'create-and-connect', from, position, rendered },
         projected,
+        (result) => result.createdCardId,
       );
-      return completed?.createdCardId ?? null;
     },
   };
 }

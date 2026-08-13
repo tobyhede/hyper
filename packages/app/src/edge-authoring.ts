@@ -1,4 +1,4 @@
-import type { CardId, GraphEdge, GraphId, LayoutPosition } from '@project/core';
+import type { CardId, LayoutPosition } from '@project/core';
 import {
   createNonThrowingReporter,
   createObservableState,
@@ -7,9 +7,9 @@ import {
 } from '@project/persistence';
 import type { CardFlowNode } from '@project/react-flow-adapter';
 import { CARD_SIZE } from './card';
-import type { ConnectionCompletion } from './connection-completion';
-import type { CanvasSelection, RenderAdapter } from './render-adapter';
-import { sameSelection } from './render-adapter';
+import type { ConnectionCompletion, ConnectionResult } from './connection-completion';
+import type { CanvasSelection, EdgeSubject, RenderAdapter } from './render-adapter';
+import { sameEdgeSubject, sameSelection } from './render-adapter';
 import type { RendererSelection } from './renderer';
 import type {
   EdgeEligibility,
@@ -134,14 +134,9 @@ export function newCardDrop(
 export type EdgeDraft =
   | { readonly kind: 'pointer-connect'; readonly from: CardId }
   | { readonly kind: 'keyboard-connect'; readonly from: CardId }
-  | {
-      readonly kind: 'pointer-reconnect';
-      readonly graphId: GraphId;
-      readonly edge: GraphEdge;
-      readonly endpoint: EdgeEndpoint;
-    }
+  | ({ readonly kind: 'pointer-reconnect'; readonly endpoint: EdgeEndpoint } & EdgeSubject)
   /** The Edge popover: both endpoints are editable while it stands. */
-  | { readonly kind: 'keyboard-reconnect'; readonly graphId: GraphId; readonly edge: GraphEdge };
+  | ({ readonly kind: 'keyboard-reconnect' } & EdgeSubject);
 
 /** Where focus goes once the projection carrying a completed Edit has rendered. */
 export type FocusRequest =
@@ -211,15 +206,11 @@ export interface EdgeAuthoring {
     to: CardId,
     projected: readonly CardFlowNode[] | null,
   ) => CardId | null;
-  readonly beginPointerReconnect: (
-    graphId: GraphId,
-    edge: GraphEdge,
-    endpoint: EdgeEndpoint,
-  ) => void;
-  readonly openEdgeEditor: (graphId: GraphId, edge: GraphEdge) => void;
+  readonly beginPointerReconnect: (subject: EdgeSubject, endpoint: EdgeEndpoint) => void;
+  readonly openEdgeEditor: (subject: EdgeSubject) => void;
   /** Move one endpoint of the drafted Edge to a Card. */
   readonly reconnect: (endpoint: EdgeEndpoint, cardId: CardId) => boolean;
-  readonly deleteEdge: (graphId: GraphId, edge: GraphEdge) => boolean;
+  readonly deleteEdge: (subject: EdgeSubject) => boolean;
   /** Cancel the topmost Edge surface, producing no Edit. */
   readonly cancelDraft: () => void;
   /** Take the pending focus move, leaving none behind. */
@@ -269,10 +260,7 @@ const selectionMatchesDraft = (selection: CanvasSelection, draft: EdgeDraft): bo
     // gesture on its first frame.
     return selection.kind !== 'card' || selection.cardId === draft.from;
   }
-  return (
-    selection.kind !== 'edge' ||
-    sameSelection(selection, { kind: 'edge', graphId: draft.graphId, edge: draft.edge })
-  );
+  return selection.kind !== 'edge' || sameEdgeSubject(selection, draft);
 };
 
 export function createEdgeAuthoring({
@@ -326,10 +314,7 @@ export function createEdgeAuthoring({
   };
 
   /** The Edge a reconnect draft is about, whichever kind of reconnect it is. */
-  const draftedEdge = (): {
-    readonly graphId: GraphId;
-    readonly edge: GraphEdge;
-  } | null => {
+  const draftedEdge = (): EdgeSubject | null => {
     const { draft } = observable.getState();
     if (draft === null) return null;
     if (draft.kind === 'pointer-reconnect' || draft.kind === 'keyboard-reconnect') {
@@ -346,8 +331,14 @@ export function createEdgeAuthoring({
    * connecting gestures: it is Authoring's answer to a completion made from
    * inside its own publication, and every caller of this reaches it from a
    * browser event with no Edit on the stack. Reported rather than thrown — a
-   * diagnostic must not take the canvas down under the author's hand — and the
-   * draft is left standing, because nothing has been authored to settle it.
+   * diagnostic must not take the canvas down under the author's hand.
+   *
+   * The draft is left standing, and that is the *cautious* half rather than the
+   * obviously right one: a queued Edit is drained and usually lands, so the
+   * draft may outlive its own subject by a moment. It is left because the
+   * alternative settles a surface for an Edit that can still be refused when
+   * the drain reaches it, and because the invalidation pass cancels the draft
+   * the instant its subject really goes.
    */
   const completeStructural = (completion: Parameters<SpaceAuthoring['complete']>[0]): boolean => {
     const result = authoring.complete(completion);
@@ -371,6 +362,26 @@ export function createEdgeAuthoring({
 
   /** The Card a finished pointer connection continues at, held across the drag's end. */
   let pendingContinuation: CardId | null = null;
+
+  /**
+   * Take what a connection attempt came to, and say what the author sees.
+   *
+   * The three outcomes are not interchangeable. A **refusal** shows its
+   * sentence; a **completion** clears whatever sentence was there, because a
+   * refusal describes the proposal that produced it and this one has landed;
+   * and **unavailable** — no arrangement yet, or an invariant already reported —
+   * says nothing either way, so a message already on screen stands.
+   */
+  const settleConnection = (result: ConnectionResult): CardId | null => {
+    if (result.kind === 'refused') {
+      publish({ refusal: result.reason });
+      return null;
+    }
+    if (result.kind !== 'completed') return null;
+    publish({ refusal: null });
+    pendingContinuation = result.cardId;
+    return result.cardId;
+  };
 
   const requestFocus = (focusRequest: FocusRequest): void => publish({ focusRequest });
 
@@ -433,22 +444,10 @@ export function createEdgeAuthoring({
 
     beginPointerConnect: (from) => begin({ kind: 'pointer-connect', from }),
 
-    connect: (from, to, projected) => {
-      const completed = connections.connect(from, to, projected);
-      if (completed === null) {
-        const refusal = eligibility({ kind: 'connect', from, to });
-        publish({ refusal: refusal.kind === 'refused' ? refusal.reason : null });
-        return null;
-      }
-      pendingContinuation = completed;
-      return completed;
-    },
+    connect: (from, to, projected) => settleConnection(connections.connect(from, to, projected)),
 
-    createConnectedCard: (from, position, projected) => {
-      const created = connections.createAndConnect(from, position, projected);
-      if (created !== null) pendingContinuation = created;
-      return created;
-    },
+    createConnectedCard: (from, position, projected) =>
+      settleConnection(connections.createAndConnect(from, position, projected)),
 
     endPointerDrag: () => {
       const continuation = pendingContinuation;
@@ -465,15 +464,11 @@ export function createEdgeAuthoring({
     completeKeyboardConnect: (to, projected) => {
       const { draft } = observable.getState();
       if (draft?.kind !== 'keyboard-connect') return null;
-      const completed = connections.connect(draft.from, to, projected);
-      if (completed === null) {
-        // The picker offered this target, so a refusal here means the Space
-        // changed while it was open. The draft stands with its reason, which is
-        // the whole point of asking eligibility again at completion.
-        const refusal = eligibility({ kind: 'connect', from: draft.from, to });
-        publish({ refusal: refusal.kind === 'refused' ? refusal.reason : null });
-        return null;
-      }
+      // The picker offered this target, so a refusal here means the Space
+      // changed while it was open — which is the whole point of validating the
+      // proposal again at completion. The draft stands with its reason.
+      const completed = settleConnection(connections.connect(draft.from, to, projected));
+      if (completed === null) return null;
       // "Successful keyboard connection selects and focuses the target Card."
       // Selection is the canvas's and happens beside this; the focus move is
       // Hyper's own, because the picker that had focus is about to unmount.
@@ -481,10 +476,12 @@ export function createEdgeAuthoring({
       return completed;
     },
 
-    beginPointerReconnect: (graphId, edge, endpoint) =>
+    // Destructured rather than spread: the caller usually holds an
+    // `EdgeSelection`, whose own `kind` would overwrite the draft's.
+    beginPointerReconnect: ({ graphId, edge }, endpoint) =>
       begin({ kind: 'pointer-reconnect', graphId, edge, endpoint }),
 
-    openEdgeEditor: (graphId, edge) => begin({ kind: 'keyboard-reconnect', graphId, edge }),
+    openEdgeEditor: ({ graphId, edge }) => begin({ kind: 'keyboard-reconnect', graphId, edge }),
 
     reconnect: (endpoint, cardId) => {
       const drafted = draftedEdge();
@@ -498,7 +495,7 @@ export function createEdgeAuthoring({
       });
     },
 
-    deleteEdge: (graphId, edge) => {
+    deleteEdge: ({ graphId, edge }) => {
       const deleted = completeStructural({ kind: 'deleted-edge', graphId, edge });
       // The Edge that held focus is about to leave the projection, and React
       // Flow moves focus only for elements it still draws.

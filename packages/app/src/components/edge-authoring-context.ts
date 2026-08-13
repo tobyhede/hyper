@@ -1,6 +1,7 @@
 import { createContext } from 'react';
-import type { CardId, GraphEdge, GraphId } from '@project/core';
+import type { CardId } from '@project/core';
 import type { CardChoice } from '@project/ui';
+import type { EdgeSubject } from '../render-adapter';
 import type { EdgeEndpoint } from '../space-authoring';
 
 /**
@@ -13,18 +14,14 @@ import type { EdgeEndpoint } from '../space-authoring';
  */
 export interface EdgeAuthoringCommands {
   /** The Edge whose editor is open, if the open draft is an Edge editor. */
-  readonly editing: { readonly graphId: GraphId; readonly edge: GraphEdge } | null;
+  readonly editing: EdgeSubject | null;
   readonly refusal: string | null;
-  readonly openEditor: (graphId: GraphId, edge: GraphEdge) => void;
+  readonly openEditor: (subject: EdgeSubject) => void;
   readonly closeEditor: () => void;
   readonly reconnect: (endpoint: EdgeEndpoint, cardId: CardId) => void;
-  readonly deleteEdge: (graphId: GraphId, edge: GraphEdge) => void;
+  readonly deleteEdge: (subject: EdgeSubject) => void;
   /** Which Cards an endpoint may be moved to, and why each cannot. */
-  readonly endpointChoices: (
-    graphId: GraphId,
-    edge: GraphEdge,
-    endpoint: EdgeEndpoint,
-  ) => readonly CardChoice[];
+  readonly endpointChoices: (subject: EdgeSubject, endpoint: EdgeEndpoint) => readonly CardChoice[];
 }
 
 export const EdgeAuthoringContext = createContext<EdgeAuthoringCommands | null>(null);

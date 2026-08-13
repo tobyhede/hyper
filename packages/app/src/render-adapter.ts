@@ -34,39 +34,52 @@ export interface Projection {
 }
 
 /**
+ * One Edge, named the way everything that acts on an Edge has to name it.
+ *
+ * A Graph and an Edge travel together through every Edge operation — selecting,
+ * reconnecting, deleting, opening an editor, offering endpoint choices — because
+ * neither identifies an Edge alone: an Edge is `{ from, to }` and says nothing
+ * about which Graph draws it, and a Graph holds many. Passing them as two
+ * arguments meant every callee re-paired what its caller had just split.
+ *
+ * It is the **domain** Edge and its owning Graph, never the React Flow edge id.
+ * That id is `<graphId>::<index>` and re-indexes whenever a Graph loses an Edge,
+ * so a subject held by id would survive a deletion pointing at whichever Edge
+ * slid into the vacated slot. A Graph cannot hold the same pair twice (ADR
+ * 0032), so this names exactly one Edge for as long as that Edge exists — and
+ * names nothing, harmlessly, once it does not.
+ */
+export interface EdgeSubject {
+  readonly graphId: GraphId;
+  readonly edge: GraphEdge;
+}
+
+/**
  * What the canvas has selected — one subject of one kind, never two.
  *
  * Discriminated rather than a pair of nullable fields, because "a Card and an
  * Edge are both selected" is not a state React Flow produces once modifier
  * multi-selection and the selection rectangle are off, and a shape that can
  * express it invites a second mutual-exclusion policy beside React Flow's own.
- *
- * The Edge subject is the **domain** Edge and its owning Graph, not the React
- * Flow edge id. That id is `<graphId>::<index>` and re-indexes whenever a Graph
- * loses an Edge, so a selection held by id survives a deletion pointing at
- * whichever Edge slid into the vacated slot. A Graph cannot hold the same pair
- * twice (ADR 0032), so `{ graphId, edge }` names exactly one Edge for as long as
- * that Edge exists — and names nothing, harmlessly, once it does not.
  */
 export type CanvasSelection =
   | { readonly kind: 'none' }
   | { readonly kind: 'card'; readonly cardId: CardId }
-  | { readonly kind: 'edge'; readonly graphId: GraphId; readonly edge: GraphEdge };
+  | ({ readonly kind: 'edge' } & EdgeSubject);
 
 export const NO_SELECTION: CanvasSelection = { kind: 'none' };
+
+/** Whether two subjects name the same Edge of the same Graph. */
+export const sameEdgeSubject = (left: EdgeSubject, right: EdgeSubject): boolean =>
+  left.graphId === right.graphId &&
+  left.edge.from === right.edge.from &&
+  left.edge.to === right.edge.to;
 
 /** Whether two selections name the same subject. */
 export function sameSelection(left: CanvasSelection, right: CanvasSelection): boolean {
   if (left.kind !== right.kind) return false;
   if (left.kind === 'card') return left.cardId === (right as { cardId: CardId }).cardId;
-  if (left.kind === 'edge') {
-    const other = right as Extract<CanvasSelection, { kind: 'edge' }>;
-    return (
-      left.graphId === other.graphId &&
-      left.edge.from === other.edge.from &&
-      left.edge.to === other.edge.to
-    );
-  }
+  if (left.kind === 'edge') return sameEdgeSubject(left, right as EdgeSelection);
   return true;
 }
 
@@ -161,7 +174,7 @@ export interface RenderAdapterState {
    * Tabs to an Edge and presses Delete would act on whatever was selected
    * before. Installing the focused Edge here is what makes the two agree.
    */
-  selectEdge: (graphId: GraphId, edge: GraphEdge) => void;
+  selectEdge: (subject: EdgeSubject) => void;
   /** Drop the selection when its subject is no longer worth naming. */
   clearSelection: () => void;
   /**
@@ -364,7 +377,7 @@ export function createRenderAdapter(authoring: SpaceAuthoring): RenderAdapter {
 
     selectCard: (cardId) => set((state) => selecting(state, { kind: 'card', cardId })),
 
-    selectEdge: (graphId, edge) =>
+    selectEdge: ({ graphId, edge }) =>
       set((state) => selecting(state, { kind: 'edge', graphId, edge })),
 
     clearSelection: () => set((state) => selecting(state, NO_SELECTION)),

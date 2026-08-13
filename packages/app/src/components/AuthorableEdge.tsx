@@ -1,9 +1,9 @@
 import { useContext, useState, type ReactNode } from 'react';
 import { EdgeLabelRenderer, type EdgeProps } from '@xyflow/react';
-import type { CardId, GraphEdge, GraphId } from '@project/core';
+import type { CardId } from '@project/core';
 import { RoutedEdge, routedEdgeGeometry, type RoutedFlowEdge } from '@project/react-flow-adapter';
 import { CardPicker, Popover, PopoverAnchor, PopoverContent } from '@project/ui';
-import { edgeSelectionOf, sameSelection } from '../render-adapter';
+import { edgeSelectionOf, sameEdgeSubject, type EdgeSubject } from '../render-adapter';
 import { EdgeAuthoringContext, type EdgeAuthoringCommands } from './edge-authoring-context';
 
 /**
@@ -60,14 +60,7 @@ export function AuthorableEdge(props: EdgeProps<RoutedFlowEdge>) {
   if (!props.selected || commands === null || subject === null) {
     return <RoutedEdge {...props} />;
   }
-  const { graphId, edge } = subject;
-  const open =
-    commands.editing !== null &&
-    sameSelection(subject, {
-      kind: 'edge',
-      graphId: commands.editing.graphId,
-      edge: commands.editing.edge,
-    });
+  const open = commands.editing !== null && sameEdgeSubject(subject, commands.editing);
 
   return (
     <>
@@ -75,9 +68,7 @@ export function AuthorableEdge(props: EdgeProps<RoutedFlowEdge>) {
       <EdgeToolbar labelX={labelX} labelY={labelY}>
         <Popover
           open={open}
-          onOpenChange={(next) =>
-            next ? commands.openEditor(graphId, edge) : commands.closeEditor()
-          }
+          onOpenChange={(next) => (next ? commands.openEditor(subject) : commands.closeEditor())}
         >
           <PopoverAnchor asChild>
             <div className="edge-toolbar__anchor">
@@ -87,7 +78,7 @@ export function AuthorableEdge(props: EdgeProps<RoutedFlowEdge>) {
                 data-testid="edge-edit"
                 aria-label="Edit this Edge"
                 aria-expanded={open}
-                onClick={() => (open ? commands.closeEditor() : commands.openEditor(graphId, edge))}
+                onClick={() => (open ? commands.closeEditor() : commands.openEditor(subject))}
               >
                 Edit
               </button>
@@ -96,10 +87,18 @@ export function AuthorableEdge(props: EdgeProps<RoutedFlowEdge>) {
                 className="edge-toolbar__button"
                 data-testid="edge-delete"
                 aria-label="Delete this Edge"
-                onClick={() => commands.deleteEdge(graphId, edge)}
+                onClick={() => commands.deleteEdge(subject)}
               >
                 Delete
               </button>
+              {/* A refused Delete has no other surface to speak from — the
+                  endpoint editor below is closed at the moment it happens, and
+                  a refusal nobody renders is a click that did nothing. */}
+              {!open && commands.refusal !== null && (
+                <span role="alert" className="edge-toolbar__refusal" data-testid="edge-refusal">
+                  {commands.refusal}
+                </span>
+              )}
             </div>
           </PopoverAnchor>
           <PopoverContent
@@ -107,7 +106,7 @@ export function AuthorableEdge(props: EdgeProps<RoutedFlowEdge>) {
             data-testid="edge-editor"
             aria-label="Edge endpoints"
           >
-            <EdgeEndpointFields graphId={graphId} edge={edge} commands={commands} />
+            <EdgeEndpointFields subject={subject} commands={commands} />
           </PopoverContent>
         </Popover>
       </EdgeToolbar>
@@ -123,19 +122,18 @@ export function AuthorableEdge(props: EdgeProps<RoutedFlowEdge>) {
  * different Edge in this Graph arrives from eligibility already disabled.
  */
 function EdgeEndpointFields({
-  graphId,
-  edge,
+  subject,
   commands,
 }: {
-  graphId: GraphId;
-  edge: GraphEdge;
+  subject: EdgeSubject;
   commands: EdgeAuthoringCommands;
 }) {
+  const { edge } = subject;
   // Read once per render of the open editor rather than per keystroke: the
   // choices are a function of the Space, and the Space cannot change while a
   // synchronous pick is being made.
-  const [from] = useState(() => commands.endpointChoices(graphId, edge, 'from'));
-  const [to] = useState(() => commands.endpointChoices(graphId, edge, 'to'));
+  const [from] = useState(() => commands.endpointChoices(subject, 'from'));
+  const [to] = useState(() => commands.endpointChoices(subject, 'to'));
 
   return (
     <div className="edge-editor__fields">

@@ -489,6 +489,45 @@ domain one, `sameSelection` the one comparison, and a refused *pointer*
 reconnect keeps its sentence the way a refused connection does
 (`endPointerDrag`, one operation for both pointer drafts).
 
+**A second review round found that pointer reconnection had never worked**, and
+no unit test could have seen it — they drive `beginPointerReconnect` directly,
+while React Flow drives a reconnect drag through the *connection* callbacks as
+well. `EdgeUpdateAnchors` calls `onReconnectStart` and then the store's
+`onConnectStart`, and on release the store's `onConnectEnd` before
+`onReconnectEnd`. Three defects followed, all now fixed and pinned:
+
+- `beginPointerConnect` **overwrote the reconnect draft**, so `reconnect()`
+  found no drafted Edge and silently authored nothing. A `reconnecting` ref
+  stands both connection handlers down for the drag.
+- With Alt held, the connection release **authored a Card and an Edge from the
+  anchored end** before `onReconnectEnd` deleted the Edge — one gesture, two
+  Edits. The same ref closes it.
+- `handleType` names the endpoint that **stays**, not the one being dragged, so
+  the draft recorded the wrong end and a cancelled drag returned focus to the
+  wrong Card.
+
+Building the browser test the design asked for is what exposed all three, and it
+exposed a fourth in the process: a **source**-endpoint drag looks for a new
+source handle, and `CardNode` offered only target handles mid-drag, so the
+gesture had nowhere to land. It now reads the role off the drag —
+`connection.fromHandle.type` — which changes nothing for an ordinary connection.
+
+Also from that round: Radix portals through the fiber tree, so the listbox's
+Escape *did* reach the picker's handler and one press closed the list and
+cancelled the connection together; the trigger's `data-state` now separates the
+two layers. A refused toolbar Delete published a sentence no surface rendered.
+And `endpointChoices` spread an `EdgeSelection` into the proposal, whose own
+`kind` silently turned every reconnect question into a connect one — the
+`EdgeSubject` refactor's one sharp edge, now destructured at all four sites and
+guarded by a test that reads the commands context an Edge really gets.
+
+Of the three browser scenarios the design names, `pointer reconnection callback
+order` is now built (with endpoint-delete, off-canvas-restore and the Card-body
+drop beside it). The other two were already proven under different names in
+`new-space.spec.ts`; the one gap there — that the frozen preview is still on
+screen at the moment of an off-canvas release — is now asserted rather than
+assumed.
+
 The original brief follows.
 
 Build the accepted Edge Authoring module in

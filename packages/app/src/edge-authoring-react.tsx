@@ -19,12 +19,17 @@ import {
   type OnConnectStart,
   type OnReconnect,
 } from '@xyflow/react';
-import type { Card, CardId, Graph, GraphEdge, GraphId } from '@project/core';
+import type { Card, CardId, Graph, GraphId } from '@project/core';
 import { uuidSchema } from '@project/core';
 import type { CardFlowNode } from '@project/react-flow-adapter';
 import { CardPicker, type CardChoice } from '@project/ui';
 import { newCardDrop, type DropTarget, type EdgeAuthoring } from './edge-authoring';
-import { edgeSelectionOf, sameSelection, type CanvasSelection } from './render-adapter';
+import {
+  edgeSelectionOf,
+  sameSelection,
+  type CanvasSelection,
+  type EdgeSubject,
+} from './render-adapter';
 import type { EdgeEndpoint } from './space-authoring';
 import { AuthorableEdge } from './components/AuthorableEdge';
 import { EdgeAuthoringContext } from './components/edge-authoring-context';
@@ -99,7 +104,7 @@ export interface EdgeAuthoringInput {
   /** Edge authoring is withdrawn before an arrangement resolves and while presenting. */
   readonly enabled: boolean;
   readonly onSelectCard: (cardId: CardId) => void;
-  readonly onSelectEdge: (graphId: GraphId, edge: GraphEdge) => void;
+  readonly onSelectEdge: (subject: EdgeSubject) => void;
 }
 
 const EDGE_TYPES: EdgeTypes = { routed: AuthorableEdge };
@@ -194,7 +199,27 @@ export function useEdgeAuthoring({
     );
   }, []);
 
+  /**
+   * **React Flow drives a reconnect drag through the connection callbacks too**,
+   * and the pair below is what keeps that from eating the reconnection.
+   *
+   * `EdgeUpdateAnchors` calls `onReconnectStart` and then the store's
+   * `onConnectStart`, and on release the store's `onConnectEnd` before
+   * `onReconnectEnd`. So a reconnect drag arrives here as a *connection*
+   * starting from the endpoint that stays put: without this flag
+   * `beginPointerConnect` replaces the reconnect draft the line before had
+   * installed, `reconnect()` then finds no drafted Edge and silently authors
+   * nothing — and an Alt-held release would author a Card and an Edge from the
+   * wrong end. The reconnect callbacks own the whole gesture; these two stand
+   * down for its duration.
+   *
+   * A ref rather than state because both reads happen inside React Flow's own
+   * event, before any render could deliver a new value.
+   */
+  const reconnecting = useRef(false);
+
   const handleConnectStart = useCallback<OnConnectStart>((event, params) => {
+    if (reconnecting.current) return;
     connecting.current = true;
     setPointerOver('off-canvas');
     setModifierHeld('altKey' in event && event.altKey);
@@ -211,6 +236,8 @@ export function useEdgeAuthoring({
 
   const handleConnectEnd = useCallback<OnConnectEnd>(
     (event, connection) => {
+      // A reconnect release reaches here first; `onReconnectEnd` owns it.
+      if (reconnecting.current) return;
       const drop =
         connection.fromNode === null || !('altKey' in event) || !('clientX' in event)
           ? null
@@ -264,14 +291,26 @@ export function useEdgeAuthoring({
     if (over === 'empty-canvas') setModifierHeld(event.altKey);
   }, []);
 
+  /**
+   * **`handleType` names the endpoint that stays, not the one being dragged.**
+   *
+   * React Flow hands `onReconnectStart` the *opposite* handle's type: taking
+   * hold of the source anchor reports `'target'`, because the target is the end
+   * the connection is now anchored at. So `'target'` means the author is moving
+   * `from`, and `'source'` means they are moving `to` — the inverse of how it
+   * reads. Only the draft depends on this; `handleReconnect` recomputes the
+   * endpoint from the proposed connection, which is why getting it wrong here
+   * showed up as a cancelled drag returning focus to the wrong Card rather than
+   * as a wrong Edit.
+   */
   const handleReconnectStart = useCallback(
     (_event: unknown, edge: Edge, handleType: 'source' | 'target') => {
+      reconnecting.current = true;
       const subject = edgeSelectionOf(edge);
       if (subject === null) return;
       latest.current.authoring.beginPointerReconnect(
-        subject.graphId,
-        subject.edge,
-        handleType === 'source' ? 'from' : 'to',
+        subject,
+        handleType === 'target' ? 'from' : 'to',
       );
     },
     [],
@@ -327,9 +366,7 @@ export function useEdgeAuthoring({
           state.toNode !== null
             ? 'connection-target'
             : dropTargetOf(document.elementFromPoint(event.clientX, event.clientY));
-        if (over === 'empty-canvas') {
-          latest.current.authoring.deleteEdge(subject.graphId, subject.edge);
-        }
+        if (over === 'empty-canvas') latest.current.authoring.deleteEdge(subject);
       }
       // Whatever it produced, the drag is over: the draft goes and a refusal's
       // sentence stays, exactly as a connection drag ends.
@@ -341,7 +378,7 @@ export function useEdgeAuthoring({
   const deleteEdges = useCallback((requested: readonly Edge[]) => {
     for (const edge of requested) {
       const subject = edgeSelectionOf(edge);
-      if (subject !== null) latest.current.authoring.deleteEdge(subject.graphId, subject.edge);
+      if (subject !== null) latest.current.authoring.deleteEdge(subject);
     }
   }, []);
 
@@ -437,7 +474,7 @@ export function useEdgeAuthoring({
             // to an Edge followed by Delete would act on whatever was selected
             // before. This is the bridge that makes the two agree.
             onFocus: () => {
-              if (interactive) onSelectEdge(subject.graphId, subject.edge);
+              if (interactive) onSelectEdge(subject);
             },
             onBlur: repairFocus,
           },
@@ -454,7 +491,10 @@ export function useEdgeAuthoring({
    * shown disabled with its reason rather than dropped from the list.
    */
   const endpointChoices = useCallback(
-    (graphId: GraphId, edge: GraphEdge, endpoint: EdgeEndpoint): CardChoice[] =>
+    // Destructured rather than spread: the caller holds an `EdgeSelection`,
+    // whose own `kind` would overwrite the proposal's and ask a different
+    // question of eligibility entirely.
+    ({ graphId, edge }: EdgeSubject, endpoint: EdgeEndpoint): CardChoice[] =>
       subjectCards.map((card) => {
         const eligibility = latest.current.authoring.eligibility({
           kind: 'reconnect',
@@ -533,13 +573,27 @@ export function useEdgeAuthoring({
         <div
           className="edge-connect-picker nopan nodrag nokey"
           data-testid="connect-target-picker"
-          // Escape cancels exactly one topmost Edge surface. While the Select's
-          // listbox is open Radix owns the key and closes it — its content is
-          // portalled, so that keydown never reaches here — and the next Escape,
-          // with focus back on the trigger inside this container, cancels the
-          // connection and returns the author to the source Card.
+          /*
+           * Escape cancels exactly one topmost Edge surface, and the open
+           * listbox is a surface above this one.
+           *
+           * **A portal is not an escape from the React tree.** Radix renders
+           * the listbox through `createPortal`, but React dispatches synthetic
+           * events along the *fiber* tree, so a keydown inside the portalled
+           * content still bubbles to this handler — and Radix's own Escape
+           * handling only calls `preventDefault`, never `stopPropagation`. One
+           * press would therefore close the listbox and cancel the connection
+           * together, leaving no way to back out of the list without losing the
+           * gesture.
+           *
+           * The trigger's `data-state` is what separates the two layers: while
+           * it reads `open` the press belongs to Radix, and the next one — with
+           * the list closed and focus back on the trigger — is this one's.
+           */
           onKeyDown={(event) => {
             if (event.key !== 'Escape') return;
+            const trigger = event.currentTarget.querySelector('[data-testid="connect-target"]');
+            if (trigger?.getAttribute('data-state') === 'open') return;
             event.stopPropagation();
             authoring.cancelDraft();
           }}

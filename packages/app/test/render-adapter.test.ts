@@ -379,7 +379,7 @@ describe('render adapter', () => {
     const store = adapter();
     store.getState().syncProjection(PROJECTED, [EDGE]);
 
-    store.getState().selectEdge(GRAPH_ID, { from: CARD_A, to: CARD_B });
+    store.getState().selectEdge({ graphId: GRAPH_ID, edge: { from: CARD_A, to: CARD_B } });
 
     expect(store.getState().selection).toEqual({
       kind: 'edge',
@@ -537,7 +537,7 @@ describe('render adapter', () => {
         uuidSchema.parse(CARD_A),
         SPARSE_PROJECTED,
       ),
-    ).toBe(CARD_A);
+    ).toEqual({ kind: 'completed', cardId: CARD_A });
 
     // C was rendered and is still not a member of this Layout.
     expect(session.getState().working.document.layouts?.[0]?.positions).toEqual({
@@ -563,7 +563,7 @@ describe('render adapter', () => {
         uuidSchema.parse(CARD_B),
         null,
       ),
-    ).toBe(CARD_B);
+    ).toEqual({ kind: 'completed', cardId: CARD_B });
 
     expect(store.getState().projection?.nodes.map((node) => node.id)).toEqual([CARD_A, CARD_B]);
   });
@@ -605,7 +605,7 @@ describe('render adapter', () => {
         uuidSchema.parse(CARD_A),
         PROJECTED,
       ),
-    ).toBe(CARD_A);
+    ).toEqual({ kind: 'completed', cardId: CARD_A });
 
     expect(session.getState().working.document.layouts?.[0]?.positions).toEqual({
       [CARD_A]: { x: 10, y: 20 },
@@ -662,7 +662,7 @@ describe('render adapter', () => {
         { x: 420, y: 360 },
         null,
       ),
-    ).toBe(CREATED_CARD_ID);
+    ).toEqual({ kind: 'completed', cardId: CREATED_CARD_ID });
 
     expect(session.getState().working.document.layouts?.[0]?.positions).toEqual({
       [CARD_A]: { x: 10, y: 20 },
@@ -691,7 +691,9 @@ describe('render adapter', () => {
         uuidSchema.parse(CARD_B),
         PROJECTED,
       ),
-    ).toBeNull();
+      // The reason travels with the outcome, so nothing asks eligibility a
+      // second time to recover the sentence it already had.
+    ).toEqual({ kind: 'refused', reason: 'This gesture is refused by the test.' });
 
     expect(spy.completions).toEqual([]);
     expect(spy.installs).toHaveLength(installedBefore);
@@ -711,7 +713,7 @@ describe('render adapter', () => {
         { x: 420, y: 360 },
         null,
       ),
-    ).toBeNull();
+    ).toEqual({ kind: 'refused', reason: 'This gesture is refused by the test.' });
 
     expect(spy.completions).toEqual([]);
     expect(spy.installs).toHaveLength(installedBefore);
@@ -860,7 +862,9 @@ describe('render adapter', () => {
         uuidSchema.parse(CARD_B),
         projected,
       ),
-    ).toBeNull();
+      // Not a refusal: the author is owed no sentence for a diagnostic, and a
+      // message already on screen must not be wiped by one.
+    ).toEqual({ kind: 'unavailable' });
 
     expect(reported).toHaveLength(1);
     expect(store.getState().projection).toBe(published);

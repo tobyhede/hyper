@@ -14,7 +14,7 @@ import {
   type OnEdgesChange,
   type OnNodesChange,
 } from '@xyflow/react';
-import type { Card, CardId, Graph, GraphEdge, GraphId } from '@project/core';
+import type { Card, CardId, Graph, GraphId } from '@project/core';
 import {
   nodeTypes,
   GraphConnectionLine,
@@ -24,7 +24,7 @@ import {
 import { activeGraphColor } from '../colors';
 import { useEdgeAuthoring } from '../edge-authoring-react';
 import type { EdgeAuthoring } from '../edge-authoring';
-import type { CanvasSelection } from '../render-adapter';
+import type { CanvasSelection, EdgeSubject } from '../render-adapter';
 import { MAX_ZOOM, OVERVIEW_FIT } from '../camera';
 import { OverviewCamera, PresentingCamera } from './cameras';
 
@@ -103,7 +103,7 @@ export interface SpaceCanvasProps {
   edgeAuthoring: EdgeAuthoring;
   selection: CanvasSelection;
   onSelectCard: (cardId: CardId) => void;
-  onSelectEdge: (graphId: GraphId, edge: GraphEdge) => void;
+  onSelectEdge: (subject: EdgeSubject) => void;
   /** The Cards this renderer's subject holds — what an Edge picker may offer. */
   subjectCards: readonly Card[];
   /** Exact neutral title shown by the transient empty-drop preview. */
