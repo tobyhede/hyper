@@ -5,7 +5,7 @@ import { Position, type NodeProps } from '@xyflow/react';
 import type { HTMLAttributes } from 'react';
 import { vi } from 'vitest';
 import { CardNode } from '../src/CardNode';
-import type { CardFlowNode, CardHandle } from '../src/projection';
+import type { CardFlowNode, CardHandle, CardNodeData } from '../src/projection';
 import { uuid } from './uuid';
 
 /**
@@ -74,6 +74,7 @@ const outHandle = (graph: typeof graphId, offsetY: number): CardHandle => ({
 interface Overrides {
   selected?: boolean;
   title?: string;
+  kind?: CardNodeData['kind'];
   titleEditingEnabled?: boolean;
   cardEditingEnabled?: boolean;
   editingTitle?: boolean;
@@ -88,6 +89,7 @@ interface Overrides {
 function props({
   selected = false,
   title = 'A',
+  kind = 'markdown',
   titleEditingEnabled = false,
   cardEditingEnabled = false,
   editingTitle = false,
@@ -113,6 +115,7 @@ function props({
     data: {
       cardId,
       title,
+      kind,
       titleEditingEnabled,
       cardEditingEnabled,
       editingTitle,

@@ -296,6 +296,39 @@ describe('render adapter', () => {
     expect(store.getState().selectedCardId).toBeNull();
   });
 
+  /**
+   * The seeding `reconcile` performs has a window in front of it, and a node
+   * change landing inside that window used to close it.
+   *
+   * Authoring selects a Card in the same tick it creates it, one render before
+   * the projection that first draws it — so `selectCard` records the id while no
+   * live node carries `selected`. React Flow measures anything it renders and
+   * reports a `dimensions` change for it, which is enough to reach `changeNodes`
+   * before that projection lands. Reading the selection off the live nodes then
+   * finds none, writes `null` over the id, and `reconcile` seeds nothing: the
+   * Card arrives unselected, which is the exact failure the seeding exists to
+   * prevent, and `F2` stops working until a click repairs it.
+   *
+   * A selection this store holds for a Card the projection has not drawn yet is
+   * therefore left alone. Only a Card that *is* drawn can be reported unselected.
+   */
+  it('keeps a selection seeded for a Card the projection has not drawn yet', () => {
+    const store = adapter();
+    store.getState().syncProjection(PROJECTED, [EDGE]);
+
+    store.getState().selectCard(CREATED_CARD_ID);
+    store
+      .getState()
+      .changeNodes([{ type: 'dimensions', id: CARD_A, dimensions: { width: 260, height: 146 } }]);
+
+    expect(store.getState().selectedCardId).toBe(CREATED_CARD_ID);
+
+    store.getState().syncProjection([...PROJECTED, node(CREATED_CARD_ID, 900, 20)], [EDGE]);
+
+    const seeded = store.getState().projection?.nodes.find((each) => each.id === CREATED_CARD_ID);
+    expect(seeded?.selected).toBe(true);
+  });
+
   it('publishes a new Graph Edge only with both endpoint handle declarations', () => {
     const store = adapter();
     store.getState().syncProjection(PROJECTED, []);
@@ -643,7 +676,7 @@ describe('render adapter', () => {
 
   /*
    * A queued completion has not happened yet: the Edit it is queued behind
-   * decides the Space it will run against, and it can still answer `no-edit`
+   * decides the Space it will run against, and it can still answer `unchanged`
    * there. Drawing the connection now publishes it for an Edge the Space has
    * not gained — the same failure as a refusal, one turn later. If the queued
    * Edit does land, the projection that follows it draws the Edge anyway.

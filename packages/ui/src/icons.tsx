@@ -94,6 +94,84 @@ export const EditIcon = () => (
   </svg>
 );
 
+/**
+ * The chevron a trigger draws to say it opens something.
+ *
+ * Shared by the Select trigger and the Add Card menu's second half — one glyph,
+ * because two triggers drawn a pixel apart in the same toolbar reading
+ * differently is the kind of drift a second inlined copy produces.
+ */
+export const ChevronDownIcon = () => (
+  <svg
+    width="14"
+    height="14"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
+    <path d="m6 9 6 6 6-6" />
+  </svg>
+);
+
+export const PlusIcon = () => (
+  <svg
+    width="14"
+    height="14"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    aria-hidden="true"
+  >
+    <path d="M12 5v14M5 12h14" />
+  </svg>
+);
+
+/**
+ * Inlined lucide `corner-down-right`, for the Card kind that shows another
+ * Card's content at a second position (ADR 0009). The house pattern is a
+ * hand-inlined SVG path, not an icon dependency.
+ */
+export const AliasIcon = ({ size = 14 }: { size?: number }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
+    <polyline points="15 10 20 15 15 20" />
+    <path d="M4 4v7a4 4 0 0 0 4 4h12" />
+  </svg>
+);
+
+/** A page with lines on it: the Card kind that owns the Markdown it draws. */
+export const MarkdownIcon = ({ size = 14 }: { size?: number }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.8"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
+    <path d="M6 3h8l4 4v14H6z" />
+    <path d="M14 3v4h4M9 12h6M9 16h6" />
+  </svg>
+);
+
 export const CheckIcon = () => (
   <svg
     width="14"

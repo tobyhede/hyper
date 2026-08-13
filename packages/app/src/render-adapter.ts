@@ -134,11 +134,24 @@ function consumeSettledMovedIds(
 function reconcile(
   current: readonly CardFlowNode[],
   projected: readonly CardFlowNode[],
+  selectedCardId: CardId | null,
 ): CardFlowNode[] {
   const byId = new Map(current.map((node) => [node.id, node]));
   return projected.map((node) => {
     const live = byId.get(node.id);
-    if (!live) return node;
+    // A Card the live list has never seen takes its selection from this store's
+    // own `selectedCardId`, because a projection carries none — `projectCardNodes`
+    // sets `data.selectedForAuthoring` and never the node's `selected`.
+    //
+    // The two notions have to be seeded together here or they never agree.
+    // Authoring selects a Card it has just created in the same tick it creates
+    // it, which is one render *before* the projection that first draws that
+    // Card: `selectCard` maps over the nodes it can see, and the new one is not
+    // among them yet. Without this the Card arrives unselected and stays that
+    // way — it reads as selected on screen, since `data.selectedForAuthoring`
+    // is right, while React Flow has no selected node at all. `F2` asks React
+    // Flow, so `F2` is what stops working, until any click repairs it.
+    if (!live) return { ...node, selected: node.id === selectedCardId };
     // `data`, `className` and `handles` are the projection's to own — they carry
     // the title, the description, the active/emphasis styling and the declared
     // handle geometry. Everything else is React Flow's runtime and belongs to the
@@ -170,7 +183,11 @@ export function createRenderAdapter(authoring: SpaceAuthoring): RenderAdapter {
     // moment anything downstream was told about the new one.
     syncProjection: (nodes, edges) => {
       const current = get().projection;
-      const reconciled = current === null ? [...nodes] : reconcile(current.nodes, nodes);
+      // The empty list rather than a separate branch for the first projection:
+      // it too may be the one that first draws a Card already selected, since
+      // `selectRenderer` clears the projection and a selection can be made
+      // before the next one lands.
+      const reconciled = reconcile(current?.nodes ?? [], nodes, get().selectedCardId);
       set({ projection: { nodes: reconciled, edges: [...edges] } });
       // Reporting geometry, not authoring it: a Card the selected Layout omits is
       // drawn in the fallback band and must stay unplaced.
@@ -220,11 +237,22 @@ export function createRenderAdapter(authoring: SpaceAuthoring): RenderAdapter {
       const beforeById = new Map(projection.nodes.map((node) => [node.id, node.position]));
       const nodes = applyNodeChanges(relevant, projection.nodes);
       const selectedNode = nodes.find((node) => node.selected);
+      // A selection held for a Card the projection has not drawn yet is a seed
+      // waiting for `reconcile`, and reading it off the live nodes would erase
+      // it. Authoring selects a Card in the same tick it creates it, one render
+      // before the projection that first draws it — and React Flow measures
+      // whatever it renders, so a `dimensions` change reaches here inside that
+      // window. Only a Card that *is* drawn can be reported unselected.
+      const pendingSeed = state.selectedCardId !== null && !owned.has(state.selectedCardId);
       // The same erasure again, read the same way. Parsing here instead would
       // put a throw on the per-pointer-frame path for a failure the other two
       // readings agree cannot happen — and `App` already uses `safeParse` at its
       // own React Flow boundary precisely so a mid-drag throw is impossible.
-      const selectedCardId = selectedNode ? (selectedNode.id as CardId) : null;
+      const selectedCardId = selectedNode
+        ? (selectedNode.id as CardId)
+        : pendingSeed
+          ? state.selectedCardId
+          : null;
       const afterById = new Map(nodes.map((node) => [node.id, node.position]));
       const positionChanges = relevant.filter(
         (change): change is NodePositionChange => change.type === 'position',
@@ -296,7 +324,12 @@ export function createRenderAdapter(authoring: SpaceAuthoring): RenderAdapter {
       // projection — accepting a stored Space drops it outright.
       const committed = get().projection;
       if (committed !== null && projected !== null) {
-        set({ projection: { ...committed, nodes: reconcile(committed.nodes, projected) } });
+        set({
+          projection: {
+            ...committed,
+            nodes: reconcile(committed.nodes, projected, get().selectedCardId),
+          },
+        });
       }
       return true;
     },

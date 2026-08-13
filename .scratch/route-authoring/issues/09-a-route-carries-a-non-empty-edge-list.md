@@ -171,3 +171,30 @@ re-deriving the table:
 Any one of those makes this cheap; none of them is worth doing *in order* to make
 it cheap. Left as `wontfix` rather than `needs-info` because no new information
 is being waited on — the decision is made on the evidence present.
+
+## Comments
+
+**2026-08-13 — verification sweep. Outcome unchanged, premise inverted; do not
+re-open as written.**
+
+The ticket argued the change was correct but uneconomic: "the domain already
+guarantees at least one Edge; only the type disagrees." That premise is now
+false. ADR 0040 creates a Layout's initial Active Graph **empty**, and ADR
+0045's Flow conversion returns exactly that, so an Edge-less Graph is ordinary
+authored state. `graphSchema.edges` is `z.array(graphEdgeSchema)` with no
+`.min(1)` (`packages/core/src/schema.ts:150`), and the docblock above it says
+so outright.
+
+Two consequences for anyone reading this ticket later:
+
+- `graphStartCard` returning `CardId | undefined` is now **correct**, not a
+  type disagreeing with the domain (`packages/graph/src/traversal.ts:78`).
+- The branch in `present()` the ticket wanted deleted is **reachable**, not
+  dead — see `packages/app/src/navigation.ts:346` and commit `4d1d36c`
+  "Refuse to present a Graph that holds no Edges".
+
+The three stated re-open triggers (property-test restructuring, a tuple-
+preserving `map`, shared fixtures) are therefore moot. The non-empty-tuple idea
+did land, but on a different value: `TraversalHistory` is
+`readonly [CardId, ...CardId[]]` (`navigation.ts:26`). `wontfix` stands and is
+now permanent.

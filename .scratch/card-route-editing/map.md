@@ -66,6 +66,39 @@ contains the authority order, cross-operation acceptance matrices, complete
 user journey, implementation sequence and proof obligations. Feature
 implementation remains a separate effort.
 
+Three tickets were raised by that implementation rather than by planning, and
+all three are now **resolved** by a maintainer decision session. Two ADRs came
+out of it and both are worth reading before touching the Card pane:
+**[0047](../../docs/adr/0047-a-shadcn-component-is-the-default-and-a-hand-roll-is-a-deviation.md)**
+(a shadcn component is the default, and a hand-roll is a deviation) and
+**[0048](../../docs/adr/0048-escape-and-commit-are-decided-by-the-surface-not-the-field.md)**
+(Escape and commit are decided by the surface, not the field).
+
+- [The Frame 5 Alias modifier gestures are unbuilt and
+  unowned](issues/15-frame-5-alias-modifier-gestures-are-unowned.md) —
+  **resolved**, split. Body drag is in scope as package **4b**; connection empty-drop
+  is out of scope and listed in the handoff with its reason, and the keyboard
+  contract's `Shift` assignment is narrowed to the half that is built.
+- [The content editor's Escape closes the pane over a dirty
+  draft](issues/16-the-content-editors-escape-closes-over-a-dirty-draft.md) —
+  **resolved**. Inside a pane, Escape is an alias of Cancel. The keyboard
+  contract's two-stage rule is withdrawn: it was never a primitive's behaviour,
+  and the pane's labelled Cancel button was already the gesture it duplicated.
+  The three in-pane field Escapes go; the Card Front's in-place Escape stays,
+  because blur is the commit there.
+- [Retargeting an Alias discards the content
+  draft](issues/17-retargeting-an-alias-discards-the-content-draft.md) —
+  **resolved by deletion, not by an answer.** The Target stops committing on
+  selection and pends to `Done` like every other field on the pane, so the
+  content editor never remounts under an open draft. All three answers this
+  ticket offered guarded a consequence of committing a form field on touch.
+
+One ticket is open, and it is the work those decisions imply:
+
+- [Rebuild the Card pane on Radix Dialog, with one submit over its
+  fields](issues/18-rebuild-the-card-pane-on-radix-dialog-and-one-submit.md) —
+  `ready-for-agent`, package **4a**, sequenced before 4b and 5.
+
 ## Out of scope
 
 - Creating or editing nested-Space Cards.

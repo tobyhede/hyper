@@ -1,8 +1,8 @@
 # A View takes Cards and Graphs and returns a Layout
 
 Status: accepted
-Refines: 0040
-Related: 0024, 0025, 0027, 0031, 0041
+Refines: 0040, 0041
+Related: 0024, 0025, 0027, 0031
 
 A View is an interface with two sides. It receives a subject — Cards, and zero or more Graphs — and renders it. When an author edits it, it returns everything needed to create a Layout: those Cards with their positions, and one or more Graphs. What a View does between those two sides is its own business, and this ADR deliberately says nothing about it.
 

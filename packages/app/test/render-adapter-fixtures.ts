@@ -12,6 +12,7 @@ export function node(id: string, x: number, y: number, title = id): CardFlowNode
     data: {
       cardId: uuidSchema.parse(id),
       title,
+      kind: 'markdown',
       sourceHandles: [],
       targetHandles: [],
       active: false,

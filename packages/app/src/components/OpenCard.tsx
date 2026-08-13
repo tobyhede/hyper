@@ -1,40 +1,26 @@
-import {
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-  type ComponentType,
-  type FormEvent,
-  type KeyboardEvent as ReactKeyboardEvent,
-  type MouseEvent as ReactMouseEvent,
-} from 'react';
-import { markdownCardSchema, type Card } from '@project/core';
+import { useState, type ComponentType, type FormEvent } from 'react';
+import { markdownCardSchema, type Card, type CardId } from '@project/core';
 import type { ResolvedContentCard } from '@project/graph';
 import { Button } from '@project/ui';
+import { CardPane } from './CardPane';
+import { CardPicker } from './CardPicker';
 
 /**
- * Exactly the three element kinds the pane contains, all of them always enabled
- * and always tabbable. Links, explicit `tabindex` and a `disabled` filter would
- * each guard a state no editor here can reach; add them back alongside whatever
- * introduces one.
+ * The control that abandons the pane, marked so a field which commits on blur
+ * can tell that this particular blur is not a commit.
  *
- * One selector, because the two things it answers have to agree: what `Tab`
- * cycles through, and what a mousedown is allowed to move focus onto. A control
- * missing from one list and present in the other is either unreachable by
- * keyboard or a way out of the pane by pointer.
+ * `<button>` is in `PANE_FOCUSABLE`, deliberately — the pane's containment lets
+ * a pointer move focus onto its own controls — so a mousedown on Cancel blurs
+ * whatever field the author was in, and it does so *before* the click that
+ * closes the pane. A field that commits on blur therefore commits the very
+ * edit Cancel exists to abandon, and the pane is gone before the author can
+ * see it happen. Both halves of the contract are written here because one small
+ * module owns both ends of it.
  */
-const PANE_FOCUSABLE = 'input, textarea, button';
-
-/**
- * Everything inside the pane a `Tab` can land on, in document order.
- *
- * Queried on each `Tab` rather than cached: the editor grows and loses field
- * errors as an author types, and a cached list would send focus to a node that
- * has since been unmounted.
- */
-const focusableWithin = (root: HTMLElement): readonly HTMLElement[] => [
-  ...root.querySelectorAll<HTMLElement>(PANE_FOCUSABLE),
-];
+const PANE_CANCEL_ATTRIBUTE = 'data-pane-cancel';
+const paneCancelProps = { [PANE_CANCEL_ATTRIBUTE]: '' };
+const abandonsThePane = (target: EventTarget | null): boolean =>
+  target instanceof Element && target.closest(`[${PANE_CANCEL_ATTRIBUTE}]`) !== null;
 
 /**
  * `Content` rather than `Card`, which is the domain type imported above: a
@@ -133,7 +119,7 @@ function MarkdownCardEditor({
 
   return (
     <form
-      className="open-card__editor"
+      className="card-pane__editor"
       onSubmit={submit}
       // Escape is the editor's own cancel, and it has to be taken here rather
       // than left to bubble: the window listener that closes an opened Card
@@ -150,10 +136,10 @@ function MarkdownCardEditor({
     >
       {titleEditable && (
         <>
-          <label className="open-card__field">
+          <label className="card-pane__field">
             <span>Title</span>
             <input
-              className="open-card__title-input"
+              className="card-pane__title-input"
               aria-invalid={titleError !== null}
               aria-describedby={titleError === null ? undefined : 'open-card-title-error'}
               value={title}
@@ -164,13 +150,13 @@ function MarkdownCardEditor({
             />
           </label>
           {titleError !== null && (
-            <span id="open-card-title-error" role="alert" className="open-card__field-error">
+            <span id="open-card-title-error" role="alert" className="card-pane__field-error">
               {titleError}
             </span>
           )}
         </>
       )}
-      <label className="open-card__field">
+      <label className="card-pane__field">
         <span>{titleEditable ? 'Description' : `Description of ${card.title}`}</span>
         <input
           aria-invalid={descriptionError !== null}
@@ -183,16 +169,16 @@ function MarkdownCardEditor({
         />
       </label>
       {descriptionError !== null && (
-        <span id="open-card-description-error" role="alert" className="open-card__field-error">
+        <span id="open-card-description-error" role="alert" className="card-pane__field-error">
           {descriptionError}
         </span>
       )}
-      <label className="open-card__field open-card__field--source">
+      <label className="card-pane__field card-pane__field--source">
         <span>{titleEditable ? 'Markdown source' : `Markdown source of ${card.title}`}</span>
         <textarea value={body} onChange={(event) => setBody(event.currentTarget.value)} />
       </label>
-      <div className="open-card__actions">
-        <Button type="button" variant="secondary" onClick={onCancel}>
+      <div className="card-pane__actions">
+        <Button type="button" variant="secondary" {...paneCancelProps} onClick={onCancel}>
           Cancel
         </Button>
         <Button type="submit" variant="default">
@@ -235,6 +221,125 @@ interface DirectOpen {
   readonly card: ResolvedContentCard;
   readonly through?: never;
   readonly content?: never;
+  readonly occurrence?: never;
+}
+
+/**
+ * Authoring the occurrence itself, from the editor it was opened in.
+ *
+ * `through` below names the Card the content was reached through; this is what
+ * may be authored *on* it — its own title, and which Card it points at. Offered
+ * by the caller rather than derived from the opened Card's kind, for the same
+ * reason delegation itself is declared: an occurrence that resolves its content
+ * elsewhere is not necessarily one whose title and pointer an author may move.
+ * Absent, the pane authors the content and nothing else.
+ *
+ * One capability rather than two optional props, because both are offered on
+ * exactly one fact — this occurrence is an Alias (ADR 0009) — and a caller able
+ * to supply the Target without the Title is a caller able to rebuild the pane
+ * that could retarget an Alias it could not rename.
+ */
+interface OccurrenceAuthoring {
+  /**
+   * Rename the occurrence, answering the sentence to show when the Space
+   * refused it. Its own edit subject: the title is the occurrence's and the
+   * fields under it are the content owner's, so this completes nothing there.
+   */
+  readonly onRename: (title: string) => string | null;
+  /** The Cards this occurrence may point at — non-Alias Cards (ADR 0009). */
+  readonly targets: readonly Card[];
+  /** Retarget, answering the sentence to show when the Space refused it. */
+  readonly onRetarget: (target: CardId) => string | null;
+}
+
+/**
+ * The occurrence's own title — the Alias's, never the content owner's.
+ *
+ * Committed on Enter and on blur, which is the rule the graph's in-place rename
+ * already follows (`CardTitleEditor`), and cancelled by an Escape that restores
+ * the stored title where there is a draft to restore — and only then, on a
+ * second press, closes the pane out from over it. It is deliberately not
+ * carried by the pane's `Done`: that button completes the *content* Card, and
+ * the Target beside this field already commits the moment it is chosen, so the
+ * occurrence's two fields settle as they are edited and the content editor
+ * keeps its own submit.
+ *
+ * A draft equal to the stored title is not submitted at all. Authoring would
+ * answer `unchanged`, which is the same nothing — this only spares the round
+ * trip a blur makes every time an author tabs past an untouched field.
+ */
+function OccurrenceTitleEditor({
+  title,
+  onRename,
+  onCancel,
+}: {
+  readonly title: string;
+  readonly onRename: (title: string) => string | null;
+  readonly onCancel: () => void;
+}) {
+  const [draft, setDraft] = useState(title);
+  const [error, setError] = useState<string | null>(null);
+
+  const complete = (): void => {
+    setError(draft === title ? null : onRename(draft));
+  };
+
+  return (
+    <>
+      <label className="card-pane__field">
+        <span>Title</span>
+        <input
+          className="card-pane__title-input"
+          aria-invalid={error !== null}
+          aria-describedby={error === null ? undefined : 'open-card-occurrence-title-error'}
+          value={draft}
+          onChange={(event) => {
+            setDraft(event.currentTarget.value);
+            setError(null);
+          }}
+          // A blur on its way to Cancel is not a commit. Every other blur is:
+          // tabbing on, clicking a field below, or leaving the pane entirely
+          // all settle the rename, which is the rule the graph's in-place
+          // rename already follows.
+          onBlur={(event) => {
+            if (abandonsThePane(event.relatedTarget)) return;
+            complete();
+          }}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter') {
+              event.preventDefault();
+              complete();
+              return;
+            }
+            if (event.key !== 'Escape') return;
+            // Taken here rather than left to bubble, for the reason the content
+            // editor takes it: the window listener that closes an opened Card is
+            // registered the whole time one is open, and one keypress may only
+            // be consumed by one owner.
+            event.preventDefault();
+            event.stopPropagation();
+            // Which owner that is depends on whether this field is holding
+            // anything: "Dirty field restores value before surface closes". A
+            // draft takes the first Escape and puts back what the Card is
+            // stored as — the message from a refused rename with it, since an
+            // alert describing a draft outlives it otherwise — and only a field
+            // with nothing to restore hands the gesture on to the pane.
+            if (draft !== title) {
+              setDraft(title);
+              setError(null);
+              return;
+            }
+            onCancel();
+          }}
+        />
+      </label>
+      {error !== null && (
+        <span id="open-card-occurrence-title-error" role="alert" className="card-pane__field-error">
+          {error}
+        </span>
+      )}
+    </>
+  );
 }
 
 /**
@@ -251,6 +356,13 @@ interface DelegatedOpen {
   readonly through: Card;
   /** The Card that owns the content reached through the occurrence above. */
   readonly content: ResolvedContentCard;
+  /**
+   * The one canonical place an Alias's own title and Target change (ADR 0009's
+   * storyboard). Optional, because delegation and authoring the occurrence are
+   * different capabilities: the pane draws the two fields when it is given one
+   * and nothing when it is not.
+   */
+  readonly occurrence?: OccurrenceAuthoring;
   readonly card?: never;
 }
 
@@ -290,9 +402,9 @@ export type OpenCardProps = {
  * non-difference is gone, along with the action that crossed it — and so, now,
  * is the component, which outlived its last caller by one release.
  *
- * A modal dialog, because it covers the graph and the graph stays focusable:
- * React Flow measures its nodes and keeps them in the tab order, so `inert` is
- * not available and the containment is this component's own.
+ * The surface it is drawn on — the covering panel and its focus containment —
+ * is `CardPane`, shared with the Alias creation state. What is left here is
+ * what the pane is *for*: which Card is being authored, and by which editor.
  *
  * Source, still — not rendered prose. ADR 0011 removed the reading pane's
  * Markdown renderer so a card could not read one way and present another, and
@@ -304,7 +416,6 @@ export type OpenCardProps = {
  */
 export function OpenCard(props: OpenCardProps) {
   const { onComplete, onCancel } = props;
-  const panel = useRef<HTMLDivElement>(null);
   // The one place the variant is read. A direct open is one Card being its own
   // content, so the pair below cannot disagree; a delegated one carries two,
   // and `delegated` is what the caller declared rather than a `kind` this
@@ -313,129 +424,90 @@ export function OpenCard(props: OpenCardProps) {
     props.through === undefined
       ? { delegated: false, opened: props.card, content: props.card }
       : { delegated: true, opened: props.through, content: props.content };
-
-  /**
-   * The pane takes focus while it is open. Where focus goes when it *closes* is
-   * not this component's to decide — see `App`, which returns it to the Card.
-   *
-   * Restoring from here was tried and is wrong twice over. The obvious capture,
-   * `document.activeElement` on mount, is the control that opened the Card — and
-   * the app unmounts that control while a Card is open, since `titleEditingEnabled`
-   * goes false and the affordance goes with it, so by closing time the captured
-   * element is detached and focus lands on `<body>`. Worse, a cleanup that only
-   * restores is not idempotent, which `StrictMode` requires rather than prefers:
-   * React double-invokes effects as mount → cleanup → mount, so the restore ran
-   * *immediately* after opening, moved focus to a control about to be removed,
-   * and left the pane with no focus at all — `containTab` never fired, because it
-   * is bound to the panel.
-   *
-   * Focus is taken here rather than by `autoFocus` on the field for that same
-   * reason: `autoFocus` fires once, on the real mount, so it cannot answer a
-   * simulated cleanup that follows it. Taking focus in the setup half can.
-   */
-  useEffect(() => {
-    const pane = panel.current;
-    if (pane !== null) focusableWithin(pane)[0]?.focus();
-  }, []);
-
-  /**
-   * Keep `Tab` inside the pane.
-   *
-   * The graph behind is not `inert` — React Flow needs its nodes measurable, and
-   * a node keeps `tabIndex=0` outside presenting — so without this, `Tab` walks
-   * out of the editor onto Cards that answer `Enter` by opening themselves.
-   * Wrapping at both ends is the whole of it; the pane's controls are few and
-   * always present.
-   */
-  const containTab = useCallback((event: ReactKeyboardEvent<HTMLDivElement>): void => {
-    if (event.key !== 'Tab' || panel.current === null) return;
-    const focusable = focusableWithin(panel.current);
-    const first = focusable[0];
-    const last = focusable[focusable.length - 1];
-    if (first === undefined || last === undefined) return;
-    // The handler sits on the panel, so the active element is always inside it.
-    const active = document.activeElement;
-    if (event.shiftKey && active === first) {
-      event.preventDefault();
-      last.focus();
-    } else if (!event.shiftKey && active === last) {
-      event.preventDefault();
-      first.focus();
-    }
-  }, []);
-
-  /**
-   * Keep the pointer from putting focus where `containTab` cannot see it.
-   *
-   * `containTab` is bound to the panel, so it only ever answers a `Tab` pressed
-   * while focus is already inside — and a mousedown on anything unfocusable
-   * moves focus to `<body>`, where it never fires at all. `Tab` then walks the
-   * document from the top, into the toolbar and on to the Card nodes the pane
-   * covers, which is the escape the containment exists to close. Two surfaces
-   * reach it: the backdrop, always visible because the panel letterboxes inside
-   * it, and the panel's own padding and gaps.
-   *
-   * Preventing the default leaves focus where it already was, which is the one
-   * answer that needs no opinion about where it should go instead. It is
-   * prevented only where the default would take focus *out* of the pane: a
-   * mousedown on a control keeps its default, or clicking a field would not put
-   * the caret in it. A label's text is not a control and is prevented, and the
-   * field still focuses — a label focuses what it names on `click`, which this
-   * does not cancel. The cost is that the pane's static text no longer
-   * drag-selects; it is two spans of banner and three field labels.
-   */
-  const containFocus = useCallback((event: ReactMouseEvent<HTMLDivElement>): void => {
-    const target = event.target;
-    if (target instanceof Element && target.closest(PANE_FOCUSABLE) !== null) return;
-    event.preventDefault();
-  }, []);
+  const occurrence = props.through === undefined ? undefined : props.occurrence;
+  const [retargetRefusal, setRetargetRefusal] = useState<string | null>(null);
 
   return (
-    <div className="open-card" data-testid="open-card" onMouseDown={containFocus}>
-      <div
-        ref={panel}
-        className="open-card__panel"
-        role="dialog"
-        aria-modal="true"
-        // Named for the Card, which is the only thing distinguishing one opened
-        // Card from another. Directly opened, that title is also the first
-        // field, so a screen reader hears the name and then lands on the
-        // control that changes it.
-        //
-        // Delegated, the two Cards are different Cards and the name has to say
-        // both: named only for the content owner, opening `A′` announced a
-        // dialog called `A`, which is neither what the author opened nor
-        // something this pane lets them rename. The delegation banner is the
-        // only other signal and it is plain text, so a reader landing on
-        // Description hears no name at all for the occurrence it came from.
-        // `aria-describedby` onto that banner was the alternative and it fixes
-        // the wrong half: a description is heard after the name, and the name
-        // would still be a Card the author did not open.
-        aria-label={
-          delegated ? `${opened.title} — editing content on ${content.title}` : content.title
-        }
-        onKeyDown={containTab}
-      >
-        {delegated && (
-          <div className="open-card__delegation">
-            <span>Opened through {opened.title}</span>
-            <span>Editing content on {content.title}</span>
-          </div>
-        )}
-        {/* Keyed by opened occurrence and content owner, because the draft is
-            seeded once and then owned by the editor. Reusing one would carry a
-            previous Card's draft under the next Card's identity. */}
-        <ResolvedContentEditor
-          key={`${opened.id}:${content.id}`}
-          card={content}
-          titleEditable={!delegated}
-          onComplete={(completed) => {
-            onComplete(completed);
-            onCancel();
-          }}
-          onCancel={onCancel}
-        />
-      </div>
-    </div>
+    <CardPane
+      testId="open-card"
+      // Named for the Card, which is the only thing distinguishing one opened
+      // Card from another. Directly opened, that title is also the first
+      // field, so a screen reader hears the name and then lands on the
+      // control that changes it.
+      //
+      // Delegated, the two Cards are different Cards and the name has to say
+      // both: named only for the content owner, opening `A′` announced a
+      // dialog called `A`, which is neither what the author opened nor
+      // something this pane lets them rename. The delegation banner is the
+      // only other signal and it is plain text, so a reader landing on
+      // Description hears no name at all for the occurrence it came from.
+      // `aria-describedby` onto that banner was the alternative and it fixes
+      // the wrong half: a description is heard after the name, and the name
+      // would still be a Card the author did not open.
+      ariaLabel={
+        delegated ? `${opened.title} — editing content on ${content.title}` : content.title
+      }
+    >
+      {delegated && (
+        <div className="card-pane__delegation">
+          <span>Opened through {opened.title}</span>
+          <span>Editing content on {content.title}</span>
+        </div>
+      )}
+      {occurrence !== undefined && (
+        // The occurrence's own two fields, above the content the Target owns:
+        // what this Card is called and *which* Card it shows come before the
+        // fields that author that Card (ADR 0009's Frame 4).
+        <div className="card-pane__occurrence">
+          {/* Keyed by the occurrence, so a second Alias of the same content
+              cannot inherit the first one's draft — the same reason the content
+              editor below is keyed by both ids. */}
+          <OccurrenceTitleEditor
+            key={opened.id}
+            title={opened.title}
+            onRename={occurrence.onRename}
+            onCancel={onCancel}
+          />
+          <CardPicker
+            label="Target"
+            cards={occurrence.targets}
+            selectedId={content.id}
+            // Frame 4 asks for no focus change, so the pane's ordinary rule
+            // holds and the open lands on the Title above this.
+            initialFocus={false}
+            onSelect={(target) => setRetargetRefusal(occurrence.onRetarget(target))}
+            // Escape past an empty search is the pane's to answer, exactly as
+            // it is in every other field here.
+            onCancel={onCancel}
+            emptyMessage="This Space holds no other Card that owns its content."
+          />
+          {retargetRefusal !== null && (
+            <span role="alert" className="card-pane__field-error">
+              {retargetRefusal}
+            </span>
+          )}
+        </div>
+      )}
+      {/* Keyed by opened occurrence and content owner, because the draft is
+          seeded once and then owned by the editor. Reusing one would carry a
+          previous Card's draft under the next Card's identity.
+
+          A completed retarget changes `content.id`, so it remounts this editor
+          and discards whatever was typed into it. Do not answer that by
+          relaxing the key — a draft surviving into the new Target's editor is
+          committed to the new Target on Done, which is the worse loss, and two
+          tests hold the key for that reason. What should happen instead is
+          undecided: issue `17` in `.scratch/card-route-editing/issues/`. */}
+      <ResolvedContentEditor
+        key={`${opened.id}:${content.id}`}
+        card={content}
+        titleEditable={!delegated}
+        onComplete={(completed) => {
+          onComplete(completed);
+          onCancel();
+        }}
+        onCancel={onCancel}
+      />
+    </CardPane>
   );
 }

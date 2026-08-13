@@ -19,7 +19,7 @@
  * overwhelmingly 16:9, and that is the worst case to letterbox.
  *
  * This couples the surfaces deliberately. The frame an opened or presented card
- * is drawn in (`.open-card__panel`) uses the same ratio. **If one changes, change
+ * is drawn in (`.card-pane__panel`) uses the same ratio. **If one changes, change
  * the other** — a mismatch would make the graph misrepresent what an audience
  * sees, and would break outright if the "show full content" view of ADR 0006
  * arrives and a card becomes a live preview of a slide.

@@ -189,7 +189,11 @@ test('editing through an Alias updates its target and survives reload', async ({
   await openCard(alias, 'A′');
   await expect(page.getByText('Opened through A′')).toBeVisible();
   await expect(page.getByText('Editing content on A')).toBeVisible();
-  await expect(page.getByRole('textbox', { name: 'Title' })).toHaveCount(0);
+  // The Title is the *occurrence's* own, and this line is what says so: it read
+  // `toHaveCount(0)` and pinned a pane that could not rename the Alias it was
+  // opened on at all. What it was guarding — that no field here renames the Card
+  // that owns the content — is the value, not the absence.
+  await expect(page.getByRole('textbox', { name: 'Title' })).toHaveValue('A′');
   // Named for the Card they author, exactly, because A′ carries a description of
   // its own on the graph behind this pane and these fields do not write it.
   await page
@@ -1060,7 +1064,7 @@ test('an opened Card keeps Tab inside it, so the graph behind cannot take focus'
   await expect(page.getByRole('textbox', { name: 'Title' })).toBeFocused();
 
   const withinPane = () =>
-    page.evaluate(() => document.activeElement?.closest('.open-card__panel') !== null);
+    page.evaluate(() => document.activeElement?.closest('.card-pane__panel') !== null);
 
   // More presses than the pane has controls, so a leak shows as focus landing on
   // the toolbar or a Card rather than wrapping back to the first field.
@@ -1094,18 +1098,18 @@ test('an opened Card keeps Tab inside it after a click that focuses nothing', as
   await expect(page.getByRole('textbox', { name: 'Title' })).toBeFocused();
 
   const withinPane = () =>
-    page.evaluate(() => document.activeElement?.closest('.open-card__panel') !== null);
+    page.evaluate(() => document.activeElement?.closest('.card-pane__panel') !== null);
 
   // The overlay's top-left corner is inside its 2rem padding, so it is backdrop
   // whatever the viewport does to the panel it letterboxes.
-  await page.locator('.open-card').click({ position: { x: 4, y: 4 } });
+  await page.locator('.card-pane').click({ position: { x: 4, y: 4 } });
   expect(await withinPane(), 'focus left the pane when the backdrop was clicked').toBe(true);
   await page.keyboard.press('Tab');
   expect(await withinPane(), 'focus left the pane on the Tab after a backdrop click').toBe(true);
 
   // And the panel's own corner, which is its 1rem padding ring — inside the
   // pane, and no more focusable than the backdrop.
-  await page.locator('.open-card__panel').click({ position: { x: 4, y: 4 } });
+  await page.locator('.card-pane__panel').click({ position: { x: 4, y: 4 } });
   expect(await withinPane(), 'focus left the pane when its padding was clicked').toBe(true);
   await page.keyboard.press('Tab');
   expect(await withinPane(), 'focus left the pane on the Tab after a padding click').toBe(true);
@@ -1144,4 +1148,249 @@ test('closing an opened Card returns focus to the Card, not the document', async
   // And the Card answers the key it advertises, without a Tab in between.
   await page.keyboard.press('Enter');
   await expect(page.getByTestId('open-card')).toBeVisible();
+});
+
+/**
+ * Add Card from an Algorithmic View: one conversion, and the naming that
+ * follows it.
+ *
+ * The fixture opens in Flow because it declares no `defaultView`, so this is the
+ * ordinary first Edit an author makes. Two things are being watched that a unit
+ * test cannot see: that the conversion happens exactly once — the fixture's own
+ * two Layouts plus one, not two — and that the created Card really is under the
+ * caret, in a browser where focus is the browser's to give.
+ */
+test('Add Card converts an Algorithmic View once and names the Card in place', async ({ page }) => {
+  await page.goto('/');
+  await expect(nodeByTitle(page, 'A').first()).toBeVisible();
+  await settled(page);
+  const before = await allPositions(page);
+  const addCard = page.getByTestId('add-card');
+  await expect(addCard).toBeEnabled();
+
+  await addCard.click();
+
+  const title = page.getByRole('textbox', { name: 'Card title' });
+  await expect(title).toBeFocused();
+  await expect(title).toHaveValue('Card 1');
+  await expect(page.getByTestId('layout-selector')).toContainText('Layout 1');
+  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
+  // Converting moves nothing: the Cards on screen keep the positions the View
+  // computed for them (ADR 0025).
+  const after = await allPositions(page);
+  for (const [id, position] of Object.entries(before)) {
+    expect(after[id], `card ${id} moved`).toEqual(position);
+  }
+
+  await title.fill('Consequences');
+  await title.press('Enter');
+
+  await expect(nodeByTitle(page, 'Consequences')).toBeVisible();
+  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '2');
+  // One conversion, so one new Layout beside the two the fixture declares.
+  await page.getByTestId('layout-selector').click();
+  await expect(page.getByRole('option')).toHaveCount(3);
+  await page.keyboard.press('Escape');
+});
+
+/**
+ * The Alias creation state is local and creates nothing (ADR 0042).
+ *
+ * Cancelling it must leave the Space exactly as it was — no Card, no conversion,
+ * no commit — and must leave focus somewhere an author can carry on from. The
+ * revision assertion needs `quiescent`: "still 0" passes instantly against a
+ * commit that has not happened yet.
+ */
+test('cancelling the Alias Target picker creates nothing', async ({ page }) => {
+  await page.goto('/');
+  await expect(nodeByTitle(page, 'A').first()).toBeVisible();
+  await settled(page);
+  const nodes = await page.locator('.react-flow__node').count();
+
+  await page.getByTestId('add-card-menu').click();
+  await page.getByRole('menuitem', { name: 'Add Alias' }).click();
+  const search = page.getByRole('combobox', { name: 'Target' });
+  await expect(search).toBeFocused();
+  await search.fill('A');
+
+  // The field draft takes the first Escape, the surface the second.
+  await search.press('Escape');
+  await expect(search).toHaveValue('');
+  await expect(page.getByTestId('new-alias')).toBeVisible();
+  await search.press('Escape');
+
+  await expect(page.getByTestId('new-alias')).toHaveCount(0);
+  await quiescent(page);
+  await expect(page.locator('.react-flow__node')).toHaveCount(nodes);
+  await expect(page.getByTestId('layout-selector')).toContainText('None');
+  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '0');
+  await expect(page.getByTestId('add-card-menu')).toBeFocused();
+});
+
+/**
+ * The pane's controls stay reachable when the pane cannot fit its content.
+ *
+ * `.card-pane__panel` is a fixed 16/9 frame that clips, and its width is clamped
+ * by viewport height — so on a short or narrow window the panel is smaller than
+ * what is in it. The opened-Card editor survives that because its Markdown field
+ * absorbs the squeeze, but the Alias creation pane has no such field: heading,
+ * Title, list, hint and actions are all fixed. With the frame clipping and
+ * nothing inside it scrolling, Cancel and the refusal line simply fall off the
+ * bottom, and a wheel over the panel does nothing because `overflow: hidden`
+ * takes no wheel.
+ *
+ * 500px is below the ~620px where clipping begins, measured against this pane.
+ */
+test('keeps the Alias pane’s controls reachable on a short viewport', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 500 });
+  await page.goto('/');
+  await expect(nodeByTitle(page, 'A').first()).toBeVisible();
+  await settled(page);
+
+  await page.getByTestId('add-card-menu').click();
+  await page.getByRole('menuitem', { name: 'Add Alias' }).click();
+  const panel = page.locator('.card-pane__panel');
+  await expect(panel).toBeVisible();
+  const box = await panel.boundingBox();
+  if (box === null) throw new Error('the pane has no box');
+
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.wheel(0, 600);
+
+  await expect(page.getByRole('button', { name: 'Cancel' })).toBeInViewport();
+});
+
+/**
+ * The same two-stage rule, on the field beside that picker.
+ *
+ * The Title holds a draft exactly as the search does and the contract exempts
+ * neither, so a typed title has to survive the press that would otherwise take
+ * the pane down with it. What it restores to is the empty string — there is no
+ * Alias yet to have read a title off — which makes restoring and clearing one
+ * act here, and the surface goes only on the press after.
+ */
+test('the Alias title draft takes its own first Escape', async ({ page }) => {
+  await page.goto('/');
+  await expect(nodeByTitle(page, 'A').first()).toBeVisible();
+  await settled(page);
+  const nodes = await page.locator('.react-flow__node').count();
+
+  await page.getByTestId('add-card-menu').click();
+  await page.getByRole('menuitem', { name: 'Add Alias' }).click();
+  const title = page.getByTestId('new-alias-title');
+  await title.fill('Recap');
+
+  await title.press('Escape');
+  await expect(title).toHaveValue('');
+  await expect(page.getByTestId('new-alias')).toBeVisible();
+
+  await title.press('Escape');
+
+  await expect(page.getByTestId('new-alias')).toHaveCount(0);
+  await quiescent(page);
+  await expect(page.locator('.react-flow__node')).toHaveCount(nodes);
+  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '0');
+});
+
+/**
+ * Choosing a Target is the creation, and the editor stays open on what it made.
+ */
+test('choosing a Target creates the Alias and leaves its editor open', async ({ page }) => {
+  await page.goto('/');
+  await expect(nodeByTitle(page, 'A').first()).toBeVisible();
+  await settled(page);
+  const nodes = await page.locator('.react-flow__node').count();
+
+  await page.getByTestId('add-card-menu').click();
+  await page.getByRole('menuitem', { name: 'Add Alias' }).click();
+  await page.getByRole('combobox', { name: 'Target' }).fill('B');
+  await page.getByRole('option', { name: 'Markdown Card B' }).click();
+
+  // The pane it is now on is the delegated editor over the Card that owns the
+  // content, which is what opening an Alias has always given (ADR 0039).
+  await expect(page.getByTestId('new-alias')).toHaveCount(0);
+  await expect(page.getByText('Opened through B')).toBeVisible();
+  await expect(page.getByText('Editing content on B')).toBeVisible();
+  await page.getByRole('button', { name: 'Cancel' }).click();
+
+  // An empty title takes the Target's, so the Alias is a second Card called B.
+  await expect(page.locator('.react-flow__node')).toHaveCount(nodes + 1);
+  await expect(nodeByTitle(page, 'B')).toHaveCount(2);
+  await expect(page.getByTestId('layout-selector')).toContainText('Layout 1');
+  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
+});
+
+/**
+ * The whole gesture, and the reason the Title field had to exist.
+ *
+ * An empty title takes the Target's, so creation leaves two Cards called `B` and
+ * the author standing in the one pane that could not tell them apart — no Title
+ * field, and the fields it did draw belonging to the other Card. Renaming has to
+ * be reachable from where the author already is, has to reach the *Alias*, and
+ * has to leave the Target's own title alone.
+ *
+ * Frame 4's focus rule rides along: this pane opens on its first field, and the
+ * Target picker no longer takes the caret off it.
+ */
+test('an Alias is renamed in the editor its creation leaves open', async ({ page }) => {
+  await page.goto('/');
+  await expect(nodeByTitle(page, 'A').first()).toBeVisible();
+  await settled(page);
+
+  await page.getByTestId('add-card-menu').click();
+  await page.getByRole('menuitem', { name: 'Add Alias' }).click();
+  await page.getByRole('combobox', { name: 'Target' }).fill('B');
+  await page.getByRole('option', { name: 'Markdown Card B' }).click();
+
+  const title = page.getByRole('textbox', { name: 'Title' });
+  await expect(title).toBeFocused();
+  await expect(title).toHaveValue('B');
+  await title.fill('Recap');
+  await title.press('Enter');
+
+  await expect(nodeByTitle(page, 'Recap')).toHaveCount(1);
+  // The Target keeps its own: one Card called B, the one that was always there.
+  await expect(nodeByTitle(page, 'B')).toHaveCount(1);
+  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '2');
+  await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
+
+  // Closing the pane completes nothing further, and the rename outlives it.
+  await page.getByRole('button', { name: 'Cancel' }).click();
+  await expect(page.getByTestId('open-card')).toHaveCount(0);
+  await quiescent(page);
+  await expect(nodeByTitle(page, 'Recap')).toHaveCount(1);
+  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '2');
+});
+
+/**
+ * And the rename is a draft, so Escape restores it rather than closing the pane
+ * out from under it: "Dirty field restores value before surface closes".
+ *
+ * The Alias itself is not a draft and does not come back with it — it was
+ * created the moment the Target was chosen, one revision earlier — so this is
+ * also the test that the two are told apart.
+ */
+test('an Alias rename draft takes its own first Escape', async ({ page }) => {
+  await page.goto('/');
+  await expect(nodeByTitle(page, 'A').first()).toBeVisible();
+  await settled(page);
+
+  await page.getByTestId('add-card-menu').click();
+  await page.getByRole('menuitem', { name: 'Add Alias' }).click();
+  await page.getByRole('combobox', { name: 'Target' }).fill('B');
+  await page.getByRole('option', { name: 'Markdown Card B' }).click();
+  const title = page.getByRole('textbox', { name: 'Title' });
+  await title.fill('Recap');
+
+  await title.press('Escape');
+  await expect(title).toHaveValue('B');
+  await expect(page.getByTestId('open-card')).toBeVisible();
+
+  await title.press('Escape');
+
+  await expect(page.getByTestId('open-card')).toHaveCount(0);
+  await quiescent(page);
+  await expect(nodeByTitle(page, 'Recap')).toHaveCount(0);
+  await expect(nodeByTitle(page, 'B')).toHaveCount(2);
+  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
 });

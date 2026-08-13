@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Handle, Position, useConnection, type NodeProps } from '@xyflow/react';
-import { CardContent, EditIcon } from '@project/ui';
+import { CardContent, CardKindIcon, EditIcon } from '@project/ui';
 import type { CardFlowNode, CardHandle } from './projection';
 import { AUTHORING_HANDLE_DIAMETER, GRAPH_PORT_DIAMETER } from './authoring-handle';
 
@@ -18,25 +18,6 @@ import { AUTHORING_HANDLE_DIAMETER, GRAPH_PORT_DIAMETER } from './authoring-hand
  * legible. It is still the same node — nothing is transformed into anything, and
  * there is no second artefact (ADR 0024).
  */
-/** Inlined lucide `corner-down-right` — the house pattern is a hand-inlined SVG
- *  path, not an icon dependency (see the Select chevron in `@project/ui`). */
-const AliasGlyph = () => (
-  <svg
-    width="12"
-    height="12"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    aria-hidden="true"
-  >
-    <polyline points="15 10 20 15 15 20" />
-    <path d="M4 4v7a4 4 0 0 0 4 4h12" />
-  </svg>
-);
-
 const AUTHORING_SIDES = [Position.Top, Position.Right, Position.Bottom, Position.Left] as const;
 
 interface CardTitleEditorProps {
@@ -50,14 +31,52 @@ function CardTitleEditor({ cardId, title, onComplete, onCancel }: CardTitleEdito
   const [draft, setDraft] = useState(title);
   const [error, setError] = useState<string | null>(null);
   const input = useRef<HTMLInputElement>(null);
-  const cancelledBlur = useRef(false);
+  const closingByKey = useRef(false);
 
+  // Focus on mount whichever control opened this editor, pointer or keyboard.
+  // A created Card enters here with its neutral title *selected*, and an
+  // unfocused input has no selection an author can type over — so the accepted
+  // prototype's separate sentence about keyboard activation restates that
+  // requirement rather than restricting it to the keyboard path. "Pointer
+  // placement selects without forcing keyboard focus" is about placement
+  // gestures, which end at a placed Card rather than in a field.
   useEffect(() => {
     input.current?.focus();
     input.current?.select();
   }, []);
 
-  const complete = (): void => setError(onComplete?.(draft) ?? null);
+  /**
+   * Submit the draft and show whatever came back, answering the refusal so a
+   * caller can tell an accepted completion from a refused one — which is the
+   * only thing the two exits disagree about.
+   */
+  const complete = (): string | null => {
+    const refusal = onComplete?.(draft) ?? null;
+    setError(refusal);
+    return refusal;
+  };
+
+  /**
+   * Enter and Escape both leave the editor, and neither may leave focus on
+   * `<body>` — a Card created from the toolbar or from `C` opens straight into
+   * this field, so where focus lands when the naming ends is where the whole
+   * gesture ends. The Card is what the author was working on, it survives the
+   * editor, and outside presenting it is focusable, so it is the answer.
+   *
+   * Taken *before* the parent unmounts the input: focus moves to a node that is
+   * already in the tree, and the unmount that follows has nothing left to
+   * displace. That move blurs the input, which is why `closingByKey` is raised
+   * first — the blur handler completes the draft, and it must not complete a
+   * second time on the way out of a completion, nor at all on the way out of a
+   * cancellation.
+   *
+   * Only the keyboard paths restore. A blur is the author clicking somewhere
+   * else, and taking focus back from wherever they clicked would be a steal.
+   */
+  const returnFocusToCard = (): void => {
+    closingByKey.current = true;
+    input.current?.closest<HTMLElement>('.react-flow__node')?.focus();
+  };
 
   return (
     <div className="card__title-editor nodrag nopan nowheel">
@@ -73,8 +92,8 @@ function CardTitleEditor({ cardId, title, onComplete, onCancel }: CardTitleEdito
           setError(null);
         }}
         onBlur={() => {
-          if (cancelledBlur.current) {
-            cancelledBlur.current = false;
+          if (closingByKey.current) {
+            closingByKey.current = false;
             return;
           }
           complete();
@@ -85,10 +104,13 @@ function CardTitleEditor({ cardId, title, onComplete, onCancel }: CardTitleEdito
           event.stopPropagation();
           if (event.key === 'Enter') {
             event.preventDefault();
-            complete();
+            // A refused draft keeps the editor open, so focus stays in the
+            // field with the message beside it rather than leaving for a Card
+            // whose name the author has not settled.
+            if (complete() === null) returnFocusToCard();
           } else if (event.key === 'Escape') {
             event.preventDefault();
-            cancelledBlur.current = true;
+            returnFocusToCard();
             onCancel?.();
           }
         }}
@@ -197,34 +219,46 @@ export function CardNode({ data, selected }: NodeProps<CardFlowNode>) {
                 : {})}
             />
           ) : (
-            // Renaming is the title's own gesture (ADR 0036). A double click
-            // here must not also reach the Card, which would open it and bury
-            // the field the author is about to type into.
-            <h2
-              className={
-                data.titleEditingEnabled ? 'card__title card__title--editable' : 'card__title'
-              }
-              onDoubleClick={
-                data.titleEditingEnabled
-                  ? (event) => {
-                      event.stopPropagation();
-                      data.onBeginTitleEditing?.();
-                    }
-                  : undefined
-              }
-            >
-              {data.title}
-            </h2>
+            // The kind is drawn beside the title and never instead of it: an
+            // Alias is a Card with a name of its own, and Markdown is the
+            // visual default with no glyph at all. Persistent rather than
+            // revealed on hover, because what kind a Card is does not depend on
+            // where the pointer happens to be.
+            <div className="card__heading">
+              {data.kind !== 'markdown' && <CardKindIcon kind={data.kind} size={12} />}
+              {/* Renaming is the title's own gesture (ADR 0036). A double click
+                  here must not also reach the Card, which would open it and
+                  bury the field the author is about to type into. */}
+              <h2
+                className={
+                  data.titleEditingEnabled ? 'card__title card__title--editable' : 'card__title'
+                }
+                onDoubleClick={
+                  data.titleEditingEnabled
+                    ? (event) => {
+                        event.stopPropagation();
+                        data.onBeginTitleEditing?.();
+                      }
+                    : undefined
+                }
+              >
+                {data.title}
+              </h2>
+            </div>
           )}
           {data.description && (
             <p className="card__description" data-testid="card-description">
               {data.description}
             </p>
           )}
+          {/* The Target's title, read-only, under the Alias's own — so a
+              redraw reads as a deliberate return rather than repetition, and
+              stays legible when the two titles match. The glyph that used to
+              sit here now names the kind beside the title, where it says the
+              same thing about the Card rather than about this one line. */}
           {data.aliasOf && (
             <p className="card__alias-of" data-testid="alias-marker">
-              <AliasGlyph />
-              <span>{data.aliasOf}</span>
+              {data.aliasOf}
             </p>
           )}
           {data.cardEditingEnabled && !data.editingTitle && (

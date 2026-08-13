@@ -253,7 +253,11 @@ describe('authoring an opened Card', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Edit Card A again' }));
     expect(screen.getByText('Opened through A again')).toBeVisible();
     expect(screen.getByText('Editing content on A')).toBeVisible();
-    expect(screen.queryByRole('textbox', { name: 'Title' })).not.toBeInTheDocument();
+    // The Title is the occurrence's own — `A again`, never the content owner's.
+    // This line read `not.toBeInTheDocument()` and pinned a pane with no Title
+    // field at all; what it was guarding is that no field here renames `A`,
+    // which the value says and the absence only implied.
+    expect(screen.getByRole('textbox', { name: 'Title' })).toHaveValue('A again');
     // Qualified, because the Alias draws a description of its own on the graph
     // behind this pane and these fields do not author it.
     expect(screen.getByRole('textbox', { name: 'Description of A' })).toHaveValue('');

@@ -62,9 +62,9 @@ derived from the fully installed preceding state.
 | --- | --- | --- | --- |
 | Add Card | None for creation | Action creates, places and selects the Card | Follow-up title Escape keeps the Card and restores `Card N` |
 | Rename Card | Dirty title | Enter or valid blur | Restore stored title |
-| Edit Markdown | Dirty title/description/body in the open Card | Explicit completion under the existing Card editor contract | Restore the opened values and keep the Card open |
+| Edit Markdown | Dirty title/description/body in the open Card | `Done` on the pane, over every pending field | Discard every pending field and close (ADR 0048) |
 | Add Alias | Empty title plus unconfirmed Target | Selecting an eligible Target creates and places the Alias | Close with no Alias and no conversion |
-| Retarget Alias | Unconfirmed Target picker value | Selecting a different eligible Target | Restore current Target |
+| Retarget Alias | Pending Target on the open pane | `Done` on the pane, with the pane's other fields (ADR 0048) | Discard every pending field and close |
 | Add Graph | None for creation | Action appends, colours and activates the Graph | Follow-up title Escape keeps the Graph and restores `Graph N` |
 | Rename Graph | Dirty title | Enter or valid blur | Restore stored title |
 | Recolour Graph | None | Choosing a different swatch | Choosing current swatch is unchanged |
@@ -100,9 +100,19 @@ Escape continues to belong to exactly one topmost owner, in this order:
 4. On the bare canvas, clear selection and Traversal history and focus canvas.
 5. During Presenting, exit Presenting.
 
-A dirty field consumes Escape by restoring its stored value without closing
-its containing surface. A second Escape may close that surface. Dismissal never
-converts an Algorithmic View merely because a draft was opened there.
+**Amended by ADR 0048.** This paragraph previously read: "A dirty field consumes
+Escape by restoring its stored value without closing its containing surface. A
+second Escape may close that surface." That rule is withdrawn, for the reasons
+recorded in the ADR and in the keyboard contract's matching amendment.
+
+Escape is decided by the surface. **In a pane**, it is an alias of Cancel:
+discard every pending field and close, with no field intercepting it — which is
+also why the Cancel outcomes in the table above now read the same way for every
+field on that pane. **In place on the canvas**, where blur is the commit, it
+reverts the field to its stored value and dismisses the editor.
+
+Dismissal never converts an Algorithmic View merely because a draft was opened
+there.
 
 ## Persistence outcomes
 

@@ -126,8 +126,8 @@ export type RendererSelection =
  * A View that breaks an obligation is wrong, and the Edit that called it has
  * nothing to fall back to; a selection naming a Layout that is gone is a caller
  * that failed to check. So these throw, and Space Authoring must **not** turn
- * one into `no-edit` — a refusal is a thing the author did, and none of these
- * is.
+ * one into `unchanged` or `refused` — a refusal is a thing the author did, and
+ * none of these is.
  */
 export type RendererInvariantReason =
   | 'renderer-not-found'

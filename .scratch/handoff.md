@@ -1,5 +1,15 @@
 # Handoff — 2026-07-20
 
+> **Historical. Do not read this as current state.** Verified stale on
+> 2026-08-13, roughly 30 PRs later. Presenting is no longer a reveal.js deck
+> (ADR 0024/0027 removed the dependency); `manifest` is retired (ADR 0010);
+> Route is renamed to Graph (ADR 0041); a Layout owns its Graphs (ADR 0040);
+> persistence is PostgreSQL over a Fetch-native HTTP application (ADR 0030,
+> 0034), not a file write-back. The "Open work" and "Stalled" sections below
+> are all resolved or superseded. For current state read `AGENTS.md`, then
+> `CONTEXT.md`; for the work queue read
+> `.scratch/card-route-editing/implementation-handoff.md`.
+
 State: everything on `main`, working tree clean, 33 commits since the initial one.
 `pnpm verify` 57 tests green. `pnpm e2e` 13 green. One pre-existing eslint warning
 in `router.tsx` (react-refresh), not introduced by this work.
