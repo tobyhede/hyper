@@ -95,7 +95,7 @@ share a UUID.
 | Retarget Alias | Target field in Card editor, pending until `Done` | Same Combobox | Cancel/Escape discards the pending Target with the pane's other fields (ADR 0048) | Alias editor/control |
 | Add Graph | Graph manager Add Graph | Visible button in keyboard-accessible manager | Rename Escape keeps Graph and neutral title | New Graph title, then Graph tab |
 | Edit Graph | Manager Title/Colour | Vertical Tabs and normal fields | Title restores; swatch selection is immediate | Edited control / Graph tab |
-| Connect | Four spatial handles | One tab-stop Connect control → Select Graph Target | Cancel returns source Card | Target Card |
+| Connect | Four spatial handles | One tab-stop Connect control → target Combobox | Cancel returns source Card | Target Card |
 | Reconnect | React Flow endpoint drag | Edge popover From/To Combobox | Restore original Edge | Edited Edge |
 | Delete Edge | Endpoint empty-canvas drop or Edge action | React Flow Delete/Backspace on the sole selected Active-Graph Edge | Cancelled drag restores Edge | Retain an existing focused control; if removal destroys focus, use the source Card, then canvas as fallback |
 | Add to Layout | Card Front click or external drag from Cards View | Command item Enter | Invalid/outside drop leaves Card absent | Added Card; pointer selects without forced focus |
@@ -448,10 +448,21 @@ Four things the design left open resolved this way:
 - **The canvas needs `tabIndex={-1}`.** React Flow's pane carries no `tabindex`,
   so the Escape repair had nothing to focus. Negative, so the canvas never
   becomes a tab stop.
-- **The Edge picker is a Radix Select, not cmdk.** `@project/ui` gained
-  `CardPicker` and a shadcn-style `Popover`; the Combobox package 4 will bring is
-  the richer surface, and this is the same primitive the existing toolbar
-  selectors use.
+- **The Edge picker is the Combobox, and this was decided twice.** Built first as
+  a Radix Select on the argument that package 4's Combobox did not exist yet and
+  the toolbar selectors use that primitive. By the time this landed package 4 had
+  shipped one — `app`'s `CardPicker`, cmdk through `@project/ui`'s `Command` —
+  and the interaction matrix above had *already* said Combobox for both
+  reconnect endpoints. Two picker models on two primitives is what the rebase
+  found, so the Select was withdrawn: `@project/ui` now has `CardCombobox`,
+  shadcn's own composition of `Popover` over `Command`. The two components that
+  remain are two **presentations** of one model, not two models — `app`'s
+  `CardPicker` is the inline one a pane draws with its list always open, and this
+  is the collapsed one a canvas surface draws behind a trigger. Both are cmdk,
+  so search, the active item, the arrow keys and the `combobox`/`listbox`
+  pairing come from the primitive in both. What the Select was carrying and the
+  Combobox had to keep: a refused choice stays in the list, disabled, with its
+  reason on the row.
 - **The Card's keyboard Connect control lives in `CardNode`**, beside the Edit
   affordance and offered on the same hover, focus and selection rules.
 

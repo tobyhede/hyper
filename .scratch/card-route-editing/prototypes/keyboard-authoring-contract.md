@@ -159,6 +159,17 @@ and focus follow Command defaults. Each full Card Front is a Command item;
 target and Graph-target pickers use shadcn Combobox composition rather than a
 second custom picker model.
 
+**One model, two presentations.** The rule above is about the *model*, not the
+component count, and two components implement it: `app`'s `CardPicker` is the
+inline presentation a pane draws with its list always open, and `@project/ui`'s
+`CardCombobox` is the collapsed one a canvas surface draws behind a trigger —
+shadcn's own Popover-over-Command. Both are cmdk, so search, the active item,
+the arrow keys and the `combobox`/`listbox` pairing are the primitive's in both.
+The Edge endpoint and Connect-target pickers were briefly a Radix Select, which
+*was* the second model this sentence forbids; it is withdrawn. A picker that
+knows a choice is refused keeps it in the list, disabled, with the reason on the
+row rather than in a tooltip.
+
 Pointer-only accelerators do not define keyboard access. `Shift` is the Alias
 creation modifier for **Card-body drag**. The Add Alias control and target
 picker are the equivalent keyboard path. Option/Alt connection empty-drop

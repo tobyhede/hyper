@@ -2,7 +2,7 @@ import { useContext, useState, type ReactNode } from 'react';
 import { EdgeLabelRenderer, type EdgeProps } from '@xyflow/react';
 import type { CardId } from '@project/core';
 import { RoutedEdge, routedEdgeGeometry, type RoutedFlowEdge } from '@project/react-flow-adapter';
-import { CardPicker, Popover, PopoverAnchor, PopoverContent } from '@project/ui';
+import { CardCombobox, Popover, PopoverAnchor, PopoverContent } from '@project/ui';
 import { edgeSelectionOf, sameEdgeSubject, type EdgeSubject } from '../render-adapter';
 import { EdgeAuthoringContext, type EdgeAuthoringCommands } from './edge-authoring-context';
 
@@ -139,14 +139,14 @@ function EdgeEndpointFields({
 
   return (
     <div className="edge-editor__fields">
-      <CardPicker
+      <CardCombobox
         label="From"
         testId="edge-from"
         choices={from}
         value={edge.from}
         onValueChange={(cardId) => commands.reconnect('from', cardId as CardId)}
       />
-      <CardPicker
+      <CardCombobox
         label="To"
         testId="edge-to"
         choices={to}

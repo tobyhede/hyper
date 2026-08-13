@@ -1140,9 +1140,11 @@ test('the Edge editor moves an endpoint and keeps the Edge in its Graph', async 
   await page.getByRole('button', { name: 'Edit this Edge' }).click();
   await page.getByRole('combobox', { name: 'To' }).click();
   // Any Card of this Layout the result would not duplicate. `hasNot` matches a
-  // *descendant*, and Radix marks the option element itself — so filtering that
-  // way excludes nothing and the choice below was eligible only by luck.
-  const option = page.locator('[role="option"]:not([data-disabled])');
+  // *descendant*, and the primitive marks the option element itself — so
+  // filtering that way excludes nothing and the choice below was eligible only
+  // by luck. cmdk writes `data-disabled` on **every** row, `"false"` included,
+  // so the attribute's absence is not the test either; its value is.
+  const option = page.locator('[role="option"][data-disabled="false"]');
   await option.last().click();
 
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
@@ -1449,7 +1451,7 @@ test('a Card offers a keyboard Connect control that authors an Edge', async ({ p
   await source.getByRole('button', { name: 'Connect from A' }).click();
   await expect(page.getByTestId('connect-target-picker')).toBeVisible();
   await page.getByRole('combobox', { name: 'Connect to' }).click();
-  await page.locator('[role="option"]:not([data-disabled])').last().click();
+  await page.locator('[role="option"][data-disabled="false"]').last().click();
 
   await expect(page.locator('.react-flow__edge')).toHaveCount(drawn + 1);
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');

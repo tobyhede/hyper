@@ -22,7 +22,7 @@ import {
 import type { Card, CardId, Graph, GraphEdge, GraphId } from '@project/core';
 import { uuidSchema } from '@project/core';
 import type { CardFlowNode } from '@project/react-flow-adapter';
-import { CardPicker, type CardChoice } from '@project/ui';
+import { CardCombobox, type CardChoice } from '@project/ui';
 import {
   newCardDrop,
   type DropTarget,
@@ -683,20 +683,22 @@ export function useEdgeAuthoring({
           data-testid="connect-target-picker"
           /*
            * Escape cancels exactly one topmost Edge surface, and the open
-           * listbox is a surface above this one.
+           * combobox is a surface above this one.
            *
            * **A portal is not an escape from the React tree.** Radix renders
-           * the listbox through `createPortal`, but React dispatches synthetic
+           * the popover through `createPortal`, but React dispatches synthetic
            * events along the *fiber* tree, so a keydown inside the portalled
            * content still bubbles to this handler — and Radix's own Escape
            * handling only calls `preventDefault`, never `stopPropagation`. One
-           * press would therefore close the listbox and cancel the connection
+           * press would therefore close the list and cancel the connection
            * together, leaving no way to back out of the list without losing the
            * gesture.
            *
            * The trigger's `data-state` is what separates the two layers: while
            * it reads `open` the press belongs to Radix, and the next one — with
-           * the list closed and focus back on the trigger — is this one's.
+           * the list closed and focus back on the trigger — is this one's. It
+           * survived the move from `Select` to the Combobox composition because
+           * both triggers are Radix triggers and both stamp that attribute.
            */
           onKeyDown={(event) => {
             if (event.key !== 'Escape') return;
@@ -706,7 +708,7 @@ export function useEdgeAuthoring({
             authoring.cancelDraft();
           }}
         >
-          <CardPicker
+          <CardCombobox
             label="Connect to"
             testId="connect-target"
             choices={connectChoices}
