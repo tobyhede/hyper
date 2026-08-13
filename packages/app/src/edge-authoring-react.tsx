@@ -23,9 +23,15 @@ import type { Card, CardId, Graph, GraphId } from '@project/core';
 import { uuidSchema } from '@project/core';
 import type { CardFlowNode } from '@project/react-flow-adapter';
 import { CardPicker, type CardChoice } from '@project/ui';
-import { newCardDrop, type DropTarget, type EdgeAuthoring } from './edge-authoring';
+import {
+  newCardDrop,
+  type DropTarget,
+  type EdgeAuthoring,
+  type FocusRequest,
+} from './edge-authoring';
 import {
   edgeSelectionOf,
+  sameEdgeSubject,
   sameSelection,
   type CanvasSelection,
   type EdgeSubject,
@@ -371,6 +377,17 @@ export function useEdgeAuthoring({
       // Whatever it produced, the drag is over: the draft goes and a refusal's
       // sentence stays, exactly as a connection drag ends.
       latest.current.authoring.endPointerDrag();
+      // **Last, and unconditionally.** The connection handlers are stood down
+      // for the drag, not for the session — they are the same handlers an
+      // ordinary connection uses, so a flag left raised disables the Alt
+      // empty-drop and the continue-at-the-target selection for as long as the
+      // canvas is mounted. `onConnect` is *not* among them, so an Edge still
+      // authors and the damage hides; the empty-drop is what goes dark.
+      //
+      // Cleared after the work above so nothing between here and
+      // `onReconnectStart` can be read as a connection, and outside every guard
+      // because this runs even when the Edge names no Graph.
+      reconnecting.current = false;
     },
     [],
   );
@@ -402,6 +419,35 @@ export function useEdgeAuthoring({
     });
   }, []);
 
+  /**
+   * The element a focus request names, resolved against the projection now on
+   * screen — the only place a domain subject becomes a React Flow id.
+   *
+   * A request that names nothing drawn falls through to the canvas, which is the
+   * point of having a fallback at all: an Edit can remove the very thing focus
+   * was owed to between the request and this effect running.
+   */
+  const focusTargetOf = useCallback(
+    (request: FocusRequest): HTMLElement | null => {
+      if (request.kind === 'canvas') return null;
+      if (request.kind === 'card') {
+        return document.querySelector<HTMLElement>(
+          `.react-flow__node[data-id="${CSS.escape(request.cardId)}"]`,
+        );
+      }
+      const drawn = edges.find((edge) => {
+        const subject = edgeSelectionOf(edge);
+        return subject !== null && sameEdgeSubject(subject, request);
+      });
+      return drawn === undefined
+        ? null
+        : document.querySelector<HTMLElement>(
+            `.react-flow__edge[data-id="${CSS.escape(drawn.id)}"]`,
+          );
+    },
+    [edges],
+  );
+
   const focusRequest = state.focusRequest;
   useEffect(() => {
     if (focusRequest === null) return;
@@ -409,14 +455,8 @@ export function useEdgeAuthoring({
     // Only when the completed projection has left focus nowhere. An author who
     // has already moved to another control keeps it.
     if (document.activeElement !== document.body) return;
-    const node =
-      focusRequest.kind === 'card'
-        ? document.querySelector<HTMLElement>(
-            `.react-flow__node[data-id="${CSS.escape(focusRequest.cardId)}"]`,
-          )
-        : null;
-    (node ?? document.querySelector<HTMLElement>('.react-flow'))?.focus();
-  }, [focusRequest, authoring]);
+    (focusTargetOf(focusRequest) ?? document.querySelector<HTMLElement>('.react-flow'))?.focus();
+  }, [focusRequest, authoring, focusTargetOf]);
 
   const cardTitles = useMemo(
     () => new Map(subjectCards.map((card) => [card.id, card.title])),
@@ -623,6 +663,21 @@ export function useEdgeAuthoring({
             </span>
           )}
         </div>
+      )}
+      {/*
+        The refusal every *other* path produces, said somewhere the author can
+        read it.
+
+        A refusal is retained beside the draft that ran into it, and a keyboard
+        draft has a surface of its own — the picker above, or the Edge's
+        popover — that shows it in context. A **pointer** gesture has neither:
+        the drag is over, its draft is gone, and the sentence is the whole of
+        what the author is told. Without this it was stored and shown nowhere.
+      */}
+      {state.refusal !== null && draft === null && (
+        <span role="alert" className="edge-refusal" data-testid="edge-gesture-refusal">
+          {state.refusal}
+        </span>
       )}
     </>
   );

@@ -138,9 +138,17 @@ export type EdgeDraft =
   /** The Edge popover: both endpoints are editable while it stands. */
   | ({ readonly kind: 'keyboard-reconnect' } & EdgeSubject);
 
-/** Where focus goes once the projection carrying a completed Edit has rendered. */
+/**
+ * Where focus goes once the projection carrying a completed Edit has rendered.
+ *
+ * The Edge is named by subject rather than by React Flow's edge id, like every
+ * other Edge reference here — the React layer resolves it against the projection
+ * it is about to draw, which is the only place that mapping exists.
+ */
 export type FocusRequest =
-  { readonly kind: 'card'; readonly cardId: CardId } | { readonly kind: 'canvas' };
+  | { readonly kind: 'card'; readonly cardId: CardId }
+  | ({ readonly kind: 'edge' } & EdgeSubject)
+  | { readonly kind: 'canvas' };
 
 export interface EdgeAuthoringState {
   readonly draft: EdgeDraft | null;
@@ -379,8 +387,21 @@ export function createEdgeAuthoring({
     }
     if (result.kind !== 'completed') return null;
     publish({ refusal: null });
-    pendingContinuation = result.cardId;
     return result.cardId;
+  };
+
+  /**
+   * Hold the Card a **pointer** connection continues at until its drag ends.
+   *
+   * Deliberately not inside `settleConnection`, which the keyboard path shares:
+   * `pendingContinuation` is drained only by `endPointerDrag`, so a keyboard
+   * connection that set it would leave it for the next pointer gesture to
+   * collect — and that gesture would select a Card it never named. The keyboard
+   * path says where focus goes itself, through the focus request.
+   */
+  const holdForDrag = (cardId: CardId | null): CardId | null => {
+    if (cardId !== null) pendingContinuation = cardId;
+    return cardId;
   };
 
   const requestFocus = (focusRequest: FocusRequest): void => publish({ focusRequest });
@@ -444,10 +465,11 @@ export function createEdgeAuthoring({
 
     beginPointerConnect: (from) => begin({ kind: 'pointer-connect', from }),
 
-    connect: (from, to, projected) => settleConnection(connections.connect(from, to, projected)),
+    connect: (from, to, projected) =>
+      holdForDrag(settleConnection(connections.connect(from, to, projected))),
 
     createConnectedCard: (from, position, projected) =>
-      settleConnection(connections.createAndConnect(from, position, projected)),
+      holdForDrag(settleConnection(connections.createAndConnect(from, position, projected))),
 
     endPointerDrag: () => {
       const continuation = pendingContinuation;
@@ -486,13 +508,35 @@ export function createEdgeAuthoring({
     reconnect: (endpoint, cardId) => {
       const drafted = draftedEdge();
       if (drafted === null) return false;
-      return completeStructural({
+      const settled = completeStructural({
         kind: 'reconnected-edge',
         graphId: drafted.graphId,
         edge: drafted.edge,
         endpoint,
         cardId,
       });
+      if (!settled) return false;
+      // **The author stays on the Edge they edited**, which is the matrix's
+      // focus for a completed Reconnect and needs saying because nothing else
+      // supplies it: the selection names the Edge by value, so a moved endpoint
+      // leaves it naming an Edge the Space no longer holds — the reconnected one
+      // draws unselected, and the popover that held focus unmounts with it,
+      // dropping focus on `body`.
+      //
+      // An endpoint returned to where it started edited nothing, and `unchanged`
+      // is indistinguishable from a completion here; the subject it names is the
+      // one already selected, so re-installing it is a no-op rather than a case
+      // to branch on.
+      const reconnected: EdgeSubject = {
+        graphId: drafted.graphId,
+        edge:
+          endpoint === 'from'
+            ? { from: cardId, to: drafted.edge.to }
+            : { from: drafted.edge.from, to: cardId },
+      };
+      adapter.getState().selectEdge(reconnected);
+      requestFocus({ kind: 'edge', ...reconnected });
+      return true;
     },
 
     deleteEdge: ({ graphId, edge }) => {

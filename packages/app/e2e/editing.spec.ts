@@ -1219,6 +1219,47 @@ test('dragging an endpoint onto another Card moves it and keeps the Edge in its 
 });
 
 /**
+ * The gestures that follow a reconnection, which one-gesture tests cannot see.
+ *
+ * React Flow drives a reconnect drag through the connection callbacks too, so
+ * Edge Authoring stands them down for its duration — and a flag left raised
+ * disables the Alt empty-drop and the continue-at-the-target selection for as
+ * long as the canvas is mounted. **A plain connection is the wrong probe**:
+ * `onConnect` is not among the handlers stood down, so an Edge still authors
+ * and the damage hides. The empty-drop is the one that goes dark, because it
+ * needs the preview state the stood-down handlers maintain.
+ */
+test('an Alt empty-drop still works after a reconnection', async ({ page }) => {
+  await page.goto('/');
+  await expect(nodeByTitle(page, 'A').first()).toBeVisible();
+  await expect(page.locator('.react-flow__edge-path').first()).toHaveAttribute('d', /L/);
+  await selectLayout(page, 'Collection 1');
+  await settled(page);
+
+  const edge = page.locator('.react-flow__edge[aria-label="Edge from A to B in Long"]');
+  await edge.focus();
+  await reconnectOnto(
+    page,
+    edge,
+    'target',
+    authoringHandle(nodeByTitle(page, 'D').first(), 'target', 'left'),
+  );
+  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
+  await settled(page);
+
+  // `connectToEmptyWithAlt` gates on the preview appearing, which is exactly the
+  // state a raised flag starves — so a leak fails inside the helper rather than
+  // as a Card that mysteriously never arrived.
+  const source = nodeByTitle(page, 'B').first();
+  await source.hover();
+  await connectToEmptyWithAlt(page, authoringHandle(source, 'source', 'right'));
+
+  await expect(nodeByTitle(page, 'Card 1')).toBeVisible();
+  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '2');
+  await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
+});
+
+/**
  * The *source* anchor, which React Flow reports through the **opposite** handle's
  * type — so a mapping read straight off `handleType` names the wrong endpoint.
  *

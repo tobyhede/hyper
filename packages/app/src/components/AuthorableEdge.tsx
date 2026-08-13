@@ -91,14 +91,10 @@ export function AuthorableEdge(props: EdgeProps<RoutedFlowEdge>) {
               >
                 Delete
               </button>
-              {/* A refused Delete has no other surface to speak from — the
-                  endpoint editor below is closed at the moment it happens, and
-                  a refusal nobody renders is a click that did nothing. */}
-              {!open && commands.refusal !== null && (
-                <span role="alert" className="edge-toolbar__refusal" data-testid="edge-refusal">
-                  {commands.refusal}
-                </span>
-              )}
+              {/* A refused Delete is announced by the canvas-level alert rather
+                  than here. The refusal is one module-wide value, so a toolbar
+                  copy showed a sentence from an unrelated gesture on whichever
+                  Edge happened to be selected. */}
             </div>
           </PopoverAnchor>
           <PopoverContent

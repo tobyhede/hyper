@@ -176,7 +176,26 @@ const graphsOf = (working: SpaceSnapshot) =>
 /** One identity, so the memo under test is not defeated by the test's own input. */
 const NO_OP = () => undefined;
 
+/** A release that resolved no handle — React Flow's shape for "dropped nowhere". */
+const FINISHED_CONNECTION = {
+  pointer: null,
+  isValid: null,
+  from: null,
+  fromHandle: null,
+  fromPosition: null,
+  fromNode: null,
+  to: null,
+  toHandle: null,
+  toPosition: null,
+  toNode: null,
+} as const;
+
 beforeAll(() => {
+  // jsdom implements no hit-testing, and the reconnect release asks for one.
+  // Answering `null` is what a release over nothing really produces, which
+  // `dropTargetOf` reads as off-canvas — so these tests exercise the cancelling
+  // path rather than the deleting one.
+  document.elementFromPoint = () => null;
   vi.stubGlobal(
     'ResizeObserver',
     class {
@@ -468,6 +487,38 @@ describe("React Flow's reconnect callback order", () => {
   });
 
   /**
+   * **Standing the connection handlers down is for the drag, not for the
+   * session.** They are the same handlers an ordinary connection uses, so a flag
+   * left raised silently disables every later pointer connection and the Alt
+   * empty-drop for the life of the canvas — and `onConnect` is unguarded, so a
+   * plain Card-to-Card drag still authors and hides it.
+   */
+  it('takes its connection handlers back once the reconnect drag ends', () => {
+    const composed = compose();
+    const { result } = surface(composed);
+    act(() => startDrag(result.current, EDGES[0]!));
+
+    act(() => {
+      result.current.reactFlowProps.onReconnectEnd(
+        new MouseEvent('mouseup'),
+        EDGES[0]!,
+        'target',
+        FINISHED_CONNECTION,
+      );
+      result.current.reactFlowProps.onConnectStart(new MouseEvent('mousedown'), {
+        nodeId: CARD_C,
+        handleId: null,
+        handleType: 'source',
+      });
+    });
+
+    expect(composed.edgeAuthoring.getState().draft).toEqual({
+      kind: 'pointer-connect',
+      from: CARD_C,
+    });
+  });
+
+  /**
    * The connection release arrives first and must author nothing: with Alt held
    * it would otherwise create a Card and an Edge from the anchored end, and then
    * `onReconnectEnd` would delete the Edge — one gesture, two Edits.
@@ -481,22 +532,54 @@ describe("React Flow's reconnect callback order", () => {
     act(() => {
       result.current.reactFlowProps.onConnectEnd(
         new MouseEvent('mouseup', { altKey: true, clientX: 10, clientY: 10 }),
-        {
-          pointer: null,
-          isValid: null,
-          from: null,
-          fromHandle: null,
-          fromPosition: null,
-          fromNode: null,
-          to: null,
-          toHandle: null,
-          toPosition: null,
-          toNode: null,
-        },
+        FINISHED_CONNECTION,
       );
     });
 
     expect(composed.session.getState().working).toBe(before);
+  });
+});
+
+/**
+ * Every refusal reaches a surface, including the one with no draft left.
+ *
+ * A refusal is retained beside the draft that ran into it, and a keyboard draft
+ * has a surface of its own to show it in context. A **pointer** gesture has
+ * neither by the time the refusal exists — the drag is over and its draft is
+ * gone — so without a canvas-level alert the sentence is stored and shown
+ * nowhere. It is rare by design, because eligibility refuses most of these
+ * during the drag through `isValidConnection`, but "rare" is not "announced".
+ */
+describe('announcing a refusal', () => {
+  it('shows the reason a finished pointer gesture ran into', () => {
+    const { edgeAuthoring } = mountCanvas();
+    expect(screen.queryByTestId('edge-gesture-refusal')).not.toBeInTheDocument();
+
+    // A→B already exists in Main, so this is the duplicate rule — reached
+    // directly, as a completion whose drag has already ended.
+    act(() => {
+      edgeAuthoring.beginPointerConnect(CARD_A);
+      edgeAuthoring.connect(CARD_A, CARD_B, null);
+      edgeAuthoring.endPointerDrag();
+    });
+
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'These Cards are already connected in this Graph.',
+    );
+  });
+
+  it('says nothing while a keyboard draft has a surface of its own', () => {
+    const { edgeAuthoring } = mountCanvas();
+
+    act(() => edgeAuthoring.beginKeyboardConnect(CARD_A));
+    act(() => {
+      edgeAuthoring.completeKeyboardConnect(CARD_B, null);
+    });
+
+    // The picker shows it inline; a second copy over the canvas would say the
+    // same thing twice, in a place the author is not looking.
+    expect(screen.getByTestId('connect-refusal')).toBeVisible();
+    expect(screen.queryByTestId('edge-gesture-refusal')).not.toBeInTheDocument();
   });
 });
 

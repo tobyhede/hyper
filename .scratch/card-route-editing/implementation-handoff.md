@@ -528,6 +528,36 @@ drop beside it). The other two were already proven under different names in
 screen at the moment of an off-canvas release — is now asserted rather than
 assumed.
 
+**A third round found that the reconnect fix had leaked its own flag.**
+`reconnecting` was set at `onReconnectStart` and never cleared, so from the
+first endpoint drag onward the Alt empty-drop and the continue-at-the-target
+selection were dead for the life of the canvas. The suite stayed green because
+`onConnect` is *not* among the handlers stood down: a plain Card-to-Card drag
+still authors its Edge, so a "connect after reconnect" test passes either way.
+The empty-drop is the probe that fails, and `editing.spec.ts` now uses it.
+
+Three more from that round:
+
+- **A completed reconnection left the author on `body`.** The selection names an
+  Edge by value, so a moved endpoint leaves it naming one the Space no longer
+  holds — the reconnected Edge draws unselected and the popover holding focus
+  unmounts with it. `reconnect` now re-selects the reconnected Edge and requests
+  focus on it, which is the matrix's "Focus after completion: Edited Edge".
+  `FocusRequest` gained an `edge` arm, named by subject like every other Edge
+  reference; the React layer resolves it against the projection.
+- **A keyboard connection left a pointer continuation behind.**
+  `pendingContinuation` is drained only by `endPointerDrag`, so the next pointer
+  gesture — including one that authored nothing — collected it and selected a
+  Card it never named. Only the pointer paths hold one now (`holdForDrag`).
+- **A refused pointer gesture said nothing.** Its draft is gone by the time the
+  refusal exists, so the sentence was stored and rendered nowhere. A
+  canvas-level alert says it; the Edge toolbar's copy is gone, which also closes
+  the leak where one Edge showed a sentence from an unrelated gesture.
+
+Most pointer refusals are unreachable by design — `isValidConnection` refuses
+them during the drag — so the alert is proven at the React level rather than in
+a browser test that would be asserting something the product prevents.
+
 The original brief follows.
 
 Build the accepted Edge Authoring module in

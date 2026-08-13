@@ -217,6 +217,36 @@ describe('a refused proposal', () => {
     expect(graphsOf(session.getState().working)[0]?.edges).toEqual([{ from: CARD_A, to: CARD_C }]);
   });
 
+  /**
+   * The matrix's focus for a completed Reconnect is the **edited Edge**, and
+   * nothing else can supply it: the selection still names the *old* `{from,to}`,
+   * so the reconnected Edge draws unselected and the surface that held focus —
+   * the popover, on the keyboard path — unmounts with it, leaving focus on
+   * `body`. Re-selecting is what keeps the author on the Edge they just edited.
+   */
+  it('keeps the reconnected Edge selected and asks for focus on it', () => {
+    const { edges, adapter } = open();
+    adapter.getState().selectEdge(SUBJECT);
+    edges.openEdgeEditor(SUBJECT);
+
+    expect(edges.reconnect('to', CARD_C)).toBe(true);
+
+    const reconnected = { graphId: GRAPH_ID, edge: { from: CARD_A, to: CARD_C } };
+    expect(adapter.getState().selection).toEqual({ kind: 'edge', ...reconnected });
+    expect(edges.takeFocusRequest()).toEqual({ kind: 'edge', ...reconnected });
+  });
+
+  /** An endpoint dragged back where it started edited nothing, so nothing moves. */
+  it('leaves the selection alone when a reconnection changes nothing', () => {
+    const { edges, adapter } = open();
+    adapter.getState().selectEdge(SUBJECT);
+    edges.openEdgeEditor(SUBJECT);
+
+    expect(edges.reconnect('to', CARD_B)).toBe(true);
+
+    expect(adapter.getState().selection).toEqual({ kind: 'edge', ...SUBJECT });
+  });
+
   /** An endpoint dragged back where it started is the author's ordinary close. */
   it('settles the draft when a reconnection is unchanged', () => {
     const { edges, session } = open();
@@ -439,6 +469,22 @@ describe('completing a keyboard connection', () => {
     expect(session.getState().working).toBe(before);
     expect(edges.getState().draft).toEqual({ kind: 'keyboard-connect', from: CARD_A });
     expect(edges.getState().refusal).toBe('These Cards are already connected in this Graph.');
+  });
+
+  /**
+   * The continuation a drag hands back is the **pointer** path's, and it is
+   * drained only when a drag ends. A keyboard connection that left one behind
+   * would be collected by the next pointer gesture — including one that authored
+   * nothing — and select a Card that gesture never named.
+   */
+  it('leaves no continuation behind for the next pointer drag to collect', () => {
+    const { edges } = open();
+    edges.beginKeyboardConnect(CARD_B);
+    expect(edges.completeKeyboardConnect(CARD_C, PROJECTED)).toBe(CARD_C);
+
+    edges.beginPointerConnect(CARD_A);
+
+    expect(edges.endPointerDrag()).toBeNull();
   });
 
   it('does nothing without an open keyboard draft', () => {

@@ -425,12 +425,22 @@ body {
   font-size: 0.75rem;
 }
 
-.edge-toolbar__refusal {
-  border-left: 1px solid var(--border);
-  padding: 0.2rem 0.5rem;
+/* The sentence a pointer gesture's refusal leaves behind. Screen-fixed at the
+   top of the canvas because the gesture that produced it is over — there is no
+   surface left to attach it to. */
+.edge-refusal {
+  position: absolute;
+  top: 0.75rem;
+  left: 50%;
+  z-index: 10;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.35rem 0.6rem;
+  background: var(--panel);
   color: var(--danger, #f08c8c);
-  font-size: 0.75rem;
-  white-space: nowrap;
+  font-size: 0.8rem;
+  box-shadow: 0 12px 40px rgb(0 0 0 / 50%);
+  transform: translateX(-50%);
 }
 
 /* The keyboard connection's target picker. Screen-fixed rather than drawn at the
