@@ -95,6 +95,33 @@ of the registry.
   connections and the canvas's own pointer handling are the things a
   `pointer-events` regression would break silently in jsdom.
 
+## Review findings this ticket inherits
+
+Three findings from the review of PR #65 were deferred here rather than fixed on
+that branch, because this ticket deletes or rewrites the code each is about.
+Fixing them first would have been work thrown away, and leaving them unrecorded
+would have been work lost — they are acceptance criteria below, not notes.
+
+- **The pane's actions scroll out of reach.** `.card-pane__actions` is a child of
+  the scrolling `.card-pane__editor`, so `Cancel` and `Done` scroll away with the
+  fields. `editing.spec.ts:1258` has to wheel 600px to reach `Cancel`, and that
+  wheel is the standing evidence — **delete it with the fix rather than leaving a
+  passing test that describes the defect.** The comment at `styles.css:743-745`
+  says the actions do not scroll, which is false today; moving the form and the
+  actions to the pane is what makes it true.
+- **`containFocus` cancels mousedown on a scrollbar.** It prevents the default on
+  anything outside `input, textarea, button`, which includes the scrollbars the
+  pane grew when it started scrolling — so dragging one does nothing. Reported as
+  plausible and **not verified in a real browser**; Radix owns the containment
+  after this ticket, so confirm it is gone rather than re-deriving it. If Radix's
+  own dismissal layer reintroduces it, that is a finding worth its own note.
+- **`PANE_CANCEL_ATTRIBUTE` is in the wrong module, and `NewAlias` carries no
+  marker.** It sits in `OpenCard.tsx:20-23` rather than beside `PANE_FOCUSABLE`,
+  and `NewAlias`'s `Cancel` has no marker at all. `PANE_FOCUSABLE` lives in the
+  `CardPane` this ticket replaces, so where both belong is decided by what the
+  Radix composition leaves standing — decide it once, in one module, and give
+  both panes' Cancel the same treatment.
+
 ## Records to amend with the build
 
 Already amended by the decision session: the keyboard contract's two-stage
@@ -116,4 +143,8 @@ still points at issue `17` and should point at ADR 0048; and AGENTS.md's
       this repo's.
 - [ ] The three in-pane field Escapes are gone; `CardTitleEditor`'s is not.
 - [ ] Retarget under a dirty content draft preserves the draft.
+- [ ] The actions do not scroll with the fields, `editing.spec.ts`'s 600px wheel
+      is deleted, and `styles.css`'s comment about them is true.
+- [ ] A scrollbar inside the pane can be dragged.
+- [ ] The pane-cancel marker has one home, and both panes' `Cancel` carry it.
 - [ ] `pnpm verify` and `pnpm e2e` both green, output reported.
