@@ -8,7 +8,7 @@ import { describe, expect, it, vi } from 'vitest';
  * primitive, not reproduce a native button locally.
  */
 vi.mock('@base-ui/react/button', () => ({
-  Button: forwardRef<HTMLElement, ButtonHTMLAttributes<HTMLButtonElement>>(
+  Button: forwardRef<HTMLButtonElement, ButtonHTMLAttributes<HTMLButtonElement>>(
     function ObservedBaseButton(props, ref) {
       return <button ref={ref} data-testid="base-ui-button" {...props} />;
     },
