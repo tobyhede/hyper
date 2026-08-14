@@ -1,4 +1,4 @@
-import { forwardRef, type ComponentPropsWithoutRef, type ElementRef, type ReactNode } from 'react';
+import { forwardRef, type ComponentPropsWithoutRef, type ElementRef } from 'react';
 import { Popover as PopoverPrimitive } from '@base-ui/react/popover';
 import { cn } from './lib/utils';
 
@@ -11,23 +11,6 @@ import { cn } from './lib/utils';
  */
 export const Popover = PopoverPrimitive.Root;
 export const PopoverTrigger = PopoverPrimitive.Trigger;
-
-/**
- * Compatibility boundary for the former Radix Anchor.
- *
- * Base UI has no Anchor part: a non-trigger anchor is instead supplied to
- * `PopoverContent` and forwarded to `Popover.Positioner`. This component is
- * intentionally inert so existing imports fail neither at runtime nor by
- * adding a wrapper; new call sites must use that `anchor` prop directly.
- */
-export function PopoverAnchor({
-  children,
-}: {
-  readonly children?: ReactNode;
-  readonly asChild?: boolean;
-}) {
-  return <>{children}</>;
-}
 
 type PopoverPositionerProps = ComponentPropsWithoutRef<typeof PopoverPrimitive.Positioner>;
 type PopoverPopupProps = ComponentPropsWithoutRef<typeof PopoverPrimitive.Popup>;
