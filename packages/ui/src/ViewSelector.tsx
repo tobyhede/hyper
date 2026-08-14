@@ -22,8 +22,11 @@ export function ViewSelector({ value, active, onValueChange }: ViewSelectorProps
 
   return (
     <Select
-      value={active ? value : ''}
-      onValueChange={(next) => onValueChange(next as AlgorithmicViewId)}
+      value={active ? value : null}
+      // Base UI infers the value type from `value`, so `next` is already
+      // `AlgorithmicViewId | null` here; the null branch is its clear value,
+      // which Hyper has no action for.
+      onValueChange={(next) => next !== null && onValueChange(next)}
     >
       <SelectorTrigger
         accessibleName="Choose view"

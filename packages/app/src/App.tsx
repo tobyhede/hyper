@@ -16,12 +16,7 @@ import {
   type CardId,
   type LayoutPosition,
 } from '@project/core';
-import {
-  Placement,
-  graphCardIds,
-  resolveContentCard,
-  type ResolvedContentCard,
-} from '@project/graph';
+import { Placement, graphCardIds, type ResolvedContentCard } from '@project/graph';
 import type { OpenedSpace } from './space';
 import { createSpaceAuthoring } from './space-authoring';
 import { createRenderAdapter, selectedCardOf, type EdgeSubject } from './render-adapter';
@@ -462,22 +457,21 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
       return null;
     }, []);
 
-    // Opening an Alias delegates to its single-hop content owner, and the
-    // authored Alias remains the opened context.
+    // Every Card the Space holds, and deliberately no narrower: a Card's kind
+    // decides which fields the pane draws, never whether it opens. An Alias is
+    // editable on its own metadata (ADR 0049), not only through the Card whose
+    // content it resolves to, so there is nothing left for a filter here to
+    // remove — the resolve-to-content test that used to stand in this `map` said
+    // an Alias could be opened only as a way to reach another Card, which is the
+    // reading 0049 withdrew.
     //
-    // For a loaded Space this set is every Card, and the filter cannot currently
-    // remove one: `loadSpace` rejects an Alias whose target is missing or is
-    // itself an Alias, so resolution refuses nothing that reached this far. It
-    // stays because the refusal is real in the type — a Card kind that resolves
-    // to no content editor would land here as a compile-time obligation rather
-    // than as an occurrence the graph offers to open and the pane cannot draw.
+    // It is a set rather than a plain count because both readers ask membership
+    // of an id they did not choose: the canvas asks it per node to decide
+    // whether that Card offers its editing affordance, and `openCardForEditing`
+    // below asks it of a string arriving from React Flow, which names a Card of
+    // this Space only by convention.
     const editableCardIds = useMemo(
-      () =>
-        new Set(
-          rendererSpace.cards
-            .filter((card) => resolveContentCard(rendererSpace, card.id) !== undefined)
-            .map((card) => card.id),
-        ),
+      () => new Set(rendererSpace.cards.map((card) => card.id)),
       [rendererSpace],
     );
     const openCardForEditing = useCallback(
@@ -501,10 +495,10 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
     );
 
     const openedCard = openedCardId ? rendererSpace.lookup.card(openedCardId) : undefined;
-    const openedContent = openedCard ? resolveContentCard(rendererSpace, openedCard.id) : undefined;
-    const completeOpenedCard = useCallback((completed: ResolvedContentCard): void => {
+    const completeOpenedCard = useCallback((completed: ResolvedContentCard): string | null => {
       const { id, ...document } = completed;
-      authoring.complete({ kind: 'edited-card', cardId: id, document });
+      const result = authoring.complete({ kind: 'edited-card', cardId: id, document });
+      return result.kind === 'refused' ? result.reason : null;
     }, []);
 
     /**
@@ -520,7 +514,6 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
       () => rendererSpace.cards.filter((card) => card.kind !== 'alias'),
       [rendererSpace],
     );
-    const openedAlias = openedCard?.kind === 'alias' ? openedCard : undefined;
     /**
      * Authoring the Alias itself — one ordinary Card Edit, on whichever of its
      * two fields the author touched, and the operation package 3 already built
@@ -535,7 +528,7 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
     const editAlias = useCallback(
       (
         alias: Extract<Card, { kind: 'alias' }>,
-        change: { readonly title: string } | { readonly target: CardId },
+        change: { readonly title: string; readonly target: CardId },
       ): string | null => {
         const { id, ...document } = alias;
         const result = authoring.complete({
@@ -571,20 +564,6 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
         .querySelector<HTMLElement>(`.react-flow__node[data-id="${CSS.escape(closed)}"]`)
         ?.focus();
     }, [openedCardId, presenting]);
-
-    // Escape closes an opened Card. Registered ahead of the traversal controls and
-    // returning early while a card is open, so the two never fight over Escape.
-    useEffect(() => {
-      if (!openedCardId) return;
-      const onKeyDown = (event: KeyboardEvent) => {
-        if (event.key === 'Escape') {
-          event.preventDefault();
-          closeCard();
-        }
-      };
-      window.addEventListener('keydown', onKeyDown);
-      return () => window.removeEventListener('keydown', onKeyDown);
-    }, [openedCardId, closeCard]);
 
     // Traversing the graph (ADR 0027). Right commits the selected edge, Left traverses
     // back, Up and Down move the selection among a fork's outgoing edges without
@@ -787,37 +766,21 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
             />
           )}
 
-          {/* Which form the pane opens in is the *relation* between the Card
-              that was opened and the Card that owns its content, not the opened
-              Card's kind: a Card that resolves to itself is a direct open, and
-              anything else was reached through an occurrence. Deciding on
-              `kind === 'alias'` would answer the same question by proxy today
-              and wrongly for the next kind that resolves elsewhere. */}
+          {/* An Alias authors only its own metadata. Its Target must be opened
+              explicitly to author shared content (ADR 0049). */}
           {openedCard &&
-            openedContent &&
-            (openedCard.id === openedContent.id ? (
-              <OpenCard card={openedContent} onComplete={completeOpenedCard} onCancel={closeCard} />
-            ) : (
+            (openedCard.kind === 'alias' ? (
               <OpenCard
                 through={openedCard}
-                content={openedContent}
-                // The Title and Target fields are offered because this
-                // occurrence is an Alias, which is a Card with a title and a
-                // pointer of its own that an author may move — not because the
-                // pane delegates, which is the weaker fact the variant above
-                // already records.
-                {...(openedAlias === undefined
-                  ? {}
-                  : {
-                      occurrence: {
-                        onRename: (title: string) => editAlias(openedAlias, { title }),
-                        targets: aliasTargets,
-                        onRetarget: (target: CardId) => editAlias(openedAlias, { target }),
-                      },
-                    })}
-                onComplete={completeOpenedCard}
+                occurrence={{
+                  targets: aliasTargets,
+                  onEdit: (change: { title: string; target: CardId }) =>
+                    editAlias(openedCard, change),
+                }}
                 onCancel={closeCard}
               />
+            ) : (
+              <OpenCard card={openedCard} onComplete={completeOpenedCard} onCancel={closeCard} />
             ))}
 
           {creatingAlias && openedCardId === null && (

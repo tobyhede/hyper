@@ -220,7 +220,7 @@ async function openEditor(): Promise<void> {
 }
 
 describe('authoring an opened Card', () => {
-  it('updates the content owner through an Alias and preserves the authored Alias', async () => {
+  it('updates only Alias metadata and preserves the Target content', async () => {
     const aliased = spaceSnapshotSchema.parse({
       ...snapshot,
       document: {
@@ -251,34 +251,19 @@ describe('authoring an opened Card', () => {
     const session = mount(aliased);
 
     fireEvent.click(await screen.findByRole('button', { name: 'Edit Card A again' }));
-    expect(screen.getByText('Opened through A again')).toBeVisible();
-    expect(screen.getByText('Editing content on A')).toBeVisible();
-    // The Title is the occurrence's own — `A again`, never the content owner's.
-    // This line read `not.toBeInTheDocument()` and pinned a pane with no Title
-    // field at all; what it was guarding is that no field here renames `A`,
-    // which the value says and the absence only implied.
     expect(screen.getByRole('textbox', { name: 'Title' })).toHaveValue('A again');
-    // Qualified, because the Alias draws a description of its own on the graph
-    // behind this pane and these fields do not author it.
-    expect(screen.getByRole('textbox', { name: 'Description of A' })).toHaveValue('');
-    fireEvent.change(screen.getByRole('textbox', { name: 'Description of A' }), {
-      target: { value: 'Shared target caption' },
-    });
-    fireEvent.change(screen.getByRole('textbox', { name: 'Markdown source of A' }), {
-      target: { value: 'Shared target source' },
+    expect(screen.queryByRole('textbox', { name: /Description/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('textbox', { name: /Markdown source/ })).not.toBeInTheDocument();
+    fireEvent.change(screen.getByRole('textbox', { name: 'Title' }), {
+      target: { value: 'Recap' },
     });
     fireEvent.click(screen.getByRole('button', { name: 'Done' }));
 
+    expect(session.getState().working.cards).toContainEqual(snapshot.cards[0]);
     expect(session.getState().working.cards).toContainEqual({
-      id: CARD_ID,
-      document: {
-        title: 'A',
-        description: 'Shared target caption',
-        kind: 'markdown',
-        body: 'Shared target source',
-      },
+      ...aliased.cards[2],
+      document: { ...aliased.cards[2]!.document, title: 'Recap' },
     });
-    expect(session.getState().working.cards).toContainEqual(aliased.cards[2]);
     await settled(session);
   });
 
@@ -288,49 +273,40 @@ describe('authoring an opened Card', () => {
    * target was written. A second Alias is a second occurrence that has to have
    * moved with it, and it never touched the edit itself.
    */
-  it('shows an edit made through one Alias when a second Alias of the same Card opens', async () => {
+  it('updates shared content only when its Target is opened explicitly', async () => {
     const session = mount(twiceAliased);
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Edit Card A again' }));
-    fireEvent.change(screen.getByRole('textbox', { name: 'Markdown source of A' }), {
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit Card A' }));
+    fireEvent.change(screen.getByRole('textbox', { name: 'Markdown source' }), {
       target: { value: 'Written once, shown everywhere' },
     });
-    fireEvent.change(screen.getByRole('textbox', { name: 'Description of A' }), {
+    fireEvent.change(screen.getByRole('textbox', { name: 'Description' }), {
       target: { value: 'One caption, three occurrences' },
     });
     fireEvent.click(screen.getByRole('button', { name: 'Done' }));
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Edit Card A once more' }));
-    expect(screen.getByText('Opened through A once more')).toBeVisible();
-    expect(screen.getByRole('textbox', { name: 'Markdown source of A' })).toHaveValue(
-      'Written once, shown everywhere',
-    );
-    expect(screen.getByRole('textbox', { name: 'Description of A' })).toHaveValue(
-      'One caption, three occurrences',
-    );
-    // Neither Alias was written, only the Card they both show.
+    expect(bodyOf(session, CARD_ID)).toBe('Written once, shown everywhere');
     expect(session.getState().working.cards).toContainEqual(twiceAliased.cards[2]);
     expect(session.getState().working.cards).toContainEqual(twiceAliased.cards[3]);
     await settled(session);
   });
 
   /**
-   * Both Aliases resolve to one content Card, so the identity the editor's draft
-   * hangs on is shared and only the occurrence differs. Nothing typed into the
-   * first and abandoned may appear in the second.
+   * Each Alias owns its metadata draft. Nothing typed into the first and
+   * abandoned may appear in the second.
    */
-  it('opens a second Alias on the stored content, not the draft abandoned in the first', async () => {
+  it('opens a second Alias on its own metadata, not the draft abandoned in the first', async () => {
     const session = mount(twiceAliased);
 
     fireEvent.click(await screen.findByRole('button', { name: 'Edit Card A again' }));
-    fireEvent.change(screen.getByRole('textbox', { name: 'Markdown source of A' }), {
+    fireEvent.change(screen.getByRole('textbox', { name: 'Title' }), {
       target: { value: 'Never completed' },
     });
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
 
     fireEvent.click(await screen.findByRole('button', { name: 'Edit Card A once more' }));
 
-    expect(screen.getByRole('textbox', { name: 'Markdown source of A' })).toHaveValue('A source');
+    expect(screen.getByRole('textbox', { name: 'Title' })).toHaveValue('A once more');
     expect(bodyOf(session, CARD_ID)).toBe('A source');
     await settled(session);
   });
@@ -338,8 +314,9 @@ describe('authoring an opened Card', () => {
   /**
    * Escape cancels, and the pane closes with it — there is no reading state
    * behind the editor to fall back to (ADR 0037). What matters is that the draft
-   * is discarded rather than committed, and that the window listener does not
-   * also fire.
+   * is discarded rather than committed: Escape is an alias of Cancel on this
+   * surface, and the field it was pressed in takes no first press of its own
+   * (ADR 0048).
    */
   it('cancels the edit on Escape without committing the draft', async () => {
     const session = mount();
@@ -394,9 +371,15 @@ describe('authoring an opened Card', () => {
    * `card.id` changed underneath it, and the fields were now A's text wearing
    * B's identity. `Done` then wrote A's title and body over B.
    *
-   * Reachable from the keyboard: the pane traps nothing, so `Enter` on a node
-   * behind it opens that Card (`SpaceCanvas`'s handler only declines while
-   * presenting).
+   * The pane traps focus, but the invariant still has to survive an event from
+   * a node behind it — including a synthetic or stale event delivered after the
+   * pane opened.
+   *
+   * The node is found by its test id rather than by its heading, because the
+   * pane hides the graph behind it from the accessibility tree (`hideOthers`,
+   * ADR 0047) and a role query answers only what is in that tree. Dispatching
+   * onto the element is still the point: this is a keypress reaching a node the
+   * author cannot see.
    */
   it('never carries one Card’s draft onto another', async () => {
     const session = mount();
@@ -405,9 +388,7 @@ describe('authoring an opened Card', () => {
       target: { value: 'A rewritten' },
     });
 
-    const other = (await screen.findByRole('heading', { name: 'B' })).closest('.react-flow__node');
-    if (other === null) throw new Error('Card B is not drawn as a node');
-    fireEvent.keyDown(other, { key: 'Enter' });
+    fireEvent.keyDown(screen.getByTestId(`rf__node-${OTHER_CARD_ID}`), { key: 'Enter' });
 
     // Whatever the pane shows, it must not be A's draft under B's id.
     expect(screen.getByRole('textbox', { name: 'Title' })).toHaveValue('A');
@@ -421,11 +402,11 @@ describe('authoring an opened Card', () => {
   });
 
   /**
-   * Two handlers answer Escape — the form's own cancel, and the window listener
-   * `App` registers while a Card is open — and which one runs depends on where
-   * the key lands. Outside the fields only the listener does. Both close without
-   * committing, so the pane behaves the same either way; this is what says so,
-   * since the form's `stopPropagation` makes it easy to assume otherwise.
+   * One owner answers Escape wherever it is pressed, which is what replaced two.
+   * The form used to take it and stop it propagating, because a window listener
+   * `App` registered would otherwise have answered the same keypress; the Dialog
+   * now listens once, on the document, so a press on the backdrop and a press in
+   * a field reach the same place.
    */
   it('closes without committing when Escape is pressed outside the fields', async () => {
     const session = mount();

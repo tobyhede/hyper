@@ -25,8 +25,13 @@ describe('ViewSelector', () => {
     expect(screen.getByRole('option', { name: 'Grid' })).toBeInTheDocument();
     expect(screen.queryByRole('option', { name: 'By name' })).not.toBeInTheDocument();
     expect(screen.queryByRole('option', { name: 'Tree' })).not.toBeInTheDocument();
+    // The list is portalled outside the toolbar, so its own marker must keep
+    // React Flow's document-level delete shortcut from treating it as canvas UI.
+    expect(screen.getByRole('listbox').parentElement).toHaveClass('nokey');
 
-    fireEvent.click(screen.getByRole('option', { name: 'Grid' }));
+    const grid = screen.getByRole('option', { name: 'Grid' });
+    fireEvent.pointerDown(grid, { pointerType: 'mouse' });
+    fireEvent.click(grid);
     expect(onValueChange).toHaveBeenCalledWith('grid');
   });
 

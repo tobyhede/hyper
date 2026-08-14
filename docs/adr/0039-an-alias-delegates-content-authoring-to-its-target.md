@@ -2,7 +2,7 @@
 
 Status: accepted
 Refines: 0037
-Refined by: 0046
+Refined by: 0046, 0049
 Related: 0009, 0011, 0036
 
 Opening an alias brings up the same surface every card opens on, filled with the content of the card it targets (ADR 0009's single hop, unchanged). Completing writes that target, so every occurrence of the content changes together — which is what an alias is for.

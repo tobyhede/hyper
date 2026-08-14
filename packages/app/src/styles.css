@@ -704,7 +704,14 @@ body {
   align-items: center;
   justify-content: center;
   padding: 2rem;
+  pointer-events: none;
+}
+
+.card-pane__backdrop {
+  position: absolute;
+  inset: 0;
   background: rgba(6, 8, 12, 0.6);
+  pointer-events: auto;
 }
 
 /* The card frame. 16:9, matching `card.ts` — a card in the graph and the same
@@ -712,6 +719,8 @@ body {
    viewport's height as well as its width, so the frame letterboxes on a viewport
    that is not 16:9 rather than silently changing the shape of the content. */
 .card-pane__panel {
+  position: relative;
+  z-index: 1;
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 12px;
@@ -724,6 +733,7 @@ body {
   gap: 0.75rem;
   /* The frame clips; the content region inside it is what scrolls. */
   overflow: hidden;
+  pointer-events: auto;
 }
 
 .card-pane__editor {
@@ -732,32 +742,16 @@ body {
   min-height: 0;
   flex-direction: column;
   gap: 0.75rem;
-  /* This is the content region the frame's own comment promises scrolls. It had
-     `flex: 1; min-height: 0` and no `overflow`, so nothing did: the panel clips
-     at a fixed 16/9 whose width is clamped by viewport height, and anything
-     taller simply fell off the bottom with no way to reach it — `overflow:
-     hidden` takes no wheel. The opened-Card editor hid that, because its
-     Markdown field absorbs the squeeze; the Alias creation pane has no such
-     field, so at a viewport below ~620px tall (or ~1000px wide) its refusal
-     line and its Cancel button were both unreachable by pointer. */
-  overflow-y: auto;
 }
 
-/* Two Cards on one line: the occurrence the author opened, and the Card whose
-   content they are editing through it. Pushed to opposite ends because they are
-   two answers to two questions, and the second is emphasised because it is the
-   one the fields below belong to. */
-.card-pane__delegation {
+/* Fields scroll independently so Cancel and Done stay reachable. */
+.card-pane__fields {
   display: flex;
-  justify-content: space-between;
-  gap: 1rem;
-  color: var(--muted);
-  font-size: 0.8rem;
-}
-
-.card-pane__delegation span:last-child {
-  color: var(--text);
-  font-weight: 600;
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
+  gap: 0.75rem;
+  overflow-y: auto;
 }
 
 /* What this pane is creating, over a line saying what that kind is. Stacked
@@ -808,11 +802,8 @@ body {
 .card-pane__field textarea {
   flex: 1;
   /* A floor low enough that the pane above it does not have to scroll in the
-     ordinary case. At 8rem this field alone overflowed the delegated pane by
-     17–64px at *every* window size, a maximised one included, because the
-     occurrence's Title and Target sit above it and the floor would not yield.
-     The scroll added to `.card-pane__editor` is the fallback for a genuinely
-     small window, not the normal state of a full-screen editor. */
+     ordinary case. The scroll on `.card-pane__fields` is the fallback for a
+     genuinely small window, not the normal state of a full-screen editor. */
   min-height: 4rem;
   resize: none;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -829,19 +820,6 @@ body {
   color: var(--muted);
   font-size: 0.78rem;
   line-height: 1.35;
-}
-
-/* The occurrence's own two fields — its title, and the Target that decides
-   *which* Card it shows — above the content that Target owns. Ruled off from
-   the fields below because the two halves author different Cards, which is the
-   one thing this pane must not let an author lose track of. The gap matches the
-   editor's, so the four fields read as one column across the rule. */
-.card-pane__occurrence {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-  border-bottom: 1px solid var(--border);
-  padding-bottom: 0.75rem;
 }
 
 /* The editor's content scrolls within the frame and this does not, so the

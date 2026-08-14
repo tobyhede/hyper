@@ -1,13 +1,16 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { AddCardControl } from '../src/index';
 
 /**
- * Radix's menu positions itself through Popper, which measures. jsdom ships
+ * Base UI's menu positions itself through Floating UI, which measures. jsdom ships
  * neither `ResizeObserver` nor pointer capture, and both are reached before the
  * menu can open at all.
  */
 beforeAll(() => {
+  // Base UI dispatches a PointerEvent when a keyboard-activated menu item
+  // completes. jsdom exposes MouseEvent but not its PointerEvent subclass.
+  vi.stubGlobal('PointerEvent', MouseEvent);
   HTMLElement.prototype.hasPointerCapture = () => false;
   HTMLElement.prototype.setPointerCapture = () => undefined;
   HTMLElement.prototype.releasePointerCapture = () => undefined;
@@ -83,21 +86,36 @@ describe('AddCardControl', () => {
    * Add Alias has no letter key of its own — the visible control *is* its
    * keyboard path — so the menu has to open and select from the keyboard alone.
    */
-  it('reaches Add Alias from the keyboard through the menu', () => {
+  it('reaches Add Alias from the keyboard through the menu', async () => {
     const onAddCard = vi.fn();
     const onAddAlias = vi.fn();
     render(<AddCardControl onAddCard={onAddCard} onAddAlias={onAddAlias} />);
 
-    fireEvent.keyDown(screen.getByRole('button', { name: 'More Card kinds' }), { key: 'Enter' });
-    // Radix moves focus onto the first item as the menu opens, and activates it
-    // from the key rather than from a click. Asserting that here is the
-    // difference between "the item exists" and "the keyboard reaches it".
+    const trigger = screen.getByRole('button', { name: 'More Card kinds' });
+    fireEvent.keyDown(trigger, { key: 'Enter' });
+    // A native button's Enter activation follows keydown with a click. Base UI
+    // deliberately keeps that browser contract, while Radix opened from the
+    // synthetic keydown alone, so jsdom needs the native activation completed.
+    fireEvent.click(trigger, { detail: 0 });
+    // Base UI moves focus onto the first item as the menu opens, and activates
+    // it from the key rather than from a pointer click. Asserting that here is
+    // the difference between "the item exists" and "the keyboard reaches it".
     const item = screen.getByRole('menuitem', { name: 'Add Alias' });
-    expect(item).toHaveFocus();
+    await waitFor(() => expect(item).toHaveFocus());
     fireEvent.keyDown(item, { key: 'Enter' });
 
     expect(onAddAlias).toHaveBeenCalledTimes(1);
     expect(onAddCard).not.toHaveBeenCalled();
+  });
+
+  it('returns focus to its trigger when the menu is dismissed', async () => {
+    render(<AddCardControl onAddCard={vi.fn()} onAddAlias={vi.fn()} />);
+
+    const trigger = screen.getByRole('button', { name: 'More Card kinds' });
+    fireEvent.click(trigger);
+    fireEvent.keyDown(screen.getByRole('menu'), { key: 'Escape' });
+
+    await waitFor(() => expect(trigger).toHaveFocus());
   });
 
   /**

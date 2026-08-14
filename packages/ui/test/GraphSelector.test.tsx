@@ -35,11 +35,8 @@ const graphs: readonly Graph[] = [
 
 describe('GraphSelector', () => {
   it('stays controlled when the first conversion mints a Space its Graph', () => {
-    // A Space with no Layout owns no Graph either (ADR 0040), so `activeGraphId`
-    // starts null and the conversion that creates the Layout mints the Graph it
-    // becomes. Omitting the prop for null made that flip Radix from uncontrolled
-    // to controlled — a warning, and selection state Radix keeps that the app is
-    // no longer the source of truth for.
+    // A Space with no Layout owns no Graph either (ADR 0040), so Base UI's
+    // controlled value starts null and conversion mints the Graph it becomes.
     const warnings: string[] = [];
     vi.spyOn(console, 'warn').mockImplementation((first: unknown) => {
       warnings.push(String(first));
@@ -99,8 +96,10 @@ describe('GraphSelector', () => {
     expect(trigger).toHaveAttribute('title', 'Active Graph');
     expect(trigger).toHaveTextContent('Short graph');
     expect(trigger.querySelector('svg')).toHaveAttribute('stroke', '#f4a259');
+    expect(trigger.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
     expect(present).toHaveAttribute('title', 'Present this Graph');
-    expect(present.querySelector('svg')).toHaveAttribute('fill', '#f4a259');
+    expect(present.querySelector('svg')).toHaveAttribute('stroke', '#f4a259');
+    expect(present.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
 
     fireEvent.click(present);
     expect(onPresent).toHaveBeenCalledOnce();
@@ -126,7 +125,7 @@ describe('GraphSelector', () => {
     ).toHaveAttribute('stroke', '#445566');
     expect(
       screen.getByRole('button', { name: 'Present this Graph' }).querySelector('svg'),
-    ).toHaveAttribute('fill', '#445566');
+    ).toHaveAttribute('stroke', '#445566');
 
     fireEvent.keyDown(screen.getByRole('combobox', { name: 'Active Graph' }), { key: 'ArrowDown' });
     const options = screen.getAllByRole('option');
@@ -155,7 +154,7 @@ describe('GraphSelector', () => {
     ).toHaveAttribute('stroke', '#f4a259');
     expect(
       screen.getByRole('button', { name: 'Present this Graph' }).querySelector('svg'),
-    ).toHaveAttribute('fill', '#f4a259');
+    ).toHaveAttribute('stroke', '#f4a259');
 
     fireEvent.keyDown(screen.getByRole('combobox', { name: 'Active Graph' }), { key: 'ArrowDown' });
     const options = screen.getAllByRole('option');
@@ -197,7 +196,9 @@ describe('GraphSelector', () => {
     );
 
     fireEvent.keyDown(screen.getByRole('combobox', { name: 'Active Graph' }), { key: 'ArrowDown' });
-    fireEvent.click(screen.getByRole('option', { name: /Long graph/ }));
+    const graph = screen.getByRole('option', { name: /Long graph/ });
+    fireEvent.pointerDown(graph, { pointerType: 'mouse' });
+    fireEvent.click(graph);
 
     expect(onActivate).toHaveBeenCalledOnce();
     expect(onActivate).toHaveBeenCalledWith(graphs[0]?.id);

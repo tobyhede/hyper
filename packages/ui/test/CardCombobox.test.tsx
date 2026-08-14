@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { CardCombobox, type CardChoice } from '../src/index';
 
@@ -121,5 +121,55 @@ describe('CardCombobox', () => {
 
     expect(screen.getAllByRole('combobox', { name: 'To' })).toHaveLength(1);
     expect(screen.getByRole('combobox', { name: 'Search' })).toBeInTheDocument();
+  });
+
+  /**
+   * The popup is portalled out of React Flow's `.nokey` canvas subtree, so the
+   * popup itself carries the key guard. Escape remains the ordinary close and
+   * returns a keyboard author to the field that opened it.
+   */
+  it('guards its portalled popup and returns focus to the trigger after Escape', async () => {
+    render(
+      <CardCombobox
+        label="To"
+        testId="edge-to"
+        choices={CHOICES}
+        value="card-a"
+        onValueChange={vi.fn()}
+      />,
+    );
+
+    // Browsers focus a pressed button before dispatching its click; fireEvent
+    // does not, so make the keyboard path explicit in jsdom. This is also what
+    // `FloatingFocusManager` records as the element to return focus to.
+    const trigger = screen.getByRole('combobox', { name: 'To' });
+    trigger.focus();
+    fireEvent.click(trigger);
+
+    const search = screen.getByRole('combobox', { name: 'Search' });
+    expect(search.closest('.nokey')).not.toBeNull();
+
+    /*
+     * The popup does not take focus **in jsdom**, and that is the environment
+     * rather than the component: Base UI's default `initialFocus` resolves to
+     * `true`, which asks `tabbable` for the first tabbable descendant, and
+     * `tabbable` needs layout — every element in jsdom measures 0×0 with no
+     * `offsetParent`, so it finds none and focus stays on the trigger. A real
+     * browser lands on this search input. Putting focus there by hand is what
+     * makes the return leg below a round trip instead of a tautology: with the
+     * trigger still focused, `toHaveFocus()` at the end passes whether or not
+     * anything ever returned it, which is exactly how this test used to pass
+     * with focus restoration switched off entirely.
+     */
+    search.focus();
+    expect(search).toHaveFocus();
+
+    fireEvent.keyDown(search, { key: 'Escape' });
+
+    expect(screen.queryByRole('combobox', { name: 'Search' })).not.toBeInTheDocument();
+    // The restore is deferred: the focus manager's cleanup reads the close type
+    // and then focuses the return element from a `queueMicrotask`, so focus is
+    // still on `<body>` for the rest of this tick.
+    await waitFor(() => expect(trigger).toHaveFocus());
   });
 });

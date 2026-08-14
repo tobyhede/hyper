@@ -1,39 +1,89 @@
 import { forwardRef, type ComponentPropsWithoutRef, type ElementRef } from 'react';
-import * as PopoverPrimitive from '@radix-ui/react-popover';
+import { Popover as PopoverPrimitive } from '@base-ui/react/popover';
 import { cn } from './lib/utils';
 
 /**
- * shadcn-style Popover built on Radix, styled to match the toolbar palette.
+ * Hyper's styled Base UI Popover composition.
  *
- * The primitive owns focus trapping, outside-press and Escape dismissal, and
- * returning focus to the trigger — none of which is re-implemented here.
+ * Positioning belongs to Base UI's Positioner, while popup semantics and the
+ * portalled surface belong to Popup. Keeping that division here stops callers
+ * from accidentally putting position props on the visible surface.
  */
 export const Popover = PopoverPrimitive.Root;
-export const PopoverAnchor = PopoverPrimitive.Anchor;
 export const PopoverTrigger = PopoverPrimitive.Trigger;
 
+type PopoverPositionerProps = ComponentPropsWithoutRef<typeof PopoverPrimitive.Positioner>;
+type PopoverPopupProps = ComponentPropsWithoutRef<typeof PopoverPrimitive.Popup>;
+
+export type PopoverContentProps = Omit<PopoverPopupProps, 'className'> &
+  Pick<
+    PopoverPositionerProps,
+    | 'align'
+    | 'alignOffset'
+    | 'anchor'
+    | 'arrowPadding'
+    | 'collisionAvoidance'
+    | 'collisionBoundary'
+    | 'collisionPadding'
+    | 'disableAnchorTracking'
+    | 'positionMethod'
+    | 'side'
+    | 'sideOffset'
+    | 'sticky'
+  > & {
+    readonly className?: string;
+  };
+
 export const PopoverContent = forwardRef<
-  ElementRef<typeof PopoverPrimitive.Content>,
-  ComponentPropsWithoutRef<typeof PopoverPrimitive.Content>
->(({ className, align = 'center', sideOffset = 6, ...props }, ref) => (
-  <PopoverPrimitive.Portal>
-    <PopoverPrimitive.Content
-      ref={ref}
-      align={align}
-      sideOffset={sideOffset}
-      // `nokey` because React Flow subscribes its delete key on `document`, and
-      // the one exclusion it makes — `isInputDOMNode` — walks the *event
-      // target's* DOM ancestors for that class. A layer portalled to
-      // `document.body` therefore sits outside every `.nokey` the app puts
-      // inside the flow, so the class has to travel with the portalled content
-      // itself. `cn` is `twMerge(clsx(...))`, which leaves a non-Tailwind class
-      // alone.
-      className={cn(
-        'nokey z-50 min-w-[15rem] rounded-[6px] border border-[var(--border)] bg-[var(--panel)] p-[0.6rem] text-[var(--text)] shadow-[0_12px_40px_rgba(0,0,0,0.5)] outline-none',
-        className,
-      )}
-      {...props}
-    />
-  </PopoverPrimitive.Portal>
-));
-PopoverContent.displayName = PopoverPrimitive.Content.displayName;
+  ElementRef<typeof PopoverPrimitive.Popup>,
+  PopoverContentProps
+>(
+  (
+    {
+      align = 'center',
+      alignOffset,
+      anchor,
+      arrowPadding,
+      className,
+      collisionAvoidance,
+      collisionBoundary,
+      collisionPadding,
+      disableAnchorTracking,
+      positionMethod,
+      side,
+      sideOffset = 6,
+      sticky,
+      ...popupProps
+    },
+    ref,
+  ) => (
+    <PopoverPrimitive.Portal>
+      <PopoverPrimitive.Positioner
+        align={align}
+        alignOffset={alignOffset}
+        anchor={anchor}
+        arrowPadding={arrowPadding}
+        collisionAvoidance={collisionAvoidance}
+        collisionBoundary={collisionBoundary}
+        collisionPadding={collisionPadding}
+        disableAnchorTracking={disableAnchorTracking}
+        positionMethod={positionMethod}
+        side={side}
+        sideOffset={sideOffset}
+        sticky={sticky}
+      >
+        <PopoverPrimitive.Popup
+          ref={ref}
+          // `nokey` because React Flow subscribes its delete key on `document`,
+          // while a portalled popup is outside the canvas's own guard.
+          className={cn(
+            'nokey z-50 min-w-[15rem] rounded-[6px] border border-[var(--border)] bg-[var(--panel)] p-[0.6rem] text-[var(--text)] shadow-[0_12px_40px_rgba(0,0,0,0.5)] outline-none',
+            className,
+          )}
+          {...popupProps}
+        />
+      </PopoverPrimitive.Positioner>
+    </PopoverPrimitive.Portal>
+  ),
+);
+PopoverContent.displayName = 'PopoverContent';

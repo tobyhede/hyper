@@ -4,6 +4,7 @@
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "module": "ESNext",
     "moduleResolution": "Bundler",
+    "resolvePackageJsonImports": true,
     // Every file is a module. Left on `auto`, a file with no import or export is
     // a global script and leaks its declarations repo-wide. No file is one
     // today, which is exactly when this is free to turn on.

@@ -1,4 +1,4 @@
-import { act, fireEvent, render, renderHook, screen } from '@testing-library/react';
+import { act, fireEvent, render, renderHook, screen, waitFor } from '@testing-library/react';
 import { useContext, type ReactNode } from 'react';
 import { Position, ReactFlowProvider, type Edge } from '@xyflow/react';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
@@ -357,7 +357,7 @@ describe('the Edge toolbar', () => {
     ]);
   });
 
-  it('opens the endpoint editor from its own button', () => {
+  it('opens the endpoint editor from its own button', async () => {
     const { adapter, edgeAuthoring } = mountCanvas();
     act(() => adapter.getState().selectEdge(SUBJECT));
 
@@ -368,8 +368,14 @@ describe('the Edge toolbar', () => {
       graphId: GRAPH_ID,
       edge: EDGE,
     });
-    expect(screen.getByRole('combobox', { name: 'From' })).toBeVisible();
-    expect(screen.getByRole('combobox', { name: 'To' })).toBeVisible();
+    // Base UI mounts its portalled Positioner after the controlled Root opens.
+    // The author-visible contract is still that both endpoint fields stand when
+    // the command completes; `waitFor` observes that contract rather than its
+    // scheduling implementation.
+    await waitFor(() => {
+      expect(screen.getByRole('combobox', { name: 'From' })).toBeVisible();
+      expect(screen.getByRole('combobox', { name: 'To' })).toBeVisible();
+    });
   });
 
   /**
@@ -919,30 +925,29 @@ describe('withdrawing Edge authoring', () => {
  * the guard removed, and the author's two stages are the e2e's to pin.
  *
  * What this pins is the **rule**, in the one environment that can see it. A
- * portal is no escape from the React tree — Radix renders the list through
- * `createPortal`, React dispatches synthetic events along the *fiber* tree, and
- * Radix's own Escape handling calls `preventDefault` and never
- * `stopPropagation` — and jsdom dispatches a whole event in one frame with no
+ * portal is no escape from the React tree — Base UI renders the list through a
+ * portal, React dispatches synthetic events along the *fiber* tree, and the
+ * popup's Escape handling calls `preventDefault` and never `stopPropagation` —
+ * and jsdom dispatches a whole event in one frame with no
  * checkpoint, so here the press really does arrive in front of the guard.
  * Without it this fails with the picker gone on the first press: one gesture
  * cancelled by a keystroke the author aimed at a list. That is what will matter
  * the next time the primitive moves to one answering Escape from React rather
  * than from the document.
  *
- * It also holds the guard to the primitive underneath it: it was written against
- * a Radix `Select` and the picker is now shadcn's Combobox — a Popover over
- * cmdk. Both stamp `data-state` because both triggers are Radix triggers, which
- * was an argument in a comment until this ran it.
+ * It also holds the guard to the primitive underneath it: the picker is
+ * shadcn's Combobox — a Base UI Popover over cmdk. Its trigger continues to
+ * expose its expanded state to the surrounding keyboard interaction.
  */
 describe('Escape in the keyboard target picker', () => {
-  it('closes the open list first and cancels the connection only on the press after', () => {
+  it('closes the open list first and cancels the connection only on the press after', async () => {
     const { edgeAuthoring, session } = mountCanvas();
     const before = session.getState().working;
     act(() => edgeAuthoring.beginKeyboardConnect(CARD_A));
     const trigger = screen.getByRole('combobox', { name: 'Connect to' });
 
     fireEvent.click(trigger);
-    expect(screen.getByRole('combobox', { name: 'Search' })).toBeVisible();
+    await waitFor(() => expect(screen.getByRole('combobox', { name: 'Search' })).toBeVisible());
     fireEvent.keyDown(screen.getByRole('combobox', { name: 'Search' }), { key: 'Escape' });
 
     // The list has gone and the gesture has not.
