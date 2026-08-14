@@ -1,8 +1,8 @@
-import { useContext, useState, type ReactNode } from 'react';
+import { useContext, useRef, useState, type ReactNode } from 'react';
 import { EdgeLabelRenderer, type EdgeProps } from '@xyflow/react';
 import type { CardId } from '@project/core';
 import { RoutedEdge, routedEdgeGeometry, type RoutedFlowEdge } from '@project/react-flow-adapter';
-import { CardCombobox, Popover, PopoverAnchor, PopoverContent } from '@project/ui';
+import { CardCombobox, Popover, PopoverContent } from '@project/ui';
 import { edgeSelectionOf, sameEdgeSubject, type EdgeSubject } from '../render-adapter';
 import { EdgeAuthoringContext, type EdgeAuthoringCommands } from './edge-authoring-context';
 
@@ -50,6 +50,7 @@ function EdgeToolbar({
  */
 export function AuthorableEdge(props: EdgeProps<RoutedFlowEdge>) {
   const commands = useContext(EdgeAuthoringContext);
+  const editorAnchor = useRef<HTMLDivElement>(null);
   const { labelX, labelY } = routedEdgeGeometry(props);
   // The same translation the selection mirror and the callbacks use, so this
   // Edge cannot disagree with them about which Edge it is.
@@ -70,34 +71,33 @@ export function AuthorableEdge(props: EdgeProps<RoutedFlowEdge>) {
           open={open}
           onOpenChange={(next) => (next ? commands.openEditor(subject) : commands.closeEditor())}
         >
-          <PopoverAnchor asChild>
-            <div className="edge-toolbar__anchor">
-              <button
-                type="button"
-                className="edge-toolbar__button"
-                data-testid="edge-edit"
-                aria-label="Edit this Edge"
-                aria-expanded={open}
-                onClick={() => (open ? commands.closeEditor() : commands.openEditor(subject))}
-              >
-                Edit
-              </button>
-              <button
-                type="button"
-                className="edge-toolbar__button"
-                data-testid="edge-delete"
-                aria-label="Delete this Edge"
-                onClick={() => commands.deleteEdge(subject)}
-              >
-                Delete
-              </button>
-              {/* A refused Delete is announced by the canvas-level alert rather
+          <div ref={editorAnchor} className="edge-toolbar__anchor">
+            <button
+              type="button"
+              className="edge-toolbar__button"
+              data-testid="edge-edit"
+              aria-label="Edit this Edge"
+              aria-expanded={open}
+              onClick={() => (open ? commands.closeEditor() : commands.openEditor(subject))}
+            >
+              Edit
+            </button>
+            <button
+              type="button"
+              className="edge-toolbar__button"
+              data-testid="edge-delete"
+              aria-label="Delete this Edge"
+              onClick={() => commands.deleteEdge(subject)}
+            >
+              Delete
+            </button>
+            {/* A refused Delete is announced by the canvas-level alert rather
                   than here. The refusal is one module-wide value, so a toolbar
                   copy showed a sentence from an unrelated gesture on whichever
                   Edge happened to be selected. */}
-            </div>
-          </PopoverAnchor>
+          </div>
           <PopoverContent
+            anchor={editorAnchor}
             className="edge-editor"
             data-testid="edge-editor"
             aria-label="Edge endpoints"

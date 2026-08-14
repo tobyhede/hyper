@@ -122,4 +122,25 @@ describe('CardCombobox', () => {
     expect(screen.getAllByRole('combobox', { name: 'To' })).toHaveLength(1);
     expect(screen.getByRole('combobox', { name: 'Search' })).toBeInTheDocument();
   });
+
+  /**
+   * The popup is portalled out of React Flow's `.nokey` canvas subtree, so the
+   * popup itself carries the key guard. Escape remains the ordinary close and
+   * returns a keyboard author to the field that opened it.
+   */
+  it('guards its portalled popup and returns focus to the trigger after Escape', () => {
+    open();
+
+    // Browsers focus a pressed button before dispatching its click; fireEvent
+    // does not, so make the keyboard path explicit in jsdom.
+    const trigger = screen.getByRole('combobox', { name: 'To' });
+    trigger.focus();
+    const search = screen.getByRole('combobox', { name: 'Search' });
+    expect(search.closest('.nokey')).not.toBeNull();
+
+    fireEvent.keyDown(search, { key: 'Escape' });
+
+    expect(screen.queryByRole('combobox', { name: 'Search' })).not.toBeInTheDocument();
+    expect(trigger).toHaveFocus();
+  });
 });
