@@ -123,7 +123,12 @@ async function readyToAuthor(): Promise<HTMLElement> {
 
 async function openAliasCreation(): Promise<void> {
   await readyToAuthor();
-  fireEvent.keyDown(screen.getByRole('button', { name: 'More Card kinds' }), { key: 'Enter' });
+  const addCardMenu = screen.getByRole('button', { name: 'More Card kinds' });
+  fireEvent.keyDown(addCardMenu, { key: 'Enter' });
+  // Native Enter activation includes a click after keydown. Base UI lets that
+  // browser behavior open its menu instead of opening from the synthetic
+  // keydown alone.
+  fireEvent.click(addCardMenu, { detail: 0 });
   fireEvent.click(await screen.findByRole('menuitem', { name: 'Add Alias' }));
   await screen.findByTestId('new-alias');
 }
