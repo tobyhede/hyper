@@ -96,6 +96,7 @@ export function CardPicker({
           accessible name. This is the visible echo of it. */}
       <span className="card-picker__label">{label}</span>
       <Command
+        className="card-picker__command"
         label={label}
         filter={(value, query) => {
           const card = cards.find((candidate) => candidate.id === value);
@@ -122,7 +123,19 @@ export function CardPicker({
             different element, and cmdk's `aria-labelledby` on the input is what
             carries it — so without this the Target picker's results announce as
             a generic suggestion list on every pane that draws one. */}
-        <CommandList label={label} data-testid="card-picker-results">
+        {/* The class is what lets the list fill the pane. `CommandList` caps
+            itself at 12rem, which is right for the collapsed presentation
+            `CardCombobox` draws in a Popover and wrong here: this pane is a
+            fixed 16/9 frame, so the height exists whether the list uses it or
+            not, and keeping the cap scrolls the list with the panel left empty
+            below it. Overridden in `styles.css` beside the picker's other
+            palette, exactly as `card-picker__unavailable` overrides the empty
+            state's. */}
+        <CommandList
+          className="card-picker__results"
+          label={label}
+          data-testid="card-picker-results"
+        >
           {/* One empty affordance for both ways of having nothing to show, and
               it is the primitive's own. `Command.Empty` renders on a filtered
               count of zero, which with no Card registered is true of every

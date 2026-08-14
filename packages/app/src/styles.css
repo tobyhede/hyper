@@ -837,12 +837,33 @@ body {
 /* ---- Choosing a Card by searching for it ---- */
 /* The Command list's own keyboard model is cmdk's; this is only the palette. */
 
+/* The picker grows into the frame, and the list inside it is what grows.
+   `.card-pane__panel` is a fixed 16/9 silhouette, so the pane has its height
+   whether or not the fields use it — and a Target list that keeps
+   `CommandList`'s own 12rem cap scrolls its Cards with a couple of hundred
+   pixels of panel sitting empty underneath. This is the rule
+   `.card-pane__field--source` already gives the Markdown pane's one long field;
+   the Target list is the Alias pane's equivalent, and both floor themselves so
+   a short window shrinks the field rather than collapsing it. */
 .card-picker {
   display: flex;
+  flex: 1;
+  min-height: 0;
   flex-direction: column;
   gap: 0.35rem;
   color: var(--muted);
   font-size: 0.8rem;
+}
+
+.card-picker__command {
+  flex: 1;
+  min-height: 0;
+}
+
+.card-picker__results {
+  flex: 1;
+  max-height: none;
+  min-height: 6rem;
 }
 
 .card-picker__label {
