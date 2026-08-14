@@ -89,16 +89,28 @@ export function NewAlias({ targets, refusal, onCreate, onCancel, onRefusalStale 
             onSelect={(target) => onCreate(target, title)}
             emptyMessage="An Alias needs a Card that owns its content, and this Space has none yet."
           />
-          {refusal === null ? (
+          {/* The hint stays among the fields, under the list it is about: it is
+              advice on how to finish, so it belongs beside the control that
+              finishes. It is still withdrawn while a refusal stands, because
+              "choosing a Target creates the Alias" is the sentence the refused
+              attempt has just contradicted. */}
+          {refusal === null && (
             <p className="card-pane__hint">
               Choosing a Target creates the Alias. Leave the title empty to take the Target’s.
             </p>
-          ) : (
-            <span role="alert" className="card-pane__field-error">
-              {refusal}
-            </span>
           )}
         </div>
+        {/* Outside the scrolling region, in the slot the opened-Card pane puts a
+            refusal in. Among the fields it could be scrolled out of view at the
+            moment it is the only thing worth reading — and this pane is the one
+            most likely to scroll, having no Markdown field to absorb the
+            squeeze. No layout class: it is a plain child of the editor's
+            column, exactly as `EditorForm`'s is. */}
+        {refusal !== null && (
+          <span role="alert" className="card-pane__field-error">
+            {refusal}
+          </span>
+        )}
         <div className="card-pane__actions">
           <Button type="button" variant="secondary" onClick={onCancel}>
             Cancel

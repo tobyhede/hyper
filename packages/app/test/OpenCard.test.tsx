@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
-import { uuidSchema } from '@project/core';
+import { uuidSchema, type CardId } from '@project/core';
 import { OpenCard } from '../src/components/OpenCard';
 
 const CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
@@ -19,9 +19,15 @@ beforeAll(() => {
   vi.stubGlobal(
     'ResizeObserver',
     class {
-      observe(): void {}
-      unobserve(): void {}
-      disconnect(): void {}
+      observe(): void {
+        return undefined;
+      }
+      unobserve(): void {
+        return undefined;
+      }
+      disconnect(): void {
+        return undefined;
+      }
     },
   );
 });
@@ -65,6 +71,60 @@ describe('the opened Card', () => {
 
     expect(onCancel).toHaveBeenCalledOnce();
     expect(onComplete).not.toHaveBeenCalled();
+  });
+
+  it('marks the field a title refusal is about, and only that field', () => {
+    const onComplete = vi.fn(() => null);
+    render(<OpenCard card={markdown()} onComplete={onComplete} onCancel={vi.fn()} />);
+
+    fireEvent.change(screen.getByRole('textbox', { name: 'Title' }), { target: { value: '   ' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+
+    expect(onComplete).not.toHaveBeenCalled();
+    expect(screen.getByRole('alert')).toHaveTextContent('A Card title is required.');
+    expect(screen.getByRole('textbox', { name: 'Title' })).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.getByRole('textbox', { name: 'Description' })).toHaveAttribute(
+      'aria-invalid',
+      'false',
+    );
+  });
+
+  /**
+   * A schema refusal that belongs to neither field on this form is unattributed
+   * — it goes to the form-level slot beside the actions, not onto Description,
+   * which was where every issue off the two named paths landed.
+   *
+   * **No author can reach this through the fields**, and that is the honest
+   * shape of the test rather than a gap in it. `markdownCardSchema` has five
+   * paths: `title` and `description` are the two the fields write, `kind` is a
+   * literal this module supplies, `body` is `z.string()` and a `<textarea>` has
+   * nothing else to give it. `id` is the last, and it comes from the Card the
+   * pane was opened on — so handing the pane a malformed one is the one way to
+   * make the real validation fail off both fields, with no mock in it. A loaded
+   * Space cannot produce that Card; the misattribution it exposes is real for
+   * every path this list grows by.
+   */
+  it('surfaces a refusal belonging to no field beside the actions', () => {
+    const onComplete = vi.fn(() => null);
+    render(
+      <OpenCard
+        card={{ ...markdown(), id: 'not-a-uuid' as CardId }}
+        onComplete={onComplete}
+        onCancel={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+
+    expect(onComplete).not.toHaveBeenCalled();
+    const alert = screen.getByRole('alert');
+    expect(alert).toHaveTextContent('The Card could not be completed.');
+    expect(alert).toHaveAttribute('id', 'open-card-refusal');
+    expect(screen.getByRole('textbox', { name: 'Description' })).toHaveAttribute(
+      'aria-invalid',
+      'false',
+    );
+    expect(screen.getByRole('textbox', { name: 'Title' })).toHaveAttribute('aria-invalid', 'false');
   });
 
   it('authors only Alias metadata in one Done', () => {

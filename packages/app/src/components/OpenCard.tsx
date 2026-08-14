@@ -48,13 +48,21 @@ interface ContentFieldGroup<Content extends ResolvedContentCard, Draft extends C
   readonly Fields: ComponentType<ContentFieldsProps<Draft>>;
   /**
    * Validate at `Done`: the whole Card to complete, or the draft carrying the
-   * refusals to draw.
+   * refusals to draw beside the fields they are about, plus the one sentence
+   * that is about **no** field on this form.
+   *
+   * Two answers rather than one because a refusal has to name the thing the
+   * author can fix. A field it attributes is marked invalid and described by its
+   * message; an issue on a path no field writes belongs to the form itself, and
+   * pinning it to a field would send the author to correct a value that is
+   * already good.
    */
   readonly settle: (
     card: Content,
     draft: Draft,
   ) =>
-    { readonly ok: true; readonly card: Content } | { readonly ok: false; readonly draft: Draft };
+    | { readonly ok: true; readonly card: Content }
+    | { readonly ok: false; readonly draft: Draft; readonly refusal: string | null };
 }
 
 type ContentFieldRegistry = {
@@ -104,15 +112,20 @@ const markdownFields: ContentFieldGroup<MarkdownCard, MarkdownDraft> = {
         : named.length === 0
           ? 'A Card title is required.'
           : forTitle.message;
+    // `markdownCardSchema` has five paths and this form writes two of them. An
+    // issue on `id`, `kind` or `body` therefore belongs to no field here, and
+    // it goes to the form's own slot rather than onto Description — which is
+    // where every such issue used to land, marking a caption the author had
+    // just written correctly as the thing that failed. Asked of the issues
+    // rather than inferred from the absence of a title issue, so a body problem
+    // is still said out loud when a title problem is being drawn beside it.
+    const unattributed = parsed.error.issues.some(
+      (candidate) => candidate.path[0] !== 'title' && candidate.path[0] !== 'description',
+    );
     return {
       ok: false,
-      draft: {
-        ...draft,
-        titleError,
-        descriptionError:
-          forDescription?.message ??
-          (forTitle === undefined ? 'The Card could not be completed.' : null),
-      },
+      draft: { ...draft, titleError, descriptionError: forDescription?.message ?? null },
+      refusal: unattributed ? 'The Card could not be completed.' : null,
     };
   },
 
@@ -295,6 +308,11 @@ function CardEditorForm({
     const settled = group.settle(content, draft);
     if (!settled.ok) {
       setDraft(settled.draft);
+      // Into the same slot the Space's own refusal uses, because both are the
+      // one sentence about this attempt that no field on the form owns. It is
+      // installed rather than merged: a fresh `Done` describes the values on
+      // screen now, so a previous sentence goes with the attempt it described.
+      setContentRefusal(settled.refusal);
       return;
     }
     const refusal = onComplete(settled.card);

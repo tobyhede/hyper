@@ -19,7 +19,7 @@ export const FlowIcon = () => <Workflow size={16} />;
 /** The computed View that arranges Cards in a regular grid. */
 export const GridIcon = () => <Grid2x2 size={16} />;
 
-/** An authored Layout: a spatial arrangement owned by a Space. */
+/** An authored Layout: the Cards a Space placed, and the Graphs over them. */
 export const LayoutIcon = () => <PanelsTopLeft size={16} />;
 
 /** A directed Graph, including its branches and joins. */

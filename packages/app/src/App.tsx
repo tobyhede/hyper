@@ -462,17 +462,19 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
       return null;
     }, []);
 
-    // Opening an Alias delegates to its single-hop content owner, and the
-    // authored Alias remains the opened context.
+    // Every Card the Space holds, and deliberately no narrower: a Card's kind
+    // decides which fields the pane draws, never whether it opens. An Alias is
+    // editable on its own metadata (ADR 0049), not only through the Card whose
+    // content it resolves to, so there is nothing left for a filter here to
+    // remove — the resolve-to-content test that used to stand in this `map` said
+    // an Alias could be opened only as a way to reach another Card, which is the
+    // reading 0049 withdrew.
     //
-    // For a loaded Space this set is every Card, and the filter cannot currently
-    // remove one: `loadSpace` rejects an Alias whose target is missing or is
-    // itself an Alias, so resolution refuses nothing that reached this far. It
-    // stays because the refusal is real in the type — a Card kind that resolves
-    // to no content editor would land here as a compile-time obligation rather
-    // than as an occurrence the graph offers to open and the pane cannot draw.
-    // An Alias is editable on its own metadata (ADR 0049), not only through
-    // the Card whose content it resolves to.
+    // It is a set rather than a plain count because both readers ask membership
+    // of an id they did not choose: the canvas asks it per node to decide
+    // whether that Card offers its editing affordance, and `openCardForEditing`
+    // below asks it of a string arriving from React Flow, which names a Card of
+    // this Space only by convention.
     const editableCardIds = useMemo(
       () => new Set(rendererSpace.cards.map((card) => card.id)),
       [rendererSpace],

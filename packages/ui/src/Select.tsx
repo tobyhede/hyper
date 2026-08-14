@@ -39,15 +39,39 @@ export const SelectTrigger = forwardRef<
 ));
 SelectTrigger.displayName = 'SelectTrigger';
 
+/**
+ * `alignItemWithTrigger` is picked alongside the placement props, and that is
+ * the whole reason they are not decorative. Base UI defaults it to `true`, and
+ * while it is active `SelectPositioner` sets `renderedSide = 'none'` and swaps
+ * the computed positioner styles for a constant `{ position: 'fixed' }` — so
+ * `align` and `sideOffset` are silently discarded and the list is drawn over
+ * the trigger with the selected item under the pointer. Exposing the two
+ * without the switch was a type promising placement the primitive's own default
+ * forbids. Forcing `alignItemWithTrigger={false}` instead would have been a
+ * deviation from a Base UI default with no product requirement behind it
+ * (ADR 0047, ADR 0050) — and shadcn's own `base-nova` select does neither: it
+ * picks `align`, `alignOffset`, `side`, `sideOffset` and `alignItemWithTrigger`
+ * from `Positioner.Props` and defaults the last to `true`. This matches that,
+ * narrowed to the props Hyper's selectors could use. Pinned in
+ * `test/Select.test.tsx`.
+ */
 type SelectContentProps = ComponentPropsWithoutRef<typeof SelectPrimitive.Popup> &
-  Pick<ComponentPropsWithoutRef<typeof SelectPrimitive.Positioner>, 'align' | 'sideOffset'>;
+  Pick<
+    ComponentPropsWithoutRef<typeof SelectPrimitive.Positioner>,
+    'align' | 'sideOffset' | 'alignItemWithTrigger'
+  >;
 
 export const SelectContent = forwardRef<
   ElementRef<typeof SelectPrimitive.Popup>,
   SelectContentProps
->(({ className, children, align, sideOffset = 4, ...props }, ref) => (
+>(({ className, children, align, sideOffset = 4, alignItemWithTrigger = true, ...props }, ref) => (
   <SelectPrimitive.Portal>
-    <SelectPrimitive.Positioner align={align} sideOffset={sideOffset} className="z-50">
+    <SelectPrimitive.Positioner
+      align={align}
+      sideOffset={sideOffset}
+      alignItemWithTrigger={alignItemWithTrigger}
+      className="z-50"
+    >
       <SelectPrimitive.Popup
         ref={ref}
         // The popup is portalled to document.body, so its own `nokey` marker is

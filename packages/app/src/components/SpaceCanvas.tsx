@@ -136,7 +136,7 @@ export interface SpaceCanvasProps {
   onOpenCard: (cardId: string) => void;
   /** Complete one locally validated title draft, or return its field error. */
   onCompleteCardTitle: (cardId: string, title: string) => string | null;
-  /** Which Cards resolve to content the opened editor can author. */
+  /** Which Cards may be opened for editing — every Card of the Space (ADR 0049). */
   editableCardIds: ReadonlySet<string>;
   graphs: readonly Graph[];
   colorByGraphId: Readonly<Record<string, string>>;

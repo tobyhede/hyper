@@ -78,6 +78,28 @@ describe('NewAlias', () => {
     expect(staleRefusal).toHaveBeenCalled();
   });
 
+  /**
+   * The fields scroll and the actions do not, so a refusal rendered among the
+   * fields can be scrolled off exactly when it is the thing the author needs to
+   * read. It sits in the non-scrolling slot the opened-Card pane already puts a
+   * refusal in — between the field region and the actions.
+   */
+  it('keeps a refusal out of the scrolling field region', () => {
+    render(
+      <NewAlias
+        targets={targets}
+        refusal="This Card is no longer part of the Space."
+        onCreate={() => undefined}
+        onCancel={() => undefined}
+        onRefusalStale={() => undefined}
+      />,
+    );
+
+    const alert = screen.getByRole('alert');
+    expect(alert.closest('.card-pane__fields')).toBeNull();
+    expect(alert.parentElement).toHaveClass('card-pane__editor');
+  });
+
   it('says nothing while there is no refusal to go stale', () => {
     const staleRefusal = vi.fn();
     render(

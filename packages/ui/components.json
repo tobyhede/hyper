@@ -16,6 +16,6 @@
     "hooks": "#hooks",
     "lib": "#lib",
     "utils": "#lib/utils",
-    "ui": "#components/ui"
+    "ui": "#components"
   }
 }
