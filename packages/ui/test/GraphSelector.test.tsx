@@ -99,8 +99,10 @@ describe('GraphSelector', () => {
     expect(trigger).toHaveAttribute('title', 'Active Graph');
     expect(trigger).toHaveTextContent('Short graph');
     expect(trigger.querySelector('svg')).toHaveAttribute('stroke', '#f4a259');
+    expect(trigger.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
     expect(present).toHaveAttribute('title', 'Present this Graph');
-    expect(present.querySelector('svg')).toHaveAttribute('fill', '#f4a259');
+    expect(present.querySelector('svg')).toHaveAttribute('stroke', '#f4a259');
+    expect(present.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
 
     fireEvent.click(present);
     expect(onPresent).toHaveBeenCalledOnce();
@@ -126,7 +128,7 @@ describe('GraphSelector', () => {
     ).toHaveAttribute('stroke', '#445566');
     expect(
       screen.getByRole('button', { name: 'Present this Graph' }).querySelector('svg'),
-    ).toHaveAttribute('fill', '#445566');
+    ).toHaveAttribute('stroke', '#445566');
 
     fireEvent.keyDown(screen.getByRole('combobox', { name: 'Active Graph' }), { key: 'ArrowDown' });
     const options = screen.getAllByRole('option');
@@ -155,7 +157,7 @@ describe('GraphSelector', () => {
     ).toHaveAttribute('stroke', '#f4a259');
     expect(
       screen.getByRole('button', { name: 'Present this Graph' }).querySelector('svg'),
-    ).toHaveAttribute('fill', '#f4a259');
+    ).toHaveAttribute('stroke', '#f4a259');
 
     fireEvent.keyDown(screen.getByRole('combobox', { name: 'Active Graph' }), { key: 'ArrowDown' });
     const options = screen.getAllByRole('option');
