@@ -166,9 +166,14 @@ write_env() {
 
 # write_secret_env KEY VALUE — persist a secret only in an ignored dotenv file,
 # with owner-only permissions.
+#
+# No --no-index: that flag decides from the ignore rules alone, so a file Git
+# already tracks reports as ignored whenever it also matches a rule — and a
+# dotenv force-added once, long ago, matches forever while staying invisible.
+# Consulting the index is what makes a tracked file fail this check.
 write_secret_env() {
   local key="$1" value="$2"
-  if ! git check-ignore -q --no-index -- "$ENV_FILE"; then
+  if ! git check-ignore -q -- "$ENV_FILE"; then
     warn "refused secret $key — $ENV_FILE is not ignored by Git"
     return 1
   fi

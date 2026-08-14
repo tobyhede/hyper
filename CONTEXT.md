@@ -129,7 +129,7 @@ Projecting a space into the repository-friendly form an author can review, commi
 _Avoid_: saving, publishing, syncing.
 
 **Opening**:
-Bringing a single card's content up in place, over whatever view the author is in, to author it. A markdown card opens on its title, its description and its Markdown source, verbatim and editable; an alias opens the same content surface through its target while remaining visibly the occurrence that was opened, and a space card opens on its nested graph to explore. Opening is not presenting — the view it happens over is still the thing being worked in, and a markdown card is only ever drawn *rendered* by presenting. There is no separate reading state: what a card opens on is what an author edits, because they were always the same bytes in the same order.
+Bringing a single card's content up in place, over whatever view the author is in, to author it. A markdown card opens on its title, its description and its Markdown source, verbatim and editable; an alias opens on the two things it owns, its own title and its target, and on nothing of the card that target names — that card is opened explicitly to author its content, at the single source of truth every alias then shows; and a space card opens on its nested graph to explore. Opening is not presenting — the view it happens over is still the thing being worked in, and a markdown card is only ever drawn *rendered* by presenting. There is no separate reading state: what a card opens on is what an author edits, because they were always the same bytes in the same order.
 _Avoid_: expand, preview, popup, modal, drill-down, view mode and edit mode (there is one surface).
 
 **Presenting**:
