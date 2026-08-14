@@ -59,7 +59,15 @@ Create a single switcher component on the route:
 
 ```tsx
 // pseudo-code — adapt to the project's framework
-const variant = searchParams.get('variant') ?? 'A';
+const requestedVariant = searchParams.get('variant');
+const variant = requestedVariant === 'A' || requestedVariant === 'B' || requestedVariant === 'C'
+  ? requestedVariant
+  : 'A';
+
+if (process.env.NODE_ENV === 'production') {
+  return <ProductionPage {...data} />; // sub-shape A
+}
+
 return (
   <>
     {variant === 'A' && <VariantA {...data} />}
@@ -72,7 +80,7 @@ return (
 
 For sub-shape A (existing page): keep all the existing data fetching above the switcher; only the rendered subtree changes per variant.
 
-For sub-shape B (new page): the throwaway route under `/prototype/<name>` mounts the same switcher.
+For sub-shape B (new page): do not register the throwaway `/prototype/<name>` route in production. The development-only check wraps the complete prototype subtree — variants, switcher and floating bar — rather than the bar alone, so no selected variant renders and no prototype page is reachable in production.
 
 ### 4. Build the floating switcher
 
@@ -87,7 +95,7 @@ Behaviour:
 - Clicking an arrow updates the URL search param (use the framework's router — `router.replace` on Next, `navigate` on React Router, etc) so the variant is shareable and reload-stable.
 - Keyboard: `←` and `→` arrow keys also cycle. Don't intercept arrow keys when an `<input>`, `<textarea>`, or `[contenteditable]` is focused.
 - Visually distinct from the page (e.g. high-contrast pill, subtle shadow) so it's obviously not part of the design being evaluated.
-- Hidden in production builds — gate on `process.env.NODE_ENV !== 'production'` or an equivalent check, so a stray prototype merge can't ship the bar to users.
+- Rendered only by the development-only prototype subtree above. Do not gate only the bar: variants and a throwaway route must be absent from production too.
 
 Put the switcher in a single shared component so both sub-shapes can reuse it. Locate it wherever shared UI lives in the project.
 

@@ -5,7 +5,7 @@
       "source": "mattpocock/skills",
       "sourceType": "github",
       "skillPath": "skills/engineering/ask-matt/SKILL.md",
-      "computedHash": "b2e8ef5ffc2f142022c1e1e1bba68073f0821356a8e1cf1b23670f61d13fe50b"
+      "computedHash": "6e3b5a2e3b73781c8118d81b853eb68effc35de6c514d956f8a3a9569b3dc435"
     },
     "code-review": {
       "source": "mattpocock/skills",
@@ -71,7 +71,7 @@
       "source": "mattpocock/skills",
       "sourceType": "github",
       "skillPath": "skills/engineering/prototype/SKILL.md",
-      "computedHash": "73862de6cd32acf30799bfb2220357b96c1a58ab0e3d01126b769fd659d6555a"
+      "computedHash": "a92a17a835c3661be18f9867a8e44959a2206cfcba48a621adcd9d6474f18650"
     },
     "research": {
       "source": "mattpocock/skills",
@@ -143,7 +143,7 @@
       "source": "mattpocock/skills",
       "sourceType": "github",
       "skillPath": "skills/engineering/wizard/SKILL.md",
-      "computedHash": "2c0d1187398b1b7ebb9902a4c91b24181ee07892f285615b46c59f45e2c4229c"
+      "computedHash": "180657a6e50adbe8a179b3829c923312fad4fbb075a187952031a7138bbfbf29"
     },
     "writing-for-agents": {
       "source": "mattpocock/skills",

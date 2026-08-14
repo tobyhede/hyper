@@ -154,6 +154,27 @@ describe('the opened Card', () => {
     expect(onCancel).toHaveBeenCalledOnce();
   });
 
+  it('trims an Alias title before the authoring refusal boundary', () => {
+    const onEdit = vi.fn(() => 'An Alias title is required.');
+    const onCancel = vi.fn();
+    render(
+      <OpenCard
+        through={{ id: ALIAS_ID, title: 'A again', kind: 'alias', target: CARD_ID }}
+        occurrence={{ targets: [markdown()], onEdit }}
+        onCancel={onCancel}
+      />,
+    );
+
+    fireEvent.change(screen.getByRole('textbox', { name: 'Title' }), {
+      target: { value: '   ' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+
+    expect(onEdit).toHaveBeenCalledWith({ title: '', target: CARD_ID });
+    expect(screen.getByRole('alert')).toHaveTextContent('An Alias title is required.');
+    expect(onCancel).not.toHaveBeenCalled();
+  });
+
   it('keeps an Alias draft open when the edit is refused', () => {
     const onCancel = vi.fn();
     render(

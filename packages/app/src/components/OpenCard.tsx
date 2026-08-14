@@ -236,7 +236,7 @@ interface AliasOpen {
  * its metadata. The props cannot express content authoring through an Alias.
  */
 export type OpenCardProps = {
-  /** Close without completing. */
+  /** Close this pane; invoked after a completed Done action as well as cancellation. */
   readonly onCancel: () => void;
 } & (DirectOpen | AliasOpen);
 
@@ -320,6 +320,7 @@ function CardEditorForm({
       setContentRefusal(refusal);
       return;
     }
+    // A completed Done closes the pane through the same callback as Cancel.
     onCancel();
   };
 
@@ -357,11 +358,12 @@ function AliasEditorForm({
 
   const submit = (event: FormEvent<HTMLFormElement>): void => {
     event.preventDefault();
-    const reason = occurrence.onEdit({ title, target });
+    const reason = occurrence.onEdit({ title: title.trim(), target });
     if (reason !== null) {
       setRefusal(reason);
       return;
     }
+    // A completed Done closes the pane through the same callback as Cancel.
     onCancel();
   };
 

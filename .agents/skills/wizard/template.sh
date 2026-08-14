@@ -24,6 +24,7 @@ TOTAL_STAGES=0
 
 _STAGE_INDEX=0
 ENV_FILE="${ENV_FILE:-.env}"
+APPROVED_URL_ORIGINS=()
 WRITTEN_ENV=()    # KEYs written to ENV_FILE this run
 WRITTEN_SECRET=() # secret NAMEs set this run
 SKIPPED=()        # things we couldn't do (e.g. gh missing)
@@ -62,9 +63,23 @@ step() { printf '  %s•%s %s\n' "$BLUE" "$RESET" "$1"; }
 note() { printf '  %s%s%s\n' "$DIM" "$1" "$RESET"; }
 warn() { printf '  %s⚠ %s%s\n' "$YELLOW" "$1" "$RESET"; }
 
-# open_url URL — open in the human's browser, cross-platform incl. WSL.
+# open_url URL — open an approved HTTPS origin in the human's browser,
+# cross-platform including WSL.
 open_url() {
-  local url="$1"
+  local url="$1" origin approved=false candidate
+  if [[ "$url" =~ ^https://[^/?#]+ ]]; then
+    origin="${BASH_REMATCH[0]}"
+  else
+    warn "refused URL outside an approved HTTPS origin: $url"
+    return 1
+  fi
+  for candidate in "${APPROVED_URL_ORIGINS[@]}"; do
+    [[ "$origin" == "$candidate" ]] && approved=true && break
+  done
+  if [[ "$approved" != true ]]; then
+    warn "refused unapproved URL origin: $origin"
+    return 1
+  fi
   printf '  %s↗ opening%s %s\n' "$GREEN" "$RESET" "$url"
   { if   command -v wslview     >/dev/null 2>&1; then wslview "$url"
     elif command -v explorer.exe >/dev/null 2>&1; then explorer.exe "$url"
@@ -125,10 +140,21 @@ ask_secret() {
   printf -v "$key" '%s' "$input"
 }
 
-# write_env KEY VALUE — upsert KEY=VALUE into ENV_FILE (creates it; replaces
-# any existing line). Idempotent.
+# _safe_env_value VALUE — accepts values that can be persisted unescaped in a
+# dotenv assignment. Newlines and comments would alter the file's meaning.
+_safe_env_value() {
+  local value="$1"
+  [[ "$value" != *$'\n'* && "$value" != *$'\r'* && "$value" != *'#'* ]]
+}
+
+# write_env KEY VALUE — validate then upsert KEY=VALUE into ENV_FILE (creates
+# it; replaces any existing line). Idempotent for non-secret values.
 write_env() {
   local key="$1" value="$2" tmp
+  if ! _safe_env_value "$value"; then
+    warn "refused unsafe dotenv value for $key"
+    return 1
+  fi
   touch "$ENV_FILE"
   tmp=$(mktemp)
   grep -vE "^${key}=" "$ENV_FILE" > "$tmp" || true
@@ -138,10 +164,27 @@ write_env() {
   printf '  %s✓ wrote%s %s → %s\n' "$GREEN" "$RESET" "$key" "$ENV_FILE"
 }
 
+# write_secret_env KEY VALUE — persist a secret only in an ignored dotenv file,
+# with owner-only permissions.
+write_secret_env() {
+  local key="$1" value="$2"
+  if ! git check-ignore -q --no-index -- "$ENV_FILE"; then
+    warn "refused secret $key — $ENV_FILE is not ignored by Git"
+    return 1
+  fi
+  write_env "$key" "$value"
+  chmod 600 "$ENV_FILE"
+}
+
 # set_secret NAME VALUE — set a GitHub Actions repo secret via gh. Falls back
 # to a warning (and records it) if gh is unavailable or unauthenticated.
 set_secret() {
   local name="$1" value="$2"
+  if ! confirm "Set GitHub secret $name?"; then
+    SKIPPED+=("GitHub secret $name (not confirmed)")
+    warn "skipped GitHub secret $name — not confirmed"
+    return
+  fi
   if command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
     if printf '%s' "$value" | gh secret set "$name" >/dev/null 2>&1; then
       WRITTEN_SECRET+=("$name")
@@ -185,6 +228,7 @@ finish() {
 # ──────────────────────────────────────────────────────────────────────────
 
 TOTAL_STAGES=1
+APPROVED_URL_ORIGINS=("https://dashboard.stripe.com")
 
 banner "Stripe setup"
 
@@ -197,7 +241,7 @@ ask STRIPE_PUBLISHABLE_KEY "Paste the publishable key:"
 step "Click 'Reveal test key' on the Secret key row, then copy it."
 ask_secret STRIPE_SECRET_KEY "Paste the secret key:"
 write_env STRIPE_PUBLISHABLE_KEY "$STRIPE_PUBLISHABLE_KEY"
-write_env STRIPE_SECRET_KEY "$STRIPE_SECRET_KEY"
+write_secret_env STRIPE_SECRET_KEY "$STRIPE_SECRET_KEY"
 set_secret STRIPE_SECRET_KEY "$STRIPE_SECRET_KEY"   # CI needs this one
 # ──────────────────────────────────────────────────────────────────────────
 

@@ -627,11 +627,12 @@ describe('an Alias on the graph', () => {
 });
 
 describe('retargeting an Alias', () => {
-  it.skip('moves the Target while keeping the Alias’s identity, title and position', async () => {
+  it('moves the Target while keeping the Alias’s identity, title and position', async () => {
     const session = mount(aliased);
 
     fireEvent.click(await screen.findByRole('button', { name: 'Edit Card A again' }));
     fireEvent.click(screen.getByRole('option', { name: 'Markdown Card B' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
 
     expect(cardsOf(session)).toContainEqual({
       id: ALIAS_ID,
@@ -672,12 +673,12 @@ describe('retargeting an Alias', () => {
    * they are looking at. The creation state keeps that focus, because it opens
    * *on* its Target; here the pane's ordinary first field is the answer.
    */
-  it.skip('opens on the Alias’s own title, leaving the Target where it was', async () => {
+  it('opens on the Alias’s own title, leaving the Target where it was', async () => {
     const session = mount(aliased);
 
     fireEvent.click(await screen.findByRole('button', { name: 'Edit Card A again' }));
 
-    expect(screen.getByRole('textbox', { name: 'Title' })).toHaveFocus();
+    await waitFor(() => expect(screen.getByRole('textbox', { name: 'Title' })).toHaveFocus());
     expect(screen.getByRole('combobox', { name: 'Target' })).not.toHaveFocus();
     await settled(session);
   });

@@ -23,11 +23,9 @@ the existing `CardCombobox` and cmdk Card-choice model.
 props (`anchor`, `side`, `align`, offsets and collision controls) are forwarded
 only to `Positioner`; popup props stay on `Popup`.
 
-Base UI does not have Radix's `Anchor` part. `PopoverAnchor` remains an explicit
-inert compatibility export: it adds no DOM and is documented as a bridge rather
-than a migration claim. The only former consumer, the Edge toolbar, now holds a
-ref to its toolbar anchor and passes it as `PopoverContent`'s Base UI `anchor`
-prop. This is the required non-trigger-anchor form for Base UI positioning.
+Base UI does not have Radix's `Anchor` part. `AuthorableEdge` holds a ref to its
+toolbar anchor and supplies it through `PopoverContent`'s Base UI `anchor` prop.
+This is the required non-trigger-anchor form for Base UI positioning.
 
 No migrated Popover or endpoint-consumer source imports Radix or uses Radix
 composition props.

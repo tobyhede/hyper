@@ -16,12 +16,7 @@ import {
   type CardId,
   type LayoutPosition,
 } from '@project/core';
-import {
-  Placement,
-  graphCardIds,
-  resolveContentCard,
-  type ResolvedContentCard,
-} from '@project/graph';
+import { Placement, graphCardIds, type ResolvedContentCard } from '@project/graph';
 import type { OpenedSpace } from './space';
 import { createSpaceAuthoring } from './space-authoring';
 import { createRenderAdapter, selectedCardOf, type EdgeSubject } from './render-adapter';
@@ -500,7 +495,6 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
     );
 
     const openedCard = openedCardId ? rendererSpace.lookup.card(openedCardId) : undefined;
-    const openedContent = openedCard ? resolveContentCard(rendererSpace, openedCard.id) : undefined;
     const completeOpenedCard = useCallback((completed: ResolvedContentCard): string | null => {
       const { id, ...document } = completed;
       const result = authoring.complete({ kind: 'edited-card', cardId: id, document });
@@ -520,7 +514,6 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
       () => rendererSpace.cards.filter((card) => card.kind !== 'alias'),
       [rendererSpace],
     );
-    const openedAlias = openedCard?.kind === 'alias' ? openedCard : undefined;
     /**
      * Authoring the Alias itself — one ordinary Card Edit, on whichever of its
      * two fields the author touched, and the operation package 3 already built
@@ -776,19 +769,19 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
           {/* An Alias authors only its own metadata. Its Target must be opened
               explicitly to author shared content (ADR 0049). */}
           {openedCard &&
-            (openedAlias !== undefined ? (
+            (openedCard.kind === 'alias' ? (
               <OpenCard
-                through={openedAlias}
+                through={openedCard}
                 occurrence={{
                   targets: aliasTargets,
                   onEdit: (change: { title: string; target: CardId }) =>
-                    editAlias(openedAlias, change),
+                    editAlias(openedCard, change),
                 }}
                 onCancel={closeCard}
               />
-            ) : openedContent?.id === openedCard.id ? (
-              <OpenCard card={openedContent} onComplete={completeOpenedCard} onCancel={closeCard} />
-            ) : null)}
+            ) : (
+              <OpenCard card={openedCard} onComplete={completeOpenedCard} onCancel={closeCard} />
+            ))}
 
           {creatingAlias && openedCardId === null && (
             <NewAlias
