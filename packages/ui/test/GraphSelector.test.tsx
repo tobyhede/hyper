@@ -35,11 +35,8 @@ const graphs: readonly Graph[] = [
 
 describe('GraphSelector', () => {
   it('stays controlled when the first conversion mints a Space its Graph', () => {
-    // A Space with no Layout owns no Graph either (ADR 0040), so `activeGraphId`
-    // starts null and the conversion that creates the Layout mints the Graph it
-    // becomes. Omitting the prop for null made that flip Radix from uncontrolled
-    // to controlled — a warning, and selection state Radix keeps that the app is
-    // no longer the source of truth for.
+    // A Space with no Layout owns no Graph either (ADR 0040), so Base UI's
+    // controlled value starts null and conversion mints the Graph it becomes.
     const warnings: string[] = [];
     vi.spyOn(console, 'warn').mockImplementation((first: unknown) => {
       warnings.push(String(first));
@@ -199,7 +196,9 @@ describe('GraphSelector', () => {
     );
 
     fireEvent.keyDown(screen.getByRole('combobox', { name: 'Active Graph' }), { key: 'ArrowDown' });
-    fireEvent.click(screen.getByRole('option', { name: /Long graph/ }));
+    const graph = screen.getByRole('option', { name: /Long graph/ });
+    fireEvent.pointerDown(graph, { pointerType: 'mouse' });
+    fireEvent.click(graph);
 
     expect(onActivate).toHaveBeenCalledOnce();
     expect(onActivate).toHaveBeenCalledWith(graphs[0]?.id);

@@ -47,11 +47,8 @@ const layouts: readonly Layout[] = [
 
 describe('LayoutSelector', () => {
   it('stays controlled when the first conversion gives a Space its Layout', () => {
-    // Before an author's first edit a Space has no Layout, so `value` is null;
-    // the conversion that creates one moves it to an id (ADR 0025). Omitting the
-    // prop for null made that transition switch Radix from uncontrolled to
-    // controlled, which it warns about and which lets it keep selection state of
-    // its own that the app is no longer the source of truth for.
+    // Before an author's first edit a Space has no Layout, so Base UI's
+    // controlled value is null; conversion moves it to an id (ADR 0025).
     const warnings: string[] = [];
     vi.spyOn(console, 'warn').mockImplementation((first: unknown) => {
       warnings.push(String(first));
@@ -92,7 +89,9 @@ describe('LayoutSelector', () => {
         .map((option) => option.textContent),
     ).toEqual(['Workshop', 'Overview']);
 
-    fireEvent.click(within(listbox).getByRole('option', { name: 'Overview' }));
+    const overview = within(listbox).getByRole('option', { name: 'Overview' });
+    fireEvent.pointerDown(overview, { pointerType: 'mouse' });
+    fireEvent.click(overview);
     expect(onValueChange).toHaveBeenCalledWith(layouts[1]?.id);
   });
 

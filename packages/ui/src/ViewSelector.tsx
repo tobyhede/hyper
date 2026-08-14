@@ -22,8 +22,8 @@ export function ViewSelector({ value, active, onValueChange }: ViewSelectorProps
 
   return (
     <Select
-      value={active ? value : ''}
-      onValueChange={(next) => onValueChange(next as AlgorithmicViewId)}
+      value={active ? value : null}
+      onValueChange={(next) => next !== null && onValueChange(next as AlgorithmicViewId)}
     >
       <SelectorTrigger
         accessibleName="Choose view"

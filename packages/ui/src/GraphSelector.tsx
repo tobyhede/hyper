@@ -37,11 +37,11 @@ export function GraphSelector({
       className="inline-flex items-stretch overflow-hidden rounded-[6px] border border-[var(--border)] bg-[var(--panel-2)]"
     >
       {/*
-        Controlled across the empty state — see `LayoutSelector` for the whole
-        argument. A Space with no Layout owns no Graph either (ADR 0040), so this
-        starts null and the first conversion gives it an id.
+        Controlled across Base UI's native null empty state. A Space with no
+        Layout owns no Graph either (ADR 0040), so this starts null and the
+        first conversion gives it an id.
       */}
-      <Select value={activeGraphId ?? ''} onValueChange={onActivate}>
+      <Select value={activeGraphId} onValueChange={(next) => next !== null && onActivate(next)}>
         <SelectorTrigger
           accessibleName="Active Graph"
           testId="graph-selector"
