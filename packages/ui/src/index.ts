@@ -10,6 +10,7 @@ export { CardKindIcon } from './CardKindIcon';
 export type { CardKindIconProps } from './CardKindIcon';
 export { CardCombobox } from './CardCombobox';
 export type { CardChoice, CardComboboxProps } from './CardCombobox';
+export { Dialog, DialogBackdrop, DialogPopup, DialogPortal, DialogViewport } from './Dialog';
 export {
   Command,
   CommandEmpty,

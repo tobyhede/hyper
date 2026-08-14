@@ -1,4 +1,4 @@
-import { useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
+import { useState } from 'react';
 import type { Card, CardId } from '@project/core';
 import { Button } from '@project/ui';
 import { CardPane } from './CardPane';
@@ -43,96 +43,62 @@ export interface NewAliasProps {
  * The kind is fixed from the outset. This is not a Markdown Card that will later
  * become an Alias — a Card keeps the kind it was created with — so the pane says
  * which kind it is creating rather than offering a control that changes it.
+ *
+ * Escape closes it, creating nothing, and no key handler here says so: the
+ * Dialog dismisses on Escape and that *is* Cancel's meaning on this pane (ADR
+ * 0048). Neither field takes a first Escape of its own any more — the title's
+ * restore-to-empty was a second, unlabelled copy of the button beside it.
  */
 export function NewAlias({ targets, refusal, onCreate, onCancel, onRefusalStale }: NewAliasProps) {
   const [title, setTitle] = useState('');
 
-  /**
-   * Escape closes the creation state, creating nothing.
-   *
-   * Both fields take their own first Escape and stop it there — the picker
-   * while it holds search text, the title below while it holds a draft — so
-   * this only ever answers the one that is left, which is the surface's own.
-   * That ordering is the keyboard contract's: a field draft consumes the first
-   * Escape without closing the surface containing it, and a second may then
-   * close that surface.
-   */
-  const close = (event: ReactKeyboardEvent<HTMLDivElement>): void => {
-    if (event.key !== 'Escape') return;
-    event.preventDefault();
-    event.stopPropagation();
-    onCancel();
-  };
-
-  /**
-   * The title's own first Escape, restoring the value the pane opened with.
-   *
-   * That value is the empty string and not a stored one: no Alias exists yet to
-   * have read a title off, so "restore" and "clear" are the same act here. It
-   * is bound to the field rather than folded into `close` because which owner a
-   * keypress belongs to is decided by where it was pressed — an Escape from the
-   * Cancel button beside this field is the surface's even while a draft stands.
-   *
-   * A field with nothing to restore does not consume anything: the event is
-   * left to reach `close` on the wrapper, which is what makes an untouched pane
-   * close on one press.
-   */
-  const restoreTitle = (event: ReactKeyboardEvent<HTMLInputElement>): void => {
-    if (event.key !== 'Escape' || title.length === 0) return;
-    event.preventDefault();
-    event.stopPropagation();
-    setTitle('');
-  };
-
   return (
-    <CardPane ariaLabel="New Alias" testId="new-alias">
+    <CardPane ariaLabel="New Alias" testId="new-alias" onDismiss={onCancel}>
       {/* One `onChange` for both fields rather than two handlers, because React
-          bubbles change through its own tree and cmdk's input is not somewhere
-          this pane can bind: `CardPicker` owns the search and exposes no change
-          of its own. Editing either field is the same fact — the refused attempt
-          is over. */}
-      <div
-        className="card-pane__editor"
-        onKeyDown={close}
-        onChange={refusal === null ? undefined : onRefusalStale}
-      >
-        {/* Not the delegation banner: that one names two Cards, and here there
-            is one Card and it does not exist yet. The kind is stated rather
-            than offered, because a Card keeps the kind it was created with. */}
-        <div className="card-pane__heading">
-          <span>New Alias</span>
-          <span>An Alias shows another Card’s content at a second position.</span>
-        </div>
-        <label className="card-pane__field">
-          <span>Title</span>
-          <input
-            data-testid="new-alias-title"
-            value={title}
-            onChange={(event) => setTitle(event.currentTarget.value)}
-            onKeyDown={restoreTitle}
+          bubbles change through its own tree and `CardPicker` owns the search
+          rather than exposing another callback. Editing either field is the
+          same fact — the refused attempt is over. */}
+      <div className="card-pane__editor" onChange={refusal === null ? undefined : onRefusalStale}>
+        {/* The fields scroll and the actions below them do not, exactly as on the
+            opened-Card pane. This one needs it most: it has no Markdown field to
+            absorb the squeeze, so on a short window its heading, Title, list and
+            hint together are taller than the frame. */}
+        <div className="card-pane__fields">
+          {/* The kind is stated rather than offered, because a Card keeps the
+              kind it was created with. */}
+          <div className="card-pane__heading">
+            <span>New Alias</span>
+            <span>An Alias shows another Card’s content at a second position.</span>
+          </div>
+          <label className="card-pane__field">
+            <span>Title</span>
+            <input
+              data-testid="new-alias-title"
+              value={title}
+              onChange={(event) => setTitle(event.currentTarget.value)}
+            />
+          </label>
+          <CardPicker
+            label="Target"
+            cards={targets}
+            selectedId={null}
+            // "It opens the normal Card editor in an Alias creation state with
+            // **Target** focused" (ADR 0009's Frame 1): the Target is what this
+            // surface is for, and the title above it is optional.
+            initialFocus
+            onSelect={(target) => onCreate(target, title)}
+            emptyMessage="An Alias needs a Card that owns its content, and this Space has none yet."
           />
-        </label>
-        <CardPicker
-          label="Target"
-          cards={targets}
-          selectedId={null}
-          // "It opens the normal Card editor in an Alias creation state with
-          // **Target** focused" (ADR 0009's Frame 1): the Target is what this
-          // surface is for, and the title above it is optional.
-          initialFocus
-          onSelect={(target) => onCreate(target, title)}
-          onCancel={onCancel}
-          emptyMessage="An Alias needs a Card that owns its content, and this Space has none yet."
-        />
-        {refusal === null ? (
-          <p className="card-pane__hint">
-            Choosing a Target creates the Alias. Leave the title empty to take the Target’s.
-          </p>
-        ) : (
-          <span role="alert" className="card-pane__field-error">
-            {refusal}
-          </span>
-        )}
+          {refusal === null ? (
+            <p className="card-pane__hint">
+              Choosing a Target creates the Alias. Leave the title empty to take the Target’s.
+            </p>
+          ) : (
+            <span role="alert" className="card-pane__field-error">
+              {refusal}
+            </span>
+          )}
+        </div>
         <div className="card-pane__actions">
           <Button type="button" variant="secondary" onClick={onCancel}>
             Cancel

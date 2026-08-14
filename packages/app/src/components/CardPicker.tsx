@@ -1,4 +1,4 @@
-import { useId, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
+import { useId, useState } from 'react';
 import type { Card, CardId } from '@project/core';
 import {
   CardKindIcon,
@@ -33,11 +33,6 @@ export interface CardPickerProps {
    */
   readonly initialFocus: boolean;
   readonly onSelect: (cardId: CardId) => void;
-  /**
-   * Escape with no search text: the field draft is already empty, so the
-   * surface's own cancellation is what is left to run.
-   */
-  readonly onCancel: () => void;
   /** What to say when the Space holds no Card this field could ever name. */
   readonly emptyMessage: string;
 }
@@ -58,12 +53,6 @@ export interface CardPickerProps {
  * plain case-insensitive substring of it. The id stays the value because that is
  * what `onSelect` hands back, and two Cards may legitimately share a title.
  *
- * **Escape.** cmdk leaves Escape to the containing surface, and the authoring
- * contract splits it: a field draft consumes the first Escape, and only then may
- * the surface consume the next. Clearing the search is that first consumption —
- * which is also, for a retarget, what "restore the current Target" means, since
- * an unfiltered list is the one showing it.
- *
  * **The list is always rendered, including with nothing in it.** cmdk mints the
  * list's id on the Command root and puts it on the input as `aria-controls`,
  * beside a hardcoded `aria-expanded="true"` — so a field drawn without its list
@@ -77,7 +66,6 @@ export function CardPicker({
   selectedId,
   initialFocus,
   onSelect,
-  onCancel,
   emptyMessage,
 }: CardPickerProps) {
   const [search, setSearch] = useState('');
@@ -95,23 +83,8 @@ export function CardPicker({
    */
   const messageId = useId();
 
-  const cancel = (event: ReactKeyboardEvent<HTMLDivElement>): void => {
-    if (event.key !== 'Escape') return;
-    event.preventDefault();
-    // Stopped either way: the surface listens for Escape too, and one keypress
-    // may only be consumed by one owner. With text in the field this is the
-    // draft's own cancellation; with none it is this component handing the
-    // gesture on deliberately rather than by letting it bubble.
-    event.stopPropagation();
-    if (search.length > 0) {
-      setSearch('');
-      return;
-    }
-    onCancel();
-  };
-
   return (
-    <div className="card-picker" onKeyDown={cancel}>
+    <div className="card-picker">
       {/* Not a `<label>`, because it cannot be one that works. cmdk spreads the
           caller's props and then writes its own `id` over them, so a `for`
           minted here names an element that never exists — and an orphan label

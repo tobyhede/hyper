@@ -286,7 +286,7 @@ test('opened Markdown editing persists source and description without moving Car
   );
 });
 
-test('editing through an Alias updates its target and survives reload', async ({ page }) => {
+test('editing an Alias authors its metadata and survives reload', async ({ page }) => {
   await page.goto('/');
   const target = nodeByTitle(page, 'A').first();
   const alias = nodeByTitle(page, 'A′').first();
@@ -295,48 +295,29 @@ test('editing through an Alias updates its target and survives reload', async ({
   const before = await allPositions(page);
 
   await openCard(alias, 'A′');
-  await expect(page.getByText('Opened through A′')).toBeVisible();
-  await expect(page.getByText('Editing content on A')).toBeVisible();
-  // The Title is the *occurrence's* own, and this line is what says so: it read
-  // `toHaveCount(0)` and pinned a pane that could not rename the Alias it was
-  // opened on at all. What it was guarding — that no field here renames the Card
-  // that owns the content — is the value, not the absence.
   await expect(page.getByRole('textbox', { name: 'Title' })).toHaveValue('A′');
-  // Named for the Card they author, exactly, because A′ carries a description of
-  // its own on the graph behind this pane and these fields do not write it.
-  await page
-    .getByRole('textbox', { name: 'Description of A', exact: true })
-    .fill('Shared through every occurrence');
-  await page
-    .getByRole('textbox', { name: 'Markdown source of A', exact: true })
-    .fill('One shared source');
+  await expect(page.getByRole('textbox', { name: 'Markdown source' })).toHaveCount(0);
+  await page.getByRole('textbox', { name: 'Title' }).fill('A reference to B');
+  const targetPicker = page.getByRole('combobox', { name: 'Target' });
+  await targetPicker.fill('B');
+  await page.getByRole('option', { name: 'B', exact: true }).click();
   await page.getByRole('button', { name: 'Done' }).click();
 
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
   await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
   expect(await allPositions(page)).toEqual(before);
-  await expect(nodeByTitle(page, 'A′').first()).toBeVisible();
+  await expect(nodeByTitle(page, 'A reference to B').first()).toBeVisible();
 
   await openCard(target, 'A');
-  await expect(page.getByRole('textbox', { name: 'Description' })).toHaveValue(
-    'Shared through every occurrence',
-  );
-  await expect(page.getByRole('textbox', { name: 'Markdown source' })).toHaveValue(
-    'One shared source',
-  );
-  await page.getByRole('button', { name: 'Cancel' }).click();
-
-  await openCard(nodeByTitle(page, 'A′').first(), 'A′');
-  await expect(
-    page.getByRole('textbox', { name: 'Markdown source of A', exact: true }),
-  ).toHaveValue('One shared source');
+  await expect(page.getByRole('textbox', { name: 'Description' })).toHaveValue(/entry point/);
   await page.getByRole('button', { name: 'Cancel' }).click();
 
   await page.reload();
-  await openCard(nodeByTitle(page, 'A′').first(), 'A′');
-  await expect(
-    page.getByRole('textbox', { name: 'Markdown source of A', exact: true }),
-  ).toHaveValue('One shared source');
+  await openCard(nodeByTitle(page, 'A reference to B').first(), 'A reference to B');
+  await expect(page.getByRole('textbox', { name: 'Title' })).toHaveValue('A reference to B');
+  const reloadedTargetPicker = page.getByRole('combobox', { name: 'Target' });
+  await reloadedTargetPicker.fill('B');
+  await expect(page.getByRole('option', { name: 'B', exact: true }).locator('svg')).toHaveCount(2);
 });
 
 /**
