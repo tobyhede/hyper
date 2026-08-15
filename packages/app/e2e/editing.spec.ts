@@ -598,9 +598,23 @@ test('a selected Card exposes four circular handles coloured as the active Graph
   // Graph the conversion mints, leaving no Edge to read a colour from.
   await a.click();
   await expect(a).toHaveClass(/selected/);
+  await page.mouse.move(0, 0);
+  await expect(a.locator('.canvas-card')).toHaveAttribute('data-state', 'selected');
+
+  // Selection is the keyboard author's stable way into the Card's controls:
+  // neither control may depend on the pointer remaining over the Card.
+  const connect = a.getByRole('button', { name: 'Connect from A' });
+  const edit = a.getByRole('button', { name: 'Edit Card A' });
+  await expect(connect).toBeVisible();
+  await expect(edit).toBeVisible();
+  await a.focus();
+  await page.keyboard.press('Tab');
+  await expect(connect).toBeFocused();
 
   const handles = a.locator('.rf-card-node__authoring-handle--source');
   await expect(handles).toHaveCount(4);
+  await expect(handles.first()).toHaveCSS('opacity', '1');
+  await expect(handles.first()).toHaveCSS('pointer-events', 'auto');
   await expect(handles.first()).toHaveCSS('width', '24px');
   await expect(handles.first()).toHaveCSS('height', '24px');
   const graphStroke = await page

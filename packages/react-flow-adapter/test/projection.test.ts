@@ -138,6 +138,39 @@ describe('projectCardNodes', () => {
     ).toBe(false);
   });
 
+  it('carries the target title only on an Alias node', () => {
+    const withAlias = load(
+      spaceFile([
+        {
+          id: '00000000-0000-4000-8000-000000000004',
+          title: 'Main',
+          edges: [
+            {
+              from: '00000000-0000-4000-8000-000000000002',
+              to: '00000000-0000-4000-8000-000000000007',
+            },
+          ],
+        },
+      ]),
+      [
+        cardFile('00000000-0000-4000-8000-000000000002', 'Card A'),
+        aliasFile(
+          '00000000-0000-4000-8000-000000000007',
+          'Card A, again',
+          '00000000-0000-4000-8000-000000000002',
+        ),
+      ],
+    );
+    const nodes = projectCardNodes(withAlias, buildCardHandles(withAlias), colors);
+
+    expect(
+      'aliasOf' in nodes.find((node) => node.id === '00000000-0000-4000-8000-000000000002')!.data,
+    ).toBe(false);
+    expect(
+      nodes.find((node) => node.id === '00000000-0000-4000-8000-000000000007')!.data.aliasOf,
+    ).toBe('Card A');
+  });
+
   it('attaches per-graph handles colored by graph', () => {
     const nodes = projectCardNodes(space, handles, colors);
     const a = nodes.find((n) => n.id === '00000000-0000-4000-8000-000000000002')!;

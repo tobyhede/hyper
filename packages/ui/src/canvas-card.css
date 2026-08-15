@@ -91,7 +91,8 @@
   letter-spacing: 0.02em;
 }
 
-.canvas-card:is([data-state='hover'], [data-state='selected-hover']) .canvas-card__actions {
+.canvas-card:is([data-state='hover'], [data-state='selected'], [data-state='selected-hover'])
+  .canvas-card__actions {
   display: flex;
 }
 
@@ -123,6 +124,16 @@
 }
 
 .canvas-card__description {
+  margin: 6px 0 0;
+  overflow: hidden;
+  color: color-mix(in oklab, var(--canvas-card-title) 70%, transparent);
+  font-size: 12px;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.canvas-card__alias-of {
   margin: 6px 0 0;
   overflow: hidden;
   color: color-mix(in oklab, var(--canvas-card-title) 70%, transparent);

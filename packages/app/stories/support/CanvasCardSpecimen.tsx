@@ -5,7 +5,7 @@ import {
 } from '@project/react-flow-adapter/authoring-handle';
 
 type CanvasCardSpecimenProps = Pick<CanvasCardProps, 'title'> &
-  Partial<Pick<CanvasCardProps, 'kind' | 'state' | 'graphColor'>> & {
+  Partial<Pick<CanvasCardProps, 'kind' | 'state' | 'graphColor' | 'aliasOf'>> & {
     readonly showActions?: boolean;
     readonly showHandles?: boolean;
   };
@@ -16,6 +16,7 @@ export function CanvasCardSpecimen({
   kind = 'markdown',
   state = 'rest',
   graphColor = '#ffc53d',
+  aliasOf,
   showActions = false,
   showHandles = false,
 }: CanvasCardSpecimenProps) {
@@ -25,6 +26,7 @@ export function CanvasCardSpecimen({
       kind={kind}
       state={state}
       graphColor={graphColor}
+      {...(aliasOf === undefined ? {} : { aliasOf })}
       {...(state === 'editing'
         ? {
             titleEditor: (

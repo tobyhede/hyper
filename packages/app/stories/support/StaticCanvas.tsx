@@ -89,6 +89,10 @@ export function StaticCanvas({
         // The colour a Card's rail takes is the Active Graph's, whichever Graphs
         // it happens to sit on — the handles are Graph-independent (ADR 0033).
         const activeColor = colorByGraphId[activeGraphId ?? ''] ?? '#ffc53d';
+        const aliasOf =
+          card.kind === 'alias'
+            ? cards.find((candidate) => candidate.id === card.target)?.title
+            : undefined;
         return (
           <div key={card.id} style={{ position: 'absolute', left: point.x, top: point.y }}>
             <CanvasCardSpecimen
@@ -96,6 +100,7 @@ export function StaticCanvas({
               kind={card.kind}
               state={cardStates[card.id] ?? 'rest'}
               graphColor={activeColor}
+              {...(aliasOf === undefined ? {} : { aliasOf })}
               showActions
               showHandles
             />

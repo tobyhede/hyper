@@ -15,6 +15,8 @@ export interface CanvasCardProps {
   readonly title: string;
   readonly graphColor: string;
   readonly description?: string;
+  /** The target Card's title, present only when this Card is an Alias. */
+  readonly aliasOf?: string;
   readonly titleEditor?: ReactNode;
   readonly actions?: ReactNode;
   /** Real interaction handles supplied by the canvas adapter. */
@@ -34,6 +36,7 @@ export function CanvasCard({
   title,
   graphColor,
   description,
+  aliasOf,
   titleEditor,
   actions,
   handles,
@@ -72,6 +75,11 @@ export function CanvasCard({
         {description !== undefined && (
           <p className="canvas-card__description" data-testid="card-description">
             {description}
+          </p>
+        )}
+        {aliasOf !== undefined && (
+          <p className="canvas-card__alias-of" data-testid="alias-marker">
+            {aliasOf}
           </p>
         )}
       </CardContent>

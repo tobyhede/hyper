@@ -28,7 +28,13 @@ export const States: Story = () => (
         ))}
         {states.map((state) => (
           <Specimen key={`alias-${state}`} label={`alias · ${state}`}>
-            <CanvasCardSpecimen title="Opening" kind="alias" state={state} showActions />
+            <CanvasCardSpecimen
+              title="Opening, again"
+              kind="alias"
+              aliasOf="Opening"
+              state={state}
+              showActions
+            />
           </Specimen>
         ))}
       </div>
@@ -50,7 +56,7 @@ export const Kinds: Story = () => (
           <CanvasCardSpecimen title="Why authored placement beats a layout engine that reshuffles on every edit" />
         </Specimen>
         <Specimen label="alias">
-          <CanvasCardSpecimen title="Opening" kind="alias" />
+          <CanvasCardSpecimen title="Opening, again" kind="alias" aliasOf="Opening" />
         </Specimen>
       </div>
     </CatalogueSection>
@@ -82,13 +88,13 @@ export const HoverActions: Story = () => (
   <div className="inv-sheet">
     <CatalogueSection
       title="Hover actions"
-      note="The story supplies the same specialized action slots as CardNode; selected Cards keep them hidden."
+      note="The story supplies the same specialized action slots as CardNode; selection keeps them visible and keyboard-reachable after hover ends."
     >
       <div className="inv-row">
         <Specimen label="hover · actions visible">
           <CanvasCardSpecimen title="Strategies" state="hover" showActions />
         </Specimen>
-        <Specimen label="selected · actions hidden">
+        <Specimen label="selected · actions visible">
           <CanvasCardSpecimen title="Strategies" state="selected" showActions />
         </Specimen>
       </div>
