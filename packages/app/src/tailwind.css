@@ -1,9 +1,8 @@
 @import 'tailwindcss';
 
 /*
- * The shared semantic vocabulary.  `@project/ui` is styled with these names;
- * the short legacy names below are compatibility aliases for the canvas
- * integration stylesheet while its consumers move to the shared primitives.
+ * The shared semantic vocabulary consumed by the app, `@project/ui`, and the
+ * React Flow integration.
  */
 @theme inline {
   --color-background: var(--background);
@@ -43,16 +42,10 @@
   --muted-foreground: #98a2b3;
   --accent: #6ea8fe;
   --accent-foreground: var(--foreground);
-  --destructive: #fca5a5;
+  --destructive: #f08c8c;
   --border: #2b303b;
   --input: var(--border);
   --ring: var(--accent);
-
-  --bg: var(--background);
-  --panel: var(--card);
-  --panel-2: var(--secondary);
-  --text: var(--foreground);
-  --accent-strong: var(--primary);
 }
 
 /*

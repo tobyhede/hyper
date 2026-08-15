@@ -5,7 +5,7 @@ import {
   AlertTitle,
   Button,
   Card,
-  CardContent,
+  CardSection,
   CardDescription,
   CardFooter,
   CardHeader,
@@ -56,7 +56,7 @@ export const Baseline: Story = () => (
         <CardTitle>Space settings</CardTitle>
         <CardDescription>Shared Card composition for a bounded product surface.</CardDescription>
       </CardHeader>
-      <CardContent>
+      <CardSection>
         <FieldGroup>
           <Field>
             <FieldLabel htmlFor="design-system-title">Title</FieldLabel>
@@ -67,7 +67,7 @@ export const Baseline: Story = () => (
             <Textarea id="design-system-body" defaultValue="A graph-native presentation." />
           </Field>
         </FieldGroup>
-      </CardContent>
+      </CardSection>
       <CardFooter className="justify-end gap-2">
         <Button>Save</Button>
       </CardFooter>

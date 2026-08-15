@@ -33,7 +33,7 @@ export function GraphHud({
         style={{
           width: 214,
           overflow: 'hidden',
-          background: 'var(--panel)',
+          background: 'var(--card)',
           border: '1px solid var(--border)',
           borderRadius: 8,
           boxShadow: '0 12px 40px rgba(0,0,0,0.5)',
@@ -47,8 +47,8 @@ export function GraphHud({
         <div aria-hidden="true" style={{ height: 1, background: 'var(--border)' }} />
         <MiniMap
           ariaLabel="Graph overview"
-          bgColor="var(--bg)"
-          nodeColor="var(--panel-2)"
+          bgColor="var(--background)"
+          nodeColor="var(--secondary)"
           nodeStrokeColor={nodeStrokeColor}
           pannable
           zoomable

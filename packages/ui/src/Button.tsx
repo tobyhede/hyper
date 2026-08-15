@@ -14,11 +14,11 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default:
-          'border-[var(--accent-strong)] bg-[var(--accent-strong)] text-white hover:border-[var(--accent)] disabled:opacity-50',
+          'border-[var(--primary)] bg-[var(--primary)] text-white hover:border-[var(--accent)] disabled:opacity-50',
         secondary:
-          'border-[var(--border)] bg-[var(--panel-2)] text-[var(--text)] hover:border-[var(--accent)] disabled:opacity-50',
+          'border-[var(--border)] bg-[var(--secondary)] text-[var(--foreground)] hover:border-[var(--accent)] disabled:opacity-50',
         destructive:
-          'border-[#7f1d1d] bg-[var(--panel-2)] text-[var(--text)] hover:border-[var(--accent)] disabled:opacity-50',
+          'border-[#7f1d1d] bg-[var(--secondary)] text-[var(--foreground)] hover:border-[var(--accent)] disabled:opacity-50',
       },
       size: {
         default: 'px-[0.8rem] py-[0.4rem]',

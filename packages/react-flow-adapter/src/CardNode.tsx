@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Handle, Position, useConnection, type NodeProps } from '@xyflow/react';
-import { CardKindIcon, ConnectIcon, EditIcon, RenderedCardContent } from '@project/ui';
+import { CardContent, CardKindIcon, ConnectIcon, EditIcon } from '@project/ui';
 import type { CardFlowNode, CardHandle } from './projection';
 import { AUTHORING_HANDLE_DIAMETER, GRAPH_PORT_DIAMETER } from './authoring-handle';
 
@@ -228,7 +228,7 @@ export function CardNode({ data, selected, isConnectable }: NodeProps<CardFlowNo
       {AUTHORING_SIDES.map((side) => renderAuthoringHandle(side, 'target'))}
       {data.showContent ? (
         <div className="rf-card-node__content">
-          <RenderedCardContent title={data.title} markdown={data.body ?? ''} />
+          <CardContent title={data.title} markdown={data.body ?? ''} />
         </div>
       ) : (
         <article className="card card--node" data-testid="card">

@@ -4,7 +4,7 @@ export { AppShell } from './AppShell';
 export type { AppShellProps } from './AppShell';
 export { Button, buttonVariants } from './Button';
 export type { ButtonProps } from './Button';
-export { RenderedCardContent } from './CardContent';
+export { RenderedCardContent, RenderedCardContent as CardContent } from './CardContent';
 export type { CardContentProps } from './CardContent';
 export { CardKindIcon } from './CardKindIcon';
 export type { CardKindIconProps } from './CardKindIcon';
@@ -57,12 +57,29 @@ export { Alert, AlertAction, AlertDescription, AlertTitle } from './components/a
 export {
   Card,
   CardAction,
-  CardContent,
+  CardContent as CardSection,
   CardDescription,
   CardFooter,
   CardHeader,
   CardTitle,
 } from './components/card';
+export {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuPortal,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+  DropdownMenuShortcut,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+  DropdownMenuTrigger,
+} from './components/dropdown-menu';
 export {
   Empty,
   EmptyContent,

@@ -5,7 +5,7 @@ import {
   AlertDescription,
   AlertTitle,
   Card,
-  CardContent,
+  CardSection,
   CardDescription,
   CardHeader,
   CardTitle,
@@ -35,7 +35,7 @@ describe('design-system baseline', () => {
             <CardTitle>Space</CardTitle>
             <CardDescription>One authored canvas.</CardDescription>
           </CardHeader>
-          <CardContent>Contents</CardContent>
+          <CardSection>Contents</CardSection>
         </Card>
         <Empty>
           <EmptyHeader>

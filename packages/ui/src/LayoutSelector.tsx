@@ -30,13 +30,13 @@ export function LayoutSelector({ layouts, value, active, onValueChange }: Layout
         activeLayout={active}
       />
       <SelectContent className="w-[214px]">
-        <div className="px-[8px] pt-[7px] pb-[5px] font-mono text-[10px] tracking-[0.12em] text-[var(--muted)] uppercase">
+        <div className="px-[8px] pt-[7px] pb-[5px] font-mono text-[10px] tracking-[0.12em] text-[var(--muted-foreground)] uppercase">
           Layouts · authored
         </div>
         {layouts.map((layout) => (
           <SelectItem key={layout.id} value={layout.id} className="px-[8px] py-[7px] text-[13px]">
             <span className="flex w-full items-center gap-[10px]">
-              <span className="text-[var(--muted)]">
+              <span className="text-[var(--muted-foreground)]">
                 <LayoutIcon />
               </span>
               <span className="flex-1">{layout.title}</span>

@@ -78,13 +78,13 @@ export function CardCombobox({
         aria-label={label}
         title={label}
         data-testid={testId}
-        className="nokey flex w-full items-center justify-between gap-[7px] rounded-[6px] border border-[var(--border)] bg-[var(--panel-2)] px-[9px] py-[6px] text-[13px] text-[var(--text)] outline-none hover:border-[var(--accent)] focus:border-[var(--accent)]"
+        className="nokey flex w-full items-center justify-between gap-[7px] rounded-[6px] border border-[var(--border)] bg-[var(--secondary)] px-[9px] py-[6px] text-[13px] text-[var(--foreground)] outline-none hover:border-[var(--accent)] focus:border-[var(--accent)]"
       >
         <span className="max-w-[9rem] truncate">{chosen?.title ?? placeholder}</span>
         <ChevronDownIcon />
       </PopoverTrigger>
       <PopoverContent className="w-[214px] p-[0.4rem]" align="start">
-        <div className="px-[8px] pt-[3px] pb-[5px] font-mono text-[10px] tracking-[0.12em] text-[var(--muted)] uppercase">
+        <div className="px-[8px] pt-[3px] pb-[5px] font-mono text-[10px] tracking-[0.12em] text-[var(--muted-foreground)] uppercase">
           {label}
         </div>
         <Command
@@ -112,7 +112,9 @@ export function CardCombobox({
                 <span className="flex flex-col gap-[2px]">
                   <span>{choice.title}</span>
                   {choice.refusal !== undefined && (
-                    <span className="text-[11px] text-[var(--muted)]">{choice.refusal}</span>
+                    <span className="text-[11px] text-[var(--muted-foreground)]">
+                      {choice.refusal}
+                    </span>
                   )}
                 </span>
               </CommandItem>
