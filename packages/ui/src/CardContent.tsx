@@ -35,7 +35,7 @@ export interface CardContentProps {
  * closed hole — it is load-bearing. Card bodies now arrive from a database over
  * HTTP, which is not a property to bet the origin on either.
  */
-export function CardContent({ title, markdown }: CardContentProps) {
+export function RenderedCardContent({ title, markdown }: CardContentProps) {
   const html = useMemo(
     () => DOMPurify.sanitize(marked.parse(markdown, { async: false })),
     [markdown],
