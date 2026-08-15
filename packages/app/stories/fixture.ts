@@ -1,0 +1,192 @@
+import { uuidSchema, type Card, type Graph, type Layout, type UUID } from '@project/core';
+
+/**
+ * The inventory's fixture: a small, believable Space, shaped to exercise the
+ * cases the design has to survive rather than to tell a story.
+ *
+ * Seven Cards, two Graphs sharing two of them, one Alias, one deliberately long
+ * title, and one Card of a kind the domain does not have — see `spaceCard`.
+ *
+ * Real ids, parsed through `uuidSchema`, so this data is the same shape the
+ * product's own components receive. A story that hands `GraphSelector` a
+ * hand-rolled object proves nothing about `GraphSelector`.
+ */
+
+const id = (value: string): UUID => uuidSchema.parse(value);
+
+export const cardIds = {
+  opening: id('0b6f4a52-8f1e-4a7c-9f2d-1c4b5e6a7d80'),
+  problem: id('1c7a5b63-9021-4b8d-8a3e-2d5c6f7b8e91'),
+  strategies: id('2d8b6c74-a132-4c9e-9b4f-3e6d7a8c9f02'),
+  traversal: id('3e9c7d85-b243-4daf-8c5a-4f7e8b9daf13'),
+  openingAlias: id('4fad8e96-c354-4eb0-9d6b-5a8f9cae0b24'),
+  collection: id('5abe9fa7-d465-4fc1-8e7c-6b9adcbf1c35'),
+  closing: id('6bcfa0b8-e576-40d2-9f8d-7cabedca2d46'),
+} as const;
+
+export const graphIds = {
+  long: id('7cd0b1c9-f687-41e3-8a9e-8dbcfedb3e57'),
+  short: id('8de1c2da-0798-42f4-9baf-9ecdafec4f68'),
+} as const;
+
+export const layoutId = id('9ef2d3eb-18a9-4305-8cba-afdeb0fd5a79');
+
+/**
+ * The design's six-colour graph palette. Assigned per Layout rather than per
+ * Space, so every Layout gets a full run of them (`nextGraphColor`).
+ */
+export const GRAPH_PALETTE = ['#ffc53d', '#35d6c3', '#6ea8fe', '#c9a2ff', '#ff7a59'] as const;
+
+/**
+ * Edge colours are the graph colour darkened for contrast on the light canvas —
+ * `#ffc53d` amber reads as a highlighter against `#efe9dc` paper at a 3px
+ * stroke, so the line takes a darker relative of its own colour.
+ *
+ * The handoff supplies amber and teal. **The other three are derived here and
+ * are not design-approved** — they hold roughly the same lightness step, which
+ * is the rule the two given pairs follow, but nobody has looked at them.
+ */
+export const EDGE_COLOR: Readonly<Record<string, string>> = {
+  '#ffc53d': '#c1861a',
+  '#35d6c3': '#14887b',
+  '#6ea8fe': '#2f66c4',
+  '#c9a2ff': '#7d4fc0',
+  '#ff7a59': '#c44a28',
+};
+
+export const cards: readonly Card[] = [
+  {
+    id: cardIds.opening,
+    kind: 'markdown',
+    title: 'Opening',
+    body: '# Opening\n\nWhere the traversal begins.',
+  },
+  {
+    id: cardIds.problem,
+    // The long title: three lines at 18px in a 260px card, which is what
+    // `text-wrap: balance` and the three-line clamp are there to survive.
+    title: 'Why authored placement beats a layout engine that reshuffles on every edit',
+    kind: 'markdown',
+    body: '# Placement\n\nThree spike increments each reshuffled the existing cards.',
+  },
+  {
+    id: cardIds.strategies,
+    title: 'Strategies',
+    description: 'Grid, sorts, tree, cluster — elkjs is one member, not the meaning of the word.',
+    kind: 'markdown',
+    body: '# Strategies\n\nNo strategy is privileged.',
+  },
+  {
+    id: cardIds.traversal,
+    title: 'Traversal',
+    kind: 'markdown',
+    body: '# Traversal\n\nPresenting is this canvas, closer in.',
+  },
+  {
+    id: cardIds.openingAlias,
+    title: 'Opening',
+    kind: 'alias',
+    target: cardIds.opening,
+  },
+  {
+    id: cardIds.closing,
+    title: 'Closing',
+    kind: 'markdown',
+    body: '# Closing\n',
+  },
+];
+
+/**
+ * The Card the design has and the domain does not.
+ *
+ * The handoff specifies a **space** kind — a second sheet offset behind the
+ * card, a layers glyph — and asks the fixture to carry "one space containing
+ * several cards". `cardSchema` is a discriminated union of `markdown` and
+ * `alias`, and nothing else; nested Spaces are ADR 0001's, unbuilt.
+ *
+ * So it is drawn here as a specimen and kept out of `cards` above, which is
+ * typed as the domain's `Card`. Adding a third kind is a domain change with an
+ * ADR behind it, not something an inventory page decides by declaring a type.
+ */
+export const spaceCard = {
+  id: cardIds.collection,
+  title: 'Collection 2',
+  kind: 'space' as const,
+  contains: 4,
+};
+
+export const graphs: readonly Graph[] = [
+  {
+    id: graphIds.long,
+    title: 'Long path',
+    color: GRAPH_PALETTE[0],
+    edges: [
+      { from: cardIds.opening, to: cardIds.problem },
+      { from: cardIds.problem, to: cardIds.strategies },
+      { from: cardIds.strategies, to: cardIds.traversal },
+      { from: cardIds.traversal, to: cardIds.openingAlias },
+    ],
+  },
+  {
+    // Shares `opening` and `strategies` with the Long path, which is what makes
+    // the fixture able to ask the open question: how does a Card show that it
+    // belongs to more than one Graph?
+    id: graphIds.short,
+    title: 'Short path',
+    color: GRAPH_PALETTE[1],
+    edges: [
+      { from: cardIds.opening, to: cardIds.strategies },
+      { from: cardIds.strategies, to: cardIds.closing },
+    ],
+  },
+];
+
+export const colorByGraphId: Readonly<Record<string, string>> = {
+  [graphIds.long]: GRAPH_PALETTE[0],
+  [graphIds.short]: GRAPH_PALETTE[1],
+};
+
+/**
+ * Where the static canvas draws each Card. Authored, as placement always is —
+ * these are hand-set so both Graphs read forward, left to right, which is the
+ * only arrangement in which two overlaid Graphs stay legible (the acyclic-union
+ * limit). `collection` is placed and belongs to no Graph, which is a Card in a
+ * Layout with no Edge on it — a real state and one the design has to draw.
+ */
+export const positions: Readonly<Record<string, { x: number; y: number }>> = {
+  [cardIds.opening]: { x: 40, y: 170 },
+  [cardIds.problem]: { x: 380, y: 30 },
+  [cardIds.strategies]: { x: 720, y: 170 },
+  [cardIds.traversal]: { x: 1060, y: 30 },
+  [cardIds.openingAlias]: { x: 1400, y: 170 },
+  [cardIds.closing]: { x: 1060, y: 330 },
+  [cardIds.collection]: { x: 380, y: 330 },
+};
+
+export const CARD_WIDTH = 260;
+export const CARD_HEIGHT = 146;
+
+export const layouts: readonly Layout[] = [
+  {
+    id: layoutId,
+    kind: 'positioned',
+    title: 'Collection 1',
+    // Domain Cards only. `positions` above also places `collection`, which is
+    // the proposed `space` kind and not a `Card`, so putting it here would be a
+    // dangling reference — the exact thing `validateReferences` rejects.
+    positions: Object.fromEntries(
+      cards.map((card) => [card.id, positions[card.id] ?? { x: 0, y: 0 }]),
+    ),
+    graphs: [...graphs],
+    activeGraph: graphIds.long,
+  },
+];
+
+export const spaceTitle = 'Graph-native presentations';
+
+/** The workspace chooser's list — UUID-titled, as the real selector receives. */
+export const spaceSummaries = [
+  { id: layoutId, title: 'Graph-native presentations' },
+  { id: graphIds.long, title: 'Layout seam findings' },
+  { id: graphIds.short, title: 'Card route editing' },
+] as const;

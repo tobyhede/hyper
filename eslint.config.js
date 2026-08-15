@@ -114,6 +114,10 @@ export default tseslint.config(
     ignores: [
       '**/dist/**',
       '**/dist-http/**',
+      // `ladle build`'s static output. Gitignored, but ESLint's flat config
+      // does not read `.gitignore`, so without this a single inventory build
+      // puts ~9k errors from bundled vendor JS in front of `pnpm verify`.
+      'packages/app/build/**',
       '**/node_modules/**',
       '**/playwright-report/**',
       '**/test-results/**',
@@ -329,8 +333,15 @@ export default tseslint.config(
     },
   },
   // Config files run as plain JS — no type information to check them against.
+  //
+  // All three extensions, not just `.js`. ESLint lints `.mjs` and `.cjs` by
+  // default and the type-checked rules above are keyed on `**/*.{ts,tsx}`, so a
+  // `.mjs` config fell between them: it was linted, the type-aware rules were
+  // still enabled for it, and the first one to ask for parser services threw —
+  // taking down the whole `eslint .` run rather than reporting a finding.
+  // `packages/app/.ladle/config.mjs` is what found it.
   {
-    files: ['**/*.js'],
+    files: ['**/*.{js,mjs,cjs}'],
     extends: [tseslint.configs.disableTypeChecked],
   },
 );

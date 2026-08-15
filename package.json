@@ -11,6 +11,8 @@
     "dev": "pnpm --filter @project/app dev",
     "dev:fixture": "pnpm --filter @project/app dev:fixture",
     "dev:new": "pnpm --filter @project/app dev:new",
+    "ladle": "pnpm --filter @project/app ladle",
+    "ladle:build": "pnpm --filter @project/app ladle:build",
     "prebuild": "pnpm contract:emit",
     "build": "pnpm --filter @project/app build",
     "http-server:build": "pnpm --filter @project/app http-server:build",

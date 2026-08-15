@@ -18,12 +18,24 @@
       "@project/ui": ["../ui/src/index.ts"]
     }
   },
+  // `stories` and `.ladle` are the surface inventory (see `.ladle/config.mjs`).
+  // They are included so the inventory typechecks against the real component
+  // props: a story that drifts from `GraphSelector`'s interface stops being
+  // evidence about `GraphSelector`, and would drift in silence otherwise —
+  // the root program's `include` reaches `packages/*/src` and not these.
   "include": [
     "src",
     "example",
     "e2e",
+    "stories",
+    // Named as a file, not as the `.ladle` directory: TypeScript drops
+    // dot-prefixed segments when it expands an `include` entry, so the
+    // directory form silently contributes nothing and the provider goes
+    // unchecked — and unparseable to type-aware lint, which is how it surfaced.
+    ".ladle/components.tsx",
     "vite.config.ts",
     "vite-space-http-plugin.ts",
-    "http-server-build.config.ts"
+    "http-server-build.config.ts",
+    "ladle-vite.config.ts"
   ]
 }

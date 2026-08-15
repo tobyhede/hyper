@@ -1,6 +1,8 @@
 node_modules/
 dist/
 packages/app/dist-http/
+# `ladle build`'s static output — the surface inventory as a hostable site.
+packages/app/build/
 .DS_Store
 coverage/
 playwright-report/
