@@ -612,7 +612,7 @@ describe('Add Alias', () => {
 });
 
 describe('an Alias on the graph', () => {
-  it('uses the Alias kind icon and frame while naming its Target beneath its own title', async () => {
+  it('uses only the Alias kind icon and frame to distinguish it', async () => {
     const session = mount(aliased);
 
     const alias = (await screen.findByRole('heading', { name: 'A again' })).closest(
@@ -621,8 +621,7 @@ describe('an Alias on the graph', () => {
     if (alias === null) throw new Error('The Alias is not drawn as a node');
     expect(alias.querySelector('[data-testid="card"]')).toHaveAttribute('data-kind', 'alias');
     expect(alias).toContainElement(screen.getByRole('img', { name: 'Alias' }));
-    expect(alias).toContainElement(screen.getByTestId('alias-marker'));
-    expect(screen.getByTestId('alias-marker')).toHaveTextContent('A');
+    expect(screen.queryByTestId('alias-marker')).not.toBeInTheDocument();
     await settled(session);
   });
 });

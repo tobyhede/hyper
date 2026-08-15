@@ -198,7 +198,6 @@ export function CardNode({ data, selected, dragging, isConnectable }: NodeProps<
   const renderAuthoringHandle = (side: AuthoringHandleSide, role: 'source' | 'target') => (
     <AuthoringHandle
       key={`${role}-${side}`}
-      mode="interactive"
       side={side}
       role={role}
       color={data.activeGraphColor}
@@ -257,7 +256,6 @@ export function CardNode({ data, selected, dragging, isConnectable }: NodeProps<
           title={data.title}
           graphColor={data.activeGraphColor}
           {...(data.description === undefined ? {} : { description: data.description })}
-          {...(data.aliasOf === undefined ? {} : { aliasOf: data.aliasOf })}
           titleEditable={data.titleEditingEnabled === true}
           {...(data.titleEditingEnabled
             ? {

@@ -1,6 +1,6 @@
 import type { Story } from '@ladle/react';
 import { AppShell } from '@project/ui';
-import { StaticCanvas } from '../support/StaticCanvas';
+import { ReactFlowCanvas } from '../support/ReactFlowCanvas';
 import { Toolbar } from '../support/Toolbar';
 import { spaceTitle } from '../support/fixture';
 
@@ -26,7 +26,7 @@ export const Default: Story = () => (
   <div style={{ height: 620 }}>
     <AppShell title={spaceTitle} toolbar={<Toolbar />}>
       <div style={{ height: '100%', overflow: 'auto' }}>
-        <StaticCanvas />
+        <ReactFlowCanvas />
       </div>
     </AppShell>
   </div>

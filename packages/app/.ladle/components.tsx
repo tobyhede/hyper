@@ -2,6 +2,7 @@ import { ThemeState } from '@ladle/react';
 import type { GlobalProvider } from '@ladle/react';
 import { Alert, AlertDescription, AlertTitle, TooltipProvider } from '@project/ui';
 import '../src/tailwind.css';
+import '@xyflow/react/dist/style.css';
 import '../src/styles.css';
 import '../stories/support/inventory.css';
 

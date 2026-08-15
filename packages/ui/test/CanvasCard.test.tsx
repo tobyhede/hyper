@@ -35,21 +35,7 @@ describe('CanvasCard', () => {
     expect(card).toHaveAttribute('data-state', 'editing');
     expect(screen.getByRole('textbox', { name: 'Card title' })).toBeVisible();
     expect(screen.getByTestId('real-handles')).toBeVisible();
-    expect(screen.queryByText(/alias of/i)).not.toBeInTheDocument();
-  });
-
-  it("shows the target Card's title beneath an Alias's own title", () => {
-    render(
-      <CanvasCard
-        kind="alias"
-        state="rest"
-        title="Opening, again"
-        aliasOf="Opening"
-        graphColor="#35d6c3"
-      />,
-    );
-
-    expect(screen.getByRole('heading', { name: 'Opening, again' })).toBeVisible();
-    expect(screen.getByTestId('alias-marker')).toHaveTextContent('Opening');
+    expect(screen.getByRole('img', { name: 'Alias' })).toBeVisible();
+    expect(screen.queryByTestId('alias-marker')).not.toBeInTheDocument();
   });
 });

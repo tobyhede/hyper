@@ -69,8 +69,6 @@ export type CardNodeData = {
   /** A short caption drawn under the title (ADR 0006). Absent when the card has
    *  none — the card's own, never inherited through an alias. */
   description?: string;
-  /** For an Alias, the title of the Card whose content it redraws (ADR 0009). */
-  aliasOf?: string;
   active: boolean;
   /** Ordinary renderer selection, kept outside the authored Space. */
   selectedForAuthoring: boolean;
@@ -251,7 +249,6 @@ export function projectCardNodes(
     const cardLayout = laidOut.get(card.id);
     const active = card.id === activeCardId;
     const showContent = active && showActiveCardContent;
-    const aliasOf = card.kind === 'alias' ? resolveContentCard(space, card.id)?.title : undefined;
     // An alias shows its target's content under its own title (ADR 0009).
     const body = showContent ? (resolveContentCard(space, card.id)?.body ?? '') : undefined;
     const sourceHandles = resolveHandles(handles.sourceHandles, colors, cardLayout, nodeHeight);
@@ -299,8 +296,6 @@ export function projectCardNodes(
         // The card's own description, drawn under the title (ADR 0006). Omit when
         // absent; never inherited through an alias.
         ...(card.description !== undefined ? { description: card.description } : {}),
-        // Omit rather than set undefined: absence means this is not an Alias.
-        ...(aliasOf !== undefined ? { aliasOf } : {}),
         active,
         selectedForAuthoring: card.id === (options.selectedCardId ?? null),
         showContent,

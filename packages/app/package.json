@@ -5,6 +5,10 @@
   "type": "module",
   "imports": {
     "#app/*": "./src/*.tsx",
+    "#app/camera": "./src/camera.ts",
+    "#app/canvas-projection": "./src/canvas-projection.ts",
+    "#app/card": "./src/card.ts",
+    "#app/renderer": "./src/renderer.ts",
     "#components/*": "./src/components/*.tsx",
     "#hooks/*": "./src/hooks/*.ts",
     "#lib/*": "./src/lib/*.ts"

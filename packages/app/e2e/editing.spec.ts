@@ -593,6 +593,16 @@ test('a selected Card exposes four circular handles coloured as the active Graph
   await expect(a).toBeVisible();
   await expect(page.locator('.react-flow__edge-path').first()).toHaveAttribute('d', /L/);
   await settled(page);
+  const handles = a.locator('.rf-card-node__authoring-handle--source');
+
+  // Hover is the pointer author's first invitation to begin an Edge. Keep this
+  // separate from selection so a selected-only rule cannot mask its loss.
+  await a.hover();
+  await expect(a.locator('.canvas-card')).toHaveAttribute('data-state', 'hover');
+  await expect(handles).toHaveCount(4);
+  await expect(handles.first()).toHaveCSS('opacity', '1');
+  await expect(handles.first()).toHaveCSS('pointer-events', 'auto');
+
   // Selecting is all this needs, and it keeps the Active Graph the fixture's
   // own first one — a drag here would convert the View and activate the empty
   // Graph the conversion mints, leaving no Edge to read a colour from.
@@ -611,12 +621,42 @@ test('a selected Card exposes four circular handles coloured as the active Graph
   await page.keyboard.press('Tab');
   await expect(connect).toBeFocused();
 
-  const handles = a.locator('.rf-card-node__authoring-handle--source');
   await expect(handles).toHaveCount(4);
   await expect(handles.first()).toHaveCSS('opacity', '1');
   await expect(handles.first()).toHaveCSS('pointer-events', 'auto');
   await expect(handles.first()).toHaveCSS('width', '24px');
   await expect(handles.first()).toHaveCSS('height', '24px');
+  const alignment = await a.locator('.canvas-card').evaluate((card) => {
+    if (!(card instanceof HTMLElement)) throw new Error('Canvas Card is not an HTML element');
+    const cardBox = card.getBoundingClientRect();
+    const border = Number.parseFloat(getComputedStyle(card).borderTopWidth);
+    const scaleX = cardBox.width / card.offsetWidth;
+    const scaleY = cardBox.height / card.offsetHeight;
+    const centers = Object.fromEntries(
+      ['top', 'right', 'bottom', 'left'].map((side) => {
+        const handle = card.querySelector<HTMLElement>(`[aria-label="Connect from ${side}"]`);
+        if (handle === null) throw new Error(`Missing ${side} Edge handle`);
+        const box = handle.getBoundingClientRect();
+        return [side, { x: box.x + box.width / 2, y: box.y + box.height / 2 }];
+      }),
+    );
+    return {
+      actual: centers,
+      expected: {
+        top: { x: cardBox.x + cardBox.width / 2, y: cardBox.y + (border * scaleY) / 2 },
+        right: { x: cardBox.right - (border * scaleX) / 2, y: cardBox.y + cardBox.height / 2 },
+        bottom: {
+          x: cardBox.x + cardBox.width / 2,
+          y: cardBox.bottom - (border * scaleY) / 2,
+        },
+        left: { x: cardBox.x + (border * scaleX) / 2, y: cardBox.y + cardBox.height / 2 },
+      },
+    };
+  });
+  for (const side of ['top', 'right', 'bottom', 'left'] as const) {
+    expect(alignment.actual[side]?.x).toBeCloseTo(alignment.expected[side].x, 3);
+    expect(alignment.actual[side]?.y).toBeCloseTo(alignment.expected[side].y, 3);
+  }
   const graphStroke = await page
     .locator('.rf-graph-edge')
     .filter({ has: page.locator('.react-flow__edge-path') })

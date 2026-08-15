@@ -22,25 +22,6 @@ export const Pending: Story = () => (
   </ToolbarRow>
 );
 
-export const Rejected: Story = () => (
-  <ToolbarRow>
-    <Toolbar persistence="rejected" />
-  </ToolbarRow>
-);
-
-export const RetryableFailure: Story = () => (
-  <ToolbarRow>
-    <Toolbar persistence="failed" />
-  </ToolbarRow>
-);
-RetryableFailure.storyName = 'Retryable failure';
-
-export const Conflict: Story = () => (
-  <ToolbarRow>
-    <Toolbar persistence="conflicted" />
-  </ToolbarRow>
-);
-
 export const Presenting: Story = () => (
   <ToolbarRow>
     <Toolbar presenting authoringDisabled />

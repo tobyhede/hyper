@@ -27,6 +27,7 @@
     "src",
     "example",
     "e2e",
+    "ladle-e2e",
     "stories",
     // Named as a file, not as the `.ladle` directory: TypeScript drops
     // dot-prefixed segments when it expands an `include` entry, so the

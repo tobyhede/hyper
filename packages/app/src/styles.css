@@ -244,6 +244,32 @@ body {
   transition: opacity 100ms ease;
 }
 
+/* React Flow anchors handles on the Card's inner edge. Move them outward by
+   half the border width so their centres sit on the border stroke. */
+.canvas-card > .rf-card-node__authoring-handle.react-flow__handle-top {
+  top: calc(var(--canvas-card-border-width) / -2);
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.canvas-card > .rf-card-node__authoring-handle.react-flow__handle-right {
+  top: 50%;
+  right: calc(var(--canvas-card-border-width) / -2);
+  transform: translate(50%, -50%);
+}
+
+.canvas-card > .rf-card-node__authoring-handle.react-flow__handle-bottom {
+  bottom: calc(var(--canvas-card-border-width) / -2);
+  left: 50%;
+  transform: translate(-50%, 50%);
+}
+
+.canvas-card > .rf-card-node__authoring-handle.react-flow__handle-left {
+  top: 50%;
+  left: calc(var(--canvas-card-border-width) / -2);
+  transform: translate(-50%, -50%);
+}
+
 /* Idle, a Card offers where an Edge may start; mid-drag, it offers whichever
    end the drag is looking for — a target for an ordinary connection, and a
    source for a reconnection that has taken hold of an Edge's `from` end. The

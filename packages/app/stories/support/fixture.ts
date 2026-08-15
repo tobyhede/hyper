@@ -1,4 +1,12 @@
-import { uuidSchema, type Card, type Graph, type Layout, type UUID } from '@project/core';
+import {
+  uuidSchema,
+  type Card,
+  type Graph,
+  type Layout,
+  type SpaceFile,
+  type UUID,
+} from '@project/core';
+import { loadSpace, type CardFile, type Space } from '@project/graph';
 
 /**
  * The inventory's fixture: a small, believable Space, shaped to exercise the
@@ -30,6 +38,7 @@ export const graphIds = {
 } as const;
 
 export const layoutId = id('9ef2d3eb-18a9-4305-8cba-afdeb0fd5a79');
+export const spaceId = id('a0f3e4fc-29ba-4416-9dcb-b0efc10e6b8a');
 
 /**
  * The design's six-colour graph palette. Assigned per Layout rather than per
@@ -183,6 +192,42 @@ export const layouts: readonly Layout[] = [
 ];
 
 export const spaceTitle = 'Graph-native presentations';
+
+const cardFiles: CardFile[] = cards.map((card) => {
+  const common = [`id: ${card.id}`, `title: ${JSON.stringify(card.title)}`];
+  if (card.kind === 'alias') {
+    return {
+      path: `cards/${card.id}.md`,
+      text: `---\n${[...common, 'kind: alias', `target: ${card.target}`].join('\n')}\n---\n`,
+    };
+  }
+
+  const frontmatter =
+    card.description === undefined
+      ? common
+      : [...common, `description: ${JSON.stringify(card.description)}`];
+  return {
+    path: `cards/${card.id}.md`,
+    text: `---\n${frontmatter.join('\n')}\n---\n\n${card.body}`,
+  };
+});
+
+const spaceFile: SpaceFile = {
+  version: 1,
+  id: spaceId,
+  title: spaceTitle,
+  layouts: [...layouts],
+};
+
+const loaded = loadSpace(spaceFile, cardFiles);
+if (!loaded.ok) {
+  throw new Error(
+    `Invalid surface-inventory fixture: ${loaded.errors.map(({ message }) => message).join('; ')}`,
+  );
+}
+
+/** Validated production-domain input for every React Flow catalogue harness. */
+export const space: Space = loaded.space;
 
 /** The workspace chooser's list — UUID-titled, as the real selector receives. */
 export const spaceSummaries = [

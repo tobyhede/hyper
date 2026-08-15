@@ -1,4 +1,4 @@
-import type { CSSProperties, MouseEventHandler } from 'react';
+import type { MouseEventHandler } from 'react';
 import { Handle, Position } from '@xyflow/react';
 import { cn } from '@project/ui';
 
@@ -15,42 +15,19 @@ export const AUTHORING_HANDLE_SIDES = [
 export type AuthoringHandleSide = (typeof AUTHORING_HANDLE_SIDES)[number];
 export type AuthoringHandleRole = 'source' | 'target';
 
-interface AuthoringHandleBaseProps {
+export interface AuthoringHandleProps {
   readonly side: AuthoringHandleSide;
   readonly role: AuthoringHandleRole;
   readonly color: string;
-}
-
-interface InteractiveAuthoringHandleProps extends AuthoringHandleBaseProps {
-  readonly mode: 'interactive';
   readonly isConnectableStart: boolean;
   readonly isConnectableEnd: boolean;
   readonly onClick: MouseEventHandler<HTMLDivElement>;
 }
 
-interface SpecimenAuthoringHandleProps extends AuthoringHandleBaseProps {
-  readonly mode: 'specimen';
-}
-
-export type AuthoringHandleProps = InteractiveAuthoringHandleProps | SpecimenAuthoringHandleProps;
-
-const specimenPosition = (side: AuthoringHandleSide): CSSProperties => {
-  switch (side) {
-    case Position.Top:
-      return { top: 0, left: '50%', transform: 'translate(-50%, -50%)' };
-    case Position.Right:
-      return { top: '50%', right: 0, transform: 'translate(50%, -50%)' };
-    case Position.Bottom:
-      return { bottom: 0, left: '50%', transform: 'translate(-50%, 50%)' };
-    case Position.Left:
-      return { top: '50%', left: 0, transform: 'translate(-50%, -50%)' };
-  }
-};
-
 /**
- * One authoring-handle interface for the live React Flow control and its
- * non-interactive design-system specimen. Geometry, naming and visual classes
- * stay here; callers choose only whether React Flow interaction is present.
+ * One React Flow control for every Edge handle, including catalogue specimens.
+ * Stories provide React Flow's context and disable connection behavior; they do
+ * not redraw the control.
  */
 export function AuthoringHandle(props: AuthoringHandleProps) {
   const { side, role, color } = props;
@@ -65,17 +42,6 @@ export function AuthoringHandle(props: AuthoringHandleProps) {
     height: AUTHORING_HANDLE_DIAMETER,
     background: color,
   };
-
-  if (props.mode === 'specimen') {
-    return (
-      <span
-        className={`react-flow__handle ${className}`}
-        data-authoring-handle-side={side}
-        style={{ position: 'absolute', ...specimenPosition(side), ...style }}
-        aria-hidden="true"
-      />
-    );
-  }
 
   return (
     <Handle

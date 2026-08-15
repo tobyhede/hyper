@@ -1,14 +1,6 @@
 import { useRef, useState } from 'react';
 import {
   AddCardControl,
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  Button,
   GraphSelector,
   LayoutSelector,
   PersistenceIndicator,
@@ -36,62 +28,8 @@ import { colorByGraphId, graphIds, graphs, layoutId, layouts } from './fixture';
  * and no Space exists behind it.
  */
 
-/** The real `SpaceSessionState.persistence.kind` vocabulary. */
-export type Persistence = 'settled' | 'pending' | 'rejected' | 'failed' | 'conflicted';
-
-const PersistenceControls = ({ kind }: { kind: Persistence }) => {
-  const [conflictOpen, setConflictOpen] = useState(kind === 'conflicted');
-  const [rejectionOpen, setRejectionOpen] = useState(kind === 'rejected');
-
-  if (kind === 'failed') {
-    return (
-      <Button variant="default" size="toolbar" title="Commit rejected — retryable">
-        Retry persistence
-      </Button>
-    );
-  }
-  if (kind === 'conflicted') {
-    return (
-      <AlertDialog open={conflictOpen} onOpenChange={setConflictOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Changes conflict</AlertDialogTitle>
-            <AlertDialogDescription>
-              A newer version of this space is available. Reload discards your local changes; Save
-              keeps them and tries again.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogAction variant="secondary" onClick={() => setConflictOpen(false)}>
-              Reload
-            </AlertDialogAction>
-            <AlertDialogAction onClick={() => setConflictOpen(false)}>Save</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    );
-  }
-  if (kind === 'rejected') {
-    return (
-      <AlertDialog open={rejectionOpen} onOpenChange={setRejectionOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Changes couldn’t be saved</AlertDialogTitle>
-            <AlertDialogDescription>
-              The server rejected these changes. Continue editing to correct the problem.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogAction onClick={() => setRejectionOpen(false)}>
-              Continue editing
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    );
-  }
-  return <PersistenceIndicator state={kind} />;
-};
+/** States represented by the exported production indicator itself. */
+export type Persistence = 'settled' | 'pending';
 
 export interface ToolbarProps {
   readonly persistence?: Persistence;
@@ -134,7 +72,7 @@ export const Toolbar = ({
         keyShortcut="C"
         menuTriggerRef={addCardMenu}
       />
-      <PersistenceControls kind={persistence} />
+      <PersistenceIndicator state={persistence} />
     </>
   );
 };

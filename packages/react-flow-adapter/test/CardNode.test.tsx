@@ -89,7 +89,6 @@ interface Overrides {
   isConnectable?: boolean;
   title?: string;
   kind?: CardNodeData['kind'];
-  aliasOf?: string;
   titleEditingEnabled?: boolean;
   cardEditingEnabled?: boolean;
   editingTitle?: boolean;
@@ -107,7 +106,6 @@ function props({
   isConnectable = true,
   title = 'A',
   kind = 'markdown',
-  aliasOf,
   titleEditingEnabled = false,
   cardEditingEnabled = false,
   editingTitle = false,
@@ -134,7 +132,6 @@ function props({
       cardId,
       title,
       kind,
-      ...(aliasOf !== undefined ? { aliasOf } : {}),
       titleEditingEnabled,
       cardEditingEnabled,
       editingTitle,
@@ -176,11 +173,12 @@ describe('CardNode canvas-card state adapter', () => {
     expect(card).toHaveAttribute('data-state', 'selected-hover');
   });
 
-  it("passes an Alias and its target's title to the shared visual primitive", () => {
-    render(<CardNode {...props({ kind: 'alias', title: 'A, again', aliasOf: 'A' })} />);
+  it('renders an Alias through its kind treatment without adding target text', () => {
+    render(<CardNode {...props({ kind: 'alias', title: 'A, again' })} />);
 
     expect(screen.getByRole('article', { name: 'A, again' })).toHaveAttribute('data-kind', 'alias');
-    expect(screen.getByTestId('alias-marker')).toHaveTextContent('A');
+    expect(screen.getByRole('img', { name: 'Alias' })).toBeVisible();
+    expect(screen.queryByTestId('alias-marker')).not.toBeInTheDocument();
   });
 });
 

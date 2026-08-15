@@ -1,7 +1,7 @@
 import type { Story } from '@ladle/react';
 import { Alert, AlertDescription, AlertTitle } from '@project/ui';
-import { CanvasCardSpecimen } from '../support/CanvasCardSpecimen';
 import { CatalogueSection, Specimen } from '../support/Catalogue';
+import { CanvasCardNodeSpecimen } from '../support/ReactFlowCanvas';
 
 export default { title: 'Review/Card Decisions' };
 
@@ -10,7 +10,7 @@ export const EditingExitSemantics: Story = () => (
     <CatalogueSection title="Card Front editing">
       <div className="inv-row">
         <Specimen label="editing">
-          <CanvasCardSpecimen title="Strategies" state="editing" />
+          <CanvasCardNodeSpecimen editingTitle />
         </Specimen>
       </div>
     </CatalogueSection>
@@ -32,7 +32,7 @@ export const RailActionComponent: Story = () => (
     <CatalogueSection title="Rail actions">
       <div className="inv-row">
         <Specimen label="hover · specialized actions">
-          <CanvasCardSpecimen title="Strategies" state="hover" showActions />
+          <CanvasCardNodeSpecimen />
         </Specimen>
       </div>
     </CatalogueSection>

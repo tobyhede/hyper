@@ -58,11 +58,21 @@
  * states a diameter.
  */
 .inv-canvas {
+  width: 1720px;
+  height: 530px;
   position: relative;
   background-color: var(--canvas);
   background-image: radial-gradient(circle at 1px 1px, var(--canvas-dot) 0.7px, transparent 0.7px);
   background-size: 22px 22px;
   overflow: hidden;
+}
+
+.inv-card-node-stage {
+  width: 320px;
+  height: 210px;
+  position: relative;
+  overflow: hidden;
+  background: var(--canvas);
 }
 
 /* Canvas-card visuals live with CanvasCard in the shared UI package. Ladle owns only the catalogue furniture below. */

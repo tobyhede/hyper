@@ -1,7 +1,6 @@
 import type { CSSProperties, MouseEventHandler, ReactNode } from 'react';
 import type { Card as DomainCard } from '@project/core';
 import { CardKindIcon } from './CardKindIcon';
-import { EditIcon } from './icons';
 import { Card, CardContent, CardHeader, CardTitle } from './components/card';
 import './canvas-card.css';
 
@@ -15,8 +14,6 @@ export interface CanvasCardProps {
   readonly title: string;
   readonly graphColor: string;
   readonly description?: string;
-  /** The target Card's title, present only when this Card is an Alias. */
-  readonly aliasOf?: string;
   readonly titleEditor?: ReactNode;
   readonly actions?: ReactNode;
   /** Real interaction handles supplied by the canvas adapter. */
@@ -36,7 +33,6 @@ export function CanvasCard({
   title,
   graphColor,
   description,
-  aliasOf,
   titleEditor,
   actions,
   handles,
@@ -55,7 +51,7 @@ export function CanvasCard({
     >
       <CardHeader className="canvas-card__rail">
         <span className="canvas-card__kind">
-          {state === 'editing' ? <EditIcon /> : <CardKindIcon kind={kind} />}
+          <CardKindIcon kind={kind} />
         </span>
         {actions !== undefined && <div className="canvas-card__actions">{actions}</div>}
         {state === 'editing' && <span className="canvas-card__editing-hint">⏎ · esc</span>}
@@ -75,11 +71,6 @@ export function CanvasCard({
         {description !== undefined && (
           <p className="canvas-card__description" data-testid="card-description">
             {description}
-          </p>
-        )}
-        {aliasOf !== undefined && (
-          <p className="canvas-card__alias-of" data-testid="alias-marker">
-            {aliasOf}
           </p>
         )}
       </CardContent>

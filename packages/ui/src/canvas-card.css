@@ -1,4 +1,5 @@
 .canvas-card {
+  --canvas-card-border-width: 4px;
   --canvas-card-ink: var(--canvas-card-ink-color, #0b0d11);
   --canvas-card-face: var(--canvas-card-face-rest, #f4efe4);
   --canvas-card-active-face: var(--canvas-card-face-active, #fffaf0);
@@ -11,7 +12,7 @@
   gap: 0;
   padding: 0;
   overflow: visible;
-  border: 4px solid var(--canvas-card-ink);
+  border: var(--canvas-card-border-width) solid var(--canvas-card-ink);
   border-radius: 0;
   background: var(--canvas-card-face);
   box-shadow: none;
@@ -124,16 +125,6 @@
 }
 
 .canvas-card__description {
-  margin: 6px 0 0;
-  overflow: hidden;
-  color: color-mix(in oklab, var(--canvas-card-title) 70%, transparent);
-  font-size: 12px;
-  line-height: 1.2;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.canvas-card__alias-of {
   margin: 6px 0 0;
   overflow: hidden;
   color: color-mix(in oklab, var(--canvas-card-title) 70%, transparent);
