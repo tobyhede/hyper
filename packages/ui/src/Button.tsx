@@ -22,6 +22,24 @@ const buttonVariants = cva(
       },
       size: {
         default: 'px-[0.8rem] py-[0.4rem]',
+        /**
+         * A control standing in the toolbar row, beside `SelectorTrigger`.
+         *
+         * It exists because `default` and the selectors disagree about height,
+         * and the disagreement is invisible in isolation and obvious in the
+         * row: `default` inherits the base `text-[0.85rem]` and pads
+         * `0.4rem`, which resolves to 13.6px text on 20.4px leading inside
+         * 6.4px padding — 35.2px tall — while a selector is the pixel scale
+         * `SelectorTrigger` overrides it to, 13px on 19.5px inside 6px, or
+         * 33.5px. Toolbar controls came out 1.7px apart and each landed on a
+         * half pixel, so the row read as fuzz rather than as a line.
+         *
+         * The horizontal padding is deliberately not matched to the selectors'
+         * `9px`: this is a labelled button and wants the Present button's
+         * `11px`. Only the two properties that decide height — font size and
+         * vertical padding — are held to the selectors' numbers.
+         */
+        toolbar: 'px-[11px] py-[6px] text-[13px]',
       },
     },
     defaultVariants: {

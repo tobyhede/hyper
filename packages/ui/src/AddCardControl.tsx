@@ -72,6 +72,9 @@ export function AddCardControl({
     <div className="inline-flex items-stretch gap-[2px]">
       <Button
         variant="secondary"
+        // Both halves take the toolbar scale, so the pair stands the same
+        // height as the selectors beside it rather than 1.7px taller.
+        size="toolbar"
         data-testid="add-card"
         // The control that performs the shortcut is the one that announces it.
         // `undefined` leaves the attribute off entirely, which is the honest
@@ -95,7 +98,7 @@ export function AddCardControl({
           aria-label="More Card kinds"
           title="More Card kinds"
           disabled={disabled}
-          className="inline-flex cursor-pointer items-center justify-center rounded-[6px] rounded-l-none border border-[var(--border)] bg-[var(--panel-2)] px-[0.4rem] py-[0.4rem] text-[0.85rem] whitespace-nowrap text-[var(--text)] transition-colors hover:border-[var(--accent)] focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+          className="inline-flex cursor-pointer items-center justify-center rounded-[6px] rounded-l-none border border-[var(--border)] bg-[var(--panel-2)] px-[6px] py-[6px] text-[13px] whitespace-nowrap text-[var(--text)] transition-colors hover:border-[var(--accent)] focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
         >
           <ChevronDownIcon />
         </Menu.Trigger>

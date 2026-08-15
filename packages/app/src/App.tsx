@@ -635,6 +635,7 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
         {sessionState.persistence.kind === 'failed' ? (
           <Button
             variant="default"
+            size="toolbar"
             data-testid="persistence-retry"
             onClick={authoring.retryPersistence}
             title={sessionState.persistence.failure.message}
@@ -645,6 +646,7 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
           <>
             <Button
               variant="default"
+              size="toolbar"
               data-testid="persistence-accept-remote"
               // The result of this attempt is the whole message: a success
               // clears whatever the last attempt on this same conflict said.
@@ -661,6 +663,7 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
             </Button>
             <Button
               variant="default"
+              size="toolbar"
               data-testid="persistence-keep-local"
               // The other half of the pair, and the one that keeps the author's
               // work: it recommits the newest local Space against the revision
