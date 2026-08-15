@@ -48,15 +48,7 @@ export type CardHandle = {
 export type CardNodeData = {
   cardId: CardId;
   title: string;
-  /**
-   * What kind of Card this is, drawn as a persistent glyph on the Front.
-   *
-   * Carried rather than derived from `aliasOf` below. The two answer different
-   * questions — one is the Card's kind, the other is the title of the Card an
-   * occurrence redraws — and reading the first off the second answers by proxy,
-   * which is exactly what goes wrong for the next kind that resolves its
-   * content elsewhere.
-   */
+  /** What kind of Card this is. The node frame owns its visual treatment. */
   kind: Card['kind'];
   /** Local Card-authoring controls supplied by the application composition. */
   titleEditingEnabled?: boolean;
@@ -77,9 +69,6 @@ export type CardNodeData = {
   /** A short caption drawn under the title (ADR 0006). Absent when the card has
    *  none — the card's own, never inherited through an alias. */
   description?: string;
-  /** For an alias, the title of the card it shows — so the node can name what it
-   *  redraws. Absent on non-alias cards. */
-  aliasOf?: string;
   active: boolean;
   /** Ordinary renderer selection, kept outside the authored Space. */
   selectedForAuthoring: boolean;
@@ -260,8 +249,6 @@ export function projectCardNodes(
     const cardLayout = laidOut.get(card.id);
     const active = card.id === activeCardId;
     const showContent = active && showActiveCardContent;
-    // An alias names the card it redraws; a markdown card names nothing (ADR 0009).
-    const aliasOf = card.kind === 'alias' ? resolveContentCard(space, card.id)?.title : undefined;
     // An alias shows its target's content under its own title (ADR 0009).
     const body = showContent ? (resolveContentCard(space, card.id)?.body ?? '') : undefined;
     const sourceHandles = resolveHandles(handles.sourceHandles, colors, cardLayout, nodeHeight);
@@ -309,8 +296,6 @@ export function projectCardNodes(
         // The card's own description, drawn under the title (ADR 0006). Omit when
         // absent; never inherited through an alias.
         ...(card.description !== undefined ? { description: card.description } : {}),
-        // Omit rather than set undefined: absent means "not an alias" (ADR 0009).
-        ...(aliasOf !== undefined ? { aliasOf } : {}),
         active,
         selectedForAuthoring: card.id === (options.selectedCardId ?? null),
         showContent,

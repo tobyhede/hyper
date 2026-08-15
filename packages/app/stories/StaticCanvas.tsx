@@ -1,14 +1,13 @@
-import { CardFace, type CardFaceState } from './CardFace';
+import type { CanvasCardState } from '@project/ui';
+import { CanvasCardSpecimen } from './CanvasCardSpecimen';
 import {
   CARD_HEIGHT,
   CARD_WIDTH,
   EDGE_COLOR,
-  cardIds,
   cards,
   colorByGraphId,
   graphs,
   positions,
-  spaceCard,
 } from './fixture';
 
 /**
@@ -31,7 +30,7 @@ const GRAPH_LANE = 16;
 
 export interface StaticCanvasProps {
   readonly activeGraphId?: string;
-  readonly cardStates?: Readonly<Record<string, CardFaceState>>;
+  readonly cardStates?: Readonly<Record<string, CanvasCardState>>;
   readonly width?: number;
   readonly height?: number;
 }
@@ -87,39 +86,20 @@ export function StaticCanvas({
       {cards.map((card) => {
         const point = positions[card.id];
         if (point === undefined) return null;
-        const target =
-          card.kind === 'alias' ? cards.find((other) => other.id === card.target) : undefined;
         // The colour a Card's rail takes is the Active Graph's, whichever Graphs
         // it happens to sit on — the handles are Graph-independent (ADR 0033).
         const activeColor = colorByGraphId[activeGraphId ?? ''] ?? '#ffc53d';
         return (
           <div key={card.id} style={{ position: 'absolute', left: point.x, top: point.y }}>
-            <CardFace
+            <CanvasCardSpecimen
               title={card.title}
               kind={card.kind}
               state={cardStates[card.id] ?? 'rest'}
               graphColor={activeColor}
-              {...(target === undefined ? {} : { aliasOf: target.title })}
             />
           </div>
         );
       })}
-
-      {/* The proposed `space` kind, placed and on no Graph. */}
-      <div
-        style={{
-          position: 'absolute',
-          left: positions[cardIds.collection]?.x,
-          top: positions[cardIds.collection]?.y,
-        }}
-      >
-        <CardFace
-          title={spaceCard.title}
-          kind="space"
-          state={cardStates[spaceCard.id] ?? 'rest'}
-          graphColor={colorByGraphId[activeGraphId ?? ''] ?? '#ffc53d'}
-        />
-      </div>
     </div>
   );
 }

@@ -237,7 +237,7 @@ body {
 }
 
 .rf-card-node__authoring-handle.react-flow__handle {
-  border: 1px solid #0b0d11;
+  border: 3px solid #0b0d11;
   border-radius: 50%;
   opacity: 0;
   pointer-events: none;
@@ -249,10 +249,11 @@ body {
    source for a reconnection that has taken hold of an Edge's `from` end. The
    role is read off the drag rather than assumed, so the second gesture has
    somewhere to land. */
-.react-flow__node:hover
+.canvas-card[data-state='hover']
   .rf-card-node__inner[data-connection-in-progress='false']
   .rf-card-node__authoring-handle--source,
-.rf-card-node__inner[data-selected='true'][data-connection-in-progress='false']
+.canvas-card[data-state='selected-hover']
+  .rf-card-node__inner[data-connection-in-progress='false']
   .rf-card-node__authoring-handle--source,
 .rf-card-node__inner[data-connection-seeking='target'] .rf-card-node__authoring-handle--target,
 .rf-card-node__inner[data-connection-seeking='source'] .rf-card-node__authoring-handle--source {
@@ -268,38 +269,9 @@ body {
   overflow: hidden;
 }
 
-.rf-card-node--active .card {
+.rf-card-node--active :is(.card, .canvas-card) {
   border-color: var(--accent);
-  box-shadow: 0 0 0 2px var(--primary);
-}
-
-.card--node {
-  /* Size comes from `card.ts`, so the layout and the render agree. */
-  height: var(--card-height);
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 0.35rem;
-  text-align: center;
-}
-
-/* The kind glyph and the title on one line, so a Card's kind is read with its
-   name rather than hunted for. Markdown draws no glyph, so the row collapses to
-   the title alone and the common Card is unchanged. */
-.card__heading {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.35rem;
-  max-width: 100%;
-}
-
-.card--node .card__title {
-  margin: 0;
-  font-size: 1.05rem;
-  line-height: 1.35;
+  outline: 2px solid var(--primary);
 }
 
 /* Renaming is the title's own double click (ADR 0036), so it must claim only the
@@ -308,11 +280,6 @@ body {
    middle of the Card. Shrunk to fit, so a double click on the band either side
    of a short title renames nothing. `cursor: text` is the only thing telling the
    title apart from the Card around it, which is why it is not decoration. */
-.card--node .card__title--editable {
-  width: fit-content;
-  max-width: 100%;
-  cursor: text;
-}
 
 /* A square icon button in the Card's corner. Sized in its own right rather than
    from its content, so the glyph cannot drag the box out of square, and kept
@@ -323,47 +290,32 @@ body {
    appear and withdraw on the same hover, focus and selection rules. */
 .card__connect,
 .card__edit {
-  position: absolute;
-  top: 0.4rem;
-  right: 0.4rem;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 1.5rem;
-  height: 1.5rem;
-  border: 1px solid var(--border);
-  border-radius: 5px;
+  width: 22px;
+  height: 22px;
+  border: 2px solid var(--canvas-card-ink);
+  border-radius: 0;
   padding: 0;
-  background: var(--secondary);
-  color: var(--muted-foreground);
-  opacity: 0;
-  pointer-events: none;
+  background: var(--canvas-card-face);
+  color: var(--canvas-card-ink);
   cursor: pointer;
   transition:
-    opacity 100ms ease,
     color 100ms ease,
-    border-color 100ms ease;
-}
-
-.card__connect {
-  right: auto;
-  left: 0.4rem;
+    background-color 100ms ease;
 }
 
 .card__connect:hover,
 .card__edit:hover {
-  border-color: var(--accent);
-  color: var(--foreground);
+  background: var(--canvas-card-ink);
+  color: var(--canvas-card-graph);
 }
 
-.react-flow__node:hover .card__connect,
-.react-flow__node:hover .card__edit,
 .card__connect:focus-visible,
-.card__edit:focus-visible,
-.rf-card-node__inner[data-selected='true'] .card__connect,
-.rf-card-node__inner[data-selected='true'] .card__edit {
-  opacity: 1;
-  pointer-events: auto;
+.card__edit:focus-visible {
+  outline: 2px solid var(--canvas-card-ink);
+  outline-offset: 2px;
 }
 
 /* Controls drawn beside a selected Edge, portalled into React Flow's own
@@ -486,20 +438,6 @@ body {
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
-}
-
-/* An alias names the card it redraws, so a redraw reads as a deliberate return
-   rather than repetition — and stays legible even when titles match. The kind
-   glyph that used to lead this line now sits beside the title, where it names
-   the Card rather than the line. */
-.card__alias-of {
-  margin: 0;
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 0.8rem;
-  color: var(--muted-foreground, #8a94a6);
 }
 
 .card__title {

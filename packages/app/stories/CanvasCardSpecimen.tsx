@@ -1,0 +1,45 @@
+import { CanvasCard, ConnectIcon, EditIcon, type CanvasCardProps } from '@project/ui';
+
+type CanvasCardSpecimenProps = Pick<CanvasCardProps, 'title'> &
+  Partial<Pick<CanvasCardProps, 'kind' | 'state' | 'graphColor'>>;
+
+/** Story fixture that composes the shipped visual primitive without redrawing it. */
+export function CanvasCardSpecimen({
+  title,
+  kind = 'markdown',
+  state = 'rest',
+  graphColor = '#ffc53d',
+}: CanvasCardSpecimenProps) {
+  return (
+    <CanvasCard
+      title={title}
+      kind={kind}
+      state={state}
+      graphColor={graphColor}
+      {...(state === 'editing'
+        ? {
+            titleEditor: (
+              <div className="card__title-editor">
+                <input
+                  className="card__title-input"
+                  aria-label="Card title"
+                  value={title}
+                  readOnly
+                />
+              </div>
+            ),
+          }
+        : {})}
+      actions={
+        <>
+          <button type="button" className="card__connect" aria-label={`Connect from ${title}`}>
+            <ConnectIcon />
+          </button>
+          <button type="button" className="card__edit" aria-label={`Edit Card ${title}`}>
+            <EditIcon />
+          </button>
+        </>
+      }
+    />
+  );
+}

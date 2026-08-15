@@ -340,7 +340,7 @@ describe('projectCardNodes', () => {
     );
   });
 
-  it('marks an alias node with the title of the card it shows', () => {
+  it('keeps alias presentation separate from the card it shows', () => {
     const withAlias = load(
       spaceFile([
         {
@@ -364,13 +364,11 @@ describe('projectCardNodes', () => {
       ],
     );
     const nodes = projectCardNodes(withAlias, buildCardHandles(withAlias), colors);
-    // A markdown card is nobody's alias.
-    expect(
-      nodes.find((n) => n.id === '00000000-0000-4000-8000-000000000002')!.data.aliasOf,
-    ).toBeUndefined();
-    // The alias carries its target's title, so the node can name what it redraws.
-    expect(nodes.find((n) => n.id === '00000000-0000-4000-8000-000000000007')!.data.aliasOf).toBe(
-      'Card A',
+    expect(nodes.find((n) => n.id === '00000000-0000-4000-8000-000000000002')!.data.kind).toBe(
+      'markdown',
+    );
+    expect(nodes.find((n) => n.id === '00000000-0000-4000-8000-000000000007')!.data.kind).toBe(
+      'alias',
     );
   });
 });

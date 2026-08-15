@@ -326,12 +326,9 @@ test('content that exceeds the frame scrolls inside it, keeping controls reachab
 test('an alias node names the card it redraws and opens its own metadata', async ({ page }) => {
   await page.goto('/');
 
-  // A′ is an alias of A. It is drawn as its own node, carrying its own title, with
-  // a muted marker naming the card it shows, so a redraw reads as a deliberate
-  // return (ADR 0009).
+  // A′ is an alias of A. It is drawn as its own node with its own title.
   const recap = nodeByTitle(page, 'A′');
   await expect(recap).toBeVisible();
-  await expect(recap.getByTestId('alias-marker')).toHaveText('A');
 
   await openCard(recap, 'A′');
   // Two fields, both the Alias's own, and nothing belonging to A.

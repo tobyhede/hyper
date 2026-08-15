@@ -50,7 +50,7 @@ export default {
 
   // The build order of the inventory, which is also the order the handoff asks
   // for it to be reviewed in: shell first, then the chooser, then the canvas.
-  storyOrder: ['shell--*', 'workspace-chooser--*', 'canvas--*', 'tokens--*'],
+  storyOrder: ['shell--*', 'workspace-chooser--*', 'canvas--*', 'design-system--*', 'tokens--*'],
 
   addons: {
     // Off by default in Ladle. On here because the card's affordances are

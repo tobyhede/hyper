@@ -84,6 +84,7 @@ const outHandle = (graph: typeof graphId, offsetY: number): CardHandle => ({
 
 interface Overrides {
   selected?: boolean;
+  dragging?: boolean;
   /** What React Flow answers for this node from `nodesConnectable`/`node.connectable`. */
   isConnectable?: boolean;
   title?: string;
@@ -101,6 +102,7 @@ interface Overrides {
 
 function props({
   selected = false,
+  dragging = false,
   isConnectable = true,
   title = 'A',
   kind = 'markdown',
@@ -120,7 +122,7 @@ function props({
     draggable: true,
     selectable: true,
     deletable: true,
-    dragging: false,
+    dragging,
     zIndex: 0,
     isConnectable,
     positionAbsoluteX: 0,
@@ -148,6 +150,24 @@ function props({
     },
   };
 }
+
+describe('CardNode canvas-card state adapter', () => {
+  it('translates React Flow selection and dragging into the shared visual states', () => {
+    const { rerender } = render(<CardNode {...props({ selected: true })} />);
+
+    expect(screen.getByRole('article', { name: 'A' })).toHaveAttribute('data-state', 'selected');
+
+    rerender(<CardNode {...props({ dragging: true })} />);
+    expect(screen.getByRole('article', { name: 'A' })).toHaveAttribute('data-state', 'dragging');
+  });
+
+  it('passes Alias identity to the shared visual primitive without target copy', () => {
+    render(<CardNode {...props({ kind: 'alias' })} />);
+
+    expect(screen.getByRole('article', { name: 'A' })).toHaveAttribute('data-kind', 'alias');
+    expect(screen.queryByTestId('alias-marker')).not.toBeInTheDocument();
+  });
+});
 
 describe('CardNode title authoring', () => {
   it('begins inline title editing from a double click on the title', () => {

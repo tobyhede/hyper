@@ -10,6 +10,8 @@ export { RenderedCardContent, RenderedCardContent as CardContent } from './CardC
 export type { CardContentProps } from './CardContent';
 export { CardKindIcon } from './CardKindIcon';
 export type { CardKindIconProps } from './CardKindIcon';
+export { CanvasCard } from './CanvasCard';
+export type { CanvasCardKind, CanvasCardProps, CanvasCardState } from './CanvasCard';
 export { CardCombobox } from './CardCombobox';
 export type { CardChoice, CardComboboxProps } from './CardCombobox';
 export { Dialog, DialogBackdrop, DialogPopup, DialogPortal, DialogViewport } from './Dialog';

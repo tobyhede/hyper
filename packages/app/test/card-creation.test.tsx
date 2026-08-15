@@ -612,16 +612,16 @@ describe('Add Alias', () => {
 });
 
 describe('an Alias on the graph', () => {
-  it('names its kind and the Target it shows', async () => {
+  it('uses the Alias kind icon and frame without drawing its Target title', async () => {
     const session = mount(aliased);
 
     const alias = (await screen.findByRole('heading', { name: 'A again' })).closest(
       '.react-flow__node',
     );
     if (alias === null) throw new Error('The Alias is not drawn as a node');
+    expect(alias.querySelector('[data-testid="card"]')).toHaveAttribute('data-kind', 'alias');
     expect(alias).toContainElement(screen.getByRole('img', { name: 'Alias' }));
-    // The Target's title, read-only, under the Alias's own.
-    expect(screen.getByTestId('alias-marker')).toHaveTextContent('A');
+    expect(screen.queryByTestId('alias-marker')).not.toBeInTheDocument();
     await settled(session);
   });
 });

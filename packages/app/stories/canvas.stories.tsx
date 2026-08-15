@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import type { Story } from '@ladle/react';
-import { GraphLegend } from '@project/ui';
-import { CardFace, type CardFaceState } from './CardFace';
+import { GraphLegend, type CanvasCardState } from '@project/ui';
+import { CanvasCardSpecimen } from './CanvasCardSpecimen';
 import { StaticCanvas } from './StaticCanvas';
 import { EDGE_COLOR, GRAPH_PALETTE, cardIds, colorByGraphId, graphIds, graphs } from './fixture';
 
@@ -63,17 +63,29 @@ OverviewWithInteraction.storyName = 'Overview · hover, selected, dragging';
  * under it.
  */
 export const CardStates: Story = () => {
-  const states: readonly CardFaceState[] = ['rest', 'hover', 'selected', 'editing', 'dragging'];
+  const states: readonly CanvasCardState[] = [
+    'rest',
+    'hover',
+    'selected',
+    'selected-hover',
+    'dragging',
+    'editing',
+  ];
   return (
     <div className="inv-sheet">
       <Section
         title="Card · states"
-        note="8a is flat: no shadow at rest, on hover, on selection or while editing. The card's weight is its 4px border. The shadow appears for dragging alone — which is what makes it mean 'lifted' unambiguously, and is why it can share the right and bottom edges with the connection handles without competing with them."
+        note="Every state is shown for both a Card and an Alias. Only the resting Alias has a dotted frame; hover, selection, editing and dragging use the base Card treatment."
       >
         <div className="inv-row">
           {states.map((state) => (
-            <Specimen key={state} label={state}>
-              <CardFace title="Strategies" state={state} />
+            <Specimen key={`card-${state}`} label={`card · ${state}`}>
+              <CanvasCardSpecimen title="Strategies" state={state} />
+            </Specimen>
+          ))}
+          {states.map((state) => (
+            <Specimen key={`alias-${state}`} label={`alias · ${state}`}>
+              <CanvasCardSpecimen title="Opening" kind="alias" state={state} />
             </Specimen>
           ))}
         </div>
@@ -84,43 +96,26 @@ export const CardStates: Story = () => {
 CardStates.storyName = 'Card · states';
 
 /**
- * A kind changes the frame and the glyph and never adds a label. There is no
- * text in the rail in any state — no "MD", no "ALIAS", no "SELECTED".
+ * A kind changes the frame and never adds a label. There is no text in the rail
+ * in any state — no "MD", no "ALIAS", no "SELECTED".
  */
 export const CardKinds: Story = () => (
   <div className="inv-sheet">
     <Section
       title="Card · kinds"
-      note="An alias is dashed, muted-faced and muted-titled, and takes no shadow even while dragging — it is not a real object, so there is nothing to lift. A space is a second sheet offset behind the card, both sheets flat."
+      note="An alias is distinguished only by its icon and dotted resting border. Every non-rest behavior is inherited from the base Card."
     >
       <div className="inv-row">
         <Specimen label="markdown">
-          <CardFace title="Strategies" kind="markdown" />
+          <CanvasCardSpecimen title="Strategies" kind="markdown" />
         </Specimen>
         <Specimen label="markdown · long title">
-          <CardFace title="Why authored placement beats a layout engine that reshuffles on every edit" />
+          <CanvasCardSpecimen title="Why authored placement beats a layout engine that reshuffles on every edit" />
         </Specimen>
         <Specimen label="alias">
-          <CardFace title="Opening" kind="alias" aliasOf="Opening" />
-        </Specimen>
-        <Specimen label="alias · dragging (no shadow)">
-          <CardFace title="Opening" kind="alias" state="dragging" aliasOf="Opening" />
-        </Specimen>
-        <Specimen label="space — proposed kind">
-          <CardFace title="Collection 2" kind="space" />
+          <CanvasCardSpecimen title="Opening" kind="alias" />
         </Specimen>
       </div>
-    </Section>
-    <Section title="Open — the space kind does not exist">
-      <p className="inv-open">
-        <strong>`space` is a design proposal, not a domain kind.</strong> `cardSchema` is a
-        discriminated union of `markdown` and `alias` and nothing else; nested Spaces are ADR
-        0001&apos;s and unbuilt. The specimen above is drawn from a local type in `fixture.ts` and
-        is deliberately absent from the `Card[]` the real components receive. Adding a third kind is
-        a domain change with an ADR behind it. Its glyph is a stand-in too — the design asks for
-        layers, `@project/ui` ships none, and Lucide&apos;s `Layers` is the obvious answer once the
-        kind is real.
-      </p>
     </Section>
   </div>
 );
@@ -133,27 +128,11 @@ export const Handles: Story = () => (
   <div className="inv-sheet">
     <Section
       title="Handles · geometry"
-      note="24px circles in the graph colour with a 3px ink ring, one centred on each side. The offset is 12px + that side's border width — −16px at a 4px border, −15px on the alias's 3px frame — because an absolute offset resolves against the parent's padding box, and without adding the border back the handle sits biased inward by exactly the border width."
+      note="Handles are intentionally absent from static specimens. They are React Flow controls supplied by CardNode, never visual spans owned by the Card or Ladle. Hover a Card in the live canvas to inspect the four real handles."
     >
       <div className="inv-row">
-        <Specimen label="markdown · 4px border · −16px">
-          <CardFace title="Strategies" state="hover" handles />
-        </Specimen>
-        <Specimen label="alias · 3px border · −15px">
-          <CardFace title="Opening" kind="alias" state="hover" handles aliasOf="Opening" />
-        </Specimen>
-      </div>
-    </Section>
-    <Section
-      title="Handles · when they appear"
-      note="Unresolved. The design says hover only. Upstream `styles.css` reveals them on hover and on selection, and the handoff's own sync note records round 8 being updated to match upstream — the two halves of the bundle disagree with each other. Both are drawn here; pick one and make the design and the stylesheet agree."
-    >
-      <div className="inv-row">
-        <Specimen label="selected · no handles (design)">
-          <CardFace title="Strategies" state="selected" handles={false} />
-        </Specimen>
-        <Specimen label="selected · handles (upstream)">
-          <CardFace title="Strategies" state="selected" handles />
+        <Specimen label="shared primitive · no imitation handles">
+          <CanvasCardSpecimen title="Strategies" state="hover" />
         </Specimen>
       </div>
     </Section>
@@ -172,10 +151,10 @@ export const TitleEditing: Story = () => (
     >
       <div className="inv-row">
         <Specimen label="editing">
-          <CardFace title="Strategies" state="editing" />
+          <CanvasCardSpecimen title="Strategies" state="editing" />
         </Specimen>
         <Specimen label="editing · long title">
-          <CardFace
+          <CanvasCardSpecimen
             title="Why authored placement beats a layout engine that reshuffles"
             state="editing"
           />
@@ -207,10 +186,10 @@ export const RailActions: Story = () => (
     >
       <div className="inv-row">
         <Specimen label="hover — three actions">
-          <CardFace title="Strategies" state="hover" />
+          <CanvasCardSpecimen title="Strategies" state="hover" />
         </Specimen>
         <Specimen label="selected — actions hidden">
-          <CardFace title="Strategies" state="selected" />
+          <CanvasCardSpecimen title="Strategies" state="selected" />
         </Specimen>
       </div>
     </Section>
@@ -241,7 +220,7 @@ export const GraphColours: Story = () => (
       <div className="inv-row">
         {GRAPH_PALETTE.map((color) => (
           <Specimen key={color} label={`${color} · edge ${EDGE_COLOR[color] ?? '—'}`}>
-            <CardFace title="Strategies" state="hover" graphColor={color} />
+            <CanvasCardSpecimen title="Strategies" state="hover" graphColor={color} />
             <svg width={260} height={18} style={{ marginTop: 12 }} aria-hidden="true">
               <path
                 d="M 8 9 L 252 9"
@@ -279,12 +258,12 @@ export const MultiGraphMembership: Story = () => (
     >
       <div className="inv-row">
         <Specimen label="Strategies — on both Graphs">
-          <CardFace title="Strategies" state="hover" graphColor={GRAPH_PALETTE[0]} />
+          <CanvasCardSpecimen title="Strategies" state="hover" graphColor={GRAPH_PALETTE[0]} />
         </Specimen>
         <Specimen label="Traversal — on one">
-          <CardFace title="Traversal" state="hover" graphColor={GRAPH_PALETTE[0]} />
+          <CanvasCardSpecimen title="Traversal" state="hover" graphColor={GRAPH_PALETTE[0]} />
         </Specimen>
-        <div style={{ background: 'var(--card-face-rest)', border: '1px solid #d9d2c2' }}>
+        <div style={{ background: 'var(--canvas-card-face-rest)', border: '1px solid #d9d2c2' }}>
           <GraphLegend
             graphs={graphs}
             colorByGraphId={colorByGraphId}
@@ -309,14 +288,14 @@ MultiGraphMembership.storyName = 'Canvas · multi-graph membership';
 /**
  * The live tweak the design prototype had, as a control.
  */
-export const Tweak: Story<{ title: string; graphColor: string; state: CardFaceState }> = ({
+export const Tweak: Story<{ title: string; graphColor: string; state: CanvasCardState }> = ({
   title,
   graphColor,
   state,
 }) => (
   <div className="inv-sheet">
     <div className="inv-specimen__stage">
-      <CardFace title={title} graphColor={graphColor} state={state} />
+      <CanvasCardSpecimen title={title} graphColor={graphColor} state={state} />
     </div>
   </div>
 );
@@ -328,7 +307,7 @@ Tweak.args = {
 Tweak.argTypes = {
   graphColor: { control: { type: 'color' } },
   state: {
-    options: ['rest', 'hover', 'selected', 'editing', 'dragging'],
+    options: ['rest', 'hover', 'selected', 'selected-hover', 'dragging', 'editing'],
     control: { type: 'inline-radio' },
   },
 };
