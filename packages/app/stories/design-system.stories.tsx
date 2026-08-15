@@ -1,8 +1,10 @@
 import type { Story } from '@ladle/react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Alert,
   AlertDescription,
   AlertTitle,
+  Badge,
   Button,
   Card,
   CardSection,
@@ -24,6 +26,7 @@ import {
   MenubarItem,
   MenubarMenu,
   MenubarTrigger,
+  PersistenceIndicator,
   Separator,
   Spinner,
   Textarea,
@@ -50,6 +53,15 @@ export const Baseline: Story = () => (
       <AlertTitle>Could not save the Space</AlertTitle>
       <AlertDescription>Try again after correcting the conflict.</AlertDescription>
     </Alert>
+
+    <div className="flex items-center gap-2">
+      <Badge>Active</Badge>
+      <Badge variant="secondary">Draft</Badge>
+      <Badge variant="destructive">Rejected</Badge>
+      <Badge variant="outline">Reference</Badge>
+      <PersistenceIndicator state="pending" />
+      <PersistenceIndicator state="rejected" />
+    </div>
 
     <Card>
       <CardHeader>
@@ -84,3 +96,32 @@ export const Baseline: Story = () => (
     </Empty>
   </div>
 );
+
+/** The normal save lifecycle: working feedback, brief acknowledgement, then no chrome. */
+export const PersistenceLifecycle: Story = () => {
+  const [state, setState] = useState<'pending' | 'settled'>('settled');
+  const settleTimer = useRef<number | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (settleTimer.current !== null) window.clearTimeout(settleTimer.current);
+    };
+  }, []);
+
+  const replay = () => {
+    if (settleTimer.current !== null) window.clearTimeout(settleTimer.current);
+    setState('pending');
+    settleTimer.current = window.setTimeout(() => {
+      settleTimer.current = null;
+      setState('settled');
+    }, 1_000);
+  };
+
+  return (
+    <div className="flex items-center gap-2">
+      <Button onClick={replay}>Replay save</Button>
+      <PersistenceIndicator state={state} />
+    </div>
+  );
+};
+PersistenceLifecycle.storyName = 'Persistence lifecycle';

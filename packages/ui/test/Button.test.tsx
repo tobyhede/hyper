@@ -55,10 +55,10 @@ describe('Button', () => {
     );
 
     expect(screen.getByRole('button', { name: 'Primary' })).toHaveClass(
-      'bg-[var(--primary)]',
+      'bg-primary',
       'caller-layout',
     );
-    expect(screen.getByRole('button', { name: 'Delete' })).toHaveClass('border-[#7f1d1d]');
+    expect(screen.getByRole('button', { name: 'Delete' })).toHaveClass('border-destructive');
     const disabled = screen.getByRole('button', { name: 'Disabled' });
     expect(disabled).toBeDisabled();
     fireEvent.click(disabled);

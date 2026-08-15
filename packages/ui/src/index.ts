@@ -4,6 +4,8 @@ export { AppShell } from './AppShell';
 export type { AppShellProps } from './AppShell';
 export { Button, buttonVariants } from './Button';
 export type { ButtonProps } from './Button';
+export { PersistenceIndicator } from './PersistenceIndicator';
+export type { PersistenceIndicatorProps, PersistenceIndicatorState } from './PersistenceIndicator';
 export { RenderedCardContent, RenderedCardContent as CardContent } from './CardContent';
 export type { CardContentProps } from './CardContent';
 export { CardKindIcon } from './CardKindIcon';
@@ -54,6 +56,7 @@ export {
 } from './Select';
 export { cn } from './lib/utils';
 export { Alert, AlertAction, AlertDescription, AlertTitle } from './components/alert';
+export { Badge, badgeVariants } from './components/badge';
 export {
   Card,
   CardAction,

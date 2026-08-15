@@ -5,6 +5,7 @@ import {
   AppShell,
   Button,
   LayoutSelector,
+  PersistenceIndicator,
   GraphSelector,
   ViewSelector,
 } from '@project/ui';
@@ -684,17 +685,7 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
             )}
           </>
         ) : (
-          <span
-            data-testid="persistence-status"
-            data-revision={sessionState.acknowledgedRevision.toString()}
-            title="Database persistence status"
-          >
-            {sessionState.persistence.kind === 'pending'
-              ? 'Persisting…'
-              : sessionState.persistence.kind === 'rejected'
-                ? 'Persistence rejected'
-                : 'Persisted'}
-          </span>
+          <PersistenceIndicator state={sessionState.persistence.kind} />
         )}
       </>
     );

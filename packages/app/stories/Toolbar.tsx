@@ -4,6 +4,7 @@ import {
   Button,
   GraphSelector,
   LayoutSelector,
+  PersistenceIndicator,
   ViewSelector,
   type AlgorithmicViewId,
 } from '@project/ui';
@@ -30,7 +31,7 @@ import { colorByGraphId, graphIds, graphs, layoutId, layouts } from './fixture';
 
 export type Persistence = 'persisted' | 'pending' | 'rejected' | 'failed' | 'conflicted';
 
-const PersistenceIndicator = ({ kind }: { kind: Persistence }) => {
+const PersistenceControls = ({ kind }: { kind: Persistence }) => {
   if (kind === 'failed') {
     return (
       <Button variant="default" size="toolbar" title="Commit rejected — retryable">
@@ -50,15 +51,7 @@ const PersistenceIndicator = ({ kind }: { kind: Persistence }) => {
       </>
     );
   }
-  return (
-    <span title="Database persistence status">
-      {kind === 'pending'
-        ? 'Persisting…'
-        : kind === 'rejected'
-          ? 'Persistence rejected'
-          : 'Persisted'}
-    </span>
-  );
+  return <PersistenceIndicator state={kind === 'persisted' ? 'settled' : kind} />;
 };
 
 export interface ToolbarProps {
@@ -102,7 +95,7 @@ export const Toolbar = ({
         keyShortcut="C"
         menuTriggerRef={addCardMenu}
       />
-      <PersistenceIndicator kind={persistence} />
+      <PersistenceControls kind={persistence} />
     </>
   );
 };
