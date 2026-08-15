@@ -5,7 +5,10 @@ import {
 } from '@project/react-flow-adapter/authoring-handle';
 
 type CanvasCardSpecimenProps = Pick<CanvasCardProps, 'title'> &
-  Partial<Pick<CanvasCardProps, 'kind' | 'state' | 'graphColor'>>;
+  Partial<Pick<CanvasCardProps, 'kind' | 'state' | 'graphColor'>> & {
+    readonly showActions?: boolean;
+    readonly showHandles?: boolean;
+  };
 
 /** Story fixture that composes the shipped visual primitive without redrawing it. */
 export function CanvasCardSpecimen({
@@ -13,6 +16,8 @@ export function CanvasCardSpecimen({
   kind = 'markdown',
   state = 'rest',
   graphColor = '#ffc53d',
+  showActions = false,
+  showHandles = false,
 }: CanvasCardSpecimenProps) {
   return (
     <CanvasCard
@@ -35,18 +40,30 @@ export function CanvasCardSpecimen({
           }
         : {})}
       actions={
-        <>
-          <button type="button" className="card__connect" aria-label={`Connect from ${title}`}>
-            <ConnectIcon />
-          </button>
-          <button type="button" className="card__edit" aria-label={`Edit Card ${title}`}>
-            <EditIcon />
-          </button>
-        </>
+        showActions ? (
+          <>
+            <button type="button" className="card__connect" aria-label={`Connect from ${title}`}>
+              <ConnectIcon />
+            </button>
+            <button type="button" className="card__edit" aria-label={`Edit Card ${title}`}>
+              <EditIcon />
+            </button>
+          </>
+        ) : undefined
       }
-      handles={AUTHORING_HANDLE_SIDES.map((side) => (
-        <AuthoringHandle key={side} mode="specimen" side={side} role="source" color={graphColor} />
-      ))}
+      handles={
+        showHandles
+          ? AUTHORING_HANDLE_SIDES.map((side) => (
+              <AuthoringHandle
+                key={side}
+                mode="specimen"
+                side={side}
+                role="source"
+                color={graphColor}
+              />
+            ))
+          : undefined
+      }
     />
   );
 }

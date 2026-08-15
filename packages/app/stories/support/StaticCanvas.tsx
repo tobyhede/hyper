@@ -96,6 +96,8 @@ export function StaticCanvas({
               kind={card.kind}
               state={cardStates[card.id] ?? 'rest'}
               graphColor={activeColor}
+              showActions
+              showHandles
             />
           </div>
         );

@@ -1,9 +1,9 @@
 import { ThemeState } from '@ladle/react';
 import type { GlobalProvider } from '@ladle/react';
-import { TooltipProvider } from '@project/ui';
+import { Alert, AlertDescription, AlertTitle, TooltipProvider } from '@project/ui';
 import '../src/tailwind.css';
 import '../src/styles.css';
-import '../stories/inventory.css';
+import '../stories/support/inventory.css';
 
 /**
  * Every story is drawn with the app's **real** stylesheets loaded — the shadcn
@@ -27,12 +27,14 @@ export const Provider: GlobalProvider = ({ children, globalState }) => (
   <TooltipProvider>
     <div className="inv">
       {globalState.theme === ThemeState.Dark && (
-        <div className="inv-open" role="note">
-          <strong>Dark mode is not decided.</strong> The handoff carries three candidates —{' '}
-          <code>8d</code> chalk line, <code>8e</code> borderless plane, <code>8f</code> graph frame
-          — and says not to implement one until it is picked. Nothing is rendered for this toggle on
-          purpose; choosing by default would be choosing. Stories below stay in the locked light
-          design.
+        <div className="p-4">
+          <Alert>
+            <AlertTitle>Dark mode is not supported yet</AlertTitle>
+            <AlertDescription>
+              The catalogue remains in the locked light design while the dark treatment is reviewed
+              under Review/Theming.
+            </AlertDescription>
+          </Alert>
         </div>
       )}
       {children}

@@ -48,16 +48,9 @@ export default {
     '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">',
   ].join(''),
 
-  // The build order of the inventory, which is also the order the handoff asks
-  // for it to be reviewed in: shell first, then the chooser, then the canvas.
-  storyOrder: [
-    'shell--*',
-    'workspace-chooser--*',
-    'cards--*',
-    'canvas--*',
-    'design-system--*',
-    'tokens--*',
-  ],
+  // Component contracts first, then composed product surfaces and finally the
+  // unresolved visual questions that must not leak into stable stories.
+  storyOrder: ['components-*', 'surfaces-*', 'review-*'],
 
   addons: {
     // Off by default in Ladle. On here because the card's affordances are

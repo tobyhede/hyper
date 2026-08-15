@@ -1,9 +1,10 @@
+import { useEffect, useRef } from 'react';
 import type { Story } from '@ladle/react';
 import type { SpaceSummary } from '@project/persistence';
-import { WorkspaceSelection } from '../src/WorkspaceSelection';
-import { spaceSummaries } from './fixture';
+import { WorkspaceSelection } from '#app/WorkspaceSelection';
+import { spaceSummaries } from '../support/fixture';
 
-export default { title: 'Workspace chooser' };
+export default { title: 'Surfaces/Workspace Chooser' };
 
 /**
  * The real `WorkspaceSelection`, over fixture summaries.
@@ -57,21 +58,27 @@ Empty.storyName = 'Empty — no spaces';
  * `Skeleton` or a spinner is the manifest's "confirm need rather than adding
  * speculatively", and this story is the evidence for the call.
  */
-export const Opening: Story = () => (
-  <div
-    className="inv-app-surface"
-    ref={(node) => {
-      // Click the first row on mount so the story lands in the busy state
-      // rather than asking a reviewer to produce it.
-      node?.querySelector('button')?.click();
-    }}
-  >
-    <WorkspaceSelection
-      spaces={spaceSummaries}
-      openSelected={openNothing}
-      onOpened={() => undefined}
-      onError={() => undefined}
-    />
-  </div>
-);
+const OpeningChooser = () => {
+  const surface = useRef<HTMLDivElement>(null);
+  const started = useRef(false);
+
+  useEffect(() => {
+    if (started.current) return;
+    started.current = true;
+    surface.current?.querySelector('button')?.click();
+  }, []);
+
+  return (
+    <div ref={surface} className="inv-app-surface">
+      <WorkspaceSelection
+        spaces={spaceSummaries}
+        openSelected={openNothing}
+        onOpened={() => undefined}
+        onError={() => undefined}
+      />
+    </div>
+  );
+};
+
+export const Opening: Story = () => <OpeningChooser />;
 Opening.storyName = 'Opening (busy)';

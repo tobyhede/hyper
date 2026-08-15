@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "imports": {
+    "#app/*": "./src/*.tsx",
     "#components/*": "./src/components/*.tsx",
     "#hooks/*": "./src/hooks/*.ts",
     "#lib/*": "./src/lib/*.ts"

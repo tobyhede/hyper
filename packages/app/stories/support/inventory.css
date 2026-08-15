@@ -136,12 +136,3 @@
 .inv-specimen__stage {
   padding: 20px;
 }
-
-.inv-open {
-  padding: 10px 12px;
-  font-size: 12px;
-  line-height: 1.5;
-  color: #7a4a12;
-  background: #fdf3dd;
-  border-left: 3px solid #c1861a;
-}
