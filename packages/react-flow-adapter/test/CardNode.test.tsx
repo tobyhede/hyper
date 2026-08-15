@@ -161,6 +161,18 @@ describe('CardNode canvas-card state adapter', () => {
     expect(screen.getByRole('article', { name: 'A' })).toHaveAttribute('data-state', 'dragging');
   });
 
+  it('preserves hover alone and together with selection', () => {
+    const { rerender } = render(<CardNode {...props()} />);
+    const card = screen.getByRole('article', { name: 'A' });
+
+    fireEvent.pointerEnter(card.parentElement!);
+    expect(card).toHaveAttribute('data-state', 'hover');
+
+    rerender(<CardNode {...props({ selected: true })} />);
+    fireEvent.pointerEnter(card.parentElement!);
+    expect(card).toHaveAttribute('data-state', 'selected-hover');
+  });
+
   it('passes Alias identity to the shared visual primitive without target copy', () => {
     render(<CardNode {...props({ kind: 'alias' })} />);
 

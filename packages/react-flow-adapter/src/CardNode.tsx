@@ -2,7 +2,12 @@ import { useEffect, useRef, useState } from 'react';
 import { Handle, Position, useConnection, type NodeProps } from '@xyflow/react';
 import { CanvasCard, CardContent, ConnectIcon, EditIcon, type CanvasCardState } from '@project/ui';
 import type { CardFlowNode, CardHandle } from './projection';
-import { AUTHORING_HANDLE_DIAMETER, GRAPH_PORT_DIAMETER } from './authoring-handle';
+import {
+  AUTHORING_HANDLE_SIDES,
+  AuthoringHandle,
+  GRAPH_PORT_DIAMETER,
+  type AuthoringHandleSide,
+} from './authoring-handle';
 
 /**
  * React Flow custom node: a card's title, with one colored handle per graph at
@@ -18,8 +23,6 @@ import { AUTHORING_HANDLE_DIAMETER, GRAPH_PORT_DIAMETER } from './authoring-hand
  * legible. It is still the same node — nothing is transformed into anything, and
  * there is no second artefact (ADR 0024).
  */
-const AUTHORING_SIDES = [Position.Top, Position.Right, Position.Bottom, Position.Left] as const;
-
 interface CardTitleEditorProps {
   readonly cardId: string;
   readonly title: string;
@@ -192,17 +195,13 @@ export function CardNode({ data, selected, dragging, isConnectable }: NodeProps<
     />
   );
 
-  const renderAuthoringHandle = (
-    side: (typeof AUTHORING_SIDES)[number],
-    role: 'source' | 'target',
-  ) => (
-    <Handle
+  const renderAuthoringHandle = (side: AuthoringHandleSide, role: 'source' | 'target') => (
+    <AuthoringHandle
       key={`${role}-${side}`}
-      id={`authoring-${role}-${side}`}
-      type={role}
-      position={side}
-      className={`rf-card-node__authoring-handle rf-card-node__authoring-handle--${role}`}
-      aria-label={`${role === 'source' ? 'Connect from' : 'Connect to'} ${side}`}
+      mode="interactive"
+      side={side}
+      role={role}
+      color={data.activeGraphColor}
       // `isConnectable` is React Flow's own switch and it only works if a custom
       // node forwards it: `NodeWrapper` resolves `nodesConnectable` and the
       // node's own `connectable` into this one prop and hands it over, and
@@ -221,19 +220,14 @@ export function CardNode({ data, selected, dragging, isConnectable }: NodeProps<
       // control whose whole purpose is to begin an Edge. React Flow spreads
       // caller props after its own `onClick`, so this replaces it.
       onClick={(event) => event.stopPropagation()}
-      style={{
-        width: AUTHORING_HANDLE_DIAMETER,
-        height: AUTHORING_HANDLE_DIAMETER,
-        background: data.activeGraphColor,
-      }}
     />
   );
 
   const handles = (
     <>
       {data.targetHandles.map((handle) => renderHandle(handle, 'target'))}
-      {AUTHORING_SIDES.map((side) => renderAuthoringHandle(side, 'target'))}
-      {AUTHORING_SIDES.map((side) => renderAuthoringHandle(side, 'source'))}
+      {AUTHORING_HANDLE_SIDES.map((side) => renderAuthoringHandle(side, 'target'))}
+      {AUTHORING_HANDLE_SIDES.map((side) => renderAuthoringHandle(side, 'source'))}
       {data.sourceHandles.map((handle) => renderHandle(handle, 'source'))}
     </>
   );

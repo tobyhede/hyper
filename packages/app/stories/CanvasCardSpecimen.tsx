@@ -1,4 +1,8 @@
 import { CanvasCard, ConnectIcon, EditIcon, type CanvasCardProps } from '@project/ui';
+import {
+  AUTHORING_HANDLE_SIDES,
+  AuthoringHandle,
+} from '@project/react-flow-adapter/authoring-handle';
 
 type CanvasCardSpecimenProps = Pick<CanvasCardProps, 'title'> &
   Partial<Pick<CanvasCardProps, 'kind' | 'state' | 'graphColor'>>;
@@ -40,6 +44,9 @@ export function CanvasCardSpecimen({
           </button>
         </>
       }
+      handles={AUTHORING_HANDLE_SIDES.map((side) => (
+        <AuthoringHandle key={side} mode="specimen" side={side} role="source" color={graphColor} />
+      ))}
     />
   );
 }
