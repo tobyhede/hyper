@@ -13,7 +13,6 @@ export interface CanvasCardProps {
   readonly state: CanvasCardState;
   readonly title: string;
   readonly graphColor: string;
-  readonly description?: string;
   readonly titleEditor?: ReactNode;
   readonly actions?: ReactNode;
   /** Real interaction handles supplied by the canvas adapter. */
@@ -32,7 +31,6 @@ export function CanvasCard({
   state,
   title,
   graphColor,
-  description,
   titleEditor,
   actions,
   handles,
@@ -54,7 +52,6 @@ export function CanvasCard({
           <CardKindIcon kind={kind} />
         </span>
         {actions !== undefined && <div className="canvas-card__actions">{actions}</div>}
-        {state === 'editing' && <span className="canvas-card__editing-hint">⏎ · esc</span>}
       </CardHeader>
       <CardContent className="canvas-card__body">
         {titleEditor ?? (
@@ -67,11 +64,6 @@ export function CanvasCard({
           >
             {title}
           </CardTitle>
-        )}
-        {description !== undefined && (
-          <p className="canvas-card__description" data-testid="card-description">
-            {description}
-          </p>
         )}
       </CardContent>
       {handles}

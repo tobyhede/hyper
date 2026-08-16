@@ -106,7 +106,7 @@ describe('projectCardNodes', () => {
     expect('markdown' in a.data).toBe(false);
   });
 
-  it("carries a card's description when it has one, and omits it otherwise", () => {
+  it('never projects a Card description onto its graph node', () => {
     const described = load(
       spaceFile([
         {
@@ -129,13 +129,7 @@ describe('projectCardNodes', () => {
       ],
     );
     const nodes = projectCardNodes(described, buildCardHandles(described), colors);
-    expect(
-      nodes.find((n) => n.id === '00000000-0000-4000-8000-000000000002')!.data.description,
-    ).toBe('What A is');
-    // Absent, not undefined — a card with no description carries no key.
-    expect(
-      'description' in nodes.find((n) => n.id === '00000000-0000-4000-8000-000000000003')!.data,
-    ).toBe(false);
+    expect(nodes.some(({ data }) => Object.hasOwn(data, 'description'))).toBe(false);
   });
 
   it('attaches per-graph handles colored by graph', () => {

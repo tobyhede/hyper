@@ -9,6 +9,7 @@
     "#app/canvas-projection": "./src/canvas-projection.ts",
     "#app/card": "./src/card.ts",
     "#app/renderer": "./src/renderer.ts",
+    "#app/snapshot": "./src/snapshot.ts",
     "#components/*": "./src/components/*.tsx",
     "#hooks/*": "./src/hooks/*.ts",
     "#lib/*": "./src/lib/*.ts"

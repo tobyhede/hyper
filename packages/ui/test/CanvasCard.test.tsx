@@ -38,4 +38,19 @@ describe('CanvasCard', () => {
     expect(screen.getByRole('img', { name: 'Alias' })).toBeVisible();
     expect(screen.queryByTestId('alias-marker')).not.toBeInTheDocument();
   });
+
+  it('replaces the read-only title with the title editor', () => {
+    render(
+      <CanvasCard
+        kind="markdown"
+        state="editing"
+        title="Strategies"
+        graphColor="#ffc53d"
+        titleEditor={<input aria-label="Card title" defaultValue="Strategies" />}
+      />,
+    );
+
+    expect(screen.getByRole('textbox', { name: 'Card title' })).toBeVisible();
+    expect(screen.queryByText(/⏎|esc/i)).not.toBeInTheDocument();
+  });
 });

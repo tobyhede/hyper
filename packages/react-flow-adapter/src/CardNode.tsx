@@ -255,7 +255,6 @@ export function CardNode({ data, selected, dragging, isConnectable }: NodeProps<
           state={visualState}
           title={data.title}
           graphColor={data.activeGraphColor}
-          {...(data.description === undefined ? {} : { description: data.description })}
           titleEditable={data.titleEditingEnabled === true}
           {...(data.titleEditingEnabled
             ? {

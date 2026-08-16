@@ -88,7 +88,6 @@ function RealReactFlow({
 export interface CanvasCardNodeSpecimenProps {
   readonly cardId?: CardId;
   readonly selected?: boolean;
-  readonly dragging?: boolean;
   readonly editingTitle?: boolean;
   readonly graphColor?: string;
 }
@@ -100,7 +99,6 @@ export interface CanvasCardNodeSpecimenProps {
 export function CanvasCardNodeSpecimen({
   cardId = cardIds.strategies,
   selected = false,
-  dragging = false,
   editingTitle = false,
   graphColor,
 }: CanvasCardNodeSpecimenProps) {
@@ -113,7 +111,6 @@ export function CanvasCardNodeSpecimen({
   const node: CardFlowNode = {
     ...source,
     selected,
-    dragging,
     data: {
       ...source.data,
       ...(graphColor === undefined ? {} : { activeGraphColor: graphColor }),

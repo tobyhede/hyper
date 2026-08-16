@@ -262,7 +262,7 @@ function reconcile(
     const live = byId.get(node.id);
     if (!live) return node;
     // `data`, `className` and `handles` are the projection's to own — they carry
-    // the title, the description, the active/emphasis styling and the declared
+    // the title, the active/emphasis styling and the declared
     // handle geometry. Everything else is React Flow's runtime and belongs to the
     // live node. `handles` must come through: React Flow builds `handleBounds`
     // from the declaration rather than measuring the DOM (AGENTS.md), so a live

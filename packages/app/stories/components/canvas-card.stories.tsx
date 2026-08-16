@@ -2,7 +2,8 @@ import type { Story } from '@ladle/react';
 import { CanvasCardSpecimen } from '../support/CanvasCardSpecimen';
 import { CatalogueSection, Specimen } from '../support/Catalogue';
 import { CanvasCardNodeSpecimen } from '../support/ReactFlowCanvas';
-import { cardIds, GRAPH_PALETTE } from '../support/fixture';
+import { TitleEditingDemo } from '../support/TitleEditingDemo';
+import { GRAPH_PALETTE } from '../support/fixture';
 
 export default { title: 'Components/Canvas Card' };
 
@@ -10,32 +11,26 @@ export const States: Story = () => (
   <div className="inv-sheet">
     <CatalogueSection
       title="Card states"
-      note="React Flow supplies selection and dragging; CardNode translates those states into the shared Canvas Card presentation. Hover combinations remain real pointer interactions in Hover actions."
+      note="The shared CanvasCard presentation contract. React Flow interaction states and handles remain real pointer behavior in Hover actions."
     >
       <div className="inv-row">
         <Specimen label="card · rest">
-          <CanvasCardNodeSpecimen />
+          <CanvasCardSpecimen title="Strategies" />
         </Specimen>
         <Specimen label="card · selected">
-          <CanvasCardNodeSpecimen selected />
+          <CanvasCardSpecimen title="Strategies" state="selected" />
         </Specimen>
         <Specimen label="card · dragging">
-          <CanvasCardNodeSpecimen dragging />
-        </Specimen>
-        <Specimen label="card · editing">
-          <CanvasCardNodeSpecimen editingTitle />
+          <CanvasCardSpecimen title="Strategies" state="dragging" />
         </Specimen>
         <Specimen label="alias · rest">
-          <CanvasCardNodeSpecimen cardId={cardIds.openingAlias} />
+          <CanvasCardSpecimen title="Opening" kind="alias" />
         </Specimen>
         <Specimen label="alias · selected">
-          <CanvasCardNodeSpecimen cardId={cardIds.openingAlias} selected />
+          <CanvasCardSpecimen title="Opening" kind="alias" state="selected" />
         </Specimen>
         <Specimen label="alias · dragging">
-          <CanvasCardNodeSpecimen cardId={cardIds.openingAlias} dragging />
-        </Specimen>
-        <Specimen label="alias · editing">
-          <CanvasCardNodeSpecimen cardId={cardIds.openingAlias} editingTitle />
+          <CanvasCardSpecimen title="Opening" kind="alias" state="dragging" />
         </Specimen>
       </div>
     </CatalogueSection>
@@ -84,17 +79,10 @@ Colours.storyName = 'Colours';
 export const Editing: Story = () => (
   <div className="inv-sheet">
     <CatalogueSection
-      title="In-place title editing"
-      note="The production CardNode editor occupies the title's position, keeps the kind icon stable, and carries the editing hint in the rail."
+      title="Title editing lifecycle"
+      note="Double-click a Card title to edit it. Enter saves the title; Escape cancels the current draft. This is the complete application composition over an isolated memory-backed fixture."
     >
-      <div className="inv-row">
-        <Specimen label="editing">
-          <CanvasCardNodeSpecimen editingTitle />
-        </Specimen>
-        <Specimen label="editing · long title">
-          <CanvasCardNodeSpecimen cardId={cardIds.problem} editingTitle />
-        </Specimen>
-      </div>
+      <TitleEditingDemo />
     </CatalogueSection>
   </div>
 );
@@ -103,7 +91,7 @@ export const HoverActions: Story = () => (
   <div className="inv-sheet">
     <CatalogueSection
       title="Hover actions"
-      note="Move the pointer over either real React Flow node to reveal its Edge handles and rail actions. The selected Card becomes selected + hover; selection alone keeps actions keyboard-reachable after hover ends."
+      note="Move the pointer over either real React Flow node to reveal its Edge handles and rail actions. The selected Card becomes selected + hover; selection alone keeps only its thick frame and coloured rail."
     >
       <div className="inv-row">
         <Specimen label="hover to show actions and Edge handles">

@@ -40,9 +40,8 @@ export const newUuid = () => uuidSchema.parse(crypto.randomUUID());
 export const CARD_DESCRIPTION_MAX_LENGTH = 120;
 
 /**
- * An optional one-line description, drawn under the title in the graph node
- * (ADR 0006). Bounded and newline-free so it cannot drift into a body — the card
- * is fixed-size, so an unbounded description would just clip silently.
+ * An optional one-line description available when the Card is opened. Bounded
+ * and newline-free so it cannot drift into a second body.
  */
 const descriptionSchema = z
   .string()

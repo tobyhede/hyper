@@ -21,7 +21,7 @@ _Avoid_: guid, key, slug, local id, authored id, and any pairing of a "human" id
 **Card**:
 A single addressable piece of a space, and the thing a Graph's Edges run between. Named for HyperCard's card.
 
-A card has a **title**, which names it wherever it is listed or drawn, and **content**, which is what it holds. The two are distinct: a view may show one without the other, and the graph draws the title, not the content. A card may also carry a short optional **description** — a caption saying what it is when the title alone is too terse — which the graph draws under the title; it is not a second body (it is capped and single-line), and the content still lives in the card.
+A card has a **title**, which names it wherever it is listed or drawn, and **content**, which is what it holds. The two are distinct: a view may show one without the other, and the graph draws the title alone, never the content or description. A card may also carry a short optional **description** — a caption available when the Card is opened; it is not a subtitle on the Card front and not a second body.
 
 A card is one of three kinds, and the kind is what its content is: **Markdown** — written directly by the author; a **space** — a nested graph the viewer opens and explores in place; or an **alias** — another card, shown again here.
 _Avoid_: node, slide, page, tile, subgraph. For the content: prose (it may be a table, a diagram or code, not only writing), body (works for markdown, but a space card's content is a graph).

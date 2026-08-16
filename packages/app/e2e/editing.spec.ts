@@ -275,12 +275,13 @@ test('opened Markdown editing persists source and description without moving Car
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
   await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
   expect(await allPositions(page)).toEqual(before);
-  await expect(card.getByTestId('card-description')).toHaveText('Edited in place');
+  await expect(card).not.toContainText('Edited in place');
 
   await page.reload();
   const persisted = nodeByTitle(page, 'A').first();
-  await expect(persisted.getByTestId('card-description')).toHaveText('Edited in place');
+  await expect(persisted).not.toContainText('Edited in place');
   await openCard(persisted, 'A');
+  await expect(page.getByRole('textbox', { name: 'Description' })).toHaveValue('Edited in place');
   await expect(page.getByRole('textbox', { name: 'Markdown source' })).toHaveValue(
     '# Edited\n\nNew source',
   );

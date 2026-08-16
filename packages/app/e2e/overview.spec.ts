@@ -189,15 +189,11 @@ test('a card shows its title in the graph, and opens to show its Markdown source
   await page.goto('/');
   await expect(page.locator('.react-flow__node').first()).toBeVisible();
 
-  // The graph draws the title, plus a card's optional short description (ADR
-  // 0006, card-display/03) — but never the card's body. A carries a description;
-  // "entry point" is its body text, which must not appear.
+  // The graph draws the title alone — never the Card's description or body.
   const a = nodeByTitle(page, 'A');
   await expect(a).toBeVisible();
-  await expect(a.getByTestId('card-description')).toHaveText('Where the first collection begins');
+  await expect(a).not.toContainText('Where the first collection begins');
   await expect(a).not.toContainText('entry point');
-  // A card without a description renders no description element.
-  await expect(nodeByTitle(page, 'B').getByTestId('card-description')).toHaveCount(0);
   await expect(page.getByTestId('open-card')).toBeHidden();
 
   // Opening shows the Markdown source verbatim, not rendered (ADR 0011) — the
@@ -206,6 +202,9 @@ test('a card shows its title in the graph, and opens to show its Markdown source
   await openCard(a, 'A');
   const opened = page.getByTestId('open-card');
   await expect(opened).toBeVisible();
+  await expect(opened.getByRole('textbox', { name: 'Description' })).toHaveValue(
+    'Where the first collection begins',
+  );
   await expect(opened.getByRole('textbox', { name: 'Markdown source' })).toHaveValue(/\*\*A\*\*/);
 
   await page.getByRole('button', { name: 'Cancel' }).click();
