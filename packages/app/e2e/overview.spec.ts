@@ -189,7 +189,7 @@ test('a card shows its title in the graph, and opens to show its Markdown source
   await page.goto('/');
   await expect(page.locator('.react-flow__node').first()).toBeVisible();
 
-  // The graph draws the title alone — never the Card's description or body.
+  // The graph draws the title alone — never the Card's description or content.
   const a = nodeByTitle(page, 'A');
   await expect(a).toBeVisible();
   await expect(a).not.toContainText('Where the first collection begins');

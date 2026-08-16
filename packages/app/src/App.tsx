@@ -668,13 +668,8 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
-      ) : sessionState.persistence.kind === 'rejected' ? (
-        <AlertDialog
-          open={rejectionOpen}
-          onOpenChange={(open) => {
-            if (!open && rejectionKey !== null) setDismissedRejection(rejectionKey);
-          }}
-        >
+      ) : sessionState.persistence.kind === 'rejected' && rejectionOpen ? (
+        <AlertDialog open onOpenChange={(open) => !open && setDismissedRejection(rejectionKey)}>
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>Changes couldn’t be saved</AlertDialogTitle>
@@ -691,9 +686,7 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
             <AlertDialogFooter>
               <AlertDialogAction
                 data-testid="persistence-rejection-continue"
-                onClick={() => {
-                  if (rejectionKey !== null) setDismissedRejection(rejectionKey);
-                }}
+                onClick={() => setDismissedRejection(rejectionKey)}
               >
                 Continue editing
               </AlertDialogAction>

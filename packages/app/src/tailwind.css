@@ -4,6 +4,7 @@
  * The shared semantic vocabulary consumed by the app, `@project/ui`, and the
  * React Flow integration.
  */
+/* stylelint-disable-next-line at-rule-no-unknown -- Tailwind CSS v4 directive */
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);

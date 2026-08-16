@@ -80,7 +80,7 @@ test('Canvas Card hover actions use CardNode handles in real React Flow geometry
   await page.mouse.move(0, 0);
   await expect(selected).toHaveAttribute('data-state', 'selected');
   await expect(selectedHandles.first()).toHaveCSS('opacity', '0');
-  await expect(selected.getByRole('button', { name: 'Connect from Strategies' })).toBeHidden();
+  await expect(selected.getByRole('button', { name: 'Connect from Strategies' })).toBeVisible();
 });
 
 test('Canvas Card states keep selection quiet and make dragging elevation visible', async ({

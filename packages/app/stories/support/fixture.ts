@@ -194,5 +194,5 @@ export const space: Space = loaded.space;
 export const spaceSummaries = [
   { id: layoutId, title: 'Graph-native presentations' },
   { id: graphIds.long, title: 'Layout seam findings' },
-  { id: graphIds.short, title: 'Card route editing' },
+  { id: graphIds.short, title: 'Card Graph editing' },
 ] as const;

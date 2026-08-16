@@ -304,6 +304,7 @@ describe('Workspace permanent save refusal', () => {
         screen.queryByRole('alertdialog', { name: 'Changes couldn’t be saved' }),
       ).not.toBeInTheDocument(),
     );
+    expect(screen.getByRole('button', { name: 'Persistence rejected' })).toBeVisible();
     expect(await screen.findByRole('heading', { name: 'Local card' })).toBeVisible();
     expect(session.getState().persistence.kind).toBe('rejected');
   });

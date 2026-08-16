@@ -24,7 +24,14 @@ export function WorkspaceToolbarFixture({
 
   return (
     <WorkspaceToolbar
-      view={{ value: view, active: layout === null, onValueChange: setView }}
+      view={{
+        value: view,
+        active: layout === null,
+        onValueChange: (value) => {
+          setView(value);
+          setLayout(null);
+        },
+      }}
       layout={{ layouts, value: layout, active: layout !== null, onValueChange: setLayout }}
       graph={{
         graphs,

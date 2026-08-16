@@ -84,7 +84,8 @@
   gap: 4px;
 }
 
-.canvas-card:is([data-state='hover'], [data-state='selected-hover']) .canvas-card__actions {
+.canvas-card:is([data-state='hover'], [data-state='selected'], [data-state='selected-hover'])
+  .canvas-card__actions {
   display: flex;
 }
 

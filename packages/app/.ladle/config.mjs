@@ -20,7 +20,7 @@ export default {
 
   // Ladle's default. Stated rather than inherited because the repo reserves
   // 5173–5175 for the human's dev servers and 5300+ for Playwright workers, and
-  // a future default change must not walk into either.
+  // a future default change must not collide with either.
   port: 61000,
   previewPort: 61001,
 

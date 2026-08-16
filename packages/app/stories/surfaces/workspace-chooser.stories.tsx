@@ -19,9 +19,8 @@ export default { title: 'Surfaces/Workspace Chooser' };
  *  - Every row prints its **UUID** beside the title. That is the only
  *    disambiguator the summary carries, and it is unreadable. What should a row
  *    show — a Card count, a last-edited time, nothing?
- *  - The rows are bare `<button>` elements styled in `styles.css`, not the
- *    shadcn `Card` the manifest earmarks for "panes and list items". This is the
- *    manifest's `Card` hypothesis, and this is the surface that confirms it.
+ *  - The rows are bare `<button>` elements styled in `styles.css`, not shared
+ *    Card compositions. This surface records the production treatment.
  *  - There is no empty state in the component at all — the third story below is
  *    what it renders when handed nothing, which is a heading and a void.
  */
@@ -55,7 +54,7 @@ Empty.storyName = 'Empty — no spaces';
 /**
  * Mid-open. The list sets `aria-busy` and disables every row; nothing else
  * changes, so there is no visible progress at all. Whether that needs a
- * `Skeleton` or a spinner is the manifest's "confirm need rather than adding
+ * `Skeleton` or a spinner is the inventory's "confirm need rather than adding
  * speculatively", and this story is the evidence for the call.
  */
 const OpeningChooser = () => {
