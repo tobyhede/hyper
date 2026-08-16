@@ -298,6 +298,21 @@ describe('the opened Card as a dialog', () => {
     await waitFor(() => expect(screen.getByRole('textbox', { name: 'Title' })).toHaveFocus());
   });
 
+  it('focuses the Target combobox when an Alias editor opens', async () => {
+    render(
+      <OpenCard
+        through={{ id: ALIAS_ID, title: 'A again', kind: 'alias', target: CARD_ID }}
+        graphColor={GRAPH_COLOR}
+        occurrence={{ targets: [markdown()], onEdit: vi.fn(() => null) }}
+        onCancel={vi.fn()}
+      />,
+    );
+
+    await waitFor(() =>
+      expect(screen.getByRole('combobox', { name: 'Target Card' })).toHaveFocus(),
+    );
+  });
+
   it('uses Base UI modal containment rather than a local Tab handler', () => {
     render(
       <OpenCard

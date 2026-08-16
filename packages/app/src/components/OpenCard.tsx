@@ -393,7 +393,7 @@ function AliasCardEditor({
       graphColor={graphColor}
       title={title}
       titleError={null}
-      titleStartsFocused
+      titleStartsFocused={false}
       onTitleChange={(nextTitle) => {
         setTitle(nextTitle);
         setRefusal(null);
@@ -406,7 +406,7 @@ function AliasCardEditor({
     >
       <Field className="card-editor__body card-editor__alias-target">
         <FieldLabel className="card-editor__alias-label" htmlFor="open-alias-target">
-          Points at
+          Alias of
         </FieldLabel>
         <CardSearchCombobox
           label="Target Card"
@@ -419,6 +419,7 @@ function AliasCardEditor({
           }))}
           value={target}
           inputRef={targetInput}
+          inputAttributes={paneInitialFocus(true)}
           onValueChange={(chosen) => {
             const parsed = uuidSchema.safeParse(chosen);
             if (!parsed.success) return;

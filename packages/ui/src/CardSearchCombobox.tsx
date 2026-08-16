@@ -1,4 +1,4 @@
-import { useRef, type Ref } from 'react';
+import { useRef, type InputHTMLAttributes, type Ref } from 'react';
 import { CardKindIcon } from './CardKindIcon';
 import type { CardChoice } from './CardCombobox';
 import {
@@ -18,6 +18,7 @@ export interface CardSearchComboboxProps {
   readonly onValueChange: (cardId: string) => void;
   readonly inputId?: string;
   readonly inputRef?: Ref<HTMLInputElement>;
+  readonly inputAttributes?: InputHTMLAttributes<HTMLInputElement>;
   readonly testId?: string;
   readonly placeholder?: string;
 }
@@ -33,6 +34,7 @@ export function CardSearchCombobox({
   onValueChange,
   inputId,
   inputRef,
+  inputAttributes,
   testId,
   placeholder = 'Choose a Card',
 }: CardSearchComboboxProps) {
@@ -51,6 +53,7 @@ export function CardSearchCombobox({
         }}
       >
         <ComboboxInput
+          {...inputAttributes}
           ref={inputRef}
           id={inputId}
           aria-label={label}
