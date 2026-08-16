@@ -1,6 +1,5 @@
-import { ThemeState } from '@ladle/react';
 import type { GlobalProvider } from '@ladle/react';
-import { Alert, AlertDescription, AlertTitle, TooltipProvider } from '@project/ui';
+import { TooltipProvider } from '@project/ui';
 import '../src/tailwind.css';
 import '@xyflow/react/dist/style.css';
 import '../src/styles.css';
@@ -8,8 +7,7 @@ import '../stories/support/inventory.css';
 
 /**
  * Every story is drawn with the app's **real** stylesheets loaded — the shadcn
- * theme layer and the hand-rolled chrome CSS — and then the inventory's own
- * card tokens on top.
+ * theme layer and the application chrome CSS.
  *
  * Loading the real ones matters. The manifest's entries are hypotheses to
  * confirm, and a component redrawn against a private copy of the palette would
@@ -17,28 +15,11 @@ import '../stories/support/inventory.css';
  * toolbar, the selectors and the workspace chooser in these stories are the
  * components the product ships, resolving the tokens the product resolves.
  *
- * The visible consequence is the first thing the inventory has to say, and it
- * is left visible rather than smoothed over: **the app's chrome is dark and the
- * card design's canvas is light paper.** The handoff's token table covers the
- * card and the canvas and stops there, so nothing in it says what the shell,
- * the toolbar or the panes become. Painting them light here would be inventing
- * that answer; showing the clash asks for it.
+ * The catalogue does not translate the production theme into a separate
+ * story-only light or dark treatment.
  */
-export const Provider: GlobalProvider = ({ children, globalState }) => (
+export const Provider: GlobalProvider = ({ children }) => (
   <TooltipProvider>
-    <div className="inv">
-      {globalState.theme === ThemeState.Dark && (
-        <div className="p-4">
-          <Alert>
-            <AlertTitle>Dark mode is not supported yet</AlertTitle>
-            <AlertDescription>
-              The catalogue remains in the locked light design while the dark treatment is reviewed
-              under Review/Theming.
-            </AlertDescription>
-          </Alert>
-        </div>
-      )}
-      {children}
-    </div>
+    <div className="inv">{children}</div>
   </TooltipProvider>
 );

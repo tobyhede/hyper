@@ -27,7 +27,7 @@ test('Card editor opens from its single production Card', async ({ page }) => {
   await expect(dialog).toHaveCSS('box-shadow', 'none');
   await expect(dialog.locator('.card-editor__rail')).toHaveCSS(
     'background-color',
-    'rgb(110, 168, 254)',
+    'rgb(52, 211, 153)',
   );
 });
 
@@ -61,7 +61,7 @@ test('Alias Card editor opens from its single production Alias', async ({ page }
   await expect(dialog.getByRole('textbox', { name: 'Markdown source' })).toHaveCount(0);
   await expect(dialog.locator('.card-editor__rail')).toHaveCSS(
     'background-color',
-    'rgb(110, 168, 254)',
+    'rgb(52, 211, 153)',
   );
 
   const target = dialog.getByRole('combobox', { name: 'Target Card' });

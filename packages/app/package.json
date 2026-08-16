@@ -8,6 +8,7 @@
     "#app/camera": "./src/camera.ts",
     "#app/canvas-projection": "./src/canvas-projection.ts",
     "#app/card": "./src/card.ts",
+    "#app/colors": "./src/colors.ts",
     "#app/renderer": "./src/renderer.ts",
     "#app/snapshot": "./src/snapshot.ts",
     "#components/*": "./src/components/*.tsx",

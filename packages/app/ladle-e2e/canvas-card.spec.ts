@@ -60,7 +60,7 @@ test('Canvas Card hover actions use CardNode handles in real React Flow geometry
   await expect(hovered).toHaveAttribute('data-state', 'hover');
   await expect(hovered.locator('.canvas-card__rail')).toHaveCSS(
     'background-color',
-    'rgb(255, 197, 61)',
+    'rgb(110, 168, 254)',
   );
   await expect(hovered.getByRole('button', { name: 'Connect from Strategies' })).toBeVisible();
   await expect(hoverHandles.first()).toHaveCSS('opacity', '1');

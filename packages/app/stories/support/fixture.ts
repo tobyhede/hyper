@@ -7,13 +7,14 @@ import {
   type UUID,
 } from '@project/core';
 import { loadSpace, type CardFile, type Space } from '@project/graph';
+import { GRAPH_PALETTE as PRODUCTION_GRAPH_PALETTE } from '#app/colors';
 
 /**
  * The inventory's fixture: a small, believable Space, shaped to exercise the
  * cases the design has to survive rather than to tell a story.
  *
- * Seven Cards, two Graphs sharing two of them, one Alias, one deliberately long
- * title, and one Card of a kind the domain does not have — see `spaceCard`.
+ * Seven Cards, two Graphs sharing two of them, one Alias, and one deliberately
+ * long title.
  *
  * Real ids, parsed through `uuidSchema`, so this data is the same shape the
  * product's own components receive. A story that hands `GraphSelector` a
@@ -40,28 +41,8 @@ export const graphIds = {
 export const layoutId = id('9ef2d3eb-18a9-4305-8cba-afdeb0fd5a79');
 export const spaceId = id('a0f3e4fc-29ba-4416-9dcb-b0efc10e6b8a');
 
-/**
- * The design's six-colour graph palette. Assigned per Layout rather than per
- * Space, so every Layout gets a full run of them (`nextGraphColor`).
- */
-export const GRAPH_PALETTE = ['#ffc53d', '#35d6c3', '#6ea8fe', '#c9a2ff', '#ff7a59'] as const;
-
-/**
- * Edge colours are the graph colour darkened for contrast on the light canvas —
- * `#ffc53d` amber reads as a highlighter against `#efe9dc` paper at a 3px
- * stroke, so the line takes a darker relative of its own colour.
- *
- * The handoff supplies amber and teal. **The other three are derived here and
- * are not design-approved** — they hold roughly the same lightness step, which
- * is the rule the two given pairs follow, but nobody has looked at them.
- */
-export const EDGE_COLOR: Readonly<Record<string, string>> = {
-  '#ffc53d': '#c1861a',
-  '#35d6c3': '#14887b',
-  '#6ea8fe': '#2f66c4',
-  '#c9a2ff': '#7d4fc0',
-  '#ff7a59': '#c44a28',
-};
+/** The application palette, reused rather than translated for the catalogue. */
+export const GRAPH_PALETTE = PRODUCTION_GRAPH_PALETTE;
 
 export const cards: readonly Card[] = [
   {
@@ -105,25 +86,6 @@ export const cards: readonly Card[] = [
   },
 ];
 
-/**
- * The Card the design has and the domain does not.
- *
- * The handoff specifies a **space** kind — a second sheet offset behind the
- * card, a layers glyph — and asks the fixture to carry "one space containing
- * several cards". `cardSchema` is a discriminated union of `markdown` and
- * `alias`, and nothing else; nested Spaces are ADR 0001's, unbuilt.
- *
- * So it is drawn here as a specimen and kept out of `cards` above, which is
- * typed as the domain's `Card`. Adding a third kind is a domain change with an
- * ADR behind it, not something an inventory page decides by declaring a type.
- */
-export const spaceCard = {
-  id: cardIds.collection,
-  title: 'Collection 2',
-  kind: 'space' as const,
-  contains: 4,
-};
-
 export const graphs: readonly Graph[] = [
   {
     id: graphIds.long,
@@ -137,9 +99,8 @@ export const graphs: readonly Graph[] = [
     ],
   },
   {
-    // Shares `opening` and `strategies` with the Long path, which is what makes
-    // the fixture able to ask the open question: how does a Card show that it
-    // belongs to more than one Graph?
+    // Shares `opening` and `strategies` with the Long path, exercising the
+    // production overview's overlapping Graph projection.
     id: graphIds.short,
     title: 'Short path',
     color: GRAPH_PALETTE[1],

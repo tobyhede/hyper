@@ -16,11 +16,7 @@ export default { title: 'Surfaces/Application Shell' };
 /**
  * The whole frame: header, toolbar, canvas.
  *
- * This is the story the first pass is for. The thing to look at is not any one
- * control but the seam between them — the header is `--panel` on `--bg`, dark,
- * and the canvas below it is `#efe9dc` paper. The handoff's token table covers
- * the card and the canvas and says nothing about the chrome, so that boundary
- * is an open decision rather than a rendering fault.
+ * The production frame and its real theme: header, toolbar and canvas together.
  */
 export const Default: Story = () => (
   <div style={{ height: 620 }}>
