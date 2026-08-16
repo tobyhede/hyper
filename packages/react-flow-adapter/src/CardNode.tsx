@@ -1,6 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { Handle, Position, useConnection, type NodeProps } from '@xyflow/react';
-import { CanvasCard, CardContent, ConnectIcon, EditIcon, type CanvasCardState } from '@project/ui';
+import {
+  CanvasCard,
+  ConnectIcon,
+  EditIcon,
+  RenderedCardContent,
+  type CanvasCardState,
+} from '@project/ui';
 import type { CardFlowNode, CardHandle } from './projection';
 import {
   AUTHORING_HANDLE_SIDES,
@@ -246,7 +252,7 @@ export function CardNode({ data, selected, dragging, isConnectable }: NodeProps<
         <>
           {handles}
           <div className="rf-card-node__content">
-            <CardContent title={data.title} markdown={data.body ?? ''} />
+            <RenderedCardContent title={data.title} markdown={data.body ?? ''} />
           </div>
         </>
       ) : (

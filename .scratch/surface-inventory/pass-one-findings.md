@@ -1,6 +1,11 @@
 # Surface inventory — pass one findings
 
-`ready-for-human`
+`historical`
+
+> This is the archival record of the first inventory pass, not active design
+> guidance. Later ADRs, `CONTEXT.md`, and the production implementation supersede
+> its conclusions. In particular, the accepted vocabulary includes the `space`
+> Card kind and Graph authoring uses the fixed six-colour palette.
 
 Pass one of the design handoff's surface inventory: app shell, toolbar, workspace chooser, canvas. Built as Ladle stories under `packages/app/stories/`, served by `pnpm ladle` at http://localhost:61000.
 
@@ -32,9 +37,12 @@ This is the largest open question in the handoff and it is not listed as one. Ei
 
 Nothing else in pass two can be settled before this is.
 
-### 2. The `space` card kind does not exist
+### 2. Historical: the `space` Card kind was not implemented in this pass
 
-The design specifies a third kind — second sheet offset behind the card, layers glyph — and the fixture brief asks for "one space containing several cards". `cardSchema` is a discriminated union of `markdown` and `alias`; nested Spaces are ADR 0001's and unbuilt.
+At the time of this pass, `cardSchema` was a discriminated union of `markdown`
+and `alias`. That observation is not the current domain conclusion:
+`CONTEXT.md` names `space` as an active Card kind. Consult the current ADR and
+implementation status before changing its representation.
 
 Drawn in `Card · kinds` as a specimen, from a local type, and kept out of the `Card[]` the real components receive. Adding it is a domain change with an ADR behind it. Its glyph is a stand-in too: `@project/ui` ships no layers glyph, and Lucide's `Layers` is the obvious answer once the kind is real.
 
@@ -48,11 +56,13 @@ Drawn in `Card · kinds` as a specimen, from a local type, and kept out of the `
 
 `Canvas · multi-graph membership` shows Strategies (on both Graphs) beside Traversal (on one). They are indistinguishable, in every state. The handoff says not to invent a treatment silently, so none is drawn. The legend beside them is what the app has, and it answers "which Graphs exist", not "which Graphs is this Card on".
 
-### 5. Three of the five edge colours are guesses
+### 5. Historical: the draft palette had five colours
 
 The handoff supplies amber `#ffc53d → #c1861a` and teal `#35d6c3 → #14887b`. Blue, violet and coral are derived in `fixture.ts` to hold roughly the same lightness step and **nobody has looked at them**. Shown together in `Canvas · graph colours`.
 
-Separately: the token table lists **five** graph colours and the per-Layout rotation rule spends **six**. One of those numbers is wrong. At five, a sixth Graph in one Layout reuses a colour over shared Cards, which is the thing the per-Layout rotation exists to prevent.
+The active Graph palette is now fixed at **six** colours. The five-colour token
+table and the guessed-colour concern recorded here were inputs to that decision,
+not competing guidance.
 
 ### 6. The rail button is not a Button variant
 

@@ -14,7 +14,7 @@ Before writing JSX for a new UI concept:
 1. Run `pnpm ui:catalog`.
 2. Inspect the existing `@project/ui` component or composition that most closely matches the requirement.
 3. Inspect its Ladle stories and tests.
-4. When Hyper lacks the capability, search the configured shadcn registry through the shadcn MCP server. If the optional server is unavailable, use the project package runner and the upstream `$shadcn` workflow for read-only search and documentation.
+4. When Hyper lacks the capability, search the configured shadcn registry through the shadcn MCP server. If the optional server is unavailable, use `pnpm dlx shadcn@4.18.0` and the upstream `$shadcn` workflow for read-only search and documentation. Never substitute `@latest` or an unversioned package invocation.
 5. Prefer composition of existing components over adding another component.
 6. Use the shadcn component when it supplies the primitive or composition.
 7. Preserve its documented keyboard, focus, dismissal, and accessibility behavior unless an accepted Hyper requirement explicitly contradicts it.
@@ -69,4 +69,4 @@ Use `$prototype` only while a visual or product question is unresolved. A chosen
 
 Test semantics through accessible roles and user behavior. Use component tests for local behavior, Ladle and Playwright for component interaction and accessibility, and application Playwright tests for behavior crossing framework or surface boundaries such as React Flow, Dialog focus, Escape, and Tab.
 
-Run the relevant tests, `pnpm e2e:ladle`, `pnpm e2e`, and `pnpm verify` before completion.
+Run the relevant tests and `pnpm verify` before completion. Run `pnpm e2e:ladle` for catalogue changes. Run `pnpm e2e` for UI, graph, canvas, or rendering changes. Record the actual command outcomes in the pull request description.

@@ -98,7 +98,7 @@ export function AddCardControl({
           aria-label="More Card kinds"
           title="More Card kinds"
           disabled={disabled}
-          className="inline-flex cursor-pointer items-center justify-center rounded-[6px] rounded-l-none border border-[var(--border)] bg-[var(--secondary)] px-[6px] py-[6px] text-[13px] whitespace-nowrap text-[var(--foreground)] transition-colors hover:border-[var(--accent)] focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+          className="inline-flex cursor-pointer items-center justify-center rounded-[6px] rounded-l-none border border-[var(--border)] bg-[var(--secondary)] px-[6px] py-[6px] text-[13px] whitespace-nowrap text-[var(--foreground)] transition-colors hover:border-[var(--accent)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ring)] disabled:cursor-not-allowed disabled:opacity-50"
         >
           <ChevronDownIcon />
         </Menu.Trigger>

@@ -130,4 +130,12 @@ describe('AddCardControl', () => {
     expect(screen.getByRole('button', { name: 'Add Card' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'More Card kinds' })).toBeDisabled();
   });
+
+  it('keeps a visible keyboard focus indicator on the menu trigger', () => {
+    render(<AddCardControl onAddCard={vi.fn()} onAddAlias={vi.fn()} />);
+
+    const trigger = screen.getByRole('button', { name: 'More Card kinds' });
+    expect(trigger.className).not.toContain('focus-visible:outline-none');
+    expect(trigger.className).toContain('focus-visible:outline-2');
+  });
 });

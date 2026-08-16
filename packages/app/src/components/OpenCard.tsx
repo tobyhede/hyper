@@ -295,7 +295,7 @@ function MarkdownCardEditor({
   };
 
   const requestCancel = (): void => {
-    if (draft.body !== content.body) {
+    if (draft.title !== content.title || draft.body !== content.body) {
       setConfirmingDiscard(true);
       return;
     }

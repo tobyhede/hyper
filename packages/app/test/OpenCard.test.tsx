@@ -89,6 +89,26 @@ describe('the opened Card', () => {
     expect(onComplete).not.toHaveBeenCalled();
   });
 
+  it('asks before discarding a title-only edit', () => {
+    const onCancel = vi.fn();
+    render(
+      <OpenCard
+        card={markdown()}
+        graphColor={GRAPH_COLOR}
+        onComplete={vi.fn(() => null)}
+        onCancel={onCancel}
+      />,
+    );
+
+    fireEvent.change(screen.getByRole('textbox', { name: 'Title' }), {
+      target: { value: 'Renamed A' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+
+    expect(screen.getByRole('alertdialog', { name: 'Discard Markdown changes?' })).toBeVisible();
+    expect(onCancel).not.toHaveBeenCalled();
+  });
+
   it('marks the field a title refusal is about, and only that field', () => {
     const onComplete = vi.fn(() => null);
     render(

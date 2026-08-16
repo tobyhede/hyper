@@ -13,7 +13,7 @@ import { GRAPH_PALETTE as PRODUCTION_GRAPH_PALETTE } from '#app/colors';
  * The inventory's fixture: a small, believable Space, shaped to exercise the
  * cases the design has to survive rather than to tell a story.
  *
- * Seven Cards, two Graphs sharing two of them, one Alias, and one deliberately
+ * Six Cards, two Graphs sharing two of them, one Alias, and one deliberately
  * long title.
  *
  * Real ids, parsed through `uuidSchema`, so this data is the same shape the
@@ -29,7 +29,6 @@ export const cardIds = {
   strategies: id('2d8b6c74-a132-4c9e-9b4f-3e6d7a8c9f02'),
   traversal: id('3e9c7d85-b243-4daf-8c5a-4f7e8b9daf13'),
   openingAlias: id('4fad8e96-c354-4eb0-9d6b-5a8f9cae0b24'),
-  collection: id('5abe9fa7-d465-4fc1-8e7c-6b9adcbf1c35'),
   closing: id('6bcfa0b8-e576-40d2-9f8d-7cabedca2d46'),
 } as const;
 
@@ -120,8 +119,8 @@ export const colorByGraphId: Readonly<Record<string, string>> = {
  * Where the static canvas draws each Card. Authored, as placement always is —
  * these are hand-set so both Graphs read forward, left to right, which is the
  * only arrangement in which two overlaid Graphs stay legible (the acyclic-union
- * limit). `collection` is placed and belongs to no Graph, which is a Card in a
- * Layout with no Edge on it — a real state and one the design has to draw.
+ * limit). `closing` belongs to only the short Graph, so the design still has to
+ * distinguish Cards with different Graph membership.
  */
 export const positions: Readonly<Record<string, { x: number; y: number }>> = {
   [cardIds.opening]: { x: 40, y: 170 },
@@ -130,7 +129,6 @@ export const positions: Readonly<Record<string, { x: number; y: number }>> = {
   [cardIds.traversal]: { x: 1060, y: 30 },
   [cardIds.openingAlias]: { x: 1400, y: 170 },
   [cardIds.closing]: { x: 1060, y: 330 },
-  [cardIds.collection]: { x: 380, y: 330 },
 };
 
 export const CARD_WIDTH = 260;
@@ -141,9 +139,6 @@ export const layouts: readonly Layout[] = [
     id: layoutId,
     kind: 'positioned',
     title: 'Collection 1',
-    // Domain Cards only. `positions` above also places `collection`, which is
-    // the proposed `space` kind and not a `Card`, so putting it here would be a
-    // dangling reference — the exact thing `validateReferences` rejects.
     positions: Object.fromEntries(
       cards.map((card) => [card.id, positions[card.id] ?? { x: 0, y: 0 }]),
     ),

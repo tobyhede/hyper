@@ -22,7 +22,12 @@ const alias = (() => {
   return found;
 })();
 
-const exampleById = new Map(space.cards.map((card) => [card.id, card]));
+const exampleById = new Map(
+  [cardIds.strategies, cardIds.problem, cardIds.traversal].map((cardId) => [
+    cardId,
+    space.lookup.card(cardId),
+  ]),
+);
 const exampleCard = (cardId: CardId, title: string) => {
   const card = exampleById.get(cardId);
   if (card?.kind !== 'markdown') {

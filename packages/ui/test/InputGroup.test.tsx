@@ -1,6 +1,11 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { InputGroup, InputGroupAddon, InputGroupInput } from '../src/components/input-group';
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupInput,
+  InputGroupTextarea,
+} from '../src/components/input-group';
 
 describe('InputGroupAddon', () => {
   it('composes a caller click handler with its input-focus behavior', () => {
@@ -29,5 +34,18 @@ describe('InputGroupAddon', () => {
     fireEvent.click(screen.getByText('Label'));
 
     expect(screen.getByRole('textbox', { name: 'Value' })).not.toHaveFocus();
+  });
+
+  it('moves focus from an addon to its textarea control', () => {
+    render(
+      <InputGroup>
+        <InputGroupAddon>Label</InputGroupAddon>
+        <InputGroupTextarea aria-label="Notes" />
+      </InputGroup>,
+    );
+
+    fireEvent.click(screen.getByText('Label'));
+
+    expect(screen.getByRole('textbox', { name: 'Notes' })).toHaveFocus();
   });
 });
