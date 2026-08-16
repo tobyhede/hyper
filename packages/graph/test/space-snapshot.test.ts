@@ -62,7 +62,7 @@ describe('loadSpaceSnapshot', () => {
    * with. `parseSnapshot` in the PostgreSQL repository used to reach a client
    * with `parsed.error.message` — Zod's entire serialized issue array as one
    * string, a JSON document nested inside a field the client renders as a
-   * sentence — and reaches it with these instead, which is what `AGENTS.md` pins
+   * sentence — and reaches it with these instead, which is what `docs/agents/editing-and-persistence.md` pins
    * under "A wire codec throws prose, not Zod".
    *
    * The *shape* is pinned, not the sentence: a located field path, then Zod's

@@ -8,7 +8,7 @@ import { cn } from './lib/utils';
  *
  * cmdk keeps the caret in the input and moves an *active* item with the arrow
  * keys, Home/End and Enter, exposing the pair as `combobox` + `listbox` with
- * `aria-activedescendant`. That is the model this repo starts from (AGENTS.md),
+ * `aria-activedescendant`. That is the model this repo starts from (docs/agents/ui.md),
  * and none of it is re-implemented here: these wrappers add the toolbar palette
  * and nothing else.
  *

@@ -19,7 +19,7 @@ import { uuid } from './uuid';
  * `gridStrategy`, `positionedStrategy` and `elkStrategy` each had thorough
  * tests, in three files, sharing no assertions. So each was verified to do what
  * *it* does, and nothing checked they agree on the thing they have in common —
- * which is the whole reason the seam exists. AGENTS.md says `gridStrategy` is
+ * which is the whole reason the seam exists. docs/agents/rendering.md says `gridStrategy` is
  * kept "partly to keep the seam honest"; this is what makes that true.
  *
  * A strategy is free to put cards anywhere. What it may not do is lose one,

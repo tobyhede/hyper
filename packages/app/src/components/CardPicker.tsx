@@ -43,7 +43,7 @@ export interface CardPickerProps {
  *
  * Built on cmdk through `@project/ui`'s Command, so the search field, the active
  * item, the arrow keys and the `combobox`/`listbox` pairing are the primitive's
- * (AGENTS.md). Two things are this component's, and each is here for a reason
+ * (docs/agents/ui.md). Two things are this component's, and each is here for a reason
  * the primitive cannot know:
  *
  * **The filter.** cmdk scores its default fuzzy match against each item's

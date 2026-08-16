@@ -44,7 +44,7 @@ export interface AddCardControlProps {
  * state instead and belongs on the other half.
  *
  * The menu is Base UI's, whose keyboard, focus-return and dismissal behaviour
- * this takes as given (AGENTS.md). Nothing here re-implements any of it: the trigger
+ * this takes as given (docs/agents/ui.md). Nothing here re-implements any of it: the trigger
  * opens on Enter, Space and Arrow keys, the items move under the arrows, and
  * closing returns focus to the trigger — which is what a cancelled Alias
  * creation state relies on having somewhere to go back to.

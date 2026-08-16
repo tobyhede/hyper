@@ -1219,7 +1219,7 @@ export function createSpaceAuthoring({
         // publication this queue fills during. An entry the epoch has outlived
         // is therefore discarded rather than derived against the Space that
         // replaced it, and a later entry still drains — why refusing would not
-        // save it, and why this skips rather than stops, is AGENTS.md's
+        // save it, and why this skips rather than stops, is docs/agents/editing-and-persistence.md's
         // install-gate rule.
         if (next.replacementEpoch !== replacementEpoch) {
           discardedAsReplaced += 1;

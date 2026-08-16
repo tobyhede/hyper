@@ -178,7 +178,7 @@ export function SpaceCanvas({
    * is a product decision rather than an oversight: the presenting chrome
    * enumerates the active Card's outgoing Edges at render time precisely so an
    * Edge drawn from the presented Card is a move the presenter can take without
-   * leaving the presentation (ADR 0027, and the `moves()` note in `AGENTS.md`).
+   * leaving the presentation (ADR 0027, and the `moves()` note in `docs/agents/rendering.md`).
    * `editing.spec.ts` authors a self-Edge mid-presentation and asserts the
    * chrome offers it.
    *
@@ -300,7 +300,7 @@ export function SpaceCanvas({
       if (event.repeat || event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) return;
       if (event.target.closest(NOT_A_CANVAS_COMMAND) !== null) return;
       // The default is prevented only where the command can actually run
-      // (`AGENTS.md`'s keyboard contract), so a `c` typed while authoring is
+      // (`docs/agents/rendering.md`'s keyboard contract), so a `c` typed while authoring is
       // withdrawn is left to whatever else would have had it.
       if (!canAuthorOnCanvas) return;
       event.preventDefault();
