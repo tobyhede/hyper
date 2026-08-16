@@ -265,7 +265,7 @@ function reconcile(
     // the title, the description, the active/emphasis styling and the declared
     // handle geometry. Everything else is React Flow's runtime and belongs to the
     // live node. `handles` must come through: React Flow builds `handleBounds`
-    // from the declaration rather than measuring the DOM (AGENTS.md), so a live
+    // from the declaration rather than measuring the DOM (docs/agents/rendering.md), so a live
     // node that kept a stale set would resolve a new Edge against the handles the
     // Card had before it gained one. The conditional spreads are for
     // `exactOptionalPropertyTypes`; the projection always sets a className.

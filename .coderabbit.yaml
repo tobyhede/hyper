@@ -87,11 +87,13 @@ reviews:
         a shared `Draft`, a `cards` array in the space file, an `edges` array
         beside Graphs.
 
-        ADR 0040 is accepted and NOT built. A Layout's `graphs` field is
-        currently a visibility filter and the Space owns the Graph collection;
-        Layout-owned Card membership and nested Graphs do not exist yet. Do not
-        review code as though they do, and do not report the current shape as a
-        bug.
+        ADR 0040 is BUILT: `.scratch/first-public-aggregate/` landed it. A
+        Layout's `graphs` are nested owned values and its position keys are its
+        explicit Card membership; there is no Space-level Graph collection.
+        `validateReferences` in `packages/graph/src/validate.ts` checks every
+        owned Edge endpoint against that membership (`graph-edge-missing-card`,
+        `graph-edge-card-outside-layout`). Do not report the aggregate as
+        unbuilt or propose reverting to a Space-owned Graph collection.
 
     - path: 'packages/core/**'
       instructions: >-
@@ -217,7 +219,8 @@ reviews:
       instructions: >-
         Prisma Next 0.16.0 emits these artifacts and owns their shape — do not
         suggest editing them; raise a concern about the source schema instead.
-        Two pinned workarounds are deliberate and documented in AGENTS.md: the
+        Two pinned workarounds are deliberate and documented in
+        `docs/agents/editing-and-persistence.md`: the
         four exact `@prisma-next/*` root devDependencies exist only so generated
         types resolve under pnpm's strict layout, and the single `int8`
         compatibility cast in `toDatabaseRevision` keeps revisions as `bigint`.
@@ -400,6 +403,16 @@ knowledge_base:
         applyTo: '.scratch/**/*.md'
       - files: 'docs/agents/domain.md'
         applyTo: 'docs/adr/**/*.md,CONTEXT.md'
+      - files: 'docs/agents/editing-and-persistence.md'
+        applyTo: 'packages/persistence/**,packages/graph/**,packages/app/src/space-authoring.ts,migrations/**,src/prisma/**'
+      - files: 'docs/agents/rendering.md'
+        applyTo: 'packages/react-flow-adapter/**,packages/app/src/components/**,packages/app/src/edge-authoring*.ts,packages/app/src/canvas-projection.ts,packages/app/src/render-adapter.ts,packages/app/src/camera.ts'
+      - files: 'docs/agents/http.md'
+        applyTo: 'packages/http/**'
+      - files: 'docs/agents/ui.md'
+        applyTo: 'packages/ui/**,packages/app/src/components/**'
+      - files: 'docs/agents/build-tooling.md'
+        applyTo: '{,packages/*/}*.config.ts,packages/app/vite*.ts'
   # One prototype repository; nothing should bleed in from or out to another.
   learnings:
     scope: 'local'

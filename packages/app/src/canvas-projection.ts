@@ -81,7 +81,7 @@ export function canvasProjection(
   const edges = buildGraphRenderEdges(space).filter((edge) => visible.has(edge.graphId));
   // Every Card in the Space, and **deliberately not `renderer.subject.cards`**.
   //
-  // This is the one deferred read of the fallback-band exception (AGENTS.md).
+  // This is the one deferred read of the fallback-band exception (docs/agents/rendering.md).
   // `positionedStrategy` still draws a Card a selected Layout omits, in a band
   // below everything the Layout places, and until package 5 builds Cards View,
   // Add to Layout and Remove from Layout that band is the only surface such a

@@ -2391,7 +2391,7 @@ describe('Space Authoring', () => {
    * queued completion is finished work, but the Space it was derived from is
    * gone by the time the drain reaches it.
    *
-   * Why the discard is not a refusal the derivation could make is AGENTS.md's
+   * Why the discard is not a refusal the derivation could make is docs/agents/editing-and-persistence.md's
    * install-gate rule; what this pins is that the accepted Space comes through
    * untouched.
    */
@@ -2450,7 +2450,7 @@ describe('Space Authoring', () => {
   /**
    * The same rule seen from the other side: two entries queued behind one drain,
    * the stale one first. Fails if the drain breaks at the stale entry instead of
-   * skipping it — see AGENTS.md's install-gate rule for why the queue is not
+   * skipping it — see docs/agents/editing-and-persistence.md's install-gate rule for why the queue is not
    * abandoned wholesale.
    */
   it('still drains a completion queued after the replacement it was made against', async () => {
