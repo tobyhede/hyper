@@ -280,10 +280,8 @@ describe('authoring an opened Card', () => {
     fireEvent.change(screen.getByRole('textbox', { name: 'Markdown source' }), {
       target: { value: 'Written once, shown everywhere' },
     });
-    fireEvent.change(screen.getByRole('textbox', { name: 'Description' }), {
-      target: { value: 'One caption, three occurrences' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+    expect(screen.queryByRole('textbox', { name: 'Description' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Ok' }));
 
     expect(bodyOf(session, CARD_ID)).toBe('Written once, shown everywhere');
     expect(session.getState().working.cards).toContainEqual(twiceAliased.cards[2]);
@@ -326,6 +324,8 @@ describe('authoring an opened Card', () => {
 
     fireEvent.keyDown(source, { key: 'Escape' });
 
+    expect(screen.getByRole('alertdialog', { name: 'Discard Markdown changes?' })).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: 'Discard changes' }));
     expect(screen.queryByTestId('open-card')).not.toBeInTheDocument();
     expect(session.getState().working).toEqual(snapshot);
     await settled(session);
@@ -341,7 +341,7 @@ describe('authoring an opened Card', () => {
   it('leaves no opened Card, and so no Edit action, once presenting starts', async () => {
     const session = mount();
     await openEditor();
-    expect(screen.getByRole('button', { name: 'Done' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Ok' })).toBeVisible();
 
     fireEvent.click(screen.getByTestId('present-button'));
 
@@ -357,7 +357,7 @@ describe('authoring an opened Card', () => {
     fireEvent.change(screen.getByRole('textbox', { name: 'Title' }), {
       target: { value: 'Renamed from the pane' },
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Ok' }));
 
     expect(cardTitleOf(session, CARD_ID)).toBe('Renamed from the pane');
     expect(screen.queryByTestId('open-card')).not.toBeInTheDocument();
@@ -394,7 +394,7 @@ describe('authoring an opened Card', () => {
     expect(screen.getByRole('textbox', { name: 'Title' })).toHaveValue('A');
     expect(screen.getByRole('textbox', { name: 'Markdown source' })).toHaveValue('A rewritten');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Ok' }));
 
     expect(cardTitleOf(session, OTHER_CARD_ID)).toBe('B');
     expect(bodyOf(session, OTHER_CARD_ID)).toBe('B source');
@@ -419,6 +419,8 @@ describe('authoring an opened Card', () => {
     fireEvent.click(panel);
     fireEvent.keyDown(panel, { key: 'Escape' });
 
+    expect(screen.getByRole('alertdialog', { name: 'Discard Markdown changes?' })).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: 'Discard changes' }));
     expect(screen.queryByTestId('open-card')).not.toBeInTheDocument();
     expect(bodyOf(session, CARD_ID)).toBe('A source');
     await settled(session);

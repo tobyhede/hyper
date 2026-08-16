@@ -6,10 +6,11 @@ import { OpenCard } from '../src/components/OpenCard';
 const CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 const ALIAS_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
 const OTHER_CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
+const GRAPH_COLOR = '#ffc53d';
 
-const markdown = (over: { description?: string; body?: string } = {}) => ({
+const markdown = (over: { title?: string; description?: string; body?: string } = {}) => ({
   id: CARD_ID,
-  title: 'A',
+  title: over.title ?? 'A',
   ...(over.description === undefined ? {} : { description: over.description }),
   kind: 'markdown' as const,
   body: over.body ?? '**A** source',
@@ -33,27 +34,32 @@ beforeAll(() => {
 });
 
 describe('the opened Card', () => {
-  it('keeps all content fields pending until Done', () => {
+  it('keeps the title and Markdown pending until Ok while preserving description metadata', () => {
     const onComplete = vi.fn(() => null);
-    render(<OpenCard card={markdown()} onComplete={onComplete} onCancel={vi.fn()} />);
+    render(
+      <OpenCard
+        card={markdown({ description: 'Existing caption' })}
+        graphColor={GRAPH_COLOR}
+        onComplete={onComplete}
+        onCancel={vi.fn()}
+      />,
+    );
 
     fireEvent.change(screen.getByRole('textbox', { name: 'Title' }), {
       target: { value: 'Renamed A' },
-    });
-    fireEvent.change(screen.getByRole('textbox', { name: 'Description' }), {
-      target: { value: 'A caption' },
     });
     fireEvent.change(screen.getByRole('textbox', { name: 'Markdown source' }), {
       target: { value: 'New body' },
     });
 
     expect(onComplete).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+    expect(screen.queryByRole('textbox', { name: 'Description' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Ok' }));
 
     expect(onComplete).toHaveBeenCalledWith({
       id: CARD_ID,
       title: 'Renamed A',
-      description: 'A caption',
+      description: 'Existing caption',
       kind: 'markdown',
       body: 'New body',
     });
@@ -62,31 +68,74 @@ describe('the opened Card', () => {
   it('cancels every pending field on Escape', () => {
     const onComplete = vi.fn(() => null);
     const onCancel = vi.fn();
-    render(<OpenCard card={markdown()} onComplete={onComplete} onCancel={onCancel} />);
+    render(
+      <OpenCard
+        card={markdown()}
+        graphColor={GRAPH_COLOR}
+        onComplete={onComplete}
+        onCancel={onCancel}
+      />,
+    );
 
     fireEvent.change(screen.getByRole('textbox', { name: 'Markdown source' }), {
       target: { value: 'abandoned' },
     });
     fireEvent.keyDown(screen.getByRole('textbox', { name: 'Markdown source' }), { key: 'Escape' });
 
+    expect(screen.getByRole('alertdialog', { name: 'Discard Markdown changes?' })).toBeVisible();
+    expect(onCancel).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Discard changes' }));
     expect(onCancel).toHaveBeenCalledOnce();
     expect(onComplete).not.toHaveBeenCalled();
   });
 
   it('marks the field a title refusal is about, and only that field', () => {
     const onComplete = vi.fn(() => null);
-    render(<OpenCard card={markdown()} onComplete={onComplete} onCancel={vi.fn()} />);
+    render(
+      <OpenCard
+        card={markdown()}
+        graphColor={GRAPH_COLOR}
+        onComplete={onComplete}
+        onCancel={vi.fn()}
+      />,
+    );
 
     fireEvent.change(screen.getByRole('textbox', { name: 'Title' }), { target: { value: '   ' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Ok' }));
 
     expect(onComplete).not.toHaveBeenCalled();
     expect(screen.getByRole('alert')).toHaveTextContent('A Card title is required.');
     expect(screen.getByRole('textbox', { name: 'Title' })).toHaveAttribute('aria-invalid', 'true');
-    expect(screen.getByRole('textbox', { name: 'Description' })).toHaveAttribute(
-      'aria-invalid',
-      'false',
+    expect(screen.queryByRole('textbox', { name: 'Description' })).not.toBeInTheDocument();
+  });
+
+  it('moves Enter from the title into Markdown and commits the form with Command-Enter', () => {
+    const onComplete = vi.fn(() => null);
+    const onCancel = vi.fn();
+    render(
+      <OpenCard
+        card={markdown()}
+        graphColor={GRAPH_COLOR}
+        onComplete={onComplete}
+        onCancel={onCancel}
+      />,
     );
+
+    const title = screen.getByRole('textbox', { name: 'Title' });
+    const body = screen.getByRole('textbox', { name: 'Markdown source' });
+    title.focus();
+    fireEvent.keyDown(title, { key: 'Enter' });
+    expect(body).toHaveFocus();
+
+    fireEvent.change(body, { target: { value: 'Committed from the keyboard' } });
+    fireEvent.keyDown(body, { key: 'Enter', metaKey: true });
+    expect(onComplete).toHaveBeenCalledWith({
+      id: CARD_ID,
+      title: 'A',
+      kind: 'markdown',
+      body: 'Committed from the keyboard',
+    });
+    expect(onCancel).toHaveBeenCalledOnce();
   });
 
   /**
@@ -109,21 +158,19 @@ describe('the opened Card', () => {
     render(
       <OpenCard
         card={{ ...markdown(), id: 'not-a-uuid' as CardId }}
+        graphColor={GRAPH_COLOR}
         onComplete={onComplete}
         onCancel={vi.fn()}
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Ok' }));
 
     expect(onComplete).not.toHaveBeenCalled();
     const alert = screen.getByRole('alert');
     expect(alert).toHaveTextContent('The Card could not be completed.');
     expect(alert).toHaveAttribute('id', 'open-card-refusal');
-    expect(screen.getByRole('textbox', { name: 'Description' })).toHaveAttribute(
-      'aria-invalid',
-      'false',
-    );
+    expect(screen.queryByRole('textbox', { name: 'Description' })).not.toBeInTheDocument();
     expect(screen.getByRole('textbox', { name: 'Title' })).toHaveAttribute('aria-invalid', 'false');
   });
 
@@ -194,14 +241,43 @@ describe('the opened Card', () => {
 
 describe('the opened Card as a dialog', () => {
   it('is named for its one edit subject and takes focus on its intended field', async () => {
-    render(<OpenCard card={markdown()} onComplete={vi.fn(() => null)} onCancel={vi.fn()} />);
+    render(
+      <OpenCard
+        card={markdown()}
+        graphColor={GRAPH_COLOR}
+        onComplete={vi.fn(() => null)}
+        onCancel={vi.fn()}
+      />,
+    );
 
-    expect(screen.getByRole('dialog')).toHaveAccessibleName('A');
+    expect(screen.getByRole('dialog')).toHaveAccessibleName('Edit A');
+    await waitFor(() =>
+      expect(screen.getByRole('textbox', { name: 'Markdown source' })).toHaveFocus(),
+    );
+  });
+
+  it('focuses the title when the Card still has its generated default name', async () => {
+    render(
+      <OpenCard
+        card={markdown({ title: 'Card 1' })}
+        graphColor={GRAPH_COLOR}
+        onComplete={vi.fn(() => null)}
+        onCancel={vi.fn()}
+      />,
+    );
+
     await waitFor(() => expect(screen.getByRole('textbox', { name: 'Title' })).toHaveFocus());
   });
 
   it('uses Base UI modal containment rather than a local Tab handler', () => {
-    render(<OpenCard card={markdown()} onComplete={vi.fn(() => null)} onCancel={vi.fn()} />);
+    render(
+      <OpenCard
+        card={markdown()}
+        graphColor={GRAPH_COLOR}
+        onComplete={vi.fn(() => null)}
+        onCancel={vi.fn()}
+      />,
+    );
     expect(screen.getByRole('dialog').closest('[data-base-ui-portal]')).not.toBeNull();
   });
 });

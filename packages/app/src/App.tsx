@@ -31,6 +31,7 @@ import { createNavigation } from './navigation';
 import { createWorkingSpaceReader } from './snapshot';
 import { nextCardTitle } from './titles';
 import { createRendererResolver, defaultRenderer, type RendererSelection } from './renderer';
+import { activeGraphColor } from './colors';
 import { ADD_CARD_KEY, SpaceCanvas } from './components/SpaceCanvas';
 import { CanvasCentre, type VisibleCentre } from './components/CanvasCentre';
 import { NewAlias } from './components/NewAlias';
@@ -774,7 +775,12 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
                 onCancel={closeCard}
               />
             ) : (
-              <OpenCard card={openedCard} onComplete={completeOpenedCard} onCancel={closeCard} />
+              <OpenCard
+                card={openedCard}
+                graphColor={activeGraphColor(projection.colors, activeGraphId)}
+                onComplete={completeOpenedCard}
+                onCancel={closeCard}
+              />
             ))}
 
           {creatingAlias && openedCardId === null && (

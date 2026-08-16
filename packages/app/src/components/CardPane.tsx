@@ -1,10 +1,19 @@
 import { useEffect, useRef, type ReactNode } from 'react';
-import { Dialog, DialogBackdrop, DialogPopup, DialogPortal, DialogViewport } from '@project/ui';
+import {
+  cn,
+  Dialog,
+  DialogBackdrop,
+  DialogPopup,
+  DialogPortal,
+  DialogTitle,
+  DialogViewport,
+} from '@project/ui';
 import { PANE_INITIAL_FOCUS } from './pane-focus';
 
 export interface CardPaneProps {
   readonly ariaLabel: string;
   readonly testId: string;
+  readonly variant?: 'default' | 'card-editor';
   /** Cancel and Escape both discard this surface's draft (ADR 0048). */
   readonly onDismiss: () => void;
   readonly children: ReactNode;
@@ -14,7 +23,13 @@ export interface CardPaneProps {
  * A modal surface shared by opening a Card and creating an Alias. Base UI owns
  * containment, Escape and accessible dialog semantics; App owns focus return.
  */
-export function CardPane({ ariaLabel, testId, onDismiss, children }: CardPaneProps) {
+export function CardPane({
+  ariaLabel,
+  testId,
+  variant = 'default',
+  onDismiss,
+  children,
+}: CardPaneProps) {
   const popup = useRef<HTMLDivElement>(null);
 
   // Base UI supplies the focus trap; this only selects the product's declared
@@ -32,17 +47,20 @@ export function CardPane({ ariaLabel, testId, onDismiss, children }: CardPanePro
   return (
     <Dialog open disablePointerDismissal onOpenChange={(open) => !open && onDismiss()}>
       <DialogPortal>
-        <DialogViewport className="card-pane" data-testid={testId}>
+        <DialogViewport className="card-pane" data-variant={variant} data-testid={testId}>
           <DialogBackdrop className="card-pane__backdrop" />
           <DialogPopup
             ref={popup}
-            className="card-pane__panel"
-            aria-label={ariaLabel}
+            className={cn(
+              'card-pane__panel',
+              variant === 'card-editor' && 'card-pane__panel--card-editor',
+            )}
             // The primitive still owns modality; the effect above supplies the
             // declared field instead of its generic first-tabbable default.
             initialFocus={false}
             finalFocus={false}
           >
+            <DialogTitle className="sr-only">{ariaLabel}</DialogTitle>
             {children}
           </DialogPopup>
         </DialogViewport>

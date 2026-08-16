@@ -202,9 +202,7 @@ test('a card shows its title in the graph, and opens to show its Markdown source
   await openCard(a, 'A');
   const opened = page.getByTestId('open-card');
   await expect(opened).toBeVisible();
-  await expect(opened.getByRole('textbox', { name: 'Description' })).toHaveValue(
-    'Where the first collection begins',
-  );
+  await expect(opened.getByRole('textbox', { name: 'Description' })).toHaveCount(0);
   await expect(opened.getByRole('textbox', { name: 'Markdown source' })).toHaveValue(/\*\*A\*\*/);
 
   await page.getByRole('button', { name: 'Cancel' }).click();
@@ -263,39 +261,25 @@ test('cards are drawn at exactly the size the layout placed them at', async ({ p
   expect(parseFloat(drawn.w)).toBeGreaterThan(parseFloat(drawn.h));
 });
 
-test('the card frame is 16:9, and letterboxes rather than reshaping content', async ({ page }) => {
-  const ratio = async () => {
-    const box = (await page.locator('.card-pane__panel').boundingBox())!;
-    return box.width / box.height;
-  };
-
+test('the Card editor keeps its compact writing frame across viewport shapes', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto('/');
   await openCard(nodeByTitle(page, 'A').first(), 'A');
   await expect(page.getByTestId('open-card')).toBeVisible();
-  expect(await ratio()).toBeCloseTo(16 / 9, 1);
+  const wide = (await page.locator('.card-pane__panel').boundingBox())!;
+  expect(wide.width).toBeCloseTo(528, 0);
+  expect(wide.height).toBeCloseTo(420, 0);
 
-  // A viewport that is not 16:9 must not change the shape of the frame.
+  // A tall viewport does not stretch the editor into a canvas-sized pane.
   await page.setViewportSize({ width: 900, height: 1200 });
-  expect(await ratio()).toBeCloseTo(16 / 9, 1);
-  await page.setViewportSize({ width: 2200, height: 700 });
-  expect(await ratio()).toBeCloseTo(16 / 9, 1);
+  const tall = (await page.locator('.card-pane__panel').boundingBox())!;
+  expect(tall.width).toBeCloseTo(wide.width, 0);
+  expect(tall.height).toBeCloseTo(wide.height, 0);
 });
 
-test('content that exceeds the frame scrolls inside it, keeping controls reachable', async ({
-  page,
-}) => {
-  // A small viewport shrinks the 16:9 frame until the fixture's longest card (D)
-  // overflows it. The frame is fixed, so content scrolls rather than the frame
-  // growing — which is what makes the ratio mean anything.
-  //
-  // Having to shrink the viewport at all is the flaw card-display/05 records:
-  // the frame has a fixed ratio but not a fixed size, so whether a card
-  // overflows depends on the window rather than on the card.
-  //
-  // Open D first, then shrink: at the tiny viewport D's node sits under the
-  // minimap and can't be clicked, but the open-card overlay re-letterboxes on
-  // resize, so the overflow is exercised all the same.
+test('long Markdown scrolls inside the editor, keeping controls reachable', async ({ page }) => {
+  // Open D first, then shrink: the textarea owns overflow while the footer stays
+  // pinned to the paper frame.
   await page.goto('/');
   await openCard(nodeByTitle(page, 'D'), 'D');
   const content = page.getByRole('textbox', { name: 'Markdown source' });
@@ -305,12 +289,9 @@ test('content that exceeds the frame scrolls inside it, keeping controls reachab
 
   expect(await content.evaluate((el) => el.scrollHeight > el.clientHeight)).toBe(true);
 
-  // The frame kept its ratio rather than growing to fit.
   const panel = (await page.locator('.card-pane__panel').boundingBox())!;
-  expect(panel.width / panel.height).toBeCloseTo(16 / 9, 1);
 
-  // Actions stay inside the frame, so step controls never scroll away.
-  const actions = (await page.locator('.card-pane__actions').boundingBox())!;
+  const actions = (await page.locator('.card-editor__footer').boundingBox())!;
   expect(actions.y + actions.height).toBeLessThanOrEqual(panel.y + panel.height + 1);
 });
 

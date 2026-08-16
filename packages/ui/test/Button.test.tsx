@@ -48,6 +48,7 @@ describe('Button', () => {
           Primary
         </Button>
         <Button variant="destructive">Delete</Button>
+        <Button variant="commit">Commit</Button>
         <Button ref={ref} disabled onClick={onClick}>
           Disabled
         </Button>
@@ -59,6 +60,9 @@ describe('Button', () => {
       'caller-layout',
     );
     expect(screen.getByRole('button', { name: 'Delete' })).toHaveClass('border-destructive');
+    expect(screen.getByRole('button', { name: 'Commit' })).toHaveClass(
+      'border-b-[var(--card-editor-commit)]',
+    );
     const disabled = screen.getByRole('button', { name: 'Disabled' });
     expect(disabled).toBeDisabled();
     fireEvent.click(disabled);

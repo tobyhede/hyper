@@ -21,6 +21,8 @@ const buttonVariants = cva(
           'border-destructive bg-secondary text-destructive hover:border-accent disabled:opacity-50',
         ghost:
           'border-transparent bg-transparent text-muted-foreground hover:border-border hover:bg-secondary hover:text-secondary-foreground disabled:opacity-50',
+        commit:
+          'border-[3px] border-transparent border-b-[var(--card-editor-commit)] bg-transparent text-foreground hover:border-[var(--card-editor-commit)] disabled:opacity-50',
       },
       size: {
         default: 'px-[0.8rem] py-[0.4rem]',

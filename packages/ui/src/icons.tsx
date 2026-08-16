@@ -11,6 +11,7 @@ import {
   Play,
   Plus,
   Workflow,
+  X,
 } from 'lucide-react';
 
 /** The computed View that draws Cards and every Graph in the Space. */
@@ -54,3 +55,6 @@ export const MarkdownIcon = ({ size = 14 }: { size?: number }) => <FileText size
 
 /** Mark the selected item in a list. */
 export const CheckIcon = () => <Check color="var(--accent)" size={14} />;
+
+/** Close the surface that contains the control. */
+export const CloseIcon = () => <X size={14} strokeWidth={3} />;

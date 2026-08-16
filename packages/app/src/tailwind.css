@@ -36,6 +36,7 @@
   --popover-foreground: var(--foreground);
   --primary: #3b82f6;
   --primary-foreground: #ffffff;
+  --card-editor-commit: #2f6fd0;
   --secondary: #20242e;
   --secondary-foreground: var(--foreground);
   --muted: var(--secondary);
