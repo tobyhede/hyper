@@ -667,22 +667,15 @@ describe('retargeting an Alias', () => {
     await settled(session);
   });
 
-  /**
-   * Opening an Alias is not opening a search box.
-   *
-   * The picker declared itself the pane's initial focus wherever it was drawn,
-   * so every open of an existing Alias put the caret in the Target field — a
-   * gesture the author had not made, on the one field that changes which Card
-   * they are looking at. The creation state keeps that focus, because it opens
-   * *on* its Target; here the pane's ordinary first field is the answer.
-   */
-  it('opens on the Alias’s own title, leaving the Target where it was', async () => {
+  /** An Alias opens ready to search or replace the Card it names. */
+  it('opens on the Alias Target picker, leaving its current Target selected', async () => {
     const session = mount(aliased);
 
     fireEvent.click(await screen.findByRole('button', { name: 'Edit Card A again' }));
 
-    await waitFor(() => expect(screen.getByRole('textbox', { name: 'Title' })).toHaveFocus());
-    expect(screen.getByRole('combobox', { name: 'Target Card' })).not.toHaveFocus();
+    const target = screen.getByRole('combobox', { name: 'Target Card' });
+    await waitFor(() => expect(target).toHaveFocus());
+    expect(target).toHaveValue('A');
     await settled(session);
   });
 

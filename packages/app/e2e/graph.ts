@@ -189,16 +189,18 @@ export async function dragBy(page: Page, node: Locator, dx: number, dy: number):
   const box = (await node.boundingBox())!;
   const zoom = Number(/scale\(([\d.]+)\)/.exec(await viewportTransform(page))?.[1] ?? 1);
 
-  // Grab the card's header rather than its centre: the body scrolls its markdown
-  // and the ports sit at the edges.
-  await page.mouse.move(box.x + box.width / 2, box.y + 12);
+  // Grab the Card body at its centre. Authoring handles deliberately overlap
+  // the border, so a fixed offset from an edge becomes a connection gesture as
+  // soon as the handle hit area changes.
+  const grab = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+  await page.mouse.move(grab.x, grab.y);
   await page.mouse.down();
   // React Flow starts a drag on the first move after mousedown; a single jump
   // can be swallowed, so move twice.
-  await page.mouse.move(box.x + box.width / 2 + (dx * zoom) / 2, box.y + 12 + (dy * zoom) / 2, {
+  await page.mouse.move(grab.x + (dx * zoom) / 2, grab.y + (dy * zoom) / 2, {
     steps: 5,
   });
-  await page.mouse.move(box.x + box.width / 2 + dx * zoom, box.y + 12 + dy * zoom, { steps: 5 });
+  await page.mouse.move(grab.x + dx * zoom, grab.y + dy * zoom, { steps: 5 });
   await page.mouse.up();
 }
 

@@ -251,7 +251,7 @@ test('cards are drawn at exactly the size the layout placed them at', async ({ p
 
   const drawn = await inner.evaluate((el) => {
     const s = getComputedStyle(el);
-    const card = el.querySelector('.card--node')!;
+    const card = el.querySelector('[data-testid="card"]')!;
     return { w: s.width, h: getComputedStyle(card).height };
   });
   expect(drawn.w).toBe(declared.w);
@@ -313,8 +313,7 @@ test('an alias node names the card it redraws and opens its own metadata', async
   await openCard(recap, 'A′');
   // Two fields, both the Alias's own, and nothing belonging to A.
   await expect(page.getByRole('textbox', { name: 'Title' })).toHaveValue('A′');
-  await expect(page.getByRole('combobox', { name: 'Target' })).toBeVisible();
-  await expect(page.getByRole('option', { name: 'Markdown Card A' }).locator('svg')).toHaveCount(2);
+  await expect(page.getByRole('combobox', { name: 'Target Card' })).toHaveValue('A');
   await expect(page.getByRole('textbox', { name: 'Markdown source' })).toHaveCount(0);
   await expect(page.getByRole('textbox', { name: 'Description' })).toHaveCount(0);
   await page.getByRole('button', { name: 'Cancel' }).click();

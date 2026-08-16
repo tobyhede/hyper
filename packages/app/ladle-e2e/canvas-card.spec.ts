@@ -42,7 +42,7 @@ async function expectHandlesOnCardBorder(card: Locator): Promise<void> {
   }
 }
 
-test('Canvas Card hover actions use CardNode handles in real React Flow geometry', async ({
+test('hovered and selected Canvas Cards use operable CardNode handles in real geometry', async ({
   page,
 }) => {
   await page.goto('/?story=components--canvas-card--hover-actions&mode=preview');
@@ -70,7 +70,8 @@ test('Canvas Card hover actions use CardNode handles in real React Flow geometry
   const selectedHandles = selected.locator('.rf-card-node__authoring-handle--source');
   await expect(selected).toHaveAttribute('data-state', 'selected');
   await expect(selectedHandles).toHaveCount(4);
-  await expect(selectedHandles.first()).toHaveCSS('opacity', '0');
+  await expect(selectedHandles.first()).toHaveCSS('opacity', '1');
+  await expect(selectedHandles.first()).toHaveCSS('pointer-events', 'auto');
 
   await selected.hover();
   await expect(selected).toHaveAttribute('data-state', 'selected-hover');
@@ -79,7 +80,8 @@ test('Canvas Card hover actions use CardNode handles in real React Flow geometry
 
   await page.mouse.move(0, 0);
   await expect(selected).toHaveAttribute('data-state', 'selected');
-  await expect(selectedHandles.first()).toHaveCSS('opacity', '0');
+  await expect(selectedHandles.first()).toHaveCSS('opacity', '1');
+  await expect(selectedHandles.first()).toHaveCSS('pointer-events', 'auto');
   await expect(selected.getByRole('button', { name: 'Connect from Strategies' })).toBeVisible();
 });
 

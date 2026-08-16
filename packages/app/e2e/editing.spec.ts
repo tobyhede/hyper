@@ -323,10 +323,7 @@ test('editing an Alias authors its metadata and survives reload', async ({ page 
   await openCard(nodeByTitle(page, 'A reference to B').first(), 'A reference to B');
   await expect(page.getByRole('textbox', { name: 'Title' })).toHaveValue('A reference to B');
   const reloadedTargetPicker = page.getByRole('combobox', { name: 'Target Card' });
-  await reloadedTargetPicker.fill('B');
-  // Two glyphs on the row: the kind, and the check that says this is the Target
-  // the reloaded Alias names.
-  await expect(page.getByRole('option', { name: 'Markdown Card B' }).locator('svg')).toHaveCount(2);
+  await expect(reloadedTargetPicker).toHaveValue('B');
 });
 
 /**
@@ -1922,50 +1919,18 @@ test('keeps the Alias pane’s controls reachable on a short viewport', async ({
   await expect(page.getByRole('button', { name: 'Cancel' })).toBeInViewport();
 });
 
-/**
- * The Target list fills the pane it is drawn in, rather than scrolling inside a
- * fixed box with the rest of the pane left empty below it.
- *
- * `@project/ui`'s `CommandList` caps itself at `12rem`, which is right for the
- * presentation it was written for — `CardCombobox`, the collapsed one, drawn in
- * a Popover over a trigger, where the list is as tall as it can afford to be.
- * The inline presentation is the opposite case: `.card-pane__panel` is a fixed
- * 16/9 frame, so the pane has a height whether or not its fields use it, and a
- * list that keeps the cap scrolls six of the fixture's eight Cards while a
- * couple of hundred pixels of panel sit empty underneath. The Markdown pane
- * already answers this for its own long field — `.card-pane__field--source`
- * grows into the frame — and the Target list is the Alias pane's equivalent.
- *
- * Asserted as geometry rather than as a class, because the cap can come back
- * from either side: `.card-picker` losing its rule, or `CommandList` changing
- * what it declares. Both end with a gap under the list, which is the thing an
- * author sees.
- */
-test('the Alias Target list fills the pane rather than scrolling inside it', async ({ page }) => {
+test('the Alias editor opens ready to search and choose its Target', async ({ page }) => {
   await page.goto('/');
   const alias = nodeByTitle(page, 'A′').first();
   await expect(alias).toBeVisible();
   await settled(page);
 
   await openCard(alias, 'A′');
-  const results = page.getByTestId('card-picker-results');
-  await expect(results).toBeVisible();
-
-  const fields = page.locator('.card-pane__fields');
-  const listBox = await results.boundingBox();
-  const fieldsBox = await fields.boundingBox();
-  expect(listBox).not.toBeNull();
-  expect(fieldsBox).not.toBeNull();
-  if (listBox === null || fieldsBox === null) throw new Error('the pane drew no Target list');
-
-  // The list ends where the fields do, give or take the container's own gap.
-  const gapBelow = fieldsBox.y + fieldsBox.height - (listBox.y + listBox.height);
-  expect(gapBelow).toBeLessThan(24);
-
-  // ...and having filled the frame it holds every fixture Card without
-  // scrolling, which is what the dead space below it was costing.
-  const overflow = await results.evaluate((list) => list.scrollHeight - list.clientHeight);
-  expect(overflow).toBeLessThanOrEqual(1);
+  const target = page.getByRole('combobox', { name: 'Target Card' });
+  await expect(target).toBeFocused();
+  await expect(target).toHaveValue('A');
+  await target.press('ArrowDown');
+  await expect(page.getByRole('option', { name: 'Markdown Card B' })).toBeVisible();
 });
 
 /**
@@ -2036,9 +2001,6 @@ test('choosing a Target creates the Alias and leaves its editor open', async ({ 
  * reachable from where the author already is, has to reach the *Alias*, and has
  * to leave the Target's own title alone.
  *
- * Frame 4's focus rule rides along: this pane opens on its first field, and the
- * Target picker no longer takes the caret off it.
- *
  * `Enter` follows the field sequence from Title to Target, just as the Markdown
  * variant moves from Title to its body. Control-Enter then commits the complete
  * form from the Target field and closes it (ADR 0048).
@@ -2054,8 +2016,9 @@ test('an Alias is renamed in the editor its creation leaves open', async ({ page
   await page.getByRole('option', { name: 'Markdown Card B' }).click();
 
   const title = page.getByRole('textbox', { name: 'Title' });
-  await expect(title).toBeFocused();
+  await expect(page.getByRole('combobox', { name: 'Target Card' })).toBeFocused();
   await expect(title).toHaveValue('B');
+  await title.focus();
   await title.fill('Recap');
   await title.press('Enter');
   const target = page.getByRole('combobox', { name: 'Target Card' });

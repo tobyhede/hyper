@@ -275,8 +275,11 @@ body {
    source for a reconnection that has taken hold of an Edge's `from` end. The
    role is read off the drag rather than assumed, so the second gesture has
    somewhere to land. */
-.canvas-card[data-state='hover'] > .rf-card-node__authoring-handle--source,
-.canvas-card[data-state='selected-hover'] > .rf-card-node__authoring-handle--source,
+.rf-card-node__inner[data-connection-in-progress='false']
+  > .canvas-card:is([data-state='hover'], [data-state='selected-hover'])
+  > .rf-card-node__authoring-handle--source,
+.rf-card-node__inner[data-selected='true'][data-connection-in-progress='false']
+  .rf-card-node__authoring-handle--source,
 .rf-card-node__inner[data-connection-seeking='target'] .rf-card-node__authoring-handle--target,
 .rf-card-node__inner[data-connection-seeking='source'] .rf-card-node__authoring-handle--source {
   opacity: 1;
