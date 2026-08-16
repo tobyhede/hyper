@@ -93,9 +93,9 @@ export const cards: readonly Card[] = [
   },
   {
     id: cardIds.openingAlias,
-    title: 'Opening',
+    title: 'Strategy overview',
     kind: 'alias',
-    target: cardIds.opening,
+    target: cardIds.strategies,
   },
   {
     id: cardIds.closing,

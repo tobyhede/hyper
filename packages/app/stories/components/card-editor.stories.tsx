@@ -1,29 +1,27 @@
-import type { Story } from '@ladle/react';
+import type { Story, StoryDefault } from '@ladle/react';
 import { CatalogueSection } from '../support/Catalogue';
-import { TitleEditingDemo } from '../support/TitleEditingDemo';
+import { CardEditorDemo, OpenCardEditorReference } from '../support/CardEditorDemo';
 
-export default { title: 'Components/Card Editor' };
+export default {
+  title: 'Components/Card Editor',
+  meta: { iframed: true },
+} satisfies StoryDefault;
 
-export const EditingDialog: Story = () => (
+export const Card: Story = () => (
   <div className="inv-sheet">
     <CatalogueSection
-      title="Card editing dialog"
-      note="Hover the Card and choose Edit Card. This is the production dialog composition: title in the graph-colour rail, Markdown in one multiline field, and no Description field."
+      title="Card editor"
+      note="Hover the Card and choose Edit Card. The story composes the production React Flow Card node with the production Card editor through their normal callback seam."
     >
-      <TitleEditingDemo />
+      <CardEditorDemo />
     </CatalogueSection>
   </div>
 );
-EditingDialog.storyName = 'Editing dialog';
+Card.storyName = 'Card';
 
-export const AliasEditingDialog: Story = () => (
-  <div className="inv-sheet">
-    <CatalogueSection
-      title="Alias editing dialog"
-      note="Hover Strategy overview and choose Edit Card. The production Alias variant shares the Card editor shell, replaces Markdown with the searchable Target Card combobox, and renders each result with its Card-kind icon."
-    >
-      <TitleEditingDemo />
-    </CatalogueSection>
+export const OpenDialog: Story = () => (
+  <div style={{ minHeight: 620 }}>
+    <OpenCardEditorReference />
   </div>
 );
-AliasEditingDialog.storyName = 'Alias editing dialog';
+OpenDialog.storyName = 'Open dialog';

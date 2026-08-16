@@ -2,7 +2,6 @@ import type { Story } from '@ladle/react';
 import { CanvasCardSpecimen } from '../support/CanvasCardSpecimen';
 import { CatalogueSection, Specimen } from '../support/Catalogue';
 import { CanvasCardNodeSpecimen } from '../support/ReactFlowCanvas';
-import { TitleEditingDemo } from '../support/TitleEditingDemo';
 import { GRAPH_PALETTE } from '../support/fixture';
 
 export default { title: 'Components/Canvas Card' };
@@ -75,17 +74,6 @@ export const Colours: Story = () => (
   </div>
 );
 Colours.storyName = 'Colours';
-
-export const Editing: Story = () => (
-  <div className="inv-sheet">
-    <CatalogueSection
-      title="Title editing lifecycle"
-      note="Double-click a Card title to edit it. Enter saves the title; Escape cancels the current draft. This is the complete application composition over an isolated memory-backed fixture."
-    >
-      <TitleEditingDemo />
-    </CatalogueSection>
-  </div>
-);
 
 export const HoverActions: Story = () => (
   <div className="inv-sheet">

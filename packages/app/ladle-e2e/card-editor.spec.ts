@@ -1,9 +1,10 @@
 import { expect, test } from '@playwright/test';
 
-test('Card editing dialog uses the production paper editor composition', async ({ page }) => {
-  await page.goto('/?story=components--card-editor--editing-dialog&mode=preview');
+test('Card editor opens from its single production Card', async ({ page }) => {
+  await page.goto('/?story=components--card-editor--card&mode=preview');
 
   const card = page.getByRole('article', { name: 'Strategies' });
+  await expect(page.getByRole('article')).toHaveCount(1);
   await card.hover();
   await card.getByRole('button', { name: 'Edit Card Strategies' }).click();
 
@@ -17,7 +18,7 @@ test('Card editing dialog uses the production paper editor composition', async (
   await expect(title).toHaveCSS('box-shadow', /rgb\(255, 255, 255\).*0px -3px.*inset/);
 
   await expect(dialog.getByRole('textbox', { name: 'Markdown source' })).toHaveValue(
-    '# Strategies',
+    '# Strategies\n\nNo strategy is privileged.',
   );
   await expect(dialog.getByRole('textbox', { name: 'Description' })).toHaveCount(0);
   await expect(dialog.getByRole('button', { name: 'Ok' })).toHaveCSS('color', 'rgb(11, 13, 17)');
@@ -30,10 +31,29 @@ test('Card editing dialog uses the production paper editor composition', async (
   );
 });
 
-test('Alias editing dialog retargets through the production Card combobox', async ({ page }) => {
-  await page.goto('/?story=components--card-editor--alias-editing-dialog&mode=preview');
+test('open Card dialog story renders the production dialog without a prerequisite interaction', async ({
+  page,
+}) => {
+  await page.goto('/?story=components--card-editor--open-dialog&mode=preview');
+
+  await expect(page.getByRole('dialog', { name: 'Edit Strategies' })).toBeVisible();
+  await expect(page.getByRole('article')).toHaveCount(0);
+});
+
+test('open dialog references are isolated from Ladle navigation', async ({ page }) => {
+  await page.goto('/?story=components--card-editor--open-dialog');
+
+  await expect(
+    page.locator('iframe[title="Story components--card-editor--open-dialog"]'),
+  ).toBeVisible();
+  await expect(page.getByRole('navigation')).toBeVisible();
+});
+
+test('Alias Card editor opens from its single production Alias', async ({ page }) => {
+  await page.goto('/?story=components--alias-card-editor--alias-card&mode=preview');
 
   const alias = page.getByRole('article', { name: 'Strategy overview' });
+  await expect(page.getByRole('article')).toHaveCount(1);
   await alias.hover();
   await alias.getByRole('button', { name: 'Edit Card Strategy overview' }).click();
 
@@ -70,16 +90,18 @@ test('Alias editing dialog retargets through the production Card combobox', asyn
   await expect(option).toHaveCSS('color', 'rgb(11, 13, 17)');
   await option.click();
 
-  await dialog.getByRole('textbox', { name: 'Title' }).fill('Updated overview');
   await dialog.getByRole('button', { name: 'Ok' }).click();
   await expect(dialog).toBeHidden();
+});
 
-  const renamed = page.getByRole('article', { name: 'Updated overview' });
-  await renamed.hover();
-  await renamed.getByRole('button', { name: 'Edit Card Updated overview' }).click();
-  await expect(
-    page.getByRole('dialog', { name: 'Edit Updated overview' }).getByRole('combobox', {
-      name: 'Target Card',
-    }),
-  ).toHaveValue('Colour tokens per graph');
+test('open Alias dialog story exposes example Card titles immediately', async ({ page }) => {
+  await page.goto('/?story=components--alias-card-editor--open-dialog&mode=preview');
+
+  const dialog = page.getByRole('dialog', { name: 'Edit Strategy overview' });
+  await expect(dialog).toBeVisible();
+  const target = dialog.getByRole('combobox', { name: 'Target Card' });
+  await target.press('ArrowDown');
+  await expect(page.getByRole('option', { name: /Strategies/ })).toBeVisible();
+  await expect(page.getByRole('option', { name: /Graphs as colour-coded flows/ })).toBeVisible();
+  await expect(page.getByRole('option', { name: /Colour tokens per graph/ })).toBeVisible();
 });

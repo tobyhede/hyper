@@ -90,6 +90,8 @@ export interface CanvasCardNodeSpecimenProps {
   readonly selected?: boolean;
   readonly editingTitle?: boolean;
   readonly graphColor?: string;
+  readonly cardEditingEnabled?: boolean;
+  readonly onEditCard?: () => void;
 }
 
 /**
@@ -101,6 +103,8 @@ export function CanvasCardNodeSpecimen({
   selected = false,
   editingTitle = false,
   graphColor,
+  cardEditingEnabled,
+  onEditCard = () => undefined,
 }: CanvasCardNodeSpecimenProps) {
   const projected = useProjection(graphIds.long);
   if (projected === null) return null;
@@ -115,11 +119,11 @@ export function CanvasCardNodeSpecimen({
       ...source.data,
       ...(graphColor === undefined ? {} : { activeGraphColor: graphColor }),
       titleEditingEnabled: true,
-      cardEditingEnabled: source.data.kind === 'markdown',
+      cardEditingEnabled: cardEditingEnabled ?? source.data.kind === 'markdown',
       connectingEnabled: true,
       editingTitle,
       onBeginConnect: () => undefined,
-      onEditCard: () => undefined,
+      onEditCard,
       onBeginTitleEditing: () => undefined,
       onCompleteTitleEditing: () => null,
       onCancelTitleEditing: () => undefined,

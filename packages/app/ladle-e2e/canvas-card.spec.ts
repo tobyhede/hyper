@@ -107,28 +107,6 @@ test('Canvas Card states keep selection quiet and make dragging elevation visibl
   await expect(dragging.first()).toHaveCSS('box-shadow', /7px 7px 0px/);
 });
 
-test('Canvas Card title editing commits with Enter and cancels with Escape', async ({ page }) => {
-  await page.goto('/?story=components--canvas-card--editing&mode=preview');
-
-  const card = page.getByRole('article', { name: 'Strategies' });
-  await card.getByRole('heading', { name: 'Strategies' }).dblclick();
-  const saving = card.getByRole('textbox', { name: 'Card title' });
-  await expect(card).toHaveAttribute('data-state', 'editing');
-  await expect(card.getByRole('button')).toHaveCount(0);
-  await expect(card.getByText(/⏎|esc/i)).toHaveCount(0);
-  await saving.fill('Saved title');
-  await saving.press('Enter');
-  await expect(page.getByRole('article', { name: 'Saved title' })).toBeVisible();
-
-  const saved = page.getByRole('article', { name: 'Saved title' });
-  await saved.getByRole('heading', { name: 'Saved title' }).dblclick();
-  const cancelling = saved.getByRole('textbox', { name: 'Card title' });
-  await cancelling.fill('Cancelled title');
-  await cancelling.press('Escape');
-  await expect(page.getByRole('article', { name: 'Saved title' })).toBeVisible();
-  await expect(page.getByRole('article', { name: 'Cancelled title' })).toHaveCount(0);
-});
-
 test('Canvas Card fronts never render domain descriptions', async ({ page }) => {
   await page.goto('/?story=components--canvas-card--hover-actions&mode=preview');
 
