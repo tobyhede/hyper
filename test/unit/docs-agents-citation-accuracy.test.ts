@@ -23,6 +23,14 @@ import { describe, expect, it } from 'vitest';
 
 const repoRoot = fileURLToPath(new URL('../../', import.meta.url));
 
+/**
+ * This file's own path, relative to `repoRoot`. Its self-test block below
+ * writes the exact citation shape as literal fixture text — real examples the
+ * pattern must match, not a citation this file is making — so the real scan
+ * excludes it rather than reporting itself as a fault.
+ */
+const SELF = 'test/unit/docs-agents-citation-accuracy.test.ts';
+
 /** The index modes of an ordinary blob; a tracked symlink is `120000`. */
 const REGULAR_FILE_MODES = new Set(['100644', '100755']);
 
@@ -81,7 +89,7 @@ const citationFaults = (citations: readonly Citation[]): string[] =>
   });
 
 describe('a docs/agents citation names the file that actually carries the fact', () => {
-  const scanned = trackedFiles();
+  const scanned = trackedFiles().filter((file) => file !== SELF);
   const citations = findCitations(scanned);
 
   it('finds at least one citation in this quoted shape', () => {
