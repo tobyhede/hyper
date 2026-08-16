@@ -4,6 +4,19 @@ Instructions for AI coding agents working in this repo.
 
 A local prototype for **graph-native technical presentations**: Markdown Cards on spatial Layouts, connected into curated directed Graphs and presented by traversal. PostgreSQL is the live write model and the browser reaches it over HTTP; memory repositories are confined to isolated development and E2E runs. Placement is **authored, not computed** — a **Layout** owns an explicitly positioned subset of Space Cards and the Graphs authored across them, while the thing that arranges Cards is a **LayoutStrategy** (ADR 0014, ADR 0040, ADR 0041). A Space need not carry a Layout: an automatic strategy the app supplies renders it, and editing converts that into a Layout (ADR 0025). **No strategy is privileged** — elkjs is one member of a growing set (grid, sorts, tree, cluster), never the thing "layout" means. A Layout overview draws every Graph it owns at once, each as a coloured line of React Flow Edges, with the Active Graph emphasised. Cards in the graph show their title; **opening** a Card reads it in place, and **presenting** traverses the Active Graph (ADR 0006, ADR 0011, ADR 0024).
 
+## Production UI — mandatory workflow
+
+For any production React UI work — components, controls, forms, dialogs, menus, popovers, comboboxes, toolbars, cards, panes, or application surfaces — use `$shadcn-first-ui` before implementation.
+
+The mandatory acquisition order is:
+
+1. existing `@project/ui`;
+2. shadcn;
+3. Base UI or an established specialist library behind `@project/ui`;
+4. custom behavior only as an explicitly justified deviation.
+
+Start with the shared design-system surface rather than a local interactive primitive. Ladle stories render the actual production component. `$prototype` is for unresolved throwaway exploration, never the production implementation.
+
 ## Decided — read these before the code
 
 Accepted ADRs run ahead of the code, and standing workarounds constrain it. Read them before touching the areas they govern, and do not read the current code as the design. Each entry states what is built and what is not; most of this section is now built, so the build status to trust is the one written in the entry.

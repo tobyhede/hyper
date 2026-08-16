@@ -124,6 +124,9 @@ describe('Workspace conflict recovery', () => {
       else view.rerender(app);
     });
     expect(screen.getByText('Local workspace')).toBeVisible();
+    expect(screen.getByRole('alertdialog', { name: 'Changes conflict' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Reload' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Save' })).toBeVisible();
 
     fireEvent.click(screen.getByTestId('persistence-accept-remote'));
 
@@ -262,9 +265,47 @@ describe('Workspace conflict recovery', () => {
     expect(screen.getByText('Local workspace')).toBeVisible();
     // Awaited because placement is asynchronous — the Card arrives with the
     // arrangement, not with the mount.
-    expect(await screen.findByRole('heading', { name: 'Local card' })).toBeVisible();
+    expect(await screen.findByRole('heading', { name: 'Local card', hidden: true })).toBeVisible();
     expect(screen.getByTestId('persistence-accept-remote')).toBeVisible();
     expect(screen.queryByTestId('workspace-failure')).not.toBeInTheDocument();
+  });
+});
+
+describe('Workspace permanent save refusal', () => {
+  it('explains the server refusal and returns the author to their local work', async () => {
+    const local = snapshot('Local workspace', 'Local card', 10, 20);
+    const control = new MemorySpaceBackendTestControl();
+    control.queueResult({
+      kind: 'permanent-failure',
+      code: 'invalid-snapshot',
+      message: 'Graph names an absent card',
+    });
+    const session = openSpaceSession(new MemorySpaceBackend([], control), {
+      snapshot: local,
+      revision: 3n,
+      exportedRevision: null,
+    });
+    session.submit(local);
+    await waitFor(() => expect(session.getState().persistence.kind).toBe('rejected'));
+
+    let view: RenderResult | undefined;
+    mountWorkspace({ space: runtime(local), spaceSession: session }, (app) => {
+      if (view === undefined) view = render(app);
+      else view.rerender(app);
+    });
+
+    expect(screen.getByRole('alertdialog', { name: 'Changes couldn’t be saved' })).toBeVisible();
+    expect(screen.getByText('Graph names an absent card')).toBeVisible();
+
+    fireEvent.click(screen.getByTestId('persistence-rejection-continue'));
+
+    await waitFor(() =>
+      expect(
+        screen.queryByRole('alertdialog', { name: 'Changes couldn’t be saved' }),
+      ).not.toBeInTheDocument(),
+    );
+    expect(await screen.findByRole('heading', { name: 'Local card' })).toBeVisible();
+    expect(session.getState().persistence.kind).toBe('rejected');
   });
 });
 

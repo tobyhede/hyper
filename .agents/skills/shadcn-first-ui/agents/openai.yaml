@@ -1,0 +1,4 @@
+interface:
+  display_name: "Shadcn-First UI"
+  short_description: "Build Hyper production UI design-system first"
+  default_prompt: "Use $shadcn-first-ui to implement this production UI change through Hyper's shared design system."

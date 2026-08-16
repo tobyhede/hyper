@@ -262,7 +262,7 @@ test('an Alt-drop released off the canvas creates no Card', async ({ page }) => 
   // Leaving the canvas fires no move the graph can see, so the preview's last
   // eligible point survives the departure. Where the release *landed* is the
   // only thing that may author a Card.
-  const offCanvas = (await page.getByTestId('persistence-status').boundingBox())!;
+  const offCanvas = (await page.locator('.shell__toolbar').boundingBox())!;
   await page.mouse.move(offCanvas.x + offCanvas.width / 2, offCanvas.y + offCanvas.height / 2);
   // The frozen half, asserted rather than assumed: the preview is *still* on
   // screen over a point that would author nothing. Without this the test would

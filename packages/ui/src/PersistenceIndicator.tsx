@@ -1,5 +1,5 @@
 import { CircleAlertIcon, SaveCheckIcon } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button } from './Button';
 import { Spinner } from './components/spinner';
 import { Tooltip, TooltipContent, TooltipTrigger } from './components/tooltip';
@@ -20,21 +20,19 @@ type SettledPhase = 'hidden' | 'visible' | 'exiting';
  * A settled write is deliberately absent: saving normally is not a user task.
  */
 export function PersistenceIndicator({ state }: PersistenceIndicatorProps) {
-  const previousState = useRef(state);
+  const [observedState, setObservedState] = useState(state);
   const [settledPhase, setSettledPhase] = useState<SettledPhase>('hidden');
 
+  if (state !== observedState) {
+    setObservedState(state);
+    setSettledPhase(state === 'settled' && observedState === 'pending' ? 'visible' : 'hidden');
+  }
+
+  const settledCueActive = settledPhase !== 'hidden';
+
   useEffect(() => {
-    const previous = previousState.current;
-    previousState.current = state;
+    if (state !== 'settled' || !settledCueActive) return;
 
-    if (state !== 'settled') {
-      setSettledPhase('hidden');
-      return;
-    }
-
-    if (previous !== 'pending') return;
-
-    setSettledPhase('visible');
     const fade = window.setTimeout(() => setSettledPhase('exiting'), SETTLED_VISIBLE_MS);
     const hide = window.setTimeout(
       () => setSettledPhase('hidden'),
@@ -45,7 +43,7 @@ export function PersistenceIndicator({ state }: PersistenceIndicatorProps) {
       window.clearTimeout(fade);
       window.clearTimeout(hide);
     };
-  }, [state]);
+  }, [settledCueActive, state]);
 
   if (state === 'settled') {
     if (settledPhase === 'hidden') return null;

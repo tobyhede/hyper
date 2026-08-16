@@ -28,7 +28,7 @@ describe('PersistenceIndicator', () => {
     expect(screen.getByRole('button', { name: label })).toBeInTheDocument();
   });
 
-  it('confirms a completed save briefly before becoming transparent again', () => {
+  it('confirms a completed save briefly before becoming transparent again', async () => {
     vi.useFakeTimers();
     const { rerender } = render(
       <TooltipProvider>
@@ -46,13 +46,13 @@ describe('PersistenceIndicator', () => {
 
     expect(screen.getByRole('button', { name: 'Changes saved' })).toBeInTheDocument();
 
-    act(() => vi.advanceTimersByTime(2_000));
+    await act(() => vi.advanceTimersByTime(2_000));
     expect(screen.getByRole('button', { name: 'Changes saved' })).toHaveAttribute(
       'data-state',
       'exiting',
     );
 
-    act(() => vi.advanceTimersByTime(200));
+    await act(() => vi.advanceTimersByTime(200));
     expect(screen.queryByRole('button', { name: 'Changes saved' })).not.toBeInTheDocument();
   });
 });

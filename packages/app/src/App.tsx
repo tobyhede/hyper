@@ -1,13 +1,19 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { ReactFlowProvider } from '@xyflow/react';
 import {
-  AddCardControl,
+  Alert,
+  AlertDescription,
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertTitle,
   AppShell,
   Button,
-  LayoutSelector,
   PersistenceIndicator,
-  GraphSelector,
-  ViewSelector,
 } from '@project/ui';
 import {
   cardDocumentSchema,
@@ -39,6 +45,7 @@ import { OpenCard } from './components/OpenCard';
 import { PlacementFailure } from './components/PlacementFailure';
 import { PlacementPending } from './components/PlacementPending';
 import { PresentingChrome } from './components/PresentingChrome';
+import { WorkspaceToolbar } from './components/WorkspaceToolbar';
 
 export const createApp = ({ space, spaceSession }: OpenedSpace) => {
   // One validated aggregate per working snapshot, shared by the render path and
@@ -105,6 +112,12 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
     // by an effect, which would render the stale sentence against the new
     // conflict for the commit before it ran.
     const [refusal, setRefusal] = useState<{ revision: bigint; message: string } | null>(null);
+    // A permanent refusal keeps the session's local work intact, so it remains
+    // the persistence state after its explanation has been acknowledged. Hold
+    // only the dismissed failure key locally: a fresh save resets it through a
+    // non-rejected state, while closing this dialog does not pretend the save
+    // succeeded.
+    const [dismissedRejection, setDismissedRejection] = useState<string | null>(null);
     /**
      * The Alias creation state: editor-local, and nothing else (ADR 0042).
      *
@@ -122,6 +135,14 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
         : null;
     const remoteRefusal =
       refusal !== null && refusal.revision === conflictRevision ? refusal.message : null;
+    const rejection =
+      sessionState.persistence.kind === 'rejected' ? sessionState.persistence.failure : null;
+    const rejectionKey = rejection === null ? null : `${rejection.code}:${rejection.message}`;
+    const rejectionOpen = rejectionKey !== null && dismissedRejection !== rejectionKey;
+
+    useEffect(() => {
+      if (rejection === null) setDismissedRejection(null);
+    }, [rejection]);
     const rendererSpace = useMemo(
       () => readWorkingSpace(sessionState.working),
       [sessionState.working],
@@ -590,26 +611,118 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
       return () => window.removeEventListener('keydown', onKeyDown);
     }, [presenting, openedCardId, advance, retreat, selectBranch, exitPresenting]);
 
+    const persistenceControl =
+      sessionState.persistence.kind === 'failed' ? (
+        <Button
+          variant="default"
+          size="toolbar"
+          data-testid="persistence-retry"
+          onClick={authoring.retryPersistence}
+          title={sessionState.persistence.failure.message}
+        >
+          Retry persistence
+        </Button>
+      ) : sessionState.persistence.kind === 'conflicted' ? (
+        <AlertDialog open onOpenChange={() => undefined}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Changes conflict</AlertDialogTitle>
+              <AlertDialogDescription>
+                A newer version of this space is available. Reload discards your local changes; Save
+                keeps them and tries again.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            {remoteRefusal === null ? null : (
+              <Alert variant="destructive" data-testid="persistence-remote-refused">
+                <AlertTitle>Unable to reload</AlertTitle>
+                <AlertDescription>{remoteRefusal}</AlertDescription>
+              </Alert>
+            )}
+            <AlertDialogFooter>
+              <AlertDialogAction
+                variant="secondary"
+                data-testid="persistence-accept-remote"
+                // The result of this attempt is the whole message: a success
+                // clears whatever the last attempt on this same conflict said.
+                onClick={() => {
+                  const message = authoring.acceptStoredSpace();
+                  setRefusal(
+                    message === null || conflictRevision === null
+                      ? null
+                      : { revision: conflictRevision, message },
+                  );
+                }}
+              >
+                Reload
+              </AlertDialogAction>
+              <AlertDialogAction
+                data-testid="persistence-keep-local"
+                // The other half of the pair, and the one that keeps the author's
+                // work: it recommits the newest local Space against the revision
+                // the conflict named. Authoring reads that snapshot itself, so
+                // Edits made while the conflict stood are included.
+                onClick={authoring.keepLocalWork}
+              >
+                Save
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      ) : sessionState.persistence.kind === 'rejected' ? (
+        <AlertDialog
+          open={rejectionOpen}
+          onOpenChange={(open) => {
+            if (!open && rejectionKey !== null) setDismissedRejection(rejectionKey);
+          }}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Changes couldn’t be saved</AlertDialogTitle>
+              <AlertDialogDescription>
+                The server rejected these changes. Continue editing to correct the problem.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            {rejection === null ? null : (
+              <Alert variant="destructive">
+                <AlertTitle>Reason</AlertTitle>
+                <AlertDescription>{rejection.message}</AlertDescription>
+              </Alert>
+            )}
+            <AlertDialogFooter>
+              <AlertDialogAction
+                data-testid="persistence-rejection-continue"
+                onClick={() => {
+                  if (rejectionKey !== null) setDismissedRejection(rejectionKey);
+                }}
+              >
+                Continue editing
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      ) : (
+        <PersistenceIndicator state={sessionState.persistence.kind} />
+      );
+
     const toolbar = (
-      <>
-        <ViewSelector
-          value={selectedView}
-          active={selectedRenderer.kind === 'view'}
-          onValueChange={(selected) => chooseRenderer({ kind: 'view', view: selected })}
-        />
-        <LayoutSelector
-          layouts={layouts}
-          value={selectedRenderer.kind === 'layout' ? selectedRenderer.layoutId : null}
-          active={selectedRenderer.kind === 'layout'}
-          onValueChange={(layoutId) =>
-            chooseRenderer({ kind: 'layout', layoutId: uuidSchema.parse(layoutId) })
-          }
-        />
-        <GraphSelector
-          graphs={projection.visibleGraphs}
-          activeGraphId={activeGraphId}
-          colorByGraphId={projection.colors}
-          onActivate={(graphId) => activateGraph(uuidSchema.parse(graphId))}
+      <WorkspaceToolbar
+        view={{
+          value: selectedView,
+          active: selectedRenderer.kind === 'view',
+          onValueChange: (selected) => chooseRenderer({ kind: 'view', view: selected }),
+        }}
+        layout={{
+          layouts,
+          value: selectedRenderer.kind === 'layout' ? selectedRenderer.layoutId : null,
+          active: selectedRenderer.kind === 'layout',
+          onValueChange: (layoutId) =>
+            chooseRenderer({ kind: 'layout', layoutId: uuidSchema.parse(layoutId) }),
+        }}
+        graph={{
+          graphs: projection.visibleGraphs,
+          activeGraphId,
+          colorByGraphId: projection.colors,
+          onActivate: (graphId) => activateGraph(uuidSchema.parse(graphId)),
           // `GraphSelector` disables its control on "no active Graph" *or* "the
           // active Graph holds no Edges", and `present()` refuses on exactly
           // those two, so the conditions agree: every Graph that is active and
@@ -618,77 +731,26 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
           // them — the control read `Present`, stayed enabled, and swallowed the
           // click. The empty Graph is the same gap reopened by ADR 0040, which
           // creates every Layout's initial Active Graph empty.
-          onPresent={present}
-          presenting={presenting}
-          onExitPresenting={exitPresenting}
-        />
-        {/* Withdrawn on exactly the conditions the graph's own Card authoring
-            is: nothing to place before an arrangement resolves, nothing to
-            author while presenting, and one authoring surface at a time. */}
-        <AddCardControl
-          onAddCard={addCard}
-          onAddAlias={() => setCreatingAlias(true)}
-          disabled={!editable || presenting || openedCardId !== null || creatingAlias}
+          onPresent: present,
+          presenting,
+          onExitPresenting: exitPresenting,
+        }}
+        addCard={{
+          onAddCard: addCard,
+          onAddAlias: () => setCreatingAlias(true),
+          // Withdrawn on exactly the conditions the graph's own Card authoring
+          // is: nothing to place before an arrangement resolves, nothing to
+          // author while presenting, and one authoring surface at a time.
+          disabled: !editable || presenting || openedCardId !== null || creatingAlias,
           // Taken from the canvas that binds it, so the announcement cannot
           // outlive the key.
-          keyShortcut={ADD_CARD_KEY}
-          menuTriggerRef={addCardMenu}
-        />
-        {sessionState.persistence.kind === 'failed' ? (
-          <Button
-            variant="default"
-            size="toolbar"
-            data-testid="persistence-retry"
-            onClick={authoring.retryPersistence}
-            title={sessionState.persistence.failure.message}
-          >
-            Retry persistence
-          </Button>
-        ) : sessionState.persistence.kind === 'conflicted' ? (
-          <>
-            <Button
-              variant="default"
-              size="toolbar"
-              data-testid="persistence-accept-remote"
-              // The result of this attempt is the whole message: a success
-              // clears whatever the last attempt on this same conflict said.
-              onClick={() => {
-                const message = authoring.acceptStoredSpace();
-                setRefusal(
-                  message === null || conflictRevision === null
-                    ? null
-                    : { revision: conflictRevision, message },
-                );
-              }}
-            >
-              Accept remote
-            </Button>
-            <Button
-              variant="default"
-              size="toolbar"
-              data-testid="persistence-keep-local"
-              // The other half of the pair, and the one that keeps the author's
-              // work: it recommits the newest local Space against the revision
-              // the conflict named. Authoring reads that snapshot itself, so
-              // Edits made while the conflict stood are included.
-              onClick={authoring.keepLocalWork}
-            >
-              Keep local
-            </Button>
-            {remoteRefusal === null ? null : (
-              <span
-                role="alert"
-                data-testid="persistence-remote-refused"
-                className="persistence-refusal"
-              >
-                {remoteRefusal}
-              </span>
-            )}
-          </>
-        ) : (
-          <PersistenceIndicator state={sessionState.persistence.kind} />
-        )}
-      </>
+          keyShortcut: ADD_CARD_KEY,
+          menuTriggerRef: addCardMenu,
+        }}
+        persistence={persistenceControl}
+        persistenceState={sessionState.persistence.kind}
+        acknowledgedRevision={sessionState.acknowledgedRevision}
+      />
     );
 
     return (

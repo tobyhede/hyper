@@ -35,7 +35,9 @@
     "e2e:ladle": "playwright test --config playwright.ladle.config.ts",
     "e2e:postgres": "playwright test --config playwright.postgres.config.ts",
     "test:integration:postgres": "pnpm contract:emit && pnpm db:migrate && vitest run --config vitest.integration.config.ts",
-    "verify": "pnpm typecheck && pnpm typecheck:packages && pnpm lint && pnpm format:check && pnpm test:coverage"
+    "ui:catalog": "tsx scripts/ui-catalog.ts",
+    "ui:catalog:check": "tsx scripts/ui-catalog.ts --check",
+    "verify": "pnpm typecheck && pnpm typecheck:packages && pnpm ui:catalog:check && pnpm lint && pnpm format:check && pnpm test:coverage"
   },
   "pnpm": {
     "overrides": {

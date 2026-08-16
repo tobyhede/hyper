@@ -1430,8 +1430,8 @@ test('dragging an endpoint off the canvas restores the Edge', async ({ page }) =
 
   const edge = page.locator('.react-flow__edge[aria-label="Edge from A to B in Long"]');
   await edge.focus();
-  // The persistence status sits in the toolbar, outside the flow container.
-  const toolbar = await boxOf(page.getByTestId('persistence-status'), 'the persistence status');
+  // The toolbar sits outside the flow container.
+  const toolbar = await boxOf(page.locator('.shell__toolbar'), 'the workspace toolbar');
   await dragEndpointTo(page, edge, 'target', {
     x: toolbar.x + toolbar.width / 2,
     y: toolbar.y + toolbar.height / 2,

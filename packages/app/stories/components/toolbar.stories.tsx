@@ -1,8 +1,8 @@
 import type { ReactNode } from 'react';
 import type { Story } from '@ladle/react';
-import { Toolbar } from '../support/Toolbar';
+import { WorkspaceToolbarFixture } from '../support/WorkspaceToolbarFixture';
 
-export default { title: 'Components/Toolbar' };
+export default { title: 'Components/Workspace Toolbar' };
 
 const ToolbarRow = ({ children }: { readonly children: ReactNode }) => (
   <div className="shell__header">
@@ -12,18 +12,18 @@ const ToolbarRow = ({ children }: { readonly children: ReactNode }) => (
 
 export const Settled: Story = () => (
   <ToolbarRow>
-    <Toolbar />
+    <WorkspaceToolbarFixture />
   </ToolbarRow>
 );
 
 export const Pending: Story = () => (
   <ToolbarRow>
-    <Toolbar persistence="pending" />
+    <WorkspaceToolbarFixture persistence="pending" />
   </ToolbarRow>
 );
 
 export const Presenting: Story = () => (
   <ToolbarRow>
-    <Toolbar presenting authoringDisabled />
+    <WorkspaceToolbarFixture presenting authoringDisabled />
   </ToolbarRow>
 );

@@ -50,6 +50,19 @@ const REACT_DOM_PATTERN = {
   message: 'Domain logic stays out of React (AGENTS.md).',
 };
 
+const UI_IMPLEMENTATION_MESSAGE =
+  'Application and adapter UI must use the public @project/ui surface. Add or compose the capability there rather than importing its implementation dependency directly.';
+
+const UI_IMPLEMENTATION_DEPENDENCIES = ['@base-ui/react', 'cmdk', 'lucide-react'].map((name) => ({
+  name,
+  message: UI_IMPLEMENTATION_MESSAGE,
+}));
+
+const UI_IMPLEMENTATION_PATTERN = {
+  group: ['@base-ui/react/*', 'cmdk/*', 'lucide-react/*', '@project/ui/*'],
+  message: UI_IMPLEMENTATION_MESSAGE,
+};
+
 /**
  * Node builtins, barred from the portable Fetch module. `node:fs` and a bare
  * `fs` are the same import, and ESLint matches specifiers literally, so a
@@ -238,6 +251,18 @@ export default tseslint.config(
     files: ['packages/*/**/*.{ts,tsx}'],
     rules: {
       'no-restricted-imports': ['error', { patterns: [ESCAPE_PATTERN] }],
+    },
+  },
+  {
+    files: ['packages/app/**/*.{ts,tsx}', 'packages/react-flow-adapter/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: UI_IMPLEMENTATION_DEPENDENCIES,
+          patterns: [ESCAPE_PATTERN, UI_IMPLEMENTATION_PATTERN],
+        },
+      ],
     },
   },
   {
