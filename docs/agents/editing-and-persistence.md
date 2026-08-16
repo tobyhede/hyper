@@ -1,6 +1,6 @@
 # Editing & Persistence
 
-`SpaceBackend`/`SpaceSession`, Space Authoring's completed-edit lifecycle, and the Layout/Graph/View aggregate model. Read before touching `packages/persistence`, `packages/graph`, or `space-authoring.ts` in `packages/app`.
+`SpaceBackend`/`SpaceSession`, Space Authoring's completed-edit lifecycle, and the Layout/Graph/View aggregate model. Read before touching `packages/persistence`, `packages/graph`, `space-authoring.ts` in `packages/app`, `migrations/**`, or `src/prisma/**`.
 
 ## PostgreSQL & the document contract
 
