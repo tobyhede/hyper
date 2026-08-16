@@ -631,8 +631,11 @@ describe('retargeting an Alias', () => {
     const session = mount(aliased);
 
     fireEvent.click(await screen.findByRole('button', { name: 'Edit Card A again' }));
+    fireEvent.keyDown(screen.getByRole('combobox', { name: 'Target Card' }), {
+      key: 'ArrowDown',
+    });
     fireEvent.click(screen.getByRole('option', { name: 'Markdown Card B' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Ok' }));
 
     expect(cardsOf(session)).toContainEqual({
       id: ALIAS_ID,
@@ -679,7 +682,7 @@ describe('retargeting an Alias', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Edit Card A again' }));
 
     await waitFor(() => expect(screen.getByRole('textbox', { name: 'Title' })).toHaveFocus());
-    expect(screen.getByRole('combobox', { name: 'Target' })).not.toHaveFocus();
+    expect(screen.getByRole('combobox', { name: 'Target Card' })).not.toHaveFocus();
     await settled(session);
   });
 
@@ -689,7 +692,7 @@ describe('retargeting an Alias', () => {
 
     fireEvent.click(await screen.findByRole('button', { name: 'Edit Card A' }));
 
-    expect(screen.queryByRole('combobox', { name: 'Target' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('combobox', { name: 'Target Card' })).not.toBeInTheDocument();
     await settled(session);
   });
 });

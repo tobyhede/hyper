@@ -22,6 +22,7 @@ type Handlers = {
 
 type AliasHandlers = {
   through: Extract<Card, { kind: 'alias' }>;
+  graphColor: string;
   occurrence: {
     targets: readonly Card[];
     onEdit: (change: { title: string; target: typeof CARD_ID }) => string | null;

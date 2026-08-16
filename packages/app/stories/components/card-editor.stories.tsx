@@ -15,3 +15,15 @@ export const EditingDialog: Story = () => (
   </div>
 );
 EditingDialog.storyName = 'Editing dialog';
+
+export const AliasEditingDialog: Story = () => (
+  <div className="inv-sheet">
+    <CatalogueSection
+      title="Alias editing dialog"
+      note="Hover Strategy overview and choose Edit Card. The production Alias variant shares the Card editor shell, replaces Markdown with the searchable Target Card combobox, and renders each result with its Card-kind icon."
+    >
+      <TitleEditingDemo />
+    </CatalogueSection>
+  </div>
+);
+AliasEditingDialog.storyName = 'Alias editing dialog';

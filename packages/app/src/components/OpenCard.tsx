@@ -6,7 +6,7 @@ import {
   type KeyboardEvent,
   type ReactNode,
 } from 'react';
-import { markdownCardSchema, type Card, type CardId } from '@project/core';
+import { markdownCardSchema, uuidSchema, type Card, type CardId } from '@project/core';
 import type { ResolvedContentCard } from '@project/graph';
 import {
   AlertDialog,
@@ -18,6 +18,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   Button,
+  CardSearchCombobox,
   CloseIcon,
   Field,
   FieldError,
@@ -26,7 +27,6 @@ import {
   Textarea,
 } from '@project/ui';
 import { CardPane } from './CardPane';
-import { CardPicker } from './CardPicker';
 import { paneInitialFocus } from './pane-focus';
 
 /**
@@ -123,6 +123,8 @@ interface OccurrenceAuthoring {
 interface AliasOpen {
   /** The Alias whose own metadata this pane authors. */
   readonly through: Extract<Card, { kind: 'alias' }>;
+  /** Active Graph colour carried from the canvas into the Card's writing rail. */
+  readonly graphColor: string;
   /** The one canonical capability for changing its title and Target. */
   readonly occurrence: OccurrenceAuthoring;
   readonly card?: never;
@@ -139,49 +141,128 @@ export type OpenCardProps = {
   readonly onCancel: () => void;
 } & (DirectOpen | AliasOpen);
 
-function EditorForm({
+/**
+ * The stable Card-writing surface shared by every Card kind.
+ *
+ * It owns dialog and form presentation only. Each kind-specific editor owns
+ * its draft, validation and completion so a field that belongs to one kind
+ * cannot accidentally appear on another.
+ */
+function CardEditorShell({
+  subjectTitle,
+  graphColor,
+  title,
+  titleError,
+  titleStartsFocused,
+  onTitleChange,
+  onTitleEnter,
   children,
   refusal,
   refusalId,
   onSubmit,
   onCancel,
+  overlay,
 }: {
+  readonly subjectTitle: string;
+  readonly graphColor: string;
+  readonly title: string;
+  readonly titleError: string | null;
+  readonly titleStartsFocused: boolean;
+  readonly onTitleChange: (title: string) => void;
+  readonly onTitleEnter?: () => void;
   readonly children: ReactNode;
   readonly refusal: string | null;
   readonly refusalId: string;
   readonly onSubmit: (event: FormEvent<HTMLFormElement>) => void;
   readonly onCancel: () => void;
+  readonly overlay?: ReactNode;
 }) {
+  const submitShortcut = (event: KeyboardEvent<HTMLFormElement>): void => {
+    if (event.key !== 'Enter' || (!event.metaKey && !event.ctrlKey)) return;
+    event.preventDefault();
+    event.currentTarget.requestSubmit();
+  };
+
   return (
-    <form
-      className="card-pane__editor"
-      aria-invalid={refusal !== null}
-      aria-describedby={refusal === null ? undefined : refusalId}
-      onSubmit={onSubmit}
+    <CardPane
+      ariaLabel={`Edit ${subjectTitle}`}
+      testId="open-card"
+      variant="card-editor"
+      onDismiss={onCancel}
     >
-      {/* The fields scroll; the actions below them do not. */}
-      <div className="card-pane__fields">{children}</div>
-      {refusal !== null && (
-        <span id={refusalId} role="alert" className="card-pane__field-error">
-          {refusal}
-        </span>
-      )}
-      <div className="card-pane__actions">
-        <Button type="button" variant="secondary" onClick={onCancel}>
-          Cancel
-        </Button>
-        <Button type="submit" variant="default">
-          Done
-        </Button>
-      </div>
-    </form>
+      <form
+        className="card-editor"
+        style={{ '--card-editor-graph': graphColor } as CSSProperties}
+        aria-invalid={refusal !== null}
+        aria-describedby={refusal === null ? undefined : refusalId}
+        onSubmit={onSubmit}
+        onKeyDown={submitShortcut}
+      >
+        <FieldGroup className="card-editor__fields">
+          <header className="card-editor__rail">
+            <Field className="card-editor__title-field" data-invalid={titleError !== null}>
+              <FieldLabel className="sr-only" htmlFor="open-card-title">
+                Title
+              </FieldLabel>
+              <input
+                id="open-card-title"
+                className="card-editor__title"
+                aria-invalid={titleError !== null}
+                aria-describedby={titleError === null ? undefined : 'open-card-title-error'}
+                value={title}
+                {...paneInitialFocus(titleStartsFocused)}
+                onChange={(event) => onTitleChange(event.currentTarget.value)}
+                onKeyDown={(event) => {
+                  if (
+                    event.key !== 'Enter' ||
+                    event.metaKey ||
+                    event.ctrlKey ||
+                    onTitleEnter === undefined
+                  ) {
+                    return;
+                  }
+                  event.preventDefault();
+                  onTitleEnter();
+                }}
+              />
+              <FieldError id="open-card-title-error">{titleError}</FieldError>
+            </Field>
+            <Button
+              type="button"
+              variant="secondary"
+              size="icon"
+              className="card-editor__close"
+              aria-label="Close Card editor"
+              onClick={onCancel}
+            >
+              <CloseIcon />
+            </Button>
+          </header>
+          {children}
+        </FieldGroup>
+        {refusal !== null && (
+          <FieldError id={refusalId} className="card-editor__refusal">
+            {refusal}
+          </FieldError>
+        )}
+        <footer className="card-editor__footer">
+          <Button type="button" variant="ghost" className="card-editor__cancel" onClick={onCancel}>
+            Cancel
+          </Button>
+          <Button type="submit" variant="commit" className="card-editor__commit">
+            Ok
+          </Button>
+        </footer>
+      </form>
+      {overlay}
+    </CardPane>
   );
 }
 
 /**
  * The content Card's form. Every field belongs to that one Card.
  */
-function CardEditorForm({
+function MarkdownCardEditor({
   content,
   graphColor,
   onComplete,
@@ -221,138 +302,79 @@ function CardEditorForm({
     onCancel();
   };
 
-  const submitShortcut = (event: KeyboardEvent<HTMLFormElement>): void => {
-    if (event.key !== 'Enter' || (!event.metaKey && !event.ctrlKey)) return;
-    event.preventDefault();
-    event.currentTarget.requestSubmit();
-  };
-
   const titleStartsFocused = /^Card \d+$/.test(content.title);
 
   return (
-    <CardPane
-      ariaLabel={`Edit ${content.title}`}
-      testId="open-card"
-      variant="card-editor"
-      onDismiss={requestCancel}
+    <CardEditorShell
+      subjectTitle={content.title}
+      graphColor={graphColor}
+      title={draft.title}
+      titleError={draft.titleError}
+      titleStartsFocused={titleStartsFocused}
+      onTitleChange={(title) => {
+        setDraft({ ...draft, title, titleError: null });
+        setContentRefusal(null);
+      }}
+      onTitleEnter={() => body.current?.focus()}
+      refusal={contentRefusal}
+      refusalId="open-card-refusal"
+      onSubmit={submit}
+      onCancel={requestCancel}
+      overlay={
+        <AlertDialog open={confirmingDiscard} onOpenChange={setConfirmingDiscard}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Discard Markdown changes?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Your changes to this Card’s Markdown will be lost.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Keep editing</AlertDialogCancel>
+              <AlertDialogAction variant="destructive" onClick={onCancel}>
+                Discard changes
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      }
     >
-      <form
-        className="card-editor"
-        style={{ '--card-editor-graph': graphColor } as CSSProperties}
-        aria-invalid={contentRefusal !== null}
-        aria-describedby={contentRefusal === null ? undefined : 'open-card-refusal'}
-        onSubmit={submit}
-        onKeyDown={submitShortcut}
-      >
-        <FieldGroup className="card-editor__fields">
-          <header className="card-editor__rail">
-            <Field className="card-editor__title-field" data-invalid={draft.titleError !== null}>
-              <FieldLabel className="sr-only" htmlFor="open-card-title">
-                Title
-              </FieldLabel>
-              <input
-                id="open-card-title"
-                className="card-editor__title"
-                aria-invalid={draft.titleError !== null}
-                aria-describedby={draft.titleError === null ? undefined : 'open-card-title-error'}
-                value={draft.title}
-                {...paneInitialFocus(titleStartsFocused)}
-                onChange={(event) => {
-                  setDraft({
-                    ...draft,
-                    title: event.currentTarget.value,
-                    titleError: null,
-                  });
-                  setContentRefusal(null);
-                }}
-                onKeyDown={(event) => {
-                  if (event.key !== 'Enter' || event.metaKey || event.ctrlKey) return;
-                  event.preventDefault();
-                  body.current?.focus();
-                }}
-              />
-              <FieldError id="open-card-title-error">{draft.titleError}</FieldError>
-            </Field>
-            <Button
-              type="button"
-              variant="secondary"
-              size="icon"
-              className="card-editor__close"
-              aria-label="Close Card editor"
-              onClick={requestCancel}
-            >
-              <CloseIcon />
-            </Button>
-          </header>
-          <Field className="card-editor__body">
-            <FieldLabel className="sr-only" htmlFor="open-card-markdown">
-              Markdown source
-            </FieldLabel>
-            <Textarea
-              ref={body}
-              id="open-card-markdown"
-              className="card-editor__markdown"
-              value={draft.body}
-              {...paneInitialFocus(!titleStartsFocused)}
-              onChange={(event) => {
-                setDraft({ ...draft, body: event.currentTarget.value });
-                setContentRefusal(null);
-              }}
-            />
-          </Field>
-        </FieldGroup>
-        {contentRefusal !== null && (
-          <FieldError id="open-card-refusal" className="card-editor__refusal">
-            {contentRefusal}
-          </FieldError>
-        )}
-        <footer className="card-editor__footer">
-          <Button
-            type="button"
-            variant="ghost"
-            className="card-editor__cancel"
-            onClick={requestCancel}
-          >
-            Cancel
-          </Button>
-          <Button type="submit" variant="commit" className="card-editor__commit">
-            Ok
-          </Button>
-        </footer>
-      </form>
-      <AlertDialog open={confirmingDiscard} onOpenChange={setConfirmingDiscard}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Discard Markdown changes?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Your changes to this Card’s Markdown will be lost.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Keep editing</AlertDialogCancel>
-            <AlertDialogAction variant="destructive" onClick={onCancel}>
-              Discard changes
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </CardPane>
+      <Field className="card-editor__body">
+        <FieldLabel className="sr-only" htmlFor="open-card-markdown">
+          Markdown source
+        </FieldLabel>
+        <Textarea
+          ref={body}
+          id="open-card-markdown"
+          className="card-editor__markdown"
+          value={draft.body}
+          {...paneInitialFocus(!titleStartsFocused)}
+          onChange={(event) => {
+            setDraft({ ...draft, body: event.currentTarget.value });
+            setContentRefusal(null);
+          }}
+        />
+      </Field>
+    </CardEditorShell>
   );
 }
 
 /** The Alias pane authors one Card too: the Alias, never its Target. */
-function AliasEditorForm({
+function AliasCardEditor({
   alias,
+  graphColor,
   occurrence,
   onCancel,
 }: {
   readonly alias: Extract<Card, { kind: 'alias' }>;
+  readonly graphColor: string;
   readonly occurrence: OccurrenceAuthoring;
   readonly onCancel: () => void;
 }) {
   const [title, setTitle] = useState(alias.title);
   const [target, setTarget] = useState<CardId>(alias.target);
   const [refusal, setRefusal] = useState<string | null>(null);
+  const targetInput = useRef<HTMLInputElement>(null);
 
   const submit = (event: FormEvent<HTMLFormElement>): void => {
     event.preventDefault();
@@ -366,35 +388,46 @@ function AliasEditorForm({
   };
 
   return (
-    <EditorForm
+    <CardEditorShell
+      subjectTitle={alias.title}
+      graphColor={graphColor}
+      title={title}
+      titleError={null}
+      titleStartsFocused
+      onTitleChange={(nextTitle) => {
+        setTitle(nextTitle);
+        setRefusal(null);
+      }}
+      onTitleEnter={() => targetInput.current?.focus()}
       refusal={refusal}
       refusalId="open-alias-refusal"
       onSubmit={submit}
       onCancel={onCancel}
     >
-      <label className="card-pane__field">
-        <span>Title</span>
-        <input
-          className="card-pane__title-input"
-          value={title}
-          onChange={(event) => {
-            setTitle(event.currentTarget.value);
+      <Field className="card-editor__body card-editor__alias-target">
+        <FieldLabel className="card-editor__alias-label" htmlFor="open-alias-target">
+          Points at
+        </FieldLabel>
+        <CardSearchCombobox
+          label="Target Card"
+          testId="alias-target"
+          inputId="open-alias-target"
+          choices={occurrence.targets.map((card) => ({
+            id: card.id,
+            title: card.title,
+            kind: card.kind,
+          }))}
+          value={target}
+          inputRef={targetInput}
+          onValueChange={(chosen) => {
+            const parsed = uuidSchema.safeParse(chosen);
+            if (!parsed.success) return;
+            setTarget(parsed.data);
             setRefusal(null);
           }}
         />
-      </label>
-      <CardPicker
-        label="Target"
-        cards={occurrence.targets}
-        selectedId={target}
-        initialFocus={false}
-        onSelect={(chosen) => {
-          setTarget(chosen);
-          setRefusal(null);
-        }}
-        emptyMessage="This Space holds no other Card that owns its content."
-      />
-    </EditorForm>
+      </Field>
+    </CardEditorShell>
   );
 }
 
@@ -425,7 +458,7 @@ export function OpenCard(props: OpenCardProps) {
   const { onCancel } = props;
 
   return props.through === undefined ? (
-    <CardEditorForm
+    <MarkdownCardEditor
       key={props.card.id}
       content={props.card}
       graphColor={props.graphColor}
@@ -433,13 +466,12 @@ export function OpenCard(props: OpenCardProps) {
       onCancel={onCancel}
     />
   ) : (
-    <CardPane testId="open-card" onDismiss={onCancel} ariaLabel={props.through.title}>
-      <AliasEditorForm
-        key={props.through.id}
-        alias={props.through}
-        occurrence={props.occurrence}
-        onCancel={onCancel}
-      />
-    </CardPane>
+    <AliasCardEditor
+      key={props.through.id}
+      alias={props.through}
+      graphColor={props.graphColor}
+      occurrence={props.occurrence}
+      onCancel={onCancel}
+    />
   );
 }

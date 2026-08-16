@@ -907,6 +907,85 @@ body {
   box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--card-editor-graph) 65%, transparent);
 }
 
+.card-editor__alias-target {
+  align-items: stretch;
+  justify-content: flex-start;
+  padding: 14px;
+  background: #fffaf0;
+}
+
+.card-editor__alias-label {
+  color: #887f70;
+  font-family: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.card-editor__alias-target [data-slot='input-group'] {
+  width: 100%;
+  min-height: 48px;
+  color: #0b0d11;
+  font-size: 15px;
+  background: #fff;
+  border: 3px solid #0b0d11;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.card-editor__alias-target [data-slot='input-group-control'] {
+  color: #0b0d11;
+  font-size: 15px;
+}
+
+.card-editor__alias-target [data-slot='input-group']:focus-within {
+  border-color: #0b0d11;
+  box-shadow: none;
+}
+
+[data-card-search-combobox] {
+  --foreground: #0b0d11;
+  --popover: #fffaf0;
+  --popover-foreground: var(--foreground);
+  --accent: #f0ebe1;
+  --accent-foreground: var(--foreground);
+  --muted-foreground: #9aa3b3;
+
+  width: var(--anchor-width);
+  min-width: var(--anchor-width);
+  color: var(--popover-foreground);
+  background: var(--popover);
+  border: 3px solid #0b0d11;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+[data-card-search-combobox] [data-slot='combobox-list'] {
+  max-height: 15rem;
+  padding: 0;
+  background: var(--popover);
+  border: 0;
+  border-radius: 0;
+}
+
+[data-card-search-combobox] [data-slot='combobox-item'] {
+  min-height: 48px;
+  gap: 12px;
+  padding: 10px 20px;
+  color: var(--foreground);
+  font-size: 15px;
+  font-weight: 600;
+  border-bottom: 1px solid #ded6c7;
+  border-radius: 0;
+}
+
+[data-card-search-combobox] [data-slot='combobox-item'][data-disabled] {
+  color: #887f70;
+  background: var(--popover);
+  opacity: 1;
+}
+
 .card-editor__refusal {
   flex: none;
   padding: 8px 14px;

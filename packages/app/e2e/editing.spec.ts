@@ -299,13 +299,13 @@ test('editing an Alias authors its metadata and survives reload', async ({ page 
   await expect(page.getByRole('textbox', { name: 'Title' })).toHaveValue('A′');
   await expect(page.getByRole('textbox', { name: 'Markdown source' })).toHaveCount(0);
   await page.getByRole('textbox', { name: 'Title' }).fill('A reference to B');
-  const targetPicker = page.getByRole('combobox', { name: 'Target' });
+  const targetPicker = page.getByRole('combobox', { name: 'Target Card' });
   await targetPicker.fill('B');
   // A picker row is named by its kind glyph and then its title — `CardKindIcon`
   // is a `role="img"` carrying the kind's name — so the accessible name of the
   // row for `B` is `Markdown Card B`, never `B`.
   await page.getByRole('option', { name: 'Markdown Card B' }).click();
-  await page.getByRole('button', { name: 'Done' }).click();
+  await page.getByRole('button', { name: 'Ok' }).click();
 
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
   await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
@@ -322,7 +322,7 @@ test('editing an Alias authors its metadata and survives reload', async ({ page 
   await page.reload();
   await openCard(nodeByTitle(page, 'A reference to B').first(), 'A reference to B');
   await expect(page.getByRole('textbox', { name: 'Title' })).toHaveValue('A reference to B');
-  const reloadedTargetPicker = page.getByRole('combobox', { name: 'Target' });
+  const reloadedTargetPicker = page.getByRole('combobox', { name: 'Target Card' });
   await reloadedTargetPicker.fill('B');
   // Two glyphs on the row: the kind, and the check that says this is the Target
   // the reloaded Alias names.
@@ -2016,7 +2016,7 @@ test('choosing a Target creates the Alias and leaves its editor open', async ({ 
   await expect(page.getByTestId('new-alias')).toHaveCount(0);
   await expect(page.getByTestId('open-card')).toBeVisible();
   await expect(page.getByRole('textbox', { name: 'Title' })).toHaveValue('B');
-  await expect(page.getByRole('combobox', { name: 'Target' })).toBeVisible();
+  await expect(page.getByRole('combobox', { name: 'Target Card' })).toBeVisible();
   await expect(page.getByRole('textbox', { name: 'Markdown source' })).toHaveCount(0);
   await expect(page.getByRole('textbox', { name: 'Description' })).toHaveCount(0);
   await page.getByRole('button', { name: 'Cancel' }).click();
@@ -2039,10 +2039,9 @@ test('choosing a Target creates the Alias and leaves its editor open', async ({ 
  * Frame 4's focus rule rides along: this pane opens on its first field, and the
  * Target picker no longer takes the caret off it.
  *
- * `Enter` in a field submits the form the pane owns, which is `Done` — so it
- * commits every pending field and closes, exactly as the button does (ADR
- * 0048). There is no Cancel left to press afterwards, and the pane closing is
- * part of what the press means rather than a separate step.
+ * `Enter` follows the field sequence from Title to Target, just as the Markdown
+ * variant moves from Title to its body. Control-Enter then commits the complete
+ * form from the Target field and closes it (ADR 0048).
  */
 test('an Alias is renamed in the editor its creation leaves open', async ({ page }) => {
   await page.goto('/');
@@ -2059,6 +2058,9 @@ test('an Alias is renamed in the editor its creation leaves open', async ({ page
   await expect(title).toHaveValue('B');
   await title.fill('Recap');
   await title.press('Enter');
+  const target = page.getByRole('combobox', { name: 'Target Card' });
+  await expect(target).toBeFocused();
+  await target.press('Control+Enter');
 
   await expect(page.getByTestId('open-card')).toHaveCount(0);
   await expect(nodeByTitle(page, 'Recap')).toHaveCount(1);

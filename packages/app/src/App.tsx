@@ -767,6 +767,7 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
             (openedCard.kind === 'alias' ? (
               <OpenCard
                 through={openedCard}
+                graphColor={activeGraphColor(projection.colors, activeGraphId)}
                 occurrence={{
                   targets: aliasTargets,
                   onEdit: (change: { title: string; target: CardId }) =>

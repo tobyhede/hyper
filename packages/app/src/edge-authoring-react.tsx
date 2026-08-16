@@ -630,6 +630,7 @@ export function useEdgeAuthoring({
         return {
           id: card.id,
           title: card.title,
+          kind: card.kind,
           ...(eligibility.kind === 'refused' ? { refusal: eligibility.reason } : {}),
         };
       }),
@@ -684,6 +685,7 @@ export function useEdgeAuthoring({
       return {
         id: card.id,
         title: card.title,
+        kind: card.kind,
         ...(eligibility.kind === 'refused' ? { refusal: eligibility.reason } : {}),
       };
     });

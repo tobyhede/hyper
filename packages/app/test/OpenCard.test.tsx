@@ -180,6 +180,7 @@ describe('the opened Card', () => {
     render(
       <OpenCard
         through={{ id: ALIAS_ID, title: 'A again', kind: 'alias', target: CARD_ID }}
+        graphColor={GRAPH_COLOR}
         occurrence={{
           targets: [markdown(), { ...markdown(), id: OTHER_CARD_ID, title: 'B' }],
           onEdit,
@@ -193,9 +194,12 @@ describe('the opened Card', () => {
     fireEvent.change(screen.getByRole('textbox', { name: 'Title' }), {
       target: { value: 'Recap' },
     });
+    fireEvent.keyDown(screen.getByRole('combobox', { name: 'Target Card' }), {
+      key: 'ArrowDown',
+    });
     fireEvent.click(screen.getByRole('option', { name: /B/ }));
     expect(onEdit).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Ok' }));
 
     expect(onEdit).toHaveBeenCalledWith({ title: 'Recap', target: OTHER_CARD_ID });
     expect(onCancel).toHaveBeenCalledOnce();
@@ -207,6 +211,7 @@ describe('the opened Card', () => {
     render(
       <OpenCard
         through={{ id: ALIAS_ID, title: 'A again', kind: 'alias', target: CARD_ID }}
+        graphColor={GRAPH_COLOR}
         occurrence={{ targets: [markdown()], onEdit }}
         onCancel={onCancel}
       />,
@@ -215,11 +220,34 @@ describe('the opened Card', () => {
     fireEvent.change(screen.getByRole('textbox', { name: 'Title' }), {
       target: { value: '   ' },
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Ok' }));
 
     expect(onEdit).toHaveBeenCalledWith({ title: '', target: CARD_ID });
     expect(screen.getByRole('alert')).toHaveTextContent('An Alias title is required.');
     expect(onCancel).not.toHaveBeenCalled();
+  });
+
+  it('moves Enter from an Alias title to its Target and commits with Control-Enter', () => {
+    const onEdit = vi.fn(() => null);
+    const onCancel = vi.fn();
+    render(
+      <OpenCard
+        through={{ id: ALIAS_ID, title: 'A again', kind: 'alias', target: CARD_ID }}
+        graphColor={GRAPH_COLOR}
+        occurrence={{ targets: [markdown()], onEdit }}
+        onCancel={onCancel}
+      />,
+    );
+
+    const title = screen.getByRole('textbox', { name: 'Title' });
+    const target = screen.getByRole('combobox', { name: 'Target Card' });
+    title.focus();
+    fireEvent.keyDown(title, { key: 'Enter' });
+    expect(target).toHaveFocus();
+
+    fireEvent.keyDown(target, { key: 'Enter', ctrlKey: true });
+    expect(onEdit).toHaveBeenCalledWith({ title: 'A again', target: CARD_ID });
+    expect(onCancel).toHaveBeenCalledOnce();
   });
 
   it('keeps an Alias draft open when the edit is refused', () => {
@@ -227,12 +255,13 @@ describe('the opened Card', () => {
     render(
       <OpenCard
         through={{ id: ALIAS_ID, title: 'A again', kind: 'alias', target: CARD_ID }}
+        graphColor={GRAPH_COLOR}
         occurrence={{ targets: [], onEdit: () => 'This Alias could not be completed.' }}
         onCancel={onCancel}
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Ok' }));
 
     expect(screen.getByRole('alert')).toHaveTextContent('This Alias could not be completed.');
     expect(onCancel).not.toHaveBeenCalled();

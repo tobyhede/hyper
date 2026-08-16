@@ -257,7 +257,7 @@ describe('authoring an opened Card', () => {
     fireEvent.change(screen.getByRole('textbox', { name: 'Title' }), {
       target: { value: 'Recap' },
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Ok' }));
 
     expect(session.getState().working.cards).toContainEqual(snapshot.cards[0]);
     expect(session.getState().working.cards).toContainEqual({

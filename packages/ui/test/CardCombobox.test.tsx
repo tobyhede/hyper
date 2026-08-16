@@ -30,9 +30,14 @@ beforeAll(() => {
 afterAll(() => vi.unstubAllGlobals());
 
 const CHOICES: readonly CardChoice[] = [
-  { id: 'card-a', title: 'Alpha' },
-  { id: 'card-b', title: 'Beta' },
-  { id: 'card-c', title: 'Gamma', refusal: 'That Edge already exists.' },
+  { id: 'card-a', title: 'Alpha', kind: 'markdown' },
+  { id: 'card-b', title: 'Beta', kind: 'alias' },
+  {
+    id: 'card-c',
+    title: 'Gamma',
+    kind: 'markdown',
+    refusal: 'That Edge already exists.',
+  },
 ];
 
 function open(onValueChange = vi.fn()) {
@@ -85,16 +90,16 @@ describe('CardCombobox', () => {
   it('marks an eligible choice with an explicit false', () => {
     open();
 
-    expect(screen.getByRole('option', { name: 'Beta' })).toHaveAttribute('data-disabled', 'false');
+    expect(screen.getByRole('option', { name: /Beta/ })).toHaveAttribute('data-disabled', 'false');
   });
 
   it('answers the chosen Card and closes', () => {
     const onValueChange = open();
 
-    fireEvent.click(screen.getByRole('option', { name: 'Beta' }));
+    fireEvent.click(screen.getByRole('option', { name: /Beta/ }));
 
     expect(onValueChange).toHaveBeenCalledWith('card-b');
-    expect(screen.queryByRole('option', { name: 'Beta' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: /Beta/ })).not.toBeInTheDocument();
   });
 
   /**
@@ -108,7 +113,7 @@ describe('CardCombobox', () => {
     fireEvent.change(screen.getByPlaceholderText('Search'), { target: { value: 'gam' } });
 
     expect(screen.getByRole('option', { name: /Gamma/ })).toBeInTheDocument();
-    expect(screen.queryByRole('option', { name: 'Alpha' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: /Alpha/ })).not.toBeInTheDocument();
   });
 
   /**
