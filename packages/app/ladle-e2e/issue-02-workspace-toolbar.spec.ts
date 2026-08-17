@@ -38,7 +38,12 @@ test('Workspace Toolbar stories render quiet, retryable, and presenting states',
   const retry = page.getByRole('button', { name: 'Retry persistence' });
   await expect(retry).toBeVisible();
   await retry.click();
-  await expect(retry).toBeVisible();
+  await expect(retry).toBeHidden();
+  await expect(page.getByTestId('persistence-status')).toHaveAttribute(
+    'data-persistence-state',
+    'settled',
+  );
+  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
 
   await page.goto('/?story=components--workspace-toolbar--presenting&mode=preview');
   await expect(page.getByRole('button', { name: 'Return to overview' })).toBeVisible();

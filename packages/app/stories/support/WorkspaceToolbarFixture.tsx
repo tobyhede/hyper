@@ -1,6 +1,11 @@
-import { useRef, useState } from 'react';
-import { uuidSchema, type Graph, type Layout } from '@project/core';
-import type { SpaceSessionState } from '@project/persistence';
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { uuidSchema, type Graph, type Layout, type SpaceSnapshot } from '@project/core';
+import {
+  MemorySpaceBackend,
+  MemorySpaceBackendTestControl,
+  openSpaceSession,
+  type SpaceSessionState,
+} from '@project/persistence';
 import type { AlgorithmicViewId } from '@project/ui';
 import { PersistenceControl } from '#components/PersistenceControl';
 import { WorkspaceToolbar } from '#components/WorkspaceToolbar';
@@ -29,6 +34,8 @@ export interface WorkspaceToolbarFixtureProps {
   readonly presenting?: boolean;
   readonly authoringDisabled?: boolean;
   readonly remoteRefusal?: string | null;
+  readonly acknowledgedRevision?: bigint;
+  readonly onRetry?: () => void;
 }
 
 /** Controlled fixture state around the unchanged production toolbar composition. */
@@ -37,6 +44,8 @@ export function WorkspaceToolbarFixture({
   presenting = false,
   authoringDisabled = false,
   remoteRefusal = null,
+  acknowledgedRevision = 4n,
+  onRetry = () => undefined,
 }: WorkspaceToolbarFixtureProps) {
   const [view, setView] = useState<AlgorithmicViewId>('flow');
   const [layout, setLayout] = useState<string | null>(layoutId);
@@ -74,14 +83,59 @@ export function WorkspaceToolbarFixture({
         control: (
           <PersistenceControl
             persistence={persistence}
-            onRetry={() => undefined}
+            onRetry={onRetry}
             onAcceptRemote={() => remoteRefusal}
             onKeepLocal={() => undefined}
           />
         ),
         state: persistence.kind,
-        acknowledgedRevision: 4n,
+        acknowledgedRevision,
       }}
+    />
+  );
+}
+
+const retrySnapshot: SpaceSnapshot = {
+  id: uuidSchema.parse('00000000-0000-4000-8000-000000000006'),
+  document: { version: 1, title: 'Retry lifecycle' },
+  cards: [],
+};
+
+/** A real session that fails its first commit and succeeds when Retry asks again. */
+export function RetryableWorkspaceToolbarFixture() {
+  const session = useMemo(() => {
+    const control = new MemorySpaceBackendTestControl();
+    control.queueResult({
+      kind: 'retryable-failure',
+      code: 'network',
+      message: 'Network unavailable',
+    });
+    return openSpaceSession(
+      new MemorySpaceBackend(
+        [{ snapshot: retrySnapshot, revision: 0n, exportedRevision: null }],
+        control,
+      ),
+      {
+        snapshot: retrySnapshot,
+        revision: 0n,
+        exportedRevision: null,
+      },
+    );
+  }, []);
+  const state = useSyncExternalStore(session.subscribe, session.getState);
+  const submitted = useRef(false);
+
+  useEffect(() => {
+    if (submitted.current) return;
+    submitted.current = true;
+    session.submit(retrySnapshot);
+  }, [session]);
+
+  return (
+    <WorkspaceToolbarFixture
+      persistence={state.persistence}
+      acknowledgedRevision={state.acknowledgedRevision}
+      onRetry={session.retry}
     />
   );
 }

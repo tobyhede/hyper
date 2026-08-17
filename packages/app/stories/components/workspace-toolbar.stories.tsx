@@ -1,7 +1,10 @@
 import type { ReactNode } from 'react';
 import type { Story } from '@ladle/react';
 import { uuidSchema } from '@project/core';
-import { WorkspaceToolbarFixture } from '../support/WorkspaceToolbarFixture';
+import {
+  RetryableWorkspaceToolbarFixture,
+  WorkspaceToolbarFixture,
+} from '../support/WorkspaceToolbarFixture';
 
 export default { title: 'Components/Workspace Toolbar' };
 
@@ -16,15 +19,7 @@ const story = (children: ReactNode) => <ToolbarRow>{children}</ToolbarRow>;
 export const Settled: Story = () => story(<WorkspaceToolbarFixture />);
 export const Pending: Story = () =>
   story(<WorkspaceToolbarFixture persistence={{ kind: 'pending' }} />);
-export const Failed: Story = () =>
-  story(
-    <WorkspaceToolbarFixture
-      persistence={{
-        kind: 'failed',
-        failure: { kind: 'retryable-failure', code: 'network', message: 'Network unavailable' },
-      }}
-    />,
-  );
+export const Failed: Story = () => story(<RetryableWorkspaceToolbarFixture />);
 export const Rejected: Story = () =>
   story(
     <WorkspaceToolbarFixture
