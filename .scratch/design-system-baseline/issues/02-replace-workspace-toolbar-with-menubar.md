@@ -1,6 +1,12 @@
 # 02 — Replace the workspace toolbar with a Menubar
 
-**What to build:** Give the workspace a persistent desktop menubar for View, Layout, Graph, Cards and presentation commands. Its selection, disabled, persistence-conflict and keyboard behaviour remains equivalent to today's controls while its grouping and accessibility follow the shared design system.
+**What to build:** Define the correct workspace command surface in stable Ladle
+stories first, using the shared shadcn/Base UI components and their native
+interaction contracts. Then convert production to the story's accepted
+composition: a persistent desktop menubar for View, Layout, Graph, Cards and
+presentation commands. Existing production is extraction input, not design
+authority; preserve product requirements, not accidental implementation
+behaviour.
 
 **Blocked by:** 01 — Establish the shadcn design-system baseline.
 
@@ -12,13 +18,19 @@
       `DropdownMenu` surface and semantic tokens while preserving the accepted
       split-control behavior: `modal={false}`, conditional focus return when
       Add Alias opens a pane, and `nokey` protection for the portalled popup.
-- [x] Normal, pending, failed and conflicted persistence states are clear without treating status as a menu command; Ladle presents each state using the production composition.
+- [x] Normal, pending, failed and conflicted persistence states are clear without treating status as a menu command; Ladle defines each accepted state and production is verified against it.
+- [x] The stable stories are authored and behavior-tested as the design-system
+      reference before production is converged onto them. Importing an
+      unreviewed production composite into a story is not parity evidence.
 
 ## Answer
 
-The production workspace now composes View, Layout and Graph as controlled
-Menubar radio groups, with Present/Overview and the accepted Add Card split
-control remaining adjacent persistent actions. The settled persistence design
+The stable workspace stories define View, Layout and Graph through native
+Menubar radio-group selection, including roving trigger focus, keyboard opening,
+selection dismissal and focus return. Production is then converged onto that contract;
+it does not carry a second open-menu state machine or item-level click handlers.
+Present/Overview and the accepted Add Card split control remain adjacent
+persistent actions. The settled persistence design
 from `feat/surface-inventory` remains intact through the shared
 `PersistenceIndicator`: its lifecycle story covers the transient saved cue,
 pending state and compact rejection. The production `PersistenceControl`
@@ -27,10 +39,15 @@ use the shared `AlertDialog` for Reload/Save and put an unloadable-remote reason
 inside a destructive `Alert`; permanent rejection uses the same dialog boundary
 and returns to the unchanged local workspace after acknowledgement.
 
-The paused implementation's portal race was resolved at the lifecycle boundary:
-the toolbar controls which of its three menus is open and closes it before a
-selection updates application state, while Menubar's non-modal root and
-immediately hidden closed content leave the adjacent Add Card popup reachable.
+The paused implementation's portal race was exposed by the story-first keyboard
+contract as a conflict between a hand-written open-menu state machine and Base
+UI's Menubar lifecycle. Removing that state machine lets the primitive own menu
+coordination, focus and dismissal. Radio groups own `onValueChange`; items do
+not duplicate selection with `onClick`. Workspace selection uses the primitive's
+supported `closeOnClick` option so pointer selection returns immediately to the
+canvas and adjacent commands. Base UI keeps a keyboard-selected radio menu open
+for continued choice; Escape dismisses it. `finalFocus` uses the primitive's
+supported focus-return hook to restore the owning trigger in both paths.
 `AddCardControl` now composes the shared DropdownMenu facade and preserves its
 conditional focus-return and `nokey` behavior; the shared trigger forwards the
 caller's ref so cancelling Alias creation still restores focus.
@@ -47,11 +64,12 @@ caller's ref so cancelling Alias creation still restores focus.
   Select controls with controlled Menubar radio groups while keeping
   Present/Overview and Add Card adjacent. Its grouped persistence input keeps
   the rendered control, typed state and acknowledged revision together.
-- **Stories retained:** `persistence-indicator.stories.tsx` now drives the
-  production control from a real `SpaceSession` over a delayed fixture backend;
-  `workspace-toolbar.stories.tsx` and `WorkspaceToolbarFixture.tsx` render
+- **Stories retained:** `persistence-indicator.stories.tsx` drives the accepted
+  lifecycle from a real `SpaceSession` over a delayed fixture backend;
+  `workspace-toolbar.stories.tsx` and `WorkspaceToolbarFixture.tsx` define
   settled, pending, retryable failure, permanent rejection, conflict and
-  presenting through the unchanged production composition.
+  presenting before production is reconciled to the same composition. They are
+  not snapshots of unreviewed production behavior.
 - **Behavior proofs retained and reconciled:** `PersistenceIndicator.test.tsx`,
   `AlertDialog.test.tsx`, `WorkspaceToolbar.test.tsx` and `Workspace.test.tsx`;
   the selector and toolbar-boundary updates in `editing.spec.ts`, `graph.ts`,

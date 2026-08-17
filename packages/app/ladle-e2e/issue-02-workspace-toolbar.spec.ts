@@ -27,6 +27,31 @@ test('Workspace Toolbar story renders production Menubar behavior', async ({ pag
   await expect(moreKinds).toBeFocused();
 });
 
+test('Workspace Toolbar story defines the Menubar keyboard contract', async ({ page }) => {
+  await page.goto('/?story=components--workspace-toolbar--pending&mode=preview');
+
+  const view = page.getByTestId('view-selector');
+  const layout = page.getByTestId('layout-selector');
+
+  await view.focus();
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('menuitemradio', { name: 'Flow', exact: true })).toBeVisible();
+
+  await page.keyboard.press('Escape');
+  await expect(view).toBeFocused();
+  await page.keyboard.press('ArrowRight');
+  await expect(layout).toBeFocused();
+  await page.keyboard.press('Enter');
+  const collection = page.getByRole('menuitemradio', { name: 'Collection 1', exact: true });
+  await expect(collection).toBeVisible();
+  await collection.press('Enter');
+  await expect(page.getByTestId('layout-live-indicator')).toBeVisible();
+  await expect(collection).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(collection).toBeHidden();
+  await expect(layout).toBeFocused();
+});
+
 test('Workspace Toolbar stories render quiet, retryable, and presenting states', async ({
   page,
 }) => {
@@ -58,6 +83,8 @@ test('Workspace Toolbar stories render production conflict and rejection recover
   await expect(page.getByRole('alertdialog', { name: 'Changes conflict' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Reload' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Save' })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('alertdialog', { name: 'Changes conflict' })).toBeVisible();
   await page.getByRole('button', { name: 'Reload' }).click();
   await expect(page.getByTestId('persistence-remote-refused')).toContainText(
     'The remote space is invalid and was not accepted.',

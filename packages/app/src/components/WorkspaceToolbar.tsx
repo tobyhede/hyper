@@ -1,4 +1,4 @@
-import { useState, type ReactNode, type Ref } from 'react';
+import type { ReactNode, Ref } from 'react';
 import type { Graph, Layout } from '@project/core';
 import type { SpaceSessionState } from '@project/persistence';
 import {
@@ -64,7 +64,6 @@ export function WorkspaceToolbar({
   addCard,
   persistence,
 }: WorkspaceToolbarProps) {
-  const [openMenu, setOpenMenu] = useState<'view' | 'layout' | 'graph' | null>(null);
   const activeGraph = graph.graphs.find((candidate) => candidate.id === graph.activeGraphId);
   const activeGraphColor =
     activeGraph === undefined
@@ -76,24 +75,17 @@ export function WorkspaceToolbar({
   return (
     <>
       <Menubar aria-label="Workspace commands" modal={false}>
-        <MenubarMenu
-          open={openMenu === 'view'}
-          onOpenChange={(open) => setOpenMenu(open ? 'view' : null)}
-        >
+        <MenubarMenu>
           <MenubarTrigger data-testid="view-selector">
             View · {views.find((candidate) => candidate.id === view.value)?.title ?? 'Flow'}
           </MenubarTrigger>
-          <MenubarContent>
-            <MenubarRadioGroup value={view.active ? view.value : ''}>
+          <MenubarContent finalFocus>
+            <MenubarRadioGroup
+              value={view.active ? view.value : ''}
+              onValueChange={(value) => view.onValueChange(value as AlgorithmicViewId)}
+            >
               {views.map((candidate) => (
-                <MenubarRadioItem
-                  key={candidate.id}
-                  value={candidate.id}
-                  onClick={() => {
-                    setOpenMenu(null);
-                    view.onValueChange(candidate.id);
-                  }}
-                >
+                <MenubarRadioItem key={candidate.id} value={candidate.id} closeOnClick>
                   {candidate.title}
                 </MenubarRadioItem>
               ))}
@@ -101,10 +93,7 @@ export function WorkspaceToolbar({
           </MenubarContent>
         </MenubarMenu>
 
-        <MenubarMenu
-          open={openMenu === 'layout'}
-          onOpenChange={(open) => setOpenMenu(open ? 'layout' : null)}
-        >
+        <MenubarMenu>
           <MenubarTrigger data-testid="layout-selector">
             {layout.active ? (
               <span
@@ -118,20 +107,16 @@ export function WorkspaceToolbar({
               ? 'None'
               : (layout.layouts.find((item) => item.id === layout.value)?.title ?? 'None')}
           </MenubarTrigger>
-          <MenubarContent>
-            <MenubarRadioGroup value={layout.active ? (layout.value ?? '') : ''}>
+          <MenubarContent finalFocus>
+            <MenubarRadioGroup
+              value={layout.active ? (layout.value ?? '') : ''}
+              onValueChange={layout.onValueChange}
+            >
               {layout.layouts.length === 0 ? (
                 <MenubarItem disabled>No authored Layouts</MenubarItem>
               ) : (
                 layout.layouts.map((item) => (
-                  <MenubarRadioItem
-                    key={item.id}
-                    value={item.id}
-                    onClick={() => {
-                      setOpenMenu(null);
-                      layout.onValueChange(item.id);
-                    }}
-                  >
+                  <MenubarRadioItem key={item.id} value={item.id} closeOnClick>
                     {item.title}
                   </MenubarRadioItem>
                 ))
@@ -140,10 +125,7 @@ export function WorkspaceToolbar({
           </MenubarContent>
         </MenubarMenu>
 
-        <MenubarMenu
-          open={openMenu === 'graph'}
-          onOpenChange={(open) => setOpenMenu(open ? 'graph' : null)}
-        >
+        <MenubarMenu>
           <MenubarTrigger data-testid="graph-selector">
             <span
               aria-hidden="true"
@@ -152,20 +134,13 @@ export function WorkspaceToolbar({
             />
             Graph · {activeGraph?.title ?? 'None'}
           </MenubarTrigger>
-          <MenubarContent>
-            <MenubarRadioGroup value={graph.activeGraphId ?? ''}>
+          <MenubarContent finalFocus>
+            <MenubarRadioGroup value={graph.activeGraphId ?? ''} onValueChange={graph.onActivate}>
               {graph.graphs.length === 0 ? (
                 <MenubarItem disabled>No Graphs</MenubarItem>
               ) : (
                 graph.graphs.map((item) => (
-                  <MenubarRadioItem
-                    key={item.id}
-                    value={item.id}
-                    onClick={() => {
-                      setOpenMenu(null);
-                      graph.onActivate(item.id);
-                    }}
-                  >
+                  <MenubarRadioItem key={item.id} value={item.id} closeOnClick>
                     <span
                       aria-hidden="true"
                       className="h-[3px] w-[14px] shrink-0 rounded-[2px]"
@@ -191,7 +166,9 @@ export function WorkspaceToolbar({
         disabled={presentDisabled}
         onClick={graph.presenting ? graph.onExitPresenting : graph.onPresent}
       >
-        {graph.presenting ? null : <PresentIcon color={activeGraphColor} />}
+        {graph.presenting ? null : (
+          <PresentIcon data-icon="inline-start" color={activeGraphColor} />
+        )}
         {graph.presenting ? 'Overview' : 'Present'}
       </Button>
 

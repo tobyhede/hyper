@@ -90,16 +90,16 @@ function ConflictControl({
           </Alert>
         )}
         <AlertDialogFooter>
-          <AlertDialogAction
+          <Button
             variant="secondary"
             data-testid="persistence-accept-remote"
             onClick={() => setRemoteRefusal(onAcceptRemote())}
           >
             Reload
-          </AlertDialogAction>
-          <AlertDialogAction data-testid="persistence-keep-local" onClick={onKeepLocal}>
+          </Button>
+          <Button variant="default" data-testid="persistence-keep-local" onClick={onKeepLocal}>
             Save
-          </AlertDialogAction>
+          </Button>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
