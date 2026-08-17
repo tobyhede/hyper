@@ -33,32 +33,12 @@ const idSchema = uuidSchema;
 export const newUuid = () => uuidSchema.parse(crypto.randomUUID());
 
 /**
- * Upper bound on a card's description. A description is a caption — what a card
- * *is* when the title is too terse (ADR 0006) — not a second body, so it is
- * capped and single-line. Past this, the content belongs in the card, opened.
- */
-export const CARD_DESCRIPTION_MAX_LENGTH = 120;
-
-/**
- * An optional one-line description, drawn under the title in the graph node
- * (ADR 0006). Bounded and newline-free so it cannot drift into a body — the card
- * is fixed-size, so an unbounded description would just clip silently.
- */
-const descriptionSchema = z
-  .string()
-  .min(1)
-  .max(CARD_DESCRIPTION_MAX_LENGTH)
-  .refine((value) => !value.includes('\n'), { message: 'description must be a single line' })
-  .optional();
-
-/**
  * The frontmatter of a markdown card file (ADR 0020). No `content` key: the
  * body of the file *is* the content, so the card and its text are one artifact.
  */
 export const markdownCardFrontmatterSchema = z.object({
   id: idSchema,
   title: z.string().min(1),
-  description: descriptionSchema,
   kind: z.literal('markdown'),
 });
 
@@ -66,7 +46,6 @@ export const markdownCardFrontmatterSchema = z.object({
 export const aliasCardFrontmatterSchema = z.object({
   id: idSchema,
   title: z.string().min(1),
-  description: descriptionSchema,
   kind: z.literal('alias'),
   /** The id of the card this alias shows. Referential checks live in `@project/graph`. */
   target: idSchema,

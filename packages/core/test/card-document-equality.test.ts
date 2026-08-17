@@ -77,13 +77,12 @@ describe('a stored markdown document is the card less its id', () => {
    *
    * The table is the edges of the rules the pane depends on and nothing else:
    * `min(1)` counts characters, so a title of spaces is valid at rest and a
-   * title of none is not; a description is capped at 120 and single-line; a
-   * body is required and may be empty. Every combination is asserted both ways,
+   * title of none is not; a body is required and may be empty. Every
+   * combination is asserted both ways,
    * because a divergence in either direction is a document that round-trips
    * through storage and then cannot be completed.
    */
   const titles = ['', ' ', '   ', 'A', ' A '];
-  const descriptions = [undefined, '', 'caption', 'x'.repeat(120), 'x'.repeat(121), 'two\nlines'];
   const bodies = [undefined, '', 'source'];
   const kinds = [undefined, 'markdown', 'alias'];
 
@@ -91,27 +90,24 @@ describe('a stored markdown document is the card less its id', () => {
     const disagreements: string[] = [];
     let examined = 0;
     for (const title of titles) {
-      for (const description of descriptions) {
-        for (const body of bodies) {
-          for (const kind of kinds) {
-            const document = {
-              title,
-              ...(description === undefined ? {} : { description }),
-              ...(body === undefined ? {} : { body }),
-              ...(kind === undefined ? {} : { kind }),
-            };
-            examined += 1;
-            const asDocument = markdownCardDocumentSchema.safeParse(document);
-            const asCard = markdownCardSchema.safeParse({ ...document, id: CARD_ID });
-            if (asDocument.success !== asCard.success) {
-              disagreements.push(
-                `${JSON.stringify(document)}: document ${asDocument.success}, card ${asCard.success}`,
-              );
-              continue;
-            }
-            if (asDocument.success && asCard.success) {
-              expect(asCard.data).toEqual({ ...asDocument.data, id: CARD_ID });
-            }
+      for (const body of bodies) {
+        for (const kind of kinds) {
+          const document = {
+            title,
+            ...(body === undefined ? {} : { body }),
+            ...(kind === undefined ? {} : { kind }),
+          };
+          examined += 1;
+          const asDocument = markdownCardDocumentSchema.safeParse(document);
+          const asCard = markdownCardSchema.safeParse({ ...document, id: CARD_ID });
+          if (asDocument.success !== asCard.success) {
+            disagreements.push(
+              `${JSON.stringify(document)}: document ${asDocument.success}, card ${asCard.success}`,
+            );
+            continue;
+          }
+          if (asDocument.success && asCard.success) {
+            expect(asCard.data).toEqual({ ...asDocument.data, id: CARD_ID });
           }
         }
       }
@@ -130,6 +126,6 @@ describe('a stored markdown document is the card less its id', () => {
      * long as nothing tied the two together; change the table and this says
      * which number the prose now owes.
      */
-    expect(examined).toBe(270);
+    expect(examined).toBe(45);
   });
 });

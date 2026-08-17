@@ -845,8 +845,8 @@ export function createSpaceAuthoring({
       const card = snapshot.cards[cardIndex];
       if (card === undefined) return refuse('This Card is no longer part of the Space.');
       // Kind is fixed for a Card's lifetime, and changing it is out of scope for
-      // version 1. Everything else the editor holds — title, description, and an
-      // Alias's Target — is one ordinary Edit of this Card.
+      // version 1. Everything else the editor holds — Title and an Alias's
+      // Target — is one ordinary Edit of this Card.
       if (card.document.kind !== completion.document.kind) {
         return refuse('A Card keeps the kind it was created with.');
       }

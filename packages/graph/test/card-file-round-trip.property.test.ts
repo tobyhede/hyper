@@ -33,7 +33,6 @@ const cardArb: fc.Arbitrary<Card> = fc.oneof(
     {
       id: fc.uuid({ version: 4 }).map((value) => uuidSchema.parse(value)),
       title: line,
-      description: fc.option(line, { nil: undefined }),
       kind: fc.constant('markdown' as const),
       body: bodyArb,
     },

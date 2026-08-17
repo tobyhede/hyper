@@ -257,9 +257,7 @@ test('a title authored in the pane persists like one authored on the graph', asy
   await expect(nodeByTitle(page, 'Renamed from the pane').first()).toBeVisible();
 });
 
-test('opened Markdown editing persists source and description without moving Cards', async ({
-  page,
-}) => {
+test('opened Markdown editing persists source without moving Cards', async ({ page }) => {
   await page.goto('/');
   const card = nodeByTitle(page, 'A').first();
   await expect(card).toBeVisible();
@@ -267,7 +265,6 @@ test('opened Markdown editing persists source and description without moving Car
   const before = await allPositions(page);
 
   await openCard(card, 'A');
-  await page.getByRole('textbox', { name: 'Description' }).fill('Edited in place');
   await page.getByRole('textbox', { name: 'Markdown source' }).fill('# Edited\n\nNew source');
   await page.getByRole('button', { name: 'Done' }).click();
 
@@ -275,11 +272,9 @@ test('opened Markdown editing persists source and description without moving Car
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
   await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
   expect(await allPositions(page)).toEqual(before);
-  await expect(card.getByTestId('card-description')).toHaveText('Edited in place');
 
   await page.reload();
   const persisted = nodeByTitle(page, 'A').first();
-  await expect(persisted.getByTestId('card-description')).toHaveText('Edited in place');
   await openCard(persisted, 'A');
   await expect(page.getByRole('textbox', { name: 'Markdown source' })).toHaveValue(
     '# Edited\n\nNew source',
@@ -312,11 +307,8 @@ test('editing an Alias authors its metadata and survives reload', async ({ page 
   await expect(nodeByTitle(page, 'A reference to B').first()).toBeVisible();
 
   // The Alias pane authored the Alias and nothing else: the Card it used to
-  // point at still holds its own description and its own source (ADR 0049).
+  // point at still holds its own source (ADR 0049).
   await openCard(target, 'A');
-  await expect(page.getByRole('textbox', { name: 'Description' })).toHaveValue(
-    'Where the first collection begins',
-  );
   await expect(page.getByRole('textbox', { name: 'Markdown source' })).toHaveValue(/entry point/);
   await page.getByRole('button', { name: 'Cancel' }).click();
 
@@ -1740,8 +1732,8 @@ test('an opened Card keeps Tab inside it after a click that focuses nothing', as
   await expect(page.getByRole('textbox', { name: 'Markdown source' })).toBeFocused();
   // Including through a label's text, which focuses its field by click rather
   // than by mousedown.
-  await page.getByText('Description', { exact: true }).click();
-  await expect(page.getByRole('textbox', { name: 'Description' })).toBeFocused();
+  await page.getByText('Title', { exact: true }).click();
+  await expect(page.getByRole('textbox', { name: 'Title' })).toBeFocused();
 });
 
 /**
@@ -1920,7 +1912,6 @@ test('choosing a Target creates the Alias and leaves its editor open', async ({ 
   await expect(page.getByRole('textbox', { name: 'Title' })).toHaveValue('B');
   await expect(page.getByRole('combobox', { name: 'Target' })).toBeVisible();
   await expect(page.getByRole('textbox', { name: 'Markdown source' })).toHaveCount(0);
-  await expect(page.getByRole('textbox', { name: 'Description' })).toHaveCount(0);
   await page.getByRole('button', { name: 'Cancel' }).click();
 
   // An empty title takes the Target's, so the Alias is a second Card called B.

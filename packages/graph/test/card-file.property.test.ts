@@ -23,7 +23,6 @@ const markdownFrontmatterArb: fc.Arbitrary<CardFrontmatter> = fc.record(
   {
     id: fc.uuid({ version: 4 }).map((value) => uuidSchema.parse(value)),
     title: lineArb,
-    description: fc.option(lineArb, { nil: undefined }),
     kind: fc.constant('markdown' as const),
   },
   { requiredKeys: ['id', 'title', 'kind'] },

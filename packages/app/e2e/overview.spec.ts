@@ -189,15 +189,11 @@ test('a card shows its title in the graph, and opens to show its Markdown source
   await page.goto('/');
   await expect(page.locator('.react-flow__node').first()).toBeVisible();
 
-  // The graph draws the title, plus a card's optional short description (ADR
-  // 0006, card-display/03) — but never the card's body. A carries a description;
-  // "entry point" is its body text, which must not appear.
+  // The graph draws the title, never the card's body (ADR 0051). "entry point"
+  // is A's body text, which must not appear.
   const a = nodeByTitle(page, 'A');
   await expect(a).toBeVisible();
-  await expect(a.getByTestId('card-description')).toHaveText('Where the first collection begins');
   await expect(a).not.toContainText('entry point');
-  // A card without a description renders no description element.
-  await expect(nodeByTitle(page, 'B').getByTestId('card-description')).toHaveCount(0);
   await expect(page.getByTestId('open-card')).toBeHidden();
 
   // Opening shows the Markdown source verbatim, not rendered (ADR 0011) — the
@@ -339,7 +335,6 @@ test('an alias node names the card it redraws and opens its own metadata', async
   await expect(page.getByRole('combobox', { name: 'Target' })).toBeVisible();
   await expect(page.getByRole('option', { name: 'Markdown Card A' }).locator('svg')).toHaveCount(2);
   await expect(page.getByRole('textbox', { name: 'Markdown source' })).toHaveCount(0);
-  await expect(page.getByRole('textbox', { name: 'Description' })).toHaveCount(0);
   await page.getByRole('button', { name: 'Cancel' }).click();
 
   // Its own title is still authored, inline on the graph.

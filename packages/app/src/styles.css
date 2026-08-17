@@ -485,21 +485,6 @@ body {
   line-height: 1.25;
 }
 
-/* A short caption under the title (ADR 0006, card-display/03): what a card is
-   when the title is too terse. Muted, and clamped to two lines so a near-max
-   description cannot push the title around — the card's fixed height and
-   `overflow: hidden` already prevent any size change; this just keeps it tidy. */
-.card__description {
-  margin: 0;
-  font-size: 0.8rem;
-  line-height: 1.35;
-  color: var(--muted, #8a94a6);
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
 /* An alias names the card it redraws, so a redraw reads as a deliberate return
    rather than repetition — and stays legible even when titles match. The kind
    glyph that used to lead this line now sits beside the title, where it names

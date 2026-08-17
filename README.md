@@ -23,7 +23,7 @@ pnpm dev:fixture     # tracked test fixture in memory at http://localhost:5175
 Then:
 
 1. Pick a Graph in the toolbar. Every Graph stays drawn; the one you pick is emphasised.
-2. Hover a card and use its Edit control to author its title, description and Markdown source. `Esc` cancels and closes it.
+2. Hover a card and use its Edit control to author its Title and Markdown source. `Esc` cancels and closes it.
 3. Drag a card to move it. A completed edit is committed automatically through the persistence session; the toolbar reports `Persisting…` and then `Persisted`. Under `pnpm dev` the edit lands in PostgreSQL and outlives the page; under `pnpm dev:new` and `pnpm dev:fixture` it lives in that server's memory repository, surviving browser reloads but not a restart.
 4. Hover or select a card to reveal its four authoring handles. Drag to another card to add an Edge to the active Graph. Dropping on empty canvas cancels unless Option (macOS) or Alt (elsewhere) is held; the modifier gesture previews and atomically creates a blank `Card N`, its placement and the Edge.
 5. Press **Present** to traverse the Graph: `→` follows an edge, `←` goes back, `↑` / `↓` choose at a fork, `Esc` returns to the overview.
@@ -133,7 +133,7 @@ Each authored edge becomes a colored drawn edge, and each card a Graph leaves ga
 
 ### Markdown cards
 
-A card is **one file**: frontmatter, then body ([ADR 0020](docs/adr/0020-a-card-is-a-markdown-file-with-frontmatter.md)). The frontmatter carries `id`, `title`, an optional `description`, and for an alias its `kind` and `target`; everything under it is the content, GitHub-flavoured Markdown. A card can be visited by any number of graphs — that reuse is the whole point, and a card shared by several graphs carries one handle pair per Graph running through it.
+A card is **one file**: frontmatter, then body ([ADR 0020](docs/adr/0020-a-card-is-a-markdown-file-with-frontmatter.md), refined by [ADR 0051](docs/adr/0051-card-kinds-own-everything-beyond-the-title.md)). Shared frontmatter carries `id`, `title` and `kind`; an Alias adds its `target`, while everything after a Markdown Card's fence is its content. A card can be visited by any number of graphs — that reuse is the whole point, and a card shared by several graphs carries one handle pair per Graph running through it.
 
 A card's identity is its frontmatter `id`, never its filename, so renaming the file is not a data migration. Since the title lives in the same file as the body, a body may open with a heading — it is just a heading, not a repeat of a title held somewhere else.
 
@@ -184,7 +184,7 @@ Design rules kept throughout: domain logic stays out of React components, React 
 
 ## Current limitations
 
-- **Card authoring is intentionally narrow.** Markdown source, titles and descriptions are editable, while visual editing, freehand drawing and whiteboard shapes are not built. Card, placement and Edge edits commit through the HTTP persistence session: under `pnpm dev` they land in PostgreSQL and outlive the page, and under `pnpm dev:new` they survive a browser reload but not a server restart.
+- **Card authoring is intentionally narrow.** Markdown source, Titles and Alias Targets are editable, while visual editing, freehand drawing and whiteboard shapes are not built. Card, placement and Edge edits commit through the HTTP persistence session: under `pnpm dev` they land in PostgreSQL and outlive the page, and under `pnpm dev:new` they survive a browser reload but not a server restart.
 - **The app never touches files.** The browser lists, opens and commits Spaces under `/api/spaces` and nothing else; file discovery and parsing are server-side CLI and import concerns. There is no write-back and no file picker. Canonical file export belongs to the `hyper` CLI ([ADR 0030](docs/adr/0030-postgres-is-the-live-write-model.md)), which regenerates a deterministic version 1 space directory from the database and records the revision it projected.
 - **Overlay legibility.** The graph draws every Graph at once. Only **compatible** graphs — the union of their edges is acyclic — lay out cleanly as parallel forward paths; two graphs disagreeing about the order of cards they share force a backward edge, drawn as a routed channel. See [`.scratch/multiple-routes/findings.md`](.scratch/multiple-routes/findings.md).
 - **Cards are a fixed shape.** A card draws its title, so every card is the same size — declared once in `packages/app/src/card.ts` as a 16:9 ratio and consumed by both the layout and the stylesheet. Content adapts to the card, not the reverse, which is why measured DOM sizes are not fed into ELK.

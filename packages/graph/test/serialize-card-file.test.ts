@@ -46,7 +46,7 @@ describe('serializeCardFile', () => {
     );
   });
 
-  it('omits a description the card does not have', () => {
+  it('writes only shared and kind-owned fields', () => {
     const card: Card = {
       id: uuid('00000000-0000-4000-8000-000000000002'),
       title: 'A',

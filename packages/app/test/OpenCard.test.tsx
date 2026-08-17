@@ -7,10 +7,9 @@ const CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 const ALIAS_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
 const OTHER_CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
 
-const markdown = (over: { description?: string; body?: string } = {}) => ({
+const markdown = (over: { body?: string } = {}) => ({
   id: CARD_ID,
   title: 'A',
-  ...(over.description === undefined ? {} : { description: over.description }),
   kind: 'markdown' as const,
   body: over.body ?? '**A** source',
 });
@@ -37,11 +36,9 @@ describe('the opened Card', () => {
     const onComplete = vi.fn(() => null);
     render(<OpenCard card={markdown()} onComplete={onComplete} onCancel={vi.fn()} />);
 
+    expect(screen.queryByRole('textbox', { name: 'Description' })).not.toBeInTheDocument();
     fireEvent.change(screen.getByRole('textbox', { name: 'Title' }), {
       target: { value: 'Renamed A' },
-    });
-    fireEvent.change(screen.getByRole('textbox', { name: 'Description' }), {
-      target: { value: 'A caption' },
     });
     fireEvent.change(screen.getByRole('textbox', { name: 'Markdown source' }), {
       target: { value: 'New body' },
@@ -53,7 +50,6 @@ describe('the opened Card', () => {
     expect(onComplete).toHaveBeenCalledWith({
       id: CARD_ID,
       title: 'Renamed A',
-      description: 'A caption',
       kind: 'markdown',
       body: 'New body',
     });
@@ -83,20 +79,15 @@ describe('the opened Card', () => {
     expect(onComplete).not.toHaveBeenCalled();
     expect(screen.getByRole('alert')).toHaveTextContent('A Card title is required.');
     expect(screen.getByRole('textbox', { name: 'Title' })).toHaveAttribute('aria-invalid', 'true');
-    expect(screen.getByRole('textbox', { name: 'Description' })).toHaveAttribute(
-      'aria-invalid',
-      'false',
-    );
   });
 
   /**
    * A schema refusal that belongs to neither field on this form is unattributed
-   * — it goes to the form-level slot beside the actions, not onto Description,
-   * which was where every issue off the two named paths landed.
+   * — it goes to the form-level slot beside the actions.
    *
    * **No author can reach this through the fields**, and that is the honest
-   * shape of the test rather than a gap in it. `markdownCardSchema` has five
-   * paths: `title` and `description` are the two the fields write, `kind` is a
+   * shape of the test rather than a gap in it. `markdownCardSchema` has four
+   * paths: `title` and `body` are the two the fields write, `kind` is a
    * literal this module supplies, `body` is `z.string()` and a `<textarea>` has
    * nothing else to give it. `id` is the last, and it comes from the Card the
    * pane was opened on — so handing the pane a malformed one is the one way to
@@ -120,10 +111,6 @@ describe('the opened Card', () => {
     const alert = screen.getByRole('alert');
     expect(alert).toHaveTextContent('The Card could not be completed.');
     expect(alert).toHaveAttribute('id', 'open-card-refusal');
-    expect(screen.getByRole('textbox', { name: 'Description' })).toHaveAttribute(
-      'aria-invalid',
-      'false',
-    );
     expect(screen.getByRole('textbox', { name: 'Title' })).toHaveAttribute('aria-invalid', 'false');
   });
 
@@ -141,7 +128,6 @@ describe('the opened Card', () => {
       />,
     );
 
-    expect(screen.queryByRole('textbox', { name: /Description/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('textbox', { name: /Markdown source/ })).not.toBeInTheDocument();
     fireEvent.change(screen.getByRole('textbox', { name: 'Title' }), {
       target: { value: 'Recap' },
