@@ -27,6 +27,24 @@ test('Workspace Toolbar story renders production Menubar behavior', async ({ pag
   await expect(moreKinds).toBeFocused();
 });
 
+test('Workspace Toolbar stories render quiet, retryable, and presenting states', async ({
+  page,
+}) => {
+  await page.goto('/?story=components--workspace-toolbar--settled&mode=preview');
+  await expect(page.getByRole('menubar', { name: 'Workspace commands' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Changes saved' })).toBeHidden();
+
+  await page.goto('/?story=components--workspace-toolbar--failed&mode=preview');
+  const retry = page.getByRole('button', { name: 'Retry persistence' });
+  await expect(retry).toBeVisible();
+  await retry.click();
+  await expect(retry).toBeVisible();
+
+  await page.goto('/?story=components--workspace-toolbar--presenting&mode=preview');
+  await expect(page.getByRole('button', { name: 'Return to overview' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Add Card' })).toBeDisabled();
+});
+
 test('Workspace Toolbar stories render production conflict and rejection recovery', async ({
   page,
 }) => {

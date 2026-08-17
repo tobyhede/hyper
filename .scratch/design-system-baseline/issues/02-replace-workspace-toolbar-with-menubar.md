@@ -69,7 +69,7 @@ Final extraction verification:
 
 - `pnpm ladle:build` passed with the production persistence and workspace
   toolbar stories.
-- `pnpm e2e:ladle` passed: 3 tests.
+- `pnpm e2e:ladle` passed: 4 tests.
 - `pnpm verify` passed: 1,286 tests passed and 8 skipped.
 - `pnpm e2e` passed: 93 tests.
 
