@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import appManifest from '../../packages/app/package.json';
-import { E2E_PORT_BASE, POSTGRES_E2E_PORT } from '../../packages/app/e2e/projects';
+import {
+  E2E_PORT_BASE,
+  POSTGRES_E2E_PORT,
+  workerScopedViteCacheDir,
+} from '../../packages/app/e2e/projects';
 
 /**
  * Both suites bind under `strictPort`, so an overlap is a hard host failure that
@@ -54,5 +58,15 @@ describe('E2E host ports', () => {
       expect(POSTGRES_E2E_PORT, `PostgreSQL host clear of ${port}`).not.toBe(port);
       expect(E2E_PORT_BASE, `default suite above ${port}`).toBeGreaterThan(port);
     }
+  });
+});
+
+describe('E2E Vite dependency cache', () => {
+  it('gives concurrent Playwright workers different optimizer caches', () => {
+    expect(workerScopedViteCacheDir('/app', 0)).not.toBe(workerScopedViteCacheDir('/app', 1));
+  });
+
+  it('lets sequential hosts in one worker reuse their optimizer cache', () => {
+    expect(workerScopedViteCacheDir('/app', 2)).toBe(workerScopedViteCacheDir('/app', 2));
   });
 });

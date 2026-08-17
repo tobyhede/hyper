@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import rootManifest from '../../package.json';
 import playwrightConfig from '../../playwright.config';
 
@@ -41,5 +41,22 @@ describe('e2e:fixture project selection', () => {
     // config down to a single project would make it a synonym, and the
     // separation the README promises would be gone without the script changing.
     expect(declaredProjects().length).toBeGreaterThan(1);
+  });
+});
+
+describe('Playwright retry policy', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.resetModules();
+  });
+
+  it('fails CI when a retry exposes a flaky test', async () => {
+    vi.stubEnv('CI', 'true');
+    vi.resetModules();
+
+    const { default: ciConfig } = await import('../../playwright.config');
+
+    expect(ciConfig.retries).toBeGreaterThan(0);
+    expect(ciConfig.failOnFlakyTests).toBe(true);
   });
 });
