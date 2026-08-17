@@ -19,6 +19,11 @@ Registry items are not limited to React components. They can distribute
 components, hooks, utilities, design tokens, pages, config files, docs, rules,
 workflows, templates, MCP files, and other project files.
 
+A workflow, template, or MCP file changes what an agent does or which tools it
+can reach, not just what a project renders. `shadcn add` installs files without
+per-file approval, so preview one of these item types with `--dry-run`,
+`--diff`, or `--view` before applying it, and read what it actually adds.
+
 ## Root `registry.json`
 
 The root registry file should define registry metadata and either `items` or

@@ -17,12 +17,12 @@ describe('.claude/skills mirrors .agents/skills by real symlink', () => {
     expect(realpathSync(claudeEntry)).toBe(realpathSync(new URL(name, agentsSkillsDirectory)));
   });
 
-  it('tracks the same skill set on both sides', () => {
-    const claudeNames = readdirSync(claudeSkillsDirectory, { withFileTypes: true })
-      .filter((entry) => entry.isSymbolicLink())
-      .map((entry) => entry.name)
-      .sort();
+  it('tracks the same skill set on both sides, and nothing but a symlink', () => {
+    const claudeEntries = readdirSync(claudeSkillsDirectory, { withFileTypes: true });
 
-    expect(claudeNames).toEqual(skillNames);
+    // Unfiltered by type: a stray regular file or directory must still show up
+    // here rather than being silently dropped before the name comparison.
+    expect(claudeEntries.map((entry) => entry.name).sort()).toEqual(skillNames);
+    expect(claudeEntries.every((entry) => entry.isSymbolicLink())).toBe(true);
   });
 });

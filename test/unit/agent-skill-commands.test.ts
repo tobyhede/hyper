@@ -12,8 +12,27 @@ const shadcnFirstUi = readFileSync(
   'utf8',
 );
 
+const shadcnSkill = readFileSync(
+  new URL('../../.agents/skills/shadcn/SKILL.md', import.meta.url),
+  'utf8',
+);
+
+const shadcnRegistry = readFileSync(
+  new URL('../../.agents/skills/shadcn/registry.md', import.meta.url),
+  'utf8',
+);
+
 const PACKAGE_RUNNER_COMMANDS = new Set(['dlx', 'exec', 'install']);
 const BACKTICKED_PNPM_COMMAND = /`pnpm ([a-z][a-z0-9:-]*)/g;
+
+// The single source of truth for the pin: shadcn/SKILL.md's own frontmatter,
+// so this test tracks a version bump there rather than a duplicated constant.
+const AUDITED_SHADCN_VERSION = /allowed-tools:.*shadcn@([^\s`,)]+)/.exec(shadcnSkill)?.[1];
+if (AUDITED_SHADCN_VERSION === undefined) {
+  throw new Error(
+    "Could not read the audited shadcn CLI version from shadcn/SKILL.md's frontmatter",
+  );
+}
 
 // Both directories invoke the shadcn CLI directly with a pinned version — the
 // vendored skill's own docs, and this repo's shadcn-first-ui workflow layer.
@@ -22,10 +41,16 @@ const SHADCN_CLI_SKILL_DIRECTORIES = [
   new URL('../../.agents/skills/shadcn-first-ui/', import.meta.url),
 ];
 
-const markdownFiles = (directory: URL): readonly URL[] =>
+const SKILL_INSTRUCTION_FILE = /\.(md|ya?ml)$/;
+
+const skillInstructionFiles = (directory: URL): readonly URL[] =>
   readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
     const child = new URL(entry.name + (entry.isDirectory() ? '/' : ''), directory);
-    return entry.isDirectory() ? markdownFiles(child) : entry.name.endsWith('.md') ? [child] : [];
+    return entry.isDirectory()
+      ? skillInstructionFiles(child)
+      : SKILL_INSTRUCTION_FILE.test(entry.name)
+        ? [child]
+        : [];
   });
 
 describe('commands in the mandatory shadcn-first UI workflow', () => {
@@ -46,10 +71,16 @@ describe('commands in the mandatory shadcn-first UI workflow', () => {
     );
   });
 
+  it('requires preview before applying a workflow, template, or MCP registry item', () => {
+    expect(shadcnRegistry).toMatch(/--dry-run.*--diff.*--view/s);
+  });
+
   it('keeps every vendored shadcn CLI invocation on the audited version', () => {
     const mutableInvocations = SHADCN_CLI_SKILL_DIRECTORIES.flatMap((directory) =>
-      markdownFiles(directory).flatMap((file) =>
-        [...readFileSync(file, 'utf8').matchAll(/shadcn@latest/g)].map(() => file.pathname),
+      skillInstructionFiles(directory).flatMap((file) =>
+        [...readFileSync(file, 'utf8').matchAll(/shadcn@([^\s`,)]+)/g)]
+          .filter((match) => match[1] !== AUDITED_SHADCN_VERSION)
+          .map((match) => `${file.pathname}: shadcn@${match[1] ?? ''}`),
       ),
     );
 
