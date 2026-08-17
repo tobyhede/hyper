@@ -1,7 +1,7 @@
 import { createRef } from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
-import { uuidSchema } from '@project/core';
+import { PersistenceIndicator } from '@project/ui';
 import { WorkspaceToolbar, type WorkspaceToolbarProps } from '../src/components/WorkspaceToolbar';
 
 beforeAll(() => {
@@ -44,11 +44,9 @@ const settledProps = (): WorkspaceToolbarProps => ({
     keyShortcut: 'C',
     menuTriggerRef: createRef<HTMLButtonElement>(),
   },
-  persistence: { kind: 'settled' },
+  persistence: <PersistenceIndicator state="settled" />,
+  persistenceState: 'settled',
   acknowledgedRevision: 4n,
-  onRetryPersistence: vi.fn(),
-  onAcceptRemote: vi.fn(),
-  onKeepLocal: vi.fn(),
 });
 
 describe('WorkspaceToolbar', () => {
@@ -81,67 +79,20 @@ describe('WorkspaceToolbar', () => {
     expect(props.view.onValueChange).toHaveBeenCalledWith('grid');
   });
 
-  it('keeps settled persistence quiet and pending or rejected cues outside the menu', () => {
+  it('keeps persistence feedback outside the menu', () => {
     const props = settledProps();
     const { rerender } = render(<WorkspaceToolbar {...props} />);
     const menubar = screen.getByRole('menubar', { name: 'Workspace commands' });
 
     expect(screen.queryByRole('button', { name: 'Changes saved' })).not.toBeInTheDocument();
 
-    rerender(<WorkspaceToolbar {...props} persistence={{ kind: 'pending' }} />);
-    expect(menubar).not.toContainElement(screen.getByRole('button', { name: 'Saving changes' }));
-
     rerender(
       <WorkspaceToolbar
         {...props}
-        persistence={{
-          kind: 'rejected',
-          failure: { kind: 'permanent-failure', code: 'forbidden', message: 'Denied' },
-        }}
+        persistence={<PersistenceIndicator state="pending" />}
+        persistenceState="pending"
       />,
     );
-    expect(menubar).not.toContainElement(
-      screen.getByRole('button', { name: 'Persistence rejected' }),
-    );
-  });
-
-  it('renders retryable failure and conflict recovery as explicit commands', () => {
-    const failed = settledProps();
-    const { rerender } = render(
-      <WorkspaceToolbar
-        {...failed}
-        persistence={{
-          kind: 'failed',
-          failure: { kind: 'retryable-failure', code: 'network', message: 'Offline' },
-        }}
-      />,
-    );
-    fireEvent.click(screen.getByRole('button', { name: 'Retry persistence' }));
-    expect(failed.onRetryPersistence).toHaveBeenCalledOnce();
-
-    const conflicted = settledProps();
-    rerender(
-      <WorkspaceToolbar
-        {...conflicted}
-        persistence={{
-          kind: 'conflicted',
-          current: {
-            snapshot: {
-              id: uuidSchema.parse('00000000-0000-4000-8000-000000000001'),
-              document: { version: 1, title: 'Remote' },
-              cards: [],
-            },
-            revision: 5n,
-            exportedRevision: null,
-          },
-        }}
-        remoteRefusal="The remote space is invalid"
-      />,
-    );
-    fireEvent.click(screen.getByRole('button', { name: 'Accept remote' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Keep local' }));
-    expect(conflicted.onAcceptRemote).toHaveBeenCalledOnce();
-    expect(conflicted.onKeepLocal).toHaveBeenCalledOnce();
-    expect(screen.getByRole('alert')).toHaveTextContent('The remote space is invalid');
+    expect(menubar).not.toContainElement(screen.getByRole('button', { name: 'Saving changes' }));
   });
 });

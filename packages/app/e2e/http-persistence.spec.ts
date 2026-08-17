@@ -129,38 +129,25 @@ test('a stale browser reports conflict and accepts the remote workspace without 
     const remotePosition = await positionOf(currentCard);
 
     await dragBy(stalePage, staleCard, 180, 0);
-    const acceptRemote = stalePage.getByRole('button', { name: 'Accept remote' });
-    await expect(acceptRemote).toBeVisible();
+    const reload = stalePage.getByRole('button', { name: 'Reload' });
+    await expect(reload).toBeVisible();
     expect(staleCommits).toBe(1);
     await expect.poll(() => navigationIsProtected(stalePage)).toBe(true);
     await settledNetwork(stalePage);
     expect(staleCommits).toBe(1);
 
-    // Leave the conflicted local workspace in unrelated navigation and start an
-    // automatic placement just before acceptance. The stored Layout must open
-    // fresh, and any result still arriving from this Graph placement is obsolete.
     const mountedGraphArea = await stalePage.locator('.graph-area').elementHandle();
     expect(mountedGraphArea).not.toBeNull();
 
-    await stalePage.getByTestId('view-selector').click();
-    await stalePage.getByRole('menuitemradio', { name: 'Flow' }).click();
-    await stalePage.getByTestId('graph-selector').click();
-    await stalePage.getByRole('menuitemradio', { name: 'Echo' }).click();
-    // No wait between starting the placement and accepting: settling first would
-    // retire the very race this test exists to cover.
-    await stalePage.getByTestId('present-button').click();
-
-    await acceptRemote.click();
+    await reload.click();
 
     const acceptedCard = nodeByTitle(stalePage, 'A').first();
     await expect(acceptedCard).toBeVisible();
     await settled(stalePage);
     expect(await positionOf(acceptedCard)).toEqual(remotePosition);
-    // A fresh Navigation over the stored Space, not the emphasis this page was
-    // left in: the accepted Space opens in the Layout the *other* page's drag
-    // converted, and the Graph that conversion minted is its first.
+    // Reload opens the Layout the other page's drag converted, whose minted
+    // Graph is first, without replacing the mounted application surface.
     await expect(stalePage.getByTestId('graph-selector')).toContainText('Graph 1');
-    await expect(stalePage.getByTestId('presenting-chrome')).not.toBeVisible();
     expect(
       await mountedGraphArea!.evaluate(
         (element) => element === document.querySelector('.graph-area'),

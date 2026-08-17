@@ -21,8 +21,11 @@ Menubar radio groups, with Present/Overview and the accepted Add Card split
 control remaining adjacent persistent actions. The settled persistence design
 from `feat/surface-inventory` remains intact through the shared
 `PersistenceIndicator`: its lifecycle story covers the transient saved cue,
-pending state and compact rejection, while the production toolbar stories add
-retryable failure and conflict compositions.
+pending state and compact rejection. The production `PersistenceControl`
+composes retryable failure, permanent rejection and conflict recovery: conflicts
+use the shared `AlertDialog` for Reload/Save and put an unloadable-remote reason
+inside a destructive `Alert`; permanent rejection uses the same dialog boundary
+and returns to the unchanged local workspace after acknowledgement.
 
 The paused implementation's portal race was resolved at the lifecycle boundary:
 the toolbar controls which of its three menus is open and closes it before a
@@ -31,6 +34,29 @@ immediately hidden closed content leave the adjacent Add Card popup reachable.
 `AddCardControl` now composes the shared DropdownMenu facade and preserves its
 conditional focus-return and `nokey` behavior; the shared trigger forwards the
 caller's ref so cancelling Alias creation still restores focus.
+
+## Extraction accounting
+
+- **Retained:** `90f87ee`'s toolbar sizing; `d8520b6`'s quiet persistence
+  lifecycle; the donor's `AlertDialog`, persistence dialogs, component tests,
+  application tests and HTTP-persistence browser behavior; and the tracked
+  Menubar WIP reworked onto the current Base UI composition.
+- **Reconciled:** the donor's Select-based `WorkspaceToolbar` became controlled
+  Menubar radio groups. Persistence remains a production node supplied by
+  `PersistenceControl`, keeping modal lifecycle outside the Menubar while the
+  toolbar retains its machine-readable state and revision contract.
+- **Deferred:** ADR 0052's repository-wide parity manifest, runtime collection
+  enforcement and dedicated Ladle CI job remain Issue 08.
+- **Rejected:** inline conflict/rejection toolbar controls introduced during
+  extraction; they replaced the donor's modal production behavior and were
+  removed.
+
+Final extraction verification:
+
+- `pnpm ladle:build` passed with the production persistence and workspace
+  toolbar stories.
+- `pnpm verify` passed: 1,286 tests passed and 8 skipped.
+- `pnpm e2e` passed: 93 tests.
 
 ## Audit note
 

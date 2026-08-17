@@ -1,6 +1,5 @@
-import { useState, type Ref } from 'react';
+import { useState, type ReactNode, type Ref } from 'react';
 import type { Graph, Layout } from '@project/core';
-import type { SpaceSessionState } from '@project/persistence';
 import {
   AddCardControl,
   Button,
@@ -12,7 +11,6 @@ import {
   MenubarRadioGroup,
   MenubarRadioItem,
   MenubarTrigger,
-  PersistenceIndicator,
   PresentIcon,
 } from '@project/ui';
 import type { AlgorithmicViewId } from '@project/ui';
@@ -45,12 +43,9 @@ export interface WorkspaceToolbarProps {
     readonly keyShortcut?: string;
     readonly menuTriggerRef?: Ref<HTMLButtonElement>;
   };
-  readonly persistence: SpaceSessionState['persistence'];
+  readonly persistence: ReactNode;
+  readonly persistenceState: string;
   readonly acknowledgedRevision: bigint;
-  readonly onRetryPersistence: () => void;
-  readonly onAcceptRemote: () => void;
-  readonly onKeepLocal: () => void;
-  readonly remoteRefusal?: string | null;
 }
 
 const views = [
@@ -65,11 +60,8 @@ export function WorkspaceToolbar({
   graph,
   addCard,
   persistence,
+  persistenceState,
   acknowledgedRevision,
-  onRetryPersistence,
-  onAcceptRemote,
-  onKeepLocal,
-  remoteRefusal = null,
 }: WorkspaceToolbarProps) {
   const [openMenu, setOpenMenu] = useState<'view' | 'layout' | 'graph' | null>(null);
   const activeGraph = graph.graphs.find((candidate) => candidate.id === graph.activeGraphId);
@@ -204,48 +196,15 @@ export function WorkspaceToolbar({
 
       <AddCardControl {...addCard} />
 
-      {persistence.kind === 'failed' ? (
-        <Button
-          variant="default"
-          data-testid="persistence-retry"
-          onClick={onRetryPersistence}
-          title={persistence.failure.message}
-        >
-          Retry persistence
-        </Button>
-      ) : persistence.kind === 'conflicted' ? (
-        <>
-          <Button
-            variant="default"
-            data-testid="persistence-accept-remote"
-            onClick={onAcceptRemote}
-          >
-            Accept remote
-          </Button>
-          <Button variant="default" data-testid="persistence-keep-local" onClick={onKeepLocal}>
-            Keep local
-          </Button>
-          {remoteRefusal === null ? null : (
-            <span
-              role="alert"
-              data-testid="persistence-remote-refused"
-              className="persistence-refusal"
-            >
-              {remoteRefusal}
-            </span>
-          )}
-        </>
-      ) : (
-        <PersistenceIndicator state={persistence.kind} />
-      )}
+      {persistence}
       <span
         hidden
         aria-hidden="true"
         data-testid="persistence-status"
-        data-persistence-state={persistence.kind}
+        data-persistence-state={persistenceState}
         data-revision={acknowledgedRevision.toString()}
       >
-        {persistence.kind === 'settled' ? 'Persisted' : persistence.kind}
+        {persistenceState === 'settled' ? 'Persisted' : persistenceState}
       </span>
     </>
   );

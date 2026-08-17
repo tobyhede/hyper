@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import { uuidSchema, type Graph, type Layout } from '@project/core';
 import type { SpaceSessionState } from '@project/persistence';
 import type { AlgorithmicViewId } from '@project/ui';
+import { PersistenceControl } from '#components/PersistenceControl';
 import { WorkspaceToolbar } from '#components/WorkspaceToolbar';
 
 const layoutId = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
@@ -69,12 +70,16 @@ export function WorkspaceToolbarFixture({
         keyShortcut: 'C',
         menuTriggerRef: addCardMenu,
       }}
-      persistence={persistence}
+      persistence={
+        <PersistenceControl
+          persistence={persistence}
+          onRetry={() => undefined}
+          onAcceptRemote={() => remoteRefusal}
+          onKeepLocal={() => undefined}
+        />
+      }
+      persistenceState={persistence.kind}
       acknowledgedRevision={4n}
-      onRetryPersistence={() => undefined}
-      onAcceptRemote={() => undefined}
-      onKeepLocal={() => undefined}
-      remoteRefusal={remoteRefusal}
     />
   );
 }

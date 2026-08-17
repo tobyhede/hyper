@@ -57,6 +57,20 @@ export {
 export { cn } from './lib/utils';
 export { Alert, AlertAction, AlertDescription, AlertTitle } from './components/alert';
 export {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogMedia,
+  AlertDialogOverlay,
+  AlertDialogPortal,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from './components/alert-dialog';
+export {
   Card,
   CardAction,
   CardContent as CardSection,

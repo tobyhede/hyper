@@ -30,6 +30,7 @@ import { OpenCard } from './components/OpenCard';
 import { PlacementFailure } from './components/PlacementFailure';
 import { PlacementPending } from './components/PlacementPending';
 import { PresentingChrome } from './components/PresentingChrome';
+import { PersistenceControl } from './components/PersistenceControl';
 import { WorkspaceToolbar } from './components/WorkspaceToolbar';
 
 export const createApp = ({ space, spaceSession }: OpenedSpace) => {
@@ -84,19 +85,6 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
     const navigationState = authoringState.navigation;
     const selectedRenderer = navigationState.selectedRenderer;
     const selectedView = navigationState.selectedView;
-    // Why the remote state was refused, reported beside the control that asked
-    // for it. The workspace behind it still holds the local work and the
-    // conflict, so this is a message, not a mode.
-    //
-    // Held against the revision it explains, and read back only while that is
-    // still the revision in conflict. A refusal explains one remote snapshot, so
-    // it dies with it: `resolveConflict` commits again without leaving the
-    // conflicted state, so the next conflict can carry a different — and
-    // loadable — remote, and holding the old sentence over it would say the
-    // local work cannot be replaced when it now can. Derived rather than cleared
-    // by an effect, which would render the stale sentence against the new
-    // conflict for the commit before it ran.
-    const [refusal, setRefusal] = useState<{ revision: bigint; message: string } | null>(null);
     /**
      * The Alias creation state: editor-local, and nothing else (ADR 0042).
      *
@@ -108,12 +96,6 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
     const [aliasRefusal, setAliasRefusal] = useState<string | null>(null);
     /** The Card a completed creation asks the canvas to open its name editor on. */
     const [createdCardId, setCreatedCardId] = useState<CardId | null>(null);
-    const conflictRevision =
-      sessionState.persistence.kind === 'conflicted'
-        ? sessionState.persistence.current.revision
-        : null;
-    const remoteRefusal =
-      refusal !== null && refusal.revision === conflictRevision ? refusal.message : null;
     const rendererSpace = useMemo(
       () => readWorkingSpace(sessionState.working),
       [sessionState.working],
@@ -613,19 +595,16 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
             keyShortcut: ADD_CARD_KEY,
             menuTriggerRef: addCardMenu,
           }}
-          persistence={sessionState.persistence}
+          persistence={
+            <PersistenceControl
+              persistence={sessionState.persistence}
+              onRetry={authoring.retryPersistence}
+              onAcceptRemote={authoring.acceptStoredSpace}
+              onKeepLocal={authoring.keepLocalWork}
+            />
+          }
+          persistenceState={sessionState.persistence.kind}
           acknowledgedRevision={sessionState.acknowledgedRevision}
-          onRetryPersistence={authoring.retryPersistence}
-          onAcceptRemote={() => {
-            const message = authoring.acceptStoredSpace();
-            setRefusal(
-              message === null || conflictRevision === null
-                ? null
-                : { revision: conflictRevision, message },
-            );
-          }}
-          onKeepLocal={authoring.keepLocalWork}
-          remoteRefusal={remoteRefusal}
         />
       </>
     );
