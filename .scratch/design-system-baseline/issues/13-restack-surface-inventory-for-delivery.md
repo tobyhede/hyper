@@ -138,7 +138,7 @@ onto the declared clean branch and verify that branch independently.
 
 - **Issue 08:** stable stories and Ladle tests from `725c992` through `b45eba5`
   move only with their owning production component or into this final parity
-  completion PR. ADR 0052's manifest, dual evidence, runtime validation,
+  completion PR. ADR 0052's parity inventory, dual evidence, runtime validation,
   no-green-flakes reporting and Ladle CI job are new work.
 
 ### Explicitly rejected donor work
