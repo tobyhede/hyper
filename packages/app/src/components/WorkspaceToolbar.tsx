@@ -1,5 +1,6 @@
 import { useState, type ReactNode, type Ref } from 'react';
 import type { Graph, Layout } from '@project/core';
+import type { SpaceSessionState } from '@project/persistence';
 import {
   AddCardControl,
   Button,
@@ -43,9 +44,11 @@ export interface WorkspaceToolbarProps {
     readonly keyShortcut?: string;
     readonly menuTriggerRef?: Ref<HTMLButtonElement>;
   };
-  readonly persistence: ReactNode;
-  readonly persistenceState: string;
-  readonly acknowledgedRevision: bigint;
+  readonly persistence: {
+    readonly control: ReactNode;
+    readonly state: SpaceSessionState['persistence']['kind'];
+    readonly acknowledgedRevision: bigint;
+  };
 }
 
 const views = [
@@ -60,8 +63,6 @@ export function WorkspaceToolbar({
   graph,
   addCard,
   persistence,
-  persistenceState,
-  acknowledgedRevision,
 }: WorkspaceToolbarProps) {
   const [openMenu, setOpenMenu] = useState<'view' | 'layout' | 'graph' | null>(null);
   const activeGraph = graph.graphs.find((candidate) => candidate.id === graph.activeGraphId);
@@ -196,15 +197,15 @@ export function WorkspaceToolbar({
 
       <AddCardControl {...addCard} />
 
-      {persistence}
+      {persistence.control}
       <span
         hidden
         aria-hidden="true"
         data-testid="persistence-status"
-        data-persistence-state={persistenceState}
-        data-revision={acknowledgedRevision.toString()}
+        data-persistence-state={persistence.state}
+        data-revision={persistence.acknowledgedRevision.toString()}
       >
-        {persistenceState === 'settled' ? 'Persisted' : persistenceState}
+        {persistence.state === 'settled' ? 'Persisted' : persistence.state}
       </span>
     </>
   );

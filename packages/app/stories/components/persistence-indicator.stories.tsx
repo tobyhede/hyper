@@ -1,33 +1,63 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useSyncExternalStore } from 'react';
 import type { Story } from '@ladle/react';
-import { Button, PersistenceIndicator } from '@project/ui';
+import { uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
+import {
+  openSpaceSession,
+  type CommitResult,
+  type LoadedSpace,
+  type SpaceBackend,
+} from '@project/persistence';
+import { PersistenceControl } from '#components/PersistenceControl';
 
 export default { title: 'Components/Persistence Indicator' };
 
-/** The normal save lifecycle: working feedback, brief acknowledgement, then no chrome. */
+const snapshot: SpaceSnapshot = {
+  id: uuidSchema.parse('00000000-0000-4000-8000-000000000001'),
+  document: { version: 1, title: 'Lifecycle' },
+  cards: [],
+};
+
+class DelayedCommitBackend implements SpaceBackend {
+  listSpaces() {
+    return Promise.resolve([]);
+  }
+
+  loadSpace(_id: UUID): Promise<LoadedSpace | undefined> {
+    return Promise.resolve(undefined);
+  }
+
+  async commitSpace(_snapshot: SpaceSnapshot, expectedRevision: bigint): Promise<CommitResult> {
+    await new Promise<void>((resolve) => window.setTimeout(resolve, 1_000));
+    return { kind: 'committed', revision: expectedRevision + 1n };
+  }
+}
+
+/** A real SpaceSession drives pending, acknowledgement and the quiet settled state. */
 export const Lifecycle: Story = () => {
-  const [state, setState] = useState<'pending' | 'settled'>('settled');
-  const settleTimer = useRef<number | null>(null);
+  const session = useMemo(
+    () =>
+      openSpaceSession(new DelayedCommitBackend(), {
+        snapshot,
+        revision: 0n,
+        exportedRevision: null,
+      }),
+    [],
+  );
+  const state = useSyncExternalStore(session.subscribe, session.getState);
+  const submitted = useRef(false);
 
   useEffect(() => {
-    return () => {
-      if (settleTimer.current !== null) window.clearTimeout(settleTimer.current);
-    };
-  }, []);
-
-  const replay = () => {
-    if (settleTimer.current !== null) window.clearTimeout(settleTimer.current);
-    setState('pending');
-    settleTimer.current = window.setTimeout(() => {
-      settleTimer.current = null;
-      setState('settled');
-    }, 1_000);
-  };
+    if (submitted.current) return;
+    submitted.current = true;
+    session.submit(snapshot);
+  }, [session]);
 
   return (
-    <div className="flex items-center gap-2">
-      <Button onClick={replay}>Replay save</Button>
-      <PersistenceIndicator state={state} />
-    </div>
+    <PersistenceControl
+      persistence={state.persistence}
+      onRetry={session.retry}
+      onAcceptRemote={() => null}
+      onKeepLocal={() => undefined}
+    />
   );
 };

@@ -595,16 +595,18 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
             keyShortcut: ADD_CARD_KEY,
             menuTriggerRef: addCardMenu,
           }}
-          persistence={
-            <PersistenceControl
-              persistence={sessionState.persistence}
-              onRetry={authoring.retryPersistence}
-              onAcceptRemote={authoring.acceptStoredSpace}
-              onKeepLocal={authoring.keepLocalWork}
-            />
-          }
-          persistenceState={sessionState.persistence.kind}
-          acknowledgedRevision={sessionState.acknowledgedRevision}
+          persistence={{
+            control: (
+              <PersistenceControl
+                persistence={sessionState.persistence}
+                onRetry={authoring.retryPersistence}
+                onAcceptRemote={authoring.acceptStoredSpace}
+                onKeepLocal={authoring.keepLocalWork}
+              />
+            ),
+            state: sessionState.persistence.kind,
+            acknowledgedRevision: sessionState.acknowledgedRevision,
+          }}
         />
       </>
     );

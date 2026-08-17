@@ -8,6 +8,7 @@
     "packages/*/src",
     "packages/*/test",
     "packages/app/e2e",
+    "packages/app/ladle-e2e",
     "migrations/**/*.ts",
     "src",
     "test/integration",

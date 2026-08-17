@@ -44,9 +44,11 @@ const settledProps = (): WorkspaceToolbarProps => ({
     keyShortcut: 'C',
     menuTriggerRef: createRef<HTMLButtonElement>(),
   },
-  persistence: <PersistenceIndicator state="settled" />,
-  persistenceState: 'settled',
-  acknowledgedRevision: 4n,
+  persistence: {
+    control: <PersistenceIndicator state="settled" />,
+    state: 'settled',
+    acknowledgedRevision: 4n,
+  },
 });
 
 describe('WorkspaceToolbar', () => {
@@ -89,8 +91,11 @@ describe('WorkspaceToolbar', () => {
     rerender(
       <WorkspaceToolbar
         {...props}
-        persistence={<PersistenceIndicator state="pending" />}
-        persistenceState="pending"
+        persistence={{
+          control: <PersistenceIndicator state="pending" />,
+          state: 'pending',
+          acknowledgedRevision: 4n,
+        }}
       />,
     );
     expect(menubar).not.toContainElement(screen.getByRole('button', { name: 'Saving changes' }));

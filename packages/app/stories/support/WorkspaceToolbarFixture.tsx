@@ -70,16 +70,18 @@ export function WorkspaceToolbarFixture({
         keyShortcut: 'C',
         menuTriggerRef: addCardMenu,
       }}
-      persistence={
-        <PersistenceControl
-          persistence={persistence}
-          onRetry={() => undefined}
-          onAcceptRemote={() => remoteRefusal}
-          onKeepLocal={() => undefined}
-        />
-      }
-      persistenceState={persistence.kind}
-      acknowledgedRevision={4n}
+      persistence={{
+        control: (
+          <PersistenceControl
+            persistence={persistence}
+            onRetry={() => undefined}
+            onAcceptRemote={() => remoteRefusal}
+            onKeepLocal={() => undefined}
+          />
+        ),
+        state: persistence.kind,
+        acknowledgedRevision: 4n,
+      }}
     />
   );
 }

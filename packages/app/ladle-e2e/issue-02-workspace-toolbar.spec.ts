@@ -1,0 +1,48 @@
+import { expect, test } from '@playwright/test';
+
+test('Persistence Indicator story renders the production save lifecycle', async ({ page }) => {
+  await page.goto('/?story=components--persistence-indicator--lifecycle&mode=preview');
+
+  await expect(page.getByRole('button', { name: 'Saving changes' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Changes saved' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Changes saved' })).toBeHidden({ timeout: 4_000 });
+});
+
+test('Workspace Toolbar story renders production Menubar behavior', async ({ page }) => {
+  await page.goto('/?story=components--workspace-toolbar--pending&mode=preview');
+
+  await expect(page.getByRole('menubar', { name: 'Workspace commands' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Saving changes' })).toBeVisible();
+  await expect(page.getByTestId('layout-live-indicator')).toBeVisible();
+
+  await page.getByTestId('view-selector').click();
+  await page.getByRole('menuitemradio', { name: 'Grid', exact: true }).click();
+  await expect(page.getByTestId('layout-live-indicator')).toBeHidden();
+
+  const moreKinds = page.getByRole('button', { name: 'More Card kinds' });
+  await moreKinds.click();
+  await expect(page.getByRole('menuitem', { name: 'Add Alias' })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('menuitem', { name: 'Add Alias' })).toBeHidden();
+  await expect(moreKinds).toBeFocused();
+});
+
+test('Workspace Toolbar stories render production conflict and rejection recovery', async ({
+  page,
+}) => {
+  await page.goto('/?story=components--workspace-toolbar--conflicted&mode=preview');
+
+  await expect(page.getByRole('alertdialog', { name: 'Changes conflict' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Reload' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Save' })).toBeVisible();
+  await page.getByRole('button', { name: 'Reload' }).click();
+  await expect(page.getByTestId('persistence-remote-refused')).toContainText(
+    'The remote space is invalid and was not accepted.',
+  );
+
+  await page.goto('/?story=components--workspace-toolbar--rejected&mode=preview');
+  await expect(page.getByRole('alertdialog', { name: 'Changes couldn’t be saved' })).toBeVisible();
+  await expect(page.getByText('Permission denied')).toBeVisible();
+  await page.getByRole('button', { name: 'Continue editing' }).click();
+  await expect(page.getByRole('button', { name: 'Persistence rejected' })).toBeVisible();
+});
