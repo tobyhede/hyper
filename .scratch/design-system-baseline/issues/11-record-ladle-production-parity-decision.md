@@ -5,7 +5,7 @@ alternatives, then record the durable decision at the level its trade-off earns.
 
 **Blocked by:** None — resolve before issue 08 treats the gate as settled.
 
-**Status:** ready-for-agent
+**Status:** ready-for-human
 
 **Delivery:** The decision and its acceptance work are complete on the donor.
 The remaining work is to extract ADR 0052 and reconcile its operational
@@ -39,3 +39,12 @@ seam. Its donor versions of `AGENTS.md`, `$shadcn-first-ui` and
 `.ladle/config.mjs` point to ADR 0052 at their respective operational boundaries
 rather than owning competing rationales; the unchecked delivery criterion owns
 bringing that coherent set to `main`.
+
+## Delivery
+
+ADR 0052 is now prepared on the clean Issue 11 branch from `main`. The
+foundation already delivered the operational `$shadcn-first-ui` pointer to the
+ADR, so this extraction does not restore the donor's duplicated AGENTS.md rule.
+The Ladle runtime, configuration and mechanical parity inventory remain owned
+by Issue 08 and will point to the ADR when that infrastructure lands. Merge and
+final PR accounting remain before this ticket can be resolved.

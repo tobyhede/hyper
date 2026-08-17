@@ -51,9 +51,12 @@ acceptance criteria or `Blocked by` relationships in the referenced tickets.
 
 - Issue 12 merged through PR #72.
 - Issue 09 merged through PR #73.
-- Issue 01 is being delivered by PR #74; this tracker is included there so every
+- Issue 01 merged through PR #74; this tracker is included there so every
   subsequent clean branch from `main` inherits the remaining tickets and their
   dependency order.
+- Issue 11's ADR 0052 decision is extracted on `feat/ladle-production-parity`
+  from PR #74's merge commit. Ladle runtime and enforcement files remain
+  assigned to Issue 08 rather than riding with the decision record.
 
 ## Preserved work
 

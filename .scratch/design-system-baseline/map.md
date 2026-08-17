@@ -10,9 +10,9 @@ and migrates production surfaces onto it without replacing Ladle.
 retained change into bounded delivery PRs from `main`; the referenced tickets
 retain their functional scope and blockers.
 
-Issue 12 shipped in PR #72, Issue 09 shipped in PR #73, and Issue 01 is being
-delivered by PR #74. Issue 13 remains the accounting source for the remaining
-extraction order.
+Issue 12 shipped in PR #72, Issue 09 shipped in PR #73, and Issue 01 shipped in
+PR #74. Issue 11's decision is extracted on its clean delivery branch. Issue 13
+remains the accounting source for the remaining extraction order.
 
 ## Decisions so far
 
