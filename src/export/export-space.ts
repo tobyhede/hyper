@@ -80,7 +80,6 @@ const canonicalCard = (
   const common = {
     id,
     title: document.title,
-    ...(document.description === undefined ? {} : { description: document.description }),
   };
   return document.kind === 'alias'
     ? { ...common, kind: 'alias', target: document.target }

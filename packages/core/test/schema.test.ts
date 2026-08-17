@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
   BUILT_IN_VIEW_IDS,
-  CARD_DESCRIPTION_MAX_LENGTH,
   cardFrontmatterSchema,
   cardSchema,
   isBuiltInViewId,
@@ -306,31 +305,13 @@ describe('card frontmatter schema', () => {
     ).toBe(false);
   });
 
-  it('accepts an optional single-line card description', () => {
+  it('does not make Description part of the shared Card contract', () => {
     const card = cardFrontmatterSchema.parse({
       id: '00000000-0000-4000-8000-000000000002',
       title: 'A',
       description: 'What A is',
     });
-    expect(card.description).toBe('What A is');
-  });
-
-  it('rejects a description longer than the cap', () => {
-    const result = cardFrontmatterSchema.safeParse({
-      id: '00000000-0000-4000-8000-000000000002',
-      title: 'A',
-      description: 'x'.repeat(CARD_DESCRIPTION_MAX_LENGTH + 1),
-    });
-    expect(result.success).toBe(false);
-  });
-
-  it('rejects a multi-line description — a caption, not a body', () => {
-    const result = cardFrontmatterSchema.safeParse({
-      id: '00000000-0000-4000-8000-000000000002',
-      title: 'A',
-      description: 'line one\nline two',
-    });
-    expect(result.success).toBe(false);
+    expect('description' in card).toBe(false);
   });
 });
 

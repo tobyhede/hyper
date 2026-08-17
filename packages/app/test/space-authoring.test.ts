@@ -471,7 +471,6 @@ describe('Space Authoring', () => {
         cardId: CARD_A,
         document: {
           title: 'A',
-          description: 'Edited in place',
           kind: 'markdown',
           body: '# Edited',
         },
@@ -481,7 +480,6 @@ describe('Space Authoring', () => {
     expect(control.attempts).toHaveLength(1);
     expect(control.attempts[0]?.snapshot.cards[0]?.document).toEqual({
       title: 'A',
-      description: 'Edited in place',
       kind: 'markdown',
       body: '# Edited',
     });
@@ -594,32 +592,6 @@ describe('Space Authoring', () => {
       reason: 'An Alias must target a Card that owns its content.',
     });
     expect(session.getState().working).toBe(before);
-  });
-
-  it('edits an Alias description without touching its Target', () => {
-    const { authoring, session } = openRefusalFixture();
-
-    expect(
-      complete(authoring, {
-        kind: 'edited-card',
-        cardId: CARD_B,
-        document: {
-          title: 'A again',
-          description: 'Where the introduction returns',
-          kind: 'alias',
-          target: CARD_A,
-        },
-      }),
-    ).toEqual({ kind: 'completed' });
-    expect(session.getState().working.cards[1]).toEqual({
-      id: CARD_B,
-      document: {
-        title: 'A again',
-        description: 'Where the introduction returns',
-        kind: 'alias',
-        target: CARD_A,
-      },
-    });
   });
 
   /**

@@ -150,6 +150,12 @@ function props({
 }
 
 describe('CardNode title authoring', () => {
+  it('draws no shared Description slot on the Card front', () => {
+    render(<CardNode {...props()} />);
+
+    expect(screen.queryByTestId('card-description')).not.toBeInTheDocument();
+  });
+
   it('begins inline title editing from a double click on the title', () => {
     const onBeginTitleEditing = vi.fn();
     const { rerender } = render(
@@ -173,8 +179,8 @@ describe('CardNode title authoring', () => {
   });
 
   /**
-   * The pencil edits the Card, not one field of it — it opens the description
-   * and Markdown surface. Renaming is the title's own gesture and `F2`.
+   * The pencil edits the Card, not one field of it — it opens the Markdown
+   * surface. Renaming is the title's own gesture and `F2`.
    */
   it('edits the Card from the affordance, without touching the title', () => {
     const onEditCard = vi.fn();

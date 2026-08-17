@@ -106,38 +106,6 @@ describe('projectCardNodes', () => {
     expect('markdown' in a.data).toBe(false);
   });
 
-  it("carries a card's description when it has one, and omits it otherwise", () => {
-    const described = load(
-      spaceFile([
-        {
-          id: '00000000-0000-4000-8000-000000000004',
-          title: 'Main',
-          edges: [
-            {
-              from: '00000000-0000-4000-8000-000000000002',
-              to: '00000000-0000-4000-8000-000000000003',
-            },
-          ],
-        },
-      ]),
-      [
-        {
-          path: 'cards/a.md',
-          text: '---\nid: 00000000-0000-4000-8000-000000000002\ntitle: Card A\ndescription: What A is\n---\n',
-        },
-        cardFile('00000000-0000-4000-8000-000000000003', 'Card B'),
-      ],
-    );
-    const nodes = projectCardNodes(described, buildCardHandles(described), colors);
-    expect(
-      nodes.find((n) => n.id === '00000000-0000-4000-8000-000000000002')!.data.description,
-    ).toBe('What A is');
-    // Absent, not undefined — a card with no description carries no key.
-    expect(
-      'description' in nodes.find((n) => n.id === '00000000-0000-4000-8000-000000000003')!.data,
-    ).toBe(false);
-  });
-
   it('attaches per-graph handles colored by graph', () => {
     const nodes = projectCardNodes(space, handles, colors);
     const a = nodes.find((n) => n.id === '00000000-0000-4000-8000-000000000002')!;

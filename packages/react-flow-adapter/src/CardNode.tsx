@@ -271,11 +271,6 @@ export function CardNode({ data, selected, isConnectable }: NodeProps<CardFlowNo
               </h2>
             </div>
           )}
-          {data.description && (
-            <p className="card__description" data-testid="card-description">
-              {data.description}
-            </p>
-          )}
           {/* The Target's title, read-only, under the Alias's own — so a
               redraw reads as a deliberate return rather than repetition, and
               stays legible when the two titles match. The glyph that used to

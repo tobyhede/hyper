@@ -69,9 +69,6 @@ Between them the shape exercises every behaviour the e2e suite covers:
   between them.
 - **Aliases on a Graph (ADR 0009).** `A′` / `E′` show `A` / `E`'s content under
   their own titles and at distinct positions.
-- **Card description (ADR 0006, card-display/03).** `A` carries a `description`
-  ("Where the first collection begins"), drawn under its title in the graph node; the other
-  cards have none, so the node renders with and without one.
 - **Open shows source (ADR 0011).** `A`'s body carries `**A**`, so opening it can
   prove the Markdown markers survive rather than rendering bold.
 - **A heading in a body is just a heading (ADR 0020).** `C`'s body opens with

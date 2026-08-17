@@ -241,7 +241,6 @@ describe('authoring an opened Card', () => {
           id: ALIAS_ID,
           document: {
             title: 'A again',
-            description: 'Alias caption stays authored here',
             kind: 'alias',
             target: CARD_ID,
           },
@@ -252,7 +251,6 @@ describe('authoring an opened Card', () => {
 
     fireEvent.click(await screen.findByRole('button', { name: 'Edit Card A again' }));
     expect(screen.getByRole('textbox', { name: 'Title' })).toHaveValue('A again');
-    expect(screen.queryByRole('textbox', { name: /Description/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('textbox', { name: /Markdown source/ })).not.toBeInTheDocument();
     fireEvent.change(screen.getByRole('textbox', { name: 'Title' }), {
       target: { value: 'Recap' },
@@ -279,9 +277,6 @@ describe('authoring an opened Card', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Edit Card A' }));
     fireEvent.change(screen.getByRole('textbox', { name: 'Markdown source' }), {
       target: { value: 'Written once, shown everywhere' },
-    });
-    fireEvent.change(screen.getByRole('textbox', { name: 'Description' }), {
-      target: { value: 'One caption, three occurrences' },
     });
     fireEvent.click(screen.getByRole('button', { name: 'Done' }));
 

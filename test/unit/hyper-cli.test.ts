@@ -386,7 +386,6 @@ describe('runHyper', () => {
           id: CARD_ID,
           document: {
             title: 'Opening: why',
-            description: 'A canonical card',
             kind: 'markdown',
             body: '# Opening\n\nHello.\n',
           },

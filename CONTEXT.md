@@ -21,7 +21,7 @@ _Avoid_: guid, key, slug, local id, authored id, and any pairing of a "human" id
 **Card**:
 A single addressable piece of a space, and the thing a Graph's Edges run between. Named for HyperCard's card.
 
-A card has a **title**, which names it wherever it is listed or drawn, and **content**, which is what it holds. The two are distinct: a view may show one without the other, and the graph draws the title, not the content. A card may also carry a short optional **description** — a caption saying what it is when the title alone is too terse — which the graph draws under the title; it is not a second body (it is capped and single-line), and the content still lives in the card.
+A card has a **Title**, which names it wherever it is listed or drawn, and a **kind**, which owns everything else: the additional fields, the opened editor, and what the Card front draws around the Title. Card fronts keep one uniform geometry across kinds. Markdown owns its body; Alias owns its Target. There is no shared Description, summary, or second content slot on Card.
 
 A card is one of three kinds, and the kind is what its content is: **Markdown** — written directly by the author; a **space** — a nested graph the viewer opens and explores in place; or an **alias** — another card, shown again here.
 _Avoid_: node, slide, page, tile, subgraph. For the content: prose (it may be a table, a diagram or code, not only writing), body (works for markdown, but a space card's content is a graph).
@@ -129,7 +129,7 @@ Projecting a space into the repository-friendly form an author can review, commi
 _Avoid_: saving, publishing, syncing.
 
 **Opening**:
-Bringing a single card's content up in place, over whatever view the author is in, to author it. A markdown card opens on its title, its description and its Markdown source, verbatim and editable; an alias opens on the two things it owns, its own title and its target, and on nothing of the card that target names — that card is opened explicitly to author its content, at the single source of truth every alias then shows; and a space card opens on its nested graph to explore. Opening is not presenting — the view it happens over is still the thing being worked in, and a markdown card is only ever drawn *rendered* by presenting. There is no separate reading state: what a card opens on is what an author edits, because they were always the same bytes in the same order.
+Bringing a single card's content up in place, over whatever view the author is in, to author it. A Markdown Card opens on its Title and Markdown source, verbatim and editable; an Alias opens on the two things it owns, its own Title and Target, and on nothing of the Card that Target names — that Card is opened explicitly to author its content, at the single source of truth every Alias then shows; and a Space Card opens on its nested Graph to explore. Opening is not presenting — the View it happens over is still the thing being worked in, and a Markdown Card is only ever drawn *rendered* by presenting. There is no separate reading state: what a Card opens on is what an author edits, because they were always the same bytes in the same order.
 _Avoid_: expand, preview, popup, modal, drill-down, view mode and edit mode (there is one surface).
 
 **Presenting**:

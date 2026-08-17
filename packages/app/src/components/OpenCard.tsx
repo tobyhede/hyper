@@ -18,10 +18,8 @@ import { CardPicker } from './CardPicker';
 type MarkdownDraft = {
   readonly kind: 'markdown';
   readonly title: string;
-  readonly description: string;
   readonly body: string;
   readonly titleError: string | null;
-  readonly descriptionError: string | null;
 };
 
 type ContentDraft = MarkdownDraft;
@@ -78,53 +76,39 @@ const markdownFields: ContentFieldGroup<MarkdownCard, MarkdownDraft> = {
   seed: (card) => ({
     kind: 'markdown',
     title: card.title,
-    description: card.description ?? '',
     body: card.body,
     titleError: null,
-    descriptionError: null,
   }),
 
   settle: (card, draft) => {
-    // Both trimmed, and for the same reason the graph's inline editor trims:
-    // `min(1)` counts characters and a space is one, so a title of spaces draws
-    // as nothing and a description of spaces leaves a caption that says nothing
-    // and no field left to clear. The body is *not* trimmed — leading and
-    // trailing whitespace there is Markdown the author wrote.
-    //
+    // The title is trimmed for the same reason the graph's inline editor trims:
+    // `min(1)` counts characters and a space is one. The body is *not* trimmed —
+    // leading and trailing whitespace there is Markdown the author wrote.
     const named = draft.title.trim();
-    const caption = draft.description.trim();
     const parsed = markdownCardSchema.safeParse({
       id: card.id,
       title: named,
-      ...(caption.length > 0 ? { description: caption } : {}),
       kind: 'markdown',
       body: draft.body,
     });
     if (parsed.success) return { ok: true, card: parsed.data };
 
     const forTitle = parsed.error.issues.find((candidate) => candidate.path[0] === 'title');
-    const forDescription = parsed.error.issues.find(
-      (candidate) => candidate.path[0] === 'description',
-    );
     const titleError =
       forTitle === undefined
         ? null
         : named.length === 0
           ? 'A Card title is required.'
           : forTitle.message;
-    // `markdownCardSchema` has five paths and this form writes two of them. An
+    // `markdownCardSchema` has four paths and this form writes two of them. An
     // issue on `id`, `kind` or `body` therefore belongs to no field here, and
-    // it goes to the form's own slot rather than onto Description — which is
-    // where every such issue used to land, marking a caption the author had
-    // just written correctly as the thing that failed. Asked of the issues
-    // rather than inferred from the absence of a title issue, so a body problem
-    // is still said out loud when a title problem is being drawn beside it.
-    const unattributed = parsed.error.issues.some(
-      (candidate) => candidate.path[0] !== 'title' && candidate.path[0] !== 'description',
-    );
+    // it goes to the form's own slot. Asked of the issues rather than inferred
+    // from the absence of a title issue, so a body problem is still said out
+    // loud when a title problem is being drawn beside it.
+    const unattributed = parsed.error.issues.some((candidate) => candidate.path[0] !== 'title');
     return {
       ok: false,
-      draft: { ...draft, titleError, descriptionError: forDescription?.message ?? null },
+      draft: { ...draft, titleError },
       refusal: unattributed ? 'The Card could not be completed.' : null,
     };
   },
@@ -146,24 +130,6 @@ const markdownFields: ContentFieldGroup<MarkdownCard, MarkdownDraft> = {
       {draft.titleError !== null && (
         <span id="open-card-title-error" role="alert" className="card-pane__field-error">
           {draft.titleError}
-        </span>
-      )}
-      <label className="card-pane__field">
-        <span>Description</span>
-        <input
-          aria-invalid={draft.descriptionError !== null}
-          aria-describedby={
-            draft.descriptionError === null ? undefined : 'open-card-description-error'
-          }
-          value={draft.description}
-          onChange={(event) =>
-            onChange({ ...draft, description: event.currentTarget.value, descriptionError: null })
-          }
-        />
-      </label>
-      {draft.descriptionError !== null && (
-        <span id="open-card-description-error" role="alert" className="card-pane__field-error">
-          {draft.descriptionError}
         </span>
       )}
       <label className="card-pane__field card-pane__field--source">
@@ -419,9 +385,9 @@ function AliasEditorForm({
  * Markdown renderer so a card could not read one way and present another, and
  * that half holds: presenting remains the one place a card is drawn rendered.
  *
- * A content Card authors its title, description and content. An Alias authors
- * only its own title and Target; its Target must be opened separately to author
- * that Card's content.
+ * A Markdown Card authors its Title and source. An Alias authors only its own
+ * Title and Target; its Target must be opened separately to author that Card's
+ * content.
  */
 export function OpenCard(props: OpenCardProps) {
   const { onCancel } = props;

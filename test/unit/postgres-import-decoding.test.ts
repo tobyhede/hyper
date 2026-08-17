@@ -221,23 +221,9 @@ describe('PostgresSpaceRepository import decoding', () => {
         },
         cards: [],
       },
-      // The bounded strings, the refinement, and the one union that is not
-      // discriminated — each writes a different sentence.
+      // A bounded string and the one union that is not discriminated — each
+      // writes a different sentence.
       { id: SPACE_ID, document: { version: 1, title: '' }, cards: [] },
-      {
-        id: SPACE_ID,
-        document: { version: 1, title: 'T' },
-        cards: [
-          {
-            id: CARD_ID,
-            document: { title: 'C', kind: 'markdown', body: '', description: 'a\nb' },
-          },
-          {
-            id: CARD_ID,
-            document: { title: 'C', kind: 'markdown', body: '', description: 'x'.repeat(200) },
-          },
-        ],
-      },
       {
         id: SPACE_ID,
         document: { version: 1, title: 'T', defaultView: 'SpaceCanvas' },
