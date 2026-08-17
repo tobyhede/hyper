@@ -7,12 +7,6 @@
       "skillPath": "skills/engineering/ask-matt/SKILL.md",
       "computedHash": "6e3b5a2e3b73781c8118d81b853eb68effc35de6c514d956f8a3a9569b3dc435"
     },
-    "code-review": {
-      "source": "mattpocock/skills",
-      "sourceType": "github",
-      "skillPath": "skills/engineering/code-review/SKILL.md",
-      "computedHash": "1d5e7242a98674635be79ab310cdda0e555d36a9903d2526ebf4263d0b7997ca"
-    },
     "codebase-design": {
       "source": "mattpocock/skills",
       "sourceType": "github",
