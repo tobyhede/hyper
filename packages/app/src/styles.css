@@ -484,7 +484,7 @@ body {
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: 0.8rem;
-  color: var(--muted-foreground, #8a94a6);
+  color: var(--muted-foreground);
 }
 
 .card__title {
@@ -602,13 +602,13 @@ body {
 .presenting__end {
   margin: 0;
   font-size: 0.85rem;
-  color: var(--muted-foreground, #8a94a6);
+  color: var(--muted-foreground);
 }
 
 .presenting__keys {
   margin: 0;
   font-size: 0.75rem;
-  color: var(--muted-foreground, #8a94a6);
+  color: var(--muted-foreground);
   white-space: nowrap;
 }
 

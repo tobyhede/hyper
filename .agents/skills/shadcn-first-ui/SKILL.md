@@ -11,9 +11,11 @@ Production UI in Hyper is design-system-first.
 
 Before writing JSX for a new UI concept:
 
-1. Run `pnpm ui:catalog`.
+1. Inspect the local UI catalogue when the repository provides one. Until then,
+   inspect the public `@project/ui` exports, `components.json`, and relevant
+   tests directly.
 2. Inspect the existing `@project/ui` component or composition that most closely matches the requirement.
-3. Inspect its Ladle stories and tests.
+3. Inspect its production-parity Ladle stories when present, and its tests.
 4. When Hyper lacks the capability, search the configured shadcn registry through the shadcn MCP server. If the optional server is unavailable, use `pnpm dlx shadcn@4.18.0` and the upstream `$shadcn` workflow for read-only search and documentation. Never substitute `@latest` or an unversioned package invocation.
 5. Prefer composition of existing components over adding another component.
 6. Use the shadcn component when it supplies the primitive or composition.
@@ -71,4 +73,7 @@ Use `$prototype` only while a visual or product question is unresolved. A chosen
 
 Test semantics through accessible roles and user behavior. Every meaningful stable-story claim requires both a Ladle behavior test and a corresponding application behavior test; this dual verification is mandatory even when the local behavior appears straightforward. Compilation, screenshots, class assertions and element counts do not establish parity.
 
-Run the relevant tests and `pnpm verify` before completion. Run `pnpm e2e:ladle` for catalogue changes. Run `pnpm e2e` for UI, graph, canvas, or rendering changes. Record the actual command outcomes in the pull request description.
+Run the relevant tests and `pnpm verify` before completion. Run the
+repository's catalogue browser gate for catalogue changes when it exists. Run
+`pnpm e2e` for UI, graph, canvas, or rendering changes. Record the actual
+command outcomes in the pull request description.
