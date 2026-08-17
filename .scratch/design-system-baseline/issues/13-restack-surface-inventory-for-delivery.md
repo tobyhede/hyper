@@ -20,8 +20,9 @@ and a trustworthy verification gate.
       reviewable against their declared base.
 - [ ] Run each PR's required verification in its own final shape; inherited
       green evidence from the donor branch does not count.
-- [ ] Keep the donor branch and the issue 02 stash until every retained change
-      has landed or has a verified owner elsewhere.
+- [ ] Keep the donor branch until every retained change has landed or has a
+      verified owner elsewhere; keep Issue 02's WIP available through its
+      tracked patch.
 - [ ] Record the final PR links, dependency order, retained commits and rejected
       donor changes in this ticket before resolving it.
 
@@ -33,8 +34,9 @@ and a trustworthy verification gate.
    further Card/editor work.
 3. Extract the resolved issue 01 design-system foundation and its tooling
    without production-surface migrations.
-4. Extract the static Ladle runtime, taxonomy and catalogue infrastructure with
-   only production-parity stable stories.
+4. Extract Issue 11's ADR 0052 decision and operational pointers together with
+   the static Ladle runtime, taxonomy and catalogue infrastructure, with only
+   production-parity stable stories.
 5. Deliver issues 02–07 as bounded production migrations in dependency order.
 6. Deliver issue 10 after issue 03 has established the pane composition it
    depends on.
@@ -49,21 +51,24 @@ acceptance criteria or `Blocked by` relationships in the referenced tickets.
 
 - Issue 12 merged through PR #72.
 - Issue 09 merged through PR #73.
-- Issue 01 is delivered by PR #74; this tracker is included there so every
+- Issue 01 is being delivered by PR #74; this tracker is included there so every
   subsequent clean branch from `main` inherits the remaining tickets and their
   dependency order.
 
 ## Preserved work
 
-The partial issue 02 Menubar migration is stored as git object
-`2814ec7c5b135ba1fe5a07d9f472a66c8634d9fe`, named
-`wip issue 02 workspace menubar migration` (`stash@{0}` when created). Apply it
-only on issue 02's eventual delivery branch and revalidate it against the state
-that branch actually inherits.
+The partial Issue 02 Menubar migration is stored as the tracked patch
+`../patches/issue-02-workspace-menubar-wip.patch`. Its source was local stash
+object `2814ec7c5b135ba1fe5a07d9f472a66c8634d9fe`, named
+`wip issue 02 workspace menubar migration` (`stash@{0}` when created). Inspect
+and rework the patch's intent only on Issue 02's eventual delivery branch. It
+targets the donor's later surface, so do not assume it applies cleanly to the
+files that branch inherits.
 
-Do not delete `feat/surface-inventory` or this stash merely because extraction
-has begun. They may be removed only after the final accounting proves that no
-retained work exists solely in either donor.
+Keep `feat/surface-inventory` until final accounting proves no retained work
+exists solely on the donor. The tracked patch makes Issue 02's WIP available
+from `main`; the local stash object is historical evidence rather than a runtime
+dependency.
 
 ## Donor accounting
 
@@ -108,9 +113,10 @@ onto the declared clean branch and verify that branch independently.
 
 ### Production migration PRs
 
-- **Issue 02 — workspace toolbar:** `90f87ee` plus the preserved stash
+- **Issue 02 — workspace toolbar:** `90f87ee` plus the tracked WIP patch at
+  `../patches/issue-02-workspace-menubar-wip.patch`, sourced from stash object
   `2814ec7c5b135ba1fe5a07d9f472a66c8634d9fe`; rework rather than blindly apply
-  where the stash conflicts with current Menubar behavior.
+  where the donor surface conflicts with the clean branch.
 - **Issue 03 — Card and Alias panes:** `f570a1c`, `50105ad`, `b2895d6`,
   `a139caa`, and the pane/focus corrections in `6292d9e` and `b45eba5`.
 - **Issue 04 — selection and feedback:** `d8520b6` and the workspace-chooser

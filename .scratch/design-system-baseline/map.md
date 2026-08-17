@@ -10,16 +10,15 @@ and migrates production surfaces onto it without replacing Ladle.
 retained change into bounded delivery PRs from `main`; the referenced tickets
 retain their functional scope and blockers.
 
-Delivery is now recorded on `main` rather than left solely on the donor:
-Issue 12 shipped in PR #72, Issue 09 shipped in PR #73, and Issue 01 is the
-foundation delivered by PR #74. Issue 13 remains the accounting source for the
-remaining extraction order.
+Issue 12 shipped in PR #72, Issue 09 shipped in PR #73, and Issue 01 is being
+delivered by PR #74. Issue 13 remains the accounting source for the remaining
+extraction order.
 
 ## Decisions so far
 
-- [Establish the shadcn design-system baseline](issues/01-establish-shadcn-design-system-baseline.md) — `packages/ui/components.json` owns generated component placement, `@project/ui` owns the public surface, application tokens have one owner, and Ladle renders the real exported primitives.
+- [Establish the shadcn design-system baseline](issues/01-establish-shadcn-design-system-baseline.md) — `packages/ui/components.json` owns generated component placement, `@project/ui` owns the public surface, and application tokens have one owner. Ladle runtime and stable stories remain deferred to their owning extractions.
 - [Retire shared Card Description](issues/09-reconcile-card-description-semantics.md) — Card owns identity, kind and Title; each kind owns its remaining fields and both presentations inside uniform Card geometry (ADR 0051).
-- [Treat stable Ladle stories as production-parity evidence](issues/11-record-ladle-production-parity-decision.md) — real production boundaries and mandatory dual behavioral verification make the catalogue trustworthy; issue 08 owns mechanical traceability (ADR 0052).
+- [Treat stable Ladle stories as production-parity evidence](issues/11-record-ladle-production-parity-decision.md) — the donor decision requires real production boundaries and dual behavioral verification; Issue 11 still owns delivering ADR 0052 to `main`, then Issue 08 owns mechanical traceability.
 - [Restack surface inventory for delivery](issues/13-restack-surface-inventory-for-delivery.md) — freeze this branch as a donor and account for every retained change across bounded, independently verified PRs from `main`.
 
 ## Audit follow-ups

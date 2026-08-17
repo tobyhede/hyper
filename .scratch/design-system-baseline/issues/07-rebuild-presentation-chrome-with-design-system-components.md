@@ -9,3 +9,10 @@
 - [ ] Available moves, selected moves and the end state are visually and accessibly distinct without changing traversal behaviour.
 - [ ] Keyboard guidance and the Overview exit preserve their current actions and remain usable at narrow viewport sizes.
 - [ ] Ladle shows real presentation states for no moves, one move, branching and retreat availability.
+
+## Audit note
+
+No production presentation-state catalogue landed for the required no-move,
+single-move, branching and retreat cases. The production presentation chrome
+also remains outside the new design-system composition; both halves belong to
+this ticket.

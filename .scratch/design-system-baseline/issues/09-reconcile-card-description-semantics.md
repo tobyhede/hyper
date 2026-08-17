@@ -13,7 +13,7 @@ decisions, schema guidance, production UI and tests state one contract.
 - [x] Compare the branch's title-only Card front with ADR 0006's description-under-title direction and ADR 0048's Markdown editor field contract.
 - [x] Decide that title-only is the intended product behavior after grilling the trade-off rather than treating it as accidental scope creep.
 - [x] Record a new ADR that supersedes or refines the affected accepted ADRs, updating relationship metadata from both ends.
-- [x] `CONTEXT.md`, schema comments, `CanvasCard`, the opened Markdown editor, fixtures and tests all implement the resulting decision without deleting Description data silently.
+- [x] `CONTEXT.md`, schema comments, `CanvasCard`, the opened Markdown editor, fixtures and tests remove the Description contract and every tracked Description value deliberately. Hyper is prerelease, so no compatibility migration is provided for untracked authored files.
 - [x] `pnpm verify` and `pnpm e2e` pass.
 
 ## Answer

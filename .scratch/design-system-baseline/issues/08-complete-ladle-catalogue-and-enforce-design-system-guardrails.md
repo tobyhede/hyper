@@ -2,7 +2,7 @@
 
 **What to build:** Make Ladle a trustworthy catalogue of the real UI, then enforce the boundary that product components and styles come through the design system while React Flow retains only its necessary geometry and integration styling.
 
-**Blocked by:** 02 — Replace the workspace toolbar with a Menubar; 03 — Recompose Card and Alias panes from form primitives; 04 — Bring workspace selection and operational feedback into the system; 05 — Make the production canvas Card a design-system component; 06 — Systematise Graph HUD and Edge authoring surfaces; 07 — Rebuild presentation chrome with design-system components.
+**Blocked by:** 02 — Replace the workspace toolbar with a Menubar; 03 — Recompose Card and Alias panes from form primitives; 04 — Bring workspace selection and operational feedback into the system; 05 — Make the production canvas Card a design-system component; 06 — Systematise Graph HUD and Edge authoring surfaces; 07 — Rebuild presentation chrome with design-system components; 11 — Deliver ADR 0052 and its production-parity operating rule to `main`.
 
 **Status:** ready-for-agent
 
@@ -20,4 +20,52 @@
 - [ ] `stories/review` is the only home for proposal-only UI.
 - [ ] `stories/support` contains no product visual facsimiles.
 - [ ] A custom replacement for existing shadcn/Base UI behavior requires an explicit documented deviation.
-- [ ] Meaningful production component behavior is verified both in its component/story context and, where ownership boundaries interact, in the real application.
+- [ ] Every meaningful stable-story claim is verified both through the rendered Ladle story and through the real application composition (ADR 0052).
+- [ ] A deterministic parity inventory maps every meaningful stable-story claim to both its Ladle behavior test and its corresponding application behavior test, and `pnpm ui:catalog:check` rejects missing or stale mappings (ADR 0052).
+- [ ] `pnpm ui:catalog` prints the resolved story, claim, Ladle evidence and application evidence matrix for review.
+- [ ] Each Playwright suite validates at runtime that every expected parity test was collected once and passed without a flaky retry.
+- [ ] Ladle E2E runs as its own required CI job, and CI fails when any Playwright test is flaky even if a diagnostic retry passes.
+
+## Audit note
+
+`ui:catalog:check` currently proves public-export reachability and story
+taxonomy. It does not prove that every meaningful production state has a story
+or detect a product visual facsimile under `stories/support`; the missing states
+recorded in issues 02–07 pass it today. Close this ticket only when those limits
+and ADR 0052's dual-verification traceability are enforced by the deterministic
+parity inventory. ADR 0052 owns the durable production-parity rule and rationale;
+this ticket owns its implementation and enforcement.
+
+## Answer
+
+Parity is inventoried as explicit named behavioral claims rather than story
+files or exports alone. A meaningful claim is any product-significant state,
+semantic, geometry, accessibility contract or interaction that justifies a
+stable story's presence. Every named export under `stories/components` and
+`stories/surfaces` must have at least one claim; `stories/review` is excluded.
+
+The checked-in source of truth is a literal TypeScript manifest. Each row holds
+a stable semantic kebab-case claim id, a story file and named export, and a
+concise human-readable claim. It contains no helpers or derived entries. Tests
+refer to claims through literal native Playwright tags of the form
+`@parity:<claim-id>`. Each claim has exactly one tagged Ladle test and exactly
+one tagged application test; one test may carry several tags when it genuinely
+proves several claims.
+
+Enforcement has two layers. `pnpm ui:catalog:check` enumerates stable story
+exports, validates every manifest story reference, requires a non-empty claim
+set per export, rejects duplicate or unknown claim ids and tags, and rejects
+missing, stale, review-only or obviously excluded evidence. `pnpm ui:catalog`
+prints the resolved matrix. Human review remains responsible for whether the
+declared claim set is semantically complete.
+
+Each Playwright suite also validates at runtime that every expected tagged
+logical test was collected once and passed. Skipped, excluded and flaky tests
+are not evidence. Retries may remain to gather diagnostics, but CI fails if any
+Playwright test needed one. This is repository-wide rather than parity-only.
+
+`pnpm verify` retains the static gate. Application and Ladle E2E remain separate
+runtime commands, with Ladle E2E added as its own parallel required CI job. The
+manifest, complete evidence backfill, static checker, runtime validation and CI
+job land coherently: there is no grandfather list. A stable state without both
+proofs moves to `review` or is removed.

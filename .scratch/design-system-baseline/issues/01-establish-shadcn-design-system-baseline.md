@@ -6,7 +6,7 @@
 
 **Status:** resolved
 
-**Delivery:** PR #74 — Establish the design system foundation.
+**Pending merge:** PR #74 — Establish the design system foundation.
 
 - [x] The shared UI package has one CLI-recognised component destination and public export path, with no generated component orphaned from its barrel.
 - [x] The app and shared UI consume one semantic token contract; a component can be rendered in Ladle without relying on feature-owned visual tokens.
