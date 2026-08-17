@@ -55,8 +55,9 @@ acceptance criteria or `Blocked by` relationships in the referenced tickets.
   subsequent clean branch from `main` inherits the remaining tickets and their
   dependency order.
 - Issue 11's ADR 0052 decision is extracted on `feat/ladle-production-parity`
-  from PR #74's merge commit. Ladle runtime and enforcement files remain
-  assigned to Issue 08 rather than riding with the decision record.
+  from PR #74's merge commit together with the static Ladle runtime, taxonomy
+  and catalogue baseline. Issue 08 retains the parity manifest, dual-evidence
+  enforcement, runtime collection checks and required CI job.
 
 ## Preserved work
 

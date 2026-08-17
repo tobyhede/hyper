@@ -45,6 +45,8 @@ bringing that coherent set to `main`.
 ADR 0052 is now prepared on the clean Issue 11 branch from `main`. The
 foundation already delivered the operational `$shadcn-first-ui` pointer to the
 ADR, so this extraction does not restore the donor's duplicated AGENTS.md rule.
-The Ladle runtime, configuration and mechanical parity inventory remain owned
-by Issue 08 and will point to the ADR when that infrastructure lands. Merge and
-final PR accounting remain before this ticket can be resolved.
+This extraction also supplies the static Ladle runtime, its taxonomy and
+catalogue baseline, with `.ladle/config.mjs` pointing to ADR 0052. Issue 08
+retains the parity manifest, dual-evidence enforcement, runtime collection
+checks and CI gate. Merge and final PR accounting remain before this ticket can
+be resolved.
