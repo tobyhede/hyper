@@ -1,8 +1,9 @@
 import { ESLint } from 'eslint';
 import { describe, expect, it } from 'vitest';
 
+const eslint = new ESLint({ cwd: process.cwd(), overrideConfigFile: 'eslint.config.js' });
+
 const lintImport = async (specifier: string, filePath: string): Promise<readonly string[]> => {
-  const eslint = new ESLint({ cwd: process.cwd(), overrideConfigFile: 'eslint.config.js' });
   const [result] = await eslint.lintText(`import value from '${specifier}'; void value;`, {
     filePath,
   });

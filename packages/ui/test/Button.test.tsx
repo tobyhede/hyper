@@ -55,7 +55,7 @@ describe('Button', () => {
     );
 
     expect(screen.getByRole('button', { name: 'Primary' })).toHaveClass(
-      'bg-[var(--accent-strong)]',
+      'bg-[var(--primary)]',
       'caller-layout',
     );
     expect(screen.getByRole('button', { name: 'Delete' })).toHaveClass('border-[#7f1d1d]');

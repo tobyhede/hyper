@@ -95,7 +95,7 @@ export function AddCardControl({
           aria-label="More Card kinds"
           title="More Card kinds"
           disabled={disabled}
-          className="inline-flex cursor-pointer items-center justify-center rounded-[6px] rounded-l-none border border-[var(--border)] bg-[var(--panel-2)] px-[0.4rem] py-[0.4rem] text-[0.85rem] whitespace-nowrap text-[var(--text)] transition-colors hover:border-[var(--accent)] focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+          className="inline-flex cursor-pointer items-center justify-center rounded-[6px] rounded-l-none border border-[var(--border)] bg-[var(--secondary)] px-[0.4rem] py-[0.4rem] text-[0.85rem] whitespace-nowrap text-[var(--foreground)] transition-colors hover:border-[var(--accent)] focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
         >
           <ChevronDownIcon />
         </Menu.Trigger>
@@ -107,7 +107,7 @@ export function AddCardControl({
                 openedASurface.current = false;
                 return false;
               }}
-              className="nokey z-50 min-w-[10rem] rounded-[6px] border border-[var(--border)] bg-[var(--panel)] p-[0.25rem] text-[var(--text)] shadow-[0_12px_40px_rgba(0,0,0,0.5)]"
+              className="nokey z-50 min-w-[10rem] rounded-[6px] border border-[var(--border)] bg-[var(--card)] p-[0.25rem] text-[var(--foreground)] shadow-[0_12px_40px_rgba(0,0,0,0.5)]"
             >
               <Menu.Item
                 data-testid="add-alias"
@@ -115,12 +115,12 @@ export function AddCardControl({
                   openedASurface.current = true;
                   onAddAlias();
                 }}
-                className="flex cursor-pointer items-center gap-[0.5rem] rounded-[4px] px-[0.5rem] py-[0.35rem] text-[0.85rem] outline-none select-none data-[highlighted]:bg-[var(--panel-2)]"
+                className="flex cursor-pointer items-center gap-[0.5rem] rounded-[4px] px-[0.5rem] py-[0.35rem] text-[0.85rem] outline-none select-none data-[highlighted]:bg-[var(--secondary)]"
               >
                 {/* Bare rather than a labelled `CardKindIcon`: the item's own
                     text already names the kind, and a second name would make the
                     menu item announce as "Alias Add Alias". */}
-                <span className="text-[var(--muted)]">
+                <span className="text-[var(--muted-foreground)]">
                   <AliasIcon />
                 </span>
                 Add Alias

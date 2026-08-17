@@ -5,7 +5,7 @@ const theme = readFileSync(new URL('../../packages/app/src/tailwind.css', import
 const styles = readFileSync(new URL('../../packages/app/src/styles.css', import.meta.url), 'utf8');
 
 const variables = new Map(
-  [...theme.matchAll(/^\s*(--[\w-]+):\s*([^;]+);/gm)].map((match) => [match[1], match[2]]),
+  [...theme.matchAll(/^\s*(--[\w-]+):\s*([^;]+);/gm)].map((match) => [match[1]!, match[2]!]),
 );
 
 const resolveColor = (name: string): string => {
@@ -30,8 +30,26 @@ const contrast = (first: string, second: string): number => {
   return (lighter! + 0.05) / (darker! + 0.05);
 };
 
+// `@theme inline` re-declares every root token as `--color-X` for Tailwind's
+// utility generator; only the root tokens themselves are the semantic roles.
+const rolesWithForeground = [...variables.keys()]
+  .filter(
+    (name) =>
+      !name.startsWith('--color-') &&
+      !name.endsWith('-foreground') &&
+      variables.has(`${name}-foreground`),
+  )
+  .map((name) => name.slice(2))
+  .sort();
+
 describe('semantic theme contrast', () => {
-  it.each(['primary', 'accent'])('%s supports normal text at WCAG AA contrast', (role) => {
+  it('background supports normal text at WCAG AA contrast', () => {
+    expect(
+      contrast(resolveColor('--background'), resolveColor('--foreground')),
+    ).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it.each(rolesWithForeground)('%s supports normal text at WCAG AA contrast', (role) => {
     expect(
       contrast(resolveColor(`--${role}`), resolveColor(`--${role}-foreground`)),
     ).toBeGreaterThanOrEqual(4.5);

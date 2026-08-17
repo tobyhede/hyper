@@ -40,7 +40,7 @@ export function CardKindIcon({ kind, size }: CardKindIconProps) {
   const Glyph = KIND_GLYPHS[kind];
   return (
     <span
-      className="inline-flex flex-none items-center text-[var(--muted)]"
+      className="inline-flex flex-none items-center text-[var(--muted-foreground)]"
       role="img"
       aria-label={KIND_NAMES[kind]}
       title={KIND_NAMES[kind]}

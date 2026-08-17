@@ -24,14 +24,14 @@ export const SelectTrigger = forwardRef<
     // `button`, so no input tag excludes it, and Backspace pressed on it deleted
     // whichever Edge the canvas had selected.
     className={cn(
-      'nokey inline-flex items-center justify-between gap-[0.4rem] rounded-[6px] border border-[var(--border)] bg-[var(--panel-2)] px-[0.5rem] py-[0.35rem] text-[0.85rem] text-[var(--text)] transition-colors outline-none focus:border-[var(--accent)] disabled:cursor-not-allowed disabled:opacity-50 data-[placeholder]:text-[var(--text)]',
+      'nokey inline-flex items-center justify-between gap-[0.4rem] rounded-[6px] border border-[var(--border)] bg-[var(--secondary)] px-[0.5rem] py-[0.35rem] text-[0.85rem] text-[var(--foreground)] transition-colors outline-none focus:border-[var(--accent)] disabled:cursor-not-allowed disabled:opacity-50 data-[placeholder]:text-[var(--foreground)]',
       className,
     )}
     {...props}
   >
     {children}
     <SelectPrimitive.Icon>
-      <span className="text-[var(--muted)]">
+      <span className="text-[var(--muted-foreground)]">
         <ChevronDownIcon />
       </span>
     </SelectPrimitive.Icon>
@@ -77,7 +77,7 @@ export const SelectContent = forwardRef<
         // The popup is portalled to document.body, so its own `nokey` marker is
         // what keeps React Flow's document-level delete handler out of the list.
         className={cn(
-          'nokey max-h-[var(--available-height)] min-w-[8rem] overflow-hidden rounded-[6px] border border-[var(--border)] bg-[var(--panel)] text-[var(--text)] shadow-[0_12px_40px_rgba(0,0,0,0.5)] data-[side=bottom]:translate-y-1 data-[side=top]:-translate-y-1',
+          'nokey max-h-[var(--available-height)] min-w-[8rem] overflow-hidden rounded-[6px] border border-[var(--border)] bg-[var(--card)] text-[var(--foreground)] shadow-[0_12px_40px_rgba(0,0,0,0.5)] data-[side=bottom]:translate-y-1 data-[side=top]:-translate-y-1',
           className,
         )}
         {...props}
@@ -98,7 +98,7 @@ export const SelectItem = forwardRef<
   <SelectPrimitive.Item
     ref={ref}
     className={cn(
-      'relative flex w-full cursor-pointer items-center rounded-[4px] px-[0.5rem] py-[0.35rem] text-[0.85rem] outline-none select-none data-[disabled]:pointer-events-none data-[disabled]:opacity-50 data-[highlighted]:bg-[var(--panel-2)] data-[highlighted]:outline-none data-[selected]:text-[var(--accent)]',
+      'relative flex w-full cursor-pointer items-center rounded-[4px] px-[0.5rem] py-[0.35rem] text-[0.85rem] outline-none select-none data-[disabled]:pointer-events-none data-[disabled]:opacity-50 data-[highlighted]:bg-[var(--secondary)] data-[highlighted]:outline-none data-[selected]:text-[var(--accent)]',
       className,
     )}
     {...props}

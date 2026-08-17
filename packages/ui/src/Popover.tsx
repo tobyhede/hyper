@@ -77,7 +77,7 @@ export const PopoverContent = forwardRef<
           // `nokey` because React Flow subscribes its delete key on `document`,
           // while a portalled popup is outside the canvas's own guard.
           className={cn(
-            'nokey z-50 min-w-[15rem] rounded-[6px] border border-[var(--border)] bg-[var(--panel)] p-[0.6rem] text-[var(--text)] shadow-[0_12px_40px_rgba(0,0,0,0.5)] outline-none',
+            'nokey z-50 min-w-[15rem] rounded-[6px] border border-[var(--border)] bg-[var(--card)] p-[0.6rem] text-[var(--foreground)] shadow-[0_12px_40px_rgba(0,0,0,0.5)] outline-none',
             className,
           )}
           {...popupProps}

@@ -35,7 +35,7 @@ export function ViewSelector({ value, active, onValueChange }: ViewSelectorProps
         label={selected.title}
       />
       <SelectContent className="w-[214px]">
-        <div className="px-[8px] pt-[7px] pb-[5px] font-mono text-[10px] tracking-[0.12em] text-[var(--muted)] uppercase">
+        <div className="px-[8px] pt-[7px] pb-[5px] font-mono text-[10px] tracking-[0.12em] text-[var(--muted-foreground)] uppercase">
           Views · computed
         </div>
         {views.map((view) => {
@@ -43,7 +43,7 @@ export function ViewSelector({ value, active, onValueChange }: ViewSelectorProps
           return (
             <SelectItem key={view.id} value={view.id} className="px-[8px] py-[7px] text-[13px]">
               <span className="flex w-full items-center gap-[10px]">
-                <span className="text-[var(--muted)]">
+                <span className="text-[var(--muted-foreground)]">
                   <Icon />
                 </span>
                 <span className="flex-1">{view.title}</span>

@@ -34,7 +34,7 @@ export function GraphSelector({
     <div
       role="group"
       aria-label="Graph controls"
-      className="inline-flex items-stretch overflow-hidden rounded-[6px] border border-[var(--border)] bg-[var(--panel-2)]"
+      className="inline-flex items-stretch overflow-hidden rounded-[6px] border border-[var(--border)] bg-[var(--secondary)]"
     >
       {/*
         Controlled across Base UI's native null empty state. A Space with no
@@ -50,7 +50,7 @@ export function GraphSelector({
           className="rounded-none border-0 bg-transparent hover:bg-[var(--border)]"
         />
         <SelectContent className="w-[214px]">
-          <div className="px-[8px] pt-[7px] pb-[5px] font-mono text-[10px] tracking-[0.12em] text-[var(--muted)] uppercase">
+          <div className="px-[8px] pt-[7px] pb-[5px] font-mono text-[10px] tracking-[0.12em] text-[var(--muted-foreground)] uppercase">
             Active Graph
           </div>
           {graphs.map((graph) => (
@@ -88,7 +88,7 @@ export function GraphSelector({
         title={actionName}
         disabled={!presenting && (activeGraph === undefined || activeGraph.edges.length === 0)}
         onClick={presenting ? onExitPresenting : onPresent}
-        className="inline-flex items-center gap-[7px] border-0 border-l border-l-[var(--border)] bg-transparent px-[11px] py-[6px] text-[13px] text-[var(--text)] hover:bg-[var(--border)] disabled:cursor-not-allowed disabled:opacity-50"
+        className="inline-flex items-center gap-[7px] border-0 border-l border-l-[var(--border)] bg-transparent px-[11px] py-[6px] text-[13px] text-[var(--foreground)] hover:bg-[var(--border)] disabled:cursor-not-allowed disabled:opacity-50"
       >
         {presenting ? null : <PresentIcon color={activeColor} />}
         {presenting ? 'Overview' : 'Present'}
