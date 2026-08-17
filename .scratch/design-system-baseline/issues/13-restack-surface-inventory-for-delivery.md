@@ -4,8 +4,8 @@
 `feat/surface-inventory` as bounded production migrations from clean bases. The
 donor is design and implementation evidence, not a branch to merge. Each target
 issue owns one extraction: recover its complete settled production boundary,
-reconcile it with the branch it now inherits, prove production parity, merge,
-then repeat.
+reconstruct its accepted design in stable stories, convert production to that
+reference, prove parity, merge, then repeat.
 
 **How to prompt an implementing agent:** Supply this issue for the shared
 extraction contract and the target issue (for example Issue 02) for functional
@@ -33,10 +33,35 @@ alternative is not parity.
 
 The donor records evidence rather than absolute instructions. Later accepted
 ADRs, merged prerequisite issues and the target issue's acceptance criteria may
-require reconciliation. Preserve the donor's intent and observable behavior;
-adapt its hunks to the current architecture. Every donor change in scope must
-end as **retained**, **deferred to a named owner**, or **rejected with a
-reason**.
+require reconciliation. Current production has the same status: it is evidence
+of product requirements and regressions, not a design authority. Recover the
+accepted intent, then express it through the design system. Every donor change
+in scope must end as **retained**, **deferred to a named owner**, or **rejected
+with a reason**.
+
+## Story-first authority
+
+A stable story is the reviewed reference implementation for its surface. Build
+the story first from shared shadcn/Base UI components, fixture data and the
+smallest coherent state boundary needed to exercise the design. Validate the
+primitive's native composition, keyboard, focus, dismissal, accessibility and
+state behavior in Ladle before changing production.
+
+Production parity is directional: convert production to the accepted story,
+then prove the same behavior through the real application. Importing an
+unreviewed production composite into a story only reproduces its mistakes and
+is not parity evidence. After production has been reconciled, the stable story
+must consume the same exported component or composition so the two cannot
+drift. This final shared dependency does not reverse the order of authority:
+the story contract was established first, and production was changed to meet
+it.
+
+Use donor and current-production behavior to identify product requirements,
+not to preserve implementation accidents. Prefer the design-system primitive's
+documented behavior. When an accepted product requirement differs, express it
+through the primitive's supported API where possible and record the requirement
+and behavior test. A hand-written replacement state machine is a deviation and
+must clear the repository's deviation rule.
 
 ## Extraction loop
 
@@ -74,20 +99,32 @@ is listed as retained, deferred to a specific issue, or rejected with a reason.
 
 ### 3. Reconcile and implement
 
-Bring retained work into the clean branch through the current architecture.
-Keep the target issue's functional scope; include its transitive UI boundary.
-When donor behavior and current code differ, determine whether the difference
-comes from a later accepted decision or is an accidental regression. Record
-intentional departures in the target issue before treating them as complete.
+Reconcile vertically, story first:
 
-Stable stories render the unchanged exported production component through the
-smallest coherent production boundary that owns the claimed behavior (ADR
-0052). Fixtures may supply public inputs and environment; they preserve the
-production component's state translation, lifecycle, focus and interaction.
+1. Write one stable story state or interaction from shared design-system
+   components and fixture inputs.
+2. Add its Ladle behavior test and observe it fail for the missing or incorrect
+   contract.
+3. Make the story correct against the primitive and accepted product
+   requirement.
+4. Convert the production boundary to the accepted component or composition.
+5. Add or update the corresponding application behavior test.
+6. Repeat for the next meaningful state or interaction.
 
-**Complete when:** the production surface, shared components and stable stories
-exercise the same owned behavior, and every intentional donor departure has a
-documented authority.
+Keep the target issue's functional scope and transitive UI boundary. When donor
+behavior and current code differ, determine which product requirement each was
+trying to serve and whether either implementation contradicts the design
+system. Record intentional departures in the target issue before treating them
+as complete.
+
+Fixtures may supply public inputs and environment. They do not inherit state
+translation, lifecycle, focus or interaction from unreviewed production code.
+Once production is reconciled, promote the accepted composition to the shared
+export both production and the stable story consume (ADR 0052).
+
+**Complete when:** every stable-story contract was established and proven before
+its production conversion, both surfaces consume the reconciled export, and
+every intentional primitive or donor departure has a documented authority.
 
 ### 4. Prove parity on the extracted branch
 
@@ -97,8 +134,8 @@ component, application, Ladle and E2E coverage. Inspect the rendered stable
 states named by the target rather than relying on compilation alone.
 
 **Complete when:** every target acceptance criterion has production evidence,
-every stable-story claim has the ADR 0052 evidence available at this delivery
-stage, and all required checks pass without flaky retries.
+every stable-story claim maps to both its Ladle behavior proof and its real
+application behavior proof, and all required checks pass without flaky retries.
 
 ### 5. Close the accounting
 
