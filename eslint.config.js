@@ -127,6 +127,9 @@ export default tseslint.config(
     ignores: [
       '**/dist/**',
       '**/dist-http/**',
+      // `ladle build` output is gitignored, but flat ESLint config does not
+      // read `.gitignore` and would otherwise lint the generated bundles.
+      'packages/app/build/**',
       '**/node_modules/**',
       '**/playwright-report/**',
       '**/test-results/**',
@@ -355,7 +358,7 @@ export default tseslint.config(
   },
   // Config files run as plain JS — no type information to check them against.
   {
-    files: ['**/*.js'],
+    files: ['**/*.{js,mjs,cjs}'],
     extends: [tseslint.configs.disableTypeChecked],
   },
 );

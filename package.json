@@ -11,6 +11,8 @@
     "dev": "pnpm --filter @project/app dev",
     "dev:fixture": "pnpm --filter @project/app dev:fixture",
     "dev:new": "pnpm --filter @project/app dev:new",
+    "ladle": "pnpm --filter @project/app ladle",
+    "ladle:build": "pnpm --filter @project/app ladle:build",
     "prebuild": "pnpm contract:emit",
     "build": "pnpm --filter @project/app build",
     "http-server:build": "pnpm --filter @project/app http-server:build",
@@ -30,9 +32,11 @@
     "test:coverage": "vitest run --coverage",
     "e2e": "playwright test",
     "e2e:fixture": "playwright test --project=chromium",
+    "ui:catalog": "tsx scripts/ui-catalog.ts",
+    "ui:catalog:check": "tsx scripts/ui-catalog.ts --check",
     "e2e:postgres": "playwright test --config playwright.postgres.config.ts",
     "test:integration:postgres": "pnpm contract:emit && pnpm db:migrate && vitest run --config vitest.integration.config.ts",
-    "verify": "pnpm typecheck && pnpm typecheck:packages && pnpm lint && pnpm format:check && pnpm test:coverage"
+    "verify": "pnpm typecheck && pnpm typecheck:packages && pnpm ui:catalog:check && pnpm lint && pnpm format:check && pnpm test:coverage"
   },
   "pnpm": {
     "overrides": {
