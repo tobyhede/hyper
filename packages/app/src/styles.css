@@ -151,7 +151,7 @@ body {
 .btn--primary {
   background: var(--primary);
   border-color: var(--primary);
-  color: white;
+  color: var(--primary-foreground);
 }
 
 /* A refused remote snapshot. The reason is a sentence and then a line per broken

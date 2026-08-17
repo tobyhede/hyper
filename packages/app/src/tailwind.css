@@ -36,13 +36,13 @@
   --popover: var(--card);
   --popover-foreground: var(--foreground);
   --primary: #3b82f6;
-  --primary-foreground: #ffffff;
+  --primary-foreground: var(--background);
   --secondary: #20242e;
   --secondary-foreground: var(--foreground);
   --muted: var(--secondary);
   --muted-foreground: #98a2b3;
   --accent: #6ea8fe;
-  --accent-foreground: var(--foreground);
+  --accent-foreground: var(--background);
   --destructive: #f08c8c;
   --border: #2b303b;
   --input: var(--border);

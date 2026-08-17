@@ -61,6 +61,7 @@ describe('design-system baseline', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('Could not save the Space');
     expect(screen.getByText('Space')).toBeVisible();
     expect(screen.getByText('No Spaces')).toBeVisible();
+    expect(screen.getByText('Create a Space to begin.').tagName).toBe('P');
     expect(screen.getByLabelText('Title')).toBeInstanceOf(HTMLInputElement);
     expect(screen.getByLabelText('Markdown')).toBeInstanceOf(HTMLTextAreaElement);
     expect(screen.getByLabelText('Loading')).toBeVisible();
