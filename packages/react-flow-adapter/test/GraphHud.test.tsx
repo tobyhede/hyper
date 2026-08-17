@@ -74,9 +74,9 @@ describe('GraphHud', () => {
     expect(
       legend.compareDocumentPosition(minimap) & globalThis.Node.DOCUMENT_POSITION_FOLLOWING,
     ).not.toBe(0);
-    expect(minimap).toHaveAttribute('data-active-fill', 'var(--panel-2)');
+    expect(minimap).toHaveAttribute('data-active-fill', 'var(--secondary)');
     expect(minimap).toHaveAttribute('data-active-stroke', '#6ea8fe');
-    expect(minimap).toHaveAttribute('data-other-fill', 'var(--panel-2)');
+    expect(minimap).toHaveAttribute('data-other-fill', 'var(--secondary)');
     expect(minimap).toHaveAttribute('data-other-stroke', 'var(--border)');
     expect(container).toHaveTextContent('Primary');
     expect(container).toHaveTextContent('Alternate');

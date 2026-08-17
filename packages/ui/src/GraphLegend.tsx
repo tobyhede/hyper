@@ -14,7 +14,7 @@ export interface GraphLegendProps {
 export function GraphLegend({ graphs, colorByGraphId, activeGraphId = null }: GraphLegendProps) {
   return (
     <div className="flex flex-col gap-[6px] p-[9px_10px]" data-testid="graph-legend">
-      <div className="flex items-center gap-[7px] font-mono text-[10px] tracking-[0.12em] text-[var(--muted)] uppercase">
+      <div className="flex items-center gap-[7px] font-mono text-[10px] tracking-[0.12em] text-[var(--muted-foreground)] uppercase">
         <GraphIcon size={13} />
         <span>Graphs</span>
       </div>
@@ -25,7 +25,7 @@ export function GraphLegend({ graphs, colorByGraphId, activeGraphId = null }: Gr
           return (
             <li
               key={graph.id}
-              className="legend__item flex items-center gap-[8px] text-[12px] text-[var(--text)]"
+              className="legend__item flex items-center gap-[8px] text-[12px] text-[var(--foreground)]"
               style={{ opacity: dimmed ? 0.5 : 1 }}
             >
               <span

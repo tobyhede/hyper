@@ -1,6 +1,55 @@
 @import 'tailwindcss';
 
 /*
+ * The shared semantic vocabulary consumed by the app, `@project/ui`, and the
+ * React Flow integration.
+ */
+/* stylelint-disable-next-line scss/at-rule-no-unknown -- Tailwind CSS v4 directive */
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+}
+
+:root {
+  color-scheme: dark;
+
+  --background: #0f1115;
+  --foreground: #e6e9ef;
+  --card: #181b22;
+  --card-foreground: var(--foreground);
+  --popover: var(--card);
+  --popover-foreground: var(--foreground);
+  --primary: #3b82f6;
+  --primary-foreground: var(--background);
+  --secondary: #20242e;
+  --secondary-foreground: var(--foreground);
+  --muted: var(--secondary);
+  --muted-foreground: #98a2b3;
+  --accent: #6ea8fe;
+  --accent-foreground: var(--background);
+  --destructive: #f08c8c;
+  --border: #2b303b;
+  --input: var(--border);
+  --ring: var(--accent);
+}
+
+/*
  * Monorepo content detection: Tailwind only scans the app package by default.
  * The shadcn-style primitives live in `@project/ui`, so their utility classes
  * would be purged without an explicit source. Paths are relative to this file:

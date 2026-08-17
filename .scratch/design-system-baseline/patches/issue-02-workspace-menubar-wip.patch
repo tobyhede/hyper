@@ -1,0 +1,384 @@
+diff --git a/packages/app/e2e/editing.spec.ts b/packages/app/e2e/editing.spec.ts
+index 05863a8..1a63aaa 100644
+--- a/packages/app/e2e/editing.spec.ts
++++ b/packages/app/e2e/editing.spec.ts
+@@ -382,22 +382,22 @@ test('selecting Flow or Grid is navigation and does not persist', async ({ page
+   await expect(persistence).toHaveAttribute('data-revision', '0');
+ 
+   await page.getByTestId('layout-selector').click();
+-  await expect(page.getByText('Layouts · authored')).toBeVisible();
++  await expect(page.getByRole('menuitemradio', { name: 'Layout 1' })).toBeVisible();
+   await page.keyboard.press('Escape');
+ 
+   await page.getByTestId('graph-selector').click();
+-  await expect(page.getByText('Active Graph', { exact: true })).toBeVisible();
++  await expect(page.getByRole('menuitemradio', { name: 'Long' })).toBeVisible();
+   await page.keyboard.press('Escape');
+ 
+   await page.getByTestId('view-selector').click();
+-  await page.getByRole('option', { name: 'Grid' }).click();
++  await page.getByRole('menuitemradio', { name: 'Grid' }).click();
+   await expect(page.getByTestId('view-selector')).toContainText('Grid');
+   await expect(page.getByTestId('layout-selector')).toContainText('None');
+   await expect(page.getByTestId('layout-live-indicator')).toHaveCount(0);
+   await expect(persistence).toHaveAttribute('data-revision', '0');
+ 
+   await page.getByTestId('view-selector').click();
+-  await page.getByRole('option', { name: 'Flow' }).click();
++  await page.getByRole('menuitemradio', { name: 'Flow' }).click();
+   await expect(page.getByTestId('view-selector')).toContainText('Flow');
+   await expect(persistence).toHaveAttribute('data-revision', '0');
+ });
+@@ -411,7 +411,7 @@ test('connecting from Flow and Grid converts atomically without moving Cards', a
+     await test.step(view, async () => {
+       if (view === 'Grid') {
+         await page.getByTestId('view-selector').click();
+-        await page.getByRole('option', { name: view }).click();
++        await page.getByRole('menuitemradio', { name: view }).click();
+       }
+ 
+       const source = nodeByTitle(page, 'A').first();
+@@ -512,17 +512,17 @@ test('editing an existing Layout updates it instead of creating another one', as
+   await expect(page.getByTestId('layout-selector')).toContainText('Layout 1');
+ 
+   await page.getByTestId('view-selector').click();
+-  await page.getByRole('option', { name: 'Grid' }).click();
++  await page.getByRole('menuitemradio', { name: 'Grid' }).click();
+   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
+   await page.getByTestId('layout-selector').click();
+-  await page.getByRole('option', { name: 'Layout 1' }).click();
++  await page.getByRole('menuitemradio', { name: 'Layout 1' }).click();
+   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
+   await settled(page);
+ 
+   await dragBy(page, a, 0, 160);
+   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '2');
+   await page.getByTestId('layout-selector').click();
+-  await expect(page.getByRole('option', { name: 'Layout 1' })).toHaveCount(1);
++  await expect(page.getByRole('menuitemradio', { name: 'Layout 1' })).toHaveCount(1);
+ });
+ 
+ /**
+@@ -949,7 +949,7 @@ test('changing the active Graph recolours authoring handles without persisting o
+   const longColour = await handle.evaluate((element) => getComputedStyle(element).backgroundColor);
+ 
+   await page.getByTestId('graph-selector').click();
+-  await page.getByRole('option', { name: 'Mid' }).click();
++  await page.getByRole('menuitemradio', { name: 'Mid' }).click();
+ 
+   await source.hover();
+   await expect(handle).not.toHaveCSS('background-color', longColour);
+@@ -1325,7 +1325,7 @@ test('dragging the source endpoint moves the end the author took hold of', async
+   await expect(page.locator('.react-flow__edge-path').first()).toHaveAttribute('d', /L/);
+   await selectLayout(page, 'Collection 1');
+   await page.getByTestId('graph-selector').click();
+-  await page.getByRole('option', { name: 'Short' }).click();
++  await page.getByRole('menuitemradio', { name: 'Short' }).click();
+   await settled(page);
+ 
+   const edge = page.locator('.react-flow__edge[aria-label="Edge from A to B in Short"]');
+@@ -1678,7 +1678,7 @@ test('an opened Card is modal, so no renderer change can strand its editor', asy
+   // And with the pane gone the renderer is selectable again, still over an
+   // unedited Space.
+   await selector.click();
+-  await page.getByRole('option', { name: 'Grid' }).click();
++  await page.getByRole('menuitemradio', { name: 'Grid' }).click();
+   await expect(selector).toContainText('Grid');
+   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '0');
+ });
+@@ -1858,7 +1858,7 @@ test('Add Card converts an Algorithmic View once and names the Card in place', a
+   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '2');
+   // One conversion, so one new Layout beside the two the fixture declares.
+   await page.getByTestId('layout-selector').click();
+-  await expect(page.getByRole('option')).toHaveCount(3);
++  await expect(page.getByRole('menuitemradio')).toHaveCount(3);
+   await page.keyboard.press('Escape');
+ });
+ 
+diff --git a/packages/app/e2e/graph.ts b/packages/app/e2e/graph.ts
+index 57a5acb..c61e1c0 100644
+--- a/packages/app/e2e/graph.ts
++++ b/packages/app/e2e/graph.ts
+@@ -109,7 +109,7 @@ export async function openCard(node: Locator, title: string): Promise<void> {
+  */
+ export async function selectLayout(page: Page, title: string): Promise<void> {
+   await page.getByTestId('layout-selector').click();
+-  await page.getByRole('option', { name: title, exact: true }).click();
++  await page.getByRole('menuitemradio', { name: title, exact: true }).click();
+   await expect(page.getByTestId('layout-selector')).toContainText(title);
+ }
+ 
+diff --git a/packages/app/e2e/http-persistence.spec.ts b/packages/app/e2e/http-persistence.spec.ts
+index 94da903..984b432 100644
+--- a/packages/app/e2e/http-persistence.spec.ts
++++ b/packages/app/e2e/http-persistence.spec.ts
+@@ -176,7 +176,7 @@ test('graph activation and presenting do not write or protect navigation', async
+   await page.goto('/');
+   await expect(nodeByTitle(page, 'A').first()).toBeVisible();
+   await page.getByTestId('graph-selector').click();
+-  await page.getByRole('option', { name: 'Echo' }).click();
++  await page.getByRole('menuitemradio', { name: 'Echo' }).click();
+   await page.getByTestId('present-button').click();
+   await expect(page.getByTestId('presenting-chrome')).toBeVisible();
+   await settledNetwork(page);
+diff --git a/packages/app/e2e/overview.spec.ts b/packages/app/e2e/overview.spec.ts
+index 09f0324..0afba73 100644
+--- a/packages/app/e2e/overview.spec.ts
++++ b/packages/app/e2e/overview.spec.ts
+@@ -33,9 +33,9 @@ function nodeByTitle(page: Page, title: string): Locator {
+ 
+ test('offers more than one named graph', async ({ page }) => {
+   await page.goto('/');
+-  // Open the (Radix, non-native) select and count its listbox options.
++  // Open the Graph menu and count its mutually exclusive choices.
+   await page.getByTestId('graph-selector').click();
+-  await expect(page.getByRole('option')).toHaveCount(4);
++  await expect(page.getByRole('menuitemradio')).toHaveCount(4);
+ });
+ 
+ test('draws every graph at once, each in its own color', async ({ page }) => {
+@@ -81,7 +81,7 @@ test('selecting a Layout draws the Graphs it owns and only those', async ({ page
+   await expect(page.getByTestId('layout-selector')).toContainText('None');
+ 
+   await page.getByTestId('layout-selector').click();
+-  await expect(page.getByRole('option')).toHaveCount(2);
++  await expect(page.getByRole('menuitemradio')).toHaveCount(2);
+   await page.keyboard.press('Escape');
+ 
+   // Collection 1 owns Long, Mid and Short over the shared spine: 4 + 3 + 2.
+@@ -89,8 +89,8 @@ test('selecting a Layout draws the Graphs it owns and only those', async ({ page
+   await expect(page.locator('.react-flow__edge')).toHaveCount(9);
+   await expect(legendItems).toHaveCount(3);
+   await page.getByTestId('graph-selector').click();
+-  await expect(page.getByRole('option')).toHaveCount(3);
+-  await expect(page.getByRole('option', { name: 'Echo' })).toHaveCount(0);
++  await expect(page.getByRole('menuitemradio')).toHaveCount(3);
++  await expect(page.getByRole('menuitemradio', { name: 'Echo' })).toHaveCount(0);
+   await page.keyboard.press('Escape');
+ 
+   // Collection 2 owns Echo alone.
+@@ -154,7 +154,7 @@ test('selecting a graph keeps the others on screen', async ({ page }) => {
+ 
+   // Selection is emphasis: it never hides the rest of the space.
+   await page.getByTestId('graph-selector').click();
+-  await page.getByRole('option', { name: 'Echo' }).click();
++  await page.getByRole('menuitemradio', { name: 'Echo' }).click();
+   await expect(page.locator('.react-flow__node')).toHaveCount(10);
+   await expect(page.locator('.react-flow__edge')).toHaveCount(13);
+   // Activating a graph changes emphasis, not the persisted document.
+@@ -223,7 +223,7 @@ test('a card can be opened even when it is not on the selected graph', async ({
+ 
+   // "E" is in the Echo collection; select Long (band 1), then open E anyway.
+   await page.getByTestId('graph-selector').click();
+-  await page.getByRole('option', { name: 'Long' }).click();
++  await page.getByRole('menuitemradio', { name: 'Long' }).click();
+ 
+   await openCard(nodeByTitle(page, 'E'), 'E');
+   await expect(
+diff --git a/packages/app/ladle-e2e/workspace-toolbar.spec.ts b/packages/app/ladle-e2e/workspace-toolbar.spec.ts
+index febb75f..b429580 100644
+--- a/packages/app/ladle-e2e/workspace-toolbar.spec.ts
++++ b/packages/app/ladle-e2e/workspace-toolbar.spec.ts
+@@ -5,15 +5,16 @@ test('Workspace Toolbar story renders the production composition and menu behavi
+ }) => {
+   await page.goto('/?story=components--workspace-toolbar--pending&mode=preview');
+ 
+-  await expect(page.getByRole('combobox', { name: 'Choose view' })).toBeVisible();
+-  await expect(page.getByRole('combobox', { name: 'Choose layout' })).toBeVisible();
+-  await expect(page.getByRole('group', { name: 'Graph controls' })).toBeVisible();
++  await expect(page.getByRole('menubar', { name: 'Workspace commands' })).toBeVisible();
++  await expect(page.getByTestId('view-selector')).toBeVisible();
++  await expect(page.getByTestId('layout-selector')).toBeVisible();
++  await expect(page.getByTestId('graph-selector')).toBeVisible();
+   await expect(page.getByRole('button', { name: 'Add Card' })).toBeVisible();
+   await expect(page.getByRole('button', { name: 'Saving changes' })).toBeVisible();
+ 
+   await expect(page.getByTestId('layout-live-indicator')).toBeVisible();
+   await page.getByTestId('view-selector').click();
+-  await page.getByRole('option', { name: 'Grid', exact: true }).click();
++  await page.getByRole('menuitemradio', { name: 'Grid', exact: true }).click();
+   await expect(page.getByTestId('layout-live-indicator')).toBeHidden();
+ 
+   const moreKinds = page.getByRole('button', { name: 'More Card kinds' });
+diff --git a/packages/app/src/components/WorkspaceToolbar.tsx b/packages/app/src/components/WorkspaceToolbar.tsx
+index 493904f..4a3a880 100644
+--- a/packages/app/src/components/WorkspaceToolbar.tsx
++++ b/packages/app/src/components/WorkspaceToolbar.tsx
+@@ -1,9 +1,16 @@
+ import type { ReactNode } from 'react';
+ import {
+   AddCardControl,
+-  GraphSelector,
+-  LayoutSelector,
+-  ViewSelector,
++  Button,
++  FALLBACK_GRAPH_COLOR,
++  Menubar,
++  MenubarContent,
++  MenubarItem,
++  MenubarMenu,
++  MenubarRadioGroup,
++  MenubarRadioItem,
++  MenubarTrigger,
++  PresentIcon,
+   type AddCardControlProps,
+   type GraphSelectorProps,
+   type LayoutSelectorProps,
+@@ -20,6 +27,11 @@ export interface WorkspaceToolbarProps {
+   readonly acknowledgedRevision: bigint;
+ }
+ 
++const views = [
++  { id: 'flow', title: 'Flow' },
++  { id: 'grid', title: 'Grid' },
++] as const;
++
+ /** The production ordering and composition of workspace-level controls. */
+ export function WorkspaceToolbar({
+   view,
+@@ -30,11 +42,115 @@ export function WorkspaceToolbar({
+   persistenceState,
+   acknowledgedRevision,
+ }: WorkspaceToolbarProps) {
++  const activeGraph = graph.graphs.find((candidate) => candidate.id === graph.activeGraphId);
++  const activeGraphColor =
++    activeGraph === undefined
++      ? FALLBACK_GRAPH_COLOR
++      : (graph.colorByGraphId[activeGraph.id] ?? activeGraph.color ?? FALLBACK_GRAPH_COLOR);
++  const presentDisabled =
++    !graph.presenting && (activeGraph === undefined || activeGraph.edges.length === 0);
++
+   return (
+     <>
+-      <ViewSelector {...view} />
+-      <LayoutSelector {...layout} />
+-      <GraphSelector {...graph} />
++      <Menubar aria-label="Workspace commands">
++        <MenubarMenu>
++          <MenubarTrigger data-testid="view-selector">
++            View · {views.find((candidate) => candidate.id === view.value)?.title ?? 'Flow'}
++          </MenubarTrigger>
++          <MenubarContent>
++            <MenubarRadioGroup
++              value={view.active ? view.value : ''}
++              onValueChange={(next) => {
++                if (next === 'flow' || next === 'grid') view.onValueChange(next);
++              }}
++            >
++              {views.map((candidate) => (
++                <MenubarRadioItem key={candidate.id} value={candidate.id}>
++                  {candidate.title}
++                </MenubarRadioItem>
++              ))}
++            </MenubarRadioGroup>
++          </MenubarContent>
++        </MenubarMenu>
++
++        <MenubarMenu>
++          <MenubarTrigger data-testid="layout-selector">
++            {layout.active ? (
++              <span
++                data-testid="layout-live-indicator"
++                className="mr-1 size-[6px] shrink-0 rounded-full bg-[var(--accent)]"
++                aria-hidden="true"
++              />
++            ) : null}
++            Layout ·{' '}
++            {view.active
++              ? 'None'
++              : (layout.layouts.find((item) => item.id === layout.value)?.title ?? 'None')}
++          </MenubarTrigger>
++          <MenubarContent>
++            <MenubarRadioGroup
++              value={layout.active ? (layout.value ?? '') : ''}
++              onValueChange={(next) => next !== '' && layout.onValueChange(next)}
++            >
++              {layout.layouts.length === 0 ? (
++                <MenubarItem disabled>No authored Layouts</MenubarItem>
++              ) : (
++                layout.layouts.map((item) => (
++                  <MenubarRadioItem key={item.id} value={item.id}>
++                    {item.title}
++                  </MenubarRadioItem>
++                ))
++              )}
++            </MenubarRadioGroup>
++          </MenubarContent>
++        </MenubarMenu>
++
++        <MenubarMenu>
++          <MenubarTrigger data-testid="graph-selector">
++            <span
++              aria-hidden="true"
++              className="mr-1 h-[3px] w-[14px] shrink-0 rounded-[2px]"
++              style={{ background: activeGraphColor }}
++            />
++            Graph · {activeGraph?.title ?? 'None'}
++          </MenubarTrigger>
++          <MenubarContent>
++            <MenubarRadioGroup
++              value={graph.activeGraphId ?? ''}
++              onValueChange={(next) => next !== '' && graph.onActivate(next)}
++            >
++              {graph.graphs.length === 0 ? (
++                <MenubarItem disabled>No Graphs</MenubarItem>
++              ) : (
++                graph.graphs.map((item) => (
++                  <MenubarRadioItem key={item.id} value={item.id}>
++                    <span
++                      aria-hidden="true"
++                      className="h-[3px] w-[14px] shrink-0 rounded-[2px]"
++                      style={{
++                        background:
++                          graph.colorByGraphId[item.id] ?? item.color ?? FALLBACK_GRAPH_COLOR,
++                      }}
++                    />
++                    {item.title}
++                  </MenubarRadioItem>
++                ))
++              )}
++            </MenubarRadioGroup>
++          </MenubarContent>
++        </MenubarMenu>
++      </Menubar>
++      <Button
++        variant="secondary"
++        size="toolbar"
++        data-testid={graph.presenting ? 'exit-presenting-button' : 'present-button'}
++        aria-label={graph.presenting ? 'Return to overview' : 'Present this Graph'}
++        disabled={presentDisabled}
++        onClick={graph.presenting ? graph.onExitPresenting : graph.onPresent}
++      >
++        {graph.presenting ? null : <PresentIcon color={activeGraphColor} />}
++        {graph.presenting ? 'Overview' : 'Present'}
++      </Button>
+       <AddCardControl {...addCard} />
+       {persistence}
+       <span
+diff --git a/packages/app/test/WorkspaceToolbar.test.tsx b/packages/app/test/WorkspaceToolbar.test.tsx
+index 15d345c..d39eaff 100644
+--- a/packages/app/test/WorkspaceToolbar.test.tsx
++++ b/packages/app/test/WorkspaceToolbar.test.tsx
+@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
+ import { WorkspaceToolbar } from '../src/components/WorkspaceToolbar';
+ 
+ describe('WorkspaceToolbar', () => {
+-  it('renders the production controls in order and forwards Card creation', () => {
++  it('renders mutually exclusive workspace choices and forwards Card creation', () => {
+     const onAddCard = vi.fn();
+     render(
+       <div data-testid="toolbar">
+@@ -33,9 +33,10 @@ describe('WorkspaceToolbar', () => {
+     );
+ 
+     const controls = [
+-      screen.getByRole('combobox', { name: 'Choose view' }),
+-      screen.getByRole('combobox', { name: 'Choose layout' }),
+-      screen.getByRole('group', { name: 'Graph controls' }),
++      screen.getByRole('menuitem', { name: 'View · Flow' }),
++      screen.getByRole('menuitem', { name: 'Layout · None' }),
++      screen.getByRole('menuitem', { name: 'Graph · None' }),
++      screen.getByRole('button', { name: 'Present this Graph' }),
+       screen.getByRole('button', { name: 'Add Card' }),
+       screen.getByText('Persistence slot'),
+     ];
