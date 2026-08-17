@@ -91,6 +91,12 @@
       "skillPath": "skills/engineering/setup-matt-pocock-skills/SKILL.md",
       "computedHash": "f9c2b933dda18eea572e96f6ebbcd5b30e0d1bfdc074af53cc99728dc5f0bdac"
     },
+    "shadcn": {
+      "source": "shadcn/ui",
+      "sourceType": "github",
+      "skillPath": "skills/shadcn/SKILL.md",
+      "computedHash": "0b19dbf0d8d8e3b2094830e9dbca497bf2869e815ab9e2d0fe6f52251ca2807c"
+    },
     "tdd": {
       "source": "mattpocock/skills",
       "sourceType": "github",
