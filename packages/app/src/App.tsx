@@ -1,13 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { ReactFlowProvider } from '@xyflow/react';
-import {
-  AddCardControl,
-  AppShell,
-  Button,
-  LayoutSelector,
-  GraphSelector,
-  ViewSelector,
-} from '@project/ui';
+import { AppShell } from '@project/ui';
 import {
   cardDocumentSchema,
   newUuid,
@@ -37,6 +30,7 @@ import { OpenCard } from './components/OpenCard';
 import { PlacementFailure } from './components/PlacementFailure';
 import { PlacementPending } from './components/PlacementPending';
 import { PresentingChrome } from './components/PresentingChrome';
+import { WorkspaceToolbar } from './components/WorkspaceToolbar';
 
 export const createApp = ({ space, spaceSession }: OpenedSpace) => {
   // One validated aggregate per working snapshot, shared by the render path and
@@ -590,109 +584,49 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
 
     const toolbar = (
       <>
-        <ViewSelector
-          value={selectedView}
-          active={selectedRenderer.kind === 'view'}
-          onValueChange={(selected) => chooseRenderer({ kind: 'view', view: selected })}
+        <WorkspaceToolbar
+          view={{
+            value: selectedView,
+            active: selectedRenderer.kind === 'view',
+            onValueChange: (selected) => chooseRenderer({ kind: 'view', view: selected }),
+          }}
+          layout={{
+            layouts,
+            value: selectedRenderer.kind === 'layout' ? selectedRenderer.layoutId : null,
+            active: selectedRenderer.kind === 'layout',
+            onValueChange: (layoutId) =>
+              chooseRenderer({ kind: 'layout', layoutId: uuidSchema.parse(layoutId) }),
+          }}
+          graph={{
+            graphs: projection.visibleGraphs,
+            activeGraphId,
+            colorByGraphId: projection.colors,
+            onActivate: (graphId) => activateGraph(uuidSchema.parse(graphId)),
+            onPresent: present,
+            presenting,
+            onExitPresenting: exitPresenting,
+          }}
+          addCard={{
+            onAddCard: addCard,
+            onAddAlias: () => setCreatingAlias(true),
+            disabled: !editable || presenting || openedCardId !== null || creatingAlias,
+            keyShortcut: ADD_CARD_KEY,
+            menuTriggerRef: addCardMenu,
+          }}
+          persistence={sessionState.persistence}
+          acknowledgedRevision={sessionState.acknowledgedRevision}
+          onRetryPersistence={authoring.retryPersistence}
+          onAcceptRemote={() => {
+            const message = authoring.acceptStoredSpace();
+            setRefusal(
+              message === null || conflictRevision === null
+                ? null
+                : { revision: conflictRevision, message },
+            );
+          }}
+          onKeepLocal={authoring.keepLocalWork}
+          remoteRefusal={remoteRefusal}
         />
-        <LayoutSelector
-          layouts={layouts}
-          value={selectedRenderer.kind === 'layout' ? selectedRenderer.layoutId : null}
-          active={selectedRenderer.kind === 'layout'}
-          onValueChange={(layoutId) =>
-            chooseRenderer({ kind: 'layout', layoutId: uuidSchema.parse(layoutId) })
-          }
-        />
-        <GraphSelector
-          graphs={projection.visibleGraphs}
-          activeGraphId={activeGraphId}
-          colorByGraphId={projection.colors}
-          onActivate={(graphId) => activateGraph(uuidSchema.parse(graphId))}
-          // `GraphSelector` disables its control on "no active Graph" *or* "the
-          // active Graph holds no Edges", and `present()` refuses on exactly
-          // those two, so the conditions agree: every Graph that is active and
-          // has an Edge can be presented, cyclic ones included (ADR 0032). They
-          // once did not, and a fully cyclic Graph fell through the gap between
-          // them — the control read `Present`, stayed enabled, and swallowed the
-          // click. The empty Graph is the same gap reopened by ADR 0040, which
-          // creates every Layout's initial Active Graph empty.
-          onPresent={present}
-          presenting={presenting}
-          onExitPresenting={exitPresenting}
-        />
-        {/* Withdrawn on exactly the conditions the graph's own Card authoring
-            is: nothing to place before an arrangement resolves, nothing to
-            author while presenting, and one authoring surface at a time. */}
-        <AddCardControl
-          onAddCard={addCard}
-          onAddAlias={() => setCreatingAlias(true)}
-          disabled={!editable || presenting || openedCardId !== null || creatingAlias}
-          // Taken from the canvas that binds it, so the announcement cannot
-          // outlive the key.
-          keyShortcut={ADD_CARD_KEY}
-          menuTriggerRef={addCardMenu}
-        />
-        {sessionState.persistence.kind === 'failed' ? (
-          <Button
-            variant="default"
-            data-testid="persistence-retry"
-            onClick={authoring.retryPersistence}
-            title={sessionState.persistence.failure.message}
-          >
-            Retry persistence
-          </Button>
-        ) : sessionState.persistence.kind === 'conflicted' ? (
-          <>
-            <Button
-              variant="default"
-              data-testid="persistence-accept-remote"
-              // The result of this attempt is the whole message: a success
-              // clears whatever the last attempt on this same conflict said.
-              onClick={() => {
-                const message = authoring.acceptStoredSpace();
-                setRefusal(
-                  message === null || conflictRevision === null
-                    ? null
-                    : { revision: conflictRevision, message },
-                );
-              }}
-            >
-              Accept remote
-            </Button>
-            <Button
-              variant="default"
-              data-testid="persistence-keep-local"
-              // The other half of the pair, and the one that keeps the author's
-              // work: it recommits the newest local Space against the revision
-              // the conflict named. Authoring reads that snapshot itself, so
-              // Edits made while the conflict stood are included.
-              onClick={authoring.keepLocalWork}
-            >
-              Keep local
-            </Button>
-            {remoteRefusal === null ? null : (
-              <span
-                role="alert"
-                data-testid="persistence-remote-refused"
-                className="persistence-refusal"
-              >
-                {remoteRefusal}
-              </span>
-            )}
-          </>
-        ) : (
-          <span
-            data-testid="persistence-status"
-            data-revision={sessionState.acknowledgedRevision.toString()}
-            title="Database persistence status"
-          >
-            {sessionState.persistence.kind === 'pending'
-              ? 'Persisting…'
-              : sessionState.persistence.kind === 'rejected'
-                ? 'Persistence rejected'
-                : 'Persisted'}
-          </span>
-        )}
       </>
     );
 

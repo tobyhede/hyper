@@ -109,7 +109,7 @@ export async function openCard(node: Locator, title: string): Promise<void> {
  */
 export async function selectLayout(page: Page, title: string): Promise<void> {
   await page.getByTestId('layout-selector').click();
-  await page.getByRole('option', { name: title, exact: true }).click();
+  await page.getByRole('menuitemradio', { name: title, exact: true }).click();
   await expect(page.getByTestId('layout-selector')).toContainText(title);
 }
 

@@ -9,19 +9,23 @@ import { cn } from './lib/utils';
  * button, `destructive` the panel button with the danger border.
  */
 const buttonVariants = cva(
-  'inline-flex cursor-pointer items-center justify-center rounded-[6px] border text-[0.85rem] whitespace-nowrap transition-colors focus-visible:outline-none disabled:cursor-not-allowed',
+  'inline-flex cursor-pointer items-center justify-center rounded-[6px] border text-[0.85rem] whitespace-nowrap transition-[color,background-color,border-color,opacity] duration-200 focus-visible:outline-none disabled:cursor-not-allowed data-[state=exiting]:opacity-0',
   {
     variants: {
       variant: {
         default:
-          'border-[var(--primary)] bg-[var(--primary)] text-[var(--primary-foreground)] hover:border-[var(--accent)] disabled:opacity-50',
+          'border-primary bg-primary text-primary-foreground hover:border-accent disabled:opacity-50',
         secondary:
-          'border-[var(--border)] bg-[var(--secondary)] text-[var(--foreground)] hover:border-[var(--accent)] disabled:opacity-50',
+          'border-border bg-secondary text-secondary-foreground hover:border-accent disabled:opacity-50',
         destructive:
-          'border-[#7f1d1d] bg-[var(--secondary)] text-[var(--foreground)] hover:border-[var(--accent)] disabled:opacity-50',
+          'border-destructive bg-secondary text-destructive hover:border-accent disabled:opacity-50',
+        ghost:
+          'border-transparent bg-transparent text-muted-foreground hover:border-border hover:bg-secondary hover:text-secondary-foreground disabled:opacity-50',
       },
       size: {
         default: 'px-[0.8rem] py-[0.4rem]',
+        toolbar: 'px-[11px] py-[6px] text-[13px]',
+        icon: 'size-7 p-0',
       },
     },
     defaultVariants: {

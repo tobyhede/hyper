@@ -4,8 +4,8 @@ import { describe, expect, it, vi } from 'vitest';
 
 /**
  * Keep the primitive boundary observable without testing Base UI's own menu
- * implementation. The split control must compose the installed Base UI Menu,
- * rather than reproduce its parts or retain the Radix implementation.
+ * implementation. The shared DropdownMenu facade must still compose the
+ * installed Base UI Menu rather than reproduce its behavior.
  */
 vi.mock('@base-ui/react/menu', () => ({
   Menu: {
@@ -19,10 +19,16 @@ vi.mock('@base-ui/react/menu', () => ({
     Positioner: ({
       children,
       sideOffset: _sideOffset,
+      alignOffset: _alignOffset,
+      side: _side,
+      align: _align,
       ...props
-    }: HTMLAttributes<HTMLDivElement> & { readonly sideOffset?: number }) => (
-      <div {...props}>{children}</div>
-    ),
+    }: HTMLAttributes<HTMLDivElement> & {
+      readonly sideOffset?: number;
+      readonly alignOffset?: number;
+      readonly side?: string;
+      readonly align?: string;
+    }) => <div {...props}>{children}</div>,
     Popup: ({
       children,
       finalFocus: _finalFocus,
@@ -30,6 +36,7 @@ vi.mock('@base-ui/react/menu', () => ({
     }: HTMLAttributes<HTMLDivElement> & { readonly finalFocus?: unknown }) => (
       <div {...props}>{children}</div>
     ),
+    Group: ({ children }: { children: ReactNode }) => <div>{children}</div>,
     Item: ({ children, ...props }: HTMLAttributes<HTMLDivElement>) => (
       <div {...props}>{children}</div>
     ),
@@ -38,8 +45,8 @@ vi.mock('@base-ui/react/menu', () => ({
 
 import { AddCardControl } from '../src/AddCardControl';
 
-describe('AddCardControl Base UI boundary', () => {
-  it('composes the split control through the Base UI Menu primitive', () => {
+describe('AddCardControl menu boundary', () => {
+  it('composes the shared DropdownMenu through the Base UI Menu primitive', () => {
     render(<AddCardControl onAddCard={() => undefined} onAddAlias={() => undefined} />);
 
     expect(screen.getByTestId('base-ui-menu-root')).toBeInTheDocument();

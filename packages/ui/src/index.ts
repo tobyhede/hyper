@@ -4,6 +4,8 @@ export { AppShell } from './AppShell';
 export type { AppShellProps } from './AppShell';
 export { Button, buttonVariants } from './Button';
 export type { ButtonProps } from './Button';
+export { PersistenceIndicator } from './PersistenceIndicator';
+export type { PersistenceIndicatorProps, PersistenceIndicatorState } from './PersistenceIndicator';
 export { CardContent } from './CardContent';
 export type { CardContentProps } from './CardContent';
 export { CardKindIcon } from './CardKindIcon';

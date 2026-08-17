@@ -143,9 +143,9 @@ test('a stale browser reports conflict and accepts the remote workspace without 
     expect(mountedGraphArea).not.toBeNull();
 
     await stalePage.getByTestId('view-selector').click();
-    await stalePage.getByRole('option', { name: 'Flow' }).click();
+    await stalePage.getByRole('menuitemradio', { name: 'Flow' }).click();
     await stalePage.getByTestId('graph-selector').click();
-    await stalePage.getByRole('option', { name: 'Echo' }).click();
+    await stalePage.getByRole('menuitemradio', { name: 'Echo' }).click();
     // No wait between starting the placement and accepting: settling first would
     // retire the very race this test exists to cover.
     await stalePage.getByTestId('present-button').click();
@@ -189,7 +189,7 @@ test('graph activation and presenting do not write or protect navigation', async
   await page.goto('/');
   await expect(nodeByTitle(page, 'A').first()).toBeVisible();
   await page.getByTestId('graph-selector').click();
-  await page.getByRole('option', { name: 'Echo' }).click();
+  await page.getByRole('menuitemradio', { name: 'Echo' }).click();
   await page.getByTestId('present-button').click();
   await expect(page.getByTestId('presenting-chrome')).toBeVisible();
   await settledNetwork(page);

@@ -4,15 +4,33 @@
 
 **Blocked by:** 01 — Establish the shadcn design-system baseline.
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] View, Layout and Graph selection are represented as mutually exclusive menu choices, with the current selection visibly and accessibly identified.
-- [ ] Card creation and Present/Overview remain reachable with their existing availability rules and keyboard commitments.
-- [ ] `AddCardControl` composes its menu half through the shared
+- [x] View, Layout and Graph selection are represented as mutually exclusive menu choices, with the current selection visibly and accessibly identified.
+- [x] Card creation and Present/Overview remain reachable with their existing availability rules and keyboard commitments.
+- [x] `AddCardControl` composes its menu half through the shared
       `DropdownMenu` surface and semantic tokens while preserving the accepted
       split-control behavior: `modal={false}`, conditional focus return when
       Add Alias opens a pane, and `nokey` protection for the portalled popup.
-- [ ] Normal, pending, failed and conflicted persistence states are clear without treating status as a menu command; Ladle presents each state using the production composition.
+- [x] Normal, pending, failed and conflicted persistence states are clear without treating status as a menu command; Ladle presents each state using the production composition.
+
+## Answer
+
+The production workspace now composes View, Layout and Graph as controlled
+Menubar radio groups, with Present/Overview and the accepted Add Card split
+control remaining adjacent persistent actions. The settled persistence design
+from `feat/surface-inventory` remains intact through the shared
+`PersistenceIndicator`: its lifecycle story covers the transient saved cue,
+pending state and compact rejection, while the production toolbar stories add
+retryable failure and conflict compositions.
+
+The paused implementation's portal race was resolved at the lifecycle boundary:
+the toolbar controls which of its three menus is open and closes it before a
+selection updates application state, while Menubar's non-modal root and
+immediately hidden closed content leave the adjacent Add Card popup reachable.
+`AddCardControl` now composes the shared DropdownMenu facade and preserves its
+conditional focus-return and `nokey` behavior; the shared trigger forwards the
+caller's ref so cancelling Alias creation still restores focus.
 
 ## Audit note
 

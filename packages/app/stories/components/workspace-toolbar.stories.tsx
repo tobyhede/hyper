@@ -1,0 +1,56 @@
+import type { ReactNode } from 'react';
+import type { Story } from '@ladle/react';
+import { uuidSchema } from '@project/core';
+import { WorkspaceToolbarFixture } from '../support/WorkspaceToolbarFixture';
+
+export default { title: 'Components/Workspace Toolbar' };
+
+const ToolbarRow = ({ children }: { readonly children: ReactNode }) => (
+  <div className="shell__header">
+    <div className="shell__toolbar">{children}</div>
+  </div>
+);
+
+const story = (children: ReactNode) => <ToolbarRow>{children}</ToolbarRow>;
+
+export const Settled: Story = () => story(<WorkspaceToolbarFixture />);
+export const Pending: Story = () =>
+  story(<WorkspaceToolbarFixture persistence={{ kind: 'pending' }} />);
+export const Failed: Story = () =>
+  story(
+    <WorkspaceToolbarFixture
+      persistence={{
+        kind: 'failed',
+        failure: { kind: 'retryable-failure', code: 'network', message: 'Network unavailable' },
+      }}
+    />,
+  );
+export const Rejected: Story = () =>
+  story(
+    <WorkspaceToolbarFixture
+      persistence={{
+        kind: 'rejected',
+        failure: { kind: 'permanent-failure', code: 'forbidden', message: 'Permission denied' },
+      }}
+    />,
+  );
+export const Conflicted: Story = () =>
+  story(
+    <WorkspaceToolbarFixture
+      persistence={{
+        kind: 'conflicted',
+        current: {
+          snapshot: {
+            id: uuidSchema.parse('00000000-0000-4000-8000-000000000005'),
+            document: { version: 1, title: 'Remote workspace' },
+            cards: [],
+          },
+          revision: 5n,
+          exportedRevision: null,
+        },
+      }}
+      remoteRefusal="The remote space is invalid and was not accepted."
+    />,
+  );
+export const Presenting: Story = () =>
+  story(<WorkspaceToolbarFixture presenting authoringDisabled />);
