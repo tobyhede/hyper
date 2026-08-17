@@ -1,7 +1,6 @@
 import { test as base, expect } from '@playwright/test';
-import { fileURLToPath } from 'node:url';
-import { createServer, type ViteDevServer } from 'vite';
-import { E2E_PORT_BASE, NEW_SPACE_PROJECT } from './projects';
+import type { ViteDevServer } from 'vite';
+import { createE2eViteServer } from './vite-server';
 
 /**
  * The Playwright `test` every spec in this directory imports, extended with a
@@ -40,30 +39,13 @@ interface E2eFixtures {
   reactFlowComplaints: string[];
 }
 
-const configFile = fileURLToPath(new URL('../vite.config.ts', import.meta.url));
-const appRoot = fileURLToPath(new URL('..', import.meta.url));
-
 export const test = base.extend<E2eFixtures>({
   // This fixture needs none of its peers, but the parameter cannot be dropped:
   // Playwright rejects a first argument that is not a destructuring pattern,
   // and `no-empty-pattern` rejects `{}`. Naming one and discarding it is what
   // satisfies both.
   e2eServer: async ({ browserName: _browserName }, run, testInfo) => {
-    const server = await createServer({
-      root: appRoot,
-      configFile,
-      mode: testInfo.project.name === NEW_SPACE_PROJECT ? 'e2e-empty' : 'e2e-fixture',
-      // Away from the ports the `dev:*` scripts hold (5173–5175), and above
-      // `POSTGRES_E2E_PORT` so no worker index can reach the opt-in suite's
-      // fixed host — `strictPort` turns any overlap into a hard failure that
-      // blames startup instead. `test/unit/e2e-ports.test.ts` derives that
-      // reserved range from the scripts and asserts the separation.
-      server: {
-        host: '127.0.0.1',
-        port: E2E_PORT_BASE + testInfo.workerIndex,
-        strictPort: true,
-      },
-    });
+    const server = await createE2eViteServer(testInfo.project.name, testInfo.workerIndex);
     try {
       await server.listen();
       await run(server);

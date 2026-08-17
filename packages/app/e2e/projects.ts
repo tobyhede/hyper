@@ -33,5 +33,17 @@ export const NEW_SPACE_PROJECT = 'new-space';
  */
 export const E2E_PORT_BASE = 5300;
 
+/**
+ * Vite's dependency optimizer mutates its cache while a cold host starts. The
+ * E2E suite starts one host per test and runs workers concurrently, so sharing
+ * Vite's default cache lets one worker invalidate another worker's first page.
+ * Hosts are sequential within a worker and can safely reuse that worker's
+ * cache, retaining the startup benefit without cross-worker mutation.
+ */
+export function workerScopedViteCacheDir(appRoot: string, workerIndex: number): string {
+  return path.join(appRoot, 'node_modules', '.vite-e2e', String(workerIndex));
+}
+
 /** The opt-in PostgreSQL project's fixed Vite host port. */
 export const POSTGRES_E2E_PORT = 5280;
+import path from 'node:path';
