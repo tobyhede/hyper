@@ -24,33 +24,32 @@ import {
   SidebarSeparator,
   useSidebar,
 } from '@project/ui';
+import type { CanvasChoice, CanvasRenderer } from '../canvas-choice';
 import { rendererSelectionKey, type RendererSelection } from '../renderer';
-
-/**
- * One thing the canvas can be drawing, named for the list it appears in.
- *
- * It carries the `RendererSelection` itself rather than an id and a kind, so
- * choosing an item hands back exactly what Navigation takes and nothing has to
- * be reassembled — or narrowed with a cast — on the way.
- */
-export interface CanvasChoice {
-  readonly selection: RendererSelection;
-  readonly title: string;
-}
 
 export interface WorkspaceSidebarProps {
   /** The Space's title. The canvas header names what is drawing it (ADR 0053). */
   readonly workspaceTitle: string;
   readonly canvas: {
-    readonly computed: readonly CanvasChoice[];
-    readonly authored: readonly CanvasChoice[];
-    readonly selected: RendererSelection;
     /**
-     * Hands back the chosen row whole rather than the selection inside it, so a
-     * caller that has to name what it chose — a canvas header, a fixture — has
-     * the title without looking the row up again by identity.
+     * The whole choice as one value, rather than two lists and a selection.
+     *
+     * One field because it is one decision (ADR 0053). Three fields let a caller
+     * assemble the lists and the selection from different places, which is how a
+     * `selected` that is not one of the rows gets in — a sidebar drawing a list
+     * with nothing pressed in it. `canvasChoice` builds all three together and
+     * states the identity below; the interface is structural, so this is a
+     * contract a hand-built literal must keep rather than one the compiler
+     * enforces, and `canvas-choice.ts` is where a caller should get one.
      */
-    readonly onSelect: (choice: CanvasChoice) => void;
+    readonly choice: CanvasChoice;
+    /**
+     * Hands back the bare selection, which is what Navigation takes. The row's
+     * title belongs to whoever built the list: a caller that has to name what is
+     * drawing reads `choice.selected` rather than deriving a second title of its
+     * own.
+     */
+    readonly onSelect: (selection: RendererSelection) => void;
   };
   readonly graph: {
     readonly graphs: readonly Graph[];
@@ -78,16 +77,18 @@ export interface WorkspaceSidebarProps {
 /**
  * Keyed by the ids `core` ships, so a new built-in View is a compile error here
  * rather than a View the workspace quietly draws without a glyph.
+ *
+ * It stays here rather than moving beside the View's strategy and title:
+ * exactly one module draws a row today, so a glyph declared next to the strategy
+ * would open a seam nothing crosses — and it would make a pure module import
+ * `@project/ui`. Revisit when a second module draws a row.
  */
 const VIEW_ICONS = {
   flow: FlowIcon,
   grid: GridIcon,
 } as const satisfies Record<BuiltInViewId, () => ReactNode>;
 
-const sameChoice = (left: RendererSelection, right: RendererSelection): boolean =>
-  rendererSelectionKey(left) === rendererSelectionKey(right);
-
-const ChoiceIcon = ({ selection }: { readonly selection: RendererSelection }): ReactNode => {
+const RendererIcon = ({ selection }: { readonly selection: RendererSelection }): ReactNode => {
   if (selection.kind === 'layout') return <LayoutIcon />;
   const Icon = VIEW_ICONS[selection.view];
   return <Icon />;
@@ -99,31 +100,35 @@ const ChoiceIcon = ({ selection }: { readonly selection: RendererSelection }): R
  * Computed Views and authored Layouts are drawn as two groups of one list and
  * not as two controls: exactly one item across both is pressed, and there is no
  * value anywhere meaning "the other group is the one drawing" (ADR 0053).
+ *
+ * The pressed test is `===` against the row the choice already named, so both
+ * groups are asked the same question by the same value. It cannot answer twice
+ * because there is only one row it can be.
  */
-function CanvasChoices({
-  choices,
+function CanvasRenderers({
+  renderers,
   selected,
   onSelect,
 }: {
-  readonly choices: readonly CanvasChoice[];
-  readonly selected: RendererSelection;
-  readonly onSelect: (choice: CanvasChoice) => void;
+  readonly renderers: readonly CanvasRenderer[];
+  readonly selected: CanvasRenderer;
+  readonly onSelect: (selection: RendererSelection) => void;
 }) {
   return (
     <SidebarMenu>
-      {choices.map((choice) => {
-        const active = sameChoice(choice.selection, selected);
+      {renderers.map((renderer) => {
+        const active = renderer === selected;
         return (
-          <SidebarMenuItem key={rendererSelectionKey(choice.selection)}>
+          <SidebarMenuItem key={rendererSelectionKey(renderer.selection)}>
             <SidebarMenuButton
               isActive={active}
               aria-pressed={active}
-              data-testid="canvas-choice"
-              data-choice={rendererSelectionKey(choice.selection)}
-              onClick={() => onSelect(choice)}
+              data-testid="canvas-renderer"
+              data-choice={rendererSelectionKey(renderer.selection)}
+              onClick={() => onSelect(renderer.selection)}
             >
-              <ChoiceIcon selection={choice.selection} />
-              <span>{choice.title}</span>
+              <RendererIcon selection={renderer.selection} />
+              <span>{renderer.title}</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
         );
@@ -211,9 +216,9 @@ export function WorkspaceSidebar({
         <SidebarGroup>
           <SidebarGroupLabel>Computed views</SidebarGroupLabel>
           <SidebarGroupContent>
-            <CanvasChoices
-              choices={canvas.computed}
-              selected={canvas.selected}
+            <CanvasRenderers
+              renderers={canvas.choice.computed}
+              selected={canvas.choice.selected}
               onSelect={onCanvas(canvas.onSelect)}
             />
           </SidebarGroupContent>
@@ -222,14 +227,14 @@ export function WorkspaceSidebar({
         <SidebarGroup>
           <SidebarGroupLabel>Authored layouts</SidebarGroupLabel>
           <SidebarGroupContent>
-            {canvas.authored.length === 0 ? (
+            {canvas.choice.authored.length === 0 ? (
               <NothingYet testId="no-authored-layouts">
                 None yet — editing a view creates one.
               </NothingYet>
             ) : (
-              <CanvasChoices
-                choices={canvas.authored}
-                selected={canvas.selected}
+              <CanvasRenderers
+                renderers={canvas.choice.authored}
+                selected={canvas.choice.selected}
                 onSelect={onCanvas(canvas.onSelect)}
               />
             )}
@@ -312,22 +317,21 @@ export function WorkspaceSidebar({
  * Separate from the sidebar it reports on, because it sits in the inset and
  * survives the sidebar closing — the single choice is still named when the list
  * it was made in is off screen.
+ *
+ * It takes the **row**, never a bare title and kind. Handed those two, a caller
+ * can name what is drawing down a second path — off the resolved renderer, say —
+ * and the header and the list it reports on are free to disagree again. Taking
+ * the row means the only way to draw this is to have built the list.
  */
-export function CurrentCanvas({
-  title,
-  kind,
-}: {
-  readonly title: string;
-  readonly kind: RendererSelection['kind'];
-}) {
+export function SelectedCanvas({ renderer }: { readonly renderer: CanvasRenderer }) {
   return (
-    <div data-testid="current-canvas" className="flex min-w-0 items-baseline gap-2">
-      <span className="truncate text-sm font-medium">{title}</span>
+    <div data-testid="selected-canvas" className="flex min-w-0 items-baseline gap-2">
+      <span className="truncate text-sm font-medium">{renderer.title}</span>
       <span
-        data-testid="current-canvas-kind"
+        data-testid="selected-canvas-kind"
         className="shrink-0 text-xs whitespace-nowrap text-muted-foreground"
       >
-        {kind === 'layout' ? 'Authored layout' : 'Computed view'}
+        {renderer.selection.kind === 'layout' ? 'Authored layout' : 'Computed view'}
       </span>
     </div>
   );

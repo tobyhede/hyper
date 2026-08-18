@@ -11,7 +11,6 @@ import {
   canvasKind,
   connectHandles,
   connectToEmptyWithAlt,
-  currentCanvas,
   dragBy,
   FIXTURE_CARD_COUNT,
   FIXTURE_EDGE_COUNT,
@@ -19,6 +18,7 @@ import {
   openCard,
   positionOf,
   selectCanvas,
+  selectedCanvas,
   settled,
   sidebar,
   viewportTransform,
@@ -357,7 +357,7 @@ test('a dragged card stays where it is dropped, and nothing else moves', async (
 
   await expect(persistence).toHaveAttribute('data-revision', '1');
   await expect(persistence).toHaveText('Persisted');
-  await expect(currentCanvas(page)).toContainText('Layout 1');
+  await expect(selectedCanvas(page)).toContainText('Layout 1');
   await expect(canvasKind(page)).toHaveText('Authored layout');
 
   const to = await positionOf(a);
@@ -448,7 +448,7 @@ test('connecting from Flow and Grid converts atomically without moving Cards', a
       await expect(page.locator('.react-flow__edge')).toHaveCount(1);
       await expect(persistence).toHaveAttribute('data-revision', String(index + 1));
       await expect(persistence).toHaveText('Persisted');
-      await expect(currentCanvas(page)).toContainText(`Layout ${index + 1}`);
+      await expect(selectedCanvas(page)).toContainText(`Layout ${index + 1}`);
       await expect(canvasKind(page)).toHaveText('Authored layout');
       await settled(page);
       expect(await allPositions(page)).toEqual(before);
@@ -478,7 +478,7 @@ test('creating from an Algorithmic View freezes existing Cards and places Card 1
   // The converted Layout owns one fresh Graph and this Edge is all it holds, so
   // the Graphs the fixture's own two Layouts own are not drawn here.
   await expect(page.locator('.react-flow__edge')).toHaveCount(1);
-  await expect(currentCanvas(page)).toContainText('Layout 1');
+  await expect(selectedCanvas(page)).toContainText('Layout 1');
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
   await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
 
@@ -489,7 +489,7 @@ test('creating from an Algorithmic View freezes existing Cards and places Card 1
   await page.reload();
   await expect(nodeByTitle(page, 'Card 1')).toBeVisible();
   await settled(page);
-  await expect(currentCanvas(page)).toContainText('Layout 1');
+  await expect(selectedCanvas(page)).toContainText('Layout 1');
   await expect(page.locator('.react-flow__edge')).toHaveCount(1);
 });
 
@@ -501,7 +501,7 @@ test('editing an existing Layout updates it instead of creating another one', as
 
   await dragBy(page, a, 0, 220);
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
-  await expect(currentCanvas(page)).toContainText('Layout 1');
+  await expect(selectedCanvas(page)).toContainText('Layout 1');
 
   await selectCanvas(page, 'Grid');
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
@@ -798,7 +798,7 @@ test('drawing an Edge the emphasised Graph already holds converts rather than re
   await expect(page.locator('.react-flow__edge')).toHaveCount(1);
   await expect(persistence).toHaveAttribute('data-revision', '1');
   await expect(persistence).toHaveText('Persisted');
-  await expect(currentCanvas(page)).toContainText('Layout 1');
+  await expect(selectedCanvas(page)).toContainText('Layout 1');
   // Conversion copies what is on screen; nothing moves at the moment of it.
   expect(await allPositions(page)).toEqual(before);
 
@@ -1777,7 +1777,7 @@ test('Add Card converts an Algorithmic View once and names the Card in place', a
   const title = page.getByRole('textbox', { name: 'Card title' });
   await expect(title).toBeFocused();
   await expect(title).toHaveValue('Card 1');
-  await expect(currentCanvas(page)).toContainText('Layout 1');
+  await expect(selectedCanvas(page)).toContainText('Layout 1');
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
   // Converting moves nothing: the Cards on screen keep the positions the View
   // computed for them (ADR 0025).
@@ -1793,7 +1793,7 @@ test('Add Card converts an Algorithmic View once and names the Card in place', a
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '2');
   // One conversion, so one new Layout beside the two the fixture declares —
   // five rows in the one canvas list, with the two built-in Views.
-  await expect(sidebar(page).getByTestId('canvas-choice')).toHaveCount(5);
+  await expect(sidebar(page).getByTestId('canvas-renderer')).toHaveCount(5);
 });
 
 /**
@@ -1908,7 +1908,7 @@ test('choosing a Target creates the Alias and leaves its editor open', async ({ 
   // An empty title takes the Target's, so the Alias is a second Card called B.
   await expect(page.locator('.react-flow__node')).toHaveCount(nodes + 1);
   await expect(nodeByTitle(page, 'B')).toHaveCount(2);
-  await expect(currentCanvas(page)).toContainText('Layout 1');
+  await expect(selectedCanvas(page)).toContainText('Layout 1');
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
 });
 

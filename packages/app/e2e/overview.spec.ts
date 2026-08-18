@@ -4,9 +4,9 @@ import { expect, test, type Locator, type Page } from './fixtures';
 import {
   activateGraph,
   activeGraph,
-  currentCanvas,
   openCard,
   selectCanvas,
+  selectedCanvas,
   sidebar,
 } from './graph';
 
@@ -83,9 +83,9 @@ test('selecting a Layout draws the Graphs it owns and only those', async ({ page
 
   // Declaring Layouts is not naming one to open in: `defaultView` is absent, so
   // the fixture arrives in Flow with no Layout selected.
-  await expect(currentCanvas(page)).toContainText('Flow');
-  await expect(page.getByTestId('current-canvas-kind')).toHaveText('Computed view');
-  await expect(sidebar(page).getByTestId('canvas-choice')).toHaveCount(4);
+  await expect(selectedCanvas(page)).toContainText('Flow');
+  await expect(page.getByTestId('selected-canvas-kind')).toHaveText('Computed view');
+  await expect(sidebar(page).getByTestId('canvas-renderer')).toHaveCount(4);
 
   // Collection 1 owns Long, Mid and Short over the shared spine: 4 + 3 + 2.
   await selectCanvas(page, 'Collection 1');

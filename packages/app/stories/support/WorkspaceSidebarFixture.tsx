@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
-import { uuidSchema, type Graph, type SpaceSnapshot } from '@project/core';
+import { uuidSchema, type SpaceSnapshot } from '@project/core';
+import type { Space } from '@project/graph';
 import {
   MemorySpaceBackend,
   MemorySpaceBackendTestControl,
@@ -7,64 +8,41 @@ import {
   type SpaceSessionState,
 } from '@project/persistence';
 import { AppShell } from '@project/ui';
+// Through the package's own subpath imports, as `#components/*` already is: a
+// story sits two directories above `src`, and climbing there by relative path is
+// how a package boundary gets crossed without naming one (AGENTS.md).
+import { canvasChoice } from '#src/canvas-choice';
+import { graphColorMap } from '#src/colors';
+import type { RendererSelection } from '#src/renderer';
 import { PersistenceControl, PersistenceNotice } from '#components/PersistenceControl';
-import { CurrentCanvas, WorkspaceSidebar, type CanvasChoice } from '#components/WorkspaceSidebar';
+import { SelectedCanvas, WorkspaceSidebar } from '#components/WorkspaceSidebar';
+import { authoredSpace } from './spaces';
 
-const from = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
-const to = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
-
-// Titles/colors mirror the tracked e2e fixture (packages/app/fixture/space.json)
-// and the app's GRAPH_PALETTE (packages/app/src/colors.ts).
-const longGraph: Graph = {
-  id: uuidSchema.parse('00000000-0000-4000-8000-000000000030'),
-  title: 'Long',
-  color: '#6ea8fe',
-  edges: [{ from, to }],
+/**
+ * Where a Space opens in this fixture: its first authored Layout, or the Flow
+ * View when it owns none.
+ *
+ * The same shape `defaultRenderer` states and deliberately not a call to it —
+ * that reads `space.defaultView`, which is the app's rule for a Space it was
+ * given, while this is a story choosing what to show. `Collection 1` is what the
+ * Ladle specs expect pressed.
+ */
+const opensOn = (space: Space): RendererSelection => {
+  const first = space.layouts[0];
+  return first === undefined
+    ? { kind: 'view', view: 'flow' }
+    : { kind: 'layout', layoutId: first.id };
 };
-const midGraph: Graph = {
-  id: uuidSchema.parse('00000000-0000-4000-8000-000000000031'),
-  title: 'Mid',
-  color: '#f59e0b',
-  edges: [{ from, to }],
-};
-const shortGraph: Graph = {
-  id: uuidSchema.parse('00000000-0000-4000-8000-000000000032'),
-  title: 'Short',
-  color: '#34d399',
-  edges: [{ from, to }],
-};
-const echoGraph: Graph = {
-  id: uuidSchema.parse('00000000-0000-4000-8000-000000000033'),
-  title: 'Echo',
-  color: '#f472b6',
-  edges: [{ from, to }],
-};
-const graphs: readonly Graph[] = [longGraph, midGraph, shortGraph, echoGraph];
-
-/** The two built-in Views, in the order `core` ships them. */
-const flow: CanvasChoice = { selection: { kind: 'view', view: 'flow' }, title: 'Flow' };
-const grid: CanvasChoice = { selection: { kind: 'view', view: 'grid' }, title: 'Grid' };
-const computed: readonly CanvasChoice[] = [flow, grid];
-
-const collectionOne: CanvasChoice = {
-  selection: { kind: 'layout', layoutId: uuidSchema.parse('00000000-0000-4000-8000-000000000020') },
-  title: 'Collection 1',
-};
-const collectionTwo: CanvasChoice = {
-  selection: { kind: 'layout', layoutId: uuidSchema.parse('00000000-0000-4000-8000-000000000021') },
-  title: 'Collection 2',
-};
-const authored: readonly CanvasChoice[] = [collectionOne, collectionTwo];
 
 export interface WorkspaceSidebarFixtureProps {
+  /** Which Space the sidebar reports on. See `./spaces`. */
+  readonly space?: Space;
   readonly persistence?: SpaceSessionState['persistence'];
   readonly presenting?: boolean;
   readonly authoringDisabled?: boolean;
   readonly remoteRefusal?: string | null;
   readonly acknowledgedRevision?: bigint;
   readonly onRetry?: () => void;
-  /** A Space before its first Edit: no authored Layout and no Graph (ADR 0025). */
-  readonly unauthored?: boolean;
 }
 
 /**
@@ -76,33 +54,40 @@ export interface WorkspaceSidebarFixtureProps {
  * as a cue in the footer and as the notice the shell pins beneath the header.
  */
 export function WorkspaceSidebarFixture({
+  space = authoredSpace,
   persistence = { kind: 'settled' },
   presenting = false,
   authoringDisabled = false,
   remoteRefusal = null,
   acknowledgedRevision = 4n,
   onRetry = () => undefined,
-  unauthored = false,
 }: WorkspaceSidebarFixtureProps) {
-  const [selected, setSelected] = useState<CanvasChoice>(unauthored ? flow : collectionOne);
-  const [activeGraph, setActiveGraph] = useState<string | null>(unauthored ? null : longGraph.id);
+  const [selected, setSelected] = useState<RendererSelection>(() => opensOn(space));
+  const [activeGraph, setActiveGraph] = useState<string | null>(space.graphs[0]?.id ?? null);
   const addCardMenu = useRef<HTMLButtonElement>(null);
+  // Both derivations run on every render, unmemoized. Production memoizes them
+  // because a canvas hangs off their identity; nothing here does, and a story
+  // that reproduces the memo without the reason for it is reproducing the shape
+  // of production rather than its behaviour.
+  //
+  // One module answers which canvases exist and which is taken, and the header
+  // below reads the row it named rather than a title of the fixture's own.
+  const choice = canvasChoice(space, selected);
+  // Colours the way the sidebar's own consumer gets them, and deliberately not
+  // through `canvasProjection`: that needs a resolved strategy, so a story about
+  // a sidebar would run elkjs to find out what colour a Graph's glyph is.
+  const colorByGraphId = graphColorMap(space);
 
   return (
     <AppShell
       sidebar={
         <WorkspaceSidebar
-          workspaceTitle="Workspace"
-          canvas={{
-            computed,
-            authored: unauthored ? [] : authored,
-            selected: selected.selection,
-            onSelect: setSelected,
-          }}
+          workspaceTitle={space.title}
+          canvas={{ choice, onSelect: setSelected }}
           graph={{
-            graphs: unauthored ? [] : graphs,
+            graphs: space.graphs,
             activeGraphId: activeGraph,
-            colorByGraphId: {},
+            colorByGraphId,
             onActivate: setActiveGraph,
             onPresent: () => undefined,
             presenting,
@@ -128,7 +113,7 @@ export function WorkspaceSidebarFixture({
           }}
         />
       }
-      header={<CurrentCanvas title={selected.title} kind={selected.selection.kind} />}
+      header={<SelectedCanvas renderer={choice.selected} />}
       notice={<PersistenceNotice persistence={persistence} onRetry={onRetry} />}
     >
       <div data-testid="workspace-canvas-stand-in" />
@@ -136,6 +121,16 @@ export function WorkspaceSidebarFixture({
   );
 }
 
+/**
+ * The Space this fixture's session commits — its own, and **not**
+ * `authoredSpace`.
+ *
+ * The sidebar below reads three things off the session: `persistence`,
+ * `acknowledgedRevision` and `retry`. It never reads its working Space, so one
+ * value serving as both the session's subject and the sidebar's would suggest a
+ * link the code does not have — a reader would take the drawn Layouts for the
+ * ones being saved. Making that link real is issue 03.
+ */
 const retrySnapshot: SpaceSnapshot = {
   id: uuidSchema.parse('00000000-0000-4000-8000-000000000006'),
   document: { version: 1, title: 'Retry lifecycle' },

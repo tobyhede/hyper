@@ -6,7 +6,8 @@
   "imports": {
     "#components/*": "./src/components/*.tsx",
     "#hooks/*": "./src/hooks/*.ts",
-    "#lib/*": "./src/lib/*.ts"
+    "#lib/*": "./src/lib/*.ts",
+    "#src/*": "./src/*.ts"
   },
   "scripts": {
     "dev": "vite",

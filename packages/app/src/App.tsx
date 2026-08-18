@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore
 import { ReactFlowProvider } from '@xyflow/react';
 import { AppShell } from '@project/ui';
 import {
-  BUILT_IN_VIEW_IDS,
   cardDocumentSchema,
   newUuid,
   uuidSchema,
@@ -17,18 +16,14 @@ import { createRenderAdapter, selectedCardOf, type EdgeSubject } from './render-
 import { createConnectionCompletion } from './connection-completion';
 import { createEdgeAuthoring } from './edge-authoring';
 import { canvasProjection } from './canvas-projection';
+import { canvasChoice } from './canvas-choice';
 import { canvasContent } from './canvas-content';
 import { usePlacementRendering } from './placement-rendering';
 import { cardSizeVars } from './card';
 import { createNavigation } from './navigation';
 import { createWorkingSpaceReader } from './snapshot';
 import { nextCardTitle } from './titles';
-import {
-  builtInViewTitle,
-  createRendererResolver,
-  defaultRenderer,
-  type RendererSelection,
-} from './renderer';
+import { createRendererResolver, defaultRenderer, type RendererSelection } from './renderer';
 import { ADD_CARD_KEY, SpaceCanvas } from './components/SpaceCanvas';
 import { CanvasCentre, type VisibleCentre } from './components/CanvasCentre';
 import { NewAlias } from './components/NewAlias';
@@ -37,7 +32,7 @@ import { PlacementFailure } from './components/PlacementFailure';
 import { PlacementPending } from './components/PlacementPending';
 import { PresentingChrome } from './components/PresentingChrome';
 import { PersistenceControl, PersistenceNotice } from './components/PersistenceControl';
-import { CurrentCanvas, WorkspaceSidebar, type CanvasChoice } from './components/WorkspaceSidebar';
+import { SelectedCanvas, WorkspaceSidebar } from './components/WorkspaceSidebar';
 
 export const createApp = ({ space, spaceSession }: OpenedSpace) => {
   // One validated aggregate per working snapshot, shared by the render path and
@@ -105,9 +100,16 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
       () => readWorkingSpace(sessionState.working),
       [sessionState.working],
     );
-    const layouts = rendererSpace.layouts;
     const renderer = useMemo(
       () => resolveRenderer(rendererSpace, selectedRenderer),
+      [rendererSpace, selectedRenderer],
+    );
+    // The one canvas choice, in the two groups it is drawn as (ADR 0053), from
+    // the one module that answers it. Memoized on the same two values the
+    // renderer is, and for the same reason: a Layout authored by the last Edit
+    // is a row here on the next render, and nothing else moves it.
+    const choice = useMemo(
+      () => canvasChoice(rendererSpace, selectedRenderer),
       [rendererSpace, selectedRenderer],
     );
     // Everything the canvas draws, derived once from the Space and the renderer.
@@ -203,13 +205,23 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
     const editable = hasArrangement;
 
     // One decision resolved from one Space, applied in an order that cannot
-    // leave the two collaborators disagreeing. Both steps that may refuse the
-    // selection run first — the resolve here and Navigation's own — and the
-    // render adapter update is a plain store write that cannot fail. Resolving
-    // against the session's live Space rather than the rendered one matters
-    // because Navigation resolves against the live one too: deciding from a
-    // snapshot Navigation will not consult is one decision with two sources of
-    // truth.
+    // leave the two collaborators disagreeing.
+    //
+    // **It keeps `choose` while the prop it is handed to is `onSelect`, and that
+    // is deliberate.** ADR 0031 says a renderer is *selected* and ADR 0053 says
+    // the canvas takes one *choice*, so either word was available. This is not
+    // the operation it delegates to — it resolves the renderer, calls
+    // `navigation.selectRenderer` **and** writes the render adapter — and named
+    // `selectRenderer` its body would read `selectRenderer` calling
+    // `navigation.selectRenderer`. The row and the callback follow the verb the
+    // sidebar acts in; this keeps the verb that says it composes.
+    //
+    // Both steps that may refuse the selection run first — the resolve here and
+    // Navigation's own — and the render adapter update is a plain store write
+    // that cannot fail. Resolving against the session's live Space rather than
+    // the rendered one matters because Navigation resolves against the live one
+    // too: deciding from a snapshot Navigation will not consult is one decision
+    // with two sources of truth.
     const chooseRenderer = useCallback((selection: RendererSelection) => {
       const resolved = resolveRenderer(currentSpace(), selection);
       navigation.selectRenderer(selection);
@@ -569,27 +581,10 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
       return () => window.removeEventListener('keydown', onKeyDown);
     }, [presenting, openedCardId, advance, retreat, selectBranch, exitPresenting]);
 
-    // The one canvas choice, in the two groups it is drawn as (ADR 0053). Both
-    // are plain derivations of the Space and the ids `core` ships, so a Layout
-    // authored by the last Edit is a row here on the next render.
-    const computedChoices: readonly CanvasChoice[] = BUILT_IN_VIEW_IDS.map((view) => ({
-      selection: { kind: 'view', view },
-      title: builtInViewTitle(view),
-    }));
-    const authoredChoices: readonly CanvasChoice[] = layouts.map((layout) => ({
-      selection: { kind: 'layout', layoutId: layout.id },
-      title: layout.title,
-    }));
-
     const sidebar = (
       <WorkspaceSidebar
         workspaceTitle={rendererSpace.title}
-        canvas={{
-          computed: computedChoices,
-          authored: authoredChoices,
-          selected: selectedRenderer,
-          onSelect: (choice) => chooseRenderer(choice.selection),
-        }}
+        canvas={{ choice, onSelect: chooseRenderer }}
         graph={{
           graphs: projection.visibleGraphs,
           activeGraphId,
@@ -623,12 +618,7 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
     return (
       <AppShell
         sidebar={sidebar}
-        header={
-          <CurrentCanvas
-            title={renderer.kind === 'view' ? renderer.title : renderer.resolvedLayout.layout.title}
-            kind={renderer.kind}
-          />
-        }
+        header={<SelectedCanvas renderer={choice.selected} />}
         notice={
           <PersistenceNotice
             persistence={sessionState.persistence}

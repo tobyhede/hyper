@@ -22,8 +22,8 @@ test('Workspace Sidebar story renders one exclusive canvas choice', async ({ pag
 
   await expect(collection).toHaveAttribute('aria-pressed', 'true');
   await expect(flow).toHaveAttribute('aria-pressed', 'false');
-  await expect(page.getByTestId('current-canvas')).toContainText('Collection 1');
-  await expect(page.getByTestId('current-canvas-kind')).toHaveText('Authored layout');
+  await expect(page.getByTestId('selected-canvas')).toContainText('Collection 1');
+  await expect(page.getByTestId('selected-canvas-kind')).toHaveText('Authored layout');
   await expect(page.getByRole('button', { name: 'Saving changes' })).toBeVisible();
   await expect(page.getByText('None', { exact: true })).toHaveCount(0);
 
@@ -31,8 +31,8 @@ test('Workspace Sidebar story renders one exclusive canvas choice', async ({ pag
 
   await expect(grid).toHaveAttribute('aria-pressed', 'true');
   await expect(collection).toHaveAttribute('aria-pressed', 'false');
-  await expect(page.getByTestId('current-canvas')).toContainText('Grid');
-  await expect(page.getByTestId('current-canvas-kind')).toHaveText('Computed view');
+  await expect(page.getByTestId('selected-canvas')).toContainText('Grid');
+  await expect(page.getByTestId('selected-canvas-kind')).toHaveText('Computed view');
 });
 
 /**
@@ -40,7 +40,7 @@ test('Workspace Sidebar story renders one exclusive canvas choice', async ({ pag
  * Menubar's: Tab reaches each row, Enter activates the row it is on, and no
  * popup opens, dismisses or has focus to return.
  */
-test('Workspace Sidebar story defines the canvas-choice keyboard contract', async ({ page }) => {
+test('Workspace Sidebar story defines the canvas renderer keyboard contract', async ({ page }) => {
   await page.goto('/?story=components--workspace-sidebar--pending&mode=preview');
 
   const flow = page.getByRole('button', { name: 'Flow' });
@@ -53,7 +53,7 @@ test('Workspace Sidebar story defines the canvas-choice keyboard contract', asyn
 
   await expect(grid).toHaveAttribute('aria-pressed', 'true');
   await expect(grid).toBeFocused();
-  await expect(page.getByTestId('current-canvas')).toContainText('Grid');
+  await expect(page.getByTestId('selected-canvas')).toContainText('Grid');
 });
 
 test('Workspace Sidebar story keeps the Add Card split control whole', async ({ page }) => {

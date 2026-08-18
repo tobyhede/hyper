@@ -7,6 +7,7 @@ import { inHandleId, loadSpaceSnapshot, outHandleId, Placement } from '@project/
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
 import type { CardFlowNode } from '@project/react-flow-adapter';
 import { AddCardControl, PersistenceIndicator, SidebarProvider } from '@project/ui';
+import type { CanvasRenderer } from '../src/canvas-choice';
 import { createNavigation } from '../src/navigation';
 import { createRenderAdapter, edgeSelectionOf } from '../src/render-adapter';
 import { createConnectionCompletion } from '../src/connection-completion';
@@ -37,15 +38,15 @@ const OTHER_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
 const LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000021');
 
 const EDGE = { from: CARD_A, to: CARD_B } as const;
+/** The one row this chrome draws, named so `selected` can be that very value. */
+const FLOW: CanvasRenderer = { selection: { kind: 'view', view: 'flow' }, title: 'Flow' };
 /** The real workspace chrome, composed as `App` composes it, outside the canvas. */
 const workspaceChrome = (
   <SidebarProvider>
     <WorkspaceSidebar
       workspaceTitle="Space"
       canvas={{
-        computed: [{ selection: { kind: 'view', view: 'flow' }, title: 'Flow' }],
-        authored: [],
-        selected: { kind: 'view', view: 'flow' },
+        choice: { computed: [FLOW], authored: [], selected: FLOW },
         onSelect: () => undefined,
       }}
       graph={{
