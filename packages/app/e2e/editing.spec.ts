@@ -1595,7 +1595,7 @@ test('an opened Card is modal, so no renderer change can strand its editor', asy
   // application root `inert`, which takes the sidebar out of the accessibility
   // tree entirely — so a role query would prove the wrong thing by finding
   // nothing at all.
-  const gridRow = page.locator('[data-choice="view:grid"]');
+  const gridRow = page.locator('[data-renderer="view:grid"]');
   await expect(gridRow).toBeEnabled();
   const covered = await gridRow.evaluate((element) => {
     const box = element.getBoundingClientRect();

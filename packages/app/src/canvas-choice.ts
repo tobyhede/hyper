@@ -1,8 +1,8 @@
-import { BUILT_IN_VIEW_IDS } from '@project/core';
+import { BUILT_IN_VIEW_IDS, type BuiltInViewId } from '@project/core';
 import type { Space } from '@project/graph';
 import {
   builtInViewTitle,
-  RendererInvariantError,
+  layoutNotFound,
   rendererSelectionKey,
   type RendererSelection,
 } from './renderer';
@@ -23,9 +23,17 @@ import {
  * derived the same title off the resolved renderer, and a story fixture wrote a
  * fourth copy by hand.
  *
- * Pure: no React, no DOM, no strategy. A `ResolvedRenderer` would drag elkjs
- * into a module whose whole value is being node-testable, and nothing here needs
- * one — the lists are `space.layouts` and the ids `core` ships.
+ * No React, no DOM, and **no resolved renderer**: the lists are `space.layouts`
+ * and the ids `core` ships, so nothing here needs a strategy, and taking a
+ * `ResolvedRenderer` would mean holding an elkjs instance to answer a question
+ * about titles. Being node-testable is the point, and the whole derivation is
+ * tested in that environment.
+ *
+ * It does not follow that elkjs is absent from the load graph. This imports
+ * `./renderer` for the View titles and the shared refusal, and `renderer.ts`
+ * imports `elkStrategy` — so the adapter loads with this module, here and in its
+ * test. The claim is about what this module *holds and calls*, not about what a
+ * bundler pulls in behind it.
  */
 
 /** One thing the canvas can draw. */
@@ -55,13 +63,33 @@ export interface CanvasChoice {
 }
 
 /**
- * The computed group, built once.
+ * Every built-in View's row, by id.
  *
- * It reads nothing from the `Space` — the built-in Views are the ids `core`
- * ships and the titles `renderer.ts` keeps beside their strategies — so there is
- * no per-call work here and no reason for two calls to answer with two arrays.
- * Frozen against a caller pushing a row onto the shared array — shallowly, which
- * is all `readonly` claims here anyway.
+ * Keyed rather than searched, because a View selection names a `BuiltInViewId`
+ * and every one of them has a row here: indexing is **total**, so there is no
+ * "no such View" case to write, and none to leave untested. Searching the array
+ * for it produced exactly that — a refusal the type made unreachable.
+ *
+ * Written out per id under `satisfies`, the same shape `BUILT_IN_VIEWS` and
+ * `VIEW_ICONS` already take, so a new built-in View is a compile error here
+ * rather than a View the canvas cannot be switched to. The titles still come
+ * from `builtInViewTitle`; only the keys are named twice, which is what makes
+ * the compiler able to ask.
+ */
+const BY_VIEW = {
+  flow: { selection: { kind: 'view', view: 'flow' }, title: builtInViewTitle('flow') },
+  grid: { selection: { kind: 'view', view: 'grid' }, title: builtInViewTitle('grid') },
+} as const satisfies Record<BuiltInViewId, CanvasRenderer>;
+
+/**
+ * The computed group, built once, in the order `core` ships the ids.
+ *
+ * It reads nothing from the `Space`, so there is no per-call work here and no
+ * reason for two calls to answer with two arrays. Frozen against a caller
+ * pushing a row onto the shared array — shallowly, which is all `readonly`
+ * claims here anyway. Its members are the very values `BY_VIEW` holds, which is
+ * what lets a View selection be answered by lookup and still be one of these
+ * rows by reference.
  *
  * Not exported. A sidebar importing this directly would be going to a second
  * source for half its list, which is the defect this module removes; it would
@@ -70,10 +98,7 @@ export interface CanvasChoice {
  * refused according to what the Space holds.
  */
 const COMPUTED: readonly CanvasRenderer[] = Object.freeze(
-  BUILT_IN_VIEW_IDS.map((view) => ({
-    selection: { kind: 'view', view } as const,
-    title: builtInViewTitle(view),
-  })),
+  BUILT_IN_VIEW_IDS.map((view) => BY_VIEW[view]),
 );
 
 /**
@@ -91,21 +116,16 @@ export function canvasChoice(space: Space, selected: RendererSelection): CanvasC
     title: layout.title,
   }));
 
-  // One identity rule for both groups, and it is the one `rendererSelectionKey`
-  // already states. Comparing the two selections field by field here would be a
-  // second answer to "are these the same choice".
-  const key = rendererSelectionKey(selected);
-  const matches = (candidate: CanvasRenderer): boolean =>
-    rendererSelectionKey(candidate.selection) === key;
-  const row = COMPUTED.find(matches) ?? authored.find(matches);
-  if (row === undefined) {
-    throw new RendererInvariantError(
-      'renderer-not-found',
-      selected.kind === 'layout'
-        ? `The selected Layout ${selected.layoutId} does not exist.`
-        : `The selected View ${selected.view} is not a built-in View.`,
-    );
+  if (selected.kind === 'view') {
+    return { computed: COMPUTED, authored, selected: BY_VIEW[selected.view] };
   }
+
+  // The one identity rule, and it is the one `rendererSelectionKey` already
+  // states. Comparing the two selections field by field here would be a second
+  // answer to "are these the same choice".
+  const key = rendererSelectionKey(selected);
+  const row = authored.find((candidate) => rendererSelectionKey(candidate.selection) === key);
+  if (row === undefined) throw layoutNotFound(selected.layoutId);
 
   return { computed: COMPUTED, authored, selected: row };
 }

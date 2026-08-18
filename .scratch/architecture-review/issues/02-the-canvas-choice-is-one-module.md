@@ -153,7 +153,11 @@ link the code does not have. Making that link real is issue 03.
 - [x] The Unauthored story is `newSpace()` through `loadSpace`, not a literal.
 - [x] `RetryableWorkspaceSidebarFixture` keeps its own snapshot, with the reason written down.
 - [x] Every renamed test id is renamed at every site.
-- [x] `pnpm verify`, `pnpm e2e` and `pnpm e2e:ladle` pass.
+- [ ] `pnpm verify`, `pnpm e2e` and `pnpm e2e:ladle` pass. **Not ticked**: `e2e`
+      and `e2e:ladle` pass and every check in `verify` passes except one test
+      file this change does not touch — see "Verification" below. Left unticked
+      rather than ticked-with-an-asterisk, because a green box over a red run is
+      the record being wrong.
 
 ## Decided, so it is not re-opened
 
@@ -201,7 +205,7 @@ Navigation stores; ADR 0053's *choice* names the whole the author picks from; th
 composed operation keeps the verb that says it composes. The reasoning is written
 above the `useCallback` so the next reader does not re-open it.
 
-**Two departures from the ticket's file list, both additive.**
+**Departures from the ticket's file list, all additive.**
 
 `packages/app/package.json` gains `"#src/*": "./src/*.ts"`. The story fixture has
 to reach `src/canvas-choice`, `src/colors` and `src/renderer`, and a story sits
@@ -215,9 +219,32 @@ ticket's list did not name it. It now builds one `CanvasRenderer` constant and
 uses that very value as `selected`, which is what the reference-identity contract
 asks of a hand-built record.
 
-**`docs/agents/ui.md` updated.** It named `CurrentCanvas` as the header
+`e2e/mobile-sidebar.spec.ts` and `e2e/new-space.spec.ts` are two more sites of
+the `currentCanvas` → `selectedCanvas` helper rename. The ticket's six-file list
+was written from the test *ids* and missed the helper's own callers.
+
+`.scratch/architecture-review/issues/03-…md` — issue 03's document, untracked
+before this branch and committed with it, so the fixture comment citing it
+resolves. It is a different ticket's spec and no code here implements it.
+
+**`docs/agents/ui.md` updated twice.** It named `CurrentCanvas` as the header
 component, and it is the read-before-you-touch file for this area — left alone,
-an agent following it would have written the bare `title`/`kind` props back.
+an agent following it would have written the bare `title`/`kind` props back. It
+also pinned `data-choice` as the attribute a test locates a covered row by, which
+the rename below moved.
+
+**`data-choice` → `data-renderer`.** Not in the ticket's rename list, which named
+only the three test ids. One element carried `data-testid="canvas-renderer"` and
+`data-choice=…`, which is two vocabularies for one row, and the ticket's own
+reason applies unchanged: "leave a test id behind and the name and the test
+surface disagree". Renamed at all three sites — the component, `editing.spec.ts`
+and `docs/agents/ui.md`.
+
+**The story's workspace title is now the Space's.** `workspaceTitle="Workspace"`
+was itself a transcription; it reads `space.title` now, so the Unauthored story's
+header says `New space` — which is what `newSpace()` titles it, and therefore
+evidence the story really draws ADR 0018's Space. Pinned in the Ladle spec so it
+is deliberate rather than incidental.
 
 **Not done, and deliberately.** The `CanvasChoice` interface is structural, so a
 hand-built literal whose `selected` is merely *equal* to a row draws with nothing
@@ -227,8 +254,55 @@ grown into" a deep module, and the two tests that build a record by hand both
 name their rows as constants and reuse them. The prop docblock states the
 contract rather than claiming the compiler enforces it.
 
-**Verification.** `pnpm verify` passes except `test/unit/agent-skill-symlinks.test.ts`,
-which is unrelated to this change and not caused by it: the vendored mattpocock
-skills pack that commit `a0dff60` retired re-installed itself into `.agents/skills/`
-mid-session without the matching `.claude/skills` symlinks. Those files are
-excluded from this commit. `pnpm e2e` (97) and `pnpm e2e:ladle` (8) both pass.
+## Review, and what it changed
+
+Reviewed on two axes — repo standards and spec conformance — after the first
+commit. The spec axis found no wrong implementation; the standards axis found
+three things worth fixing, and the fixes are in this branch.
+
+**ADR 0052: the fixture was translating production state.** `WorkspaceSidebarFixture`
+decided where a Space opens — "the first Layout, else Flow" — where production
+asks `defaultRenderer(space)`. ADR 0052's negative to remember forbids exactly
+that: "Do not make a stable story possible by … translating its state in the
+harness." `authoredSpace` now declares `defaultView`, which is fixture *data* and
+allowed, and the fixture calls `defaultRenderer`. New
+`packages/app/test/story-spaces.test.ts` holds the declaration and what the Ladle
+specs press to one answer; it was written first and failed on the old code.
+
+**One producer of the missing-Layout refusal.** `canvasChoice` had copied
+`resolveRenderer`'s message string. The ticket's own argument — "two modules
+answering one condition two ways is the disagreement this ticket removes" —
+applies to the copy, so `renderer.ts` now exports `layoutNotFound` and both call
+it. `canvas-choice.test.ts` asserts the two answer with the same reason *and* the
+same words, so a reword in one place fails there.
+
+**The unreachable refusal is gone.** The View arm of that throw could not be
+reached under `RendererSelection`'s type and could not be tested without a cast.
+The rows are now keyed by `BuiltInViewId` under `satisfies` — the shape
+`BUILT_IN_VIEWS` and `VIEW_ICONS` already take — so a View selection is answered
+by a total lookup and there is no case left to refuse. `COMPUTED` is built from
+those same values, so reference identity is unchanged.
+
+Also from the review: `spaces.ts` names `LoadSpaceResult`/`LoadSpaceSnapshotResult`
+rather than restating the shape; the header comment no longer implies elkjs is
+absent from this module's load graph (it is not — `./renderer` imports
+`elkStrategy`, and the claim is about what this module holds and calls); and
+`chooseRenderer`'s comment is four lines pointing here instead of fourteen
+re-arguing it.
+
+**Left as it is.** `#src/*` is broader than the one fixture that needed it, and
+stays: it is the exact parallel of `#components/*`, and three bespoke entries
+would be worse. The `CanvasChoice` interface is structural, so a hand-built
+literal whose `selected` is merely *equal* to a row draws with nothing pressed
+rather than failing to compile. Branding would close that and was not done: the
+ticket sizes this as a locality change that "should not be grown into" a deep
+module, and the prop docblock states the contract rather than claiming the
+compiler enforces it.
+
+**Verification.** `pnpm e2e` (97) and `pnpm e2e:ladle` (8) pass. Every check in
+`pnpm verify` passes except one test file this change does not touch:
+`test/unit/agent-skill-symlinks.test.ts`. The vendored mattpocock skills pack
+that commit `a0dff60` retired re-installed itself into `.agents/skills/`
+mid-session without the matching `.claude/skills` symlinks, and that test
+enumerates the former. Those files are excluded from this branch; the tree still
+holds them, and reconciling them is its own change.

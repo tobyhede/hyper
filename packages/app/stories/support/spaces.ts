@@ -1,5 +1,12 @@
 import { uuidSchema, type GraphEdge, type LayoutPosition, type SpaceSnapshot } from '@project/core';
-import { loadSpace, loadSpaceSnapshot, newSpace, type Space } from '@project/graph';
+import {
+  loadSpace,
+  loadSpaceSnapshot,
+  newSpace,
+  type LoadSpaceResult,
+  type LoadSpaceSnapshotResult,
+  type Space,
+} from '@project/graph';
 
 /**
  * The Spaces the catalogue's stories draw.
@@ -14,9 +21,15 @@ import { loadSpace, loadSpaceSnapshot, newSpace, type Space } from '@project/gra
  *
  * Both are loaded at module scope, so a literal that stops parsing takes the
  * story down with a message instead of rendering something subtly wrong.
+ *
+ * Each also **declares where it opens**, so `defaultRenderer` answers that for a
+ * story exactly as it does for the app. The fixture used to decide it — "the
+ * first Layout, else Flow" — which is the state translation ADR 0052's negative
+ * names. `story-spaces.test.ts` holds the declaration and what the Ladle specs
+ * press to the same answer.
  */
 
-const loaded = (result: { ok: true; space: Space } | { ok: false; errors: unknown[] }): Space => {
+const loaded = (result: LoadSpaceResult | LoadSpaceSnapshotResult): Space => {
   if (!result.ok) throw new Error(`Story Space did not load: ${JSON.stringify(result.errors)}`);
   return result.space;
 };
@@ -40,6 +53,9 @@ const chain = (links: number): GraphEdge[] =>
     return index < links && to !== undefined ? [{ from, to }] : [];
   });
 
+/** Named once, because the Space both declares this Layout and opens on it. */
+const COLLECTION_ONE = uuidSchema.parse('00000000-0000-4000-8000-000000000020');
+
 /**
  * A Space with two authored Layouts and the four Graphs they own.
  *
@@ -49,15 +65,22 @@ const chain = (links: number): GraphEdge[] =>
  * same blue, amber, green and pink the fixture used to write out by hand.
  * Deriving them is the point: a palette edit reaches the story, and the story
  * cannot claim a colour production would not give it.
+ *
+ * **It names `defaultView`**, which the tracked e2e fixture deliberately does
+ * not: that one exists to prove a Space declaring Layouts still arrives in Flow,
+ * and this one exists to draw a sidebar with a Layout pressed. Declaring it is
+ * how the story gets that from `defaultRenderer` instead of from a rule the
+ * harness keeps.
  */
 const authoredSnapshot: SpaceSnapshot = {
   id: uuidSchema.parse('00000000-0000-4000-8000-000000000040'),
   document: {
     version: 1,
     title: 'Workspace',
+    defaultView: COLLECTION_ONE,
     layouts: [
       {
-        id: uuidSchema.parse('00000000-0000-4000-8000-000000000020'),
+        id: COLLECTION_ONE,
         title: 'Collection 1',
         kind: 'positioned',
         positions: positions(5),

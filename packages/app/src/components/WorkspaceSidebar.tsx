@@ -124,7 +124,7 @@ function CanvasRenderers({
               isActive={active}
               aria-pressed={active}
               data-testid="canvas-renderer"
-              data-choice={rendererSelectionKey(renderer.selection)}
+              data-renderer={rendererSelectionKey(renderer.selection)}
               onClick={() => onSelect(renderer.selection)}
             >
               <RendererIcon selection={renderer.selection} />

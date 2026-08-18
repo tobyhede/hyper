@@ -13,26 +13,10 @@ import { AppShell } from '@project/ui';
 // how a package boundary gets crossed without naming one (AGENTS.md).
 import { canvasChoice } from '#src/canvas-choice';
 import { graphColorMap } from '#src/colors';
-import type { RendererSelection } from '#src/renderer';
+import { defaultRenderer, type RendererSelection } from '#src/renderer';
 import { PersistenceControl, PersistenceNotice } from '#components/PersistenceControl';
 import { SelectedCanvas, WorkspaceSidebar } from '#components/WorkspaceSidebar';
 import { authoredSpace } from './spaces';
-
-/**
- * Where a Space opens in this fixture: its first authored Layout, or the Flow
- * View when it owns none.
- *
- * The same shape `defaultRenderer` states and deliberately not a call to it —
- * that reads `space.defaultView`, which is the app's rule for a Space it was
- * given, while this is a story choosing what to show. `Collection 1` is what the
- * Ladle specs expect pressed.
- */
-const opensOn = (space: Space): RendererSelection => {
-  const first = space.layouts[0];
-  return first === undefined
-    ? { kind: 'view', view: 'flow' }
-    : { kind: 'layout', layoutId: first.id };
-};
 
 export interface WorkspaceSidebarFixtureProps {
   /** Which Space the sidebar reports on. See `./spaces`. */
@@ -62,7 +46,13 @@ export function WorkspaceSidebarFixture({
   acknowledgedRevision = 4n,
   onRetry = () => undefined,
 }: WorkspaceSidebarFixtureProps) {
-  const [selected, setSelected] = useState<RendererSelection>(() => opensOn(space));
+  // Where the Space opens is production's answer, from the same call `createApp`
+  // makes on the Space it was given. A rule of the fixture's own — "the first
+  // Layout, else Flow" — stood here, and it is the state translation ADR 0052's
+  // negative names: the story would go on pressing a row after the app had
+  // stopped. The Space declares `defaultView`, which is fixture *data* and
+  // allowed; deciding what to do with it is not.
+  const [selected, setSelected] = useState<RendererSelection>(() => defaultRenderer(space));
   const [activeGraph, setActiveGraph] = useState<string | null>(space.graphs[0]?.id ?? null);
   const addCardMenu = useRef<HTMLButtonElement>(null);
   // Both derivations run on every render, unmemoized. Production memoizes them

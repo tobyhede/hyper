@@ -207,14 +207,10 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
     // One decision resolved from one Space, applied in an order that cannot
     // leave the two collaborators disagreeing.
     //
-    // **It keeps `choose` while the prop it is handed to is `onSelect`, and that
-    // is deliberate.** ADR 0031 says a renderer is *selected* and ADR 0053 says
-    // the canvas takes one *choice*, so either word was available. This is not
-    // the operation it delegates to — it resolves the renderer, calls
-    // `navigation.selectRenderer` **and** writes the render adapter — and named
-    // `selectRenderer` its body would read `selectRenderer` calling
-    // `navigation.selectRenderer`. The row and the callback follow the verb the
-    // sidebar acts in; this keeps the verb that says it composes.
+    // It keeps `choose` while the prop it feeds is `onSelect` because it is not
+    // the operation it delegates to: renamed, its body would read
+    // `selectRenderer` calling `navigation.selectRenderer`. The argument is in
+    // `.scratch/architecture-review/issues/02-the-canvas-choice-is-one-module.md`.
     //
     // Both steps that may refuse the selection run first — the resolve here and
     // Navigation's own — and the render adapter update is a plain store write

@@ -149,6 +149,22 @@ export class RendererInvariantError extends Error {
 }
 
 /**
+ * A selection naming a Layout the Space does not hold.
+ *
+ * Two modules ask this — the resolver below, and `canvasChoice`, which lists
+ * what may be selected — and they must not answer it two ways. Offered as a
+ * constructor rather than a bare message so the reason travels with the words:
+ * a copied string agrees only until someone rewords one of them, which is the
+ * disagreement `canvas-choice.ts` exists to remove and would then have
+ * reintroduced a layer down.
+ */
+export const layoutNotFound = (layoutId: UUID): RendererInvariantError =>
+  new RendererInvariantError(
+    'renderer-not-found',
+    `The selected Layout ${layoutId} does not exist.`,
+  );
+
+/**
  * A Graph's content with no identity on it — what a View policy decides.
  *
  * Identity is the shared module's to mint, so a policy cannot return a source
@@ -474,12 +490,7 @@ export function createRendererResolver({
   return (space, selection = defaultRenderer(space)) => {
     if (selection.kind === 'layout') {
       const resolvedLayout = space.lookup.layout(selection.layoutId);
-      if (resolvedLayout === undefined) {
-        throw new RendererInvariantError(
-          'renderer-not-found',
-          `The selected Layout ${selection.layoutId} does not exist.`,
-        );
-      }
+      if (resolvedLayout === undefined) throw layoutNotFound(selection.layoutId);
       const members = Placement.fromLayout(resolvedLayout.layout);
       return {
         kind: 'layout',

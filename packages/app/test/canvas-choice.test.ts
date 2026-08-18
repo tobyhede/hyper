@@ -2,7 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { uuidSchema } from '@project/core';
 import { loadSpace, type Space } from '@project/graph';
 import { canvasChoice } from '../src/canvas-choice';
-import { RendererInvariantError, type RendererSelection } from '../src/renderer';
+import {
+  createRendererResolver,
+  RendererInvariantError,
+  type RendererSelection,
+} from '../src/renderer';
 import { cardFile } from './card-files';
 
 const CARD_A = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
@@ -103,4 +107,39 @@ describe('canvasChoice', () => {
       expect((error as RendererInvariantError).reason).toBe('renderer-not-found');
     }
   });
+
+  /**
+   * The refusal is the *same* refusal, not a matching one.
+   *
+   * "Two modules answering one condition two ways is the disagreement this
+   * ticket removes" — and a copied message is two answers that happen to agree
+   * today. This pins reason and wording together, so reworded in one place and
+   * not the other, it fails here rather than in whichever surface reads it.
+   */
+  it('refuses in the same words the resolver does', () => {
+    const selection: RendererSelection = { kind: 'layout', layoutId: ABSENT_LAYOUT };
+    const resolveRenderer = createRendererResolver({
+      newGraphId: () => uuidSchema.parse('00000000-0000-4000-8000-0000000000ff'),
+    });
+
+    const fromChoice = attempt(() => canvasChoice(AUTHORED, selection));
+    const fromResolver = attempt(() => resolveRenderer(AUTHORED, selection));
+
+    expect(fromChoice.reason).toBe('renderer-not-found');
+    expect(fromChoice.reason).toBe(fromResolver.reason);
+    expect(fromChoice.message).toBe(fromResolver.message);
+  });
 });
+
+/** The `RendererInvariantError` a call threw, or a failure naming what it did instead. */
+function attempt(call: () => unknown): { reason: string; message: string } {
+  try {
+    call();
+  } catch (error) {
+    if (error instanceof RendererInvariantError) {
+      return { reason: error.reason, message: error.message };
+    }
+    throw error;
+  }
+  return expect.unreachable('a missing Layout must not resolve');
+}

@@ -67,11 +67,22 @@ test('Workspace Sidebar story keeps the Add Card split control whole', async ({ 
   await expect(moreKinds).toBeFocused();
 });
 
-/** A Space opens on a computed View owning no Layout and no Graph (ADR 0025, ADR 0018). */
+/**
+ * A Space opens on a computed View owning no Layout and no Graph (ADR 0025, ADR
+ * 0018).
+ *
+ * The header names the Space itself, and the title is `newSpace()`'s own rather
+ * than a word the harness supplies: this story draws the Space ADR 0018
+ * describes, so "New space" is the evidence that it is really that Space and not
+ * a hand-built stand-in wearing the catalogue's label.
+ */
 test('Workspace Sidebar story says an unauthored Space has nothing yet', async ({ page }) => {
   await page.goto('/?story=components--workspace-sidebar--unauthored&mode=preview');
 
   await expect(page.getByRole('button', { name: 'Flow' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByTestId('selected-canvas')).toContainText('Flow');
+  await expect(page.getByTestId('selected-canvas-kind')).toHaveText('Computed view');
+  await expect(page.getByTestId('workspace-title')).toHaveText('New space');
   await expect(page.getByTestId('no-authored-layouts')).toBeVisible();
   await expect(page.getByTestId('no-graphs')).toBeVisible();
   await expect(page.getByTestId('present-button')).toBeDisabled();
