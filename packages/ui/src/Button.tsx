@@ -9,7 +9,7 @@ import { cn } from './lib/utils';
  * button, `destructive` the panel button with the danger border.
  */
 const buttonVariants = cva(
-  'inline-flex cursor-pointer items-center justify-center rounded-[6px] border text-[0.85rem] whitespace-nowrap transition-[color,background-color,border-color,opacity] duration-200 focus-visible:outline-none disabled:cursor-not-allowed',
+  'inline-flex cursor-pointer items-center justify-center rounded-[6px] border text-[0.85rem] whitespace-nowrap transition-[color,background-color,border-color,opacity] duration-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:cursor-not-allowed',
   {
     variants: {
       variant: {

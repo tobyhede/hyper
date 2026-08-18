@@ -111,15 +111,15 @@ function ConflictControl({
     // A conflict has no safe dismissal: the revision conflict doesn't resolve
     // itself, so every close reason (Escape included — AlertDialog's
     // `disablePointerDismissal` only blocks outside-press) is ignored until
-    // Reload or Save is chosen. Contrast RejectionControl below, which honors
+    // Reload or Keep local and retry is chosen. Contrast RejectionControl below, which honors
     // onOpenChange because rejection returns to an unchanged, safe workspace.
     <AlertDialog open onOpenChange={() => undefined}>
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>Changes conflict</AlertDialogTitle>
           <AlertDialogDescription>
-            A newer version of this space is available. Reload discards your local changes; Save
-            keeps them and tries again.
+            A newer version of this space is available. Reload discards your local changes; keeping
+            your local version tries to save it again.
           </AlertDialogDescription>
         </AlertDialogHeader>
         {remoteRefusal === null ? null : (
@@ -137,7 +137,7 @@ function ConflictControl({
             Reload
           </Button>
           <Button variant="default" data-testid="persistence-keep-local" onClick={onKeepLocal}>
-            Save
+            Keep local and retry
           </Button>
         </AlertDialogFooter>
       </AlertDialogContent>

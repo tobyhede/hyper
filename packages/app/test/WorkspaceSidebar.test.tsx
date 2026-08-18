@@ -1,8 +1,8 @@
 import { createRef, type ReactElement } from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
-import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { uuidSchema } from '@project/core';
-import { PersistenceIndicator, SidebarProvider } from '@project/ui';
+import { PersistenceIndicator, SidebarProvider, SidebarTrigger } from '@project/ui';
 import { WorkspaceSidebar, type WorkspaceSidebarProps } from '../src/components/WorkspaceSidebar';
 
 const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
@@ -33,6 +33,27 @@ beforeAll(() => {
 });
 
 afterAll(() => vi.unstubAllGlobals());
+
+/**
+ * Which side of the Sidebar's breakpoint this test is on.
+ *
+ * `useIsMobile` reads `matchMedia` on every render, and `vitest.setup.ts` stubs
+ * jsdom's missing one as a query that never matches. A mobile test replaces that
+ * stub and puts the desktop one back afterwards rather than unstubbing, because
+ * the globals `beforeAll` installed above have to survive it.
+ */
+const stubViewport = (mobile: boolean): void => {
+  vi.stubGlobal('matchMedia', (query: string) => ({
+    matches: mobile,
+    media: query,
+    onchange: null,
+    addEventListener: () => undefined,
+    removeEventListener: () => undefined,
+    addListener: () => undefined,
+    removeListener: () => undefined,
+    dispatchEvent: () => false,
+  }));
+};
 
 /** The sidebar reads its open state from the primitive's provider, as production does. */
 const draw = (element: ReactElement) => render(<SidebarProvider>{element}</SidebarProvider>);
@@ -224,6 +245,91 @@ describe('WorkspaceSidebar', () => {
     const present = screen.getByRole('button', { name: 'Present Authored' });
     expect(present).toBeEnabled();
     expect(present.querySelector('svg')).toHaveAttribute('stroke', '#123456');
+  });
+
+  /**
+   * Below the primitive's breakpoint the sidebar is a modal Sheet over the
+   * canvas, and every command in it acts on the canvas.
+   *
+   * Add Card and Add Alias are the sharp end: each opens an editor on the
+   * canvas, which a Dialog's focus trap will not let receive focus while the
+   * sheet is still up. The rest would simply leave the author reading the
+   * sidebar instead of the result. `mobile-sidebar.spec.ts` proves the focus
+   * half in a real browser; this proves the rule for every command.
+   */
+  describe('as a mobile Sheet', () => {
+    beforeEach(() => stubViewport(true));
+    afterEach(() => stubViewport(false));
+
+    const openSheet = (props: WorkspaceSidebarProps) => {
+      render(
+        <SidebarProvider>
+          <WorkspaceSidebar {...props} />
+          <SidebarTrigger />
+        </SidebarProvider>,
+      );
+      fireEvent.click(screen.getByRole('button', { name: 'Toggle Sidebar' }));
+      expect(screen.getByTestId('workspace-title')).toBeVisible();
+    };
+
+    const dismissed = () =>
+      waitFor(() => expect(screen.queryByTestId('workspace-title')).not.toBeInTheDocument());
+
+    it('dismisses itself when Card creation opens an editor on the canvas', async () => {
+      const props = settledProps();
+      openSheet(props);
+
+      fireEvent.click(screen.getByRole('button', { name: 'Add Card' }));
+
+      expect(props.addCard.onAddCard).toHaveBeenCalledOnce();
+      await dismissed();
+    });
+
+    it('dismisses itself when a canvas choice changes what is drawing', async () => {
+      const props = withLayout(settledProps());
+      openSheet(props);
+
+      fireEvent.click(screen.getByRole('button', { name: 'Layout 1' }));
+
+      expect(props.canvas.onSelect).toHaveBeenCalledOnce();
+      await dismissed();
+    });
+
+    it('dismisses itself when a Graph is activated', async () => {
+      const base = settledProps();
+      const props: WorkspaceSidebarProps = {
+        ...base,
+        graph: {
+          ...base.graph,
+          graphs: [{ id: GRAPH_ID, title: 'Graph 1', edges: [{ from: CARD_A, to: CARD_B }] }],
+          activeGraphId: null,
+        },
+      };
+      openSheet(props);
+
+      fireEvent.click(screen.getByRole('button', { name: 'Graph 1' }));
+
+      expect(props.graph.onActivate).toHaveBeenCalledWith(GRAPH_ID);
+      await dismissed();
+    });
+
+    it('dismisses itself when presenting begins', async () => {
+      const base = settledProps();
+      const props: WorkspaceSidebarProps = {
+        ...base,
+        graph: {
+          ...base.graph,
+          graphs: [{ id: GRAPH_ID, title: 'Graph 1', edges: [{ from: CARD_A, to: CARD_B }] }],
+          activeGraphId: GRAPH_ID,
+        },
+      };
+      openSheet(props);
+
+      fireEvent.click(screen.getByRole('button', { name: 'Present Graph 1' }));
+
+      expect(props.graph.onPresent).toHaveBeenCalledOnce();
+      await dismissed();
+    });
   });
 
   /** Status is not a command, so it sits outside every list rather than inside one. */

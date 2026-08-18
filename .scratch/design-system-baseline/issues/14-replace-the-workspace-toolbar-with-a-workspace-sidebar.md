@@ -87,3 +87,56 @@ Four things broke, each caught by a test rather than by review:
 - `pnpm e2e` passed: 93 tests.
 - `pnpm e2e:ladle` passed: 8 tests.
 - The rendered application was inspected on the tracked fixture in both a computed View and an authored Layout.
+
+## Comments
+
+### 2026-08-18 — the mobile Sheet had to be dismissed by its own commands
+
+Reported against `WorkspaceSidebar.tsx` as a P1: below 768px the sidebar is a
+modal Sheet over the canvas, and `AddCardControl` ran the callbacks without
+closing it, so Add Card's title editor and Add Alias's Target picker opened
+behind a focus trap and could not be reached.
+
+Verified, and it was wider than reported. `mobile-sidebar.spec.ts` — a new spec
+at 390x844, the only place the Sheet branch is exercised — failed on all four
+commands before the fix: Add Card, Add Alias, choosing a canvas or a Graph, and
+Present. The last three are not focus bugs, but they leave the author reading
+the sidebar instead of the result they asked for, so the rule is one rule:
+**a command whose result is on the canvas dismisses the sheet first**, applied
+in `WorkspaceSidebar` through an `onCanvas` wrapper over `useSidebar()`'s
+`setOpenMobile`. The persistence control is deliberately outside it — its result
+is a dialog stacked over the sheet, not the canvas.
+
+Two defects had to be fixed to write the test at all:
+
+- The e2e `page` fixture built its context from `baseURL` alone and dropped
+  Playwright's resolved `contextOptions`, so `test.use({ viewport })` was served
+  a desktop. Every project's declared device was equally inert; nothing noticed
+  because the default viewport matched `Desktop Chrome`'s.
+- `Sidebar`'s mobile branch spread the caller's props onto the `Sheet` root,
+  which renders no DOM. The sidebar therefore lost its `className`, its test id
+  and the `nokey` React Flow's delete key reads as soon as the viewport went
+  below the breakpoint. Props and className now go to `SheetContent`, and the
+  component's props are `Omit<…, 'ref'>` because Base UI's popup will not take a
+  legacy div ref.
+- The registry styling hid the Sheet's only close button. Hyper keeps that
+  button visible because the mobile surface is modal and must expose an explicit
+  touch and assistive-technology escape route.
+
+The provider also closes two smaller gaps in the registry drop: it reads the
+desktop state cookie it writes so the documented remembered state survives a
+reload, and its global Cmd/Ctrl+B shortcut ignores inputs, textareas, selects,
+buttons and editable content so typing in an editor cannot collapse workspace
+chrome.
+
+Regression coverage is in both places the rule can break: four cases in
+`mobile-sidebar.spec.ts` for the real focus behaviour, and four in
+`WorkspaceSidebar.test.tsx` under a mobile `matchMedia` stub for the rule
+itself. The component tests put the desktop stub back rather than unstubbing, so
+the globals the file installs once survive them.
+
+Verification after the fix:
+
+- `pnpm verify` passed: 1,266 tests passed and 8 skipped across 123 files.
+- `pnpm e2e` passed: 97 tests.
+- `pnpm e2e:ladle` passed: 8 tests.

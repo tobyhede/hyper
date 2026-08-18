@@ -126,7 +126,7 @@ describe('Workspace conflict recovery', () => {
     expect(screen.getByText('Local workspace')).toBeVisible();
     expect(screen.getByRole('alertdialog', { name: 'Changes conflict' })).toBeVisible();
     expect(screen.getByRole('button', { name: 'Reload' })).toBeVisible();
-    expect(screen.getByRole('button', { name: 'Save' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Keep local and retry' })).toBeVisible();
 
     fireEvent.click(screen.getByTestId('persistence-accept-remote'));
 

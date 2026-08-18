@@ -22,6 +22,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarSeparator,
+  useSidebar,
 } from '@project/ui';
 import { rendererSelectionKey, type RendererSelection } from '../renderer';
 
@@ -154,6 +155,21 @@ export function WorkspaceSidebar({
   addCard,
   persistence,
 }: WorkspaceSidebarProps) {
+  // Below the primitive's breakpoint this whole surface is a modal Sheet drawn
+  // *over* the canvas, with a focus trap and everything behind it inert. Every
+  // command here acts on the canvas, so every one of them dismisses the sheet
+  // first: Add Card and Add Alias open an editor that otherwise cannot take
+  // focus at all, and the rest would leave the author looking at the sidebar
+  // instead of the result. Above the breakpoint the sidebar is beside the canvas
+  // and there is nothing to dismiss.
+  const { isMobile, setOpenMobile } = useSidebar();
+  const onCanvas =
+    <Args extends readonly unknown[]>(command: (...args: Args) => void) =>
+    (...args: Args): void => {
+      if (isMobile) setOpenMobile(false);
+      command(...args);
+    };
+
   const activeGraph = graph.graphs.find((candidate) => candidate.id === graph.activeGraphId);
   const activeGraphColor =
     activeGraph === undefined
@@ -184,7 +200,11 @@ export function WorkspaceSidebar({
       <SidebarContent className="nokey">
         <SidebarGroup>
           <SidebarGroupContent>
-            <AddCardControl {...addCard} />
+            <AddCardControl
+              {...addCard}
+              onAddCard={onCanvas(addCard.onAddCard)}
+              onAddAlias={onCanvas(addCard.onAddAlias)}
+            />
           </SidebarGroupContent>
         </SidebarGroup>
 
@@ -194,7 +214,7 @@ export function WorkspaceSidebar({
             <CanvasChoices
               choices={canvas.computed}
               selected={canvas.selected}
-              onSelect={canvas.onSelect}
+              onSelect={onCanvas(canvas.onSelect)}
             />
           </SidebarGroupContent>
         </SidebarGroup>
@@ -210,7 +230,7 @@ export function WorkspaceSidebar({
               <CanvasChoices
                 choices={canvas.authored}
                 selected={canvas.selected}
-                onSelect={canvas.onSelect}
+                onSelect={onCanvas(canvas.onSelect)}
               />
             )}
           </SidebarGroupContent>
@@ -234,7 +254,7 @@ export function WorkspaceSidebar({
                         aria-pressed={active}
                         data-testid="graph-choice"
                         data-graph-id={candidate.id}
-                        onClick={() => graph.onActivate(candidate.id)}
+                        onClick={onCanvas(() => graph.onActivate(candidate.id))}
                       >
                         <GraphIcon color={graphColor(candidate, graph.colorByGraphId)} />
                         <span>{candidate.title}</span>
@@ -255,7 +275,7 @@ export function WorkspaceSidebar({
           className="w-full justify-start gap-2"
           data-testid={graph.presenting ? 'exit-presenting-button' : 'present-button'}
           disabled={presentDisabled}
-          onClick={graph.presenting ? graph.onExitPresenting : graph.onPresent}
+          onClick={onCanvas(graph.presenting ? graph.onExitPresenting : graph.onPresent)}
         >
           {graph.presenting ? null : <PresentIcon color={activeGraphColor} />}
           {/* The visible text is the accessible name. It carries the active

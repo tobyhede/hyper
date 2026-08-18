@@ -65,4 +65,14 @@ describe('Button', () => {
     expect(onClick).not.toHaveBeenCalled();
     expect(ref.current).toBeInstanceOf(HTMLButtonElement);
   });
+
+  it('keeps a visible keyboard focus indicator in every variant', () => {
+    render(<Button>Focusable</Button>);
+
+    expect(screen.getByRole('button', { name: 'Focusable' })).toHaveClass(
+      'focus-visible:outline-2',
+      'focus-visible:outline-offset-2',
+      'focus-visible:outline-ring',
+    );
+  });
 });

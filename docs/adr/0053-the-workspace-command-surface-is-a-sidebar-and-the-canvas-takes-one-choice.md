@@ -4,7 +4,7 @@ Status: accepted
 Refines: 0031
 Related: 0025, 0026, 0028, 0040, 0045, 0047, 0050, 0052
 
-Workspace commands live in a persistent left **Sidebar**, and what draws the canvas is **one exclusive choice** in it: a single list of the computed Views and the authored Layouts, with exactly one item pressed. There is no second selector and no `None`. The Space title names the workspace at the top of the sidebar; the canvas header names what is currently drawing it and whether that is computed or authored.
+Workspace commands live in a persistent left **Sidebar**, and what draws the canvas is **one exclusive choice** in it: the computed Views and authored Layouts are rendered as two labelled menu groups sharing exactly one pressed item. There is no second selector and no `None`. The Space title names the workspace at the top of the sidebar; the canvas header names what is currently drawing it and whether that is computed or authored.
 
 Two things are being decided together because one forced the other. The horizontal row could not hold the choice honestly, and the choice could not be drawn as one list in a row.
 
@@ -22,7 +22,7 @@ The domain has always had one. `RendererSelection` is `{ kind: 'view' } | { kind
 
 The drift is legible in the values it had to invent. `Layout · None` does not name a Layout; it says a View is drawing. `View · Flow` while a Layout draws does not name what is on screen; it names the View that *would* draw if you picked one. A control whose value can mean "not this control" is not the choice — it is half of one, and the author is left to reconstruct the whole from which of two triggers is styled active.
 
-The sidebar draws the choice as the model already holds it: one list under two group labels, **Computed views** and **Authored layouts**, one item pressed, no empty value anywhere. Selecting is navigation and not an edit — ADR 0028 and ADR 0031 are untouched — and conversion still lands the author on the new Layout, which is now a new row in the list rather than a value appearing inside a trigger that previously read `None`.
+The sidebar draws the choice as the model already holds it: one logical choice rendered through two labelled `SidebarMenu` groups, **Computed views** and **Authored layouts**, one item pressed across both, and no empty value anywhere. The two menu elements preserve shadcn's group composition; they do not represent independent values. Selecting is navigation and not an edit — ADR 0028 and ADR 0031 are untouched — and conversion still lands the author on the new Layout, which is now a new row in the list rather than a value appearing inside a trigger that previously read `None`.
 
 **Graphs stay a separate list, deliberately.** Activating a Graph does not choose what draws the canvas; it is emphasis within whatever is drawing (ADR 0026, ADR 0045). Merging the two lists would put two different kinds of exclusivity in one place and make `Long` look like an alternative to `Grid`. Two lists, each of which is a list, is the point — not one list of everything.
 

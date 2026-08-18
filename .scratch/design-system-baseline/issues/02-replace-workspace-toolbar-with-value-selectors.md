@@ -1,4 +1,4 @@
-# 02 — Replace the workspace toolbar with a Menubar
+# 02 — Replace the workspace toolbar with value selectors
 
 **What to build:** Define the correct workspace command surface in stable Ladle
 stories first, using the shared shadcn/Base UI components and their native

@@ -113,7 +113,7 @@ test('Workspace Sidebar stories render production conflict and rejection recover
 
   await expect(page.getByRole('alertdialog', { name: 'Changes conflict' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Reload' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Save' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Keep local and retry' })).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(page.getByRole('alertdialog', { name: 'Changes conflict' })).toBeVisible();
   await page.getByRole('button', { name: 'Reload' }).click();
