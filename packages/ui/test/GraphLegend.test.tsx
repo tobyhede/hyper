@@ -13,6 +13,7 @@ const graphs: readonly Graph[] = [
   {
     id: uuidSchema.parse('22222222-2222-4222-8222-222222222222'),
     title: 'Short graph',
+    color: '#f4a259',
     edges: [],
   },
 ];
@@ -35,7 +36,7 @@ describe('GraphLegend', () => {
     expect(active).toHaveStyle({ opacity: '1' });
     expect(active?.querySelector('[aria-hidden="true"]')).toHaveStyle({ background: '#123456' });
     expect(inactive).toHaveStyle({ opacity: '0.5' });
-    expect(inactive?.querySelector('[aria-hidden="true"]')).toHaveStyle({ background: '#8a94a6' });
+    expect(inactive?.querySelector('[aria-hidden="true"]')).toHaveStyle({ background: '#f4a259' });
   });
 
   // `list-none` sets `list-style: none`, which makes Safari/VoiceOver drop list

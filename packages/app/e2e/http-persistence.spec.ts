@@ -118,9 +118,21 @@ test('a stale browser reports conflict and accepts the remote workspace without 
     await Promise.all([settled(page), settled(stalePage)]);
 
     let staleCommits = 0;
+    let releaseStaleCommit = (): void => undefined;
+    const staleCommitGate = new Promise<void>((resolve) => {
+      releaseStaleCommit = resolve;
+    });
+    let observeStaleCommit = (): void => undefined;
+    const staleCommitObserved = new Promise<void>((resolve) => {
+      observeStaleCommit = resolve;
+    });
     await stalePage.route('**/api/spaces/*', async (route) => {
       const request = route.request();
-      if (isCommit(request.method(), request.url())) staleCommits += 1;
+      if (isCommit(request.method(), request.url())) {
+        staleCommits += 1;
+        observeStaleCommit();
+        await staleCommitGate;
+      }
       await route.continue();
     });
 
@@ -129,25 +141,42 @@ test('a stale browser reports conflict and accepts the remote workspace without 
     const remotePosition = await positionOf(currentCard);
 
     await dragBy(stalePage, staleCard, 180, 0);
-    const reload = stalePage.getByRole('button', { name: 'Reload' });
-    await expect(reload).toBeVisible();
+    await staleCommitObserved;
     expect(staleCommits).toBe(1);
     await expect.poll(() => navigationIsProtected(stalePage)).toBe(true);
-    await settledNetwork(stalePage);
-    expect(staleCommits).toBe(1);
 
     const mountedGraphArea = await stalePage.locator('.graph-area').elementHandle();
     expect(mountedGraphArea).not.toBeNull();
 
+    // The conflict AlertDialog is modal, so prepare the race while the stale PUT
+    // is parked: leave the local workspace in unrelated navigation and start an
+    // automatic placement, then let the conflict arrive. Any placement result
+    // still arriving after Reload belongs to the Space that is being replaced.
+    try {
+      await stalePage.getByTestId('view-selector').click();
+      await stalePage.getByRole('menuitemradio', { name: 'Flow' }).click();
+      await stalePage.getByTestId('graph-selector').click();
+      await stalePage.getByRole('menuitemradio', { name: 'Echo' }).click();
+      await stalePage.getByTestId('present-button').click();
+    } finally {
+      // Release even when setup fails, so the intercepted request cannot leave
+      // the page hanging and hide the useful Playwright assertion.
+      releaseStaleCommit();
+    }
+
+    const reload = stalePage.getByRole('button', { name: 'Reload' });
+    await expect(reload).toBeVisible();
     await reload.click();
 
     const acceptedCard = nodeByTitle(stalePage, 'A').first();
     await expect(acceptedCard).toBeVisible();
     await settled(stalePage);
     expect(await positionOf(acceptedCard)).toEqual(remotePosition);
-    // Reload opens the Layout the other page's drag converted, whose minted
-    // Graph is first, without replacing the mounted application surface.
+    // Fresh Navigation over the stored Space, not the emphasis this page was
+    // left in: Reload opens the Layout the other page's drag converted, whose
+    // minted Graph is first, without replacing the mounted application surface.
     await expect(stalePage.getByTestId('graph-selector')).toContainText('Graph 1');
+    await expect(stalePage.getByTestId('presenting-chrome')).not.toBeVisible();
     expect(
       await mountedGraphArea!.evaluate(
         (element) => element === document.querySelector('.graph-area'),

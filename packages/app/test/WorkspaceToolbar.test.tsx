@@ -1,8 +1,11 @@
 import { createRef } from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { uuidSchema } from '@project/core';
 import { PersistenceIndicator } from '@project/ui';
 import { WorkspaceToolbar, type WorkspaceToolbarProps } from '../src/components/WorkspaceToolbar';
+
+const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 
 beforeAll(() => {
   vi.stubGlobal('PointerEvent', MouseEvent);
@@ -79,6 +82,23 @@ describe('WorkspaceToolbar', () => {
 
     fireEvent.click(grid);
     expect(props.view.onValueChange).toHaveBeenCalledWith('grid');
+  });
+
+  it('uses an authored Graph colour when no resolved colour is available', async () => {
+    const base = settledProps();
+    const props: WorkspaceToolbarProps = {
+      ...base,
+      graph: {
+        ...base.graph,
+        graphs: [{ id: GRAPH_ID, title: 'Authored', color: '#123456', edges: [] }],
+        activeGraphId: GRAPH_ID,
+      },
+    };
+    render(<WorkspaceToolbar {...props} />);
+
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Graph · Authored' }));
+    const choice = await screen.findByRole('menuitemradio', { name: 'Authored' });
+    expect(choice.querySelector('[style]')).toHaveStyle({ background: '#123456' });
   });
 
   it('keeps persistence feedback outside the menu', () => {

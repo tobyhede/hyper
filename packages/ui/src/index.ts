@@ -21,7 +21,7 @@ export {
   CommandItem,
   CommandList,
 } from './Command';
-export { FALLBACK_GRAPH_COLOR, GraphLegend } from './GraphLegend';
+export { FALLBACK_GRAPH_COLOR, GraphLegend, graphColor } from './GraphLegend';
 export type { GraphLegendProps } from './GraphLegend';
 export { Popover, PopoverContent, PopoverTrigger } from './Popover';
 export {

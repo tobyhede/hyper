@@ -3,6 +3,11 @@ import { GraphIcon } from './icons';
 
 export const FALLBACK_GRAPH_COLOR = '#8a94a6';
 
+/** Resolve a Graph's displayed colour from projection, authorship, then UI fallback. */
+export function graphColor(graph: Graph, colorByGraphId: Readonly<Record<string, string>>): string {
+  return colorByGraphId[graph.id] ?? graph.color ?? FALLBACK_GRAPH_COLOR;
+}
+
 export interface GraphLegendProps {
   graphs: readonly Graph[];
   colorByGraphId: Readonly<Record<string, string>>;
@@ -30,7 +35,7 @@ export function GraphLegend({ graphs, colorByGraphId, activeGraphId = null }: Gr
             >
               <span
                 className="h-[3px] w-[14px] shrink-0 rounded-[2px]"
-                style={{ background: colorByGraphId[graph.id] ?? FALLBACK_GRAPH_COLOR }}
+                style={{ background: graphColor(graph, colorByGraphId) }}
                 aria-hidden="true"
               />
               {graph.title}

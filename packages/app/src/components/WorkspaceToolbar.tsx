@@ -1,10 +1,11 @@
 import type { ReactNode, Ref } from 'react';
-import type { BuiltInViewId, Graph, Layout } from '@project/core';
+import { BUILT_IN_VIEW_IDS, type BuiltInViewId, type Graph, type Layout } from '@project/core';
 import type { SpaceSessionState } from '@project/persistence';
 import {
   AddCardControl,
   Button,
   FALLBACK_GRAPH_COLOR,
+  graphColor,
   Menubar,
   MenubarContent,
   MenubarItem,
@@ -50,10 +51,12 @@ export interface WorkspaceToolbarProps {
   };
 }
 
-const views = [
-  { id: 'flow', title: 'Flow' },
-  { id: 'grid', title: 'Grid' },
-] as const;
+const VIEW_TITLES = {
+  flow: 'Flow',
+  grid: 'Grid',
+} satisfies Readonly<Record<BuiltInViewId, string>>;
+
+const views = BUILT_IN_VIEW_IDS.map((id) => ({ id, title: VIEW_TITLES[id] }));
 
 /** The production ordering and composition of workspace-level controls. */
 export function WorkspaceToolbar({
@@ -63,10 +66,11 @@ export function WorkspaceToolbar({
   addCard,
   persistence,
 }: WorkspaceToolbarProps) {
-  const colorOf = (candidate: Graph) =>
-    graph.colorByGraphId[candidate.id] ?? candidate.color ?? FALLBACK_GRAPH_COLOR;
   const activeGraph = graph.graphs.find((candidate) => candidate.id === graph.activeGraphId);
-  const activeGraphColor = activeGraph === undefined ? FALLBACK_GRAPH_COLOR : colorOf(activeGraph);
+  const activeGraphColor =
+    activeGraph === undefined
+      ? FALLBACK_GRAPH_COLOR
+      : graphColor(activeGraph, graph.colorByGraphId);
   const presentDisabled =
     !graph.presenting && (activeGraph === undefined || activeGraph.edges.length === 0);
 
@@ -142,7 +146,7 @@ export function WorkspaceToolbar({
                     <span
                       aria-hidden="true"
                       className="h-[3px] w-[14px] shrink-0 rounded-[2px]"
-                      style={{ background: colorOf(item) }}
+                      style={{ background: graphColor(item, graph.colorByGraphId) }}
                     />
                     {item.title}
                   </MenubarRadioItem>
