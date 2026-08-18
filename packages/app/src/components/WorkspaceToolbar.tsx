@@ -1,19 +1,15 @@
 import type { ReactNode, Ref } from 'react';
-import { BUILT_IN_VIEW_IDS, type BuiltInViewId, type Graph, type Layout } from '@project/core';
+import type { BuiltInViewId, Graph, Layout } from '@project/core';
 import type { SpaceSessionState } from '@project/persistence';
 import {
   AddCardControl,
   Button,
   FALLBACK_GRAPH_COLOR,
+  GraphSelector,
   graphColor,
-  Menubar,
-  MenubarContent,
-  MenubarItem,
-  MenubarMenu,
-  MenubarRadioGroup,
-  MenubarRadioItem,
-  MenubarTrigger,
+  LayoutSelector,
   PresentIcon,
+  ViewSelector,
 } from '@project/ui';
 
 export interface WorkspaceToolbarProps {
@@ -51,14 +47,14 @@ export interface WorkspaceToolbarProps {
   };
 }
 
-const VIEW_TITLES = {
-  flow: 'Flow',
-  grid: 'Grid',
-} satisfies Readonly<Record<BuiltInViewId, string>>;
-
-const views = BUILT_IN_VIEW_IDS.map((id) => ({ id, title: VIEW_TITLES[id] }));
-
-/** The production ordering and composition of workspace-level controls. */
+/**
+ * The production ordering and composition of workspace-level controls.
+ *
+ * View, Layout and Graph are three independent single choices, each showing its
+ * current value, so each is a Select. They are deliberately not a Menubar: a
+ * menubar trigger is a stable command noun, and roving focus across the bar
+ * assumes stable command groups, neither of which describes a value picker.
+ */
 export function WorkspaceToolbar({
   view,
   layout,
@@ -71,91 +67,31 @@ export function WorkspaceToolbar({
     activeGraph === undefined
       ? FALLBACK_GRAPH_COLOR
       : graphColor(activeGraph, graph.colorByGraphId);
+  // Dead on two things, and they are one rule: there is no Card to begin at. No
+  // Graph is active, or the active Graph holds no Edges — and the second is not
+  // a defensive nicety. Creating a Layout creates its initial Active Graph empty
+  // in the same Edit (ADR 0040), so a Layout converted out of a View by a plain
+  // Card drag is always in this state until the author draws something.
   const presentDisabled =
     !graph.presenting && (activeGraph === undefined || activeGraph.edges.length === 0);
 
   return (
     <>
-      <Menubar aria-label="Workspace commands" modal={false}>
-        <MenubarMenu>
-          <MenubarTrigger data-testid="view-selector">
-            View · {views.find((candidate) => candidate.id === view.value)?.title ?? 'Flow'}
-          </MenubarTrigger>
-          <MenubarContent finalFocus>
-            <MenubarRadioGroup
-              value={view.active ? view.value : ''}
-              onValueChange={(value) => view.onValueChange(value as BuiltInViewId)}
-            >
-              {views.map((candidate) => (
-                <MenubarRadioItem key={candidate.id} value={candidate.id} closeOnClick>
-                  {candidate.title}
-                </MenubarRadioItem>
-              ))}
-            </MenubarRadioGroup>
-          </MenubarContent>
-        </MenubarMenu>
+      <AddCardControl {...addCard} />
 
-        <MenubarMenu>
-          <MenubarTrigger data-testid="layout-selector">
-            {layout.active ? (
-              <span
-                data-testid="layout-live-indicator"
-                className="mr-1 size-[6px] shrink-0 rounded-full bg-accent"
-                aria-hidden="true"
-              />
-            ) : null}
-            Layout ·{' '}
-            {view.active
-              ? 'None'
-              : (layout.layouts.find((item) => item.id === layout.value)?.title ?? 'None')}
-          </MenubarTrigger>
-          <MenubarContent finalFocus>
-            <MenubarRadioGroup
-              value={layout.active ? (layout.value ?? '') : ''}
-              onValueChange={layout.onValueChange}
-            >
-              {layout.layouts.length === 0 ? (
-                <MenubarItem disabled>No authored Layouts</MenubarItem>
-              ) : (
-                layout.layouts.map((item) => (
-                  <MenubarRadioItem key={item.id} value={item.id} closeOnClick>
-                    {item.title}
-                  </MenubarRadioItem>
-                ))
-              )}
-            </MenubarRadioGroup>
-          </MenubarContent>
-        </MenubarMenu>
-
-        <MenubarMenu>
-          <MenubarTrigger data-testid="graph-selector">
-            <span
-              aria-hidden="true"
-              className="mr-1 h-[3px] w-[14px] shrink-0 rounded-[2px]"
-              style={{ background: activeGraphColor }}
-            />
-            Graph · {activeGraph?.title ?? 'None'}
-          </MenubarTrigger>
-          <MenubarContent finalFocus>
-            <MenubarRadioGroup value={graph.activeGraphId ?? ''} onValueChange={graph.onActivate}>
-              {graph.graphs.length === 0 ? (
-                <MenubarItem disabled>No Graphs</MenubarItem>
-              ) : (
-                graph.graphs.map((item) => (
-                  <MenubarRadioItem key={item.id} value={item.id} closeOnClick>
-                    <span
-                      aria-hidden="true"
-                      className="h-[3px] w-[14px] shrink-0 rounded-[2px]"
-                      style={{ background: graphColor(item, graph.colorByGraphId) }}
-                    />
-                    {item.title}
-                  </MenubarRadioItem>
-                ))
-              )}
-            </MenubarRadioGroup>
-          </MenubarContent>
-        </MenubarMenu>
-      </Menubar>
+      <ViewSelector value={view.value} active={view.active} onValueChange={view.onValueChange} />
+      <LayoutSelector
+        layouts={layout.layouts}
+        value={layout.value}
+        active={layout.active}
+        onValueChange={layout.onValueChange}
+      />
+      <GraphSelector
+        graphs={graph.graphs}
+        colorByGraphId={graph.colorByGraphId}
+        activeGraphId={graph.activeGraphId}
+        onActivate={graph.onActivate}
+      />
 
       <Button
         variant="secondary"
@@ -165,13 +101,9 @@ export function WorkspaceToolbar({
         disabled={presentDisabled}
         onClick={graph.presenting ? graph.onExitPresenting : graph.onPresent}
       >
-        {graph.presenting ? null : (
-          <PresentIcon data-icon="inline-start" color={activeGraphColor} />
-        )}
+        {graph.presenting ? null : <PresentIcon color={activeGraphColor} />}
         {graph.presenting ? 'Overview' : 'Present'}
       </Button>
-
-      <AddCardControl {...addCard} />
 
       {persistence.control}
       <span

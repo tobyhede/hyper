@@ -6,12 +6,15 @@ import { PersistenceIndicator } from '@project/ui';
 import { WorkspaceToolbar, type WorkspaceToolbarProps } from '../src/components/WorkspaceToolbar';
 
 const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
+const CARD_A = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
+const CARD_B = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
 
 beforeAll(() => {
   vi.stubGlobal('PointerEvent', MouseEvent);
   HTMLElement.prototype.hasPointerCapture = () => false;
   HTMLElement.prototype.setPointerCapture = () => undefined;
   HTMLElement.prototype.releasePointerCapture = () => undefined;
+  HTMLElement.prototype.scrollIntoView = () => undefined;
   vi.stubGlobal(
     'ResizeObserver',
     class {
@@ -59,10 +62,9 @@ describe('WorkspaceToolbar', () => {
     const props = settledProps();
     render(<WorkspaceToolbar {...props} />);
 
-    expect(screen.getByRole('menubar', { name: 'Workspace commands' })).toBeVisible();
-    expect(screen.getByRole('menuitem', { name: 'View · Flow' })).toBeVisible();
-    expect(screen.getByRole('menuitem', { name: 'Layout · None' })).toBeVisible();
-    expect(screen.getByRole('menuitem', { name: 'Graph · None' })).toBeVisible();
+    expect(screen.getByRole('combobox', { name: 'Choose view' })).toHaveTextContent('Flow');
+    expect(screen.getByRole('combobox', { name: 'Choose layout' })).toHaveTextContent('None');
+    expect(screen.getByRole('combobox', { name: 'Active Graph' })).toHaveTextContent('None');
     expect(screen.getByRole('button', { name: 'Present this Graph' })).toBeDisabled();
 
     fireEvent.click(screen.getByRole('button', { name: 'Add Card' }));
@@ -74,12 +76,13 @@ describe('WorkspaceToolbar', () => {
     const props = settledProps();
     render(<WorkspaceToolbar {...props} />);
 
-    fireEvent.click(screen.getByRole('menuitem', { name: 'View · Flow' }));
-    const flow = await screen.findByRole('menuitemradio', { name: 'Flow' });
-    const grid = screen.getByRole('menuitemradio', { name: 'Grid' });
-    expect(flow).toHaveAttribute('aria-checked', 'true');
-    expect(grid).toHaveAttribute('aria-checked', 'false');
+    fireEvent.keyDown(screen.getByRole('combobox', { name: 'Choose view' }), { key: 'ArrowDown' });
+    const flow = await screen.findByRole('option', { name: 'Flow' });
+    const grid = screen.getByRole('option', { name: 'Grid' });
+    expect(flow).toHaveAttribute('aria-selected', 'true');
+    expect(grid).toHaveAttribute('aria-selected', 'false');
 
+    fireEvent.pointerDown(grid, { pointerType: 'mouse' });
     fireEvent.click(grid);
     expect(props.view.onValueChange).toHaveBeenCalledWith('grid');
   });
@@ -96,15 +99,82 @@ describe('WorkspaceToolbar', () => {
     };
     render(<WorkspaceToolbar {...props} />);
 
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Graph · Authored' }));
-    const choice = await screen.findByRole('menuitemradio', { name: 'Authored' });
+    fireEvent.keyDown(screen.getByRole('combobox', { name: 'Active Graph' }), { key: 'ArrowDown' });
+    const choice = await screen.findByRole('option', { name: 'Authored' });
     expect(choice.querySelector('[style]')).toHaveStyle({ background: '#123456' });
   });
 
-  it('keeps persistence feedback outside the menu', () => {
+  /**
+   * A Layout is created with its initial Active Graph empty (ADR 0040), so this
+   * is the state every conversion out of a View leaves behind until the author
+   * draws an Edge. `graphStartCard` has no answer for it, so `present()` would
+   * return having changed nothing — the control must say so rather than accept a
+   * click and do nothing.
+   */
+  it('cannot present an active Graph that holds no Edges', () => {
+    const base = settledProps();
+    const props: WorkspaceToolbarProps = {
+      ...base,
+      graph: {
+        ...base.graph,
+        graphs: [{ id: GRAPH_ID, title: 'Graph 1', edges: [] }],
+        activeGraphId: GRAPH_ID,
+      },
+    };
+    render(<WorkspaceToolbar {...props} />);
+
+    const present = screen.getByRole('button', { name: 'Present this Graph' });
+    expect(present).toBeDisabled();
+    fireEvent.click(present);
+    expect(props.graph.onPresent).not.toHaveBeenCalled();
+  });
+
+  it('exits presenting through the Overview action', () => {
+    const base = settledProps();
+    const props: WorkspaceToolbarProps = {
+      ...base,
+      graph: {
+        ...base.graph,
+        graphs: [{ id: GRAPH_ID, title: 'Graph 1', edges: [{ from: CARD_A, to: CARD_B }] }],
+        activeGraphId: GRAPH_ID,
+        presenting: true,
+      },
+    };
+    render(<WorkspaceToolbar {...props} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Return to overview' }));
+
+    expect(props.graph.onExitPresenting).toHaveBeenCalledOnce();
+    expect(props.graph.onPresent).not.toHaveBeenCalled();
+  });
+
+  it('colours Present with the active Graph', () => {
+    const base = settledProps();
+    const props: WorkspaceToolbarProps = {
+      ...base,
+      graph: {
+        ...base.graph,
+        graphs: [
+          {
+            id: GRAPH_ID,
+            title: 'Authored',
+            color: '#123456',
+            edges: [{ from: CARD_A, to: CARD_B }],
+          },
+        ],
+        activeGraphId: GRAPH_ID,
+      },
+    };
+    render(<WorkspaceToolbar {...props} />);
+
+    const present = screen.getByRole('button', { name: 'Present this Graph' });
+    expect(present).toBeEnabled();
+    expect(present.querySelector('svg')).toHaveAttribute('stroke', '#123456');
+  });
+
+  it('keeps persistence feedback out of the selectors', () => {
     const props = settledProps();
     const { rerender } = render(<WorkspaceToolbar {...props} />);
-    const menubar = screen.getByRole('menubar', { name: 'Workspace commands' });
 
     expect(screen.queryByRole('button', { name: 'Changes saved' })).not.toBeInTheDocument();
 
@@ -118,6 +188,9 @@ describe('WorkspaceToolbar', () => {
         }}
       />,
     );
-    expect(menubar).not.toContainElement(screen.getByRole('button', { name: 'Saving changes' }));
+    const saving = screen.getByRole('button', { name: 'Saving changes' });
+    for (const name of ['Choose view', 'Choose layout', 'Active Graph']) {
+      expect(screen.getByRole('combobox', { name })).not.toContainElement(saving);
+    }
   });
 });

@@ -378,22 +378,22 @@ test('selecting Flow or Grid is navigation and does not persist', async ({ page 
   await expect(persistence).toHaveAttribute('data-revision', '0');
 
   await page.getByTestId('layout-selector').click();
-  await expect(page.getByRole('menuitemradio', { name: 'Collection 1' })).toBeVisible();
+  await expect(page.getByRole('option', { name: 'Collection 1' })).toBeVisible();
   await page.keyboard.press('Escape');
 
   await page.getByTestId('graph-selector').click();
-  await expect(page.getByRole('menuitemradio', { name: 'Long' })).toBeVisible();
+  await expect(page.getByRole('option', { name: 'Long' })).toBeVisible();
   await page.keyboard.press('Escape');
 
   await page.getByTestId('view-selector').click();
-  await page.getByRole('menuitemradio', { name: 'Grid' }).click();
+  await page.getByRole('option', { name: 'Grid' }).click();
   await expect(page.getByTestId('view-selector')).toContainText('Grid');
   await expect(page.getByTestId('layout-selector')).toContainText('None');
   await expect(page.getByTestId('layout-live-indicator')).toHaveCount(0);
   await expect(persistence).toHaveAttribute('data-revision', '0');
 
   await page.getByTestId('view-selector').click();
-  await page.getByRole('menuitemradio', { name: 'Flow' }).click();
+  await page.getByRole('option', { name: 'Flow' }).click();
   await expect(page.getByTestId('view-selector')).toContainText('Flow');
   await expect(persistence).toHaveAttribute('data-revision', '0');
 });
@@ -407,7 +407,7 @@ test('connecting from Flow and Grid converts atomically without moving Cards', a
     await test.step(view, async () => {
       if (view === 'Grid') {
         await page.getByTestId('view-selector').click();
-        await page.getByRole('menuitemradio', { name: view }).click();
+        await page.getByRole('option', { name: view }).click();
       }
 
       const source = nodeByTitle(page, 'A').first();
@@ -508,17 +508,17 @@ test('editing an existing Layout updates it instead of creating another one', as
   await expect(page.getByTestId('layout-selector')).toContainText('Layout 1');
 
   await page.getByTestId('view-selector').click();
-  await page.getByRole('menuitemradio', { name: 'Grid' }).click();
+  await page.getByRole('option', { name: 'Grid' }).click();
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
   await page.getByTestId('layout-selector').click();
-  await page.getByRole('menuitemradio', { name: 'Layout 1' }).click();
+  await page.getByRole('option', { name: 'Layout 1' }).click();
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
   await settled(page);
 
   await dragBy(page, a, 0, 160);
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '2');
   await page.getByTestId('layout-selector').click();
-  await expect(page.getByRole('menuitemradio', { name: 'Layout 1' })).toHaveCount(1);
+  await expect(page.getByRole('option', { name: 'Layout 1' })).toHaveCount(1);
 });
 
 /**
@@ -891,7 +891,7 @@ test('changing the active Graph recolours authoring handles without persisting o
   const longColour = await handle.evaluate((element) => getComputedStyle(element).backgroundColor);
 
   await page.getByTestId('graph-selector').click();
-  await page.getByRole('menuitemradio', { name: 'Mid' }).click();
+  await page.getByRole('option', { name: 'Mid' }).click();
 
   await source.hover();
   await expect(handle).not.toHaveCSS('background-color', longColour);
@@ -1267,7 +1267,7 @@ test('dragging the source endpoint moves the end the author took hold of', async
   await expect(page.locator('.react-flow__edge-path').first()).toHaveAttribute('d', /L/);
   await selectLayout(page, 'Collection 1');
   await page.getByTestId('graph-selector').click();
-  await page.getByRole('menuitemradio', { name: 'Short' }).click();
+  await page.getByRole('option', { name: 'Short' }).click();
   await settled(page);
 
   const edge = page.locator('.react-flow__edge[aria-label="Edge from A to B in Short"]');
@@ -1619,7 +1619,7 @@ test('an opened Card is modal, so no renderer change can strand its editor', asy
   // And with the pane gone the renderer is selectable again, still over an
   // unedited Space.
   await selector.click();
-  await page.getByRole('menuitemradio', { name: 'Grid' }).click();
+  await page.getByRole('option', { name: 'Grid' }).click();
   await expect(selector).toContainText('Grid');
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '0');
 });
@@ -1801,7 +1801,7 @@ test('Add Card converts an Algorithmic View once and names the Card in place', a
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '2');
   // One conversion, so one new Layout beside the two the fixture declares.
   await page.getByTestId('layout-selector').click();
-  await expect(page.getByRole('menuitemradio')).toHaveCount(3);
+  await expect(page.getByRole('option')).toHaveCount(3);
   await page.keyboard.press('Escape');
 });
 

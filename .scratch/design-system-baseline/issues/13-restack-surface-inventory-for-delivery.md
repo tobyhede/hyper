@@ -163,7 +163,7 @@ boundary from the issue record without reconstructing the extraction.
 The target issue owns behavior; these notes identify the expected donor seam.
 They supplement rather than replace each target's acceptance criteria.
 
-- **Issue 02 — workspace toolbar:** Menubar commands, Add Card integration,
+- **Issue 02 — workspace toolbar:** View/Layout/Graph selectors, Add Card integration,
   Present/Overview and the complete persistence composition. On the donor that
   includes `PersistenceIndicator`, conflict and permanent-rejection
   `AlertDialog` surfaces, nested `Alert` detail, their exports, tests and real

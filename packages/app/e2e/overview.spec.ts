@@ -35,7 +35,7 @@ test('offers more than one named graph', async ({ page }) => {
   await page.goto('/');
   // Open the Graph menu and count its mutually exclusive choices.
   await page.getByTestId('graph-selector').click();
-  await expect(page.getByRole('menuitemradio')).toHaveCount(4);
+  await expect(page.getByRole('option')).toHaveCount(4);
 });
 
 test('draws every graph at once, each in its own color', async ({ page }) => {
@@ -81,7 +81,7 @@ test('selecting a Layout draws the Graphs it owns and only those', async ({ page
   await expect(page.getByTestId('layout-selector')).toContainText('None');
 
   await page.getByTestId('layout-selector').click();
-  await expect(page.getByRole('menuitemradio')).toHaveCount(2);
+  await expect(page.getByRole('option')).toHaveCount(2);
   await page.keyboard.press('Escape');
 
   // Collection 1 owns Long, Mid and Short over the shared spine: 4 + 3 + 2.
@@ -89,8 +89,8 @@ test('selecting a Layout draws the Graphs it owns and only those', async ({ page
   await expect(page.locator('.react-flow__edge')).toHaveCount(9);
   await expect(legendItems).toHaveCount(3);
   await page.getByTestId('graph-selector').click();
-  await expect(page.getByRole('menuitemradio')).toHaveCount(3);
-  await expect(page.getByRole('menuitemradio', { name: 'Echo' })).toHaveCount(0);
+  await expect(page.getByRole('option')).toHaveCount(3);
+  await expect(page.getByRole('option', { name: 'Echo' })).toHaveCount(0);
   await page.keyboard.press('Escape');
 
   // Collection 2 owns Echo alone.
@@ -154,7 +154,7 @@ test('selecting a graph keeps the others on screen', async ({ page }) => {
 
   // Selection is emphasis: it never hides the rest of the space.
   await page.getByTestId('graph-selector').click();
-  await page.getByRole('menuitemradio', { name: 'Echo' }).click();
+  await page.getByRole('option', { name: 'Echo' }).click();
   await expect(page.locator('.react-flow__node')).toHaveCount(10);
   await expect(page.locator('.react-flow__edge')).toHaveCount(13);
   // Activating a graph changes emphasis, not the persisted document.
@@ -222,7 +222,7 @@ test('a card can be opened even when it is not on the selected graph', async ({ 
 
   // "E" is in the Echo collection; select Long (band 1), then open E anyway.
   await page.getByTestId('graph-selector').click();
-  await page.getByRole('menuitemradio', { name: 'Long' }).click();
+  await page.getByRole('option', { name: 'Long' }).click();
 
   await openCard(nodeByTitle(page, 'E'), 'E');
   await expect(

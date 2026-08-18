@@ -3,10 +3,14 @@
 **What to build:** Define the correct workspace command surface in stable Ladle
 stories first, using the shared shadcn/Base UI components and their native
 interaction contracts. Then convert production to the story's accepted
-composition: a persistent desktop menubar for View, Layout and Graph, with
-Card creation and presentation commands as adjacent persistent controls.
-Existing production is extraction input, not design authority; preserve
+composition: a persistent row of single-choice selectors for View, Layout and
+Graph, with Card creation and presentation commands as adjacent persistent
+controls. Existing production is extraction input, not design authority; preserve
 product requirements, not accidental implementation behaviour.
+
+This originally read "a persistent desktop menubar for View, Layout and Graph".
+That was wrong for the reason recorded in the 2026-08-18 comment — a menubar
+trigger is a stable command noun, and these carry values.
 
 **Blocked by:** 01 — Establish the shadcn design-system baseline.
 
@@ -25,12 +29,11 @@ product requirements, not accidental implementation behaviour.
 
 ## Answer
 
-The stable workspace stories define View, Layout and Graph through native
-Menubar radio-group selection, including roving trigger focus, keyboard opening,
-selection dismissal and focus return. Production is then converged onto that contract;
-it does not carry a second open-menu state machine or item-level click handlers.
-Present/Overview and the accepted Add Card split control remain adjacent
-persistent actions. The settled persistence design
+**Amended 2026-08-18 — the Menubar was withdrawn; see the comment below.** View,
+Layout and Graph are three independent single choices, each drawn as a `Select`
+whose trigger carries its current value at a fixed width. Present/Overview and
+the accepted Add Card split control remain adjacent persistent actions. The
+settled persistence design
 from `feat/surface-inventory` remains intact through the shared
 `PersistenceIndicator`: `PersistenceIndicator`'s own lifecycle story covers the
 transient saved cue and pending state, and the workspace toolbar's `Rejected`
@@ -89,10 +92,20 @@ caller's ref so cancelling Alias creation still restores focus.
   enforcement and dedicated Ladle CI job remain Issue 08.
 - **Rejected:** inline conflict/rejection toolbar controls introduced during
   extraction; they replaced the donor's modal production behavior and were
-  removed. The donor's Select-based toolbar implementation was superseded by
-  this ticket's Menubar acceptance criteria.
+  removed. The Menubar composition itself was rejected on 2026-08-18 and the
+  donor's Select-based selectors were rebuilt in its place — see the comment
+  below for why the acceptance criterion that asked for a menubar was wrong.
 
-Final extraction verification:
+Verification after the 2026-08-18 amendment:
+
+- `pnpm verify` passed: 1,262 tests passed and 8 skipped, across 125 files.
+- `pnpm e2e` passed: 93 tests.
+- `pnpm e2e:ladle` passed: 6 tests. One run of "modal persistence stories are
+  isolated from the Ladle catalogue" failed on the catalogue search input before
+  four consecutive green runs; that test predates this change and touches nothing
+  the selectors own, so it is recorded as flaky rather than fixed here.
+
+Extraction verification when the ticket first resolved:
 
 - `pnpm ladle:build` passed with the production persistence and workspace
   toolbar stories.
@@ -101,6 +114,38 @@ Final extraction verification:
 - `pnpm e2e` passed: 93 tests.
 
 ## Comments
+
+### 2026-08-18 — Menubar withdrawn, Select restored
+
+This ticket's own acceptance criterion named a menubar, and that criterion was
+wrong. A menubar trigger is a stable command noun — File, Edit, View — and the
+roving tab focus across the bar assumes stable command groups. These three
+triggers carry *values*: `View · Flow`, `Layout · None`, `Graph · None`, one of
+them with a colour swatch and another with a live dot. Every deviation the
+Menubar implementation needed was a reconstruction of Select: a fixed `w-40` on
+each trigger because a data label cannot size itself, a `truncate` span inside
+it, and a duplicated `title` so the truncated value stayed readable. It also
+invented `''` as the no-selection sentinel and cast `onValueChange`'s untyped
+string back to `BuiltInViewId`, where Base UI's documented empty state is `null`
+and Select infers the value type — both already recorded in `docs/agents/ui.md`
+as what the View, Layout and Graph selectors do.
+
+`6885084` had deleted `ViewSelector`, `LayoutSelector`, `GraphSelector` and
+`SelectorTrigger` as orphans of that migration. They are rebuilt rather than
+reverted: `BuiltInViewId` from `@project/core` replaces the local
+`AlgorithmicViewId`, `graphColor` replaces the inlined fallback chain, semantic
+Tailwind tokens replace the raw `var(--…)` classes, and `GraphSelector` no longer
+welds Present into a segmented group — Present stays the adjacent `Button` this
+ticket accepted, with its disabled rule and its tests moving to
+`WorkspaceToolbar`. `packages/ui/src/components/menubar.tsx` is deleted with
+them; nothing else used it.
+
+One behaviour is new rather than restored: a Select trigger's natural width is
+the width of whatever is chosen, so selecting a longer title used to shift every
+control to its right. The label is now a **fixed** width rather than a maximum,
+and the live-Layout dot sits in a reserved slot on the Layout selector, so the
+toolbar's geometry is a property of the toolbar and not of the Space's longest
+title.
 
 ### 2026-08-16 — paused implementation
 
