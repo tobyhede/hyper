@@ -71,8 +71,13 @@ const COLLECTION_ONE = uuidSchema.parse('00000000-0000-4000-8000-000000000020');
  * and this one exists to draw a sidebar with a Layout pressed. Declaring it is
  * how the story gets that from `defaultRenderer` instead of from a rule the
  * harness keeps.
+ *
+ * Exported alongside the {@link authoredSpace} it loads into, because a story
+ * that opens a real `SpaceSession` needs the stored shape and not the validated
+ * aggregate. One literal, two exports: the snapshot a session commits and the
+ * Space the other stories draw cannot come to disagree.
  */
-const authoredSnapshot: SpaceSnapshot = {
+export const authoredSnapshot: SpaceSnapshot = {
   id: uuidSchema.parse('00000000-0000-4000-8000-000000000040'),
   document: {
     version: 1,
@@ -124,6 +129,45 @@ const authoredSnapshot: SpaceSnapshot = {
 };
 
 export const authoredSpace: Space = loaded(loadSpaceSnapshot(authoredSnapshot));
+
+/**
+ * {@link authoredSnapshot} one Edit later: a third Layout, `Collection 3`.
+ *
+ * What a story submits has to differ from what it loaded, or a failed save and
+ * a successful one draw the same list and nothing proves the sidebar read the
+ * session at all. The Layout only has to be legal — a title, positions naming
+ * Cards this Space already holds, and one owned Graph whose Edge endpoints are
+ * members of it (ADR 0040) — so it is built from the same spine helpers the two
+ * Layouts above it are, rather than by transcribing coordinates a third time.
+ *
+ * It **appends**, and an Edit here that removed or replaced a Layout or a Graph
+ * would not. The fixture that submits this seeds its opened canvas and its
+ * Active Graph from the first Space it is handed and never reconciles them
+ * against a later one, so withdrawing `Collection 1` would leave the story
+ * naming a Layout the Space no longer holds.
+ */
+export const editedSnapshot: SpaceSnapshot = {
+  ...authoredSnapshot,
+  document: {
+    ...authoredSnapshot.document,
+    layouts: [
+      ...(authoredSnapshot.document.layouts ?? []),
+      {
+        id: uuidSchema.parse('00000000-0000-4000-8000-000000000022'),
+        title: 'Collection 3',
+        kind: 'positioned',
+        positions: positions(3),
+        graphs: [
+          {
+            id: uuidSchema.parse('00000000-0000-4000-8000-000000000034'),
+            title: 'Trail',
+            edges: chain(2),
+          },
+        ],
+      },
+    ],
+  },
+};
 
 /**
  * A Space before its first Edit: one Card, no Layout and so no Graph.

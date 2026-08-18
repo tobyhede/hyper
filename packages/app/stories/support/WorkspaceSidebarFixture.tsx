@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
-import { uuidSchema, type SpaceSnapshot } from '@project/core';
 import type { Space } from '@project/graph';
 import {
   MemorySpaceBackend,
@@ -14,9 +13,10 @@ import { AppShell } from '@project/ui';
 import { canvasChoice } from '#src/canvas-choice';
 import { graphColorMap } from '#src/colors';
 import { defaultRenderer, type RendererSelection } from '#src/renderer';
+import { createWorkingSpaceReader } from '#src/snapshot';
 import { PersistenceControl, PersistenceNotice } from '#components/PersistenceControl';
 import { SelectedCanvas, WorkspaceSidebar } from '#components/WorkspaceSidebar';
-import { authoredSpace } from './spaces';
+import { authoredSnapshot, authoredSpace, editedSnapshot } from './spaces';
 
 export interface WorkspaceSidebarFixtureProps {
   /** Which Space the sidebar reports on. See `./spaces`. */
@@ -112,22 +112,25 @@ export function WorkspaceSidebarFixture({
 }
 
 /**
- * The Space this fixture's session commits — its own, and **not**
- * `authoredSpace`.
+ * A real session that fails its first commit and succeeds when Retry asks
+ * again, with the sidebar drawing the Space that session holds.
  *
- * The sidebar below reads three things off the session: `persistence`,
- * `acknowledgedRevision` and `retry`. It never reads its working Space, so one
- * value serving as both the session's subject and the sidebar's would suggest a
- * link the code does not have — a reader would take the drawn Layouts for the
- * ones being saved. Making that link real is issue 03.
+ * One claim: **a failed save keeps the unsaved work on screen.** The session
+ * loads `authoredSnapshot` and submits `editedSnapshot`, so `Collection 3` is
+ * work no stored revision carries — it is on screen only because the sidebar
+ * reads `state.working`, and it is still there once the retry succeeds. Its
+ * pair in the application is `keeps persistence failure visible, accepts
+ * another Edit, and retries the latest Space`, in
+ * `packages/app/test/space-authoring.test.ts`: that one proves the working
+ * state survives a failure, this one proves the workspace draws it (ADR 0052).
+ *
+ * The Space comes from one `createWorkingSpaceReader`, the same translation the
+ * application's render path runs — a second `loadSpaceSnapshot` here would be a
+ * copy of it and would reparse on every publication. The reader caches on
+ * snapshot identity, and a session replaces `working` only when a submission
+ * does, so the two states this story passes through cost two parses and hand
+ * `canvasChoice` a stable `Space` in between.
  */
-const retrySnapshot: SpaceSnapshot = {
-  id: uuidSchema.parse('00000000-0000-4000-8000-000000000006'),
-  document: { version: 1, title: 'Retry lifecycle' },
-  cards: [],
-};
-
-/** A real session that fails its first commit and succeeds when Retry asks again. */
 export function RetryableWorkspaceSidebarFixture() {
   const session = useMemo(() => {
     const control = new MemorySpaceBackendTestControl();
@@ -138,27 +141,29 @@ export function RetryableWorkspaceSidebarFixture() {
     });
     return openSpaceSession(
       new MemorySpaceBackend(
-        [{ snapshot: retrySnapshot, revision: 0n, exportedRevision: null }],
+        [{ snapshot: authoredSnapshot, revision: 0n, exportedRevision: null }],
         control,
       ),
       {
-        snapshot: retrySnapshot,
+        snapshot: authoredSnapshot,
         revision: 0n,
         exportedRevision: null,
       },
     );
   }, []);
+  const readWorkingSpace = useMemo(() => createWorkingSpaceReader(), []);
   const state = useSyncExternalStore(session.subscribe, session.getState);
   const submitted = useRef(false);
 
   useEffect(() => {
     if (submitted.current) return;
     submitted.current = true;
-    session.submit(retrySnapshot);
+    session.submit(editedSnapshot);
   }, [session]);
 
   return (
     <WorkspaceSidebarFixture
+      space={readWorkingSpace(state.working)}
       persistence={state.persistence}
       acknowledgedRevision={state.acknowledgedRevision}
       onRetry={session.retry}
