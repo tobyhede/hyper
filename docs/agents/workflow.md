@@ -79,12 +79,10 @@ Also stated in AGENTS.md; repeated here because it is the easiest step to skip.
 
 ## Skills
 
-Vendored from [`mattpocock/skills`](https://github.com/mattpocock/skills) and tracked, so every clone and worktree has them. The files live under `.agents/skills/` — the repo-wide location Codex reads — and `.claude/skills/` holds a symlink per skill, which is where Claude Code reads. `skills-lock.json` records the upstream path and content hash of each, and is tracked with them; without it the vendored copies have no recorded revision and the installer can't tell what's drifted.
+Vendored skills are tracked, so every clone and worktree has them. The files live under `.agents/skills/` — the repo-wide location Codex reads — and `.claude/skills/` holds a symlink per skill, which is where Claude Code reads. `skills-lock.json` records the upstream path and content hash of each, and is tracked with them; without it the vendored copies have no recorded revision and the installer can't tell what's drifted.
 
 Tracking both paths is deliberate. An ordinary `git worktree add` populates only tracked files, so while these were ignored every worktree ran agents with no skills at all — and tracking just one of the two locations fixes just one of the two harnesses.
 
-The set:
+The set is deliberately small: only `shadcn` (from `shadcn/ui`) is vendored.
 
-- Used regularly: `improve-codebase-architecture`, `grilling`, `domain-modeling`, `codebase-design`.
-- Installed, not yet exercised: `to-spec`, `to-tickets`, `tdd`, `research`, `grill-me`, `grill-with-docs`, `diagnosing-bugs`, `handoff`, `implement`, `resolving-merge-conflicts`, `teach`, `triage`, `wayfinder`, `writing-great-skills`.
-- Deliberately **not** installed: `code-review`. Its vendored name collided with Claude Code's built-in `/code-review`, and a skill of that name shadows the built-in rather than sitting beside it. The built-in is what we want — it reviews the current diff (or a PR/branch target) at a chosen effort level, posts inline comments with `--comment`, applies findings with `--fix`, and runs `ultra` as a multi-agent cloud review. Don't let the installer re-add the vendored one; if its two-axis Standards/Spec framing is ever wanted, vendor it under a different name.
+The [`mattpocock/skills`](https://github.com/mattpocock/skills) pack was vendored here previously and has been removed. Most of its names (`codebase-design`, `diagnosing-bugs`, `domain-modeling`, `grilling`, `prototype`, `research`, `resolving-merge-conflicts`, `tdd`, `wizard`, `writing-for-agents`, and more) collided with Claude Code's built-in skills of the same name, and a vendored skill of that name shadows the built-in rather than sitting beside it — the same problem `code-review` hit earlier. Don't reinstall it; if a specific skill from that pack is wanted again, vendor it individually under a name that doesn't collide with a built-in.
