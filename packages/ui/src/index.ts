@@ -4,6 +4,8 @@ export { AppShell } from './AppShell';
 export type { AppShellProps } from './AppShell';
 export { Button, buttonVariants } from './Button';
 export type { ButtonProps } from './Button';
+export { PersistenceIndicator } from './PersistenceIndicator';
+export type { PersistenceIndicatorProps, PersistenceIndicatorState } from './PersistenceIndicator';
 export { CardContent } from './CardContent';
 export type { CardContentProps } from './CardContent';
 export { CardKindIcon } from './CardKindIcon';
@@ -19,18 +21,11 @@ export {
   CommandItem,
   CommandList,
 } from './Command';
-export { FALLBACK_GRAPH_COLOR, GraphLegend } from './GraphLegend';
+export { FALLBACK_GRAPH_COLOR, GraphLegend, graphColor } from './GraphLegend';
 export type { GraphLegendProps } from './GraphLegend';
-export { GraphSelector } from './GraphSelector';
-export type { GraphSelectorProps } from './GraphSelector';
 export { Popover, PopoverContent, PopoverTrigger } from './Popover';
-export { SelectorTrigger } from './SelectorTrigger';
-export type { SelectorTriggerProps } from './SelectorTrigger';
-export { LayoutSelector } from './LayoutSelector';
-export type { LayoutSelectorProps } from './LayoutSelector';
-export { ViewSelector } from './ViewSelector';
-export type { AlgorithmicViewId, ViewSelectorProps } from './ViewSelector';
 export {
+  AlertIcon,
   AliasIcon,
   CheckIcon,
   ChevronDownIcon,
@@ -54,6 +49,20 @@ export {
 } from './Select';
 export { cn } from './lib/utils';
 export { Alert, AlertAction, AlertDescription, AlertTitle } from './components/alert';
+export {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogMedia,
+  AlertDialogOverlay,
+  AlertDialogPortal,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from './components/alert-dialog';
 export {
   Card,
   CardAction,
@@ -102,25 +111,33 @@ export {
 } from './components/field';
 export { Input } from './components/input';
 export { Label } from './components/label';
-export {
-  Menubar,
-  MenubarCheckboxItem,
-  MenubarContent,
-  MenubarGroup,
-  MenubarItem,
-  MenubarLabel,
-  MenubarMenu,
-  MenubarPortal,
-  MenubarRadioGroup,
-  MenubarRadioItem,
-  MenubarSeparator,
-  MenubarShortcut,
-  MenubarSub,
-  MenubarSubContent,
-  MenubarSubTrigger,
-  MenubarTrigger,
-} from './components/menubar';
 export { Separator } from './components/separator';
 export { Spinner } from './components/spinner';
 export { Textarea } from './components/textarea';
 export { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './components/tooltip';
+export {
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarGroup,
+  SidebarGroupAction,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarHeader,
+  SidebarInput,
+  SidebarInset,
+  SidebarMenu,
+  SidebarMenuAction,
+  SidebarMenuBadge,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarMenuSkeleton,
+  SidebarMenuSub,
+  SidebarMenuSubButton,
+  SidebarMenuSubItem,
+  SidebarProvider,
+  SidebarRail,
+  SidebarSeparator,
+  SidebarTrigger,
+  useSidebar,
+} from './components/sidebar';

@@ -55,14 +55,24 @@ describe('Button', () => {
     );
 
     expect(screen.getByRole('button', { name: 'Primary' })).toHaveClass(
-      'bg-[var(--primary)]',
+      'bg-primary',
       'caller-layout',
     );
-    expect(screen.getByRole('button', { name: 'Delete' })).toHaveClass('border-[#7f1d1d]');
+    expect(screen.getByRole('button', { name: 'Delete' })).toHaveClass('border-destructive');
     const disabled = screen.getByRole('button', { name: 'Disabled' });
     expect(disabled).toBeDisabled();
     fireEvent.click(disabled);
     expect(onClick).not.toHaveBeenCalled();
     expect(ref.current).toBeInstanceOf(HTMLButtonElement);
+  });
+
+  it('keeps a visible keyboard focus indicator in every variant', () => {
+    render(<Button>Focusable</Button>);
+
+    expect(screen.getByRole('button', { name: 'Focusable' })).toHaveClass(
+      'focus-visible:outline-2',
+      'focus-visible:outline-offset-2',
+      'focus-visible:outline-ring',
+    );
   });
 });

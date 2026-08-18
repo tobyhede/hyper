@@ -100,17 +100,44 @@ export async function openCard(node: Locator, title: string): Promise<void> {
   await node.getByRole('button', { name: `Edit Card ${title}` }).click();
 }
 
+/** The workspace's command surface: one list of everything the canvas can draw. */
+export function sidebar(page: Page): Locator {
+  return page.getByTestId('workspace-sidebar');
+}
+
+/** What the canvas header says is drawing, computed View or authored Layout alike. */
+export function currentCanvas(page: Page): Locator {
+  return page.getByTestId('current-canvas');
+}
+
 /**
- * Select one of the Space's authored Layouts by title.
+ * Draw one computed View or one authored Layout, by title.
  *
- * The fixture declares two (`fixture/space.json`), so unlike every earlier
- * version of this suite a test can open one without authoring it first —
- * which is the only way to drag a Card in a Layout that already owns Edges.
+ * One helper for both because there is one choice (ADR 0053): the sidebar lists
+ * every View and every Layout together and exactly one row is pressed. The
+ * fixture declares two Layouts (`fixture/space.json`), so a test can open one
+ * without authoring it first — which is the only way to drag a Card in a Layout
+ * that already owns Edges.
  */
-export async function selectLayout(page: Page, title: string): Promise<void> {
-  await page.getByTestId('layout-selector').click();
-  await page.getByRole('option', { name: title, exact: true }).click();
-  await expect(page.getByTestId('layout-selector')).toContainText(title);
+export async function selectCanvas(page: Page, title: string): Promise<void> {
+  await sidebar(page).getByRole('button', { name: title, exact: true }).click();
+  await expect(currentCanvas(page)).toContainText(title);
+}
+
+/** Whether the canvas is drawing a computed View or an authored Layout. */
+export function canvasKind(page: Page): Locator {
+  return page.getByTestId('current-canvas-kind');
+}
+
+/** The row of the Graph the workspace is emphasising, or nothing when none is. */
+export function activeGraph(page: Page): Locator {
+  return sidebar(page).locator('[data-testid="graph-choice"][aria-pressed="true"]');
+}
+
+/** Emphasise one Graph by title. Activating is never an Edit (ADR 0028). */
+export async function activateGraph(page: Page, title: string): Promise<void> {
+  await sidebar(page).getByRole('button', { name: title, exact: true }).click();
+  await expect(activeGraph(page)).toHaveText(title);
 }
 
 /** Where React Flow has actually put a node, in flow coordinates. */
@@ -232,11 +259,20 @@ export async function connectHandles(
   whileConnecting?: () => Promise<void>,
 ): Promise<void> {
   const from = (await sourceHandle.boundingBox())!;
-  await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
+  const to = await targetHandle.boundingBox();
+  const start = { x: from.x + from.width / 2, y: from.y + from.height / 2 };
+  // The opening nudge goes *towards* the target rather than always rightwards.
+  // React Flow auto-pans while a connection is dragged within 40px of the
+  // container edge, and the workspace Sidebar took 256px of that container
+  // (ADR 0053): parking the pointer 36px from the right edge made the canvas
+  // pan for as long as the drag lasted, and Playwright waits forever for a box
+  // that never stops moving. Aiming at the target is also the truer gesture.
+  const nudge = to !== null && to.x + to.width / 2 < start.x ? -30 : 30;
+  await page.mouse.move(start.x, start.y);
   await page.mouse.down();
   // React Flow starts the connection on the first move after mousedown, and a
   // single jump can be swallowed — the same reason `dragBy` moves in steps.
-  await page.mouse.move(from.x + from.width / 2 + 30, from.y + from.height / 2, { steps: 4 });
+  await page.mouse.move(start.x + nudge, start.y, { steps: 4 });
 
   await expect(targetHandle).toHaveCSS('opacity', '1');
   await expect(targetHandle).toHaveClass(/connectableend/);

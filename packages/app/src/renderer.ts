@@ -340,6 +340,17 @@ const BUILT_IN_VIEWS: Readonly<Record<BuiltInViewId, BuiltInViewDefinition>> = {
 };
 
 /**
+ * What a built-in View is called, for the chrome that lists every one of them.
+ *
+ * A lookup and not the registration seam the collection above declines to be:
+ * the workspace sidebar draws one row per built-in View (ADR 0053) and needs a
+ * title for each, where `ResolvedViewRenderer.title` answers only for the View
+ * currently drawing. Titles stay defined once, beside the strategy and subject
+ * they belong to.
+ */
+export const builtInViewTitle = (id: BuiltInViewId): string => BUILT_IN_VIEWS[id].title;
+
+/**
  * A Layout's subject: its own Card members, and the Graphs it owns.
  *
  * Members are the Layout's position keys (ADR 0040), listed in `space.cards`
@@ -430,6 +441,16 @@ export interface RendererResolverDependencies {
 }
 
 export type ResolveRenderer = (space: Space, selection?: RendererSelection) => ResolvedRenderer;
+
+/**
+ * The identity of a renderer selection as one string.
+ *
+ * Chrome that lists every selection at once has to say which member of the list
+ * is current, and comparing two selections field by field at each site is how
+ * the list and the thing it reports on begin to disagree (ADR 0053).
+ */
+export const rendererSelectionKey = (selection: RendererSelection): string =>
+  selection.kind === 'view' ? `view:${selection.view}` : `layout:${selection.layoutId}`;
 
 /** Resolve the Space default into the initial renderer selection. */
 export function defaultRenderer(space: Space): RendererSelection {

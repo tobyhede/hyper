@@ -16,3 +16,15 @@ The current chooser story documents the production gaps rather than closing
 them: rows remain bare buttons, the empty state is a heading over a void, and
 the busy state has no visible progress. Treat that story as evidence of the
 work still required, not acceptance of the surface.
+
+## Comments
+
+### 2026-08-18 — a visible persistence cue label is this ticket's call
+
+Under ADR 0053 the persistence cue moves into the Sidebar footer, where there is
+room for the label `PersistenceIndicator` currently states only through its
+`aria-label` and tooltip. Issue 14 deliberately does not add one: the working
+design paired the dot with static text that disagreed with the cue beside it,
+and a second copy of the cue vocabulary in the application is exactly the drift
+that text was. If a visible label is wanted, it is a change to
+`PersistenceIndicator`'s own presentation and belongs here.

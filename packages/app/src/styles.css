@@ -93,39 +93,50 @@ body {
 }
 
 /* ---- App shell ---- */
+
+/* The sidebar wrapper's own classes size it to the viewport minimum; the app
+   owns exactly one viewport and never scrolls the page, so it is pinned to the
+   viewport height and its overflow belongs to the canvas inside it. */
 .shell {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
+  height: 100svh;
+  overflow: hidden;
 }
 
+/* Inside the inset rather than over the page, so it survives the sidebar
+   closing and keeps the trigger that reopens it. */
 .shell__header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  padding: 0.6rem 1rem;
+  gap: 0.5rem;
+  flex: 0 0 auto;
+  padding: 0.45rem 0.75rem;
   background: var(--card);
   border-bottom: 1px solid var(--border);
-}
-
-.shell__title {
-  font-size: 1rem;
-  font-weight: 600;
-  margin: 0;
-  white-space: nowrap;
-}
-
-.shell__toolbar {
-  display: flex;
-  align-items: center;
-  gap: 8px;
 }
 
 .shell__main {
   position: relative;
   flex: 1;
   min-height: 0;
+}
+
+/*
+ * Pinned under the canvas header. Above the canvas but not over its controls:
+ * the width is capped so the graph stays visible beside it, and pointer events
+ * are the notice's own — nothing invisible is laid over the canvas.
+ */
+.shell__notice {
+  position: absolute;
+  top: 0.75rem;
+  right: 1rem;
+  z-index: 5;
+  width: min(22rem, calc(100% - 2rem));
+}
+
+/* Nothing to say: the slot is unconditional, so it takes itself out of the
+   canvas entirely rather than leaving a zero-height box over it. */
+.shell__notice:empty {
+  display: none;
 }
 
 /* ---- Toolbar controls ---- */

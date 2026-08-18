@@ -129,7 +129,6 @@ it('selects a renderer and its active Graph without changing the Space', () => {
 
   expect(navigation.getState()).toMatchObject({
     selectedRenderer: { kind: 'layout', layoutId: LAYOUT },
-    selectedView: 'flow',
     activeGraphId: GRAPH_TWO,
     mode: 'overview',
   });
@@ -137,7 +136,7 @@ it('selects a renderer and its active Graph without changing the Space', () => {
   expect(space.defaultView).toBeUndefined();
 
   navigation.selectRenderer({ kind: 'view', view: 'grid' });
-  expect(navigation.getState().selectedView).toBe('grid');
+  expect(navigation.getState().selectedRenderer).toEqual({ kind: 'view', view: 'grid' });
 });
 
 /**
@@ -314,7 +313,6 @@ it('leaves no Traversal history behind when presenting ends', () => {
 
   expect(navigation.getState()).toEqual({
     selectedRenderer: { kind: 'view', view: 'flow' },
-    selectedView: 'flow',
     activeGraphId: GRAPH_ONE,
     mode: 'overview',
     openedCardId: null,
@@ -569,11 +567,9 @@ it('opens and closes Cards, and closes an opened Card when presenting starts', (
 
 /*
  * Opening a replacement Space is not navigating to a renderer within the one
- * already open, and the difference is what `selectRenderer` deliberately
- * retains. There is no earlier Algorithmic View to fall back to, so a Layout
- * selection resets `selectedView`, which `selectRenderer` leaves standing.
- * Both clear `openedCardId`; the reason differs, and only this one is about
- * there being no Space left for that Card to belong to.
+ * already open, and the difference is what each retains. Both clear
+ * `openedCardId`; the reason differs, and only this one is about there being no
+ * Space left for that Card to belong to.
  */
 it('opens a replacement Space as new navigation, retaining no reading state', () => {
   const space = fixture();
@@ -587,7 +583,6 @@ it('opens a replacement Space as new navigation, retaining no reading state', ()
 
   expect(navigation.getState()).toEqual({
     selectedRenderer: { kind: 'layout', layoutId: LAYOUT },
-    selectedView: 'flow',
     activeGraphId: GRAPH_TWO,
     mode: 'overview',
     openedCardId: null,

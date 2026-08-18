@@ -1,21 +1,26 @@
 import type { Locator, Page } from '@playwright/test';
 import { expect, test } from './fixtures';
 import {
+  activateGraph,
   activeCard,
+  activeGraph,
   allPositions,
   authoringHandle,
   AUTHORING_HANDLE_SIDES,
   boxOf,
+  canvasKind,
   connectHandles,
   connectToEmptyWithAlt,
+  currentCanvas,
   dragBy,
   FIXTURE_CARD_COUNT,
   FIXTURE_EDGE_COUNT,
   nodeByTitle,
   openCard,
   positionOf,
-  selectLayout,
+  selectCanvas,
   settled,
+  sidebar,
   viewportTransform,
 } from './graph';
 
@@ -352,8 +357,8 @@ test('a dragged card stays where it is dropped, and nothing else moves', async (
 
   await expect(persistence).toHaveAttribute('data-revision', '1');
   await expect(persistence).toHaveText('Persisted');
-  await expect(page.getByTestId('layout-selector')).toContainText('Layout 1');
-  await expect(page.getByTestId('layout-live-indicator')).toBeVisible();
+  await expect(currentCanvas(page)).toContainText('Layout 1');
+  await expect(canvasKind(page)).toHaveText('Authored layout');
 
   const to = await positionOf(a);
   expect(to.y).toBeGreaterThan(from.y + 100);
@@ -377,24 +382,18 @@ test('selecting Flow or Grid is navigation and does not persist', async ({ page 
   const persistence = page.getByTestId('persistence-status');
   await expect(persistence).toHaveAttribute('data-revision', '0');
 
-  await page.getByTestId('layout-selector').click();
-  await expect(page.getByText('Layouts · authored')).toBeVisible();
-  await page.keyboard.press('Escape');
+  // One list over both, so the fixture's Layouts and the built-in Views are
+  // rows of the same menu and only one of them is pressed (ADR 0053).
+  await expect(
+    sidebar(page).getByRole('button', { name: 'Collection 1', exact: true }),
+  ).toBeVisible();
+  await expect(sidebar(page).getByRole('button', { name: 'Long', exact: true })).toBeVisible();
 
-  await page.getByTestId('graph-selector').click();
-  await expect(page.getByText('Active Graph', { exact: true })).toBeVisible();
-  await page.keyboard.press('Escape');
-
-  await page.getByTestId('view-selector').click();
-  await page.getByRole('option', { name: 'Grid' }).click();
-  await expect(page.getByTestId('view-selector')).toContainText('Grid');
-  await expect(page.getByTestId('layout-selector')).toContainText('None');
-  await expect(page.getByTestId('layout-live-indicator')).toHaveCount(0);
+  await selectCanvas(page, 'Grid');
+  await expect(canvasKind(page)).toHaveText('Computed view');
   await expect(persistence).toHaveAttribute('data-revision', '0');
 
-  await page.getByTestId('view-selector').click();
-  await page.getByRole('option', { name: 'Flow' }).click();
-  await expect(page.getByTestId('view-selector')).toContainText('Flow');
+  await selectCanvas(page, 'Flow');
   await expect(persistence).toHaveAttribute('data-revision', '0');
 });
 
@@ -405,10 +404,7 @@ test('connecting from Flow and Grid converts atomically without moving Cards', a
     [1, 'Grid', 'F'],
   ] as const) {
     await test.step(view, async () => {
-      if (view === 'Grid') {
-        await page.getByTestId('view-selector').click();
-        await page.getByRole('option', { name: view }).click();
-      }
+      if (view === 'Grid') await selectCanvas(page, view);
 
       const source = nodeByTitle(page, 'A').first();
       const target = nodeByTitle(page, targetTitle).first();
@@ -421,7 +417,7 @@ test('connecting from Flow and Grid converts atomically without moving Cards', a
       const before = await allPositions(page);
       const persistence = page.getByTestId('persistence-status');
       await expect(persistence).toHaveAttribute('data-revision', String(index));
-      await expect(page.getByTestId('layout-selector')).toContainText('None');
+      await expect(canvasKind(page)).toHaveText('Computed view');
 
       await expect(sourceHandle).toHaveCSS('opacity', '1');
       const from = (await sourceHandle.boundingBox())!;
@@ -438,7 +434,7 @@ test('connecting from Flow and Grid converts atomically without moving Cards', a
       await quiescent(page);
       await expect(persistence).toHaveAttribute('data-revision', String(index));
       await expect(persistence).toHaveText('Persisted');
-      await expect(page.getByTestId('layout-selector')).toContainText('None');
+      await expect(canvasKind(page)).toHaveText('Computed view');
       expect(await allPositions(page)).toEqual(before);
 
       await source.hover();
@@ -452,8 +448,8 @@ test('connecting from Flow and Grid converts atomically without moving Cards', a
       await expect(page.locator('.react-flow__edge')).toHaveCount(1);
       await expect(persistence).toHaveAttribute('data-revision', String(index + 1));
       await expect(persistence).toHaveText('Persisted');
-      await expect(page.getByTestId('layout-selector')).toContainText(`Layout ${index + 1}`);
-      await expect(page.getByTestId('layout-live-indicator')).toBeVisible();
+      await expect(currentCanvas(page)).toContainText(`Layout ${index + 1}`);
+      await expect(canvasKind(page)).toHaveText('Authored layout');
       await settled(page);
       expect(await allPositions(page)).toEqual(before);
     });
@@ -482,7 +478,7 @@ test('creating from an Algorithmic View freezes existing Cards and places Card 1
   // The converted Layout owns one fresh Graph and this Edge is all it holds, so
   // the Graphs the fixture's own two Layouts own are not drawn here.
   await expect(page.locator('.react-flow__edge')).toHaveCount(1);
-  await expect(page.getByTestId('layout-selector')).toContainText('Layout 1');
+  await expect(currentCanvas(page)).toContainText('Layout 1');
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
   await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
 
@@ -493,7 +489,7 @@ test('creating from an Algorithmic View freezes existing Cards and places Card 1
   await page.reload();
   await expect(nodeByTitle(page, 'Card 1')).toBeVisible();
   await settled(page);
-  await expect(page.getByTestId('layout-selector')).toContainText('Layout 1');
+  await expect(currentCanvas(page)).toContainText('Layout 1');
   await expect(page.locator('.react-flow__edge')).toHaveCount(1);
 });
 
@@ -505,20 +501,17 @@ test('editing an existing Layout updates it instead of creating another one', as
 
   await dragBy(page, a, 0, 220);
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
-  await expect(page.getByTestId('layout-selector')).toContainText('Layout 1');
+  await expect(currentCanvas(page)).toContainText('Layout 1');
 
-  await page.getByTestId('view-selector').click();
-  await page.getByRole('option', { name: 'Grid' }).click();
+  await selectCanvas(page, 'Grid');
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
-  await page.getByTestId('layout-selector').click();
-  await page.getByRole('option', { name: 'Layout 1' }).click();
+  await selectCanvas(page, 'Layout 1');
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
   await settled(page);
 
   await dragBy(page, a, 0, 160);
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '2');
-  await page.getByTestId('layout-selector').click();
-  await expect(page.getByRole('option', { name: 'Layout 1' })).toHaveCount(1);
+  await expect(sidebar(page).getByRole('button', { name: 'Layout 1', exact: true })).toHaveCount(1);
 });
 
 /**
@@ -534,7 +527,7 @@ test('editing an existing Layout updates it instead of creating another one', as
 test('edges follow a card that has been dragged', async ({ page }) => {
   await page.goto('/');
   await expect(page.locator('.react-flow__edge-path').first()).toHaveAttribute('d', /L/);
-  await selectLayout(page, 'Collection 1');
+  await selectCanvas(page, 'Collection 1');
   const a = nodeByTitle(page, 'A').first();
   await expect(a).toBeVisible();
 
@@ -789,7 +782,7 @@ test('drawing an Edge the emphasised Graph already holds converts rather than re
   const before = await allPositions(page);
   const persistence = page.getByTestId('persistence-status');
   await expect(persistence).toHaveAttribute('data-revision', '0');
-  await expect(page.getByTestId('layout-selector')).toContainText('None');
+  await expect(canvasKind(page)).toHaveText('Computed view');
 
   await source.hover();
   await connectHandles(
@@ -805,7 +798,7 @@ test('drawing an Edge the emphasised Graph already holds converts rather than re
   await expect(page.locator('.react-flow__edge')).toHaveCount(1);
   await expect(persistence).toHaveAttribute('data-revision', '1');
   await expect(persistence).toHaveText('Persisted');
-  await expect(page.getByTestId('layout-selector')).toContainText('Layout 1');
+  await expect(currentCanvas(page)).toContainText('Layout 1');
   // Conversion copies what is on screen; nothing moves at the moment of it.
   expect(await allPositions(page)).toEqual(before);
 
@@ -890,8 +883,7 @@ test('changing the active Graph recolours authoring handles without persisting o
   const handle = source.locator('.rf-card-node__authoring-handle--source').first();
   const longColour = await handle.evaluate((element) => getComputedStyle(element).backgroundColor);
 
-  await page.getByTestId('graph-selector').click();
-  await page.getByRole('option', { name: 'Mid' }).click();
+  await activateGraph(page, 'Mid');
 
   await source.hover();
   await expect(handle).not.toHaveCSS('background-color', longColour);
@@ -942,7 +934,7 @@ for (const key of ['Backspace', 'Delete'] as const) {
     await expect(nodeByTitle(page, 'A').first()).toBeVisible();
     await expect(page.locator('.react-flow__edge-path').first()).toHaveAttribute('d', /L/);
     // An Edge belongs to a Layout's Graph, so an Edge Edit needs one selected.
-    await selectLayout(page, 'Collection 1');
+    await selectCanvas(page, 'Collection 1');
     await settled(page);
     const drawn = await page.locator('.react-flow__edge').count();
     const persistence = page.getByTestId('persistence-status');
@@ -972,7 +964,7 @@ test('Backspace with a Card selected removes neither the Card nor its Edges', as
   const card = nodeByTitle(page, 'A').first();
   await expect(card).toBeVisible();
   await expect(page.locator('.react-flow__edge-path').first()).toHaveAttribute('d', /L/);
-  await selectLayout(page, 'Collection 1');
+  await selectCanvas(page, 'Collection 1');
   await settled(page);
   const drawn = await page.locator('.react-flow__edge').count();
 
@@ -1019,11 +1011,10 @@ test('only Active Graph Edges are focusable, and focus selects the one reached',
 }) => {
   await page.goto('/');
   await expect(nodeByTitle(page, 'A').first()).toBeVisible();
-  await selectLayout(page, 'Collection 1');
+  await selectCanvas(page, 'Collection 1');
   await settled(page);
 
-  const activeGraph = page.getByTestId('graph-selector');
-  const activeTitle = ((await activeGraph.textContent()) ?? '').trim();
+  const activeTitle = ((await activeGraph(page).textContent()) ?? '').trim();
   const focusable = page.locator('.react-flow__edge[tabindex]');
   await expect(focusable.first()).toBeAttached();
   const names = await focusable.evaluateAll((edges) =>
@@ -1054,7 +1045,7 @@ test('Escape on a focused Edge leaves focus on the canvas rather than the docume
 }) => {
   await page.goto('/');
   await expect(nodeByTitle(page, 'A').first()).toBeVisible();
-  await selectLayout(page, 'Collection 1');
+  await selectCanvas(page, 'Collection 1');
   await settled(page);
 
   const edge = page.locator('.react-flow__edge[tabindex]').first();
@@ -1081,7 +1072,7 @@ test('a selected Edge offers a toolbar that deletes it and opens its endpoint ed
   await page.goto('/');
   await expect(nodeByTitle(page, 'A').first()).toBeVisible();
   await expect(page.locator('.react-flow__edge-path').first()).toHaveAttribute('d', /L/);
-  await selectLayout(page, 'Collection 1');
+  await selectCanvas(page, 'Collection 1');
   await settled(page);
   const drawn = await page.locator('.react-flow__edge').count();
   await expect(page.getByRole('button', { name: 'Delete this Edge' })).toHaveCount(0);
@@ -1115,7 +1106,7 @@ test('the Edge editor moves an endpoint and keeps the Edge in its Graph', async 
   await page.goto('/');
   await expect(nodeByTitle(page, 'A').first()).toBeVisible();
   await expect(page.locator('.react-flow__edge-path').first()).toHaveAttribute('d', /L/);
-  await selectLayout(page, 'Collection 1');
+  await selectCanvas(page, 'Collection 1');
   await settled(page);
   const drawn = await page.locator('.react-flow__edge').count();
 
@@ -1155,7 +1146,7 @@ test('reconnect anchors exist only on the selected Edge', async ({ page }) => {
   await page.goto('/');
   await expect(nodeByTitle(page, 'A').first()).toBeVisible();
   await expect(page.locator('.react-flow__edge-path').first()).toHaveAttribute('d', /L/);
-  await selectLayout(page, 'Collection 1');
+  await selectCanvas(page, 'Collection 1');
   await settled(page);
   const anchors = page.locator('.react-flow__edgeupdater');
   await expect(anchors).toHaveCount(0);
@@ -1184,7 +1175,7 @@ test('dragging an endpoint onto another Card moves it and keeps the Edge in its 
   await page.goto('/');
   await expect(nodeByTitle(page, 'A').first()).toBeVisible();
   await expect(page.locator('.react-flow__edge-path').first()).toHaveAttribute('d', /L/);
-  await selectLayout(page, 'Collection 1');
+  await selectCanvas(page, 'Collection 1');
   await settled(page);
   const drawn = await page.locator('.react-flow__edge').count();
   const persistence = page.getByTestId('persistence-status');
@@ -1228,7 +1219,7 @@ test('an Alt empty-drop still works after a reconnection', async ({ page }) => {
   await page.goto('/');
   await expect(nodeByTitle(page, 'A').first()).toBeVisible();
   await expect(page.locator('.react-flow__edge-path').first()).toHaveAttribute('d', /L/);
-  await selectLayout(page, 'Collection 1');
+  await selectCanvas(page, 'Collection 1');
   await settled(page);
 
   const edge = page.locator('.react-flow__edge[aria-label="Edge from A to B in Long"]');
@@ -1265,9 +1256,8 @@ test('dragging the source endpoint moves the end the author took hold of', async
   await page.goto('/');
   await expect(nodeByTitle(page, 'A').first()).toBeVisible();
   await expect(page.locator('.react-flow__edge-path').first()).toHaveAttribute('d', /L/);
-  await selectLayout(page, 'Collection 1');
-  await page.getByTestId('graph-selector').click();
-  await page.getByRole('option', { name: 'Short' }).click();
+  await selectCanvas(page, 'Collection 1');
+  await activateGraph(page, 'Short');
   await settled(page);
 
   const edge = page.locator('.react-flow__edge[aria-label="Edge from A to B in Short"]');
@@ -1302,7 +1292,7 @@ test('an endpoint dropped back where it came from stays valid throughout', async
   await page.goto('/');
   await expect(nodeByTitle(page, 'A').first()).toBeVisible();
   await expect(page.locator('.react-flow__edge-path').first()).toHaveAttribute('d', /L/);
-  await selectLayout(page, 'Collection 1');
+  await selectCanvas(page, 'Collection 1');
   await settled(page);
   const drawn = await page.locator('.react-flow__edge').count();
 
@@ -1344,7 +1334,7 @@ test('dragging an endpoint onto empty canvas deletes the Edge', async ({ page })
   await page.goto('/');
   await expect(nodeByTitle(page, 'A').first()).toBeVisible();
   await expect(page.locator('.react-flow__edge-path').first()).toHaveAttribute('d', /L/);
-  await selectLayout(page, 'Collection 1');
+  await selectCanvas(page, 'Collection 1');
   await settled(page);
   const drawn = await page.locator('.react-flow__edge').count();
 
@@ -1363,17 +1353,17 @@ test('dragging an endpoint off the canvas restores the Edge', async ({ page }) =
   await page.goto('/');
   await expect(nodeByTitle(page, 'A').first()).toBeVisible();
   await expect(page.locator('.react-flow__edge-path').first()).toHaveAttribute('d', /L/);
-  await selectLayout(page, 'Collection 1');
+  await selectCanvas(page, 'Collection 1');
   await settled(page);
   const drawn = await page.locator('.react-flow__edge').count();
 
   const edge = page.locator('.react-flow__edge[aria-label="Edge from A to B in Long"]');
   await edge.focus();
-  // The persistence status sits in the toolbar, outside the flow container.
-  const toolbar = await boxOf(page.getByTestId('persistence-status'), 'the persistence status');
+  // The canvas header sits outside the flow container.
+  const header = await boxOf(page.locator('.shell__header'), 'the canvas header');
   await dragEndpointTo(page, edge, 'target', {
-    x: toolbar.x + toolbar.width / 2,
-    y: toolbar.y + toolbar.height / 2,
+    x: header.x + header.width / 2,
+    y: header.y + header.height / 2,
   });
 
   await quiescent(page);
@@ -1432,7 +1422,7 @@ test('a Card offers a keyboard Connect control that authors an Edge', async ({ p
   const source = nodeByTitle(page, 'A').first();
   await expect(source).toBeVisible();
   await expect(page.locator('.react-flow__edge-path').first()).toHaveAttribute('d', /L/);
-  await selectLayout(page, 'Collection 1');
+  await selectCanvas(page, 'Collection 1');
   await settled(page);
   const drawn = await page.locator('.react-flow__edge').count();
 
@@ -1576,11 +1566,11 @@ test('a duplicate Edge is marked invalid while the drag is still live', async ({
  * on success. The author saw a save and got nothing.
  *
  * **The window is now closed twice over, and this pins the outer one.** The pane
- * is a modal Base UI Dialog, so while a Card is open the toolbar is behind a
- * backdrop that takes every pointer event: the renderer selectors cannot be
- * reached at all, which is the primitive's own outside-interaction behaviour and
+ * is a modal Base UI Dialog, so while a Card is open the sidebar is behind a
+ * backdrop that takes every pointer event: the canvas choice cannot be reached
+ * at all, which is the primitive's own outside-interaction behaviour and
  * what ticket 07 asked for. `Navigation.selectRenderer` still clears the opened
- * Card for the paths that do not go through the toolbar, and
+ * Card for the paths that do not go through the chrome, and
  * `navigation.test.ts` — "closes an opened Card when the renderer changes" — is
  * where that stays pinned; it needs no browser.
  *
@@ -1598,17 +1588,21 @@ test('an opened Card is modal, so no renderer change can strand its editor', asy
   await expect(source).toBeVisible();
   await source.fill('Typed into a pane that cannot lose its placement');
 
-  // The selector is still on screen and still enabled — the backdrop is what
-  // stands between it and the pointer, so this asks what a click would actually
-  // land on rather than whether the control exists.
-  const selector = page.getByTestId('view-selector');
-  await expect(selector).toBeEnabled();
-  const covered = await selector.evaluate((element) => {
+  // The row is still on screen and still enabled — the backdrop is what stands
+  // between it and the pointer, so this asks what a click would actually land on
+  // rather than whether the control exists.
+  // Located by its data attribute rather than its role: the open pane marks the
+  // application root `inert`, which takes the sidebar out of the accessibility
+  // tree entirely — so a role query would prove the wrong thing by finding
+  // nothing at all.
+  const gridRow = page.locator('[data-choice="view:grid"]');
+  await expect(gridRow).toBeEnabled();
+  const covered = await gridRow.evaluate((element) => {
     const box = element.getBoundingClientRect();
     const hit = document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2);
     return hit !== null && hit.closest('[data-base-ui-portal]') !== null;
   });
-  expect(covered, 'the toolbar was reachable through an open Card pane').toBe(true);
+  expect(covered, 'the sidebar was reachable through an open Card pane').toBe(true);
 
   // Cancel is the way out, and it discards the draft rather than writing it.
   await page.getByRole('button', { name: 'Cancel' }).click();
@@ -1618,9 +1612,7 @@ test('an opened Card is modal, so no renderer change can strand its editor', asy
 
   // And with the pane gone the renderer is selectable again, still over an
   // unedited Space.
-  await selector.click();
-  await page.getByRole('option', { name: 'Grid' }).click();
-  await expect(selector).toContainText('Grid');
+  await selectCanvas(page, 'Grid');
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '0');
 });
 
@@ -1785,7 +1777,7 @@ test('Add Card converts an Algorithmic View once and names the Card in place', a
   const title = page.getByRole('textbox', { name: 'Card title' });
   await expect(title).toBeFocused();
   await expect(title).toHaveValue('Card 1');
-  await expect(page.getByTestId('layout-selector')).toContainText('Layout 1');
+  await expect(currentCanvas(page)).toContainText('Layout 1');
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
   // Converting moves nothing: the Cards on screen keep the positions the View
   // computed for them (ADR 0025).
@@ -1799,10 +1791,9 @@ test('Add Card converts an Algorithmic View once and names the Card in place', a
 
   await expect(nodeByTitle(page, 'Consequences')).toBeVisible();
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '2');
-  // One conversion, so one new Layout beside the two the fixture declares.
-  await page.getByTestId('layout-selector').click();
-  await expect(page.getByRole('option')).toHaveCount(3);
-  await page.keyboard.press('Escape');
+  // One conversion, so one new Layout beside the two the fixture declares —
+  // five rows in the one canvas list, with the two built-in Views.
+  await expect(sidebar(page).getByTestId('canvas-choice')).toHaveCount(5);
 });
 
 /**
@@ -1837,7 +1828,7 @@ test('cancelling the Alias Target picker creates nothing', async ({ page }) => {
   await expect(page.getByTestId('new-alias')).toHaveCount(0);
   await quiescent(page);
   await expect(page.locator('.react-flow__node')).toHaveCount(nodes);
-  await expect(page.getByTestId('layout-selector')).toContainText('None');
+  await expect(canvasKind(page)).toHaveText('Computed view');
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '0');
   await expect(page.getByTestId('add-card-menu')).toBeFocused();
 });
@@ -1917,7 +1908,7 @@ test('choosing a Target creates the Alias and leaves its editor open', async ({ 
   // An empty title takes the Target's, so the Alias is a second Card called B.
   await expect(page.locator('.react-flow__node')).toHaveCount(nodes + 1);
   await expect(nodeByTitle(page, 'B')).toHaveCount(2);
-  await expect(page.getByTestId('layout-selector')).toContainText('Layout 1');
+  await expect(currentCanvas(page)).toContainText('Layout 1');
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
 });
 

@@ -1,7 +1,14 @@
 // `test` comes from ./fixtures, not @playwright/test — it carries the auto-use
 // gate that fails a test if React Flow logged a warning while it ran.
 import { expect, test, type Locator, type Page } from './fixtures';
-import { openCard, selectLayout } from './graph';
+import {
+  activateGraph,
+  activeGraph,
+  currentCanvas,
+  openCard,
+  selectCanvas,
+  sidebar,
+} from './graph';
 
 // The app loads the abstract layout fixture (packages/app/fixture) — two
 // disconnected collections sharing no cards, laid out by ELK as separate bands:
@@ -33,9 +40,8 @@ function nodeByTitle(page: Page, title: string): Locator {
 
 test('offers more than one named graph', async ({ page }) => {
   await page.goto('/');
-  // Open the (Radix, non-native) select and count its listbox options.
-  await page.getByTestId('graph-selector').click();
-  await expect(page.getByRole('option')).toHaveCount(4);
+  // The sidebar's Graphs group lists every Graph the canvas draws.
+  await expect(sidebar(page).getByTestId('graph-choice')).toHaveCount(4);
 });
 
 test('draws every graph at once, each in its own color', async ({ page }) => {
@@ -77,27 +83,22 @@ test('selecting a Layout draws the Graphs it owns and only those', async ({ page
 
   // Declaring Layouts is not naming one to open in: `defaultView` is absent, so
   // the fixture arrives in Flow with no Layout selected.
-  await expect(page.getByTestId('view-selector')).toContainText('Flow');
-  await expect(page.getByTestId('layout-selector')).toContainText('None');
-
-  await page.getByTestId('layout-selector').click();
-  await expect(page.getByRole('option')).toHaveCount(2);
-  await page.keyboard.press('Escape');
+  await expect(currentCanvas(page)).toContainText('Flow');
+  await expect(page.getByTestId('current-canvas-kind')).toHaveText('Computed view');
+  await expect(sidebar(page).getByTestId('canvas-choice')).toHaveCount(4);
 
   // Collection 1 owns Long, Mid and Short over the shared spine: 4 + 3 + 2.
-  await selectLayout(page, 'Collection 1');
+  await selectCanvas(page, 'Collection 1');
   await expect(page.locator('.react-flow__edge')).toHaveCount(9);
   await expect(legendItems).toHaveCount(3);
-  await page.getByTestId('graph-selector').click();
-  await expect(page.getByRole('option')).toHaveCount(3);
-  await expect(page.getByRole('option', { name: 'Echo' })).toHaveCount(0);
-  await page.keyboard.press('Escape');
+  await expect(sidebar(page).getByTestId('graph-choice')).toHaveCount(3);
+  await expect(sidebar(page).getByRole('button', { name: 'Echo', exact: true })).toHaveCount(0);
 
   // Collection 2 owns Echo alone.
-  await selectLayout(page, 'Collection 2');
+  await selectCanvas(page, 'Collection 2');
   await expect(page.locator('.react-flow__edge')).toHaveCount(4);
   await expect(legendItems).toHaveCount(1);
-  await expect(page.getByTestId('graph-selector')).toContainText('Echo');
+  await expect(activeGraph(page)).toHaveText('Echo');
 
   await expect(persistence).toHaveAttribute('data-revision', '0');
 });
@@ -153,8 +154,7 @@ test('selecting a graph keeps the others on screen', async ({ page }) => {
   await expect(persistence).toHaveAttribute('data-revision', '0');
 
   // Selection is emphasis: it never hides the rest of the space.
-  await page.getByTestId('graph-selector').click();
-  await page.getByRole('option', { name: 'Echo' }).click();
+  await activateGraph(page, 'Echo');
   await expect(page.locator('.react-flow__node')).toHaveCount(10);
   await expect(page.locator('.react-flow__edge')).toHaveCount(13);
   // Activating a graph changes emphasis, not the persisted document.
@@ -221,8 +221,7 @@ test('a card can be opened even when it is not on the selected graph', async ({ 
   await page.goto('/');
 
   // "E" is in the Echo collection; select Long (band 1), then open E anyway.
-  await page.getByTestId('graph-selector').click();
-  await page.getByRole('option', { name: 'Long' }).click();
+  await activateGraph(page, 'Long');
 
   await openCard(nodeByTitle(page, 'E'), 'E');
   await expect(

@@ -1,6 +1,6 @@
 'use client';
 
-import type * as React from 'react';
+import * as React from 'react';
 import { Menu as MenuPrimitive } from '@base-ui/react/menu';
 
 import { cn } from '#lib/utils';
@@ -14,9 +14,11 @@ function DropdownMenuPortal({ ...props }: MenuPrimitive.Portal.Props) {
   return <MenuPrimitive.Portal data-slot="dropdown-menu-portal" {...props} />;
 }
 
-function DropdownMenuTrigger({ ...props }: MenuPrimitive.Trigger.Props) {
-  return <MenuPrimitive.Trigger data-slot="dropdown-menu-trigger" {...props} />;
-}
+const DropdownMenuTrigger = React.forwardRef<HTMLButtonElement, MenuPrimitive.Trigger.Props>(
+  function DropdownMenuTrigger(props, ref) {
+    return <MenuPrimitive.Trigger ref={ref} data-slot="dropdown-menu-trigger" {...props} />;
+  },
+);
 
 function DropdownMenuContent({
   align = 'start',
@@ -30,7 +32,10 @@ function DropdownMenuContent({
   return (
     <MenuPrimitive.Portal>
       <MenuPrimitive.Positioner
-        className="outline-none"
+        // `z-50`, as every other portalled surface in this package carries:
+        // the workspace Sidebar's container is `fixed` at `z-10`, and a popup
+        // left at the auto stacking level opens behind it.
+        className="z-50 outline-none"
         align={align}
         alignOffset={alignOffset}
         side={side}

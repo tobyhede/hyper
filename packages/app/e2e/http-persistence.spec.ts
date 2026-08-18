@@ -1,6 +1,14 @@
 import { expect, test } from './fixtures';
 import type { Page, Route } from '@playwright/test';
-import { dragBy, nodeByTitle, positionOf, settled } from './graph';
+import {
+  activateGraph,
+  activeGraph,
+  dragBy,
+  nodeByTitle,
+  positionOf,
+  selectCanvas,
+  settled,
+} from './graph';
 
 const isCommit = (method: string, url: string): boolean =>
   method === 'PUT' && /\/api\/spaces\/[0-9a-f-]+$/.test(new URL(url).pathname);
@@ -92,7 +100,12 @@ test('a network failure stays visible until the user retries', async ({ page }) 
   await expect(card).toBeVisible();
   await dragBy(page, card, 0, 180);
 
-  const retry = page.getByRole('button', { name: 'Retry persistence' });
+  // The toolbar reports the failure as a red dot and keeps every control where
+  // it was; the reason and the action are in the notice pinned beneath it.
+  await expect(page.getByRole('button', { name: 'Changes not saved' })).toBeVisible();
+  const failure = page.getByTestId('persistence-failure');
+  await expect(failure).toBeVisible();
+  const retry = failure.getByRole('button', { name: 'Retry' });
   await expect(retry).toBeVisible();
   expect(attempts).toBe(1);
   await expect.poll(() => navigationIsProtected(page)).toBe(true);
@@ -100,6 +113,7 @@ test('a network failure stays visible until the user retries', async ({ page }) 
   await page.unroute('**/api/spaces/*', failFirstCommit);
   await retry.click();
 
+  await expect(failure).toBeHidden();
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
   await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
   await expect.poll(() => navigationIsProtected(page)).toBe(false);
@@ -118,9 +132,21 @@ test('a stale browser reports conflict and accepts the remote workspace without 
     await Promise.all([settled(page), settled(stalePage)]);
 
     let staleCommits = 0;
+    let releaseStaleCommit = (): void => undefined;
+    const staleCommitGate = new Promise<void>((resolve) => {
+      releaseStaleCommit = resolve;
+    });
+    let observeStaleCommit = (): void => undefined;
+    const staleCommitObserved = new Promise<void>((resolve) => {
+      observeStaleCommit = resolve;
+    });
     await stalePage.route('**/api/spaces/*', async (route) => {
       const request = route.request();
-      if (isCommit(request.method(), request.url())) staleCommits += 1;
+      if (isCommit(request.method(), request.url())) {
+        staleCommits += 1;
+        observeStaleCommit();
+        await staleCommitGate;
+      }
       await route.continue();
     });
 
@@ -129,37 +155,39 @@ test('a stale browser reports conflict and accepts the remote workspace without 
     const remotePosition = await positionOf(currentCard);
 
     await dragBy(stalePage, staleCard, 180, 0);
-    const acceptRemote = stalePage.getByRole('button', { name: 'Accept remote' });
-    await expect(acceptRemote).toBeVisible();
+    await staleCommitObserved;
     expect(staleCommits).toBe(1);
     await expect.poll(() => navigationIsProtected(stalePage)).toBe(true);
-    await settledNetwork(stalePage);
-    expect(staleCommits).toBe(1);
 
-    // Leave the conflicted local workspace in unrelated navigation and start an
-    // automatic placement just before acceptance. The stored Layout must open
-    // fresh, and any result still arriving from this Graph placement is obsolete.
     const mountedGraphArea = await stalePage.locator('.graph-area').elementHandle();
     expect(mountedGraphArea).not.toBeNull();
 
-    await stalePage.getByTestId('view-selector').click();
-    await stalePage.getByRole('option', { name: 'Flow' }).click();
-    await stalePage.getByTestId('graph-selector').click();
-    await stalePage.getByRole('option', { name: 'Echo' }).click();
-    // No wait between starting the placement and accepting: settling first would
-    // retire the very race this test exists to cover.
-    await stalePage.getByTestId('present-button').click();
+    // The conflict AlertDialog is modal, so prepare the race while the stale PUT
+    // is parked: leave the local workspace in unrelated navigation and start an
+    // automatic placement, then let the conflict arrive. Any placement result
+    // still arriving after Reload belongs to the Space that is being replaced.
+    try {
+      await selectCanvas(stalePage, 'Flow');
+      await activateGraph(stalePage, 'Echo');
+      await stalePage.getByTestId('present-button').click();
+    } finally {
+      // Release even when setup fails, so the intercepted request cannot leave
+      // the page hanging and hide the useful Playwright assertion.
+      releaseStaleCommit();
+    }
 
-    await acceptRemote.click();
+    const reload = stalePage.getByRole('button', { name: 'Reload' });
+    await expect(reload).toBeVisible();
+    await reload.click();
 
     const acceptedCard = nodeByTitle(stalePage, 'A').first();
     await expect(acceptedCard).toBeVisible();
     await settled(stalePage);
     expect(await positionOf(acceptedCard)).toEqual(remotePosition);
-    // A fresh Navigation over the stored Space, not the emphasis this page was
-    // left in: the accepted Space opens in the Layout the *other* page's drag
-    // converted, and the Graph that conversion minted is its first.
-    await expect(stalePage.getByTestId('graph-selector')).toContainText('Graph 1');
+    // Fresh Navigation over the stored Space, not the emphasis this page was
+    // left in: Reload opens the Layout the other page's drag converted, whose
+    // minted Graph is first, without replacing the mounted application surface.
+    await expect(activeGraph(stalePage)).toHaveText('Graph 1');
     await expect(stalePage.getByTestId('presenting-chrome')).not.toBeVisible();
     expect(
       await mountedGraphArea!.evaluate(
@@ -188,8 +216,7 @@ test('graph activation and presenting do not write or protect navigation', async
 
   await page.goto('/');
   await expect(nodeByTitle(page, 'A').first()).toBeVisible();
-  await page.getByTestId('graph-selector').click();
-  await page.getByRole('option', { name: 'Echo' }).click();
+  await activateGraph(page, 'Echo');
   await page.getByTestId('present-button').click();
   await expect(page.getByTestId('presenting-chrome')).toBeVisible();
   await settledNetwork(page);

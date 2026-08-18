@@ -6,7 +6,7 @@ import { uuidSchema, type SpaceSnapshot } from '@project/core';
 import { inHandleId, loadSpaceSnapshot, outHandleId, Placement } from '@project/graph';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
 import type { CardFlowNode } from '@project/react-flow-adapter';
-import { LayoutSelector } from '@project/ui';
+import { AddCardControl, PersistenceIndicator, SidebarProvider } from '@project/ui';
 import { createNavigation } from '../src/navigation';
 import { createRenderAdapter, edgeSelectionOf } from '../src/render-adapter';
 import { createConnectionCompletion } from '../src/connection-completion';
@@ -16,6 +16,7 @@ import { createSpaceAuthoring } from '../src/space-authoring';
 import { createRendererResolver } from '../src/renderer';
 import { SpaceCanvas } from '../src/components/SpaceCanvas';
 import { EdgeAuthoringContext } from '../src/components/edge-authoring-context';
+import { WorkspaceSidebar } from '../src/components/WorkspaceSidebar';
 import { CARD_SIZE } from '../src/card';
 
 /**
@@ -36,6 +37,34 @@ const OTHER_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
 const LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000021');
 
 const EDGE = { from: CARD_A, to: CARD_B } as const;
+/** The real workspace chrome, composed as `App` composes it, outside the canvas. */
+const workspaceChrome = (
+  <SidebarProvider>
+    <WorkspaceSidebar
+      workspaceTitle="Space"
+      canvas={{
+        computed: [{ selection: { kind: 'view', view: 'flow' }, title: 'Flow' }],
+        authored: [],
+        selected: { kind: 'view', view: 'flow' },
+        onSelect: () => undefined,
+      }}
+      graph={{
+        graphs: [],
+        colorByGraphId: {},
+        activeGraphId: null,
+        onActivate: () => undefined,
+        onPresent: () => undefined,
+        onExitPresenting: () => undefined,
+      }}
+      addCard={{ onAddCard: () => undefined, onAddAlias: () => undefined }}
+      persistence={{
+        control: <PersistenceIndicator state="settled" />,
+        state: 'settled',
+        acknowledgedRevision: 0n,
+      }}
+    />
+  </SidebarProvider>
+);
 /** The Graph and Edge an Edge operation is named by, which travel together. */
 const SUBJECT = { graphId: GRAPH_ID, edge: EDGE } as const;
 const ASIDE_EDGE = { from: CARD_B, to: CARD_C } as const;
@@ -464,24 +493,34 @@ describe("React Flow's document-level delete key", () => {
     expect(graphsOf(session.getState().working)[0]?.edges).toEqual([EDGE]);
   });
 
-  it.each(DELETE_KEYS)('leaves the Edge standing when %s reaches the toolbar', (key) => {
+  it.each(DELETE_KEYS)('leaves the Edge standing when %s reaches the sidebar', (key) => {
     // The real control, mounted where the real one is: outside the flow
-    // entirely, with no portal involved and so nothing for a `.nokey` inside the
-    // canvas to reach.
-    const { adapter, session } = mountCanvas(
-      <LayoutSelector
-        layouts={snapshot.document.layouts ?? []}
-        value={LAYOUT_ID}
-        active
-        onValueChange={NO_OP}
-      />,
-    );
+    // entirely, with no portal involved and so nothing for a `.nokey` inside
+    // the canvas to reach. A canvas choice is a focusable `button` that no
+    // input tag excludes, which is exactly the exposure this covers.
+    const { adapter, session } = mountCanvas(workspaceChrome);
     act(() => adapter.getState().selectEdge(SUBJECT));
 
-    fireEvent.keyDown(screen.getByRole('combobox', { name: 'Choose layout' }), { key });
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Flow' }), { key });
 
     expect(graphsOf(session.getState().working)[0]?.edges).toEqual([EDGE]);
   });
+
+  it.each(DELETE_KEYS)(
+    'leaves the Edge standing when %s reaches the Add Card menu trigger',
+    (key) => {
+      // AddCardControl sits beside the Menubar in the real toolbar, outside the
+      // flow, with the same document-level exposure MenubarTrigger has.
+      const { adapter, session } = mountCanvas(
+        <AddCardControl onAddCard={NO_OP} onAddAlias={NO_OP} />,
+      );
+      act(() => adapter.getState().selectEdge(SUBJECT));
+
+      fireEvent.keyDown(screen.getByRole('button', { name: 'More Card kinds' }), { key });
+
+      expect(graphsOf(session.getState().working)[0]?.edges).toEqual([EDGE]);
+    },
+  );
 });
 
 /**

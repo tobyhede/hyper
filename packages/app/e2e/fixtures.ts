@@ -53,10 +53,15 @@ export const test = base.extend<E2eFixtures>({
       await server.close();
     }
   },
-  page: async ({ browser, e2eServer }, run) => {
+  // `contextOptions` is Playwright's own resolved bundle of everything `use`
+  // declares — viewport, device, locale — and this fixture dropped all of it by
+  // building a context from `baseURL` alone. Nothing noticed while every project
+  // wanted Playwright's default 1280x720, and a `test.use({ viewport })` asking
+  // for a phone was silently served a desktop.
+  page: async ({ browser, contextOptions, e2eServer }, run) => {
     const baseURL = e2eServer.resolvedUrls?.local[0];
     if (baseURL === undefined) throw new Error('Vite did not publish a loopback URL');
-    const context = await browser.newContext({ baseURL });
+    const context = await browser.newContext({ ...contextOptions, baseURL });
     try {
       await run(await context.newPage());
     } finally {

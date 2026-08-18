@@ -1,5 +1,5 @@
 import type { Graph } from '@project/core';
-import { FALLBACK_GRAPH_COLOR, GraphLegend } from '@project/ui';
+import { FALLBACK_GRAPH_COLOR, GraphLegend, graphColor } from '@project/ui';
 import { MiniMap, Panel } from '@xyflow/react';
 
 export interface GraphHudProps {
@@ -20,9 +20,7 @@ export function GraphHud({
 }: GraphHudProps) {
   const activeGraph = graphs.find((graph) => graph.id === activeGraphId);
   const activeGraphColor =
-    (activeGraphId === null ? undefined : colorByGraphId[activeGraphId]) ??
-    activeGraph?.color ??
-    FALLBACK_GRAPH_COLOR;
+    activeGraph === undefined ? FALLBACK_GRAPH_COLOR : graphColor(activeGraph, colorByGraphId);
   const nodeStrokeColor = ({ id }: { id: string }) =>
     activeGraphId !== null && activeGraphCardIds.has(id) ? activeGraphColor : inactiveNodeColor;
 

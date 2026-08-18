@@ -194,3 +194,38 @@ if (typeof window !== 'undefined') {
     };
   };
 }
+
+/**
+ * jsdom ships no `matchMedia`, and the shared Sidebar asks for one.
+ *
+ * `useIsMobile` subscribes to `(max-width: 767px)` to decide whether the
+ * workspace chrome draws as a sidebar or as a Sheet (ADR 0053). jsdom has no
+ * layout and no media engine, so the honest answer is a query that never
+ * matches and never changes: every rendering test then exercises the desktop
+ * sidebar, which is the surface those tests are about.
+ *
+ * Guarded like the stubs above — the setup file also runs under
+ * `environment: 'node'`, and any environment that implements the real thing
+ * keeps it. The guard reads the value rather than asking `in`, because jsdom
+ * *declares* `matchMedia` and leaves it `undefined`: the property is there and
+ * calling it throws. Read off a widened alias so the check is about the value
+ * this environment actually holds rather than about the DOM lib's promise,
+ * which is what would make it a condition lint can prove pointless.
+ */
+const declaredMatchMedia = (globalThis as { window?: { matchMedia?: unknown } }).window?.matchMedia;
+if (typeof window !== 'undefined' && typeof declaredMatchMedia !== 'function') {
+  Object.defineProperty(window, 'matchMedia', {
+    configurable: true,
+    writable: true,
+    value: (query: string) => ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addEventListener: () => undefined,
+      removeEventListener: () => undefined,
+      addListener: () => undefined,
+      removeListener: () => undefined,
+      dispatchEvent: () => false,
+    }),
+  });
+}

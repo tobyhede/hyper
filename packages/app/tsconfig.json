@@ -22,6 +22,7 @@
     "src",
     "example",
     "e2e",
+    "ladle-e2e",
     "stories",
     ".ladle/components.tsx",
     "vite.config.ts",
