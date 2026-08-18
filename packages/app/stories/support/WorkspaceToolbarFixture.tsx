@@ -15,22 +15,54 @@ import {
 import { PersistenceControl } from '#components/PersistenceControl';
 import { WorkspaceToolbar } from '#components/WorkspaceToolbar';
 
-const layoutId = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
-const graphId = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 const from = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
 const to = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
+const positions = { [from]: { x: 0, y: 0 }, [to]: { x: 320, y: 0 } };
 
-const graphs: readonly Graph[] = [
-  { id: graphId, title: 'Long path', color: '#4f8cff', edges: [{ from, to }] },
-];
+// Titles/colors mirror the tracked e2e fixture (packages/app/fixture/space.json)
+// and the app's GRAPH_PALETTE (packages/app/src/colors.ts).
+const longGraph: Graph = {
+  id: uuidSchema.parse('00000000-0000-4000-8000-000000000030'),
+  title: 'Long',
+  color: '#6ea8fe',
+  edges: [{ from, to }],
+};
+const midGraph: Graph = {
+  id: uuidSchema.parse('00000000-0000-4000-8000-000000000031'),
+  title: 'Mid',
+  color: '#f59e0b',
+  edges: [{ from, to }],
+};
+const shortGraph: Graph = {
+  id: uuidSchema.parse('00000000-0000-4000-8000-000000000032'),
+  title: 'Short',
+  color: '#34d399',
+  edges: [{ from, to }],
+};
+const echoGraph: Graph = {
+  id: uuidSchema.parse('00000000-0000-4000-8000-000000000033'),
+  title: 'Echo',
+  color: '#f472b6',
+  edges: [{ from, to }],
+};
+const graphs: readonly Graph[] = [longGraph, midGraph, shortGraph, echoGraph];
+
 const layouts: readonly Layout[] = [
   {
-    id: layoutId,
+    id: uuidSchema.parse('00000000-0000-4000-8000-000000000020'),
     title: 'Collection 1',
     kind: 'positioned',
-    positions: { [from]: { x: 0, y: 0 }, [to]: { x: 320, y: 0 } },
-    graphs: [...graphs],
-    activeGraph: graphId,
+    positions,
+    graphs: [longGraph, midGraph, shortGraph],
+    activeGraph: longGraph.id,
+  },
+  {
+    id: uuidSchema.parse('00000000-0000-4000-8000-000000000021'),
+    title: 'Collection 2',
+    kind: 'positioned',
+    positions,
+    graphs: [echoGraph],
+    activeGraph: echoGraph.id,
   },
 ];
 
@@ -53,8 +85,8 @@ export function WorkspaceToolbarFixture({
   onRetry = () => undefined,
 }: WorkspaceToolbarFixtureProps) {
   const [view, setView] = useState<BuiltInViewId>('flow');
-  const [layout, setLayout] = useState<string | null>(layoutId);
-  const [activeGraph, setActiveGraph] = useState<string | null>(graphId);
+  const [layout, setLayout] = useState<string | null>(layouts[0]?.id ?? null);
+  const [activeGraph, setActiveGraph] = useState<string | null>(longGraph.id);
   const addCardMenu = useRef<HTMLButtonElement>(null);
 
   return (
@@ -71,7 +103,7 @@ export function WorkspaceToolbarFixture({
       graph={{
         graphs,
         activeGraphId: activeGraph,
-        colorByGraphId: { [graphId]: '#4f8cff' },
+        colorByGraphId: {},
         onActivate: setActiveGraph,
         onPresent: () => undefined,
         presenting,

@@ -10,6 +10,7 @@ export default { title: 'Components/Workspace Toolbar' };
 
 const ToolbarRow = ({ children }: { readonly children: ReactNode }) => (
   <div className="shell__header">
+    <h1 className="shell__title">Workspace</h1>
     <div className="shell__toolbar">{children}</div>
   </div>
 );
