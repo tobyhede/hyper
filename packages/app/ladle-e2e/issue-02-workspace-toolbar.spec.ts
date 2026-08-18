@@ -97,13 +97,16 @@ test('modal persistence stories are isolated from the Ladle catalogue', async ({
   await page.goto('/?story=components--workspace-toolbar--conflicted');
 
   const storyFrame = page.frameLocator('iframe');
-  await expect(storyFrame.getByRole('menubar', { name: 'Workspace commands' })).toBeVisible();
-  await expect(page.getByRole('alertdialog', { name: 'Changes conflict' })).toBeVisible();
+  await expect(storyFrame.getByRole('alertdialog', { name: 'Changes conflict' })).toBeVisible();
 
   const storySearch = page.getByLabel('Search stories');
   await storySearch.fill('Persistence Indicator');
   await expect(storySearch).toHaveValue('Persistence Indicator');
+  await page.getByRole('link', { name: 'Lifecycle' }).click();
+  await expect(page).toHaveURL(/story=components--persistence-indicator--lifecycle/);
 
   await page.goto('/?story=components--workspace-toolbar--rejected');
-  await expect(page.getByRole('alertdialog', { name: 'Changes couldn’t be saved' })).toBeVisible();
+  await expect(
+    page.frameLocator('iframe').getByRole('alertdialog', { name: 'Changes couldn’t be saved' }),
+  ).toBeVisible();
 });

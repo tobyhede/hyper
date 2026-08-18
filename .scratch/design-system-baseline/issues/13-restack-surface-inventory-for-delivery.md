@@ -66,9 +66,13 @@ must clear the repository's deviation rule.
 Ladle renders stories in its catalogue document by default. A modal story must
 use Ladle's documented `Story.meta = { iframed: true }` isolation so its focus
 trap and inert boundary remain inside the story canvas rather than capturing
-the catalogue navigation. Preview mode disables that iframe, so focused Ladle
-behavior tests still exercise the component directly. Solve catalogue hosting
-at the story boundary; do not invent a product dismissal action for Ladle.
+the catalogue navigation. Portalled primitives must also resolve their portal
+container from the rendered content's `ownerDocument`; a portal that defaults to
+the outer document defeats Ladle's iframe. Prove isolation by clicking real
+catalogue navigation while the modal is open, not by programmatically filling a
+control. Preview mode disables the iframe, so focused Ladle behavior tests still
+exercise the component directly. Solve catalogue hosting at the story and
+portal boundaries; do not invent a product dismissal action for Ladle.
 
 ## Extraction loop
 

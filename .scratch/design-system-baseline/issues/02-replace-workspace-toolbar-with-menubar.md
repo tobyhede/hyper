@@ -42,7 +42,10 @@ and returns to the unchanged local workspace after acknowledgement.
 The conflicted and rejected stories use Ladle's documented `iframed` metadata
 for modal stories. Their production focus traps therefore stay inside the story
 canvas instead of making the catalogue navigation inert; preview-mode behavior
-tests remain unframed and exercise the dialogs directly.
+tests remain unframed and exercise the dialogs directly. The shared AlertDialog
+portal resolves its container from the rendered content's `ownerDocument`, so
+Base UI mounts into Ladle's iframe rather than escaping back to the catalogue
+body. Catalogue coverage clicks a real story link while the modal is open.
 
 The paused implementation's portal race was exposed by the story-first keyboard
 contract as a conflict between a hand-written open-menu state machine and Base
