@@ -39,6 +39,11 @@ use the shared `AlertDialog` for Reload/Save and put an unloadable-remote reason
 inside a destructive `Alert`; permanent rejection uses the same dialog boundary
 and returns to the unchanged local workspace after acknowledgement.
 
+The conflict dialog has a real Back action. It dismisses the modal without
+discarding the unresolved conflict and leaves a compact Resolve conflict control
+that reopens it. This product path also prevents the automatically open stable
+story from trapping Ladle's catalogue UI and requiring browser history to leave.
+
 The paused implementation's portal race was exposed by the story-first keyboard
 contract as a conflict between a hand-written open-menu state machine and Base
 UI's Menubar lifecycle. Removing that state machine lets the primitive own menu
