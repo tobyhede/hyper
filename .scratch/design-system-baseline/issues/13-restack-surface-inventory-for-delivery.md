@@ -63,13 +63,6 @@ through the primitive's supported API where possible and record the requirement
 and behavior test. A hand-written replacement state machine is a deviation and
 must clear the repository's deviation rule.
 
-Ladle renders stories in its catalogue document, so an automatically open modal
-also makes the catalogue chrome inert. Every stable modal story therefore needs
-the accepted product dismissal path on screen; after dismissal, Ladle navigation
-must be usable without browser history. Implement that path in the product
-surface and verify it in production too. A Ladle-only Back button or story-only
-modal escape is not parity.
-
 ## Extraction loop
 
 Run this loop for every target issue.

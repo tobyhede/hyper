@@ -5,7 +5,6 @@ import {
   AlertDescription,
   AlertDialog,
   AlertDialogAction,
-  AlertDialogCancel,
   AlertDialogContent,
   AlertDialogDescription,
   AlertDialogFooter,
@@ -72,19 +71,10 @@ function ConflictControl({
   readonly onAcceptRemote: () => string | null;
   readonly onKeepLocal: () => void;
 }) {
-  const [open, setOpen] = useState(true);
   const [remoteRefusal, setRemoteRefusal] = useState<string | null>(null);
 
-  if (!open) {
-    return (
-      <Button variant="secondary" size="toolbar" onClick={() => setOpen(true)}>
-        Resolve conflict
-      </Button>
-    );
-  }
-
   return (
-    <AlertDialog open={open} onOpenChange={setOpen}>
+    <AlertDialog open onOpenChange={() => undefined}>
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>Changes conflict</AlertDialogTitle>
@@ -100,7 +90,6 @@ function ConflictControl({
           </Alert>
         )}
         <AlertDialogFooter>
-          <AlertDialogCancel>Back</AlertDialogCancel>
           <Button
             variant="secondary"
             data-testid="persistence-accept-remote"

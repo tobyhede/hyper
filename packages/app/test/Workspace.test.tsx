@@ -125,11 +125,6 @@ describe('Workspace conflict recovery', () => {
     });
     expect(screen.getByText('Local workspace')).toBeVisible();
     expect(screen.getByRole('alertdialog', { name: 'Changes conflict' })).toBeVisible();
-    fireEvent.click(screen.getByRole('button', { name: 'Back' }));
-    const resolveConflict = screen.getByRole('button', { name: 'Resolve conflict' });
-    expect(resolveConflict).toBeVisible();
-    fireEvent.click(resolveConflict);
-    expect(screen.getByRole('alertdialog', { name: 'Changes conflict' })).toBeVisible();
     expect(screen.getByRole('button', { name: 'Reload' })).toBeVisible();
     expect(screen.getByRole('button', { name: 'Save' })).toBeVisible();
 

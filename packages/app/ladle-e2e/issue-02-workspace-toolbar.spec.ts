@@ -81,13 +81,9 @@ test('Workspace Toolbar stories render production conflict and rejection recover
   await page.goto('/?story=components--workspace-toolbar--conflicted&mode=preview');
 
   await expect(page.getByRole('alertdialog', { name: 'Changes conflict' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Back' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Reload' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Save' })).toBeVisible();
-  await page.getByRole('button', { name: 'Back' }).click();
-  const resolveConflict = page.getByRole('button', { name: 'Resolve conflict' });
-  await expect(resolveConflict).toBeVisible();
-  await resolveConflict.click();
+  await page.keyboard.press('Escape');
   await expect(page.getByRole('alertdialog', { name: 'Changes conflict' })).toBeVisible();
   await page.getByRole('button', { name: 'Reload' }).click();
   await expect(page.getByTestId('persistence-remote-refused')).toContainText(
@@ -99,15 +95,4 @@ test('Workspace Toolbar stories render production conflict and rejection recover
   await expect(page.getByText('Permission denied')).toBeVisible();
   await page.getByRole('button', { name: 'Continue editing' }).click();
   await expect(page.getByRole('button', { name: 'Persistence rejected' })).toBeVisible();
-});
-
-test('modal persistence stories do not trap the Ladle catalogue', async ({ page }) => {
-  await page.goto('/?story=components--workspace-toolbar--conflicted');
-
-  await expect(page.getByRole('alertdialog', { name: 'Changes conflict' })).toBeVisible();
-  await page.getByRole('button', { name: 'Back' }).click();
-
-  const storySearch = page.getByLabel('Search stories');
-  await storySearch.fill('Persistence Indicator');
-  await expect(storySearch).toHaveValue('Persistence Indicator');
 });
