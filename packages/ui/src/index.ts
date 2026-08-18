@@ -33,6 +33,7 @@ export { ViewSelector } from './ViewSelector';
 export type { ViewSelectorProps } from './ViewSelector';
 export { Popover, PopoverContent, PopoverTrigger } from './Popover';
 export {
+  AlertIcon,
   AliasIcon,
   CheckIcon,
   ChevronDownIcon,

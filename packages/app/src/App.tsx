@@ -30,7 +30,7 @@ import { OpenCard } from './components/OpenCard';
 import { PlacementFailure } from './components/PlacementFailure';
 import { PlacementPending } from './components/PlacementPending';
 import { PresentingChrome } from './components/PresentingChrome';
-import { PersistenceControl } from './components/PersistenceControl';
+import { PersistenceControl, PersistenceNotice } from './components/PersistenceControl';
 import { WorkspaceToolbar } from './components/WorkspaceToolbar';
 
 export const createApp = ({ space, spaceSession }: OpenedSpace) => {
@@ -599,7 +599,6 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
             control: (
               <PersistenceControl
                 persistence={sessionState.persistence}
-                onRetry={authoring.retryPersistence}
                 onAcceptRemote={authoring.acceptStoredSpace}
                 onKeepLocal={authoring.keepLocalWork}
               />
@@ -612,7 +611,16 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
     );
 
     return (
-      <AppShell title={rendererSpace.title} toolbar={toolbar}>
+      <AppShell
+        title={rendererSpace.title}
+        toolbar={toolbar}
+        notice={
+          <PersistenceNotice
+            persistence={sessionState.persistence}
+            onRetry={authoring.retryPersistence}
+          />
+        }
+      >
         <div className="graph-area" style={cardSizeVars}>
           {canvas.kind === 'failure' ? (
             <PlacementFailure error={canvas.error} />

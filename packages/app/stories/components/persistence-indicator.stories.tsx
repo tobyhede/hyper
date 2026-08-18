@@ -55,7 +55,6 @@ export const Lifecycle: Story = () => {
   return (
     <PersistenceControl
       persistence={state.persistence}
-      onRetry={session.retry}
       onAcceptRemote={() => null}
       onKeepLocal={() => undefined}
     />

@@ -5,7 +5,7 @@ import { Button, type ButtonProps } from './Button';
 import { Spinner } from './components/spinner';
 import { Tooltip, TooltipContent, TooltipTrigger } from './components/tooltip';
 
-export type PersistenceIndicatorState = 'settled' | 'pending' | 'rejected';
+export type PersistenceIndicatorState = 'settled' | 'pending' | 'failed' | 'rejected';
 
 export interface PersistenceIndicatorProps {
   readonly state: PersistenceIndicatorState;
@@ -18,6 +18,7 @@ const dotVariants = cva('size-2.5 shrink-0 rounded-full transition-colors durati
     tone: {
       neutral: 'bg-muted-foreground',
       success: 'bg-success',
+      danger: 'bg-destructive',
     },
   },
 });
@@ -40,6 +41,13 @@ const CUES = {
   persisted: { label: 'Persisted', icon: <Dot tone="neutral" />, variant: 'ghost' },
   saving: { label: 'Saving changes', icon: <Spinner />, variant: 'ghost' },
   saved: { label: 'Changes saved', icon: <Dot tone="success" />, variant: 'ghost' },
+  // A retryable failure keeps the dot the other resting cues use, in red: the
+  // work is still here and the next attempt may well succeed, so the toolbar
+  // says only that saving has stopped. What went wrong and what to do about it
+  // is the pinned notice's to say, not a glyph's.
+  failed: { label: 'Changes not saved', icon: <Dot tone="danger" />, variant: 'ghost' },
+  // Permanent rejection keeps the louder glyph. It is not a dot because it is
+  // not the same kind of news: no retry will clear it.
   rejected: { label: 'Persistence rejected', icon: <CircleAlertIcon />, variant: 'destructive' },
 } as const satisfies Record<string, Cue>;
 
@@ -49,6 +57,7 @@ type CueName = keyof typeof CUES;
 const RESTING_CUE = {
   settled: 'persisted',
   pending: 'saving',
+  failed: 'failed',
   rejected: 'rejected',
 } as const satisfies Record<PersistenceIndicatorState, CueName>;
 

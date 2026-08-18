@@ -64,10 +64,15 @@ test('Workspace Toolbar stories render quiet, retryable, and presenting states',
   await expect(page.getByRole('button', { name: 'Changes saved' })).toBeHidden();
 
   await page.goto('/?story=components--workspace-toolbar--failed&mode=preview');
-  const retry = page.getByRole('button', { name: 'Retry persistence' });
-  await expect(retry).toBeVisible();
+  // Two surfaces for one condition: a red dot that leaves the toolbar's
+  // geometry alone, and the notice pinned under it carrying reason and action.
+  await expect(page.getByRole('button', { name: 'Changes not saved' })).toBeVisible();
+  const failure = page.getByTestId('persistence-failure');
+  await expect(failure).toContainText('Network unavailable');
+  const retry = failure.getByRole('button', { name: 'Retry' });
   await retry.click();
-  await expect(retry).toBeHidden();
+  await expect(failure).toBeHidden();
+  await expect(page.getByRole('button', { name: 'Changes not saved' })).toBeHidden();
   await expect(page.getByTestId('persistence-status')).toHaveAttribute(
     'data-persistence-state',
     'settled',

@@ -2,6 +2,7 @@ import {
   ArrowRightFromLine,
   Check,
   ChevronDown,
+  CircleAlert,
   CornerDownRight,
   FileText,
   Grid2x2,
@@ -54,3 +55,10 @@ export const MarkdownIcon = ({ size = 14 }: { size?: number }) => <FileText size
 
 /** Mark the selected item in a list. */
 export const CheckIcon = () => <Check color="var(--accent)" size={14} />;
+
+/**
+ * Something went wrong and the surface carrying this says what. Sized by the
+ * caller's own icon rules rather than a fixed `size`, because it is drawn both
+ * beside a line of Alert text and inside a toolbar button.
+ */
+export const AlertIcon = () => <CircleAlert />;

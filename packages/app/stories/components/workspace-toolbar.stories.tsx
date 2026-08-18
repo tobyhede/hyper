@@ -8,14 +8,12 @@ import {
 
 export default { title: 'Components/Workspace Toolbar' };
 
-const ToolbarRow = ({ children }: { readonly children: ReactNode }) => (
-  <div className="shell__header">
-    <h1 className="shell__title">Workspace</h1>
-    <div className="shell__toolbar">{children}</div>
-  </div>
-);
-
-const story = (children: ReactNode) => <ToolbarRow>{children}</ToolbarRow>;
+/**
+ * The shell sizes its main area from its own height, and the pinned notice is
+ * positioned inside that area — so a story has to give it one rather than let
+ * Ladle's auto-height collapse it to the header.
+ */
+const story = (children: ReactNode) => <div className="h-[22rem]">{children}</div>;
 
 export const Settled: Story = () => story(<WorkspaceToolbarFixture />);
 export const Pending: Story = () =>

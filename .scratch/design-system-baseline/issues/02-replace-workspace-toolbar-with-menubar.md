@@ -96,14 +96,25 @@ caller's ref so cancelling Alias creation still restores focus.
   donor's Select-based selectors were rebuilt in its place — see the comment
   below for why the acceptance criterion that asked for a menubar was wrong.
 
-Verification after the 2026-08-18 amendment:
+Verification after the 2026-08-18 amendments:
 
-- `pnpm verify` passed: 1,262 tests passed and 8 skipped, across 125 files.
+- `pnpm verify` passed: 1,264 tests passed and 8 skipped, across 125 files.
 - `pnpm e2e` passed: 93 tests.
 - `pnpm e2e:ladle` passed: 6 tests. One run of "modal persistence stories are
   isolated from the Ladle catalogue" failed on the catalogue search input before
-  four consecutive green runs; that test predates this change and touches nothing
-  the selectors own, so it is recorded as flaky rather than fixed here.
+  five consecutive green runs; that test predates these changes and touches
+  nothing they own, so it is recorded as flaky rather than fixed here.
+
+Known outstanding, not addressed by either amendment: **the header is not
+responsive.** `.shell__header`'s two flex children keep the default
+`min-width: auto`, so neither compresses and both overflow the header's painted
+box at roughly 1050px and below. The fixed trigger width makes selection stable
+but removes the row's give, and the title's `white-space: nowrap` never
+truncates. Fixing it needs `min-w-0` on both children, `flex-basis` rather than
+a fixed width on the trigger label, and a disclosure step below the point where
+labels stop being readable. Whether that is the horizontal toolbar's fix or a
+move to shadcn's `Sidebar` — which is the only application-chrome component in
+that registry with a worked-out responsive story — is an open design question.
 
 Extraction verification when the ticket first resolved:
 
@@ -114,6 +125,36 @@ Extraction verification when the ticket first resolved:
 - `pnpm e2e` passed: 93 tests.
 
 ## Comments
+
+### 2026-08-18 — retryable failure reports in two places, not one
+
+The donor put a retryable failure in the toolbar as a `Retry persistence`
+Button that *replaced* the indicator, with the reason in a `title` attribute.
+Two things wrong with that. It moved every control beside it, for the same
+reason the fixed trigger width above exists — chrome geometry should not depend
+on a transient condition. And a `title` is the one place a reason cannot be
+read: touch never shows it and screen readers treat it inconsistently, so the
+only account of *why* a save failed was effectively invisible.
+
+Split by what each surface is good at. The toolbar reports the condition as a
+red dot through `PersistenceIndicator`'s new `failed` cue — same shape and size
+as the resting cues, so nothing moves. The reason and the action live in
+`PersistenceNotice`, a destructive `Alert` with an `AlertAction` retry, pinned
+top-right under the toolbar through `AppShell`'s new `notice` slot. `Alert`
+carries `role="alert"`, so the reason is announced when it arrives.
+
+Deliberately not a dialog. A retryable failure leaves the local work intact and
+the workspace fully usable — the author can keep editing and the next commit may
+succeed on its own — so blocking the canvas would overstate it. That is the line
+between this and the two states that do get dialogs: a conflict has no safe
+dismissal, and a rejection needs acknowledging. Permanent rejection also keeps
+the louder `CircleAlert` glyph rather than a dot, because no retry clears it.
+
+The shell's `notice` slot is unconditional and `.shell__notice:empty` hides it,
+so a caller passes one component for the whole condition instead of repeating
+that component's own test. `WorkspaceToolbarFixture` now composes the real
+`AppShell` rather than a stand-in header, since a fixture drawing only the
+toolbar could not show a pairing that spans both.
 
 ### 2026-08-18 — Menubar withdrawn, Select restored
 

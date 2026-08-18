@@ -12,7 +12,8 @@ import {
   openSpaceSession,
   type SpaceSessionState,
 } from '@project/persistence';
-import { PersistenceControl } from '#components/PersistenceControl';
+import { AppShell } from '@project/ui';
+import { PersistenceControl, PersistenceNotice } from '#components/PersistenceControl';
 import { WorkspaceToolbar } from '#components/WorkspaceToolbar';
 
 const from = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
@@ -75,7 +76,14 @@ export interface WorkspaceToolbarFixtureProps {
   readonly onRetry?: () => void;
 }
 
-/** Controlled fixture state around the unchanged production toolbar composition. */
+/**
+ * Controlled fixture state around the unchanged production chrome.
+ *
+ * It composes the real `AppShell`, not a stand-in header, because a retryable
+ * failure now reports in two places at once — a red dot in the toolbar and the
+ * notice the shell pins beneath it — and a fixture that drew only the toolbar
+ * could not show the pairing the design depends on.
+ */
 export function WorkspaceToolbarFixture({
   persistence = { kind: 'settled' },
   presenting = false,
@@ -90,45 +98,52 @@ export function WorkspaceToolbarFixture({
   const addCardMenu = useRef<HTMLButtonElement>(null);
 
   return (
-    <WorkspaceToolbar
-      view={{
-        value: view,
-        active: layout === null,
-        onValueChange: (value) => {
-          setView(value);
-          setLayout(null);
-        },
-      }}
-      layout={{ layouts, value: layout, active: layout !== null, onValueChange: setLayout }}
-      graph={{
-        graphs,
-        activeGraphId: activeGraph,
-        colorByGraphId: {},
-        onActivate: setActiveGraph,
-        onPresent: () => undefined,
-        presenting,
-        onExitPresenting: () => undefined,
-      }}
-      addCard={{
-        onAddCard: () => undefined,
-        onAddAlias: () => undefined,
-        disabled: authoringDisabled,
-        keyShortcut: 'C',
-        menuTriggerRef: addCardMenu,
-      }}
-      persistence={{
-        control: (
-          <PersistenceControl
-            persistence={persistence}
-            onRetry={onRetry}
-            onAcceptRemote={() => remoteRefusal}
-            onKeepLocal={() => undefined}
-          />
-        ),
-        state: persistence.kind,
-        acknowledgedRevision,
-      }}
-    />
+    <AppShell
+      title="Workspace"
+      toolbar={
+        <WorkspaceToolbar
+          view={{
+            value: view,
+            active: layout === null,
+            onValueChange: (value) => {
+              setView(value);
+              setLayout(null);
+            },
+          }}
+          layout={{ layouts, value: layout, active: layout !== null, onValueChange: setLayout }}
+          graph={{
+            graphs,
+            activeGraphId: activeGraph,
+            colorByGraphId: {},
+            onActivate: setActiveGraph,
+            onPresent: () => undefined,
+            presenting,
+            onExitPresenting: () => undefined,
+          }}
+          addCard={{
+            onAddCard: () => undefined,
+            onAddAlias: () => undefined,
+            disabled: authoringDisabled,
+            keyShortcut: 'C',
+            menuTriggerRef: addCardMenu,
+          }}
+          persistence={{
+            control: (
+              <PersistenceControl
+                persistence={persistence}
+                onAcceptRemote={() => remoteRefusal}
+                onKeepLocal={() => undefined}
+              />
+            ),
+            state: persistence.kind,
+            acknowledgedRevision,
+          }}
+        />
+      }
+      notice={<PersistenceNotice persistence={persistence} onRetry={onRetry} />}
+    >
+      <div data-testid="workspace-canvas-stand-in" />
+    </AppShell>
   );
 }
 

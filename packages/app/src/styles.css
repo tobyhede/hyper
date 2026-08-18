@@ -128,6 +128,27 @@ body {
   min-height: 0;
 }
 
+/*
+ * Pinned under the toolbar, at the same right edge the persistence indicator
+ * sits on, so the dot that reports the condition and the notice that explains
+ * it read as one thing. Above the canvas but not over its controls: the width
+ * is capped so the graph stays visible beside it, and pointer events are the
+ * notice's own — nothing invisible is laid over the canvas.
+ */
+.shell__notice {
+  position: absolute;
+  top: 0.75rem;
+  right: 1rem;
+  z-index: 5;
+  width: min(22rem, calc(100% - 2rem));
+}
+
+/* Nothing to say: the slot is unconditional, so it takes itself out of the
+   canvas entirely rather than leaving a zero-height box over it. */
+.shell__notice:empty {
+  display: none;
+}
+
 /* ---- Toolbar controls ---- */
 .btn {
   background: var(--secondary);

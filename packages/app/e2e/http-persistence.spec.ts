@@ -92,7 +92,12 @@ test('a network failure stays visible until the user retries', async ({ page }) 
   await expect(card).toBeVisible();
   await dragBy(page, card, 0, 180);
 
-  const retry = page.getByRole('button', { name: 'Retry persistence' });
+  // The toolbar reports the failure as a red dot and keeps every control where
+  // it was; the reason and the action are in the notice pinned beneath it.
+  await expect(page.getByRole('button', { name: 'Changes not saved' })).toBeVisible();
+  const failure = page.getByTestId('persistence-failure');
+  await expect(failure).toBeVisible();
+  const retry = failure.getByRole('button', { name: 'Retry' });
   await expect(retry).toBeVisible();
   expect(attempts).toBe(1);
   await expect.poll(() => navigationIsProtected(page)).toBe(true);
@@ -100,6 +105,7 @@ test('a network failure stays visible until the user retries', async ({ page }) 
   await page.unroute('**/api/spaces/*', failFirstCommit);
   await retry.click();
 
+  await expect(failure).toBeHidden();
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
   await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
   await expect.poll(() => navigationIsProtected(page)).toBe(false);
