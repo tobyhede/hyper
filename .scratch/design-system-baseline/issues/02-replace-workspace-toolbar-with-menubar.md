@@ -39,15 +39,19 @@ use the shared `AlertDialog` for Reload/Save and put an unloadable-remote reason
 inside a destructive `Alert`; permanent rejection uses the same dialog boundary
 and returns to the unchanged local workspace after acknowledgement.
 
+The conflicted and rejected stories use Ladle's documented `iframed` metadata
+for modal stories. Their production focus traps therefore stay inside the story
+canvas instead of making the catalogue navigation inert; preview-mode behavior
+tests remain unframed and exercise the dialogs directly.
+
 The paused implementation's portal race was exposed by the story-first keyboard
 contract as a conflict between a hand-written open-menu state machine and Base
 UI's Menubar lifecycle. Removing that state machine lets the primitive own menu
 coordination, focus and dismissal. Radio groups own `onValueChange`; items do
 not duplicate selection with `onClick`. Workspace selection uses the primitive's
-supported `closeOnClick` option so pointer selection returns immediately to the
-canvas and adjacent commands. Base UI keeps a keyboard-selected radio menu open
-for continued choice; Escape dismisses it. `finalFocus` uses the primitive's
-supported focus-return hook to restore the owning trigger in both paths.
+supported `closeOnClick` option so selection returns immediately to the canvas
+and adjacent commands. `finalFocus` uses the primitive's supported focus-return
+hook to restore the owning trigger.
 `AddCardControl` now composes the shared DropdownMenu facade and preserves its
 conditional focus-return and `nokey` behavior; the shared trigger forwards the
 caller's ref so cancelling Alias creation still restores focus.

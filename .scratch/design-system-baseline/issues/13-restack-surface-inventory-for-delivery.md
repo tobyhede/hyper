@@ -63,6 +63,13 @@ through the primitive's supported API where possible and record the requirement
 and behavior test. A hand-written replacement state machine is a deviation and
 must clear the repository's deviation rule.
 
+Ladle renders stories in its catalogue document by default. A modal story must
+use Ladle's documented `Story.meta = { iframed: true }` isolation so its focus
+trap and inert boundary remain inside the story canvas rather than capturing
+the catalogue navigation. Preview mode disables that iframe, so focused Ladle
+behavior tests still exercise the component directly. Solve catalogue hosting
+at the story boundary; do not invent a product dismissal action for Ladle.
+
 ## Extraction loop
 
 Run this loop for every target issue.

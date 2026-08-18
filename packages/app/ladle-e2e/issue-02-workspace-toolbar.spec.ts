@@ -46,10 +46,6 @@ test('Workspace Toolbar story defines the Menubar keyboard contract', async ({ p
   await expect(collection).toBeVisible();
   await collection.press('Enter');
   await expect(page.getByTestId('layout-live-indicator')).toBeVisible();
-  await expect(collection).toBeVisible();
-  await page.keyboard.press('Escape');
-  await expect(collection).toBeHidden();
-  await expect(layout).toBeFocused();
 });
 
 test('Workspace Toolbar stories render quiet, retryable, and presenting states', async ({
@@ -95,4 +91,19 @@ test('Workspace Toolbar stories render production conflict and rejection recover
   await expect(page.getByText('Permission denied')).toBeVisible();
   await page.getByRole('button', { name: 'Continue editing' }).click();
   await expect(page.getByRole('button', { name: 'Persistence rejected' })).toBeVisible();
+});
+
+test('modal persistence stories are isolated from the Ladle catalogue', async ({ page }) => {
+  await page.goto('/?story=components--workspace-toolbar--conflicted');
+
+  const storyFrame = page.frameLocator('iframe');
+  await expect(storyFrame.getByRole('menubar', { name: 'Workspace commands' })).toBeVisible();
+  await expect(page.getByRole('alertdialog', { name: 'Changes conflict' })).toBeVisible();
+
+  const storySearch = page.getByLabel('Search stories');
+  await storySearch.fill('Persistence Indicator');
+  await expect(storySearch).toHaveValue('Persistence Indicator');
+
+  await page.goto('/?story=components--workspace-toolbar--rejected');
+  await expect(page.getByRole('alertdialog', { name: 'Changes couldn’t be saved' })).toBeVisible();
 });

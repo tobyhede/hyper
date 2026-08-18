@@ -29,6 +29,7 @@ export const Rejected: Story = () =>
       }}
     />,
   );
+Rejected.meta = { iframed: true };
 export const Conflicted: Story = () =>
   story(
     <WorkspaceToolbarFixture
@@ -47,5 +48,6 @@ export const Conflicted: Story = () =>
       remoteRefusal="The remote space is invalid and was not accepted."
     />,
   );
+Conflicted.meta = { iframed: true };
 export const Presenting: Story = () =>
   story(<WorkspaceToolbarFixture presenting authoringDisabled />);
