@@ -1,12 +1,17 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
-import { uuidSchema, type Graph, type Layout, type SpaceSnapshot } from '@project/core';
+import {
+  uuidSchema,
+  type BuiltInViewId,
+  type Graph,
+  type Layout,
+  type SpaceSnapshot,
+} from '@project/core';
 import {
   MemorySpaceBackend,
   MemorySpaceBackendTestControl,
   openSpaceSession,
   type SpaceSessionState,
 } from '@project/persistence';
-import type { AlgorithmicViewId } from '@project/ui';
 import { PersistenceControl } from '#components/PersistenceControl';
 import { WorkspaceToolbar } from '#components/WorkspaceToolbar';
 
@@ -47,7 +52,7 @@ export function WorkspaceToolbarFixture({
   acknowledgedRevision = 4n,
   onRetry = () => undefined,
 }: WorkspaceToolbarFixtureProps) {
-  const [view, setView] = useState<AlgorithmicViewId>('flow');
+  const [view, setView] = useState<BuiltInViewId>('flow');
   const [layout, setLayout] = useState<string | null>(layoutId);
   const [activeGraph, setActiveGraph] = useState<string | null>(graphId);
   const addCardMenu = useRef<HTMLButtonElement>(null);

@@ -48,8 +48,12 @@ function MenubarTrigger({ className, ...props }: React.ComponentProps<typeof Dro
   return (
     <DropdownMenuTrigger
       data-slot="menubar-trigger"
+      // `nokey`: React Flow subscribes its delete key on `document`, excluding
+      // only inputs and `.nokey`. The trigger sits in the toolbar outside the
+      // flow but is still a document-level keydown target, and roving focus
+      // can land here — closed, not just open — while an Edge is selected.
       className={cn(
-        'flex items-center rounded-sm px-1.5 py-[2px] text-sm font-medium outline-hidden select-none hover:bg-muted aria-expanded:bg-muted',
+        'nokey flex items-center rounded-sm px-1.5 py-[2px] text-sm font-medium outline-hidden select-none hover:bg-muted aria-expanded:bg-muted',
         className,
       )}
       {...props}

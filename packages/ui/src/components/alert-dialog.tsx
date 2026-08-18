@@ -38,6 +38,15 @@ function AlertDialogContent({
 
   return (
     <>
+      {/*
+        Base UI's FloatingPortal defaults an unset container to the global
+        `document.body`. A story rendered inside Ladle's `iframed: true`
+        isolation lives in a genuinely separate iframe document, so that
+        default would portal the dialog (and its focus trap) out of the
+        iframe and back into the catalogue — defeating the isolation. Reading
+        `ownerDocument` off content actually rendered here keeps the portal in
+        whichever document rendered it.
+      */}
       <span
         ref={(element) => {
           ownerDocumentBody.current = element?.ownerDocument.body ?? null;

@@ -32,8 +32,10 @@ it does not carry a second open-menu state machine or item-level click handlers.
 Present/Overview and the accepted Add Card split control remain adjacent
 persistent actions. The settled persistence design
 from `feat/surface-inventory` remains intact through the shared
-`PersistenceIndicator`: its lifecycle story covers the transient saved cue,
-pending state and compact rejection. The production `PersistenceControl`
+`PersistenceIndicator`: `PersistenceIndicator`'s own lifecycle story covers the
+transient saved cue and pending state, and the workspace toolbar's `Rejected`
+story covers compact rejection by dismissing `RejectionControl`'s dialog. The
+production `PersistenceControl`
 composes retryable failure, permanent rejection and conflict recovery: conflicts
 use the shared `AlertDialog` for Reload/Save and put an unloadable-remote reason
 inside a destructive `Alert`; permanent rejection uses the same dialog boundary

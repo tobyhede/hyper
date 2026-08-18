@@ -6,7 +6,7 @@ import { uuidSchema, type SpaceSnapshot } from '@project/core';
 import { inHandleId, loadSpaceSnapshot, outHandleId, Placement } from '@project/graph';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
 import type { CardFlowNode } from '@project/react-flow-adapter';
-import { LayoutSelector } from '@project/ui';
+import { Menubar, MenubarContent, MenubarItem, MenubarMenu, MenubarTrigger } from '@project/ui';
 import { createNavigation } from '../src/navigation';
 import { createRenderAdapter, edgeSelectionOf } from '../src/render-adapter';
 import { createConnectionCompletion } from '../src/connection-completion';
@@ -466,19 +466,23 @@ describe("React Flow's document-level delete key", () => {
 
   it.each(DELETE_KEYS)('leaves the Edge standing when %s reaches the toolbar', (key) => {
     // The real control, mounted where the real one is: outside the flow
-    // entirely, with no portal involved and so nothing for a `.nokey` inside the
-    // canvas to reach.
+    // entirely, with no portal involved and so nothing for a `.nokey` inside
+    // the canvas to reach. Closed, not open — roving focus can land on a
+    // Menubar trigger without opening it, which is exactly the state
+    // `MenubarTrigger`'s own `nokey` class exists to cover.
     const { adapter, session } = mountCanvas(
-      <LayoutSelector
-        layouts={snapshot.document.layouts ?? []}
-        value={LAYOUT_ID}
-        active
-        onValueChange={NO_OP}
-      />,
+      <Menubar aria-label="Workspace commands">
+        <MenubarMenu>
+          <MenubarTrigger>Layout · Collection 1</MenubarTrigger>
+          <MenubarContent>
+            <MenubarItem>Collection 1</MenubarItem>
+          </MenubarContent>
+        </MenubarMenu>
+      </Menubar>,
     );
     act(() => adapter.getState().selectEdge(SUBJECT));
 
-    fireEvent.keyDown(screen.getByRole('combobox', { name: 'Choose layout' }), { key });
+    fireEvent.keyDown(screen.getByRole('menuitem', { name: 'Layout · Collection 1' }), { key });
 
     expect(graphsOf(session.getState().working)[0]?.edges).toEqual([EDGE]);
   });

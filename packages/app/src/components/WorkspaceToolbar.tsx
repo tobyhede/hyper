@@ -1,5 +1,5 @@
 import type { ReactNode, Ref } from 'react';
-import type { Graph, Layout } from '@project/core';
+import type { BuiltInViewId, Graph, Layout } from '@project/core';
 import type { SpaceSessionState } from '@project/persistence';
 import {
   AddCardControl,
@@ -14,13 +14,12 @@ import {
   MenubarTrigger,
   PresentIcon,
 } from '@project/ui';
-import type { AlgorithmicViewId } from '@project/ui';
 
 export interface WorkspaceToolbarProps {
   readonly view: {
-    readonly value: AlgorithmicViewId;
+    readonly value: BuiltInViewId;
     readonly active: boolean;
-    readonly onValueChange: (view: AlgorithmicViewId) => void;
+    readonly onValueChange: (view: BuiltInViewId) => void;
   };
   readonly layout: {
     readonly layouts: readonly Layout[];
@@ -64,11 +63,10 @@ export function WorkspaceToolbar({
   addCard,
   persistence,
 }: WorkspaceToolbarProps) {
+  const colorOf = (candidate: Graph) =>
+    graph.colorByGraphId[candidate.id] ?? candidate.color ?? FALLBACK_GRAPH_COLOR;
   const activeGraph = graph.graphs.find((candidate) => candidate.id === graph.activeGraphId);
-  const activeGraphColor =
-    activeGraph === undefined
-      ? FALLBACK_GRAPH_COLOR
-      : (graph.colorByGraphId[activeGraph.id] ?? activeGraph.color ?? FALLBACK_GRAPH_COLOR);
+  const activeGraphColor = activeGraph === undefined ? FALLBACK_GRAPH_COLOR : colorOf(activeGraph);
   const presentDisabled =
     !graph.presenting && (activeGraph === undefined || activeGraph.edges.length === 0);
 
@@ -82,7 +80,7 @@ export function WorkspaceToolbar({
           <MenubarContent finalFocus>
             <MenubarRadioGroup
               value={view.active ? view.value : ''}
-              onValueChange={(value) => view.onValueChange(value as AlgorithmicViewId)}
+              onValueChange={(value) => view.onValueChange(value as BuiltInViewId)}
             >
               {views.map((candidate) => (
                 <MenubarRadioItem key={candidate.id} value={candidate.id} closeOnClick>
@@ -144,10 +142,7 @@ export function WorkspaceToolbar({
                     <span
                       aria-hidden="true"
                       className="h-[3px] w-[14px] shrink-0 rounded-[2px]"
-                      style={{
-                        background:
-                          graph.colorByGraphId[item.id] ?? item.color ?? FALLBACK_GRAPH_COLOR,
-                      }}
+                      style={{ background: colorOf(item) }}
                     />
                     {item.title}
                   </MenubarRadioItem>

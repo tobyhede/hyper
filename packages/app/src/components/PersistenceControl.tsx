@@ -74,6 +74,11 @@ function ConflictControl({
   const [remoteRefusal, setRemoteRefusal] = useState<string | null>(null);
 
   return (
+    // A conflict has no safe dismissal: the revision conflict doesn't resolve
+    // itself, so every close reason (Escape included — AlertDialog's
+    // `disablePointerDismissal` only blocks outside-press) is ignored until
+    // Reload or Save is chosen. Contrast RejectionControl below, which honors
+    // onOpenChange because rejection returns to an unchanged, safe workspace.
     <AlertDialog open onOpenChange={() => undefined}>
       <AlertDialogContent>
         <AlertDialogHeader>
