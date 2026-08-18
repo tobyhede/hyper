@@ -167,7 +167,14 @@ They supplement rather than replace each target's acceptance criteria.
   Present/Overview and the complete persistence composition. On the donor that
   includes `PersistenceIndicator`, conflict and permanent-rejection
   `AlertDialog` surfaces, nested `Alert` detail, their exports, tests and real
-  production stories. A toolbar-only substitute is not parity.
+  production stories. A toolbar-only substitute is not parity. **Delivered, and
+  its surface is superseded by Issue 14** — the behaviour above still has to
+  exist and still has to be proven; it is now proven in a Sidebar.
+- **Issue 14 — workspace Sidebar:** not a donor extraction. ADR 0053 moves the
+  command surface out of the header row and makes the canvas choice one
+  exclusive list over computed Views and authored Layouts. Its retained input is
+  Issue 02's settled behaviour carried across unchanged; the donor contributes
+  nothing to it.
 - **Issue 03 — Card and Alias panes:** form/dialog composition, atomic edit,
   validation, focus, long-content and target-picker states. Card-choice model
   consolidation remains Issue 10.
@@ -201,8 +208,9 @@ it between PRs.
 4. Issue 11 extracts ADR 0052 with static Ladle runtime, taxonomy and catalogue
    baseline.
 5. Deliver Issues 02–07 as bounded production migrations in dependency order.
-6. Deliver Issue 10 after Issue 03 establishes its pane composition.
-7. Deliver Issue 08 last with the complete parity and enforcement gate.
+6. Deliver Issue 14 after Issue 02, replacing the surface Issue 02 delivered.
+7. Deliver Issue 10 after Issue 03 establishes its pane composition.
+8. Deliver Issue 08 last with the complete parity and enforcement gate.
 
 This order coordinates extraction. Functional acceptance and `Blocked by`
 relationships remain authoritative in the target issues.
@@ -219,6 +227,11 @@ implementation.
 Keep `feat/surface-inventory` until final accounting proves no retained work
 exists solely on the donor. The patch makes the partial Menubar work available
 from clean branches; the stash object is historical evidence only.
+
+**That patch is now dead in both directions and must not be applied.** The
+Menubar it migrates *to* was withdrawn on 2026-08-18, and the header row it
+migrates *within* is withdrawn by ADR 0053. It stays tracked as donor evidence
+for the final audit and for nothing else.
 
 ## Donor accounting
 

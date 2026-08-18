@@ -105,7 +105,8 @@ Verification after the 2026-08-18 amendments:
   five consecutive green runs; that test predates these changes and touches
   nothing they own, so it is recorded as flaky rather than fixed here.
 
-Known outstanding, not addressed by either amendment: **the header is not
+Known outstanding when this ticket resolved, and **now answered by ADR 0053 and
+owned by Issue 14** — see the 2026-08-18 comment below: **the header is not
 responsive.** `.shell__header`'s two flex children keep the default
 `min-width: auto`, so neither compresses and both overflow the header's painted
 box at roughly 1050px and below. The fixed trigger width makes selection stable
@@ -125,6 +126,27 @@ Extraction verification when the ticket first resolved:
 - `pnpm e2e` passed: 93 tests.
 
 ## Comments
+
+### 2026-08-18 — the toolbar surface is superseded by a Sidebar
+
+The open design question this ticket resolved with is decided. The header's
+responsive defect above is not repaired in the row; the workspace command
+surface moves into a persistent left Sidebar, and the canvas choice becomes one
+exclusive list over the computed Views and the authored Layouts. ADR 0053
+records it, and Issue 14 delivers it.
+
+Nothing this ticket settled about *behaviour* is withdrawn with the row. Add
+Card keeps `AddCardControl` whole, Present keeps its two dead conditions and its
+test ids, and the persistence composition — the indicator's cue, the pinned
+`PersistenceNotice` for retryable failure, and the two `AlertDialog` recoveries —
+carries across unchanged. What goes is the presentation: `ViewSelector`,
+`LayoutSelector`, `GraphSelector` and `SelectorTrigger`, and with them the two
+`None` values that only ever meant "the other control is the one drawing".
+
+The tracked Menubar WIP patch (`../patches/issue-02-workspace-menubar-wip.patch`)
+is now dead in both directions — the Menubar it migrates to was withdrawn on
+2026-08-18, and the row it migrates within is withdrawn here. Keep it as donor
+evidence for the final Issue 13 audit; do not apply it.
 
 ### 2026-08-18 — retryable failure reports in two places, not one
 

@@ -2,7 +2,7 @@
 
 **What to build:** Make Ladle a trustworthy catalogue of the real UI, then enforce the boundary that product components and styles come through the design system while React Flow retains only its necessary geometry and integration styling.
 
-**Blocked by:** 02 — Replace the workspace toolbar with a Menubar; 03 — Recompose Card and Alias panes from form primitives; 04 — Bring workspace selection and operational feedback into the system; 05 — Make the production canvas Card a design-system component; 06 — Systematise Graph HUD and Edge authoring surfaces; 07 — Rebuild presentation chrome with design-system components; 11 — Deliver ADR 0052 and its production-parity operating rule to `main`.
+**Blocked by:** 02 — Replace the workspace toolbar with a Menubar; 03 — Recompose Card and Alias panes from form primitives; 04 — Bring workspace selection and operational feedback into the system; 05 — Make the production canvas Card a design-system component; 06 — Systematise Graph HUD and Edge authoring surfaces; 07 — Rebuild presentation chrome with design-system components; 11 — Deliver ADR 0052 and its production-parity operating rule to `main`; 14 — Replace the workspace toolbar with a workspace Sidebar.
 
 **Status:** ready-for-agent
 
