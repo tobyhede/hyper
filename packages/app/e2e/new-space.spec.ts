@@ -1,14 +1,17 @@
 import { expect, test, type Page } from './fixtures';
 import {
   activeCard,
+  activeGraph,
   AUTHORING_HANDLE_SIDES,
   authoringHandle,
   connectHandles,
   connectToEmptyWithAlt,
+  currentCanvas,
   dragBy,
   nodeByTitle,
   positionOf,
   settled,
+  sidebar,
 } from './graph';
 import { seedPositionedLayout } from './seed';
 
@@ -109,9 +112,9 @@ test('graph-less handles preview Graph 1 and an empty drop cancels', async ({ pa
   await page.mouse.up();
 
   await expect(page.locator('.react-flow__edge')).toHaveCount(0);
-  await expect(page.getByTestId('graph-selector')).toContainText('None');
-  await expect(page.getByTestId('layout-selector')).toContainText('None');
-  await expect(page.getByTestId('view-selector')).toContainText('Flow');
+  await expect(sidebar(page).getByTestId('no-graphs')).toBeVisible();
+  await expect(sidebar(page).getByTestId('no-authored-layouts')).toBeVisible();
+  await expect(currentCanvas(page)).toContainText('Flow');
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '0');
 });
 
@@ -179,8 +182,8 @@ test('Alt empty-drop creates, connects and selects Card 2 at the previewed posit
   expect(createdBox.x + createdBox.width / 2).toBeCloseTo(dropPoint.x, 0);
   expect(createdBox.y + createdBox.height / 2).toBeCloseTo(dropPoint.y, 0);
   await expect(page.locator('.react-flow__edge')).toHaveCount(1);
-  await expect(page.getByTestId('graph-selector')).toContainText('Graph 1');
-  await expect(page.getByTestId('layout-selector')).toContainText('Layout 1');
+  await expect(activeGraph(page)).toHaveText('Graph 1');
+  await expect(currentCanvas(page)).toContainText('Layout 1');
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
   await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
   await expect(authoringHandle(created, 'source', 'left')).toHaveCSS('opacity', '1');
@@ -211,8 +214,8 @@ test('Alt empty-drop authors the first Edge into the Graph a selected Layout own
 
   const sourceCard = nodeByTitle(page, 'Card 1');
   await expect(sourceCard).toBeVisible();
-  await expect(page.getByTestId('layout-selector')).toContainText('Authored Layout');
-  await expect(page.getByTestId('graph-selector')).toContainText('Graph 1');
+  await expect(currentCanvas(page)).toContainText('Authored Layout');
+  await expect(activeGraph(page)).toHaveText('Graph 1');
   await expect(page.locator('.react-flow__edge')).toHaveCount(0);
   await settled(page);
   await sourceCard.hover();
@@ -221,9 +224,9 @@ test('Alt empty-drop authors the first Edge into the Graph a selected Layout own
 
   await expect(nodeByTitle(page, 'Card 2')).toBeVisible();
   await expect(page.locator('.react-flow__edge')).toHaveCount(1);
-  await expect(page.getByTestId('graph-selector')).toContainText('Graph 1');
+  await expect(activeGraph(page)).toHaveText('Graph 1');
   await expect(page.getByTestId('graph-legend')).toContainText('Graph 1');
-  await expect(page.getByTestId('layout-selector')).toContainText('Authored Layout');
+  await expect(currentCanvas(page)).toContainText('Authored Layout');
   await expect(page.getByTestId('persistence-status')).toHaveAttribute(
     'data-revision',
     persistedRevision,
@@ -234,8 +237,8 @@ test('Alt empty-drop authors the first Edge into the Graph a selected Layout own
   await expect(nodeByTitle(page, 'Card 1')).toBeVisible();
   await expect(nodeByTitle(page, 'Card 2')).toBeVisible();
   await expect(page.locator('.react-flow__edge')).toHaveCount(1);
-  await expect(page.getByTestId('graph-selector')).toContainText('Graph 1');
-  await expect(page.getByTestId('layout-selector')).toContainText('Authored Layout');
+  await expect(activeGraph(page)).toHaveText('Graph 1');
+  await expect(currentCanvas(page)).toContainText('Authored Layout');
   await expect(page.getByTestId('persistence-status')).toHaveAttribute(
     'data-revision',
     persistedRevision,
@@ -262,7 +265,7 @@ test('an Alt-drop released off the canvas creates no Card', async ({ page }) => 
   // Leaving the canvas fires no move the graph can see, so the preview's last
   // eligible point survives the departure. Where the release *landed* is the
   // only thing that may author a Card.
-  const offCanvas = (await page.locator('.shell__toolbar').boundingBox())!;
+  const offCanvas = (await page.locator('.shell__header').boundingBox())!;
   await page.mouse.move(offCanvas.x + offCanvas.width / 2, offCanvas.y + offCanvas.height / 2);
   // The frozen half, asserted rather than assumed: the preview is *still* on
   // screen over a point that would author nothing. Without this the test would
@@ -295,9 +298,9 @@ test('the first self-connection mints and activates Graph 1 in one persisted Lay
   );
 
   await expect(page.locator('.react-flow__edge')).toHaveCount(1);
-  await expect(page.getByTestId('graph-selector')).toContainText('Graph 1');
+  await expect(activeGraph(page)).toHaveText('Graph 1');
   await expect(page.getByTestId('graph-legend')).toContainText('Graph 1');
-  await expect(page.getByTestId('layout-selector')).toContainText('Layout 1');
+  await expect(currentCanvas(page)).toContainText('Layout 1');
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
   await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
   // Conversion must not move what is already on screen (ADR 0025), so the
@@ -322,7 +325,7 @@ test('the Graph that self-connection mints can be presented', async ({ page }) =
     authoringHandle(card, 'source', 'right'),
     authoringHandle(card, 'target', 'left'),
   );
-  await expect(page.getByTestId('graph-selector')).toContainText('Graph 1');
+  await expect(activeGraph(page)).toHaveText('Graph 1');
 
   // Every Card a fully cyclic Graph holds is arrived at, so it has no entry
   // Card. The control is enabled because a Graph *is* active, and presenting
@@ -340,7 +343,7 @@ test('shows an empty disabled graph control and no graph HUD (ADR 0015)', async 
   await page.goto('/');
   await expect(nodeByTitle(page, 'Card 1')).toBeVisible();
 
-  await expect(page.getByTestId('graph-selector')).toContainText('None');
+  await expect(sidebar(page).getByTestId('no-graphs')).toBeVisible();
   await expect(page.getByTestId('present-button')).toBeDisabled();
   await expect(page.getByTestId('graph-legend')).toHaveCount(0);
 });

@@ -23,14 +23,6 @@ export {
 } from './Command';
 export { FALLBACK_GRAPH_COLOR, GraphLegend, graphColor } from './GraphLegend';
 export type { GraphLegendProps } from './GraphLegend';
-export { GraphSelector } from './GraphSelector';
-export type { GraphSelectorProps } from './GraphSelector';
-export { LayoutSelector } from './LayoutSelector';
-export type { LayoutSelectorProps } from './LayoutSelector';
-export { SelectorGroupLabel, SelectorTrigger } from './SelectorTrigger';
-export type { SelectorTriggerProps } from './SelectorTrigger';
-export { ViewSelector } from './ViewSelector';
-export type { ViewSelectorProps } from './ViewSelector';
 export { Popover, PopoverContent, PopoverTrigger } from './Popover';
 export {
   AlertIcon,

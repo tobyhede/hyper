@@ -7,7 +7,7 @@ import { cva, type VariantProps } from 'class-variance-authority';
 
 import { useIsMobile } from '#hooks/use-mobile';
 import { cn } from '#lib/utils';
-import { Button } from '#components/button';
+import { Button } from '../Button';
 import { Input } from '#components/input';
 import { Separator } from '#components/separator';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '#components/sheet';
@@ -247,7 +247,7 @@ function SidebarTrigger({ className, onClick, ...props }: React.ComponentProps<t
       data-sidebar="trigger"
       data-slot="sidebar-trigger"
       variant="ghost"
-      size="icon-sm"
+      size="icon"
       className={cn(className)}
       onClick={(event) => {
         onClick?.(event);

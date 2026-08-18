@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore
 import { ReactFlowProvider } from '@xyflow/react';
 import { AppShell } from '@project/ui';
 import {
+  BUILT_IN_VIEW_IDS,
   cardDocumentSchema,
   newUuid,
   uuidSchema,
@@ -22,7 +23,12 @@ import { cardSizeVars } from './card';
 import { createNavigation } from './navigation';
 import { createWorkingSpaceReader } from './snapshot';
 import { nextCardTitle } from './titles';
-import { createRendererResolver, defaultRenderer, type RendererSelection } from './renderer';
+import {
+  builtInViewTitle,
+  createRendererResolver,
+  defaultRenderer,
+  type RendererSelection,
+} from './renderer';
 import { ADD_CARD_KEY, SpaceCanvas } from './components/SpaceCanvas';
 import { CanvasCentre, type VisibleCentre } from './components/CanvasCentre';
 import { NewAlias } from './components/NewAlias';
@@ -31,7 +37,7 @@ import { PlacementFailure } from './components/PlacementFailure';
 import { PlacementPending } from './components/PlacementPending';
 import { PresentingChrome } from './components/PresentingChrome';
 import { PersistenceControl, PersistenceNotice } from './components/PersistenceControl';
-import { WorkspaceToolbar } from './components/WorkspaceToolbar';
+import { CurrentCanvas, WorkspaceSidebar, type CanvasChoice } from './components/WorkspaceSidebar';
 
 export const createApp = ({ space, spaceSession }: OpenedSpace) => {
   // One validated aggregate per working snapshot, shared by the render path and
@@ -84,7 +90,6 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
     const sessionState = authoringState.session;
     const navigationState = authoringState.navigation;
     const selectedRenderer = navigationState.selectedRenderer;
-    const selectedView = navigationState.selectedView;
     /**
      * The Alias creation state: editor-local, and nothing else (ADR 0042).
      *
@@ -564,56 +569,66 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
       return () => window.removeEventListener('keydown', onKeyDown);
     }, [presenting, openedCardId, advance, retreat, selectBranch, exitPresenting]);
 
-    const toolbar = (
-      <>
-        <WorkspaceToolbar
-          view={{
-            value: selectedView,
-            active: selectedRenderer.kind === 'view',
-            onValueChange: (selected) => chooseRenderer({ kind: 'view', view: selected }),
-          }}
-          layout={{
-            layouts,
-            value: selectedRenderer.kind === 'layout' ? selectedRenderer.layoutId : null,
-            active: selectedRenderer.kind === 'layout',
-            onValueChange: (layoutId) =>
-              chooseRenderer({ kind: 'layout', layoutId: uuidSchema.parse(layoutId) }),
-          }}
-          graph={{
-            graphs: projection.visibleGraphs,
-            activeGraphId,
-            colorByGraphId: projection.colors,
-            onActivate: (graphId) => activateGraph(uuidSchema.parse(graphId)),
-            onPresent: present,
-            presenting,
-            onExitPresenting: exitPresenting,
-          }}
-          addCard={{
-            onAddCard: addCard,
-            onAddAlias: () => setCreatingAlias(true),
-            disabled: !editable || presenting || openedCardId !== null || creatingAlias,
-            keyShortcut: ADD_CARD_KEY,
-            menuTriggerRef: addCardMenu,
-          }}
-          persistence={{
-            control: (
-              <PersistenceControl
-                persistence={sessionState.persistence}
-                onAcceptRemote={authoring.acceptStoredSpace}
-                onKeepLocal={authoring.keepLocalWork}
-              />
-            ),
-            state: sessionState.persistence.kind,
-            acknowledgedRevision: sessionState.acknowledgedRevision,
-          }}
-        />
-      </>
+    // The one canvas choice, in the two groups it is drawn as (ADR 0053). Both
+    // are plain derivations of the Space and the ids `core` ships, so a Layout
+    // authored by the last Edit is a row here on the next render.
+    const computedChoices: readonly CanvasChoice[] = BUILT_IN_VIEW_IDS.map((view) => ({
+      selection: { kind: 'view', view },
+      title: builtInViewTitle(view),
+    }));
+    const authoredChoices: readonly CanvasChoice[] = layouts.map((layout) => ({
+      selection: { kind: 'layout', layoutId: layout.id },
+      title: layout.title,
+    }));
+
+    const sidebar = (
+      <WorkspaceSidebar
+        workspaceTitle={rendererSpace.title}
+        canvas={{
+          computed: computedChoices,
+          authored: authoredChoices,
+          selected: selectedRenderer,
+          onSelect: (choice) => chooseRenderer(choice.selection),
+        }}
+        graph={{
+          graphs: projection.visibleGraphs,
+          activeGraphId,
+          colorByGraphId: projection.colors,
+          onActivate: (graphId) => activateGraph(uuidSchema.parse(graphId)),
+          onPresent: present,
+          presenting,
+          onExitPresenting: exitPresenting,
+        }}
+        addCard={{
+          onAddCard: addCard,
+          onAddAlias: () => setCreatingAlias(true),
+          disabled: !editable || presenting || openedCardId !== null || creatingAlias,
+          keyShortcut: ADD_CARD_KEY,
+          menuTriggerRef: addCardMenu,
+        }}
+        persistence={{
+          control: (
+            <PersistenceControl
+              persistence={sessionState.persistence}
+              onAcceptRemote={authoring.acceptStoredSpace}
+              onKeepLocal={authoring.keepLocalWork}
+            />
+          ),
+          state: sessionState.persistence.kind,
+          acknowledgedRevision: sessionState.acknowledgedRevision,
+        }}
+      />
     );
 
     return (
       <AppShell
-        title={rendererSpace.title}
-        toolbar={toolbar}
+        sidebar={sidebar}
+        header={
+          <CurrentCanvas
+            title={renderer.kind === 'view' ? renderer.title : renderer.resolvedLayout.layout.title}
+            kind={renderer.kind}
+          />
+        }
         notice={
           <PersistenceNotice
             persistence={sessionState.persistence}

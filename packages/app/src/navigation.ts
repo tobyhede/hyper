@@ -1,12 +1,7 @@
-import type { BuiltInViewId, CardId, GraphId } from '@project/core';
+import type { CardId, GraphId } from '@project/core';
 import { outgoingEdges, graphStartCard, type Space } from '@project/graph';
 import { createObservableState, type ObserverErrorReporter } from '@project/persistence';
-import {
-  DEFAULT_VIEW_ID,
-  type RendererSelection,
-  type ResolvedRenderer,
-  type ResolveRenderer,
-} from './renderer';
+import type { RendererSelection, ResolvedRenderer, ResolveRenderer } from './renderer';
 
 export interface Move {
   readonly cardId: CardId;
@@ -28,8 +23,6 @@ type TraversalHistory = readonly [CardId, ...CardId[]];
 /** What navigation carries whatever it is doing. */
 interface NavigationBase {
   readonly selectedRenderer: RendererSelection;
-  /** The last Algorithmic View selected, retained while a Layout is selected. */
-  readonly selectedView: BuiltInViewId;
   readonly activeGraphId: GraphId | null;
   readonly openedCardId: CardId | null;
 }
@@ -141,8 +134,8 @@ function currentCard(traversalHistory: TraversalHistory): CardId {
  * here to stop, arriving through the back door as an untyped property.
  */
 function baseOf(state: NavigationState): NavigationBase {
-  const { selectedRenderer, selectedView, activeGraphId, openedCardId } = state;
-  return { selectedRenderer, selectedView, activeGraphId, openedCardId };
+  const { selectedRenderer, activeGraphId, openedCardId } = state;
+  return { selectedRenderer, activeGraphId, openedCardId };
 }
 
 /**
@@ -151,14 +144,11 @@ function baseOf(state: NavigationState): NavigationBase {
  *
  * The one definition, shared by the initial state and by `openFresh` — a
  * replacement Space is opened, not navigated to, so the two cannot be allowed
- * to disagree about what "opened" means. `selectedView` falls back rather than
- * being retained, which is the one thing that separates this from
- * `selectRenderer`: there is no earlier Algorithmic View to return to.
+ * to disagree about what "opened" means.
  */
 function openedState(selection: RendererSelection, renderer: ResolvedRenderer): NavigationState {
   return {
     selectedRenderer: selection,
-    selectedView: selection.kind === 'view' ? selection.view : DEFAULT_VIEW_ID,
     mode: 'overview',
     activeGraphId: openingGraphId(renderer),
     openedCardId: null,
@@ -194,7 +184,6 @@ export function createNavigation(
       observable.publish({
         ...baseOf(observable.getState()),
         selectedRenderer: selection,
-        ...(selection.kind === 'view' ? { selectedView: selection.view } : {}),
         activeGraphId: openingGraphId(renderer),
         mode: 'overview',
         // An opened Card closes with the renderer it was opened over. This once
@@ -257,7 +246,6 @@ export function createNavigation(
       }
       setState({
         selectedRenderer: selection,
-        ...(selection.kind === 'view' ? { selectedView: selection.view } : {}),
         activeGraphId,
       });
     },

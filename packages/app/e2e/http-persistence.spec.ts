@@ -1,6 +1,14 @@
 import { expect, test } from './fixtures';
 import type { Page, Route } from '@playwright/test';
-import { dragBy, nodeByTitle, positionOf, settled } from './graph';
+import {
+  activateGraph,
+  activeGraph,
+  dragBy,
+  nodeByTitle,
+  positionOf,
+  selectCanvas,
+  settled,
+} from './graph';
 
 const isCommit = (method: string, url: string): boolean =>
   method === 'PUT' && /\/api\/spaces\/[0-9a-f-]+$/.test(new URL(url).pathname);
@@ -159,10 +167,8 @@ test('a stale browser reports conflict and accepts the remote workspace without 
     // automatic placement, then let the conflict arrive. Any placement result
     // still arriving after Reload belongs to the Space that is being replaced.
     try {
-      await stalePage.getByTestId('view-selector').click();
-      await stalePage.getByRole('option', { name: 'Flow' }).click();
-      await stalePage.getByTestId('graph-selector').click();
-      await stalePage.getByRole('option', { name: 'Echo' }).click();
+      await selectCanvas(stalePage, 'Flow');
+      await activateGraph(stalePage, 'Echo');
       await stalePage.getByTestId('present-button').click();
     } finally {
       // Release even when setup fails, so the intercepted request cannot leave
@@ -181,7 +187,7 @@ test('a stale browser reports conflict and accepts the remote workspace without 
     // Fresh Navigation over the stored Space, not the emphasis this page was
     // left in: Reload opens the Layout the other page's drag converted, whose
     // minted Graph is first, without replacing the mounted application surface.
-    await expect(stalePage.getByTestId('graph-selector')).toContainText('Graph 1');
+    await expect(activeGraph(stalePage)).toHaveText('Graph 1');
     await expect(stalePage.getByTestId('presenting-chrome')).not.toBeVisible();
     expect(
       await mountedGraphArea!.evaluate(
@@ -210,8 +216,7 @@ test('graph activation and presenting do not write or protect navigation', async
 
   await page.goto('/');
   await expect(nodeByTitle(page, 'A').first()).toBeVisible();
-  await page.getByTestId('graph-selector').click();
-  await page.getByRole('option', { name: 'Echo' }).click();
+  await activateGraph(page, 'Echo');
   await page.getByTestId('present-button').click();
   await expect(page.getByTestId('presenting-chrome')).toBeVisible();
   await settledNetwork(page);
