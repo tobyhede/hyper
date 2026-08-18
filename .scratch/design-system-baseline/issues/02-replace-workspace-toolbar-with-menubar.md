@@ -3,10 +3,10 @@
 **What to build:** Define the correct workspace command surface in stable Ladle
 stories first, using the shared shadcn/Base UI components and their native
 interaction contracts. Then convert production to the story's accepted
-composition: a persistent desktop menubar for View, Layout, Graph, Cards and
-presentation commands. Existing production is extraction input, not design
-authority; preserve product requirements, not accidental implementation
-behaviour.
+composition: a persistent desktop menubar for View, Layout and Graph, with
+Card creation and presentation commands as adjacent persistent controls.
+Existing production is extraction input, not design authority; preserve
+product requirements, not accidental implementation behaviour.
 
 **Blocked by:** 01 — Establish the shadcn design-system baseline.
 

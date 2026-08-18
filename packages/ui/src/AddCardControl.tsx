@@ -102,7 +102,10 @@ export function AddCardControl({
           aria-label="More Card kinds"
           title="More Card kinds"
           disabled={disabled}
-          className="inline-flex cursor-pointer items-center justify-center rounded-[6px] rounded-l-none border border-border bg-secondary px-[6px] py-[6px] text-[13px] whitespace-nowrap text-foreground transition-colors hover:border-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:cursor-not-allowed disabled:opacity-50"
+          // `nokey`: React Flow subscribes its delete key on `document`,
+          // excluding only inputs and `.nokey` (see MenubarTrigger). This
+          // trigger sits in the toolbar beside the flow, not inside it.
+          className="nokey inline-flex cursor-pointer items-center justify-center rounded-[6px] rounded-l-none border border-border bg-secondary px-[6px] py-[6px] text-[13px] whitespace-nowrap text-foreground transition-colors hover:border-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:cursor-not-allowed disabled:opacity-50"
         >
           <ChevronDownIcon />
         </DropdownMenuTrigger>

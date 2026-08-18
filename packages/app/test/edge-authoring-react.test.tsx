@@ -6,7 +6,14 @@ import { uuidSchema, type SpaceSnapshot } from '@project/core';
 import { inHandleId, loadSpaceSnapshot, outHandleId, Placement } from '@project/graph';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
 import type { CardFlowNode } from '@project/react-flow-adapter';
-import { Menubar, MenubarContent, MenubarItem, MenubarMenu, MenubarTrigger } from '@project/ui';
+import {
+  AddCardControl,
+  Menubar,
+  MenubarContent,
+  MenubarItem,
+  MenubarMenu,
+  MenubarTrigger,
+} from '@project/ui';
 import { createNavigation } from '../src/navigation';
 import { createRenderAdapter, edgeSelectionOf } from '../src/render-adapter';
 import { createConnectionCompletion } from '../src/connection-completion';
@@ -486,6 +493,22 @@ describe("React Flow's document-level delete key", () => {
 
     expect(graphsOf(session.getState().working)[0]?.edges).toEqual([EDGE]);
   });
+
+  it.each(DELETE_KEYS)(
+    'leaves the Edge standing when %s reaches the Add Card menu trigger',
+    (key) => {
+      // AddCardControl sits beside the Menubar in the real toolbar, outside the
+      // flow, with the same document-level exposure MenubarTrigger has.
+      const { adapter, session } = mountCanvas(
+        <AddCardControl onAddCard={NO_OP} onAddAlias={NO_OP} />,
+      );
+      act(() => adapter.getState().selectEdge(SUBJECT));
+
+      fireEvent.keyDown(screen.getByRole('button', { name: 'More Card kinds' }), { key });
+
+      expect(graphsOf(session.getState().working)[0]?.edges).toEqual([EDGE]);
+    },
+  );
 });
 
 /**
