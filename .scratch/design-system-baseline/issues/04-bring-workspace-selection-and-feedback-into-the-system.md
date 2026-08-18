@@ -17,7 +17,9 @@ them: rows remain bare buttons, the empty state is a heading over a void, and
 the busy state has no visible progress. Treat that story as evidence of the
 work still required, not acceptance of the surface.
 
-## 2026-08-18 — a visible persistence cue label is this ticket's call
+## Comments
+
+### 2026-08-18 — a visible persistence cue label is this ticket's call
 
 Under ADR 0053 the persistence cue moves into the Sidebar footer, where there is
 room for the label `PersistenceIndicator` currently states only through its

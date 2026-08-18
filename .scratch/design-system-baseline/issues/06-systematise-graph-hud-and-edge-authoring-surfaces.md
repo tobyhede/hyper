@@ -17,7 +17,9 @@ focused production-component stories for the HUD, selected Edge toolbar,
 endpoint editing, refusal and reconnection states. Those states remain in scope
 here.
 
-## 2026-08-18 — the legend now has a second statement of the same facts
+## Comments
+
+### 2026-08-18 — the legend now has a second statement of the same facts
 
 ADR 0053 gives the workspace Sidebar a Graphs group carrying every Graph's
 title, colour and active state, which is what `GraphLegend` in the canvas HUD

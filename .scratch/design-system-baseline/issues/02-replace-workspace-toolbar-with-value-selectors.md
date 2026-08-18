@@ -71,23 +71,25 @@ caller's ref so cancelling Alias creation still restores focus.
   lifecycle story; the donor's `alert-dialog.tsx`, public exports and component
   test; the already-landed shared `Alert`; and the DropdownMenu trigger/ref and
   Menubar lifecycle corrections in their shared components and tests.
-- **Production composition retained and reconciled:** `App.tsx` composes the new
-  app-owned `PersistenceControl`; `WorkspaceToolbar.tsx` replaces the donor's
+- **Historical production composition retained and reconciled before Issue 14:** `App.tsx` composed the new
+  app-owned `PersistenceControl`; `WorkspaceToolbar.tsx` replaced the donor's
   Select controls with controlled Menubar radio groups while keeping
   Present/Overview and Add Card adjacent. Its grouped persistence input keeps
   the rendered control, typed state and acknowledged revision together.
-- **Stories retained:** `persistence-indicator.stories.tsx` drives the accepted
+- **Historical stories retained before the Sidebar superseded them:** `persistence-indicator.stories.tsx` drove the accepted
   lifecycle from a real `SpaceSession` over a delayed fixture backend;
-  `workspace-toolbar.stories.tsx` and `WorkspaceToolbarFixture.tsx` define
+  `workspace-toolbar.stories.tsx` and `WorkspaceToolbarFixture.tsx` defined
   settled, pending, retryable failure, permanent rejection, conflict and
   presenting before production is reconciled to the same composition. They are
   not snapshots of unreviewed production behavior.
-- **Behavior proofs retained and reconciled:** `PersistenceIndicator.test.tsx`,
+- **Historical behavior proofs retained and reconciled before Issue 14:** `PersistenceIndicator.test.tsx`,
   `AlertDialog.test.tsx`, `WorkspaceToolbar.test.tsx` and `Workspace.test.tsx`;
   the selector and toolbar-boundary updates in `editing.spec.ts`, `graph.ts`,
   `new-space.spec.ts` and `overview.spec.ts`; the donor's modal conflict behavior
   in `http-persistence.spec.ts`; and the focused production-story checks in
   `issue-02-workspace-toolbar.spec.ts` through `playwright.ladle.config.ts`.
+  The toolbar component, fixture, story and focused Ladle spec were later
+  superseded and removed by `WorkspaceSidebar`, ADR 0053 and Issue 14.
 - **Deferred:** ADR 0052's repository-wide parity manifest, runtime collection
   enforcement and dedicated Ladle CI job remain Issue 08.
 - **Rejected:** inline conflict/rejection toolbar controls introduced during

@@ -1,7 +1,13 @@
 import { useEffect } from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { Sidebar, SidebarProvider, SidebarTrigger, useSidebar } from '../src/components/sidebar';
+import {
+  Sidebar,
+  SidebarMenuSkeleton,
+  SidebarProvider,
+  SidebarTrigger,
+  useSidebar,
+} from '../src/components/sidebar';
 
 const stubViewport = (mobile: boolean): void => {
   vi.stubGlobal('matchMedia', (query: string) => ({
@@ -76,5 +82,13 @@ describe('Sidebar', () => {
     expect(mobileSidebar).not.toHaveClass('[&>button]:hidden');
     fireEvent.click(screen.getByRole('button', { name: 'Close' }));
     await waitFor(() => expect(screen.queryByTestId('workspace-sidebar')).not.toBeInTheDocument());
+  });
+
+  it('takes skeleton width from its composer instead of generating it during render', () => {
+    render(<SidebarMenuSkeleton width="63%" />);
+
+    expect(document.querySelector('[data-sidebar="menu-skeleton-text"]')).toHaveStyle({
+      '--skeleton-width': '63%',
+    });
   });
 });

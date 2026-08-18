@@ -83,6 +83,7 @@ Vendored skills are tracked, so every clone and worktree has them. The files liv
 
 Tracking both paths is deliberate. An ordinary `git worktree add` populates only tracked files, so while these were ignored every worktree ran agents with no skills at all — and tracking just one of the two locations fixes just one of the two harnesses.
 
-The set is deliberately small: only `shadcn` (from `shadcn/ui`) is vendored.
+The set is deliberately small: `shadcn` (from `shadcn/ui`) and the repo-owned
+`shadcn-first-ui` production workflow are vendored.
 
 The [`mattpocock/skills`](https://github.com/mattpocock/skills) pack was vendored here previously and has been removed. Most of its names (`codebase-design`, `diagnosing-bugs`, `domain-modeling`, `grilling`, `prototype`, `research`, `resolving-merge-conflicts`, `tdd`, `wizard`, `writing-for-agents`, and more) collided with Claude Code's built-in skills of the same name, and a vendored skill of that name shadows the built-in rather than sitting beside it — the same problem `code-review` hit earlier. Don't reinstall it; if a specific skill from that pack is wanted again, vendor it individually under a name that doesn't collide with a built-in.
