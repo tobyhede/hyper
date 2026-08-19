@@ -10,12 +10,12 @@ import { AppShell } from '@project/ui';
 // Through the package's own subpath imports, as `#components/*` already is: a
 // story sits two directories above `src`, and climbing there by relative path is
 // how a package boundary gets crossed without naming one (AGENTS.md).
-import { canvasChoice } from '#src/canvas-choice';
+import { canvasRenderers } from '#src/canvas-renderers';
 import { graphColorMap } from '#src/colors';
-import { defaultRenderer, type RendererSelection } from '#src/renderer';
+import { defaultRenderer, type CanvasRendererId } from '#src/renderer';
 import { createWorkingSpaceReader } from '#src/snapshot';
 import { PersistenceControl, PersistenceNotice } from '#components/PersistenceControl';
-import { SelectedCanvas, WorkspaceSidebar } from '#components/WorkspaceSidebar';
+import { SelectedCanvasRenderer, WorkspaceSidebar } from '#components/WorkspaceSidebar';
 import { authoredSnapshot, authoredSpace, editedSnapshot } from './spaces';
 
 export interface WorkspaceSidebarFixtureProps {
@@ -52,7 +52,7 @@ export function WorkspaceSidebarFixture({
   // negative names: the story would go on pressing a row after the app had
   // stopped. The Space declares `defaultView`, which is fixture *data* and
   // allowed; deciding what to do with it is not.
-  const [selected, setSelected] = useState<RendererSelection>(() => defaultRenderer(space));
+  const [selected, setSelected] = useState<CanvasRendererId>(() => defaultRenderer(space));
   const [activeGraph, setActiveGraph] = useState<string | null>(space.graphs[0]?.id ?? null);
   const addCardMenu = useRef<HTMLButtonElement>(null);
   // Both derivations run on every render, unmemoized. Production memoizes them
@@ -62,7 +62,7 @@ export function WorkspaceSidebarFixture({
   //
   // One module answers which canvases exist and which is taken, and the header
   // below reads the row it named rather than a title of the fixture's own.
-  const choice = canvasChoice(space, selected);
+  const choice = canvasRenderers(space, selected);
   // Colours the way the sidebar's own consumer gets them, and deliberately not
   // through `canvasProjection`: that needs a resolved strategy, so a story about
   // a sidebar would run elkjs to find out what colour a Graph's glyph is.
@@ -103,7 +103,7 @@ export function WorkspaceSidebarFixture({
           }}
         />
       }
-      header={<SelectedCanvas renderer={choice.selected} />}
+      header={<SelectedCanvasRenderer renderer={choice.selected} />}
       notice={<PersistenceNotice persistence={persistence} onRetry={onRetry} />}
     >
       <div data-testid="workspace-canvas-stand-in" />
@@ -129,7 +129,7 @@ export function WorkspaceSidebarFixture({
  * copy of it and would reparse on every publication. The reader caches on
  * snapshot identity, and a session replaces `working` only when a submission
  * does, so the two states this story passes through cost two parses and hand
- * `canvasChoice` a stable `Space` in between.
+ * `canvasRenderers` a stable `Space` in between.
  */
 export function RetryableWorkspaceSidebarFixture() {
   const session = useMemo(() => {

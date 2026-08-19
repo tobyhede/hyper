@@ -7,7 +7,7 @@ import { inHandleId, loadSpaceSnapshot, outHandleId, Placement } from '@project/
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
 import type { CardFlowNode } from '@project/react-flow-adapter';
 import { AddCardControl, PersistenceIndicator, SidebarProvider } from '@project/ui';
-import type { CanvasRenderer } from '../src/canvas-choice';
+import type { CanvasRenderer } from '../src/canvas-renderers';
 import { createNavigation } from '../src/navigation';
 import { createRenderAdapter, edgeSelectionOf } from '../src/render-adapter';
 import { createConnectionCompletion } from '../src/connection-completion';

@@ -3,7 +3,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { uuidSchema } from '@project/core';
 import { PersistenceIndicator, SidebarProvider, SidebarTrigger } from '@project/ui';
-import type { CanvasRenderer } from '../src/canvas-choice';
+import type { CanvasRenderer } from '../src/canvas-renderers';
 import { WorkspaceSidebar, type WorkspaceSidebarProps } from '../src/components/WorkspaceSidebar';
 
 const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
@@ -62,7 +62,7 @@ const draw = (element: ReactElement) => render(<SidebarProvider>{element}</Sideb
 /**
  * The rows, written out here rather than derived from a Space.
  *
- * `canvasChoice` owns the derivation and `canvas-choice.test.ts` owns testing
+ * `canvasRenderers` owns the derivation and `canvas-renderers.test.ts` owns testing
  * it. What is left for this file is what the sidebar *draws*, and a test of a
  * list should not need a Space to state it. They are named constants because the
  * pressed row is decided by reference: `selected` below is one of these very

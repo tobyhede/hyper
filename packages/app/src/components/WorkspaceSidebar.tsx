@@ -24,8 +24,8 @@ import {
   SidebarSeparator,
   useSidebar,
 } from '@project/ui';
-import type { CanvasChoice, CanvasRenderer } from '../canvas-choice';
-import { rendererSelectionKey, type RendererSelection } from '../renderer';
+import type { CanvasRenderers, CanvasRenderer } from '../canvas-renderers';
+import { canvasRendererKey, type CanvasRendererId } from '../renderer';
 
 export interface WorkspaceSidebarProps {
   /** The Space's title. The canvas header names what is drawing it (ADR 0053). */
@@ -37,19 +37,19 @@ export interface WorkspaceSidebarProps {
      * One field because it is one decision (ADR 0053). Three fields let a caller
      * assemble the lists and the selection from different places, which is how a
      * `selected` that is not one of the rows gets in — a sidebar drawing a list
-     * with nothing pressed in it. `canvasChoice` builds all three together and
+     * with nothing pressed in it. `canvasRenderers` builds all three together and
      * states the identity below; the interface is structural, so this is a
      * contract a hand-built literal must keep rather than one the compiler
-     * enforces, and `canvas-choice.ts` is where a caller should get one.
+     * enforces, and `canvas-renderers.ts` is where a caller should get one.
      */
-    readonly choice: CanvasChoice;
+    readonly choice: CanvasRenderers;
     /**
      * Hands back the bare selection, which is what Navigation takes. The row's
      * title belongs to whoever built the list: a caller that has to name what is
      * drawing reads `choice.selected` rather than deriving a second title of its
      * own.
      */
-    readonly onSelect: (selection: RendererSelection) => void;
+    readonly onSelect: (selection: CanvasRendererId) => void;
   };
   readonly graph: {
     readonly graphs: readonly Graph[];
@@ -88,7 +88,7 @@ const VIEW_ICONS = {
   grid: GridIcon,
 } as const satisfies Record<BuiltInViewId, () => ReactNode>;
 
-const RendererIcon = ({ selection }: { readonly selection: RendererSelection }): ReactNode => {
+const RendererIcon = ({ selection }: { readonly selection: CanvasRendererId }): ReactNode => {
   if (selection.kind === 'layout') return <LayoutIcon />;
   const Icon = VIEW_ICONS[selection.view];
   return <Icon />;
@@ -112,19 +112,19 @@ function CanvasRenderers({
 }: {
   readonly renderers: readonly CanvasRenderer[];
   readonly selected: CanvasRenderer;
-  readonly onSelect: (selection: RendererSelection) => void;
+  readonly onSelect: (selection: CanvasRendererId) => void;
 }) {
   return (
     <SidebarMenu>
       {renderers.map((renderer) => {
         const active = renderer === selected;
         return (
-          <SidebarMenuItem key={rendererSelectionKey(renderer.selection)}>
+          <SidebarMenuItem key={canvasRendererKey(renderer.selection)}>
             <SidebarMenuButton
               isActive={active}
               aria-pressed={active}
               data-testid="canvas-renderer"
-              data-renderer={rendererSelectionKey(renderer.selection)}
+              data-renderer={canvasRendererKey(renderer.selection)}
               onClick={() => onSelect(renderer.selection)}
             >
               <RendererIcon selection={renderer.selection} />
@@ -323,7 +323,7 @@ export function WorkspaceSidebar({
  * and the header and the list it reports on are free to disagree again. Taking
  * the row means the only way to draw this is to have built the list.
  */
-export function SelectedCanvas({ renderer }: { readonly renderer: CanvasRenderer }) {
+export function SelectedCanvasRenderer({ renderer }: { readonly renderer: CanvasRenderer }) {
   return (
     <div data-testid="selected-canvas" className="flex min-w-0 items-baseline gap-2">
       <span className="truncate text-sm font-medium">{renderer.title}</span>

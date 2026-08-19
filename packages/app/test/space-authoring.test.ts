@@ -26,7 +26,7 @@ import {
   type AuthoringResult,
   type SpaceAuthoring,
 } from '../src/space-authoring';
-import { createRendererResolver, type RendererSelection } from '../src/renderer';
+import { createRendererResolver, type CanvasRendererId } from '../src/renderer';
 
 /**
  * The eligibility query, asked in the shape the two connecting gestures ask it.
@@ -215,7 +215,7 @@ function testResolver() {
 function attachAuthoring(
   backend: SpaceBackend,
   loaded: LoadedFixture,
-  renderer: RendererSelection,
+  renderer: CanvasRendererId,
   { reportObserverError, newId }: AuthoringOptions = {},
 ) {
   const session = openSpaceSession(backend, loaded);
@@ -242,7 +242,7 @@ function attachAuthoring(
 
 function openAuthoring(
   snapshot: SpaceSnapshot = automaticSnapshot,
-  renderer: RendererSelection = { kind: 'view', view: 'flow' },
+  renderer: CanvasRendererId = { kind: 'view', view: 'flow' },
   { reportObserverError, newId }: AuthoringOptions = {},
 ) {
   const loaded = { snapshot, revision: 0n, exportedRevision: null };
@@ -953,7 +953,7 @@ describe('Space Authoring', () => {
     };
     const resolveRenderer = testResolver();
     const real = createNavigation(currentSpace, resolveRenderer, { kind: 'view', view: 'flow' });
-    const adopted: { renderer: RendererSelection; graphId: GraphId | null }[] = [];
+    const adopted: { renderer: CanvasRendererId; graphId: GraphId | null }[] = [];
     const navigation: Navigation = {
       ...real,
       continueInRenderer: (selection, graphId) => {

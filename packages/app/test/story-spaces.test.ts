@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { loadSpaceSnapshot } from '@project/graph';
-import { canvasChoice } from '../src/canvas-choice';
+import { canvasRenderers } from '../src/canvas-renderers';
 import { defaultRenderer } from '../src/renderer';
 import { authoredSpace, editedSnapshot, unauthoredSpace } from '../stories/support/spaces';
 
@@ -23,7 +23,7 @@ describe('the story Spaces', () => {
     const opens = defaultRenderer(authoredSpace);
 
     expect(opens.kind).toBe('layout');
-    expect(canvasChoice(authoredSpace, opens).selected.title).toBe('Collection 1');
+    expect(canvasRenderers(authoredSpace, opens).selected.title).toBe('Collection 1');
   });
 
   /** A new Space names no view, so production's own fallback answers (ADR 0018, ADR 0025). */
@@ -33,14 +33,14 @@ describe('the story Spaces', () => {
     expect(opens).toEqual({ kind: 'view', view: 'flow' });
     expect(unauthoredSpace.layouts).toEqual([]);
     expect(unauthoredSpace.graphs).toEqual([]);
-    expect(canvasChoice(unauthoredSpace, opens).selected.title).toBe('Flow');
+    expect(canvasRenderers(unauthoredSpace, opens).selected.title).toBe('Flow');
   });
 
   /**
    * The retryable story hands the fixture a Space that changes: it opens on
    * `authoredSnapshot` and submits `editedSnapshot`. The fixture seeds `selected`
    * once and never reconciles it, so an Edit withdrawing the opened Layout would
-   * make `canvasChoice` throw on the second render — a blank story rather than a
+   * make `canvasRenderers` throw on the second render — a blank story rather than a
    * degraded one. The Edit appends, and this is what says so, at `verify` rather
    * than in a browser — including that it appends *something*, since an
    * `editedSnapshot` that stopped differing from what the session loaded would
@@ -52,7 +52,7 @@ describe('the story Spaces', () => {
 
     const opens = defaultRenderer(authoredSpace);
 
-    expect(canvasChoice(edited.space, opens).selected.title).toBe('Collection 1');
+    expect(canvasRenderers(edited.space, opens).selected.title).toBe('Collection 1');
     expect(edited.space.layouts.slice(0, authoredSpace.layouts.length)).toEqual(
       authoredSpace.layouts,
     );

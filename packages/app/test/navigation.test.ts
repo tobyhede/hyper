@@ -2,7 +2,7 @@ import { expect, expectTypeOf, it, vi } from 'vitest';
 import { uuidSchema, type CardId, type GraphId, type UUID } from '@project/core';
 import { loadSpace, type Space } from '@project/graph';
 import { createNavigation, type NavigationState, type NavigationOptions } from '../src/navigation';
-import { createRendererResolver, type RendererSelection } from '../src/renderer';
+import { createRendererResolver, type CanvasRendererId } from '../src/renderer';
 import { cardFile } from './card-files';
 
 /**
@@ -18,7 +18,7 @@ const resolveRenderer = createRendererResolver({
 
 const navigationFor = (
   currentSpace: () => Space,
-  initialRenderer: RendererSelection,
+  initialRenderer: CanvasRendererId,
   initialSpace?: Space,
   options?: NavigationOptions,
 ) =>

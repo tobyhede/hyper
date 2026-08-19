@@ -25,7 +25,7 @@ import {
   withoutIncidentEdges,
 } from './snapshot';
 import { nextCardTitle, nextGraphTitle, nextLayoutTitle } from './titles';
-import { defaultRenderer, type RendererSelection, type ResolveRenderer } from './renderer';
+import { defaultRenderer, type CanvasRendererId, type ResolveRenderer } from './renderer';
 
 /** Which end of an Edge a reconnection replaces. */
 export type EdgeEndpoint = 'from' | 'to';
@@ -254,7 +254,7 @@ interface CompletedEdit {
   readonly snapshot: SpaceSnapshot;
   readonly placement: Placement;
   /** The Layout this Edit wrote, which Navigation continues in. */
-  readonly nextRenderer: RendererSelection;
+  readonly nextRenderer: CanvasRendererId;
   /**
    * The Active Graph of that Layout, which Navigation adopts along with it.
    *

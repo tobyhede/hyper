@@ -15,7 +15,7 @@ import {
   type EdgeProposal,
   type SpaceAuthoring,
 } from '../src/space-authoring';
-import { createRendererResolver, type RendererSelection } from '../src/renderer';
+import { createRendererResolver, type CanvasRendererId } from '../src/renderer';
 import { completeDrag, moving, node, settled } from './render-adapter-fixtures';
 
 const CARD_A = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
@@ -124,7 +124,7 @@ function connections(
  */
 function sessionBackedAdapter(
   snapshot: SpaceSnapshot,
-  renderer: RendererSelection,
+  renderer: CanvasRendererId,
   initialPlacement?: Placement,
   /** A newer stored state, so the first commit conflicts rather than settling. */
   stored?: SpaceSnapshot,
