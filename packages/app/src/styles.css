@@ -1022,11 +1022,9 @@ body {
   opacity: 1;
 }
 
-.card-editor__refusal {
+.card-editor__error {
   flex: none;
-  padding: 8px 14px;
-  color: #0b0d11;
-  background: color-mix(in srgb, var(--destructive) 12%, #fffaf0);
+  margin: 12px 14px 0;
 }
 
 .card-editor__footer {

@@ -9,6 +9,10 @@ import {
 import { markdownCardSchema, uuidSchema, type Card, type CardId } from '@project/core';
 import type { ResolvedContentCard } from '@project/graph';
 import {
+  Alert,
+  AlertDescription,
+  AlertIcon,
+  AlertTitle,
   Button,
   CardSearchCombobox,
   CloseIcon,
@@ -149,8 +153,8 @@ function CardEditorShell({
   onTitleChange,
   onTitleEnter,
   children,
-  refusal,
-  refusalId,
+  error,
+  errorId,
   onSubmit,
   onCancel,
 }: {
@@ -162,8 +166,8 @@ function CardEditorShell({
   readonly onTitleChange: (title: string) => void;
   readonly onTitleEnter?: () => void;
   readonly children: ReactNode;
-  readonly refusal: string | null;
-  readonly refusalId: string;
+  readonly error: string | null;
+  readonly errorId: string;
   readonly onSubmit: (event: FormEvent<HTMLFormElement>) => void;
   readonly onCancel: () => void;
 }) {
@@ -183,8 +187,8 @@ function CardEditorShell({
       <form
         className="card-editor"
         style={{ '--card-editor-graph': graphColor } as CSSProperties}
-        aria-invalid={refusal !== null}
-        aria-describedby={refusal === null ? undefined : refusalId}
+        aria-invalid={error !== null}
+        aria-describedby={error === null ? undefined : errorId}
         onSubmit={onSubmit}
         onKeyDown={submitShortcut}
       >
@@ -230,10 +234,12 @@ function CardEditorShell({
           </header>
           {children}
         </FieldGroup>
-        {refusal !== null && (
-          <FieldError id={refusalId} className="card-editor__refusal">
-            {refusal}
-          </FieldError>
+        {error !== null && (
+          <Alert id={errorId} variant="destructive" className="card-editor__error">
+            <AlertIcon />
+            <AlertTitle>Couldn’t save changes</AlertTitle>
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
         )}
         <footer className="card-editor__footer">
           <Button type="button" variant="ghost" className="card-editor__cancel" onClick={onCancel}>
@@ -296,8 +302,8 @@ function MarkdownCardEditor({
         setContentRefusal(null);
       }}
       onTitleEnter={() => body.current?.focus()}
-      refusal={contentRefusal}
-      refusalId="open-card-refusal"
+      error={contentRefusal}
+      errorId="open-card-error"
       onSubmit={submit}
       onCancel={onCancel}
     >
@@ -361,8 +367,8 @@ function AliasCardEditor({
         setRefusal(null);
       }}
       onTitleEnter={() => targetInput.current?.focus()}
-      refusal={refusal}
-      refusalId="open-alias-refusal"
+      error={refusal}
+      errorId="open-alias-error"
       onSubmit={submit}
       onCancel={onCancel}
     >

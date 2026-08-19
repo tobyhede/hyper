@@ -69,7 +69,7 @@ describe('the opened Card', () => {
     expect(onComplete).not.toHaveBeenCalled();
   });
 
-  it('marks the field a title refusal is about, and only that field', () => {
+  it('marks the field a title validation error is about, and only that field', () => {
     const onComplete = vi.fn(() => null);
     render(<OpenCard card={markdown()} onComplete={onComplete} onCancel={vi.fn()} />);
 
@@ -82,7 +82,7 @@ describe('the opened Card', () => {
   });
 
   /**
-   * A schema refusal that belongs to neither field on this form is unattributed
+   * A schema error that belongs to neither field on this form is unattributed
    * — it goes to the form-level slot beside the actions.
    *
    * **No author can reach this through the fields**, and that is the honest
@@ -95,7 +95,7 @@ describe('the opened Card', () => {
    * Space cannot produce that Card; the misattribution it exposes is real for
    * every path this list grows by.
    */
-  it('surfaces a refusal belonging to no field beside the actions', () => {
+  it('surfaces an error belonging to no field in the shared dialog alert', () => {
     const onComplete = vi.fn(() => null);
     render(
       <OpenCard
@@ -110,7 +110,8 @@ describe('the opened Card', () => {
     expect(onComplete).not.toHaveBeenCalled();
     const alert = screen.getByRole('alert');
     expect(alert).toHaveTextContent('The Card could not be completed.');
-    expect(alert).toHaveAttribute('id', 'open-card-refusal');
+    expect(alert).toHaveAttribute('id', 'open-card-error');
+    expect(alert).toHaveTextContent('Couldn’t save changes');
     expect(screen.getByRole('textbox', { name: 'Title' })).toHaveAttribute('aria-invalid', 'false');
   });
 
