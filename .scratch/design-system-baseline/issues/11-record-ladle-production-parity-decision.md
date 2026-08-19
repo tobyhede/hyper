@@ -5,7 +5,7 @@ alternatives, then record the durable decision at the level its trade-off earns.
 
 **Blocked by:** None — resolve before issue 08 treats the gate as settled.
 
-**Status:** ready-for-human
+**Status:** resolved — ADR 0052 and the Ladle baseline were delivered in PR #75.
 
 **Delivery:** The decision and its acceptance work are complete on the donor.
 The remaining work is to extract ADR 0052 and reconcile its operational

@@ -4,7 +4,7 @@
 
 **Blocked by:** 03 — Move Button onto Base UI.
 
-**Status:** ready-for-agent
+**Status:** resolved — delivered in PR #69.
 
 - [ ] Rebuild the menu from the idiomatic Base UI/shadcn parts and replace Radix child composition with Base UI rendering without changing the split-control presentation.
 - [ ] Preserve immediate Add Card, the announced keyboard shortcut, disabled behavior and the menu trigger's accessible name.

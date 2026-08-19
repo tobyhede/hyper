@@ -1,6 +1,6 @@
 # Three pane fields still take their own Escape, which ADR 0048 withdrew
 
-Status: needs-triage
+Status: resolved — delivered with the Card Editor migration in PR #69.
 
 Surfaced by: rebasing the Edge Authoring branch onto package 4a and reconciling
 the two edits both branches made to the keyboard authoring contract

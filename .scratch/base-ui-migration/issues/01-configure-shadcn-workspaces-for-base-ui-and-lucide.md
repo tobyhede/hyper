@@ -4,7 +4,7 @@
 
 **Blocked by:** None — can start immediately.
 
-**Status:** ready-for-agent
+**Status:** resolved — delivered in PR #69.
 
 - [ ] Record the clean-branch typecheck and production-build baseline before changing dependencies, including any pre-existing failure or warning.
 - [ ] Give every participating workspace a shadcn configuration with matching `base-nova` style, `neutral` base colour, CSS-variable theming and Lucide icon library, with React Server Components disabled and TypeScript enabled.
