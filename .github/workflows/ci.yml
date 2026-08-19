@@ -109,9 +109,12 @@ jobs:
   e2e:
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    # Playwright's own image, so this job never reaches a package mirror: the
+    # Playwright's own image, so nothing in this job reaches an apt mirror: the
     # browsers, the shared libraries they need and the font set are all baked
-    # into its layers. The apt install this replaces was pure downside — on
+    # into its layers. It is the Ubuntu package path that is gone, not every
+    # network fetch — `pnpm install` still reaches the npm registry, which is
+    # why the pnpm store is cached below. The apt install this replaces was
+    # pure downside — on
     # `ubuntu-latest` it found every library already present and fetched only
     # nine font packages (CJK, Thai, Cyrillic, unifont), which nothing here can
     # see because the suite takes no screenshots. It cost 11–23s of every run
@@ -131,16 +134,20 @@ jobs:
     # tags. A guard step here would catch that a minute earlier at the cost of a
     # third place to edit, which is why there isn't one.
     #
-    # `--ipc=host` comes from Playwright's Docker guidance rather than from its
-    # Actions example, which omits it: the default 64MB `/dev/shm` makes
-    # Chromium run out of memory and crash, and under `failOnFlakyTests` a
-    # crash is a red build rather than a retry. What that example does carry is
-    # `--user 1001`, which answers root-owned files in the mounted workspace —
-    # not a problem here, because `upload-artifact` and the cache's save step
-    # both run inside the container too, and the runner is ephemeral.
+    # `--ipc=host` and `--init` are both off Playwright's Docker guidance rather
+    # than its Actions example, which carries neither. Without `--ipc=host` the
+    # default 64MB `/dev/shm` makes Chromium run out of memory and crash, and
+    # under `failOnFlakyTests` a crash is a red build rather than a retry.
+    # `--init` supplies the child-process reaper, since PID 1 here is not ours:
+    # Actions holds the container open for the whole job and runs each step
+    # inside it, so an orphaned Chromium helper reparents onto a process that
+    # never waits on it. What that example does carry is `--user 1001`, which
+    # answers root-owned files in the mounted workspace — not a problem here,
+    # because `upload-artifact` and the cache's save step both run inside the
+    # container too, and the runner is ephemeral.
     container:
       image: mcr.microsoft.com/playwright:v1.61.1-noble@sha256:5b8f294aff9041b7191c34a4bab3ac270157a28774d4b0660e9743297b697e48
-      options: --ipc=host
+      options: --ipc=host --init
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: { persist-credentials: false }
