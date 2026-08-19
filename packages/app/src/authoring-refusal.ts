@@ -38,7 +38,7 @@ export const describeAuthoringRefusal = (refusal: AuthoringRefusal): string => {
     case 'card-not-in-layout':
       return 'This Card is not in this Layout.';
     case 'card-has-aliases':
-      return `Retarget or delete the Aliases of this Card first: ${refusal.aliases.map((alias) => alias.title).join(', ')}.`;
+      return `Retarget or delete the Aliases of this Card first: ${refusal.aliasTitles.join(', ')}.`;
     case 'graph-title-required':
       return 'A Graph title is required.';
     case 'layout-must-keep-graph':
@@ -57,3 +57,22 @@ export const describeAuthoringRefusal = (refusal: AuthoringRefusal): string => {
       return unreachable(refusal);
   }
 };
+
+export type AuthoringRefusalPresentation = {
+  readonly message: string;
+  readonly placement: 'title' | 'target' | 'form';
+};
+
+/** The application-owned copy and placement decision for one refusal. */
+export const presentAuthoringRefusal = (
+  refusal: AuthoringRefusal,
+): AuthoringRefusalPresentation => ({
+  message: describeAuthoringRefusal(refusal),
+  placement:
+    refusal.code === 'card-title-required'
+      ? 'title'
+      : refusal.code === 'alias-target-not-found' ||
+          refusal.code === 'alias-target-must-own-content'
+        ? 'target'
+        : 'form',
+});

@@ -12,7 +12,7 @@ import {
 import { Placement, graphCardIds, type ResolvedContentCard } from '@project/graph';
 import type { OpenedSpace } from './space';
 import { createSpaceAuthoring } from './space-authoring';
-import type { AuthoringRefusal } from './space-authoring';
+import { describeAuthoringRefusal } from './authoring-refusal';
 import { createRenderAdapter, selectedCardOf, type EdgeSubject } from './render-adapter';
 import { createConnectionCompletion } from './connection-completion';
 import { createEdgeAuthoring } from './edge-authoring';
@@ -28,7 +28,7 @@ import { activeGraphColor } from './colors';
 import { createRendererResolver, defaultRenderer, type CanvasRendererId } from './renderer';
 import { ADD_CARD_KEY, SpaceCanvas } from './components/SpaceCanvas';
 import { CanvasCentre, type VisibleCentre } from './components/CanvasCentre';
-import { NewAlias } from './components/NewAlias';
+import { NewAlias, type CreatedAliasRefusal } from './components/NewAlias';
 import { OpenCard } from './components/OpenCard';
 import { PlacementFailure } from './components/PlacementFailure';
 import { PlacementPending } from './components/PlacementPending';
@@ -95,7 +95,7 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
      * than a partial entity. Closing it creates nothing.
      */
     const [creatingAlias, setCreatingAlias] = useState(false);
-    const [aliasRefusal, setAliasRefusal] = useState<AuthoringRefusal | null>(null);
+    const [aliasRefusal, setAliasRefusal] = useState<CreatedAliasRefusal | null>(null);
     /** The Card a completed creation asks the canvas to open its name editor on. */
     const [createdCardId, setCreatedCardId] = useState<CardId | null>(null);
     const rendererSpace = useMemo(
@@ -336,6 +336,14 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
           anchor: centreAnchor(),
         });
         if (created.kind === 'refused') {
+          if (
+            created.refusal.code !== 'arrangement-pending' &&
+            created.refusal.code !== 'layout-not-found' &&
+            created.refusal.code !== 'alias-target-not-found' &&
+            created.refusal.code !== 'alias-target-must-own-content'
+          ) {
+            throw new Error(`Unexpected Add Alias refusal: ${created.refusal.code}`);
+          }
           setAliasRefusal(created.refusal);
           return;
         }
@@ -429,16 +437,19 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
           ? 'A Card title is required.'
           : (parsed.error.issues[0]?.message ?? 'The Card title is invalid.');
       }
-      // The result is deliberately not inspected, and that is not an oversight.
-      // `unchanged` here means the title did not change, which is the editor's
-      // ordinary close. Authoring's refusals need a state no author can reach
-      // from this control: a rename never changes kind or an Alias Target, and
-      // the two that turn on a missing placement or a vanished Layout cannot
-      // coincide with a drawn Card, because the affordance is rendered by the
-      // same projection that installs the placement. `queued` is an Edit that
-      // will still be performed.
-      authoring.complete({ kind: 'edited-card', cardId: cardId.data, document: parsed.data });
-      return null;
+      const result = authoring.complete({
+        kind: 'edited-card',
+        cardId: cardId.data,
+        document: parsed.data,
+      });
+      switch (result.kind) {
+        case 'refused':
+          return describeAuthoringRefusal(result.refusal);
+        case 'completed':
+        case 'unchanged':
+        case 'queued':
+          return null;
+      }
     }, []);
 
     // Every Card the Space holds, and deliberately no narrower: a Card's kind

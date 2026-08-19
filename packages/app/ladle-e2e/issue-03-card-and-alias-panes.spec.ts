@@ -34,6 +34,18 @@ test('opened Alias empty story explains that no Target is eligible', async ({ pa
   await expect(page.getByRole('option')).toHaveCount(0);
 });
 
+test('a production-reachable stale Alias Target refusal stays field-local', async ({ page }) => {
+  await page.goto('/?story=components--card-and-alias-panes--alias-target-refused&mode=preview');
+
+  const dialog = page.getByRole('dialog', { name: 'Placement recap' });
+  const target = dialog.getByRole('combobox', { name: 'Target' });
+  await dialog.getByRole('button', { name: 'Done' }).click();
+
+  await expect(dialog.getByRole('alert')).toHaveText('That Target is no longer part of the Space.');
+  await expect(target).toHaveAttribute('aria-invalid', 'true');
+  await expect(dialog).toBeVisible();
+});
+
 test('Card pane stories are isolated from the Ladle catalogue', async ({ page }) => {
   await page.goto('/?story=components--card-and-alias-panes--markdown');
 

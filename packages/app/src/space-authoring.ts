@@ -187,8 +187,7 @@ export type AuthoringRefusal =
   | { readonly code: 'card-not-in-layout' }
   | {
       readonly code: 'card-has-aliases';
-      readonly cardId: CardId;
-      readonly aliases: readonly { readonly id: CardId; readonly title: string }[];
+      readonly aliasTitles: readonly string[];
     }
   | { readonly code: 'graph-title-required' }
   | { readonly code: 'layout-must-keep-graph' }
@@ -964,8 +963,7 @@ export function createSpaceAuthoring({
       if (incoming.length > 0) {
         return refuse({
           code: 'card-has-aliases',
-          cardId: completion.cardId,
-          aliases: incoming.map((alias) => ({ id: alias.id, title: alias.document.title })),
+          aliasTitles: incoming.map((alias) => alias.document.title),
         });
       }
       // Deferred like a creation, and for the same reason: conversion is checked

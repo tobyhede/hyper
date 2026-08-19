@@ -1074,8 +1074,7 @@ describe('Delete Card from Space', () => {
       kind: 'refused',
       refusal: {
         code: 'card-has-aliases',
-        cardId: CARD_A,
-        aliases: [{ id: CARD_B, title: 'A again' }],
+        aliasTitles: ['A again'],
       },
     });
     expect(session.getState().working).toBe(before);

@@ -13,14 +13,25 @@ import {
 } from '@project/ui';
 import { CardPane } from './CardPane';
 import { paneInitialFocus } from './pane-focus';
-import { describeAuthoringRefusal } from '../authoring-refusal';
+import { presentAuthoringRefusal } from '../authoring-refusal';
 import type { AuthoringRefusal } from '../space-authoring';
+
+export type CreatedAliasRefusal = Extract<
+  AuthoringRefusal,
+  {
+    readonly code:
+      | 'arrangement-pending'
+      | 'layout-not-found'
+      | 'alias-target-not-found'
+      | 'alias-target-must-own-content';
+  }
+>;
 
 export interface NewAliasProps {
   /** Every Card an Alias may name: the non-Alias Cards of this Space (ADR 0009). */
   readonly targets: readonly Card[];
   /** Why the Space refused the Alias this pane tried to create, or `null`. */
-  readonly refusal: AuthoringRefusal | null;
+  readonly refusal: CreatedAliasRefusal | null;
   /**
    * Create the Alias on the chosen Target, with the title exactly as typed —
    * the empty string included, because an empty title is what tells Authoring
@@ -63,10 +74,8 @@ export interface NewAliasProps {
  */
 export function NewAlias({ targets, refusal, onCreate, onCancel, onRefusalStale }: NewAliasProps) {
   const [title, setTitle] = useState('');
-  const targetError =
-    refusal?.code === 'alias-target-not-found' || refusal?.code === 'alias-target-must-own-content'
-      ? describeAuthoringRefusal(refusal)
-      : null;
+  const presentation = refusal === null ? null : presentAuthoringRefusal(refusal);
+  const targetError = presentation?.placement === 'target' ? presentation.message : null;
 
   return (
     <CardPane ariaLabel="New Alias" testId="new-alias" onDismiss={onCancel}>
@@ -130,13 +139,8 @@ export function NewAlias({ targets, refusal, onCreate, onCancel, onRefusalStale 
             </FieldDescription>
           )}
         </FieldGroup>
-        {/* A refusal not attributable to the Target remains form-level. Current
-            Alias creation refusals are Target-specific; this exhaustive fallback
-            keeps a future non-field refusal from being silently discarded. */}
-        {refusal !== null && targetError === null && (
-          <FieldError className="card-pane__field-error">
-            {describeAuthoringRefusal(refusal)}
-          </FieldError>
+        {presentation?.placement === 'form' && (
+          <FieldError className="card-pane__field-error">{presentation.message}</FieldError>
         )}
         <div className="card-pane__actions">
           <Button type="button" variant="secondary" onClick={onCancel}>

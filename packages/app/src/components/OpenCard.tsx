@@ -24,7 +24,7 @@ import {
 } from '@project/ui';
 import { CardPane } from './CardPane';
 import { paneInitialFocus } from './pane-focus';
-import { describeAuthoringRefusal } from '../authoring-refusal';
+import { presentAuthoringRefusal } from '../authoring-refusal';
 import type { AuthoringRefusal } from '../space-authoring';
 
 /**
@@ -287,10 +287,11 @@ function MarkdownCardEditor({
     }
     const refusal = onComplete(settled.card);
     if (refusal !== null) {
-      if (refusal.code === 'card-title-required') {
-        setDraft({ ...draft, titleError: describeAuthoringRefusal(refusal) });
+      const presentation = presentAuthoringRefusal(refusal);
+      if (presentation.placement === 'title') {
+        setDraft({ ...draft, titleError: presentation.message });
       } else {
-        setContentRefusal(describeAuthoringRefusal(refusal));
+        setContentRefusal(presentation.message);
       }
       return;
     }
@@ -359,14 +360,10 @@ function AliasCardEditor({
     event.preventDefault();
     const refusal = occurrence.onEdit({ title: title.trim(), target });
     if (refusal !== null) {
-      const message = describeAuthoringRefusal(refusal);
-      if (refusal.code === 'card-title-required') setTitleError(message);
-      else if (
-        refusal.code === 'alias-target-not-found' ||
-        refusal.code === 'alias-target-must-own-content'
-      ) {
-        setTargetError(message);
-      } else setFormError(message);
+      const presentation = presentAuthoringRefusal(refusal);
+      if (presentation.placement === 'title') setTitleError(presentation.message);
+      else if (presentation.placement === 'target') setTargetError(presentation.message);
+      else setFormError(presentation.message);
       return;
     }
     // A completed Done closes the pane through the same callback as Cancel.

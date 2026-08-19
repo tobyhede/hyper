@@ -245,6 +245,23 @@ test('the Card affordance opens the Card on its editable fields', async ({ page 
   );
 });
 
+test('a refused Card title stays in the dialog and is attached to its field', async ({ page }) => {
+  await page.goto('/');
+  const card = nodeByTitle(page, 'A').first();
+  await expect(card).toBeVisible();
+  await settled(page);
+
+  await openCard(card, 'A');
+  const dialog = page.getByRole('dialog', { name: 'A' });
+  const title = dialog.getByRole('textbox', { name: 'Title' });
+  await title.fill('   ');
+  await dialog.getByRole('button', { name: 'Done' }).click();
+
+  await expect(dialog.getByRole('alert')).toHaveText('A Card title is required.');
+  await expect(title).toHaveAttribute('aria-invalid', 'true');
+  await expect(dialog).toBeVisible();
+});
+
 test('a title authored in the pane persists like one authored on the graph', async ({ page }) => {
   await page.goto('/');
   const card = nodeByTitle(page, 'A').first();

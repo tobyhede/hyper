@@ -61,3 +61,16 @@ export const AliasEmpty: Story = () => (
   />
 );
 AliasEmpty.meta = { iframed: true };
+
+/** A stale Target is a production-reachable refusal and remains attached to its field. */
+export const AliasTargetRefused: Story = () => (
+  <OpenCard
+    through={alias}
+    occurrence={{
+      targets: [markdown],
+      onEdit: () => ({ code: 'alias-target-not-found', targetId: MARKDOWN_ID }),
+    }}
+    onCancel={() => undefined}
+  />
+);
+AliasTargetRefused.meta = { iframed: true };
