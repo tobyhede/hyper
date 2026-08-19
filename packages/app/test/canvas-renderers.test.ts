@@ -122,12 +122,12 @@ describe('canvasRenderers', () => {
       newGraphId: () => uuidSchema.parse('00000000-0000-4000-8000-0000000000ff'),
     });
 
-    const fromChoice = attempt(() => canvasRenderers(AUTHORED, selection));
+    const fromCanvasRenderers = attempt(() => canvasRenderers(AUTHORED, selection));
     const fromResolver = attempt(() => resolveRenderer(AUTHORED, selection));
 
-    expect(fromChoice.reason).toBe('renderer-not-found');
-    expect(fromChoice.reason).toBe(fromResolver.reason);
-    expect(fromChoice.message).toBe(fromResolver.message);
+    expect(fromCanvasRenderers.reason).toBe('renderer-not-found');
+    expect(fromCanvasRenderers.reason).toBe(fromResolver.reason);
+    expect(fromCanvasRenderers.message).toBe(fromResolver.message);
   });
 });
 
