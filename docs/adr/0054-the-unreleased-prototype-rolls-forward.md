@@ -1,6 +1,7 @@
 # The unreleased prototype rolls forward
 
 Status: accepted
+Refined by: 0056
 
 Hyper has no old documents to preserve. Its only data are fixtures kept with the
 prototype, so authored document changes roll forward with those fixtures rather
