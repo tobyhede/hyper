@@ -121,7 +121,7 @@ Nothing tracks whether a viewer is editing, and there is no edit mode. Editing a
 _Avoid_: layout, arrangement, algorithm.
 
 **Canvas renderer**:
-A View or a Layout in the role of drawing a Space's Cards on the canvas.
+A View or a Layout in the role of drawing its Cards on the canvas.
 _Avoid_: choice (the value names the available renderers and which is current,
 not an act), canvas alone (the canvas is the one surface being drawn), and names
 taken from the control that draws it — selector, menu item, row.

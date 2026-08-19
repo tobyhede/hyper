@@ -172,14 +172,14 @@ Docs first, then the rename, so the rename diff is readable on its own:
 
 ## Acceptance criteria
 
-- [ ] `RendererSelection` and `rendererSelectionKey` no longer exist; `CanvasRendererId` and `canvasRendererKey` do, across all 16 files.
-- [ ] `spaceFileSchema` declares `defaultRenderer`; no `defaultView` remains in `packages/`, `README.md` or the story fixtures; no `refine`, version bump or transitional read was added.
-- [ ] `canvas-renderers.ts` exports `canvasRenderers` and `CanvasRenderers`; `CanvasRenderer` is unchanged; the module still has one operation.
-- [ ] `SelectedCanvasRenderer` replaces `SelectedCanvas`, and `App.tsx:210`'s comment is gone rather than reworded.
-- [ ] `CONTEXT.md` has a **Canvas renderer** entry with an `_Avoid_` list, and no file-format or storage detail in it.
-- [ ] Two ADRs land; `0053` gains `Refined by:` and no other edit; `AGENTS.md` points at ADR B without restating it.
-- [ ] All eight `package.json` files read `0.0.0`.
-- [ ] `pnpm verify`, `pnpm e2e` and `pnpm e2e:ladle` pass, with real output quoted. `pnpm e2e` must be **green and unchanged** — this is a behaviour-preserving rename and that is the guard that proves it.
+- [x] `RendererSelection` and `rendererSelectionKey` no longer exist; `CanvasRendererId` and `canvasRendererKey` do, across all 16 files.
+- [x] `spaceFileSchema` declares `defaultRenderer`; no `defaultView` remains in `packages/`, `README.md` or the story fixtures; no `refine`, version bump or transitional read was added.
+- [x] `canvas-renderers.ts` exports `canvasRenderers` and `CanvasRenderers`; `CanvasRenderer` is unchanged; the module still has one operation.
+- [x] `SelectedCanvasRenderer` replaces `SelectedCanvas`, and `App.tsx:210`'s comment is gone rather than reworded.
+- [x] `CONTEXT.md` has a **Canvas renderer** entry with an `_Avoid_` list, and no file-format or storage detail in it.
+- [x] Two ADRs land; `0053` gains `Refined by:` and no other edit; `AGENTS.md` points at ADR B without restating it.
+- [x] All eight `package.json` files read `0.0.0`.
+- [x] `pnpm verify`, `pnpm e2e` and `pnpm e2e:ladle` pass, with real output quoted. `pnpm e2e` must be **green and unchanged** — this is a behaviour-preserving rename and that is the guard that proves it.
 
 ## Decided — do not re-open
 
