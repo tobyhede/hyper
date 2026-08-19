@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
+import { loadSpaceSnapshot } from '@project/graph';
 import { canvasChoice } from '../src/canvas-choice';
 import { defaultRenderer } from '../src/renderer';
-import { authoredSpace, unauthoredSpace } from '../stories/support/spaces';
+import { authoredSpace, editedSnapshot, unauthoredSpace } from '../stories/support/spaces';
 
 /**
  * The Spaces the Ladle catalogue draws, held to production's own rules.
@@ -33,6 +34,31 @@ describe('the story Spaces', () => {
     expect(unauthoredSpace.layouts).toEqual([]);
     expect(unauthoredSpace.graphs).toEqual([]);
     expect(canvasChoice(unauthoredSpace, opens).selected.title).toBe('Flow');
+  });
+
+  /**
+   * The retryable story hands the fixture a Space that changes: it opens on
+   * `authoredSnapshot` and submits `editedSnapshot`. The fixture seeds `selected`
+   * once and never reconciles it, so an Edit withdrawing the opened Layout would
+   * make `canvasChoice` throw on the second render — a blank story rather than a
+   * degraded one. The Edit appends, and this is what says so, at `verify` rather
+   * than in a browser — including that it appends *something*, since an
+   * `editedSnapshot` that stopped differing from what the session loaded would
+   * leave the story's claim with nothing to show.
+   */
+  it('keeps the opened Layout when the retryable story submits its Edit', () => {
+    const edited = loadSpaceSnapshot(editedSnapshot);
+    if (!edited.ok) throw new Error(edited.errors.map((error) => error.message).join('\n'));
+
+    const opens = defaultRenderer(authoredSpace);
+
+    expect(canvasChoice(edited.space, opens).selected.title).toBe('Collection 1');
+    expect(edited.space.layouts.slice(0, authoredSpace.layouts.length)).toEqual(
+      authoredSpace.layouts,
+    );
+    expect(
+      edited.space.layouts.slice(authoredSpace.layouts.length).map((layout) => layout.title),
+    ).toEqual(['Collection 3']);
   });
 
   /**

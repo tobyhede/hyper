@@ -1,6 +1,6 @@
 # The retryable story draws the Space its session holds
 
-Status: ready-for-agent
+Status: resolved
 
 Surfaced by: issue 02's design loop. Deferred there deliberately, with the
 cheaper option taken. Settled by a grilling loop on 2026-08-19; the rejected
@@ -92,14 +92,49 @@ state survives.
 
 ## Acceptance
 
-- [ ] `RetryableWorkspaceSidebarFixture` draws the Space its own session holds, and `retrySnapshot` is gone.
-- [ ] The drawn Space comes from `createWorkingSpaceReader`, not from a second call to `loadSpaceSnapshot`.
-- [ ] `packages/app/package.json` gains `"#src/*"`, and no story imports a path starting with `../../`.
-- [ ] The submitted snapshot differs from the loaded one by the `Collection 3` Layout, and that Layout passes `positionedLayoutSchema`.
-- [ ] The Ladle spec proves `Collection 3` is drawn during the failure and after the retry.
-- [ ] The story comment names the application test that pairs with the claim.
-- [ ] The other six stories and the fixture's props are unchanged.
-- [ ] `pnpm verify`, `pnpm e2e` and `pnpm e2e:ladle` pass.
+- [x] `RetryableWorkspaceSidebarFixture` draws the Space its own session holds, and `retrySnapshot` is gone.
+- [x] The drawn Space comes from `createWorkingSpaceReader`, not from a second call to `loadSpaceSnapshot`.
+- [x] `packages/app/package.json` gains `"#src/*"`, and no story imports a path starting with `../../`. Issue 02 landed the entry; nothing further was needed.
+- [x] The submitted snapshot differs from the loaded one by the `Collection 3` Layout, and that Layout passes `positionedLayoutSchema`.
+- [x] The Ladle spec proves `Collection 3` is drawn during the failure and after the retry.
+- [x] The story comment names the application test that pairs with the claim.
+- [x] The other six stories and the fixture's props are unchanged.
+- [x] `pnpm verify`, `pnpm e2e` and `pnpm e2e:ladle` pass.
+
+## Answer
+
+Built on `retryable-story-space`, off `the-canvas-choice-is-one-module`.
+
+`spaces.ts` exports the literal it already parsed as `authoredSnapshot` and adds
+`editedSnapshot` beside it — the same literal one Edit later, with a third
+Layout `Collection 3` positioning three Cards the Space already holds and owning
+one Graph, `Trail`, over two of the spine's Edges. The Edit **appends**: the
+fixture seeds `selected` from the first Space through a `useState` initializer
+and never reconciles it, so an Edit that withdrew the opened Layout would make
+`canvasChoice` throw on the second render, with no boundary above it.
+
+`RetryableWorkspaceSidebarFixture` opens its session over `authoredSnapshot`,
+submits `editedSnapshot`, and passes `readWorkingSpace(state.working)` as the
+`space` prop through one `createWorkingSpaceReader`. `retrySnapshot` is gone,
+the fixture's props are unchanged, and the other six stories are untouched.
+
+Three proofs around the one claim, none of them the other two:
+
+- `story-spaces.test.ts` holds the Edit to appending — the opened Layout
+  survives it, and the earlier Layouts still come first. That is what keeps the
+  story renderable at all.
+- `RetryableWorkspaceSidebar.test.tsx` renders the story, waits for the failure
+  notice, and asserts `Collection 3` is drawn there and still drawn once Retry
+  settles at revision 1. Proven against the defect rather than only against the
+  fix: dropping the `space` prop again fails it with the notice up and no such
+  row.
+- `issue-14-workspace-sidebar.spec.ts` presses the same two visibilities in a
+  browser. The unit test is there as well because `pnpm verify` does not run
+  Ladle.
+
+The same finding also arrived as a review comment on issue 02's branch and was
+implemented there independently; that duplicate was dropped in favour of this
+branch, which the render test above came from.
 
 ## Decided, so it is not re-opened
 
