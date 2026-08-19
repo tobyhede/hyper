@@ -1,6 +1,6 @@
 # The sidebar story composes the Navigation it draws
 
-Status: ready-for-agent
+Status: resolved
 
 Surfaced by: the 2026-08-19 architecture review, candidate 1, and upheld by its
 adversarial audit as the only pair of confirmed, observable ADR 0052 violations
@@ -134,3 +134,20 @@ check whether `canvas-projection.test.ts` already pins
 - **A shared story harness is not built here.** Issues 03, 05, 06 and 07 of the design-system baseline will each want session-plus-resolver-plus-Navigation, and that is when a shared harness earns its place — with the second caller, not the first.
 
 ## Answer
+
+Implemented in `9f6a19a`. `WorkspaceSidebarFixture` now composes the production
+renderer resolver and Navigation, subscribes through `useSyncExternalStore`, and
+takes renderer selection, visible Graphs, Active Graph, activation, presenting,
+and exit behavior from those collaborators. The retryable fixture supplies one
+stable live-Space callback over its existing `createWorkingSpaceReader`, so the
+rendered Space and Navigation share the same translation. `newGraphId` is
+deterministic and injected once; `authoringDisabled` remains a direct boolean
+input.
+
+TDD evidence: the new Ladle assertion failed first because Echo appeared while
+Collection 1 was selected. It then passed and additionally proves Collection 2
+opens with Echo active, Graph activation is real, and presenting enters and
+exits through Navigation. Its application pairs are cited beside the test.
+Final verification: `pnpm verify` passed, `pnpm e2e` passed all 97 tests, and
+`pnpm e2e:ladle` passed 9 tests. The review's one partial finding about a second
+Space reader was fixed; final Standards and Spec reviews reported no findings.
