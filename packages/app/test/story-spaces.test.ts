@@ -42,7 +42,9 @@ describe('the story Spaces', () => {
    * once and never reconciles it, so an Edit withdrawing the opened Layout would
    * make `canvasChoice` throw on the second render — a blank story rather than a
    * degraded one. The Edit appends, and this is what says so, at `verify` rather
-   * than in a browser.
+   * than in a browser — including that it appends *something*, since an
+   * `editedSnapshot` that stopped differing from what the session loaded would
+   * leave the story's claim with nothing to show.
    */
   it('keeps the opened Layout when the retryable story submits its Edit', () => {
     const edited = loadSpaceSnapshot(editedSnapshot);
@@ -54,6 +56,9 @@ describe('the story Spaces', () => {
     expect(edited.space.layouts.slice(0, authoredSpace.layouts.length)).toEqual(
       authoredSpace.layouts,
     );
+    expect(
+      edited.space.layouts.slice(authoredSpace.layouts.length).map((layout) => layout.title),
+    ).toEqual(['Collection 3']);
   });
 
   /**
