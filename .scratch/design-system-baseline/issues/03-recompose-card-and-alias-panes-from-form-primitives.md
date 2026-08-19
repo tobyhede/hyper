@@ -13,10 +13,11 @@
 ## Audit note
 
 The production opened-Card surface now uses the shared Dialog and form
-primitives, but the catalogue proves only its ordinary interactive state. Add
-fixed, real-component stories for validation, long content, empty and refused
-Target choices, and the focus states named above. Card-choice architecture is
-owned separately by issue 10.
+primitives, but at the time of this note the catalogue proved only its
+ordinary interactive state — validation, long content, empty and refused
+Target choices, and the focus states named above still needed fixed,
+real-component stories. The Answer below records that delivery. Card-choice
+architecture is owned separately by issue 10.
 
 ## Answer
 
