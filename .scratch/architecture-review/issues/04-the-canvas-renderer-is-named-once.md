@@ -1,6 +1,6 @@
 # The canvas renderer is named once
 
-Status: ready-for-agent
+Status: resolved
 
 Surfaced by: the 2026-08-19 architecture review's first candidate, then by
 grilling the name rather than the change. The derivation defect that started it
@@ -189,3 +189,17 @@ Docs first, then the rename, so the rename diff is readable on its own:
 - **Half the rename was considered and refused.** Stopping at the in-memory boundary would leave `defaultView` contradicting the glossary in the persisted format, which is the same defect this ticket exists to end.
 
 ## Answer
+
+Implemented as a five-commit vocabulary stream. ADR 0054 records the prototype's
+roll-forward boundary and all workspace package versions now say `0.0.0`; ADR
+0055 names the Canvas renderer and refines ADR 0053. The application now uses
+`CanvasRendererId`, `canvasRendererKey`, `canvasRenderers`, `CanvasRenderers`, and
+`SelectedCanvasRenderer`, while the persisted field is `defaultRenderer`
+through schema, intake, storage, export, fixtures, and documentation.
+
+TDD evidence: the renamed public schema tests failed first (2 failures) before
+the field was rolled through the implementation, then 228 focused tests passed.
+Final verification: `pnpm verify` passed; `pnpm e2e` passed all 97 unchanged
+tests; `pnpm e2e:ladle` passed 8 tests. The two-axis review found one remaining
+`choice` value name and one plural `canvases` comment; both were corrected, and
+the final Standards and Spec re-reviews reported no findings.
