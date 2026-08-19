@@ -54,9 +54,11 @@ The signal itself is built and correct: `SpaceAuthoringState.replacementEpoch`
 (`packages/app/src/space-authoring.ts:136-150`), advanced in `acceptStoredSpace`
 and nowhere else (`:1147-1167`, increment at `:1164`).
 
-There are exactly **three** readers of it outside Authoring's own drain:
-`render-adapter.ts:327-338`, `App.tsx:518`, and nothing else. No component
-compares a captured epoch. There is **no shared contract test**.
+There are exactly **two** readers of it outside Authoring's own drain: the render
+adapter's subscriber (`render-adapter.ts:524-535`, which reads the epoch twice
+within the one subscription — before and after) and the canvas key
+(`App.tsx:639`). Nothing else. No component compares a captured epoch, and there
+is **no shared contract test**.
 
 ## Each draft the ADR names, against the tree
 
@@ -147,9 +149,14 @@ Every path is exercised; no draft is ever open when it is.
   remounted; it opens no draft.
 
 **None of them opens a title editor, starts a connection, or begins a drag
-first.** So every "yes" in the table holds by construction and by reading, and
-not one of them is defended against a regression. The ADR's "one shared contract
-test" does not exist.
+first.** So every "yes" in the table held by construction and by reading, and not
+one of them was defended against a regression.
+
+That gap is now closed by `packages/app/test/replacement-invalidation.test.tsx` —
+the ADR's "one shared contract test", built after this investigation and
+described in the answer below. What it does *not* close is the argument above:
+two of its three cases still pass under either single mechanism, which is the
+over-determination measured rather than reasoned.
 
 The nearest precedent for the guarantee is `editing.spec.ts:1022`, "changing the
 renderer closes an opened Card rather than stranding its editor" — the same shape
@@ -160,21 +167,40 @@ for a different trigger.
 - [ ] A decision on silent discard versus an acknowledgement, recorded here.
 - [ ] A decision on what "focuses the canvas" means, recorded here.
 - [ ] A decision on the two unreachable survivors, recorded here.
-- [ ] AGENTS.md and `03`'s answer no longer say the half is simply unbuilt.
-- [ ] The covered cases are pinned, so they stop holding by accident: an inline
-      title edit, an opened-Card draft and a drag, each open when a stored Space
-      is accepted. This is the ADR's "one shared contract test", which does not
-      exist today.
+- [ ] A decision on whether an arriving conflict should commit an in-progress
+      inline rename, recorded here. Surfaced by 5 below: the modal that carries
+      `Accept remote` blurs the field, and blur is that editor's commit.
+- [x] `docs/agents/editing-and-persistence.md` (where AGENTS.md's install-gate
+      rule now lives) and `03`'s answer no longer say the half is simply
+      unbuilt. Both now carry the finding in a sentence and point here for the
+      argument; `03`'s Direction keeps what was believed when it was written,
+      marked as corrected rather than rewritten.
+- [x] The *reachable* covered cases are pinned, so they stop holding by
+      accident: an opened-Card draft and a drag, each open when a stored Space is
+      accepted. This is the ADR's "one shared contract test", and it is
+      `packages/app/test/replacement-invalidation.test.tsx`. It asserts the
+      discard and nothing else — not that the discard is silent, not where focus
+      lands — so it freezes none of the decisions above. The inline title edit is
+      *not* pinned, and 5 below says why it cannot be through the app's own
+      trigger.
 
 ## Answer
+
+**This records what the investigation established; it does not resolve the
+ticket.** `Status:` stays `ready-for-human` because the three decisions in
+Comments are open, and the Acceptance boxes above are the ones that close it.
+Read the heading as the answer to "is this built?", which was answerable from the
+tree, and not as the answer to "what should happen?", which is not.
 
 The half is not unbuilt — it is unevenly built, and nothing tests the part that
 works. Two of the four drafts ADR 0042 names have nothing to invalidate: no
 picker and no armed destructive control exist, only their callerless completion
 kinds. The two that do exist are discarded on every replacement already, by a
-subtree unmount nothing tests and a key that is currently redundant. Three
-things are genuinely left in the code, and only the first is a defect an author
-can reach; a fourth item is the prose that sent this investigation the wrong way.
+subtree unmount and a key that is currently redundant. Three things are genuinely
+left in the code, and only the first is a defect an author can reach. Two further
+items needed no decision and are therefore done rather than deferred: the prose
+that sent this investigation the wrong way, and the contract test — which is what
+makes "nothing tests them" a sentence about the past.
 
 ### 1. Focus after a replacement contradicts the ADR
 
@@ -234,13 +260,58 @@ requestAnimationFrame(() => {
 A replacement landing inside that frame leaves `selectCard` naming a Card from
 the Space that is gone. Same unreachability argument as 2, and the same question.
 
-### 4. The prose that sends the next reader the wrong way
+### 4. The prose that sent the next reader the wrong way — corrected
 
-This part needs no decision. AGENTS.md's "not built" sentence and `03`'s closing
-sentence should say what this ticket establishes instead: that the drafts which
-exist are already discarded, by an unmount nothing tests and one redundant key;
-that the two drafts needing new work do not exist yet; and that what remains is
-focus behaviour plus two survivors behind an unreachable trigger.
+This part needed no decision, so it is done rather than waiting with the rest.
+The "not built" sentence — which moved from AGENTS.md into
+`docs/agents/editing-and-persistence.md` when the scoped agent docs were split
+out — and `03`'s closing sentence now say what this ticket establishes: that the
+drafts which exist are already discarded, by an unmount and one redundant key;
+that the two drafts needing new work do not exist yet; that the contract test in
+5 below now pins the discard; and that what remains is focus behaviour and two
+survivors behind an unreachable trigger. Both point here rather than restating
+the argument. `03`'s Direction is left as written and marked as
+corrected — it is the record of what was believed when the epoch gate was built,
+and rewriting it would falsify the thing the ticket exists to preserve.
+
+### 5. The contract test, and what measuring it added
+
+Built as `packages/app/test/replacement-invalidation.test.tsx`, since it needed
+no decision either: it pins the discard ADR 0042 already requires and asserts
+nothing about acknowledgement or focus, so it survives whichever way the
+questions below are answered.
+
+Mutation-checking it turned this ticket's central claim from an argument into a
+measurement. **K** deletes the canvas key, **R** stops the render adapter's epoch
+subscriber clearing, **N** makes `openFresh` retain `openedCardId`:
+
+| case | K | R | K+R | N |
+|---|---|---|---|---|
+| opened-Card pane | passes | passes | passes | **fails** |
+| in-flight drag | passes | **fails** | **fails** | passes |
+
+The drag is the one case a single mutation kills, and `reconcile` is why — a
+surviving Card takes its position from the live node, so a store that kept its
+projection would go on drawing the Card where the pointer left it, under the
+accepted Space's title. An unmount cannot reach a store.
+
+**The inline title field is absent from that table, and the reason is a finding
+of its own.** It was in the first draft of this test, written when the conflict
+banner was inline chrome and a workspace could be mounted already-conflicted with
+its Cards still reachable. `Accept remote` now lives in a modal `AlertDialog`
+(`PersistenceControl.tsx`), so the draft has to be opened *before* the conflict is
+raised — and raising it traps focus into the dialog, which blurs the field, and
+blur is `CardTitleEditor`'s own commit. Measured, not reasoned: with the field
+open and a rename typed, the input is gone from the DOM by the time
+`persistence-accept-remote` is on screen, and the typed text has been committed.
+There is no open draft left for the replacement to discard.
+
+Two things follow. First, the over-determination this ticket opened with is
+**undefended**: the canvas key and the projection reset are each sufficient for
+the drafts inside the canvas subtree, only the title field distinguished them,
+and with it unreachable `K` alone breaks nothing in the suite. Second, there is a
+new product question — *should a conflict arriving under an in-progress rename
+commit it?* — which is listed with the others below rather than answered here.
 
 ## Comments
 
@@ -274,5 +345,5 @@ Three separable answers are needed:
   describes, which has some value on its own.
 
 Until the first is answered, building anything here is guessing at product
-behaviour. The answer's fourth item is the exception — the prose correction
-stands whichever way these three go, so it does not wait on them.
+behaviour. The answer's fourth item was the exception — the prose correction
+stands whichever way these three go, so it did not wait on them and is done.

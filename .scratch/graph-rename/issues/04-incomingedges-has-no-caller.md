@@ -54,7 +54,10 @@ there are none.
       reason a reader can find from the module.
 - [x] The curation doc at the top of `packages/graph/src/index.ts` matches
       whichever answer is taken.
-- [x] `pnpm verify` green.
+- [x] `pnpm verify` green, with its output recorded at the close of the Answer.
+- [x] `pnpm e2e` green — not asked for when this list was written, but AGENTS.md
+      calls for it on a change to a package the graph renders from, and this one
+      removed a function from `packages/graph`.
 
 ## Answer
 
@@ -108,3 +111,19 @@ Nothing else changed, and nothing else needed to:
   falsify the record that produced this ticket. Not edited.
 
 Behaviour-preserving, as predicted: there were no callers.
+
+`pnpm verify` green: 100 test files, 1058 tests. `pnpm e2e` green: 72 passed.
+Both were run at the tip of `chore/clear-small-items`, with this change already
+in it as commit `9a734db`, rather than at the moment it was committed — the
+acceptance box above was ticked without recording anything, and these are the
+numbers it should have carried. The tip also carries
+`packages/app/test/replacement-invalidation.test.tsx`, which is the one file by
+which these numbers exceed what this change alone would give; it touches no
+source and nothing here depends on it.
+
+`chore/clear-small-items` was never merged, and these notes reached `main`
+through a later salvage instead. The numbers above are the record of that branch
+and are left as measured; the salvage, rebased onto `main` at `86ed160`, ran
+`pnpm verify` green at 150 test files and 1595 tests, and `pnpm e2e` green at 115
+passed. The contract test arrived there as two tests rather than three —
+`02-…`'s section 5 says which case was dropped and why.

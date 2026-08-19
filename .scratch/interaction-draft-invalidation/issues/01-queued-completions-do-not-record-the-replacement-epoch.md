@@ -47,6 +47,11 @@ unbuilt. It is a larger surface — title fields, pickers, React Flow's
 connection attempt, armed destructive controls — and does not have to land in
 the same change, but the epoch it reads is the same one.
 
+(Corrected later, after this ticket resolved: that second paragraph is what was
+believed here, and checking it against the tree did not bear it out. See the
+close of the Answer below and
+`02-interaction-draft-invalidation-is-mostly-already-covered.md`.)
+
 ## Constraint that must survive
 
 The epoch stays invalidation rather than a registry — Space Authoring does not
@@ -88,8 +93,20 @@ accepted snapshot comes through untouched — it fails without the gate by writi
 the abandoned drag's `{111, 222}` over the stored `{900, 700}`. The second pins
 the skip, and fails if the drain breaks at the first stale entry instead.
 
-Interaction-draft invalidation — the other half of ADR 0042 — is deliberately
-still unbuilt. It reads this same epoch.
+Interaction-draft invalidation — the other half of ADR 0042 — reads this same
+epoch, and is unevenly built rather than unbuilt. Two of the four drafts the
+ADR names, a picker's unconfirmed target and an armed destructive control, have
+nothing in the tree to invalidate; the two that do are discarded on every
+replacement already, by a subtree unmount and the render adapter's own epoch
+reset, behind a canvas key that is currently redundant. The ADR's one shared
+contract test is `packages/app/test/replacement-invalidation.test.tsx`, which
+pins that discard for the two drafts the app's own trigger can leave open — the
+opened-Card pane and an in-flight drag. The inline title field is not one of
+them: the modal carrying `Accept remote` blurs it, and blur is its commit. What
+is genuinely left is that question, the focus effect, which cannot tell a
+replacement from a pane close, and two survivors behind a trigger no input
+reaches. Established after this ticket resolved, and written out once in
+`02-interaction-draft-invalidation-is-mostly-already-covered.md`.
 
 `pnpm verify` green: 86 test files, 871 tests. `pnpm e2e` green: 71 passed,
 unchanged.

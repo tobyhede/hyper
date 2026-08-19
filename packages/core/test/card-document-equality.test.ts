@@ -122,10 +122,11 @@ describe('a stored markdown document is the card less its id', () => {
     expect(disagreements).toEqual([]);
     /*
      * The size of the product, asserted after it, because a loop that visits
-     * nothing agrees with itself perfectly: empty one of the four lists and the
-     * line above passes while checking no value at all. Asserted as a literal
-     * rather than as the product of the four lengths, because the product moves
-     * with whatever it is measuring and would notice only the empty case.
+     * nothing agrees with itself perfectly: empty one of the three lists and
+     * the line above passes while checking no value at all. Asserted as a
+     * literal rather than as the product of the three lengths, because the
+     * product moves with whatever it is measuring and would notice only the
+     * empty case.
      *
      * It is also the one number written down twice. The issue that resolved
      * this file quotes it, and quoted a shorter enumeration beside it for as
