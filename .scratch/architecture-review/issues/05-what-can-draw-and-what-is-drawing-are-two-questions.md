@@ -1,6 +1,6 @@
 # What can draw and what is drawing are two questions
 
-Status: ready-for-agent
+Status: resolved
 
 Surfaced by: grilling issue 06's candidate. The module answers two questions and
 returns them as one value, which is why its name kept coming out wrong.
@@ -82,3 +82,16 @@ Call sites to convert: `App.tsx`, `WorkspaceSidebar.tsx`,
 - [ ] `pnpm verify`, `pnpm e2e` and `pnpm e2e:ladle` pass, with real output quoted. `pnpm e2e` green and **unchanged** — nothing here is meant to reach behaviour.
 
 ## Answer
+
+Implemented in `a8edfde`. `canvasRenderers(space)` is now total and returns only
+the computed and authored groups; `currentRenderer(renderers, id)` returns the
+reference-identical current row from that supplied list and preserves the
+existing missing-Layout refusal. App, Sidebar, story support, and tests build the
+list once and pass it into the lookup.
+
+TDD evidence: the total-list tracer failed when the old operation dereferenced
+an absent id, and the current-row tracer then failed because `currentRenderer`
+did not exist. Both went green before call-site conversion. Final verification:
+`pnpm verify` passed, `pnpm e2e` passed all 97 unchanged tests, and
+`pnpm e2e:ladle` passed 8 tests. Standards and Spec reviews each reported zero
+findings.
