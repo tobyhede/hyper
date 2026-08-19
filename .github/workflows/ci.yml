@@ -194,3 +194,78 @@ jobs:
             playwright-report/
             test-results/
           retention-days: 7
+
+  ladle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # ADR 0052 makes a Ladle behaviour test half of every surface ticket's
+    # acceptance evidence. Until this job existed nothing but a developer's
+    # memory executed `pnpm e2e:ladle`, so the evidence accumulated ungated.
+    #
+    # It is its own job rather than a step in `verify` because `verify` —
+    # typecheck, typecheck:packages, ui:catalog:check, lint, format:check,
+    # test:coverage — has never needed a browser binary, runs on a plain
+    # `ubuntu-latest`, and is the loop developers run constantly. Two commands,
+    # two jobs. It is its own job rather than a second command in `e2e` because
+    # a red catalogue and a red application are different diagnoses, and the
+    # check name on a pull request should say which one failed.
+    #
+    # Every environment decision below is the `e2e` job's above, made for the
+    # reasons its comments give and not repeated here: the same image pinned by
+    # tag *and* digest (a bump moves both, together with `@playwright/test` in
+    # the lockfile), `--ipc=host` for Chromium's `/dev/shm`, `--init` for the
+    # helpers that reparent onto a PID 1 that is not ours, no
+    # `actions/setup-node`, and the `.node-version` assertion that restores the
+    # Node pin dropping `setup-node` would otherwise lose. Two things differ,
+    # and both are commented where they appear: the cache key and the artifact
+    # name.
+    container:
+      image: mcr.microsoft.com/playwright:v1.61.1-noble@sha256:5b8f294aff9041b7191c34a4bab3ac270157a28774d4b0660e9743297b697e48
+      options: --ipc=host --init
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false }
+      - name: The image's Node must satisfy .node-version
+        run: |
+          want="$(cut -d. -f1 < .node-version)"
+          have="$(node -p 'process.versions.node.split(".")[0]')"
+          [ "$want" = "$have" ] || {
+            echo "::error::.node-version wants Node $want; the container ships $have. Move the image tag and digest to a Playwright image built on Node $want."
+            exit 1
+          }
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+      - name: Resolve the pnpm store
+        id: pnpm-store
+        run: echo "path=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+      # Its own key rather than `e2e`'s, although the two archives really are
+      # interchangeable: both jobs are `container:` jobs, so both resolve the
+      # store under `/github/home/…` and either could restore the other's.
+      # Sharing would keep one copy, but on a cold run both jobs build the
+      # store, both try to save it, and the loser logs a 409 — benign and noisy
+      # on exactly the runs a reader is already reading the log. A second copy
+      # against the repository's 10 GB cache limit is the cheaper of the two.
+      # Sharing `verify`'s key is not on the table: it resolves its store under
+      # `/home/runner/…`, so each job would restore the other's archive into a
+      # path it never reads.
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ steps.pnpm-store.outputs.path }}
+          key: pnpm-store-ladle-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: pnpm-store-ladle-${{ runner.os }}-
+      - run: pnpm install --frozen-lockfile
+
+      # Starts `ladle serve --noWatch` itself, so there is no build step here.
+      - run: pnpm e2e:ladle
+
+      # Its own artifact name. `upload-artifact` refuses a second upload under
+      # a name already claimed in the same run, and both browser jobs can fail
+      # in one run — sharing `playwright-report` would cost whichever finished
+      # second its report, which is the run where you most want both.
+      - if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ladle-playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7

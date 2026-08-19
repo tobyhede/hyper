@@ -69,3 +69,25 @@ runtime commands, with Ladle E2E added as its own parallel required CI job. The
 manifest, complete evidence backfill, static checker, runtime validation and CI
 job land coherently: there is no grandfather list. A stable state without both
 proofs moves to `review` or is removed.
+
+## Comments
+
+### 2026-08-19 — the CI job moves to Issue 15
+
+The criterion "Ladle E2E runs as its own required CI job" is now owned by
+[Issue 15](15-run-the-ladle-parity-suite-in-ci.md), which is blocked by nothing.
+This ticket is blocked by 03, 04, 05, 06, 07, 11 and 14 — every one of which is
+required to land a stable story and its Ladle behaviour test — so holding the job
+here means six tickets' worth of parity evidence accumulates before anything
+executes any of it.
+
+What stays here is unchanged: the parity inventory, the `@parity:<id>` tags, the
+runtime collection validation, and `ui:catalog:check`'s traceability
+enforcement. Issue 15 delivers only the job that runs the suite, so the
+"land coherently, no grandfather list" rule above still governs the manifest and
+the checker — it just no longer has to wait for a workflow file.
+
+One correction to carry: the retry half of the criterion assumed a diagnostic
+retry exists. `playwright.ladle.config.ts` sets `retries: 0`, so there is nothing
+for `failOnFlakyTests` to change. Issue 15 settles which of the two shapes both
+suites use.

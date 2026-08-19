@@ -6,7 +6,11 @@ export default defineConfig({
   testDir: './packages/app/ladle-e2e',
   fullyParallel: true,
   forbidOnly: !!process.env['CI'],
-  retries: 0,
+  // One flake policy for both suites, matching `playwright.config.ts`: an
+  // infrastructure blip retries instead of reddening the build, and a real
+  // flake still fails the run with its retries recorded in the report.
+  failOnFlakyTests: !!process.env['CI'],
+  retries: process.env['CI'] ? 2 : 0,
   reporter: 'list',
   use: {
     ...devices['Desktop Chrome'],

@@ -25,6 +25,7 @@ remains the accounting source for the remaining extraction order.
 
 - [Restore one Card-choice model](issues/10-restore-one-card-choice-model.md) — collapse the three production implementations back to two presentations over one behavior.
 - [Stabilise the E2E fixture startup gate](issues/12-stabilise-e2e-fixture-startup.md) — turn the full-suite-only startup failure into a reproduced and fixed race.
+- [Run the Ladle parity suite in CI](issues/15-run-the-ladle-parity-suite-in-ci.md) — carve the CI job out of Issue 08, which every remaining surface ticket blocks, so parity evidence is gated on the day it lands.
 
 ## Fog
 
