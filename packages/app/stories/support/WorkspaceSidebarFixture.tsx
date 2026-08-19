@@ -60,9 +60,9 @@ export function WorkspaceSidebarFixture({
   // that reproduces the memo without the reason for it is reproducing the shape
   // of production rather than its behaviour.
   //
-  // One module answers which canvases exist and which is taken, and the header
+  // One module answers which canvas renderers exist and which is current, and the header
   // below reads the row it named rather than a title of the fixture's own.
-  const choice = canvasRenderers(space, selected);
+  const renderers = canvasRenderers(space, selected);
   // Colours the way the sidebar's own consumer gets them, and deliberately not
   // through `canvasProjection`: that needs a resolved strategy, so a story about
   // a sidebar would run elkjs to find out what colour a Graph's glyph is.
@@ -73,7 +73,7 @@ export function WorkspaceSidebarFixture({
       sidebar={
         <WorkspaceSidebar
           workspaceTitle={space.title}
-          canvas={{ choice, onSelect: setSelected }}
+          canvas={{ renderers, onSelect: setSelected }}
           graph={{
             graphs: space.graphs,
             activeGraphId: activeGraph,
@@ -103,7 +103,7 @@ export function WorkspaceSidebarFixture({
           }}
         />
       }
-      header={<SelectedCanvasRenderer renderer={choice.selected} />}
+      header={<SelectedCanvasRenderer renderer={renderers.selected} />}
       notice={<PersistenceNotice persistence={persistence} onRetry={onRetry} />}
     >
       <div data-testid="workspace-canvas-stand-in" />

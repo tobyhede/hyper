@@ -48,11 +48,11 @@ const GRID: CanvasRendererId = { kind: 'view', view: 'grid' };
 
 describe('canvasRenderers', () => {
   it('offers every built-in View and every authored Layout, in the order each is declared', () => {
-    const choice = canvasRenderers(AUTHORED, FLOW);
+    const renderers = canvasRenderers(AUTHORED, FLOW);
 
-    expect(choice.computed.map((renderer) => renderer.title)).toEqual(['Flow', 'Grid']);
-    expect(choice.computed.map((renderer) => renderer.selection)).toEqual([FLOW, GRID]);
-    expect(choice.authored).toEqual([
+    expect(renderers.computed.map((renderer) => renderer.title)).toEqual(['Flow', 'Grid']);
+    expect(renderers.computed.map((renderer) => renderer.selection)).toEqual([FLOW, GRID]);
+    expect(renderers.authored).toEqual([
       { selection: { kind: 'layout', layoutId: FIRST_LAYOUT }, title: 'Collection 1' },
       { selection: { kind: 'layout', layoutId: SECOND_LAYOUT }, title: 'Collection 2' },
     ]);
@@ -60,11 +60,11 @@ describe('canvasRenderers', () => {
 
   /** A Space authors its first Layout by editing a View (ADR 0025), so this is how one opens. */
   it('offers the computed group before a Space owns any Layout', () => {
-    const choice = canvasRenderers(space(), FLOW);
+    const renderers = canvasRenderers(space(), FLOW);
 
-    expect(choice.computed).toHaveLength(2);
-    expect(choice.authored).toEqual([]);
-    expect(choice.selected.title).toBe('Flow');
+    expect(renderers.computed).toHaveLength(2);
+    expect(renderers.authored).toEqual([]);
+    expect(renderers.selected.title).toBe('Flow');
   });
 
   /**

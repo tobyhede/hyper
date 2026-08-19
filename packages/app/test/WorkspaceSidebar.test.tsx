@@ -78,7 +78,7 @@ const LAYOUT: CanvasRenderer = {
 const settledProps = (): WorkspaceSidebarProps => ({
   workspaceTitle: 'Workspace',
   canvas: {
-    choice: { computed: [FLOW, GRID], authored: [], selected: FLOW },
+    renderers: { computed: [FLOW, GRID], authored: [], selected: FLOW },
     onSelect: vi.fn(),
   },
   graph: {
@@ -104,7 +104,7 @@ const settledProps = (): WorkspaceSidebarProps => ({
 
 const withLayout = (props: WorkspaceSidebarProps): WorkspaceSidebarProps => ({
   ...props,
-  canvas: { ...props.canvas, choice: { ...props.canvas.choice, authored: [LAYOUT] } },
+  canvas: { ...props.canvas, renderers: { ...props.canvas.renderers, authored: [LAYOUT] } },
 });
 
 describe('WorkspaceSidebar', () => {
@@ -130,7 +130,7 @@ describe('WorkspaceSidebar', () => {
     const base = withLayout(settledProps());
     const props: WorkspaceSidebarProps = {
       ...base,
-      canvas: { ...base.canvas, choice: { ...base.canvas.choice, selected: LAYOUT } },
+      canvas: { ...base.canvas, renderers: { ...base.canvas.renderers, selected: LAYOUT } },
     };
     draw(<WorkspaceSidebar {...props} />);
 

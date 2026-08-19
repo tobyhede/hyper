@@ -42,11 +42,11 @@ export interface WorkspaceSidebarProps {
      * contract a hand-built literal must keep rather than one the compiler
      * enforces, and `canvas-renderers.ts` is where a caller should get one.
      */
-    readonly choice: CanvasRenderers;
+    readonly renderers: CanvasRenderers;
     /**
      * Hands back the bare selection, which is what Navigation takes. The row's
      * title belongs to whoever built the list: a caller that has to name what is
-     * drawing reads `choice.selected` rather than deriving a second title of its
+     * drawing reads `renderers.selected` rather than deriving a second title of its
      * own.
      */
     readonly onSelect: (selection: CanvasRendererId) => void;
@@ -217,8 +217,8 @@ export function WorkspaceSidebar({
           <SidebarGroupLabel>Computed views</SidebarGroupLabel>
           <SidebarGroupContent>
             <CanvasRenderers
-              renderers={canvas.choice.computed}
-              selected={canvas.choice.selected}
+              renderers={canvas.renderers.computed}
+              selected={canvas.renderers.selected}
               onSelect={onCanvas(canvas.onSelect)}
             />
           </SidebarGroupContent>
@@ -227,14 +227,14 @@ export function WorkspaceSidebar({
         <SidebarGroup>
           <SidebarGroupLabel>Authored layouts</SidebarGroupLabel>
           <SidebarGroupContent>
-            {canvas.choice.authored.length === 0 ? (
+            {canvas.renderers.authored.length === 0 ? (
               <NothingYet testId="no-authored-layouts">
                 None yet — editing a view creates one.
               </NothingYet>
             ) : (
               <CanvasRenderers
-                renderers={canvas.choice.authored}
-                selected={canvas.choice.selected}
+                renderers={canvas.renderers.authored}
+                selected={canvas.renderers.selected}
                 onSelect={onCanvas(canvas.onSelect)}
               />
             )}

@@ -108,7 +108,7 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
     // the one module that answers it. Memoized on the same two values the
     // renderer is, and for the same reason: a Layout authored by the last Edit
     // is a row here on the next render, and nothing else moves it.
-    const choice = useMemo(
+    const renderers = useMemo(
       () => canvasRenderers(rendererSpace, selectedRenderer),
       [rendererSpace, selectedRenderer],
     );
@@ -575,7 +575,7 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
     const sidebar = (
       <WorkspaceSidebar
         workspaceTitle={rendererSpace.title}
-        canvas={{ choice, onSelect: selectCanvasRenderer }}
+        canvas={{ renderers, onSelect: selectCanvasRenderer }}
         graph={{
           graphs: projection.visibleGraphs,
           activeGraphId,
@@ -609,7 +609,7 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
     return (
       <AppShell
         sidebar={sidebar}
-        header={<SelectedCanvasRenderer renderer={choice.selected} />}
+        header={<SelectedCanvasRenderer renderer={renderers.selected} />}
         notice={
           <PersistenceNotice
             persistence={sessionState.persistence}
