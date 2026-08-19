@@ -97,6 +97,12 @@ const RendererIcon = ({ selection }: { readonly selection: CanvasRendererId }): 
 /**
  * One group of the single canvas choice.
  *
+ * Named for the group it draws and not for what it draws — `CanvasRenderers` is
+ * the aggregate this takes one list *out of*, and one identifier meaning both
+ * is what ADR 0055 is about. It compiles today only because that import is
+ * type-only, so the two names sit in different declaration spaces; dropping the
+ * `type` or adding a value export under that name turns it into TS2440.
+ *
  * Computed Views and authored Layouts are drawn as two groups of one list and
  * not as two controls: exactly one item across both is pressed, and there is no
  * value anywhere meaning "the other group is the one drawing" (ADR 0053).
@@ -105,7 +111,7 @@ const RendererIcon = ({ selection }: { readonly selection: CanvasRendererId }): 
  * groups are asked the same question by the same value. It cannot answer twice
  * because there is only one row it can be.
  */
-function CanvasRenderers({
+function RendererGroup({
   renderers,
   selected,
   onSelect,
@@ -216,7 +222,7 @@ export function WorkspaceSidebar({
         <SidebarGroup>
           <SidebarGroupLabel>Computed views</SidebarGroupLabel>
           <SidebarGroupContent>
-            <CanvasRenderers
+            <RendererGroup
               renderers={canvas.renderers.computed}
               selected={canvas.renderers.selected}
               onSelect={onCanvas(canvas.onSelect)}
@@ -232,7 +238,7 @@ export function WorkspaceSidebar({
                 None yet — editing a view creates one.
               </NothingYet>
             ) : (
-              <CanvasRenderers
+              <RendererGroup
                 renderers={canvas.renderers.authored}
                 selected={canvas.renderers.selected}
                 onSelect={onCanvas(canvas.onSelect)}
