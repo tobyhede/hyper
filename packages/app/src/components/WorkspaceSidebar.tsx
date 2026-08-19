@@ -1,5 +1,5 @@
 import type { ReactNode, Ref } from 'react';
-import type { BuiltInViewId, Graph } from '@project/core';
+import type { BuiltInViewId, Graph, GraphId } from '@project/core';
 import type { SpaceSessionState } from '@project/persistence';
 import {
   AddCardControl,
@@ -56,7 +56,7 @@ export interface WorkspaceSidebarProps {
     readonly graphs: readonly Graph[];
     readonly colorByGraphId: Readonly<Record<string, string>>;
     readonly activeGraphId: string | null;
-    readonly onActivate: (graphId: string) => void;
+    readonly onActivate: (graphId: GraphId) => void;
     readonly onPresent: () => void;
     readonly presenting?: boolean;
     readonly onExitPresenting: () => void;

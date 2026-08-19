@@ -577,7 +577,7 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
           graphs: projection.visibleGraphs,
           activeGraphId,
           colorByGraphId: projection.colors,
-          onActivate: (graphId) => activateGraph(uuidSchema.parse(graphId)),
+          onActivate: activateGraph,
           onPresent: present,
           presenting,
           onExitPresenting: exitPresenting,

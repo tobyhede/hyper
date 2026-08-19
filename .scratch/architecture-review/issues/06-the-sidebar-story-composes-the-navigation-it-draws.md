@@ -1,6 +1,6 @@
 # The sidebar story composes the Navigation it draws
 
-Status: ready-for-agent
+Status: resolved
 
 Surfaced by: the 2026-08-19 architecture review, candidate 1, and upheld by its
 adversarial audit as the only pair of confirmed, observable ADR 0052 violations
@@ -125,7 +125,7 @@ check whether `canvas-projection.test.ts` already pins
 - [ ] `newGraphId` is deterministic and injected once at composition.
 - [ ] The two Ladle assertions were seen failing before the fix and pass after.
 - [ ] Each claim names its application pair, cited by file and test name.
-- [ ] `pnpm verify`, `pnpm e2e` and `pnpm e2e:ladle` pass, with real output quoted.
+- [x] `pnpm verify`, `pnpm e2e` and `pnpm e2e:ladle` pass, with real output quoted. See "Verification" below.
 
 ## Decided — do not re-open
 
@@ -134,3 +134,64 @@ check whether `canvas-projection.test.ts` already pins
 - **A shared story harness is not built here.** Issues 03, 05, 06 and 07 of the design-system baseline will each want session-plus-resolver-plus-Navigation, and that is when a shared harness earns its place — with the second caller, not the first.
 
 ## Answer
+
+Implemented in `9f6a19a`. `WorkspaceSidebarFixture` now composes the production
+renderer resolver and Navigation, subscribes through `useSyncExternalStore`, and
+takes renderer selection, visible Graphs, Active Graph, activation, presenting,
+and exit behavior from those collaborators. The retryable fixture supplies one
+stable live-Space callback over its existing `createWorkingSpaceReader`, so the
+rendered Space and Navigation share the same translation. `newGraphId` is
+deterministic and injected once; `authoringDisabled` remains a direct boolean
+input.
+
+TDD evidence: the new Ladle assertion failed first because Echo appeared while
+Collection 1 was selected. It then passed and additionally proves Collection 2
+opens with Echo active, Graph activation is real, and presenting enters and
+exits through Navigation. Its application pairs are cited beside the test.
+Final verification: `pnpm verify` passed, `pnpm e2e` passed all 97 tests, and
+`pnpm e2e:ladle` passed 9 tests. The review's one partial finding about a second
+Space reader was fixed; final Standards and Spec reviews reported no findings.
+
+## Verification
+
+Re-run at `ab95fcc`, so these are the numbers for the branch as it stands rather
+than for `9f6a19a`, which the Answer above reports on. That commit and the three
+before it are the review follow-ups; the story fixture, the story id block and
+this record moved, and nothing in the application did. All three exited 0. The
+Playwright blocks quote the header, the specs this issue is about, and the
+summary; the vitest block is the tail of `test:coverage`.
+
+`pnpm verify`, exit 0:
+
+```
+> pnpm typecheck && pnpm typecheck:packages && pnpm ui:catalog:check && pnpm lint && pnpm format:check && pnpm test:coverage
+All matched files use Prettier code style!
+ Test Files  129 passed (129)
+      Tests  1296 passed | 8 skipped (1304)
+   Duration  22.66s (transform 2.42s, setup 6.76s, collect 42.55s, tests 39.04s, environment 11.36s, prepare 7.35s)
+```
+
+`pnpm e2e`, exit 0. Ninety-seven tests, the count the branch inherited — nothing
+here was meant to reach application behaviour, and the two renderer-touching
+specs among them are quoted:
+
+```
+Running 97 tests using 4 workers
+  ✓  41 [chromium] › packages/app/e2e/editing.spec.ts:1581:1 › an opened Card is modal, so no renderer change can strand its editor (2.1s)
+  ✓  80 [chromium] › packages/app/e2e/presenting.spec.ts:173:1 › returning to the overview restores the space and its gestures (3.0s)
+
+  97 passed (46.7s)
+```
+
+`pnpm e2e:ladle`, exit 0. This is the suite that carries this issue's evidence,
+and `verify` does not run it — the two assertions the Answer describes are in
+the spec at `:135`, which draws and activates only the selected Layout's Graphs:
+
+```
+Running 9 tests using 4 workers
+  ✓  6 packages/app/ladle-e2e/issue-14-workspace-sidebar.spec.ts:91:1 › Workspace Sidebar stories render quiet, retryable, and presenting states (868ms)
+  ✓  7 packages/app/ladle-e2e/issue-14-workspace-sidebar.spec.ts:135:1 › Workspace Sidebar story draws and activates only the selected Layout graphs (589ms)
+  ✓  9 packages/app/ladle-e2e/issue-14-workspace-sidebar.spec.ts:191:1 › Workspace Sidebar stories are isolated from the Ladle catalogue (570ms)
+
+  9 passed (5.6s)
+```

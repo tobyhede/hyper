@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import type { Space } from '@project/graph';
 import {
   MemorySpaceBackend,
@@ -12,15 +12,54 @@ import { AppShell } from '@project/ui';
 // how a package boundary gets crossed without naming one (AGENTS.md).
 import { canvasRenderers, currentRenderer } from '#src/canvas-renderers';
 import { graphColorMap } from '#src/colors';
-import { defaultRenderer, type CanvasRendererId } from '#src/renderer';
+import { createNavigation, type Navigation } from '#src/navigation';
+import { createRendererResolver, defaultRenderer, type ResolveRenderer } from '#src/renderer';
 import { createWorkingSpaceReader } from '#src/snapshot';
 import { PersistenceControl, PersistenceNotice } from '#components/PersistenceControl';
 import { SelectedCanvasRenderer, WorkspaceSidebar } from '#components/WorkspaceSidebar';
-import { authoredSnapshot, authoredSpace, editedSnapshot } from './spaces';
+import { authoredSnapshot, authoredSpace, editedSnapshot, storyGraphIds } from './spaces';
+
+/**
+ * Production Navigation, plus the one seam that lets an instance outlive the
+ * reader it was composed with.
+ *
+ * Navigation resolves every selection against `currentSpace()` — that is what
+ * stops it naming a renderer the Space does not hold — so what it holds has to
+ * be one indirection over the reader that answers *now*, not the closure that
+ * answered at mount. A `useRef` is the usual shape for that and is refused
+ * here: React's own lint rule forbids reading a ref during render, and the
+ * initializer below runs during one. The mutable reader is therefore a local of
+ * this function, reached only by the Navigation composed over it and replaced
+ * only through `readFrom` — so the render path cannot read it at all, and the
+ * effect that calls `readFrom` is its one writer.
+ */
+function composeStoryNavigation(
+  read: () => Space,
+  resolveRenderer: ResolveRenderer,
+  presenting: boolean,
+): { readonly navigation: Navigation; readonly readFrom: (next: () => Space) => void } {
+  let current = read;
+  const initialSpace = current();
+  const navigation = createNavigation(
+    () => current(),
+    resolveRenderer,
+    defaultRenderer(initialSpace),
+    initialSpace,
+  );
+  if (presenting) navigation.present();
+  return {
+    navigation,
+    readFrom: (next) => {
+      current = next;
+    },
+  };
+}
 
 export interface WorkspaceSidebarFixtureProps {
   /** Which Space the sidebar reports on. See `./spaces`. */
   readonly space?: Space;
+  /** The live Space Navigation reads; supplied by session-backed fixtures. */
+  readonly currentSpace?: () => Space;
   readonly persistence?: SpaceSessionState['persistence'];
   readonly presenting?: boolean;
   readonly authoringDisabled?: boolean;
@@ -30,7 +69,7 @@ export interface WorkspaceSidebarFixtureProps {
 }
 
 /**
- * Controlled fixture state around the unchanged production chrome.
+ * Production Navigation around the unchanged production chrome.
  *
  * It composes the real `AppShell`, not a stand-in frame, because the sidebar and
  * the canvas header are two halves of one decision — the header names the choice
@@ -39,6 +78,7 @@ export interface WorkspaceSidebarFixtureProps {
  */
 export function WorkspaceSidebarFixture({
   space = authoredSpace,
+  currentSpace,
   persistence = { kind: 'settled' },
   presenting = false,
   authoringDisabled = false,
@@ -46,24 +86,46 @@ export function WorkspaceSidebarFixture({
   acknowledgedRevision = 4n,
   onRetry = () => undefined,
 }: WorkspaceSidebarFixtureProps) {
-  // Where the Space opens is production's answer, from the same call `createApp`
-  // makes on the Space it was given. A rule of the fixture's own — "the first
-  // Layout, else Flow" — stood here, and it is the state translation ADR 0052's
-  // negative names: the story would go on pressing a row after the app had
-  // stopped. The Space declares `defaultRenderer`, which is fixture *data* and
-  // allowed; deciding what to do with it is not.
-  const [selected, setSelected] = useState<CanvasRendererId>(() => defaultRenderer(space));
-  const [activeGraph, setActiveGraph] = useState<string | null>(space.graphs[0]?.id ?? null);
+  const suppliedSpace = useCallback(() => space, [space]);
+  const readCurrentSpace = currentSpace ?? suppliedSpace;
+  const resolveRenderer = useMemo(
+    () => createRendererResolver({ newGraphId: storyGraphIds() }),
+    [],
+  );
+  // State, not a memo. Navigation holds the selected renderer, the Active Graph
+  // and the mode — everything a Ladle spec clicks its way into — and a memo is a
+  // caching hint React may discard, not a place to keep any of that. Keyed on
+  // the fixture's props it was worse than that: `presenting` changing rebuilt
+  // Navigation outright and undid every click before it.
+  const [composed] = useState(() =>
+    composeStoryNavigation(readCurrentSpace, resolveRenderer, presenting),
+  );
+  const { navigation } = composed;
+  // Declared before the mode effect below, so a render that changes the Space
+  // *and* the mode has already installed the new reader when presenting is
+  // reconciled against it.
+  useEffect(() => {
+    composed.readFrom(readCurrentSpace);
+  }, [composed, readCurrentSpace]);
+  const navigationState = useSyncExternalStore(navigation.subscribe, navigation.getState);
+  // Where `presenting` is honoured now that Navigation outlives it. Reconciled
+  // against the mode rather than applied, so the mount the initializer already
+  // presented publishes nothing here, and so a story's own Present button — the
+  // prop unchanged either side of it — is never argued with: this runs when the
+  // prop changes and at no other time.
+  useEffect(() => {
+    if (presenting === (navigation.getState().mode === 'presenting')) return;
+    if (presenting) navigation.present();
+    else navigation.exitPresenting();
+  }, [navigation, presenting]);
   const addCardMenu = useRef<HTMLButtonElement>(null);
-  // Both derivations run on every render, unmemoized. Production memoizes them
-  // because a canvas hangs off their identity; nothing here does, and a story
-  // that reproduces the memo without the reason for it is reproducing the shape
-  // of production rather than its behaviour.
-  //
-  // One module answers which canvas renderers exist and which is current, and the header
-  // below reads the row it named rather than a title of the fixture's own.
+  // One module answers which canvas renderers exist and which is current, and
+  // the header below reads the row it named rather than a title of the
+  // fixture's own. The selected renderer, its Active Graph and its mode are all
+  // Navigation's published state.
   const renderers = canvasRenderers(space);
-  const current = currentRenderer(renderers, selected);
+  const current = currentRenderer(renderers, navigationState.selectedRenderer);
+  const renderer = resolveRenderer(space, navigationState.selectedRenderer);
   // Colours the way the sidebar's own consumer gets them, and deliberately not
   // through `canvasProjection`: that needs a resolved strategy, so a story about
   // a sidebar would run elkjs to find out what colour a Graph's glyph is.
@@ -74,15 +136,15 @@ export function WorkspaceSidebarFixture({
       sidebar={
         <WorkspaceSidebar
           workspaceTitle={space.title}
-          canvas={{ renderers, current, onSelect: setSelected }}
+          canvas={{ renderers, current, onSelect: navigation.selectRenderer }}
           graph={{
-            graphs: space.graphs,
-            activeGraphId: activeGraph,
+            graphs: renderer.subject.graphs,
+            activeGraphId: navigationState.activeGraphId,
             colorByGraphId,
-            onActivate: setActiveGraph,
-            onPresent: () => undefined,
-            presenting,
-            onExitPresenting: () => undefined,
+            onActivate: navigation.activateGraph,
+            onPresent: navigation.present,
+            presenting: navigationState.mode === 'presenting',
+            onExitPresenting: navigation.exitPresenting,
           }}
           addCard={{
             onAddCard: () => undefined,
@@ -154,6 +216,10 @@ export function RetryableWorkspaceSidebarFixture() {
   }, []);
   const readWorkingSpace = useMemo(() => createWorkingSpaceReader(), []);
   const state = useSyncExternalStore(session.subscribe, session.getState);
+  const currentSpace = useCallback(
+    () => readWorkingSpace(session.getState().working),
+    [readWorkingSpace, session],
+  );
   const submitted = useRef(false);
 
   useEffect(() => {
@@ -164,7 +230,8 @@ export function RetryableWorkspaceSidebarFixture() {
 
   return (
     <WorkspaceSidebarFixture
-      space={readWorkingSpace(state.working)}
+      space={currentSpace()}
+      currentSpace={currentSpace}
       persistence={state.persistence}
       acknowledgedRevision={state.acknowledgedRevision}
       onRetry={session.retry}
