@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { uuidSchema } from '@project/core';
+import { BUILT_IN_VIEW_IDS, uuidSchema } from '@project/core';
 import { loadSpace, type Space } from '@project/graph';
 import { canvasRenderers, currentRenderer } from '../src/canvas-renderers';
 import {
@@ -67,9 +67,12 @@ describe('canvasRenderers', () => {
   });
 
   /**
-   * The reference identity is the interface, not an implementation detail: it is
-   * how the sidebar decides which row is pressed, so a `selected` that merely
-   * *equals* a row would leave the list with nothing pressed in it.
+   * The current row is the list's own row, not an equal one built beside it.
+   *
+   * Reference identity is no longer what the sidebar presses on — it matches by
+   * `canvasRendererKey`, so that it does not have to. It is still the interface:
+   * an operation that reconstructed the row would be a second derivation of a
+   * title the list already carries, and the canvas header reads that title.
    */
   it('answers with the very row it offered, for a View and for a Layout alike', () => {
     const renderers = canvasRenderers(AUTHORED);
@@ -135,6 +138,57 @@ describe('canvasRenderers', () => {
     expect(fromCanvasRenderers.reason).toBe('renderer-not-found');
     expect(fromCanvasRenderers.reason).toBe(fromResolver.reason);
     expect(fromCanvasRenderers.message).toBe(fromResolver.message);
+  });
+
+  /**
+   * Every built-in View resolves, and to the very row the computed group holds.
+   *
+   * `BuiltInViewId` is a closed union and `BY_VIEW` has a row for each member,
+   * so this is the whole of the View case rather than a sample of it. Reference
+   * identity is the assertion because it is what the canvas header draws and
+   * what the sidebar's list is asked about.
+   */
+  it('answers every built-in View with the row the computed group holds', () => {
+    const renderers = canvasRenderers(AUTHORED);
+
+    BUILT_IN_VIEW_IDS.forEach((view, index) => {
+      expect(currentRenderer(renderers, { kind: 'view', view })).toBe(renderers.computed[index]);
+    });
+  });
+
+  /**
+   * A View is answered by lookup and not by searching the group it was handed.
+   *
+   * `BY_VIEW` is total over `BuiltInViewId`: there is no "no such View" case to
+   * write and none to leave untested. Searching the supplied group put one back
+   * — a refusal reachable only by handing in a list `canvasRenderers` would
+   * never build, so no test could reach it without a cast. This pins the lookup
+   * by asking with the group emptied: the answer never depended on it.
+   */
+  it('answers a View without consulting the supplied computed group', () => {
+    const renderers = canvasRenderers(AUTHORED);
+
+    expect(currentRenderer({ computed: [], authored: renderers.authored }, FLOW)).toBe(
+      renderers.computed[0],
+    );
+  });
+
+  /**
+   * Two calls build two authored lists, and equal rows in them are two objects.
+   *
+   * Stated here because the sidebar is handed a list and a current row and
+   * nothing in the type says they came from one call. Under an object-identity
+   * pressed test that pairing drew a Layout list with nothing pressed, silently.
+   * `WorkspaceSidebar.test.tsx` pins the other half of it.
+   */
+  it('builds a fresh authored row on each call', () => {
+    const selection: CanvasRendererId = { kind: 'layout', layoutId: FIRST_LAYOUT };
+
+    const fromFirstCall = currentRenderer(canvasRenderers(AUTHORED), selection);
+    const fromSecondCall = currentRenderer(canvasRenderers(AUTHORED), selection);
+
+    expect(fromSecondCall).toEqual(fromFirstCall);
+    expect(fromSecondCall).not.toBe(fromFirstCall);
   });
 });
 

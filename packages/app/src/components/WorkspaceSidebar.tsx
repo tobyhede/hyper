@@ -33,7 +33,16 @@ export interface WorkspaceSidebarProps {
   readonly canvas: {
     /** The computed and authored rows `canvasRenderers` derives from the Space. */
     readonly renderers: CanvasRenderers;
-    /** Reference-identical to one row in `renderers`. */
+    /**
+     * The row that is drawing, which `currentRenderer` answers from that list.
+     *
+     * Matched to a row by `canvasRendererKey` and not by object identity. The
+     * interface is structural, so "this came out of that list" is a thing a
+     * hand-built literal can break and the compiler cannot check; making the
+     * pressed test the one identity rule means it does not have to. A caller
+     * that lists from one derivation and takes its current row from a second
+     * presses the right row rather than none.
+     */
     readonly current: CanvasRenderer;
     /**
      * Hands back the bare selection, which is what Navigation takes. The row's
@@ -99,9 +108,11 @@ const RendererIcon = ({ selection }: { readonly selection: CanvasRendererId }): 
  * not as two controls: exactly one item across both is pressed, and there is no
  * value anywhere meaning "the other group is the one drawing" (ADR 0053).
  *
- * The pressed test is `===` against the row the choice already named, so both
- * groups are asked the same question by the same value. It cannot answer twice
- * because there is only one row it can be.
+ * The pressed test is `canvasRendererKey` against the row the choice already
+ * named, so both groups are asked the same question by the same value — and it
+ * is the same question the row keys and `data-renderer` are already written in.
+ * It cannot answer twice: a key names one selection, and a Space cannot hold
+ * two renderers with one id.
  */
 function RendererGroup({
   renderers,
@@ -112,10 +123,11 @@ function RendererGroup({
   readonly selected: CanvasRenderer;
   readonly onSelect: (selection: CanvasRendererId) => void;
 }) {
+  const selectedKey = canvasRendererKey(selected.selection);
   return (
     <SidebarMenu>
       {renderers.map((renderer) => {
-        const active = renderer === selected;
+        const active = canvasRendererKey(renderer.selection) === selectedKey;
         return (
           <SidebarMenuItem key={canvasRendererKey(renderer.selection)}>
             <SidebarMenuButton
