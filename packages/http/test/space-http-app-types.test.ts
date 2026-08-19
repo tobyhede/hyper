@@ -43,10 +43,10 @@ it('declares every status the commit resource answers with', () => {
   expectTypeOf<InferResponseType<SpaceResource['$put'], 200>>().toEqualTypeOf<{
     revision: string;
   }>();
-  expectTypeOf<InferResponseType<SpaceResource['$put'], 413>>().toEqualTypeOf<{
-    message: string;
-  }>();
-  expectTypeOf<InferResponseType<SpaceResource['$put'], 415>>().toEqualTypeOf<{
-    message: string;
-  }>();
+  type PayloadTooLarge = InferResponseType<SpaceResource['$put'], 413>;
+  type UnsupportedMedia = InferResponseType<SpaceResource['$put'], 415>;
+  expectTypeOf<PayloadTooLarge['type']>().toExtend<`urn:hyper:problem:${string}`>();
+  expectTypeOf<PayloadTooLarge['detail']>().toEqualTypeOf<string>();
+  expectTypeOf<UnsupportedMedia['type']>().toExtend<`urn:hyper:problem:${string}`>();
+  expectTypeOf<UnsupportedMedia['detail']>().toEqualTypeOf<string>();
 });

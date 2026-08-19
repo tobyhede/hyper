@@ -1,60 +1,75 @@
 import { describe, expect, it } from 'vitest';
 import { HttpSpaceBackend } from '@project/http';
+import { encodeProblemDetails, type ProblemCode } from '@project/persistence';
 import { CARD_ID, SPACE_ID, oneCardSnapshot as snapshot } from '../support/space-fixtures';
 
 const backendFor = (response: Response): HttpSpaceBackend =>
   new HttpSpaceBackend('/', { fetch: () => Promise.resolve(response) });
 
+const problemResponse = (
+  code: ProblemCode,
+  detail: string,
+  headers: Record<string, string> = {},
+): Response => {
+  const problem = encodeProblemDetails(code, detail);
+  return new Response(JSON.stringify(problem), {
+    status: problem.status,
+    headers: { 'Content-Type': 'application/problem+json', ...headers },
+  });
+};
+
 describe('typed Hono HttpSpaceBackend failure classification', () => {
   const permanent = [
-    [400, 'protocol'],
-    [401, 'forbidden'],
-    [403, 'forbidden'],
-    [404, 'not-found'],
-    [422, 'invalid-snapshot'],
+    ['invalid-request', 'protocol'],
+    ['authentication-required', 'forbidden'],
+    ['forbidden', 'forbidden'],
+    ['not-found', 'not-found'],
+    ['invalid-snapshot', 'invalid-snapshot'],
   ] as const;
 
-  for (const [status, code] of permanent) {
-    it(`maps ${status} to permanent ${code}`, async () => {
+  for (const [problemCode, code] of permanent) {
+    it(`maps ${problemCode} to permanent ${code}`, async () => {
       await expect(
-        backendFor(new Response(JSON.stringify({ message: 'Denied' }), { status })).commitSpace(
-          snapshot,
-          0n,
-        ),
+        backendFor(problemResponse(problemCode, 'Denied')).commitSpace(snapshot, 0n),
       ).resolves.toEqual({ kind: 'permanent-failure', code, message: 'Denied' });
     });
   }
 
   const retryable = [
-    [408, 'timeout', 'Request timed out'],
-    [429, 'rate-limited', 'Rate limited'],
-    [500, 'unavailable', 'Persistence service unavailable'],
-    [503, 'unavailable', 'Persistence service unavailable'],
+    ['request-timeout', 'timeout'],
+    ['rate-limited', 'rate-limited'],
+    ['internal-error', 'unavailable'],
+    ['service-unavailable', 'unavailable'],
   ] as const;
-  const malformedBodies = ['', '<html>broken</html>', '{', JSON.stringify({ nope: true })];
 
-  for (const [status, code, fallback] of retryable) {
-    for (const body of malformedBodies) {
-      it(`maps ${status} to retryable ${code} before parsing ${JSON.stringify(body)}`, async () => {
-        await expect(
-          backendFor(new Response(body, { status })).commitSpace(snapshot, 0n),
-        ).resolves.toEqual({
-          kind: 'retryable-failure',
-          code,
-          message: fallback,
-        });
-      });
-    }
+  for (const [problemCode, code] of retryable) {
+    it(`maps ${problemCode} to retryable ${code}`, async () => {
+      await expect(
+        backendFor(problemResponse(problemCode, 'Try later')).commitSpace(snapshot, 0n),
+      ).resolves.toEqual({ kind: 'retryable-failure', code, message: 'Try later' });
+    });
   }
+
+  it.each(['', '<html>broken</html>', '{', JSON.stringify({ nope: true })])(
+    'rejects an off-contract error body %j as a protocol failure',
+    async (body) => {
+      await expect(
+        backendFor(
+          new Response(body, {
+            status: 503,
+            headers: { 'Content-Type': 'application/problem+json' },
+          }),
+        ).commitSpace(snapshot, 0n),
+      ).resolves.toMatchObject({ kind: 'permanent-failure', code: 'protocol' });
+    },
+  );
 
   it('uses a valid retryable error message and Retry-After seconds', async () => {
     await expect(
-      backendFor(
-        new Response(JSON.stringify({ message: 'Try later' }), {
-          status: 429,
-          headers: { 'Retry-After': '2' },
-        }),
-      ).commitSpace(snapshot, 0n),
+      backendFor(problemResponse('rate-limited', 'Try later', { 'Retry-After': '2' })).commitSpace(
+        snapshot,
+        0n,
+      ),
     ).resolves.toEqual({
       kind: 'retryable-failure',
       code: 'rate-limited',
@@ -64,13 +79,10 @@ describe('typed Hono HttpSpaceBackend failure classification', () => {
   });
 
   it('honours Retry-After on an unavailable response', async () => {
-    for (const status of [500, 503]) {
+    for (const code of ['internal-error', 'service-unavailable'] as const) {
       await expect(
         backendFor(
-          new Response(JSON.stringify({ message: 'Down for maintenance' }), {
-            status,
-            headers: { 'Retry-After': '30' },
-          }),
+          problemResponse(code, 'Down for maintenance', { 'Retry-After': '30' }),
         ).commitSpace(snapshot, 0n),
       ).resolves.toEqual({
         kind: 'retryable-failure',
@@ -83,10 +95,7 @@ describe('typed Hono HttpSpaceBackend failure classification', () => {
 
   it('omits Retry-After when a retryable response does not send one', async () => {
     await expect(
-      backendFor(new Response(JSON.stringify({ message: 'Down' }), { status: 503 })).commitSpace(
-        snapshot,
-        0n,
-      ),
+      backendFor(problemResponse('service-unavailable', 'Down')).commitSpace(snapshot, 0n),
     ).resolves.toEqual({
       kind: 'retryable-failure',
       code: 'unavailable',
@@ -102,10 +111,7 @@ describe('typed Hono HttpSpaceBackend failure classification', () => {
     for (const value of unusable) {
       await expect(
         backendFor(
-          new Response(JSON.stringify({ message: 'Down' }), {
-            status: 503,
-            headers: { 'Retry-After': value },
-          }),
+          problemResponse('service-unavailable', 'Down', { 'Retry-After': value }),
         ).commitSpace(snapshot, 0n),
       ).resolves.toEqual({ kind: 'retryable-failure', code: 'unavailable', message: 'Down' });
     }
@@ -132,13 +138,33 @@ describe('typed Hono HttpSpaceBackend failure classification', () => {
     );
   });
 
-  it('maps unexpected client errors to permanent protocol failures', async () => {
+  it('maps an error without Problem Details to a permanent protocol failure', async () => {
     await expect(
       backendFor(new Response(JSON.stringify({ message: 'Teapot' }), { status: 418 })).commitSpace(
         snapshot,
         0n,
       ),
-    ).resolves.toEqual({ kind: 'permanent-failure', code: 'protocol', message: 'Teapot' });
+    ).resolves.toEqual({
+      kind: 'permanent-failure',
+      code: 'protocol',
+      message: 'error response must use application/problem+json',
+    });
+  });
+
+  it('rejects a Problem Details status that differs from the HTTP status', async () => {
+    const body = encodeProblemDetails('not-found', 'Missing');
+    await expect(
+      backendFor(
+        new Response(JSON.stringify(body), {
+          status: 503,
+          headers: { 'Content-Type': 'application/problem+json' },
+        }),
+      ).commitSpace(snapshot, 0n),
+    ).resolves.toEqual({
+      kind: 'permanent-failure',
+      code: 'protocol',
+      message: 'HTTP status does not match problem status',
+    });
   });
 
   it('maps Fetch rejection to a retryable network failure', async () => {
@@ -257,13 +283,19 @@ describe('typed Hono HttpSpaceBackend failure classification', () => {
           new ReadableStream({
             start(controller) {
               // Prompt, delivered — and still never a complete body.
-              controller.enqueue(new TextEncoder().encode('{"message":"Still working"'));
+              controller.enqueue(new TextEncoder().encode('{"type":"urn:hyper:problem:'));
               init?.signal?.addEventListener('abort', () => {
                 controller.error(new Error('aborted'));
               });
             },
           }),
-          { status, headers: { 'content-type': 'application/json', ...headers } },
+          {
+            status,
+            headers: {
+              'content-type': status >= 400 ? 'application/problem+json' : 'application/json',
+              ...headers,
+            },
+          },
         ),
       );
 

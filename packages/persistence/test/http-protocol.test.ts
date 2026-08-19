@@ -3,8 +3,10 @@ import { describe, expect, it } from 'vitest';
 import { uuidSchema, type SpaceSnapshot } from '@project/core';
 import type { LoadedSpace } from '../src/backend';
 import {
+  decodeProblemDetails,
   decodeCommittedRevision,
   decodeLoadedSpace,
+  encodeProblemDetails,
   encodeLoadedSpace,
 } from '../src/http-protocol';
 
@@ -79,5 +81,63 @@ describe('loaded space round trip', () => {
     expect(overTheWire({ snapshot, revision: 0n, exportedRevision: null }).exportedRevision).toBe(
       null,
     );
+  });
+});
+
+describe('Problem Details', () => {
+  it('round-trips a closed problem identity with typed request errors', () => {
+    const encoded = encodeProblemDetails('invalid-request', 'Path id must match snapshot id', [
+      { code: 'snapshot-id-mismatch', pointer: '/snapshot/id' },
+    ]);
+
+    expect(encoded).toEqual({
+      type: 'urn:hyper:problem:invalid-request',
+      title: 'Invalid request',
+      status: 400,
+      detail: 'Path id must match snapshot id',
+      errors: [{ code: 'snapshot-id-mismatch', pointer: '/snapshot/id' }],
+    });
+    expect(decodeProblemDetails(JSON.parse(JSON.stringify(encoded)) as unknown)).toEqual({
+      code: 'invalid-request',
+      title: 'Invalid request',
+      status: 400,
+      detail: 'Path id must match snapshot id',
+      errors: [{ code: 'snapshot-id-mismatch', pointer: '/snapshot/id' }],
+    });
+  });
+
+  it('rejects unknown identities, mismatched statuses and extra fields', () => {
+    const valid = encodeProblemDetails('not-found', 'No such resource');
+    expect(() => decodeProblemDetails({ ...valid, type: 'urn:hyper:problem:unknown' })).toThrow(
+      'unknown problem type',
+    );
+    expect(() => decodeProblemDetails({ ...valid, status: 500 })).toThrow(
+      'does not match problem type',
+    );
+    expect(() => decodeProblemDetails({ ...valid, message: 'legacy' })).toThrow(
+      'unexpected fields',
+    );
+  });
+
+  it('requires RFC 6901 pointers on typed request errors', () => {
+    const valid = encodeProblemDetails('invalid-request', 'Invalid request');
+    expect(() =>
+      decodeProblemDetails({
+        ...valid,
+        errors: [{ code: 'snapshot-id-mismatch', pointer: 'snapshot.id' }],
+      }),
+    ).toThrow('RFC 6901 JSON Pointer');
+
+    expect(() =>
+      encodeProblemDetails('invalid-request', 'Invalid request', [
+        { code: 'snapshot-id-mismatch', pointer: 'snapshot.id' },
+      ]),
+    ).toThrow('RFC 6901 JSON Pointer');
+    expect(
+      decodeProblemDetails({
+        ...valid,
+        errors: [{ code: 'snapshot-id-mismatch', pointer: '' }],
+      }).errors,
+    ).toEqual([{ code: 'snapshot-id-mismatch', pointer: '' }]);
   });
 });
