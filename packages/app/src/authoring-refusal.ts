@@ -7,8 +7,8 @@ const unreachable = (value: never): never => {
 /** Application-owned copy for a stable Authoring refusal identity. */
 export const describeAuthoringRefusal = (refusal: AuthoringRefusal): string => {
   switch (refusal.code) {
-    case 'arrangement-pending':
-      return 'This view has not finished arranging, so there is nowhere to write yet.';
+    case 'placement-pending':
+      return 'This view has not finished placing its Cards, so there is nowhere to write yet.';
     case 'layout-not-found':
       return 'This Layout is no longer part of the Space.';
     case 'layout-required':

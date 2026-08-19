@@ -337,7 +337,7 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
         });
         if (created.kind === 'refused') {
           if (
-            created.refusal.code !== 'arrangement-pending' &&
+            created.refusal.code !== 'placement-pending' &&
             created.refusal.code !== 'layout-not-found' &&
             created.refusal.code !== 'alias-target-not-found' &&
             created.refusal.code !== 'alias-target-must-own-content'

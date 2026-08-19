@@ -20,7 +20,7 @@ export type CreatedAliasRefusal = Extract<
   AuthoringRefusal,
   {
     readonly code:
-      | 'arrangement-pending'
+      | 'placement-pending'
       | 'layout-not-found'
       | 'alias-target-not-found'
       | 'alias-target-must-own-content';

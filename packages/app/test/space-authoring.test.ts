@@ -403,7 +403,7 @@ describe('Space Authoring', () => {
       }),
     ).toEqual({
       kind: 'refused',
-      refusal: { code: 'arrangement-pending' },
+      refusal: { code: 'placement-pending' },
     });
 
     replacePlacementForTest(

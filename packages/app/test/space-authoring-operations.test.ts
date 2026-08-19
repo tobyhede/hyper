@@ -1209,7 +1209,7 @@ describe('Stale identities', () => {
 
     expect(authoring.complete({ kind: 'created-card', anchor: CENTRE })).toEqual({
       kind: 'refused',
-      refusal: { code: 'arrangement-pending' },
+      refusal: { code: 'placement-pending' },
     });
   });
 });

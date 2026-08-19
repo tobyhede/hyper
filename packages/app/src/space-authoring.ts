@@ -175,7 +175,7 @@ type LayoutRequiredOperation = Extract<
 
 /** Stable identities for every expected refusal at the Authoring seam. */
 export type AuthoringRefusal =
-  | { readonly code: 'arrangement-pending' }
+  | { readonly code: 'placement-pending' }
   | { readonly code: 'layout-not-found' }
   | { readonly code: 'layout-required'; readonly operation: LayoutRequiredOperation }
   | { readonly code: 'card-not-found' }
@@ -803,7 +803,7 @@ export function createSpaceAuthoring({
     if (placement === null) {
       return {
         kind: 'refused',
-        refusal: { code: 'arrangement-pending' },
+        refusal: { code: 'placement-pending' },
       };
     }
     const outcome = reconnectOutcome(ownedGraph(proposal.graphId), proposal, placement, (cardId) =>
@@ -832,7 +832,7 @@ export function createSpaceAuthoring({
     placement: reportedPlacement,
   }: ReportedCompletion): DerivedCompletion => {
     if (reportedPlacement === null) {
-      return refuse({ code: 'arrangement-pending' });
+      return refuse({ code: 'placement-pending' });
     }
     let snapshot = session.getState().working;
     const previousSnapshot = snapshot;
