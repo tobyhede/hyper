@@ -50,7 +50,7 @@ export type SpaceReferenceErrorKind =
   | 'graph-edge-missing-card'
   /** An Edge endpoint names a Space Card that is not a member of its own Layout. */
   | 'graph-edge-card-outside-layout'
-  | 'unresolved-default-view'
+  | 'unresolved-default-renderer'
   | 'duplicate-graph-edge'
   | 'unresolved-alias-target'
   | 'alias-self-reference'
@@ -237,7 +237,7 @@ export function validateReferences(space: Referenceable): SpaceReferenceError[] 
     const declared = new Set(layouts.map((l) => l.id));
     if (!isBuiltInViewId(space.defaultRenderer) && !declared.has(space.defaultRenderer)) {
       errors.push({
-        kind: 'unresolved-default-view',
+        kind: 'unresolved-default-renderer',
         ref: space.defaultRenderer,
         message: `defaultRenderer "${space.defaultRenderer}" names neither a declared layout nor a built-in view`,
       });

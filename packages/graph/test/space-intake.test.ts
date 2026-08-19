@@ -550,10 +550,15 @@ describe.each([
     });
 
     it('refuses a defaultRenderer naming neither', () => {
+      // The kind names the field the document actually has (ADR 0055). A kind
+      // and the message beside it that name two different fields is the split
+      // the rename exists to close, and a consumer matching on the kind is the
+      // one that reads the retired name.
       const errors = refused(load(simple(ABSENT)));
       expect(errors).toContainEqual(
-        expect.objectContaining({ kind: 'unresolved-default-view', ref: ABSENT }),
+        expect.objectContaining({ kind: 'unresolved-default-renderer', ref: ABSENT }),
       );
+      expect(errors.map(({ message }) => message).join('\n')).toContain('defaultRenderer');
     });
   });
 
@@ -571,7 +576,7 @@ describe.each([
       );
 
       expect(new Set(errors.map(({ kind }) => kind))).toEqual(
-        new Set(['duplicate-layout-id', 'unresolved-default-view', 'unresolved-alias-target']),
+        new Set(['duplicate-layout-id', 'unresolved-default-renderer', 'unresolved-alias-target']),
       );
     });
 
