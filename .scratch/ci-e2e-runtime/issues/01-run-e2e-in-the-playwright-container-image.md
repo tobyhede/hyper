@@ -4,7 +4,7 @@
 
 **Blocked by:** None — can start immediately.
 
-**Status:** ready-for-human — built and locally verified on branch `run-e2e-in-the-playwright-container-image`. What remains needs a real CI run: the container path cannot be exercised locally, so the last three acceptance criteria close only once the branch is pushed and the first run is read.
+**Status:** resolved — built, and verified green in the container by run 32204750136 on PR #79. Every acceptance criterion is closed; see "Measured" below. Pending review and merge of that PR.
 
 ## Why
 
@@ -61,8 +61,26 @@ Against today's 17s of cache-restore-plus-`install-deps` and a 2.4% chance of pa
 - [x] The pnpm store is still cached, under a key that cannot collide with the one `verify` uses.
 - [x] `ci.yml` comments explain the tag/lockfile coupling and why `--ipc=host` is there, in place of the comments about the browser cache and the apt libraries.
 - [x] `verify` and `postgres` are untouched — the diff reaches only the `e2e` job — and `pnpm verify` passes locally (125 files, 1276 passed, 8 skipped).
-- [ ] `pnpm e2e` passes all 97 tests in both projects **in the container**. Not provable locally: a local run uses the machine's own browsers and exercises none of this change.
-- [ ] The real *Initialize containers* duration is read off the first green run and recorded here, against the ~30s estimate.
+- [x] `pnpm e2e` passes all 97 tests in both projects **in the container** — `97 passed (1.8m)` on run 32204750136.
+- [x] The real *Initialize containers* duration is read off the first green run and recorded here, against the ~30s estimate. It was **32s**.
+
+## Measured — run 32204750136, PR #79
+
+```
+                          before (41 runs)      after
+Initialize containers     n/a                    32s   ← estimated ~30s
+cache restore             5s                      1s   (cold, first run)
+install-deps             11–23s, once 589s        —    gone
+pnpm install              3s                      5s
+pnpm e2e                 142–155s               110s
+e2e job total            ~190s                  172s
+```
+
+The estimate for the pull was right. The prediction that this would be *break-even to slightly slower* was wrong: the job came out ~18s faster, because `pnpm e2e` itself dropped to 110s — below the whole 142–155s band the previous 41 runs occupied.
+
+That drop is not worker count: the run still reports `Running 97 tests using 2 workers`. The likeliest cause is `--ipc=host`. It was added to prevent Chromium crashing on the default 64MB `/dev/shm`, but the same constraint also makes Chromium fall back to slower disk-backed shared memory for renderer transport, so removing it plausibly speeds the tests as well as stabilising them. **One run is one sample** — treat the 110s as provisional until a few more land, and don't build anything on the causal story without checking it.
+
+One consequence worth carrying forward: `verify` ran 163s against e2e's 172s, so the two jobs are now effectively tied for the critical path. Any further e2e-only optimisation buys almost nothing in total CI wall clock — which is the reason ticket 2 (raising the worker count) was cut, now confirmed by measurement rather than estimate.
 
 ## Implementation notes
 
