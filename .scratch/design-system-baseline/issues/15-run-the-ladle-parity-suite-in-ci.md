@@ -169,6 +169,30 @@ Nothing about the change alters local behaviour — `process.env['CI']` is unset
 on a laptop, so `retries` is still `0` there. Confirmed by running the suite
 both ways; the CI-shaped run is quoted below.
 
+**One correction to this ticket's own recommendation.** The paragraph above
+argues for the shape partly on the grounds that "a genuine infrastructure blip
+does not red-build". That is wrong on the mechanism, in the same way the
+`failOnFlakyTests` reading this ticket set out to correct was wrong. In
+Playwright 1.61.1 the run's status is computed as
+
+```
+this.hasWorkerErrors || this.hasReachedMaxFailures() || hasFailedTests
+  || this.config.config.failOnFlakyTests && hasFlakyTests ? 'failed' : 'passed'
+```
+
+— `playwright/lib/runner/index.js:5823`. A test that fails once and passes on
+retry is precisely what makes `hasFlakyTests` true, so with `failOnFlakyTests`
+set the blip still reds the build; it just takes three attempts to get there.
+The two settings cannot both mean what the recommendation assumed, and blip
+tolerance is not available at all while `failOnFlakyTests` is on.
+
+The choice is unchanged, because it never rested on that. It rests on Issue
+08's criterion needing a retry to exist, on one policy across both suites, and
+on the diagnosis: under `retries: 0` the `trace: 'on-first-retry'` already in
+this config captures nothing, so a red run arrives with no artifact — which
+would have made the failure-artifact step below dead weight. The config comment
+states those grounds and not the wrong one.
+
 ### Cache key: its own, `pnpm-store-ladle-…`
 
 Took the recommendation. `key: pnpm-store-ladle-${{ runner.os }}-${{
