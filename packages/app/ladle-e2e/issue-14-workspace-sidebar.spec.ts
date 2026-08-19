@@ -102,6 +102,12 @@ test('Workspace Sidebar stories render quiet, retryable, and presenting states',
   await expect(page.getByRole('button', { name: 'Changes not saved' })).toBeVisible();
   const failure = page.getByTestId('persistence-failure');
   await expect(failure).toContainText('Network unavailable');
+  // The claim this story owns: a failed save keeps the unsaved work on screen.
+  // `Collection 3` is in the snapshot the session submitted and in no revision
+  // the backend has stored, so a sidebar drawing anything but its own session's
+  // working Space cannot show it.
+  const unsaved = page.getByRole('button', { name: 'Collection 3' });
+  await expect(unsaved).toBeVisible();
   const retry = failure.getByRole('button', { name: 'Retry' });
   await retry.click();
   await expect(failure).toBeHidden();
@@ -111,6 +117,8 @@ test('Workspace Sidebar stories render quiet, retryable, and presenting states',
     'settled',
   );
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
+  // And the retry saves that same work rather than replacing it.
+  await expect(unsaved).toBeVisible();
 
   await page.goto('/?story=components--workspace-sidebar--presenting&mode=preview');
   await expect(page.getByTestId('exit-presenting-button')).toBeVisible();
