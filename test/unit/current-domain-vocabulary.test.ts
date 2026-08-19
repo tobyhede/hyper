@@ -375,10 +375,29 @@ const RETIRED_RENDERER_NAMES = [
  */
 const RETIRED_SELECTED_CANVAS = ['Selected', 'Canvas'].join('');
 
+/**
+ * The field the aggregate stopped carrying when the two questions were split.
+ *
+ * `CanvasRenderers` is every row the canvas can draw; which one is current is
+ * `currentRenderer`'s separate answer over an id. A reader sent to this field is
+ * sent to one that does not exist — which is what `docs/agents/ui.md` went on
+ * doing after the split, in the same bullet the rename above had already been
+ * corrected in. Nothing was reading for it: the retired *names* were gone, so
+ * every scan here was green while the read-before-touching document still
+ * described a shape the code had left.
+ *
+ * Named rather than listed above because it is the one entry the self-test has
+ * to write out, and because the two spellings differ: the scan needs the dot
+ * escaped, and the fixture text needs it plain. Unescaped it is a wildcard, and
+ * the scan would also report an identifier with any character in between.
+ */
+const RETIRED_AGGREGATE_FIELD = ['renderers', '.selected'].join('');
+
 const RETIRED_RENDERER_NAME = new RegExp(
   [
     ...RETIRED_RENDERER_NAMES.map((name) => `\\b${name}`),
     `\\b${RETIRED_SELECTED_CANVAS}(?![A-Za-z])`,
+    `\\b${RETIRED_AGGREGATE_FIELD.replace('.', '\\.')}`,
   ].join('|'),
 );
 
@@ -408,6 +427,21 @@ describe('the canvas renderer is named once (ADR 0055)', () => {
     expect(found).toEqual([]);
   });
 
+  it('reports the field the aggregate stopped carrying, the way a document writes it', () => {
+    // The document is what this arm keeps honest, and a document names a field
+    // in prose rather than in a declaration. Composed from the constant above
+    // for the same reason every retired name here is: written out, the fixture
+    // would be a hit this scan reports against its own file.
+    const retired = [
+      `takes the row naming the current renderer (\`${RETIRED_AGGREGATE_FIELD}\`)`,
+      `whether \`${RETIRED_AGGREGATE_FIELD}\` is computed or authored`,
+    ];
+
+    for (const line of retired) {
+      expect(RETIRED_RENDERER_NAME.test(line), line).toBe(true);
+    }
+  });
+
   it('stays silent on the current names the retired ones are prefixes of', () => {
     // The guard has to survive the names that replaced these. The header
     // component is the one that would otherwise report its own replacement.
@@ -416,6 +450,10 @@ describe('the canvas renderer is named once (ADR 0055)', () => {
       `import type { CanvasRenderers, CanvasRenderer } from '../canvas-renderers';`,
       `const key = canvasRendererKey(selected);`,
       `expect(errors[0]?.kind).toBe('unresolved-default-renderer');`,
+      // The two questions, asked separately — the list, and the row that is
+      // current — which is the shape the retired field entry must not report.
+      `const current = currentRenderer(renderers, navigationState.selectedRenderer);`,
+      `<RendererGroup renderers={canvas.renderers.authored} selected={canvas.current} />`,
     ];
 
     for (const line of kept) {
