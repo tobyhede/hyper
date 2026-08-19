@@ -1,5 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useSyncExternalStore } from 'react';
-import { uuidSchema } from '@project/core';
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import type { Space } from '@project/graph';
 import {
   MemorySpaceBackend,
@@ -13,20 +12,48 @@ import { AppShell } from '@project/ui';
 // how a package boundary gets crossed without naming one (AGENTS.md).
 import { canvasRenderers, currentRenderer } from '#src/canvas-renderers';
 import { graphColorMap } from '#src/colors';
-import { createNavigation } from '#src/navigation';
-import { createRendererResolver, defaultRenderer } from '#src/renderer';
+import { createNavigation, type Navigation } from '#src/navigation';
+import { createRendererResolver, defaultRenderer, type ResolveRenderer } from '#src/renderer';
 import { createWorkingSpaceReader } from '#src/snapshot';
 import { PersistenceControl, PersistenceNotice } from '#components/PersistenceControl';
 import { SelectedCanvasRenderer, WorkspaceSidebar } from '#components/WorkspaceSidebar';
-import { authoredSnapshot, authoredSpace, editedSnapshot } from './spaces';
+import { authoredSnapshot, authoredSpace, editedSnapshot, storyGraphIds } from './spaces';
 
-const storyGraphIds = (): (() => ReturnType<typeof uuidSchema.parse>) => {
-  let next = 0;
-  return () => {
-    next += 1;
-    return uuidSchema.parse(`00000000-0000-4000-8000-${next.toString().padStart(12, '0')}`);
+/**
+ * Production Navigation, plus the one seam that lets an instance outlive the
+ * reader it was composed with.
+ *
+ * Navigation resolves every selection against `currentSpace()` — that is what
+ * stops it naming a renderer the Space does not hold — so what it holds has to
+ * be one indirection over the reader that answers *now*, not the closure that
+ * answered at mount. A `useRef` is the usual shape for that and is refused
+ * here: React's own lint rule forbids reading a ref during render, and the
+ * initializer below runs during one. The mutable reader is therefore a local of
+ * this function, reached only by the Navigation composed over it and replaced
+ * only through `readFrom` — so the render path cannot read it at all, and the
+ * effect that calls `readFrom` is its one writer.
+ */
+function composeStoryNavigation(
+  read: () => Space,
+  resolveRenderer: ResolveRenderer,
+  presenting: boolean,
+): { readonly navigation: Navigation; readonly readFrom: (next: () => Space) => void } {
+  let current = read;
+  const initialSpace = current();
+  const navigation = createNavigation(
+    () => current(),
+    resolveRenderer,
+    defaultRenderer(initialSpace),
+    initialSpace,
+  );
+  if (presenting) navigation.present();
+  return {
+    navigation,
+    readFrom: (next) => {
+      current = next;
+    },
   };
-};
+}
 
 export interface WorkspaceSidebarFixtureProps {
   /** Which Space the sidebar reports on. See `./spaces`. */
@@ -65,18 +92,32 @@ export function WorkspaceSidebarFixture({
     () => createRendererResolver({ newGraphId: storyGraphIds() }),
     [],
   );
-  const navigation = useMemo(() => {
-    const initialSpace = readCurrentSpace();
-    const composed = createNavigation(
-      readCurrentSpace,
-      resolveRenderer,
-      defaultRenderer(initialSpace),
-      initialSpace,
-    );
-    if (presenting) composed.present();
-    return composed;
-  }, [presenting, readCurrentSpace, resolveRenderer]);
+  // State, not a memo. Navigation holds the selected renderer, the Active Graph
+  // and the mode — everything a Ladle spec clicks its way into — and a memo is a
+  // caching hint React may discard, not a place to keep any of that. Keyed on
+  // the fixture's props it was worse than that: `presenting` changing rebuilt
+  // Navigation outright and undid every click before it.
+  const [composed] = useState(() =>
+    composeStoryNavigation(readCurrentSpace, resolveRenderer, presenting),
+  );
+  const { navigation } = composed;
+  // Declared before the mode effect below, so a render that changes the Space
+  // *and* the mode has already installed the new reader when presenting is
+  // reconciled against it.
+  useEffect(() => {
+    composed.readFrom(readCurrentSpace);
+  }, [composed, readCurrentSpace]);
   const navigationState = useSyncExternalStore(navigation.subscribe, navigation.getState);
+  // Where `presenting` is honoured now that Navigation outlives it. Reconciled
+  // against the mode rather than applied, so the mount the initializer already
+  // presented publishes nothing here, and so a story's own Present button — the
+  // prop unchanged either side of it — is never argued with: this runs when the
+  // prop changes and at no other time.
+  useEffect(() => {
+    if (presenting === (navigation.getState().mode === 'presenting')) return;
+    if (presenting) navigation.present();
+    else navigation.exitPresenting();
+  }, [navigation, presenting]);
   const addCardMenu = useRef<HTMLButtonElement>(null);
   // One module answers which canvas renderers exist and which is current, and
   // the header below reads the row it named rather than a title of the
