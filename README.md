@@ -23,7 +23,7 @@ pnpm dev:fixture     # tracked test fixture in memory at http://localhost:5175
 Then:
 
 1. Pick a Graph in the toolbar. Every Graph stays drawn; the one you pick is emphasised.
-2. Hover a card and use its Edit control to author its Title and Markdown source. `Esc` cancels and closes it.
+2. Hover a Markdown Card and use its Edit control to author its Title and Markdown source. `Esc` cancels and closes it.
 3. Drag a card to move it. A completed edit is committed automatically through the persistence session; the toolbar reports `Persisting…` and then `Persisted`. Under `pnpm dev` the edit lands in PostgreSQL and outlives the page; under `pnpm dev:new` and `pnpm dev:fixture` it lives in that server's memory repository, surviving browser reloads but not a restart.
 4. Hover or select a card to reveal its four authoring handles. Drag to another card to add an Edge to the active Graph. Dropping on empty canvas cancels unless Option (macOS) or Alt (elsewhere) is held; the modifier gesture previews and atomically creates a blank `Card N`, its placement and the Edge.
 5. Press **Present** to traverse the Graph: `→` follows an edge, `←` goes back, `↑` / `↓` choose at a fork, `Esc` returns to the overview.

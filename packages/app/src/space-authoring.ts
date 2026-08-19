@@ -903,8 +903,9 @@ export function createSpaceAuthoring({
       const card = snapshot.cards[cardIndex];
       if (card === undefined) return refuse({ code: 'card-not-found' });
       // Kind is fixed for a Card's lifetime, and changing it is out of scope for
-      // version 1. Everything else the editor holds — Title and an Alias's
-      // Target — is one ordinary Edit of this Card.
+      // version 1. Everything else the editor holds — a Markdown Card's Title
+      // and body, or an Alias's Title and Target — is one ordinary Edit of
+      // this Card.
       if (card.document.kind !== completion.document.kind) {
         return refuse({ code: 'card-kind-immutable' });
       }
