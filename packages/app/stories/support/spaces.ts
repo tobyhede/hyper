@@ -1,4 +1,10 @@
-import { uuidSchema, type GraphEdge, type LayoutPosition, type SpaceSnapshot } from '@project/core';
+import {
+  uuidSchema,
+  type GraphEdge,
+  type GraphId,
+  type LayoutPosition,
+  type SpaceSnapshot,
+} from '@project/core';
 import {
   loadSpace,
   loadSpaceSnapshot,
@@ -183,3 +189,37 @@ export const editedSnapshot: SpaceSnapshot = {
  */
 const minted = newSpace();
 export const unauthoredSpace: Space = loaded(loadSpace(minted.file, minted.cardFiles));
+
+/**
+ * Where a story's converted Graph takes its identity.
+ *
+ * Here rather than in the fixture, because the only thing that decides whether
+ * a minted id is safe is the block of ids declared above it, and the two were
+ * in different files: the fixture counted from one and handed out the very ids
+ * `CARD_A` and `CARD_B` already carry. `convertSubject` would not have refused
+ * either — a conversion's freshness is checked against the Space's *Graphs*
+ * (ADR 0045), and a Card's id is not one — so a story that converted a View
+ * would have minted a Graph wearing a Card's identity, in silence.
+ *
+ * No story converts one today. The counter is the fixture's answer to ADR
+ * 0016's composition seam, and nothing presses it; the collision is one Ladle
+ * spec away rather than on screen now. Co-locating it is what stops that being
+ * a thing to remember: an id declared above and the counter below it are read
+ * together, and `story-spaces.test.ts` holds them apart.
+ *
+ * The base is a **reserved block** rather than one past the highest id, so a
+ * story that declares another Card or Layout does not have to move it — the
+ * literals above occupy `0x02`..`0x40`, and this leaves the whole space between
+ * them and here. Hexadecimal throughout, which is what the ids are: the
+ * decimal counter this replaced rendered `12` as `…0000012` while `CARD_E` is
+ * `…000000c`, so the two spellings did not even sort against each other.
+ */
+const MINTED_GRAPH_ID_BASE = 0x1000;
+
+export const storyGraphIds = (): (() => GraphId) => {
+  let next = MINTED_GRAPH_ID_BASE;
+  return () => {
+    next += 1;
+    return uuidSchema.parse(`00000000-0000-4000-8000-${next.toString(16).padStart(12, '0')}`);
+  };
+};

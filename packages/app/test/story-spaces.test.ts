@@ -2,7 +2,13 @@ import { describe, expect, it } from 'vitest';
 import { loadSpaceSnapshot } from '@project/graph';
 import { canvasRenderers, currentRenderer } from '../src/canvas-renderers';
 import { defaultRenderer } from '../src/renderer';
-import { authoredSpace, editedSnapshot, unauthoredSpace } from '../stories/support/spaces';
+import {
+  authoredSnapshot,
+  authoredSpace,
+  editedSnapshot,
+  storyGraphIds,
+  unauthoredSpace,
+} from '../stories/support/spaces';
 
 /**
  * The Spaces the Ladle catalogue draws, held to production's own rules.
@@ -59,6 +65,49 @@ describe('the story Spaces', () => {
     expect(
       edited.space.layouts.slice(authoredSpace.layouts.length).map((layout) => layout.title),
     ).toEqual(['Collection 3']);
+  });
+
+  /**
+   * The identities a story's conversion mints are not identities the story
+   * already carries.
+   *
+   * `convertSubject` checks a minted Graph id against the Space's **Graphs**
+   * and nothing else, which is right: ADR 0045 makes a Graph id unique across
+   * the Graphs of a Space, and a Card's id lives in another namespace. So the
+   * boundary would accept a Graph wearing `CARD_A`'s id without a word, and the
+   * counter that produced it is the only thing that can refuse — which it can
+   * only do by starting above every id the literals above it declare.
+   *
+   * The counter has no upper bound, so this reads far enough past the declared
+   * block to be about where it *starts* rather than about how many ids happen
+   * to be asked for: `0x40` is the highest id declared, and a counter that
+   * began anywhere below it would be caught inside this many draws.
+   *
+   * `unauthoredSpace` is deliberately not in the set. `newSpace()` mints a real
+   * v4 uuid on every load, so its ids are not tracked literals this could be
+   * held against, and asserting over them would make the test a coin toss
+   * rather than a claim about the block.
+   */
+  it('mints Graph identities no story literal already carries', () => {
+    const edited = loadSpaceSnapshot(editedSnapshot);
+    if (!edited.ok) throw new Error(edited.errors.map((error) => error.message).join('\n'));
+
+    const declared = new Set<string>([
+      authoredSnapshot.id,
+      ...[authoredSpace, edited.space].flatMap((space) => [
+        ...space.cards.map((card) => card.id),
+        ...space.layouts.map((layout) => layout.id),
+        ...space.graphs.map((graph) => graph.id),
+      ]),
+    ]);
+
+    const mint = storyGraphIds();
+    const minted = Array.from({ length: 0x40 }, mint);
+
+    expect(minted.filter((id) => declared.has(id))).toEqual([]);
+    // The set has to be reaching the literals, or the assertion above holds for
+    // a reason nobody chose.
+    expect(declared.size).toBeGreaterThan(0x0c);
   });
 
   /**
