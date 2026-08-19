@@ -109,34 +109,80 @@ jobs:
   e2e:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    # Playwright's own image, so nothing in this job reaches an apt mirror: the
+    # browsers, the shared libraries they need and the font set are all baked
+    # into its layers. It is the Ubuntu package path that is gone, not every
+    # network fetch — `pnpm install` still reaches the npm registry, which is
+    # why the pnpm store is cached below. The apt install this replaces was
+    # pure downside — on
+    # `ubuntu-latest` it found every library already present and fetched only
+    # nine font packages (CJK, Thai, Cyrillic, unifont), which nothing here can
+    # see because the suite takes no screenshots. It cost 11–23s of every run
+    # and, once, 9m49s, when the Ubuntu mirror served those 21.1MB at 36kB/s.
+    #
+    # The digest is pinned for the same reason every action above is pinned to a
+    # commit: a tag can be repointed at new content and a digest cannot. It is
+    # the multi-arch index digest, so it resolves on any runner architecture.
+    # **Docker resolves `repo:tag@digest` by the digest and ignores the tag**,
+    # so the digest is the authoritative half and the tag beside it is a label
+    # for human readers. Moving only the tag changes nothing and lies to the
+    # next reader; move both, together with `@playwright/test` in the lockfile —
+    # a three-way pairing that used to be derived from `node_modules` and is now
+    # maintained by hand. Getting the lockfile ahead of the image is at least
+    # loud: the image records its own name at build time (`playwright-core
+    # mark-docker-image`), so `pnpm e2e` fails naming the current and required
+    # tags. A guard step here would catch that a minute earlier at the cost of a
+    # third place to edit, which is why there isn't one.
+    #
+    # `--ipc=host` and `--init` are both off Playwright's Docker guidance rather
+    # than its Actions example, which carries neither. Without `--ipc=host` the
+    # default 64MB `/dev/shm` makes Chromium run out of memory and crash, and
+    # under `failOnFlakyTests` a crash is a red build rather than a retry.
+    # `--init` supplies the child-process reaper, since PID 1 here is not ours:
+    # Actions holds the container open for the whole job and runs each step
+    # inside it, so an orphaned Chromium helper reparents onto a process that
+    # never waits on it. What that example does carry is `--user 1001`, which
+    # answers root-owned files in the mounted workspace — not a problem here,
+    # because `upload-artifact` and the cache's save step both run inside the
+    # container too, and the runner is ephemeral.
+    container:
+      image: mcr.microsoft.com/playwright:v1.61.1-noble@sha256:5b8f294aff9041b7191c34a4bab3ac270157a28774d4b0660e9743297b697e48
+      options: --ipc=host --init
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: { persist-credentials: false }
-      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version-file: .node-version
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-
-      - name: Resolve Playwright version
-        id: pw
+      # No `actions/setup-node` here, unlike the other two jobs. The image brings
+      # its own Node, and `setup-node`'s `cache: pnpm` would key a store resolved
+      # under the container's `HOME` — `/github/home`, which Actions mounts and
+      # sets for every `container:` job — against the key `verify` uses for
+      # `/home/runner/…`, restoring each job's archive into the other's wrong
+      # path. pnpm is the one thing the image lacks, so `action-setup` stays and
+      # the store is cached below under a key that cannot collide.
+      #
+      # Losing `setup-node` also loses `.node-version` as this job's Node pin,
+      # and nothing else enforces it: `.npmrc` sets no `engine-strict` and pnpm 9
+      # does not check `engines` by default, so a `.node-version` bump would
+      # otherwise land while e2e quietly kept running the image's older Node.
+      # The check below restores that pin by reading the file rather than
+      # repeating it, so it stays correct without becoming a literal to update.
+      - name: The image's Node must satisfy .node-version
         run: |
-          version=$(node -p "require('./node_modules/@playwright/test/package.json').version")
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-
+          want="$(cut -d. -f1 < .node-version)"
+          have="$(node -p 'process.versions.node.split(".")[0]')"
+          [ "$want" = "$have" ] || {
+            echo "::error::.node-version wants Node $want; the container ships $have. Move the image tag and digest to a Playwright image built on Node $want."
+            exit 1
+          }
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+      - name: Resolve the pnpm store
+        id: pnpm-store
+        run: echo "path=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        id: pw-cache
         with:
-          path: ~/.cache/ms-playwright
-          key: pw-${{ runner.os }}-${{ steps.pw.outputs.version }}
-
-      - if: steps.pw-cache.outputs.cache-hit != 'true'
-        run: pnpm exec playwright install --with-deps chromium
-      # The browser binaries are cached; the apt libraries they need are not,
-      # since those live outside ~/.cache/ms-playwright.
-      - if: steps.pw-cache.outputs.cache-hit == 'true'
-        run: pnpm exec playwright install-deps chromium
+          path: ${{ steps.pnpm-store.outputs.path }}
+          key: pnpm-store-e2e-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: pnpm-store-e2e-${{ runner.os }}-
+      - run: pnpm install --frozen-lockfile
 
       - run: pnpm e2e
 
