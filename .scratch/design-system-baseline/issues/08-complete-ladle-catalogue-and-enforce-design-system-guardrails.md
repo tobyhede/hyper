@@ -88,6 +88,14 @@ enforcement. Issue 15 delivers only the job that runs the suite, so the
 the checker — it just no longer has to wait for a workflow file.
 
 One correction to carry: the retry half of the criterion assumed a diagnostic
-retry exists. `playwright.ladle.config.ts` sets `retries: 0`, so there is nothing
-for `failOnFlakyTests` to change. Issue 15 settles which of the two shapes both
-suites use.
+retry exists, and when this was written `playwright.ladle.config.ts` set
+`retries: 0`, leaving `failOnFlakyTests` nothing to change. Issue 15 has since
+settled it — the config now carries `retries: process.env['CI'] ? 2 : 0` and
+`failOnFlakyTests: !!process.env['CI']`, which is `playwright.config.ts`
+exactly, so both suites run one policy and a diagnostic retry exists for the
+criterion to be written in terms of.
+
+Read Issue 15's Answer before relying on that retry for anything: it does not
+make a blip survivable. With `failOnFlakyTests` set, a test that fails once and
+passes on retry is flaky and a flaky run still exits non-zero. The retry buys
+the trace and the reproduce-or-not signal, not tolerance.

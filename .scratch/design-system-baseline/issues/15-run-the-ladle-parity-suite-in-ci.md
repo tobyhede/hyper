@@ -1,6 +1,6 @@
 # 15 — Run the Ladle parity suite in CI
 
-**What to build:** A third CI job that runs `pnpm e2e:ladle` on every push and
+**What to build:** A fourth CI job that runs `pnpm e2e:ladle` on every push and
 pull request, alongside `verify`, `postgres` and `e2e`. ADR 0052 makes a Ladle
 behaviour test half of every surface ticket's acceptance evidence; today nothing
 but a developer's memory executes it.
