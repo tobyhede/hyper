@@ -64,23 +64,26 @@ Against today's 17s of cache-restore-plus-`install-deps` and a 2.4% chance of pa
 - [x] `pnpm e2e` passes all 97 tests in both projects **in the container** — `97 passed (1.8m)` on run 32204750136.
 - [x] The real *Initialize containers* duration is read off the first green run and recorded here, against the ~30s estimate. It was **32s**.
 
-## Measured — run 32204750136, PR #79
+## Measured — PR #79, three green runs
 
 ```
-                          before (41 runs)      after
-Initialize containers     n/a                    32s   ← estimated ~30s
-cache restore             5s                      1s   (cold, first run)
-install-deps             11–23s, once 589s        —    gone
-pnpm install              3s                      5s
-pnpm e2e                 142–155s               110s
-e2e job total            ~190s                  172s
+                          before (41 runs)   44c3bdb   f5ebbf8   122d54d
+Initialize containers     n/a                   32s       33s       25s
+cache restore              5s                    1s        1s        1s
+install-deps             11–23s, once 589s        —         —         —
+pnpm install               3s                    5s        5s        6s
+pnpm e2e                 142–155s              110s      123s      149s
+e2e job total            ~183–195s             172s      175s      189s
+verify job total          ~169s                163s      164s      159s
 ```
 
-The estimate for the pull was right. The prediction that this would be *break-even to slightly slower* was wrong: the job came out ~18s faster, because `pnpm e2e` itself dropped to 110s — below the whole 142–155s band the previous 41 runs occupied.
+**The pull estimate held**: 25–33s against ~30s predicted, and it cannot be cached, so that is the fixed cost this change buys.
 
-That drop is not worker count: the run still reports `Running 97 tests using 2 workers`. The likeliest cause is `--ipc=host`. It was added to prevent Chromium crashing on the default 64MB `/dev/shm`, but the same constraint also makes Chromium fall back to slower disk-backed shared memory for renderer transport, so removing it plausibly speeds the tests as well as stabilising them. **One run is one sample** — treat the 110s as provisional until a few more land, and don't build anything on the causal story without checking it.
+**On wall clock the change is neutral, and the original prediction was the right one.** After the first run I recorded that the "break-even to slightly slower" call had been wrong because `pnpm e2e` came in at 110s. Two further runs give 123s and 149s — the last of those lands squarely back inside the old 142–155s band. Three samples spanning 39s cannot separate a real effect from runner variance, and the `--ipc=host`-relieves-`/dev/shm` story offered for the 110s does not survive the 149s run, which still has `--ipc=host`. The mean is lower than the old band's floor, which is mildly suggestive and nothing more. Do not quote a speedup from this change; quote the removed failure mode.
 
-One consequence worth carrying forward: `verify` ran 163s against e2e's 172s, so the two jobs are now effectively tied for the critical path. Any further e2e-only optimisation buys almost nothing in total CI wall clock — which is the reason ticket 2 (raising the worker count) was cut, now confirmed by measurement rather than estimate.
+That is the whole case for it, and it is enough: `install-deps` is gone, so the 589s tail is gone, and four steps of bespoke cache logic went with it.
+
+One consequence worth carrying forward: `verify` runs 159–164s against e2e's 172–189s, so the two jobs are now close enough that e2e-only optimisation buys little in total CI wall clock. That is the reason ticket 2 (raising the worker count) was cut, now supported by measurement rather than estimate.
 
 ## Implementation notes
 
