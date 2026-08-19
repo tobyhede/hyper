@@ -24,7 +24,7 @@
 - [ ] A deterministic parity inventory maps every meaningful stable-story claim to both its Ladle behavior test and its corresponding application behavior test, and `pnpm ui:catalog:check` rejects missing or stale mappings (ADR 0052).
 - [ ] `pnpm ui:catalog` prints the resolved story, claim, Ladle evidence and application evidence matrix for review.
 - [ ] Each Playwright suite validates at runtime that every expected parity test was collected once and passed without a flaky retry.
-- [ ] Ladle E2E runs as its own required CI job, and CI fails when any Playwright test is flaky even if a diagnostic retry passes.
+- [ ] **Delegated to [Issue 15](15-run-the-ladle-parity-suite-in-ci.md); not this ticket's to build.** Ladle E2E runs as its own required CI job, and CI fails when any Playwright test is flaky even if a diagnostic retry passes. — The job landed in PR #83 and the flake policy is settled; what remains is the branch-protection rule that makes it *required*, which is a GitHub setting rather than a file. Close this line against Issue 15's Answer, not against work here. See the Comments below.
 
 ## Audit note
 
@@ -69,3 +69,33 @@ runtime commands, with Ladle E2E added as its own parallel required CI job. The
 manifest, complete evidence backfill, static checker, runtime validation and CI
 job land coherently: there is no grandfather list. A stable state without both
 proofs moves to `review` or is removed.
+
+## Comments
+
+### 2026-08-19 — the CI job moves to Issue 15
+
+The criterion "Ladle E2E runs as its own required CI job" is now owned by
+[Issue 15](15-run-the-ladle-parity-suite-in-ci.md), which is blocked by nothing.
+This ticket is blocked by 03, 04, 05, 06, 07, 11 and 14 — every one of which is
+required to land a stable story and its Ladle behaviour test — so holding the job
+here means six tickets' worth of parity evidence accumulates before anything
+executes any of it.
+
+What stays here is unchanged: the parity inventory, the `@parity:<id>` tags, the
+runtime collection validation, and `ui:catalog:check`'s traceability
+enforcement. Issue 15 delivers only the job that runs the suite, so the
+"land coherently, no grandfather list" rule above still governs the manifest and
+the checker — it just no longer has to wait for a workflow file.
+
+One correction to carry: the retry half of the criterion assumed a diagnostic
+retry exists, and when this was written `playwright.ladle.config.ts` set
+`retries: 0`, leaving `failOnFlakyTests` nothing to change. Issue 15 has since
+settled it — the config now carries `retries: process.env['CI'] ? 2 : 0` and
+`failOnFlakyTests: !!process.env['CI']`, which is `playwright.config.ts`
+exactly, so both suites run one policy and a diagnostic retry exists for the
+criterion to be written in terms of.
+
+Read Issue 15's Answer before relying on that retry for anything: it does not
+make a blip survivable. With `failOnFlakyTests` set, a test that fails once and
+passes on retry is flaky and a flaky run still exits non-zero. The retry buys
+the trace and the reproduce-or-not signal, not tolerance.
