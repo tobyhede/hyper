@@ -12,6 +12,7 @@ import {
 import { Placement, graphCardIds, type ResolvedContentCard } from '@project/graph';
 import type { OpenedSpace } from './space';
 import { createSpaceAuthoring } from './space-authoring';
+import type { AuthoringRefusal } from './space-authoring';
 import { createRenderAdapter, selectedCardOf, type EdgeSubject } from './render-adapter';
 import { createConnectionCompletion } from './connection-completion';
 import { createEdgeAuthoring } from './edge-authoring';
@@ -94,7 +95,7 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
      * than a partial entity. Closing it creates nothing.
      */
     const [creatingAlias, setCreatingAlias] = useState(false);
-    const [aliasRefusal, setAliasRefusal] = useState<string | null>(null);
+    const [aliasRefusal, setAliasRefusal] = useState<AuthoringRefusal | null>(null);
     /** The Card a completed creation asks the canvas to open its name editor on. */
     const [createdCardId, setCreatedCardId] = useState<CardId | null>(null);
     const rendererSpace = useMemo(
@@ -335,7 +336,7 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
           anchor: centreAnchor(),
         });
         if (created.kind === 'refused') {
-          setAliasRefusal(created.reason);
+          setAliasRefusal(created.refusal);
           return;
         }
         // The surface comes down only where the continuations below will run,
@@ -478,10 +479,10 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
     );
 
     const openedCard = openedCardId ? rendererSpace.lookup.card(openedCardId) : undefined;
-    const completeOpenedCard = useCallback((completed: ResolvedContentCard): string | null => {
+    const completeOpenedCard = useCallback((completed: ResolvedContentCard) => {
       const { id, ...document } = completed;
       const result = authoring.complete({ kind: 'edited-card', cardId: id, document });
-      return result.kind === 'refused' ? result.reason : null;
+      return result.kind === 'refused' ? result.refusal : null;
     }, []);
 
     /**
@@ -512,14 +513,14 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
       (
         alias: Extract<Card, { kind: 'alias' }>,
         change: { readonly title: string; readonly target: CardId },
-      ): string | null => {
+      ) => {
         const { id, ...document } = alias;
         const result = authoring.complete({
           kind: 'edited-card',
           cardId: id,
           document: { ...document, ...change },
         });
-        return result.kind === 'refused' ? result.reason : null;
+        return result.kind === 'refused' ? result.refusal : null;
       },
       [],
     );

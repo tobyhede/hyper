@@ -7,6 +7,7 @@ import {
 } from '@project/persistence';
 import type { CardFlowNode } from '@project/react-flow-adapter';
 import { CARD_SIZE } from './card';
+import { describeAuthoringRefusal } from './authoring-refusal';
 import type { ConnectionCompletion, ConnectionResult } from './connection-completion';
 import type { CanvasSelection, EdgeSubject, RenderAdapter } from './render-adapter';
 import { sameEdgeSubject, sameSelection } from './render-adapter';
@@ -351,7 +352,7 @@ export function createEdgeAuthoring({
   const completeStructural = (completion: Parameters<SpaceAuthoring['complete']>[0]): boolean => {
     const result = authoring.complete(completion);
     if (result.kind === 'refused') {
-      publish({ refusal: result.reason });
+      publish({ refusal: describeAuthoringRefusal(result.refusal) });
       return false;
     }
     if (result.kind === 'queued') {

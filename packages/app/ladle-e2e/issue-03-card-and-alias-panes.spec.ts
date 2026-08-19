@@ -24,23 +24,6 @@ test('Markdown Card story validates atomically and Escape cancels the whole draf
   await expect(page.getByText('No edit completed.')).toBeVisible();
 });
 
-test('Card Editor error story keeps the draft pending', async ({ page }) => {
-  await page.goto('/?story=components--card-and-alias-panes--error&mode=preview');
-
-  const dialog = page.getByRole('dialog', { name: 'Architecture notes' });
-  const title = dialog.getByRole('textbox', { name: 'Title' });
-  await expect(title).toBeFocused();
-  await title.fill('Retitled notes');
-  await dialog.getByRole('button', { name: 'Done' }).click();
-
-  await expect(dialog.getByRole('alert')).toContainText('Couldn’t save changes');
-  await expect(dialog.getByRole('alert')).toContainText(
-    'This Card could not be completed. Try again.',
-  );
-  await expect(dialog.getByRole('textbox', { name: 'Title' })).toHaveValue('Retitled notes');
-  await expect(dialog).toBeVisible();
-});
-
 test('opened Alias empty story explains that no Target is eligible', async ({ page }) => {
   await page.goto('/?story=components--card-and-alias-panes--alias-empty&mode=preview');
 

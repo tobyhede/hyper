@@ -48,7 +48,7 @@ describe('NewAlias', () => {
     render(
       <NewAlias
         targets={targets}
-        refusal="This Card is no longer part of the Space."
+        refusal={{ code: 'alias-target-not-found', targetId: TARGET_ID }}
         onCreate={() => undefined}
         onCancel={() => undefined}
         onRefusalStale={staleRefusal}
@@ -66,7 +66,7 @@ describe('NewAlias', () => {
     render(
       <NewAlias
         targets={targets}
-        refusal="This Card is no longer part of the Space."
+        refusal={{ code: 'alias-target-not-found', targetId: TARGET_ID }}
         onCreate={() => undefined}
         onCancel={() => undefined}
         onRefusalStale={staleRefusal}
@@ -78,17 +78,11 @@ describe('NewAlias', () => {
     expect(staleRefusal).toHaveBeenCalled();
   });
 
-  /**
-   * The fields scroll and the actions do not, so a refusal rendered among the
-   * fields can be scrolled off exactly when it is the thing the author needs to
-   * read. It sits in the non-scrolling slot the opened-Card pane already puts a
-   * refusal in — between the field region and the actions.
-   */
-  it('keeps a refusal out of the scrolling field region', () => {
+  it('attaches a Target refusal to the Target field', () => {
     render(
       <NewAlias
         targets={targets}
-        refusal="This Card is no longer part of the Space."
+        refusal={{ code: 'alias-target-not-found', targetId: TARGET_ID }}
         onCreate={() => undefined}
         onCancel={() => undefined}
         onRefusalStale={() => undefined}
@@ -96,8 +90,12 @@ describe('NewAlias', () => {
     );
 
     const alert = screen.getByRole('alert');
-    expect(alert.closest('.card-pane__fields')).toBeNull();
-    expect(alert.parentElement).toHaveClass('card-pane__editor');
+    expect(alert).toHaveTextContent('That Target is no longer part of the Space.');
+    expect(alert.closest('.card-pane__fields')).not.toBeNull();
+    expect(screen.getByRole('combobox', { name: 'Target' })).toHaveAttribute(
+      'aria-invalid',
+      'true',
+    );
   });
 
   it('says nothing while there is no refusal to go stale', () => {

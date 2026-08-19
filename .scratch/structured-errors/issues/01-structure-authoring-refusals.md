@@ -4,16 +4,16 @@
 typed refusal identity decided by ADR 0057, and map those identities to wording,
 field placement and recovery in application composition.
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] Inventory every current `refuse(...)`, eligibility refusal and caller.
-- [ ] Define one exhaustive `AuthoringRefusal` union whose variants carry stable
+- [x] Inventory every current `refuse(...)`, eligibility refusal and caller.
+- [x] Define one exhaustive `AuthoringRefusal` union whose variants carry stable
   codes and only their required domain context.
-- [ ] Make Authoring and eligibility return structured refusals; remove
+- [x] Make Authoring and eligibility return structured refusals; remove
   programmatic comparisons and domain tests against display prose.
-- [ ] Map refusals exhaustively at application surfaces. Card title and Alias
+- [x] Map refusals exhaustively at application surfaces. Card title and Alias
   Target validation attach to their fields; invariant failures remain failures.
-- [ ] Remove the manufactured generic Card Editor error story. Persistence
+- [x] Remove the manufactured generic Card Editor error story. Persistence
   failures remain represented only by workspace persistence states.
-- [ ] Update property, unit, Ladle and application browser coverage.
-- [ ] `pnpm verify`, `pnpm e2e` and `pnpm e2e:ladle` pass.
+- [x] Update property, unit, Ladle and application browser coverage.
+- [x] `pnpm verify`, `pnpm e2e` and `pnpm e2e:ladle` pass.

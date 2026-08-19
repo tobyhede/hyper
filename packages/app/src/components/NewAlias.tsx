@@ -13,12 +13,14 @@ import {
 } from '@project/ui';
 import { CardPane } from './CardPane';
 import { paneInitialFocus } from './pane-focus';
+import { describeAuthoringRefusal } from '../authoring-refusal';
+import type { AuthoringRefusal } from '../space-authoring';
 
 export interface NewAliasProps {
   /** Every Card an Alias may name: the non-Alias Cards of this Space (ADR 0009). */
   readonly targets: readonly Card[];
   /** Why the Space refused the Alias this pane tried to create, or `null`. */
-  readonly refusal: string | null;
+  readonly refusal: AuthoringRefusal | null;
   /**
    * Create the Alias on the chosen Target, with the title exactly as typed —
    * the empty string included, because an empty title is what tells Authoring
@@ -61,6 +63,10 @@ export interface NewAliasProps {
  */
 export function NewAlias({ targets, refusal, onCreate, onCancel, onRefusalStale }: NewAliasProps) {
   const [title, setTitle] = useState('');
+  const targetError =
+    refusal?.code === 'alias-target-not-found' || refusal?.code === 'alias-target-must-own-content'
+      ? describeAuthoringRefusal(refusal)
+      : null;
 
   return (
     <CardPane ariaLabel="New Alias" testId="new-alias" onDismiss={onCancel}>
@@ -90,44 +96,48 @@ export function NewAlias({ targets, refusal, onCreate, onCancel, onRefusalStale 
               onChange={(event) => setTitle(event.currentTarget.value)}
             />
           </Field>
-          <CardSearchCombobox
-            label="Target"
-            choices={targets.map((card) => ({
-              id: card.id,
-              title: card.title,
-              kind: card.kind,
-            }))}
-            value={null}
-            // "It opens the normal Card editor in an Alias creation state with
-            // **Target** focused" (ADR 0009's Frame 1): the Target is what this
-            // surface is for, and the title above it is optional.
-            inputAttributes={paneInitialFocus(true)}
-            testId="card-picker-search"
-            resultsTestId="card-picker-results"
-            onValueChange={(target) => {
-              const parsed = uuidSchema.safeParse(target);
-              if (parsed.success) onCreate(parsed.data, title);
-            }}
-            emptyMessage="An Alias needs a Card that owns its content, and this Space has none yet."
-          />
+          <Field className="card-pane__field" data-invalid={targetError !== null}>
+            <CardSearchCombobox
+              label="Target"
+              choices={targets.map((card) => ({
+                id: card.id,
+                title: card.title,
+                kind: card.kind,
+              }))}
+              value={null}
+              inputAttributes={{
+                ...paneInitialFocus(true),
+                'aria-invalid': targetError !== null,
+                'aria-describedby': targetError === null ? undefined : 'new-alias-target-error',
+              }}
+              testId="card-picker-search"
+              resultsTestId="card-picker-results"
+              onValueChange={(target) => {
+                const parsed = uuidSchema.safeParse(target);
+                if (parsed.success) onCreate(parsed.data, title);
+              }}
+              emptyMessage="An Alias needs a Card that owns its content, and this Space has none yet."
+            />
+            <FieldError id="new-alias-target-error">{targetError}</FieldError>
+          </Field>
           {/* The hint stays among the fields, under the list it is about: it is
               advice on how to finish, so it belongs beside the control that
-              finishes. It is still withdrawn while a refusal stands, because
-              "choosing a Target creates the Alias" is the sentence the refused
-              attempt has just contradicted. */}
+              finishes. It is withdrawn while a refusal stands, leaving the
+              field-local corrective message to describe the next action. */}
           {refusal === null && (
             <FieldDescription className="card-pane__hint">
               Choosing a Target creates the Alias. Leave the title empty to take the Target’s.
             </FieldDescription>
           )}
         </FieldGroup>
-        {/* Outside the scrolling region, in the slot the opened-Card pane puts a
-            refusal in. Among the fields it could be scrolled out of view at the
-            moment it is the only thing worth reading — and this pane is the one
-            most likely to scroll, having no Markdown field to absorb the
-            squeeze. No layout class: it is a plain child of the editor's
-            column, exactly as `EditorForm`'s is. */}
-        {refusal !== null && <FieldError className="card-pane__field-error">{refusal}</FieldError>}
+        {/* A refusal not attributable to the Target remains form-level. Current
+            Alias creation refusals are Target-specific; this exhaustive fallback
+            keeps a future non-field refusal from being silently discarded. */}
+        {refusal !== null && targetError === null && (
+          <FieldError className="card-pane__field-error">
+            {describeAuthoringRefusal(refusal)}
+          </FieldError>
+        )}
         <div className="card-pane__actions">
           <Button type="button" variant="secondary" onClick={onCancel}>
             Cancel

@@ -23,6 +23,7 @@ import type { Card, CardId, Graph, GraphEdge, GraphId } from '@project/core';
 import { uuidSchema } from '@project/core';
 import type { CardFlowNode } from '@project/react-flow-adapter';
 import { CardSearchCombobox, type CardChoice } from '@project/ui';
+import { describeAuthoringRefusal } from './authoring-refusal';
 import {
   newCardDrop,
   type DropTarget,
@@ -631,7 +632,9 @@ export function useEdgeAuthoring({
           id: card.id,
           title: card.title,
           kind: card.kind,
-          ...(eligibility.kind === 'refused' ? { refusal: eligibility.reason } : {}),
+          ...(eligibility.kind === 'refused'
+            ? { refusal: describeAuthoringRefusal(eligibility.refusal) }
+            : {}),
         };
       }),
     [subjectCards],
@@ -686,7 +689,9 @@ export function useEdgeAuthoring({
         id: card.id,
         title: card.title,
         kind: card.kind,
-        ...(eligibility.kind === 'refused' ? { refusal: eligibility.reason } : {}),
+        ...(eligibility.kind === 'refused'
+          ? { refusal: describeAuthoringRefusal(eligibility.refusal) }
+          : {}),
       };
     });
   }, [connectTarget, subjectCards, authoring]);

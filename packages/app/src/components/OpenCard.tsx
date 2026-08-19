@@ -24,6 +24,8 @@ import {
 } from '@project/ui';
 import { CardPane } from './CardPane';
 import { paneInitialFocus } from './pane-focus';
+import { describeAuthoringRefusal } from '../authoring-refusal';
+import type { AuthoringRefusal } from '../space-authoring';
 
 /**
  * The two values the Card dialog authors. Description remains valid domain
@@ -87,7 +89,7 @@ interface DirectOpen {
   readonly graphColor?: string;
   readonly through?: never;
   readonly occurrence?: never;
-  readonly onComplete: (card: ResolvedContentCard) => string | null;
+  readonly onComplete: (card: ResolvedContentCard) => AuthoringRefusal | null;
 }
 
 /**
@@ -110,7 +112,10 @@ interface OccurrenceAuthoring {
    * authored fact. Two calls would be two Edits and two commits over one press.
    * This capability completes nothing on the Target.
    */
-  readonly onEdit: (change: { readonly title: string; readonly target: CardId }) => string | null;
+  readonly onEdit: (change: {
+    readonly title: string;
+    readonly target: CardId;
+  }) => AuthoringRefusal | null;
 }
 
 /**
@@ -265,7 +270,7 @@ function MarkdownCardEditor({
 }: {
   readonly content: MarkdownCard;
   readonly graphColor: string;
-  readonly onComplete: (card: ResolvedContentCard) => string | null;
+  readonly onComplete: (card: ResolvedContentCard) => AuthoringRefusal | null;
   readonly onCancel: () => void;
 }) {
   const [draft, setDraft] = useState<MarkdownDraft>(() => seedMarkdown(content));
@@ -282,7 +287,11 @@ function MarkdownCardEditor({
     }
     const refusal = onComplete(settled.card);
     if (refusal !== null) {
-      setContentRefusal(refusal);
+      if (refusal.code === 'card-title-required') {
+        setDraft({ ...draft, titleError: describeAuthoringRefusal(refusal) });
+      } else {
+        setContentRefusal(describeAuthoringRefusal(refusal));
+      }
       return;
     }
     onCancel();
@@ -341,14 +350,23 @@ function AliasCardEditor({
 }) {
   const [title, setTitle] = useState(alias.title);
   const [target, setTarget] = useState<CardId>(alias.target);
-  const [refusal, setRefusal] = useState<string | null>(null);
+  const [titleError, setTitleError] = useState<string | null>(null);
+  const [targetError, setTargetError] = useState<string | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
   const targetInput = useRef<HTMLInputElement>(null);
 
   const submit = (event: FormEvent<HTMLFormElement>): void => {
     event.preventDefault();
-    const reason = occurrence.onEdit({ title: title.trim(), target });
-    if (reason !== null) {
-      setRefusal(reason);
+    const refusal = occurrence.onEdit({ title: title.trim(), target });
+    if (refusal !== null) {
+      const message = describeAuthoringRefusal(refusal);
+      if (refusal.code === 'card-title-required') setTitleError(message);
+      else if (
+        refusal.code === 'alias-target-not-found' ||
+        refusal.code === 'alias-target-must-own-content'
+      ) {
+        setTargetError(message);
+      } else setFormError(message);
       return;
     }
     // A completed Done closes the pane through the same callback as Cancel.
@@ -360,19 +378,23 @@ function AliasCardEditor({
       subjectTitle={alias.title}
       graphColor={graphColor}
       title={title}
-      titleError={null}
+      titleError={titleError}
       titleStartsFocused={false}
       onTitleChange={(nextTitle) => {
         setTitle(nextTitle);
-        setRefusal(null);
+        setTitleError(null);
+        setFormError(null);
       }}
       onTitleEnter={() => targetInput.current?.focus()}
-      error={refusal}
+      error={formError}
       errorId="open-alias-error"
       onSubmit={submit}
       onCancel={onCancel}
     >
-      <Field className="card-editor__body card-editor__alias-target">
+      <Field
+        className="card-editor__body card-editor__alias-target"
+        data-invalid={targetError !== null}
+      >
         <FieldLabel className="card-editor__alias-label" htmlFor="open-alias-target">
           Alias of
         </FieldLabel>
@@ -388,14 +410,20 @@ function AliasCardEditor({
           }))}
           value={target}
           inputRef={targetInput}
+          inputAttributes={{
+            'aria-invalid': targetError !== null,
+            'aria-describedby': targetError === null ? undefined : 'open-alias-target-error',
+          }}
           emptyMessage="This Space holds no other Card that owns its content."
           onValueChange={(chosen) => {
             const parsed = uuidSchema.safeParse(chosen);
             if (!parsed.success) return;
             setTarget(parsed.data);
-            setRefusal(null);
+            setTargetError(null);
+            setFormError(null);
           }}
         />
+        <FieldError id="open-alias-target-error">{targetError}</FieldError>
       </Field>
     </CardEditorShell>
   );

@@ -61,13 +61,3 @@ export const AliasEmpty: Story = () => (
   />
 );
 AliasEmpty.meta = { iframed: true };
-
-/** A submission error uses the shared Card Editor treatment and keeps the draft pending. */
-export const Error: Story = () => (
-  <OpenCard
-    card={markdown}
-    onComplete={() => 'This Card could not be completed. Try again.'}
-    onCancel={() => undefined}
-  />
-);
-Error.meta = { iframed: true };

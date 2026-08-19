@@ -145,7 +145,7 @@ describe('the opened Card', () => {
   });
 
   it('trims an Alias title before the authoring refusal boundary', () => {
-    const onEdit = vi.fn(() => 'An Alias title is required.');
+    const onEdit = vi.fn(() => ({ code: 'card-title-required' }) as const);
     const onCancel = vi.fn();
     render(
       <OpenCard
@@ -161,23 +161,33 @@ describe('the opened Card', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Done' }));
 
     expect(onEdit).toHaveBeenCalledWith({ title: '', target: CARD_ID });
-    expect(screen.getByRole('alert')).toHaveTextContent('An Alias title is required.');
+    expect(screen.getByRole('alert')).toHaveTextContent('A Card title is required.');
+    expect(screen.getByRole('textbox', { name: 'Title' })).toHaveAttribute('aria-invalid', 'true');
     expect(onCancel).not.toHaveBeenCalled();
   });
 
-  it('keeps an Alias draft open when the edit is refused', () => {
+  it('keeps an Alias draft open and attaches a Target refusal to its field', () => {
     const onCancel = vi.fn();
     render(
       <OpenCard
         through={{ id: ALIAS_ID, title: 'A again', kind: 'alias', target: CARD_ID }}
-        occurrence={{ targets: [], onEdit: () => 'This Alias could not be completed.' }}
+        occurrence={{
+          targets: [],
+          onEdit: () => ({ code: 'alias-target-not-found', targetId: CARD_ID }),
+        }}
         onCancel={onCancel}
       />,
     );
 
     fireEvent.click(screen.getByRole('button', { name: 'Done' }));
 
-    expect(screen.getByRole('alert')).toHaveTextContent('This Alias could not be completed.');
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'That Target is no longer part of the Space.',
+    );
+    expect(screen.getByRole('combobox', { name: 'Target' })).toHaveAttribute(
+      'aria-invalid',
+      'true',
+    );
     expect(onCancel).not.toHaveBeenCalled();
   });
 });
