@@ -6,6 +6,7 @@ import {
   authoredSnapshot,
   authoredSpace,
   editedSnapshot,
+  MINTED_GRAPH_ID_BASE,
   storyGraphIds,
   unauthoredSpace,
 } from '../stories/support/spaces';
@@ -108,6 +109,24 @@ describe('the story Spaces', () => {
     // The set has to be reaching the literals, or the assertion above holds for
     // a reason nobody chose.
     expect(declared.size).toBeGreaterThan(0x0c);
+
+    // The whole boundary, and not only the draws above. The counter is
+    // monotonic from `MINTED_GRAPH_ID_BASE`, so once every declared id sits
+    // below the base *no* draw can reach one — including the draws this test
+    // does not make. Without this, a literal added at or above the base would
+    // pass the assertion above and collide on a later draw.
+    //
+    // The block is read off a minted id rather than written down again: the
+    // minter is what decides the shape, and a second copy of the prefix here
+    // would be a transcription that agrees only until one of them moves.
+    const sample = minted[0];
+    if (sample === undefined) throw new Error('The story minter produced no id.');
+    const block = sample.slice(0, sample.lastIndexOf('-') + 1);
+
+    for (const id of declared) {
+      expect(id.startsWith(block), id).toBe(true);
+      expect(Number.parseInt(id.slice(block.length), 16), id).toBeLessThan(MINTED_GRAPH_ID_BASE);
+    }
   });
 
   /**

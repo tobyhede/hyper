@@ -214,7 +214,7 @@ export const unauthoredSpace: Space = loaded(loadSpace(minted.file, minted.cardF
  * decimal counter this replaced rendered `12` as `…0000012` while `CARD_E` is
  * `…000000c`, so the two spellings did not even sort against each other.
  */
-const MINTED_GRAPH_ID_BASE = 0x1000;
+export const MINTED_GRAPH_ID_BASE = 0x1000;
 
 export const storyGraphIds = (): (() => GraphId) => {
   let next = MINTED_GRAPH_ID_BASE;
