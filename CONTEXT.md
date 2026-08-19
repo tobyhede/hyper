@@ -70,6 +70,12 @@ A validated transition from one Space to another that changes its authored Cards
 
 One Edit may change several authored parts atomically. Creating a Card at the end of a drawn Edge may create the Card, mint the Layout's first Graph, add the Edge, and write the Card's position into a Layout; together they are one Edit, not a sequence of smaller Edits.
 
+**Completion outcome**:
+What an authoring attempt produces: **completed**, **unchanged** or **refused**, and never more than one. Completed is an Edit. Unchanged is the value the author already authored — a rename to the stored title, a swatch already chosen, a drag returned to where it began — so it produces no Edit and needs no explanation. Refused is an operation that cannot happen now — stale context, or a domain rule the author has run into — and produces no Edit either, but carries a stable machine identity (a **refusal** code) and only the typed domain context that code needs; application composition owns the wording and where it is shown, never the domain (ADR 0057).
+
+None of the three is an error. A refusal is an anticipated outcome of attempting an Edit, not an exception, which is why it is named apart from one. A broken invariant is neither completed, unchanged, nor refused — it throws, or is reported through the non-throwing reporter, because dressing a programming defect as a refusal would put it in front of the author as their own mistake.
+_Avoid_: error, failure, exception (all reserved for a broken invariant or a thrown/reported defect — never for one of the three outcomes), validation error.
+
 **Replacement epoch**:
 Which generation of the working Space a piece of local work was made against. Replacing the working Space wholesale — accepting the stored Space is the only thing that does it — advances the epoch once, as part of the same transition that installs the replacement. Nothing else advances it: retrying, keeping local work, a change in persistence status, choosing another View or Layout, and completing an Edit all leave it where it is.
 
