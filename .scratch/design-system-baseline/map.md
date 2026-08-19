@@ -25,7 +25,7 @@ remains the accounting source for the remaining extraction order.
 
 - [Restore one Card-choice model](issues/10-restore-one-card-choice-model.md) — collapse the three production implementations back to two presentations over one behavior.
 - [Stabilise the E2E fixture startup gate](issues/12-stabilise-e2e-fixture-startup.md) — turn the full-suite-only startup failure into a reproduced and fixed race.
-- [Run the Ladle parity suite in CI](issues/15-run-the-ladle-parity-suite-in-ci.md) — carve the CI job out of Issue 08, which every remaining surface ticket blocks, so parity evidence is gated on the day it lands.
+- [Run the Ladle parity suite in CI](issues/15-run-the-ladle-parity-suite-in-ci.md) — carve the CI job out of Issue 08, which every remaining surface ticket blocks, so `pnpm e2e:ladle` runs on every push and pull request from the day each ticket's evidence lands. It *reports*; it does not yet *gate*. Making the `ladle` check required to merge is a branch-protection rule on `main`, outside the repository and unapplied — until it is set, a red check can still be merged past, and Issue 08's "required CI job" criterion stays open.
 
 ## Fog
 

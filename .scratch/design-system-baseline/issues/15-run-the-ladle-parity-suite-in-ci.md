@@ -7,10 +7,10 @@ but a developer's memory executes it.
 
 **Blocked by:** None — can start immediately.
 
-**Status:** resolved — built on `ci/run-ladle-parity-suite`, green locally. Two
-criteria stay open until the branch is pushed and the human sets the branch
-protection rule: the first green run's duration and the "required" half of Issue
-08's criterion. See "Answer".
+**Status:** resolved — delivered in PR #83, green on CI in 1m12s. **One criterion
+stays open and it is not the repository's to close**: making the `ladle` check
+*required* to merge is a branch-protection rule on `main`, which the human sets
+in GitHub. Until then the job reports without gating. See "Answer".
 
 ## Why this is its own ticket rather than Issue 08's
 
@@ -19,14 +19,18 @@ Issue 08 already owns the criterion, in writing:
 > Ladle E2E runs as its own required CI job, and CI fails when any Playwright
 > test is flaky even if a diagnostic retry passes.
 
-Issue 08 is blocked by 03, 04, 05, 06, 07, 11 and 14. Every one of those tickets
-is required by Issue 13's extraction loop to land a stable story and its Ladle
-behaviour test. So the gate arrives *after* six tickets' worth of the evidence it
-exists to protect — the evidence accumulates ungated, and the first time anything
-executes it is the run that is also meant to prove Issue 08.
+Issue 08 is blocked by seven tickets — 03, 04, 05, 06, 07, 11 and 14 — every one
+of which is required by Issue 13's extraction loop to land a stable story and its
+Ladle behaviour test. **Six of the seven are still open**: 14 is resolved, and its
+`issue-14-workspace-sidebar.spec.ts` is precisely the evidence sitting unexecuted
+today, which is what makes the point concrete rather than hypothetical. So the
+gate arrives *after* six more tickets' worth of the same evidence accumulates
+ungated, and the first thing to execute any of it is the run also meant to prove
+Issue 08.
 
-Nothing about the job depends on those six tickets. Carving it out costs Issue 08
-one criterion and buys six tickets a gate on the day their evidence lands.
+Nothing about the job depends on those six open tickets. Carving it out costs
+Issue 08 one criterion and buys the six a gate on the day their evidence lands —
+and gives 14's evidence one immediately.
 
 **What stays with Issue 08:** the parity inventory, the `@parity:<id>` tags, the
 runtime collection validation and `ui:catalog:check`'s traceability enforcement.
@@ -130,7 +134,7 @@ rather than assumption.
 - [x] The flake policy is one deliberate choice, recorded here, and the two Playwright configs no longer disagree by accident.
 - [x] `verify` is untouched and still requires no browser binary.
 - [x] The diff reaches `ci.yml` and `playwright.ladle.config.ts` only — no story, no spec and no production module changes.
-- [x] The first green run's real duration is recorded in this ticket against the "under two minutes" budget. — **1m12s** cold, PR #83 run `32211978070`. — **not knowable yet**: the branch is committed but unpushed, so no CI run exists. Placeholder below.
+- [x] The first green run's real duration is recorded in this ticket against the "under two minutes" budget. — **1m12s** cold, PR #83 run `32211978070`.
 - [ ] Whether branch protection now requires the job is recorded here. — **not applied**: it is a GitHub setting on `main`, outside the repository, and the human's to set.
 - [x] `pnpm verify` and `pnpm e2e:ladle` pass locally, with real output quoted.
 
@@ -285,6 +289,39 @@ the digest is pinned precisely so it stays a pull of the same bytes.
 For scale, the other three jobs on the same run: `e2e` 2m57s, `verify` 2m38s,
 `postgres` 1m21s. The new gate is the fastest of the four and does not move the
 critical path, which runs through `e2e`.
+
+### Two regression tests, and the scope call they represent
+
+Review raised two invariants this branch creates and leaves unenforced. Both are
+now held by `test/unit/`, beside the repository-invariant tests already there
+(`agent-skill-symlinks`, `ui-import-restrictions`), and both were written
+red-first against a deliberately broken tree.
+
+**`ci-container-image-pin.test.ts`** — the Playwright image pin exists in two
+jobs and nothing made the copies agree. The `.node-version` guard cannot: it
+compares the Node major, identical across Playwright image versions. Bump `e2e`
+and forget `ladle` and that job silently keeps running the old image, surfacing
+later as a `@playwright/test` mismatch that points a reader at the lockfile
+rather than at the pin nobody moved. Proven red by moving the `ladle` tag and
+digest alone — `expected [ …(2) ] to have a length of 1`. It also holds the
+`--ipc=host --init` options and the tag-and-digest shape, and deliberately does
+*not* assert the number of container jobs, so consolidating the two behind a
+`strategy.matrix` later stays a passing refactor rather than a red build.
+
+**`playwright-flake-policy.test.ts`** — acceptance criterion 4 above says the
+two configs "no longer disagree by accident", and until now nothing but review
+enforced that. It loads both configs with `CI` set and unset and compares
+`forbidOnly`, `failOnFlakyTests` and `retries`. The literal assertion beside the
+equality is the load-bearing half: two configs that both said `retries: 0` would
+satisfy equality while leaving Issue 08's criterion with no diagnostic retry to
+exercise, which is exactly the state this branch corrected. Proven red by
+restoring the Ladle config's `retries: 0`.
+
+The ticket's diff criterion says `ci.yml` and `playwright.ladle.config.ts` only.
+Two new test files exceed that, deliberately: the criterion exists to keep
+product change out of a CI ticket, and a test that holds this ticket's own
+invariants is not that. They are in their own commit and can be dropped without
+touching the job.
 
 ### Branch protection — NOT applied
 

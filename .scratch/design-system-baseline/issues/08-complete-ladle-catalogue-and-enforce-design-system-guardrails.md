@@ -24,7 +24,7 @@
 - [ ] A deterministic parity inventory maps every meaningful stable-story claim to both its Ladle behavior test and its corresponding application behavior test, and `pnpm ui:catalog:check` rejects missing or stale mappings (ADR 0052).
 - [ ] `pnpm ui:catalog` prints the resolved story, claim, Ladle evidence and application evidence matrix for review.
 - [ ] Each Playwright suite validates at runtime that every expected parity test was collected once and passed without a flaky retry.
-- [ ] Ladle E2E runs as its own required CI job, and CI fails when any Playwright test is flaky even if a diagnostic retry passes.
+- [ ] **Delegated to [Issue 15](15-run-the-ladle-parity-suite-in-ci.md); not this ticket's to build.** Ladle E2E runs as its own required CI job, and CI fails when any Playwright test is flaky even if a diagnostic retry passes. — The job landed in PR #83 and the flake policy is settled; what remains is the branch-protection rule that makes it *required*, which is a GitHub setting rather than a file. Close this line against Issue 15's Answer, not against work here. See the Comments below.
 
 ## Audit note
 
