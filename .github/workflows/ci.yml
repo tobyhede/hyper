@@ -134,6 +134,14 @@ jobs:
     # tags. A guard step here would catch that a minute earlier at the cost of a
     # third place to edit, which is why there isn't one.
     #
+    # **There are now two copies of this pin.** The `ladle` job below carries
+    # the same tag and digest. A bump moves both, or that job silently keeps
+    # running the old image: the `.node-version` check will not catch it, since
+    # it compares the Node major and that is identical across Playwright image
+    # versions. What surfaces instead is `pnpm e2e:ladle` failing on the
+    # version the lockfile requires, which points a reader at the lockfile
+    # rather than at the pin they forgot to move.
+    #
     # `--ipc=host` and `--init` are both off Playwright's Docker guidance rather
     # than its Actions example, which carries neither. Without `--ipc=host` the
     # default 64MB `/dev/shm` makes Chromium run out of memory and crash, and

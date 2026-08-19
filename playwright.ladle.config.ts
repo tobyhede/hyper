@@ -28,5 +28,14 @@ export default defineConfig({
     url: `http://localhost:${PORT}`,
     reuseExistingServer: false,
     timeout: 120_000,
+    // This is the only CI command that spawns a server and waits on a port —
+    // the app E2E fixtures start their Vite hosts in-process. Playwright
+    // forwards a spawned server's stdout only when this is `'pipe'`
+    // (`playwright/lib/runner/index.js:871`), and Vite logs its startup and
+    // most of its failures there, so without it a container-side problem —
+    // the port, `localhost` resolving to `::1` while Vite bound `127.0.0.1`,
+    // a plugin throwing — reaches the log as a bare 120s timeout with nothing
+    // under it to read.
+    stdout: 'pipe',
   },
 });

@@ -130,7 +130,7 @@ rather than assumption.
 - [x] The flake policy is one deliberate choice, recorded here, and the two Playwright configs no longer disagree by accident.
 - [x] `verify` is untouched and still requires no browser binary.
 - [x] The diff reaches `ci.yml` and `playwright.ladle.config.ts` only — no story, no spec and no production module changes.
-- [ ] The first green run's real duration is recorded in this ticket against the "under two minutes" budget. — **not knowable yet**: the branch is committed but unpushed, so no CI run exists. Placeholder below.
+- [x] The first green run's real duration is recorded in this ticket against the "under two minutes" budget. — **1m12s** cold, PR #83 run `32211978070`. — **not knowable yet**: the branch is committed but unpushed, so no CI run exists. Placeholder below.
 - [ ] Whether branch protection now requires the job is recorded here. — **not applied**: it is a GitHub setting on `main`, outside the repository, and the human's to set.
 - [x] `pnpm verify` and `pnpm e2e:ladle` pass locally, with real output quoted.
 
@@ -256,21 +256,35 @@ The workflow YAML parses: `python3 -c "import yaml; yaml.safe_load(...)"` reads
 four jobs — `verify`, `postgres`, `e2e`, `ladle` — with the `ladle` container and
 its eight steps as written.
 
-### First green CI run — TO BE FILLED IN
+### First green CI run — 1m12s, inside the budget
 
-The branch is committed and **not pushed**, so no run exists to read. Against
-the "under two minutes" budget, the expected shape is ~25–33s of *Initialize
-containers* (the pull, from Issue 01's three measured runs) plus ~5s of
-`pnpm install` plus the suite. Record the real numbers here once the first green
-run lands:
+PR #83, run `32211978070`, job `95946312753`. All four jobs green on the first
+attempt. This is a **cold** run in every sense — no cache to restore, so it also
+paid to build and save the store.
 
 ```
-Initialize containers   TBD   (Issue 01 measured 25–33s for the same image)
-cache restore           TBD
-pnpm install            TBD
-pnpm e2e:ladle          TBD
-ladle job total         TBD   (budget: under 2m)
+Set up job                2s
+Initialize containers    25s   (the pull; Issue 01 measured 25–33s, same image)
+checkout                  2s
+.node-version check       0s
+pnpm/action-setup         3s
+Resolve the pnpm store    1s
+cache restore             0s   (cold — no hit)
+pnpm install              5s
+pnpm e2e:ladle           13s
+upload-artifact           –    (skipped; the run was green)
+cache save               18s   (cold only; a warm run restores instead)
+ladle job total        1m12s   (budget: under 2m ✅)
 ```
+
+The two numbers a warm run changes are the cache: the 18s save disappears and
+the 0s restore becomes a few seconds, so steady state is roughly a minute. The
+25s pull is the floor and is not this job's to reduce — `e2e` pays it too, and
+the digest is pinned precisely so it stays a pull of the same bytes.
+
+For scale, the other three jobs on the same run: `e2e` 2m57s, `verify` 2m38s,
+`postgres` 1m21s. The new gate is the fastest of the four and does not move the
+critical path, which runs through `e2e`.
 
 ### Branch protection — NOT applied
 
