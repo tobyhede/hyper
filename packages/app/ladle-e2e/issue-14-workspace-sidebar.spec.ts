@@ -125,6 +125,42 @@ test('Workspace Sidebar stories render quiet, retryable, and presenting states',
   await expect(page.getByRole('button', { name: 'Add Card' })).toBeDisabled();
 });
 
+/**
+ * Application pairs:
+ * - `canvas-projection.test.ts`: "draws every Graph a selected Layout owns"
+ * - `navigation.test.ts`: "selects a renderer and its active Graph without changing the Space"
+ * - `navigation.test.ts`: "activating a Graph ends the current Traversal history without changing the Space"
+ * - `navigation.test.ts`: "leaves no Traversal history behind when presenting ends"
+ */
+test('Workspace Sidebar story draws and activates only the selected Layout graphs', async ({
+  page,
+}) => {
+  await page.goto('/?story=components--workspace-sidebar--settled&mode=preview');
+
+  await expect(page.getByRole('button', { name: 'Long', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Mid', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Short', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Echo', exact: true })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Mid', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Mid', exact: true })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+
+  await page.getByRole('button', { name: 'Collection 2' }).click();
+
+  await expect(page.getByRole('button', { name: 'Echo', exact: true })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+  await expect(page.getByRole('button', { name: 'Long', exact: true })).toHaveCount(0);
+
+  await page.getByRole('button', { name: 'Present Echo' }).click();
+  await expect(page.getByRole('button', { name: 'Overview' })).toBeVisible();
+  await page.getByRole('button', { name: 'Overview' }).click();
+  await expect(page.getByRole('button', { name: 'Present Echo' })).toBeVisible();
+});
+
 test('Workspace Sidebar stories render production conflict and rejection recovery', async ({
   page,
 }) => {

@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useSyncExternalStore } from 'react';
+import { uuidSchema } from '@project/core';
 import type { Space } from '@project/graph';
 import {
   MemorySpaceBackend,
@@ -12,15 +13,26 @@ import { AppShell } from '@project/ui';
 // how a package boundary gets crossed without naming one (AGENTS.md).
 import { canvasRenderers, currentRenderer } from '#src/canvas-renderers';
 import { graphColorMap } from '#src/colors';
-import { defaultRenderer, type CanvasRendererId } from '#src/renderer';
+import { createNavigation } from '#src/navigation';
+import { createRendererResolver, defaultRenderer } from '#src/renderer';
 import { createWorkingSpaceReader } from '#src/snapshot';
 import { PersistenceControl, PersistenceNotice } from '#components/PersistenceControl';
 import { SelectedCanvasRenderer, WorkspaceSidebar } from '#components/WorkspaceSidebar';
 import { authoredSnapshot, authoredSpace, editedSnapshot } from './spaces';
 
+const storyGraphIds = (): (() => ReturnType<typeof uuidSchema.parse>) => {
+  let next = 0;
+  return () => {
+    next += 1;
+    return uuidSchema.parse(`00000000-0000-4000-8000-${next.toString().padStart(12, '0')}`);
+  };
+};
+
 export interface WorkspaceSidebarFixtureProps {
   /** Which Space the sidebar reports on. See `./spaces`. */
   readonly space?: Space;
+  /** The live Space Navigation reads; supplied by session-backed fixtures. */
+  readonly currentSpace?: () => Space;
   readonly persistence?: SpaceSessionState['persistence'];
   readonly presenting?: boolean;
   readonly authoringDisabled?: boolean;
@@ -30,7 +42,7 @@ export interface WorkspaceSidebarFixtureProps {
 }
 
 /**
- * Controlled fixture state around the unchanged production chrome.
+ * Production Navigation around the unchanged production chrome.
  *
  * It composes the real `AppShell`, not a stand-in frame, because the sidebar and
  * the canvas header are two halves of one decision — the header names the choice
@@ -39,6 +51,7 @@ export interface WorkspaceSidebarFixtureProps {
  */
 export function WorkspaceSidebarFixture({
   space = authoredSpace,
+  currentSpace,
   persistence = { kind: 'settled' },
   presenting = false,
   authoringDisabled = false,
@@ -46,24 +59,32 @@ export function WorkspaceSidebarFixture({
   acknowledgedRevision = 4n,
   onRetry = () => undefined,
 }: WorkspaceSidebarFixtureProps) {
-  // Where the Space opens is production's answer, from the same call `createApp`
-  // makes on the Space it was given. A rule of the fixture's own — "the first
-  // Layout, else Flow" — stood here, and it is the state translation ADR 0052's
-  // negative names: the story would go on pressing a row after the app had
-  // stopped. The Space declares `defaultRenderer`, which is fixture *data* and
-  // allowed; deciding what to do with it is not.
-  const [selected, setSelected] = useState<CanvasRendererId>(() => defaultRenderer(space));
-  const [activeGraph, setActiveGraph] = useState<string | null>(space.graphs[0]?.id ?? null);
+  const suppliedSpace = useCallback(() => space, [space]);
+  const readCurrentSpace = currentSpace ?? suppliedSpace;
+  const resolveRenderer = useMemo(
+    () => createRendererResolver({ newGraphId: storyGraphIds() }),
+    [],
+  );
+  const navigation = useMemo(() => {
+    const initialSpace = readCurrentSpace();
+    const composed = createNavigation(
+      readCurrentSpace,
+      resolveRenderer,
+      defaultRenderer(initialSpace),
+      initialSpace,
+    );
+    if (presenting) composed.present();
+    return composed;
+  }, [presenting, readCurrentSpace, resolveRenderer]);
+  const navigationState = useSyncExternalStore(navigation.subscribe, navigation.getState);
   const addCardMenu = useRef<HTMLButtonElement>(null);
-  // Both derivations run on every render, unmemoized. Production memoizes them
-  // because a canvas hangs off their identity; nothing here does, and a story
-  // that reproduces the memo without the reason for it is reproducing the shape
-  // of production rather than its behaviour.
-  //
-  // One module answers which canvas renderers exist and which is current, and the header
-  // below reads the row it named rather than a title of the fixture's own.
+  // One module answers which canvas renderers exist and which is current, and
+  // the header below reads the row it named rather than a title of the
+  // fixture's own. The selected renderer, its Active Graph and its mode are all
+  // Navigation's published state.
   const renderers = canvasRenderers(space);
-  const current = currentRenderer(renderers, selected);
+  const current = currentRenderer(renderers, navigationState.selectedRenderer);
+  const renderer = resolveRenderer(space, navigationState.selectedRenderer);
   // Colours the way the sidebar's own consumer gets them, and deliberately not
   // through `canvasProjection`: that needs a resolved strategy, so a story about
   // a sidebar would run elkjs to find out what colour a Graph's glyph is.
@@ -74,15 +95,15 @@ export function WorkspaceSidebarFixture({
       sidebar={
         <WorkspaceSidebar
           workspaceTitle={space.title}
-          canvas={{ renderers, current, onSelect: setSelected }}
+          canvas={{ renderers, current, onSelect: navigation.selectRenderer }}
           graph={{
-            graphs: space.graphs,
-            activeGraphId: activeGraph,
+            graphs: renderer.subject.graphs,
+            activeGraphId: navigationState.activeGraphId,
             colorByGraphId,
-            onActivate: setActiveGraph,
-            onPresent: () => undefined,
-            presenting,
-            onExitPresenting: () => undefined,
+            onActivate: navigation.activateGraph,
+            onPresent: navigation.present,
+            presenting: navigationState.mode === 'presenting',
+            onExitPresenting: navigation.exitPresenting,
           }}
           addCard={{
             onAddCard: () => undefined,
@@ -154,6 +175,10 @@ export function RetryableWorkspaceSidebarFixture() {
   }, []);
   const readWorkingSpace = useMemo(() => createWorkingSpaceReader(), []);
   const state = useSyncExternalStore(session.subscribe, session.getState);
+  const currentSpace = useCallback(
+    () => readWorkingSpace(session.getState().working),
+    [readWorkingSpace, session],
+  );
   const submitted = useRef(false);
 
   useEffect(() => {
@@ -164,7 +189,8 @@ export function RetryableWorkspaceSidebarFixture() {
 
   return (
     <WorkspaceSidebarFixture
-      space={readWorkingSpace(state.working)}
+      space={currentSpace()}
+      currentSpace={currentSpace}
       persistence={state.persistence}
       acknowledgedRevision={state.acknowledgedRevision}
       onRetry={session.retry}
