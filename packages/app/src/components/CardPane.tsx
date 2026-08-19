@@ -16,6 +16,7 @@ export interface CardPaneProps {
  */
 export function CardPane({ ariaLabel, testId, onDismiss, children }: CardPaneProps) {
   const popup = useRef<HTMLDivElement>(null);
+  const ownerDocumentBody = useRef<HTMLElement | null>(null);
 
   // Base UI supplies the focus trap; this only selects the product's declared
   // starting field (Target for a new Alias, otherwise the first field).
@@ -31,7 +32,17 @@ export function CardPane({ ariaLabel, testId, onDismiss, children }: CardPanePro
 
   return (
     <Dialog open disablePointerDismissal onOpenChange={(open) => !open && onDismiss()}>
-      <DialogPortal>
+      {/* Base UI otherwise portals to the global document. Resolve the body
+          from content rendered beside the portal so an iframed Ladle story
+          keeps both the dialog and its focus trap inside its own document. */}
+      <span
+        ref={(element) => {
+          ownerDocumentBody.current = element?.ownerDocument.body ?? null;
+        }}
+        hidden
+        aria-hidden="true"
+      />
+      <DialogPortal container={ownerDocumentBody}>
         <DialogViewport className="card-pane" data-testid={testId}>
           <DialogBackdrop className="card-pane__backdrop" />
           <DialogPopup

@@ -1,7 +1,7 @@
 import { useState, type ComponentType, type FormEvent, type ReactNode } from 'react';
 import { markdownCardSchema, type Card, type CardId } from '@project/core';
 import type { ResolvedContentCard } from '@project/graph';
-import { Button } from '@project/ui';
+import { Button, Field, FieldError, FieldGroup, FieldLabel, Input, Textarea } from '@project/ui';
 import { CardPane } from './CardPane';
 import { CardPicker } from './CardPicker';
 
@@ -115,9 +115,10 @@ const markdownFields: ContentFieldGroup<MarkdownCard, MarkdownDraft> = {
 
   Fields: ({ draft, onChange }) => (
     <>
-      <label className="card-pane__field">
-        <span>Title</span>
-        <input
+      <Field className="card-pane__field" data-invalid={draft.titleError !== null}>
+        <FieldLabel htmlFor="open-card-title">Title</FieldLabel>
+        <Input
+          id="open-card-title"
           className="card-pane__title-input"
           aria-invalid={draft.titleError !== null}
           aria-describedby={draft.titleError === null ? undefined : 'open-card-title-error'}
@@ -126,19 +127,18 @@ const markdownFields: ContentFieldGroup<MarkdownCard, MarkdownDraft> = {
             onChange({ ...draft, title: event.currentTarget.value, titleError: null })
           }
         />
-      </label>
-      {draft.titleError !== null && (
-        <span id="open-card-title-error" role="alert" className="card-pane__field-error">
+        <FieldError id="open-card-title-error" className="card-pane__field-error">
           {draft.titleError}
-        </span>
-      )}
-      <label className="card-pane__field card-pane__field--source">
-        <span>Markdown source</span>
-        <textarea
+        </FieldError>
+      </Field>
+      <Field className="card-pane__field card-pane__field--source">
+        <FieldLabel htmlFor="open-card-markdown">Markdown source</FieldLabel>
+        <Textarea
+          id="open-card-markdown"
           value={draft.body}
           onChange={(event) => onChange({ ...draft, body: event.currentTarget.value })}
         />
-      </label>
+      </Field>
     </>
   ),
 };
@@ -227,11 +227,11 @@ function EditorForm({
       onSubmit={onSubmit}
     >
       {/* The fields scroll; the actions below them do not. */}
-      <div className="card-pane__fields">{children}</div>
+      <FieldGroup className="card-pane__fields">{children}</FieldGroup>
       {refusal !== null && (
-        <span id={refusalId} role="alert" className="card-pane__field-error">
+        <FieldError id={refusalId} className="card-pane__field-error">
           {refusal}
-        </span>
+        </FieldError>
       )}
       <div className="card-pane__actions">
         <Button type="button" variant="secondary" onClick={onCancel}>
@@ -340,9 +340,10 @@ function AliasEditorForm({
       onSubmit={submit}
       onCancel={onCancel}
     >
-      <label className="card-pane__field">
-        <span>Title</span>
-        <input
+      <Field className="card-pane__field">
+        <FieldLabel htmlFor="open-alias-title">Title</FieldLabel>
+        <Input
+          id="open-alias-title"
           className="card-pane__title-input"
           value={title}
           onChange={(event) => {
@@ -350,7 +351,7 @@ function AliasEditorForm({
             setRefusal(null);
           }}
         />
-      </label>
+      </Field>
       <CardPicker
         label="Target"
         cards={occurrence.targets}

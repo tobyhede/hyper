@@ -1,6 +1,15 @@
 import { useState } from 'react';
 import type { Card, CardId } from '@project/core';
-import { Button } from '@project/ui';
+import {
+  Button,
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+  FieldTitle,
+  Input,
+} from '@project/ui';
 import { CardPane } from './CardPane';
 import { CardPicker } from './CardPicker';
 
@@ -63,21 +72,24 @@ export function NewAlias({ targets, refusal, onCreate, onCancel, onRefusalStale 
             opened-Card pane. This one needs it most: it has no Markdown field to
             absorb the squeeze, so on a short window its heading, Title, list and
             hint together are taller than the frame. */}
-        <div className="card-pane__fields">
+        <FieldGroup className="card-pane__fields">
           {/* The kind is stated rather than offered, because a Card keeps the
               kind it was created with. */}
-          <div className="card-pane__heading">
-            <span>New Alias</span>
-            <span>An Alias shows another Card’s content at a second position.</span>
-          </div>
-          <label className="card-pane__field">
-            <span>Title</span>
-            <input
+          <Field className="card-pane__heading">
+            <FieldTitle>New Alias</FieldTitle>
+            <FieldDescription>
+              An Alias shows another Card’s content at a second position.
+            </FieldDescription>
+          </Field>
+          <Field className="card-pane__field">
+            <FieldLabel htmlFor="new-alias-title">Title</FieldLabel>
+            <Input
+              id="new-alias-title"
               data-testid="new-alias-title"
               value={title}
               onChange={(event) => setTitle(event.currentTarget.value)}
             />
-          </label>
+          </Field>
           <CardPicker
             label="Target"
             cards={targets}
@@ -95,22 +107,18 @@ export function NewAlias({ targets, refusal, onCreate, onCancel, onRefusalStale 
               "choosing a Target creates the Alias" is the sentence the refused
               attempt has just contradicted. */}
           {refusal === null && (
-            <p className="card-pane__hint">
+            <FieldDescription className="card-pane__hint">
               Choosing a Target creates the Alias. Leave the title empty to take the Target’s.
-            </p>
+            </FieldDescription>
           )}
-        </div>
+        </FieldGroup>
         {/* Outside the scrolling region, in the slot the opened-Card pane puts a
             refusal in. Among the fields it could be scrolled out of view at the
             moment it is the only thing worth reading — and this pane is the one
             most likely to scroll, having no Markdown field to absorb the
             squeeze. No layout class: it is a plain child of the editor's
             column, exactly as `EditorForm`'s is. */}
-        {refusal !== null && (
-          <span role="alert" className="card-pane__field-error">
-            {refusal}
-          </span>
-        )}
+        {refusal !== null && <FieldError className="card-pane__field-error">{refusal}</FieldError>}
         <div className="card-pane__actions">
           <Button type="button" variant="secondary" onClick={onCancel}>
             Cancel
