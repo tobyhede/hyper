@@ -106,8 +106,8 @@ export function sidebar(page: Page): Locator {
 }
 
 /** What the canvas header says is drawing, computed View or authored Layout alike. */
-export function currentCanvas(page: Page): Locator {
-  return page.getByTestId('current-canvas');
+export function selectedCanvas(page: Page): Locator {
+  return page.getByTestId('selected-canvas');
 }
 
 /**
@@ -121,12 +121,12 @@ export function currentCanvas(page: Page): Locator {
  */
 export async function selectCanvas(page: Page, title: string): Promise<void> {
   await sidebar(page).getByRole('button', { name: title, exact: true }).click();
-  await expect(currentCanvas(page)).toContainText(title);
+  await expect(selectedCanvas(page)).toContainText(title);
 }
 
 /** Whether the canvas is drawing a computed View or an authored Layout. */
 export function canvasKind(page: Page): Locator {
-  return page.getByTestId('current-canvas-kind');
+  return page.getByTestId('selected-canvas-kind');
 }
 
 /** The row of the Graph the workspace is emphasising, or nothing when none is. */

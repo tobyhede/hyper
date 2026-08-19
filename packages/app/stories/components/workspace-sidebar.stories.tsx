@@ -4,6 +4,7 @@ import {
   RetryableWorkspaceSidebarFixture,
   WorkspaceSidebarFixture,
 } from '../support/WorkspaceSidebarFixture';
+import { unauthoredSpace } from '../support/spaces';
 
 export default { title: 'Components/Workspace Sidebar' };
 
@@ -25,7 +26,7 @@ export const Settled: Story = () => <WorkspaceSidebarFixture />;
 Settled.meta = { iframed: true };
 
 /** A Space before its first Edit authors a Layout: two groups with nothing in them. */
-export const Unauthored: Story = () => <WorkspaceSidebarFixture unauthored />;
+export const Unauthored: Story = () => <WorkspaceSidebarFixture space={unauthoredSpace} />;
 Unauthored.meta = { iframed: true };
 
 export const Pending: Story = () => <WorkspaceSidebarFixture persistence={{ kind: 'pending' }} />;

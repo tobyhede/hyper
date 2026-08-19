@@ -1,5 +1,5 @@
 import { expect, test, type Page } from './fixtures';
-import { currentCanvas, nodeByTitle, settled, sidebar } from './graph';
+import { nodeByTitle, selectedCanvas, settled, sidebar } from './graph';
 
 /**
  * The workspace chrome below the Sidebar's breakpoint, where it is a modal
@@ -62,7 +62,7 @@ test('choosing a canvas or a Graph closes the mobile sidebar', async ({ page }) 
   await page.getByRole('button', { name: 'Collection 1', exact: true }).click();
 
   await expect(sheet(page)).toHaveCount(0);
-  await expect(currentCanvas(page)).toContainText('Collection 1');
+  await expect(selectedCanvas(page)).toContainText('Collection 1');
 
   await openMobileSidebar(page);
   await page.getByRole('button', { name: 'Mid', exact: true }).click();

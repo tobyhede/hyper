@@ -6,10 +6,10 @@ import {
   authoringHandle,
   connectHandles,
   connectToEmptyWithAlt,
-  currentCanvas,
   dragBy,
   nodeByTitle,
   positionOf,
+  selectedCanvas,
   settled,
   sidebar,
 } from './graph';
@@ -114,7 +114,7 @@ test('graph-less handles preview Graph 1 and an empty drop cancels', async ({ pa
   await expect(page.locator('.react-flow__edge')).toHaveCount(0);
   await expect(sidebar(page).getByTestId('no-graphs')).toBeVisible();
   await expect(sidebar(page).getByTestId('no-authored-layouts')).toBeVisible();
-  await expect(currentCanvas(page)).toContainText('Flow');
+  await expect(selectedCanvas(page)).toContainText('Flow');
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '0');
 });
 
@@ -183,7 +183,7 @@ test('Alt empty-drop creates, connects and selects Card 2 at the previewed posit
   expect(createdBox.y + createdBox.height / 2).toBeCloseTo(dropPoint.y, 0);
   await expect(page.locator('.react-flow__edge')).toHaveCount(1);
   await expect(activeGraph(page)).toHaveText('Graph 1');
-  await expect(currentCanvas(page)).toContainText('Layout 1');
+  await expect(selectedCanvas(page)).toContainText('Layout 1');
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
   await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
   await expect(authoringHandle(created, 'source', 'left')).toHaveCSS('opacity', '1');
@@ -214,7 +214,7 @@ test('Alt empty-drop authors the first Edge into the Graph a selected Layout own
 
   const sourceCard = nodeByTitle(page, 'Card 1');
   await expect(sourceCard).toBeVisible();
-  await expect(currentCanvas(page)).toContainText('Authored Layout');
+  await expect(selectedCanvas(page)).toContainText('Authored Layout');
   await expect(activeGraph(page)).toHaveText('Graph 1');
   await expect(page.locator('.react-flow__edge')).toHaveCount(0);
   await settled(page);
@@ -226,7 +226,7 @@ test('Alt empty-drop authors the first Edge into the Graph a selected Layout own
   await expect(page.locator('.react-flow__edge')).toHaveCount(1);
   await expect(activeGraph(page)).toHaveText('Graph 1');
   await expect(page.getByTestId('graph-legend')).toContainText('Graph 1');
-  await expect(currentCanvas(page)).toContainText('Authored Layout');
+  await expect(selectedCanvas(page)).toContainText('Authored Layout');
   await expect(page.getByTestId('persistence-status')).toHaveAttribute(
     'data-revision',
     persistedRevision,
@@ -238,7 +238,7 @@ test('Alt empty-drop authors the first Edge into the Graph a selected Layout own
   await expect(nodeByTitle(page, 'Card 2')).toBeVisible();
   await expect(page.locator('.react-flow__edge')).toHaveCount(1);
   await expect(activeGraph(page)).toHaveText('Graph 1');
-  await expect(currentCanvas(page)).toContainText('Authored Layout');
+  await expect(selectedCanvas(page)).toContainText('Authored Layout');
   await expect(page.getByTestId('persistence-status')).toHaveAttribute(
     'data-revision',
     persistedRevision,
@@ -300,7 +300,7 @@ test('the first self-connection mints and activates Graph 1 in one persisted Lay
   await expect(page.locator('.react-flow__edge')).toHaveCount(1);
   await expect(activeGraph(page)).toHaveText('Graph 1');
   await expect(page.getByTestId('graph-legend')).toContainText('Graph 1');
-  await expect(currentCanvas(page)).toContainText('Layout 1');
+  await expect(selectedCanvas(page)).toContainText('Layout 1');
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
   await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
   // Conversion must not move what is already on screen (ADR 0025), so the

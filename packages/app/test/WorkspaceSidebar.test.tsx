@@ -3,6 +3,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { uuidSchema } from '@project/core';
 import { PersistenceIndicator, SidebarProvider, SidebarTrigger } from '@project/ui';
+import type { CanvasRenderer } from '../src/canvas-choice';
 import { WorkspaceSidebar, type WorkspaceSidebarProps } from '../src/components/WorkspaceSidebar';
 
 const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
@@ -58,15 +59,26 @@ const stubViewport = (mobile: boolean): void => {
 /** The sidebar reads its open state from the primitive's provider, as production does. */
 const draw = (element: ReactElement) => render(<SidebarProvider>{element}</SidebarProvider>);
 
+/**
+ * The rows, written out here rather than derived from a Space.
+ *
+ * `canvasChoice` owns the derivation and `canvas-choice.test.ts` owns testing
+ * it. What is left for this file is what the sidebar *draws*, and a test of a
+ * list should not need a Space to state it. They are named constants because the
+ * pressed row is decided by reference: `selected` below is one of these very
+ * values, exactly as the record production hands in guarantees.
+ */
+const FLOW: CanvasRenderer = { selection: { kind: 'view', view: 'flow' }, title: 'Flow' };
+const GRID: CanvasRenderer = { selection: { kind: 'view', view: 'grid' }, title: 'Grid' };
+const LAYOUT: CanvasRenderer = {
+  selection: { kind: 'layout', layoutId: LAYOUT_ID },
+  title: 'Layout 1',
+};
+
 const settledProps = (): WorkspaceSidebarProps => ({
   workspaceTitle: 'Workspace',
   canvas: {
-    computed: [
-      { selection: { kind: 'view', view: 'flow' }, title: 'Flow' },
-      { selection: { kind: 'view', view: 'grid' }, title: 'Grid' },
-    ],
-    authored: [],
-    selected: { kind: 'view', view: 'flow' },
+    choice: { computed: [FLOW, GRID], authored: [], selected: FLOW },
     onSelect: vi.fn(),
   },
   graph: {
@@ -92,10 +104,7 @@ const settledProps = (): WorkspaceSidebarProps => ({
 
 const withLayout = (props: WorkspaceSidebarProps): WorkspaceSidebarProps => ({
   ...props,
-  canvas: {
-    ...props.canvas,
-    authored: [{ selection: { kind: 'layout', layoutId: LAYOUT_ID }, title: 'Layout 1' }],
-  },
+  canvas: { ...props.canvas, choice: { ...props.canvas.choice, authored: [LAYOUT] } },
 });
 
 describe('WorkspaceSidebar', () => {
@@ -121,34 +130,28 @@ describe('WorkspaceSidebar', () => {
     const base = withLayout(settledProps());
     const props: WorkspaceSidebarProps = {
       ...base,
-      canvas: { ...base.canvas, selected: { kind: 'layout', layoutId: LAYOUT_ID } },
+      canvas: { ...base.canvas, choice: { ...base.canvas.choice, selected: LAYOUT } },
     };
     draw(<WorkspaceSidebar {...props} />);
 
     const pressed = screen
-      .getAllByTestId('canvas-choice')
-      .filter((choice) => choice.getAttribute('aria-pressed') === 'true');
+      .getAllByTestId('canvas-renderer')
+      .filter((renderer) => renderer.getAttribute('aria-pressed') === 'true');
     expect(pressed).toHaveLength(1);
     expect(pressed[0]).toHaveTextContent('Layout 1');
     expect(screen.getByRole('button', { name: 'Flow' })).toHaveAttribute('aria-pressed', 'false');
     expect(screen.queryByText('None')).not.toBeInTheDocument();
   });
 
-  it('forwards the chosen row whole', () => {
+  it('forwards the selection', () => {
     const props = withLayout(settledProps());
     draw(<WorkspaceSidebar {...props} />);
 
     fireEvent.click(screen.getByRole('button', { name: 'Grid' }));
-    expect(props.canvas.onSelect).toHaveBeenCalledWith({
-      selection: { kind: 'view', view: 'grid' },
-      title: 'Grid',
-    });
+    expect(props.canvas.onSelect).toHaveBeenCalledWith({ kind: 'view', view: 'grid' });
 
     fireEvent.click(screen.getByRole('button', { name: 'Layout 1' }));
-    expect(props.canvas.onSelect).toHaveBeenCalledWith({
-      selection: { kind: 'layout', layoutId: LAYOUT_ID },
-      title: 'Layout 1',
-    });
+    expect(props.canvas.onSelect).toHaveBeenCalledWith({ kind: 'layout', layoutId: LAYOUT_ID });
   });
 
   /** A Space authors its first Layout by editing a View (ADR 0025), so this is how it opens. */
@@ -352,8 +355,8 @@ describe('WorkspaceSidebar', () => {
       </SidebarProvider>,
     );
     const saving = screen.getByRole('button', { name: 'Saving changes' });
-    for (const choice of screen.getAllByTestId('canvas-choice')) {
-      expect(choice).not.toContainElement(saving);
+    for (const renderer of screen.getAllByTestId('canvas-renderer')) {
+      expect(renderer).not.toContainElement(saving);
     }
   });
 });
