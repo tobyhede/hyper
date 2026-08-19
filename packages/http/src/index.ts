@@ -62,9 +62,17 @@ const invokeLogError = (
  */
 const MAX_DRAINED_BODY_BYTES = MAX_COMMIT_BODY_BYTES * 8;
 
-const problem = <Code extends ProblemCode>(context: Context, code: Code, detail: string) => {
+const problem = <Code extends ProblemCode>(
+  context: Context,
+  code: Code,
+  detail: string,
+  headers?: Record<string, string>,
+) => {
   const body = encodeProblemDetails(code, detail);
-  return context.json(body, body.status, { 'Content-Type': 'application/problem+json' });
+  return context.json(body, body.status, {
+    'Content-Type': 'application/problem+json',
+    ...headers,
+  });
 };
 
 const invalidRequestProblem = (
@@ -406,6 +414,23 @@ export const createSpaceHttpApp = (
   return app;
 };
 
+// The two headers a caller throwing through the `logError` seam (see
+// `space-http-app.test.ts`) can carry retry and auth-challenge semantics on:
+// `Retry-After` for 429 and a retryable 5xx, `WWW-Authenticate` for 401.
+// `problem()` otherwise builds the response from scratch, so these are lost
+// unless copied off the exception's own `res` explicitly.
+const RETRY_SEMANTIC_HEADERS = ['Retry-After', 'WWW-Authenticate'] as const;
+
+const retrySemanticHeaders = (error: HTTPException): Record<string, string> | undefined => {
+  if (!error.res) return undefined;
+  const headers: Record<string, string> = {};
+  for (const name of RETRY_SEMANTIC_HEADERS) {
+    const value = error.res.headers.get(name);
+    if (value !== null) headers[name] = value;
+  }
+  return headers;
+};
+
 const problemForHttpException = (context: Context, error: HTTPException): Response => {
   const codeByStatus: Partial<Record<number, ProblemCode>> = {
     400: 'invalid-request',
@@ -424,7 +449,7 @@ const problemForHttpException = (context: Context, error: HTTPException): Respon
   const code = codeByStatus[error.status];
   return code === undefined
     ? problem(context, 'internal-error', 'Internal server error')
-    : problem(context, code, error.message);
+    : problem(context, code, error.message, retrySemanticHeaders(error));
 };
 
 export type SpaceHttpApp = ReturnType<typeof createSpaceHttpApp>;

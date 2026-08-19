@@ -764,6 +764,36 @@ describe('Space HTTP application', () => {
     },
   );
 
+  // A `logError` sink is the seam a caller can throw a fully-formed
+  // `HTTPException` through, `res` included — a rate limiter answering 429 or
+  // an auth layer answering 401 wants its `Retry-After` or `WWW-Authenticate`
+  // to reach the client, not just the Problem Details body.
+  it.each([
+    ['Retry-After', '30', 429],
+    ['WWW-Authenticate', 'Bearer', 401],
+  ] as const)(
+    'forwards a %s header from an HTTPException onto its Problem Details response',
+    async (header, value, status) => {
+      const app = createSpaceHttpApp(
+        repository({ listSpaces: () => Promise.reject(new Error('database is down')) }),
+        {
+          logError: () => {
+            throw new HTTPException(status, {
+              message: `Refused with ${status}`,
+              res: new Response(null, { headers: { [header]: value } }),
+            });
+          },
+        },
+      );
+
+      const response = await app.request('/api/spaces');
+
+      expect(response.status).toBe(status);
+      expect(response.headers.get(header)).toBe(value);
+      await expectProblem(response, `Refused with ${status}`);
+    },
+  );
+
   // Hono's own json validator applies a stricter Content-Type regex than this
   // module's media policy, and when it disagrees it does not parse the body and
   // hands the validator `{}` — surfacing as a 400 about fields, for a body that
