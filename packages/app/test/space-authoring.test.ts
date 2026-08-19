@@ -97,7 +97,7 @@ const positionedSnapshot: SpaceSnapshot = {
         graphs: [MAIN_GRAPH],
       },
     ],
-    defaultView: LAYOUT_ID,
+    defaultRenderer: LAYOUT_ID,
   },
 };
 
@@ -633,7 +633,7 @@ describe('Space Authoring', () => {
       },
     ]);
     expect(Object.hasOwn(session.getState().working.document, 'graphs')).toBe(false);
-    expect(session.getState().working.document.defaultView).toBe(LAYOUT_ID);
+    expect(session.getState().working.document.defaultRenderer).toBe(LAYOUT_ID);
     expect(navigation.getState().selectedRenderer).toEqual({ kind: 'layout', layoutId: LAYOUT_ID });
     expect(navigation.getState().activeGraphId).toBe(MINTED_GRAPH_ID);
   });
@@ -692,7 +692,7 @@ describe('Space Authoring', () => {
     const { authoring, session, navigation } = openAuthoring(
       {
         ...positionedSnapshot,
-        document: { ...positionedSnapshot.document, defaultView: undefined },
+        document: { ...positionedSnapshot.document, defaultRenderer: undefined },
       },
       { kind: 'view', view: 'flow' },
       { newId: mintingIds(CONVERTED_LAYOUT_ID) },
@@ -822,7 +822,7 @@ describe('Space Authoring', () => {
             graphs: [{ id: ASIDE_GRAPH, title: 'Aside', edges: [{ from: CARD_B, to: CARD_A }] }],
           },
         ],
-        defaultView: undefined,
+        defaultRenderer: undefined,
       },
     };
     const control = new MemorySpaceBackendTestControl();
@@ -891,7 +891,7 @@ describe('Space Authoring', () => {
             graphs: [{ id: MINTED_GRAPH_ID, title: 'Graph 1', edges: [] }],
           },
         ],
-        defaultView: LAYOUT_ID,
+        defaultRenderer: LAYOUT_ID,
       },
       cards: [{ id: CARD_A, document: { title: 'Card 1', kind: 'markdown', body: '' } }],
     };
@@ -1047,7 +1047,7 @@ describe('Space Authoring', () => {
             activeGraph: MINTED_GRAPH_ID,
           },
         ],
-        defaultView: LAYOUT_ID,
+        defaultRenderer: LAYOUT_ID,
       },
       cards: [
         ...graphLess.cards,
@@ -1081,7 +1081,7 @@ describe('Space Authoring', () => {
             graphs: [MAIN_GRAPH],
           },
         ],
-        defaultView: LAYOUT_ID,
+        defaultRenderer: LAYOUT_ID,
       },
     };
     const { authoring } = openAuthoring(positioned, {
@@ -1232,11 +1232,12 @@ describe('Space Authoring', () => {
         [CARD_B, { x: 300, y: 40 }],
       ]),
     );
-    const observed: { readonly defaultView: string | undefined; readonly renderer: string }[] = [];
+    const observed: { readonly defaultRenderer: string | undefined; readonly renderer: string }[] =
+      [];
     authoring.subscribe(() => {
       const state = authoring.getState();
       observed.push({
-        defaultView: state.session.working.document.defaultView,
+        defaultRenderer: state.session.working.document.defaultRenderer,
         renderer:
           state.navigation.selectedRenderer.kind === 'layout'
             ? state.navigation.selectedRenderer.layoutId
@@ -1246,7 +1247,7 @@ describe('Space Authoring', () => {
 
     complete(authoring, { kind: 'connected-cards', from: CARD_B, to: CARD_A });
 
-    expect(observed).toEqual([{ defaultView: LAYOUT_ID, renderer: LAYOUT_ID }]);
+    expect(observed).toEqual([{ defaultRenderer: LAYOUT_ID, renderer: LAYOUT_ID }]);
   });
 
   it('requires rendered placement and treats duplicate Edges and stale Card identities as no Edit', () => {
@@ -1306,7 +1307,7 @@ describe('Space Authoring', () => {
             graphs: [MAIN_GRAPH],
           },
         ],
-        defaultView: LAYOUT_ID,
+        defaultRenderer: LAYOUT_ID,
       },
     };
     const loaded = { snapshot: positioned, revision: 0n, exportedRevision: null };
@@ -1370,7 +1371,7 @@ describe('Space Authoring', () => {
             graphs: [{ id: GRAPH_ID, title: 'Graph 1', edges: [] }],
           },
         ],
-        defaultView: LAYOUT_ID,
+        defaultRenderer: LAYOUT_ID,
       },
     };
     const { authoring, navigation } = openAuthoring(positioned, {
@@ -1511,7 +1512,7 @@ describe('Space Authoring', () => {
             id: LAYOUT_ID,
           },
         ],
-        defaultView: LAYOUT_ID,
+        defaultRenderer: LAYOUT_ID,
       },
     };
     const { authoring, session } = openAuthoring(positioned, {
@@ -2110,7 +2111,7 @@ describe('Space Authoring', () => {
             activeGraph: GRAPH_ID,
           },
         ],
-        defaultView: LAYOUT_ID,
+        defaultRenderer: LAYOUT_ID,
       },
     };
     // The stored Space's Layout owns a second Graph and opens on it. Under ADR

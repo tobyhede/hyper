@@ -60,7 +60,7 @@ export async function seedPositionedLayout(
           graphs: [{ id: SEEDED_GRAPH_ID, title: 'Graph 1', edges: [] }],
         },
       ],
-      defaultView: SEEDED_LAYOUT_ID,
+      defaultRenderer: SEEDED_LAYOUT_ID,
     },
   };
   const commitResponse = await page.request.put(`/api/spaces/${spaceId}`, {

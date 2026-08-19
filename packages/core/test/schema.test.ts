@@ -148,7 +148,7 @@ describe('space file schema', () => {
           graphs: [{ id: 'main', title: 'Main', edges: [{ from: 'a', to: 'b' }] }],
         },
       ],
-      defaultView: 'working',
+      defaultRenderer: 'working',
     });
     expect(result.success).toBe(false);
   });
@@ -322,7 +322,7 @@ describe('space file layouts', () => {
     const { layouts: _layouts, ...withoutLayouts } = validSpaceFile;
     const file = spaceFileSchema.parse(withoutLayouts);
     expect(file.layouts).toBeUndefined();
-    expect(file.defaultView).toBeUndefined();
+    expect(file.defaultRenderer).toBeUndefined();
   });
 
   it('parses a positioned layout and its positions', () => {
@@ -448,15 +448,17 @@ describe('space file layouts', () => {
     expect(file.layouts?.[0]?.activeGraph).toBe('00000000-0000-4000-8000-000000000099');
   });
 
-  it('accepts defaultView as a plain name, resolved elsewhere', () => {
+  it('accepts defaultRenderer as a plain name, resolved elsewhere', () => {
     // Shape only: whether the name resolves is a reference check, since it needs
     // the declared layouts in view.
     const file = spaceFileSchema.parse({
       ...validSpaceFile,
-      defaultView: '00000000-0000-4000-8000-000000000010',
+      defaultRenderer: '00000000-0000-4000-8000-000000000010',
     });
-    expect(file.defaultView).toBe('00000000-0000-4000-8000-000000000010');
-    expect(spaceFileSchema.safeParse({ ...validSpaceFile, defaultView: '' }).success).toBe(false);
+    expect(file.defaultRenderer).toBe('00000000-0000-4000-8000-000000000010');
+    expect(spaceFileSchema.safeParse({ ...validSpaceFile, defaultRenderer: '' }).success).toBe(
+      false,
+    );
   });
 });
 

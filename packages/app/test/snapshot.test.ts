@@ -53,7 +53,7 @@ it('writes a Layout that owns its Graphs as a complete valid persistence snapsho
   });
 
   expect(changed.cards).toEqual(snapshot.cards);
-  expect(changed.document.defaultView).toBe(LAYOUT_ID);
+  expect(changed.document.defaultRenderer).toBe(LAYOUT_ID);
   expect(changed.document.layouts).toEqual([
     {
       id: LAYOUT_ID,

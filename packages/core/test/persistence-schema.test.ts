@@ -21,7 +21,7 @@ const identified = {
         graphs: [{ id: GRAPH_ID, title: 'Main', edges: [{ from: CARD_A, to: CARD_B }] }],
       },
     ],
-    defaultView: LAYOUT_ID,
+    defaultRenderer: LAYOUT_ID,
   },
   cards: [
     { id: CARD_A, document: { title: 'A', kind: 'markdown' as const, body: 'A' } },

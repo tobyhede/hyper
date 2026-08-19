@@ -33,7 +33,7 @@ describe('newSpace', () => {
     // whatever is on screen, so a new space declares no layout and no view.
     const { file } = newSpace();
     expect(file.layouts).toBeUndefined();
-    expect(file.defaultView).toBeUndefined();
+    expect(file.defaultRenderer).toBeUndefined();
   });
 
   it('mints fresh UUID identity for each new space and its first card', () => {

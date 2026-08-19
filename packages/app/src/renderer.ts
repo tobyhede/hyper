@@ -194,7 +194,7 @@ export interface SubjectConversion {
   readonly newGraphId: () => GraphId;
   /**
    * Which renderer a refusal names, in the same closed vocabulary a selection
-   * and `space.defaultView` are written in: a built-in View's id, or a Layout's.
+   * and `space.defaultRenderer` are written in: a built-in View's id, or a Layout's.
    */
   readonly rendererId: BuiltInViewId | UUID;
 }
@@ -470,7 +470,7 @@ export const canvasRendererKey = (selection: CanvasRendererId): string =>
 
 /** Resolve the Space default into the initial renderer selection. */
 export function defaultRenderer(space: Space): CanvasRendererId {
-  const requested = space.defaultView ?? DEFAULT_VIEW_ID;
+  const requested = space.defaultRenderer ?? DEFAULT_VIEW_ID;
   return isBuiltInViewId(requested)
     ? { kind: 'view', view: requested }
     : { kind: 'layout', layoutId: requested };

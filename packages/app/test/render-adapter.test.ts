@@ -188,7 +188,7 @@ function sparsePositionedAdapter(newId?: () => UUID) {
           ],
         },
       ],
-      defaultView: LAYOUT_ID,
+      defaultRenderer: LAYOUT_ID,
     },
     cards: [
       {
@@ -242,7 +242,7 @@ function storedSpaceAdapter() {
           ],
         },
       ],
-      defaultView: LAYOUT_ID,
+      defaultRenderer: LAYOUT_ID,
     },
     cards: [
       { id: uuidSchema.parse(CARD_A), document: { title: 'A', kind: 'markdown', body: 'A' } },

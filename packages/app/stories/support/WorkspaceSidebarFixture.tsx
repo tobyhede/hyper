@@ -50,7 +50,7 @@ export function WorkspaceSidebarFixture({
   // makes on the Space it was given. A rule of the fixture's own — "the first
   // Layout, else Flow" — stood here, and it is the state translation ADR 0052's
   // negative names: the story would go on pressing a row after the app had
-  // stopped. The Space declares `defaultView`, which is fixture *data* and
+  // stopped. The Space declares `defaultRenderer`, which is fixture *data* and
   // allowed; deciding what to do with it is not.
   const [selected, setSelected] = useState<CanvasRendererId>(() => defaultRenderer(space));
   const [activeGraph, setActiveGraph] = useState<string | null>(space.graphs[0]?.id ?? null);

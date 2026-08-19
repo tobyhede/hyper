@@ -69,7 +69,7 @@ const positionedSnapshot: SpaceSnapshot = {
         graphs: [MAIN_GRAPH],
       },
     ],
-    defaultView: LAYOUT_ID,
+    defaultRenderer: LAYOUT_ID,
   },
 };
 

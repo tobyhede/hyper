@@ -34,7 +34,7 @@ const snapshot = (title: string, cardTitle: string, x: number, y: number): Space
           graphs: [{ id: OWNED_GRAPH_ID, title: 'Graph', edges: [] }],
         },
       ],
-      defaultView: LAYOUT_ID,
+      defaultRenderer: LAYOUT_ID,
     },
     cards: [
       {

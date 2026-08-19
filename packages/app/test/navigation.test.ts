@@ -133,7 +133,7 @@ it('selects a renderer and its active Graph without changing the Space', () => {
     mode: 'overview',
   });
   expect(navigation.activeCardId()).toBeNull();
-  expect(space.defaultView).toBeUndefined();
+  expect(space.defaultRenderer).toBeUndefined();
 
   navigation.selectRenderer({ kind: 'view', view: 'grid' });
   expect(navigation.getState().selectedRenderer).toEqual({ kind: 'view', view: 'grid' });
@@ -350,7 +350,7 @@ it('activating a Graph ends the current Traversal history without changing the S
     mode: 'overview',
   });
   expect(navigation.activeCardId()).toBeNull();
-  expect(space.defaultView).toBeUndefined();
+  expect(space.defaultRenderer).toBeUndefined();
 });
 
 it('refuses to activate a Graph the current Space does not hold', () => {

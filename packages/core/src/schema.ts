@@ -203,12 +203,12 @@ export const layoutSchema = z.preprocess(
 );
 
 /**
- * The views a space can name without declaring anything: the graph-driven flow
- * and a plain grid. Both are automatic, so they are named, never configured —
- * `defaultView` records intent ("open me like this") and carries no parameters,
- * because parameters would put computed geometry back into authored content
- * (ADR 0025). A `defaultView` naming none of these and no declared layout is a
- * reference error.
+ * The canvas renderers a space can name without declaring anything: the
+ * graph-driven flow and a plain grid. Both are automatic Views, so they are
+ * named, never configured — `defaultRenderer` records intent ("open me like
+ * this") and carries no parameters, because parameters would put computed
+ * geometry back into authored content (ADR 0025). A `defaultRenderer` naming
+ * none of these and no declared Layout is a reference error.
  */
 export const BUILT_IN_VIEW_IDS = ['flow', 'grid'] as const;
 
@@ -263,8 +263,8 @@ export const spaceFileSchema = z.object({
    * space *is*: it renders and it cannot be presented (ADR 0015).
    */
   layouts: z.array(layoutSchema).optional(),
-  /** A declared layout's id, or a built-in view's. See {@link BUILT_IN_VIEW_IDS}. */
-  defaultView: z.union([z.enum(BUILT_IN_VIEW_IDS), uuidSchema]).optional(),
+  /** A declared Layout's id, or a built-in View's id. See {@link BUILT_IN_VIEW_IDS}. */
+  defaultRenderer: z.union([z.enum(BUILT_IN_VIEW_IDS), uuidSchema]).optional(),
 });
 
 /** The JSONB document stored beside a space's relational UUID. */

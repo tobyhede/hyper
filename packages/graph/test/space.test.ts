@@ -196,16 +196,16 @@ describe('loadSpace', () => {
     if (!result.ok) throw new Error('expected a valid space');
     expect(result.space.layouts).toEqual([]);
     expect(result.space.graphs).toEqual([]);
-    expect(result.space.defaultView).toBeUndefined();
+    expect(result.space.defaultRenderer).toBeUndefined();
   });
 
   it('carries a declared layout’s positions through unchanged', () => {
     const result = loadSpace(
-      { ...validInput, defaultView: uuid('00000000-0000-4000-8000-000000000022') },
+      { ...validInput, defaultRenderer: uuid('00000000-0000-4000-8000-000000000022') },
       validCards,
     );
     if (!result.ok) throw new Error('expected a valid space');
-    expect(result.space.defaultView).toBe(uuid('00000000-0000-4000-8000-000000000022'));
+    expect(result.space.defaultRenderer).toBe(uuid('00000000-0000-4000-8000-000000000022'));
     expect(
       result.space.lookup.layout(uuid('00000000-0000-4000-8000-000000000022'))?.layout.positions[
         uuid('00000000-0000-4000-8000-000000000003')

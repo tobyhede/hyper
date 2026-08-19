@@ -81,7 +81,7 @@ const positionedSnapshot: SpaceSnapshot = {
         ],
       },
     ],
-    defaultView: LAYOUT_ID,
+    defaultRenderer: LAYOUT_ID,
   },
 };
 

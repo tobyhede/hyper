@@ -115,7 +115,7 @@ A space is a **space directory**: a space file (`space.json`) plus one Markdown 
       "activeGraph": "00000000-0000-4000-8000-000000000004"
     }
   ],
-  "defaultView": "00000000-0000-4000-8000-000000000048"
+  "defaultRenderer": "00000000-0000-4000-8000-000000000048"
 }
 ```
 
@@ -125,7 +125,7 @@ A space is a **space directory**: a space file (`space.json`) plus one Markdown 
 | `id`, `title` | What names the space. Every explicit id is a UUID; an import may omit ids for the persistence layer to allocate. The id is not the title and not the file name. |
 | `layouts` | Optional authored card-to-position maps ([ADR 0014](docs/adr/0014-layout-is-the-authored-data-strategy-is-the-behaviour.md)). A layout's position keys **are** its card membership: sparse relative to the space — it may omit cards, but may not name one the space lacks. Each layout owns a non-empty ordered `graphs` collection and may name which of them opens **active** (`activeGraph`; absent means the first it owns) — [ADR 0026](docs/adr/0026-a-route-is-active-and-the-layout-may-name-it.md). A space with no layouts has no graphs, which is what a **new space** is: it renders and cannot be presented ([ADR 0015](docs/adr/0015-a-space-may-have-no-routes.md)). |
 | `layouts[].graphs` | Named walkthroughs, each an `id`, `title`, optional `color`, and a set of `{ from, to }` **edges** between cards **of that layout** ([ADR 0032](docs/adr/0032-routes-may-contain-cycles.md)). Forks, merges, disconnected components, cycles and self-edges are legal; an exact duplicate Edge within one Graph is not, and an endpoint naming a card the owning layout omits is a load error. A graph belongs to exactly one layout, and there is no space-level collection beside them ([ADR 0040](docs/adr/0040-layouts-own-card-membership-and-routes.md)); its id is nonetheless unique across the whole space, because a view drawing every graph flattened across layouts keys colour, handles and activation on that id alone ([ADR 0045](docs/adr/0045-a-view-takes-cards-and-graphs-and-returns-a-layout.md)). The edge set may be empty. Graphs are a layout's only connection structure ([ADR 0007](docs/adr/0007-routes-are-the-only-structure.md)), and the drawn edges and handles are derived from them. |
-| `defaultView` | Which view the space opens in: a declared layout's id, or a built-in automatic one (`flow`, `grid`). A declared layout wins a name collision. |
+| `defaultRenderer` | Which view the space opens in: a declared layout's id, or a built-in automatic one (`flow`, `grid`). A declared layout wins a name collision. |
 
 ### Graphs as color-coded flows
 

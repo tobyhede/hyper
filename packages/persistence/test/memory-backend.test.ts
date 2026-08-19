@@ -135,7 +135,7 @@ describe('MemorySpaceBackend', () => {
         ],
       },
       // One rule per snapshot: a layout placing a card that does not exist, and
-      // separately a defaultView naming a layout that does not exist. Breaking
+      // separately a defaultRenderer naming a layout that does not exist. Breaking
       // both at once would pass even if only one of the two were enforced.
       {
         ...loaded.snapshot,
@@ -158,7 +158,7 @@ describe('MemorySpaceBackend', () => {
               ],
             },
           ],
-          defaultView: LAYOUT_ID,
+          defaultRenderer: LAYOUT_ID,
         },
       },
       {
@@ -180,7 +180,7 @@ describe('MemorySpaceBackend', () => {
               ],
             },
           ],
-          defaultView: MISSING_ID,
+          defaultRenderer: MISSING_ID,
         },
       },
     ];

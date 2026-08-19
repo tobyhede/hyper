@@ -91,7 +91,7 @@ const snapshot: SpaceSnapshot = {
         ],
       },
     ],
-    defaultView: LAYOUT_ID,
+    defaultRenderer: LAYOUT_ID,
   },
   cards: [
     { id: CARD_A, document: { title: 'A', kind: 'markdown', body: 'A' } },

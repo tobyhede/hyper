@@ -61,10 +61,7 @@ export interface Navigation {
    * owns its Graphs, so the Graph a Layout opens on is a fact about that Layout
    * and not something Navigation carries across from the renderer before it.
    */
-  readonly continueInRenderer: (
-    selection: CanvasRendererId,
-    activeGraphId: GraphId | null,
-  ) => void;
+  readonly continueInRenderer: (selection: CanvasRendererId, activeGraphId: GraphId | null) => void;
   readonly activateGraph: (graphId: GraphId) => void;
   readonly openCard: (cardId: CardId) => void;
   readonly closeCard: () => void;

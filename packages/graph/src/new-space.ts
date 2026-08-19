@@ -25,7 +25,7 @@ const FIRST_CARD_TITLE = 'Card 1';
 export function newSpace(): NewSpace {
   const spaceId = newUuid();
   const cardId = newUuid();
-  // No `layouts` and no `defaultView`, which is now the same statement as "no
+  // No `layouts` and no `defaultRenderer`, which is now the same statement as "no
   // graphs": a Layout owns at least one (ADR 0040), so a space with neither is
   // the state a new one starts in. A new space's card carries no position
   // either, because centering is the view's job — `fitView` frames whatever is

@@ -37,7 +37,7 @@ const ABSENT = uuid('00000000-0000-4000-8000-000000000099');
 /** What both loaders are handed: a document's structure, and the cards under it. */
 interface Document {
   readonly layouts?: readonly unknown[];
-  readonly defaultView?: string;
+  readonly defaultRenderer?: string;
   readonly cards: readonly Card[];
 }
 
@@ -95,14 +95,14 @@ const layout = (
 ) => ({ id, title: `Layout ${id}`, kind: 'positioned', positions, graphs, ...extra });
 
 /** One Layout over A and B, owning one Graph that joins them. */
-const simple = (defaultView?: string): Document => ({
+const simple = (defaultRenderer?: string): Document => ({
   cards: [markdown(A, 'A'), markdown(B, 'B')],
   layouts: [
     layout(WORKING, { [A]: { x: 0, y: 0 }, [B]: { x: 320, y: 0 } }, [
       graph(MAIN, 'Main', [{ from: A, to: B }]),
     ]),
   ],
-  ...(defaultView === undefined ? {} : { defaultView }),
+  ...(defaultRenderer === undefined ? {} : { defaultRenderer }),
 });
 
 const loaded = (result: LoadSpaceResult) => {
@@ -539,17 +539,17 @@ describe.each([
   });
 
   describe('the view a space opens in', () => {
-    it('accepts a defaultView naming a declared layout', () => {
-      expect(loaded(load(simple(WORKING))).defaultView).toBe(WORKING);
+    it('accepts a defaultRenderer naming a declared layout', () => {
+      expect(loaded(load(simple(WORKING))).defaultRenderer).toBe(WORKING);
     });
 
-    it('accepts a defaultView naming a built-in view', () => {
+    it('accepts a defaultRenderer naming a built-in view', () => {
       for (const view of ['flow', 'grid'] as const) {
-        expect(loaded(load(simple(view))).defaultView).toBe(view);
+        expect(loaded(load(simple(view))).defaultRenderer).toBe(view);
       }
     });
 
-    it('refuses a defaultView naming neither', () => {
+    it('refuses a defaultRenderer naming neither', () => {
       const errors = refused(load(simple(ABSENT)));
       expect(errors).toContainEqual(
         expect.objectContaining({ kind: 'unresolved-default-view', ref: ABSENT }),
@@ -566,7 +566,7 @@ describe.each([
             layout(WORKING, { [A]: { x: 0, y: 0 } }, [graph(MAIN, 'Main')]),
             layout(WORKING, { [A]: { x: 0, y: 200 } }, [graph(ASIDE, 'Aside')]),
           ],
-          defaultView: ABSENT,
+          defaultRenderer: ABSENT,
         }),
       );
 

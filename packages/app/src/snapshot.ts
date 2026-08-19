@@ -54,7 +54,7 @@ export const snapshotFromSpace = (space: Space): SpaceSnapshot => ({
     version: SPACE_FILE_VERSION,
     title: space.title,
     ...(space.layouts.length > 0 ? { layouts: [...space.layouts] } : {}),
-    ...(space.defaultView !== undefined ? { defaultView: space.defaultView } : {}),
+    ...(space.defaultRenderer !== undefined ? { defaultRenderer: space.defaultRenderer } : {}),
   },
   cards: space.cards.map(({ id, ...document }) => ({
     id,
@@ -168,7 +168,7 @@ export const updatePositionedLayout = (
     document: {
       ...base.document,
       layouts,
-      defaultView: layoutId,
+      defaultRenderer: layoutId,
     },
   };
 };

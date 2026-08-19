@@ -10,13 +10,13 @@ import { authoredSpace, editedSnapshot, unauthoredSpace } from '../stories/suppo
  * ADR 0052 makes a stable story evidence about the UI Hyper ships, and its
  * negative to remember forbids making one possible by "translating its state in
  * the harness". Where a Space opens is `defaultRenderer` reading
- * `space.defaultView` — so the story fixture must not answer that question
+ * `space.defaultRenderer` — so the story fixture must not answer that question
  * itself, and these Spaces have to *declare* what the Ladle specs then assert.
  *
  * That is what this file pins. `issue-14-workspace-sidebar.spec.ts` proves the
  * rendered story presses Collection 1; this proves the story is entitled to,
  * because the Space says so through the same call production makes. Delete the
- * `defaultView` and this fails here rather than in a browser.
+ * `defaultRenderer` and this fails here rather than in a browser.
  */
 describe('the story Spaces', () => {
   it('opens the authored Space on the Layout its stories press', () => {
