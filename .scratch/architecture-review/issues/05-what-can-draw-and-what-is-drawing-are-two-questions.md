@@ -139,5 +139,44 @@ against the code beneath it, and `layoutNotFound` in `renderer.ts`, which still
 named `canvasRenderers` as the second module asking for it when the asker is now
 `currentRenderer`.
 
-Re-verified after the fixes: `pnpm verify` exit 0 (128 files, 1291 passed, 8
-skipped), `pnpm e2e` 97 passed, `pnpm e2e:ladle` 8 passed.
+## Verification
+
+Re-run at `4deeb02` in a clean worktree after the follow-up fixes, so these are
+the numbers for the branch as it stands rather than for its first commit. All
+three exited 0. The Playwright blocks quote the header, a slice of the `✓`
+lines, and the summary; the vitest block is the tail of `test:coverage`.
+
+`pnpm verify`, exit 0:
+
+```
+> pnpm typecheck && pnpm typecheck:packages && pnpm ui:catalog:check && pnpm lint && pnpm format:check && pnpm test:coverage
+All matched files use Prettier code style!
+ Test Files  128 passed (128)
+      Tests  1291 passed | 8 skipped (1299)
+   Duration  26.27s (transform 2.77s, setup 7.50s, collect 51.04s, tests 47.21s, environment 14.09s, prepare 8.49s)
+```
+
+`pnpm e2e`, exit 0. Ninety-seven tests, the count the branch inherited — this is
+the unchanged-behaviour guard the acceptance criteria asked for, and the two
+renderer-touching specs among them are quoted here:
+
+```
+Running 97 tests using 4 workers
+  ✓  41 [chromium] › packages/app/e2e/editing.spec.ts:1581:1 › an opened Card is modal, so no renderer change can strand its editor (2.0s)
+  ✓  58 [chromium] › packages/app/e2e/mobile-sidebar.spec.ts:56:1 › choosing a canvas or a Graph closes the mobile sidebar (2.7s)
+  ✓  97 [new-space] › packages/app/e2e/new-space.spec.ts:395:1 › a completed edit and workspace identity survive reload (2.1s)
+
+  97 passed (58.8s)
+```
+
+`pnpm e2e:ladle`, exit 0. This is the job neither `verify` nor `e2e` runs, and
+the Sidebar is what this ticket changed:
+
+```
+Running 8 tests using 4 workers
+  ✓  4 …issue-14-workspace-sidebar.spec.ts:16:1 › Workspace Sidebar story renders one exclusive canvas choice (1.2s)
+  ✓  1 …issue-14-workspace-sidebar.spec.ts:43:1 › Workspace Sidebar story defines the canvas renderer keyboard contract (1.6s)
+  ✓  8 …issue-14-workspace-sidebar.spec.ts:155:1 › Workspace Sidebar stories are isolated from the Ladle catalogue (822ms)
+
+  8 passed (8.4s)
+```
