@@ -46,7 +46,15 @@ jobs:
 
   verify:
     needs: reuse-pr-ci
-    if: always() && needs.reuse-pr-ci.outputs.should_skip != 'true'
+    # `reuse-pr-ci` is skipped on every pull request, and a skipped `needs`
+    # skips its dependents unless the default `success()` is overridden — hence
+    # a condition here at all. `!cancelled()` rather than `always()` because the
+    # two differ in exactly one case and `cancel-in-progress` above makes that
+    # case routine: under `always()` a superseded run cancels and then starts
+    # these jobs anyway, and the `ci` gate below reads four cancelled results
+    # and reports a red *CI passed*. The three jobs after this one carry the
+    # same condition for the same reason.
+    if: ${{ !cancelled() && needs.reuse-pr-ci.outputs.should_skip != 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -85,7 +93,7 @@ jobs:
 
   postgres:
     needs: reuse-pr-ci
-    if: always() && needs.reuse-pr-ci.outputs.should_skip != 'true'
+    if: ${{ !cancelled() && needs.reuse-pr-ci.outputs.should_skip != 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -137,7 +145,7 @@ jobs:
 
   e2e:
     needs: reuse-pr-ci
-    if: always() && needs.reuse-pr-ci.outputs.should_skip != 'true'
+    if: ${{ !cancelled() && needs.reuse-pr-ci.outputs.should_skip != 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     # Playwright's own image, so nothing in this job reaches an apt mirror: the
@@ -236,7 +244,7 @@ jobs:
 
   ladle:
     needs: reuse-pr-ci
-    if: always() && needs.reuse-pr-ci.outputs.should_skip != 'true'
+    if: ${{ !cancelled() && needs.reuse-pr-ci.outputs.should_skip != 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     # ADR 0052 makes a Ladle behaviour test half of every surface ticket's
@@ -314,7 +322,7 @@ jobs:
   ci:
     name: CI passed
     needs: [reuse-pr-ci, verify, postgres, e2e, ladle]
-    if: always()
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
