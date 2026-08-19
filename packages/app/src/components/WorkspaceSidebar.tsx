@@ -31,22 +31,14 @@ export interface WorkspaceSidebarProps {
   /** The Space's title. The canvas header names what is drawing it (ADR 0053). */
   readonly workspaceTitle: string;
   readonly canvas: {
-    /**
-     * The whole choice as one value, rather than two lists and a selection.
-     *
-     * One field because it is one decision (ADR 0053). Three fields let a caller
-     * assemble the lists and the selection from different places, which is how a
-     * `selected` that is not one of the rows gets in — a sidebar drawing a list
-     * with nothing pressed in it. `canvasRenderers` builds all three together and
-     * states the identity below; the interface is structural, so this is a
-     * contract a hand-built literal must keep rather than one the compiler
-     * enforces, and `canvas-renderers.ts` is where a caller should get one.
-     */
+    /** The computed and authored rows `canvasRenderers` derives from the Space. */
     readonly renderers: CanvasRenderers;
+    /** Reference-identical to one row in `renderers`. */
+    readonly current: CanvasRenderer;
     /**
      * Hands back the bare selection, which is what Navigation takes. The row's
      * title belongs to whoever built the list: a caller that has to name what is
-     * drawing reads `renderers.selected` rather than deriving a second title of its
+     * drawing reads `current` rather than deriving a second title of its
      * own.
      */
     readonly onSelect: (selection: CanvasRendererId) => void;
@@ -224,7 +216,7 @@ export function WorkspaceSidebar({
           <SidebarGroupContent>
             <RendererGroup
               renderers={canvas.renderers.computed}
-              selected={canvas.renderers.selected}
+              selected={canvas.current}
               onSelect={onCanvas(canvas.onSelect)}
             />
           </SidebarGroupContent>
@@ -240,7 +232,7 @@ export function WorkspaceSidebar({
             ) : (
               <RendererGroup
                 renderers={canvas.renderers.authored}
-                selected={canvas.renderers.selected}
+                selected={canvas.current}
                 onSelect={onCanvas(canvas.onSelect)}
               />
             )}

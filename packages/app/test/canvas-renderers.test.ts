@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { uuidSchema } from '@project/core';
 import { loadSpace, type Space } from '@project/graph';
-import { canvasRenderers } from '../src/canvas-renderers';
+import { canvasRenderers, currentRenderer } from '../src/canvas-renderers';
 import {
   createRendererResolver,
   RendererInvariantError,
@@ -48,7 +48,7 @@ const GRID: CanvasRendererId = { kind: 'view', view: 'grid' };
 
 describe('canvasRenderers', () => {
   it('offers every built-in View and every authored Layout, in the order each is declared', () => {
-    const renderers = canvasRenderers(AUTHORED, FLOW);
+    const renderers = canvasRenderers(AUTHORED);
 
     expect(renderers.computed.map((renderer) => renderer.title)).toEqual(['Flow', 'Grid']);
     expect(renderers.computed.map((renderer) => renderer.selection)).toEqual([FLOW, GRID]);
@@ -60,11 +60,10 @@ describe('canvasRenderers', () => {
 
   /** A Space authors its first Layout by editing a View (ADR 0025), so this is how one opens. */
   it('offers the computed group before a Space owns any Layout', () => {
-    const renderers = canvasRenderers(space(), FLOW);
+    const renderers = canvasRenderers(space());
 
     expect(renderers.computed).toHaveLength(2);
     expect(renderers.authored).toEqual([]);
-    expect(renderers.selected.title).toBe('Flow');
   });
 
   /**
@@ -73,11 +72,12 @@ describe('canvasRenderers', () => {
    * *equals* a row would leave the list with nothing pressed in it.
    */
   it('answers with the very row it offered, for a View and for a Layout alike', () => {
-    const onView = canvasRenderers(AUTHORED, GRID);
-    expect(onView.selected).toBe(onView.computed[1]);
+    const renderers = canvasRenderers(AUTHORED);
+    expect(currentRenderer(renderers, GRID)).toBe(renderers.computed[1]);
 
-    const onLayout = canvasRenderers(AUTHORED, { kind: 'layout', layoutId: SECOND_LAYOUT });
-    expect(onLayout.selected).toBe(onLayout.authored[1]);
+    expect(currentRenderer(renderers, { kind: 'layout', layoutId: SECOND_LAYOUT })).toBe(
+      renderers.authored[1],
+    );
   });
 
   /**
@@ -86,7 +86,7 @@ describe('canvasRenderers', () => {
    * every render for a value that never changes.
    */
   it('builds the computed group once, whatever Space it is asked about', () => {
-    expect(canvasRenderers(AUTHORED, FLOW).computed).toBe(canvasRenderers(space(), GRID).computed);
+    expect(canvasRenderers(AUTHORED).computed).toBe(canvasRenderers(space()).computed);
   });
 
   /**
@@ -97,10 +97,15 @@ describe('canvasRenderers', () => {
    */
   it('refuses a selection naming a Layout the Space does not hold', () => {
     const selection: CanvasRendererId = { kind: 'layout', layoutId: ABSENT_LAYOUT };
+    const renderers = canvasRenderers(AUTHORED);
 
-    expect(() => canvasRenderers(AUTHORED, selection)).toThrow(RendererInvariantError);
+    expect(renderers.authored.map((renderer) => renderer.title)).toEqual([
+      'Collection 1',
+      'Collection 2',
+    ]);
+    expect(() => currentRenderer(renderers, selection)).toThrow(RendererInvariantError);
     try {
-      canvasRenderers(AUTHORED, selection);
+      currentRenderer(renderers, selection);
       expect.unreachable('a missing Layout must not resolve');
     } catch (error) {
       expect(error).toBeInstanceOf(RendererInvariantError);
@@ -122,7 +127,9 @@ describe('canvasRenderers', () => {
       newGraphId: () => uuidSchema.parse('00000000-0000-4000-8000-0000000000ff'),
     });
 
-    const fromCanvasRenderers = attempt(() => canvasRenderers(AUTHORED, selection));
+    const fromCanvasRenderers = attempt(() =>
+      currentRenderer(canvasRenderers(AUTHORED), selection),
+    );
     const fromResolver = attempt(() => resolveRenderer(AUTHORED, selection));
 
     expect(fromCanvasRenderers.reason).toBe('renderer-not-found');

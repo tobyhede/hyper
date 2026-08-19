@@ -16,7 +16,7 @@ import { createRenderAdapter, selectedCardOf, type EdgeSubject } from './render-
 import { createConnectionCompletion } from './connection-completion';
 import { createEdgeAuthoring } from './edge-authoring';
 import { canvasProjection } from './canvas-projection';
-import { canvasRenderers } from './canvas-renderers';
+import { canvasRenderers, currentRenderer } from './canvas-renderers';
 import { canvasContent } from './canvas-content';
 import { usePlacementRendering } from './placement-rendering';
 import { cardSizeVars } from './card';
@@ -104,13 +104,10 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
       () => resolveRenderer(rendererSpace, selectedRenderer),
       [rendererSpace, selectedRenderer],
     );
-    // The one canvas choice, in the two groups it is drawn as (ADR 0053), from
-    // the one module that answers it. Memoized on the same two values the
-    // renderer is, and for the same reason: a Layout authored by the last Edit
-    // is a row here on the next render, and nothing else moves it.
-    const renderers = useMemo(
-      () => canvasRenderers(rendererSpace, selectedRenderer),
-      [rendererSpace, selectedRenderer],
+    const renderers = useMemo(() => canvasRenderers(rendererSpace), [rendererSpace]);
+    const current = useMemo(
+      () => currentRenderer(renderers, selectedRenderer),
+      [renderers, selectedRenderer],
     );
     // Everything the canvas draws, derived once from the Space and the renderer.
     // Memoized on those two alone: the interaction state below changes far more
@@ -575,7 +572,7 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
     const sidebar = (
       <WorkspaceSidebar
         workspaceTitle={rendererSpace.title}
-        canvas={{ renderers, onSelect: selectCanvasRenderer }}
+        canvas={{ renderers, current, onSelect: selectCanvasRenderer }}
         graph={{
           graphs: projection.visibleGraphs,
           activeGraphId,
@@ -609,7 +606,7 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
     return (
       <AppShell
         sidebar={sidebar}
-        header={<SelectedCanvasRenderer renderer={renderers.selected} />}
+        header={<SelectedCanvasRenderer renderer={current} />}
         notice={
           <PersistenceNotice
             persistence={sessionState.persistence}

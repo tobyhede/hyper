@@ -3,6 +3,7 @@ import type { Space } from '@project/graph';
 import {
   builtInViewTitle,
   layoutNotFound,
+  RendererInvariantError,
   canvasRendererKey,
   type CanvasRendererId,
 } from './renderer';
@@ -12,9 +13,8 @@ import {
  *
  * Deliberately **not** in `renderer.ts`. That module answers what one selection
  * resolves to — a subject, a strategy, and what editing it means — and needs
- * `elkStrategy` to do it. This answers a different question: what the author may
- * choose between, and which of those choices is current. Different question,
- * different test file, and `renderer.ts` is long enough already.
+ * `elkStrategy` to do it. This module answers two related questions without
+ * making the current id an input to the total renderer list.
  *
  * It is a **locality** change and not a deep module. The mapping below is small
  * on purpose; what it buys is that no caller derives the choice a second way.
@@ -47,19 +47,10 @@ export interface CanvasRenderer {
   readonly title: string;
 }
 
-/** Every renderer the canvas can draw and the one currently drawing it. */
+/** Every renderer the canvas can draw. */
 export interface CanvasRenderers {
   readonly computed: readonly CanvasRenderer[];
   readonly authored: readonly CanvasRenderer[];
-  /**
-   * Reference-identical to one row in `computed` or in `authored`.
-   *
-   * Part of the interface and not an implementation detail: it is how the
-   * sidebar decides which row is pressed, so the pressed test is `===` rather
-   * than a field-by-field comparison made at each site — which is how a list and
-   * the thing it reports on begin to disagree.
-   */
-  readonly selected: CanvasRenderer;
 }
 
 /**
@@ -102,30 +93,32 @@ const COMPUTED: readonly CanvasRenderer[] = Object.freeze(
 );
 
 /**
- * Everything the canvas can draw, and the row that is drawing.
- *
- * A `selected` naming a Layout the Space no longer holds throws — the same
- * answer `resolveRenderer` gives to the same condition, in the same words.
- * ADR 0053's canvas choice is one decision, and a caller holding a selection
- * that resolves in one module and not in the other is a defect rather than an
- * author's mistake.
+ * Everything the canvas can draw. Total for every valid Space: the identity of
+ * the current renderer is deliberately not an input.
  */
-export function canvasRenderers(space: Space, selected: CanvasRendererId): CanvasRenderers {
+export function canvasRenderers(space: Space): CanvasRenderers {
   const authored: readonly CanvasRenderer[] = space.layouts.map((layout) => ({
     selection: { kind: 'layout', layoutId: layout.id },
     title: layout.title,
   }));
+  return { computed: COMPUTED, authored };
+}
 
-  if (selected.kind === 'view') {
-    return { computed: COMPUTED, authored, selected: BY_VIEW[selected.view] };
-  }
-
-  // The one identity rule, and it is the one `canvasRendererKey` already
-  // states. Comparing the two selections field by field here would be a second
-  // answer to "are these the same choice".
-  const key = canvasRendererKey(selected);
-  const row = authored.find((candidate) => canvasRendererKey(candidate.selection) === key);
-  if (row === undefined) throw layoutNotFound(selected.layoutId);
-
-  return { computed: COMPUTED, authored, selected: row };
+/**
+ * The row, from the supplied list, named by the current renderer id.
+ *
+ * A Layout id that is no longer present throws in the same words as
+ * `resolveRenderer`; asking for the list itself remains total.
+ */
+export function currentRenderer(renderers: CanvasRenderers, id: CanvasRendererId): CanvasRenderer {
+  const key = canvasRendererKey(id);
+  const row = [...renderers.computed, ...renderers.authored].find(
+    (candidate) => canvasRendererKey(candidate.selection) === key,
+  );
+  if (row !== undefined) return row;
+  if (id.kind === 'layout') throw layoutNotFound(id.layoutId);
+  throw new RendererInvariantError(
+    'renderer-not-found',
+    `The selected View ${id.view} does not exist.`,
+  );
 }

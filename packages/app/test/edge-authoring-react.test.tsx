@@ -46,7 +46,8 @@ const workspaceChrome = (
     <WorkspaceSidebar
       workspaceTitle="Space"
       canvas={{
-        renderers: { computed: [FLOW], authored: [], selected: FLOW },
+        renderers: { computed: [FLOW], authored: [] },
+        current: FLOW,
         onSelect: () => undefined,
       }}
       graph={{
