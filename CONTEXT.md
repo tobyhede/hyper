@@ -120,6 +120,12 @@ A viewer chooses between the application's Algorithmic Views and the Space's Lay
 Nothing tracks whether a viewer is editing, and there is no edit mode. Editing an Algorithmic View creates a new Layout from the Cards and positions already on screen; moving or connecting a Card, or choosing Add Graph, therefore converts before writing the Edit. A connection or Add Graph may create the new Layout's first Graph as part of that same Edit. Whatever Graphs a conversion returns, the Graphs the View was drawing are left unchanged, because what it returns are new Graphs and not those ones. Editing a Layout changes that Layout directly. Conversion retains no relationship to the View or layout strategy that produced those initial positions: selecting another View later is a fresh rendering choice, not undo or reversal.
 _Avoid_: layout, arrangement, algorithm.
 
+**Canvas renderer**:
+A View or a Layout in the role of drawing a Space's Cards on the canvas.
+_Avoid_: choice (the value names the available renderers and which is current,
+not an act), canvas alone (the canvas is the one surface being drawn), and names
+taken from the control that draws it — selector, menu item, row.
+
 **Cards View**:
 An application-supplied collection View of the Space Cards absent from the selected Layout. Its current rendering is a Sidebar, but that mounting location is not part of the View's identity.
 _Avoid_: Space-card palette, Card panel, Sidebar as the domain name.
