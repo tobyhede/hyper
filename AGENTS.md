@@ -19,6 +19,7 @@ Deeper build-status and gotcha detail for the ADRs that see the most churn now l
 - Verify: `pnpm verify` runs `typecheck` -> `typecheck:packages` -> `lint` -> `format:check` -> `test:coverage` (i.e. `tsc --noEmit` over the root program, then `pnpm -r typecheck` over each package's own config, `eslint . --max-warnings=0`, `prettier --check .`, `vitest run --coverage`). **Both typechecks are needed**: the root program's `include` has `"*.config.ts"`, and `*` does not cross directory boundaries, so `packages/app/vite.config.ts`, `vite-space-http-plugin.ts` and `http-server-build.config.ts` are covered only by the per-package pass. Warnings fail the lint run; coverage thresholds are per-package and pinned at what already holds (`core`, `graph`, `persistence`), with no global threshold on purpose.
 - Test: `pnpm test` (Vitest, `vitest` for watch). Unit + property tests (fast-check) live in `packages/*/test`.
 - E2E: `pnpm e2e` (Playwright, Chromium only) stays database-free and exercises HTTP; `pnpm e2e:fixture` selects only the tracked-fixture project. Every test owns a fresh Vite host, `E2eMemorySpaceRepository` and catalog; reloads and extra pages inside that test share them, while no revision leaks to another test. The `chromium` project imports the tracked fixture and `new-space` starts empty so database startup creates one card. Hosts use worker-scoped ports beginning at 5300, away from the human's 5173–5175. `pnpm e2e:postgres` is the separate opt-in one-test project proving a real PostgreSQL edit survives a fresh Vite host; run it only with PostgreSQL up and always stop PostgreSQL afterward. One-time first: `pnpm exec playwright install chromium`.
+- Ladle E2E: `pnpm e2e:ladle` runs `playwright.ladle.config.ts` over `packages/app/ladle-e2e/`, against a `ladle serve --noWatch` catalogue it starts itself on port 61100. This is the behaviour half of ADR 0052's story evidence and it is **its own CI job**, run by neither `verify` nor `e2e` — so a component change that breaks a story is only caught here. The two Playwright configs share one flake policy (`retries: 2` and `failOnFlakyTests` under CI, `retries: 0` on a laptop); under `failOnFlakyTests` a retry that passes still fails the run, so the retries buy the trace and the reproduce-or-not signal rather than tolerance for a blip.
 - Build: `pnpm build` (Vite build of the app).
 - PostgreSQL integration: copy `.env.example` to the ignored `.env`, fill its password and matching `DATABASE_URL`, then run `pnpm postgres:up` followed by `pnpm test:integration:postgres`. Always finish with `pnpm postgres:down`; it keeps the named volume. `docker compose down --volumes` is the destructive reset. Normal `pnpm verify` and `pnpm e2e` do not require PostgreSQL.
 
@@ -55,8 +56,9 @@ Hard rules — **all four are now enforced, not just documented**. Two layers, b
 
 - Run `pnpm verify` and report the real output.
 - For any UI/graph change, also run `pnpm e2e` and report it.
+- For any change to a component with a story, also run `pnpm e2e:ladle` and report it. It is not part of `verify` and not part of `e2e`, so nothing else runs it for you, and it is a CI job — a story left behind by a component change fails there.
 - Do not assert success without having run the commands.
-- CI (`.github/workflows/ci.yml`) runs both on every push and PR, with `--frozen-lockfile`. It is a backstop, not a substitute — a red CI after the fact is slower than a green run before the commit.
+- CI (`.github/workflows/ci.yml`) runs all four jobs on every push and PR, with `--frozen-lockfile`. It is a backstop, not a substitute — a red CI after the fact is slower than a green run before the commit.
 
 ## Scope discipline
 
