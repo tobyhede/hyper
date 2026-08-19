@@ -12,6 +12,7 @@ import {
   Play,
   Plus,
   Workflow,
+  X,
 } from 'lucide-react';
 
 /** The computed View that draws Cards and every Graph in the Space. */
@@ -62,3 +63,6 @@ export const CheckIcon = () => <Check color="var(--accent)" size={14} />;
  * beside a line of Alert text and inside a toolbar button.
  */
 export const AlertIcon = () => <CircleAlert />;
+
+/** Close the surface that contains the control. */
+export const CloseIcon = () => <X size={14} strokeWidth={3} />;

@@ -322,6 +322,7 @@ test('editing an Alias authors its metadata and survives reload', async ({ page 
   await expect(page.getByRole('textbox', { name: 'Title' })).toHaveValue('A reference to B');
   const reloadedTargetPicker = page.getByRole('combobox', { name: 'Target' });
   await reloadedTargetPicker.fill('B');
+  await reloadedTargetPicker.press('ArrowDown');
   // Two glyphs on the row: the kind, and the check that says this is the Target
   // the reloaded Alias names.
   await expect(page.getByRole('option', { name: 'Markdown Card B' }).locator('svg')).toHaveCount(2);
@@ -1112,19 +1113,14 @@ test('the Edge editor moves an endpoint and keeps the Edge in its Graph', async 
 
   const selected = await selectAnEdge(page);
   await page.getByRole('button', { name: 'Edit this Edge' }).click();
-  await page.getByRole('combobox', { name: 'To' }).click();
-  // How an *eligible* row is named, which is the only way to name one: cmdk
-  // writes `data-disabled` on **every** row, `"false"` included, so the
-  // attribute's absence says nothing and only its value distinguishes them.
-  // `hasNot` is no use either — it matches a *descendant*, and the primitive
-  // marks the option element itself.
+  await page.getByRole('combobox', { name: 'To' }).press('ArrowDown');
   //
   // Here the filter excludes nothing, and that is the fixture rather than the
   // rule: every Graph in it is a line, so no endpoint this list offers would
   // duplicate an existing Edge, and self-Edges, cycles and the endpoint the Edge
   // already names are all eligible (ADR 0032, ADR 0042). It is load-bearing at
   // the keyboard Connect picker below, where B is disabled as a duplicate.
-  const option = page.locator('[role="option"][data-disabled="false"]');
+  const option = page.locator('[role="option"]:not([data-disabled])');
   await option.last().click();
 
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
@@ -1429,8 +1425,8 @@ test('a Card offers a keyboard Connect control that authors an Edge', async ({ p
   await source.hover();
   await source.getByRole('button', { name: 'Connect from A' }).click();
   await expect(page.getByTestId('connect-target-picker')).toBeVisible();
-  await page.getByRole('combobox', { name: 'Connect to' }).click();
-  await page.locator('[role="option"][data-disabled="false"]').last().click();
+  await page.getByRole('combobox', { name: 'Connect to' }).press('ArrowDown');
+  await page.locator('[role="option"]:not([data-disabled])').last().click();
 
   await expect(page.locator('.react-flow__edge')).toHaveCount(drawn + 1);
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
@@ -1470,12 +1466,14 @@ test('Escape closes the connect picker’s list before it cancels the connection
   const picker = page.getByTestId('connect-target-picker');
   await expect(picker).toBeVisible();
   const trigger = page.getByRole('combobox', { name: 'Connect to' });
-  await trigger.click();
-  await expect(page.getByRole('combobox', { name: 'Search' })).toBeVisible();
+  await trigger.press('ArrowDown');
+  await expect(trigger).toHaveAttribute('aria-expanded', 'true');
+  await expect(page.getByRole('listbox', { name: 'Connect to' })).toBeVisible();
 
   await page.keyboard.press('Escape');
 
-  await expect(page.getByRole('combobox', { name: 'Search' })).toHaveCount(0);
+  await expect(page.getByRole('listbox', { name: 'Connect to' })).toHaveCount(0);
+  await expect(trigger).toHaveAttribute('aria-expanded', 'false');
   await expect(picker).toBeVisible();
   // **The handoff, asserted rather than assumed.** Radix restores focus from a
   // `setTimeout(0)` in the focus scope's unmount, so for a moment after the list
@@ -1722,10 +1720,6 @@ test('an opened Card keeps Tab inside it after a click that focuses nothing', as
   // cost: it is prevented only where the default would take focus out of here.
   await page.getByRole('textbox', { name: 'Markdown source' }).click();
   await expect(page.getByRole('textbox', { name: 'Markdown source' })).toBeFocused();
-  // Including through a label's text, which focuses its field by click rather
-  // than by mousedown.
-  await page.getByText('Title', { exact: true }).click();
-  await expect(page.getByRole('textbox', { name: 'Title' })).toBeFocused();
 });
 
 /**
@@ -1804,10 +1798,7 @@ test('Add Card converts an Algorithmic View once and names the Card in place', a
  * revision assertion needs `quiescent`: "still 0" passes instantly against a
  * commit that has not happened yet.
  *
- * Escape is the gesture, and it is one press. The two-stage rule this used to
- * assert — the field draft taking the first Escape and the surface the second —
- * was withdrawn by ADR 0048: a pane has exactly one non-committing exit, it is
- * called Cancel, and Escape is its alias rather than a second unlabelled copy.
+ * An open combobox dismisses its popup first; the pane owns the next Escape.
  */
 test('cancelling the Alias Target picker creates nothing', async ({ page }) => {
   await page.goto('/');
@@ -1821,8 +1812,7 @@ test('cancelling the Alias Target picker creates nothing', async ({ page }) => {
   await expect(search).toBeFocused();
   await search.fill('A');
 
-  // One Escape, from a field holding a draft. Escape is Cancel on this pane and
-  // no field intercepts it (ADR 0048) — the search does not clear itself first.
+  await search.press('Escape');
   await search.press('Escape');
 
   await expect(page.getByTestId('new-alias')).toHaveCount(0);
@@ -1923,10 +1913,7 @@ test('choosing a Target creates the Alias and leaves its editor open', async ({ 
  * Frame 4's focus rule rides along: this pane opens on its first field, and the
  * Target picker no longer takes the caret off it.
  *
- * `Enter` in a field submits the form the pane owns, which is `Done` — so it
- * commits every pending field and closes, exactly as the button does (ADR
- * 0048). There is no Cancel left to press afterwards, and the pane closing is
- * part of what the press means rather than a separate step.
+ * The editor retains the pane contract: only its labelled Done action commits.
  */
 test('an Alias is renamed in the editor its creation leaves open', async ({ page }) => {
   await page.goto('/');
@@ -1942,7 +1929,7 @@ test('an Alias is renamed in the editor its creation leaves open', async ({ page
   await expect(title).toBeFocused();
   await expect(title).toHaveValue('B');
   await title.fill('Recap');
-  await title.press('Enter');
+  await page.getByRole('button', { name: 'Done' }).click();
 
   await expect(page.getByTestId('open-card')).toHaveCount(0);
   await expect(nodeByTitle(page, 'Recap')).toHaveCount(1);

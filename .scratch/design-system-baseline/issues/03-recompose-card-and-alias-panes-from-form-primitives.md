@@ -25,8 +25,8 @@ preserved ADR 0048's one-completion lifecycle. This extraction finished the
 form boundary: `OpenCard` and `NewAlias` now compose the shared `FieldGroup`,
 `Field`, `FieldLabel`, `FieldDescription`, `FieldError`, `FieldTitle`, `Input`
 and `Textarea` exports rather than maintaining raw form controls alongside the
-design system. `CardPicker` remains the established cmdk presentation; Issue 10
-still owns consolidating the Card-choice model.
+design system. Issue 10 now consolidates Card choice on the donor's Base UI
+editable combobox.
 
 Five stable, iframed stories mount the real production `OpenCard` and
 `NewAlias` components for long Markdown content and validation, an opened Alias
@@ -58,15 +58,15 @@ different Target-first contract.
 - Reconciled with main: Base UI Dialog semantics, ADR 0048's `Done`/Cancel/
   Escape contract, ADR 0049's Alias-only metadata form, and ADR 0051's removal
   of shared Card Description.
-- Deferred to Issue 10: replacing the inline `CardPicker` with the one shared
-  Card-choice behavior and its two presentations.
-- Rejected from the donor: its superseded visual redesign, Graph-colour rail,
-  discard-confirmation interaction, renamed `Ok` action and alternate
-  combobox. None is required by this issue or current accepted ADRs.
+- Delivered with Issue 10: the donor's editable combobox replaces both prior
+  picker presentations.
+- Ported from the donor after design review: its card-editor composition and
+  Graph-colour rail. The current `Done`, Cancel and Escape contract remains;
+  the donor's discard confirmation and renamed `Ok` action do not.
 
 ### Verification
 
-- `pnpm verify` — passed: 129 test files, 1,296 tests passed, 8 skipped; UI
+- `pnpm verify` — passed: 128 test files, 1,289 tests passed, 8 skipped; UI
   catalogue, both typecheck layers, lint, formatting and coverage all passed.
 - `pnpm e2e` — passed: 97 tests.
 - `pnpm e2e:ladle` — passed: 15 tests.

@@ -23,6 +23,7 @@ import { cardSizeVars } from './card';
 import { createNavigation } from './navigation';
 import { createWorkingSpaceReader } from './snapshot';
 import { nextCardTitle } from './titles';
+import { activeGraphColor } from './colors';
 import { createRendererResolver, defaultRenderer, type CanvasRendererId } from './renderer';
 import { ADD_CARD_KEY, SpaceCanvas } from './components/SpaceCanvas';
 import { CanvasCentre, type VisibleCentre } from './components/CanvasCentre';
@@ -118,6 +119,7 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
     );
 
     const { activeGraphId, openedCardId } = navigationState;
+    const editorGraphColor = activeGraphColor(projection.colors, activeGraphId);
     const activateGraph = navigation.activateGraph;
     const openCard = navigation.openCard;
     const closeCard = navigation.closeCard;
@@ -688,6 +690,7 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
             (openedCard.kind === 'alias' ? (
               <OpenCard
                 through={openedCard}
+                graphColor={editorGraphColor}
                 occurrence={{
                   targets: aliasTargets,
                   onEdit: (change: { title: string; target: CardId }) =>
@@ -696,7 +699,12 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
                 onCancel={closeCard}
               />
             ) : (
-              <OpenCard card={openedCard} onComplete={completeOpenedCard} onCancel={closeCard} />
+              <OpenCard
+                card={openedCard}
+                graphColor={editorGraphColor}
+                onComplete={completeOpenedCard}
+                onCancel={closeCard}
+              />
             ))}
 
           {creatingAlias && openedCardId === null && (

@@ -22,7 +22,7 @@ import {
 import type { Card, CardId, Graph, GraphEdge, GraphId } from '@project/core';
 import { uuidSchema } from '@project/core';
 import type { CardFlowNode } from '@project/react-flow-adapter';
-import { CardCombobox, type CardChoice } from '@project/ui';
+import { CardSearchCombobox, type CardChoice } from '@project/ui';
 import {
   newCardDrop,
   type DropTarget,
@@ -630,6 +630,7 @@ export function useEdgeAuthoring({
         return {
           id: card.id,
           title: card.title,
+          kind: card.kind,
           ...(eligibility.kind === 'refused' ? { refusal: eligibility.reason } : {}),
         };
       }),
@@ -684,6 +685,7 @@ export function useEdgeAuthoring({
       return {
         id: card.id,
         title: card.title,
+        kind: card.kind,
         ...(eligibility.kind === 'refused' ? { refusal: eligibility.reason } : {}),
       };
     });
@@ -736,12 +738,12 @@ export function useEdgeAuthoring({
           onKeyDown={(event) => {
             if (event.key !== 'Escape') return;
             const trigger = event.currentTarget.querySelector('[data-testid="connect-target"]');
-            if (trigger?.getAttribute('data-state') === 'open') return;
+            if (trigger?.getAttribute('aria-expanded') === 'true') return;
             event.stopPropagation();
             authoring.cancelDraft();
           }}
         >
-          <CardCombobox
+          <CardSearchCombobox
             label="Connect to"
             testId="connect-target"
             choices={connectChoices}

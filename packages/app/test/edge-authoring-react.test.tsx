@@ -987,12 +987,12 @@ describe('Escape in the keyboard target picker', () => {
     act(() => edgeAuthoring.beginKeyboardConnect(CARD_A));
     const trigger = screen.getByRole('combobox', { name: 'Connect to' });
 
-    fireEvent.click(trigger);
-    await waitFor(() => expect(screen.getByRole('combobox', { name: 'Search' })).toBeVisible());
-    fireEvent.keyDown(screen.getByRole('combobox', { name: 'Search' }), { key: 'Escape' });
+    fireEvent.keyDown(trigger, { key: 'ArrowDown' });
+    await waitFor(() => expect(trigger).toHaveAttribute('aria-expanded', 'true'));
+    fireEvent.keyDown(trigger, { key: 'Escape' });
 
     // The list has gone and the gesture has not.
-    expect(screen.queryByRole('combobox', { name: 'Search' })).not.toBeInTheDocument();
+    expect(trigger).toHaveAttribute('aria-expanded', 'false');
     expect(screen.getByTestId('connect-target-picker')).toBeVisible();
     expect(edgeAuthoring.getState().draft).toEqual({ kind: 'keyboard-connect', from: CARD_A });
 

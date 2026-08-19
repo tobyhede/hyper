@@ -1,4 +1,4 @@
-import { forwardRef, type ButtonHTMLAttributes } from 'react';
+import { forwardRef, type ComponentProps } from 'react';
 import { Button as ButtonPrimitive } from '@base-ui/react/button';
 import { cva, type VariantProps } from 'class-variance-authority';
 import { cn } from './lib/utils';
@@ -21,6 +21,8 @@ const buttonVariants = cva(
           'border-destructive bg-secondary text-destructive hover:border-accent disabled:opacity-50',
         ghost:
           'border-transparent bg-transparent text-muted-foreground hover:border-border hover:bg-secondary hover:text-secondary-foreground disabled:opacity-50',
+        commit:
+          'border-[3px] border-transparent border-b-primary bg-transparent text-foreground hover:border-primary disabled:opacity-50',
       },
       size: {
         default: 'px-[0.8rem] py-[0.4rem]',
@@ -35,8 +37,8 @@ const buttonVariants = cva(
   },
 );
 
-export type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> &
-  VariantProps<typeof buttonVariants>;
+export type ButtonProps = Omit<ComponentProps<typeof ButtonPrimitive>, 'className'> &
+  VariantProps<typeof buttonVariants> & { className?: string };
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
   { className, variant, size, type = 'button', ...props },

@@ -132,6 +132,9 @@ describe('the opened Card', () => {
     fireEvent.change(screen.getByRole('textbox', { name: 'Title' }), {
       target: { value: 'Recap' },
     });
+    fireEvent.keyDown(screen.getByRole('combobox', { name: 'Target' }), {
+      key: 'ArrowDown',
+    });
     fireEvent.click(screen.getByRole('option', { name: /B/ }));
     expect(onEdit).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: 'Done' }));

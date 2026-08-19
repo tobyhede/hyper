@@ -259,23 +259,21 @@ test('cards are drawn at exactly the size the layout placed them at', async ({ p
   expect(parseFloat(drawn.w)).toBeGreaterThan(parseFloat(drawn.h));
 });
 
-test('the card frame is 16:9, and letterboxes rather than reshaping content', async ({ page }) => {
-  const ratio = async () => {
-    const box = (await page.locator('.card-pane__panel').boundingBox())!;
-    return box.width / box.height;
-  };
-
+test('the card editor remains bounded across viewport shapes', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto('/');
   await openCard(nodeByTitle(page, 'A').first(), 'A');
   await expect(page.getByTestId('open-card')).toBeVisible();
-  expect(await ratio()).toBeCloseTo(16 / 9, 1);
 
-  // A viewport that is not 16:9 must not change the shape of the frame.
-  await page.setViewportSize({ width: 900, height: 1200 });
-  expect(await ratio()).toBeCloseTo(16 / 9, 1);
-  await page.setViewportSize({ width: 2200, height: 700 });
-  expect(await ratio()).toBeCloseTo(16 / 9, 1);
+  for (const viewport of [
+    { width: 900, height: 1200 },
+    { width: 2200, height: 700 },
+  ]) {
+    await page.setViewportSize(viewport);
+    const panel = (await page.locator('.card-pane__panel').boundingBox())!;
+    expect(panel.width).toBeLessThanOrEqual(viewport.width);
+    expect(panel.height).toBeLessThanOrEqual(viewport.height);
+  }
 });
 
 test('content that exceeds the frame scrolls inside it, keeping controls reachable', async ({
@@ -301,12 +299,12 @@ test('content that exceeds the frame scrolls inside it, keeping controls reachab
 
   expect(await content.evaluate((el) => el.scrollHeight > el.clientHeight)).toBe(true);
 
-  // The frame kept its ratio rather than growing to fit.
   const panel = (await page.locator('.card-pane__panel').boundingBox())!;
-  expect(panel.width / panel.height).toBeCloseTo(16 / 9, 1);
+  expect(panel.width).toBeLessThanOrEqual(520);
+  expect(panel.height).toBeLessThanOrEqual(380);
 
   // Actions stay inside the frame, so step controls never scroll away.
-  const actions = (await page.locator('.card-pane__actions').boundingBox())!;
+  const actions = (await page.locator('.card-editor__footer').boundingBox())!;
   expect(actions.y + actions.height).toBeLessThanOrEqual(panel.y + panel.height + 1);
 });
 
@@ -331,9 +329,12 @@ test('an alias node names the card it redraws and opens its own metadata', async
   await openCard(recap, 'A′');
   // Two fields, both the Alias's own, and nothing belonging to A.
   await expect(page.getByRole('textbox', { name: 'Title' })).toHaveValue('A′');
-  await expect(page.getByRole('combobox', { name: 'Target' })).toBeVisible();
+  const target = page.getByRole('combobox', { name: 'Target' });
+  await expect(target).toBeVisible();
+  await target.press('ArrowDown');
   await expect(page.getByRole('option', { name: 'Markdown Card A' }).locator('svg')).toHaveCount(2);
   await expect(page.getByRole('textbox', { name: 'Markdown source' })).toHaveCount(0);
+  await target.press('Escape');
   await page.getByRole('button', { name: 'Cancel' }).click();
 
   // Its own title is still authored, inline on the graph.

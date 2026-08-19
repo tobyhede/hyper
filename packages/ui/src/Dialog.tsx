@@ -8,4 +8,5 @@ export const Dialog = DialogPrimitive.Root;
 export const DialogBackdrop = DialogPrimitive.Backdrop;
 export const DialogPopup = DialogPrimitive.Popup;
 export const DialogPortal = DialogPrimitive.Portal;
+export const DialogTitle = DialogPrimitive.Title;
 export const DialogViewport = DialogPrimitive.Viewport;

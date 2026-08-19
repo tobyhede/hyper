@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import type { Card, CardId } from '@project/core';
+import { uuidSchema, type Card, type CardId } from '@project/core';
 import {
   Button,
+  CardSearchCombobox,
   Field,
   FieldDescription,
   FieldError,
@@ -11,7 +12,7 @@ import {
   Input,
 } from '@project/ui';
 import { CardPane } from './CardPane';
-import { CardPicker } from './CardPicker';
+import { paneInitialFocus } from './pane-focus';
 
 export interface NewAliasProps {
   /** Every Card an Alias may name: the non-Alias Cards of this Space (ADR 0009). */
@@ -64,9 +65,8 @@ export function NewAlias({ targets, refusal, onCreate, onCancel, onRefusalStale 
   return (
     <CardPane ariaLabel="New Alias" testId="new-alias" onDismiss={onCancel}>
       {/* One `onChange` for both fields rather than two handlers, because React
-          bubbles change through its own tree and `CardPicker` owns the search
-          rather than exposing another callback. Editing either field is the
-          same fact — the refused attempt is over. */}
+          bubbles change through its own tree. Editing either field is the same
+          fact — the refused attempt is over. */}
       <div className="card-pane__editor" onChange={refusal === null ? undefined : onRefusalStale}>
         {/* The fields scroll and the actions below them do not, exactly as on the
             opened-Card pane. This one needs it most: it has no Markdown field to
@@ -90,15 +90,24 @@ export function NewAlias({ targets, refusal, onCreate, onCancel, onRefusalStale 
               onChange={(event) => setTitle(event.currentTarget.value)}
             />
           </Field>
-          <CardPicker
+          <CardSearchCombobox
             label="Target"
-            cards={targets}
-            selectedId={null}
+            choices={targets.map((card) => ({
+              id: card.id,
+              title: card.title,
+              kind: card.kind,
+            }))}
+            value={null}
             // "It opens the normal Card editor in an Alias creation state with
             // **Target** focused" (ADR 0009's Frame 1): the Target is what this
             // surface is for, and the title above it is optional.
-            initialFocus
-            onSelect={(target) => onCreate(target, title)}
+            inputAttributes={paneInitialFocus(true)}
+            testId="card-picker-search"
+            resultsTestId="card-picker-results"
+            onValueChange={(target) => {
+              const parsed = uuidSchema.safeParse(target);
+              if (parsed.success) onCreate(parsed.data, title);
+            }}
             emptyMessage="An Alias needs a Card that owns its content, and this Space has none yet."
           />
           {/* The hint stays among the fields, under the list it is about: it is

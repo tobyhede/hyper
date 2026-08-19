@@ -42,10 +42,10 @@ test('opened Alias empty story explains that no Target is eligible', async ({ pa
   await page.goto('/?story=components--card-and-alias-panes--alias-empty&mode=preview');
 
   const dialog = page.getByRole('dialog', { name: 'Placement recap' });
-  await expect(dialog.getByTestId('card-picker-results')).toHaveText(
+  await expect(dialog.getByRole('combobox', { name: 'Target' })).toHaveAccessibleDescription(
     'This Space holds no other Card that owns its content.',
   );
-  await expect(dialog.getByRole('option')).toHaveCount(0);
+  await expect(page.getByRole('option')).toHaveCount(0);
 });
 
 test('new Alias empty story focuses Target and explains the missing choices', async ({ page }) => {
@@ -54,10 +54,10 @@ test('new Alias empty story focuses Target and explains the missing choices', as
   const dialog = page.getByRole('dialog', { name: 'New Alias' });
   const target = dialog.getByRole('combobox', { name: 'Target' });
   await expect(target).toBeFocused();
-  await expect(dialog.getByTestId('card-picker-results')).toHaveText(
+  await expect(target).toHaveAccessibleDescription(
     'An Alias needs a Card that owns its content, and this Space has none yet.',
   );
-  await expect(dialog.getByRole('option')).toHaveCount(0);
+  await expect(page.getByRole('option')).toHaveCount(0);
 });
 
 test('new Alias refusal stays open and becomes stale when a field changes', async ({ page }) => {

@@ -1,152 +1,75 @@
-import { useState, type ComponentType, type FormEvent, type ReactNode } from 'react';
-import { markdownCardSchema, type Card, type CardId } from '@project/core';
+import {
+  useRef,
+  useState,
+  type CSSProperties,
+  type FormEvent,
+  type KeyboardEvent,
+  type ReactNode,
+} from 'react';
+import { markdownCardSchema, uuidSchema, type Card, type CardId } from '@project/core';
 import type { ResolvedContentCard } from '@project/graph';
-import { Button, Field, FieldError, FieldGroup, FieldLabel, Input, Textarea } from '@project/ui';
+import {
+  Button,
+  CardSearchCombobox,
+  CloseIcon,
+  Field,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+  Textarea,
+} from '@project/ui';
 import { CardPane } from './CardPane';
-import { CardPicker } from './CardPicker';
+import { paneInitialFocus } from './pane-focus';
 
 /**
- * What a content kind holds while it is being authored: the pending values, and
- * whatever the last `Done` refused about them.
- *
- * A discriminated union with one member per resolved content kind, which is
- * half of the registry's compile-time obligation — the other half is
- * `CONTENT_FIELDS` below. Errors live in here rather than beside it because a
- * refusal *is* pending state: it describes the values on screen and goes stale
- * the moment one of them is edited.
+ * The two values the Card dialog authors. Description remains valid domain
+ * metadata, but it is not Card-front copy and it is not duplicated in this
+ * writing surface.
  */
 type MarkdownDraft = {
-  readonly kind: 'markdown';
   readonly title: string;
   readonly body: string;
   readonly titleError: string | null;
 };
 
-type ContentDraft = MarkdownDraft;
-
-/**
- * `Content` rather than `Card`, which is the domain type imported above: a
- * parameter shadowing it reads as that type at every use and is not one.
- */
-type ContentFieldsProps<Draft extends ContentDraft> = {
-  readonly draft: Draft;
-  readonly onChange: (draft: Draft) => void;
-};
-
-/**
- * A content kind's field group: fields that hold nothing, a seed, and one pure
- * validation the pane's single `Done` runs (ADR 0048).
- *
- * The pane owns the `<form>`, submit and actions, so a content kind supplies
- * values and validity — never a completion of its own.
- */
-interface ContentFieldGroup<Content extends ResolvedContentCard, Draft extends ContentDraft> {
-  /** The pending values the pane opens with. */
-  readonly seed: (card: Content) => Draft;
-  readonly Fields: ComponentType<ContentFieldsProps<Draft>>;
-  /**
-   * Validate at `Done`: the whole Card to complete, or the draft carrying the
-   * refusals to draw beside the fields they are about, plus the one sentence
-   * that is about **no** field on this form.
-   *
-   * Two answers rather than one because a refusal has to name the thing the
-   * author can fix. A field it attributes is marked invalid and described by its
-   * message; an issue on a path no field writes belongs to the form itself, and
-   * pinning it to a field would send the author to correct a value that is
-   * already good.
-   */
-  readonly settle: (
-    card: Content,
-    draft: Draft,
-  ) =>
-    | { readonly ok: true; readonly card: Content }
-    | { readonly ok: false; readonly draft: Draft; readonly refusal: string | null };
-}
-
-type ContentFieldRegistry = {
-  [Kind in ResolvedContentCard['kind']]: ContentFieldGroup<
-    Extract<ResolvedContentCard, { kind: Kind }>,
-    Extract<ContentDraft, { kind: Kind }>
-  >;
-};
-
 type MarkdownCard = Extract<ResolvedContentCard, { kind: 'markdown' }>;
 
-const markdownFields: ContentFieldGroup<MarkdownCard, MarkdownDraft> = {
-  seed: (card) => ({
-    kind: 'markdown',
-    title: card.title,
-    body: card.body,
-    titleError: null,
-  }),
+const seedMarkdown = (card: MarkdownCard): MarkdownDraft => ({
+  title: card.title,
+  body: card.body,
+  titleError: null,
+});
 
-  settle: (card, draft) => {
-    // The title is trimmed for the same reason the graph's inline editor trims:
-    // `min(1)` counts characters and a space is one. The body is *not* trimmed —
-    // leading and trailing whitespace there is Markdown the author wrote.
-    const named = draft.title.trim();
-    const parsed = markdownCardSchema.safeParse({
-      id: card.id,
-      title: named,
-      kind: 'markdown',
-      body: draft.body,
-    });
-    if (parsed.success) return { ok: true, card: parsed.data };
+function settleMarkdown(
+  card: MarkdownCard,
+  draft: MarkdownDraft,
+):
+  | { readonly ok: true; readonly card: MarkdownCard }
+  | { readonly ok: false; readonly draft: MarkdownDraft; readonly refusal: string | null } {
+  // The title is trimmed for the same reason as the graph's inline editor:
+  // `min(1)` counts spaces. The Markdown body is preserved byte-for-byte.
+  const named = draft.title.trim();
+  const parsed = markdownCardSchema.safeParse({
+    ...card,
+    title: named,
+    body: draft.body,
+  });
+  if (parsed.success) return { ok: true, card: parsed.data };
 
-    const forTitle = parsed.error.issues.find((candidate) => candidate.path[0] === 'title');
-    const titleError =
-      forTitle === undefined
-        ? null
-        : named.length === 0
-          ? 'A Card title is required.'
-          : forTitle.message;
-    // `markdownCardSchema` has four paths and this form writes two of them. An
-    // issue on `id`, `kind` or `body` therefore belongs to no field here, and
-    // it goes to the form's own slot. Asked of the issues rather than inferred
-    // from the absence of a title issue, so a body problem is still said out
-    // loud when a title problem is being drawn beside it.
-    const unattributed = parsed.error.issues.some((candidate) => candidate.path[0] !== 'title');
-    return {
-      ok: false,
-      draft: { ...draft, titleError },
-      refusal: unattributed ? 'The Card could not be completed.' : null,
-    };
-  },
-
-  Fields: ({ draft, onChange }) => (
-    <>
-      <Field className="card-pane__field" data-invalid={draft.titleError !== null}>
-        <FieldLabel htmlFor="open-card-title">Title</FieldLabel>
-        <Input
-          id="open-card-title"
-          className="card-pane__title-input"
-          aria-invalid={draft.titleError !== null}
-          aria-describedby={draft.titleError === null ? undefined : 'open-card-title-error'}
-          value={draft.title}
-          onChange={(event) =>
-            onChange({ ...draft, title: event.currentTarget.value, titleError: null })
-          }
-        />
-        <FieldError id="open-card-title-error" className="card-pane__field-error">
-          {draft.titleError}
-        </FieldError>
-      </Field>
-      <Field className="card-pane__field card-pane__field--source">
-        <FieldLabel htmlFor="open-card-markdown">Markdown source</FieldLabel>
-        <Textarea
-          id="open-card-markdown"
-          value={draft.body}
-          onChange={(event) => onChange({ ...draft, body: event.currentTarget.value })}
-        />
-      </Field>
-    </>
-  ),
-};
-
-/** Adding a resolved content kind creates a compile-time obligation here. */
-const CONTENT_FIELDS = {
-  markdown: markdownFields,
-} satisfies ContentFieldRegistry;
+  const forTitle = parsed.error.issues.find((candidate) => candidate.path[0] === 'title');
+  const titleError =
+    forTitle === undefined
+      ? null
+      : named.length === 0
+        ? 'A Card title is required.'
+        : forTitle.message;
+  const unattributed = parsed.error.issues.some((candidate) => candidate.path[0] !== 'title');
+  return {
+    ok: false,
+    draft: { ...draft, titleError },
+    refusal: unattributed ? 'The Card could not be completed.' : null,
+  };
+}
 
 /**
  * A Card opened on its own content — the ordinary case, and one Card.
@@ -156,6 +79,8 @@ const CONTENT_FIELDS = {
 interface DirectOpen {
   /** The Card that was opened, which owns the content this pane authors. */
   readonly card: ResolvedContentCard;
+  /** Active Graph colour carried from the canvas into the Card's writing rail. */
+  readonly graphColor?: string;
   readonly through?: never;
   readonly occurrence?: never;
   readonly onComplete: (card: ResolvedContentCard) => string | null;
@@ -190,6 +115,8 @@ interface OccurrenceAuthoring {
 interface AliasOpen {
   /** The Alias whose own metadata this pane authors. */
   readonly through: Extract<Card, { kind: 'alias' }>;
+  /** Active Graph colour carried from the canvas into the Card's writing rail. */
+  readonly graphColor?: string;
   /** The one canonical capability for changing its title and Target. */
   readonly occurrence: OccurrenceAuthoring;
   readonly card?: never;
@@ -206,78 +133,144 @@ export type OpenCardProps = {
   readonly onCancel: () => void;
 } & (DirectOpen | AliasOpen);
 
-function EditorForm({
+/**
+ * The stable Card-writing surface shared by every Card kind.
+ *
+ * It owns dialog and form presentation only. Each kind-specific editor owns
+ * its draft, validation and completion so a field that belongs to one kind
+ * cannot accidentally appear on another.
+ */
+function CardEditorShell({
+  subjectTitle,
+  graphColor,
+  title,
+  titleError,
+  titleStartsFocused,
+  onTitleChange,
+  onTitleEnter,
   children,
   refusal,
   refusalId,
   onSubmit,
   onCancel,
 }: {
+  readonly subjectTitle: string;
+  readonly graphColor: string;
+  readonly title: string;
+  readonly titleError: string | null;
+  readonly titleStartsFocused: boolean;
+  readonly onTitleChange: (title: string) => void;
+  readonly onTitleEnter?: () => void;
   readonly children: ReactNode;
   readonly refusal: string | null;
   readonly refusalId: string;
   readonly onSubmit: (event: FormEvent<HTMLFormElement>) => void;
   readonly onCancel: () => void;
 }) {
+  const submitShortcut = (event: KeyboardEvent<HTMLFormElement>): void => {
+    if (event.key !== 'Enter' || (!event.metaKey && !event.ctrlKey)) return;
+    event.preventDefault();
+    event.currentTarget.requestSubmit();
+  };
+
   return (
-    <form
-      className="card-pane__editor"
-      aria-invalid={refusal !== null}
-      aria-describedby={refusal === null ? undefined : refusalId}
-      onSubmit={onSubmit}
+    <CardPane
+      ariaLabel={subjectTitle}
+      testId="open-card"
+      variant="card-editor"
+      onDismiss={onCancel}
     >
-      {/* The fields scroll; the actions below them do not. */}
-      <FieldGroup className="card-pane__fields">{children}</FieldGroup>
-      {refusal !== null && (
-        <FieldError id={refusalId} className="card-pane__field-error">
-          {refusal}
-        </FieldError>
-      )}
-      <div className="card-pane__actions">
-        <Button type="button" variant="secondary" onClick={onCancel}>
-          Cancel
-        </Button>
-        <Button type="submit" variant="default">
-          Done
-        </Button>
-      </div>
-    </form>
+      <form
+        className="card-editor"
+        style={{ '--card-editor-graph': graphColor } as CSSProperties}
+        aria-invalid={refusal !== null}
+        aria-describedby={refusal === null ? undefined : refusalId}
+        onSubmit={onSubmit}
+        onKeyDown={submitShortcut}
+      >
+        <FieldGroup className="card-editor__fields">
+          <header className="card-editor__rail">
+            <Field className="card-editor__title-field" data-invalid={titleError !== null}>
+              <FieldLabel className="sr-only" htmlFor="open-card-title">
+                Title
+              </FieldLabel>
+              <input
+                id="open-card-title"
+                className="card-editor__title"
+                aria-invalid={titleError !== null}
+                aria-describedby={titleError === null ? undefined : 'open-card-title-error'}
+                value={title}
+                {...paneInitialFocus(titleStartsFocused)}
+                onChange={(event) => onTitleChange(event.currentTarget.value)}
+                onKeyDown={(event) => {
+                  if (
+                    event.key !== 'Enter' ||
+                    event.metaKey ||
+                    event.ctrlKey ||
+                    onTitleEnter === undefined
+                  ) {
+                    return;
+                  }
+                  event.preventDefault();
+                  onTitleEnter();
+                }}
+              />
+              <FieldError id="open-card-title-error">{titleError}</FieldError>
+            </Field>
+            <Button
+              type="button"
+              variant="secondary"
+              size="icon"
+              className="card-editor__close"
+              aria-label="Close Card editor"
+              onClick={onCancel}
+            >
+              <CloseIcon />
+            </Button>
+          </header>
+          {children}
+        </FieldGroup>
+        {refusal !== null && (
+          <FieldError id={refusalId} className="card-editor__refusal">
+            {refusal}
+          </FieldError>
+        )}
+        <footer className="card-editor__footer">
+          <Button type="button" variant="ghost" className="card-editor__cancel" onClick={onCancel}>
+            Cancel
+          </Button>
+          <Button type="submit" variant="commit" className="card-editor__commit">
+            Done
+          </Button>
+        </footer>
+      </form>
+    </CardPane>
   );
 }
 
 /**
  * The content Card's form. Every field belongs to that one Card.
  */
-function CardEditorForm({
+function MarkdownCardEditor({
   content,
+  graphColor,
   onComplete,
   onCancel,
 }: {
-  readonly content: ResolvedContentCard;
+  readonly content: MarkdownCard;
+  readonly graphColor: string;
   readonly onComplete: (card: ResolvedContentCard) => string | null;
   readonly onCancel: () => void;
 }) {
-  // The one dynamic dispatch, and deliberately uncast. With one resolved content
-  // kind the indexed access resolves to that kind's group and everything below
-  // it typechecks exactly. A second kind makes this a union of groups over a
-  // union of cards, which stops compiling here — which is the obligation working,
-  // and the place to answer it rather than to widen it away.
-  const group = CONTENT_FIELDS[content.kind];
-  const [draft, setDraft] = useState<ContentDraft>(() => group.seed(content));
+  const [draft, setDraft] = useState<MarkdownDraft>(() => seedMarkdown(content));
   const [contentRefusal, setContentRefusal] = useState<string | null>(null);
+  const body = useRef<HTMLTextAreaElement>(null);
 
-  /**
-   * Validate locally, then author the one Card this pane owns.
-   */
   const submit = (event: FormEvent<HTMLFormElement>): void => {
     event.preventDefault();
-    const settled = group.settle(content, draft);
+    const settled = settleMarkdown(content, draft);
     if (!settled.ok) {
       setDraft(settled.draft);
-      // Into the same slot the Space's own refusal uses, because both are the
-      // one sentence about this attempt that no field on the form owns. It is
-      // installed rather than merged: a fresh `Done` describes the values on
-      // screen now, so a previous sentence goes with the attempt it described.
       setContentRefusal(settled.refusal);
       return;
     }
@@ -286,41 +279,64 @@ function CardEditorForm({
       setContentRefusal(refusal);
       return;
     }
-    // A completed Done closes the pane through the same callback as Cancel.
     onCancel();
   };
 
+  const titleStartsFocused = true;
+
   return (
-    <EditorForm
+    <CardEditorShell
+      subjectTitle={content.title}
+      graphColor={graphColor}
+      title={draft.title}
+      titleError={draft.titleError}
+      titleStartsFocused={titleStartsFocused}
+      onTitleChange={(title) => {
+        setDraft({ ...draft, title, titleError: null });
+        setContentRefusal(null);
+      }}
+      onTitleEnter={() => body.current?.focus()}
       refusal={contentRefusal}
       refusalId="open-card-refusal"
       onSubmit={submit}
       onCancel={onCancel}
     >
-      <group.Fields
-        draft={draft}
-        onChange={(next) => {
-          setDraft(next);
-          setContentRefusal(null);
-        }}
-      />
-    </EditorForm>
+      <Field className="card-editor__body">
+        <FieldLabel className="sr-only" htmlFor="open-card-markdown">
+          Markdown source
+        </FieldLabel>
+        <Textarea
+          ref={body}
+          id="open-card-markdown"
+          className="card-editor__markdown"
+          value={draft.body}
+          {...paneInitialFocus(!titleStartsFocused)}
+          onChange={(event) => {
+            setDraft({ ...draft, body: event.currentTarget.value });
+            setContentRefusal(null);
+          }}
+        />
+      </Field>
+    </CardEditorShell>
   );
 }
 
 /** The Alias pane authors one Card too: the Alias, never its Target. */
-function AliasEditorForm({
+function AliasCardEditor({
   alias,
+  graphColor,
   occurrence,
   onCancel,
 }: {
   readonly alias: Extract<Card, { kind: 'alias' }>;
+  readonly graphColor: string;
   readonly occurrence: OccurrenceAuthoring;
   readonly onCancel: () => void;
 }) {
   const [title, setTitle] = useState(alias.title);
   const [target, setTarget] = useState<CardId>(alias.target);
   const [refusal, setRefusal] = useState<string | null>(null);
+  const targetInput = useRef<HTMLInputElement>(null);
 
   const submit = (event: FormEvent<HTMLFormElement>): void => {
     event.preventDefault();
@@ -334,36 +350,48 @@ function AliasEditorForm({
   };
 
   return (
-    <EditorForm
+    <CardEditorShell
+      subjectTitle={alias.title}
+      graphColor={graphColor}
+      title={title}
+      titleError={null}
+      titleStartsFocused={false}
+      onTitleChange={(nextTitle) => {
+        setTitle(nextTitle);
+        setRefusal(null);
+      }}
+      onTitleEnter={() => targetInput.current?.focus()}
       refusal={refusal}
       refusalId="open-alias-refusal"
       onSubmit={submit}
       onCancel={onCancel}
     >
-      <Field className="card-pane__field">
-        <FieldLabel htmlFor="open-alias-title">Title</FieldLabel>
-        <Input
-          id="open-alias-title"
-          className="card-pane__title-input"
-          value={title}
-          onChange={(event) => {
-            setTitle(event.currentTarget.value);
+      <Field className="card-editor__body card-editor__alias-target">
+        <FieldLabel className="card-editor__alias-label" htmlFor="open-alias-target">
+          Alias of
+        </FieldLabel>
+        <CardSearchCombobox
+          label="Target"
+          testId="alias-target"
+          resultsTestId="card-picker-results"
+          inputId="open-alias-target"
+          choices={occurrence.targets.map((card) => ({
+            id: card.id,
+            title: card.title,
+            kind: card.kind,
+          }))}
+          value={target}
+          inputRef={targetInput}
+          emptyMessage="This Space holds no other Card that owns its content."
+          onValueChange={(chosen) => {
+            const parsed = uuidSchema.safeParse(chosen);
+            if (!parsed.success) return;
+            setTarget(parsed.data);
             setRefusal(null);
           }}
         />
       </Field>
-      <CardPicker
-        label="Target"
-        cards={occurrence.targets}
-        selectedId={target}
-        initialFocus={false}
-        onSelect={(chosen) => {
-          setTarget(chosen);
-          setRefusal(null);
-        }}
-        emptyMessage="This Space holds no other Card that owns its content."
-      />
-    </EditorForm>
+    </CardEditorShell>
   );
 }
 
@@ -380,45 +408,34 @@ function AliasEditorForm({
  * The surface it is drawn on — the covering panel, its focus trap and its
  * Escape — is `CardPane`, a Base UI Dialog shared with the Alias creation state.
  * What is left here is what the pane is *for*: which Card is being authored, by
- * which fields, and what one `Done` over them means.
+ * which fields, and what one commit over them means.
  *
  * Source, still — not rendered prose. ADR 0011 removed the reading pane's
  * Markdown renderer so a card could not read one way and present another, and
  * that half holds: presenting remains the one place a card is drawn rendered.
  *
- * A Markdown Card authors its Title and source. An Alias authors only its own
- * Title and Target; its Target must be opened separately to author that Card's
- * content.
+ * A content Card authors its title and Markdown. Description metadata is left
+ * untouched. An Alias authors only its own title and Target; its Target must be
+ * opened separately to author that Card's content.
  */
 export function OpenCard(props: OpenCardProps) {
   const { onCancel } = props;
-  const opened = props.through ?? props.card;
 
-  return (
-    <CardPane
-      testId="open-card"
-      onDismiss={onCancel}
-      // Named for the Card, which is the only thing distinguishing one opened
-      // Card from another. Directly opened, that title is also the first
-      // field, so a screen reader hears the name and then lands on the
-      // control that changes it.
-      ariaLabel={opened.title}
-    >
-      {props.through === undefined ? (
-        <CardEditorForm
-          key={props.card.id}
-          content={props.card}
-          onComplete={props.onComplete}
-          onCancel={onCancel}
-        />
-      ) : (
-        <AliasEditorForm
-          key={props.through.id}
-          alias={props.through}
-          occurrence={props.occurrence}
-          onCancel={onCancel}
-        />
-      )}
-    </CardPane>
+  return props.through === undefined ? (
+    <MarkdownCardEditor
+      key={props.card.id}
+      content={props.card}
+      graphColor={props.graphColor ?? '#6ea8fe'}
+      onComplete={props.onComplete}
+      onCancel={onCancel}
+    />
+  ) : (
+    <AliasCardEditor
+      key={props.through.id}
+      alias={props.through}
+      graphColor={props.graphColor ?? '#6ea8fe'}
+      occurrence={props.occurrence}
+      onCancel={onCancel}
+    />
   );
 }

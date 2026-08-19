@@ -361,6 +361,7 @@ describe('Add Alias', () => {
     const search = screen.getByRole('combobox', { name: 'Target' });
 
     await waitFor(() => expect(search).toHaveFocus());
+    fireEvent.keyDown(search, { key: 'ArrowDown' });
     // The Alias already in the Space is not offered: a Target must own its
     // content, so no chain can be authored (ADR 0009).
     expect(screen.getAllByRole('option').map((option) => option.textContent)).toEqual(['A', 'B']);
@@ -507,6 +508,7 @@ describe('Add Alias', () => {
     await openAliasCreation();
 
     fireEvent.change(screen.getByTestId('new-alias-title'), { target: { value: 'Recap' } });
+    fireEvent.keyDown(screen.getByRole('combobox', { name: 'Target' }), { key: 'ArrowDown' });
     fireEvent.click(screen.getByRole('option', { name: 'Markdown Card A' }));
 
     expect(cardsOf(session)[2]?.document).toEqual({
@@ -529,10 +531,13 @@ describe('Add Alias', () => {
   it('explains itself when the Space holds no eligible Card', async () => {
     const session = mount(noCards);
     await openAliasCreation();
+    fireEvent.keyDown(screen.getByRole('combobox', { name: 'Target' }), { key: 'ArrowDown' });
 
-    expect(screen.getByTestId('card-picker-results')).toHaveTextContent(
-      'An Alias needs a Card that owns its content, and this Space has none yet.',
-    );
+    expect(
+      screen.getAllByText(
+        'An Alias needs a Card that owns its content, and this Space has none yet.',
+      ),
+    ).not.toHaveLength(0);
     expect(screen.queryByText('No Card matches that search.')).not.toBeInTheDocument();
     expect(screen.queryByRole('option')).not.toBeInTheDocument();
     await settled(session);
@@ -605,8 +610,11 @@ describe('Add Alias', () => {
 
     const listId = search.getAttribute('aria-controls');
 
-    expect(listId).not.toBeNull();
-    expect(document.getElementById(listId ?? '')).toBe(screen.getByTestId('card-picker-results'));
+    expect(listId).toBeNull();
+    expect(document.getElementById(listId ?? '')).toBeNull();
+    fireEvent.keyDown(search, { key: 'ArrowDown' });
+    expect(search.getAttribute('aria-controls')).not.toBeNull();
+    expect(screen.getByTestId('card-picker-results')).toBeInTheDocument();
     await settled(session);
   });
 });
@@ -631,6 +639,7 @@ describe('retargeting an Alias', () => {
     const session = mount(aliased);
 
     fireEvent.click(await screen.findByRole('button', { name: 'Edit Card A again' }));
+    fireEvent.keyDown(screen.getByRole('combobox', { name: 'Target' }), { key: 'ArrowDown' });
     fireEvent.click(screen.getByRole('option', { name: 'Markdown Card B' }));
     fireEvent.click(screen.getByRole('button', { name: 'Done' }));
 
@@ -767,6 +776,7 @@ describe('the Target picker’s results list', () => {
     const session = mount();
     await openAliasCreation();
 
+    fireEvent.keyDown(screen.getByRole('combobox', { name: 'Target' }), { key: 'ArrowDown' });
     expect(screen.getByRole('listbox', { name: 'Target' })).toBeInTheDocument();
 
     fireEvent.keyDown(screen.getByTestId('new-alias-title'), { key: 'Escape' });

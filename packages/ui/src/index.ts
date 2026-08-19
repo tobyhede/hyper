@@ -10,11 +10,16 @@ export { CardContent } from './CardContent';
 export type { CardContentProps } from './CardContent';
 export { CardKindIcon } from './CardKindIcon';
 export type { CardKindIconProps } from './CardKindIcon';
-export { CardCombobox } from './CardCombobox';
-export type { CardChoice, CardComboboxProps } from './CardCombobox';
-export { WorkingCardSearchCombobox } from './WorkingCardSearchCombobox';
-export type { WorkingCardSearchComboboxProps } from './WorkingCardSearchCombobox';
-export { Dialog, DialogBackdrop, DialogPopup, DialogPortal, DialogViewport } from './Dialog';
+export { CardSearchCombobox } from './CardSearchCombobox';
+export type { CardChoice, CardSearchComboboxProps } from './CardSearchCombobox';
+export {
+  Dialog,
+  DialogBackdrop,
+  DialogPopup,
+  DialogPortal,
+  DialogTitle,
+  DialogViewport,
+} from './Dialog';
 export {
   Command,
   CommandEmpty,
@@ -31,6 +36,7 @@ export {
   AliasIcon,
   CheckIcon,
   ChevronDownIcon,
+  CloseIcon,
   ConnectIcon,
   EditIcon,
   FlowIcon,
