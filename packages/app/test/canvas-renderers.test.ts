@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { uuidSchema } from '@project/core';
 import { loadSpace, type Space } from '@project/graph';
-import { canvasChoice } from '../src/canvas-choice';
+import { canvasRenderers } from '../src/canvas-renderers';
 import {
   createRendererResolver,
   RendererInvariantError,
-  type RendererSelection,
+  type CanvasRendererId,
 } from '../src/renderer';
 import { cardFile } from './card-files';
 
@@ -43,16 +43,16 @@ const AUTHORED = space([
   layout(SECOND_LAYOUT, 'Collection 2', '00000000-0000-4000-8000-000000000031'),
 ]);
 
-const FLOW: RendererSelection = { kind: 'view', view: 'flow' };
-const GRID: RendererSelection = { kind: 'view', view: 'grid' };
+const FLOW: CanvasRendererId = { kind: 'view', view: 'flow' };
+const GRID: CanvasRendererId = { kind: 'view', view: 'grid' };
 
-describe('canvasChoice', () => {
+describe('canvasRenderers', () => {
   it('offers every built-in View and every authored Layout, in the order each is declared', () => {
-    const choice = canvasChoice(AUTHORED, FLOW);
+    const renderers = canvasRenderers(AUTHORED, FLOW);
 
-    expect(choice.computed.map((renderer) => renderer.title)).toEqual(['Flow', 'Grid']);
-    expect(choice.computed.map((renderer) => renderer.selection)).toEqual([FLOW, GRID]);
-    expect(choice.authored).toEqual([
+    expect(renderers.computed.map((renderer) => renderer.title)).toEqual(['Flow', 'Grid']);
+    expect(renderers.computed.map((renderer) => renderer.selection)).toEqual([FLOW, GRID]);
+    expect(renderers.authored).toEqual([
       { selection: { kind: 'layout', layoutId: FIRST_LAYOUT }, title: 'Collection 1' },
       { selection: { kind: 'layout', layoutId: SECOND_LAYOUT }, title: 'Collection 2' },
     ]);
@@ -60,11 +60,11 @@ describe('canvasChoice', () => {
 
   /** A Space authors its first Layout by editing a View (ADR 0025), so this is how one opens. */
   it('offers the computed group before a Space owns any Layout', () => {
-    const choice = canvasChoice(space(), FLOW);
+    const renderers = canvasRenderers(space(), FLOW);
 
-    expect(choice.computed).toHaveLength(2);
-    expect(choice.authored).toEqual([]);
-    expect(choice.selected.title).toBe('Flow');
+    expect(renderers.computed).toHaveLength(2);
+    expect(renderers.authored).toEqual([]);
+    expect(renderers.selected.title).toBe('Flow');
   });
 
   /**
@@ -73,10 +73,10 @@ describe('canvasChoice', () => {
    * *equals* a row would leave the list with nothing pressed in it.
    */
   it('answers with the very row it offered, for a View and for a Layout alike', () => {
-    const onView = canvasChoice(AUTHORED, GRID);
+    const onView = canvasRenderers(AUTHORED, GRID);
     expect(onView.selected).toBe(onView.computed[1]);
 
-    const onLayout = canvasChoice(AUTHORED, { kind: 'layout', layoutId: SECOND_LAYOUT });
+    const onLayout = canvasRenderers(AUTHORED, { kind: 'layout', layoutId: SECOND_LAYOUT });
     expect(onLayout.selected).toBe(onLayout.authored[1]);
   });
 
@@ -86,7 +86,7 @@ describe('canvasChoice', () => {
    * every render for a value that never changes.
    */
   it('builds the computed group once, whatever Space it is asked about', () => {
-    expect(canvasChoice(AUTHORED, FLOW).computed).toBe(canvasChoice(space(), GRID).computed);
+    expect(canvasRenderers(AUTHORED, FLOW).computed).toBe(canvasRenderers(space(), GRID).computed);
   });
 
   /**
@@ -96,11 +96,11 @@ describe('canvasChoice', () => {
    * back to a View and quietly drawing something else.
    */
   it('refuses a selection naming a Layout the Space does not hold', () => {
-    const selection: RendererSelection = { kind: 'layout', layoutId: ABSENT_LAYOUT };
+    const selection: CanvasRendererId = { kind: 'layout', layoutId: ABSENT_LAYOUT };
 
-    expect(() => canvasChoice(AUTHORED, selection)).toThrow(RendererInvariantError);
+    expect(() => canvasRenderers(AUTHORED, selection)).toThrow(RendererInvariantError);
     try {
-      canvasChoice(AUTHORED, selection);
+      canvasRenderers(AUTHORED, selection);
       expect.unreachable('a missing Layout must not resolve');
     } catch (error) {
       expect(error).toBeInstanceOf(RendererInvariantError);
@@ -117,17 +117,17 @@ describe('canvasChoice', () => {
    * not the other, it fails here rather than in whichever surface reads it.
    */
   it('refuses in the same words the resolver does', () => {
-    const selection: RendererSelection = { kind: 'layout', layoutId: ABSENT_LAYOUT };
+    const selection: CanvasRendererId = { kind: 'layout', layoutId: ABSENT_LAYOUT };
     const resolveRenderer = createRendererResolver({
       newGraphId: () => uuidSchema.parse('00000000-0000-4000-8000-0000000000ff'),
     });
 
-    const fromChoice = attempt(() => canvasChoice(AUTHORED, selection));
+    const fromCanvasRenderers = attempt(() => canvasRenderers(AUTHORED, selection));
     const fromResolver = attempt(() => resolveRenderer(AUTHORED, selection));
 
-    expect(fromChoice.reason).toBe('renderer-not-found');
-    expect(fromChoice.reason).toBe(fromResolver.reason);
-    expect(fromChoice.message).toBe(fromResolver.message);
+    expect(fromCanvasRenderers.reason).toBe('renderer-not-found');
+    expect(fromCanvasRenderers.reason).toBe(fromResolver.reason);
+    expect(fromCanvasRenderers.message).toBe(fromResolver.message);
   });
 });
 

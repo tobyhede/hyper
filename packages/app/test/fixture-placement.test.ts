@@ -15,7 +15,7 @@ const resolveRenderer = createRendererResolver({
  * The fixture's authored positions are ELK's own arrangement of it.
  *
  * The fixture declares two Layouts because a Graph is owned by one (ADR 0040),
- * and it names no `defaultView`, so it still opens in Flow over the flatten
+ * and it names no `defaultRenderer`, so it still opens in Flow over the flatten
  * across both. Their position maps were therefore seeded from one ELK run over
  * the whole fixture, so that selecting a Layout draws its Cards exactly where
  * Flow already had them and first paint did not move.

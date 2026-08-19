@@ -7,7 +7,7 @@ import { GRAPH_PALETTE } from '../src/colors';
 import { createNavigation } from '../src/navigation';
 import type { AuthoringCompletion, AuthoringResult } from '../src/space-authoring';
 import { createSpaceAuthoring } from '../src/space-authoring';
-import { createRendererResolver, type RendererSelection } from '../src/renderer';
+import { createRendererResolver, type CanvasRendererId } from '../src/renderer';
 
 /**
  * What every semantic operation owes, whatever order they arrive in.
@@ -78,7 +78,7 @@ const start: SpaceSnapshot = {
         ],
       },
     ],
-    defaultView: LAYOUT_ID,
+    defaultRenderer: LAYOUT_ID,
   },
   cards: [
     { id: CARD_A, document: { title: 'A', kind: 'markdown', body: 'A' } },
@@ -153,7 +153,7 @@ it('keeps the working Space loadable through any sequence of semantic operations
   fc.assert(
     fc.property(
       fc.array(operation, { minLength: 1, maxLength: 12 }),
-      fc.constantFrom<RendererSelection>(
+      fc.constantFrom<CanvasRendererId>(
         { kind: 'layout', layoutId: LAYOUT_ID },
         { kind: 'layout', layoutId: OTHER_LAYOUT_ID },
         { kind: 'view', view: 'flow' },

@@ -5,7 +5,7 @@ import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
 import { GRAPH_PALETTE } from '../src/colors';
 import { createNavigation } from '../src/navigation';
 import { createSpaceAuthoring, type SpaceAuthoring } from '../src/space-authoring';
-import { createRendererResolver, type RendererSelection } from '../src/renderer';
+import { createRendererResolver, type CanvasRendererId } from '../src/renderer';
 import { mintingIds } from './minting';
 
 /**
@@ -69,7 +69,7 @@ const positionedSnapshot: SpaceSnapshot = {
         graphs: [MAIN_GRAPH],
       },
     ],
-    defaultView: LAYOUT_ID,
+    defaultRenderer: LAYOUT_ID,
   },
 };
 
@@ -96,7 +96,7 @@ function testResolver() {
 
 function open(
   snapshot: SpaceSnapshot = positionedSnapshot,
-  renderer: RendererSelection = { kind: 'layout', layoutId: LAYOUT_ID },
+  renderer: CanvasRendererId = { kind: 'layout', layoutId: LAYOUT_ID },
   // The ids this Edit will mint, named by the test that asserts on them rather
   // than taken from the ambient generator (ADR 0016, and `./minting`).
   newId: () => UUID = mintingIds(MINTED),

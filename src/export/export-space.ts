@@ -67,9 +67,9 @@ const canonicalSpaceFile = ({ snapshot }: LoadedSpace): SpaceFile => {
     id: snapshot.id,
     title: snapshot.document.title,
     ...(layouts === undefined ? {} : { layouts }),
-    ...(snapshot.document.defaultView === undefined
+    ...(snapshot.document.defaultRenderer === undefined
       ? {}
-      : { defaultView: snapshot.document.defaultView }),
+      : { defaultRenderer: snapshot.document.defaultRenderer }),
   };
 };
 

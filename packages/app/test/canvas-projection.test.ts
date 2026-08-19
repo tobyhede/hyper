@@ -4,7 +4,7 @@ import { loadSpace, type Space } from '@project/graph';
 import type { CardFlowNode } from '@project/react-flow-adapter';
 import { canvasProjection, type CanvasInteraction } from '../src/canvas-projection';
 import { GRAPH_PALETTE } from '../src/colors';
-import { createRendererResolver, type RendererSelection } from '../src/renderer';
+import { createRendererResolver, type CanvasRendererId } from '../src/renderer';
 
 /** One composed resolver; nothing here converts, so its identity source is never used. */
 const resolveRenderer = createRendererResolver({
@@ -60,7 +60,7 @@ function spaceWith(extra: Record<string, unknown> = {}): Space {
 async function projectThrough(
   space: Space,
   interaction: CanvasInteraction = AT_REST,
-  selection?: RendererSelection,
+  selection?: CanvasRendererId,
 ) {
   const view = resolveRenderer(space, selection);
   const projection = canvasProjection(space, view);

@@ -3,12 +3,12 @@ import type { Space } from '@project/graph';
 import {
   builtInViewTitle,
   layoutNotFound,
-  rendererSelectionKey,
-  type RendererSelection,
+  canvasRendererKey,
+  type CanvasRendererId,
 } from './renderer';
 
 /**
- * Which canvases exist, and which one is taken (ADR 0053).
+ * Which canvas renderers exist, and which one is current (ADR 0053, ADR 0055).
  *
  * Deliberately **not** in `renderer.ts`. That module answers what one selection
  * resolves to — a subject, a strategy, and what editing it means — and needs
@@ -43,12 +43,12 @@ export interface CanvasRenderer {
    * back exactly what Navigation takes and nothing is reassembled — or narrowed
    * with a cast — on the way.
    */
-  readonly selection: RendererSelection;
+  readonly selection: CanvasRendererId;
   readonly title: string;
 }
 
-/** The one choice over everything the canvas can draw (ADR 0053). */
-export interface CanvasChoice {
+/** Every renderer the canvas can draw and the one currently drawing it. */
+export interface CanvasRenderers {
   readonly computed: readonly CanvasRenderer[];
   readonly authored: readonly CanvasRenderer[];
   /**
@@ -110,7 +110,7 @@ const COMPUTED: readonly CanvasRenderer[] = Object.freeze(
  * that resolves in one module and not in the other is a defect rather than an
  * author's mistake.
  */
-export function canvasChoice(space: Space, selected: RendererSelection): CanvasChoice {
+export function canvasRenderers(space: Space, selected: CanvasRendererId): CanvasRenderers {
   const authored: readonly CanvasRenderer[] = space.layouts.map((layout) => ({
     selection: { kind: 'layout', layoutId: layout.id },
     title: layout.title,
@@ -120,11 +120,11 @@ export function canvasChoice(space: Space, selected: RendererSelection): CanvasC
     return { computed: COMPUTED, authored, selected: BY_VIEW[selected.view] };
   }
 
-  // The one identity rule, and it is the one `rendererSelectionKey` already
+  // The one identity rule, and it is the one `canvasRendererKey` already
   // states. Comparing the two selections field by field here would be a second
   // answer to "are these the same choice".
-  const key = rendererSelectionKey(selected);
-  const row = authored.find((candidate) => rendererSelectionKey(candidate.selection) === key);
+  const key = canvasRendererKey(selected);
+  const row = authored.find((candidate) => canvasRendererKey(candidate.selection) === key);
   if (row === undefined) throw layoutNotFound(selected.layoutId);
 
   return { computed: COMPUTED, authored, selected: row };

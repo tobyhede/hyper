@@ -15,7 +15,7 @@ import {
 //   1. Long (A→B→C→D→A′), Mid (A→B→C→D), Short (A→B→C) — graphs over one spine
 //   2. Echo (E→F→G→H→E′) — a plain linear collection
 // Each collection is a Layout, because a Graph is a nested owned value of one
-// (ADR 0040) and these two share no cards. The fixture names no `defaultView`,
+// (ADR 0040) and these two share no cards. The fixture names no `defaultRenderer`,
 // so it opens in Flow — whose subject is the Space's cards, and which therefore
 // draws the flatten across both Layouts (ADR 0045). That flatten crossing a
 // Layout boundary is what this file exercises and nothing else in the tree does.
@@ -81,7 +81,7 @@ test('selecting a Layout draws the Graphs it owns and only those', async ({ page
   await expect(persistence).toHaveAttribute('data-revision', '0');
   const legendItems = page.getByTestId('graph-legend').locator('.legend__item');
 
-  // Declaring Layouts is not naming one to open in: `defaultView` is absent, so
+  // Declaring Layouts is not naming one to open in: `defaultRenderer` is absent, so
   // the fixture arrives in Flow with no Layout selected.
   await expect(selectedCanvas(page)).toContainText('Flow');
   await expect(page.getByTestId('selected-canvas-kind')).toHaveText('Computed view');

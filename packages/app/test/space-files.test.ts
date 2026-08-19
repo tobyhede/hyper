@@ -13,7 +13,7 @@ import exampleJson from '../example/space.json';
  * unquoted title in a card's frontmatter fails here.
  *
  * Both declare Layouts, because both hold Graphs and a Layout is what owns one
- * (ADR 0040). Neither names a `defaultView`, so both still open in Flow — which
+ * (ADR 0040). Neither names a `defaultRenderer`, so both still open in Flow — which
  * is what makes the fixture's Space-subject flatten, across two Layouts, the
  * thing the app and the e2e suite actually exercise. The fixture is separately
  * proven by the app booting; `example/` is dormant and nothing else would notice
@@ -50,7 +50,7 @@ describe.each([
     expect(result.space.graphs).toHaveLength(expected.graphs);
     // Absent, so neither space opens in an authored Layout — the Algorithmic
     // View draws the flatten instead.
-    expect(result.space.defaultView).toBeUndefined();
+    expect(result.space.defaultRenderer).toBeUndefined();
   });
 
   it("each Layout's position keys are exactly the Cards its own Graphs connect", () => {

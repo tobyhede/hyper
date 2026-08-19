@@ -14,7 +14,7 @@ import {
   type DropTarget,
 } from '../src/edge-authoring';
 import { createSpaceAuthoring } from '../src/space-authoring';
-import { createRendererResolver, type RendererSelection } from '../src/renderer';
+import { createRendererResolver, type CanvasRendererId } from '../src/renderer';
 import { CARD_SIZE } from '../src/card';
 import { mintingIds } from './minting';
 import { node } from './render-adapter-fixtures';
@@ -81,13 +81,13 @@ const positionedSnapshot: SpaceSnapshot = {
         ],
       },
     ],
-    defaultView: LAYOUT_ID,
+    defaultRenderer: LAYOUT_ID,
   },
 };
 
 function open(
   snapshot: SpaceSnapshot = positionedSnapshot,
-  renderer: RendererSelection = { kind: 'layout', layoutId: LAYOUT_ID },
+  renderer: CanvasRendererId = { kind: 'layout', layoutId: LAYOUT_ID },
   newId: () => UUID = mintingIds(MINTED),
 ) {
   const loaded = { snapshot, revision: 0n, exportedRevision: null };
@@ -329,7 +329,7 @@ describe('draft invalidation', () => {
       return result.space;
     };
     const resolveRenderer = createRendererResolver({ newGraphId: () => MINTED_GRAPH });
-    const selection: RendererSelection = { kind: 'layout', layoutId: LAYOUT_ID };
+    const selection: CanvasRendererId = { kind: 'layout', layoutId: LAYOUT_ID };
     const navigation = createNavigation(currentSpace, resolveRenderer, selection);
     const authoring = createSpaceAuthoring({
       session,

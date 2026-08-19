@@ -66,7 +66,7 @@ const COLLECTION_ONE = uuidSchema.parse('00000000-0000-4000-8000-000000000020');
  * Deriving them is the point: a palette edit reaches the story, and the story
  * cannot claim a colour production would not give it.
  *
- * **It names `defaultView`**, which the tracked e2e fixture deliberately does
+ * **It names `defaultRenderer`**, which the tracked e2e fixture deliberately does
  * not: that one exists to prove a Space declaring Layouts still arrives in Flow,
  * and this one exists to draw a sidebar with a Layout pressed. Declaring it is
  * how the story gets that from `defaultRenderer` instead of from a rule the
@@ -82,7 +82,7 @@ export const authoredSnapshot: SpaceSnapshot = {
   document: {
     version: 1,
     title: 'Workspace',
-    defaultView: COLLECTION_ONE,
+    defaultRenderer: COLLECTION_ONE,
     layouts: [
       {
         id: COLLECTION_ONE,

@@ -10,7 +10,7 @@ import { CARD_SIZE } from './card';
 import type { ConnectionCompletion, ConnectionResult } from './connection-completion';
 import type { CanvasSelection, EdgeSubject, RenderAdapter } from './render-adapter';
 import { sameEdgeSubject, sameSelection } from './render-adapter';
-import type { RendererSelection } from './renderer';
+import type { CanvasRendererId } from './renderer';
 import type {
   EdgeEligibility,
   EdgeEndpoint,
@@ -255,7 +255,7 @@ const anchorCardOf = (draft: EdgeDraft): CardId => {
  * identity comparison reads "the renderer changed" after an Edit that plainly
  * stayed in the same Layout, and cancels a draft that had nothing to do with it.
  */
-const sameRenderer = (left: RendererSelection, right: RendererSelection): boolean =>
+const sameRenderer = (left: CanvasRendererId, right: CanvasRendererId): boolean =>
   left.kind === 'view'
     ? right.kind === 'view' && left.view === right.view
     : right.kind === 'layout' && left.layoutId === right.layoutId;

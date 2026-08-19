@@ -327,3 +327,99 @@ describe('the vocabulary that guard reads', () => {
     }
   });
 });
+
+/**
+ * ADR 0055's rename is the same event as ADR 0041's and earns the same guard.
+ * Three names each called the canvas renderer after a different interaction or
+ * surface — the act of selecting one, the control that offered the choice, and
+ * the header that showed which one won — so every new presentation invited a
+ * fourth. The renderer's identity is `CanvasRendererId` now and the aggregate
+ * around it is `CanvasRenderers`.
+ *
+ * The persisted key that moved with them is deliberately **not** read here.
+ * ADR 0054 rolls the unreleased prototype forward, and issue `04` foreclosed
+ * every back-compat path for that key by name — so there is no live source this
+ * scan would be protecting, and a document outside this repository still
+ * carrying it is not a thing a scan over tracked files can reach anyway.
+ *
+ * The names below have no qualified sense anywhere, unlike ADR 0041's, so this
+ * scan carries no exemption list beyond the historical trees. What it caught on
+ * the rename that added it was `docs/agents/ui.md` — the read-before-touching
+ * authority for the sidebar, still pointing the next agent at a deleted module
+ * and a renamed prop. `docs-agents-citation-accuracy.test.ts` reads code→doc
+ * quotations and has nothing to say about a document naming code that is gone.
+ */
+const RETIRED_RENDERER_NAMES = [
+  // The type, and the key function that was built on its name.
+  ['Renderer', 'Selection'],
+  ['renderer', 'Selection'],
+  // The aggregate, its camelCase builder, and the module both lived in.
+  ['Canvas', 'Choice'],
+  ['canvas', 'Choice'],
+  ['canvas', '-choice'],
+  // The reference error whose kind named a field the format no longer has.
+  ['unresolved-default', '-view'],
+].map((parts) => parts.join(''));
+
+/**
+ * The one retired name that is a *prefix* of a current one: the header
+ * component kept its name and gained the renderer noun, so this alone is read as
+ * a whole identifier. Every other name above is read as a prefix on purpose —
+ * that is what makes one entry cover the key function built on a retired type's
+ * name as well as the type itself.
+ *
+ * Joined here rather than written out, in this file's established idiom, and the
+ * prose above says which names these are without spelling one: no retired name
+ * appears literally, so the scan reads this file like every other tracked one
+ * instead of excluding the file that talks about them.
+ */
+const RETIRED_SELECTED_CANVAS = ['Selected', 'Canvas'].join('');
+
+const RETIRED_RENDERER_NAME = new RegExp(
+  [
+    ...RETIRED_RENDERER_NAMES.map((name) => `\\b${name}`),
+    `\\b${RETIRED_SELECTED_CANVAS}(?![A-Za-z])`,
+  ].join('|'),
+);
+
+describe('the canvas renderer is named once (ADR 0055)', () => {
+  const scanned = trackedFiles().filter(
+    (file) => !HISTORICAL_TREES.some((tree) => file.startsWith(tree)),
+  );
+
+  it('reaches the kinds of file this rename actually touched', () => {
+    // The two files the rename left something behind in: the sidebar, which
+    // held one identifier over two things, and the agent-facing document that
+    // pointed at a deleted module. A file list that quietly stopped resolving
+    // would report nothing forever.
+    expect(scanned).toContain('packages/app/src/components/WorkspaceSidebar.tsx');
+    expect(scanned).toContain('docs/agents/ui.md');
+    expect(scanned.filter((file) => file.endsWith('.tsx')).length).toBeGreaterThan(0);
+  });
+
+  it('finds no name the canvas renderer was called after its control', () => {
+    const found = scanned.flatMap((file) => {
+      const source = readTracked(file);
+      return source === null
+        ? []
+        : hits(source, RETIRED_RENDERER_NAME).map((hit) => `${file}:${hit}`);
+    });
+
+    expect(found).toEqual([]);
+  });
+
+  it('stays silent on the current names the retired ones are prefixes of', () => {
+    // The guard has to survive the names that replaced these. The header
+    // component is the one that would otherwise report its own replacement.
+    const kept = [
+      `export function ${RETIRED_SELECTED_CANVAS}Renderer({ renderer }: { readonly renderer: CanvasRenderer }) {`,
+      `import type { CanvasRenderers, CanvasRenderer } from '../canvas-renderers';`,
+      `const key = canvasRendererKey(selected);`,
+      `expect(errors[0]?.kind).toBe('unresolved-default-renderer');`,
+    ];
+
+    for (const line of kept) {
+      expect(RETIRED_RENDERER_NAME.test(line), line).toBe(false);
+    }
+  });
+});

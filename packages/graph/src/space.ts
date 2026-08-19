@@ -58,7 +58,7 @@ export interface Space {
    */
   readonly layouts: readonly Layout[];
   /** Which view this space opens in — a layout's id or a built-in view's. */
-  readonly defaultView: BuiltInViewId | UUID | undefined;
+  readonly defaultRenderer: BuiltInViewId | UUID | undefined;
   /**
    * Contextual entity resolution — the only one. The Maps behind it are closed
    * over and appear nowhere on this value, so no caller can index the space a
@@ -231,7 +231,7 @@ export function loadSpace(input: unknown, cardFiles: readonly CardFile[]): LoadS
     title: file.title,
     cards,
     layouts: file.layouts,
-    defaultView: file.defaultView,
+    defaultRenderer: file.defaultRenderer,
   });
 }
 
@@ -263,7 +263,7 @@ export function loadSpaceSnapshot(input: unknown): LoadSpaceSnapshotResult {
     title: document.title,
     cards,
     layouts: document.layouts,
-    defaultView: document.defaultView,
+    defaultRenderer: document.defaultRenderer,
   });
   return loaded.ok ? { ...loaded, snapshot: parsed.data } : loaded;
 }
@@ -273,7 +273,7 @@ function buildSpace(input: {
   title: string;
   cards: Card[];
   layouts: Layout[] | undefined;
-  defaultView: BuiltInViewId | UUID | undefined;
+  defaultRenderer: BuiltInViewId | UUID | undefined;
 }): LoadSpaceResult {
   // Array order is read only by automatic strategies, so title order is the one
   // default stable across filesystem scans and unordered relational reads. Ties
@@ -312,7 +312,7 @@ function buildSpace(input: {
       cards,
       graphs,
       layouts,
-      defaultView: input.defaultView,
+      defaultRenderer: input.defaultRenderer,
       lookup: built.lookup,
     }),
   };

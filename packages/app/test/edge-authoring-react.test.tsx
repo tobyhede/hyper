@@ -7,7 +7,7 @@ import { inHandleId, loadSpaceSnapshot, outHandleId, Placement } from '@project/
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
 import type { CardFlowNode } from '@project/react-flow-adapter';
 import { AddCardControl, PersistenceIndicator, SidebarProvider } from '@project/ui';
-import type { CanvasRenderer } from '../src/canvas-choice';
+import type { CanvasRenderer } from '../src/canvas-renderers';
 import { createNavigation } from '../src/navigation';
 import { createRenderAdapter, edgeSelectionOf } from '../src/render-adapter';
 import { createConnectionCompletion } from '../src/connection-completion';
@@ -46,7 +46,7 @@ const workspaceChrome = (
     <WorkspaceSidebar
       workspaceTitle="Space"
       canvas={{
-        choice: { computed: [FLOW], authored: [], selected: FLOW },
+        renderers: { computed: [FLOW], authored: [], selected: FLOW },
         onSelect: () => undefined,
       }}
       graph={{
@@ -91,7 +91,7 @@ const snapshot: SpaceSnapshot = {
         ],
       },
     ],
-    defaultView: LAYOUT_ID,
+    defaultRenderer: LAYOUT_ID,
   },
   cards: [
     { id: CARD_A, document: { title: 'A', kind: 'markdown', body: 'A' } },

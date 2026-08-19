@@ -375,7 +375,7 @@ describe('runHyper', () => {
             activeGraph: GRAPH_ID,
           },
         ],
-        defaultView: OTHER_SPACE_ID,
+        defaultRenderer: OTHER_SPACE_ID,
       },
       cards: [
         {

@@ -16,14 +16,14 @@ import { createRenderAdapter, selectedCardOf, type EdgeSubject } from './render-
 import { createConnectionCompletion } from './connection-completion';
 import { createEdgeAuthoring } from './edge-authoring';
 import { canvasProjection } from './canvas-projection';
-import { canvasChoice } from './canvas-choice';
+import { canvasRenderers } from './canvas-renderers';
 import { canvasContent } from './canvas-content';
 import { usePlacementRendering } from './placement-rendering';
 import { cardSizeVars } from './card';
 import { createNavigation } from './navigation';
 import { createWorkingSpaceReader } from './snapshot';
 import { nextCardTitle } from './titles';
-import { createRendererResolver, defaultRenderer, type RendererSelection } from './renderer';
+import { createRendererResolver, defaultRenderer, type CanvasRendererId } from './renderer';
 import { ADD_CARD_KEY, SpaceCanvas } from './components/SpaceCanvas';
 import { CanvasCentre, type VisibleCentre } from './components/CanvasCentre';
 import { NewAlias } from './components/NewAlias';
@@ -32,7 +32,7 @@ import { PlacementFailure } from './components/PlacementFailure';
 import { PlacementPending } from './components/PlacementPending';
 import { PresentingChrome } from './components/PresentingChrome';
 import { PersistenceControl, PersistenceNotice } from './components/PersistenceControl';
-import { SelectedCanvas, WorkspaceSidebar } from './components/WorkspaceSidebar';
+import { SelectedCanvasRenderer, WorkspaceSidebar } from './components/WorkspaceSidebar';
 
 export const createApp = ({ space, spaceSession }: OpenedSpace) => {
   // One validated aggregate per working snapshot, shared by the render path and
@@ -108,8 +108,8 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
     // the one module that answers it. Memoized on the same two values the
     // renderer is, and for the same reason: a Layout authored by the last Edit
     // is a row here on the next render, and nothing else moves it.
-    const choice = useMemo(
-      () => canvasChoice(rendererSpace, selectedRenderer),
+    const renderers = useMemo(
+      () => canvasRenderers(rendererSpace, selectedRenderer),
       [rendererSpace, selectedRenderer],
     );
     // Everything the canvas draws, derived once from the Space and the renderer.
@@ -207,18 +207,13 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
     // One decision resolved from one Space, applied in an order that cannot
     // leave the two collaborators disagreeing.
     //
-    // It keeps `choose` while the prop it feeds is `onSelect` because it is not
-    // the operation it delegates to: renamed, its body would read
-    // `selectRenderer` calling `navigation.selectRenderer`. The argument is in
-    // `.scratch/architecture-review/issues/02-the-canvas-choice-is-one-module.md`.
-    //
     // Both steps that may refuse the selection run first — the resolve here and
     // Navigation's own — and the render adapter update is a plain store write
     // that cannot fail. Resolving against the session's live Space rather than
     // the rendered one matters because Navigation resolves against the live one
     // too: deciding from a snapshot Navigation will not consult is one decision
     // with two sources of truth.
-    const chooseRenderer = useCallback((selection: RendererSelection) => {
+    const selectCanvasRenderer = useCallback((selection: CanvasRendererId) => {
       const resolved = resolveRenderer(currentSpace(), selection);
       navigation.selectRenderer(selection);
       useRenderAdapter
@@ -580,7 +575,7 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
     const sidebar = (
       <WorkspaceSidebar
         workspaceTitle={rendererSpace.title}
-        canvas={{ choice, onSelect: chooseRenderer }}
+        canvas={{ renderers, onSelect: selectCanvasRenderer }}
         graph={{
           graphs: projection.visibleGraphs,
           activeGraphId,
@@ -614,7 +609,7 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
     return (
       <AppShell
         sidebar={sidebar}
-        header={<SelectedCanvas renderer={choice.selected} />}
+        header={<SelectedCanvasRenderer renderer={renderers.selected} />}
         notice={
           <PersistenceNotice
             persistence={sessionState.persistence}

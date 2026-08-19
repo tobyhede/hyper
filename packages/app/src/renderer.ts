@@ -115,7 +115,7 @@ export interface ResolvedLayoutRenderer {
 export type ResolvedRenderer = ResolvedViewRenderer | ResolvedLayoutRenderer;
 
 /** The one renderer currently navigating a Space (ADR 0031). */
-export type RendererSelection =
+export type CanvasRendererId =
   | { readonly kind: 'view'; readonly view: BuiltInViewId }
   | { readonly kind: 'layout'; readonly layoutId: UUID };
 
@@ -151,11 +151,11 @@ export class RendererInvariantError extends Error {
 /**
  * A selection naming a Layout the Space does not hold.
  *
- * Two modules ask this — the resolver below, and `canvasChoice`, which lists
+ * Two modules ask this — the resolver below, and `canvasRenderers`, which lists
  * what may be selected — and they must not answer it two ways. Offered as a
  * constructor rather than a bare message so the reason travels with the words:
  * a copied string agrees only until someone rewords one of them, which is the
- * disagreement `canvas-choice.ts` exists to remove and would then have
+ * disagreement `canvas-renderers.ts` exists to remove and would then have
  * reintroduced a layer down.
  */
 export const layoutNotFound = (layoutId: UUID): RendererInvariantError =>
@@ -194,7 +194,7 @@ export interface SubjectConversion {
   readonly newGraphId: () => GraphId;
   /**
    * Which renderer a refusal names, in the same closed vocabulary a selection
-   * and `space.defaultView` are written in: a built-in View's id, or a Layout's.
+   * and `space.defaultRenderer` are written in: a built-in View's id, or a Layout's.
    */
   readonly rendererId: BuiltInViewId | UUID;
 }
@@ -456,7 +456,7 @@ export interface RendererResolverDependencies {
   readonly newGraphId: () => GraphId;
 }
 
-export type ResolveRenderer = (space: Space, selection?: RendererSelection) => ResolvedRenderer;
+export type ResolveRenderer = (space: Space, selection?: CanvasRendererId) => ResolvedRenderer;
 
 /**
  * The identity of a renderer selection as one string.
@@ -465,12 +465,12 @@ export type ResolveRenderer = (space: Space, selection?: RendererSelection) => R
  * is current, and comparing two selections field by field at each site is how
  * the list and the thing it reports on begin to disagree (ADR 0053).
  */
-export const rendererSelectionKey = (selection: RendererSelection): string =>
+export const canvasRendererKey = (selection: CanvasRendererId): string =>
   selection.kind === 'view' ? `view:${selection.view}` : `layout:${selection.layoutId}`;
 
 /** Resolve the Space default into the initial renderer selection. */
-export function defaultRenderer(space: Space): RendererSelection {
-  const requested = space.defaultView ?? DEFAULT_VIEW_ID;
+export function defaultRenderer(space: Space): CanvasRendererId {
+  const requested = space.defaultRenderer ?? DEFAULT_VIEW_ID;
   return isBuiltInViewId(requested)
     ? { kind: 'view', view: requested }
     : { kind: 'layout', layoutId: requested };

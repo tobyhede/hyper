@@ -149,14 +149,14 @@ async function arrange(space: Space) {
 
 describe('resolving a renderer', () => {
   it('resolves an explicitly selected View without changing the Space default', async () => {
-    const space = spaceWith({ defaultView: '00000000-0000-4000-8000-000000000022' });
+    const space = spaceWith({ defaultRenderer: '00000000-0000-4000-8000-000000000022' });
 
     const renderer = resolver()(space, { kind: 'view', view: 'grid' });
 
     expect(renderer.kind).toBe('view');
     expect(renderer.kind === 'view' && renderer.id).toBe('grid');
     expect(renderer.kind === 'view' && renderer.title).toBe('Grid');
-    expect(space.defaultView).toBe('00000000-0000-4000-8000-000000000022');
+    expect(space.defaultRenderer).toBe('00000000-0000-4000-8000-000000000022');
     const graph = buildLayoutStrategyGraph(
       space.cards.map((card) => card.id),
       new Map(),
@@ -168,14 +168,14 @@ describe('resolving a renderer', () => {
   });
 
   it('resolves an explicitly selected Layout without changing the Space default', async () => {
-    const space = spaceWith({ defaultView: 'grid' });
+    const space = spaceWith({ defaultRenderer: 'grid' });
 
     const renderer = resolver()(space, LAYOUT_SELECTION);
 
     expect(renderer.kind).toBe('layout');
     if (renderer.kind !== 'layout') return;
     expect(renderer.resolvedLayout.layout.title).toBe('Working');
-    expect(space.defaultView).toBe('grid');
+    expect(space.defaultRenderer).toBe('grid');
     const graph = buildLayoutStrategyGraph(
       space.cards.map((card) => card.id),
       new Map(),
@@ -218,28 +218,28 @@ describe('resolving a renderer', () => {
   });
 
   it('resolves a declared Layout and carries its authored placement', () => {
-    const renderer = resolver()(spaceWith({ defaultView: WORKING.id }));
+    const renderer = resolver()(spaceWith({ defaultRenderer: WORKING.id }));
     expect(renderer.kind === 'layout' && renderer.resolvedLayout.layout.positions).toEqual(
       POSITIONS,
     );
   });
 
   it('places cards where a resolved Layout says', async () => {
-    expect(await arrange(spaceWith({ defaultView: WORKING.id }))).toEqual({
+    expect(await arrange(spaceWith({ defaultRenderer: WORKING.id }))).toEqual({
       [A]: { x: 40, y: 10 },
       [B]: { x: 400, y: 250 },
     });
   });
 
   it('resolves the built-in grid, which computes placement and carries no Layout', async () => {
-    const space = spaceWith({ defaultView: 'grid' });
+    const space = spaceWith({ defaultRenderer: 'grid' });
     expect(resolver()(space).kind).toBe('view');
     // The grid's own arithmetic, not ELK's: first card at the origin.
     expect((await arrange(space))[A]).toEqual({ x: 0, y: 0 });
   });
 
   it('ignores a declared Layout the space does not open in', () => {
-    // `spaceWith()` declares `WORKING`. Naming no `defaultView` is what opens the
+    // `spaceWith()` declares `WORKING`. Naming no `defaultRenderer` is what opens the
     // Space in a View regardless, so the Layout is there to be resolved and is
     // not what resolution answers.
     const space = spaceWith();
@@ -266,7 +266,7 @@ describe('the subject a renderer names', () => {
           graphs: [{ ...MAIN, edges: [{ from: A, to: A }] }],
         },
       ],
-      defaultView: WORKING.id,
+      defaultRenderer: WORKING.id,
     });
 
     const renderer = resolver()(space);
@@ -277,7 +277,7 @@ describe('the subject a renderer names', () => {
     // Ownership is what a Layout's answer now means. `Aside` belongs to a second
     // Layout and is in `space.graphs`, so a resolution still reading the flatten
     // would draw it here — over Cards this Layout may not even hold.
-    const space = spaceWith({ layouts: [WORKING, SECOND], defaultView: WORKING.id });
+    const space = spaceWith({ layouts: [WORKING, SECOND], defaultRenderer: WORKING.id });
     expect(resolver()(space).subject.graphs.map((graph) => graph.id)).toEqual([MAIN.id]);
   });
 
@@ -289,7 +289,7 @@ describe('the subject a renderer names', () => {
   });
 
   it('lists a Layout’s members in the Space’s stable Card order', () => {
-    const space = spaceWith({ layouts: [WORKING_TWO], defaultView: WORKING.id });
+    const space = spaceWith({ layouts: [WORKING_TWO], defaultRenderer: WORKING.id });
     const renderer = resolver()(space);
     expect(renderer.subject.cards).toEqual(
       space.cards.filter((card) => card.id === A || card.id === B),
@@ -314,14 +314,14 @@ describe('the Graph a renderer opens on', () => {
   it('answers a Layout through its own resolved Active Graph', () => {
     const space = spaceWith({
       layouts: [{ ...WORKING_TWO, activeGraph: ASIDE.id }],
-      defaultView: WORKING.id,
+      defaultRenderer: WORKING.id,
     });
     const renderer = resolver()(space);
     expect(renderer.kind === 'layout' && renderer.resolvedLayout.activeGraph.id).toBe(ASIDE.id);
   });
 
   it('opens a selected Layout on its own first Graph, not the Space’s', () => {
-    const space = spaceWith({ layouts: [SECOND, WORKING], defaultView: WORKING.id });
+    const space = spaceWith({ layouts: [SECOND, WORKING], defaultRenderer: WORKING.id });
     const renderer = resolver()(space);
     expect(renderer.kind === 'layout' && renderer.resolvedLayout.activeGraph.id).toBe(MAIN.id);
   });
@@ -380,7 +380,7 @@ describe('converting a View into a Layout’s Graphs', () => {
     // A Layout is not converted — it is updated in place, and its Graphs keep the
     // identities it already owns. The discriminant is what says so: there is no
     // `convert` on that variant to call.
-    const renderer = resolver()(spaceWith({ defaultView: WORKING.id }));
+    const renderer = resolver()(spaceWith({ defaultRenderer: WORKING.id }));
     expect(renderer.kind).toBe('layout');
     expect(renderer).not.toHaveProperty('convert');
   });

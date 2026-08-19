@@ -1,7 +1,7 @@
 import type { CardId, GraphId } from '@project/core';
 import { outgoingEdges, graphStartCard, type Space } from '@project/graph';
 import { createObservableState, type ObserverErrorReporter } from '@project/persistence';
-import type { RendererSelection, ResolvedRenderer, ResolveRenderer } from './renderer';
+import type { CanvasRendererId, ResolvedRenderer, ResolveRenderer } from './renderer';
 
 export interface Move {
   readonly cardId: CardId;
@@ -22,7 +22,7 @@ type TraversalHistory = readonly [CardId, ...CardId[]];
 
 /** What navigation carries whatever it is doing. */
 interface NavigationBase {
-  readonly selectedRenderer: RendererSelection;
+  readonly selectedRenderer: CanvasRendererId;
   readonly activeGraphId: GraphId | null;
   readonly openedCardId: CardId | null;
 }
@@ -50,9 +50,9 @@ export type NavigationState =
 export interface Navigation {
   readonly getState: () => NavigationState;
   readonly subscribe: (listener: () => void) => () => void;
-  readonly selectRenderer: (selection: RendererSelection) => void;
+  readonly selectRenderer: (selection: CanvasRendererId) => void;
   /** Open a replacement Space as new navigation, retaining no prior reading state. */
-  readonly openFresh: (selection: RendererSelection) => void;
+  readonly openFresh: (selection: CanvasRendererId) => void;
   /**
    * Adopt a renderer created by an Edit, and the Active Graph that goes with it,
    * without interrupting the current navigation.
@@ -61,10 +61,7 @@ export interface Navigation {
    * owns its Graphs, so the Graph a Layout opens on is a fact about that Layout
    * and not something Navigation carries across from the renderer before it.
    */
-  readonly continueInRenderer: (
-    selection: RendererSelection,
-    activeGraphId: GraphId | null,
-  ) => void;
+  readonly continueInRenderer: (selection: CanvasRendererId, activeGraphId: GraphId | null) => void;
   readonly activateGraph: (graphId: GraphId) => void;
   readonly openCard: (cardId: CardId) => void;
   readonly closeCard: () => void;
@@ -146,7 +143,7 @@ function baseOf(state: NavigationState): NavigationBase {
  * replacement Space is opened, not navigated to, so the two cannot be allowed
  * to disagree about what "opened" means.
  */
-function openedState(selection: RendererSelection, renderer: ResolvedRenderer): NavigationState {
+function openedState(selection: CanvasRendererId, renderer: ResolvedRenderer): NavigationState {
   return {
     selectedRenderer: selection,
     mode: 'overview',
@@ -158,7 +155,7 @@ function openedState(selection: RendererSelection, renderer: ResolvedRenderer): 
 export function createNavigation(
   currentSpace: () => Space,
   resolveRenderer: ResolveRenderer,
-  initialRenderer: RendererSelection,
+  initialRenderer: CanvasRendererId,
   initialSpace: Space = currentSpace(),
   options: NavigationOptions = {},
 ): Navigation {

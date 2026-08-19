@@ -11,7 +11,7 @@ import { repeatedGraphEdges } from './graph-edges';
 /**
  * The cards and layouts a reference check reads. Structural so it accepts both
  * a freshly parsed space file (inside `loadSpace`) and an already-built
- * `Space`. `layouts` and `defaultView` are optional: a space may declare
+ * `Space`. `layouts` and `defaultRenderer` are optional: a space may declare
  * neither and open in an automatic view (ADR 0025).
  *
  * There is no `graphs` here, and that is the whole of ADR 0040 in one shape: a
@@ -22,7 +22,7 @@ import { repeatedGraphEdges } from './graph-edges';
 export interface Referenceable {
   readonly cards: readonly Card[];
   readonly layouts?: readonly Layout[] | undefined;
-  readonly defaultView?: BuiltInViewId | UUID | undefined;
+  readonly defaultRenderer?: BuiltInViewId | UUID | undefined;
 }
 
 /**
@@ -50,7 +50,7 @@ export type SpaceReferenceErrorKind =
   | 'graph-edge-missing-card'
   /** An Edge endpoint names a Space Card that is not a member of its own Layout. */
   | 'graph-edge-card-outside-layout'
-  | 'unresolved-default-view'
+  | 'unresolved-default-renderer'
   | 'duplicate-graph-edge'
   | 'unresolved-alias-target'
   | 'alias-self-reference'
@@ -231,15 +231,15 @@ export function validateReferences(space: Referenceable): SpaceReferenceError[] 
     }
   }
 
-  // `defaultView` names a declared layout or a built-in automatic view, and
+  // `defaultRenderer` names a declared layout or a built-in automatic view, and
   // nothing else — it records which view opens, never how to compute one.
-  if (space.defaultView !== undefined) {
+  if (space.defaultRenderer !== undefined) {
     const declared = new Set(layouts.map((l) => l.id));
-    if (!isBuiltInViewId(space.defaultView) && !declared.has(space.defaultView)) {
+    if (!isBuiltInViewId(space.defaultRenderer) && !declared.has(space.defaultRenderer)) {
       errors.push({
-        kind: 'unresolved-default-view',
-        ref: space.defaultView,
-        message: `defaultView "${space.defaultView}" names neither a declared layout nor a built-in view`,
+        kind: 'unresolved-default-renderer',
+        ref: space.defaultRenderer,
+        message: `defaultRenderer "${space.defaultRenderer}" names neither a declared layout nor a built-in view`,
       });
     }
   }

@@ -330,7 +330,7 @@ test('editing an Alias authors its metadata and survives reload', async ({ page 
 /**
  * Dragging a card writes its placement into the Layout.
  *
- * The fixture names no `defaultView`, so it opens in Flow however many Layouts
+ * The fixture names no `defaultRenderer`, so it opens in Flow however many Layouts
  * it declares, and this first edit converts the resolved automatic arrangement
  * into a Layout of its own (ADR 0025). What this asserts is the point of
  * the whole pivot: a card goes where you put it and *nothing else moves*. Three
@@ -484,7 +484,7 @@ test('creating from an Algorithmic View freezes existing Cards and places Card 1
 
   // `Persisted` says the commit was acknowledged, not that the conversion is what
   // reopens. Reload against the same repository: the created Layout must still be
-  // `defaultView`, still hold the created Card and still carry its Edge — a
+  // `defaultRenderer`, still hold the created Card and still carry its Edge — a
   // conversion that only lived in runtime state passes every assertion above.
   await page.reload();
   await expect(nodeByTitle(page, 'Card 1')).toBeVisible();
@@ -1574,7 +1574,7 @@ test('a duplicate Edge is marked invalid while the drag is still live', async ({
  * `navigation.test.ts` — "closes an opened Card when the renderer changes" — is
  * where that stays pinned; it needs no browser.
  *
- * The fixture names no `defaultView`, so it opens on `Flow`; `Grid` is the other
+ * The fixture names no `defaultRenderer`, so it opens on `Flow`; `Grid` is the other
  * Algorithmic View and installs no placement until its strategy resolves, which
  * is the state a stranded editor would be writing into.
  */
@@ -1758,7 +1758,7 @@ test('closing an opened Card returns focus to the Card, not the document', async
  * Add Card from an Algorithmic View: one conversion, and the naming that
  * follows it.
  *
- * The fixture opens in Flow because it declares no `defaultView`, so this is the
+ * The fixture opens in Flow because it declares no `defaultRenderer`, so this is the
  * ordinary first Edit an author makes. Two things are being watched that a unit
  * test cannot see: that the conversion happens exactly once — the fixture's own
  * two Layouts plus one, not two — and that the created Card really is under the
