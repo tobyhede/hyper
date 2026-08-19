@@ -25,13 +25,19 @@ const FIRST_CARD_TITLE = 'Card 1';
 export function newSpace(): NewSpace {
   const spaceId = newUuid();
   const cardId = newUuid();
-  // No `layouts` and no `defaultRenderer`, which is now the same statement as "no
-  // graphs": a Layout owns at least one (ADR 0040), so a space with neither is
-  // the state a new one starts in. A new space's card carries no position
-  // either, because centering is the view's job — `fitView` frames whatever is
-  // on screen, and a position nobody wrote would be authored content nobody
-  // wrote. The Layout arrives when the space is edited (ADR 0025), not here and
-  // not on open: a space that is only read keeps none.
+  // Neither `layouts` nor `defaultRenderer`, and they are two statements rather
+  // than one. No Layouts *is* also "no graphs" — a Layout owns at least one (ADR
+  // 0040) and there is nowhere else for a Graph to live — and that is the state a
+  // new space starts in. No `defaultRenderer` says nothing about graphs at all:
+  // the field names a built-in automatic renderer as readily as an authored
+  // Layout (ADR 0055), so leaving it unset only declines to record which renderer
+  // opens, and the application falls back to a built-in View.
+  //
+  // A new space's card carries no position either, because centering is the
+  // view's job — `fitView` frames whatever is on screen, and a position nobody
+  // wrote would be authored content nobody wrote. The Layout arrives when the
+  // space is edited (ADR 0025), not here and not on open: a space that is only
+  // read keeps none.
   const file: SpaceFile = {
     version: SPACE_FILE_VERSION,
     id: spaceId,
