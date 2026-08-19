@@ -12,6 +12,8 @@ export { CardKindIcon } from './CardKindIcon';
 export type { CardKindIconProps } from './CardKindIcon';
 export { CardCombobox } from './CardCombobox';
 export type { CardChoice, CardComboboxProps } from './CardCombobox';
+export { WorkingCardSearchCombobox } from './WorkingCardSearchCombobox';
+export type { WorkingCardSearchComboboxProps } from './WorkingCardSearchCombobox';
 export { Dialog, DialogBackdrop, DialogPopup, DialogPortal, DialogViewport } from './Dialog';
 export {
   Command,

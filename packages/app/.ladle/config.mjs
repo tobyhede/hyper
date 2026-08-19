@@ -8,7 +8,7 @@ export default {
   viteConfig: import.meta.dirname + '/../ladle-vite.config.ts',
   port: 61000,
   previewPort: 61001,
-  storyOrder: ['components-*', 'surfaces-*', 'review-*'],
+  storyOrder: ['components-*', 'surfaces-*', 'working-*', 'review-*'],
   addons: {
     a11y: { enabled: true },
     theme: { enabled: false, defaultState: 'light' },

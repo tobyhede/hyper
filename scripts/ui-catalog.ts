@@ -80,6 +80,7 @@ export const buildUiCatalog = (repositoryRoot = process.cwd()): UiCatalog => {
   const prefixes = new Map([
     ['components', 'Components/'],
     ['surfaces', 'Surfaces/'],
+    ['working', 'Working/'],
     ['review', 'Review/'],
   ]);
   const stories: string[] = [];
