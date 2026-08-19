@@ -64,9 +64,10 @@ const draw = (element: ReactElement) => render(<SidebarProvider>{element}</Sideb
  *
  * `canvasRenderers` owns the derivation and `canvas-renderers.test.ts` owns testing
  * it. What is left for this file is what the sidebar *draws*, and a test of a
- * list should not need a Space to state it. They are named constants because the
- * pressed row is decided by reference: `selected` below is one of these very
- * values, exactly as the record production hands in guarantees.
+ * list should not need a Space to state it. They are named constants so a test
+ * can say which row it expects pressed by naming the same value it listed —
+ * which is convenience here, not the contract: the sidebar matches by
+ * `canvasRendererKey`, and the test below hands it an equal row it never listed.
  */
 const FLOW: CanvasRenderer = { selection: { kind: 'view', view: 'flow' }, title: 'Flow' };
 const GRID: CanvasRenderer = { selection: { kind: 'view', view: 'grid' }, title: 'Grid' };
@@ -78,7 +79,8 @@ const LAYOUT: CanvasRenderer = {
 const settledProps = (): WorkspaceSidebarProps => ({
   workspaceTitle: 'Workspace',
   canvas: {
-    renderers: { computed: [FLOW, GRID], authored: [], selected: FLOW },
+    renderers: { computed: [FLOW, GRID], authored: [] },
+    current: FLOW,
     onSelect: vi.fn(),
   },
   graph: {
@@ -130,7 +132,7 @@ describe('WorkspaceSidebar', () => {
     const base = withLayout(settledProps());
     const props: WorkspaceSidebarProps = {
       ...base,
-      canvas: { ...base.canvas, renderers: { ...base.canvas.renderers, selected: LAYOUT } },
+      canvas: { ...base.canvas, current: LAYOUT },
     };
     draw(<WorkspaceSidebar {...props} />);
 
@@ -141,6 +143,34 @@ describe('WorkspaceSidebar', () => {
     expect(pressed[0]).toHaveTextContent('Layout 1');
     expect(screen.getByRole('button', { name: 'Flow' })).toHaveAttribute('aria-pressed', 'false');
     expect(screen.queryByText('None')).not.toBeInTheDocument();
+  });
+
+  /**
+   * The pressed row is decided by the one identity rule, not by object identity.
+   *
+   * `canvasRenderers` mints a fresh authored row per call, so a caller listing
+   * from one call and taking its current row from a second hands in two equal
+   * values that are not the same object — see `canvas-renderers.test.ts`. A
+   * `===` test drew that as a Layout list with nothing pressed: no throw, and
+   * nothing in the type to catch it. `canvasRendererKey` is the rule the row
+   * keys and `data-renderer` already carry, so the sidebar now asks the one
+   * question it answers everywhere else.
+   */
+  it('presses an equal row that a second derivation built', () => {
+    const base = withLayout(settledProps());
+    const rebuilt: CanvasRenderer = {
+      selection: { kind: 'layout', layoutId: LAYOUT_ID },
+      title: 'Layout 1',
+    };
+    expect(rebuilt).not.toBe(LAYOUT);
+
+    draw(<WorkspaceSidebar {...base} canvas={{ ...base.canvas, current: rebuilt }} />);
+
+    const pressed = screen
+      .getAllByTestId('canvas-renderer')
+      .filter((renderer) => renderer.getAttribute('aria-pressed') === 'true');
+    expect(pressed).toHaveLength(1);
+    expect(pressed[0]).toHaveAttribute('data-renderer', `layout:${LAYOUT_ID}`);
   });
 
   it('forwards the selection', () => {

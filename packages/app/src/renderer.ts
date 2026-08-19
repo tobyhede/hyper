@@ -151,8 +151,8 @@ export class RendererInvariantError extends Error {
 /**
  * A selection naming a Layout the Space does not hold.
  *
- * Two modules ask this — the resolver below, and `canvasRenderers`, which lists
- * what may be selected — and they must not answer it two ways. Offered as a
+ * Two modules ask this — the resolver below, and `currentRenderer`, which names
+ * the row that is drawing — and they must not answer it two ways. Offered as a
  * constructor rather than a bare message so the reason travels with the words:
  * a copied string agrees only until someone rewords one of them, which is the
  * disagreement `canvas-renderers.ts` exists to remove and would then have

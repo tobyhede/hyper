@@ -31,22 +31,23 @@ export interface WorkspaceSidebarProps {
   /** The Space's title. The canvas header names what is drawing it (ADR 0053). */
   readonly workspaceTitle: string;
   readonly canvas: {
-    /**
-     * The whole choice as one value, rather than two lists and a selection.
-     *
-     * One field because it is one decision (ADR 0053). Three fields let a caller
-     * assemble the lists and the selection from different places, which is how a
-     * `selected` that is not one of the rows gets in — a sidebar drawing a list
-     * with nothing pressed in it. `canvasRenderers` builds all three together and
-     * states the identity below; the interface is structural, so this is a
-     * contract a hand-built literal must keep rather than one the compiler
-     * enforces, and `canvas-renderers.ts` is where a caller should get one.
-     */
+    /** The computed and authored rows `canvasRenderers` derives from the Space. */
     readonly renderers: CanvasRenderers;
+    /**
+     * The row that is drawing, which `currentRenderer` answers from that list.
+     *
+     * Matched to a row by `canvasRendererKey` and not by object identity. The
+     * interface is structural, so "this came out of that list" is a thing a
+     * hand-built literal can break and the compiler cannot check; making the
+     * pressed test the one identity rule means it does not have to. A caller
+     * that lists from one derivation and takes its current row from a second
+     * presses the right row rather than none.
+     */
+    readonly current: CanvasRenderer;
     /**
      * Hands back the bare selection, which is what Navigation takes. The row's
      * title belongs to whoever built the list: a caller that has to name what is
-     * drawing reads `renderers.selected` rather than deriving a second title of its
+     * drawing reads `current` rather than deriving a second title of its
      * own.
      */
     readonly onSelect: (selection: CanvasRendererId) => void;
@@ -107,9 +108,11 @@ const RendererIcon = ({ selection }: { readonly selection: CanvasRendererId }): 
  * not as two controls: exactly one item across both is pressed, and there is no
  * value anywhere meaning "the other group is the one drawing" (ADR 0053).
  *
- * The pressed test is `===` against the row the choice already named, so both
- * groups are asked the same question by the same value. It cannot answer twice
- * because there is only one row it can be.
+ * The pressed test is `canvasRendererKey` against the row the choice already
+ * named, so both groups are asked the same question by the same value — and it
+ * is the same question the row keys and `data-renderer` are already written in.
+ * It cannot answer twice: a key names one selection, and a Space cannot hold
+ * two renderers with one id.
  */
 function RendererGroup({
   renderers,
@@ -120,10 +123,11 @@ function RendererGroup({
   readonly selected: CanvasRenderer;
   readonly onSelect: (selection: CanvasRendererId) => void;
 }) {
+  const selectedKey = canvasRendererKey(selected.selection);
   return (
     <SidebarMenu>
       {renderers.map((renderer) => {
-        const active = renderer === selected;
+        const active = canvasRendererKey(renderer.selection) === selectedKey;
         return (
           <SidebarMenuItem key={canvasRendererKey(renderer.selection)}>
             <SidebarMenuButton
@@ -224,7 +228,7 @@ export function WorkspaceSidebar({
           <SidebarGroupContent>
             <RendererGroup
               renderers={canvas.renderers.computed}
-              selected={canvas.renderers.selected}
+              selected={canvas.current}
               onSelect={onCanvas(canvas.onSelect)}
             />
           </SidebarGroupContent>
@@ -240,7 +244,7 @@ export function WorkspaceSidebar({
             ) : (
               <RendererGroup
                 renderers={canvas.renderers.authored}
-                selected={canvas.renderers.selected}
+                selected={canvas.current}
                 onSelect={onCanvas(canvas.onSelect)}
               />
             )}

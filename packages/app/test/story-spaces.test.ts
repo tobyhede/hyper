@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { loadSpaceSnapshot } from '@project/graph';
-import { canvasRenderers } from '../src/canvas-renderers';
+import { canvasRenderers, currentRenderer } from '../src/canvas-renderers';
 import { defaultRenderer } from '../src/renderer';
 import { authoredSpace, editedSnapshot, unauthoredSpace } from '../stories/support/spaces';
 
@@ -23,7 +23,7 @@ describe('the story Spaces', () => {
     const opens = defaultRenderer(authoredSpace);
 
     expect(opens.kind).toBe('layout');
-    expect(canvasRenderers(authoredSpace, opens).selected.title).toBe('Collection 1');
+    expect(currentRenderer(canvasRenderers(authoredSpace), opens).title).toBe('Collection 1');
   });
 
   /** A new Space names no view, so production's own fallback answers (ADR 0018, ADR 0025). */
@@ -33,7 +33,7 @@ describe('the story Spaces', () => {
     expect(opens).toEqual({ kind: 'view', view: 'flow' });
     expect(unauthoredSpace.layouts).toEqual([]);
     expect(unauthoredSpace.graphs).toEqual([]);
-    expect(canvasRenderers(unauthoredSpace, opens).selected.title).toBe('Flow');
+    expect(currentRenderer(canvasRenderers(unauthoredSpace), opens).title).toBe('Flow');
   });
 
   /**
@@ -52,7 +52,7 @@ describe('the story Spaces', () => {
 
     const opens = defaultRenderer(authoredSpace);
 
-    expect(canvasRenderers(edited.space, opens).selected.title).toBe('Collection 1');
+    expect(currentRenderer(canvasRenderers(edited.space), opens).title).toBe('Collection 1');
     expect(edited.space.layouts.slice(0, authoredSpace.layouts.length)).toEqual(
       authoredSpace.layouts,
     );

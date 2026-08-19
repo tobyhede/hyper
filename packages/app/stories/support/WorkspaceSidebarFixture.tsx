@@ -10,7 +10,7 @@ import { AppShell } from '@project/ui';
 // Through the package's own subpath imports, as `#components/*` already is: a
 // story sits two directories above `src`, and climbing there by relative path is
 // how a package boundary gets crossed without naming one (AGENTS.md).
-import { canvasRenderers } from '#src/canvas-renderers';
+import { canvasRenderers, currentRenderer } from '#src/canvas-renderers';
 import { graphColorMap } from '#src/colors';
 import { defaultRenderer, type CanvasRendererId } from '#src/renderer';
 import { createWorkingSpaceReader } from '#src/snapshot';
@@ -62,7 +62,8 @@ export function WorkspaceSidebarFixture({
   //
   // One module answers which canvas renderers exist and which is current, and the header
   // below reads the row it named rather than a title of the fixture's own.
-  const renderers = canvasRenderers(space, selected);
+  const renderers = canvasRenderers(space);
+  const current = currentRenderer(renderers, selected);
   // Colours the way the sidebar's own consumer gets them, and deliberately not
   // through `canvasProjection`: that needs a resolved strategy, so a story about
   // a sidebar would run elkjs to find out what colour a Graph's glyph is.
@@ -73,7 +74,7 @@ export function WorkspaceSidebarFixture({
       sidebar={
         <WorkspaceSidebar
           workspaceTitle={space.title}
-          canvas={{ renderers, onSelect: setSelected }}
+          canvas={{ renderers, current, onSelect: setSelected }}
           graph={{
             graphs: space.graphs,
             activeGraphId: activeGraph,
@@ -103,7 +104,7 @@ export function WorkspaceSidebarFixture({
           }}
         />
       }
-      header={<SelectedCanvasRenderer renderer={renderers.selected} />}
+      header={<SelectedCanvasRenderer renderer={current} />}
       notice={<PersistenceNotice persistence={persistence} onRetry={onRetry} />}
     >
       <div data-testid="workspace-canvas-stand-in" />
