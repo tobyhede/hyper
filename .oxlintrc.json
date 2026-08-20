@@ -39,6 +39,7 @@
     "anti-slop/no-unsafe-dictionary-type": "error",
     "anti-slop/no-conditional-empty-object-spread": "error",
     "anti-slop/no-unknown-parameters": "error",
+    "anti-slop/require-safety-comment-for-type-assertion": "error",
     // `allowInTypeGuards` exempts a `typeof` check inside a function whose own
     // return type is a type predicate (`x is Y`) — the check IS that predicate's
     // narrowing logic, not a bypass of it (e.g. `observable-state.ts`'s

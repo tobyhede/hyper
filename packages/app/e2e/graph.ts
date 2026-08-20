@@ -53,14 +53,20 @@ export const FIXTURE_CARD_COUNT =
  * Layouts (ADR 0045). A *selected* Layout draws only the Graphs it owns, so it
  * is not the number to assert after a conversion.
  */
-export const FIXTURE_EDGE_COUNT = (
-  JSON.parse(readFileSync(`${fixtureDir}/space.json`, 'utf8')) as {
-    layouts: readonly { graphs: readonly { edges: readonly unknown[] }[] }[];
-  }
-).layouts.reduce(
-  (total, layout) => total + layout.graphs.reduce((edges, graph) => edges + graph.edges.length, 0),
-  0,
-);
+export const FIXTURE_EDGE_COUNT =
+  // SAFETY: `space.json` is this repo's own tracked E2E fixture, not user
+  // input — its shape is asserted elsewhere by the fixture's own
+  // schema-validated load; this narrow read only needs the two nested array
+  // fields used below.
+  (
+    JSON.parse(readFileSync(`${fixtureDir}/space.json`, 'utf8')) as {
+      layouts: readonly { graphs: readonly { edges: readonly unknown[] }[] }[];
+    }
+  ).layouts.reduce(
+    (total, layout) =>
+      total + layout.graphs.reduce((edges, graph) => edges + graph.edges.length, 0),
+    0,
+  );
 
 /** Authoring presents one handle per side of a Card, source and target alike —
  *  four sides, graph-independent (ADR 0033). */
@@ -143,6 +149,9 @@ export async function activateGraph(page: Page, title: string): Promise<void> {
 /** Where React Flow has actually put a node, in flow coordinates. */
 export async function positionOf(node: Locator): Promise<{ x: number; y: number }> {
   return node.evaluate((el) => {
+    // SAFETY: `.react-flow__node` only ever matches a `<div>` React Flow
+    // renders, so the element this callback receives is always an
+    // `HTMLElement`.
     const match = /translate\((-?[\d.]+)px,\s*(-?[\d.]+)px\)/.exec(
       (el as HTMLElement).style.transform,
     );
@@ -155,6 +164,9 @@ export async function allPositions(page: Page): Promise<Record<string, { x: numb
   return page.locator('.react-flow__node').evaluateAll((els) =>
     Object.fromEntries(
       els.map((el) => {
+        // SAFETY: `.react-flow__node` only ever matches a `<div>` React Flow
+        // renders, so the element this callback receives is always an
+        // `HTMLElement`.
         const match = /translate\((-?[\d.]+)px,\s*(-?[\d.]+)px\)/.exec(
           (el as HTMLElement).style.transform,
         );

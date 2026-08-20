@@ -131,6 +131,9 @@ async function selectAnEdge(page: Page): Promise<string> {
     .locator('.react-flow__edge[tabindex] .react-flow__edge-path')
     .evaluateAll((paths) => {
       for (const path of paths) {
+        // SAFETY: `.react-flow__edge-path` only ever matches the `<path>`
+        // element React Flow's SVG edge renderer draws, so it's always an
+        // `SVGPathElement`.
         const geometry = path as SVGPathElement;
         const transform = geometry.getScreenCTM();
         if (transform === null) continue;

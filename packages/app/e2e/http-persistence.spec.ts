@@ -45,6 +45,9 @@ test('rapid edits commit in order and the latest position survives reload', asyn
   await page.route('**/api/spaces/*', async (route) => {
     const request = route.request();
     if (!isCommit(request.method(), request.url())) return route.continue();
+    // SAFETY: Playwright's `postDataJSON()` returns `any`; this narrows to
+    // the one field read below, from a commit request this same app's own
+    // client code just sent — not third-party input.
     const body = request.postDataJSON() as { expectedRevision: string };
     expectedRevisions.push(body.expectedRevision);
     if (expectedRevisions.length === 1) {

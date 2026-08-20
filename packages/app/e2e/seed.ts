@@ -39,12 +39,18 @@ export async function seedPositionedLayout(
 ): Promise<HttpLoadedSpace> {
   const summariesResponse = await page.request.get('/api/spaces');
   expect(summariesResponse.ok()).toBe(true);
+  // SAFETY: this E2E helper trusts the running app's own `/api/spaces`
+  // response shape rather than importing its Zod schema here — the read is
+  // narrow (just `id`), and a real shape mismatch fails the assertion below.
   const summaries = (await summariesResponse.json()) as readonly { readonly id: string }[];
   const spaceId = summaries[0]?.id;
   expect(spaceId).toBeDefined();
 
   const loadedResponse = await page.request.get(`/api/spaces/${spaceId}`);
   expect(loadedResponse.ok()).toBe(true);
+  // SAFETY: `HttpLoadedSpace` is this app's own wire type for a GET
+  // `/api/spaces/:id` response — the server producing it is this same
+  // codebase, not third-party JSON.
   const loaded = (await loadedResponse.json()) as HttpLoadedSpace;
 
   const snapshot: SpaceSnapshot = {
@@ -70,5 +76,7 @@ export async function seedPositionedLayout(
 
   const seededResponse = await page.request.get(`/api/spaces/${spaceId}`);
   expect(seededResponse.ok()).toBe(true);
+  // SAFETY: same as `loaded` above — this app's own wire response, not
+  // third-party JSON.
   return (await seededResponse.json()) as HttpLoadedSpace;
 }

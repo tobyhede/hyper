@@ -60,6 +60,8 @@ function authoringSpy({ refusing }: AuthoringCapabilities = {}) {
   const completions: unknown[] = [];
   let adapter: RenderAdapter | null = null;
   const authoring: SpaceAuthoring = {
+    // SAFETY: `getState` is never read by these tests — the spy only needs to
+    // satisfy `SpaceAuthoring`'s shape, not implement a real state.
     getState: () => ({}) as never,
     authoredPlacement: () => null,
     subscribe: () => () => undefined,

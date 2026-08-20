@@ -81,6 +81,9 @@ describe('loadSpaceSnapshot', () => {
     const message = result.errors.map((error) => error.message).join('\n');
     expect(message).toMatch(/^cards\.0\.document\.title: \S/);
     expect(message.startsWith('[')).toBe(false);
+    // SAFETY: `JSON.parse` returns `any`; narrowing to `unknown` only stops
+    // that `any` from leaking into the assertion above — this call is
+    // expected to throw regardless of what it would otherwise have returned.
     expect(() => JSON.parse(message) as unknown).toThrow();
   });
 

@@ -8,7 +8,11 @@ type Middleware = (
   next: (error?: unknown) => void,
 ) => void;
 
+// SAFETY: `spaceHttpPlugin`'s middleware only ever reads `request.url` and
+// writes through `response`'s ServerResponse methods it's given below —
+// neither stub needs to implement the rest of Node's interfaces.
 const request = { url: '/api/spaces' } as IncomingMessage;
+// SAFETY: unused beyond being passed through to the middleware under test.
 const response = {} as ServerResponse;
 
 describe('spaceHttpPlugin', () => {
@@ -28,6 +32,9 @@ describe('spaceHttpPlugin', () => {
       });
       const configureServer = plugin.configureServer;
       if (typeof configureServer !== 'function') throw new Error('Expected configureServer hook');
+      // SAFETY: `this` is unused by `configureServer`'s implementation, and the
+      // fake server exposes exactly the two members it reads (`ssrLoadModule`,
+      // `middlewares.use`) — not Vite's full `ViteDevServer` interface.
       void configureServer.call(
         {} as never,
         {
@@ -52,6 +59,8 @@ describe('spaceHttpPlugin', () => {
     });
     const configureServer = plugin.configureServer;
     if (typeof configureServer !== 'function') throw new Error('Expected configureServer hook');
+    // SAFETY: same as above — `this` is unused, and the fake server exposes
+    // only the two members `configureServer` reads.
     void configureServer.call(
       {} as never,
       {
@@ -77,6 +86,8 @@ describe('spaceHttpPlugin', () => {
     const failedConfigureServer = failedPlugin.configureServer;
     if (typeof failedConfigureServer !== 'function')
       throw new Error('Expected configureServer hook');
+    // SAFETY: same as the two sites above — `this` is unused, and the fake
+    // server exposes only the two members `configureServer` reads.
     void failedConfigureServer.call(
       {} as never,
       {
@@ -104,6 +115,9 @@ describe('spaceHttpPlugin', () => {
     if (typeof configurePreviewServer !== 'function') {
       throw new Error('Expected configurePreviewServer hook');
     }
+    // SAFETY: `this` is unused by `configurePreviewServer`'s implementation,
+    // and the fake server exposes exactly the one member it reads
+    // (`middlewares.use`) — not Vite's full `PreviewServer` interface.
     void configurePreviewServer.call(
       {} as never,
       {

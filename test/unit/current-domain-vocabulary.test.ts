@@ -179,6 +179,10 @@ const readTracked = (file: string): string | null => {
 };
 
 describe('the retired domain vocabulary is gone from tracked files', () => {
+  // SAFETY: `includes` only needs to compare `file` against the literal
+  // members of `QUALIFIED_FILES` at runtime — the cast doesn't claim `file`
+  // is one of them, it just lets a plain `string` be checked against a
+  // narrower tuple's `includes` signature.
   const scanned = trackedFiles().filter(
     (file) =>
       !HISTORICAL_TREES.some((tree) => file.startsWith(tree)) &&

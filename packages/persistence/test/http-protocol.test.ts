@@ -25,6 +25,9 @@ const snapshot: SpaceSnapshot = {
 
 /** The wire is JSON, so a round trip that skips it would not prove anything. */
 const overTheWire = (loaded: LoadedSpace): LoadedSpace =>
+  // SAFETY: `JSON.parse` returns `any`; the cast narrows it to `unknown` so
+  // `decodeLoadedSpace`'s own runtime validation is what's under test here,
+  // not an unchecked `any` flowing straight through.
   decodeLoadedSpace(JSON.parse(JSON.stringify(encodeLoadedSpace(loaded))) as unknown);
 
 const BIGINT_MAX = 9_223_372_036_854_775_807n;

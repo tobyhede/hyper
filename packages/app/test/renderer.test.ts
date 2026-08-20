@@ -135,6 +135,9 @@ function refusal(act: () => void): RendererInvariantError {
     act();
   } catch (error) {
     expect(error).toBeInstanceOf(RendererInvariantError);
+    // SAFETY: the assertion above just proved `error` is a
+    // RendererInvariantError at runtime; `toBeInstanceOf` has no
+    // type-narrowing effect, so this recovers what was just checked.
     return error as RendererInvariantError;
   }
   throw new Error('expected a RendererInvariantError, and nothing was thrown');

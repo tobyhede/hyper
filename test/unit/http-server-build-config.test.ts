@@ -11,6 +11,11 @@ import config from '../../packages/app/http-server-build.config';
  * run from the repo root, which is exactly the discrepancy worth catching.
  */
 describe('http server build config', () => {
+  // SAFETY: Vite's `UserConfig` types `resolve`/`build` far more broadly than
+  // this one config file actually uses — `http-server-build.config.ts` is a
+  // literal object naming exactly `resolve.alias` (a plain string map) and
+  // `build.ssr`/`build.outDir` (both strings), so narrowing to just what this
+  // file reads doesn't claim anything the config doesn't provide.
   const resolved = config as {
     resolve?: { alias?: Record<string, string> };
     build?: { ssr?: string; outDir?: string };

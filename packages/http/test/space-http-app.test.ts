@@ -402,12 +402,18 @@ describe('Space HTTP application', () => {
       },
     });
 
-    const response = await createSpaceHttpApp(repository()).request(`/api/spaces/${SPACE_ID}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: endless,
-      duplex: 'half',
-    } as RequestInit);
+    const response = await createSpaceHttpApp(repository()).request(
+      `/api/spaces/${SPACE_ID}`,
+      // SAFETY: `duplex: 'half'` is required by the Fetch spec for a streaming
+      // request body, but the DOM lib's `RequestInit` type in this TypeScript
+      // version doesn't declare it yet — the field is real, just untyped.
+      {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: endless,
+        duplex: 'half',
+      } as RequestInit,
+    );
 
     expect(response.status).toBe(413);
     expect(pulled).toBeLessThanOrEqual(MAX_COMMIT_BODY_BYTES * 16);

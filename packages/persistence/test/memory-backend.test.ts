@@ -71,6 +71,10 @@ describe('MemorySpaceBackend', () => {
     const message = result.kind === 'permanent-failure' ? result.message : '';
     expect(message).toMatch(/^document\.title: \S/);
     expect(message.startsWith('[')).toBe(false);
+    // SAFETY: `JSON.parse` returns `any`; narrowed to `unknown` only so this
+    // stays a type-checked no-op cast rather than letting `any` mask what the
+    // assertion below is actually about — `message` is prose, not JSON, and is
+    // expected to throw before the cast's type ever matters.
     expect(() => JSON.parse(message) as unknown).toThrow();
   });
 

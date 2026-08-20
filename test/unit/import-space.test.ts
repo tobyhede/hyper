@@ -149,8 +149,13 @@ describe('importSingleSpace', () => {
     const error = await captureError(() => importSingleSpace(directory, repository));
 
     expect(error).toBeInstanceOf(SpaceImportFileError);
+    // SAFETY: the assertion above just proved `error` is a SpaceImportFileError
+    // at runtime; TypeScript's `toBeInstanceOf` has no type-narrowing effect,
+    // so each cast below recovers what was just checked.
     expect((error as SpaceImportFileError).kind).toBe('parsing');
+    // SAFETY: same as above.
     expect((error as SpaceImportFileError).diagnostics).toHaveLength(1);
+    // SAFETY: same as above.
     expect((error as SpaceImportFileError).diagnostics[0]).toContain('version 2');
     expect(repository.imports).toEqual([]);
   });
@@ -176,8 +181,13 @@ describe('importSingleSpace', () => {
     const error = await captureError(() => importSingleSpace(directory, repository));
 
     expect(error).toBeInstanceOf(SpaceImportFileError);
+    // SAFETY: the assertion above just proved `error` is a SpaceImportFileError
+    // at runtime; TypeScript's `toBeInstanceOf` has no type-narrowing effect,
+    // so each cast below recovers what was just checked.
     expect((error as SpaceImportFileError).kind).toBe('parsing');
+    // SAFETY: same as above.
     expect((error as SpaceImportFileError).diagnostics).toHaveLength(1);
+    // SAFETY: same as above.
     expect((error as SpaceImportFileError).diagnostics[0]).toContain('`graphs`');
     expect(repository.imports).toEqual([]);
   });
