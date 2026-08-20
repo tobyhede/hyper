@@ -23,45 +23,6 @@ body {
   color: var(--foreground);
 }
 
-/* ---- Startup failure ---- */
-.startup-error {
-  display: grid;
-  min-height: 100%;
-  place-items: center;
-  padding: 2rem;
-}
-
-.startup-error__panel {
-  width: min(48rem, 100%);
-  padding: 1.5rem;
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-}
-
-.startup-error__panel h1 {
-  margin: 0 0 0.75rem;
-  font-size: 1.25rem;
-}
-
-.startup-error__panel p {
-  margin: 0 0 1rem;
-  color: var(--muted-foreground);
-}
-
-.startup-error__panel pre {
-  margin: 0;
-  padding: 1rem;
-  overflow: auto;
-  background: var(--background);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 0.8rem;
-  line-height: 1.5;
-  white-space: pre-wrap;
-}
-
 /* ---- Workspace selection ---- */
 .workspace-selection {
   display: grid;
@@ -182,41 +143,6 @@ body {
 .graph-area {
   position: absolute;
   inset: 0;
-}
-
-.placement-status {
-  display: grid;
-  height: 100%;
-  place-items: center;
-  padding: 2rem;
-  color: var(--muted-foreground);
-}
-
-.placement-status__panel {
-  width: min(36rem, 100%);
-  padding: 1.5rem;
-  color: var(--foreground);
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-}
-
-.placement-status__panel h2 {
-  margin: 0 0 1rem;
-  font-size: 1.1rem;
-}
-
-.placement-status__panel pre {
-  margin: 0;
-  /* A placement failure can carry every unresolved id at once. Bounded here so
-     a long one scrolls inside the panel instead of growing it past the canvas
-     and taking its own close affordance off screen. */
-  max-height: 40vh;
-  overflow: auto;
-  color: var(--muted-foreground);
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 0.8rem;
-  white-space: pre-wrap;
 }
 
 /* ---- Card node ---- */

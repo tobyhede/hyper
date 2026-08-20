@@ -4,6 +4,7 @@ import type { SpaceSummary } from '@project/persistence';
 import { createAppRouter } from './router';
 import type { OpenedSpace } from './open-workspace';
 import { mountWorkspace } from './Workspace';
+import { StartupFailure } from './components/StartupFailure';
 import { WorkspaceSelection } from './WorkspaceSelection';
 
 export interface ApplicationRoot {
@@ -25,9 +26,6 @@ export type ApplicationStartupResult = OpenedApplicationStartup | SelectionAppli
 export type ApplicationStartupResolver = () => Promise<ApplicationStartupResult>;
 export type WorkspaceSelectionOpener = (id: UUID) => Promise<OpenedSpace>;
 
-const errorMessage = (error: unknown): string =>
-  error instanceof Error ? error.message : 'An unknown startup error occurred.';
-
 const renderOpenedWorkspace = (root: ApplicationRoot, opened: OpenedSpace): void => {
   mountWorkspace(opened, (app) => {
     const AppRouter = createAppRouter(() => app);
@@ -39,16 +37,11 @@ const renderOpenedWorkspace = (root: ApplicationRoot, opened: OpenedSpace): void
   });
 };
 
+const errorMessage = (error: unknown): string =>
+  error instanceof Error ? error.message : 'An unknown startup error occurred.';
+
 const renderStartupError = (root: ApplicationRoot, error: unknown): void => {
-  root.render(
-    <main className="startup-error" role="alert">
-      <section className="startup-error__panel">
-        <h1>Application could not start</h1>
-        <p>The space could not be opened.</p>
-        <pre>{errorMessage(error)}</pre>
-      </section>
-    </main>,
-  );
+  root.render(<StartupFailure message={errorMessage(error)} />);
 };
 
 /** Open and render the app, replacing an empty root with diagnostics on failure. */
