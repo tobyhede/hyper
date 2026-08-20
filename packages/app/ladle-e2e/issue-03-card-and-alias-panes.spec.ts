@@ -26,6 +26,21 @@ test(
   },
 );
 
+test(
+  'Alias Card story is present in the production catalogue',
+  { tag: '@parity:alias-pane-authors-metadata' },
+  async ({ page }) => {
+    await page.goto('/?story=components--card-and-alias-panes--alias&mode=preview');
+
+    const dialog = page.getByRole('dialog', { name: 'Placement recap' });
+    await expect(dialog.getByRole('textbox', { name: 'Title' })).toHaveValue('Placement recap');
+    await expect(dialog.getByRole('combobox', { name: 'Target' })).toHaveValue(
+      'Architecture notes',
+    );
+    await expect(dialog.getByRole('textbox', { name: 'Markdown source' })).toHaveCount(0);
+  },
+);
+
 test('review Alias empty state explains that no Target is eligible', async ({ page }) => {
   await page.goto('/?story=review--alias-pane-unreachable-states--empty&mode=preview');
 
