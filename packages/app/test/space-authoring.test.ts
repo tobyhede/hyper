@@ -2019,21 +2019,30 @@ describe('Space Authoring', () => {
     // valid when it was made — an accepted remote Space that dropped it, say.
     // Authoring may not resurrect it, so the Edit is refused rather than
     // written to a fresh Layout under the missing id.
-    const navigation = {
-      getState: () =>
-        ({
-          selectedRenderer: { kind: 'layout', layoutId: LAYOUT_ID },
-          activeGraphId: GRAPH_ID,
-        }) as NavigationState,
-      subscribe: () => () => undefined,
-      continueInRenderer: () => undefined,
-      activateGraph: () => undefined,
-    } as unknown as Navigation;
+    const resolveRenderer = testResolver();
+    const real = createNavigation(currentSpace, resolveRenderer, { kind: 'view', view: 'flow' });
+    const navigation: Navigation = {
+      ...real,
+      getState: () => ({
+        ...real.getState(),
+        selectedRenderer: { kind: 'layout', layoutId: LAYOUT_ID },
+        activeGraphId: GRAPH_ID,
+      }),
+      // The refusal this test pins happens before Authoring would adopt a
+      // renderer, so neither is expected to run against `real`'s own state —
+      // which the fixed `getState` above has already diverged from.
+      continueInRenderer: () => {
+        throw new Error('A refused Edit must not adopt a renderer.');
+      },
+      activateGraph: () => {
+        throw new Error('A refused Edit must not activate a Graph.');
+      },
+    };
     const authoring = createSpaceAuthoring({
       session,
       navigation,
       currentSpace,
-      resolveRenderer: testResolver(),
+      resolveRenderer,
     });
     replacePlacementForTest(
       authoring,

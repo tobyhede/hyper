@@ -59,7 +59,7 @@ function authoringSpy({ refusing }: AuthoringCapabilities = {}) {
   const installs: InstallRecord[] = [];
   const completions: unknown[] = [];
   let adapter: RenderAdapter | null = null;
-  const authoring = {
+  const authoring: SpaceAuthoring = {
     getState: () => ({}) as never,
     authoredPlacement: () => null,
     subscribe: () => () => undefined,
@@ -86,8 +86,10 @@ function authoringSpy({ refusing }: AuthoringCapabilities = {}) {
       return { kind: 'completed' };
     },
     retryPersistence: () => undefined,
+    keepLocalWork: () => undefined,
+    acceptStoredSpace: () => null,
     dispose: () => undefined,
-  } as unknown as SpaceAuthoring;
+  };
   return {
     authoring,
     installs,

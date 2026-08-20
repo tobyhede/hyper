@@ -109,7 +109,7 @@ const placementArb = fc
   .map((entries) => Placement.fromEntries(entries));
 
 const asPolicy = (answer: readonly GraphWithoutId[]): ViewGraphPolicy =>
-  (() => answer) as unknown as ViewGraphPolicy;
+  ((_space: Space, _subject: RendererSubject, _placement: Placement) => answer) as ViewGraphPolicy;
 
 const matchesSubject = (subject: RendererSubject, placement: Placement): boolean =>
   placement.size === subject.cards.length && subject.cards.every((card) => placement.has(card.id));

@@ -197,13 +197,10 @@ describe('typed Hono HttpSpaceBackend failure classification', () => {
       new Promise<T>((_resolve, reject) => {
         signal?.addEventListener('abort', () => reject(new Error('aborted')));
       });
-    return {
-      ok: status >= 200 && status < 300,
-      status,
-      headers: new Headers(),
+    return Object.assign(new Response(null, { status }), {
       json: stalled<unknown>,
       text: stalled<string>,
-    } as unknown as Response;
+    });
   };
 
   it('times out a response whose body never arrives', async () => {
