@@ -16,6 +16,13 @@ test(
     await expect(rest.locator('.canvas-card__title')).toHaveCSS('color', 'rgb(18, 22, 28)');
     await expect(rest.locator('.canvas-card__kind')).toHaveCSS('color', 'rgb(11, 13, 17)');
 
+    const restingConnect = page.getByRole('button', { name: 'Connect from Strategies' });
+    await expect(restingConnect).toHaveCSS('opacity', '1');
+    await expect(rest.locator('.canvas-card__actions')).toHaveCSS('opacity', '0');
+    await restingConnect.focus();
+    await expect(restingConnect).toBeFocused();
+    await expect(rest.locator('.canvas-card__actions')).toHaveCSS('opacity', '1');
+
     const connect = page.getByRole('button', { name: 'Connect from Traversal' });
     await connect.focus();
     await expect(connect).toBeFocused();

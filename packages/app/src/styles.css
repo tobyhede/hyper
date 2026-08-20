@@ -159,10 +159,10 @@ body {
    treatment stays here with the graph/card CSS, while @project/ui owns the
    markup and semantic state interface. */
 .canvas-card {
-  --canvas-card-ink: var(--canvas-card-ink-color, #0b0d11);
-  --canvas-card-face: var(--canvas-card-face-rest, #f4efe4);
-  --canvas-card-active-face: var(--canvas-card-face-active, #fffaf0);
-  --canvas-card-title: var(--canvas-card-title-color, #12161c);
+  --canvas-card-ink: var(--canvas-card-ink-color);
+  --canvas-card-face: var(--canvas-card-face-rest);
+  --canvas-card-active-face: var(--canvas-card-face-active);
+  --canvas-card-title: var(--canvas-card-title-color);
 
   position: relative;
   box-sizing: border-box;
@@ -237,14 +237,19 @@ body {
 }
 
 .canvas-card__actions {
-  display: none;
+  display: flex;
   align-items: center;
   gap: 4px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 100ms ease;
 }
 
 .canvas-card:is([data-state='hover'], [data-state='selected'], [data-state='selected-hover'])
-  .canvas-card__actions {
-  display: flex;
+  .canvas-card__actions,
+.canvas-card__actions:focus-within {
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .canvas-card :is(.card__connect, .card__edit) {
@@ -394,7 +399,8 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .canvas-card,
   .canvas-card__rail,
-  .canvas-card__kind {
+  .canvas-card__kind,
+  .canvas-card__actions {
     transition: none;
   }
 }

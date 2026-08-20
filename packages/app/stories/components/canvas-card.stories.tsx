@@ -7,7 +7,22 @@ export default { title: 'Components/Canvas Card' };
 /** The exported production component, shown across its authored kinds and states. */
 export const States: Story = () => (
   <div className="flex flex-wrap gap-8 p-8" style={cardSizeVars}>
-    <CanvasCard kind="markdown" state="rest" title="Strategies" graphColor="#ffc53d" />
+    <CanvasCard
+      kind="markdown"
+      state="rest"
+      title="Strategies"
+      graphColor="#ffc53d"
+      actions={
+        <Button
+          variant="ghost"
+          size="icon"
+          className="card__connect"
+          aria-label="Connect from Strategies"
+        >
+          <ConnectIcon />
+        </Button>
+      }
+    />
     <CanvasCard
       kind="markdown"
       state="selected"
