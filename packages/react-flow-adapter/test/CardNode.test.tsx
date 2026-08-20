@@ -17,16 +17,21 @@ import { uuid } from './uuid';
  * longer calls it, so that re-introducing the call is caught here rather than
  * only in a browser.
  */
+/**
+ * The live connection React Flow reports, so a test can put a drag in flight.
+ *
+ * `fromHandle` is the end the drag is anchored at, and React Flow always
+ * supplies it while `inProgress` — it is what says whether the drag is looking
+ * for a target (an ordinary connection, anchored at a source) or for a source
+ * (a reconnection that took hold of an Edge's `from` end).
+ */
+interface MockConnectionState {
+  inProgress: boolean;
+  fromHandle: { type: 'source' | 'target' };
+}
+
 const { updateNodeInternals, connection } = vi.hoisted(() => {
-  /**
-   * The live connection React Flow reports, so a test can put a drag in flight.
-   *
-   * `fromHandle` is the end the drag is anchored at, and React Flow always
-   * supplies it while `inProgress` — it is what says whether the drag is looking
-   * for a target (an ordinary connection, anchored at a source) or for a source
-   * (a reconnection that took hold of an Edge's `from` end).
-   */
-  const connection: { inProgress: boolean; fromHandle: { type: 'source' | 'target' } } = {
+  const connection: MockConnectionState = {
     inProgress: false,
     fromHandle: { type: 'source' },
   };
@@ -45,7 +50,7 @@ vi.mock('@xyflow/react', async (importOriginal) => {
   return {
     ...actual,
     useUpdateNodeInternals: () => updateNodeInternals,
-    useConnection: (selector: (state: typeof connection) => unknown) => selector(connection),
+    useConnection: <T,>(selector: (state: MockConnectionState) => T): T => selector(connection),
     Handle: ({
       className,
       style,

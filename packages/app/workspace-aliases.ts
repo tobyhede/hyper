@@ -13,14 +13,14 @@ import { fileURLToPath } from 'node:url';
  * anchor on cwd, which is the app package only for the one filtered script that
  * loads the build config.
  */
-export const workspaceAliases = (): Record<string, string> => {
+export const workspaceAliases = () => {
   const here = (path: string): string => fileURLToPath(new URL(path, import.meta.url));
   return {
     '@project/core': here('../core/src/index.ts'),
     '@project/graph': here('../graph/src/index.ts'),
     '@project/http': here('../http/src/index.ts'),
     '@project/persistence': here('../persistence/src/index.ts'),
-  };
+  } satisfies Record<string, string>;
 };
 
 /** The same packages, for the SSR build's `noExternal`. */

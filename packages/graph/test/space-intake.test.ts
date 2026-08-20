@@ -91,7 +91,7 @@ const layout = (
   id: string,
   positions: Record<string, { x: number; y: number }>,
   graphs: unknown[],
-  extra: Record<string, unknown> = {},
+  extra: { readonly activeGraph?: string } = {},
 ) => ({ id, title: `Layout ${id}`, kind: 'positioned', positions, graphs, ...extra });
 
 /** One Layout over A and B, owning one Graph that joins them. */

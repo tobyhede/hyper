@@ -158,8 +158,14 @@ const earnedRefusals = (
   return earned;
 };
 
+/** A `counter`'s minting function, and how many ids it has minted so far. */
+interface Counter {
+  readonly newGraphId: () => GraphId;
+  readonly used: () => number;
+}
+
 /** An identity source that never repeats, so freshness is about the boundary. */
-function counter(start = 0x900): { newGraphId: () => GraphId; used: () => number } {
+function counter(start = 0x900): Counter {
   let next = start;
   let used = 0;
   return {

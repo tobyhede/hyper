@@ -95,7 +95,13 @@ const writeValidSpace = async (id: UUID = SPACE_ID, title = 'Imported talk'): Pr
   return directory;
 };
 
-const captureIo = (): { io: CliIo; stdout: string[]; stderr: string[] } => {
+interface CapturedIo {
+  readonly io: CliIo;
+  readonly stdout: string[];
+  readonly stderr: string[];
+}
+
+const captureIo = (): CapturedIo => {
   const stdout: string[] = [];
   const stderr: string[] = [];
   return {

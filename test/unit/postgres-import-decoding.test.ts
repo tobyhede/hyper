@@ -114,7 +114,7 @@ describe('PostgresSpaceRepository import decoding', () => {
    * schemas hand their summariser the same issue list and the CLI and the wire
    * can be held to the same string at each boundary.
    */
-  const documentFailingIn = (paths: 1 | 3 | 4 | 5): unknown => ({
+  const documentFailingIn = (paths: 1 | 3 | 4 | 5) => ({
     id: SPACE_ID,
     document: {
       version: paths === 1 ? 1 : 9,

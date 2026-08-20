@@ -28,10 +28,10 @@ const DEFAULT_NODE_HEIGHT = 300;
 export type GraphEmphasis = 'equal' | 'subtle';
 
 /** Opacity applied to graphs that are not the active one. */
-export const OTHER_GRAPH_OPACITY: Record<GraphEmphasis, number> = {
+export const OTHER_GRAPH_OPACITY = {
   equal: 1,
   subtle: 0.35,
-};
+} satisfies Record<GraphEmphasis, number>;
 
 /** A graph handle resolved for rendering: a color and a vertical offset (px from
  *  the node's top) matching where ELK placed the port. */

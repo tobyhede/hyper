@@ -192,8 +192,14 @@ describe('canvasRenderers', () => {
   });
 });
 
+/** What a `RendererInvariantError` gave, once a call is known to have thrown one. */
+interface AttemptFailure {
+  readonly reason: string;
+  readonly message: string;
+}
+
 /** The `RendererInvariantError` a call threw, or a failure naming what it did instead. */
-function attempt(call: () => unknown): { reason: string; message: string } {
+function attempt(call: () => void): AttemptFailure {
   try {
     call();
   } catch (error) {

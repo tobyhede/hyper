@@ -88,11 +88,17 @@ function spaceWith(extra: Record<string, unknown> = {}): Space {
   return result.space;
 }
 
+/** A `deterministicResolver`'s resolver, and the sequence of ids it minted. */
+interface DeterministicResolver {
+  readonly resolve: ResolveRenderer;
+  readonly minted: GraphId[];
+}
+
 /**
  * A resolver whose minted identities are a known sequence, so a conversion's
  * output can be named rather than merely counted.
  */
-function deterministicResolver(start = 0x900): { resolve: ResolveRenderer; minted: GraphId[] } {
+function deterministicResolver(start = 0x900): DeterministicResolver {
   const minted: GraphId[] = [];
   let next = start;
   const resolve = createRendererResolver({
@@ -124,7 +130,7 @@ function asView(space: Space, selection?: Parameters<ResolveRenderer>[1]): Resol
  * never entered, would take the reason assertion with it silently. Failing here
  * when nothing throws is the whole point.
  */
-function refusal(act: () => unknown): RendererInvariantError {
+function refusal(act: () => void): RendererInvariantError {
   try {
     act();
   } catch (error) {

@@ -340,7 +340,7 @@ const freshEmptyGraph: ViewGraphPolicy = (_space, subject) => [
  * exposed before either question is answered would be a guess. Two definitions
  * behind one internal shape is enough to keep the shape honest.
  */
-const BUILT_IN_VIEWS: Readonly<Record<BuiltInViewId, BuiltInViewDefinition>> = {
+const BUILT_IN_VIEWS = {
   flow: {
     title: 'Flow',
     selectSubject: spaceSubject,
@@ -353,7 +353,7 @@ const BUILT_IN_VIEWS: Readonly<Record<BuiltInViewId, BuiltInViewDefinition>> = {
     createStrategy: gridStrategy,
     graphPolicy: freshEmptyGraph,
   },
-};
+} satisfies Readonly<Record<BuiltInViewId, BuiltInViewDefinition>>;
 
 /**
  * What a built-in View is called, for the chrome that lists every one of them.
