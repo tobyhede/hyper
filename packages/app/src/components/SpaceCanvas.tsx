@@ -140,7 +140,7 @@ export interface SpaceCanvasProps {
   editableCardIds: ReadonlySet<string>;
   graphs: readonly Graph[];
   colorByGraphId: Readonly<Record<string, string>>;
-  activeGraphId: string | null;
+  activeGraphId: GraphId | null;
   activeGraphCardIds: ReadonlySet<string>;
 }
 
@@ -239,12 +239,7 @@ export function SpaceCanvas({
     edges,
     projectedNodes,
     selection,
-    // SAFETY: `SpaceCanvasProps.activeGraphId` widens the branded `GraphId` to
-    // plain `string` at this component's boundary, the same as its sibling id
-    // props (`onOpenCard`, `editableCardIds`, `colorByGraphId`) — `App.tsx` is
-    // this component's one caller and always passes Navigation's own
-    // `GraphId | null` through unchanged.
-    activeGraphId: (activeGraphId as GraphId | null) ?? null,
+    activeGraphId,
     graphs,
     subjectCards,
     newCardTitle,

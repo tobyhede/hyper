@@ -32,6 +32,32 @@ interface RestrictedImports {
   readonly patterns: readonly { readonly group: readonly string[] }[];
 }
 
+function isRestrictedImports(value: unknown): value is RestrictedImports {
+  if (typeof value !== 'object' || value === null) return false;
+  if (!('paths' in value) || !('patterns' in value)) return false;
+  const { paths, patterns } = value;
+  // `Array.isArray` narrows to `any[]` in its lib types, not `unknown[]` — the
+  // explicit annotations below re-assert the honest element type it erases.
+  if (!Array.isArray(paths) || !Array.isArray(patterns)) return false;
+  const pathEntries: readonly unknown[] = paths;
+  const patternEntries: readonly unknown[] = patterns;
+
+  return (
+    pathEntries.every((entry) => {
+      if (typeof entry !== 'object' || entry === null || !('name' in entry)) return false;
+      const { name } = entry;
+      return typeof name === 'string';
+    }) &&
+    patternEntries.every((entry) => {
+      if (typeof entry !== 'object' || entry === null || !('group' in entry)) return false;
+      const { group } = entry;
+      if (!Array.isArray(group)) return false;
+      const groupEntries: readonly unknown[] = group;
+      return groupEntries.every((member) => typeof member === 'string');
+    })
+  );
+}
+
 const httpRestrictions = async (): Promise<RestrictedImports> => {
   const eslint = new ESLint({ cwd: process.cwd() });
   const config: unknown = await eslint.calculateConfigForFile('packages/http/src/index.ts');
@@ -53,11 +79,32 @@ const httpRestrictions = async (): Promise<RestrictedImports> => {
   // 2 is `error`. A zone downgraded to a warning would still be "configured"
   // while `--max-warnings=0` is the only thing left stopping the import.
   expect(severity).toBe(2);
-  // SAFETY: unverified here, but every assertion below reads `paths`/
-  // `patterns` off the return value — a real shape mismatch fails those
-  // assertions immediately rather than passing silently.
-  return options as RestrictedImports;
+  if (!isRestrictedImports(options)) {
+    throw new Error("@project/http's no-restricted-imports options have an unexpected shape.");
+  }
+  return options;
 };
+
+describe('isRestrictedImports', () => {
+  const validRestrictedImports = { paths: [{ name: 'fs' }], patterns: [{ group: ['fs/*'] }] };
+
+  it('accepts the options the rule actually has', () => {
+    expect(isRestrictedImports(validRestrictedImports)).toBe(true);
+  });
+
+  it.each([
+    ['not an object', 'a string'],
+    ['null', null],
+    ['missing paths', { patterns: [] }],
+    ['missing patterns', { paths: [] }],
+    ['a path entry with no name', { paths: [{}], patterns: [] }],
+    ['a path entry with a non-string name', { paths: [{ name: 1 }], patterns: [] }],
+    ['a pattern entry with no group', { paths: [], patterns: [{}] }],
+    ['a pattern entry whose group holds a non-string', { paths: [], patterns: [{ group: [1] }] }],
+  ])('rejects %s', (_description, candidate) => {
+    expect(isRestrictedImports(candidate)).toBe(false);
+  });
+});
 
 describe('@project/http Node builtin restrictions', () => {
   it('restricts every bare Node builtin specifier', async () => {

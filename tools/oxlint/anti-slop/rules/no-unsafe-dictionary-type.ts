@@ -5,6 +5,7 @@ import {
 	classifyUnsafeDictionaryValue,
 	createTypeEnvironment,
 	type TypeEnvironment,
+	type UnsafeDictionary,
 } from "../shared/dictionary-types.ts";
 
 import type { ESTree } from "@oxlint/plugins";
@@ -72,16 +73,42 @@ function isPlainAliasConsumerUse(node: ESTree.TSType, environment: TypeEnvironme
 	return name !== null && environment.aliases.has(name) && !isInsideTypeAliasDeclaration(node);
 }
 
-function shouldReportType(node: ESTree.TSType, environment: TypeEnvironment): boolean {
-	if (isPlainAliasConsumerUse(node, environment)) return false;
-	if (classifyUnsafeDictionary(node, environment) === null) return false;
+/**
+ * Every reported node's own classification is asked for at least twice
+ * (once to decide whether to report it, once more by every descendant's
+ * ancestor walk that passes through it), and `classifyUnsafeDictionary`
+ * re-resolves aliases and wrappers from scratch each time. A node's AST
+ * identity is stable for the lifetime of one file's lint pass, so caching by
+ * node is exact, not an approximation.
+ */
+function memoizedClassifier(
+	environment: TypeEnvironment,
+): (node: ESTree.TSType) => UnsafeDictionary | null {
+	const classifications = new Map<ESTree.TSType, UnsafeDictionary | null>();
+	return (node) => {
+		const cached = classifications.get(node);
+		if (cached !== undefined) return cached;
+		const result = classifyUnsafeDictionary(node, environment);
+		classifications.set(node, result);
+		return result;
+	};
+}
+
+/**
+ * A type is reported when it is itself unsafe and no ancestor type node is
+ * also unsafe — an ancestor's own report already covers it, so only the
+ * outermost offender in a nested chain is flagged.
+ */
+function hasUnsafeAncestor(
+	node: ESTree.TSType,
+	classify: (node: ESTree.TSType) => UnsafeDictionary | null,
+): boolean {
 	let current: ESTree.Node | null = node.parent;
 	while (current !== null && current.type !== "Program") {
-		if (isTypeNode(current) && classifyUnsafeDictionary(current, environment) !== null)
-			return false;
+		if (isTypeNode(current) && classify(current) !== null) return true;
 		current = current.parent;
 	}
-	return true;
+	return false;
 }
 
 /** Disallow object-dictionary contracts whose direct value type is an unsafe escape hatch. */
@@ -99,19 +126,22 @@ export const noUnsafeDictionaryTypeRule = defineRule({
 	},
 	createOnce(context) {
 		let environment: TypeEnvironment | null = null;
+		let classify: ((node: ESTree.TSType) => UnsafeDictionary | null) | null = null;
 		const report = (node: ESTree.Node, value: string) => {
 			context.report({ node, messageId: "unsafeDictionary", data: { value } });
 		};
 		const reportIfUnsafe = (node: ESTree.TSType) => {
-			if (environment === null || !shouldReportType(node, environment)) return;
-			const unsafe = classifyUnsafeDictionary(node, environment);
-			if (unsafe === null) return;
+			if (environment === null || classify === null || isPlainAliasConsumerUse(node, environment))
+				return;
+			const unsafe = classify(node);
+			if (unsafe === null || hasUnsafeAncestor(node, classify)) return;
 			report(node, unsafe.unsafeValue);
 		};
 
 		return {
 			Program(node) {
 				environment = createTypeEnvironment(node);
+				classify = memoizedClassifier(environment);
 			},
 			TSTypeReference: reportIfUnsafe,
 			TSTypeLiteral: reportIfUnsafe,
