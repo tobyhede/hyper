@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { uuidSchema, type CardId } from '@project/core';
+import { GRAPH_PALETTE } from '../src/colors';
 import { OpenCard } from '../src/components/OpenCard';
 
 const CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
@@ -286,5 +287,32 @@ describe('the opened Card as a dialog', () => {
     );
 
     await waitFor(() => expect(screen.getByRole('combobox', { name: 'Target' })).toHaveFocus());
+  });
+});
+
+describe('the graph color rail, with no Active Graph color supplied', () => {
+  /** `--card-editor-graph`, read off the pane Base UI portals onto `document.body`. */
+  const graphRailColor = (): string | undefined =>
+    document.body
+      .querySelector('.card-editor')
+      ?.getAttribute('style')
+      ?.match(/--card-editor-graph:\s*([^;]+)/)?.[1];
+
+  it('falls back to the same palette slot for a Markdown Card as for an Alias', () => {
+    const markdownRender = render(
+      <OpenCard card={markdown()} onComplete={vi.fn(() => null)} onCancel={vi.fn()} />,
+    );
+    expect(graphRailColor()).toBe(GRAPH_PALETTE[0]);
+    markdownRender.unmount();
+
+    const aliasRender = render(
+      <OpenCard
+        through={{ id: ALIAS_ID, title: 'A again', kind: 'alias', target: CARD_ID }}
+        occurrence={{ targets: [markdown()], onEdit: vi.fn(() => null) }}
+        onCancel={vi.fn()}
+      />,
+    );
+    expect(graphRailColor()).toBe(GRAPH_PALETTE[0]);
+    aliasRender.unmount();
   });
 });

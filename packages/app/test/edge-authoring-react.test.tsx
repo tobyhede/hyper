@@ -956,14 +956,15 @@ describe('withdrawing Edge authoring', () => {
  * Escape cancels exactly one topmost surface, and the picker's open list is a
  * surface above the connection draft.
  *
- * **In Chromium the `data-state` guard is not what produces those two stages**,
- * and that is the first thing to know about this test. Measured against the
- * fixture: Radix closes from a document capture listener, and the microtask
- * checkpoint the browser performs *between* listeners commits that close before
- * React's delegated listener runs — by which time the cmdk input is detached and
- * React has stripped its fiber, so nothing dispatches, the handler is never
- * asked, and the trigger already reads `closed`. `editing.spec.ts` passes with
- * the guard removed, and the author's two stages are the e2e's to pin.
+ * **In Chromium the `aria-expanded` guard is not what produces those two
+ * stages**, and that is the first thing to know about this test. Measured
+ * against the fixture: Base UI closes from a document listener, and the
+ * microtask checkpoint the browser performs *between* listeners commits that
+ * close before React's delegated listener runs — by which time the cmdk input
+ * is detached and React has stripped its fiber, so nothing dispatches, the
+ * handler is never asked, and the trigger already reads `false`.
+ * `editing.spec.ts` passes with the guard removed, and the author's two stages
+ * are the e2e's to pin.
  *
  * What this pins is the **rule**, in the one environment that can see it. A
  * portal is no escape from the React tree — Base UI renders the list through a

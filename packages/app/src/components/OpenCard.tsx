@@ -25,6 +25,7 @@ import {
 import { CardPane } from './CardPane';
 import { paneInitialFocus } from './pane-focus';
 import { presentAliasCardRefusal, presentMarkdownCardRefusal } from '../authoring-refusal';
+import { GRAPH_PALETTE } from '../colors';
 import type { AuthoringRefusal } from '../space-authoring';
 
 /**
@@ -457,7 +458,7 @@ export function OpenCard(props: OpenCardProps) {
     <MarkdownCardEditor
       key={props.card.id}
       content={props.card}
-      graphColor={props.graphColor ?? '#6ea8fe'}
+      graphColor={props.graphColor ?? GRAPH_PALETTE[0]}
       onComplete={props.onComplete}
       onCancel={onCancel}
     />
@@ -465,7 +466,7 @@ export function OpenCard(props: OpenCardProps) {
     <AliasCardEditor
       key={props.through.id}
       alias={props.through}
-      graphColor={props.graphColor ?? '#6ea8fe'}
+      graphColor={props.graphColor ?? GRAPH_PALETTE[0]}
       occurrence={props.occurrence}
       onCancel={onCancel}
     />
