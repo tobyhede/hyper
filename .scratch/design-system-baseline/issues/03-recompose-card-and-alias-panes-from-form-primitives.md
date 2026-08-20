@@ -46,8 +46,9 @@ The opened Markdown and Alias forms own their validation/error state locally,
 so their deterministic stories reach those states through the same `Done`
 interaction production uses. Injecting a fixed error would add a story-only
 state seam, which ADR 0052 forbids. Focus variants need no alternate fixture:
-the Markdown and opened-Alias stories assert their Title focus; New Alias focus
-remains covered by application tests.
+the Markdown story asserts Title focus; opened-Alias and New Alias both open
+on their Target picker, since the title stays editable from the Card's own
+front — both are covered by application tests.
 
 ### Donor accounting
 

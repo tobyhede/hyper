@@ -15,7 +15,7 @@ pointers on a clean branch from `main` with the Ladle-infrastructure delivery.
 - [x] Decide whether the rule is hard to reverse, surprising and a real trade-off under `docs/agents/workflow.md`.
 - [x] If it clears that bar, write an ADR that records the rejected alternatives and the catalogue convenience accepted as a cost; otherwise keep the narrow operational rule in agent guidance and record why an ADR was unnecessary in this ticket.
 - [x] Reconcile AGENTS.md, the shadcn-first skill, `.ladle/config.mjs` and issue 08 so one source owns the rule and the others point to it rather than restating competing versions.
-- [ ] Deliver ADR 0052 and those operational pointers to `main` before Issue 08 treats the parity gate as available.
+- [x] Deliver ADR 0052 and those operational pointers to `main` before Issue 08 treats the parity gate as available.
 
 ## Answer
 
@@ -48,5 +48,5 @@ ADR, so this extraction does not restore the donor's duplicated AGENTS.md rule.
 This extraction also supplies the static Ladle runtime, its taxonomy and
 catalogue baseline, with `.ladle/config.mjs` pointing to ADR 0052. Issue 08
 retains the parity manifest, dual-evidence enforcement, runtime collection
-checks and CI gate. Merge and final PR accounting remain before this ticket can
-be resolved.
+checks and CI gate. ADR 0052 is confirmed merged to `main`; merge and final PR
+accounting are complete.

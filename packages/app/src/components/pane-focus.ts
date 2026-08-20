@@ -1,7 +1,9 @@
 /**
  * Where focus goes when a `CardPane` opens, when its first focusable is the
- * wrong answer. The Alias creation state opens on its Target picker, which the
- * storyboard draws *below* the title it is more urgent than.
+ * wrong answer. An Alias pane opens on its Target picker, which the
+ * storyboard draws *below* the title it is more urgent than — the title
+ * remains editable from the Card's own front, so the picker is the field
+ * that needs the pane to open it.
  *
  * A module of its own, holding both halves of one contract: the selector the
  * pane queries with, and the props a field declares itself with. They are two

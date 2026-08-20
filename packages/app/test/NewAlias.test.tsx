@@ -98,6 +98,23 @@ describe('NewAlias', () => {
     );
   });
 
+  it('keeps the Target refusal reference when no choices remain', () => {
+    render(
+      <NewAlias
+        targets={[]}
+        refusal={{ code: 'alias-target-not-found', targetId: TARGET_ID }}
+        onCreate={() => undefined}
+        onCancel={() => undefined}
+        onRefusalStale={() => undefined}
+      />,
+    );
+
+    const combobox = screen.getByRole('combobox', { name: 'Target' });
+    expect(combobox.getAttribute('aria-describedby')?.split(' ')).toContain(
+      'new-alias-target-error',
+    );
+  });
+
   it('says nothing while there is no refusal to go stale', () => {
     const staleRefusal = vi.fn();
     render(

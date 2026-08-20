@@ -408,6 +408,7 @@ function AliasCardEditor({
           value={target}
           inputRef={targetInput}
           inputAttributes={{
+            ...paneInitialFocus(true),
             'aria-invalid': targetError !== null,
             'aria-describedby': targetError === null ? undefined : 'open-alias-target-error',
           }}

@@ -335,6 +335,7 @@ test('an alias node names the card it redraws and opens its own metadata', async
   await expect(page.getByRole('option', { name: 'Markdown Card A' }).locator('svg')).toHaveCount(2);
   await expect(page.getByRole('textbox', { name: 'Markdown source' })).toHaveCount(0);
   await target.press('Escape');
+  await expect(page.getByTestId('open-card')).toBeVisible();
   await page.getByRole('button', { name: 'Cancel' }).click();
 
   // Its own title is still authored, inline on the graph.

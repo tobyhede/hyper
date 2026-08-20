@@ -37,7 +37,7 @@ export function CardPane({
   }, []);
 
   // Base UI supplies the focus trap; this only selects the product's declared
-  // starting field (Target for a new Alias, otherwise the first field).
+  // starting field (Target for an Alias, otherwise the first field).
   useEffect(() => {
     if (portalContainer === null) return;
     const timer = window.setTimeout(() => {

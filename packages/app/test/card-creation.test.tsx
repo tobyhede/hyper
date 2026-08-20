@@ -613,8 +613,10 @@ describe('Add Alias', () => {
     expect(listId).toBeNull();
     expect(document.getElementById(listId ?? '')).toBeNull();
     fireEvent.keyDown(search, { key: 'ArrowDown' });
-    expect(search.getAttribute('aria-controls')).not.toBeNull();
-    expect(screen.getByTestId('card-picker-results')).toBeInTheDocument();
+    const openedListId = search.getAttribute('aria-controls');
+    const results = screen.getByTestId('card-picker-results');
+    expect(openedListId).not.toBeNull();
+    expect(document.getElementById(openedListId ?? '')).toBe(results);
     await settled(session);
   });
 });
@@ -674,21 +676,19 @@ describe('retargeting an Alias', () => {
   });
 
   /**
-   * Opening an Alias is not opening a search box.
+   * Opening an Alias opens on its Target picker, not its title.
    *
-   * The picker declared itself the pane's initial focus wherever it was drawn,
-   * so every open of an existing Alias put the caret in the Target field — a
-   * gesture the author had not made, on the one field that changes which Card
-   * they are looking at. The creation state keeps that focus, because it opens
-   * *on* its Target; here the pane's ordinary first field is the answer.
+   * The title stays editable from the Card's own front, so it is the Target
+   * that needs the pane to open it — the same reason the creation state opens
+   * on Target too.
    */
-  it('opens on the Alias’s own title, leaving the Target where it was', async () => {
+  it('opens on the Alias’s Target, since the title stays editable from the Card front', async () => {
     const session = mount(aliased);
 
     fireEvent.click(await screen.findByRole('button', { name: 'Edit Card A again' }));
 
-    await waitFor(() => expect(screen.getByRole('textbox', { name: 'Title' })).toHaveFocus());
-    expect(screen.getByRole('combobox', { name: 'Target' })).not.toHaveFocus();
+    await waitFor(() => expect(screen.getByRole('combobox', { name: 'Target' })).toHaveFocus());
+    expect(screen.getByRole('textbox', { name: 'Title' })).not.toHaveFocus();
     await settled(session);
   });
 

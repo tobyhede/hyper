@@ -28,9 +28,11 @@ test('opened Alias empty story explains that no Target is eligible', async ({ pa
   await page.goto('/?story=components--card-and-alias-panes--alias-empty&mode=preview');
 
   const dialog = page.getByRole('dialog', { name: 'Placement recap' });
-  await expect(dialog.getByRole('combobox', { name: 'Target' })).toHaveAccessibleDescription(
+  const target = dialog.getByRole('combobox', { name: 'Target' });
+  await expect(target).toHaveAccessibleDescription(
     'This Space holds no other Card that owns its content.',
   );
+  await target.press('ArrowDown');
   await expect(page.getByRole('option')).toHaveCount(0);
 });
 

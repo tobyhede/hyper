@@ -73,7 +73,9 @@ export function CardSearchCombobox({
           id={inputId}
           aria-label={label}
           aria-describedby={
-            unavailable ? emptyDescriptionId : inputAttributes?.['aria-describedby']
+            [inputAttributes?.['aria-describedby'], unavailable ? emptyDescriptionId : undefined]
+              .filter(Boolean)
+              .join(' ') || undefined
           }
           data-testid={testId}
           placeholder={placeholder}

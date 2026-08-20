@@ -204,4 +204,16 @@ describe('the opened Card as a dialog', () => {
     render(<OpenCard card={markdown()} onComplete={vi.fn(() => null)} onCancel={vi.fn()} />);
     expect(screen.getByRole('dialog').closest('[data-base-ui-portal]')).not.toBeNull();
   });
+
+  it('opens an Alias on its Target picker, since the title stays editable from the Card front', async () => {
+    render(
+      <OpenCard
+        through={{ id: ALIAS_ID, title: 'A again', kind: 'alias', target: CARD_ID }}
+        occurrence={{ targets: [markdown()], onEdit: vi.fn(() => null) }}
+        onCancel={vi.fn()}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByRole('combobox', { name: 'Target' })).toHaveFocus());
+  });
 });

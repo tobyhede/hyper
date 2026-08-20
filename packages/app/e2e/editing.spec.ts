@@ -1927,9 +1927,6 @@ test('choosing a Target creates the Alias and leaves its editor open', async ({ 
  * reachable from where the author already is, has to reach the *Alias*, and has
  * to leave the Target's own title alone.
  *
- * Frame 4's focus rule rides along: this pane opens on its first field, and the
- * Target picker no longer takes the caret off it.
- *
  * The editor retains the pane contract: only its labelled Done action commits.
  */
 test('an Alias is renamed in the editor its creation leaves open', async ({ page }) => {
@@ -1943,8 +1940,9 @@ test('an Alias is renamed in the editor its creation leaves open', async ({ page
   await page.getByRole('option', { name: 'Markdown Card B' }).click();
 
   const title = page.getByRole('textbox', { name: 'Title' });
-  await expect(title).toBeFocused();
   await expect(title).toHaveValue('B');
+  // The reopened editor opens on its Target picker, not the title it just left.
+  await expect(page.getByRole('combobox', { name: 'Target' })).toBeFocused();
   await title.fill('Recap');
   await page.getByRole('button', { name: 'Done' }).click();
 
