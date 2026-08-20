@@ -1,5 +1,6 @@
 import { Component, type ReactElement, type ReactNode } from 'react';
 import { createApp } from './App';
+import { WorkspaceFailureView } from './components/WorkspaceFailureView';
 import type { OpenedSpace } from './space';
 
 export type WorkspaceRenderer = (app: ReactElement) => void;
@@ -32,14 +33,7 @@ class WorkspaceFailure extends Component<{ children: ReactNode }, WorkspaceFailu
 
   override render(): ReactNode {
     if (this.state.message === null) return this.props.children;
-    return (
-      <div className="placement-status" role="alert" data-testid="workspace-failure">
-        <div className="placement-status__panel">
-          <h2>Unable to open this space</h2>
-          <pre>{this.state.message}</pre>
-        </div>
-      </div>
-    );
+    return <WorkspaceFailureView message={this.state.message} />;
   }
 }
 
