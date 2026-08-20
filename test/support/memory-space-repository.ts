@@ -55,10 +55,7 @@ const identifyImport = (input: ImportSpace): SpaceSnapshot => {
     // there. Rebuilding it stamped `version` with a constant, which quietly
     // rewrote an unsupported document into a supported one — the one thing a
     // double of an insert-only importer must not do.
-    document: {
-      ...document,
-      ...(layouts === undefined ? {} : { layouts }),
-    },
+    document: layouts === undefined ? { ...document } : { ...document, layouts },
     cards: input.cards.map(({ id, ...card }) => ({ ...card, id: id ?? newUuid() })),
   };
 };

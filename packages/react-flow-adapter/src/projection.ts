@@ -264,51 +264,17 @@ export function projectCardNodes(
     const sourceHandles = resolveHandles(handles.sourceHandles, colors, cardLayout, nodeHeight);
     const targetHandles = resolveHandles(handles.targetHandles, colors, cardLayout, nodeHeight);
 
-    return {
+    const node: CardFlowNode = {
       id: card.id,
       type: 'card',
       position: { x: cardLayout?.x ?? 0, y: cardLayout?.y ?? 0 },
-      // Carry the layout's dimensions through when it has placed the card. ELK
-      // (and the grid) work at a fixed `CARD_SIZE`, so declaring width/height
-      // here means React Flow renders the node at exactly the size the layout
-      // reasoned about — no measure-then-reflow, and a centred `nodeOrigin` (if a
-      // view chooses one) resolves correctly on first paint. Absent before the
-      // layout resolves, so React Flow falls back to measuring, as before.
-      //
-      // `measured` is deliberately *not* set alongside them. React Flow documents
-      // it as an output it writes after measuring, and it is redundant as an
-      // input: `nodeHasDimensions` reads `measured?.width ?? width ?? initialWidth`,
-      // so width/height already answer it, and a Card counts as initialized on
-      // those plus its declared `handles`. What supplying it would change is that
-      // React Flow preserves cached `handleBounds` instead of resetting them for
-      // re-measure — a distinction with no meaning here, because the bounds come
-      // from `declaredHandles` either way.
-      ...(cardLayout
-        ? {
-            width: cardLayout.width,
-            height: cardLayout.height,
-          }
-        : {}),
-      ...(cardLayout
-        ? {
-            handles: declaredHandles(
-              sourceHandles,
-              targetHandles,
-              space.graphs.map((graph) => graph.id),
-              cardLayout,
-            ),
-          }
-        : {}),
       data: {
         cardId: card.id,
         title: card.title,
         kind: card.kind,
-        // Omit rather than set undefined: absent means "not an alias" (ADR 0009).
-        ...(aliasOf !== undefined ? { aliasOf } : {}),
         active,
         selectedForAuthoring: card.id === (options.selectedCardId ?? null),
         showContent,
-        ...(body !== undefined ? { body } : {}),
         activeGraphId,
         activeGraphColor: options.activeGraphColor ?? FALLBACK_COLOR,
         emphasis,
@@ -316,7 +282,36 @@ export function projectCardNodes(
         targetHandles,
       },
       className: active ? 'rf-card-node rf-card-node--active' : 'rf-card-node',
-    } satisfies CardFlowNode;
+    };
+    // Carry the layout's dimensions through when it has placed the card. ELK
+    // (and the grid) work at a fixed `CARD_SIZE`, so declaring width/height
+    // here means React Flow renders the node at exactly the size the layout
+    // reasoned about — no measure-then-reflow, and a centred `nodeOrigin` (if a
+    // view chooses one) resolves correctly on first paint. Absent before the
+    // layout resolves, so React Flow falls back to measuring, as before.
+    //
+    // `measured` is deliberately *not* set alongside them. React Flow documents
+    // it as an output it writes after measuring, and it is redundant as an
+    // input: `nodeHasDimensions` reads `measured?.width ?? width ?? initialWidth`,
+    // so width/height already answer it, and a Card counts as initialized on
+    // those plus its declared `handles`. What supplying it would change is that
+    // React Flow preserves cached `handleBounds` instead of resetting them for
+    // re-measure — a distinction with no meaning here, because the bounds come
+    // from `declaredHandles` either way.
+    if (cardLayout) {
+      node.width = cardLayout.width;
+      node.height = cardLayout.height;
+      node.handles = declaredHandles(
+        sourceHandles,
+        targetHandles,
+        space.graphs.map((graph) => graph.id),
+        cardLayout,
+      );
+    }
+    // Omit rather than set undefined: absent means "not an alias" (ADR 0009).
+    if (aliasOf !== undefined) node.data.aliasOf = aliasOf;
+    if (body !== undefined) node.data.body = body;
+    return node;
   });
 }
 
@@ -355,6 +350,9 @@ export function projectGraphEdges(
     const emphasized = isActiveGraph || emphasis === 'equal';
     const points = routedPoints(laidEdges.get(edge.id));
 
+    const data: RoutedEdgeData = { graphId: edge.graphId };
+    if (points !== undefined) data.points = points;
+
     return {
       id: edge.id,
       // A custom edge that draws ELK's routed polyline (issue 03); it falls back
@@ -372,10 +370,7 @@ export function projectGraphEdges(
         opacity: emphasized ? 1 : OTHER_GRAPH_OPACITY[emphasis],
       },
       markerEnd: { type: MarkerType.ArrowClosed, color },
-      data: {
-        graphId: edge.graphId,
-        ...(points !== undefined ? { points } : {}),
-      } satisfies RoutedEdgeData,
+      data,
     };
   });
 }

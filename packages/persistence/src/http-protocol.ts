@@ -115,11 +115,9 @@ export const encodeProblemDetails = (
     }
   }
   const problem = problemCatalogue[code];
-  return {
-    ...problem,
-    detail,
-    ...(errors === undefined || errors.length === 0 ? {} : { errors: [...errors] }),
-  };
+  const result: ProblemDetails = { ...problem, detail };
+  if (errors !== undefined && errors.length > 0) result.errors = [...errors];
+  return result;
 };
 
 export const decodeProblemDetails = (value: unknown): ProblemDetails => {

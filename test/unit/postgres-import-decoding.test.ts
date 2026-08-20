@@ -114,16 +114,27 @@ describe('PostgresSpaceRepository import decoding', () => {
    * schemas hand their summariser the same issue list and the CLI and the wire
    * can be held to the same string at each boundary.
    */
-  const documentFailingIn = (paths: 1 | 3 | 4 | 5) => ({
-    id: SPACE_ID,
-    document: {
+  /** Deliberately invalid version/title, plus the two optional fields once `paths` reaches them. */
+  interface FailingDocument {
+    version: number;
+    title: number;
+    layouts?: number;
+    defaultRenderer?: number;
+  }
+
+  const documentFailingIn = (paths: 1 | 3 | 4 | 5) => {
+    const document: FailingDocument = {
       version: paths === 1 ? 1 : 9,
       title: 7,
-      ...(paths >= 3 ? { layouts: 4 } : {}),
-      ...(paths >= 4 ? { defaultRenderer: 7 } : {}),
-    },
-    cards: paths >= 5 ? [{ id: CARD_ID, document: { title: 5, kind: 'nope', body: 3 } }] : [],
-  });
+    };
+    if (paths >= 3) document.layouts = 4;
+    if (paths >= 4) document.defaultRenderer = 7;
+    return {
+      id: SPACE_ID,
+      document,
+      cards: paths >= 5 ? [{ id: CARD_ID, document: { title: 5, kind: 'nope', body: 3 } }] : [],
+    };
+  };
 
   it('shows all three failing paths at three, and counts no remainder', async () => {
     const cli = await cliMessage(documentFailingIn(3));

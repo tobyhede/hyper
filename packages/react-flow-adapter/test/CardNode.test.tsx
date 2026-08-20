@@ -119,6 +119,27 @@ function props({
   sourceHandles = [outHandle(graphId, 50)],
   targetHandles = [],
 }: Overrides = {}): NodeProps<CardFlowNode> {
+  const data: CardFlowNode['data'] = {
+    cardId,
+    title,
+    kind,
+    titleEditingEnabled,
+    cardEditingEnabled,
+    editingTitle,
+    active: false,
+    selectedForAuthoring: false,
+    showContent: false,
+    activeGraphId: graphId,
+    activeGraphColor: '#6ea8fe',
+    emphasis: 'subtle',
+    sourceHandles,
+    targetHandles,
+  };
+  if (onEditCard !== undefined) data.onEditCard = onEditCard;
+  if (onBeginTitleEditing !== undefined) data.onBeginTitleEditing = onBeginTitleEditing;
+  if (onCompleteTitleEditing !== undefined) data.onCompleteTitleEditing = onCompleteTitleEditing;
+  if (onCancelTitleEditing !== undefined) data.onCancelTitleEditing = onCancelTitleEditing;
+
   return {
     id: cardId,
     selected,
@@ -131,26 +152,7 @@ function props({
     positionAbsoluteX: 0,
     positionAbsoluteY: 0,
     type: 'card',
-    data: {
-      cardId,
-      title,
-      kind,
-      titleEditingEnabled,
-      cardEditingEnabled,
-      editingTitle,
-      ...(onEditCard !== undefined ? { onEditCard } : {}),
-      ...(onBeginTitleEditing !== undefined ? { onBeginTitleEditing } : {}),
-      ...(onCompleteTitleEditing !== undefined ? { onCompleteTitleEditing } : {}),
-      ...(onCancelTitleEditing !== undefined ? { onCancelTitleEditing } : {}),
-      active: false,
-      selectedForAuthoring: false,
-      showContent: false,
-      activeGraphId: graphId,
-      activeGraphColor: '#6ea8fe',
-      emphasis: 'subtle',
-      sourceHandles,
-      targetHandles,
-    },
+    data,
   };
 }
 

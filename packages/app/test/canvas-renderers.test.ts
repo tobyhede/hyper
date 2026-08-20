@@ -25,15 +25,20 @@ const layout = (id: string, title: string, graphId: string) => ({
 
 /** A Space with two Layouts, declared in the order the authored group must draw them. */
 const space = (layouts: readonly ReturnType<typeof layout>[] = []): Space => {
-  const result = loadSpace(
-    {
-      version: 1,
-      id: uuidSchema.parse('00000000-0000-4000-8000-000000000040'),
-      title: 'Choices',
-      ...(layouts.length === 0 ? {} : { layouts }),
-    },
-    [cardFile(CARD_A), cardFile(CARD_B)],
-  );
+  const file =
+    layouts.length === 0
+      ? {
+          version: 1,
+          id: uuidSchema.parse('00000000-0000-4000-8000-000000000040'),
+          title: 'Choices',
+        }
+      : {
+          version: 1,
+          id: uuidSchema.parse('00000000-0000-4000-8000-000000000040'),
+          title: 'Choices',
+          layouts,
+        };
+  const result = loadSpace(file, [cardFile(CARD_A), cardFile(CARD_B)]);
   if (!result.ok) throw new Error(JSON.stringify(result.errors));
   return result.space;
 };

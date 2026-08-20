@@ -66,13 +66,16 @@ export function elkStrategy(
       if (!edge.sections?.length) continue;
       sectionsByEdgeId.set(
         edge.id,
-        edge.sections.map((section) => ({
-          startPoint: { x: section.startPoint.x, y: section.startPoint.y },
-          endPoint: { x: section.endPoint.x, y: section.endPoint.y },
-          ...(section.bendPoints
-            ? { bendPoints: section.bendPoints.map((point) => ({ x: point.x, y: point.y })) }
-            : {}),
-        })),
+        edge.sections.map((section) => {
+          const point: LayoutStrategyEdgeSection = {
+            startPoint: { x: section.startPoint.x, y: section.startPoint.y },
+            endPoint: { x: section.endPoint.x, y: section.endPoint.y },
+          };
+          if (section.bendPoints) {
+            point.bendPoints = section.bendPoints.map((bend) => ({ x: bend.x, y: bend.y }));
+          }
+          return point;
+        }),
       );
     }
 

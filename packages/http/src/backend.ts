@@ -158,22 +158,24 @@ const commitFailureForProblem = (problem: ProblemDetails, response: Response): C
       return { kind: 'retryable-failure', code: 'timeout', message: problem.detail };
     case 'rate-limited': {
       const retryAfterMs = retryAfterMilliseconds(response);
-      return {
+      const result: CommitResult = {
         kind: 'retryable-failure',
         code: 'rate-limited',
         message: problem.detail,
-        ...(retryAfterMs === undefined ? {} : { retryAfterMs }),
       };
+      if (retryAfterMs !== undefined) result.retryAfterMs = retryAfterMs;
+      return result;
     }
     case 'persistence-unavailable':
     case 'internal-error': {
       const retryAfterMs = retryAfterMilliseconds(response);
-      return {
+      const result: CommitResult = {
         kind: 'retryable-failure',
         code: 'unavailable',
         message: problem.detail,
-        ...(retryAfterMs === undefined ? {} : { retryAfterMs }),
       };
+      if (retryAfterMs !== undefined) result.retryAfterMs = retryAfterMs;
+      return result;
     }
     case 'unauthorized':
     case 'forbidden':
