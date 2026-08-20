@@ -159,10 +159,10 @@ body {
    treatment stays here with the graph/card CSS, while @project/ui owns the
    markup and semantic state interface. */
 .canvas-card {
-  --canvas-card-ink: var(--foreground);
-  --canvas-card-face: var(--card);
-  --canvas-card-active-face: var(--secondary);
-  --canvas-card-title: var(--card-foreground);
+  --canvas-card-ink: var(--canvas-card-ink-color, #0b0d11);
+  --canvas-card-face: var(--canvas-card-face-rest, #f4efe4);
+  --canvas-card-active-face: var(--canvas-card-face-active, #fffaf0);
+  --canvas-card-title: var(--canvas-card-title-color, #12161c);
 
   position: relative;
   box-sizing: border-box;
@@ -224,7 +224,7 @@ body {
   display: flex;
   align-items: center;
   color: var(--canvas-card-ink);
-  opacity: 0.45;
+  opacity: 0.28;
   transition: opacity 120ms ease;
 }
 
@@ -237,19 +237,38 @@ body {
 }
 
 .canvas-card__actions {
-  display: flex;
+  display: none;
   align-items: center;
   gap: 4px;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 100ms ease;
 }
 
 .canvas-card:is([data-state='hover'], [data-state='selected'], [data-state='selected-hover'])
-  .canvas-card__actions,
-.canvas-card__actions:focus-within {
-  opacity: 1;
-  pointer-events: auto;
+  .canvas-card__actions {
+  display: flex;
+}
+
+.canvas-card :is(.card__connect, .card__edit) {
+  width: 22px;
+  height: 22px;
+  border: 2px solid var(--canvas-card-ink);
+  border-radius: 0;
+  padding: 0;
+  background: var(--canvas-card-face);
+  color: var(--canvas-card-ink);
+  transition:
+    color 100ms ease,
+    background-color 100ms ease;
+}
+
+.canvas-card :is(.card__connect, .card__edit):hover {
+  border-color: var(--canvas-card-ink);
+  background: var(--canvas-card-ink);
+  color: var(--canvas-card-graph);
+}
+
+.canvas-card :is(.card__connect, .card__edit):focus-visible {
+  outline: 2px solid var(--canvas-card-ink);
+  outline-offset: 2px;
 }
 
 .canvas-card__body {
@@ -375,8 +394,7 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .canvas-card,
   .canvas-card__rail,
-  .canvas-card__kind,
-  .canvas-card__actions {
+  .canvas-card__kind {
     transition: none;
   }
 }

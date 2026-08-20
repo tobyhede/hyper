@@ -15,10 +15,20 @@ export const States: Story = () => (
       graphColor="#ffc53d"
       actions={
         <>
-          <Button variant="ghost" size="icon" aria-label="Connect from Traversal">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="card__connect"
+            aria-label="Connect from Traversal"
+          >
             <ConnectIcon />
           </Button>
-          <Button variant="ghost" size="icon" aria-label="Edit Card Traversal">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="card__edit"
+            aria-label="Edit Card Traversal"
+          >
             <EditIcon />
           </Button>
         </>
@@ -31,7 +41,12 @@ export const States: Story = () => (
       aliasOf="Opening"
       graphColor="#35d6c3"
       actions={
-        <Button variant="ghost" size="icon" aria-label="Connect from Opening, again">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="card__connect"
+          aria-label="Connect from Opening, again"
+        >
           <ConnectIcon />
         </Button>
       }

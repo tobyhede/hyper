@@ -299,7 +299,7 @@ export function CardNode({ data, selected, dragging, isConnectable }: NodeProps<
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="nodrag nopan"
+                  className="card__connect nodrag nopan"
                   data-testid="connect-from-card"
                   aria-label={`Connect from ${data.title}`}
                   onClick={(event) => {
@@ -316,7 +316,7 @@ export function CardNode({ data, selected, dragging, isConnectable }: NodeProps<
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="nodrag nopan"
+                  className="card__edit nodrag nopan"
                   aria-label={`Edit Card ${data.title}`}
                   onClick={(event) => {
                     event.stopPropagation();
