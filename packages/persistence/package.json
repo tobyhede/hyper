@@ -14,7 +14,8 @@
   },
   "dependencies": {
     "@project/core": "workspace:*",
-    "@project/graph": "workspace:*"
+    "@project/graph": "workspace:*",
+    "zod": "^3.23.8"
   },
   "devDependencies": {
     "vitest": "^2.1.8"

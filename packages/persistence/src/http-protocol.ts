@@ -1,4 +1,5 @@
 import { spaceSnapshotSchema, uuidSchema, type SpaceSnapshot } from '@project/core';
+import { z } from 'zod';
 import type { LoadedSpace, SpaceSummary } from './backend';
 
 /**
@@ -29,11 +30,10 @@ const exactRecord = (
 };
 
 /**
- * Zod serializes its entire issue array into `Error.message`, and the HTTP layer
- * ships that verbatim as the `{ message: string }` error contract — hundreds of
- * characters of internal schema shape for one wrong field, JSON nested inside a
- * field clients render as prose. Every other decoder here throws a sentence, so
- * this one does too: the failing paths and their reasons, nothing else.
+ * Zod serializes its entire issue array into `Error.message`; passing that into
+ * Problem Details would expose hundreds of characters of internal schema shape
+ * for one wrong field. Every decoder here throws a sentence, so this one does
+ * too: the failing paths and their reasons, nothing else.
  *
  * `describeSchemaFailure` in `src/persistence/postgres-space-repository.ts`
  * summarises an import failure in this same format — first three failing paths,
@@ -141,10 +141,128 @@ export const decodeCommittedRevision = (value: unknown): bigint => {
   return decodeRevision(record['revision'], 'revision');
 };
 
-export const decodeErrorMessage = (value: unknown): string => {
-  const record = exactRecord(value, ['message'], 'error response');
-  if (typeof record['message'] !== 'string' || record['message'].length === 0) {
-    throw new Error('error message must be non-empty');
+const PROBLEMS = {
+  'invalid-request': { status: 400, title: 'Invalid request' },
+  'authentication-required': { status: 401, title: 'Authentication required' },
+  forbidden: { status: 403, title: 'Forbidden' },
+  'not-found': { status: 404, title: 'Not found' },
+  'method-not-allowed': { status: 405, title: 'Method not allowed' },
+  'request-timeout': { status: 408, title: 'Request timeout' },
+  'payload-too-large': { status: 413, title: 'Payload too large' },
+  'unsupported-media-type': { status: 415, title: 'Unsupported media type' },
+  'invalid-snapshot': { status: 422, title: 'Invalid Space snapshot' },
+  'rate-limited': { status: 429, title: 'Rate limited' },
+  'internal-error': { status: 500, title: 'Internal server error' },
+  'service-unavailable': { status: 503, title: 'Service unavailable' },
+} as const;
+
+export type ProblemCode = keyof typeof PROBLEMS;
+export type ProblemStatus = (typeof PROBLEMS)[ProblemCode]['status'];
+export type ProblemError = {
+  readonly code: 'snapshot-id-mismatch';
+  readonly pointer: string;
+};
+type ProblemDetailsJsonFor<Code extends ProblemCode> = {
+  readonly type: `urn:hyper:problem:${Code}`;
+  readonly title: string;
+  readonly status: (typeof PROBLEMS)[Code]['status'];
+  readonly detail: string;
+} & (Code extends 'invalid-request'
+  ? { readonly errors?: readonly ProblemError[] }
+  : { readonly errors?: never });
+export type ProblemDetailsJson = {
+  [Code in ProblemCode]: ProblemDetailsJsonFor<Code>;
+}[ProblemCode];
+export type ProblemDetails = {
+  [Code in ProblemCode]: Omit<ProblemDetailsJsonFor<Code>, 'type'> & { readonly code: Code };
+}[ProblemCode];
+
+export function encodeProblemDetails<Code extends ProblemCode>(
+  code: Code,
+  detail: string,
+): ProblemDetailsJsonFor<Code>;
+export function encodeProblemDetails(
+  code: 'invalid-request',
+  detail: string,
+  errors: readonly ProblemError[],
+): ProblemDetailsJsonFor<'invalid-request'>;
+export function encodeProblemDetails(
+  code: ProblemCode,
+  detail: string,
+  errors?: readonly ProblemError[],
+): ProblemDetailsJson {
+  const encoded = {
+    type: `urn:hyper:problem:${code}`,
+    title: PROBLEMS[code].title,
+    status: PROBLEMS[code].status,
+    detail,
+    ...(errors === undefined ? {} : { errors }),
+  };
+  const parsed = problemDetailsSchema.safeParse(encoded);
+  if (!parsed.success) throw new Error(describeProblemFailure(parsed.error));
+  return parsed.data as ProblemDetailsJson;
+}
+
+const problemErrorSchema = z
+  .object({
+    code: z.literal('snapshot-id-mismatch'),
+    pointer: z.string().regex(/^(?:\/(?:[^~]|~[01])*)*$/),
+  })
+  .strict();
+
+const problemSchema = <Code extends ProblemCode>(code: Code) =>
+  z
+    .object({
+      type: z.literal(`urn:hyper:problem:${code}`),
+      title: z.string().min(1),
+      status: z.literal(PROBLEMS[code].status),
+      detail: z.string().min(1),
+      errors:
+        code === 'invalid-request'
+          ? z.array(problemErrorSchema).min(1).optional()
+          : z.never().optional(),
+    })
+    .strict();
+
+const problemDetailsSchema = z.discriminatedUnion('type', [
+  problemSchema('invalid-request'),
+  problemSchema('authentication-required'),
+  problemSchema('forbidden'),
+  problemSchema('not-found'),
+  problemSchema('method-not-allowed'),
+  problemSchema('request-timeout'),
+  problemSchema('payload-too-large'),
+  problemSchema('unsupported-media-type'),
+  problemSchema('invalid-snapshot'),
+  problemSchema('rate-limited'),
+  problemSchema('internal-error'),
+  problemSchema('service-unavailable'),
+]);
+
+const describeProblemFailure = (error: z.ZodError): string => {
+  const issue = error.issues[0];
+  if (issue?.code === 'unrecognized_keys') return 'problem details has unexpected fields';
+  if (issue?.path[0] === 'type') return 'unknown problem type';
+  if (issue?.path[0] === 'status') return 'problem status does not match problem type';
+  if (issue?.path.at(-1) === 'pointer') {
+    return 'problem error pointer must be an RFC 6901 JSON Pointer';
   }
-  return record['message'];
+  if (issue?.path[0] === 'errors') return 'problem errors must be a non-empty array';
+  if (issue?.path[0] === 'title') return 'problem title must be non-empty';
+  if (issue?.path[0] === 'detail') return 'problem detail must be non-empty';
+  return 'problem details must match the Hyper problem contract';
+};
+
+export const decodeProblemDetails = (value: unknown): ProblemDetails => {
+  const parsed = problemDetailsSchema.safeParse(value);
+  if (!parsed.success) throw new Error(describeProblemFailure(parsed.error));
+  const problem = parsed.data;
+  const code = problem.type.slice('urn:hyper:problem:'.length) as ProblemCode;
+  return {
+    code,
+    title: problem.title,
+    status: problem.status,
+    detail: problem.detail,
+    ...(problem.errors === undefined ? {} : { errors: problem.errors }),
+  } as ProblemDetails;
 };

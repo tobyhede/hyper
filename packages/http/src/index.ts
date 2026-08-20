@@ -2,7 +2,10 @@ import { uuidSchema } from '@project/core';
 import {
   decodeCommitRequest,
   encodeLoadedSpace,
+  encodeProblemDetails,
   type CommitRequestJson,
+  type ProblemCode,
+  type ProblemError,
   type SpaceResourceRepository,
 } from '@project/persistence';
 import { parse as parseContentType } from 'content-type';
@@ -59,8 +62,30 @@ const invokeLogError = (
  */
 const MAX_DRAINED_BODY_BYTES = MAX_COMMIT_BODY_BYTES * 8;
 
+const problem = <Code extends ProblemCode>(
+  context: Context,
+  code: Code,
+  detail: string,
+  headers?: Record<string, string>,
+) => {
+  const body = encodeProblemDetails(code, detail);
+  return context.json(body, body.status, {
+    'Content-Type': 'application/problem+json',
+    ...headers,
+  });
+};
+
+const invalidRequestProblem = (
+  context: Context,
+  detail: string,
+  errors: readonly ProblemError[],
+) => {
+  const body = encodeProblemDetails('invalid-request', detail, errors);
+  return context.json(body, body.status, { 'Content-Type': 'application/problem+json' });
+};
+
 const rejectOversizedBody = (context: Context) =>
-  context.json({ message: `Request body exceeds ${MAX_COMMIT_BODY_BYTES} bytes` }, 413);
+  problem(context, 'payload-too-large', `Request body exceeds ${MAX_COMMIT_BODY_BYTES} bytes`);
 
 /** Read and discard what is left, up to the allowance. Bytes are never buffered. */
 const drainRejectedBody = async (
@@ -150,21 +175,21 @@ const requireBoundedCommitBody = createMiddleware(async (context, next) => {
 const requireSupportedRequestMedia = createMiddleware(async (context, next) => {
   const contentEncoding = context.req.header('Content-Encoding');
   if (contentEncoding !== undefined && contentEncoding.trim().toLowerCase() !== 'identity') {
-    return context.json({ message: 'Content-Encoding must be identity' }, 415);
+    return problem(context, 'unsupported-media-type', 'Content-Encoding must be identity');
   }
   const contentType = context.req.header('Content-Type');
   if (contentType === undefined || !hasValidUniqueMediaTypeParameters(contentType)) {
-    return context.json({ message: 'Content-Type must be application/json' }, 415);
+    return problem(context, 'unsupported-media-type', 'Content-Type must be application/json');
   }
   // `parse` only splits and lowercases a value `./media-type` has already
   // accepted — `content-type@2` validates nothing itself. See that module.
   const parsed = parseContentType(contentType);
   if (parsed.type !== 'application/json') {
-    return context.json({ message: 'Content-Type must be application/json' }, 415);
+    return problem(context, 'unsupported-media-type', 'Content-Type must be application/json');
   }
   const charset = parsed.parameters['charset'];
   if (charset !== undefined && charset.toLowerCase() !== 'utf-8') {
-    return context.json({ message: 'JSON charset must be UTF-8' }, 415);
+    return problem(context, 'unsupported-media-type', 'JSON charset must be UTF-8');
   }
   // Hono's json validator applies its own narrower Content-Type regex, and when
   // that disagrees it does not parse the body — it hands the validator `{}` and
@@ -202,9 +227,10 @@ const decodeCommitBody = (
   try {
     return decodeCommitRequest(value);
   } catch (error) {
-    return context.json(
-      { message: error instanceof Error ? error.message : 'Invalid request' },
-      400,
+    return problem(
+      context,
+      'invalid-request',
+      error instanceof Error ? error.message : 'Invalid request',
     );
   }
 };
@@ -220,7 +246,9 @@ const validateCommitBody = validator<
 
 const validateSpaceId = validator('param', (value, context) => {
   const id = uuidSchema.safeParse(value['id']);
-  return id.success ? { id: id.data } : context.json({ message: 'Space id must be a UUID' }, 400);
+  return id.success
+    ? { id: id.data }
+    : problem(context, 'invalid-request', 'Space id must be a UUID');
 });
 
 /**
@@ -240,17 +268,17 @@ const validateSpaceId = validator('param', (value, context) => {
 const unservedContractPath = (context: Context): Response | undefined => {
   if (context.req.path === SPACE_COLLECTION_PATH) {
     context.header('Allow', 'GET');
-    return context.body(null, 405);
+    return problem(context, 'method-not-allowed', 'Method not allowed');
   }
   const resource = SPACE_RESOURCE_PATTERN.exec(context.req.path);
   if (resource === null) {
     return undefined;
   }
   if (!uuidSchema.safeParse(resource[1]).success) {
-    return context.json({ message: 'Space id must be a UUID' }, 400);
+    return problem(context, 'invalid-request', 'Space id must be a UUID');
   }
   context.header('Allow', 'GET, PUT');
-  return context.body(null, 405);
+  return problem(context, 'method-not-allowed', 'Method not allowed');
 };
 
 /**
@@ -302,7 +330,7 @@ export const createSpaceHttpApp = (
         return context.json(await repository.listSpaces(), 200);
       } catch (error) {
         invokeLogError(logError, 'Failed to list spaces', error);
-        return context.json({ message: 'Persistence service unavailable' }, 503);
+        return problem(context, 'service-unavailable', 'Persistence service unavailable');
       }
     })
     .get(SPACE_RESOURCE_PATH, validateSpaceId, async (context) => {
@@ -310,12 +338,12 @@ export const createSpaceHttpApp = (
       try {
         const loaded = await repository.loadSpace(id);
         if (loaded === undefined) {
-          return context.json({ message: `Space ${id} does not exist` }, 404);
+          return problem(context, 'not-found', `Space ${id} does not exist`);
         }
         return context.json(encodeLoadedSpace(loaded), 200);
       } catch (error) {
         invokeLogError(logError, `Failed to load space ${id}`, error);
-        return context.json({ message: 'Persistence service unavailable' }, 503);
+        return problem(context, 'service-unavailable', 'Persistence service unavailable');
       }
     })
     .put(
@@ -328,7 +356,9 @@ export const createSpaceHttpApp = (
         const { id } = context.req.valid('param');
         const commit = context.req.valid('json');
         if (commit.snapshot.id !== id) {
-          return context.json({ message: 'Path id must match snapshot id' }, 400);
+          return invalidRequestProblem(context, 'Path id must match snapshot id', [
+            { code: 'snapshot-id-mismatch', pointer: '/snapshot/id' },
+          ]);
         }
         try {
           const result = await repository.commitSpace(commit.snapshot, commit.expectedRevision);
@@ -338,10 +368,14 @@ export const createSpaceHttpApp = (
           if (result.kind === 'conflict') {
             return context.json(encodeLoadedSpace(result.current), 409);
           }
-          return context.json({ message: result.message }, result.code === 'not-found' ? 404 : 422);
+          return problem(
+            context,
+            result.code === 'not-found' ? 'not-found' : 'invalid-snapshot',
+            result.message,
+          );
         } catch (error) {
           invokeLogError(logError, `Failed to commit space ${id}`, error);
-          return context.json({ message: 'Persistence service unavailable' }, 503);
+          return problem(context, 'service-unavailable', 'Persistence service unavailable');
         }
       },
     );
@@ -354,16 +388,16 @@ export const createSpaceHttpApp = (
       // off the declared contract, including the trailing slash an address bar
       // makes. The RPC docs independently say not to use it when a client
       // infers types.
-      context.json({ message: 'Not found' }, 404),
+      problem(context, 'not-found', 'Not found'),
   );
   app.onError((error, context) => {
     // Answer through the context rather than `error.getResponse()`, whatever the
     // status. That method builds a bare `text/plain` Response carrying none of
     // this application's policy — no `Cache-Control: no-store`, and a body the
-    // typed client cannot decode, since `HttpSpaceBackend` reads every non-200
-    // and non-409 commit response as `{ message }` JSON.
+    // typed client cannot decode, since `HttpSpaceBackend` strictly reads every
+    // non-200 and non-409 commit response as Problem Details JSON.
     if (error instanceof HTTPException) {
-      return context.json({ message: error.message }, error.status);
+      return problemForHttpException(context, error);
     }
     // Never rethrow: Hono does not convert that into a 500, it re-invokes this
     // handler and lets the throw escape, so `app.fetch()` hands the host a
@@ -375,9 +409,47 @@ export const createSpaceHttpApp = (
     } catch {
       // A log sink that throws must not cost the caller its response either.
     }
-    return context.json({ message: 'Internal server error' }, 500);
+    return problem(context, 'internal-error', 'Internal server error');
   });
   return app;
+};
+
+// The two headers a caller throwing through the `logError` seam (see
+// `space-http-app.test.ts`) can carry retry and auth-challenge semantics on:
+// `Retry-After` for 429 and a retryable 5xx, `WWW-Authenticate` for 401.
+// `problem()` otherwise builds the response from scratch, so these are lost
+// unless copied off the exception's own `res` explicitly.
+const RETRY_SEMANTIC_HEADERS = ['Retry-After', 'WWW-Authenticate'] as const;
+
+const retrySemanticHeaders = (error: HTTPException): Record<string, string> | undefined => {
+  if (!error.res) return undefined;
+  const headers: Record<string, string> = {};
+  for (const name of RETRY_SEMANTIC_HEADERS) {
+    const value = error.res.headers.get(name);
+    if (value !== null) headers[name] = value;
+  }
+  return headers;
+};
+
+const problemForHttpException = (context: Context, error: HTTPException): Response => {
+  const codeByStatus: Partial<Record<number, ProblemCode>> = {
+    400: 'invalid-request',
+    401: 'authentication-required',
+    403: 'forbidden',
+    404: 'not-found',
+    405: 'method-not-allowed',
+    408: 'request-timeout',
+    413: 'payload-too-large',
+    415: 'unsupported-media-type',
+    422: 'invalid-snapshot',
+    429: 'rate-limited',
+    500: 'internal-error',
+    503: 'service-unavailable',
+  };
+  const code = codeByStatus[error.status];
+  return code === undefined
+    ? problem(context, 'internal-error', 'Internal server error')
+    : problem(context, code, error.message, retrySemanticHeaders(error));
 };
 
 export type SpaceHttpApp = ReturnType<typeof createSpaceHttpApp>;

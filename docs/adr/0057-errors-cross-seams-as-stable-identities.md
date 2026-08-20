@@ -3,7 +3,7 @@
 Status: accepted
 Refines: 0042
 Related: 0030, 0048, 0056
-Build status: not built
+Build status: built
 
 An expected failure has a stable machine identity and typed context at every
 interface it crosses. Space Authoring's `refused` result therefore carries a
@@ -32,12 +32,28 @@ Details. The optimistic `409` conflict response may continue carrying the
 current `LoadedSpace`, because that representation is the recovery value rather
 than an explanation of an error.
 
+The wire codec is a closed Zod discriminated union over Hyper's problem
+`type`s. Each member fixes its matching status and permitted typed extensions;
+strict objects reject unknown members, and the decoder turns Zod's diagnostics
+into concise protocol prose rather than exposing schema internals. The server
+uses one small encoder over the same catalogue, and the browser exhaustively
+maps the decoded union into `CommitResult`. This is the idiomatic TypeScript
+boundary here: Zod validates untrusted JSON while the application, not a generic
+Problem Details package, owns the identities and their domain mapping.
+
 We rejected keeping `{ reason: string }` and `{ message: string }`: both make
 English copy part of a programmatic interface and force callers and tests to
 parse or pin it. We rejected putting `field` on a refusal because a field is a
 fact about one presentation, not the domain rule. We also rejected one generic
 error envelope spanning domain, application and HTTP; translating once at each
 seam keeps each module's interface in its own vocabulary.
+
+We rejected adding a generic Problem Details library. The available packages
+primarily model the extensible RFC envelope or integrate a different server
+framework; they do not provide Hyper's closed catalogue, strict extension
+validation or `CommitResult` mapping, and several still target RFC 7807. Such a
+dependency would leave the consequential code in Hyper while duplicating a
+small shape Zod already expresses and validates.
 
 The accepted cost is an explicit catalogue and exhaustive mappings. Adding or
 changing a refusal code changes the Authoring interface deliberately; domain

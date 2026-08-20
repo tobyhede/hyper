@@ -271,8 +271,12 @@ test('the card editor remains bounded across viewport shapes', async ({ page }) 
   ]) {
     await page.setViewportSize(viewport);
     const panel = (await page.locator('.card-pane__panel').boundingBox())!;
+    expect(panel.x).toBeGreaterThanOrEqual(0);
+    expect(panel.y).toBeGreaterThanOrEqual(0);
     expect(panel.width).toBeLessThanOrEqual(viewport.width);
     expect(panel.height).toBeLessThanOrEqual(viewport.height);
+    expect(panel.x + panel.width).toBeLessThanOrEqual(viewport.width);
+    expect(panel.y + panel.height).toBeLessThanOrEqual(viewport.height);
   }
 });
 
