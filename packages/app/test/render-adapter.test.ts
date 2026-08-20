@@ -81,7 +81,7 @@ function authoringSpy({ refusing }: AuthoringCapabilities = {}) {
       proposal.kind === refusing
         ? { kind: 'refused', refusal: { code: 'edge-card-outside-layout' } }
         : { kind: 'eligible' },
-    complete: (completion: unknown): AuthoringResult => {
+    complete: (completion): AuthoringResult => {
       completions.push(completion);
       return { kind: 'completed' };
     },

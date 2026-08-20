@@ -38,6 +38,7 @@
     "anti-slop/no-unknown-returns": "error",
     "anti-slop/no-unsafe-dictionary-type": "error",
     "anti-slop/no-conditional-empty-object-spread": "error",
+    "anti-slop/no-unknown-parameters": "error",
     // `allowInTypeGuards` exempts a `typeof` check inside a function whose own
     // return type is a type predicate (`x is Y`) — the check IS that predicate's
     // narrowing logic, not a bypass of it (e.g. `observable-state.ts`'s
@@ -162,7 +163,11 @@
       "rules": {
         "anti-slop/no-known-value-widening": "off",
         "anti-slop/no-runtime-typeof": "off",
-        "anti-slop/no-unsafe-dictionary-type": "off"
+        "anti-slop/no-unsafe-dictionary-type": "off",
+        // sameValue's `left`/`right: unknown` parameters are the same generic
+        // recursive comparator case as the two rules above — nothing narrower
+        // to accept when the whole point is comparing two arbitrary JSON values.
+        "anti-slop/no-unknown-parameters": "off"
       }
     },
     {
@@ -170,56 +175,66 @@
       // transformers: they run on raw, unvalidated input *before* the schema
       // parses it, so `unknown` in and out is the honest contract, not a
       // narrowing that was skipped — the schema right after is where parsing
-      // happens. Their `typeof value === 'object'` is that preprocessing step
-      // itself, the same boundary-parser category issue 02 established for
-      // `http-protocol.ts`'s decode functions.
+      // happens. Their `typeof value === 'object'` and `value: unknown`
+      // parameter are that preprocessing step itself, the same boundary-parser
+      // category issue 02 established for `http-protocol.ts`'s decode functions.
       "files": ["packages/core/src/schema.ts"],
       "rules": {
         "anti-slop/no-runtime-typeof": "off",
-        "anti-slop/no-unknown-returns": "off"
+        "anti-slop/no-unknown-returns": "off",
+        "anti-slop/no-unknown-parameters": "off"
       }
     },
     {
       // This file's whole job is loading a dynamically `import()`-ed module and
       // validating its shape before treating it as `SpaceHttpRuntime` —
-      // `asRuntime`'s `unknown` parameter and `typeof` checks are that
-      // validation, and `defaultPreviewLoader`/`loadPreviewModule`'s
-      // `Promise<unknown>` is what a dynamic import genuinely resolves to
-      // before anyone has looked at it. Same boundary-parser category as
-      // `schema.ts`'s preprocessors above.
+      // `FetchApplication.fetch`'s `env`, `SpaceHttpRuntime.createApp`'s
+      // `options`, `asRuntime`'s `loaded` parameter and its `typeof` checks,
+      // and `runtimeOptions` are all that validation boundary or what a dynamic
+      // import genuinely resolves to before anyone has looked at it — same
+      // boundary-parser category as `schema.ts`'s preprocessors above. `Next`'s
+      // `error?: unknown` mirrors Node/Connect middleware's own `next(err?)`
+      // contract, a second, unrelated external contract in the same file.
       "files": ["packages/app/vite-space-http-plugin.ts"],
       "rules": {
         "anti-slop/no-runtime-typeof": "off",
-        "anti-slop/no-unknown-returns": "off"
+        "anti-slop/no-unknown-returns": "off",
+        "anti-slop/no-unknown-parameters": "off"
       }
     },
     {
       // `@project/graph`'s one intake (`loadSpace`/`loadSpaceSnapshot`, ADR
       // 0010): `unsupportedDocumentVersion`, `retiredSpaceGraphs` and
-      // `loadSpaceSnapshot` itself read a raw `unknown` document's shape before
-      // (and to decide whether to reach) the Zod schema that actually parses
-      // it. Same boundary-parser category as issue 02's two excepted files —
-      // this is that same kind of code, just in `@project/graph` instead of
-      // `@project/persistence`.
+      // `loadSpaceSnapshot` itself take and read a raw `unknown` document's
+      // shape before (and to decide whether to reach) the Zod schema that
+      // actually parses it. Same boundary-parser category as issue 02's two
+      // excepted files — this is that same kind of code, just in
+      // `@project/graph` instead of `@project/persistence`.
       "files": ["packages/graph/src/space.ts"],
       "rules": {
-        "anti-slop/no-runtime-typeof": "off"
+        "anti-slop/no-runtime-typeof": "off",
+        "anti-slop/no-unknown-parameters": "off"
       }
     },
     {
       // `listeners: Set<() => unknown>` and the test double that mirrors it:
       // a subscriber's return value is inspected only to detect whether it's
       // thenable (`isThenable`, a real type guard — its own `typeof` checks are
-      // already exempted by `allowInTypeGuards`), never narrowed into a domain
-      // type. The test's `onRejected: (reason: unknown) => unknown` mirrors
-      // `PromiseLike.then`'s own lib.d.ts signature, which is `unknown` for the
-      // same reason.
+      // already exempted by `allowInTypeGuards`, and its `value: unknown`
+      // parameter is the type guard's own input by definition), never narrowed
+      // into a domain type. The test's `_onFulfilled`/`onRejected: (reason:
+      // unknown) => unknown` mirrors `PromiseLike.then`'s own lib.d.ts
+      // signature, which is `unknown` for the same reason. `ObserverError
+      // Reporter`'s `error: unknown` (this file's own error-reporting seam) is
+      // the same case every file in the override below shares — grouped here
+      // instead because this file already has other rules excepted.
       "files": [
         "packages/persistence/src/observable-state.ts",
         "packages/persistence/test/observable-state.test.ts"
       ],
       "rules": {
-        "anti-slop/no-unknown-returns": "off"
+        "anti-slop/no-unknown-returns": "off",
+        "anti-slop/no-unknown-parameters": "off"
       }
     },
     {
@@ -289,6 +304,104 @@
       ],
       "rules": {
         "anti-slop/no-unsafe-dictionary-type": "off"
+      }
+    },
+    {
+      // `FrontmatterSchema.safeParse`'s `value: unknown` mirrors Zod's own
+      // `ZodType.safeParse(data: unknown)` signature exactly — this interface
+      // exists so a caller can hold "something Zod-safeParse-shaped" without
+      // importing Zod's own types, so its parameter has to match Zod's, not a
+      // narrower one. `describe`'s `error: unknown` is this file's own
+      // error-reporting seam, the same case as the override below — kept here
+      // rather than folded in because it shares a file with the genuine
+      // external-contract case above.
+      "files": ["packages/graph/src/card-file.ts"],
+      "rules": {
+        "anti-slop/no-unknown-parameters": "off"
+      }
+    },
+    {
+      // This repo's error-reporting/error-describing seam, repeated across
+      // many independent files: a function that receives whatever a `catch`
+      // or a Promise rejection handed it and either logs it (`console.error`),
+      // converts it to a display string, or classifies it (`instanceof Error`,
+      // a `.code` check) — the same shape as `ObserverErrorReporter` above and
+      // structurally identical to the rule's own exempted `cause` parameter.
+      // JS lets `throw`/`reject` carry any value, so `unknown` is the sound
+      // type for "whatever was thrown"; every one of these functions does its
+      // own narrowing immediately (`error instanceof Error ? ... : ...`),
+      // which *is* the "parse before use" step the rule's message asks for —
+      // there is no schema to run first for an opaque caught value. Renaming
+      // every one of these to the rule's literal exempted name (`cause`) was
+      // considered and rejected: most of them are the error being reported,
+      // not a wrapped cause, and inventing a name to dodge a linter is worse
+      // than a scoped exception. Two are genuine external contracts, not our
+      // own seam: `Workspace.tsx`'s `getDerivedStateFromError` overrides
+      // React's own lifecycle method signature, and
+      // `space-authoring.test.ts`'s `AuthoringOptions`/`AuthoringExtras`
+      // mirror `packages/app/src/space-authoring.ts`'s real
+      // `SpaceAuthoringDependencies.reportObserverError` (ADR 0016's
+      // composition-time injection seam).
+      "files": [
+        "packages/app/src/navigation.ts",
+        "packages/app/src/placement-rendering.ts",
+        "packages/app/src/startup.tsx",
+        "packages/app/src/Workspace.tsx",
+        "packages/app/src/WorkspaceSelection.tsx",
+        "packages/app/test/render-adapter.test.ts",
+        "packages/app/test/space-authoring.test.ts",
+        "packages/http/src/index.ts",
+        "packages/persistence/src/session.ts",
+        "src/cli/main.ts",
+        "src/cli/run.ts",
+        "src/import/read-single-space.ts"
+      ],
+      "rules": {
+        "anti-slop/no-unknown-parameters": "off"
+      }
+    },
+    {
+      // Each of these takes a deliberately raw or deliberately invalid value
+      // and hands it straight to a real intake or schema this repo already
+      // trusts to parse it: `open-workspace.ts`'s `spaceFile` goes straight
+      // into `loadSpace` (the one intake, ADR 0010); the three test files
+      // build a value and pass it to `loadSpace`, `importSpaces`, or
+      // `decodeCommitRequest` specifically to exercise their refusal paths —
+      // the same "deliberately loosely-typed fixture, so the real runtime
+      // validation is what's under test" case as issue 04/05's `spaceWith`
+      // exception. There is nothing to parse ahead of the parser itself.
+      "files": [
+        "packages/app/src/open-workspace.ts",
+        "packages/core/test/persistence-schema.test.ts",
+        "packages/react-flow-adapter/test/projection.test.ts",
+        "test/unit/postgres-import-decoding.test.ts"
+      ],
+      "rules": {
+        "anti-slop/no-unknown-parameters": "off"
+      }
+    },
+    {
+      // `onReconnectStart`/`onReconnectEnd`'s `event`/`_type` parameters are
+      // this file's own prop contract wired straight through to `<ReactFlow>`
+      // (see `reactFlowProps.onReconnectStart` below), carrying whatever
+      // internal event/handle-type value React Flow's reconnect gesture
+      // passes — not part of React Flow's own published types, so there is no
+      // named type to import for it. Both are unused at the one call site
+      // that reads them (`_event`, `_type`), consistent with that.
+      "files": ["packages/app/src/edge-authoring-react.tsx"],
+      "rules": {
+        "anti-slop/no-unknown-parameters": "off"
+      }
+    },
+    {
+      // `Middleware`'s `next(error?: unknown)` mirrors Node/Connect
+      // middleware's own `next(err?)` contract exactly. `vite-space-http-
+      // plugin.test.ts`'s `record`'s `reason: unknown` mirrors Node's own
+      // `process.on('unhandledRejection', (reason, promise) => ...)` event
+      // signature, another external contract this repo doesn't declare.
+      "files": ["test/unit/vite-hono-host.test.ts", "test/unit/vite-space-http-plugin.test.ts"],
+      "rules": {
+        "anti-slop/no-unknown-parameters": "off"
       }
     }
   ]
