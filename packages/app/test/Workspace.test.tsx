@@ -330,5 +330,6 @@ describe('Workspace failure reporting', () => {
     ).not.toThrow();
 
     expect(screen.getByTestId('workspace-failure')).toHaveTextContent(MISSING_CARD_ID);
+    expect(screen.getByRole('heading', { name: 'Unable to open this space' })).toBeVisible();
   });
 });

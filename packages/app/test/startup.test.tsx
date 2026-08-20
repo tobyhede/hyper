@@ -248,7 +248,9 @@ it('renders the complete startup error when the chosen UUID has disappeared', as
     );
 
     const alert = await within(container).findByRole('alert');
-    expect(within(alert).getByText('Application could not start')).toBeVisible();
+    expect(
+      within(alert).getByRole('heading', { name: 'Application could not start' }),
+    ).toBeVisible();
     expect(alert).toHaveTextContent('The space could not be opened.');
     expect(alert).toHaveTextContent(`The backend could not load space ${SPACE_ID}`);
     expect(
@@ -278,7 +280,9 @@ it('renders complete startup failure details instead of leaving an empty root', 
     });
 
     const alert = within(container).getByRole('alert');
-    expect(within(alert).getByText('Application could not start')).toBeVisible();
+    expect(
+      within(alert).getByRole('heading', { name: 'Application could not start' }),
+    ).toBeVisible();
     expect(alert).toHaveTextContent('The space could not be opened.');
     expect(alert).toHaveTextContent(
       'The bundled space failed to import: - Space document version 2 is not supported; this build reads version 1',

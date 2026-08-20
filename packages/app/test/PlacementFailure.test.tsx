@@ -34,12 +34,17 @@ describe('a placement failure', () => {
 
   /**
    * A strategy's message says which Card it could not place; it does not say
-   * that the canvas is empty for that reason. The title is the only thing
-   * that does, so the panel is not the raw message under an alert role.
+   * that the canvas is empty for that reason. The heading is the only thing
+   * that does, so the panel is not the raw message under an alert role — and
+   * it stays a real heading, reachable by heading navigation, not just visible
+   * text.
    */
   it('frames the failure rather than handing over the strategy message alone', () => {
     render(<PlacementFailure error={new Error('No position for Card A')} />);
 
-    expect(screen.getByText('Unable to arrange this view')).toBeVisible();
+    const heading = screen.getByRole('heading', { name: 'Unable to arrange this view' });
+
+    expect(heading).toBeVisible();
+    expect(heading).not.toHaveTextContent('No position for Card A');
   });
 });
