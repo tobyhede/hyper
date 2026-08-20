@@ -17,7 +17,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
  */
 
 const flow = vi.hoisted(() => ({
-  fitView: vi.fn(() => new Promise<boolean>(() => undefined)),
+  fitView: vi.fn(
+    (_options: {
+      nodes?: { id: string }[];
+      padding?: number;
+      duration?: number;
+      maxZoom?: number;
+    }) => new Promise<boolean>(() => undefined),
+  ),
   getNode: vi.fn(),
   viewport: { width: 1000, height: 800 },
 }));
@@ -33,10 +40,7 @@ const { OverviewCamera, PresentingCamera } = await import('../src/components/cam
 const CARD = { id: 'a', position: { x: 0, y: 0 }, width: 200, height: 100 };
 const OTHER_CARD = { id: 'b', position: { x: 600, y: 0 }, width: 200, height: 100 };
 
-const fits = () =>
-  flow.fitView.mock.calls as unknown as [
-    { nodes?: { id: string }[]; padding?: number; duration?: number; maxZoom?: number },
-  ][];
+const fits = () => flow.fitView.mock.calls;
 
 beforeEach(() => {
   flow.fitView.mockClear();

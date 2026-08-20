@@ -30,11 +30,14 @@
     "anti-slop/no-reflect-apply": "error",
     "anti-slop/no-reflect-get": "error",
     "anti-slop/no-unknown-type-aliases": "error",
-    "anti-slop/no-widen-then-assert": "error"
+    "anti-slop/no-widen-then-assert": "error",
+    "anti-slop/no-chained-type-assertions": "error",
+    "anti-slop/no-shape-in-symbol-names": "error",
+    "anti-slop/no-module-mocking": "error"
   },
-  // Scoped exceptions from .scratch/anti-slop/issues/02-migrate-boundary-decoders.md.
-  // Both files inert here until the rule they name is enabled repo-wide by a
-  // later migration phase — see .scratch/anti-slop/spec.md.
+  // Scoped exceptions from .scratch/anti-slop/issues/02-migrate-boundary-decoders.md
+  // and 03-migrate-bounded-rules.md — see .scratch/anti-slop/spec.md for which
+  // rule each override waits on before it goes live repo-wide.
   "overrides": [
     {
       // The Postgres repository's own boundary code: classifying caught driver
@@ -65,6 +68,59 @@
         "anti-slop/no-unknown-parameters": "off",
         "anti-slop/no-runtime-typeof": "off",
         "anti-slop/no-unsafe-dictionary-type": "off"
+      }
+    },
+    {
+      // `.shape` is Zod's own public `ZodObject` API for reading a schema's field
+      // schemas back out — not a symbol either test declares, so there is nothing
+      // to rename. Both files read it to keep an assertion honest against the
+      // schema itself rather than a hand-copied literal (see each file's own
+      // docstring for why the duplication would be worse than the exception).
+      "files": [
+        "packages/core/test/card-document-equality.test.ts",
+        "test/unit/postgres-import-decoding.test.ts"
+      ],
+      "rules": {
+        "anti-slop/no-shape-in-symbol-names": "off"
+      }
+    },
+    {
+      // Base UI and React Flow are vendored third-party UI libraries this repo
+      // does not own. Each of these mocks the primitive/component boundary so
+      // the test observes delegation — that the wrapper renders the *installed*
+      // import — without asserting the vendor's own private DOM or requiring
+      // its full runtime context (React Flow's store/provider tree). There is
+      // no in-repo real implementation of either library to inject instead;
+      // the boundary itself is the seam, same as `no-runtime-typeof`'s
+      // postgres/http-protocol exceptions above but for a vendored render
+      // dependency rather than a wire format.
+      "files": [
+        "packages/ui/test/Button.test.tsx",
+        "packages/ui/test/AddCardControl-base-ui.test.tsx",
+        "packages/react-flow-adapter/test/CardNode.test.tsx",
+        "packages/react-flow-adapter/test/GraphHud.test.tsx",
+        "packages/app/test/cameras.test.tsx"
+      ],
+      "rules": {
+        "anti-slop/no-module-mocking": "off"
+      }
+    },
+    {
+      // Design debt flagged rather than fixed (research.md: no-module-mocking
+      // findings are design feedback, not free syntax fixes). This mocks
+      // `node:fs/promises` to fault-inject ENOSPC/EPERM on specific paths so
+      // export's cleanup-after-partial-failure paths are reachable at all —
+      // real disk-full/permission-denied conditions aren't practically
+      // triggerable in a test. Unlike the Base UI/React Flow boundary above,
+      // a real fix exists in principle: give `exportSpace` an injected
+      // filesystem seam (ADR 0016's composition-time pattern) so this test
+      // could supply a faithful in-memory implementation that fails on
+      // command. That is a production-code change this bounded, zero-prod-risk
+      // phase deliberately does not make — left for whoever next touches
+      // `src/export/export-space.ts`.
+      "files": ["test/unit/export-space-recovery.test.ts"],
+      "rules": {
+        "anti-slop/no-module-mocking": "off"
       }
     }
   ]

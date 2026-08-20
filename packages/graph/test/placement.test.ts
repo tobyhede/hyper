@@ -31,12 +31,13 @@ const asObject = (placement: Placement) => Object.fromEntries(placement);
 
 describe('Placement.fromLayout', () => {
   it('reads the positions a Layout authored', () => {
-    const layout = {
+    const layout: Layout = {
       id: uuid('00000000-0000-4000-8000-000000000021'),
       title: 'Layout 1',
       kind: 'positioned',
       positions: { [CARD_A]: { x: 10, y: 20 }, [CARD_B]: { x: 300, y: 40 } },
-    } as unknown as Layout;
+      graphs: [],
+    };
 
     expect(asObject(Placement.fromLayout(layout))).toEqual({
       [CARD_A]: { x: 10, y: 20 },
@@ -45,12 +46,13 @@ describe('Placement.fromLayout', () => {
   });
 
   it('carries a Layout that authors no card at all', () => {
-    const layout = {
+    const layout: Layout = {
       id: uuid('00000000-0000-4000-8000-000000000021'),
       title: 'Layout 1',
       kind: 'positioned',
       positions: {},
-    } as unknown as Layout;
+      graphs: [],
+    };
 
     // Distinct from having no Layout: this one exists and authors nothing yet.
     expect(Placement.fromLayout(layout).size).toBe(0);
@@ -305,12 +307,13 @@ describe('Placement.toPositions', () => {
       '00000000-0000-4000-8000-000000000002': [10, 20],
       '00000000-0000-4000-8000-000000000003': [300, 40],
     });
-    const layout = {
+    const layout: Layout = {
       id: uuid('00000000-0000-4000-8000-000000000021'),
       title: 'Layout 1',
       kind: 'positioned',
       positions: Placement.toPositions(placement),
-    } as unknown as Layout;
+      graphs: [],
+    };
 
     expect(Placement.equals(Placement.fromLayout(layout), placement)).toBe(true);
   });

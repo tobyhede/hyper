@@ -66,9 +66,9 @@ describe('a stored markdown document is the card less its id', () => {
    * refuses.
    */
   it('shares one instance of every rule with the card schema', () => {
-    const cardShape: Record<string, unknown> = markdownCardSchema.shape;
+    const cardFieldSchemas: Record<string, unknown> = markdownCardSchema.shape;
     for (const [field, schema] of Object.entries(markdownCardDocumentSchema.shape)) {
-      expect(schema, `the document's "${field}" is not the card's`).toBe(cardShape[field]);
+      expect(schema, `the document's "${field}" is not the card's`).toBe(cardFieldSchemas[field]);
     }
   });
 
