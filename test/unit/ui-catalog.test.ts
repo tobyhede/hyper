@@ -23,7 +23,7 @@ const fixture = (): string => {
   );
   write(
     root,
-    'packages/app/stories/parity-manifest.ts',
+    'packages/app/stories/parity-claims.ts',
     `export const parityClaims = [{ id: 'button-is-operable', storyFile: 'components/button.stories.tsx', storyExport: 'Primary', claim: 'The Button can be operated.' }] as const;`,
   );
   write(

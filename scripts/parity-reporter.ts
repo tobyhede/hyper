@@ -1,5 +1,5 @@
 import type { FullConfig, FullResult, Reporter, Suite, TestCase } from '@playwright/test/reporter';
-import { parityClaims } from '../packages/app/stories/parity-manifest';
+import { parityClaims } from '../packages/app/stories/parity-claims';
 import { PARITY_TAG_PREFIX } from './parity-tag';
 
 interface ParityReporterOptions {

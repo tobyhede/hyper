@@ -10,8 +10,8 @@ interface for ADR 0045
 
 A Space Card points at another Space. Today nothing says what it looks like on
 the canvas beyond being a Card. The proposal is that it renders as a **frame**
-containing the Space it points at — a portal onto that Space's Layout, drawn in
-place rather than only on open.
+containing the Space it points at — a portal onto the target Space's current
+canvas renderer, drawn in place rather than only on open.
 
 ```
 [Card]
@@ -22,14 +22,20 @@ place rather than only on open.
 ```
 
 Expandable: collapsed it is an ordinary Card Front; expanded it draws the
-nested Layout. Making the nested Space *editable* through the frame is a
-separate question and explicitly not part of this one.
+target Space's current canvas renderer. Making the nested Space *editable*
+through the frame is a separate question and explicitly not part of this one.
 
 React Flow calls this a **sub flow** and it is a documented feature: "A sub flow
 is a flow inside a node." It is not a second canvas — it is nodes inside one
 canvas with `parentId` set, sharing one store and one viewport. The mechanism
 and its constraints are recorded in
 `.scratch/react-flow-guidance/findings.md` §8.
+
+**Both renderer subjects are in scope.** If the target currently selects a
+Layout, the frame uses that Layout's authored placement and Graphs. If it
+selects an Algorithmic View, the frame resolves that View's strategy and uses
+its computed placement and Graphs. Expanding the Space Card does not convert an
+Algorithmic View because rendering alone is not an Edit.
 
 ## What blocks it outright
 
@@ -47,7 +53,7 @@ opens to whatever the target Space's own renderer choice currently is.
 ## What it runs into, once the kind exists
 
 **One viewport.** A sub flow shares the parent's store and camera, and a child's
-position is relative to the parent's top-left. The nested Layout's own
+position is relative to the parent's top-left. The nested renderer's
 coordinates therefore need transforming into the parent's space rather than
 passing through, and the nested content renders at the parent's zoom.
 
