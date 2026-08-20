@@ -1,39 +1,54 @@
 import { expect, test } from '@playwright/test';
 
-test('Persistence Indicator story renders the production save lifecycle', async ({ page }) => {
-  await page.goto('/?story=components--persistence-indicator--lifecycle&mode=preview');
+test(
+  'Persistence Indicator story renders the production save lifecycle',
+  { tag: '@parity:persistence-indicator-shows-save-lifecycle' },
+  async ({ page }) => {
+    await page.goto('/?story=components--persistence-indicator--lifecycle&mode=preview');
 
-  await expect(page.getByRole('button', { name: 'Saving changes' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Changes saved' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Changes saved' })).toBeHidden({ timeout: 4_000 });
-});
+    await expect(page.getByRole('button', { name: 'Saving changes' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Changes saved' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Changes saved' })).toBeHidden({
+      timeout: 4_000,
+    });
+  },
+);
 
 /**
  * ADR 0053's first claim, proven on the rendered story: one exclusive list over
  * computed Views and authored Layouts, one pressed item, and a canvas header
  * that names it.
  */
-test('Workspace Sidebar story renders one exclusive canvas choice', async ({ page }) => {
-  await page.goto('/?story=components--workspace-sidebar--pending&mode=preview');
+test(
+  'Workspace Sidebar story renders one exclusive canvas choice',
+  {
+    tag: [
+      '@parity:space-sidebar-marks-one-current-renderer',
+      '@parity:space-sidebar-shows-pending-persistence',
+    ],
+  },
+  async ({ page }) => {
+    await page.goto('/?story=components--workspace-sidebar--pending&mode=preview');
 
-  const flow = page.getByRole('button', { name: 'Flow' });
-  const grid = page.getByRole('button', { name: 'Grid' });
-  const collection = page.getByRole('button', { name: 'Collection 1' });
+    const flow = page.getByRole('button', { name: 'Flow' });
+    const grid = page.getByRole('button', { name: 'Grid' });
+    const collection = page.getByRole('button', { name: 'Collection 1' });
 
-  await expect(collection).toHaveAttribute('aria-pressed', 'true');
-  await expect(flow).toHaveAttribute('aria-pressed', 'false');
-  await expect(page.getByTestId('selected-canvas')).toContainText('Collection 1');
-  await expect(page.getByTestId('selected-canvas-kind')).toHaveText('Authored layout');
-  await expect(page.getByRole('button', { name: 'Saving changes' })).toBeVisible();
-  await expect(page.getByText('None', { exact: true })).toHaveCount(0);
+    await expect(collection).toHaveAttribute('aria-pressed', 'true');
+    await expect(flow).toHaveAttribute('aria-pressed', 'false');
+    await expect(page.getByTestId('selected-canvas')).toContainText('Collection 1');
+    await expect(page.getByTestId('selected-canvas-kind')).toHaveText('Authored layout');
+    await expect(page.getByRole('button', { name: 'Saving changes' })).toBeVisible();
+    await expect(page.getByText('None', { exact: true })).toHaveCount(0);
 
-  await grid.click();
+    await grid.click();
 
-  await expect(grid).toHaveAttribute('aria-pressed', 'true');
-  await expect(collection).toHaveAttribute('aria-pressed', 'false');
-  await expect(page.getByTestId('selected-canvas')).toContainText('Grid');
-  await expect(page.getByTestId('selected-canvas-kind')).toHaveText('Computed view');
-});
+    await expect(grid).toHaveAttribute('aria-pressed', 'true');
+    await expect(collection).toHaveAttribute('aria-pressed', 'false');
+    await expect(page.getByTestId('selected-canvas')).toContainText('Grid');
+    await expect(page.getByTestId('selected-canvas-kind')).toHaveText('Computed view');
+  },
+);
 
 /**
  * The list's keyboard contract is a list of buttons', not a Select's or a
@@ -76,54 +91,68 @@ test('Workspace Sidebar story keeps the Add Card split control whole', async ({ 
  * describes, so "New space" is the evidence that it is really that Space and not
  * a hand-built stand-in wearing the catalogue's label.
  */
-test('Workspace Sidebar story says an unauthored Space has nothing yet', async ({ page }) => {
-  await page.goto('/?story=components--workspace-sidebar--unauthored&mode=preview');
+test(
+  'Workspace Sidebar story says an unauthored Space has nothing yet',
+  { tag: '@parity:space-sidebar-names-unauthored-state' },
+  async ({ page }) => {
+    await page.goto('/?story=components--workspace-sidebar--unauthored&mode=preview');
 
-  await expect(page.getByRole('button', { name: 'Flow' })).toHaveAttribute('aria-pressed', 'true');
-  await expect(page.getByTestId('selected-canvas')).toContainText('Flow');
-  await expect(page.getByTestId('selected-canvas-kind')).toHaveText('Computed view');
-  await expect(page.getByTestId('workspace-title')).toHaveText('New space');
-  await expect(page.getByTestId('no-authored-layouts')).toBeVisible();
-  await expect(page.getByTestId('no-graphs')).toBeVisible();
-  await expect(page.getByTestId('present-button')).toBeDisabled();
-});
+    await expect(page.getByRole('button', { name: 'Flow' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    await expect(page.getByTestId('selected-canvas')).toContainText('Flow');
+    await expect(page.getByTestId('selected-canvas-kind')).toHaveText('Computed view');
+    await expect(page.getByTestId('workspace-title')).toHaveText('New space');
+    await expect(page.getByTestId('no-authored-layouts')).toBeVisible();
+    await expect(page.getByTestId('no-graphs')).toBeVisible();
+    await expect(page.getByTestId('present-button')).toBeDisabled();
+  },
+);
 
-test('Workspace Sidebar stories render quiet, retryable, and presenting states', async ({
-  page,
-}) => {
-  await page.goto('/?story=components--workspace-sidebar--settled&mode=preview');
-  await expect(page.getByRole('button', { name: 'Collection 1' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Changes saved' })).toBeHidden();
+test(
+  'Workspace Sidebar stories render quiet, retryable, and presenting states',
+  {
+    tag: [
+      '@parity:space-sidebar-recovers-retryable-failure',
+      '@parity:space-sidebar-withdraws-authoring-while-presenting',
+    ],
+  },
+  async ({ page }) => {
+    await page.goto('/?story=components--workspace-sidebar--settled&mode=preview');
+    await expect(page.getByRole('button', { name: 'Collection 1' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Changes saved' })).toBeHidden();
 
-  await page.goto('/?story=components--workspace-sidebar--failed&mode=preview');
-  // Two surfaces for one condition: a red dot that leaves the sidebar footer's
-  // geometry alone, and the notice pinned under the canvas header carrying
-  // reason and action.
-  await expect(page.getByRole('button', { name: 'Changes not saved' })).toBeVisible();
-  const failure = page.getByTestId('persistence-failure');
-  await expect(failure).toContainText('Network unavailable');
-  // The claim this story owns: a failed save keeps the unsaved work on screen.
-  // `Collection 3` is in the snapshot the session submitted and in no revision
-  // the backend has stored, so a sidebar drawing anything but its own session's
-  // working Space cannot show it.
-  const unsaved = page.getByRole('button', { name: 'Collection 3' });
-  await expect(unsaved).toBeVisible();
-  const retry = failure.getByRole('button', { name: 'Retry' });
-  await retry.click();
-  await expect(failure).toBeHidden();
-  await expect(page.getByRole('button', { name: 'Changes not saved' })).toBeHidden();
-  await expect(page.getByTestId('persistence-status')).toHaveAttribute(
-    'data-persistence-state',
-    'settled',
-  );
-  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
-  // And the retry saves that same work rather than replacing it.
-  await expect(unsaved).toBeVisible();
+    await page.goto('/?story=components--workspace-sidebar--failed&mode=preview');
+    // Two surfaces for one condition: a red dot that leaves the sidebar footer's
+    // geometry alone, and the notice pinned under the canvas header carrying
+    // reason and action.
+    await expect(page.getByRole('button', { name: 'Changes not saved' })).toBeVisible();
+    const failure = page.getByTestId('persistence-failure');
+    await expect(failure).toContainText('Network unavailable');
+    // The claim this story owns: a failed save keeps the unsaved work on screen.
+    // `Collection 3` is in the snapshot the session submitted and in no revision
+    // the backend has stored, so a sidebar drawing anything but its own session's
+    // working Space cannot show it.
+    const unsaved = page.getByRole('button', { name: 'Collection 3' });
+    await expect(unsaved).toBeVisible();
+    const retry = failure.getByRole('button', { name: 'Retry' });
+    await retry.click();
+    await expect(failure).toBeHidden();
+    await expect(page.getByRole('button', { name: 'Changes not saved' })).toBeHidden();
+    await expect(page.getByTestId('persistence-status')).toHaveAttribute(
+      'data-persistence-state',
+      'settled',
+    );
+    await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
+    // And the retry saves that same work rather than replacing it.
+    await expect(unsaved).toBeVisible();
 
-  await page.goto('/?story=components--workspace-sidebar--presenting&mode=preview');
-  await expect(page.getByTestId('exit-presenting-button')).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Add Card' })).toBeDisabled();
-});
+    await page.goto('/?story=components--workspace-sidebar--presenting&mode=preview');
+    await expect(page.getByTestId('exit-presenting-button')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Add Card' })).toBeDisabled();
+  },
+);
 
 /**
  * Application pairs:
@@ -161,27 +190,36 @@ test('Workspace Sidebar story draws and activates only the selected Layout graph
   await expect(page.getByRole('button', { name: 'Present Echo' })).toBeVisible();
 });
 
-test('Workspace Sidebar stories render production conflict and rejection recovery', async ({
-  page,
-}) => {
-  await page.goto('/?story=components--workspace-sidebar--conflicted&mode=preview');
+test(
+  'Workspace Sidebar stories render production conflict and rejection recovery',
+  {
+    tag: [
+      '@parity:space-sidebar-reports-permanent-rejection',
+      '@parity:space-sidebar-resolves-conflict',
+    ],
+  },
+  async ({ page }) => {
+    await page.goto('/?story=components--workspace-sidebar--conflicted&mode=preview');
 
-  await expect(page.getByRole('alertdialog', { name: 'Changes conflict' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Reload' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Keep local and retry' })).toBeVisible();
-  await page.keyboard.press('Escape');
-  await expect(page.getByRole('alertdialog', { name: 'Changes conflict' })).toBeVisible();
-  await page.getByRole('button', { name: 'Reload' }).click();
-  await expect(page.getByTestId('persistence-remote-refused')).toContainText(
-    'The remote space is invalid and was not accepted.',
-  );
+    await expect(page.getByRole('alertdialog', { name: 'Changes conflict' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Reload' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Keep local and retry' })).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('alertdialog', { name: 'Changes conflict' })).toBeVisible();
+    await page.getByRole('button', { name: 'Reload' }).click();
+    await expect(page.getByTestId('persistence-remote-refused')).toContainText(
+      'The remote space is invalid and was not accepted.',
+    );
 
-  await page.goto('/?story=components--workspace-sidebar--rejected&mode=preview');
-  await expect(page.getByRole('alertdialog', { name: 'Changes couldn’t be saved' })).toBeVisible();
-  await expect(page.getByText('Permission denied')).toBeVisible();
-  await page.getByRole('button', { name: 'Continue editing' }).click();
-  await expect(page.getByRole('button', { name: 'Persistence rejected' })).toBeVisible();
-});
+    await page.goto('/?story=components--workspace-sidebar--rejected&mode=preview');
+    await expect(
+      page.getByRole('alertdialog', { name: 'Changes couldn’t be saved' }),
+    ).toBeVisible();
+    await expect(page.getByText('Permission denied')).toBeVisible();
+    await page.getByRole('button', { name: 'Continue editing' }).click();
+    await expect(page.getByRole('button', { name: 'Persistence rejected' })).toBeVisible();
+  },
+);
 
 /**
  * The Sidebar's desktop container is `fixed`, so every one of these stories is

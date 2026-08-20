@@ -19,7 +19,22 @@ const fixture = (): string => {
   write(
     root,
     'packages/app/stories/components/button.stories.tsx',
-    "export default { title: 'Components/Button' };",
+    "export default { title: 'Components/Button' }; export const Primary = () => null;",
+  );
+  write(
+    root,
+    'packages/app/stories/parity-manifest.ts',
+    `export const parityClaims = [{ id: 'button-is-operable', storyFile: 'components/button.stories.tsx', storyExport: 'Primary', claim: 'The Button can be operated.' }] as const;`,
+  );
+  write(
+    root,
+    'packages/app/ladle-e2e/button.spec.ts',
+    `test('story button', { tag: '@parity:button-is-operable' }, async () => undefined);`,
+  );
+  write(
+    root,
+    'packages/app/e2e/button.spec.ts',
+    `test('application button', { tag: '@parity:button-is-operable' }, async () => undefined);`,
   );
   return root;
 };
@@ -33,6 +48,22 @@ describe('UI catalogue', () => {
     expect(buildUiCatalog(fixture())).toEqual({
       exports: ['Button'],
       stories: ['Components/Button'],
+      claims: [
+        {
+          id: 'button-is-operable',
+          storyFile: 'components/button.stories.tsx',
+          storyExport: 'Primary',
+          claim: 'The Button can be operated.',
+          ladle: {
+            file: 'packages/app/ladle-e2e/button.spec.ts',
+            test: 'story button',
+          },
+          application: {
+            file: 'packages/app/e2e/button.spec.ts',
+            test: 'application button',
+          },
+        },
+      ],
     });
   });
 
@@ -47,4 +78,36 @@ describe('UI catalogue', () => {
     expect(() => buildUiCatalog(root)).toThrowError(UiCatalogError);
     expect(() => buildUiCatalog(root)).toThrowError(/title must start with Surfaces\//);
   });
+
+  it('rejects a stable story without one proof in each Playwright suite', () => {
+    const root = fixture();
+    write(
+      root,
+      'packages/app/e2e/button.spec.ts',
+      `test('application button', async () => undefined);`,
+    );
+
+    expect(() => buildUiCatalog(root)).toThrowError(
+      /button-is-operable requires exactly one application test; found 0/,
+    );
+  });
+
+  it.each(['test.skip', 'test.fixme', 'test.describe.skip'])(
+    '%s cannot supply parity evidence',
+    (modifier) => {
+      const root = fixture();
+      const test = `test('application button', { tag: '@parity:button-is-operable' }, async () => undefined);`;
+      write(
+        root,
+        'packages/app/e2e/button.spec.ts',
+        modifier === 'test.describe.skip'
+          ? `test.describe.skip('excluded', () => { ${test} });`
+          : `${modifier}('application button', { tag: '@parity:button-is-operable' }, async () => undefined);`,
+      );
+
+      expect(() => buildUiCatalog(root)).toThrowError(
+        /parity tag @parity:button-is-operable is excluded/,
+      );
+    },
+  );
 });

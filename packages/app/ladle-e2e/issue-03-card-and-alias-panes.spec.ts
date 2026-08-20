@@ -1,31 +1,33 @@
 import { expect, test } from '@playwright/test';
 
-test('Markdown Card story validates atomically and Escape cancels the whole draft', async ({
-  page,
-}) => {
-  await page.goto('/?story=components--card-and-alias-panes--markdown&mode=preview');
+test(
+  'Markdown Card story validates atomically and Escape cancels the whole draft',
+  { tag: '@parity:markdown-pane-refusal-is-field-local' },
+  async ({ page }) => {
+    await page.goto('/?story=components--card-and-alias-panes--markdown&mode=preview');
 
-  const dialog = page.getByRole('dialog', { name: 'Architecture notes' });
-  const title = dialog.getByRole('textbox', { name: 'Title' });
-  const body = dialog.getByRole('textbox', { name: 'Markdown source' });
-  await expect(title).toBeFocused();
-  await expect(body).toHaveValue(/## Placement/);
+    const dialog = page.getByRole('dialog', { name: 'Architecture notes' });
+    const title = dialog.getByRole('textbox', { name: 'Title' });
+    const body = dialog.getByRole('textbox', { name: 'Markdown source' });
+    await expect(title).toBeFocused();
+    await expect(body).toHaveValue(/## Placement/);
 
-  await title.fill('   ');
-  await body.fill('A pending replacement');
-  await dialog.getByRole('button', { name: 'Done' }).click();
+    await title.fill('   ');
+    await body.fill('A pending replacement');
+    await dialog.getByRole('button', { name: 'Done' }).click();
 
-  await expect(dialog.getByRole('alert')).toHaveText('A Card title is required.');
-  await expect(title).toHaveAttribute('aria-invalid', 'true');
-  await expect(dialog).toBeVisible();
+    await expect(dialog.getByRole('alert')).toHaveText('A Card title is required.');
+    await expect(title).toHaveAttribute('aria-invalid', 'true');
+    await expect(dialog).toBeVisible();
 
-  await body.press('Escape');
-  await expect(dialog).toBeHidden();
-  await expect(page.getByText('No edit completed.')).toBeVisible();
-});
+    await body.press('Escape');
+    await expect(dialog).toBeHidden();
+    await expect(page.getByText('No edit completed.')).toBeVisible();
+  },
+);
 
-test('opened Alias empty story explains that no Target is eligible', async ({ page }) => {
-  await page.goto('/?story=components--card-and-alias-panes--alias-empty&mode=preview');
+test('review Alias empty state explains that no Target is eligible', async ({ page }) => {
+  await page.goto('/?story=review--alias-pane-unreachable-states--empty&mode=preview');
 
   const dialog = page.getByRole('dialog', { name: 'Placement recap' });
   const target = dialog.getByRole('combobox', { name: 'Target' });
@@ -36,8 +38,8 @@ test('opened Alias empty story explains that no Target is eligible', async ({ pa
   await expect(page.getByRole('option')).toHaveCount(0);
 });
 
-test('a production-reachable stale Alias Target refusal stays field-local', async ({ page }) => {
-  await page.goto('/?story=components--card-and-alias-panes--alias-target-refused&mode=preview');
+test('review stale Alias Target refusal stays field-local', async ({ page }) => {
+  await page.goto('/?story=review--alias-pane-unreachable-states--target-refused&mode=preview');
 
   const dialog = page.getByRole('dialog', { name: 'Placement recap' });
   const target = dialog.getByRole('combobox', { name: 'Target' });

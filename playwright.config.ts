@@ -13,7 +13,7 @@ export default defineConfig({
   forbidOnly: !!process.env['CI'],
   failOnFlakyTests: !!process.env['CI'],
   retries: process.env['CI'] ? 2 : 0,
-  reporter: 'list',
+  reporter: [['list'], ['./scripts/parity-reporter.ts', { suite: 'application' }]],
   use: {
     trace: 'on-first-retry',
   },

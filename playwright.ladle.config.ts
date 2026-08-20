@@ -17,7 +17,7 @@ export default defineConfig({
   // suite or the runner is at fault.
   failOnFlakyTests: !!process.env['CI'],
   retries: process.env['CI'] ? 2 : 0,
-  reporter: 'list',
+  reporter: [['list'], ['./scripts/parity-reporter.ts', { suite: 'Ladle' }]],
   use: {
     ...devices['Desktop Chrome'],
     baseURL: `http://localhost:${PORT}`,
