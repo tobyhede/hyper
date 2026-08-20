@@ -341,22 +341,26 @@
       // This repo's error-reporting/error-describing seam, repeated across
       // many independent files: a function that receives whatever a `catch`
       // or a Promise rejection handed it and either logs it (`console.error`),
-      // converts it to a display string, or classifies it (`instanceof Error`,
-      // a `.code` check) — the same shape as `ObserverErrorReporter` above and
-      // structurally identical to the rule's own exempted `cause` parameter.
-      // JS lets `throw`/`reject` carry any value, so `unknown` is the sound
-      // type for "whatever was thrown"; every one of these functions does its
-      // own narrowing immediately (`error instanceof Error ? ... : ...`),
-      // which *is* the "parse before use" step the rule's message asks for —
-      // there is no schema to run first for an opaque caught value. Renaming
-      // every one of these to the rule's literal exempted name (`cause`) was
-      // considered and rejected: most of them are the error being reported,
-      // not a wrapped cause, and inventing a name to dodge a linter is worse
-      // than a scoped exception. Two are genuine external contracts, not our
-      // own seam: `Workspace.tsx`'s `getDerivedStateFromError` overrides
-      // React's own lifecycle method signature, and
-      // `space-authoring.test.ts`'s `AuthoringOptions`/`AuthoringExtras`
-      // mirror `packages/app/src/space-authoring.ts`'s real
+      // converts it to a display string, classifies it (`instanceof Error`,
+      // a `.code` check), or — `elk-strategy.ts`'s `loadDefaultEngine` —
+      // invalidates a cache keyed on the failure and re-throws the same value
+      // unexamined. All are the same shape as `ObserverErrorReporter` above
+      // and structurally identical to the rule's own exempted `cause`
+      // parameter. JS lets `throw`/`reject` carry any value, so `unknown` is
+      // the sound type for "whatever was thrown"; every one of these
+      // functions does its own narrowing immediately where it narrows at all
+      // (`error instanceof Error ? ... : ...`), which *is* the "parse before
+      // use" step the rule's message asks for — there is no schema to run
+      // first for an opaque caught value, and a pure re-throw needs no
+      // narrowing to begin with. Renaming every one of these to the rule's
+      // literal exempted name (`cause`) was considered and rejected: most of
+      // them are the error being reported, not a wrapped cause, and inventing
+      // a name to dodge a linter is worse than a scoped exception. Two are
+      // genuine external contracts, not our own seam: `Workspace.tsx`'s
+      // `getDerivedStateFromError` overrides React's own lifecycle method
+      // signature, and `space-authoring.test.ts`'s
+      // `AuthoringOptions`/`AuthoringExtras` mirror
+      // `packages/app/src/space-authoring.ts`'s real
       // `SpaceAuthoringDependencies.reportObserverError` (ADR 0016's
       // composition-time injection seam).
       "files": [
@@ -369,6 +373,7 @@
         "packages/app/test/space-authoring.test.ts",
         "packages/http/src/index.ts",
         "packages/persistence/src/session.ts",
+        "packages/react-flow-adapter/src/elk/elk-strategy.ts",
         "src/cli/main.ts",
         "src/cli/run.ts",
         "src/import/read-single-space.ts"
