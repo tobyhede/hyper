@@ -40,7 +40,7 @@ describe('a point has one type', () => {
     ts.createSourceFile(file, readFileSync(file, 'utf8'), ts.ScriptTarget.Latest, true);
 
   /** Exactly two required members, `x` and `y`, both `number` — that is a point. */
-  const isPointShape = (members: ts.NodeArray<ts.TypeElement>): boolean => {
+  const isPointStructure = (members: ts.NodeArray<ts.TypeElement>): boolean => {
     const numeric = members.filter(
       (member) =>
         ts.isPropertySignature(member) &&
@@ -55,10 +55,10 @@ describe('a point has one type', () => {
   /** The name of a point declared by this statement, if it declares one. */
   const declaredPoint = (statement: ts.Statement): string | null => {
     if (ts.isInterfaceDeclaration(statement)) {
-      return isPointShape(statement.members) ? statement.name.text : null;
+      return isPointStructure(statement.members) ? statement.name.text : null;
     }
     if (ts.isTypeAliasDeclaration(statement) && ts.isTypeLiteralNode(statement.type)) {
-      return isPointShape(statement.type.members) ? statement.name.text : null;
+      return isPointStructure(statement.type.members) ? statement.name.text : null;
     }
     return null;
   };
