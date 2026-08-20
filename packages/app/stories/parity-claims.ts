@@ -22,6 +22,12 @@ export const parityClaims: readonly ParityClaim[] = [
     claim: 'A refused Markdown Card title stays field-local and the whole draft can be cancelled.',
   },
   {
+    id: 'alias-pane-authors-metadata',
+    storyFile: 'components/card-and-alias-panes.stories.tsx',
+    storyExport: 'Alias',
+    claim: 'An Alias opens its own title and Target editor without exposing Target content.',
+  },
+  {
     id: 'persistence-indicator-shows-save-lifecycle',
     storyFile: 'components/persistence-indicator.stories.tsx',
     storyExport: 'Lifecycle',

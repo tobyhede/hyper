@@ -316,29 +316,35 @@ test('content that exceeds the frame scrolls inside it, keeping controls reachab
  * in the pane. ADR 0049 withdrew that: a pane has one edit subject, and to
  * author A's content the author opens A.
  */
-test('an alias node names the card it redraws and opens its own metadata', async ({ page }) => {
-  await page.goto('/');
+test(
+  'an alias node names the card it redraws and opens its own metadata',
+  { tag: '@parity:alias-pane-authors-metadata' },
+  async ({ page }) => {
+    await page.goto('/');
 
-  // A′ is an alias of A. It is drawn as its own node, carrying its own title, with
-  // a muted marker naming the card it shows, so a redraw reads as a deliberate
-  // return (ADR 0009).
-  const recap = nodeByTitle(page, 'A′');
-  await expect(recap).toBeVisible();
-  await expect(recap.getByTestId('alias-marker')).toHaveText('A');
+    // A′ is an alias of A. It is drawn as its own node, carrying its own title, with
+    // a muted marker naming the card it shows, so a redraw reads as a deliberate
+    // return (ADR 0009).
+    const recap = nodeByTitle(page, 'A′');
+    await expect(recap).toBeVisible();
+    await expect(recap.getByTestId('alias-marker')).toHaveText('A');
 
-  await openCard(recap, 'A′');
-  // Two fields, both the Alias's own, and nothing belonging to A.
-  await expect(page.getByRole('textbox', { name: 'Title' })).toHaveValue('A′');
-  const target = page.getByRole('combobox', { name: 'Target' });
-  await expect(target).toBeVisible();
-  await target.press('ArrowDown');
-  await expect(page.getByRole('option', { name: 'Markdown Card A' }).locator('svg')).toHaveCount(2);
-  await expect(page.getByRole('textbox', { name: 'Markdown source' })).toHaveCount(0);
-  await target.press('Escape');
-  await expect(page.getByTestId('open-card')).toBeVisible();
-  await page.getByRole('button', { name: 'Cancel' }).click();
+    await openCard(recap, 'A′');
+    // Two fields, both the Alias's own, and nothing belonging to A.
+    await expect(page.getByRole('textbox', { name: 'Title' })).toHaveValue('A′');
+    const target = page.getByRole('combobox', { name: 'Target' });
+    await expect(target).toBeVisible();
+    await target.press('ArrowDown');
+    await expect(page.getByRole('option', { name: 'Markdown Card A' }).locator('svg')).toHaveCount(
+      2,
+    );
+    await expect(page.getByRole('textbox', { name: 'Markdown source' })).toHaveCount(0);
+    await target.press('Escape');
+    await expect(page.getByTestId('open-card')).toBeVisible();
+    await page.getByRole('button', { name: 'Cancel' }).click();
 
-  // Its own title is still authored, inline on the graph.
-  await recap.getByRole('heading', { name: 'A′', exact: true }).dblclick();
-  await expect(page.getByRole('textbox', { name: 'Card title' })).toHaveValue('A′');
-});
+    // Its own title is still authored, inline on the graph.
+    await recap.getByRole('heading', { name: 'A′', exact: true }).dblclick();
+    await expect(page.getByRole('textbox', { name: 'Card title' })).toHaveValue('A′');
+  },
+);
