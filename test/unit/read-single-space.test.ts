@@ -8,6 +8,7 @@ import {
   readImportBatch,
   readSingleSpace,
 } from '../../src/import/read-single-space';
+import { captureError } from '../support/capture-error';
 
 const SPACE_ID = '00000000-0000-4000-8000-000000000001';
 const ROOT_CARD_ID = '00000000-0000-4000-8000-000000000002';
@@ -47,19 +48,6 @@ const makeTemporaryDirectory = async (): Promise<string> => {
   const directory = await mkdtemp(join(tmpdir(), 'hyper-single-space-'));
   temporaryDirectories.push(directory);
   return directory;
-};
-
-const captureError = async <T>(operation: () => Promise<T>): Promise<Error | undefined> => {
-  try {
-    await operation();
-    return undefined;
-  } catch (error) {
-    // Every path under test throws one of this module's own Error subclasses;
-    // a non-Error throw would be a bug in the code under test, not something
-    // to paper over by wrapping it into a generic Error that loses its shape.
-    if (error instanceof Error) return error;
-    throw error;
-  }
 };
 
 afterEach(async () => {

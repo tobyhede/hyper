@@ -15,6 +15,7 @@ import type {
   RepositoryImportResult,
   SpaceRepository,
 } from '../../src/persistence/space-repository';
+import { captureError } from '../support/capture-error';
 
 const SPACE_ID = uuidSchema.parse('11111111-1111-4111-8111-111111111111');
 const OTHER_SPACE_ID = uuidSchema.parse('22222222-2222-4222-8222-222222222222');
@@ -100,19 +101,6 @@ const writeValidSpace = async (): Promise<string> => {
   );
   await writeFile(join(directory, 'cards', 'opening.md'), '---\ntitle: Opening\n---\nHello.\n');
   return directory;
-};
-
-const captureError = async <T>(operation: () => Promise<T>): Promise<Error | undefined> => {
-  try {
-    await operation();
-    return undefined;
-  } catch (error) {
-    // Every path under test throws one of this module's own Error subclasses;
-    // a non-Error throw would be a bug in the code under test, not something
-    // to paper over by wrapping it into a generic Error that loses its shape.
-    if (error instanceof Error) return error;
-    throw error;
-  }
 };
 
 afterEach(async () => {
