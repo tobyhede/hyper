@@ -37,40 +37,49 @@ const compareOrdinal = (left: string, right: string): number =>
 const canonicalGraphs = (
   graphs: NonNullable<SpaceFile['layouts']>[number]['graphs'],
 ): NonNullable<SpaceFile['layouts']>[number]['graphs'] =>
-  graphs.map((graph) => ({
-    id: graph.id,
-    title: graph.title,
-    ...(graph.color === undefined ? {} : { color: graph.color }),
-    edges: graph.edges.map(({ from, to }) => ({ from, to })),
-  }));
+  graphs.map((graph) => {
+    const edges = graph.edges.map(({ from, to }) => ({ from, to }));
+    // Two full literals rather than a base object with `color` assigned after:
+    // `color` sits between `title` and `edges` in the exported key order, and an
+    // assignment after construction would insert it last instead.
+    return graph.color === undefined
+      ? { id: graph.id, title: graph.title, edges }
+      : { id: graph.id, title: graph.title, color: graph.color, edges };
+  });
 
 const canonicalSpaceFile = ({ snapshot }: LoadedSpace): SpaceFile => {
-  const layouts = snapshot.document.layouts?.map((layout) => ({
-    id: layout.id,
-    title: layout.title,
-    kind: layout.kind,
-    positions: Object.fromEntries(
-      Object.entries(layout.positions)
-        .sort(([left], [right]) => compareOrdinal(left, right))
-        // The point is rebuilt too, not passed through: a stored `{"y":…,"x":…}`
-        // would otherwise export in that order. An absent value cannot come off
-        // a parsed document — the optionality is the `Partial<Record>` the
-        // schema's key branding produces — and dropping it matches what
-        // `JSON.stringify` already did with one.
-        .flatMap(([id, point]) => (point === undefined ? [] : [[id, { x: point.x, y: point.y }]])),
-    ),
-    graphs: canonicalGraphs(layout.graphs),
-    ...(layout.activeGraph === undefined ? {} : { activeGraph: layout.activeGraph }),
-  }));
-  return {
+  const layouts = snapshot.document.layouts?.map((layout) => {
+    const layoutBase: Omit<NonNullable<SpaceFile['layouts']>[number], 'activeGraph'> = {
+      id: layout.id,
+      title: layout.title,
+      kind: layout.kind,
+      positions: Object.fromEntries(
+        Object.entries(layout.positions)
+          .sort(([left], [right]) => compareOrdinal(left, right))
+          // The point is rebuilt too, not passed through: a stored `{"y":…,"x":…}`
+          // would otherwise export in that order. An absent value cannot come off
+          // a parsed document — the optionality is the `Partial<Record>` the
+          // schema's key branding produces — and dropping it matches what
+          // `JSON.stringify` already did with one.
+          .flatMap(([id, point]) =>
+            point === undefined ? [] : [[id, { x: point.x, y: point.y }]],
+          ),
+      ),
+      graphs: canonicalGraphs(layout.graphs),
+    };
+    return layout.activeGraph === undefined
+      ? layoutBase
+      : { ...layoutBase, activeGraph: layout.activeGraph };
+  });
+  const fileBase: Pick<SpaceFile, 'version' | 'id' | 'title'> = {
     version: SPACE_FILE_VERSION,
     id: snapshot.id,
     title: snapshot.document.title,
-    ...(layouts === undefined ? {} : { layouts }),
-    ...(snapshot.document.defaultRenderer === undefined
-      ? {}
-      : { defaultRenderer: snapshot.document.defaultRenderer }),
   };
+  const withLayouts = layouts === undefined ? fileBase : { ...fileBase, layouts };
+  return snapshot.document.defaultRenderer === undefined
+    ? withLayouts
+    : { ...withLayouts, defaultRenderer: snapshot.document.defaultRenderer };
 };
 
 const canonicalCard = (

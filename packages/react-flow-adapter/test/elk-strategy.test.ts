@@ -33,8 +33,13 @@ const graph: LayoutStrategyGraph = {
   ],
 };
 
+interface EngineSpy {
+  readonly engine: ElkEngine;
+  readonly seen: () => ElkNode;
+}
+
 /** Captures the graph handed to ELK instead of laying it out. */
-function spyEngine(): { engine: ElkEngine; seen: () => ElkNode } {
+function spyEngine(): EngineSpy {
   let captured: ElkNode | undefined;
   return {
     engine: {

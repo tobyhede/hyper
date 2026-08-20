@@ -16,14 +16,25 @@ import { CanvasCentre, type VisibleCentre } from '../src/components/CanvasCentre
  * is withdrawn rather than left standing. `App` falls back to the origin, which
  * is what it already does before the first report.
  */
+/** The `report` callback's last value, mutated in place so `mount`'s return stays live. */
+interface CentreHolder {
+  current: VisibleCentre | null;
+}
+
+/** What `mount` hands the test: a live reader over the holder, and a way to tear it down. */
+interface MountedCanvasCentre {
+  readonly centre: () => VisibleCentre | null;
+  readonly unmount: () => void;
+}
+
 describe('CanvasCentre', () => {
   /**
    * A holder rather than a `let`, so the assignment inside the callback is not
    * narrowed away: TypeScript cannot see that `report` ran, and reads a bare
    * `let` as still `null` at every use below.
    */
-  const mount = (): { readonly centre: () => VisibleCentre | null; unmount: () => void } => {
-    const reported: { current: VisibleCentre | null } = { current: null };
+  const mount = (): MountedCanvasCentre => {
+    const reported: CentreHolder = { current: null };
     const view = render(
       <ReactFlowProvider>
         <CanvasCentre

@@ -75,10 +75,9 @@ export function parseImportCardFile(file: CardFile): ParseImportCardFileResult {
   if (!decoded.ok) return decoded;
 
   const { id, ...document } = decoded.candidate;
-  return {
-    ok: true,
-    card: { ...(id === undefined ? {} : { id }), document },
-  };
+  const card: ImportCard = { document };
+  if (id !== undefined) card.id = id;
+  return { ok: true, card };
 }
 
 function decodeCardFile<T extends Frontmatter>(

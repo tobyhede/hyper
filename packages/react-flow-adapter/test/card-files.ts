@@ -5,17 +5,15 @@ export function cardFile(id: string, title = defaultTitle(id), body = ''): CardF
   return { path: `cards/${id}.md`, text: `---\nid: ${id}\ntitle: ${title}\n---\n\n${body}` };
 }
 
+const DEFAULT_TITLES = new Map([
+  ['00000000-0000-4000-8000-000000000002', 'A'],
+  ['00000000-0000-4000-8000-000000000003', 'B'],
+  ['00000000-0000-4000-8000-000000000005', 'C'],
+  ['00000000-0000-4000-8000-000000000006', 'D'],
+]);
+
 function defaultTitle(id: string): string {
-  return (
-    (
-      {
-        '00000000-0000-4000-8000-000000000002': 'A',
-        '00000000-0000-4000-8000-000000000003': 'B',
-        '00000000-0000-4000-8000-000000000005': 'C',
-        '00000000-0000-4000-8000-000000000006': 'D',
-      } as Record<string, string>
-    )[id] ?? id.toUpperCase()
-  );
+  return DEFAULT_TITLES.get(id) ?? id.toUpperCase();
 }
 
 export function aliasFile(id: string, title: string, target: string): CardFile {

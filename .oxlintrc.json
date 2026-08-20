@@ -33,7 +33,17 @@
     "anti-slop/no-widen-then-assert": "error",
     "anti-slop/no-chained-type-assertions": "error",
     "anti-slop/no-shape-in-symbol-names": "error",
-    "anti-slop/no-module-mocking": "error"
+    "anti-slop/no-module-mocking": "error",
+    "anti-slop/no-known-value-widening": "error",
+    "anti-slop/no-unknown-returns": "error",
+    "anti-slop/no-unsafe-dictionary-type": "error",
+    "anti-slop/no-conditional-empty-object-spread": "error",
+    // `allowInTypeGuards` exempts a `typeof` check inside a function whose own
+    // return type is a type predicate (`x is Y`) — the check IS that predicate's
+    // narrowing logic, not a bypass of it (e.g. `observable-state.ts`'s
+    // `isThenable`). Discovered while migrating this rule in issue 04; see that
+    // ticket's resolution for the before/after count.
+    "anti-slop/no-runtime-typeof": ["error", { "allowInTypeGuards": true }]
   },
   // Scoped exceptions from .scratch/anti-slop/issues/02-migrate-boundary-decoders.md
   // and 03-migrate-bounded-rules.md — see .scratch/anti-slop/spec.md for which
@@ -121,6 +131,164 @@
       "files": ["test/unit/export-space-recovery.test.ts"],
       "rules": {
         "anti-slop/no-module-mocking": "off"
+      }
+    },
+    {
+      // `graphColorMap` builds its map at runtime, keyed by however many graphs
+      // a Space holds — there is no static literal for `satisfies` to check and
+      // no narrower key type escapes the rule's own unconditional `Record<...>`
+      // = "open dictionary" classification (see `tools/oxlint/anti-slop/shared/
+      // dictionary-types.ts`'s `classifyWideningTarget`, which doesn't look at
+      // the key type at all). Returning a `Map` instead would dodge the rule but
+      // is an API change beyond a lint migration's scope.
+      "files": ["packages/app/src/colors.ts"],
+      "rules": {
+        "anti-slop/no-known-value-widening": "off"
+      }
+    },
+    {
+      // `LAYOUT_ONLY` is genuinely sparse: indexed by the full
+      // `AuthoringCompletion['kind']` union at its one call site
+      // (`LAYOUT_ONLY[completion.kind]`), it lists only the completion kinds
+      // that need a Layout, not every kind that union has. `Partial<Record<...>>`
+      // is what makes that indexing return `string | undefined` safely; a named
+      // interface would have to enumerate every kind as optional, which
+      // duplicates (and can drift from) the union instead of tracking it.
+      // `sameValue`'s `typeof`/`Record<string, unknown>` are the same case
+      // issue 02 excepted for `http-protocol.ts`'s `toJsonValue`: a genuinely
+      // generic recursive JSON-value comparator, not unparsed external input —
+      // both sides are already-validated snapshot values by the time this runs.
+      "files": ["packages/app/src/space-authoring.ts"],
+      "rules": {
+        "anti-slop/no-known-value-widening": "off",
+        "anti-slop/no-runtime-typeof": "off",
+        "anti-slop/no-unsafe-dictionary-type": "off"
+      }
+    },
+    {
+      // `defaultMarkdownKind`/`defaultPositionedKind` are Zod `z.preprocess`
+      // transformers: they run on raw, unvalidated input *before* the schema
+      // parses it, so `unknown` in and out is the honest contract, not a
+      // narrowing that was skipped — the schema right after is where parsing
+      // happens. Their `typeof value === 'object'` is that preprocessing step
+      // itself, the same boundary-parser category issue 02 established for
+      // `http-protocol.ts`'s decode functions.
+      "files": ["packages/core/src/schema.ts"],
+      "rules": {
+        "anti-slop/no-runtime-typeof": "off",
+        "anti-slop/no-unknown-returns": "off"
+      }
+    },
+    {
+      // This file's whole job is loading a dynamically `import()`-ed module and
+      // validating its shape before treating it as `SpaceHttpRuntime` —
+      // `asRuntime`'s `unknown` parameter and `typeof` checks are that
+      // validation, and `defaultPreviewLoader`/`loadPreviewModule`'s
+      // `Promise<unknown>` is what a dynamic import genuinely resolves to
+      // before anyone has looked at it. Same boundary-parser category as
+      // `schema.ts`'s preprocessors above.
+      "files": ["packages/app/vite-space-http-plugin.ts"],
+      "rules": {
+        "anti-slop/no-runtime-typeof": "off",
+        "anti-slop/no-unknown-returns": "off"
+      }
+    },
+    {
+      // `@project/graph`'s one intake (`loadSpace`/`loadSpaceSnapshot`, ADR
+      // 0010): `unsupportedDocumentVersion`, `retiredSpaceGraphs` and
+      // `loadSpaceSnapshot` itself read a raw `unknown` document's shape before
+      // (and to decide whether to reach) the Zod schema that actually parses
+      // it. Same boundary-parser category as issue 02's two excepted files —
+      // this is that same kind of code, just in `@project/graph` instead of
+      // `@project/persistence`.
+      "files": ["packages/graph/src/space.ts"],
+      "rules": {
+        "anti-slop/no-runtime-typeof": "off"
+      }
+    },
+    {
+      // `listeners: Set<() => unknown>` and the test double that mirrors it:
+      // a subscriber's return value is inspected only to detect whether it's
+      // thenable (`isThenable`, a real type guard — its own `typeof` checks are
+      // already exempted by `allowInTypeGuards`), never narrowed into a domain
+      // type. The test's `onRejected: (reason: unknown) => unknown` mirrors
+      // `PromiseLike.then`'s own lib.d.ts signature, which is `unknown` for the
+      // same reason.
+      "files": [
+        "packages/persistence/src/observable-state.ts",
+        "packages/persistence/test/observable-state.test.ts"
+      ],
+      "rules": {
+        "anti-slop/no-unknown-returns": "off"
+      }
+    },
+    {
+      // `typeof` used for JS-environment/platform feature detection
+      // (`typeof window/document/Element !== 'undefined'`, `vitest.setup.ts`'s
+      // whole reason for existing) or to discriminate a closed union or
+      // optional-function property a library's own types declare (React Flow's
+      // `nodeColor`, Node's `net.Server.address(): AddressInfo | string | null`
+      // and `fs.writeFile`'s `PathLike` parameter, Vite's optional
+      // `configureServer`/`configurePreviewServer` plugin hooks, an ESLint
+      // `unknown` config result shape-checked once) — none of these are
+      // unparsed *external* data the rule's "parse at the I/O boundary" message
+      // has anywhere further to push to.
+      "files": [
+        "vitest.setup.ts",
+        "packages/ui/src/components/sidebar.tsx",
+        "packages/react-flow-adapter/test/GraphHud.test.tsx",
+        "test/unit/raw-http-request.test.ts",
+        "test/unit/vite-hono-host.test.ts",
+        "test/unit/vite-space-http-plugin.test.ts",
+        "test/unit/export-space-recovery.test.ts"
+      ],
+      "rules": {
+        "anti-slop/no-runtime-typeof": "off"
+      }
+    },
+    {
+      // `typeof x` used to name a runtime type as the *value under test*
+      // (`expect(typeof x).toBe('number')`) rather than to narrow or branch on
+      // anything — there is nothing to parse ahead of an assertion that the
+      // assertion itself is checking.
+      "files": [
+        "packages/react-flow-adapter/test/projection.test.ts",
+        "test/unit/http-server-build-config.test.ts"
+      ],
+      "rules": {
+        "anti-slop/no-runtime-typeof": "off"
+      }
+    },
+    {
+      // This test deliberately verifies ESLint's *actual runtime* resolved
+      // config (`calculateConfigForFile`) rather than trusting `eslint`'s own
+      // declared types — see the file's own docstring. `config`'s `typeof`
+      // check and `rules`'s dictionary type are that boundary verification
+      // itself: `rules` is genuinely keyed by an open-ended, ESLint-ecosystem-
+      // wide set of rule names with a heterogeneous per-rule value shape
+      // (`Severity | [Severity, ...unknown[]]`), so there is no honest
+      // narrower type to give it.
+      "files": ["test/unit/http-node-builtin-restrictions.test.ts"],
+      "rules": {
+        "anti-slop/no-runtime-typeof": "off",
+        "anti-slop/no-unsafe-dictionary-type": "off"
+      }
+    },
+    {
+      // `spaceWith`'s `extra` parameter accepts raw, not-yet-validated
+      // space-file fields that get spread into the object `loadSpace` parses
+      // immediately after — the same boundary-parser category as
+      // `schema.ts`'s preprocessors above. Both files' own fixture constants
+      // are deliberately loosely typed (plain `string` ids/kind, not the
+      // branded/literal `SpaceFile` shape) so that `loadSpace`'s own runtime
+      // validation is what each test exercises, not a static type — retyping
+      // `extra` to `Partial<SpaceFile>` breaks on exactly that mismatch.
+      "files": [
+        "packages/app/test/canvas-projection.test.ts",
+        "packages/app/test/renderer.test.ts"
+      ],
+      "rules": {
+        "anti-slop/no-unsafe-dictionary-type": "off"
       }
     }
   ]

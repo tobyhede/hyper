@@ -173,11 +173,12 @@ function dropTargetOf(target: EventTarget | null): DropTarget {
  * disagreement would mark a drop invalid that the Edit would have accepted, or
  * the reverse.
  */
-function movedEndpoint(
-  edge: GraphEdge,
-  source: CardId,
-  target: CardId,
-): { readonly endpoint: EdgeEndpoint; readonly cardId: CardId } {
+interface MovedEndpoint {
+  readonly endpoint: EdgeEndpoint;
+  readonly cardId: CardId;
+}
+
+function movedEndpoint(edge: GraphEdge, source: CardId, target: CardId): MovedEndpoint {
   const endpoint: EdgeEndpoint = source === edge.from ? 'to' : 'from';
   return { endpoint, cardId: endpoint === 'from' ? source : target };
 }
@@ -628,14 +629,14 @@ export function useEdgeAuthoring({
           endpoint,
           cardId: card.id,
         });
-        return {
-          id: card.id,
-          title: card.title,
-          kind: card.kind,
-          ...(eligibility.kind === 'refused'
-            ? { refusal: describeAuthoringRefusal(eligibility.refusal) }
-            : {}),
-        };
+        return eligibility.kind === 'refused'
+          ? {
+              id: card.id,
+              title: card.title,
+              kind: card.kind,
+              refusal: describeAuthoringRefusal(eligibility.refusal),
+            }
+          : { id: card.id, title: card.title, kind: card.kind };
       }),
     [subjectCards],
   );
@@ -685,14 +686,14 @@ export function useEdgeAuthoring({
         from: connectTarget,
         to: card.id,
       });
-      return {
-        id: card.id,
-        title: card.title,
-        kind: card.kind,
-        ...(eligibility.kind === 'refused'
-          ? { refusal: describeAuthoringRefusal(eligibility.refusal) }
-          : {}),
-      };
+      return eligibility.kind === 'refused'
+        ? {
+            id: card.id,
+            title: card.title,
+            kind: card.kind,
+            refusal: describeAuthoringRefusal(eligibility.refusal),
+          }
+        : { id: card.id, title: card.title, kind: card.kind };
     });
   }, [connectTarget, subjectCards, authoring]);
 

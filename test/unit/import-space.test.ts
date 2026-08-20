@@ -15,6 +15,7 @@ import type {
   RepositoryImportResult,
   SpaceRepository,
 } from '../../src/persistence/space-repository';
+import { captureError } from '../support/capture-error';
 
 const SPACE_ID = uuidSchema.parse('11111111-1111-4111-8111-111111111111');
 const OTHER_SPACE_ID = uuidSchema.parse('22222222-2222-4222-8222-222222222222');
@@ -100,15 +101,6 @@ const writeValidSpace = async (): Promise<string> => {
   );
   await writeFile(join(directory, 'cards', 'opening.md'), '---\ntitle: Opening\n---\nHello.\n');
   return directory;
-};
-
-const captureError = async (operation: () => Promise<unknown>): Promise<unknown> => {
-  try {
-    await operation();
-    return undefined;
-  } catch (error) {
-    return error;
-  }
 };
 
 afterEach(async () => {

@@ -91,19 +91,21 @@ const layout = (
   id: string,
   positions: Record<string, { x: number; y: number }>,
   graphs: unknown[],
-  extra: Record<string, unknown> = {},
+  extra: { readonly activeGraph?: string } = {},
 ) => ({ id, title: `Layout ${id}`, kind: 'positioned', positions, graphs, ...extra });
 
 /** One Layout over A and B, owning one Graph that joins them. */
-const simple = (defaultRenderer?: string): Document => ({
-  cards: [markdown(A, 'A'), markdown(B, 'B')],
-  layouts: [
-    layout(WORKING, { [A]: { x: 0, y: 0 }, [B]: { x: 320, y: 0 } }, [
-      graph(MAIN, 'Main', [{ from: A, to: B }]),
-    ]),
-  ],
-  ...(defaultRenderer === undefined ? {} : { defaultRenderer }),
-});
+const simple = (defaultRenderer?: string): Document => {
+  const document: Document = {
+    cards: [markdown(A, 'A'), markdown(B, 'B')],
+    layouts: [
+      layout(WORKING, { [A]: { x: 0, y: 0 }, [B]: { x: 320, y: 0 } }, [
+        graph(MAIN, 'Main', [{ from: A, to: B }]),
+      ]),
+    ],
+  };
+  return defaultRenderer === undefined ? document : { ...document, defaultRenderer };
+};
 
 const loaded = (result: LoadSpaceResult) => {
   if (!result.ok) throw new Error(result.errors.map((error) => error.message).join('; '));

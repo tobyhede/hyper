@@ -167,11 +167,7 @@ export const readSingleSpace = async (inputPath: string): Promise<ImportSpace> =
   }
 
   const { id, ...document } = parsedSpaceFile;
-  return importSpaceSchema.parse({
-    ...(id === undefined ? {} : { id }),
-    document,
-    cards,
-  });
+  return importSpaceSchema.parse(id === undefined ? { document, cards } : { id, document, cards });
 };
 
 export const readImportBatch = async (inputPath: string): Promise<readonly ImportSpace[]> => {

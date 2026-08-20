@@ -8,6 +8,7 @@ import {
   readImportBatch,
   readSingleSpace,
 } from '../../src/import/read-single-space';
+import { captureError } from '../support/capture-error';
 
 const SPACE_ID = '00000000-0000-4000-8000-000000000001';
 const ROOT_CARD_ID = '00000000-0000-4000-8000-000000000002';
@@ -47,15 +48,6 @@ const makeTemporaryDirectory = async (): Promise<string> => {
   const directory = await mkdtemp(join(tmpdir(), 'hyper-single-space-'));
   temporaryDirectories.push(directory);
   return directory;
-};
-
-const captureError = async (operation: () => Promise<unknown>): Promise<unknown> => {
-  try {
-    await operation();
-    return undefined;
-  } catch (error) {
-    return error;
-  }
 };
 
 afterEach(async () => {

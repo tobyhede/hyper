@@ -1,3 +1,4 @@
+import type { PlaywrightTestConfig } from '@playwright/test';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 /*
@@ -24,7 +25,7 @@ const loadPolicies = async () => {
     // Asserted rather than annotated: a dynamic import through a variable
     // specifier is typed `any`, and annotating the binding would be an unsafe
     // assignment rather than a narrowing.
-    const module = (await import(specifier)) as { default: Record<string, unknown> };
+    const module = (await import(specifier)) as { default: PlaywrightTestConfig };
     const { forbidOnly, failOnFlakyTests, retries } = module.default;
     loaded.push({ specifier, policy: { forbidOnly, failOnFlakyTests, retries } });
   }

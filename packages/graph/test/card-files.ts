@@ -37,17 +37,15 @@ export function card(id: string, title = defaultTitle(id), body = ''): Card {
 
 export const uuid = (value: string): UUID => uuidSchema.parse(value);
 
+const DEFAULT_TITLES = new Map([
+  ['00000000-0000-4000-8000-000000000002', 'A'],
+  ['00000000-0000-4000-8000-000000000003', 'B'],
+  ['00000000-0000-4000-8000-000000000005', 'C'],
+  ['00000000-0000-4000-8000-000000000006', 'D'],
+]);
+
 function defaultTitle(id: string): string {
-  return (
-    (
-      {
-        '00000000-0000-4000-8000-000000000002': 'A',
-        '00000000-0000-4000-8000-000000000003': 'B',
-        '00000000-0000-4000-8000-000000000005': 'C',
-        '00000000-0000-4000-8000-000000000006': 'D',
-      } as Record<string, string>
-    )[id] ?? id.toUpperCase()
-  );
+  return DEFAULT_TITLES.get(id) ?? id.toUpperCase();
 }
 
 export function alias(id: string, title: string, target: string): Card {

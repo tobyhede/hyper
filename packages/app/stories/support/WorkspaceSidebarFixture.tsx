@@ -33,11 +33,16 @@ import { authoredSnapshot, authoredSpace, editedSnapshot, storyGraphIds } from '
  * only through `readFrom` — so the render path cannot read it at all, and the
  * effect that calls `readFrom` is its one writer.
  */
+interface StoryNavigation {
+  readonly navigation: Navigation;
+  readonly readFrom: (next: () => Space) => void;
+}
+
 function composeStoryNavigation(
   read: () => Space,
   resolveRenderer: ResolveRenderer,
   presenting: boolean,
-): { readonly navigation: Navigation; readonly readFrom: (next: () => Space) => void } {
+): StoryNavigation {
   let current = read;
   const initialSpace = current();
   const navigation = createNavigation(
