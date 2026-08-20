@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { uuidSchema } from '@project/core';
 import {
+  describeAuthoringRefusal,
   presentAliasCardRefusal,
   presentMarkdownCardRefusal,
   presentNewAliasRefusal,
@@ -47,7 +48,9 @@ describe('presentMarkdownCardRefusal', () => {
   it('routes every other refusal to the form, since Markdown editing owns no other field', () => {
     for (const [code, refusal] of Object.entries(EVERY_REFUSAL)) {
       if (code === 'card-title-required') continue;
-      expect(presentMarkdownCardRefusal(refusal).fields).toEqual({});
+      const errors = presentMarkdownCardRefusal(refusal);
+      expect(errors.fields).toEqual({});
+      expect(errors.form).toBe(describeAuthoringRefusal(refusal));
     }
   });
 });
