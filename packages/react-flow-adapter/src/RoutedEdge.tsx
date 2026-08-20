@@ -30,8 +30,19 @@ export type RoutedEdgeData = {
  */
 export type RoutedFlowEdge = Edge<RoutedEdgeData, 'routed'>;
 
+/** Rounded to one decimal place — ELK's coordinates carry long float tails
+ *  that add nothing visible to an edge's path but bloat the SVG string. */
+function roundCoordinate(value: number): number {
+  return Math.round(value * 10) / 10;
+}
+
 function polyline(points: LayoutPosition[]): string {
-  return points.map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x} ${point.y}`).join(' ');
+  return points
+    .map(
+      (point, index) =>
+        `${index === 0 ? 'M' : 'L'} ${roundCoordinate(point.x)} ${roundCoordinate(point.y)}`,
+    )
+    .join(' ');
 }
 
 /** Where a routed polyline reads as its middle: the point half its length along,
