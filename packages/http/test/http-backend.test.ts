@@ -1,5 +1,9 @@
 import { uuidSchema, type SpaceSnapshot } from '@project/core';
-import { encodeLoadedSpace, encodeProblemDetails, type HyperProblemCode } from '@project/persistence';
+import {
+  encodeLoadedSpace,
+  encodeProblemDetails,
+  type HyperProblemCode,
+} from '@project/persistence';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { HttpSpaceBackend } from '@project/http';
 
@@ -16,7 +20,11 @@ const backendAnswering = (response: Response): HttpSpaceBackend =>
     fetch: () => Promise.resolve(response),
   });
 
-const problemResponse = (code: HyperProblemCode, detail: string, headers?: HeadersInit): Response => {
+const problemResponse = (
+  code: HyperProblemCode,
+  detail: string,
+  headers?: HeadersInit,
+): Response => {
   const body = encodeProblemDetails(code, detail);
   const responseHeaders = new Headers(headers);
   responseHeaders.set('Content-Type', 'application/problem+json');
@@ -149,13 +157,14 @@ describe('HTTP Space backend Problem Details decoding', () => {
   });
 
   it('treats a non-Error throw while decoding the body as a malformed response', async () => {
-    const response = {
-      status: 500,
-      headers: new Headers({ 'Content-Type': 'application/problem+json' }),
-      // A caller's Response-like stand-in can reject with anything; that is the regression case.
-      // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors
-      json: () => Promise.reject('boom'),
-    } as unknown as Response;
+    const response = Object.assign(
+      new Response(null, { status: 500, headers: { 'Content-Type': 'application/problem+json' } }),
+      {
+        // A caller's Response-like stand-in can reject with anything; that is the regression case.
+        // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors
+        json: () => Promise.reject('boom'),
+      },
+    );
 
     await expect(backendAnswering(response).commitSpace(snapshot, 0n)).resolves.toEqual({
       kind: 'permanent-failure',

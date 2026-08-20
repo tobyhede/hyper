@@ -798,7 +798,9 @@ describe('Space HTTP application', () => {
       },
     ];
 
-    const responses = await Promise.all(cases.map((testCase) => testCase.request()));
+    const responses = await Promise.all(
+      cases.map((testCase) => Promise.resolve(testCase.request())),
+    );
 
     expect(swallowed).toEqual(['Failed to list spaces']);
     responses.forEach((response, index) => {
