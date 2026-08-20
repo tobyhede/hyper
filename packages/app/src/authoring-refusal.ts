@@ -58,21 +58,102 @@ export const describeAuthoringRefusal = (refusal: AuthoringRefusal): string => {
   }
 };
 
-export type AuthoringRefusalPresentation = {
-  readonly message: string;
-  readonly placement: 'title' | 'target' | 'form';
+type AuthoringRefusalCode = AuthoringRefusal['code'];
+
+type AuthoringRefusalErrors<Field extends string> = {
+  readonly fields: Partial<Readonly<Record<Field, string>>>;
+  readonly form?: string;
 };
 
-/** The application-owned copy and placement decision for one refusal. */
-export const presentAuthoringRefusal = (
+const presentRefusal = <Field extends string>(
   refusal: AuthoringRefusal,
-): AuthoringRefusalPresentation => ({
-  message: describeAuthoringRefusal(refusal),
-  placement:
-    refusal.code === 'card-title-required'
-      ? 'title'
-      : refusal.code === 'alias-target-not-found' ||
-          refusal.code === 'alias-target-must-own-content'
-        ? 'target'
-        : 'form',
-});
+  placements: Readonly<Record<AuthoringRefusalCode, Field | null>>,
+): AuthoringRefusalErrors<Field> => {
+  const message = describeAuthoringRefusal(refusal);
+  const field = placements[refusal.code];
+  if (field === null) return { fields: {}, form: message };
+  const fields: Partial<Record<Field, string>> = {};
+  fields[field] = message;
+  return { fields };
+};
+
+const form = null;
+
+const markdownCardPlacements = {
+  'placement-pending': form,
+  'layout-not-found': form,
+  'layout-required': form,
+  'card-not-found': form,
+  'card-kind-immutable': form,
+  'card-title-required': 'title',
+  'alias-target-not-found': form,
+  'alias-target-must-own-content': form,
+  'card-already-in-layout': form,
+  'card-not-in-layout': form,
+  'card-has-aliases': form,
+  'graph-title-required': form,
+  'layout-must-keep-graph': form,
+  'graph-not-owned': form,
+  'edge-not-found': form,
+  'edge-card-outside-layout': form,
+  'edge-already-exists': form,
+  'layout-active-graph-required': form,
+} as const satisfies Readonly<Record<AuthoringRefusalCode, 'title' | null>>;
+
+const aliasCardPlacements = {
+  'placement-pending': form,
+  'layout-not-found': form,
+  'layout-required': form,
+  'card-not-found': form,
+  'card-kind-immutable': form,
+  'card-title-required': 'title',
+  'alias-target-not-found': 'target',
+  'alias-target-must-own-content': 'target',
+  'card-already-in-layout': form,
+  'card-not-in-layout': form,
+  'card-has-aliases': form,
+  'graph-title-required': form,
+  'layout-must-keep-graph': form,
+  'graph-not-owned': form,
+  'edge-not-found': form,
+  'edge-card-outside-layout': form,
+  'edge-already-exists': form,
+  'layout-active-graph-required': form,
+} as const satisfies Readonly<Record<AuthoringRefusalCode, 'title' | 'target' | null>>;
+
+const newAliasPlacements = {
+  'placement-pending': form,
+  'layout-not-found': form,
+  'layout-required': form,
+  'card-not-found': form,
+  'card-kind-immutable': form,
+  'card-title-required': 'title',
+  'alias-target-not-found': 'target',
+  'alias-target-must-own-content': 'target',
+  'card-already-in-layout': form,
+  'card-not-in-layout': form,
+  'card-has-aliases': form,
+  'graph-title-required': form,
+  'layout-must-keep-graph': form,
+  'graph-not-owned': form,
+  'edge-not-found': form,
+  'edge-card-outside-layout': form,
+  'edge-already-exists': form,
+  'layout-active-graph-required': form,
+} as const satisfies Readonly<Record<AuthoringRefusalCode, 'title' | 'target' | null>>;
+
+export type MarkdownCardRefusalErrors = AuthoringRefusalErrors<'title'>;
+export type AliasCardRefusalErrors = AuthoringRefusalErrors<'title' | 'target'>;
+export type NewAliasRefusalErrors = AuthoringRefusalErrors<'title' | 'target'>;
+
+/** Error placement for a Markdown Card editor, which owns only Title. */
+export const presentMarkdownCardRefusal = (refusal: AuthoringRefusal): MarkdownCardRefusalErrors =>
+  presentRefusal(refusal, markdownCardPlacements);
+
+/** Error placement for an Alias editor, which owns Title and Target. */
+export const presentAliasCardRefusal = (refusal: AuthoringRefusal): AliasCardRefusalErrors =>
+  presentRefusal(refusal, aliasCardPlacements);
+
+/** Error placement for Alias creation, which owns Title and Target. */
+export const presentNewAliasRefusal = (refusal: AuthoringRefusal): NewAliasRefusalErrors =>
+  presentRefusal(refusal, newAliasPlacements);

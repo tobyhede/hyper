@@ -14,6 +14,10 @@ const markdown = (over: { body?: string } = {}) => ({
   body: over.body ?? '**A** source',
 });
 
+/** The ids a field points assistive technology at, in the order it names them. */
+const described = (field: HTMLElement): readonly string[] =>
+  (field.getAttribute('aria-describedby') ?? '').split(' ').filter(Boolean);
+
 beforeAll(() => {
   vi.stubGlobal(
     'ResizeObserver',
@@ -79,6 +83,43 @@ describe('the opened Card', () => {
     expect(onComplete).not.toHaveBeenCalled();
     expect(screen.getByRole('alert')).toHaveTextContent('A Card title is required.');
     expect(screen.getByRole('textbox', { name: 'Title' })).toHaveAttribute('aria-invalid', 'true');
+  });
+
+  it('attaches an Authoring title refusal to the Markdown Title field', () => {
+    render(
+      <OpenCard
+        card={markdown()}
+        onComplete={() => ({ code: 'card-title-required' })}
+        onCancel={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+
+    const title = screen.getByRole('textbox', { name: 'Title' });
+    expect(title).toHaveAttribute('aria-invalid', 'true');
+    expect(title).toHaveAccessibleDescription('A Card title is required.');
+    expect(screen.getByRole('textbox', { name: 'Markdown source' })).not.toHaveAttribute(
+      'aria-invalid',
+      'true',
+    );
+  });
+
+  it('shows an Authoring refusal the Markdown fields cannot correct as form feedback', () => {
+    render(
+      <OpenCard
+        card={markdown()}
+        onComplete={() => ({ code: 'layout-not-found' })}
+        onCancel={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'This Layout is no longer part of the Space.',
+    );
+    expect(screen.getByRole('textbox', { name: 'Title' })).toHaveAttribute('aria-invalid', 'false');
   });
 
   /**
@@ -162,7 +203,13 @@ describe('the opened Card', () => {
 
     expect(onEdit).toHaveBeenCalledWith({ title: '', target: CARD_ID });
     expect(screen.getByRole('alert')).toHaveTextContent('A Card title is required.');
-    expect(screen.getByRole('textbox', { name: 'Title' })).toHaveAttribute('aria-invalid', 'true');
+    const title = screen.getByRole('textbox', { name: 'Title' });
+    expect(title).toHaveAttribute('aria-invalid', 'true');
+    expect(title).toHaveAccessibleDescription('A Card title is required.');
+    expect(screen.getByRole('combobox', { name: 'Target' })).toHaveAttribute(
+      'aria-invalid',
+      'false',
+    );
     expect(onCancel).not.toHaveBeenCalled();
   });
 
@@ -184,11 +231,35 @@ describe('the opened Card', () => {
     expect(screen.getByRole('alert')).toHaveTextContent(
       'That Target is no longer part of the Space.',
     );
+    const target = screen.getByRole('combobox', { name: 'Target' });
+    expect(target).toHaveAttribute('aria-invalid', 'true');
+    // `aria-invalid` says only that something is wrong. The message saying
+    // *what* has to reach the field too, and this Space has no eligible Target
+    // left — which is the picker's own empty-list note, not a reason to drop the
+    // refusal that put the field in this state.
+    expect(described(target)).toContain('open-alias-target-error');
+    expect(onCancel).not.toHaveBeenCalled();
+  });
+
+  it('shows an Authoring refusal the Alias fields cannot correct as form feedback', () => {
+    render(
+      <OpenCard
+        through={{ id: ALIAS_ID, title: 'A again', kind: 'alias', target: CARD_ID }}
+        occurrence={{ targets: [markdown()], onEdit: () => ({ code: 'layout-not-found' }) }}
+        onCancel={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'This Layout is no longer part of the Space.',
+    );
+    expect(screen.getByRole('textbox', { name: 'Title' })).toHaveAttribute('aria-invalid', 'false');
     expect(screen.getByRole('combobox', { name: 'Target' })).toHaveAttribute(
       'aria-invalid',
-      'true',
+      'false',
     );
-    expect(onCancel).not.toHaveBeenCalled();
   });
 });
 
