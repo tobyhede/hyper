@@ -4,7 +4,7 @@
 
 **Blocked by:** 01 — Configure shadcn workspaces for Base UI and Lucide.
 
-**Status:** ready-for-agent
+**Status:** resolved — delivered in PR #69.
 
 - [ ] Rebuild the shared Popover using Base UI's portal, positioner and popup anatomy, forwarding positioning props to the part that owns them.
 - [ ] Preserve Hyper's portalled-surface styling and the protection against React Flow handling deletion keys raised inside the popup.

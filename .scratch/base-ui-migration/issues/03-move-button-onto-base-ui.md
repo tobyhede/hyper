@@ -4,7 +4,7 @@
 
 **Blocked by:** 01 — Configure shadcn workspaces for Base UI and Lucide.
 
-**Status:** ready-for-agent
+**Status:** resolved — delivered in PR #69.
 
 - [ ] Build the wrapper on the actual Base UI Button primitive rather than a hand-rolled render helper or native-button substitute.
 - [ ] Preserve the current default, secondary and destructive meanings, disabled behavior, default `type="button"`, ref support and caller-supplied layout classes.

@@ -1,6 +1,6 @@
 # Rebuild the Card pane on Radix Dialog, with one submit over its fields
 
-Status: ready-for-agent
+Status: resolved — superseded by the Base UI Dialog delivery in PR #69.
 
 Type: task
 

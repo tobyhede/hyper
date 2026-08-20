@@ -4,7 +4,7 @@
 
 **Blocked by:** 01 — Configure shadcn workspaces for Base UI and Lucide.
 
-**Status:** ready-for-agent
+**Status:** resolved — delivered in PR #69.
 
 - [ ] Classify every exported interface icon by meaning, not by visual resemblance, and replace each clear equivalent with its Lucide implementation.
 - [ ] Keep a custom icon only when no Lucide glyph communicates the required Hyper-specific concept, and record that missing semantic distinction beside the exception.

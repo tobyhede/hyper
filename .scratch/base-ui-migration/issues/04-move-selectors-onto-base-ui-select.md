@@ -4,7 +4,7 @@
 
 **Blocked by:** 01 — Configure shadcn workspaces for Base UI and Lucide.
 
-**Status:** ready-for-agent
+**Status:** resolved — delivered in PR #69.
 
 - [ ] Rebuild the shared Select anatomy from the Base UI registry shape, including the portal, positioner, popup, list and item parts required by Base UI.
 - [ ] Replay Hyper's custom toolbar palette and dimensions without retaining Radix state attributes, CSS variables or composition props.

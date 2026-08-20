@@ -65,7 +65,7 @@ export type EdgeProposal =
  * already names would show the current value as the one forbidden choice.
  */
 export type EdgeEligibility =
-  { readonly kind: 'eligible' } | { readonly kind: 'refused'; readonly reason: string };
+  { readonly kind: 'eligible' } | { readonly kind: 'refused'; readonly refusal: AuthoringRefusal };
 
 const ELIGIBLE = { kind: 'eligible' } as const;
 
@@ -145,8 +145,8 @@ export type AuthoringCompletion =
  * Unchanged is the value the author already authored — a rename to the stored
  * title, a swatch already chosen, a drag returned to where it began — and the
  * surface's ordinary close. Refused is an operation that cannot happen now:
- * stale context, or a domain rule the author has run into. It carries the
- * sentence that surface shows, because only Authoring knows which rule it was.
+ * stale context, or a domain rule the author has run into. It carries a stable
+ * identity and typed domain context; application composition owns its prose.
  *
  * A broken invariant is neither. It throws, or is reported through the
  * non-throwing reporter — dressing a programming defect as a refusal would put
@@ -159,8 +159,43 @@ export type AuthoringResult =
       readonly createdGraphId?: GraphId;
     }
   | { readonly kind: 'unchanged' }
-  | { readonly kind: 'refused'; readonly reason: string }
+  | { readonly kind: 'refused'; readonly refusal: AuthoringRefusal }
   | { readonly kind: 'queued' };
+
+type LayoutRequiredOperation = Extract<
+  AuthoringCompletion,
+  | { readonly kind: 'added-card-to-layout' }
+  | { readonly kind: 'removed-card-from-layout' }
+  | { readonly kind: 'renamed-graph' }
+  | { readonly kind: 'recolored-graph' }
+  | { readonly kind: 'deleted-graph' }
+  | { readonly kind: 'reconnected-edge' }
+  | { readonly kind: 'deleted-edge' }
+>['kind'];
+
+/** Stable identities for every expected refusal at the Authoring seam. */
+export type AuthoringRefusal =
+  | { readonly code: 'placement-pending' }
+  | { readonly code: 'layout-not-found' }
+  | { readonly code: 'layout-required'; readonly operation: LayoutRequiredOperation }
+  | { readonly code: 'card-not-found' }
+  | { readonly code: 'card-kind-immutable' }
+  | { readonly code: 'card-title-required' }
+  | { readonly code: 'alias-target-not-found'; readonly targetId: CardId }
+  | { readonly code: 'alias-target-must-own-content'; readonly targetId: CardId }
+  | { readonly code: 'card-already-in-layout' }
+  | { readonly code: 'card-not-in-layout' }
+  | {
+      readonly code: 'card-has-aliases';
+      readonly aliasTitles: readonly string[];
+    }
+  | { readonly code: 'graph-title-required' }
+  | { readonly code: 'layout-must-keep-graph' }
+  | { readonly code: 'graph-not-owned' }
+  | { readonly code: 'edge-not-found' }
+  | { readonly code: 'edge-card-outside-layout' }
+  | { readonly code: 'edge-already-exists' }
+  | { readonly code: 'layout-active-graph-required' };
 
 /**
  * The published state: what the collaborators say, plus the one thing only
@@ -280,10 +315,10 @@ interface CompletedEdit {
 type DerivedCompletion =
   | { readonly kind: 'completed'; readonly edit: CompletedEdit }
   | { readonly kind: 'unchanged' }
-  | { readonly kind: 'refused'; readonly reason: string };
+  | { readonly kind: 'refused'; readonly refusal: AuthoringRefusal };
 
 const UNCHANGED = { kind: 'unchanged' } as const;
-const refuse = (reason: string): DerivedCompletion => ({ kind: 'refused', reason });
+const refuse = (refusal: AuthoringRefusal): DerivedCompletion => ({ kind: 'refused', refusal });
 
 /**
  * Everything a completion is derived from: the report itself, and the editor
@@ -397,26 +432,24 @@ const indexOfEdge = (edges: readonly GraphEdge[], edge: GraphEdge): number =>
  * owns none of it. Add Graph is deliberately absent: it converts, and the Graph
  * it asked for becomes the new Layout's initial one.
  */
-const LAYOUT_REQUIRED_FOR_EDGES = 'Select a Layout to edit its Edges.';
-
-const LAYOUT_ONLY: Partial<Record<AuthoringCompletion['kind'], string>> = {
-  'added-card-to-layout': 'Select a Layout to add an existing Card to it.',
-  'removed-card-from-layout': 'Select a Layout to remove a Card from it.',
-  'renamed-graph': 'Select a Layout to manage its Graphs.',
-  'recolored-graph': 'Select a Layout to manage its Graphs.',
-  'deleted-graph': 'Select a Layout to manage its Graphs.',
-  'reconnected-edge': LAYOUT_REQUIRED_FOR_EDGES,
-  'deleted-edge': LAYOUT_REQUIRED_FOR_EDGES,
-};
-
-/** A Graph named by an operation that this Layout turns out not to own. */
-const UNOWNED_GRAPH = 'That Graph is not one this Layout owns.';
+const LAYOUT_ONLY = new Set<LayoutRequiredOperation>([
+  'added-card-to-layout',
+  'removed-card-from-layout',
+  'renamed-graph',
+  'recolored-graph',
+  'deleted-graph',
+  'reconnected-edge',
+  'deleted-edge',
+]);
+const requiresLayout = (
+  operation: AuthoringCompletion['kind'],
+): operation is LayoutRequiredOperation => LAYOUT_ONLY.has(operation as LayoutRequiredOperation);
 
 /** What a reconnected endpoint settles to, before anything has been written. */
 type ReconnectOutcome =
   | { readonly kind: 'edge'; readonly edge: GraphEdge }
   | { readonly kind: 'unchanged' }
-  | { readonly kind: 'refused'; readonly reason: string };
+  | { readonly kind: 'refused'; readonly refusal: AuthoringRefusal };
 
 /**
  * The one reconnection rule, asked by eligibility and again by the Edit.
@@ -430,7 +463,12 @@ type ReconnectOutcome =
  */
 const reconnectOutcome = (
   graph: Graph | undefined,
-  proposal: { readonly edge: GraphEdge; readonly endpoint: EdgeEndpoint; readonly cardId: CardId },
+  proposal: {
+    readonly graphId: GraphId;
+    readonly edge: GraphEdge;
+    readonly endpoint: EdgeEndpoint;
+    readonly cardId: CardId;
+  },
   placement: Placement,
   /**
    * Whether the Space still holds the Card, which the placement does not answer.
@@ -445,9 +483,14 @@ const reconnectOutcome = (
 ): ReconnectOutcome => {
   // Ownership, not existence: a Graph a *second* Layout owns exists and is
   // still not one this Edit may write (ADR 0040).
-  if (graph === undefined) return { kind: 'refused', reason: UNOWNED_GRAPH };
+  if (graph === undefined) {
+    return { kind: 'refused', refusal: { code: 'graph-not-owned' } };
+  }
   if (indexOfEdge(graph.edges, proposal.edge) === -1) {
-    return { kind: 'refused', reason: 'That Edge is no longer in this Graph.' };
+    return {
+      kind: 'refused',
+      refusal: { code: 'edge-not-found' },
+    };
   }
   const reconnected: GraphEdge =
     proposal.endpoint === 'from'
@@ -457,10 +500,10 @@ const reconnectOutcome = (
   // Checked together and after `unchanged`, so an endpoint returned to its own
   // Card is still eligible on a Layout that has not finished arranging.
   if (!placement.has(proposal.cardId) || !holdsCard(proposal.cardId)) {
-    return { kind: 'refused', reason: 'An Edge can only join Cards in this Layout.' };
+    return { kind: 'refused', refusal: { code: 'edge-card-outside-layout' } };
   }
   if (indexOfEdge(graph.edges, reconnected) !== -1) {
-    return { kind: 'refused', reason: 'These Cards are already connected in this Graph.' };
+    return { kind: 'refused', refusal: { code: 'edge-already-exists' } };
   }
   return { kind: 'edge', edge: reconnected };
 };
@@ -476,13 +519,15 @@ const reconnectOutcome = (
  * deserves a sentence rather than an exception. A markdown document has no
  * Target and nothing to refuse.
  */
-const aliasTargetRefusal = (space: Space, document: CardDocument): string | null => {
+const aliasTargetRefusal = (space: Space, document: CardDocument): AuthoringRefusal | null => {
   if (document.kind !== 'alias') return null;
   const target = space.lookup.card(document.target);
-  if (target === undefined) return 'That Target is no longer part of the Space.';
+  if (target === undefined) return { code: 'alias-target-not-found', targetId: document.target };
   // Single-hop by construction (ADR 0009): the Target must own its content, so
   // an Alias pointing at an Alias — including at itself — is refused here.
-  if (target.kind === 'alias') return 'An Alias must target a Card that owns its content.';
+  if (target.kind === 'alias') {
+    return { code: 'alias-target-must-own-content', targetId: document.target };
+  }
   return null;
 };
 
@@ -716,15 +761,15 @@ export function createSpaceAuthoring({
    * why. A created Card cannot duplicate anything either, which is the whole of
    * why the two callers below differ.
    */
-  const connectRefusal = (from: CardId, to: CardId | null): string | null => {
+  const connectRefusal = (from: CardId, to: CardId | null): AuthoringRefusal | null => {
     if (!connectable(from) || (to !== null && !connectable(to))) {
-      return 'A connection can only join Cards in this Layout.';
+      return { code: 'edge-card-outside-layout' };
     }
     if (navigation.getState().selectedRenderer.kind === 'view') return null;
     const graph = targetGraph();
-    if (graph === null) return 'This Layout has no active Graph for the connection to join.';
+    if (graph === null) return { code: 'layout-active-graph-required' };
     if (to !== null && indexOfEdge(graph.edges, { from, to }) !== -1) {
-      return 'These Cards are already connected in this Graph.';
+      return { code: 'edge-already-exists' };
     }
     return null;
   };
@@ -744,18 +789,21 @@ export function createSpaceAuthoring({
         proposal.from,
         proposal.kind === 'connect' ? proposal.to : null,
       );
-      return refusal === null ? ELIGIBLE : { kind: 'refused', reason: refusal };
+      return refusal === null ? ELIGIBLE : { kind: 'refused', refusal };
     }
     // Reconnection has no answer at all without a Layout, and refusing here
     // rather than converting is the same rule `LAYOUT_ONLY` states for the
     // completion: an Algorithmic View owns no Edge to move an endpoint of.
     if (navigation.getState().selectedRenderer.kind === 'view') {
-      return { kind: 'refused', reason: LAYOUT_REQUIRED_FOR_EDGES };
+      return {
+        kind: 'refused',
+        refusal: { code: 'layout-required', operation: 'reconnected-edge' },
+      };
     }
     if (placement === null) {
       return {
         kind: 'refused',
-        reason: 'This view has not finished arranging, so there is nowhere to write yet.',
+        refusal: { code: 'placement-pending' },
       };
     }
     const outcome = reconnectOutcome(ownedGraph(proposal.graphId), proposal, placement, (cardId) =>
@@ -784,7 +832,7 @@ export function createSpaceAuthoring({
     placement: reportedPlacement,
   }: ReportedCompletion): DerivedCompletion => {
     if (reportedPlacement === null) {
-      return refuse('This view has not finished arranging, so there is nowhere to write yet.');
+      return refuse({ code: 'placement-pending' });
     }
     let snapshot = session.getState().working;
     const previousSnapshot = snapshot;
@@ -801,14 +849,15 @@ export function createSpaceAuthoring({
     // than a defect: the Layout this gesture was aimed at is gone, so there is
     // nothing to write it into.
     if (selection.kind === 'layout' && space.lookup.layout(selection.layoutId) === undefined) {
-      return refuse('This Layout is no longer part of the Space.');
+      return refuse({ code: 'layout-not-found' });
     }
     // The operations with no answer at all before a Layout exists, refused
     // *before* conversion rather than after it. An Algorithmic View has no
     // membership to add to and no Graph to manage, and converting first would
     // mint a Layout whose only purpose was to fail the next line.
-    const layoutRequired = LAYOUT_ONLY[completion.kind];
-    if (selection.kind === 'view' && layoutRequired !== undefined) return refuse(layoutRequired);
+    if (selection.kind === 'view' && requiresLayout(completion.kind)) {
+      return refuse({ code: 'layout-required', operation: completion.kind });
+    }
     const renderer = resolveRenderer(space, selection);
     /**
      * What this Edit does to the placement, held rather than applied.
@@ -843,12 +892,12 @@ export function createSpaceAuthoring({
     if (completion.kind === 'edited-card') {
       const cardIndex = snapshot.cards.findIndex((card) => card.id === completion.cardId);
       const card = snapshot.cards[cardIndex];
-      if (card === undefined) return refuse('This Card is no longer part of the Space.');
+      if (card === undefined) return refuse({ code: 'card-not-found' });
       // Kind is fixed for a Card's lifetime, and changing it is out of scope for
       // version 1. Everything else the editor holds — Title and an Alias's
       // Target — is one ordinary Edit of this Card.
       if (card.document.kind !== completion.document.kind) {
-        return refuse('A Card keeps the kind it was created with.');
+        return refuse({ code: 'card-kind-immutable' });
       }
       // Trimmed and refused *here* rather than only at the surface that typed
       // it. A blank title is the empty case wearing different bytes, and intake
@@ -856,7 +905,7 @@ export function createSpaceAuthoring({
       // throwing, and an author's mistake may not throw. Every caller of this
       // operation is covered by one rule instead of each remembering it.
       const title = trimmedNonBlankTitle(completion.document.title);
-      if (title === null) return refuse('A Card title is required.');
+      if (title === null) return refuse({ code: 'card-title-required' });
       const document: CardDocument = { ...completion.document, title };
       if (sameValue(card.document, document)) return UNCHANGED;
       const refusal = aliasTargetRefusal(space, document);
@@ -885,10 +934,10 @@ export function createSpaceAuthoring({
       createdCard = createCard(document, completion.anchor);
     } else if (completion.kind === 'added-card-to-layout') {
       if (space.lookup.card(completion.cardId) === undefined) {
-        return refuse('This Card is no longer part of the Space.');
+        return refuse({ code: 'card-not-found' });
       }
       if (completedPlacement.has(completion.cardId)) {
-        return refuse('This Card is already in this Layout.');
+        return refuse({ code: 'card-already-in-layout' });
       }
       // Membership and a position, and nothing else: a re-added Card is detached,
       // and the Edges it once had are never inferred back.
@@ -899,24 +948,23 @@ export function createSpaceAuthoring({
       );
     } else if (completion.kind === 'removed-card-from-layout') {
       if (!completedPlacement.has(completion.cardId)) {
-        return refuse('This Card is not in this Layout.');
+        return refuse({ code: 'card-not-in-layout' });
       }
       unplacedCardId = completion.cardId;
       completedPlacement = Placement.remove(completedPlacement, completion.cardId);
     } else if (completion.kind === 'deleted-card') {
       if (space.lookup.card(completion.cardId) === undefined) {
-        return refuse('This Card is no longer part of the Space.');
+        return refuse({ code: 'card-not-found' });
       }
       // An Alias whose Target vanished is not a Card intake accepts, so the Space
       // cannot lose one out from under its Aliases. Removing that Card from a
       // single Layout is never blocked this way — only deleting it outright.
       const incoming = incomingAliases(snapshot.cards, completion.cardId);
       if (incoming.length > 0) {
-        return refuse(
-          `Retarget or delete the Aliases of this Card first: ${incoming
-            .map((alias) => alias.document.title)
-            .join(', ')}.`,
-        );
+        return refuse({
+          code: 'card-has-aliases',
+          aliasTitles: incoming.map((alias) => alias.document.title),
+        });
       }
       // Deferred like a creation, and for the same reason: conversion is checked
       // against the Space as it stands, and this Card is still in it.
@@ -997,7 +1045,7 @@ export function createSpaceAuthoring({
       const graphIndex = ownedGraphs.findIndex((graph) => graph.id === activeGraphId);
       const graph = ownedGraphs[graphIndex];
       if (graph === undefined) {
-        return refuse('This Layout has no active Graph for the connection to join.');
+        return refuse({ code: 'layout-active-graph-required' });
       }
       const graphs = [...ownedGraphs];
       graphs[graphIndex] = { ...graph, edges: [...graph.edges, connection] };
@@ -1028,14 +1076,18 @@ export function createSpaceAuthoring({
       const graph = ownedGraphs[graphIndex];
       // Ownership, not existence: a Graph a *second* Layout owns exists and is
       // still not one this Edit may write (ADR 0040).
-      if (graph === undefined) return refuse(UNOWNED_GRAPH);
+      if (graph === undefined) {
+        return refuse({ code: 'graph-not-owned' });
+      }
       const replacing = (next: Graph): readonly Graph[] =>
         ownedGraphs.map((existing, index) => (index === graphIndex ? next : existing));
       if (completion.kind === 'renamed-graph') {
         // Trimmed, for the reason a Card title is: `z.string().min(1)` counts
         // characters, so blank is the empty case wearing different bytes.
         const title = trimmedNonBlankTitle(completion.title);
-        if (title === null) return refuse('A Graph title is required.');
+        if (title === null) {
+          return refuse({ code: 'graph-title-required' });
+        }
         if (title === graph.title) return UNCHANGED;
         ownedGraphs = replacing({ ...graph, title });
       } else if (completion.kind === 'recolored-graph') {
@@ -1044,14 +1096,18 @@ export function createSpaceAuthoring({
       } else if (completion.kind === 'deleted-graph') {
         // Every Layout resolves an Active Graph, so the last one cannot go
         // (ADR 0040). Removing its Edges is the author's way to empty it.
-        if (ownedGraphs.length === 1) return refuse('A Layout keeps at least one Graph.');
+        if (ownedGraphs.length === 1) {
+          return refuse({ code: 'layout-must-keep-graph' });
+        }
         ownedGraphs = ownedGraphs.filter((_, index) => index !== graphIndex);
         // Order among the survivors is untouched, and the first of them becomes
         // active when the deleted Graph was the one being emphasised.
         if (activeGraphId === graph.id) activeGraphId = ownedGraphs[0]?.id ?? null;
       } else if (completion.kind === 'deleted-edge') {
         const edgeIndex = indexOfEdge(graph.edges, completion.edge);
-        if (edgeIndex === -1) return refuse('That Edge is no longer in this Graph.');
+        if (edgeIndex === -1) {
+          return refuse({ code: 'edge-not-found' });
+        }
         ownedGraphs = replacing({
           ...graph,
           edges: graph.edges.filter((_, index) => index !== edgeIndex),

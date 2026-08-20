@@ -12,6 +12,7 @@ import {
 import { Placement, graphCardIds, type ResolvedContentCard } from '@project/graph';
 import type { OpenedSpace } from './space';
 import { createSpaceAuthoring } from './space-authoring';
+import { describeAuthoringRefusal } from './authoring-refusal';
 import { createRenderAdapter, selectedCardOf, type EdgeSubject } from './render-adapter';
 import { createConnectionCompletion } from './connection-completion';
 import { createEdgeAuthoring } from './edge-authoring';
@@ -23,10 +24,11 @@ import { cardSizeVars } from './card';
 import { createNavigation } from './navigation';
 import { createWorkingSpaceReader } from './snapshot';
 import { nextCardTitle } from './titles';
+import { activeGraphColor } from './colors';
 import { createRendererResolver, defaultRenderer, type CanvasRendererId } from './renderer';
 import { ADD_CARD_KEY, SpaceCanvas } from './components/SpaceCanvas';
 import { CanvasCentre, type VisibleCentre } from './components/CanvasCentre';
-import { NewAlias } from './components/NewAlias';
+import { NewAlias, type CreatedAliasRefusal } from './components/NewAlias';
 import { OpenCard } from './components/OpenCard';
 import { PlacementFailure } from './components/PlacementFailure';
 import { PlacementPending } from './components/PlacementPending';
@@ -93,7 +95,7 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
      * than a partial entity. Closing it creates nothing.
      */
     const [creatingAlias, setCreatingAlias] = useState(false);
-    const [aliasRefusal, setAliasRefusal] = useState<string | null>(null);
+    const [aliasRefusal, setAliasRefusal] = useState<CreatedAliasRefusal | null>(null);
     /** The Card a completed creation asks the canvas to open its name editor on. */
     const [createdCardId, setCreatedCardId] = useState<CardId | null>(null);
     const rendererSpace = useMemo(
@@ -118,6 +120,7 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
     );
 
     const { activeGraphId, openedCardId } = navigationState;
+    const editorGraphColor = activeGraphColor(projection.colors, activeGraphId);
     const activateGraph = navigation.activateGraph;
     const openCard = navigation.openCard;
     const closeCard = navigation.closeCard;
@@ -333,7 +336,15 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
           anchor: centreAnchor(),
         });
         if (created.kind === 'refused') {
-          setAliasRefusal(created.reason);
+          if (
+            created.refusal.code !== 'placement-pending' &&
+            created.refusal.code !== 'layout-not-found' &&
+            created.refusal.code !== 'alias-target-not-found' &&
+            created.refusal.code !== 'alias-target-must-own-content'
+          ) {
+            throw new Error(`Unexpected Add Alias refusal: ${created.refusal.code}`);
+          }
+          setAliasRefusal(created.refusal);
           return;
         }
         // The surface comes down only where the continuations below will run,
@@ -426,16 +437,19 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
           ? 'A Card title is required.'
           : (parsed.error.issues[0]?.message ?? 'The Card title is invalid.');
       }
-      // The result is deliberately not inspected, and that is not an oversight.
-      // `unchanged` here means the title did not change, which is the editor's
-      // ordinary close. Authoring's refusals need a state no author can reach
-      // from this control: a rename never changes kind or an Alias Target, and
-      // the two that turn on a missing placement or a vanished Layout cannot
-      // coincide with a drawn Card, because the affordance is rendered by the
-      // same projection that installs the placement. `queued` is an Edit that
-      // will still be performed.
-      authoring.complete({ kind: 'edited-card', cardId: cardId.data, document: parsed.data });
-      return null;
+      const result = authoring.complete({
+        kind: 'edited-card',
+        cardId: cardId.data,
+        document: parsed.data,
+      });
+      switch (result.kind) {
+        case 'refused':
+          return describeAuthoringRefusal(result.refusal);
+        case 'completed':
+        case 'unchanged':
+        case 'queued':
+          return null;
+      }
     }, []);
 
     // Every Card the Space holds, and deliberately no narrower: a Card's kind
@@ -476,10 +490,10 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
     );
 
     const openedCard = openedCardId ? rendererSpace.lookup.card(openedCardId) : undefined;
-    const completeOpenedCard = useCallback((completed: ResolvedContentCard): string | null => {
+    const completeOpenedCard = useCallback((completed: ResolvedContentCard) => {
       const { id, ...document } = completed;
       const result = authoring.complete({ kind: 'edited-card', cardId: id, document });
-      return result.kind === 'refused' ? result.reason : null;
+      return result.kind === 'refused' ? result.refusal : null;
     }, []);
 
     /**
@@ -510,14 +524,14 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
       (
         alias: Extract<Card, { kind: 'alias' }>,
         change: { readonly title: string; readonly target: CardId },
-      ): string | null => {
+      ) => {
         const { id, ...document } = alias;
         const result = authoring.complete({
           kind: 'edited-card',
           cardId: id,
           document: { ...document, ...change },
         });
-        return result.kind === 'refused' ? result.reason : null;
+        return result.kind === 'refused' ? result.refusal : null;
       },
       [],
     );
@@ -688,6 +702,7 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
             (openedCard.kind === 'alias' ? (
               <OpenCard
                 through={openedCard}
+                graphColor={editorGraphColor}
                 occurrence={{
                   targets: aliasTargets,
                   onEdit: (change: { title: string; target: CardId }) =>
@@ -696,7 +711,12 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
                 onCancel={closeCard}
               />
             ) : (
-              <OpenCard card={openedCard} onComplete={completeOpenedCard} onCancel={closeCard} />
+              <OpenCard
+                card={openedCard}
+                graphColor={editorGraphColor}
+                onComplete={completeOpenedCard}
+                onCancel={closeCard}
+              />
             ))}
 
           {creatingAlias && openedCardId === null && (

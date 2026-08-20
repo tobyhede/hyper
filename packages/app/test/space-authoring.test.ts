@@ -403,7 +403,7 @@ describe('Space Authoring', () => {
       }),
     ).toEqual({
       kind: 'refused',
-      reason: 'This view has not finished arranging, so there is nowhere to write yet.',
+      refusal: { code: 'placement-pending' },
     });
 
     replacePlacementForTest(
@@ -538,7 +538,7 @@ describe('Space Authoring', () => {
         cardId: CARD_A,
         document: { title: 'Converted A', kind: 'alias', target: CARD_C },
       }),
-    ).toEqual({ kind: 'refused', reason: 'A Card keeps the kind it was created with.' });
+    ).toEqual({ kind: 'refused', refusal: { code: 'card-kind-immutable' } });
     expect(session.getState().working).toBe(before);
   });
 
@@ -589,7 +589,7 @@ describe('Space Authoring', () => {
       }),
     ).toEqual({
       kind: 'refused',
-      reason: 'An Alias must target a Card that owns its content.',
+      refusal: { code: 'alias-target-must-own-content', targetId: CARD_B },
     });
     expect(session.getState().working).toBe(before);
   });
@@ -669,7 +669,7 @@ describe('Space Authoring', () => {
     expect(offersConnection(authoring, CARD_B, CARD_A)).toBe(false);
     expect(complete(authoring, { kind: 'connected-cards', from: CARD_B, to: CARD_A })).toEqual({
       kind: 'refused',
-      reason: 'These Cards are already connected in this Graph.',
+      refusal: { code: 'edge-already-exists' },
     });
   });
 
@@ -784,12 +784,12 @@ describe('Space Authoring', () => {
     expect(offersConnection(authoring, CARD_A, CARD_C)).toBe(false);
     expect(complete(authoring, { kind: 'connected-cards', from: CARD_A, to: CARD_C })).toEqual({
       kind: 'refused',
-      reason: 'A connection can only join Cards in this Layout.',
+      refusal: { code: 'edge-card-outside-layout' },
     });
     expect(offersConnection(authoring, CARD_C, CARD_A)).toBe(false);
     expect(complete(authoring, { kind: 'connected-cards', from: CARD_C, to: CARD_A })).toEqual({
       kind: 'refused',
-      reason: 'A connection can only join Cards in this Layout.',
+      refusal: { code: 'edge-card-outside-layout' },
     });
     expect(offersEmptyDrop(authoring, CARD_C)).toBe(false);
     expect(session.getState().working).toBe(before);
@@ -1268,7 +1268,7 @@ describe('Space Authoring', () => {
     // nothing to report as rendered — so eligibility is where the question goes.
     expect(authoring.edgeEligibility({ kind: 'connect', from: CARD_A, to: CARD_B })).toEqual({
       kind: 'refused',
-      reason: 'A connection can only join Cards in this Layout.',
+      refusal: { code: 'edge-card-outside-layout' },
     });
     replacePlacementForTest(
       authoring,
@@ -1280,12 +1280,12 @@ describe('Space Authoring', () => {
     expect(offersConnection(authoring, CARD_A, CARD_B)).toBe(false);
     expect(complete(authoring, { kind: 'connected-cards', from: CARD_A, to: CARD_B })).toEqual({
       kind: 'refused',
-      reason: 'These Cards are already connected in this Graph.',
+      refusal: { code: 'edge-already-exists' },
     });
     expect(offersConnection(authoring, CARD_A, staleCard)).toBe(false);
     expect(complete(authoring, { kind: 'connected-cards', from: CARD_A, to: staleCard })).toEqual({
       kind: 'refused',
-      reason: 'A connection can only join Cards in this Layout.',
+      refusal: { code: 'edge-card-outside-layout' },
     });
     expect(session.getState().working).toEqual(positionedSnapshot);
   });
@@ -2046,7 +2046,7 @@ describe('Space Authoring', () => {
 
     expect(complete(authoring, { kind: 'settled-card-movement' })).toEqual({
       kind: 'refused',
-      reason: 'This Layout is no longer part of the Space.',
+      refusal: { code: 'layout-not-found' },
     });
     expect(session.getState().working).toBe(before);
   });

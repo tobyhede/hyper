@@ -2,6 +2,7 @@ import { expectTypeOf, it } from 'vitest';
 import { uuidSchema, type Card } from '@project/core';
 import type { ResolvedContentCard } from '@project/graph';
 import type { OpenCardProps } from '../src/components/OpenCard';
+import type { AuthoringRefusal } from '../src/space-authoring';
 
 /**
  * The pane's props carry their own invariant, and only a typecheck can say so.
@@ -15,7 +16,7 @@ import type { OpenCardProps } from '../src/components/OpenCard';
 const CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 /** The half of the props that never varies, kept out of every assertion below. */
 type Handlers = {
-  onComplete: (card: ResolvedContentCard) => string | null;
+  onComplete: (card: ResolvedContentCard) => AuthoringRefusal | null;
   onCancel: () => void;
 };
 
@@ -23,7 +24,7 @@ type AliasHandlers = {
   through: Extract<Card, { kind: 'alias' }>;
   occurrence: {
     targets: readonly Card[];
-    onEdit: (change: { title: string; target: typeof CARD_ID }) => string | null;
+    onEdit: (change: { title: string; target: typeof CARD_ID }) => AuthoringRefusal | null;
   };
   onCancel: () => void;
 };

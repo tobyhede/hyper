@@ -69,7 +69,7 @@ describe('the opened Card', () => {
     expect(onComplete).not.toHaveBeenCalled();
   });
 
-  it('marks the field a title refusal is about, and only that field', () => {
+  it('marks the field a title validation error is about, and only that field', () => {
     const onComplete = vi.fn(() => null);
     render(<OpenCard card={markdown()} onComplete={onComplete} onCancel={vi.fn()} />);
 
@@ -82,7 +82,7 @@ describe('the opened Card', () => {
   });
 
   /**
-   * A schema refusal that belongs to neither field on this form is unattributed
+   * A schema error that belongs to neither field on this form is unattributed
    * — it goes to the form-level slot beside the actions.
    *
    * **No author can reach this through the fields**, and that is the honest
@@ -95,7 +95,7 @@ describe('the opened Card', () => {
    * Space cannot produce that Card; the misattribution it exposes is real for
    * every path this list grows by.
    */
-  it('surfaces a refusal belonging to no field beside the actions', () => {
+  it('surfaces an error belonging to no field in the shared dialog alert', () => {
     const onComplete = vi.fn(() => null);
     render(
       <OpenCard
@@ -110,7 +110,8 @@ describe('the opened Card', () => {
     expect(onComplete).not.toHaveBeenCalled();
     const alert = screen.getByRole('alert');
     expect(alert).toHaveTextContent('The Card could not be completed.');
-    expect(alert).toHaveAttribute('id', 'open-card-refusal');
+    expect(alert).toHaveAttribute('id', 'open-card-error');
+    expect(alert).toHaveTextContent('Couldn’t save changes');
     expect(screen.getByRole('textbox', { name: 'Title' })).toHaveAttribute('aria-invalid', 'false');
   });
 
@@ -132,6 +133,9 @@ describe('the opened Card', () => {
     fireEvent.change(screen.getByRole('textbox', { name: 'Title' }), {
       target: { value: 'Recap' },
     });
+    fireEvent.keyDown(screen.getByRole('combobox', { name: 'Target' }), {
+      key: 'ArrowDown',
+    });
     fireEvent.click(screen.getByRole('option', { name: /B/ }));
     expect(onEdit).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: 'Done' }));
@@ -141,7 +145,7 @@ describe('the opened Card', () => {
   });
 
   it('trims an Alias title before the authoring refusal boundary', () => {
-    const onEdit = vi.fn(() => 'An Alias title is required.');
+    const onEdit = vi.fn(() => ({ code: 'card-title-required' }) as const);
     const onCancel = vi.fn();
     render(
       <OpenCard
@@ -157,23 +161,33 @@ describe('the opened Card', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Done' }));
 
     expect(onEdit).toHaveBeenCalledWith({ title: '', target: CARD_ID });
-    expect(screen.getByRole('alert')).toHaveTextContent('An Alias title is required.');
+    expect(screen.getByRole('alert')).toHaveTextContent('A Card title is required.');
+    expect(screen.getByRole('textbox', { name: 'Title' })).toHaveAttribute('aria-invalid', 'true');
     expect(onCancel).not.toHaveBeenCalled();
   });
 
-  it('keeps an Alias draft open when the edit is refused', () => {
+  it('keeps an Alias draft open and attaches a Target refusal to its field', () => {
     const onCancel = vi.fn();
     render(
       <OpenCard
         through={{ id: ALIAS_ID, title: 'A again', kind: 'alias', target: CARD_ID }}
-        occurrence={{ targets: [], onEdit: () => 'This Alias could not be completed.' }}
+        occurrence={{
+          targets: [],
+          onEdit: () => ({ code: 'alias-target-not-found', targetId: CARD_ID }),
+        }}
         onCancel={onCancel}
       />,
     );
 
     fireEvent.click(screen.getByRole('button', { name: 'Done' }));
 
-    expect(screen.getByRole('alert')).toHaveTextContent('This Alias could not be completed.');
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'That Target is no longer part of the Space.',
+    );
+    expect(screen.getByRole('combobox', { name: 'Target' })).toHaveAttribute(
+      'aria-invalid',
+      'true',
+    );
     expect(onCancel).not.toHaveBeenCalled();
   });
 });
@@ -189,5 +203,17 @@ describe('the opened Card as a dialog', () => {
   it('uses Base UI modal containment rather than a local Tab handler', () => {
     render(<OpenCard card={markdown()} onComplete={vi.fn(() => null)} onCancel={vi.fn()} />);
     expect(screen.getByRole('dialog').closest('[data-base-ui-portal]')).not.toBeNull();
+  });
+
+  it('opens an Alias on its Target picker, since the title stays editable from the Card front', async () => {
+    render(
+      <OpenCard
+        through={{ id: ALIAS_ID, title: 'A again', kind: 'alias', target: CARD_ID }}
+        occurrence={{ targets: [markdown()], onEdit: vi.fn(() => null) }}
+        onCancel={vi.fn()}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByRole('combobox', { name: 'Target' })).toHaveFocus());
   });
 });

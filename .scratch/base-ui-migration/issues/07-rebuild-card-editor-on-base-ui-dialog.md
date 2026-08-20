@@ -4,7 +4,7 @@
 
 **Blocked by:** 03 — Move Button onto Base UI.
 
-**Status:** ready-for-agent
+**Status:** resolved — delivered in PR #69.
 
 - [ ] Use the Base UI/shadcn Dialog component and its normal modal focus, initial-focus, outside-interaction, Escape and accessible-title behavior instead of retaining the hand-rolled focus trap or importing the paused Radix wrapper.
 - [ ] Preserve ADR 0048: every opened-Card field remains pending until one Done, while Cancel or Escape discards every pending field and closes.

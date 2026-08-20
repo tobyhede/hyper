@@ -62,7 +62,10 @@ function inertEdgeAuthoring(): EdgeAuthoring {
     // snapshot: a fresh object per call is an infinite loop, not a stub detail.
     getState: () => IDLE_EDGE_STATE,
     subscribe: () => () => undefined,
-    eligibility: () => ({ kind: 'refused', reason: 'No Layout is selected.' }),
+    eligibility: () => ({
+      kind: 'refused',
+      refusal: { code: 'layout-required', operation: 'reconnected-edge' },
+    }),
     accepts: () => false,
     beginPointerConnect: () => undefined,
     connect: () => null,

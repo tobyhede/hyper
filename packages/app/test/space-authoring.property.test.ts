@@ -25,7 +25,7 @@ import { createRendererResolver, type CanvasRendererId } from '../src/renderer';
  *    both leave the working snapshot's *identity* alone, which is stronger than
  *    leaving its value alone and is what a surface relies on when it keeps a
  *    draft open over a refusal.
- * 3. Nothing throws. A refusal is a sentence, not an exception; a throw here
+ * 3. Nothing throws. A refusal is a stable identity, not an exception; a throw here
  *    would be a broken invariant, and the point of generating hostile sequences
  *    is to find one.
  *
@@ -212,6 +212,10 @@ it('keeps the working Space loadable through any sequence of semantic operations
           const result: AuthoringResult = authoring.complete(completion);
 
           expect(['completed', 'unchanged', 'refused']).toContain(result.kind);
+          if (result.kind === 'refused') {
+            expect(result.refusal.code).toEqual(expect.any(String));
+            expect(result).not.toHaveProperty('reason');
+          }
           if (result.kind !== 'completed') {
             // Not an Edit, so not a change: the identity holds, which is what a
             // surface keeping a draft open over a refusal depends on.

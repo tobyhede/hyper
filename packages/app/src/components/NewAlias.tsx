@@ -1,14 +1,37 @@
 import { useState } from 'react';
-import type { Card, CardId } from '@project/core';
-import { Button } from '@project/ui';
+import { uuidSchema, type Card, type CardId } from '@project/core';
+import {
+  Button,
+  CardSearchCombobox,
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+  FieldTitle,
+  Input,
+} from '@project/ui';
 import { CardPane } from './CardPane';
-import { CardPicker } from './CardPicker';
+import { paneInitialFocus } from './pane-focus';
+import { presentAuthoringRefusal } from '../authoring-refusal';
+import type { AuthoringRefusal } from '../space-authoring';
+
+export type CreatedAliasRefusal = Extract<
+  AuthoringRefusal,
+  {
+    readonly code:
+      | 'placement-pending'
+      | 'layout-not-found'
+      | 'alias-target-not-found'
+      | 'alias-target-must-own-content';
+  }
+>;
 
 export interface NewAliasProps {
   /** Every Card an Alias may name: the non-Alias Cards of this Space (ADR 0009). */
   readonly targets: readonly Card[];
   /** Why the Space refused the Alias this pane tried to create, or `null`. */
-  readonly refusal: string | null;
+  readonly refusal: CreatedAliasRefusal | null;
   /**
    * Create the Alias on the chosen Target, with the title exactly as typed —
    * the empty string included, because an empty title is what tells Authoring
@@ -51,65 +74,73 @@ export interface NewAliasProps {
  */
 export function NewAlias({ targets, refusal, onCreate, onCancel, onRefusalStale }: NewAliasProps) {
   const [title, setTitle] = useState('');
+  const presentation = refusal === null ? null : presentAuthoringRefusal(refusal);
+  const targetError = presentation?.placement === 'target' ? presentation.message : null;
 
   return (
     <CardPane ariaLabel="New Alias" testId="new-alias" onDismiss={onCancel}>
       {/* One `onChange` for both fields rather than two handlers, because React
-          bubbles change through its own tree and `CardPicker` owns the search
-          rather than exposing another callback. Editing either field is the
-          same fact — the refused attempt is over. */}
+          bubbles change through its own tree. Editing either field is the same
+          fact — the refused attempt is over. */}
       <div className="card-pane__editor" onChange={refusal === null ? undefined : onRefusalStale}>
         {/* The fields scroll and the actions below them do not, exactly as on the
             opened-Card pane. This one needs it most: it has no Markdown field to
             absorb the squeeze, so on a short window its heading, Title, list and
             hint together are taller than the frame. */}
-        <div className="card-pane__fields">
+        <FieldGroup className="card-pane__fields">
           {/* The kind is stated rather than offered, because a Card keeps the
               kind it was created with. */}
-          <div className="card-pane__heading">
-            <span>New Alias</span>
-            <span>An Alias shows another Card’s content at a second position.</span>
-          </div>
-          <label className="card-pane__field">
-            <span>Title</span>
-            <input
+          <Field className="card-pane__heading">
+            <FieldTitle>New Alias</FieldTitle>
+            <FieldDescription>
+              An Alias shows another Card’s content at a second position.
+            </FieldDescription>
+          </Field>
+          <Field className="card-pane__field">
+            <FieldLabel htmlFor="new-alias-title">Title</FieldLabel>
+            <Input
+              id="new-alias-title"
               data-testid="new-alias-title"
               value={title}
               onChange={(event) => setTitle(event.currentTarget.value)}
             />
-          </label>
-          <CardPicker
-            label="Target"
-            cards={targets}
-            selectedId={null}
-            // "It opens the normal Card editor in an Alias creation state with
-            // **Target** focused" (ADR 0009's Frame 1): the Target is what this
-            // surface is for, and the title above it is optional.
-            initialFocus
-            onSelect={(target) => onCreate(target, title)}
-            emptyMessage="An Alias needs a Card that owns its content, and this Space has none yet."
-          />
+          </Field>
+          <Field className="card-pane__field" data-invalid={targetError !== null}>
+            <CardSearchCombobox
+              label="Target"
+              choices={targets.map((card) => ({
+                id: card.id,
+                title: card.title,
+                kind: card.kind,
+              }))}
+              value={null}
+              inputAttributes={{
+                ...paneInitialFocus(true),
+                'aria-invalid': targetError !== null,
+                'aria-describedby': targetError === null ? undefined : 'new-alias-target-error',
+              }}
+              testId="card-picker-search"
+              resultsTestId="card-picker-results"
+              onValueChange={(target) => {
+                const parsed = uuidSchema.safeParse(target);
+                if (parsed.success) onCreate(parsed.data, title);
+              }}
+              emptyMessage="An Alias needs a Card that owns its content, and this Space has none yet."
+            />
+            <FieldError id="new-alias-target-error">{targetError}</FieldError>
+          </Field>
           {/* The hint stays among the fields, under the list it is about: it is
               advice on how to finish, so it belongs beside the control that
-              finishes. It is still withdrawn while a refusal stands, because
-              "choosing a Target creates the Alias" is the sentence the refused
-              attempt has just contradicted. */}
+              finishes. It is withdrawn while a refusal stands, leaving the
+              field-local corrective message to describe the next action. */}
           {refusal === null && (
-            <p className="card-pane__hint">
+            <FieldDescription className="card-pane__hint">
               Choosing a Target creates the Alias. Leave the title empty to take the Target’s.
-            </p>
+            </FieldDescription>
           )}
-        </div>
-        {/* Outside the scrolling region, in the slot the opened-Card pane puts a
-            refusal in. Among the fields it could be scrolled out of view at the
-            moment it is the only thing worth reading — and this pane is the one
-            most likely to scroll, having no Markdown field to absorb the
-            squeeze. No layout class: it is a plain child of the editor's
-            column, exactly as `EditorForm`'s is. */}
-        {refusal !== null && (
-          <span role="alert" className="card-pane__field-error">
-            {refusal}
-          </span>
+        </FieldGroup>
+        {presentation?.placement === 'form' && (
+          <FieldError className="card-pane__field-error">{presentation.message}</FieldError>
         )}
         <div className="card-pane__actions">
           <Button type="button" variant="secondary" onClick={onCancel}>

@@ -22,7 +22,8 @@ import {
 import type { Card, CardId, Graph, GraphEdge, GraphId } from '@project/core';
 import { uuidSchema } from '@project/core';
 import type { CardFlowNode } from '@project/react-flow-adapter';
-import { CardCombobox, type CardChoice } from '@project/ui';
+import { CardSearchCombobox, type CardChoice } from '@project/ui';
+import { describeAuthoringRefusal } from './authoring-refusal';
 import {
   newCardDrop,
   type DropTarget,
@@ -630,7 +631,10 @@ export function useEdgeAuthoring({
         return {
           id: card.id,
           title: card.title,
-          ...(eligibility.kind === 'refused' ? { refusal: eligibility.reason } : {}),
+          kind: card.kind,
+          ...(eligibility.kind === 'refused'
+            ? { refusal: describeAuthoringRefusal(eligibility.refusal) }
+            : {}),
         };
       }),
     [subjectCards],
@@ -684,7 +688,10 @@ export function useEdgeAuthoring({
       return {
         id: card.id,
         title: card.title,
-        ...(eligibility.kind === 'refused' ? { refusal: eligibility.reason } : {}),
+        kind: card.kind,
+        ...(eligibility.kind === 'refused'
+          ? { refusal: describeAuthoringRefusal(eligibility.refusal) }
+          : {}),
       };
     });
   }, [connectTarget, subjectCards, authoring]);
@@ -705,29 +712,29 @@ export function useEdgeAuthoring({
            * Escape cancels exactly one topmost Edge surface, and the open
            * combobox is a surface above this one.
            *
-           * **A portal is not an escape from the React tree.** Radix renders
-           * the popover through `createPortal`, but React dispatches synthetic
+           * **A portal is not an escape from the React tree.** Base UI renders
+           * the popup through `createPortal`, but React dispatches synthetic
            * events along the *fiber* tree, so a keydown inside the portalled
-           * content is not out of this handler's reach — and Radix's own Escape
-           * handling only calls `preventDefault`, never `stopPropagation`.
+           * content is not out of this handler's reach — and Base UI's own
+           * Escape handling calls `preventDefault` but does not stop the event
+           * from bubbling to this listener.
            *
-           * The trigger's `data-state` is what separates the two layers: while
-           * it reads `open` the press belongs to Radix, and the next one — with
-           * the list closed and focus back on the trigger — is this one's. It
-           * survived the move from `Select` to the Combobox composition
-           * (`f21d5d3`) because both triggers are Radix triggers and both stamp
-           * that attribute.
+           * The combobox input's `aria-expanded` is what separates the two
+           * layers: while it reads `true` the press belongs to Base UI's
+           * Combobox, and the next one — with the list closed and focus back
+           * on the input — is this one's.
            *
            * **In Chromium the guard is not what produces those two stages**, and
-           * a claim here that it did was measured and refused. Radix closes from
-           * a document capture listener, and the microtask checkpoint the
-           * browser performs *between* listeners commits that close before
-           * React's delegated listener runs — so the portalled content is
-           * unmounted and its fiber stripped, nothing dispatches, and this
-           * handler is never asked; the trigger already reads `closed`. jsdom
-           * performs no such checkpoint, dispatching a whole event in one frame,
-           * which is the only reason a unit test can see the guard at all.
-           * `editing.spec.ts` passes with the guard removed.
+           * a claim here that it did was measured and refused. Base UI's
+           * `useDismiss` closes from a bubble-phase `keydown` listener on
+           * `document`, and the microtask checkpoint the browser performs
+           * *between* listeners commits that close before React's delegated
+           * listener runs — so the portalled content is unmounted and its fiber
+           * stripped, nothing dispatches, and this handler is never asked; the
+           * input already reads `aria-expanded="false"`. jsdom performs no such
+           * checkpoint, dispatching a whole event in one frame, which is the
+           * only reason a unit test can see the guard at all. `editing.spec.ts`
+           * passes with the guard removed.
            *
            * It stays because it is the rule this handler owns, and it becomes
            * load-bearing again the moment the picker moves to a primitive that
@@ -736,12 +743,12 @@ export function useEdgeAuthoring({
           onKeyDown={(event) => {
             if (event.key !== 'Escape') return;
             const trigger = event.currentTarget.querySelector('[data-testid="connect-target"]');
-            if (trigger?.getAttribute('data-state') === 'open') return;
+            if (trigger?.getAttribute('aria-expanded') === 'true') return;
             event.stopPropagation();
             authoring.cancelDraft();
           }}
         >
-          <CardCombobox
+          <CardSearchCombobox
             label="Connect to"
             testId="connect-target"
             choices={connectChoices}

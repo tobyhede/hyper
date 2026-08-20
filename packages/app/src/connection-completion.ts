@@ -2,6 +2,7 @@ import type { CardId, LayoutPosition } from '@project/core';
 import { createNonThrowingReporter, type ObserverErrorReporter } from '@project/persistence';
 import type { CardFlowNode } from '@project/react-flow-adapter';
 import type { RenderAdapter } from './render-adapter';
+import { describeAuthoringRefusal } from './authoring-refusal';
 import type { SpaceAuthoring } from './space-authoring';
 
 /**
@@ -106,7 +107,9 @@ export function createConnectionCompletion({
     continueAt: (result: { readonly createdCardId?: CardId }) => CardId | undefined,
   ): ConnectionResult => {
     const result = authoring.complete(completion);
-    if (result.kind === 'refused') return { kind: 'refused', reason: result.reason };
+    if (result.kind === 'refused') {
+      return { kind: 'refused', reason: describeAuthoringRefusal(result.refusal) };
+    }
     if (result.kind === 'queued') {
       report(
         new Error(
@@ -133,7 +136,7 @@ export function createConnectionCompletion({
    */
   const eligible = (proposal: Parameters<SpaceAuthoring['edgeEligibility']>[0]): string | null => {
     const eligibility = authoring.edgeEligibility(proposal);
-    return eligibility.kind === 'refused' ? eligibility.reason : null;
+    return eligibility.kind === 'refused' ? describeAuthoringRefusal(eligibility.refusal) : null;
   };
 
   return {

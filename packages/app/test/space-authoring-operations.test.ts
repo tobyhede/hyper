@@ -229,7 +229,7 @@ describe('Edit Card', () => {
         cardId: CARD_A,
         document: { title: '', kind: 'markdown', body: 'A' },
       }),
-    ).toEqual({ kind: 'refused', reason: 'A Card title is required.' });
+    ).toEqual({ kind: 'refused', refusal: { code: 'card-title-required' } });
     expect(session.getState().working).toBe(before);
   });
 
@@ -245,7 +245,7 @@ describe('Edit Card', () => {
         cardId: CARD_A,
         document: { title: '   ', kind: 'markdown', body: 'A' },
       }),
-    ).toEqual({ kind: 'refused', reason: 'A Card title is required.' });
+    ).toEqual({ kind: 'refused', refusal: { code: 'card-title-required' } });
     expect(session.getState().working).toBe(before);
   });
 
@@ -318,7 +318,7 @@ describe('Add Alias', () => {
 
     expect(authoring.complete({ kind: 'created-alias', target: CARD_B, anchor: CENTRE })).toEqual({
       kind: 'refused',
-      reason: 'An Alias must target a Card that owns its content.',
+      refusal: { code: 'alias-target-must-own-content', targetId: CARD_B },
     });
     expect(session.getState().working).toBe(before);
   });
@@ -330,7 +330,7 @@ describe('Add Alias', () => {
       authoring.complete({ kind: 'created-alias', target: UNKNOWN_CARD, anchor: CENTRE }),
     ).toEqual({
       kind: 'refused',
-      reason: 'That Target is no longer part of the Space.',
+      refusal: { code: 'alias-target-not-found', targetId: UNKNOWN_CARD },
     });
   });
 });
@@ -429,7 +429,7 @@ describe('Edit Graph', () => {
 
     expect(authoring.complete({ kind: 'renamed-graph', graphId: GRAPH_ID, title: '   ' })).toEqual({
       kind: 'refused',
-      reason: 'A Graph title is required.',
+      refusal: { code: 'graph-title-required' },
     });
     expect(session.getState().working).toBe(before);
   });
@@ -462,7 +462,10 @@ describe('Edit Graph', () => {
 
     expect(
       authoring.complete({ kind: 'renamed-graph', graphId: GRAPH_ID, title: 'Renamed' }),
-    ).toEqual({ kind: 'refused', reason: 'Select a Layout to manage its Graphs.' });
+    ).toEqual({
+      kind: 'refused',
+      refusal: { code: 'layout-required', operation: 'renamed-graph' },
+    });
   });
 });
 
@@ -513,7 +516,7 @@ describe('Delete Graph', () => {
 
     expect(authoring.complete({ kind: 'deleted-graph', graphId: GRAPH_ID })).toEqual({
       kind: 'refused',
-      reason: 'A Layout keeps at least one Graph.',
+      refusal: { code: 'layout-must-keep-graph' },
     });
     expect(session.getState().working).toBe(before);
   });
@@ -540,7 +543,7 @@ describe('Delete Graph', () => {
 
     expect(authoring.complete({ kind: 'deleted-graph', graphId: OTHER_GRAPH_ID })).toEqual({
       kind: 'refused',
-      reason: 'That Graph is not one this Layout owns.',
+      refusal: { code: 'graph-not-owned' },
     });
   });
 });
@@ -648,7 +651,7 @@ describe('Edge lifecycle', () => {
         endpoint: 'from',
         cardId: CARD_B,
       }),
-    ).toEqual({ kind: 'refused', reason: 'These Cards are already connected in this Graph.' });
+    ).toEqual({ kind: 'refused', refusal: { code: 'edge-already-exists' } });
   });
 
   it('refuses a reconnection onto a Card this Layout does not hold', () => {
@@ -670,7 +673,7 @@ describe('Edge lifecycle', () => {
         endpoint: 'to',
         cardId: CARD_C,
       }),
-    ).toEqual({ kind: 'refused', reason: 'An Edge can only join Cards in this Layout.' });
+    ).toEqual({ kind: 'refused', refusal: { code: 'edge-card-outside-layout' } });
   });
 
   it('refuses an Edge the Graph no longer holds', () => {
@@ -682,7 +685,7 @@ describe('Edge lifecycle', () => {
         graphId: GRAPH_ID,
         edge: { from: CARD_B, to: CARD_A },
       }),
-    ).toEqual({ kind: 'refused', reason: 'That Edge is no longer in this Graph.' });
+    ).toEqual({ kind: 'refused', refusal: { code: 'edge-not-found' } });
   });
 
   it('deletes one Edge and leaves the Graph standing, empty', () => {
@@ -744,7 +747,7 @@ describe('Edge eligibility', () => {
   it('refuses a duplicate with the reason the completion gives', () => {
     const { authoring } = openPositioned();
 
-    const refusal = { kind: 'refused', reason: 'These Cards are already connected in this Graph.' };
+    const refusal = { kind: 'refused', refusal: { code: 'edge-already-exists' } };
     expect(authoring.edgeEligibility({ kind: 'connect', from: CARD_A, to: CARD_B })).toEqual(
       refusal,
     );
@@ -777,11 +780,11 @@ describe('Edge eligibility', () => {
 
     expect(authoring.edgeEligibility({ kind: 'connect', from: CARD_A, to: CARD_C })).toEqual({
       kind: 'refused',
-      reason: 'A connection can only join Cards in this Layout.',
+      refusal: { code: 'edge-card-outside-layout' },
     });
     expect(authoring.edgeEligibility({ kind: 'create-and-connect', from: CARD_C })).toEqual({
       kind: 'refused',
-      reason: 'A connection can only join Cards in this Layout.',
+      refusal: { code: 'edge-card-outside-layout' },
     });
   });
 
@@ -829,7 +832,7 @@ describe('Edge eligibility', () => {
     const { authoring } = open(sparse);
     place(authoring, { [CARD_A]: [10, 20], [CARD_B]: [300, 40] });
 
-    const refusal = { kind: 'refused', reason: 'An Edge can only join Cards in this Layout.' };
+    const refusal = { kind: 'refused', refusal: { code: 'edge-card-outside-layout' } };
     expect(authoring.edgeEligibility({ ...RECONNECT, cardId: CARD_C })).toEqual(refusal);
     expect(authoring.complete({ ...RECONNECT, kind: 'reconnected-edge', cardId: CARD_C })).toEqual(
       refusal,
@@ -848,7 +851,7 @@ describe('Edge eligibility', () => {
     // Placed, so the Layout would take it — but never a Card of this Space.
     place(authoring, { [CARD_A]: [10, 20], [CARD_B]: [300, 40], [UNKNOWN_CARD]: [600, 40] });
 
-    const refusal = { kind: 'refused', reason: 'An Edge can only join Cards in this Layout.' };
+    const refusal = { kind: 'refused', refusal: { code: 'edge-card-outside-layout' } };
     expect(authoring.edgeEligibility({ ...RECONNECT, cardId: UNKNOWN_CARD })).toEqual(refusal);
     expect(
       authoring.complete({ ...RECONNECT, kind: 'reconnected-edge', cardId: UNKNOWN_CARD }),
@@ -860,7 +863,7 @@ describe('Edge eligibility', () => {
 
     expect(
       authoring.edgeEligibility({ ...RECONNECT, graphId: UNKNOWN_GRAPH, cardId: CARD_A }),
-    ).toEqual({ kind: 'refused', reason: 'That Graph is not one this Layout owns.' });
+    ).toEqual({ kind: 'refused', refusal: { code: 'graph-not-owned' } });
   });
 
   /**
@@ -875,7 +878,7 @@ describe('Edge eligibility', () => {
     const { authoring } = openPositioned();
     const absent = { ...RECONNECT, edge: { from: CARD_B, to: CARD_A }, cardId: CARD_A } as const;
 
-    const refusal = { kind: 'refused', reason: 'That Edge is no longer in this Graph.' };
+    const refusal = { kind: 'refused', refusal: { code: 'edge-not-found' } };
     expect(authoring.edgeEligibility(absent)).toEqual(refusal);
     expect(authoring.complete({ ...absent, kind: 'reconnected-edge' })).toEqual(refusal);
   });
@@ -890,7 +893,7 @@ describe('Edge eligibility', () => {
 
     expect(authoring.edgeEligibility({ ...RECONNECT, cardId: CARD_A })).toEqual({
       kind: 'refused',
-      reason: 'Select a Layout to edit its Edges.',
+      refusal: { code: 'layout-required', operation: 'reconnected-edge' },
     });
     expect(authoring.edgeEligibility({ kind: 'connect', from: CARD_A, to: CARD_B })).toEqual({
       kind: 'eligible',
@@ -929,7 +932,7 @@ describe('Layout membership', () => {
 
     expect(
       authoring.complete({ kind: 'added-card-to-layout', cardId: UNKNOWN_CARD, anchor: CENTRE }),
-    ).toEqual({ kind: 'refused', reason: 'This Card is no longer part of the Space.' });
+    ).toEqual({ kind: 'refused', refusal: { code: 'card-not-found' } });
   });
 
   it('refuses a Card the Layout already holds', () => {
@@ -937,7 +940,7 @@ describe('Layout membership', () => {
 
     expect(
       authoring.complete({ kind: 'added-card-to-layout', cardId: CARD_A, anchor: CENTRE }),
-    ).toEqual({ kind: 'refused', reason: 'This Card is already in this Layout.' });
+    ).toEqual({ kind: 'refused', refusal: { code: 'card-already-in-layout' } });
   });
 
   it('refuses adding to an Algorithmic View, which has no membership to write', () => {
@@ -946,7 +949,10 @@ describe('Layout membership', () => {
 
     expect(
       authoring.complete({ kind: 'added-card-to-layout', cardId: CARD_A, anchor: CENTRE }),
-    ).toEqual({ kind: 'refused', reason: 'Select a Layout to add an existing Card to it.' });
+    ).toEqual({
+      kind: 'refused',
+      refusal: { code: 'layout-required', operation: 'added-card-to-layout' },
+    });
     // Refused *before* converting: a Layout minted only to fail the next line
     // would leave the Space carrying a Layout the author never asked for.
     expect(session.getState().working).toBe(before);
@@ -999,7 +1005,7 @@ describe('Layout membership', () => {
 
     expect(authoring.complete({ kind: 'removed-card-from-layout', cardId: CARD_C })).toEqual({
       kind: 'refused',
-      reason: 'This Card is not in this Layout.',
+      refusal: { code: 'card-not-in-layout' },
     });
   });
 });
@@ -1066,7 +1072,10 @@ describe('Delete Card from Space', () => {
 
     expect(authoring.complete({ kind: 'deleted-card', cardId: CARD_A })).toEqual({
       kind: 'refused',
-      reason: 'Retarget or delete the Aliases of this Card first: A again.',
+      refusal: {
+        code: 'card-has-aliases',
+        aliasTitles: ['A again'],
+      },
     });
     expect(session.getState().working).toBe(before);
   });
@@ -1125,7 +1134,7 @@ describe('Delete Card from Space', () => {
 
     expect(authoring.complete({ kind: 'deleted-card', cardId: UNKNOWN_CARD })).toEqual({
       kind: 'refused',
-      reason: 'This Card is no longer part of the Space.',
+      refusal: { code: 'card-not-found' },
     });
   });
 });
@@ -1192,7 +1201,7 @@ describe('Stale identities', () => {
 
     expect(
       authoring.complete({ kind: 'renamed-graph', graphId: UNKNOWN_GRAPH, title: 'Renamed' }),
-    ).toEqual({ kind: 'refused', reason: 'That Graph is not one this Layout owns.' });
+    ).toEqual({ kind: 'refused', refusal: { code: 'graph-not-owned' } });
   });
 
   it('refuses every operation before the view has arranged anything', () => {
@@ -1200,7 +1209,7 @@ describe('Stale identities', () => {
 
     expect(authoring.complete({ kind: 'created-card', anchor: CENTRE })).toEqual({
       kind: 'refused',
-      reason: 'This view has not finished arranging, so there is nowhere to write yet.',
+      refusal: { code: 'placement-pending' },
     });
   });
 });
