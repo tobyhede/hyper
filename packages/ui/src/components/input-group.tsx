@@ -54,6 +54,9 @@ function InputGroupAddon({
       onClick={(e) => {
         onClick?.(e);
         if (e.defaultPrevented) return;
+        // SAFETY: `e.target` from a DOM MouseEvent inside this div is always
+        // an Element; asserting HTMLElement to call `closest` is only how
+        // this checks whether the click landed on a nested button.
         if ((e.target as HTMLElement).closest('button')) {
           return;
         }

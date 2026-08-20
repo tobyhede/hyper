@@ -96,12 +96,19 @@ describe('Problem Details', () => {
   it('round trips every problem identity and an RFC 6901 whole-document pointer', () => {
     fc.assert(
       fc.property(
+        // SAFETY: `Object.keys` widens problemCatalogue's own keys to
+        // `string[]`, but every key iterated here comes from problemCatalogue
+        // itself, so each one is a HyperProblemCode literal.
         fc.constantFrom<HyperProblemCode>(...(Object.keys(problemCatalogue) as HyperProblemCode[])),
         fc.string({ minLength: 1 }),
         (code, detail) => {
           const encoded = encodeProblemDetails(code, detail, [
             { code: 'invalid-value', pointer: '' },
           ]);
+          // SAFETY: `JSON.parse`'s return type is `any`; asserting `unknown`
+          // stops that `any` from propagating past this call so
+          // decodeProblemDetails has to validate the shape instead of
+          // trusting it.
           expect(decodeProblemDetails(JSON.parse(JSON.stringify(encoded)) as unknown)).toEqual(
             encoded,
           );
@@ -193,6 +200,8 @@ describe('Problem Details', () => {
   });
 
   it('rejects an unrecognized problem type at the codeForType boundary', () => {
+    // SAFETY: deliberately invalid input for problemCodeForType's own runtime
+    // check to reject.
     expect(() => problemCodeForType('https://hyper.dev/problems/nope' as HyperProblemType)).toThrow(
       'problem details has an unknown type',
     );

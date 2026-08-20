@@ -441,6 +441,9 @@ const LAYOUT_ONLY = new Set<LayoutRequiredOperation>([
   'reconnected-edge',
   'deleted-edge',
 ]);
+// SAFETY: `Set<LayoutRequiredOperation>.has` requires its argument narrowed to
+// that type, but the `.has` call itself is this function's own type predicate
+// check — its boolean result is what proves the narrowing true.
 const requiresLayout = (
   operation: AuthoringCompletion['kind'],
 ): operation is LayoutRequiredOperation => LAYOUT_ONLY.has(operation as LayoutRequiredOperation);

@@ -192,6 +192,8 @@ function CardEditorShell({
     >
       <form
         className="card-editor"
+        // SAFETY: CSSProperties doesn't type CSS custom properties (`--*`);
+        // this one is read only by the stylesheet, which is its actual contract.
         style={{ '--card-editor-graph': graphColor } as CSSProperties}
         aria-invalid={error !== null}
         aria-describedby={error === null ? undefined : errorId}
