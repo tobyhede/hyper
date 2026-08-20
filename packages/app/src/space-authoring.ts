@@ -584,6 +584,9 @@ function sameValue(left: unknown, right: unknown): boolean {
   }
   const leftKeys = Object.keys(left);
   if (leftKeys.length !== Object.keys(right).length) return false;
+  // SAFETY: the `typeof`/array checks above already confirmed both are
+  // non-null, non-array objects; indexing them as `Record<string, unknown>`
+  // just names that shape for the recursive comparison.
   return leftKeys.every(
     (key) =>
       Object.hasOwn(right, key) &&

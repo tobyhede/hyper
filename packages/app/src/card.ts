@@ -44,7 +44,10 @@ export const CARD_SIZE = { width: CARD_WIDTH, height: CARD_HEIGHT } as const;
  * Handed to the graph container so the stylesheet draws cards at exactly the size
  * the layout placed them at. If these drift, ports land where the card isn't.
  */
-export const cardSizeVars = {
-  '--card-width': `${CARD_WIDTH}px`,
-  '--card-height': `${CARD_HEIGHT}px`,
-} as CSSProperties;
+export const cardSizeVars =
+  // SAFETY: CSSProperties doesn't type CSS custom properties (`--*`); these
+  // two are read only by the stylesheet, which is their actual contract.
+  {
+    '--card-width': `${CARD_WIDTH}px`,
+    '--card-height': `${CARD_HEIGHT}px`,
+  } as CSSProperties;

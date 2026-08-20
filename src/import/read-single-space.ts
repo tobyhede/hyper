@@ -220,6 +220,8 @@ export const readImportBatch = async (inputPath: string): Promise<readonly Impor
   const results = await Promise.allSettled(
     spaceDirectories.map(({ directory }) => readSingleSpace(directory)),
   );
+  // SAFETY: PromiseRejectedResult.reason is typed `any` by lib.es; asserting
+  // `unknown` stops that `any` from propagating into `failures`.
   const failures: unknown[] = results.flatMap((result) =>
     result.status === 'rejected' ? [result.reason as unknown] : [],
   );

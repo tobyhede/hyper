@@ -56,7 +56,7 @@ export type Placement = ReadonlyMap<CardId, Readonly<LayoutPosition>> & {
 /**
  * The one place a `CardId` key is asserted rather than parsed.
  *
- * A single erasure reaches this module: `Object.entries` widens the keys of a
+ * SAFETY: a single erasure reaches this module: `Object.entries` widens the keys of a
  * `Layout`'s `positions` to `string`. They have already been branded —
  * `layoutSchema` declares `positions` as `z.record(idSchema, …)`, so Zod rejects
  * a non-UUID key at parse, and every Space arrives through `loadSpace` or
@@ -77,7 +77,14 @@ const point = (at: LayoutPosition): LayoutPosition => ({ x: at.x, y: at.y });
 function fromLayout(layout: Layout): Placement {
   const positions = new Map<CardId, LayoutPosition>();
   for (const [cardId, at] of Object.entries(layout.positions)) {
-    if (at !== undefined) positions.set(cardId as CardId, point(at));
+    if (at !== undefined) {
+      // SAFETY: `Object.entries` widens this key to `string`, but it was
+      // already branded — `layoutSchema` declares `positions` as
+      // `z.record(idSchema, …)`, so every key reaching here already passed
+      // through `loadSpace`/`loadSpaceSnapshot` (see the module docstring
+      // above `brand`).
+      positions.set(cardId as CardId, point(at));
+    }
   }
   return brand(positions);
 }
