@@ -76,10 +76,10 @@ all.
 
 ## Phases
 
-- `01` — vendor the plugin, install Oxlint, enable the 5 clean rules in `verify`
-- `02` — combined pass on the two boundary-decoder files (highest leverage)
+- `01` — vendor the plugin, install Oxlint, enable the 5 clean rules in `verify` (done)
+- `02` — combined pass on the two boundary-decoder files (highest leverage) (done)
 - `03` — remaining bounded rules: chained assertions, shape-in-symbol-names, module mocking
-- `04` — remaining scattered rules: unsafe dictionary type, unknown returns, known-value widening
+- `04` — remaining scattered rules: unsafe dictionary type, unknown returns, known-value widening, runtime typeof
 - `05` — conditional empty object spread (moderate concentration, split by package)
 - `06` — unknown parameters (largest remaining prod rule, split by package)
 - `07` — safety-comment sweep (largest overall, run last, split prod then test)
@@ -88,3 +88,13 @@ all.
 Each phase after `01` produces its own before/after count via `pnpm lint:anti-slop
 --rules <rule>` (or the full run) so the next phase starts from a verified
 baseline rather than a stale count.
+
+**Correction after issue 02 landed**: the original phase list above never
+assigned a phase to `no-runtime-typeof`'s remaining diagnostics — issue 02
+only covered its 13 hits in the two boundary-decoder files (via a scoped
+override, since those are genuine boundary/closed-union `typeof` checks, not
+missing parsing). The ~30 remaining diagnostics across ~14 files now fold into
+issue 04, which is renamed accordingly. Also: issue 02 introduced a
+`.oxlintrc.json` `overrides` block (glob-scoped rule exceptions with a
+rationale comment) as the mechanism for "narrowly scoped exception" —
+later phases should reuse that mechanism rather than inventing a new one.
