@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ComponentProps } from 'react';
 import { Handle, Position, useConnection, type NodeProps } from '@xyflow/react';
 import {
   Button,
@@ -26,6 +26,11 @@ import { AUTHORING_HANDLE_DIAMETER, GRAPH_PORT_DIAMETER } from './authoring-hand
  * there is no second artefact (ADR 0024).
  */
 const AUTHORING_SIDES = [Position.Top, Position.Right, Position.Bottom, Position.Left] as const;
+
+/** Strips `readonly` off a props type so an optional slice of it can be built by
+ *  conditionally assigning keys rather than by a conditional empty-object
+ *  spread — the props themselves stay readonly to every other caller. */
+type MutableOptional<T> = { -readonly [K in keyof T]: T[K] };
 
 interface CardTitleEditorProps {
   readonly cardId: string;
@@ -236,6 +241,29 @@ export function CardNode({ data, selected, dragging, isConnectable }: NodeProps<
     />
   );
 
+  const canvasCardOptionalProps: MutableOptional<
+    Pick<ComponentProps<typeof CanvasCard>, 'aliasOf' | 'onDoubleClickTitle' | 'titleEditor'>
+  > = {};
+  if (data.aliasOf !== undefined) canvasCardOptionalProps.aliasOf = data.aliasOf;
+  if (data.titleEditingEnabled) {
+    canvasCardOptionalProps.onDoubleClickTitle = (event) => {
+      event.stopPropagation();
+      data.onBeginTitleEditing?.();
+    };
+  }
+  if (data.editingTitle) {
+    const titleEditorProps: { cardId: string; title: string } & MutableOptional<
+      Pick<CardTitleEditorProps, 'onComplete' | 'onCancel'>
+    > = { cardId: data.cardId, title: data.title };
+    if (data.onCompleteTitleEditing !== undefined) {
+      titleEditorProps.onComplete = data.onCompleteTitleEditing;
+    }
+    if (data.onCancelTitleEditing !== undefined) {
+      titleEditorProps.onCancel = data.onCancelTitleEditing;
+    }
+    canvasCardOptionalProps.titleEditor = <CardTitleEditor {...titleEditorProps} />;
+  }
+
   return (
     <div
       className="rf-card-node__inner"
@@ -258,32 +286,8 @@ export function CardNode({ data, selected, dragging, isConnectable }: NodeProps<
           state={visualState}
           title={data.title}
           graphColor={data.activeGraphColor}
-          {...(data.aliasOf === undefined ? {} : { aliasOf: data.aliasOf })}
           titleEditable={data.titleEditingEnabled === true}
-          {...(data.titleEditingEnabled
-            ? {
-                onDoubleClickTitle: (event) => {
-                  event.stopPropagation();
-                  data.onBeginTitleEditing?.();
-                },
-              }
-            : {})}
-          {...(data.editingTitle
-            ? {
-                titleEditor: (
-                  <CardTitleEditor
-                    cardId={data.cardId}
-                    title={data.title}
-                    {...(data.onCompleteTitleEditing !== undefined
-                      ? { onComplete: data.onCompleteTitleEditing }
-                      : {})}
-                    {...(data.onCancelTitleEditing !== undefined
-                      ? { onCancel: data.onCancelTitleEditing }
-                      : {})}
-                  />
-                ),
-              }
-            : {})}
+          {...canvasCardOptionalProps}
           actions={
             <>
               {/* The keyboard's way into an Edge. The four spatial handles (ADR

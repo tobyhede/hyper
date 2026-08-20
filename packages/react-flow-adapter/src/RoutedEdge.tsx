@@ -1,3 +1,4 @@
+import type { ComponentProps } from 'react';
 import { BaseEdge, getBezierPath, type Edge, type EdgeProps } from '@xyflow/react';
 import type { LayoutPosition, GraphId } from '@project/core';
 
@@ -116,12 +117,9 @@ export function RoutedEdge(props: EdgeProps<RoutedFlowEdge>) {
   const { id, markerEnd, style } = props;
   const { path } = routedEdgeGeometry(props);
 
-  return (
-    <BaseEdge
-      id={id}
-      path={path}
-      {...(markerEnd !== undefined ? { markerEnd } : {})}
-      {...(style !== undefined ? { style } : {})}
-    />
-  );
+  const baseEdgeProps: ComponentProps<typeof BaseEdge> = { id, path };
+  if (markerEnd !== undefined) baseEdgeProps.markerEnd = markerEnd;
+  if (style !== undefined) baseEdgeProps.style = style;
+
+  return <BaseEdge {...baseEdgeProps} />;
 }

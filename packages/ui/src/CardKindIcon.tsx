@@ -1,4 +1,4 @@
-import type { ComponentType } from 'react';
+import type { ComponentProps, ComponentType } from 'react';
 import type { Card } from '@project/core';
 import { AliasIcon, MarkdownIcon } from './icons';
 
@@ -38,6 +38,8 @@ export interface CardKindIconProps {
  */
 export function CardKindIcon({ kind, size }: CardKindIconProps) {
   const Glyph = KIND_GLYPHS[kind];
+  const glyphProps: ComponentProps<typeof Glyph> = {};
+  if (size !== undefined) glyphProps.size = size;
   return (
     <span
       className="inline-flex flex-none items-center text-[var(--muted-foreground)]"
@@ -46,7 +48,7 @@ export function CardKindIcon({ kind, size }: CardKindIconProps) {
       title={KIND_NAMES[kind]}
       data-card-kind={kind}
     >
-      <Glyph {...(size === undefined ? {} : { size })} />
+      <Glyph {...glyphProps} />
     </span>
   );
 }

@@ -11,6 +11,10 @@ describe('CanvasCard', () => {
     const card = screen.getByRole('article', { name: 'Strategies' });
     expect(card).toHaveAttribute('data-kind', 'markdown');
     expect(card).toHaveAttribute('data-state', 'rest');
+    // Every kind draws its glyph, Markdown included — CardKindIcon has no
+    // silent-nothing case, and the rail is not the centred, icon-optional
+    // layout the pre-design-system Card used.
+    expect(screen.getByRole('img', { name: 'Markdown Card' })).toBeVisible();
 
     rerender(
       <CanvasCard kind="alias" state="selected-hover" title="Opening" graphColor="#35d6c3" />,

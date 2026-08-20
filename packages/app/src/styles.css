@@ -206,7 +206,6 @@ body {
 
 .canvas-card__rail {
   display: flex;
-  grid-template-columns: none;
   align-items: center;
   justify-content: space-between;
   height: 34px;
@@ -276,7 +275,14 @@ body {
   -webkit-line-clamp: 3;
 }
 
+/* Renaming is the title's own double click (ADR 0036), so it must claim only
+   the pixels it draws — the body is a left-aligned column, and a block title
+   spans its full width with most of it blank, which would put the rename
+   target across the band beside a short title rather than just the title
+   itself. Shrunk to fit, so that band renames nothing. */
 .canvas-card__title[data-editable='true'] {
+  width: fit-content;
+  max-width: 100%;
   cursor: text;
 }
 

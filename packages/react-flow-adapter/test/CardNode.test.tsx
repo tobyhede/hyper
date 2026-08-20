@@ -185,6 +185,12 @@ describe('CardNode canvas Card state adapter', () => {
     expect(screen.getByRole('article', { name: 'A, again' })).toHaveAttribute('data-kind', 'alias');
     expect(screen.getByRole('img', { name: 'Alias' })).toBeVisible();
   });
+
+  it('draws a Markdown Card kind glyph like any other kind', () => {
+    render(<CardNode {...props({ kind: 'markdown' })} />);
+
+    expect(screen.getByRole('img', { name: 'Markdown Card' })).toBeVisible();
+  });
 });
 
 describe('CardNode title authoring', () => {
