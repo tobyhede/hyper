@@ -33,7 +33,7 @@ Grilled 2026-08-20. Recorded in ADR 0058 (the load-bearing part) and sharpened i
 
 - **Reference is a bare `{ kind: 'space', spaceId }`.** No pinned Layout/View — a Space Card always opens to whatever the target Space's own renderer choice is, so it can't become a second place selecting the same canvas choice ADR 0053 already gives one home.
 - **Ownership, not a shared pointer.** Unlike Alias's Target, a Space Card's reference is never retargeted once minted. It is the only path to the Space it names.
-- **Creation is atomic.** Creating a Space Card mints the Card and a new, empty target Space (ADR 0018's template) in the same Edit, via the same `newId` seam that already mints Card/Layout ids. A Space Card can never point at nothing.
+- **Creation is atomic.** Creating a Space Card mints the Card and a normal one-card target Space from ADR 0018's template in the same Edit, via the same `newId` seam that already mints Card/Layout ids. A Space Card can never point at nothing.
 - **Deletion cascades.** Deleting a Space Card deletes the Space it owns, and everything nested inside it, in the same Edit. Deliberately destructive, no soft-delete built. Rejected alternative: detach-and-orphan, which reopens the exact unreachable-Space state this decision closes off everywhere else.
 - **Cycles are rejected at `loadSpace` intake** (ADR 0010) — a Space Card may not target an ancestor along the chain that reaches it. Depth stays arbitrary (ADR 0001); cycles do not.
 - **The root Space is pure convention.** ADR 0018's existing one-card bootstrap needs no change, and plays this role by virtue of never being nested under anything. Nothing restricts what it may contain.

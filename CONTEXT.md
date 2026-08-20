@@ -27,7 +27,7 @@ A card is one of three kinds, and the kind is what its content is: **Markdown** 
 _Avoid_: node, slide, page, tile, subgraph. For the content: prose (it may be a table, a diagram or code, not only writing), body (works for markdown, but a space card's content is a graph).
 
 **Space Card**:
-A card of kind **space**: the only way a new Space comes to exist, and the only path to it. Creating one creates its Space in the same Edit; opening it explores that Space in place. The relationship is ownership, not reference — deleting a Space Card deletes the Space it owns, with everything nested inside it, and unlike an Alias's Target, a Space Card's reference is never retargeted once minted. A Space Card may not target a Space already open along the chain that reaches it, so a Space cannot contain itself, directly or through any chain of Space Cards.
+A card of kind **space**: the only way an authored nested Space comes to exist, and the only path to a nested Space. Creating one creates its Space in the same Edit; opening it explores that Space in place. The root Space is created by the ADR 0018 bootstrap, while import creates complete Spaces and their linking Space Cards in one transaction. The relationship is ownership, not reference — deleting a Space Card deletes the Space it owns, with everything nested inside it, and unlike an Alias's Target, a Space Card's reference is never retargeted once minted. A Space Card may not target a Space already open along the chain that reaches it, so a Space cannot contain itself, directly or through any chain of Space Cards.
 _Avoid_: subspace, portal, link, nested space (as a second name for the same thing — it is a Space, full stop).
 
 **Alias**:

@@ -105,7 +105,7 @@ const declaredParityClaims = (path: string, problems: string[]): readonly Declar
       : initializer;
   if (array === undefined || !ts.isArrayLiteralExpression(array)) {
     problems.push(
-      'packages/app/stories/parity-manifest.ts must declare a literal parityClaims array',
+      'packages/app/stories/parity-claims.ts must declare a literal parityClaims array',
     );
     return [];
   }
@@ -263,7 +263,7 @@ export const buildUiCatalog = (repositoryRoot = process.cwd()): UiCatalog => {
     }
   }
 
-  const declared = declaredParityClaims(join(storiesRoot, 'parity-manifest.ts'), problems);
+  const declared = declaredParityClaims(join(storiesRoot, 'parity-claims.ts'), problems);
   const ids = new Set<string>();
   const claimedExports = new Set<string>();
   for (const item of declared) {
