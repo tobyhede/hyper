@@ -38,6 +38,11 @@ test(
       'Architecture notes',
     );
     await expect(dialog.getByRole('textbox', { name: 'Markdown source' })).toHaveCount(0);
+
+    await dialog.getByRole('textbox', { name: 'Title' }).fill('Revised placement recap');
+    await dialog.getByRole('button', { name: 'Done' }).click();
+
+    await expect(page.getByText('Completed Revised placement recap.')).toBeVisible();
   },
 );
 

@@ -55,15 +55,22 @@ Markdown.meta = { iframed: true };
 /** The production Alias metadata editor with its current Target available. */
 export const Alias: Story = () => {
   const [open, setOpen] = useState(true);
+  const [message, setMessage] = useState('No edit completed.');
 
   return open ? (
     <OpenCard
       through={alias}
-      occurrence={{ targets: [markdown], onEdit: () => null }}
+      occurrence={{
+        targets: [markdown],
+        onEdit: ({ title }) => {
+          setMessage(`Completed ${title}.`);
+          return null;
+        },
+      }}
       onCancel={() => setOpen(false)}
     />
   ) : (
-    <p>Alias edit completed.</p>
+    <p>{message}</p>
   );
 };
 Alias.meta = { iframed: true };
