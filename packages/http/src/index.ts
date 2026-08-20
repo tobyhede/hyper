@@ -222,12 +222,14 @@ const decodeCommitBody = (
   try {
     return decodeCommitRequest(value);
   } catch (error) {
-    return problem(
-      context,
-      'invalid-request',
-      error instanceof Error ? error.message : 'Correct the request body.',
-      [{ code: 'invalid-value', pointer: '' }],
-    );
+    // Problem Details requires a non-empty `detail`, and `error instanceof Error`
+    // does not guarantee `error.message` is one — the same fallback the
+    // `HTTPException` branch in `onError` needs, for the same reason.
+    const detail =
+      error instanceof Error && error.message.length > 0
+        ? error.message
+        : 'Correct the request body.';
+    return problem(context, 'invalid-request', detail, [{ code: 'invalid-value', pointer: '' }]);
   }
 };
 

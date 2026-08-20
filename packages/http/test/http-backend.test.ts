@@ -1,5 +1,5 @@
 import { uuidSchema, type SpaceSnapshot } from '@project/core';
-import { encodeLoadedSpace, encodeProblemDetails } from '@project/persistence';
+import { encodeLoadedSpace, encodeProblemDetails, type HyperProblemCode } from '@project/persistence';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { HttpSpaceBackend } from '@project/http';
 
@@ -16,11 +16,7 @@ const backendAnswering = (response: Response): HttpSpaceBackend =>
     fetch: () => Promise.resolve(response),
   });
 
-const problemResponse = (
-  code: Parameters<typeof encodeProblemDetails>[0],
-  detail: string,
-  headers?: HeadersInit,
-): Response => {
+const problemResponse = (code: HyperProblemCode, detail: string, headers?: HeadersInit): Response => {
   const body = encodeProblemDetails(code, detail);
   const responseHeaders = new Headers(headers);
   responseHeaders.set('Content-Type', 'application/problem+json');

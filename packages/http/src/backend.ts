@@ -9,6 +9,7 @@ import {
   problemCodeForType,
   type CommitResult,
   type LoadedSpace,
+  type ProblemDetails,
   type SpaceBackend,
   type SpaceSummary,
 } from '@project/persistence';
@@ -150,9 +151,7 @@ const retryAfterMilliseconds = (response: Response): number | undefined => {
   return Number(seconds) * 1000;
 };
 
-type DecodedProblem = ReturnType<typeof decodeProblemDetails>;
-
-const commitFailureForProblem = (problem: DecodedProblem, response: Response): CommitResult => {
+const commitFailureForProblem = (problem: ProblemDetails, response: Response): CommitResult => {
   const code = problemCodeForType(problem.type);
   switch (code) {
     case 'request-timeout':

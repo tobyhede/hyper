@@ -686,60 +686,125 @@ describe('Space HTTP application', () => {
       headers: { 'Content-Type': contentType },
       body,
     });
-    const responses = await Promise.all([
-      createSpaceHttpApp(repository()).request('/api/spaces'),
-      createSpaceHttpApp(repository()).request(`/api/spaces/${SPACE_ID}`),
-      createSpaceHttpApp(repository({ loadSpace: () => Promise.resolve(undefined) })).request(
-        `/api/spaces/${SPACE_ID}`,
-      ),
-      createSpaceHttpApp(repository()).request('/api/spaces/not-a-uuid'),
-      createSpaceHttpApp(repository()).request('/api/spaces/not-a-uuid', { method: 'POST' }),
-      createSpaceHttpApp(repository()).request('/off-contract'),
-      createSpaceHttpApp(repository()).request(`/api/spaces/${SPACE_ID}`, put(commit)),
-      createSpaceHttpApp(repository()).request(`/api/spaces/${SPACE_ID}`, put('not json')),
-      createSpaceHttpApp(repository()).request(`/api/spaces/${SPACE_ID}`, put('{}')),
-      createSpaceHttpApp(repository()).request(
-        `/api/spaces/${SPACE_ID}`,
-        put('{}', 'text/plain; charset=utf-8'),
-      ),
-      createSpaceHttpApp(repository()).request(`/api/spaces/${SPACE_ID}`, put(oversized)),
+    const JSON_MEDIA = 'application/json; charset=utf-8';
+    const PROBLEM_MEDIA = 'application/problem+json';
+
+    const cases = [
+      {
+        status: 200,
+        contentType: JSON_MEDIA,
+        request: () => createSpaceHttpApp(repository()).request('/api/spaces'),
+      },
+      {
+        status: 200,
+        contentType: JSON_MEDIA,
+        request: () => createSpaceHttpApp(repository()).request(`/api/spaces/${SPACE_ID}`),
+      },
+      {
+        status: 404,
+        contentType: PROBLEM_MEDIA,
+        request: () =>
+          createSpaceHttpApp(repository({ loadSpace: () => Promise.resolve(undefined) })).request(
+            `/api/spaces/${SPACE_ID}`,
+          ),
+      },
+      {
+        status: 400,
+        contentType: PROBLEM_MEDIA,
+        request: () => createSpaceHttpApp(repository()).request('/api/spaces/not-a-uuid'),
+      },
+      {
+        status: 400,
+        contentType: PROBLEM_MEDIA,
+        request: () =>
+          createSpaceHttpApp(repository()).request('/api/spaces/not-a-uuid', { method: 'POST' }),
+      },
+      {
+        status: 404,
+        contentType: PROBLEM_MEDIA,
+        request: () => createSpaceHttpApp(repository()).request('/off-contract'),
+      },
+      {
+        status: 200,
+        contentType: JSON_MEDIA,
+        request: () =>
+          createSpaceHttpApp(repository()).request(`/api/spaces/${SPACE_ID}`, put(commit)),
+      },
+      {
+        status: 400,
+        contentType: PROBLEM_MEDIA,
+        request: () =>
+          createSpaceHttpApp(repository()).request(`/api/spaces/${SPACE_ID}`, put('not json')),
+      },
+      {
+        status: 400,
+        contentType: PROBLEM_MEDIA,
+        request: () =>
+          createSpaceHttpApp(repository()).request(`/api/spaces/${SPACE_ID}`, put('{}')),
+      },
+      {
+        status: 415,
+        contentType: PROBLEM_MEDIA,
+        request: () =>
+          createSpaceHttpApp(repository()).request(
+            `/api/spaces/${SPACE_ID}`,
+            put('{}', 'text/plain; charset=utf-8'),
+          ),
+      },
+      {
+        status: 413,
+        contentType: PROBLEM_MEDIA,
+        request: () =>
+          createSpaceHttpApp(repository()).request(`/api/spaces/${SPACE_ID}`, put(oversized)),
+      },
       // The conflict branch encodes a whole loaded space rather than a message,
       // so it reaches `context.json` by a different graph than its neighbours.
-      createSpaceHttpApp(
-        repository({
-          commitSpace: () =>
-            Promise.resolve({
-              kind: 'conflict' as const,
-              current: { snapshot, revision: 1n, exportedRevision: null },
+      {
+        status: 409,
+        contentType: JSON_MEDIA,
+        request: () =>
+          createSpaceHttpApp(
+            repository({
+              commitSpace: () =>
+                Promise.resolve({
+                  kind: 'conflict' as const,
+                  current: { snapshot, revision: 1n, exportedRevision: null },
+                }),
             }),
-        }),
-      ).request(`/api/spaces/${SPACE_ID}`, put(commit)),
-      createSpaceHttpApp(
-        repository({
-          commitSpace: () =>
-            Promise.resolve({
-              kind: 'rejected' as const,
-              code: 'invalid-snapshot' as const,
-              message: 'bad',
+          ).request(`/api/spaces/${SPACE_ID}`, put(commit)),
+      },
+      {
+        status: 422,
+        contentType: PROBLEM_MEDIA,
+        request: () =>
+          createSpaceHttpApp(
+            repository({
+              commitSpace: () =>
+                Promise.resolve({
+                  kind: 'rejected' as const,
+                  code: 'invalid-snapshot' as const,
+                  message: 'bad',
+                }),
             }),
-        }),
-      ).request(`/api/spaces/${SPACE_ID}`, put(commit)),
-      createSpaceHttpApp(repository({ listSpaces: () => Promise.reject(new Error('down')) }), {
-        logError: (message) => swallowed.push(message),
-      }).request('/api/spaces'),
-    ]);
+          ).request(`/api/spaces/${SPACE_ID}`, put(commit)),
+      },
+      {
+        status: 503,
+        contentType: PROBLEM_MEDIA,
+        request: () =>
+          createSpaceHttpApp(repository({ listSpaces: () => Promise.reject(new Error('down')) }), {
+            logError: (message) => swallowed.push(message),
+          }).request('/api/spaces'),
+      },
+    ];
 
-    expect(responses.map((response) => response.status)).toEqual([
-      200, 200, 404, 400, 400, 404, 200, 400, 400, 415, 413, 409, 422, 503,
-    ]);
+    const responses = await Promise.all(cases.map((testCase) => testCase.request()));
+
     expect(swallowed).toEqual(['Failed to list spaces']);
-    for (const [index, response] of responses.entries()) {
-      expect(response.headers.get('content-type')).toBe(
-        [0, 1, 6, 11].includes(index)
-          ? 'application/json; charset=utf-8'
-          : 'application/problem+json',
-      );
-    }
+    responses.forEach((response, index) => {
+      expect(response.status).toBe(cases[index]?.status);
+      expect(response.headers.get('content-type')).toBe(cases[index]?.contentType);
+    });
   });
 
   it.each([

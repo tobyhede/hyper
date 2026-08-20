@@ -10,6 +10,7 @@ import {
   decodeSpaceSummaries,
   encodeProblemDetails,
   encodeLoadedSpace,
+  problemCatalogue,
   problemCodeForType,
 } from '../src/http-protocol';
 import type { HyperProblemCode, HyperProblemType } from '../src/http-protocol';
@@ -92,21 +93,7 @@ describe('Problem Details', () => {
   it('round trips every problem identity and an RFC 6901 whole-document pointer', () => {
     fc.assert(
       fc.property(
-        fc.constantFrom<HyperProblemCode>(
-          'invalid-request',
-          'invalid-space-id',
-          'unsupported-media-type',
-          'payload-too-large',
-          'not-found',
-          'method-not-allowed',
-          'persistence-unavailable',
-          'invalid-snapshot',
-          'unauthorized',
-          'forbidden',
-          'request-timeout',
-          'rate-limited',
-          'internal-error',
-        ),
+        fc.constantFrom<HyperProblemCode>(...(Object.keys(problemCatalogue) as HyperProblemCode[])),
         fc.string({ minLength: 1 }),
         (code, detail) => {
           const encoded = encodeProblemDetails(code, detail, [

@@ -34,19 +34,22 @@ describe('typed Hono HttpSpaceBackend failure classification', () => {
     });
   }
 
-  const retryableStatuses = [408, 429, 500, 503] as const;
+  // The HTTP status is irrelevant here: a malformed body fails at JSON parsing
+  // or Problem Details decoding, before the status is ever consulted, so one
+  // representative status covers every status this backend could see.
   const malformedBodies = ['', '<html>broken</html>', '{', JSON.stringify({ nope: true })];
 
-  for (const status of retryableStatuses) {
-    for (const body of malformedBodies) {
-      it(`rejects a malformed Problem Details body for ${status}: ${JSON.stringify(body)}`, async () => {
-        await expect(
-          backendFor(
-            new Response(body, { status, headers: { 'Content-Type': 'application/problem+json' } }),
-          ).commitSpace(snapshot, 0n),
-        ).resolves.toMatchObject({ kind: 'permanent-failure', code: 'protocol' });
-      });
-    }
+  for (const body of malformedBodies) {
+    it(`rejects a malformed Problem Details body: ${JSON.stringify(body)}`, async () => {
+      await expect(
+        backendFor(
+          new Response(body, {
+            status: 503,
+            headers: { 'Content-Type': 'application/problem+json' },
+          }),
+        ).commitSpace(snapshot, 0n),
+      ).resolves.toMatchObject({ kind: 'permanent-failure', code: 'protocol' });
+    });
   }
 
   it('rejects a well-formed Problem Details body sent with the wrong media type', async () => {
