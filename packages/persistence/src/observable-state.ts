@@ -7,9 +7,9 @@ export interface ObservableState<State> {
   readonly clearSubscribers: () => void;
 }
 
-// SAFETY: the two checks above already confirm `value` is a non-null object
-// or function; this only widens it enough to probe for an optional `then`
-// property without asserting one exists.
+// SAFETY: the checks in this predicate already confirm `value` is a
+// non-null object or function; this only widens it enough to probe for an
+// optional `then` property without asserting one exists.
 const isThenable = (value: unknown): value is PromiseLike<unknown> =>
   (typeof value === 'object' || typeof value === 'function') &&
   value !== null &&

@@ -131,7 +131,7 @@ replaced), `pnpm lint:anti-slop` clean.
 `pnpm verify` (typecheck, typecheck:packages, ui:catalog:check, lint,
 lint:anti-slop, format:check, test:coverage) run after each half and again
 after the full diff landed — green throughout: 129 test files, 1296 tests
-passed, 8 skipped, all seven enabled anti-slop rules report 0 findings
+passed, 8 skipped, all 15 enabled anti-slop rules report 0 findings
 repo-wide. This closes out every rule `spec.md` scoped except issue 08
 (a human policy decision on Oxlint's own built-in categories, not phased
 migration work).
