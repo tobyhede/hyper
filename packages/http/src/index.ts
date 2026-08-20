@@ -3,6 +3,7 @@ import {
   decodeCommitRequest,
   encodeProblemDetails,
   encodeLoadedSpace,
+  problemCatalogue,
   type HyperProblemCode,
   type ProblemError,
   type CommitRequestJson,
@@ -397,7 +398,12 @@ export const createSpaceHttpApp = (
     // Details body for the typed client to decode.
     if (error instanceof HTTPException) {
       const code = httpExceptionProblem(error.status);
-      return problem(context, code, error.message);
+      // `new HTTPException(status)` with no `options.message` carries an empty
+      // `Error#message`, and Problem Details requires a non-empty `detail` —
+      // falling through to that constructor here is what the next comment
+      // warns about, so this cannot lean on the throw being caught.
+      const detail = error.message.length > 0 ? error.message : problemCatalogue[code].title;
+      return problem(context, code, detail);
     }
     // Never rethrow: Hono does not convert that into a 500, it re-invokes this
     // handler and lets the throw escape, so `app.fetch()` hands the host a

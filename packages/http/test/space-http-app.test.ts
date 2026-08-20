@@ -782,6 +782,29 @@ describe('Space HTTP application', () => {
     },
   );
 
+  /*
+   * `new HTTPException(status)` with no `options.message` carries an empty
+   * `Error#message`, and Problem Details requires a non-empty `detail`. This
+   * must not throw out of `onError` itself — Hono has no third attempt, so
+   * that throw would otherwise escape as the exception-with-no-message case,
+   * losing the real status and code behind a generic 500.
+   */
+  it('answers an HTTPException with no message using its code title as detail', async () => {
+    const app = createSpaceHttpApp(
+      repository({ listSpaces: () => Promise.reject(new Error('database is down')) }),
+      {
+        logError: () => {
+          throw new HTTPException(404);
+        },
+      },
+    );
+
+    const response = await app.request('/api/spaces');
+
+    expect(response.headers.get('cache-control')).toBe('no-store');
+    await expectProblem(response, 'not-found', problemCatalogue['not-found'].title);
+  });
+
   // Hono's own json validator applies a stricter Content-Type regex than this
   // module's media policy, and when it disagrees it does not parse the body and
   // hands the validator `{}` — surfacing as a 400 about fields, for a body that
