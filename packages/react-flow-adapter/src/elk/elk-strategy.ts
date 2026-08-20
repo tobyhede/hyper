@@ -1,8 +1,8 @@
-import ELK, {
-  type ElkExtendedEdge,
-  type ElkNode as ElkGraphNode,
-  type ElkPort,
-  type LayoutOptions,
+import type {
+  ElkExtendedEdge,
+  ElkNode as ElkGraphNode,
+  ElkPort,
+  LayoutOptions,
 } from 'elkjs/lib/elk.bundled.js';
 import type {
   LayoutStrategyEdgeSection,
@@ -26,13 +26,24 @@ export interface ElkEngine {
   layout: (graph: ElkGraphNode) => Promise<ElkGraphNode>;
 }
 
-const defaultEngine: ElkEngine = new ELK();
+// elkjs's bundled engine is ~1.5MB and is not every Space's strategy (ADR
+// 0014/0040/0041 — no strategy is privileged), so the default engine loads on
+// first use rather than paying for it in every session's initial bundle.
+let defaultEnginePromise: Promise<ElkEngine> | undefined;
+
+function loadDefaultEngine(): Promise<ElkEngine> {
+  defaultEnginePromise ??= import('elkjs/lib/elk.bundled.js').then(
+    (module) => new module.default(),
+  );
+  return defaultEnginePromise;
+}
 
 export function elkStrategy(
   layoutOptions: LayoutOptions = DEFAULT_ELK_LAYOUT_OPTIONS,
-  engine: ElkEngine = defaultEngine,
+  engine?: ElkEngine,
 ): LayoutStrategy {
   return async (strategyGraph: LayoutStrategyGraph): Promise<LayoutStrategyGraph> => {
+    const resolvedEngine = engine ?? (await loadDefaultEngine());
     const elkGraph: ElkGraphNode = {
       id: 'root',
       layoutOptions,
@@ -55,7 +66,7 @@ export function elkStrategy(
       })),
     };
 
-    const laid = await engine.layout(elkGraph);
+    const laid = await resolvedEngine.layout(elkGraph);
     const byId = new Map((laid.children ?? []).map((child) => [child.id, child]));
 
     // ELK's routed geometry, keyed by edge id. Points are in the root graph's

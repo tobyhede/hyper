@@ -136,8 +136,9 @@ function resolveHandles(
   nodeHeight: number,
 ): CardHandle[] {
   const count = refs.length;
+  const portsById = new Map((card?.ports ?? []).map((port) => [port.id, port]));
   return refs.map((ref, index) => {
-    const port = card?.ports.find((p) => p.id === ref.id);
+    const port = portsById.get(ref.id);
     // Not every layout places ports — a grid has no opinion about them, and ELK
     // has not run yet on first paint. Fall back to an even spread.
     const offsetY = port?.y ?? ((index + 1) / (count + 1)) * nodeHeight;

@@ -507,6 +507,11 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
       () => rendererSpace.cards.filter((card) => card.kind !== 'alias'),
       [rendererSpace],
     );
+    // Scans every title in the Space, so it must not re-run on every drag
+    // frame — `projection` (and this component) re-renders on each
+    // intermediate drag position, but `sessionState.working` only changes on
+    // a completed Edit.
+    const newCardTitle = useMemo(() => nextCardTitle(sessionState.working), [sessionState.working]);
     /**
      * Authoring the Alias itself — one ordinary Card Edit, on whichever of its
      * two fields the author touched, and the operation package 3 already built
@@ -668,7 +673,7 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
                 onSelectCard={selectCard}
                 onSelectEdge={selectEdge}
                 subjectCards={renderer.subject.cards}
-                newCardTitle={nextCardTitle(sessionState.working)}
+                newCardTitle={newCardTitle}
                 onAddCard={addCard}
                 nameOnCreation={createdCardId}
                 onOpenCard={openCardForEditing}
