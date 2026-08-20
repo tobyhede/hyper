@@ -1,11 +1,10 @@
 import type { FullConfig, FullResult, Reporter, Suite, TestCase } from '@playwright/test/reporter';
 import { parityClaims } from '../packages/app/stories/parity-manifest';
+import { PARITY_TAG_PREFIX } from './parity-tag';
 
 interface ParityReporterOptions {
   readonly suite: string;
 }
-
-const PREFIX = '@parity:';
 
 export default class ParityReporter implements Reporter {
   readonly #suiteName: string;
@@ -22,8 +21,8 @@ export default class ParityReporter implements Reporter {
 
     for (const test of suite.allTests()) {
       for (const tag of test.tags) {
-        if (!tag.startsWith(PREFIX)) continue;
-        const id = tag.slice(PREFIX.length);
+        if (!tag.startsWith(PARITY_TAG_PREFIX)) continue;
+        const id = tag.slice(PARITY_TAG_PREFIX.length);
         const matches = this.#tagged.get(id);
         if (matches === undefined) this.#problems.push(`unknown parity tag ${tag}`);
         else matches.push(test);
