@@ -35,12 +35,15 @@ function loadDefaultEngine(): Promise<ElkEngine> {
   // A failed dynamic import (chunk-load blip, offline) must not poison the
   // cache: caching the rejection would strand every later layout on the same
   // dead promise for the rest of the session.
-  defaultEnginePromise ??= import('elkjs/lib/elk.bundled.js')
-    .then((module) => new module.default())
-    .catch((error: unknown) => {
-      defaultEnginePromise = undefined;
-      throw error;
+  if (!defaultEnginePromise) {
+    const loadingEngine: Promise<ElkEngine> = import('elkjs/lib/elk.bundled.js').then(
+      (module) => new module.default(),
+    );
+    defaultEnginePromise = loadingEngine;
+    void loadingEngine.catch(() => {
+      if (defaultEnginePromise === loadingEngine) defaultEnginePromise = undefined;
     });
+  }
   return defaultEnginePromise;
 }
 
