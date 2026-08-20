@@ -110,4 +110,34 @@ describe('UI catalogue', () => {
       );
     },
   );
+
+  it('recognizes test.only as valid parity evidence', () => {
+    const root = fixture();
+    write(
+      root,
+      'packages/app/e2e/button.spec.ts',
+      `test.only('application button', { tag: '@parity:button-is-operable' }, async () => undefined);`,
+    );
+
+    const catalog = buildUiCatalog(root);
+    expect(catalog.claims[0]?.application).toEqual({
+      file: 'packages/app/e2e/button.spec.ts',
+      test: 'application button',
+    });
+  });
+
+  it('recognizes parity evidence nested inside a plain describe block', () => {
+    const root = fixture();
+    write(
+      root,
+      'packages/app/e2e/button.spec.ts',
+      `test.describe('group', () => { test('application button', { tag: '@parity:button-is-operable' }, async () => undefined); });`,
+    );
+
+    const catalog = buildUiCatalog(root);
+    expect(catalog.claims[0]?.application).toEqual({
+      file: 'packages/app/e2e/button.spec.ts',
+      test: 'application button',
+    });
+  });
 });

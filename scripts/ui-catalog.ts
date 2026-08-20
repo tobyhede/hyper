@@ -2,6 +2,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { join, relative, resolve, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import ts from 'typescript';
+import { PARITY_TAG_PREFIX } from './parity-tag';
 
 export interface UiCatalog {
   readonly exports: readonly string[];
@@ -46,13 +47,7 @@ const filesBelow = (directory: string, suffix: string): readonly string[] => {
   return files.sort();
 };
 
-const literalStoryTitle = (path: string): string | null => {
-  const source = ts.createSourceFile(
-    path,
-    readFileSync(path, 'utf8'),
-    ts.ScriptTarget.Latest,
-    true,
-  );
+const literalStoryTitle = (source: ts.SourceFile): string | null => {
   const exported = source.statements.find(
     (statement): statement is ts.ExportAssignment =>
       ts.isExportAssignment(statement) && !statement.isExportEquals,
@@ -136,9 +131,9 @@ const declaredParityClaims = (path: string, problems: string[]): readonly Declar
   return claims;
 };
 
-const namedStoryExports = (path: string): readonly string[] => {
+const namedStoryExports = (source: ts.SourceFile): readonly string[] => {
   const names: string[] = [];
-  for (const statement of sourceFile(path).statements) {
+  for (const statement of source.statements) {
     const exported = (
       ts.canHaveModifiers(statement) ? ts.getModifiers(statement) : undefined
     )?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword);
@@ -164,10 +159,11 @@ const directTestKind = (call: ts.CallExpression): 'included' | 'excluded' | null
   if (
     ts.isPropertyAccessExpression(call.expression) &&
     ts.isIdentifier(call.expression.expression) &&
-    call.expression.expression.text === 'test' &&
-    (call.expression.name.text === 'skip' || call.expression.name.text === 'fixme')
+    call.expression.expression.text === 'test'
   ) {
-    return 'excluded';
+    if (call.expression.name.text === 'only') return 'included';
+    if (call.expression.name.text === 'skip' || call.expression.name.text === 'fixme')
+      return 'excluded';
   }
   return null;
 };
@@ -206,9 +202,9 @@ const parityTagsIn = (root: string, repositoryRoot: string): readonly TaggedTest
                 ? tag.initializer.elements.filter(ts.isStringLiteralLike).map((item) => item.text)
                 : [];
         for (const value of tags) {
-          if (!value.startsWith('@parity:')) continue;
+          if (!value.startsWith(PARITY_TAG_PREFIX)) continue;
           evidence.push({
-            claimId: value.slice('@parity:'.length),
+            claimId: value.slice(PARITY_TAG_PREFIX.length),
             file: relative(repositoryRoot, path).split(sep).join('/'),
             test: title.text,
             excluded: excludedByParent || kind === 'excluded',
@@ -252,7 +248,8 @@ export const buildUiCatalog = (repositoryRoot = process.cwd()): UiCatalog => {
     const storyPath = relative(storiesRoot, path).split(sep).join('/');
     const category = storyPath.split('/')[0] ?? '';
     const prefix = prefixes.get(category);
-    const title = literalStoryTitle(path);
+    const storySource = sourceFile(path);
+    const title = literalStoryTitle(storySource);
     if (prefix === undefined) problems.push(`${storyPath} is outside the catalogue taxonomy`);
     else if (title === null) problems.push(`${storyPath} must declare a literal default title`);
     else if (!title.startsWith(prefix))
@@ -260,7 +257,8 @@ export const buildUiCatalog = (repositoryRoot = process.cwd()): UiCatalog => {
     else {
       stories.push(title);
       if (category === 'components' || category === 'surfaces') {
-        for (const name of namedStoryExports(path)) stableExports.add(`${storyPath}#${name}`);
+        for (const name of namedStoryExports(storySource))
+          stableExports.add(`${storyPath}#${name}`);
       }
     }
   }
@@ -303,9 +301,9 @@ export const buildUiCatalog = (repositoryRoot = process.cwd()): UiCatalog => {
   };
   for (const item of [...ladleEvidence, ...applicationEvidence]) {
     if (!ids.has(item.claimId))
-      problems.push(`unknown parity tag @parity:${item.claimId} in ${item.file}`);
+      problems.push(`unknown parity tag ${PARITY_TAG_PREFIX}${item.claimId} in ${item.file}`);
     if (item.excluded)
-      problems.push(`parity tag @parity:${item.claimId} is excluded in ${item.file}`);
+      problems.push(`parity tag ${PARITY_TAG_PREFIX}${item.claimId} is excluded in ${item.file}`);
   }
   const claims = declared.map((item) => ({
     ...item,
