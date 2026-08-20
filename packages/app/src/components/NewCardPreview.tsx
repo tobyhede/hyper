@@ -1,4 +1,5 @@
 import { ViewportPortal, useConnection } from '@xyflow/react';
+import { CanvasCard } from '@project/ui';
 import { CARD_SIZE } from '../card';
 import { newCardDrop, type DropTarget } from '../edge-authoring';
 
@@ -58,9 +59,7 @@ export function NewCardPreview({ title, modifierHeld, pointerOver, accepts }: Ne
           width: CARD_SIZE.width,
         }}
       >
-        <article className="card card--node">
-          <h2 className="card__title">{title}</h2>
-        </article>
+        <CanvasCard kind="markdown" state="rest" title={title} graphColor="var(--accent)" />
       </div>
     </ViewportPortal>
   );

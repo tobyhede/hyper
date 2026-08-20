@@ -1,6 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { Handle, Position, useConnection, type NodeProps } from '@xyflow/react';
-import { CardContent, CardKindIcon, ConnectIcon, EditIcon } from '@project/ui';
+import {
+  Button,
+  CanvasCard,
+  CardContent,
+  ConnectIcon,
+  EditIcon,
+  type CanvasCardState,
+} from '@project/ui';
 import type { CardFlowNode, CardHandle } from './projection';
 import { AUTHORING_HANDLE_DIAMETER, GRAPH_PORT_DIAMETER } from './authoring-handle';
 
@@ -143,7 +150,7 @@ function CardTitleEditor({ cardId, title, onComplete, onCancel }: CardTitleEdito
  * lets an Edge completed onto this Card resolve in the render that first makes
  * it incident, before the projection catches up.
  */
-export function CardNode({ data, selected, isConnectable }: NodeProps<CardFlowNode>) {
+export function CardNode({ data, selected, dragging, isConnectable }: NodeProps<CardFlowNode>) {
   /**
    * Which handle role the live drag is looking for, or `null` when none is.
    *
@@ -159,6 +166,19 @@ export function CardNode({ data, selected, isConnectable }: NodeProps<CardFlowNo
     connection.inProgress ? (connection.fromHandle.type === 'target' ? 'source' : 'target') : null,
   );
   const connectionInProgress = seeking !== null;
+  const [hovered, setHovered] = useState(false);
+  const visuallySelected = selected || data.selectedForAuthoring;
+  const visualState: CanvasCardState = data.editingTitle
+    ? 'editing'
+    : dragging
+      ? 'dragging'
+      : visuallySelected && hovered
+        ? 'selected-hover'
+        : visuallySelected
+          ? 'selected'
+          : hovered
+            ? 'hover'
+            : 'rest';
 
   const renderHandle = (handle: CardHandle, type: 'source' | 'target') => (
     <Handle
@@ -220,9 +240,11 @@ export function CardNode({ data, selected, isConnectable }: NodeProps<CardFlowNo
     <div
       className="rf-card-node__inner"
       data-active={data.active}
-      data-selected={selected || data.selectedForAuthoring}
+      data-selected={visuallySelected}
       data-connection-in-progress={connectionInProgress}
       data-connection-seeking={seeking ?? 'none'}
+      onPointerEnter={() => setHovered(true)}
+      onPointerLeave={() => setHovered(false)}
     >
       {data.targetHandles.map((handle) => renderHandle(handle, 'target'))}
       {AUTHORING_SIDES.map((side) => renderAuthoringHandle(side, 'target'))}
@@ -231,96 +253,81 @@ export function CardNode({ data, selected, isConnectable }: NodeProps<CardFlowNo
           <CardContent title={data.title} markdown={data.body ?? ''} />
         </div>
       ) : (
-        <article className="card card--node" data-testid="card">
-          {data.editingTitle ? (
-            <CardTitleEditor
-              cardId={data.cardId}
-              title={data.title}
-              {...(data.onCompleteTitleEditing !== undefined
-                ? { onComplete: data.onCompleteTitleEditing }
-                : {})}
-              {...(data.onCancelTitleEditing !== undefined
-                ? { onCancel: data.onCancelTitleEditing }
-                : {})}
-            />
-          ) : (
-            // The kind is drawn beside the title and never instead of it: an
-            // Alias is a Card with a name of its own, and Markdown is the
-            // visual default with no glyph at all. Persistent rather than
-            // revealed on hover, because what kind a Card is does not depend on
-            // where the pointer happens to be.
-            <div className="card__heading">
-              {data.kind !== 'markdown' && <CardKindIcon kind={data.kind} size={12} />}
-              {/* Renaming is the title's own gesture (ADR 0036). A double click
-                  here must not also reach the Card, which would open it and
-                  bury the field the author is about to type into. */}
-              <h2
-                className={
-                  data.titleEditingEnabled ? 'card__title card__title--editable' : 'card__title'
-                }
-                onDoubleClick={
-                  data.titleEditingEnabled
-                    ? (event) => {
-                        event.stopPropagation();
-                        data.onBeginTitleEditing?.();
-                      }
-                    : undefined
-                }
-              >
-                {data.title}
-              </h2>
-            </div>
-          )}
-          {/* The Target's title, read-only, under the Alias's own — so a
-              redraw reads as a deliberate return rather than repetition, and
-              stays legible when the two titles match. The glyph that used to
-              sit here now names the kind beside the title, where it says the
-              same thing about the Card rather than about this one line. */}
-          {data.aliasOf && (
-            <p className="card__alias-of" data-testid="alias-marker">
-              {data.aliasOf}
-            </p>
-          )}
-          {/* The keyboard's way into an Edge. The four spatial handles (ADR
+        <CanvasCard
+          kind={data.kind}
+          state={visualState}
+          title={data.title}
+          graphColor={data.activeGraphColor}
+          {...(data.aliasOf === undefined ? {} : { aliasOf: data.aliasOf })}
+          titleEditable={data.titleEditingEnabled === true}
+          {...(data.titleEditingEnabled
+            ? {
+                onDoubleClickTitle: (event) => {
+                  event.stopPropagation();
+                  data.onBeginTitleEditing?.();
+                },
+              }
+            : {})}
+          {...(data.editingTitle
+            ? {
+                titleEditor: (
+                  <CardTitleEditor
+                    cardId={data.cardId}
+                    title={data.title}
+                    {...(data.onCompleteTitleEditing !== undefined
+                      ? { onComplete: data.onCompleteTitleEditing }
+                      : {})}
+                    {...(data.onCancelTitleEditing !== undefined
+                      ? { onCancel: data.onCancelTitleEditing }
+                      : {})}
+                  />
+                ),
+              }
+            : {})}
+          actions={
+            <>
+              {/* The keyboard's way into an Edge. The four spatial handles (ADR
               0033) are drag affordances and reach no keyboard author, so this
               is the one tab stop that begins a connection — it opens a target
               picker rather than starting a drag. Same event discipline as the
               Edit control beside it. */}
-          {data.connectingEnabled && !data.editingTitle && (
-            <button
-              type="button"
-              className="card__connect nodrag nopan"
-              data-testid="connect-from-card"
-              aria-label={`Connect from ${data.title}`}
-              onClick={(event) => {
-                event.stopPropagation();
-                data.onBeginConnect?.();
-              }}
-              onPointerDown={(event) => event.stopPropagation()}
-              onKeyDown={(event) => event.stopPropagation()}
-            >
-              <ConnectIcon />
-            </button>
-          )}
-          {data.cardEditingEnabled && !data.editingTitle && (
-            <button
-              type="button"
-              className="card__edit nodrag nopan"
-              aria-label={`Edit Card ${data.title}`}
-              onClick={(event) => {
-                event.stopPropagation();
-                data.onEditCard?.();
-              }}
-              onPointerDown={(event) => event.stopPropagation()}
-              // A real button in the tab order, and its activation keys are the
-              // same two the graph reads as "open this Card". The graph's
-              // handler sits on an ancestor and sees them first, so Enter and
-              // Space opened the Card and called `preventDefault`, cancelling
-              // the activation this button never got — unusable by the very
-              // input it is here for.
-              onKeyDown={(event) => event.stopPropagation()}
-            >
-              {/* The glyph is `aria-hidden`, so the `aria-label` above is the
+              {data.connectingEnabled && !data.editingTitle && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="nodrag nopan"
+                  data-testid="connect-from-card"
+                  aria-label={`Connect from ${data.title}`}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    data.onBeginConnect?.();
+                  }}
+                  onPointerDown={(event) => event.stopPropagation()}
+                  onKeyDown={(event) => event.stopPropagation()}
+                >
+                  <ConnectIcon />
+                </Button>
+              )}
+              {data.cardEditingEnabled && !data.editingTitle && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="nodrag nopan"
+                  aria-label={`Edit Card ${data.title}`}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    data.onEditCard?.();
+                  }}
+                  onPointerDown={(event) => event.stopPropagation()}
+                  // A real button in the tab order, and its activation keys are the
+                  // same two the graph reads as "open this Card". The graph's
+                  // handler sits on an ancestor and sees them first, so Enter and
+                  // Space opened the Card and called `preventDefault`, cancelling
+                  // the activation this button never got — unusable by the very
+                  // input it is here for.
+                  onKeyDown={(event) => event.stopPropagation()}
+                >
+                  {/* The glyph is `aria-hidden`, so the `aria-label` above is the
                   button's *only* accessible name — not a refinement of visible
                   text the way it was when this read "Edit title". Removing it
                   leaves the control unnamed rather than coarsely named.
@@ -328,10 +335,12 @@ export function CardNode({ data, selected, isConnectable }: NodeProps<CardFlowNo
                   It opens the Card's *content* editor, which is why it is absent
                   on an Alias: an Alias owns a title and a pointer, and its title
                   is renamed on the graph. */}
-              <EditIcon />
-            </button>
-          )}
-        </article>
+                  <EditIcon />
+                </Button>
+              )}
+            </>
+          }
+        />
       )}
       {AUTHORING_SIDES.map((side) => renderAuthoringHandle(side, 'source'))}
       {data.sourceHandles.map((handle) => renderHandle(handle, 'source'))}

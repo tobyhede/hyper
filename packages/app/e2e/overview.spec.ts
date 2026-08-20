@@ -67,6 +67,26 @@ test('draws every graph at once, each in its own color', async ({ page }) => {
   expect(new Set(strokes).size).toBe(4);
 });
 
+test(
+  'production Canvas Cards expose Alias identity and keyboard authoring actions',
+  { tag: '@parity:canvas-card-exposes-kind-and-keyboard-actions' },
+  async ({ page }) => {
+    await page.goto('/');
+
+    const alias = nodeByTitle(page, 'A′').first();
+    await expect(alias.getByRole('img', { name: 'Alias' })).toBeVisible();
+    await expect(alias.getByTestId('alias-marker')).toHaveText('A');
+
+    const markdown = nodeByTitle(page, 'A').first();
+    await markdown.click();
+    const connect = markdown.getByRole('button', { name: 'Connect from A' });
+    await connect.focus();
+    await expect(connect).toBeFocused();
+    await connect.press('Enter');
+    await expect(page.getByRole('combobox', { name: 'Connect to' })).toBeVisible();
+  },
+);
+
 /**
  * A Layout draws the Graphs it owns, and the flatten is what crosses them.
  *
@@ -306,7 +326,7 @@ test('cards are drawn at exactly the size the layout placed them at', async ({ p
 
   const drawn = await inner.evaluate((el) => {
     const s = getComputedStyle(el);
-    const card = el.querySelector('.card--node')!;
+    const card = el.querySelector('.canvas-card')!;
     return { w: s.width, h: getComputedStyle(card).height };
   });
   expect(drawn.w).toBe(declared.w);

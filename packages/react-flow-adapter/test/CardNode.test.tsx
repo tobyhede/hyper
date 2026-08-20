@@ -89,6 +89,7 @@ const outHandle = (graph: typeof graphId, offsetY: number): CardHandle => ({
 
 interface Overrides {
   selected?: boolean;
+  dragging?: boolean;
   /** What React Flow answers for this node from `nodesConnectable`/`node.connectable`. */
   isConnectable?: boolean;
   title?: string;
@@ -106,6 +107,7 @@ interface Overrides {
 
 function props({
   selected = false,
+  dragging = false,
   isConnectable = true,
   title = 'A',
   kind = 'markdown',
@@ -146,7 +148,7 @@ function props({
     draggable: true,
     selectable: true,
     deletable: true,
-    dragging: false,
+    dragging,
     zIndex: 0,
     isConnectable,
     positionAbsoluteX: 0,
@@ -155,6 +157,35 @@ function props({
     data,
   };
 }
+
+describe('CardNode canvas Card state adapter', () => {
+  it('translates React Flow selection and dragging into shared visual states', () => {
+    const { rerender } = render(<CardNode {...props({ selected: true })} />);
+
+    expect(screen.getByRole('article', { name: 'A' })).toHaveAttribute('data-state', 'selected');
+
+    rerender(<CardNode {...props({ dragging: true })} />);
+    expect(screen.getByRole('article', { name: 'A' })).toHaveAttribute('data-state', 'dragging');
+  });
+
+  it('preserves hover alone and together with selection', () => {
+    const { rerender } = render(<CardNode {...props()} />);
+    const card = screen.getByRole('article', { name: 'A' });
+
+    fireEvent.pointerEnter(card.parentElement!);
+    expect(card).toHaveAttribute('data-state', 'hover');
+
+    rerender(<CardNode {...props({ selected: true })} />);
+    expect(card).toHaveAttribute('data-state', 'selected-hover');
+  });
+
+  it('renders an Alias through the shared kind treatment', () => {
+    render(<CardNode {...props({ kind: 'alias', title: 'A, again' })} />);
+
+    expect(screen.getByRole('article', { name: 'A, again' })).toHaveAttribute('data-kind', 'alias');
+    expect(screen.getByRole('img', { name: 'Alias' })).toBeVisible();
+  });
+});
 
 describe('CardNode title authoring', () => {
   it('draws no shared Description slot on the Card front', () => {

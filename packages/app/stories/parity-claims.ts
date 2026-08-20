@@ -16,6 +16,12 @@ export interface ParityClaim {
 
 export const parityClaims: readonly ParityClaim[] = [
   {
+    id: 'canvas-card-exposes-kind-and-keyboard-actions',
+    storyFile: 'components/canvas-card.stories.tsx',
+    storyExport: 'States',
+    claim: 'The production canvas Card exposes Alias identity and keyboard-focusable actions.',
+  },
+  {
     id: 'markdown-pane-refusal-is-field-local',
     storyFile: 'components/card-and-alias-panes.stories.tsx',
     storyExport: 'Markdown',
