@@ -78,8 +78,16 @@ export const sameEdgeSubject = (left: EdgeSubject, right: EdgeSubject): boolean 
 /** Whether two selections name the same subject. */
 export function sameSelection(left: CanvasSelection, right: CanvasSelection): boolean {
   if (left.kind !== right.kind) return false;
-  if (left.kind === 'card') return left.cardId === (right as { cardId: CardId }).cardId;
-  if (left.kind === 'edge') return sameEdgeSubject(left, right as EdgeSelection);
+  if (left.kind === 'card') {
+    // SAFETY: the `left.kind !== right.kind` guard above already confirmed
+    // the two share a discriminant, so `right` is the card variant too even
+    // though narrowing `left` here doesn't propagate to `right`.
+    return left.cardId === (right as { cardId: CardId }).cardId;
+  }
+  if (left.kind === 'edge') {
+    // SAFETY: same discriminant-equality guard as above, for the edge variant.
+    return sameEdgeSubject(left, right as EdgeSelection);
+  }
   return true;
 }
 
@@ -103,8 +111,13 @@ export type EdgeSelection = Extract<CanvasSelection, { kind: 'edge' }>;
  * erasure `placementFromNodes` repairs for a node id below.
  */
 export function edgeSelectionOf(edge: Edge): EdgeSelection | null {
+  // SAFETY: `edge.data` is React Flow's generic bag, but every Edge this
+  // adapter projects has its `data` written by this same module's own
+  // edge-projection as `RoutedEdgeData` — there is no other producer.
   const graphId = (edge.data as RoutedEdgeData | undefined)?.graphId;
   if (graphId === undefined) return null;
+  // SAFETY: `source`/`target` are `CardId`s widened to `string` by React
+  // Flow's `Edge` type — the same erasure `placementFromNodes` repairs below.
   return {
     kind: 'edge',
     graphId,
@@ -206,8 +219,9 @@ export type RenderAdapter = UseBoundStore<StoreApi<RenderAdapterState>>;
  * authoring fact is decided at each call site below.
  */
 function placementFromNodes(nodes: readonly CardFlowNode[]): Placement {
-  // A node id is the Card id it was projected from, widened to `string` by React
-  // Flow's `Node` type — the same erasure `consumeSettledMovedIds` repairs below.
+  // SAFETY: a node id is the Card id it was projected from, widened to
+  // `string` by React Flow's `Node` type — the same erasure
+  // `consumeSettledMovedIds` repairs below.
   return Placement.fromEntries(nodes.map((node) => [node.id as CardId, node.position]));
 }
 
@@ -240,6 +254,7 @@ function consumeSettledMovedIds(
       after !== undefined &&
       (origin.x !== after.x || origin.y !== after.y)
     ) {
+      // SAFETY: same `Node.id` erasure as `placementFromNodes` above.
       movedIds.push(change.id as CardId);
     }
   }
@@ -426,13 +441,15 @@ export function createRenderAdapter(authoring: SpaceAuthoring): RenderAdapter {
       // subject. See `changeEdges` for the other half of the same rule.
       const selection = additiveSelection(
         state.selection,
-        selectChanges(relevant).map((change) => ({
-          // The same erasure again, read the same way. Parsing here instead
-          // would put a throw on the per-pointer-frame path for a failure the
-          // other readings agree cannot happen.
-          subject: { kind: 'card', cardId: change.id as CardId } as const,
-          selected: change.selected,
-        })),
+        selectChanges(relevant).map((change) => {
+          // SAFETY: the same `Node.id` erasure as `placementFromNodes` above.
+          // Parsing here instead would put a throw on the per-pointer-frame
+          // path for a failure the other readings agree cannot happen.
+          return {
+            subject: { kind: 'card', cardId: change.id as CardId } as const,
+            selected: change.selected,
+          };
+        }),
       );
       const nodes = withSelection(applied, selection);
       const afterById = new Map(nodes.map((node) => [node.id, node.position]));

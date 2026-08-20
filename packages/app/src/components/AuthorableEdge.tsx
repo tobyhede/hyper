@@ -144,6 +144,10 @@ function EdgeEndpointFields({
         testId="edge-from"
         choices={from}
         value={edge.from}
+        // SAFETY: `CardCombobox` is `ui`'s generic primitive and reports the
+        // picked choice's `id` as plain `string`, but `from`'s choices are
+        // `endpointChoices`'s own `{ id: card.id, ... }` list — every id it can
+        // report back here is a real `CardId`.
         onValueChange={(cardId) => commands.reconnect('from', cardId as CardId)}
       />
       <CardSearchCombobox
@@ -151,6 +155,9 @@ function EdgeEndpointFields({
         testId="edge-to"
         choices={to}
         value={edge.to}
+        // SAFETY: same as `from` above — `to`'s choices are `endpointChoices`'s
+        // own `CardId`-derived ids widened to `string` by `CardCombobox`'s
+        // generic contract.
         onValueChange={(cardId) => commands.reconnect('to', cardId as CardId)}
       />
       {commands.refusal !== null && (

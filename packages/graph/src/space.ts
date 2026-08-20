@@ -98,6 +98,10 @@ export type SpaceError =
  */
 function unsupportedDocumentVersion(document: unknown): UnsupportedVersionError | null {
   if (typeof document !== 'object' || document === null) return null;
+  // SAFETY: the guard above narrows `document` to a non-null object, and every
+  // object may or may not carry a `version` key — reading it through this
+  // optional-property shape stays `unknown` either way, so nothing is assumed
+  // about what `version` actually is; the `typeof` check right below narrows it.
   const declared: unknown = (document as { version?: unknown }).version;
   if (typeof declared !== 'number' || declared === SPACE_FILE_VERSION) return null;
   return {
@@ -237,6 +241,11 @@ export function loadSpace(input: unknown, cardFiles: readonly CardFile[]): LoadS
 
 /** Validate and index a fully identified persistence aggregate. */
 export function loadSpaceSnapshot(input: unknown): LoadSpaceSnapshotResult {
+  // SAFETY: the `typeof`/`null` check just narrowed `input` to a non-null
+  // object, and every object may or may not carry a `document` key — reading
+  // it through this optional-property shape stays `unknown` either way, ahead
+  // of `documentRefusal`'s own checks and the real `spaceSnapshotSchema` parse
+  // below.
   const storedDocument =
     typeof input === 'object' && input !== null ? (input as { document?: unknown }).document : null;
   const refusal = documentRefusal(storedDocument);
@@ -254,6 +263,11 @@ export function loadSpaceSnapshot(input: unknown): LoadSpaceSnapshotResult {
   }
 
   const { id, document, cards: storedCards } = parsed.data;
+  // SAFETY: `cardDocument` is `cardDocumentSchema`'s output, which is exactly
+  // `cardSchema.omit({ id: true })` per card kind — re-adding the `id` this
+  // schema stores alongside it reconstructs precisely a `Card`. TypeScript
+  // can't confirm that itself: spreading a discriminated union plus one field
+  // doesn't re-infer back to the original union.
   const cards = storedCards.map(({ id: cardId, document: cardDocument }) => ({
     id: cardId,
     ...cardDocument,
@@ -321,10 +335,10 @@ function buildSpace(input: {
 /**
  * The one place a Space is minted, and the whole of what the brand costs.
  *
- * It sits here rather than at each loader because `buildSpace` is the function
- * that has just run the reference check the brand asserts. The argument is the
- * Space without it, so the cast can add nothing else: every field is still
- * checked against the declared shape, and the only thing being asserted is that
- * this value came through intake.
+ * SAFETY: it sits here rather than at each loader because `buildSpace` is the
+ * function that has just run the reference check the brand asserts. The
+ * argument is the Space without it, so the cast can add nothing else: every
+ * field is still checked against the declared shape, and the only thing being
+ * asserted is that this value came through intake.
  */
 const intake = (space: Omit<Space, typeof SPACE_INTAKE>): Space => space as Space;

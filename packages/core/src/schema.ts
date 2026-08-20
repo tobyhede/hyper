@@ -215,6 +215,8 @@ export const BUILT_IN_VIEW_IDS = ['flow', 'grid'] as const;
 export type BuiltInViewId = (typeof BUILT_IN_VIEW_IDS)[number];
 
 export function isBuiltInViewId(id: string): id is BuiltInViewId {
+  // SAFETY: widened only so `.includes` accepts an arbitrary `string`; the
+  // values actually held are still exactly `BUILT_IN_VIEW_IDS`'s two literals.
   return (BUILT_IN_VIEW_IDS as readonly string[]).includes(id);
 }
 

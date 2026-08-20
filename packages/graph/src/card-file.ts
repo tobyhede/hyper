@@ -126,6 +126,11 @@ function decodeCardFile<T extends Frontmatter>(
 
   const candidate =
     parsed.data.kind === 'markdown' ? { ...parsed.data, body: split.body } : parsed.data;
+  // SAFETY: the ternary above already adds `body` exactly when `kind` is
+  // `'markdown'` and leaves the value alone otherwise — precisely what
+  // `DecodedCandidate<T>` demands. TypeScript cannot verify this itself
+  // because a conditional type keyed on a generic `T` isn't narrowed by a
+  // runtime check on a *value* of that generic type, only on a concrete union.
   return { ok: true, candidate: candidate as DecodedCandidate<T> };
 }
 

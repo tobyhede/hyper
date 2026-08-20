@@ -44,10 +44,15 @@ const asRuntime = (loaded: unknown, modulePath: string): SpaceHttpRuntime => {
   if (
     typeof loaded !== 'object' ||
     loaded === null ||
+    // SAFETY: this probe is the shape check itself — a non-function `createApp`
+    // (including a missing one) fails it and throws below before the widened
+    // return can be reached.
     typeof (loaded as SpaceHttpRuntime).createApp !== 'function'
   ) {
     throw new Error(`${modulePath} does not export a createApp function`);
   }
+  // SAFETY: the guard above confirmed `loaded` is a non-null object whose
+  // `createApp` is a function — the two members `SpaceHttpRuntime` declares.
   return loaded as SpaceHttpRuntime;
 };
 

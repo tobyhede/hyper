@@ -132,6 +132,9 @@ function SidebarProvider({
     <SidebarContext.Provider value={contextValue}>
       <div
         data-slot="sidebar-wrapper"
+        // SAFETY: React's `CSSProperties` has no index signature for custom
+        // properties, so a style object naming `--sidebar-width` needs this
+        // cast; the DOM applies unknown-named CSS custom properties as-is.
         style={
           {
             '--sidebar-width': SIDEBAR_WIDTH,
@@ -195,6 +198,8 @@ function Sidebar({
           data-slot="sidebar"
           data-mobile="true"
           className={cn('w-(--sidebar-width) bg-sidebar p-0 text-sidebar-foreground', className)}
+          // SAFETY: same custom-property cast as the wrapper's `style` above —
+          // `--sidebar-width` has no place in `CSSProperties`'s declared shape.
           style={
             {
               '--sidebar-width': SIDEBAR_WIDTH_MOBILE,
@@ -609,6 +614,8 @@ function SidebarMenuSkeleton({
       <Skeleton
         className="h-4 max-w-(--skeleton-width) flex-1"
         data-sidebar="menu-skeleton-text"
+        // SAFETY: same custom-property cast as the two `style` casts above —
+        // `--skeleton-width` has no place in `CSSProperties`'s declared shape.
         style={
           {
             '--skeleton-width': width,
