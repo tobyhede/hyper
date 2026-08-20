@@ -31,5 +31,41 @@
     "anti-slop/no-reflect-get": "error",
     "anti-slop/no-unknown-type-aliases": "error",
     "anti-slop/no-widen-then-assert": "error"
-  }
+  },
+  // Scoped exceptions from .scratch/anti-slop/issues/02-migrate-boundary-decoders.md.
+  // Both files inert here until the rule they name is enabled repo-wide by a
+  // later migration phase — see .scratch/anti-slop/spec.md.
+  "overrides": [
+    {
+      // The Postgres repository's own boundary code: classifying caught driver
+      // errors (`error: unknown` is the caught-exception case, structurally the
+      // same as the rule's own exempted `cause` parameter) and coercing
+      // `number | string | bigint` wire/DB revisions, where `typeof` discriminates
+      // an already-closed union rather than narrowing untyped external input.
+      "files": ["src/persistence/postgres-space-repository.ts"],
+      "rules": {
+        "anti-slop/no-unknown-parameters": "off",
+        "anti-slop/no-runtime-typeof": "off",
+        // toDatabaseRevision's `value as unknown as number`: bigint and number
+        // have no direct assertion path, and a real `Number(value)` call could
+        // lose precision above Number.MAX_SAFE_INTEGER — see the SAFETY comment
+        // on that function for the full rationale.
+        "anti-slop/no-chained-type-assertions": "off"
+      }
+    },
+    {
+      // The HTTP wire-protocol codec: every decode*/exactRecord function here
+      // IS the I/O boundary parser the rule asks callers to run before calling
+      // in — their `value: unknown` parameters and typeof/dictionary checks are
+      // the boundary itself, not a missing one. exactRecord's generic
+      // `Record<string, unknown>` is a runtime key-set check parameterized by a
+      // caller-supplied key list, so it cannot be narrowed to a named shape.
+      "files": ["packages/persistence/src/http-protocol.ts"],
+      "rules": {
+        "anti-slop/no-unknown-parameters": "off",
+        "anti-slop/no-runtime-typeof": "off",
+        "anti-slop/no-unsafe-dictionary-type": "off"
+      }
+    }
+  ]
 }
