@@ -1,14 +1,14 @@
-# 04 — Bring workspace selection and operational feedback into the system
+# 04 — Bring Space startup and operational feedback into the system
 
-**What to build:** Present choosing a Space and receiving operational feedback through shared design-system surfaces, including empty, busy, failure and persistence-refusal states.
+**What to build:** Present operational feedback through shared design-system surfaces, including busy, failure and persistence-refusal states.
 
 **Blocked by:** 01 — Establish the shadcn design-system baseline.
 
 **Status:** ready-for-agent
 
-- [ ] A Space choice is a clear reusable item/card treatment, including a usable loading state and an intentional empty state.
-- [ ] Startup, workspace and placement failures use a common accessible alert treatment without losing their diagnostic detail.
-- [ ] Ladle renders the actual chooser and feedback states rather than representative markup.
+- [ ] ~~A Space choice is a clear reusable item/card treatment, including a usable loading state and an intentional empty state.~~ Superseded — see 2026-08-20 comment.
+- [ ] Startup and placement failures use a common accessible alert treatment without losing their diagnostic detail.
+- [ ] Ladle renders the actual feedback states rather than representative markup.
 
 ## Audit note
 
@@ -18,6 +18,21 @@ the busy state has no visible progress. Treat that story as evidence of the
 work still required, not acceptance of the surface.
 
 ## Comments
+
+### 2026-08-20 — the Space chooser is retired, not designed
+
+ADR 0058 (`.scratch/space-cards/issues/02-grill-space-card-model.md`) deletes
+`WorkspaceSelection` outright: a Space is now reached by opening the Space
+Card that owns it, the same as any other nested content, and the root Space
+ADR 0018 already bootstraps always exists — there is no more 0-or-N-Spaces
+moment at startup to choose between. The struck criterion above has no
+component left to design. The item/card visual treatment it named already has
+a home in `.scratch/space-cards/issues/01-render-a-space-card-as-a-sub-flow.md`
+(rendering a Space Card as a Card, not a chooser row). This ticket's remaining
+scope — busy/failure/persistence-refusal feedback for loading the one root
+Space — is unaffected. Renamed off "workspace selection" per the same
+decision's retirement of "workspace" as a word (see `CONTEXT.md`'s Space
+entry).
 
 ### 2026-08-18 — a visible persistence cue label is this ticket's call
 

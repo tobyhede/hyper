@@ -178,9 +178,11 @@ They supplement rather than replace each target's acceptance criteria.
 - **Issue 03 — Card and Alias panes:** form/dialog composition, atomic edit,
   validation, focus, long-content and target-picker states. Card-choice model
   consolidation remains Issue 10.
-- **Issue 04 — workspace selection and feedback:** real chooser states and
-  common operational feedback not already owned by Issue 02's persistence
-  composition.
+- **Issue 04 — Space startup and operational feedback:** common operational
+  feedback not already owned by Issue 02's persistence composition. Its donor
+  chooser-state scope is superseded by ADR 0058 (2026-08-20): `WorkspaceSelection`
+  is deleted rather than designed, so no donor hunk for a Space chooser is
+  retained here.
 - **Issue 05 — Canvas Card:** the production React Flow Card's visual and
   control surface while adapter-owned geometry and gestures remain intact.
 - **Issue 06 — Graph HUD and Edge authoring:** legend, minimap framing,

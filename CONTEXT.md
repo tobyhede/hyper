@@ -6,7 +6,7 @@ Graph-native technical content. Cards of content live in spatial Layouts; author
 
 **Space**:
 The whole authored world, and the top-level of the domain model: Cards organised into spatial Layouts, with each Layout carrying the Graphs authored across its Cards. Everything else — Cards, Layouts, their Graphs, and application-supplied Views — belongs within a Space. A Card may itself be a Space, so Spaces nest arbitrarily deep; the Space you load is the root, and a nested Space is reached by opening a Space Card.
-_Avoid_: presentation (that is one view of a space), manifest (a shipping-ledger word, wrong for an authored, reshapeable thing — retired from the code, not merely avoided), deck, document, canvas, board, file, subgraph.
+_Avoid_: presentation (that is one view of a space), manifest (a shipping-ledger word, wrong for an authored, reshapeable thing — retired from the code, not merely avoided), deck, document, canvas, board, file, subgraph, workspace (used loosely for the loaded Space and for the app chrome around it — say Space, or Sidebar/canvas for the chrome).
 
 A **new space** is one Card, centered — not an empty canvas (ADR 0018). It has no Graphs yet, so it can be read and edited but not presented. One Card is the starting state, not a permanent minimum: deliberate deletion may later leave the Space with no Cards.
 
@@ -25,6 +25,10 @@ A card has a **Title**, which names it wherever it is listed or drawn, and a **k
 
 A card is one of three kinds, and the kind is what its content is: **Markdown** — written directly by the author; a **space** — a nested graph the viewer opens and explores in place; or an **alias** — another card, shown again here.
 _Avoid_: node, slide, page, tile, subgraph. For the content: prose (it may be a table, a diagram or code, not only writing), body (works for markdown, but a space card's content is a graph).
+
+**Space Card**:
+A card of kind **space**: the only way a new Space comes to exist, and the only path to it. Creating one creates its Space in the same Edit; opening it explores that Space in place. The relationship is ownership, not reference — deleting a Space Card deletes the Space it owns, with everything nested inside it, and unlike an Alias's Target, a Space Card's reference is never retargeted once minted. A Space Card may not target a Space already open along the chain that reaches it, so a Space cannot contain itself, directly or through any chain of Space Cards.
+_Avoid_: subspace, portal, link, nested space (as a second name for the same thing — it is a Space, full stop).
 
 **Alias**:
 A card that shows another card's **content**: the same content appearing again elsewhere in the space, with a single source of truth, so editing the target changes every place it appears. An alias carries its own title — only content is shared. An alias may target any non-alias card kind, including a Markdown card or a space card, but never another alias: aliasing is a single hop, so an alias never points at itself and alias chains cannot form.
@@ -95,9 +99,9 @@ _Avoid_: view (a View is application-supplied and carries no authored positions)
 **Placement**:
 The card-to-position map itself — which Cards are present and where they sit, and nothing more. A **Layout** is the authored thing a Space holds; the placement is the map inside it. It is also what an automatic **layout strategy** computes and what the positioned strategy reads, and it is the same value in both directions: editing an Algorithmic View copies the computed placement into the new Layout, which is the crossing ADR 0025 describes.
 
-A Layout's placement is **sparse** relative to the Space, and omission is meaningful: a Card the map leaves out is not in that Layout and is not rendered there. Adding an existing Space Card to a Layout writes its position. Removing it from the Layout removes that entry and the incident Edges the Layout owns without deleting the Card from the Space. Omission is never the origin.
+A Layout's placement is **sparse** relative to the Space, and omission is meaningful: a Card the map leaves out is not in that Layout and is not rendered there. Adding an existing Card to a Layout writes its position. Removing it from the Layout removes that entry and the incident Edges the Layout owns without deleting the Card from the Space. Omission is never the origin.
 
-**Add Card** creates a new Space Card and adds it to the current Layout. **Add to Layout** adds an existing Space Card with its initial position. **Move Card** changes the position of a Card already in the Layout. **Remove from Layout** removes its membership, position and incident Layout-local Edges. “Place” is not a separate domain operation: every Card in a Layout necessarily has a position.
+**Add Card** creates a new Card and adds it to the current Layout. **Add to Layout** adds an existing Card with its initial position. **Move Card** changes the position of a Card already in the Layout. **Remove from Layout** removes its membership, position and incident Layout-local Edges. “Place” is not a separate domain operation: every Card in a Layout necessarily has a position.
 
 This is not the placement layer ADR 0004 rejected. That was an entity sitting *between* a Card and its position, which Edges and Graphs referenced instead of the Card, so one Card could occupy two positions. A placement is keyed by Card and holds at most one position for each.
 _Avoid_: arrangement (ADR 0005 — applying a strategy produces no separate entity), layer.
@@ -119,7 +123,7 @@ A View is an interface with two sides (ADR 0045). It receives its subject — Ca
 _Avoid_: screen, page, panel, mode. Space-scoped and Graph-scoped as named kinds (a View has a subject, not a type).
 
 **Algorithmic View**:
-A spatial View that uses an automatic **layout strategy** over its subject and renders the computed Card positions on the canvas. A View whose subject is the Space's Cards — Grid, an alphabetical list, Flow — draws every Graph in the Space, flattened across its Layouts, which no Edge can escape because every endpoint is a Space Card. A View whose subject is the Cards one Graph connects, such as a future tree, draws that Graph. The subject is what differs; neither is a kind of View.
+A spatial View that uses an automatic **layout strategy** over its subject and renders the computed Card positions on the canvas. A View whose subject is the Space's Cards — Grid, an alphabetical list, Flow — draws every Graph in the Space, flattened across its Layouts, which no Edge can escape because every endpoint is a Card of the Space. A View whose subject is the Cards one Graph connects, such as a future tree, draws that Graph. The subject is what differs; neither is a kind of View.
 
 A viewer chooses between the application's Algorithmic Views and the Space's Layouts as the primary canvas renderer. The Space may name either as its default renderer; a viewer may have a default Algorithmic View of their own; failing both, the application supplies one. Choosing one is navigation, not an edit, and never changes the Space by itself.
 
@@ -133,7 +137,7 @@ not an act), canvas alone (the canvas is the one surface being drawn), and names
 taken from the control that draws it — selector, menu item, row.
 
 **Cards View**:
-An application-supplied collection View of the Space Cards absent from the selected Layout. Its current rendering is a Sidebar, but that mounting location is not part of the View's identity.
+An application-supplied collection View of the Space's Cards absent from the selected Layout. Its current rendering is a Sidebar, but that mounting location is not part of the View's identity.
 _Avoid_: Space-card palette, Card panel, Sidebar as the domain name.
 
 **Exporting**:

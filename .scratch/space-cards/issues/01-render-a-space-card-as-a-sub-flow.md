@@ -1,6 +1,7 @@
 # Render a Space Card as a sub flow
 
 Status: needs-triage
+Blocked by: 02 — Grill the Space Card model (resolved; ADR 0058)
 
 Surfaced by: asking how a Space Card should be drawn, while deciding the View
 interface for ADR 0045
@@ -32,18 +33,16 @@ and its constraints are recorded in
 
 ## What blocks it outright
 
-**There is no Space Card in the schema.** `cardSchema` is
+**There is still no Space Card in the schema.** `cardSchema` is
 `z.discriminatedUnion('kind', [markdownCardSchema, aliasCardSchema])`
 (`packages/core/src/schema.ts:117`) and `'space'` appears nowhere in `core`.
-Space Cards exist in `CONTEXT.md` and ADR 0001 and in no code: no kind, no
-reference field, no import path, no export path.
-
-So this ticket cannot be scheduled as rendering work. It needs the kind first,
-and the kind needs a decision this ticket should not pre-empt: **what a Space
-Card references.** The framing offered was "a Space plus a configured
-Layout/View", which is more than a Space id — it names which renderer of the
-target Space is shown. That choice decides whether the frame draws authored
-positions or computed ones, and ADR 0045 already says what a View hands back.
+This is now an implementation gap rather than an open design question: Issue
+02 settled what a Space Card is (ADR 0058) — kind `space`, a bare
+`{ spaceId }` reference with no pinned Layout/View, ownership rather than a
+retargetable pointer, atomic creation, cascading deletion, and cycle
+rejection at `loadSpace` intake. The "Space plus a configured Layout/View"
+framing this ticket originally floated was rejected: a Space Card always
+opens to whatever the target Space's own renderer choice currently is.
 
 ## What it runs into, once the kind exists
 
@@ -79,7 +78,6 @@ and says nothing about Space nesting.
 
 ## Suggested next step
 
-Not this ticket. The prior decision is what a Space Card *is* as a domain value:
-its kind, what it references, and whether that reference names a Layout or a
-View of the target Space. That is a grilling ticket in its own effort, and this
-one becomes schedulable once it lands.
+Schedulable now that Issue 02 has landed. Still needs the kind actually built
+in `core` (schema, import/export paths) before this rendering work can start —
+that's its own implementation ticket, not this one.
