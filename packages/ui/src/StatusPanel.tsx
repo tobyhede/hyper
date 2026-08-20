@@ -21,6 +21,15 @@ export interface StatusFailureProps {
   readonly detailLabel: string;
   readonly testId?: string;
   readonly className?: string;
+  /** Overrides the panel's default width (`max-w-2xl`). */
+  readonly panelClassName?: string;
+  /**
+   * Bounds the detail region to a scrolling 40vh instead of growing with the
+   * page. Set this where the panel shares the screen with other chrome a long
+   * detail could push out of view; leave it unset where the panel already owns
+   * the whole viewport and the page can simply scroll.
+   */
+  readonly boundedDetail?: boolean;
 }
 
 /**
@@ -41,10 +50,16 @@ export function StatusFailure({
   detailLabel,
   testId,
   className,
+  panelClassName,
+  boundedDetail,
 }: StatusFailureProps) {
   return (
     <Center className={className}>
-      <Alert variant="destructive" className="w-full max-w-2xl" data-testid={testId}>
+      <Alert
+        variant="destructive"
+        className={cn('w-full max-w-2xl', panelClassName)}
+        data-testid={testId}
+      >
         <AlertIcon />
         <AlertTitle>{title}</AlertTitle>
         <AlertDescription>
@@ -53,7 +68,10 @@ export function StatusFailure({
             role="region"
             tabIndex={0}
             aria-label={detailLabel}
-            className="mt-2 max-h-[40vh] overflow-auto font-mono text-xs whitespace-pre-wrap"
+            className={cn(
+              'mt-2 font-mono text-xs whitespace-pre-wrap',
+              boundedDetail === true && 'max-h-[40vh] overflow-auto',
+            )}
           >
             {detail}
           </pre>
@@ -68,12 +86,18 @@ export interface StatusBusyProps {
   readonly className?: string;
 }
 
-/** Common accessible framing for an in-progress operational state. */
+/**
+ * Common accessible framing for an in-progress operational state.
+ *
+ * The outer `role="status"` is the one live region; the decorative `Spinner`
+ * icon's own default `role="status"`/`aria-label="Loading"` would otherwise
+ * duplicate it on a second, `aria-hidden` node, so both are cleared here.
+ */
 export function StatusBusy({ label, className }: StatusBusyProps) {
   return (
     <Center className={className}>
       <div role="status" className="flex items-center gap-2 text-sm text-muted-foreground">
-        <Spinner aria-hidden="true" />
+        <Spinner role={undefined} aria-label={undefined} aria-hidden="true" />
         <span>{label}</span>
       </div>
     </Center>

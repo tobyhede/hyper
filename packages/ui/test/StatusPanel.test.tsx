@@ -60,6 +60,74 @@ describe('StatusFailure', () => {
 
     expect(screen.getByTestId('workspace-failure')).toHaveAttribute('role', 'alert');
   });
+
+  it('exposes the title as a heading, so it is reachable by heading navigation', () => {
+    render(
+      <StatusFailure
+        title="Application could not start"
+        detail="boom"
+        detailLabel="Startup failure detail"
+      />,
+    );
+
+    expect(screen.getByRole('heading', { name: 'Application could not start' })).toBeVisible();
+  });
+
+  it('leaves the detail unbounded by default', () => {
+    render(
+      <StatusFailure
+        title="Application could not start"
+        detail="boom"
+        detailLabel="Startup failure detail"
+      />,
+    );
+
+    expect(screen.getByRole('region', { name: 'Startup failure detail' }).className).not.toMatch(
+      /max-h-/,
+    );
+  });
+
+  it('bounds the detail to a scrolling region when the caller opts in', () => {
+    render(
+      <StatusFailure
+        title="Unable to arrange this view"
+        detail="No position for Card A"
+        detailLabel="Placement failure detail"
+        boundedDetail
+      />,
+    );
+
+    expect(screen.getByRole('region', { name: 'Placement failure detail' }).className).toMatch(
+      /max-h-\[40vh\]/,
+    );
+  });
+
+  it('defaults the panel to a standard width', () => {
+    render(
+      <StatusFailure
+        title="Unable to open this space"
+        detail="boom"
+        detailLabel="Workspace failure detail"
+      />,
+    );
+
+    expect(screen.getByRole('alert').className).toMatch(/max-w-2xl/);
+  });
+
+  it('lets a caller override the panel width', () => {
+    render(
+      <StatusFailure
+        title="Application could not start"
+        detail="boom"
+        detailLabel="Startup failure detail"
+        panelClassName="max-w-3xl"
+      />,
+    );
+
+    const alert = screen.getByRole('alert');
+    expect(alert.className).toMatch(/max-w-3xl/);
+    expect(alert.className).not.toMatch(/max-w-2xl\b/);
+  });
 });
 
 describe('StatusBusy', () => {
@@ -67,5 +135,15 @@ describe('StatusBusy', () => {
     render(<StatusBusy label="Arranging…" />);
 
     expect(screen.getByRole('status')).toHaveTextContent('Arranging…');
+  });
+
+  it('does not give its decorative spinner its own competing status role', () => {
+    const { container } = render(<StatusBusy label="Arranging…" />);
+
+    const spinner = container.querySelector('[data-slot="spinner"]');
+    expect(spinner).not.toBeNull();
+    expect(spinner).not.toHaveAttribute('role');
+    expect(spinner).not.toHaveAttribute('aria-label');
+    expect(spinner).toHaveAttribute('aria-hidden', 'true');
   });
 });

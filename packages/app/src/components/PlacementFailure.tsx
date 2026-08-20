@@ -12,6 +12,8 @@ export function PlacementFailure({ error }: { error: Error }) {
   return (
     <StatusFailure
       className="h-full"
+      panelClassName="max-w-xl"
+      boundedDetail
       title="Unable to arrange this view"
       detail={error.message}
       detailLabel="Placement failure detail"
