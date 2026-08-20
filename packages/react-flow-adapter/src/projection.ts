@@ -132,11 +132,10 @@ export interface ProjectCardNodesOptions {
 function resolveHandles(
   refs: GraphRenderHandleRef[],
   colors: ColorByGraphId,
-  card: LayoutStrategyCard | undefined,
+  portsById: ReadonlyMap<string, LayoutStrategyCard['ports'][number]>,
   nodeHeight: number,
 ): CardHandle[] {
   const count = refs.length;
-  const portsById = new Map((card?.ports ?? []).map((port) => [port.id, port]));
   return refs.map((ref, index) => {
     const port = portsById.get(ref.id);
     // Not every layout places ports — a grid has no opinion about them, and ELK
@@ -262,8 +261,9 @@ export function projectCardNodes(
     const aliasOf = card.kind === 'alias' ? resolveContentCard(space, card.id)?.title : undefined;
     // An alias shows its target's content under its own title (ADR 0009).
     const body = showContent ? (resolveContentCard(space, card.id)?.body ?? '') : undefined;
-    const sourceHandles = resolveHandles(handles.sourceHandles, colors, cardLayout, nodeHeight);
-    const targetHandles = resolveHandles(handles.targetHandles, colors, cardLayout, nodeHeight);
+    const portsById = new Map((cardLayout?.ports ?? []).map((port) => [port.id, port]));
+    const sourceHandles = resolveHandles(handles.sourceHandles, colors, portsById, nodeHeight);
+    const targetHandles = resolveHandles(handles.targetHandles, colors, portsById, nodeHeight);
 
     const node: CardFlowNode = {
       id: card.id,
