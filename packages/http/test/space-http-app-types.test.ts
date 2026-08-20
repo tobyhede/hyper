@@ -1,6 +1,11 @@
 import type { SpaceSnapshot } from '@project/core';
 import type { SpaceHttpApp } from '@project/http';
-import type { CommitRequestJson, LoadedSpaceJson } from '@project/persistence';
+import type {
+  CommitRequestJson,
+  HyperProblemStatus,
+  HyperProblemType,
+  LoadedSpaceJson,
+} from '@project/persistence';
 import type { hc, InferRequestType, InferResponseType } from 'hono/client';
 import { expectTypeOf, it } from 'vitest';
 
@@ -43,10 +48,12 @@ it('declares every status the commit resource answers with', () => {
   expectTypeOf<InferResponseType<SpaceResource['$put'], 200>>().toEqualTypeOf<{
     revision: string;
   }>();
-  expectTypeOf<InferResponseType<SpaceResource['$put'], 413>>().toEqualTypeOf<{
-    message: string;
-  }>();
-  expectTypeOf<InferResponseType<SpaceResource['$put'], 415>>().toEqualTypeOf<{
-    message: string;
-  }>();
+  type PayloadTooLarge = InferResponseType<SpaceResource['$put'], 413>;
+  type UnsupportedMedia = InferResponseType<SpaceResource['$put'], 415>;
+  expectTypeOf<PayloadTooLarge['type']>().toEqualTypeOf<HyperProblemType>();
+  expectTypeOf<PayloadTooLarge['status']>().toEqualTypeOf<HyperProblemStatus>();
+  expectTypeOf<PayloadTooLarge['detail']>().toEqualTypeOf<string>();
+  expectTypeOf<UnsupportedMedia['type']>().toEqualTypeOf<HyperProblemType>();
+  expectTypeOf<UnsupportedMedia['status']>().toEqualTypeOf<HyperProblemStatus>();
+  expectTypeOf<UnsupportedMedia['detail']>().toEqualTypeOf<string>();
 });

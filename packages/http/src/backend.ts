@@ -2,17 +2,21 @@ import type { SpaceSnapshot, UUID } from '@project/core';
 import {
   CANONICAL_DECIMAL,
   decodeCommittedRevision,
-  decodeErrorMessage,
+  decodeProblemDetails,
   decodeSpaceSummaries,
   decodeLoadedSpace,
   encodeCommitRequest,
+  problemCodeForType,
   type CommitResult,
   type LoadedSpace,
+  type ProblemDetails,
   type SpaceBackend,
   type SpaceSummary,
 } from '@project/persistence';
+import { parse as parseContentType } from 'content-type';
 import { hc } from 'hono/client';
 import type { SpaceHttpApp } from './index';
+import { hasValidUniqueMediaTypeParameters } from './media-type';
 
 type SpaceHttpClient = ReturnType<typeof hc<SpaceHttpApp>>;
 
@@ -21,6 +25,13 @@ const protocolFailure = (message: string): CommitResult => ({
   code: 'protocol',
   message,
 });
+
+/** Media-type essence match, so a charset or other parameter doesn't fail an otherwise-valid response. */
+const hasProblemDetailsMediaType = (response: Response): boolean => {
+  const contentType = response.headers.get('Content-Type');
+  if (contentType === null || !hasValidUniqueMediaTypeParameters(contentType)) return false;
+  return parseContentType(contentType).type === 'application/problem+json';
+};
 
 export interface HttpSpaceBackendOptions {
   fetch?: typeof globalThis.fetch;
@@ -89,8 +100,6 @@ export class HttpSpaceBackend implements SpaceBackend {
             json: encodeCommitRequest(snapshot, expectedRevision),
           }),
         async (response, signal): Promise<CommitResult> => {
-          const retryable = await retryableForStatus(response, signal);
-          if (retryable !== undefined) return retryable;
           try {
             if (response.status === 200) {
               return {
@@ -101,17 +110,14 @@ export class HttpSpaceBackend implements SpaceBackend {
             if (response.status === 409) {
               return { kind: 'conflict', current: decodeLoadedSpace(await response.json()) };
             }
-            const message = decodeErrorMessage(await response.json());
-            if (response.status === 401 || response.status === 403) {
-              return { kind: 'permanent-failure', code: 'forbidden', message };
+            if (!hasProblemDetailsMediaType(response)) {
+              return protocolFailure('Error response must use application/problem+json');
             }
-            if (response.status === 404) {
-              return { kind: 'permanent-failure', code: 'not-found', message };
+            const problem = decodeProblemDetails(await response.json());
+            if (problem.status !== response.status) {
+              return protocolFailure('Problem status does not match the HTTP status');
             }
-            if (response.status === 422) {
-              return { kind: 'permanent-failure', code: 'invalid-snapshot', message };
-            }
-            return protocolFailure(message);
+            return commitFailureForProblem(problem, response);
           } catch (error) {
             if (signal.aborted) throw error;
             return protocolFailure(error instanceof Error ? error.message : 'Malformed response');
@@ -137,14 +143,6 @@ class HttpTimeoutError extends Error {
   }
 }
 
-const optionalErrorMessage = async (response: Response): Promise<string | undefined> => {
-  try {
-    return decodeErrorMessage(JSON.parse(await response.text()) as unknown);
-  } catch {
-    return undefined;
-  }
-};
-
 const retryAfterMilliseconds = (response: Response): number | undefined => {
   const value = response.headers.get('Retry-After');
   if (value === null || !CANONICAL_DECIMAL.test(value)) return undefined;
@@ -153,33 +151,48 @@ const retryAfterMilliseconds = (response: Response): number | undefined => {
   return Number(seconds) * 1000;
 };
 
-const retryableForStatus = async (
-  response: Response,
-  signal: AbortSignal,
-): Promise<CommitResult | undefined> => {
-  let code: 'timeout' | 'rate-limited' | 'unavailable';
-  let fallback: string;
-  let honoursRetryAfter = true;
-  if (response.status === 408) {
-    code = 'timeout';
-    fallback = 'Request timed out';
-    honoursRetryAfter = false;
-  } else if (response.status === 429) {
-    code = 'rate-limited';
-    fallback = 'Rate limited';
-  } else if (response.status >= 500) {
-    code = 'unavailable';
-    fallback = 'Persistence service unavailable';
-  } else {
-    return undefined;
+const commitFailureForProblem = (problem: ProblemDetails, response: Response): CommitResult => {
+  const code = problemCodeForType(problem.type);
+  switch (code) {
+    case 'request-timeout':
+      return { kind: 'retryable-failure', code: 'timeout', message: problem.detail };
+    case 'rate-limited': {
+      const retryAfterMs = retryAfterMilliseconds(response);
+      return {
+        kind: 'retryable-failure',
+        code: 'rate-limited',
+        message: problem.detail,
+        ...(retryAfterMs === undefined ? {} : { retryAfterMs }),
+      };
+    }
+    case 'persistence-unavailable':
+    case 'internal-error': {
+      const retryAfterMs = retryAfterMilliseconds(response);
+      return {
+        kind: 'retryable-failure',
+        code: 'unavailable',
+        message: problem.detail,
+        ...(retryAfterMs === undefined ? {} : { retryAfterMs }),
+      };
+    }
+    case 'unauthorized':
+    case 'forbidden':
+      return { kind: 'permanent-failure', code: 'forbidden', message: problem.detail };
+    case 'not-found':
+      return { kind: 'permanent-failure', code: 'not-found', message: problem.detail };
+    case 'invalid-snapshot':
+      return { kind: 'permanent-failure', code: 'invalid-snapshot', message: problem.detail };
+    case 'invalid-request':
+    case 'invalid-space-id':
+    case 'unsupported-media-type':
+    case 'payload-too-large':
+    case 'method-not-allowed':
+      return protocolFailure(problem.detail);
+    default:
+      return assertNever(code);
   }
-  const retryAfterMs = honoursRetryAfter ? retryAfterMilliseconds(response) : undefined;
-  const message = await optionalErrorMessage(response);
-  if (signal.aborted) throw new HttpTimeoutError();
-  return {
-    kind: 'retryable-failure',
-    code,
-    message: message ?? fallback,
-    ...(retryAfterMs === undefined ? {} : { retryAfterMs }),
-  };
+};
+
+const assertNever = (value: never): never => {
+  throw new Error(`Unmapped problem code: ${String(value)}`);
 };

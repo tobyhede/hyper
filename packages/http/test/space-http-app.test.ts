@@ -1,7 +1,13 @@
 import { uuidSchema, type SpaceSnapshot } from '@project/core';
-import { encodeCommitRequest, type SpaceResourceRepository } from '@project/persistence';
+import {
+  decodeProblemDetails,
+  encodeCommitRequest,
+  problemCatalogue,
+  type HyperProblemCode,
+  type SpaceResourceRepository,
+} from '@project/persistence';
 import { HTTPException } from 'hono/http-exception';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { createSpaceHttpApp, MAX_COMMIT_BODY_BYTES } from '@project/http';
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
@@ -26,6 +32,16 @@ const repository = (overrides: Partial<SpaceResourceRepository> = {}): SpaceReso
   ...overrides,
 });
 
+const expectProblem = async (response: Response, code: HyperProblemCode, detail?: string) => {
+  expect(response.status).toBe(problemCatalogue[code].status);
+  expect(response.headers.get('content-type')).toBe('application/problem+json');
+  const decoded = decodeProblemDetails(await response.json());
+  expect(decoded.type).toBe(problemCatalogue[code].type);
+  expect(decoded.title).toBe(problemCatalogue[code].title);
+  if (detail !== undefined) expect(decoded.detail).toBe(detail);
+  return decoded;
+};
+
 describe('Space HTTP application', () => {
   it('lists spaces as non-cacheable UTF-8 JSON', async () => {
     const response = await createSpaceHttpApp(repository()).request('/api/spaces');
@@ -45,9 +61,8 @@ describe('Space HTTP application', () => {
 
     const response = await app.request('/api/spaces');
 
-    expect(response.status).toBe(503);
     expect(response.headers.get('cache-control')).toBe('no-store');
-    await expect(response.json()).resolves.toEqual({ message: 'Persistence service unavailable' });
+    await expectProblem(response, 'persistence-unavailable', 'Try the request again later.');
     expect(logged).toEqual(['Failed to list spaces', failure]);
   });
 
@@ -67,10 +82,11 @@ describe('Space HTTP application', () => {
       repository({ loadSpace: () => Promise.resolve(undefined) }),
     ).request(`/api/spaces/${OTHER_SPACE_ID}`);
 
-    expect(response.status).toBe(404);
-    await expect(response.json()).resolves.toEqual({
-      message: `Space ${OTHER_SPACE_ID} does not exist`,
-    });
+    await expectProblem(
+      response,
+      'not-found',
+      `Choose a Space that exists; Space ${OTHER_SPACE_ID} does not.`,
+    );
   });
 
   it('hides and logs a repository failure while loading a space', async () => {
@@ -82,8 +98,7 @@ describe('Space HTTP application', () => {
 
     const response = await app.request(`/api/spaces/${SPACE_ID}`);
 
-    expect(response.status).toBe(503);
-    await expect(response.json()).resolves.toEqual({ message: 'Persistence service unavailable' });
+    await expectProblem(response, 'persistence-unavailable', 'Try the request again later.');
     expect(logged).toEqual([`Failed to load space ${SPACE_ID}`, failure]);
   });
 
@@ -135,8 +150,12 @@ describe('Space HTTP application', () => {
       body: JSON.stringify(encodeCommitRequest(snapshot, 0n)),
     });
 
-    expect(response.status).toBe(422);
-    await expect(response.json()).resolves.toEqual({ message: 'Graph names an absent card' });
+    const problem = await expectProblem(
+      response,
+      'invalid-snapshot',
+      'Correct the snapshot: Graph names an absent card',
+    );
+    expect(problem.errors).toEqual([{ code: 'invalid-value', pointer: '/snapshot' }]);
   });
 
   it('reports an absent space while committing', async () => {
@@ -151,8 +170,7 @@ describe('Space HTTP application', () => {
       body: JSON.stringify(encodeCommitRequest(snapshot, 0n)),
     });
 
-    expect(response.status).toBe(404);
-    await expect(response.json()).resolves.toEqual({ message });
+    await expectProblem(response, 'not-found', `Choose a Space that exists; ${message}`);
   });
 
   it('hides and logs a repository failure while committing a space', async () => {
@@ -167,8 +185,7 @@ describe('Space HTTP application', () => {
       body: JSON.stringify(encodeCommitRequest(snapshot, 0n)),
     });
 
-    expect(response.status).toBe(503);
-    await expect(response.json()).resolves.toEqual({ message: 'Persistence service unavailable' });
+    await expectProblem(response, 'persistence-unavailable', 'Try the request again later.');
     expect(logged).toEqual([`Failed to commit space ${SPACE_ID}`, failure]);
   });
 
@@ -199,10 +216,9 @@ describe('Space HTTP application', () => {
       }),
     ]);
 
-    expect(responses.map(({ status }) => status)).toEqual([503, 503, 503]);
     await Promise.all(
       responses.map((response) =>
-        expect(response.json()).resolves.toEqual({ message: 'Persistence service unavailable' }),
+        expectProblem(response, 'persistence-unavailable', 'Try the request again later.'),
       ),
     );
   });
@@ -213,10 +229,11 @@ describe('Space HTTP application', () => {
       body: JSON.stringify(encodeCommitRequest(snapshot, 0n)),
     });
 
-    expect(response.status).toBe(415);
-    await expect(response.json()).resolves.toEqual({
-      message: 'Content-Type must be application/json',
-    });
+    await expectProblem(
+      response,
+      'unsupported-media-type',
+      'Send the request as application/json.',
+    );
   });
 
   it('rejects a non-JSON media type', async () => {
@@ -226,10 +243,11 @@ describe('Space HTTP application', () => {
       body: JSON.stringify(encodeCommitRequest(snapshot, 0n)),
     });
 
-    expect(response.status).toBe(415);
-    await expect(response.json()).resolves.toEqual({
-      message: 'Content-Type must be application/json',
-    });
+    await expectProblem(
+      response,
+      'unsupported-media-type',
+      'Send the request as application/json.',
+    );
   });
 
   it('rejects a JSON charset other than UTF-8', async () => {
@@ -239,10 +257,7 @@ describe('Space HTTP application', () => {
       body: JSON.stringify(encodeCommitRequest(snapshot, 0n)),
     });
 
-    expect(response.status).toBe(415);
-    await expect(response.json()).resolves.toEqual({
-      message: 'JSON charset must be UTF-8',
-    });
+    await expectProblem(response, 'unsupported-media-type', 'Encode the JSON request as UTF-8.');
   });
 
   it('rejects duplicate charset parameters', async () => {
@@ -254,10 +269,11 @@ describe('Space HTTP application', () => {
       body: JSON.stringify(encodeCommitRequest(snapshot, 0n)),
     });
 
-    expect(response.status).toBe(415);
-    await expect(response.json()).resolves.toEqual({
-      message: 'Content-Type must be application/json',
-    });
+    await expectProblem(
+      response,
+      'unsupported-media-type',
+      'Send the request as application/json.',
+    );
   });
 
   it('rejects a malformed charset parameter', async () => {
@@ -267,10 +283,11 @@ describe('Space HTTP application', () => {
       body: JSON.stringify(encodeCommitRequest(snapshot, 0n)),
     });
 
-    expect(response.status).toBe(415);
-    await expect(response.json()).resolves.toEqual({
-      message: 'Content-Type must be application/json',
-    });
+    await expectProblem(
+      response,
+      'unsupported-media-type',
+      'Send the request as application/json.',
+    );
   });
 
   it('rejects compressed request bodies', async () => {
@@ -283,10 +300,11 @@ describe('Space HTTP application', () => {
       body: JSON.stringify(encodeCommitRequest(snapshot, 0n)),
     });
 
-    expect(response.status).toBe(415);
-    await expect(response.json()).resolves.toEqual({
-      message: 'Content-Encoding must be identity',
-    });
+    await expectProblem(
+      response,
+      'unsupported-media-type',
+      'Send the request without content encoding.',
+    );
   });
 
   /*
@@ -306,10 +324,7 @@ describe('Space HTTP application', () => {
       body: '{}',
     });
 
-    expect(response.status).toBe(400);
-    await expect(response.json()).resolves.toEqual({
-      message: 'commit request has unexpected fields',
-    });
+    await expectProblem(response, 'invalid-request', 'commit request has unexpected fields');
   });
 
   it('rejects an actual body over 1 MiB when its declared length is honest', async () => {
@@ -323,10 +338,11 @@ describe('Space HTTP application', () => {
       body,
     });
 
-    expect(response.status).toBe(413);
-    await expect(response.json()).resolves.toEqual({
-      message: 'Request body exceeds 1048576 bytes',
-    });
+    await expectProblem(
+      response,
+      'payload-too-large',
+      'Send a request body no larger than 1048576 bytes.',
+    );
   });
 
   it('rejects a streamed body over 1 MiB without a declared length', async () => {
@@ -336,10 +352,11 @@ describe('Space HTTP application', () => {
       body: `{"padding":"${'x'.repeat(1_048_576)}"}`,
     });
 
-    expect(response.status).toBe(413);
-    await expect(response.json()).resolves.toEqual({
-      message: 'Request body exceeds 1048576 bytes',
-    });
+    await expectProblem(
+      response,
+      'payload-too-large',
+      'Send a request body no larger than 1048576 bytes.',
+    );
   });
 
   it('rejects an actual body over 1 MiB when its declared length is understated', async () => {
@@ -360,10 +377,11 @@ describe('Space HTTP application', () => {
       body: JSON.stringify(encodeCommitRequest(oversizedSnapshot, 0n)),
     });
 
-    expect(response.status).toBe(413);
-    await expect(response.json()).resolves.toEqual({
-      message: 'Request body exceeds 1048576 bytes',
-    });
+    await expectProblem(
+      response,
+      'payload-too-large',
+      'Send a request body no larger than 1048576 bytes.',
+    );
     expect(commitCalls).toBe(0);
   });
 
@@ -393,6 +411,41 @@ describe('Space HTTP application', () => {
 
     expect(response.status).toBe(413);
     expect(pulled).toBeLessThanOrEqual(MAX_COMMIT_BODY_BYTES * 16);
+  });
+
+  // A client that disconnects mid-drain costs its own connection, not the 413
+  // this app already decided to answer with — the drain's own read failure
+  // must not turn into a second, worse response.
+  it('still answers 413 when the client vanishes mid-drain', async () => {
+    let reads = 0;
+    const flaky = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        reads += 1;
+        if (reads > 20) {
+          controller.error(new Error('client disconnected'));
+          return;
+        }
+        controller.enqueue(new Uint8Array(64 * 1024));
+      },
+    });
+
+    const response = await createSpaceHttpApp(repository()).request(`/api/spaces/${SPACE_ID}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: flaky,
+      duplex: 'half',
+    } as RequestInit);
+
+    expect(response.status).toBe(413);
+  });
+
+  it('proceeds past the body-size guard when the request has no body at all', async () => {
+    const response = await createSpaceHttpApp(repository()).request(`/api/spaces/${SPACE_ID}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+    expect(response.status).toBe(400);
   });
 
   // The limit is a maximum, not a threshold the body must stay under. Both size
@@ -442,8 +495,7 @@ describe('Space HTTP application', () => {
       body: JSON.stringify(encodeCommitRequest(oversizedSnapshot, 0n)),
     });
 
-    expect(response.status).toBe(400);
-    await expect(response.json()).resolves.toEqual({ message: 'Space id must be a UUID' });
+    await expectProblem(response, 'invalid-space-id', 'Use a UUID for the Space id.');
   });
 
   // `validateSpaceId` guards both methods, but only the commit graph proved it.
@@ -454,8 +506,7 @@ describe('Space HTTP application', () => {
       repository({ loadSpace: () => Promise.reject(new Error('must not be reached')) }),
     ).request('/api/spaces/not-a-uuid');
 
-    expect(response.status).toBe(400);
-    await expect(response.json()).resolves.toEqual({ message: 'Space id must be a UUID' });
+    await expectProblem(response, 'invalid-space-id', 'Use a UUID for the Space id.');
   });
 
   it('rejects a path and snapshot identity mismatch before repository access', async () => {
@@ -467,8 +518,12 @@ describe('Space HTTP application', () => {
       body: JSON.stringify(encodeCommitRequest(snapshot, 0n)),
     });
 
-    expect(response.status).toBe(400);
-    await expect(response.json()).resolves.toEqual({ message: 'Path id must match snapshot id' });
+    const problem = await expectProblem(
+      response,
+      'invalid-request',
+      'Use the path Space id as the snapshot id.',
+    );
+    expect(problem.errors).toEqual([{ code: 'invalid-value', pointer: '/snapshot/id' }]);
   });
 
   it('returns JSON when the request body is malformed JSON', async () => {
@@ -478,9 +533,7 @@ describe('Space HTTP application', () => {
       body: '{',
     });
 
-    expect(response.status).toBe(400);
-    expect(response.headers.get('content-type')).toBe('application/json; charset=utf-8');
-    await expect(response.json()).resolves.toEqual({ message: 'Malformed JSON in request body' });
+    await expectProblem(response, 'invalid-request', 'Malformed JSON in request body');
   });
 
   // Each case carries the guard that should reject it. Asserting only the 400
@@ -517,14 +570,13 @@ describe('Space HTTP application', () => {
       body: JSON.stringify(body),
     });
 
-    expect(response.status).toBe(400);
-    expect(response.headers.get('content-type')).toBe('application/json; charset=utf-8');
-    expect(((await response.json()) as { message: string }).message).toMatch(expectedMessage);
+    const problem = await expectProblem(response, 'invalid-request');
+    expect(problem.detail).toMatch(expectedMessage);
   });
 
   /*
-   * `{ message: string }` is the declared error contract, and every other 400
-   * honours it with a sentence. Zod serializes its whole issue array into
+   * Problem `detail` is the display-prose contract, and every other 400 honours
+   * it with a sentence. Zod serializes its whole issue array into
    * `Error.message`, so a snapshot that fails the schema used to answer with
    * hundreds of characters of internal schema shape — a JSON document nested
    * inside a field the client renders as prose.
@@ -540,11 +592,11 @@ describe('Space HTTP application', () => {
     });
 
     expect(response.status).toBe(400);
-    const { message } = (await response.json()) as { message: string };
-    expect(message).toContain('snapshot is invalid');
-    expect(message).toContain('document.title');
-    expect(message).not.toContain('{');
-    expect(message.length).toBeLessThan(200);
+    const problem = await expectProblem(response, 'invalid-request');
+    expect(problem.detail).toContain('snapshot is invalid');
+    expect(problem.detail).toContain('document.title');
+    expect(problem.detail).not.toContain('{');
+    expect(problem.detail.length).toBeLessThan(200);
   });
 
   it('advertises the methods supported by a space resource', async () => {
@@ -598,13 +650,13 @@ describe('Space HTTP application', () => {
   // `Allow: GET, PUT` for a path no method can address, so it advertises a
   // resource that cannot exist and disagrees with GET on the same URL.
   it.each([
-    ['an undeclared method', 'POST', '{"message":"Space id must be a UUID"}'],
+    ['an undeclared method', 'POST'],
     // Hono strips a HEAD response's body itself, so the guard that intercepts
     // HEAD is observable only in the status and headers. The empty string is
     // asserted rather than ignored: it is why the guard cannot simply be
     // deleted and left to the GET graph, which answers 200 with nothing.
-    ['HEAD', 'HEAD', ''],
-  ])('rejects an invalid path identity for %s', async (_name, method, body) => {
+    ['HEAD', 'HEAD'],
+  ])('rejects an invalid path identity for %s', async (_name, method) => {
     const response = await createSpaceHttpApp(repository()).request('/api/spaces/not-a-uuid', {
       method,
     });
@@ -612,13 +664,12 @@ describe('Space HTTP application', () => {
     expect(response.status).toBe(400);
     expect(response.headers.get('allow')).toBeNull();
     expect(response.headers.get('cache-control')).toBe('no-store');
-    // The two rows reach the 400 by different exits — POST through `notFound()`
-    // and back out of the middleware, HEAD through the guard's early return —
-    // and the media type is what tells them apart. The guard returned its own
-    // response without the charset rewrite, so one URL answered under two media
-    // types depending on the method.
-    expect(response.headers.get('content-type')).toBe('application/json; charset=utf-8');
-    await expect(response.text()).resolves.toBe(body);
+    expect(response.headers.get('content-type')).toBe('application/problem+json');
+    if (method === 'HEAD') {
+      await expect(response.text()).resolves.toBe('');
+    } else {
+      await expectProblem(response, 'invalid-space-id', 'Use a UUID for the Space id.');
+    }
   });
 
   // The normalization matches `Content-Type` exactly, which holds only while
@@ -635,67 +686,136 @@ describe('Space HTTP application', () => {
       headers: { 'Content-Type': contentType },
       body,
     });
-    const responses = await Promise.all([
-      createSpaceHttpApp(repository()).request('/api/spaces'),
-      createSpaceHttpApp(repository()).request(`/api/spaces/${SPACE_ID}`),
-      createSpaceHttpApp(repository({ loadSpace: () => Promise.resolve(undefined) })).request(
-        `/api/spaces/${SPACE_ID}`,
-      ),
-      createSpaceHttpApp(repository()).request('/api/spaces/not-a-uuid'),
-      createSpaceHttpApp(repository()).request('/api/spaces/not-a-uuid', { method: 'POST' }),
-      createSpaceHttpApp(repository()).request('/off-contract'),
-      createSpaceHttpApp(repository()).request(`/api/spaces/${SPACE_ID}`, put(commit)),
-      createSpaceHttpApp(repository()).request(`/api/spaces/${SPACE_ID}`, put('not json')),
-      createSpaceHttpApp(repository()).request(`/api/spaces/${SPACE_ID}`, put('{}')),
-      createSpaceHttpApp(repository()).request(
-        `/api/spaces/${SPACE_ID}`,
-        put('{}', 'text/plain; charset=utf-8'),
-      ),
-      createSpaceHttpApp(repository()).request(`/api/spaces/${SPACE_ID}`, put(oversized)),
+    const JSON_MEDIA = 'application/json; charset=utf-8';
+    const PROBLEM_MEDIA = 'application/problem+json';
+
+    const cases = [
+      {
+        status: 200,
+        contentType: JSON_MEDIA,
+        request: () => createSpaceHttpApp(repository()).request('/api/spaces'),
+      },
+      {
+        status: 200,
+        contentType: JSON_MEDIA,
+        request: () => createSpaceHttpApp(repository()).request(`/api/spaces/${SPACE_ID}`),
+      },
+      {
+        status: 404,
+        contentType: PROBLEM_MEDIA,
+        request: () =>
+          createSpaceHttpApp(repository({ loadSpace: () => Promise.resolve(undefined) })).request(
+            `/api/spaces/${SPACE_ID}`,
+          ),
+      },
+      {
+        status: 400,
+        contentType: PROBLEM_MEDIA,
+        request: () => createSpaceHttpApp(repository()).request('/api/spaces/not-a-uuid'),
+      },
+      {
+        status: 400,
+        contentType: PROBLEM_MEDIA,
+        request: () =>
+          createSpaceHttpApp(repository()).request('/api/spaces/not-a-uuid', { method: 'POST' }),
+      },
+      {
+        status: 404,
+        contentType: PROBLEM_MEDIA,
+        request: () => createSpaceHttpApp(repository()).request('/off-contract'),
+      },
+      {
+        status: 200,
+        contentType: JSON_MEDIA,
+        request: () =>
+          createSpaceHttpApp(repository()).request(`/api/spaces/${SPACE_ID}`, put(commit)),
+      },
+      {
+        status: 400,
+        contentType: PROBLEM_MEDIA,
+        request: () =>
+          createSpaceHttpApp(repository()).request(`/api/spaces/${SPACE_ID}`, put('not json')),
+      },
+      {
+        status: 400,
+        contentType: PROBLEM_MEDIA,
+        request: () =>
+          createSpaceHttpApp(repository()).request(`/api/spaces/${SPACE_ID}`, put('{}')),
+      },
+      {
+        status: 415,
+        contentType: PROBLEM_MEDIA,
+        request: () =>
+          createSpaceHttpApp(repository()).request(
+            `/api/spaces/${SPACE_ID}`,
+            put('{}', 'text/plain; charset=utf-8'),
+          ),
+      },
+      {
+        status: 413,
+        contentType: PROBLEM_MEDIA,
+        request: () =>
+          createSpaceHttpApp(repository()).request(`/api/spaces/${SPACE_ID}`, put(oversized)),
+      },
       // The conflict branch encodes a whole loaded space rather than a message,
       // so it reaches `context.json` by a different graph than its neighbours.
-      createSpaceHttpApp(
-        repository({
-          commitSpace: () =>
-            Promise.resolve({
-              kind: 'conflict' as const,
-              current: { snapshot, revision: 1n, exportedRevision: null },
+      {
+        status: 409,
+        contentType: JSON_MEDIA,
+        request: () =>
+          createSpaceHttpApp(
+            repository({
+              commitSpace: () =>
+                Promise.resolve({
+                  kind: 'conflict' as const,
+                  current: { snapshot, revision: 1n, exportedRevision: null },
+                }),
             }),
-        }),
-      ).request(`/api/spaces/${SPACE_ID}`, put(commit)),
-      createSpaceHttpApp(
-        repository({
-          commitSpace: () =>
-            Promise.resolve({
-              kind: 'rejected' as const,
-              code: 'invalid-snapshot' as const,
-              message: 'bad',
+          ).request(`/api/spaces/${SPACE_ID}`, put(commit)),
+      },
+      {
+        status: 422,
+        contentType: PROBLEM_MEDIA,
+        request: () =>
+          createSpaceHttpApp(
+            repository({
+              commitSpace: () =>
+                Promise.resolve({
+                  kind: 'rejected' as const,
+                  code: 'invalid-snapshot' as const,
+                  message: 'bad',
+                }),
             }),
-        }),
-      ).request(`/api/spaces/${SPACE_ID}`, put(commit)),
-      createSpaceHttpApp(repository({ listSpaces: () => Promise.reject(new Error('down')) }), {
-        logError: (message) => swallowed.push(message),
-      }).request('/api/spaces'),
-    ]);
+          ).request(`/api/spaces/${SPACE_ID}`, put(commit)),
+      },
+      {
+        status: 503,
+        contentType: PROBLEM_MEDIA,
+        request: () =>
+          createSpaceHttpApp(repository({ listSpaces: () => Promise.reject(new Error('down')) }), {
+            logError: (message) => swallowed.push(message),
+          }).request('/api/spaces'),
+      },
+    ];
 
-    expect(responses.map((response) => response.status)).toEqual([
-      200, 200, 404, 400, 400, 404, 200, 400, 400, 415, 413, 409, 422, 503,
-    ]);
+    const responses = await Promise.all(
+      cases.map((testCase) => Promise.resolve(testCase.request())),
+    );
+
     expect(swallowed).toEqual(['Failed to list spaces']);
-    for (const response of responses) {
-      expect(response.headers.get('content-type')).toBe('application/json; charset=utf-8');
-    }
+    responses.forEach((response, index) => {
+      expect(response.status).toBe(cases[index]?.status);
+      expect(response.headers.get('content-type')).toBe(cases[index]?.contentType);
+    });
   });
 
-  // A bodyless 405 must not claim to carry JSON.
   it.each([
     ['the collection', '/api/spaces'],
     ['a space resource', `/api/spaces/${SPACE_ID}`],
-  ])('sends no media type with the bodyless 405 for %s', async (_name, path) => {
+  ])('returns Problem Details for a disallowed method on %s', async (_name, path) => {
     const response = await createSpaceHttpApp(repository()).request(path, { method: 'POST' });
 
-    expect(response.status).toBe(405);
-    expect(response.headers.get('content-type')).toBeNull();
+    await expectProblem(response, 'method-not-allowed');
   });
 
   // `c.notFound()` inside the handler installed by `app.notFound()` calls that
@@ -707,11 +827,24 @@ describe('Space HTTP application', () => {
     async (path) => {
       const response = await createSpaceHttpApp(repository()).request(path);
 
-      expect(response.status).toBe(404);
       expect(response.headers.get('cache-control')).toBe('no-store');
-      await expect(response.json()).resolves.toEqual({ message: 'Not found' });
+      await expectProblem(response, 'not-found', 'Use a declared Space API path.');
     },
   );
+
+  it('logs through the default console sink when no logError option is given', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    const app = createSpaceHttpApp(
+      repository({ listSpaces: () => Promise.reject(new Error('database is down')) }),
+    );
+    const response = await app.request('/api/spaces');
+
+    expect(consoleError).toHaveBeenCalledWith('Failed to list spaces', expect.any(Error));
+    await expectProblem(response, 'persistence-unavailable', 'Try the request again later.');
+
+    consoleError.mockRestore();
+  });
 
   // Hono does not turn a rethrow from `onError` into a 500: it re-invokes the
   // custom handler and lets the throw escape, so `app.fetch()` returns a
@@ -729,22 +862,33 @@ describe('Space HTTP application', () => {
 
     const response = await app.request('/api/spaces');
 
-    expect(response.status).toBe(500);
     expect(response.headers.get('cache-control')).toBe('no-store');
-    await expect(response.json()).resolves.toEqual({ message: 'Internal server error' });
+    await expectProblem(response, 'internal-error', 'Try the request again later.');
   });
 
   /*
-   * `{ message: string }` is the whole error contract, and `HttpSpaceBackend`
-   * decodes every non-200/409 commit response as JSON. `HTTPException`'s own
+   * Problem Details is the whole error contract, and `HttpSpaceBackend` decodes
+   * every non-200/409 commit response through it. `HTTPException`'s own
    * `getResponse()` answers `text/plain` with no `Cache-Control`, so forwarding
    * it for any status but 400 left the typed client a body it cannot read and a
    * cacheable error. A throwing log sink is the seam that reaches this branch
    * with a status the application does not itself produce.
    */
-  it.each([401, 404, 422] as const)(
+  it.each([
+    [401, 'unauthorized'],
+    [403, 'forbidden'],
+    [404, 'not-found'],
+    [405, 'method-not-allowed'],
+    [408, 'request-timeout'],
+    [413, 'payload-too-large'],
+    [415, 'unsupported-media-type'],
+    [422, 'invalid-snapshot'],
+    [429, 'rate-limited'],
+    [503, 'persistence-unavailable'],
+    [418, 'internal-error'],
+  ] as const)(
     'answers an HTTPException with %i in the declared JSON error shape',
-    async (status) => {
+    async (status, code) => {
       const app = createSpaceHttpApp(
         repository({ listSpaces: () => Promise.reject(new Error('database is down')) }),
         {
@@ -756,12 +900,33 @@ describe('Space HTTP application', () => {
 
       const response = await app.request('/api/spaces');
 
-      expect(response.status).toBe(status);
       expect(response.headers.get('cache-control')).toBe('no-store');
-      expect(response.headers.get('content-type')).toBe('application/json; charset=utf-8');
-      await expect(response.json()).resolves.toEqual({ message: `Refused with ${status}` });
+      await expectProblem(response, code, `Refused with ${status}`);
     },
   );
+
+  /*
+   * `new HTTPException(status)` with no `options.message` carries an empty
+   * `Error#message`, and Problem Details requires a non-empty `detail`. This
+   * must not throw out of `onError` itself — Hono has no third attempt, so
+   * that throw would otherwise escape as the exception-with-no-message case,
+   * losing the real status and code behind a generic 500.
+   */
+  it('answers an HTTPException with no message using its code title as detail', async () => {
+    const app = createSpaceHttpApp(
+      repository({ listSpaces: () => Promise.reject(new Error('database is down')) }),
+      {
+        logError: () => {
+          throw new HTTPException(404);
+        },
+      },
+    );
+
+    const response = await app.request('/api/spaces');
+
+    expect(response.headers.get('cache-control')).toBe('no-store');
+    await expectProblem(response, 'not-found', problemCatalogue['not-found'].title);
+  });
 
   // Hono's own json validator applies a stricter Content-Type regex than this
   // module's media policy, and when it disagrees it does not parse the body and

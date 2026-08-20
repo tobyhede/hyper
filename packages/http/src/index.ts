@@ -1,7 +1,11 @@
 import { uuidSchema } from '@project/core';
 import {
   decodeCommitRequest,
+  encodeProblemDetails,
   encodeLoadedSpace,
+  problemCatalogue,
+  type HyperProblemCode,
+  type ProblemError,
   type CommitRequestJson,
   type SpaceResourceRepository,
 } from '@project/persistence';
@@ -59,8 +63,24 @@ const invokeLogError = (
  */
 const MAX_DRAINED_BODY_BYTES = MAX_COMMIT_BODY_BYTES * 8;
 
+const problem = (
+  context: Context,
+  code: HyperProblemCode,
+  detail: string,
+  errors?: readonly ProblemError[],
+) => {
+  const body = encodeProblemDetails(code, detail, errors);
+  const response = context.json(body, body.status);
+  response.headers.set('Content-Type', 'application/problem+json');
+  return response;
+};
+
 const rejectOversizedBody = (context: Context) =>
-  context.json({ message: `Request body exceeds ${MAX_COMMIT_BODY_BYTES} bytes` }, 413);
+  problem(
+    context,
+    'payload-too-large',
+    `Send a request body no larger than ${MAX_COMMIT_BODY_BYTES} bytes.`,
+  );
 
 /** Read and discard what is left, up to the allowance. Bytes are never buffered. */
 const drainRejectedBody = async (
@@ -150,21 +170,21 @@ const requireBoundedCommitBody = createMiddleware(async (context, next) => {
 const requireSupportedRequestMedia = createMiddleware(async (context, next) => {
   const contentEncoding = context.req.header('Content-Encoding');
   if (contentEncoding !== undefined && contentEncoding.trim().toLowerCase() !== 'identity') {
-    return context.json({ message: 'Content-Encoding must be identity' }, 415);
+    return problem(context, 'unsupported-media-type', 'Send the request without content encoding.');
   }
   const contentType = context.req.header('Content-Type');
   if (contentType === undefined || !hasValidUniqueMediaTypeParameters(contentType)) {
-    return context.json({ message: 'Content-Type must be application/json' }, 415);
+    return problem(context, 'unsupported-media-type', 'Send the request as application/json.');
   }
   // `parse` only splits and lowercases a value `./media-type` has already
   // accepted — `content-type@2` validates nothing itself. See that module.
   const parsed = parseContentType(contentType);
   if (parsed.type !== 'application/json') {
-    return context.json({ message: 'Content-Type must be application/json' }, 415);
+    return problem(context, 'unsupported-media-type', 'Send the request as application/json.');
   }
   const charset = parsed.parameters['charset'];
   if (charset !== undefined && charset.toLowerCase() !== 'utf-8') {
-    return context.json({ message: 'JSON charset must be UTF-8' }, 415);
+    return problem(context, 'unsupported-media-type', 'Encode the JSON request as UTF-8.');
   }
   // Hono's json validator applies its own narrower Content-Type regex, and when
   // that disagrees it does not parse the body — it hands the validator `{}` and
@@ -202,10 +222,14 @@ const decodeCommitBody = (
   try {
     return decodeCommitRequest(value);
   } catch (error) {
-    return context.json(
-      { message: error instanceof Error ? error.message : 'Invalid request' },
-      400,
-    );
+    // Problem Details requires a non-empty `detail`, and `error instanceof Error`
+    // does not guarantee `error.message` is one — the same fallback the
+    // `HTTPException` branch in `onError` needs, for the same reason.
+    const detail =
+      error instanceof Error && error.message.length > 0
+        ? error.message
+        : 'Correct the request body.';
+    return problem(context, 'invalid-request', detail, [{ code: 'invalid-value', pointer: '' }]);
   }
 };
 
@@ -220,7 +244,9 @@ const validateCommitBody = validator<
 
 const validateSpaceId = validator('param', (value, context) => {
   const id = uuidSchema.safeParse(value['id']);
-  return id.success ? { id: id.data } : context.json({ message: 'Space id must be a UUID' }, 400);
+  return id.success
+    ? { id: id.data }
+    : problem(context, 'invalid-space-id', 'Use a UUID for the Space id.');
 });
 
 /**
@@ -240,17 +266,17 @@ const validateSpaceId = validator('param', (value, context) => {
 const unservedContractPath = (context: Context): Response | undefined => {
   if (context.req.path === SPACE_COLLECTION_PATH) {
     context.header('Allow', 'GET');
-    return context.body(null, 405);
+    return problem(context, 'method-not-allowed', 'Use GET for the Space collection.');
   }
   const resource = SPACE_RESOURCE_PATTERN.exec(context.req.path);
   if (resource === null) {
     return undefined;
   }
   if (!uuidSchema.safeParse(resource[1]).success) {
-    return context.json({ message: 'Space id must be a UUID' }, 400);
+    return problem(context, 'invalid-space-id', 'Use a UUID for the Space id.');
   }
   context.header('Allow', 'GET, PUT');
-  return context.body(null, 405);
+  return problem(context, 'method-not-allowed', 'Use GET or PUT for a Space resource.');
 };
 
 /**
@@ -302,7 +328,7 @@ export const createSpaceHttpApp = (
         return context.json(await repository.listSpaces(), 200);
       } catch (error) {
         invokeLogError(logError, 'Failed to list spaces', error);
-        return context.json({ message: 'Persistence service unavailable' }, 503);
+        return problem(context, 'persistence-unavailable', 'Try the request again later.');
       }
     })
     .get(SPACE_RESOURCE_PATH, validateSpaceId, async (context) => {
@@ -310,12 +336,12 @@ export const createSpaceHttpApp = (
       try {
         const loaded = await repository.loadSpace(id);
         if (loaded === undefined) {
-          return context.json({ message: `Space ${id} does not exist` }, 404);
+          return problem(context, 'not-found', `Choose a Space that exists; Space ${id} does not.`);
         }
         return context.json(encodeLoadedSpace(loaded), 200);
       } catch (error) {
         invokeLogError(logError, `Failed to load space ${id}`, error);
-        return context.json({ message: 'Persistence service unavailable' }, 503);
+        return problem(context, 'persistence-unavailable', 'Try the request again later.');
       }
     })
     .put(
@@ -328,7 +354,9 @@ export const createSpaceHttpApp = (
         const { id } = context.req.valid('param');
         const commit = context.req.valid('json');
         if (commit.snapshot.id !== id) {
-          return context.json({ message: 'Path id must match snapshot id' }, 400);
+          return problem(context, 'invalid-request', 'Use the path Space id as the snapshot id.', [
+            { code: 'invalid-value', pointer: '/snapshot/id' },
+          ]);
         }
         try {
           const result = await repository.commitSpace(commit.snapshot, commit.expectedRevision);
@@ -338,10 +366,19 @@ export const createSpaceHttpApp = (
           if (result.kind === 'conflict') {
             return context.json(encodeLoadedSpace(result.current), 409);
           }
-          return context.json({ message: result.message }, result.code === 'not-found' ? 404 : 422);
+          return problem(
+            context,
+            result.code === 'not-found' ? 'not-found' : 'invalid-snapshot',
+            result.code === 'not-found'
+              ? `Choose a Space that exists; ${result.message}`
+              : `Correct the snapshot: ${result.message}`,
+            result.code === 'invalid-snapshot'
+              ? [{ code: 'invalid-value', pointer: '/snapshot' }]
+              : undefined,
+          );
         } catch (error) {
           invokeLogError(logError, `Failed to commit space ${id}`, error);
-          return context.json({ message: 'Persistence service unavailable' }, 503);
+          return problem(context, 'persistence-unavailable', 'Try the request again later.');
         }
       },
     );
@@ -354,16 +391,21 @@ export const createSpaceHttpApp = (
       // off the declared contract, including the trailing slash an address bar
       // makes. The RPC docs independently say not to use it when a client
       // infers types.
-      context.json({ message: 'Not found' }, 404),
+      problem(context, 'not-found', 'Use a declared Space API path.'),
   );
   app.onError((error, context) => {
     // Answer through the context rather than `error.getResponse()`, whatever the
     // status. That method builds a bare `text/plain` Response carrying none of
-    // this application's policy — no `Cache-Control: no-store`, and a body the
-    // typed client cannot decode, since `HttpSpaceBackend` reads every non-200
-    // and non-409 commit response as `{ message }` JSON.
+    // this application's policy — no `Cache-Control: no-store`, and no Problem
+    // Details body for the typed client to decode.
     if (error instanceof HTTPException) {
-      return context.json({ message: error.message }, error.status);
+      const code = httpExceptionProblem(error.status);
+      // `new HTTPException(status)` with no `options.message` carries an empty
+      // `Error#message`, and Problem Details requires a non-empty `detail` —
+      // falling through to that constructor here is what the next comment
+      // warns about, so this cannot lean on the throw being caught.
+      const detail = error.message.length > 0 ? error.message : problemCatalogue[code].title;
+      return problem(context, code, detail);
     }
     // Never rethrow: Hono does not convert that into a 500, it re-invokes this
     // handler and lets the throw escape, so `app.fetch()` hands the host a
@@ -375,9 +417,38 @@ export const createSpaceHttpApp = (
     } catch {
       // A log sink that throws must not cost the caller its response either.
     }
-    return context.json({ message: 'Internal server error' }, 500);
+    return problem(context, 'internal-error', 'Try the request again later.');
   });
   return app;
+};
+
+const httpExceptionProblem = (status: number): HyperProblemCode => {
+  switch (status) {
+    case 400:
+      return 'invalid-request';
+    case 401:
+      return 'unauthorized';
+    case 403:
+      return 'forbidden';
+    case 404:
+      return 'not-found';
+    case 405:
+      return 'method-not-allowed';
+    case 408:
+      return 'request-timeout';
+    case 413:
+      return 'payload-too-large';
+    case 415:
+      return 'unsupported-media-type';
+    case 422:
+      return 'invalid-snapshot';
+    case 429:
+      return 'rate-limited';
+    case 503:
+      return 'persistence-unavailable';
+    default:
+      return 'internal-error';
+  }
 };
 
 export type SpaceHttpApp = ReturnType<typeof createSpaceHttpApp>;
