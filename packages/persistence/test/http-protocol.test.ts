@@ -3,13 +3,16 @@ import { describe, expect, it } from 'vitest';
 import { uuidSchema, type SpaceSnapshot } from '@project/core';
 import type { LoadedSpace } from '../src/backend';
 import {
+  decodeCommitRequest,
   decodeProblemDetails,
   decodeCommittedRevision,
   decodeLoadedSpace,
+  decodeSpaceSummaries,
   encodeProblemDetails,
   encodeLoadedSpace,
+  problemCodeForType,
 } from '../src/http-protocol';
-import type { HyperProblemCode } from '../src/http-protocol';
+import type { HyperProblemCode, HyperProblemType } from '../src/http-protocol';
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
@@ -148,5 +151,77 @@ describe('Problem Details', () => {
         errors: [{ code: 'invalid-value', pointer: 'snapshot/id' }],
       }),
     ).toThrow('JSON Pointer');
+  });
+
+  it('rejects a Problem Details value that is not an object', () => {
+    expect(() => decodeProblemDetails('nope')).toThrow('problem details must be an object');
+    expect(() => decodeProblemDetails(null)).toThrow('problem details must be an object');
+    expect(() => decodeProblemDetails([])).toThrow('problem details must be an object');
+  });
+
+  it('rejects a Problem Details type that is not a string', () => {
+    expect(() =>
+      decodeProblemDetails({ type: 404, title: 'Not found', status: 404, detail: 'x' }),
+    ).toThrow('problem type must be a string');
+  });
+
+  it('rejects a Problem Details title or status that disagrees with its type', () => {
+    const valid = encodeProblemDetails('not-found', 'Missing.');
+    expect(() => decodeProblemDetails({ ...valid, title: 'Wrong title' })).toThrow(
+      'problem title does not match its type',
+    );
+    expect(() => decodeProblemDetails({ ...valid, status: 400 })).toThrow(
+      'problem status does not match its type',
+    );
+  });
+
+  it('rejects a Problem Details detail that is missing or empty', () => {
+    const valid = encodeProblemDetails('not-found', 'Missing.');
+    expect(() => decodeProblemDetails({ ...valid, detail: 42 })).toThrow(
+      'problem detail must be non-empty',
+    );
+    expect(() => decodeProblemDetails({ ...valid, detail: '' })).toThrow(
+      'problem detail must be non-empty',
+    );
+  });
+
+  it('rejects a Problem Details errors extension that is not a non-empty array', () => {
+    const valid = encodeProblemDetails('not-found', 'Missing.');
+    expect(() => decodeProblemDetails({ ...valid, errors: 'nope' })).toThrow(
+      'problem errors must be a non-empty array',
+    );
+    expect(() => decodeProblemDetails({ ...valid, errors: [] })).toThrow(
+      'problem errors must be a non-empty array',
+    );
+  });
+
+  it('rejects a Problem Details errors entry with an unknown code', () => {
+    const valid = encodeProblemDetails('not-found', 'Missing.');
+    expect(() =>
+      decodeProblemDetails({ ...valid, errors: [{ code: 'nope', pointer: '/x' }] }),
+    ).toThrow('problem error has an unknown code');
+  });
+
+  it('rejects an unrecognized problem type at the codeForType boundary', () => {
+    expect(() => problemCodeForType('https://hyper.dev/problems/nope' as HyperProblemType)).toThrow(
+      'problem details has an unknown type',
+    );
+  });
+
+  it('falls back to "snapshot" when a schema failure has no field path', () => {
+    expect(() => decodeCommitRequest({ snapshot: null, expectedRevision: '0' })).toThrow(
+      /snapshot is invalid: snapshot /,
+    );
+  });
+});
+
+describe('space summaries', () => {
+  it('rejects a summary with a missing or empty title', () => {
+    expect(() => decodeSpaceSummaries([{ id: SPACE_ID, title: '' }])).toThrow(
+      'space summary title must be non-empty',
+    );
+    expect(() => decodeSpaceSummaries([{ id: SPACE_ID, title: 42 }])).toThrow(
+      'space summary title must be non-empty',
+    );
   });
 });

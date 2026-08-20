@@ -1,6 +1,6 @@
 import { uuidSchema, type SpaceSnapshot } from '@project/core';
 import { encodeLoadedSpace, encodeProblemDetails } from '@project/persistence';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { HttpSpaceBackend } from '@project/http';
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
@@ -140,5 +140,69 @@ describe('HTTP Space backend Problem Details decoding', () => {
       kind: 'conflict',
       current,
     });
+  });
+
+  it('omits Retry-After when a rate-limited response does not send one', async () => {
+    await expect(
+      backendAnswering(problemResponse('rate-limited', 'Slow down')).commitSpace(snapshot, 0n),
+    ).resolves.toEqual({
+      kind: 'retryable-failure',
+      code: 'rate-limited',
+      message: 'Slow down',
+    });
+  });
+
+  it('treats a non-Error throw while decoding the body as a malformed response', async () => {
+    const response = {
+      status: 500,
+      headers: new Headers({ 'Content-Type': 'application/problem+json' }),
+      // A caller's Response-like stand-in can reject with anything; that is the regression case.
+      // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors
+      json: () => Promise.reject('boom'),
+    } as unknown as Response;
+
+    await expect(backendAnswering(response).commitSpace(snapshot, 0n)).resolves.toEqual({
+      kind: 'permanent-failure',
+      code: 'protocol',
+      message: 'Malformed response',
+    });
+  });
+
+  it('treats a non-Error network rejection with a generic message', async () => {
+    const backend = new HttpSpaceBackend('http://example.test', {
+      // A caller-injected fetch can reject with anything; that is the regression case.
+      // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors
+      fetch: () => Promise.reject('offline'),
+    });
+
+    await expect(backend.commitSpace(snapshot, 0n)).resolves.toEqual({
+      kind: 'retryable-failure',
+      code: 'network',
+      message: 'Network request failed',
+    });
+  });
+});
+
+describe('HTTP Space backend transport', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('falls back to the global fetch when none is injected', async () => {
+    const globalFetch = vi.fn(() =>
+      Promise.resolve(new Response(JSON.stringify([]), { status: 200 })),
+    );
+    vi.stubGlobal('fetch', globalFetch);
+
+    const backend = new HttpSpaceBackend('http://example.test');
+
+    await expect(backend.listSpaces()).resolves.toEqual([]);
+    expect(globalFetch).toHaveBeenCalledOnce();
+  });
+
+  it('rejects an unsuccessful load by status rather than decoding it', async () => {
+    await expect(
+      backendAnswering(new Response('gateway', { status: 502 })).loadSpace(SPACE_ID),
+    ).rejects.toThrow('Unable to load space: HTTP 502');
   });
 });

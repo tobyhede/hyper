@@ -7,7 +7,7 @@ import {
   type SpaceResourceRepository,
 } from '@project/persistence';
 import { HTTPException } from 'hono/http-exception';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { createSpaceHttpApp, MAX_COMMIT_BODY_BYTES } from '@project/http';
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
@@ -413,6 +413,41 @@ describe('Space HTTP application', () => {
     expect(pulled).toBeLessThanOrEqual(MAX_COMMIT_BODY_BYTES * 16);
   });
 
+  // A client that disconnects mid-drain costs its own connection, not the 413
+  // this app already decided to answer with — the drain's own read failure
+  // must not turn into a second, worse response.
+  it('still answers 413 when the client vanishes mid-drain', async () => {
+    let reads = 0;
+    const flaky = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        reads += 1;
+        if (reads > 20) {
+          controller.error(new Error('client disconnected'));
+          return;
+        }
+        controller.enqueue(new Uint8Array(64 * 1024));
+      },
+    });
+
+    const response = await createSpaceHttpApp(repository()).request(`/api/spaces/${SPACE_ID}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: flaky,
+      duplex: 'half',
+    } as RequestInit);
+
+    expect(response.status).toBe(413);
+  });
+
+  it('proceeds past the body-size guard when the request has no body at all', async () => {
+    const response = await createSpaceHttpApp(repository()).request(`/api/spaces/${SPACE_ID}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+    expect(response.status).toBe(400);
+  });
+
   // The limit is a maximum, not a threshold the body must stay under. Both size
   // checks compare with `>`, and neither existing case would notice one of them
   // becoming `>=` — the oversize tests would still pass while every commit of
@@ -730,6 +765,20 @@ describe('Space HTTP application', () => {
     },
   );
 
+  it('logs through the default console sink when no logError option is given', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    const app = createSpaceHttpApp(
+      repository({ listSpaces: () => Promise.reject(new Error('database is down')) }),
+    );
+    const response = await app.request('/api/spaces');
+
+    expect(consoleError).toHaveBeenCalledWith('Failed to list spaces', expect.any(Error));
+    await expectProblem(response, 'persistence-unavailable', 'Try the request again later.');
+
+    consoleError.mockRestore();
+  });
+
   // Hono does not turn a rethrow from `onError` into a 500: it re-invokes the
   // custom handler and lets the throw escape, so `app.fetch()` returns a
   // rejected promise. A host without a `.catch` then has an unhandled rejection
@@ -760,9 +809,16 @@ describe('Space HTTP application', () => {
    */
   it.each([
     [401, 'unauthorized'],
+    [403, 'forbidden'],
     [404, 'not-found'],
     [405, 'method-not-allowed'],
+    [408, 'request-timeout'],
+    [413, 'payload-too-large'],
+    [415, 'unsupported-media-type'],
     [422, 'invalid-snapshot'],
+    [429, 'rate-limited'],
+    [503, 'persistence-unavailable'],
+    [418, 'internal-error'],
   ] as const)(
     'answers an HTTPException with %i in the declared JSON error shape',
     async (status, code) => {
