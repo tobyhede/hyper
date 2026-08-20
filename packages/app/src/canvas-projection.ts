@@ -104,6 +104,14 @@ export function canvasProjection(
       // Activating a Graph emphasises it; it never hides the rest of the Space.
       const emphasis: GraphEmphasis = activeGraphId === null ? 'equal' : 'subtle';
 
+      // A layout's routed Edge geometry describes the arrangement it computed,
+      // so it stops being true once a Card is dragged out of it. From then on
+      // the Edges fall back to plain curves between wherever the Cards now are
+      // — which is what a positioned view draws anyway, since it routes nothing.
+      const edgeOptions = interaction.moved
+        ? { activeGraphId, emphasis }
+        : { activeGraphId, emphasis, strategyGraph: laidOut };
+
       return {
         nodes: projectCardNodes(space, handles, colors, {
           activeCardId: interaction.activeCardId,
@@ -116,15 +124,7 @@ export function canvasProjection(
           nodeHeight: CARD_HEIGHT,
           cardIds,
         }),
-        // A layout's routed Edge geometry describes the arrangement it computed,
-        // so it stops being true once a Card is dragged out of it. From then on
-        // the Edges fall back to plain curves between wherever the Cards now are
-        // — which is what a positioned view draws anyway, since it routes nothing.
-        edges: projectGraphEdges(edges, colors, {
-          activeGraphId,
-          emphasis,
-          ...(interaction.moved ? {} : { strategyGraph: laidOut }),
-        }),
+        edges: projectGraphEdges(edges, colors, edgeOptions),
       };
     },
   };

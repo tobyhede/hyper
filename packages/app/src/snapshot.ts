@@ -48,19 +48,22 @@ export const createWorkingSpaceReader = (): ((snapshot: SpaceSnapshot) => Space)
  * space-level collection for it to go back into. Every graph reaches the wire
  * inside the layout that owns it, which `space.layouts` already carries.
  */
-export const snapshotFromSpace = (space: Space): SpaceSnapshot => ({
-  id: space.id,
-  document: {
+export const snapshotFromSpace = (space: Space): SpaceSnapshot => {
+  const document: SpaceSnapshot['document'] = {
     version: SPACE_FILE_VERSION,
     title: space.title,
-    ...(space.layouts.length > 0 ? { layouts: [...space.layouts] } : {}),
-    ...(space.defaultRenderer !== undefined ? { defaultRenderer: space.defaultRenderer } : {}),
-  },
-  cards: space.cards.map(({ id, ...document }) => ({
-    id,
+  };
+  if (space.layouts.length > 0) document.layouts = [...space.layouts];
+  if (space.defaultRenderer !== undefined) document.defaultRenderer = space.defaultRenderer;
+  return {
+    id: space.id,
     document,
-  })),
-});
+    cards: space.cards.map(({ id, ...rest }) => ({
+      id,
+      document: rest,
+    })),
+  };
+};
 
 /**
  * The graphs a Card has left, with every Edge incident to it gone.

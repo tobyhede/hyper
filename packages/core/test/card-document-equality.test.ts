@@ -87,17 +87,22 @@ describe('a stored markdown document is the card less its id', () => {
   const bodies = [undefined, '', 'source'];
   const kinds = [undefined, 'markdown', 'alias'];
 
+  /** One combination from the title/body/kind product, present only when drawn. */
+  interface CandidateDocument {
+    title: string;
+    body?: string;
+    kind?: string;
+  }
+
   it('accepts a document exactly when the card accepts it with an id', () => {
     const disagreements: string[] = [];
     let examined = 0;
     for (const title of titles) {
       for (const body of bodies) {
         for (const kind of kinds) {
-          const document = {
-            title,
-            ...(body === undefined ? {} : { body }),
-            ...(kind === undefined ? {} : { kind }),
-          };
+          const document: CandidateDocument = { title };
+          if (body !== undefined) document.body = body;
+          if (kind !== undefined) document.kind = kind;
           examined += 1;
           const asDocument = markdownCardDocumentSchema.safeParse(document);
           const asCard = markdownCardSchema.safeParse({ ...document, id: CARD_ID });

@@ -628,11 +628,9 @@ export function useEdgeAuthoring({
           endpoint,
           cardId: card.id,
         });
-        return {
-          id: card.id,
-          title: card.title,
-          ...(eligibility.kind === 'refused' ? { refusal: eligibility.reason } : {}),
-        };
+        return eligibility.kind === 'refused'
+          ? { id: card.id, title: card.title, refusal: eligibility.reason }
+          : { id: card.id, title: card.title };
       }),
     [subjectCards],
   );
@@ -682,11 +680,9 @@ export function useEdgeAuthoring({
         from: connectTarget,
         to: card.id,
       });
-      return {
-        id: card.id,
-        title: card.title,
-        ...(eligibility.kind === 'refused' ? { refusal: eligibility.reason } : {}),
-      };
+      return eligibility.kind === 'refused'
+        ? { id: card.id, title: card.title, refusal: eligibility.reason }
+        : { id: card.id, title: card.title };
     });
   }, [connectTarget, subjectCards, authoring]);
 

@@ -176,10 +176,7 @@ const retryableForStatus = async (
   const retryAfterMs = honoursRetryAfter ? retryAfterMilliseconds(response) : undefined;
   const message = await optionalErrorMessage(response);
   if (signal.aborted) throw new HttpTimeoutError();
-  return {
-    kind: 'retryable-failure',
-    code,
-    message: message ?? fallback,
-    ...(retryAfterMs === undefined ? {} : { retryAfterMs }),
-  };
+  const result: CommitResult = { kind: 'retryable-failure', code, message: message ?? fallback };
+  if (retryAfterMs !== undefined) result.retryAfterMs = retryAfterMs;
+  return result;
 };

@@ -5,7 +5,8 @@ import contractJson from './contract.json' with { type: 'json' };
 
 const databaseUrl = process.env['DATABASE_URL']?.trim();
 
-export const db = postgres<Contract>({
-  contractJson,
-  ...(databaseUrl ? { url: databaseUrl } : {}),
-});
+const options: Parameters<typeof postgres<Contract>>[0] = databaseUrl
+  ? { contractJson, url: databaseUrl }
+  : { contractJson };
+
+export const db = postgres<Contract>(options);

@@ -267,14 +267,13 @@ function reconcile(
     // live node. `handles` must come through: React Flow builds `handleBounds`
     // from the declaration rather than measuring the DOM (docs/agents/rendering.md), so a live
     // node that kept a stale set would resolve a new Edge against the handles the
-    // Card had before it gained one. The conditional spreads are for
-    // `exactOptionalPropertyTypes`; the projection always sets a className.
-    return {
-      ...live,
-      data: node.data,
-      ...(node.handles !== undefined ? { handles: node.handles } : {}),
-      ...(node.className !== undefined ? { className: node.className } : {}),
-    };
+    // Card had before it gained one. `handles`/`className` are assigned only when
+    // the projection sets them, for `exactOptionalPropertyTypes`; the projection
+    // always sets a className.
+    const merged: CardFlowNode = { ...live, data: node.data };
+    if (node.handles !== undefined) merged.handles = node.handles;
+    if (node.className !== undefined) merged.className = node.className;
+    return merged;
   });
 }
 

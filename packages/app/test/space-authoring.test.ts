@@ -212,6 +212,26 @@ function testResolver() {
   });
 }
 
+/** Builds `AuthoringOptions`: mutable so a key can be added only when present. */
+interface AuthoringExtras {
+  reportObserverError?: (error: unknown) => void;
+  newId?: () => UUID;
+}
+
+/** `AuthoringOptions`, built so an absent option is an absent key rather than an explicit `undefined`. */
+function authoringExtras({
+  reportObserverError,
+  newId,
+}: {
+  reportObserverError: ((error: unknown) => void) | undefined;
+  newId: (() => UUID) | undefined;
+}): AuthoringOptions {
+  const extras: AuthoringExtras = {};
+  if (reportObserverError !== undefined) extras.reportObserverError = reportObserverError;
+  if (newId !== undefined) extras.newId = newId;
+  return extras;
+}
+
 function attachAuthoring(
   backend: SpaceBackend,
   loaded: LoadedFixture,
@@ -234,8 +254,7 @@ function attachAuthoring(
     resolveRenderer,
     initialPlacement:
       resolved.kind === 'view' ? null : Placement.fromLayout(resolved.resolvedLayout.layout),
-    ...(reportObserverError !== undefined ? { reportObserverError } : {}),
-    ...(newId !== undefined ? { newId } : {}),
+    ...authoringExtras({ reportObserverError, newId }),
   });
   return { backend, session, navigation, authoring };
 }
@@ -264,8 +283,7 @@ function openAuthoring(
       navigation,
       currentSpace,
       resolveRenderer,
-      ...(reportObserverError !== undefined ? { reportObserverError } : {}),
-      ...(newId !== undefined ? { newId } : {}),
+      ...authoringExtras({ reportObserverError, newId }),
     }),
   };
 }

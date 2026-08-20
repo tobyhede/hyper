@@ -119,6 +119,12 @@ function connections(
   return createConnectionCompletion({ adapter: store, authoring, reportInvariant });
 }
 
+/** The two `createSpaceAuthoring` options `sessionBackedAdapter` forwards, present only when given. */
+interface SessionBackedAdapterExtras {
+  initialPlacement?: Placement;
+  newId?: () => UUID;
+}
+
 /**
  * A real Session, Navigation and Authoring behind one render adapter. The spy
  * above answers what the adapter was *told*; this answers what a Space ends up
@@ -147,13 +153,15 @@ function sessionBackedAdapter(
     newGraphId: () => uuidSchema.parse('00000000-0000-4000-8000-0000000000ff'),
   });
   const navigation = createNavigation(currentSpace, resolveRenderer, renderer);
+  const extras: SessionBackedAdapterExtras = {};
+  if (initialPlacement !== undefined) extras.initialPlacement = initialPlacement;
+  if (newId !== undefined) extras.newId = newId;
   const authoring = createSpaceAuthoring({
     session,
     navigation,
     currentSpace,
     resolveRenderer,
-    ...(initialPlacement !== undefined ? { initialPlacement } : {}),
-    ...(newId !== undefined ? { newId } : {}),
+    ...extras,
   });
   return { session, authoring, store: createRenderAdapter(authoring) };
 }

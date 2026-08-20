@@ -1095,6 +1095,9 @@ export function createSpaceAuthoring({
           .join('; ')}`,
       );
     }
+    const created: { createdCardId?: CardId; createdGraphId?: GraphId } = {};
+    if (createdCard !== null) created.createdCardId = createdCard.id;
+    if (createdGraphId !== undefined) created.createdGraphId = createdGraphId;
     return {
       kind: 'completed',
       edit: {
@@ -1102,8 +1105,7 @@ export function createSpaceAuthoring({
         placement: completedPlacement,
         nextActiveGraphId: activeGraphId,
         nextRenderer: { kind: 'layout', layoutId },
-        ...(createdCard !== null ? { createdCardId: createdCard.id } : {}),
-        ...(createdGraphId !== undefined ? { createdGraphId } : {}),
+        ...created,
       },
     };
   };
@@ -1169,11 +1171,10 @@ export function createSpaceAuthoring({
     if (derived.kind !== 'completed') return derived;
     const { createdCardId, createdGraphId } = derived.edit;
     installCompletedEdit(derived.edit);
-    return {
-      kind: 'completed',
-      ...(createdCardId !== undefined ? { createdCardId } : {}),
-      ...(createdGraphId !== undefined ? { createdGraphId } : {}),
-    };
+    const created: { createdCardId?: CardId; createdGraphId?: GraphId } = {};
+    if (createdCardId !== undefined) created.createdCardId = createdCardId;
+    if (createdGraphId !== undefined) created.createdGraphId = createdGraphId;
+    return { kind: 'completed', ...created };
   };
 
   let completing = false;
