@@ -1,7 +1,7 @@
 # Render a Space Card as a sub flow
 
 Status: needs-triage
-Blocked by: 02 — Grill the Space Card model (resolved; ADR 0058)
+Blocked by: 02 — Grill the Space Card model (resolved; ADR 0058); 03 — Build the Space Card kind in core
 
 Surfaced by: asking how a Space Card should be drawn, while deciding the View
 interface for ADR 0045
@@ -78,6 +78,4 @@ and says nothing about Space nesting.
 
 ## Suggested next step
 
-Schedulable now that Issue 02 has landed. Still needs the kind actually built
-in `core` (schema, import/export paths) before this rendering work can start —
-that's its own implementation ticket, not this one.
+Blocked on Issue 03 (build the kind in `core`). Schedulable once that lands.
