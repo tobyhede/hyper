@@ -1460,8 +1460,8 @@ test('a Card offers a keyboard Connect control that authors an Edge', async ({ p
  * **Only a browser answers this one.** Two of the facts it turns on are the
  * host's rather than the app's. The press goes wherever focus really is, not to
  * an element a test names — so the second stage exists only if closing the list
- * really does hand focus back inside the picker. And Radix closes from a
- * document capture listener whose React flush lands in the microtask checkpoint
+ * really does hand focus back inside the picker. And Base UI closes from a
+ * document listener whose React flush lands in the microtask checkpoint
  * *between* listeners, which unmounts the list before React's own delegated
  * listener can dispatch the press anywhere; jsdom performs no such checkpoint,
  * dispatching a whole event in one JS frame, so it reaches the two stages by a
@@ -1492,10 +1492,10 @@ test('Escape closes the connect picker’s list before it cancels the connection
   await expect(page.getByRole('listbox', { name: 'Connect to' })).toHaveCount(0);
   await expect(trigger).toHaveAttribute('aria-expanded', 'false');
   await expect(picker).toBeVisible();
-  // **The handoff, asserted rather than assumed.** Radix restores focus from a
-  // `setTimeout(0)` in the focus scope's unmount, so for a moment after the list
-  // goes there is nothing focused inside the picker and a press would reach no
-  // handler at all. A human never presses that fast; a test does.
+  // **The handoff, asserted rather than assumed.** Base UI restores focus from
+  // a `queueMicrotask` in the focus manager's unmount, so for a moment after
+  // the list goes there is nothing focused inside the picker and a press would
+  // reach no handler at all. A human never presses that fast; a test does.
   await expect(trigger).toBeFocused();
 
   await page.keyboard.press('Escape');

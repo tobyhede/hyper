@@ -11,7 +11,7 @@ import {
 } from '@project/core';
 import { Placement, graphCardIds, type ResolvedContentCard } from '@project/graph';
 import type { OpenedSpace } from './space';
-import { createSpaceAuthoring } from './space-authoring';
+import { createSpaceAuthoring, type AuthoringRefusal } from './space-authoring';
 import { describeAuthoringRefusal } from './authoring-refusal';
 import { createRenderAdapter, selectedCardOf, type EdgeSubject } from './render-adapter';
 import { createConnectionCompletion } from './connection-completion';
@@ -28,7 +28,7 @@ import { activeGraphColor } from './colors';
 import { createRendererResolver, defaultRenderer, type CanvasRendererId } from './renderer';
 import { ADD_CARD_KEY, SpaceCanvas } from './components/SpaceCanvas';
 import { CanvasCentre, type VisibleCentre } from './components/CanvasCentre';
-import { NewAlias, type CreatedAliasRefusal } from './components/NewAlias';
+import { NewAlias } from './components/NewAlias';
 import { OpenCard } from './components/OpenCard';
 import { PlacementFailure } from './components/PlacementFailure';
 import { PlacementPending } from './components/PlacementPending';
@@ -95,7 +95,7 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
      * than a partial entity. Closing it creates nothing.
      */
     const [creatingAlias, setCreatingAlias] = useState(false);
-    const [aliasRefusal, setAliasRefusal] = useState<CreatedAliasRefusal | null>(null);
+    const [aliasRefusal, setAliasRefusal] = useState<AuthoringRefusal | null>(null);
     /** The Card a completed creation asks the canvas to open its name editor on. */
     const [createdCardId, setCreatedCardId] = useState<CardId | null>(null);
     const rendererSpace = useMemo(
@@ -321,9 +321,15 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
     /**
      * Add Alias: the Target choice *is* the creation (ADR 0009's storyboard).
      *
-     * A refusal keeps the surface open with its reason, because both of them are
-     * about the Target the author just chose — it has left the Space, or it is
-     * an Alias itself — and closing would take away the field that answers them.
+     * A refusal keeps the surface open with its reason, because the two the
+     * creation can raise are about the Target the author just chose — it has
+     * left the Space, or it is an Alias itself — and closing would take away the
+     * field that answers them.
+     *
+     * Handed on whole rather than checked against that pair first. The check was
+     * a string comparison ending in a `throw`, which is a crash inside a React
+     * event callback — a blank canvas — for the one case it was written to catch,
+     * and the pane places every refusal it is given.
      */
     const createAlias = useCallback(
       (target: CardId, title: string) => {
@@ -336,14 +342,6 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
           anchor: centreAnchor(),
         });
         if (created.kind === 'refused') {
-          if (
-            created.refusal.code !== 'placement-pending' &&
-            created.refusal.code !== 'layout-not-found' &&
-            created.refusal.code !== 'alias-target-not-found' &&
-            created.refusal.code !== 'alias-target-must-own-content'
-          ) {
-            throw new Error(`Unexpected Add Alias refusal: ${created.refusal.code}`);
-          }
           setAliasRefusal(created.refusal);
           return;
         }

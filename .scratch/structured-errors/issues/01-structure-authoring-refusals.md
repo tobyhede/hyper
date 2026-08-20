@@ -17,3 +17,12 @@ field placement and recovery in application composition.
   failures remain represented only by workspace persistence states.
 - [x] Update property, unit, Ladle and application browser coverage.
 - [x] `pnpm verify`, `pnpm e2e` and `pnpm e2e:ladle` pass.
+
+## Comments
+
+An audit of the New Alias follow-up found that the global placement result can
+make a pane accept an impossible refusal while rendering it away from the field
+the placement names. Issue
+[03 — Route Authoring refusals once per surface](03-route-refusals-per-surface.md)
+tracks the pane-specific presentation adapter; this issue remains done because
+its structured identity and application-owned placement decision shipped.

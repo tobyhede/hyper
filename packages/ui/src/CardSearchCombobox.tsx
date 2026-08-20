@@ -54,6 +54,22 @@ export function CardSearchCombobox({
   const emptyDescriptionId = useId();
   const chosen = choices.find((choice) => choice.id === value) ?? null;
   const unavailable = choices.length === 0;
+  /*
+   * The empty-list note is an addition to the caller's description, never a
+   * replacement for it. The two are true at once on a real screen: an Alias
+   * whose Target has left the Space is refused *and* has no eligible Card left
+   * to choose, so the field carries a `FieldError` and an empty list together.
+   * Overwriting left `aria-invalid="true"` announcing a problem whose sentence
+   * no assistive technology could reach.
+   *
+   * The caller's id leads, because `aria-describedby` is announced in the order
+   * it names: a refusal is what the author has to act on, and the note saying
+   * the list is empty is the context under it.
+   */
+  const descriptions = [
+    inputAttributes?.['aria-describedby'],
+    unavailable ? emptyDescriptionId : undefined,
+  ].filter((id) => id !== undefined && id !== '');
 
   return (
     <div ref={fieldRef} className="w-full">
@@ -72,11 +88,7 @@ export function CardSearchCombobox({
           ref={inputRef}
           id={inputId}
           aria-label={label}
-          aria-describedby={
-            [inputAttributes?.['aria-describedby'], unavailable ? emptyDescriptionId : undefined]
-              .filter(Boolean)
-              .join(' ') || undefined
-          }
+          aria-describedby={descriptions.length === 0 ? undefined : descriptions.join(' ')}
           data-testid={testId}
           placeholder={placeholder}
         >

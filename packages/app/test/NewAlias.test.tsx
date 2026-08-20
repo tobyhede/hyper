@@ -115,6 +115,53 @@ describe('NewAlias', () => {
     );
   });
 
+  it('attaches a Title refusal to the Title field', () => {
+    render(
+      <NewAlias
+        targets={targets}
+        refusal={{ code: 'card-title-required' }}
+        onCreate={() => undefined}
+        onCancel={() => undefined}
+        onRefusalStale={() => undefined}
+      />,
+    );
+
+    const alert = screen.getByRole('alert');
+    expect(alert).toHaveTextContent('A Card title is required.');
+    expect(alert.closest('[data-slot="field"]')).toContainElement(
+      screen.getByTestId('new-alias-title'),
+    );
+    expect(screen.getByTestId('new-alias-title')).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.getByTestId('new-alias-title')).toHaveAccessibleDescription(
+      'A Card title is required.',
+    );
+    expect(screen.getByRole('combobox', { name: 'Target' })).toHaveAttribute(
+      'aria-invalid',
+      'false',
+    );
+  });
+
+  it('shows a refusal that neither field can correct as form feedback', () => {
+    render(
+      <NewAlias
+        targets={targets}
+        refusal={{ code: 'layout-not-found' }}
+        onCreate={() => undefined}
+        onCancel={() => undefined}
+        onRefusalStale={() => undefined}
+      />,
+    );
+
+    const alert = screen.getByRole('alert');
+    expect(alert).toHaveTextContent('This Layout is no longer part of the Space.');
+    expect(alert.closest('.card-pane__fields')).toBeNull();
+    expect(screen.getByTestId('new-alias-title')).toHaveAttribute('aria-invalid', 'false');
+    expect(screen.getByRole('combobox', { name: 'Target' })).toHaveAttribute(
+      'aria-invalid',
+      'false',
+    );
+  });
+
   it('says nothing while there is no refusal to go stale', () => {
     const staleRefusal = vi.fn();
     render(

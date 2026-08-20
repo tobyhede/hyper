@@ -24,7 +24,8 @@ import {
 } from '@project/ui';
 import { CardPane } from './CardPane';
 import { paneInitialFocus } from './pane-focus';
-import { presentAuthoringRefusal } from '../authoring-refusal';
+import { presentAliasCardRefusal, presentMarkdownCardRefusal } from '../authoring-refusal';
+import { GRAPH_PALETTE } from '../colors';
 import type { AuthoringRefusal } from '../space-authoring';
 
 /**
@@ -275,7 +276,12 @@ function MarkdownCardEditor({
 }) {
   const [draft, setDraft] = useState<MarkdownDraft>(() => seedMarkdown(content));
   const [contentRefusal, setContentRefusal] = useState<string | null>(null);
+  const [authoringRefusal, setAuthoringRefusal] = useState<AuthoringRefusal | null>(null);
   const body = useRef<HTMLTextAreaElement>(null);
+  const authoringErrors =
+    authoringRefusal === null ? { fields: {} } : presentMarkdownCardRefusal(authoringRefusal);
+  const titleError = draft.titleError ?? authoringErrors.fields.title ?? null;
+  const formError = contentRefusal ?? authoringErrors.form ?? null;
 
   const submit = (event: FormEvent<HTMLFormElement>): void => {
     event.preventDefault();
@@ -287,12 +293,7 @@ function MarkdownCardEditor({
     }
     const refusal = onComplete(settled.card);
     if (refusal !== null) {
-      const presentation = presentAuthoringRefusal(refusal);
-      if (presentation.placement === 'title') {
-        setDraft({ ...draft, titleError: presentation.message });
-      } else {
-        setContentRefusal(presentation.message);
-      }
+      setAuthoringRefusal(refusal);
       return;
     }
     onCancel();
@@ -305,14 +306,15 @@ function MarkdownCardEditor({
       subjectTitle={content.title}
       graphColor={graphColor}
       title={draft.title}
-      titleError={draft.titleError}
+      titleError={titleError}
       titleStartsFocused={titleStartsFocused}
       onTitleChange={(title) => {
         setDraft({ ...draft, title, titleError: null });
         setContentRefusal(null);
+        setAuthoringRefusal(null);
       }}
       onTitleEnter={() => body.current?.focus()}
-      error={contentRefusal}
+      error={formError}
       errorId="open-card-error"
       onSubmit={submit}
       onCancel={onCancel}
@@ -330,6 +332,7 @@ function MarkdownCardEditor({
           onChange={(event) => {
             setDraft({ ...draft, body: event.currentTarget.value });
             setContentRefusal(null);
+            setAuthoringRefusal(null);
           }}
         />
       </Field>
@@ -351,19 +354,19 @@ function AliasCardEditor({
 }) {
   const [title, setTitle] = useState(alias.title);
   const [target, setTarget] = useState<CardId>(alias.target);
-  const [titleError, setTitleError] = useState<string | null>(null);
-  const [targetError, setTargetError] = useState<string | null>(null);
-  const [formError, setFormError] = useState<string | null>(null);
+  const [authoringRefusal, setAuthoringRefusal] = useState<AuthoringRefusal | null>(null);
   const targetInput = useRef<HTMLInputElement>(null);
+  const errors =
+    authoringRefusal === null ? { fields: {} } : presentAliasCardRefusal(authoringRefusal);
+  const titleError = errors.fields.title ?? null;
+  const targetError = errors.fields.target ?? null;
+  const formError = errors.form ?? null;
 
   const submit = (event: FormEvent<HTMLFormElement>): void => {
     event.preventDefault();
     const refusal = occurrence.onEdit({ title: title.trim(), target });
     if (refusal !== null) {
-      const presentation = presentAuthoringRefusal(refusal);
-      if (presentation.placement === 'title') setTitleError(presentation.message);
-      else if (presentation.placement === 'target') setTargetError(presentation.message);
-      else setFormError(presentation.message);
+      setAuthoringRefusal(refusal);
       return;
     }
     // A completed Done closes the pane through the same callback as Cancel.
@@ -379,8 +382,7 @@ function AliasCardEditor({
       titleStartsFocused={false}
       onTitleChange={(nextTitle) => {
         setTitle(nextTitle);
-        setTitleError(null);
-        setFormError(null);
+        setAuthoringRefusal(null);
       }}
       onTitleEnter={() => targetInput.current?.focus()}
       error={formError}
@@ -417,8 +419,7 @@ function AliasCardEditor({
             const parsed = uuidSchema.safeParse(chosen);
             if (!parsed.success) return;
             setTarget(parsed.data);
-            setTargetError(null);
-            setFormError(null);
+            setAuthoringRefusal(null);
           }}
         />
         <FieldError id="open-alias-target-error">{targetError}</FieldError>
@@ -457,7 +458,7 @@ export function OpenCard(props: OpenCardProps) {
     <MarkdownCardEditor
       key={props.card.id}
       content={props.card}
-      graphColor={props.graphColor ?? '#6ea8fe'}
+      graphColor={props.graphColor ?? GRAPH_PALETTE[0]}
       onComplete={props.onComplete}
       onCancel={onCancel}
     />
@@ -465,7 +466,7 @@ export function OpenCard(props: OpenCardProps) {
     <AliasCardEditor
       key={props.through.id}
       alias={props.through}
-      graphColor={props.graphColor ?? '#6ea8fe'}
+      graphColor={props.graphColor ?? GRAPH_PALETTE[0]}
       occurrence={props.occurrence}
       onCancel={onCancel}
     />
