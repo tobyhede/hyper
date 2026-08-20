@@ -25,6 +25,7 @@ export type UnsafeDictionary = {
 };
 
 export type WideningTargetKind =
+	| "any"
 	| "anonymous object"
 	| "generic container"
 	| "object"
@@ -343,6 +344,7 @@ export function classifyWideningTarget(
 ): WideningTarget | null {
 	const unwrapped = unwrapTransparentType(type);
 	if (unwrapped.type === "TSUnknownKeyword") return { kind: "unknown" };
+	if (unwrapped.type === "TSAnyKeyword") return { kind: "any" };
 	if (unwrapped.type === "TSObjectKeyword") return { kind: "object" };
 	if (unwrapped.type === "TSTypeLiteral") {
 		return unwrapped.members.some((member) => member.type === "TSIndexSignature")
@@ -416,6 +418,7 @@ function classifyAliasBroadTarget(
 ): WideningTarget | null {
 	const unwrapped = unwrapTransparentType(type);
 	if (unwrapped.type === "TSUnknownKeyword") return { kind: "unknown" };
+	if (unwrapped.type === "TSAnyKeyword") return { kind: "any" };
 	if (unwrapped.type === "TSObjectKeyword") return { kind: "object" };
 	if (unwrapped.type === "TSTypeLiteral") {
 		return unwrapped.members.some((member) => member.type === "TSIndexSignature")

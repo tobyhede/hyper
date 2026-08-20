@@ -187,6 +187,19 @@
       }
     },
     {
+      // `rule-fixture.ts` shells out to the real `oxlint` binary and parses its
+      // JSON report — an external process's output with no declared type on
+      // either side. `runOxlint`'s `unknown` return, `isOxlintReport`'s and
+      // `isExecFileError`'s `unknown` parameters and `typeof` checks are that
+      // boundary itself, the same category as `schema.ts`'s preprocessors above.
+      "files": ["test/unit/anti-slop/rule-fixture.ts"],
+      "rules": {
+        "anti-slop/no-runtime-typeof": "off",
+        "anti-slop/no-unknown-returns": "off",
+        "anti-slop/no-unknown-parameters": "off"
+      }
+    },
+    {
       // This file's whole job is loading a dynamically `import()`-ed module and
       // validating its shape before treating it as `SpaceHttpRuntime` —
       // `FetchApplication.fetch`'s `env`, `SpaceHttpRuntime.createApp`'s
@@ -283,11 +296,14 @@
       // itself: `rules` is genuinely keyed by an open-ended, ESLint-ecosystem-
       // wide set of rule names with a heterogeneous per-rule value shape
       // (`Severity | [Severity, ...unknown[]]`), so there is no honest
-      // narrower type to give it.
+      // narrower type to give it. `isRestrictedImports` is that same
+      // boundary's own runtime shape guard — its `value` parameter is
+      // genuinely unparsed input from the same untyped resolved config.
       "files": ["test/unit/http-node-builtin-restrictions.test.ts"],
       "rules": {
         "anti-slop/no-runtime-typeof": "off",
-        "anti-slop/no-unsafe-dictionary-type": "off"
+        "anti-slop/no-unsafe-dictionary-type": "off",
+        "anti-slop/no-unknown-parameters": "off"
       }
     },
     {
