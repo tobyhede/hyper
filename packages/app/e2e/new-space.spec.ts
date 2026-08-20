@@ -69,6 +69,9 @@ test('centres its first card without animating it in from the canvas origin', as
   await expect(nodeByTitle(page, 'Card 1')).toBeVisible();
   await settled(page);
 
+  // SAFETY: `__hyperOverviewTransforms` is a debug array this same spec sets
+  // on `window` above (`Object.defineProperty`) — not part of the DOM lib's
+  // `Window` type, but a value only this test's own instrumentation writes.
   const transforms = await page.evaluate(
     () =>
       (window as Window & { __hyperOverviewTransforms?: string[] }).__hyperOverviewTransforms ?? [],

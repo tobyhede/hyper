@@ -97,6 +97,8 @@ describe('Prisma Next foundation', () => {
 
     let result: unknown;
     try {
+      // SAFETY: `JSON.parse` returns `any`; narrowing the assignment to
+      // `unknown` keeps the caller from trusting it without checking.
       result = JSON.parse(command.stdout) as unknown;
     } catch (error) {
       throw new Error(`prisma-next returned non-JSON output\n${diagnostic}`, { cause: error });

@@ -38,15 +38,24 @@ const httpRestrictions = async (): Promise<RestrictedImports> => {
   if (typeof config !== 'object' || config === null || !('rules' in config)) {
     throw new Error('ESLint resolved no config for @project/http.');
   }
+  // SAFETY: the guard above already confirmed `'rules' in config`, so `config`
+  // genuinely carries a `rules` property here — its value type stays loose
+  // because ESLint's own resolved-config shape isn't declared anywhere.
   const { rules } = config as { rules?: Record<string, unknown> };
   const rule = rules?.['no-restricted-imports'];
   if (!Array.isArray(rule)) {
     throw new Error('@project/http declares no no-restricted-imports rule.');
   }
+  // SAFETY: `Array.isArray(rule)` above confirmed `rule` is an array; ESLint's
+  // own rule-entry shape (`[severity, ...options]`) isn't typed, so the tuple
+  // destructure still needs a cast.
   const [severity, options] = rule as readonly unknown[];
   // 2 is `error`. A zone downgraded to a warning would still be "configured"
   // while `--max-warnings=0` is the only thing left stopping the import.
   expect(severity).toBe(2);
+  // SAFETY: unverified here, but every assertion below reads `paths`/
+  // `patterns` off the return value — a real shape mismatch fails those
+  // assertions immediately rather than passing silently.
   return options as RestrictedImports;
 };
 

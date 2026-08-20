@@ -53,6 +53,8 @@ async function arrangeFixture(space: Space): Promise<Map<string, { x: number; y:
   const { strategyGraph } = canvasProjection(space, resolveRenderer(space));
   const laidOut = await elkStrategy()(strategyGraph);
   return new Map(
+    // SAFETY: widening the branded `CardId` to its own underlying `string`
+    // representation for use as a plain `Map` key — no information is lost.
     laidOut.cards.map((card) => [card.id as string, { x: card.x ?? NaN, y: card.y ?? NaN }]),
   );
 }
@@ -95,6 +97,10 @@ it('lays the two collections out as separate bands, which is why they split', as
     return { top: Math.min(...ys), bottom: Math.max(...ys) };
   });
   expect(bands).toHaveLength(2);
+  // SAFETY: the length check above just proved `bands` holds exactly two
+  // elements; `noUncheckedIndexedAccess` doesn't see that runtime check, so
+  // destructuring the plain array would otherwise type each element
+  // possibly-`undefined`.
   const [first, second] = bands as [(typeof bands)[number], (typeof bands)[number]];
   expect(Math.min(first.bottom, second.bottom)).toBeLessThan(Math.max(first.top, second.top));
 });

@@ -65,6 +65,9 @@ const startHost = async (
   });
   const configure = hook === 'preview' ? plugin.configurePreviewServer : plugin.configureServer;
   if (typeof configure !== 'function') throw new Error(`Expected ${hook} hook`);
+  // SAFETY: `this` is unused by either hook's implementation, and the fake
+  // server exposes exactly the members `configureServer`/`configurePreviewServer`
+  // read (`ssrLoadModule`, `middlewares.use`) — not Vite's full server interface.
   void configure.call(
     {} as never,
     {

@@ -28,6 +28,10 @@ describe('PostgresSpaceRepository import decoding', () => {
 
   /** The rejection message the CLI prints for a batch of one malformed Space. */
   const cliMessage = async (input: unknown): Promise<string> => {
+    // SAFETY: `input` is deliberately malformed to exercise `importSpaces`'s
+    // own runtime validation, which is what every call site here is testing —
+    // the cast only bypasses the compile-time check that a real snapshot
+    // would already satisfy.
     const result = await repository.importSpaces([input as never], 'insert');
     expect(result).toMatchObject({ kind: 'rejected', code: 'invalid-snapshot' });
     return result.kind === 'rejected' ? result.message : '';
@@ -47,6 +51,9 @@ describe('PostgresSpaceRepository import decoding', () => {
   const summaryOf = (message: string): string | undefined => message.split(' is invalid: ')[1];
 
   it('rejects a malformed import with prose rather than a serialized Zod dump', async () => {
+    // SAFETY: the literal is deliberately malformed to exercise
+    // `importSpaces`'s own runtime validation — the cast only bypasses the
+    // compile-time check that a real snapshot would already satisfy.
     const result = await repository.importSpaces(
       [{ document: { version: 1, title: 7 }, cards: [] } as never],
       'insert',
@@ -55,11 +62,16 @@ describe('PostgresSpaceRepository import decoding', () => {
     expect(result).toMatchObject({ kind: 'rejected', code: 'invalid-snapshot' });
     const message = result.kind === 'rejected' ? result.message : '';
     expect(message.startsWith('[')).toBe(false);
+    // SAFETY: `JSON.parse` returns `any`; the cast narrows it to `unknown`
+    // rather than trusting the parsed shape — the assertion only checks that
+    // parsing throws, so the narrowed value itself is never used.
     expect(() => JSON.parse(message) as unknown).toThrow();
     expect(message).toMatch(/^import space is invalid: document\.title \S/);
   });
 
   it('summarises a long issue list instead of listing every one of them', async () => {
+    // SAFETY: same as the malformed-literal cast above — deliberately invalid
+    // input for `importSpaces`'s own runtime validation to reject.
     const result = await repository.importSpaces(
       [
         {

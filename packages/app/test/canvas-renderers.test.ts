@@ -117,6 +117,9 @@ describe('canvasRenderers', () => {
       expect.unreachable('a missing Layout must not resolve');
     } catch (error) {
       expect(error).toBeInstanceOf(RendererInvariantError);
+      // SAFETY: the assertion above just proved `error` is a
+      // RendererInvariantError at runtime; `toBeInstanceOf` has no
+      // type-narrowing effect, so this recovers what was just checked.
       expect((error as RendererInvariantError).reason).toBe('renderer-not-found');
     }
   });

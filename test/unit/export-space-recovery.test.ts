@@ -8,6 +8,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { exportSpace } from '../../src/export/export-space';
 import { MemorySpaceRepository } from '../support/memory-space-repository';
 
+// SAFETY: `kind` starts `undefined` but is reassigned to 'backup'/'staging'
+// later (per test) — the cast states the mutable field's real type up front
+// rather than letting the initializer narrow it to the literal `undefined`.
 const cleanupFailure = vi.hoisted(() => ({
   kind: undefined as 'backup' | 'staging' | undefined,
   replacementWrite: false,

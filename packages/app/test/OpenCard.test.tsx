@@ -141,7 +141,13 @@ describe('the opened Card', () => {
     const onComplete = vi.fn(() => null);
     render(
       <OpenCard
-        card={{ ...markdown(), id: 'not-a-uuid' as CardId }}
+        card={{
+          ...markdown(),
+          // SAFETY: deliberately not a real UUID — this test exercises what
+          // the pane does when a Card carries a malformed id, so the whole
+          // point is to bypass the branded-type constructor and hand it one.
+          id: 'not-a-uuid' as CardId,
+        }}
         onComplete={onComplete}
         onCancel={vi.fn()}
       />,

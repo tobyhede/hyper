@@ -1,6 +1,9 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
+// SAFETY: `JSON.parse` returns `any`; this repo's own root `package.json` is
+// what's being read, so it is trusted to hold the `scripts` map this file
+// checks against, the same trust every script here already places in it.
 const rootPackage = JSON.parse(
   readFileSync(new URL('../../package.json', import.meta.url), 'utf8'),
 ) as {

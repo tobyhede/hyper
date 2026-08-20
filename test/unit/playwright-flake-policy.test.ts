@@ -22,9 +22,11 @@ const CONFIGS = ['../../playwright.config', '../../playwright.ladle.config'] as 
 const loadPolicies = async () => {
   const loaded = [];
   for (const specifier of CONFIGS) {
-    // Asserted rather than annotated: a dynamic import through a variable
-    // specifier is typed `any`, and annotating the binding would be an unsafe
-    // assignment rather than a narrowing.
+    // SAFETY: asserted rather than annotated — a dynamic import through a
+    // variable specifier is typed `any`, and annotating the binding would be
+    // an unsafe assignment rather than a narrowing. Both config files export
+    // a default `PlaywrightTestConfig`, checked by `tsc` at their own
+    // declaration site.
     const module = (await import(specifier)) as { default: PlaywrightTestConfig };
     const { forbidOnly, failOnFlakyTests, retries } = module.default;
     loaded.push({ specifier, policy: { forbidOnly, failOnFlakyTests, retries } });

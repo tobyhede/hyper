@@ -41,6 +41,9 @@ describe('Button', () => {
 
   it('preserves variants, caller layout classes, disabled activation, and a button ref', () => {
     const onClick = vi.fn();
+    // SAFETY: `null` is the ref's initial value before render assigns the real
+    // element; widening it here is the standard mutable-ref-cell idiom, not a
+    // narrowing of unchecked data.
     const ref = { current: null as HTMLButtonElement | null };
     render(
       <>

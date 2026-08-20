@@ -7,6 +7,9 @@ describe('E2E Vite host startup', () => {
     const configurations: InlineConfig[] = [];
     const factory = vi.fn((config: InlineConfig) => {
       configurations.push(config);
+      // SAFETY: this test only inspects the `config` each call was given
+      // (pushed above) — the resolved server itself is never read, so an
+      // empty stub is enough to satisfy the factory's declared return type.
       return Promise.resolve({} as ViteDevServer);
     });
 

@@ -108,6 +108,10 @@ const placementArb = fc
   .uniqueArray(fc.tuple(cardId, point), { selector: ([id]) => id, minLength: 1, maxLength: 6 })
   .map((entries) => Placement.fromEntries(entries));
 
+// SAFETY: `answer` is deliberately drawn from the hostile part of the
+// generator's range (empty, or naming a Card the Placement doesn't hold) to
+// prove `convertSubject` refuses it — a real `ViewGraphPolicy` could never
+// return it, which is exactly why this cast has to bypass the type it names.
 const asPolicy = (answer: readonly GraphWithoutId[]): ViewGraphPolicy =>
   ((_space: Space, _subject: RendererSubject, _placement: Placement) => answer) as ViewGraphPolicy;
 
@@ -293,6 +297,10 @@ describe('the conversion boundary, over every View that could be written', () =>
           // is refuse for a reason this output did not earn — a message sending
           // its author to the wrong rule is worse than no message.
           expect(error).toBeInstanceOf(RendererInvariantError);
+          // SAFETY: the assertion above just proved `error` is a
+          // RendererInvariantError at runtime; TypeScript's `toBeInstanceOf`
+          // has no type-narrowing effect, so this cast recovers what was
+          // just checked.
           expect(earnedRefusals(subject, placement, answer)).toContain(
             (error as RendererInvariantError).reason,
           );
@@ -389,6 +397,10 @@ describe('the conversion boundary, over every View that could be written', () =>
         }
 
         expect(refusal).toBeInstanceOf(RendererInvariantError);
+        // SAFETY: the assertion above just proved `refusal` is a
+        // RendererInvariantError at runtime; TypeScript's `toBeInstanceOf`
+        // has no type-narrowing effect, so this cast recovers what was just
+        // checked.
         expect((refusal as RendererInvariantError).reason).toBe('graph-id-not-fresh');
         expect(drawn).toBe(1);
       }),

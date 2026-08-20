@@ -15,6 +15,9 @@ import '@testing-library/jest-dom/vitest';
  * runs under `environment: 'node'`, where there is no React renderer at all.
  */
 if (typeof document !== 'undefined') {
+  // SAFETY: `IS_REACT_ACT_ENVIRONMENT` is React's own ambient test flag, not
+  // part of `typeof globalThis` — the narrow shape names only the one property
+  // this file writes.
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 }
 
@@ -176,6 +179,9 @@ if (typeof window !== 'undefined') {
   // Read through a descriptor rather than naming `Element.prototype.getBoundingClientRect`
   // directly: the latter is an unbound method reference, which lint rejects.
   const descriptor = Object.getOwnPropertyDescriptor(Element.prototype, 'getBoundingClientRect');
+  // SAFETY: `PropertyDescriptor.value` is typed `any`; `getBoundingClientRect`
+  // is the one property read off this descriptor, so its real signature is
+  // known even though the descriptor's own type can't express it.
   const inherited = descriptor?.value as ((this: Element) => DOMRect) | undefined;
 
   Element.prototype.getBoundingClientRect = function getBoundingClientRect(this: Element): DOMRect {
@@ -212,6 +218,10 @@ if (typeof window !== 'undefined') {
  * this environment actually holds rather than about the DOM lib's promise,
  * which is what would make it a condition lint can prove pointless.
  */
+// SAFETY: this file runs under both `jsdom` and `node` test environments, so
+// `window` may not exist on `globalThis` at all — the narrow optional shape
+// reads whatever is actually there instead of asserting the DOM lib's promise
+// that `window` (and `matchMedia` on it) is always defined.
 const declaredMatchMedia = (globalThis as { window?: { matchMedia?: unknown } }).window?.matchMedia;
 if (typeof window !== 'undefined' && typeof declaredMatchMedia !== 'function') {
   Object.defineProperty(window, 'matchMedia', {
