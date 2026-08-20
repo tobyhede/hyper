@@ -3,6 +3,7 @@
 Status: accepted
 Refines: 0001, 0030
 Related: 0009, 0051, 0053
+Refined by: 0059, 0060
 
 ADR 0001 decided a card may itself be a space, arbitrarily deep, but left the payload undefined — ADR 0009 explicitly deferred it "to the change that actually builds recursive spaces." This is that change: a Space Card is a Card of kind `space` whose entire additional field is a reference to another Space, addressed by id (`spaceId`), mirroring how `alias` owns one field, `target` (ADR 0051). It carries no Layout or View pin — opening it always renders whatever the target Space's own renderer choice currently is, so a Space Card cannot become a second place selecting the same canvas choice ADR 0053 already gives one home.
 
