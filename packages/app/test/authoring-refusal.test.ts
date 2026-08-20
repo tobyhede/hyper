@@ -11,7 +11,7 @@ import type { AuthoringRefusal } from '../src/space-authoring';
 const TARGET_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000009');
 
 /** One sample of every AuthoringRefusal, keyed by code for exhaustive iteration. */
-const EVERY_REFUSAL: Readonly<Record<AuthoringRefusal['code'], AuthoringRefusal>> = {
+const EVERY_REFUSAL = {
   'placement-pending': { code: 'placement-pending' },
   'layout-not-found': { code: 'layout-not-found' },
   'layout-required': { code: 'layout-required', operation: 'added-card-to-layout' },
@@ -30,7 +30,7 @@ const EVERY_REFUSAL: Readonly<Record<AuthoringRefusal['code'], AuthoringRefusal>
   'edge-card-outside-layout': { code: 'edge-card-outside-layout' },
   'edge-already-exists': { code: 'edge-already-exists' },
   'layout-active-graph-required': { code: 'layout-active-graph-required' },
-};
+} as const satisfies Readonly<Record<AuthoringRefusal['code'], AuthoringRefusal>>;
 
 describe('Alias Card editing and New Alias creation place every refusal identically', () => {
   it.each(Object.values(EVERY_REFUSAL))('for $code', (refusal) => {
