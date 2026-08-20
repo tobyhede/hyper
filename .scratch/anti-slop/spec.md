@@ -81,7 +81,7 @@ all.
 - `03` — remaining bounded rules: chained assertions, shape-in-symbol-names, module mocking (done)
 - `04` — remaining scattered rules: unsafe dictionary type, unknown returns, known-value widening, runtime typeof (done)
 - `05` — conditional empty object spread (moderate concentration, split by package) (done)
-- `06` — unknown parameters (largest remaining prod rule, split by package)
+- `06` — unknown parameters (largest remaining prod rule, split by package) (done)
 - `07` — safety-comment sweep (largest overall, run last, split prod then test)
 - `08` — decide on the 3 unrelated built-in Oxlint findings
 
