@@ -164,6 +164,10 @@ export default tseslint.config(
       '**/src/prisma/contract.d.ts',
       '**/migrations/**/end-contract.d.ts',
       '**/migrations/**/start-contract.d.ts',
+      // Vendored anti-slop Oxlint plugin (.scratch/anti-slop/). Third-party
+      // source at a pinned commit, not repository-authored — not part of any
+      // tsconfig project, and not ours to reformat or re-lint.
+      'tools/oxlint/anti-slop/**',
     ],
   },
   js.configs.recommended,
