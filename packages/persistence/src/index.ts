@@ -7,14 +7,25 @@ export {
   CANONICAL_DECIMAL,
   decodeCommitRequest,
   decodeCommittedRevision,
-  decodeErrorMessage,
+  decodeProblemDetails,
   decodeLoadedSpace,
   decodeSpaceSummaries,
   encodeCommitRequest,
   encodeLoadedSpace,
+  encodeProblemDetails,
+  problemCodeForType,
+  problemCatalogue,
 } from './http-protocol';
-export type { LoadedSpaceJson } from './http-protocol';
-export type { CommitRequestJson, DecodedCommitRequest } from './http-protocol';
+export type {
+  CommitRequestJson,
+  DecodedCommitRequest,
+  HyperProblemCode,
+  HyperProblemStatus,
+  HyperProblemType,
+  LoadedSpaceJson,
+  ProblemDetails,
+  ProblemError,
+} from './http-protocol';
 /* Two test-facing helpers, two doors, and the difference is what they are.
  * `MemorySpaceBackendTestControl` is named by `MemorySpaceBackend`'s public
  * constructor, so a caller that cannot import it cannot construct the adapter

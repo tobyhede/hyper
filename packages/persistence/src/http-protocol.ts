@@ -11,6 +11,156 @@ import type { LoadedSpace, SpaceSummary } from './backend';
 export const CANONICAL_DECIMAL = /^(0|[1-9]\d{0,18})$/;
 const BIGINT_MAX = 9_223_372_036_854_775_807n;
 
+export const problemCatalogue = {
+  'invalid-request': {
+    type: 'https://hyper.dev/problems/invalid-request',
+    title: 'Invalid request',
+    status: 400,
+  },
+  'invalid-space-id': {
+    type: 'https://hyper.dev/problems/invalid-space-id',
+    title: 'Invalid Space id',
+    status: 400,
+  },
+  'unsupported-media-type': {
+    type: 'https://hyper.dev/problems/unsupported-media-type',
+    title: 'Unsupported media type',
+    status: 415,
+  },
+  'payload-too-large': {
+    type: 'https://hyper.dev/problems/payload-too-large',
+    title: 'Payload too large',
+    status: 413,
+  },
+  'not-found': { type: 'https://hyper.dev/problems/not-found', title: 'Not found', status: 404 },
+  'method-not-allowed': {
+    type: 'https://hyper.dev/problems/method-not-allowed',
+    title: 'Method not allowed',
+    status: 405,
+  },
+  'persistence-unavailable': {
+    type: 'https://hyper.dev/problems/persistence-unavailable',
+    title: 'Persistence unavailable',
+    status: 503,
+  },
+  'invalid-snapshot': {
+    type: 'https://hyper.dev/problems/invalid-snapshot',
+    title: 'Invalid Space snapshot',
+    status: 422,
+  },
+  unauthorized: {
+    type: 'https://hyper.dev/problems/unauthorized',
+    title: 'Unauthorized',
+    status: 401,
+  },
+  forbidden: { type: 'https://hyper.dev/problems/forbidden', title: 'Forbidden', status: 403 },
+  'request-timeout': {
+    type: 'https://hyper.dev/problems/request-timeout',
+    title: 'Request timed out',
+    status: 408,
+  },
+  'rate-limited': {
+    type: 'https://hyper.dev/problems/rate-limited',
+    title: 'Rate limited',
+    status: 429,
+  },
+  'internal-error': {
+    type: 'https://hyper.dev/problems/internal-error',
+    title: 'Internal server error',
+    status: 500,
+  },
+} as const;
+
+export type HyperProblemCode = keyof typeof problemCatalogue;
+export type HyperProblemStatus = (typeof problemCatalogue)[HyperProblemCode]['status'];
+export type HyperProblemType = (typeof problemCatalogue)[HyperProblemCode]['type'];
+
+export interface ProblemError {
+  code: 'invalid-value';
+  pointer: string;
+}
+
+export interface ProblemDetails {
+  type: HyperProblemType;
+  title: string;
+  status: HyperProblemStatus;
+  detail: string;
+  errors?: ProblemError[];
+}
+
+const JSON_POINTER = /^(?:|(?:\/(?:[^~]|~[01])*)+)$/;
+
+const problemCodeByType = new Map<HyperProblemType, HyperProblemCode>(
+  Object.entries(problemCatalogue).map(([code, problem]) => [
+    problem.type,
+    code as HyperProblemCode,
+  ]),
+);
+
+export const problemCodeForType = (type: HyperProblemType): HyperProblemCode => {
+  const code = problemCodeByType.get(type);
+  if (code === undefined) throw new Error('problem details has an unknown type');
+  return code;
+};
+
+export const encodeProblemDetails = (
+  code: HyperProblemCode,
+  detail: string,
+  errors?: readonly ProblemError[],
+): ProblemDetails => {
+  if (detail.length === 0) throw new Error('problem detail must be non-empty');
+  for (const error of errors ?? []) {
+    if (!JSON_POINTER.test(error.pointer)) {
+      throw new Error('problem error pointer must be an RFC 6901 JSON Pointer');
+    }
+  }
+  const problem = problemCatalogue[code];
+  return {
+    ...problem,
+    detail,
+    ...(errors === undefined || errors.length === 0 ? {} : { errors: [...errors] }),
+  };
+};
+
+export const decodeProblemDetails = (value: unknown): ProblemDetails => {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    throw new Error('problem details must be an object');
+  }
+  const candidate = value as Record<string, unknown>;
+  const keys =
+    candidate['errors'] === undefined
+      ? ['type', 'title', 'status', 'detail']
+      : ['type', 'title', 'status', 'detail', 'errors'];
+  const record = exactRecord(value, keys, 'problem details');
+  if (typeof record['type'] !== 'string') throw new Error('problem type must be a string');
+  if (!problemCodeByType.has(record['type'] as HyperProblemType)) {
+    throw new Error('problem details has an unknown type');
+  }
+  const code = problemCodeForType(record['type'] as HyperProblemType);
+  const expected = problemCatalogue[code];
+  if (record['title'] !== expected.title) throw new Error('problem title does not match its type');
+  if (record['status'] !== expected.status)
+    throw new Error('problem status does not match its type');
+  if (typeof record['detail'] !== 'string' || record['detail'].length === 0) {
+    throw new Error('problem detail must be non-empty');
+  }
+  let errors: readonly ProblemError[] | undefined;
+  if (record['errors'] !== undefined) {
+    if (!Array.isArray(record['errors']) || record['errors'].length === 0) {
+      throw new Error('problem errors must be a non-empty array');
+    }
+    errors = record['errors'].map((value) => {
+      const error = exactRecord(value, ['code', 'pointer'], 'problem error');
+      if (error['code'] !== 'invalid-value') throw new Error('problem error has an unknown code');
+      if (typeof error['pointer'] !== 'string' || !JSON_POINTER.test(error['pointer'])) {
+        throw new Error('problem error pointer must be an RFC 6901 JSON Pointer');
+      }
+      return { code: error['code'], pointer: error['pointer'] };
+    });
+  }
+  return encodeProblemDetails(code, record['detail'], errors);
+};
+
 const exactRecord = (
   value: unknown,
   keys: readonly string[],
@@ -32,11 +182,9 @@ const exactRecord = (
 };
 
 /**
- * Zod serializes its entire issue array into `Error.message`, and the HTTP layer
- * ships that verbatim as the `{ message: string }` error contract — hundreds of
- * characters of internal schema shape for one wrong field, JSON nested inside a
- * field clients render as prose. Every other decoder here throws a sentence, so
- * this one does too: the failing paths and their reasons, nothing else.
+ * Zod serializes its entire issue array into `Error.message`. The wire codec
+ * needs concise corrective detail instead: the failing paths and their reasons,
+ * nothing else.
  *
  * `describeSchemaFailure` in `src/persistence/postgres-space-repository.ts`
  * summarises an import failure in this same format — first three failing paths,
@@ -145,12 +293,4 @@ export const decodeSpaceSummaries = (value: unknown): readonly SpaceSummary[] =>
 export const decodeCommittedRevision = (value: unknown): bigint => {
   const record = exactRecord(value, ['revision'], 'commit response');
   return decodeRevision(record['revision'], 'revision');
-};
-
-export const decodeErrorMessage = (value: unknown): string => {
-  const record = exactRecord(value, ['message'], 'error response');
-  if (typeof record['message'] !== 'string' || record['message'].length === 0) {
-    throw new Error('error message must be non-empty');
-  }
-  return record['message'];
 };
