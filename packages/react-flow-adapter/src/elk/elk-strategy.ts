@@ -32,9 +32,15 @@ export interface ElkEngine {
 let defaultEnginePromise: Promise<ElkEngine> | undefined;
 
 function loadDefaultEngine(): Promise<ElkEngine> {
-  defaultEnginePromise ??= import('elkjs/lib/elk.bundled.js').then(
-    (module) => new module.default(),
-  );
+  // A failed dynamic import (chunk-load blip, offline) must not poison the
+  // cache: caching the rejection would strand every later layout on the same
+  // dead promise for the rest of the session.
+  defaultEnginePromise ??= import('elkjs/lib/elk.bundled.js')
+    .then((module) => new module.default())
+    .catch((error: unknown) => {
+      defaultEnginePromise = undefined;
+      throw error;
+    });
   return defaultEnginePromise;
 }
 
