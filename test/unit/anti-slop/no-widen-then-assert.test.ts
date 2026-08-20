@@ -28,7 +28,9 @@ describe('no-widen-then-assert', () => {
   });
 
   it('does not flag an assertion on a variable with no widened binding', () => {
-    const diagnostics = lint(['declare const value: unknown;', 'const n = value as number;'].join('\n'));
+    const diagnostics = lint(
+      ['declare const value: unknown;', 'const n = value as number;'].join('\n'),
+    );
     expect(diagnostics).toEqual([]);
   });
 

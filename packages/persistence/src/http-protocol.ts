@@ -93,6 +93,9 @@ const JSON_POINTER = /^(?:|(?:\/(?:[^~]|~[01])*)+)$/;
 const problemCodeByType = new Map<HyperProblemType, HyperProblemCode>(
   Object.entries(problemCatalogue).map(([code, problem]) => [
     problem.type,
+    // SAFETY: `Object.entries` widens problemCatalogue's own keys to `string`,
+    // but every entry iterated here comes from problemCatalogue itself, so
+    // each key is one of its HyperProblemCode literals.
     code as HyperProblemCode,
   ]),
 );
@@ -124,6 +127,9 @@ export const decodeProblemDetails = (value: unknown): ProblemDetails => {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
     throw new Error('problem details must be an object');
   }
+  // SAFETY: checked above — value is a non-null, non-array object, so it is
+  // safe to inspect as a string-keyed record; each value stays unknown until
+  // exactRecord validates the expected keys below.
   const candidate = value as Record<string, unknown>;
   const keys =
     candidate['errors'] === undefined
@@ -131,9 +137,15 @@ export const decodeProblemDetails = (value: unknown): ProblemDetails => {
       : ['type', 'title', 'status', 'detail', 'errors'];
   const record = exactRecord(value, keys, 'problem details');
   if (typeof record['type'] !== 'string') throw new Error('problem type must be a string');
+  // SAFETY: record['type'] is narrowed to `string` above, but only the `.has`
+  // check below proves it is one of HyperProblemType's known literals — that
+  // check is what this assertion stands in for.
   if (!problemCodeByType.has(record['type'] as HyperProblemType)) {
     throw new Error('problem details has an unknown type');
   }
+  // SAFETY: the `.has` check above already confirmed record['type'] is one of
+  // HyperProblemType's literals; it just couldn't narrow the index access
+  // itself, since `record` is a plain string-keyed record, not a union type.
   const code = problemCodeForType(record['type'] as HyperProblemType);
   const expected = problemCatalogue[code];
   if (record['title'] !== expected.title) throw new Error('problem title does not match its type');
