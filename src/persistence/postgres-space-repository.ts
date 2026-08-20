@@ -18,6 +18,7 @@ import type { ImportMode, RepositoryImportResult, SpaceRepository } from './spac
 type Orm = typeof db.orm;
 type JsonValue =
   null | boolean | number | string | readonly JsonValue[] | { readonly [key: string]: JsonValue };
+type SpaceCreateInput = Parameters<Orm['public']['Space']['create']>[0];
 
 class SnapshotValidationError extends Error {}
 
@@ -25,27 +26,35 @@ class DuplicateIdentityError extends Error {}
 
 class CardOwnershipError extends Error {}
 
-const isSpacePrimaryKeyConflict = (error: unknown): boolean => {
+interface SqlPrimaryKeyConflictFields {
+  readonly kind?: unknown;
+  readonly sqlState?: unknown;
+  readonly table?: unknown;
+  readonly constraint?: unknown;
+}
+
+const isPrimaryKeyConflict = (
+  error: unknown,
+  table: string,
+  constraint: string,
+): error is SqlPrimaryKeyConflictFields => {
   if (typeof error !== 'object' || error === null) return false;
-  const candidate = error as Record<string, unknown>;
+  // SAFETY: checked above — error is a non-null object, so probing named
+  // fields on it (each still typed unknown until compared) cannot throw.
+  const candidate = error as SqlPrimaryKeyConflictFields;
   return (
-    candidate['kind'] === 'sql_query' &&
-    candidate['sqlState'] === '23505' &&
-    candidate['table'] === 'spaces' &&
-    candidate['constraint'] === 'spaces_pkey'
+    candidate.kind === 'sql_query' &&
+    candidate.sqlState === '23505' &&
+    candidate.table === table &&
+    candidate.constraint === constraint
   );
 };
 
-const isCardPrimaryKeyConflict = (error: unknown): boolean => {
-  if (typeof error !== 'object' || error === null) return false;
-  const candidate = error as Record<string, unknown>;
-  return (
-    candidate['kind'] === 'sql_query' &&
-    candidate['sqlState'] === '23505' &&
-    candidate['table'] === 'cards' &&
-    candidate['constraint'] === 'cards_pkey'
-  );
-};
+const isSpacePrimaryKeyConflict = (error: unknown): error is SqlPrimaryKeyConflictFields =>
+  isPrimaryKeyConflict(error, 'spaces', 'spaces_pkey');
+
+const isCardPrimaryKeyConflict = (error: unknown): error is SqlPrimaryKeyConflictFields =>
+  isPrimaryKeyConflict(error, 'cards', 'cards_pkey');
 
 const toRevision = (value: number | string | bigint): bigint => {
   if (typeof value === 'number' && !Number.isSafeInteger(value)) {
@@ -58,9 +67,13 @@ const toOptionalRevision = (value: number | string | bigint | null): bigint | nu
   value === null ? null : toRevision(value);
 
 /**
- * Prisma Next 0.16.0 emits `int8` inputs as `number`, although its codec passes
- * values through unchanged and node-postgres supports bigint parameters. Keep
- * the upstream type workaround isolated here so revisions are never narrowed.
+ * SAFETY: Prisma Next 0.16.0 declares `int8` inputs as `number`, although its
+ * codec passes values through unchanged at runtime and node-postgres accepts
+ * bigint parameters directly — this relabels the type without converting the
+ * value, so no precision is lost the way a real `Number(value)` call could
+ * lose it above `Number.MAX_SAFE_INTEGER`. `bigint` and `number` have no
+ * direct assertion path in TypeScript, hence the `unknown` bridge. Keep the
+ * upstream type workaround isolated here so revisions are never narrowed.
  */
 const toDatabaseRevision = (value: bigint): number => value as unknown as number;
 
@@ -139,7 +152,7 @@ const describeSchemaFailure = (issues: readonly SchemaIssue[], label: string): s
   return `${label} is invalid: ${described}${remaining > 0 ? ` (and ${remaining} more)` : ''}`;
 };
 
-const parseSnapshotShape = (input: unknown): SpaceSnapshot => {
+const parseSnapshotSchema = (input: unknown): SpaceSnapshot => {
   const parsed = spaceSnapshotSchema.safeParse(input);
   if (!parsed.success) {
     throw new SnapshotValidationError(
@@ -230,7 +243,7 @@ const validateSnapshotIdentities = (snapshot: SpaceSnapshot): void => {
  * A layout's id and the ids of the graphs it owns are minted in the **same
  * pass**, because under version 1 a graph is reached only through its owner
  * (ADR 0040): there is no space-level collection to walk beside the layouts.
- * That the pass runs before `parseSnapshotShape` and before the first card write
+ * That the pass runs before `parseSnapshotSchema` and before the first card write
  * is what keeps a rejection rolling the complete batch back.
  */
 const resolveImport = (input: ImportSpace, reservedSpaceId: UUID): SpaceSnapshot => {
@@ -240,12 +253,11 @@ const resolveImport = (input: ImportSpace, reservedSpaceId: UUID): SpaceSnapshot
     graphs: layout.graphs.map((graph) => ({ ...graph, id: graph.id ?? newUuid() })),
   }));
 
-  return parseSnapshotShape({
+  const document = layouts === undefined ? { ...input.document } : { ...input.document, layouts };
+
+  return parseSnapshotSchema({
     id: input.id ?? reservedSpaceId,
-    document: {
-      ...input.document,
-      ...(layouts === undefined ? {} : { layouts }),
-    },
+    document,
     cards: input.cards.map((card) => ({ ...card, id: card.id ?? newUuid() })),
   });
 };
@@ -458,14 +470,15 @@ export class PostgresSpaceRepository implements SpaceRepository {
             // collection, because a space has none until a layout exists to own
             // one (ADR 0040) — under version 2 this was an empty space-level
             // array, and there is no longer a key for it to be empty in.
-            space = await orm.public.Space.create({
-              ...(importInput.id === undefined ? {} : { id: importInput.id }),
+            const spaceCreateInput: SpaceCreateInput = {
               document: toJsonValue({
                 version: SPACE_FILE_VERSION,
                 title: importInput.document.title,
               }),
               revision: 0,
-            });
+            };
+            if (importInput.id !== undefined) spaceCreateInput.id = importInput.id;
+            space = await orm.public.Space.create(spaceCreateInput);
           } catch (error) {
             // An explicit id that collides is an identity rejection, never a
             // revision conflict: insert-only import compares no revisions, so

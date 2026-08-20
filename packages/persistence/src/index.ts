@@ -14,7 +14,7 @@ export {
   encodeLoadedSpace,
 } from './http-protocol';
 export type { LoadedSpaceJson } from './http-protocol';
-export type { CommitRequestJson } from './http-protocol';
+export type { CommitRequestJson, DecodedCommitRequest } from './http-protocol';
 /* Two test-facing helpers, two doors, and the difference is what they are.
  * `MemorySpaceBackendTestControl` is named by `MemorySpaceBackend`'s public
  * constructor, so a caller that cannot import it cannot construct the adapter

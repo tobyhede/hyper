@@ -19,6 +19,9 @@ const exactRecord = (
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
     throw new Error(`${label} must be an object`);
   }
+  // SAFETY: checked above — value is a non-null, non-array object, so it is
+  // safe to inspect as a string-keyed record; each value stays unknown until
+  // the caller-specific decoders below validate it.
   const record = value as Record<string, unknown>;
   const actual = Object.keys(record).sort();
   const expected = [...keys].sort();
@@ -115,9 +118,12 @@ export const encodeCommitRequest = (
   expectedRevision: expectedRevision.toString(),
 });
 
-export const decodeCommitRequest = (
-  value: unknown,
-): { snapshot: SpaceSnapshot; expectedRevision: bigint } => {
+export interface DecodedCommitRequest {
+  snapshot: SpaceSnapshot;
+  expectedRevision: bigint;
+}
+
+export const decodeCommitRequest = (value: unknown): DecodedCommitRequest => {
   const record = exactRecord(value, ['snapshot', 'expectedRevision'], 'commit request');
   return {
     snapshot: decodeSnapshot(record['snapshot'], 'commit request'),
