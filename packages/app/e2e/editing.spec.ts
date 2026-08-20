@@ -248,22 +248,30 @@ test('the Card affordance opens the Card on its editable fields', async ({ page 
   );
 });
 
-test('a refused Card title stays in the dialog and is attached to its field', async ({ page }) => {
-  await page.goto('/');
-  const card = nodeByTitle(page, 'A').first();
-  await expect(card).toBeVisible();
-  await settled(page);
+test(
+  'a refused Card title stays in the dialog and is attached to its field',
+  { tag: '@parity:markdown-pane-refusal-is-field-local' },
+  async ({ page }) => {
+    await page.goto('/');
+    const card = nodeByTitle(page, 'A').first();
+    await expect(card).toBeVisible();
+    await settled(page);
 
-  await openCard(card, 'A');
-  const dialog = page.getByRole('dialog', { name: 'A' });
-  const title = dialog.getByRole('textbox', { name: 'Title' });
-  await title.fill('   ');
-  await dialog.getByRole('button', { name: 'Done' }).click();
+    await openCard(card, 'A');
+    const dialog = page.getByRole('dialog', { name: 'A' });
+    const title = dialog.getByRole('textbox', { name: 'Title' });
+    await title.fill('   ');
+    await dialog.getByRole('button', { name: 'Done' }).click();
 
-  await expect(dialog.getByRole('alert')).toHaveText('A Card title is required.');
-  await expect(title).toHaveAttribute('aria-invalid', 'true');
-  await expect(dialog).toBeVisible();
-});
+    await expect(dialog.getByRole('alert')).toHaveText('A Card title is required.');
+    await expect(title).toHaveAttribute('aria-invalid', 'true');
+    await expect(dialog).toBeVisible();
+    await title.press('Escape');
+    await expect(dialog).toBeHidden();
+    await openCard(card, 'A');
+    await expect(page.getByRole('textbox', { name: 'Title' })).toHaveValue('A');
+  },
+);
 
 test('a title authored in the pane persists like one authored on the graph', async ({ page }) => {
   await page.goto('/');
@@ -395,28 +403,49 @@ test('a dragged card stays where it is dropped, and nothing else moves', async (
   }
 });
 
-test('selecting Flow or Grid is navigation and does not persist', async ({ page }) => {
-  await page.goto('/');
-  const a = nodeByTitle(page, 'A').first();
-  await expect(a).toBeVisible();
-  await settled(page);
-  const persistence = page.getByTestId('persistence-status');
-  await expect(persistence).toHaveAttribute('data-revision', '0');
+test(
+  'selecting Flow or Grid is navigation and does not persist',
+  { tag: '@parity:space-sidebar-marks-one-current-renderer' },
+  async ({ page }) => {
+    await page.goto('/');
+    const a = nodeByTitle(page, 'A').first();
+    await expect(a).toBeVisible();
+    await settled(page);
+    const persistence = page.getByTestId('persistence-status');
+    await expect(persistence).toHaveAttribute('data-revision', '0');
 
-  // One list over both, so the fixture's Layouts and the built-in Views are
-  // rows of the same menu and only one of them is pressed (ADR 0053).
-  await expect(
-    sidebar(page).getByRole('button', { name: 'Collection 1', exact: true }),
-  ).toBeVisible();
-  await expect(sidebar(page).getByRole('button', { name: 'Long', exact: true })).toBeVisible();
+    // One list over both, so the fixture's Layouts and the built-in Views are
+    // rows of the same menu and only one of them is pressed (ADR 0053).
+    await expect(
+      sidebar(page).getByRole('button', { name: 'Collection 1', exact: true }),
+    ).toBeVisible();
+    await expect(sidebar(page).getByRole('button', { name: 'Long', exact: true })).toBeVisible();
+    await expect(
+      sidebar(page).locator('[data-testid="canvas-renderer"][aria-pressed="true"]'),
+    ).toHaveCount(1);
 
-  await selectCanvas(page, 'Grid');
-  await expect(canvasKind(page)).toHaveText('Computed view');
-  await expect(persistence).toHaveAttribute('data-revision', '0');
+    await selectCanvas(page, 'Grid');
+    await expect(canvasKind(page)).toHaveText('Computed view');
+    await expect(sidebar(page).getByRole('button', { name: 'Grid' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    await expect(
+      sidebar(page).locator('[data-testid="canvas-renderer"][aria-pressed="true"]'),
+    ).toHaveCount(1);
+    await expect(persistence).toHaveAttribute('data-revision', '0');
 
-  await selectCanvas(page, 'Flow');
-  await expect(persistence).toHaveAttribute('data-revision', '0');
-});
+    await selectCanvas(page, 'Flow');
+    await expect(sidebar(page).getByRole('button', { name: 'Flow' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    await expect(
+      sidebar(page).locator('[data-testid="canvas-renderer"][aria-pressed="true"]'),
+    ).toHaveCount(1);
+    await expect(persistence).toHaveAttribute('data-revision', '0');
+  },
+);
 
 test('connecting from Flow and Grid converts atomically without moving Cards', async ({ page }) => {
   await page.goto('/');

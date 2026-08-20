@@ -119,25 +119,37 @@ test('the camera closes in on the active card, and pulls back on exit', async ({
   expect((await camera(page)).zoom).toBeCloseTo(overview.zoom, 1);
 });
 
-test('the chrome names the moves available, and says when the graph ends', async ({ page }) => {
-  await present(page);
+test(
+  'the chrome names the moves available, and says when the graph ends',
+  { tag: '@parity:space-sidebar-withdraws-authoring-while-presenting' },
+  async ({ page }) => {
+    await present(page);
+    await expect(page.getByRole('button', { name: 'Add Card' })).toBeDisabled();
+    await expect(page.getByRole('button', { name: 'Overview' })).toBeVisible();
 
-  // A line gives a one-member choice at each card — the degenerate fork, not a
-  // second mode (ADR 0024).
-  const moves = page.getByTestId('presenting-moves').getByRole('button');
-  await expect(moves).toHaveCount(1);
-  await expect(moves).toHaveText('B');
+    // A line gives a one-member choice at each card — the degenerate fork, not a
+    // second mode (ADR 0024).
+    const moves = page.getByTestId('presenting-moves').getByRole('button');
+    await expect(moves).toHaveCount(1);
+    await expect(moves).toHaveText('B');
 
-  // Long is A → B → C → D → A′: four moves, then a sink.
-  for (const _ of [0, 1, 2, 3]) await page.keyboard.press('ArrowRight');
-  await expect(activeCard(page)).toHaveAttribute('data-id', '00000000-0000-4000-8000-00000000000c');
-  await expect(page.getByTestId('presenting-end')).toBeVisible();
+    // Long is A → B → C → D → A′: four moves, then a sink.
+    for (const _ of [0, 1, 2, 3]) await page.keyboard.press('ArrowRight');
+    await expect(activeCard(page)).toHaveAttribute(
+      'data-id',
+      '00000000-0000-4000-8000-00000000000c',
+    );
+    await expect(page.getByTestId('presenting-end')).toBeVisible();
 
-  // Advancing past the end stays put rather than wrapping to the start, which is
-  // what a sequence would do.
-  await page.keyboard.press('ArrowRight');
-  await expect(activeCard(page)).toHaveAttribute('data-id', '00000000-0000-4000-8000-00000000000c');
-});
+    // Advancing past the end stays put rather than wrapping to the start, which is
+    // what a sequence would do.
+    await page.keyboard.press('ArrowRight');
+    await expect(activeCard(page)).toHaveAttribute(
+      'data-id',
+      '00000000-0000-4000-8000-00000000000c',
+    );
+  },
+);
 
 /**
  * No pointer gesture on a Card's body opens it (ADR 0036), and presenting does

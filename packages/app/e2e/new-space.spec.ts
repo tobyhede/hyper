@@ -342,14 +342,19 @@ test('the Graph that self-connection mints can be presented', async ({ page }) =
   await expect(moves).toHaveText('Card 1');
 });
 
-test('shows an empty disabled graph control and no graph HUD (ADR 0015)', async ({ page }) => {
-  await page.goto('/');
-  await expect(nodeByTitle(page, 'Card 1')).toBeVisible();
+test(
+  'shows an empty disabled graph control and no graph HUD (ADR 0015)',
+  { tag: '@parity:space-sidebar-names-unauthored-state' },
+  async ({ page }) => {
+    await page.goto('/');
+    await expect(nodeByTitle(page, 'Card 1')).toBeVisible();
 
-  await expect(sidebar(page).getByTestId('no-graphs')).toBeVisible();
-  await expect(page.getByTestId('present-button')).toBeDisabled();
-  await expect(page.getByTestId('graph-legend')).toHaveCount(0);
-});
+    await expect(sidebar(page).getByTestId('no-graphs')).toBeVisible();
+    await expect(sidebar(page).getByTestId('no-authored-layouts')).toBeVisible();
+    await expect(page.getByTestId('present-button')).toBeDisabled();
+    await expect(page.getByTestId('graph-legend')).toHaveCount(0);
+  },
+);
 
 test('its one card is draggable once its automatic arrangement resolves (ADR 0025)', async ({
   page,

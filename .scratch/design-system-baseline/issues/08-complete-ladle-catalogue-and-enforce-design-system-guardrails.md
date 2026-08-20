@@ -72,6 +72,31 @@ proofs moves to `review` or is removed.
 
 ## Comments
 
+### 2026-08-20 — the parity-evidence model lands before the remaining migrations
+
+The literal manifest, resolved catalogue matrix, static exact-one evidence
+checks and runtime Playwright collection checks now exist. The current stable
+catalogue has nine claims; every one names exactly one Ladle test and exactly
+one application test through a literal `@parity:<claim-id>` tag. Both suites
+read the same manifest at runtime and fail when an expected claim is missing,
+duplicated, skipped, failed or flaky.
+
+This deliberately establishes ADR 0052's live seam before Issues 04–07 add
+their stories, so those migrations extend the manifest and both proofs in the
+same change instead of leaving Issue 08 a late evidence backfill. There is no
+grandfather list.
+
+The first complete scan also found two Issue 03 stories with no honest
+application proof: an Alias with no eligible Target, and an Alias whose Target
+becomes stale while its editor remains open. The production pane accepts those
+inputs, but the current application cannot reach either state. They moved from
+`stories/components` to `stories/review` as ADR 0052 requires; their Ladle
+behavior tests remain review evidence and carry no parity tag.
+
+Issue 08 remains open. The complete production-state inventory, remaining
+story migrations, visual-facsimile/style cleanup and design-system guardrails
+still depend on Issues 04–07.
+
 ### 2026-08-19 — the CI job moves to Issue 15
 
 The criterion "Ladle E2E runs as its own required CI job" is now owned by

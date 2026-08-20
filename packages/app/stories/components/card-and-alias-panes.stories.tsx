@@ -6,7 +6,6 @@ import { OpenCard } from '#components/OpenCard';
 export default { title: 'Components/Card and Alias Panes' };
 
 const MARKDOWN_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000101');
-const ALIAS_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000103');
 
 const markdown: Extract<Card, { kind: 'markdown' }> = {
   id: MARKDOWN_ID,
@@ -23,13 +22,6 @@ No strategy is privileged. Grid, sorts, trees, clusters, and ELK are choices ove
 ## Presentation
 
 Opening authors one Card in place. Presenting traverses the Active Graph.`,
-};
-
-const alias: Extract<Card, { kind: 'alias' }> = {
-  id: ALIAS_ID,
-  title: 'Placement recap',
-  kind: 'alias',
-  target: MARKDOWN_ID,
 };
 
 /** Long content, local validation, atomic completion and dismissal through the production pane. */
@@ -51,26 +43,3 @@ export const Markdown: Story = () => {
   );
 };
 Markdown.meta = { iframed: true };
-
-/** The production Alias form with no eligible Target choices. */
-export const AliasEmpty: Story = () => (
-  <OpenCard
-    through={alias}
-    occurrence={{ targets: [], onEdit: () => null }}
-    onCancel={() => undefined}
-  />
-);
-AliasEmpty.meta = { iframed: true };
-
-/** A stale Target is a production-reachable refusal and remains attached to its field. */
-export const AliasTargetRefused: Story = () => (
-  <OpenCard
-    through={alias}
-    occurrence={{
-      targets: [markdown],
-      onEdit: () => ({ code: 'alias-target-not-found', targetId: MARKDOWN_ID }),
-    }}
-    onCancel={() => undefined}
-  />
-);
-AliasTargetRefused.meta = { iframed: true };

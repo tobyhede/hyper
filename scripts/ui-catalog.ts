@@ -6,6 +6,21 @@ import ts from 'typescript';
 export interface UiCatalog {
   readonly exports: readonly string[];
   readonly stories: readonly string[];
+  readonly claims: readonly ResolvedParityClaim[];
+}
+
+export interface ParityEvidence {
+  readonly file: string;
+  readonly test: string;
+}
+
+export interface ResolvedParityClaim {
+  readonly id: string;
+  readonly storyFile: string;
+  readonly storyExport: string;
+  readonly claim: string;
+  readonly ladle: ParityEvidence;
+  readonly application: ParityEvidence;
 }
 
 export class UiCatalogError extends Error {
@@ -54,14 +69,163 @@ const literalStoryTitle = (path: string): string | null => {
     : null;
 };
 
+const sourceFile = (path: string): ts.SourceFile =>
+  ts.createSourceFile(path, readFileSync(path, 'utf8'), ts.ScriptTarget.Latest, true);
+
+const propertyNamed = (
+  object: ts.ObjectLiteralExpression,
+  name: string,
+): ts.PropertyAssignment | undefined =>
+  object.properties.find(
+    (property): property is ts.PropertyAssignment =>
+      ts.isPropertyAssignment(property) &&
+      ((ts.isIdentifier(property.name) && property.name.text === name) ||
+        (ts.isStringLiteral(property.name) && property.name.text === name)),
+  );
+
+const literalStringProperty = (object: ts.ObjectLiteralExpression, name: string): string | null => {
+  const property = propertyNamed(object, name);
+  return property !== undefined && ts.isStringLiteralLike(property.initializer)
+    ? property.initializer.text
+    : null;
+};
+
+interface DeclaredParityClaim {
+  readonly id: string;
+  readonly storyFile: string;
+  readonly storyExport: string;
+  readonly claim: string;
+}
+
+const declaredParityClaims = (path: string, problems: string[]): readonly DeclaredParityClaim[] => {
+  const source = sourceFile(path);
+  const declaration = source.statements
+    .filter(ts.isVariableStatement)
+    .flatMap((statement) => [...statement.declarationList.declarations])
+    .find((item) => ts.isIdentifier(item.name) && item.name.text === 'parityClaims');
+  const initializer = declaration?.initializer;
+  const array =
+    initializer !== undefined && ts.isAsExpression(initializer)
+      ? initializer.expression
+      : initializer;
+  if (array === undefined || !ts.isArrayLiteralExpression(array)) {
+    problems.push(
+      'packages/app/stories/parity-manifest.ts must declare a literal parityClaims array',
+    );
+    return [];
+  }
+
+  const claims: DeclaredParityClaim[] = [];
+  for (const element of array.elements) {
+    if (!ts.isObjectLiteralExpression(element)) {
+      problems.push('parityClaims entries must be object literals');
+      continue;
+    }
+    const id = literalStringProperty(element, 'id');
+    const storyFile = literalStringProperty(element, 'storyFile');
+    const storyExport = literalStringProperty(element, 'storyExport');
+    const claim = literalStringProperty(element, 'claim');
+    if (id === null || storyFile === null || storyExport === null || claim === null) {
+      problems.push(
+        'parityClaims entries require literal id, storyFile, storyExport and claim fields',
+      );
+      continue;
+    }
+    claims.push({ id, storyFile, storyExport, claim });
+  }
+  return claims;
+};
+
+const namedStoryExports = (path: string): readonly string[] => {
+  const names: string[] = [];
+  for (const statement of sourceFile(path).statements) {
+    const exported = (
+      ts.canHaveModifiers(statement) ? ts.getModifiers(statement) : undefined
+    )?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword);
+    if (!exported) continue;
+    if (ts.isVariableStatement(statement)) {
+      for (const declaration of statement.declarationList.declarations) {
+        if (ts.isIdentifier(declaration.name)) names.push(declaration.name.text);
+      }
+    } else if (ts.isFunctionDeclaration(statement) && statement.name !== undefined) {
+      names.push(statement.name.text);
+    }
+  }
+  return names;
+};
+
+interface TaggedTest extends ParityEvidence {
+  readonly claimId: string;
+  readonly excluded: boolean;
+}
+
+const directTestKind = (call: ts.CallExpression): 'included' | 'excluded' | null => {
+  if (ts.isIdentifier(call.expression) && call.expression.text === 'test') return 'included';
+  if (
+    ts.isPropertyAccessExpression(call.expression) &&
+    ts.isIdentifier(call.expression.expression) &&
+    call.expression.expression.text === 'test' &&
+    (call.expression.name.text === 'skip' || call.expression.name.text === 'fixme')
+  ) {
+    return 'excluded';
+  }
+  return null;
+};
+
+const isExcludedDescribe = (node: ts.Node): boolean =>
+  ts.isCallExpression(node) &&
+  ts.isPropertyAccessExpression(node.expression) &&
+  (node.expression.name.text === 'skip' || node.expression.name.text === 'fixme') &&
+  ts.isPropertyAccessExpression(node.expression.expression) &&
+  ts.isIdentifier(node.expression.expression.expression) &&
+  node.expression.expression.expression.text === 'test' &&
+  node.expression.expression.name.text === 'describe';
+
+const parityTagsIn = (root: string, repositoryRoot: string): readonly TaggedTest[] => {
+  const evidence: TaggedTest[] = [];
+  for (const path of filesBelow(root, '.spec.ts')) {
+    const visit = (node: ts.Node, excludedByParent: boolean): void => {
+      const title = ts.isCallExpression(node) ? node.arguments[0] : undefined;
+      const options = ts.isCallExpression(node) ? node.arguments[1] : undefined;
+      const kind = ts.isCallExpression(node) ? directTestKind(node) : null;
+      if (
+        ts.isCallExpression(node) &&
+        kind !== null &&
+        title !== undefined &&
+        options !== undefined &&
+        ts.isStringLiteralLike(title) &&
+        ts.isObjectLiteralExpression(options)
+      ) {
+        const tag = propertyNamed(options, 'tag');
+        const tags =
+          tag === undefined
+            ? []
+            : ts.isStringLiteralLike(tag.initializer)
+              ? [tag.initializer.text]
+              : ts.isArrayLiteralExpression(tag.initializer)
+                ? tag.initializer.elements.filter(ts.isStringLiteralLike).map((item) => item.text)
+                : [];
+        for (const value of tags) {
+          if (!value.startsWith('@parity:')) continue;
+          evidence.push({
+            claimId: value.slice('@parity:'.length),
+            file: relative(repositoryRoot, path).split(sep).join('/'),
+            test: title.text,
+            excluded: excludedByParent || kind === 'excluded',
+          });
+        }
+      }
+      const descendantsExcluded = excludedByParent || isExcludedDescribe(node);
+      ts.forEachChild(node, (child) => visit(child, descendantsExcluded));
+    };
+    visit(sourceFile(path), false);
+  }
+  return evidence;
+};
+
 export const buildUiCatalog = (repositoryRoot = process.cwd()): UiCatalog => {
   const indexPath = join(repositoryRoot, 'packages/ui/src/index.ts');
-  const source = ts.createSourceFile(
-    indexPath,
-    readFileSync(indexPath, 'utf8'),
-    ts.ScriptTarget.Latest,
-    true,
-  );
+  const source = sourceFile(indexPath);
   const exports: string[] = [];
   const problems: string[] = [];
 
@@ -83,6 +247,7 @@ export const buildUiCatalog = (repositoryRoot = process.cwd()): UiCatalog => {
     ['review', 'Review/'],
   ]);
   const stories: string[] = [];
+  const stableExports = new Set<string>();
   for (const path of filesBelow(storiesRoot, '.stories.tsx')) {
     const storyPath = relative(storiesRoot, path).split(sep).join('/');
     const category = storyPath.split('/')[0] ?? '';
@@ -92,11 +257,64 @@ export const buildUiCatalog = (repositoryRoot = process.cwd()): UiCatalog => {
     else if (title === null) problems.push(`${storyPath} must declare a literal default title`);
     else if (!title.startsWith(prefix))
       problems.push(`${storyPath} title must start with ${prefix}`);
-    else stories.push(title);
+    else {
+      stories.push(title);
+      if (category === 'components' || category === 'surfaces') {
+        for (const name of namedStoryExports(path)) stableExports.add(`${storyPath}#${name}`);
+      }
+    }
   }
 
+  const declared = declaredParityClaims(join(storiesRoot, 'parity-manifest.ts'), problems);
+  const ids = new Set<string>();
+  const claimedExports = new Set<string>();
+  for (const item of declared) {
+    if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(item.id))
+      problems.push(`parity claim ${item.id} must use semantic kebab-case`);
+    if (ids.has(item.id)) problems.push(`duplicate parity claim id ${item.id}`);
+    ids.add(item.id);
+    const story = `${item.storyFile}#${item.storyExport}`;
+    if (!stableExports.has(story))
+      problems.push(`parity claim ${item.id} names unknown stable story ${story}`);
+    claimedExports.add(story);
+  }
+  for (const story of stableExports) {
+    if (!claimedExports.has(story)) problems.push(`stable story ${story} has no parity claim`);
+  }
+
+  const ladleEvidence = parityTagsIn(
+    join(repositoryRoot, 'packages/app/ladle-e2e'),
+    repositoryRoot,
+  );
+  const applicationEvidence = parityTagsIn(
+    join(repositoryRoot, 'packages/app/e2e'),
+    repositoryRoot,
+  );
+  const evidenceFor = (all: readonly TaggedTest[], id: string, suite: string): ParityEvidence => {
+    const matches = all.filter((item) => item.claimId === id);
+    if (matches.length !== 1)
+      problems.push(
+        `parity claim ${id} requires exactly one ${suite} test; found ${matches.length}`,
+      );
+    const match = matches[0];
+    return match === undefined
+      ? { file: '(missing)', test: '(missing)' }
+      : { file: match.file, test: match.test };
+  };
+  for (const item of [...ladleEvidence, ...applicationEvidence]) {
+    if (!ids.has(item.claimId))
+      problems.push(`unknown parity tag @parity:${item.claimId} in ${item.file}`);
+    if (item.excluded)
+      problems.push(`parity tag @parity:${item.claimId} is excluded in ${item.file}`);
+  }
+  const claims = declared.map((item) => ({
+    ...item,
+    ladle: evidenceFor(ladleEvidence, item.id, 'Ladle'),
+    application: evidenceFor(applicationEvidence, item.id, 'application'),
+  }));
+
   if (problems.length > 0) throw new UiCatalogError(problems);
-  return { exports: exports.sort(), stories: stories.sort() };
+  return { exports: exports.sort(), stories: stories.sort(), claims };
 };
 
 export const formatUiCatalog = (catalog: UiCatalog): string =>
@@ -106,6 +324,14 @@ export const formatUiCatalog = (catalog: UiCatalog): string =>
     '',
     'Ladle stories',
     ...catalog.stories.map((title) => `  ${title}`),
+    '',
+    'Parity evidence',
+    ...catalog.claims.flatMap((item) => [
+      `  ${item.id} — ${item.claim}`,
+      `    story ${item.storyFile}#${item.storyExport}`,
+      `    ladle ${item.ladle.file} — ${item.ladle.test}`,
+      `    application ${item.application.file} — ${item.application.test}`,
+    ]),
   ].join('\n');
 
 const entryPoint = process.argv[1];
