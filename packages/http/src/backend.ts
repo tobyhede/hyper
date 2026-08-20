@@ -12,8 +12,10 @@ import {
   type SpaceBackend,
   type SpaceSummary,
 } from '@project/persistence';
+import { parse as parseContentType } from 'content-type';
 import { hc } from 'hono/client';
 import type { SpaceHttpApp } from './index';
+import { hasValidUniqueMediaTypeParameters } from './media-type';
 
 type SpaceHttpClient = ReturnType<typeof hc<SpaceHttpApp>>;
 
@@ -22,6 +24,13 @@ const protocolFailure = (message: string): CommitResult => ({
   code: 'protocol',
   message,
 });
+
+/** Media-type essence match, so a charset or other parameter doesn't fail an otherwise-valid response. */
+const hasProblemDetailsMediaType = (response: Response): boolean => {
+  const contentType = response.headers.get('Content-Type');
+  if (contentType === null || !hasValidUniqueMediaTypeParameters(contentType)) return false;
+  return parseContentType(contentType).type === 'application/problem+json';
+};
 
 export interface HttpSpaceBackendOptions {
   fetch?: typeof globalThis.fetch;
@@ -100,7 +109,7 @@ export class HttpSpaceBackend implements SpaceBackend {
             if (response.status === 409) {
               return { kind: 'conflict', current: decodeLoadedSpace(await response.json()) };
             }
-            if (response.headers.get('Content-Type') !== 'application/problem+json') {
+            if (!hasProblemDetailsMediaType(response)) {
               return protocolFailure('Error response must use application/problem+json');
             }
             const problem = decodeProblemDetails(await response.json());

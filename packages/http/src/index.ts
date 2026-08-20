@@ -424,6 +424,8 @@ const httpExceptionProblem = (status: number): HyperProblemCode => {
       return 'forbidden';
     case 404:
       return 'not-found';
+    case 405:
+      return 'method-not-allowed';
     case 408:
       return 'request-timeout';
     case 413:

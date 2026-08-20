@@ -34,23 +34,34 @@ describe('typed Hono HttpSpaceBackend failure classification', () => {
     });
   }
 
-  const retryable = [
-    [408, 'timeout'],
-    [429, 'rate-limited'],
-    [500, 'unavailable'],
-    [503, 'unavailable'],
-  ] as const;
+  const retryableStatuses = [408, 429, 500, 503] as const;
   const malformedBodies = ['', '<html>broken</html>', '{', JSON.stringify({ nope: true })];
 
-  for (const [status] of retryable) {
+  for (const status of retryableStatuses) {
     for (const body of malformedBodies) {
-      it(`rejects malformed Problem Details for ${status}: ${JSON.stringify(body)}`, async () => {
+      it(`rejects a malformed Problem Details body for ${status}: ${JSON.stringify(body)}`, async () => {
         await expect(
-          backendFor(new Response(body, { status })).commitSpace(snapshot, 0n),
+          backendFor(
+            new Response(body, { status, headers: { 'Content-Type': 'application/problem+json' } }),
+          ).commitSpace(snapshot, 0n),
         ).resolves.toMatchObject({ kind: 'permanent-failure', code: 'protocol' });
       });
     }
   }
+
+  it('rejects a well-formed Problem Details body sent with the wrong media type', async () => {
+    const body = encodeProblemDetails('persistence-unavailable', 'Down');
+    await expect(
+      backendFor(new Response(JSON.stringify(body), { status: body.status })).commitSpace(
+        snapshot,
+        0n,
+      ),
+    ).resolves.toEqual({
+      kind: 'permanent-failure',
+      code: 'protocol',
+      message: 'Error response must use application/problem+json',
+    });
+  });
 
   it('uses a valid retryable error message and Retry-After seconds', async () => {
     await expect(

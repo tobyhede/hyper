@@ -104,6 +104,34 @@ describe('HTTP Space backend Problem Details decoding', () => {
     });
   });
 
+  it('accepts a Problem Details response whose Content-Type carries parameters', async () => {
+    const body = encodeProblemDetails('persistence-unavailable', 'Down for maintenance');
+    const response = new Response(JSON.stringify(body), {
+      status: body.status,
+      headers: { 'Content-Type': 'application/problem+json; charset=utf-8' },
+    });
+
+    await expect(backendAnswering(response).commitSpace(snapshot, 0n)).resolves.toMatchObject({
+      kind: 'retryable-failure',
+      code: 'unavailable',
+      message: 'Down for maintenance',
+    });
+  });
+
+  it('rejects a Problem Details response whose Content-Type is not a valid media type', async () => {
+    const body = encodeProblemDetails('persistence-unavailable', 'Down for maintenance');
+    const response = new Response(JSON.stringify(body), {
+      status: body.status,
+      headers: { 'Content-Type': 'application/problem+json; charset=' },
+    });
+
+    await expect(backendAnswering(response).commitSpace(snapshot, 0n)).resolves.toEqual({
+      kind: 'permanent-failure',
+      code: 'protocol',
+      message: 'Error response must use application/problem+json',
+    });
+  });
+
   it('keeps the 409 recovery representation as LoadedSpace', async () => {
     const current = { snapshot, revision: 4n, exportedRevision: 2n };
     const response = new Response(JSON.stringify(encodeLoadedSpace(current)), { status: 409 });

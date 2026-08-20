@@ -761,6 +761,7 @@ describe('Space HTTP application', () => {
   it.each([
     [401, 'unauthorized'],
     [404, 'not-found'],
+    [405, 'method-not-allowed'],
     [422, 'invalid-snapshot'],
   ] as const)(
     'answers an HTTPException with %i in the declared JSON error shape',
