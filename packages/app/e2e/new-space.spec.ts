@@ -13,7 +13,7 @@ import {
   settled,
   sidebar,
 } from './graph';
-import { seedPositionedLayout } from './seed';
+import { seedPositionedLayout, type HttpLoadedSpace } from './seed';
 
 /**
  * Opening the app with nothing to open gives a new space: one card (ADR 0018).
@@ -422,3 +422,118 @@ test('a completed edit and workspace identity survive reload', async ({ page }) 
   expect(await positionOf(second)).toEqual(durablePosition);
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
 });
+
+/**
+ * `openStoredWorkspace` validates the backend's response before opening it
+ * (`open-workspace.ts`) — a real backend can return a snapshot referencing a
+ * card it does not hold (a partial write, a migration gap), and this proves
+ * that reaches `StartupFailure` rather than an unhandled rejection. The
+ * response is wire-valid (it parses as a `SpaceSnapshot`) and only fails
+ * domain intake, so this is the real client boundary rather than a decode
+ * error.
+ */
+test(
+  'a backend snapshot naming a card its own Graph does not hold fails startup with the real diagnostic',
+  { tag: '@parity:operational-feedback-startup-failure' },
+  async ({ page }) => {
+    const summariesResponse = await page.request.get('/api/spaces');
+    expect(summariesResponse.ok()).toBe(true);
+    // SAFETY: this E2E test trusts the running app's own `/api/spaces`
+    // response shape rather than importing its Zod schema here — the read is
+    // narrow (just `id`), and a real shape mismatch fails the assertion below.
+    const summaries = (await summariesResponse.json()) as readonly { readonly id: string }[];
+    const spaceId = summaries[0]?.id;
+    if (spaceId === undefined) throw new Error('The new Space must already exist.');
+
+    const loadedResponse = await page.request.get(`/api/spaces/${spaceId}`);
+    expect(loadedResponse.ok()).toBe(true);
+    // SAFETY: `HttpLoadedSpace` is this app's own wire type for a GET
+    // `/api/spaces/:id` response — the server producing it is this same
+    // codebase, not third-party JSON.
+    const loaded = (await loadedResponse.json()) as HttpLoadedSpace;
+    const cardId = loaded.snapshot.cards[0]?.id;
+    if (cardId === undefined) throw new Error('The new Space must hold Card 1.');
+
+    const layoutId = '00000000-0000-4000-8000-0000000000fe';
+    const graphId = '00000000-0000-4000-8000-0000000000fd';
+    const missingCardId = '00000000-0000-4000-8000-0000000000ff';
+    await page.route('**/api/spaces/*', async (route) => {
+      const request = route.request();
+      const isLoadOne =
+        request.method() === 'GET' &&
+        /\/api\/spaces\/[0-9a-f-]+$/.test(new URL(request.url()).pathname);
+      if (!isLoadOne) {
+        await route.continue();
+        return;
+      }
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          ...loaded,
+          snapshot: {
+            ...loaded.snapshot,
+            document: {
+              ...loaded.snapshot.document,
+              layouts: [
+                {
+                  id: layoutId,
+                  title: 'Layout',
+                  kind: 'positioned',
+                  positions: { [cardId]: { x: 0, y: 0 } },
+                  graphs: [
+                    { id: graphId, title: 'Graph', edges: [{ from: cardId, to: missingCardId }] },
+                  ],
+                },
+              ],
+              defaultRenderer: layoutId,
+            },
+          },
+        }),
+      });
+    });
+
+    await page.goto('/');
+    const alert = page.getByRole('alert');
+    await expect(alert.getByText('Application could not start')).toBeVisible();
+    await expect(alert).toContainText(missingCardId);
+  },
+);
+
+/**
+ * The Flow view's strategy, `elkStrategy`, loads elkjs as a dynamic import on
+ * first use (`elk-strategy.ts`) — a real network condition (a chunk-load
+ * blip, a stale service worker) can fail that fetch, and this proves the
+ * rejection reaches `PlacementFailure` through `usePlacementRendering`'s own
+ * catch rather than an unhandled rejection or a stuck busy state. A fresh
+ * Space has no authored Layout, so it opens on Flow — the one View this
+ * failure mode can reach.
+ */
+test(
+  'a blocked elkjs chunk fails placement with the real strategy diagnostic',
+  { tag: '@parity:operational-feedback-placement-failure' },
+  async ({ page }) => {
+    await page.route('**/deps/elkjs*', (route) => route.abort('failed'));
+
+    await page.goto('/');
+    const alert = page.getByRole('alert');
+    await expect(alert.getByText('Unable to arrange this view')).toBeVisible();
+    await expect(alert).toContainText('elkjs');
+  },
+);
+
+/**
+ * `usePlacementRendering` starts every strategy pending and only resolves
+ * once it settles (`placement-rendering.ts`) — a fresh Space has no authored
+ * Layout, so it opens on Flow, and elkjs's real (uninjected) layout
+ * computation is slow enough that the pending state is reliably observable
+ * on first paint rather than being a same-tick flash.
+ */
+test(
+  'a fresh Space shows the busy state while elk is still arranging it',
+  { tag: '@parity:operational-feedback-placement-pending' },
+  async ({ page }) => {
+    await page.goto('/');
+    await expect(page.getByRole('status')).toHaveText('Arranging…');
+  },
+);

@@ -16,7 +16,13 @@ export default class ParityReporter implements Reporter {
   }
 
   onBegin(_config: FullConfig, suite: Suite): void {
-    const expected = new Set(parityClaims.map((claim) => claim.id));
+    // A claim whose `applicationEvidence` names a reason instead of a test
+    // (see parity-claims.ts) is exempt from the application suite's count —
+    // never from Ladle's, which every claim still owes one test.
+    const applicable = parityClaims.filter(
+      (claim) => this.#suiteName !== 'application' || claim.applicationEvidence === undefined,
+    );
+    const expected = new Set(applicable.map((claim) => claim.id));
     this.#tagged = new Map([...expected].map((id) => [id, []]));
 
     for (const test of suite.allTests()) {

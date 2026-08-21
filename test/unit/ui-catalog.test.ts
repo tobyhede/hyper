@@ -140,4 +140,35 @@ describe('UI catalogue', () => {
       test: 'application button',
     });
   });
+
+  it('accepts a claim exempted from application evidence, and still requires its Ladle evidence', () => {
+    const root = fixture();
+    write(
+      root,
+      'packages/app/stories/parity-claims.ts',
+      `export const parityClaims = [{ id: 'button-is-operable', storyFile: 'components/button.stories.tsx', storyExport: 'Primary', claim: 'The Button can be operated.', applicationEvidence: 'No production trigger exists.' }] as const;`,
+    );
+    write(root, 'packages/app/e2e/button.spec.ts', '');
+
+    const catalog = buildUiCatalog(root);
+    expect(catalog.claims[0]?.application).toEqual({
+      file: '(exempt)',
+      test: 'No production trigger exists.',
+    });
+  });
+
+  it('still rejects an exempted claim missing its Ladle evidence', () => {
+    const root = fixture();
+    write(
+      root,
+      'packages/app/stories/parity-claims.ts',
+      `export const parityClaims = [{ id: 'button-is-operable', storyFile: 'components/button.stories.tsx', storyExport: 'Primary', claim: 'The Button can be operated.', applicationEvidence: 'No production trigger exists.' }] as const;`,
+    );
+    write(root, 'packages/app/ladle-e2e/button.spec.ts', '');
+    write(root, 'packages/app/e2e/button.spec.ts', '');
+
+    expect(() => buildUiCatalog(root)).toThrowError(
+      /button-is-operable requires exactly one Ladle test; found 0/,
+    );
+  });
 });

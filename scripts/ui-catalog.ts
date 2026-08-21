@@ -90,6 +90,12 @@ interface DeclaredParityClaim {
   readonly storyFile: string;
   readonly storyExport: string;
   readonly claim: string;
+  /**
+   * A documented exemption from the one-application-test requirement, carrying
+   * the reason in place of the test. Absent for every claim with a real
+   * `packages/app/e2e` test to find.
+   */
+  readonly applicationEvidence: string | null;
 }
 
 const declaredParityClaims = (path: string, problems: string[]): readonly DeclaredParityClaim[] => {
@@ -126,7 +132,18 @@ const declaredParityClaims = (path: string, problems: string[]): readonly Declar
       );
       continue;
     }
-    claims.push({ id, storyFile, storyExport, claim });
+    const applicationEvidenceProperty = propertyNamed(element, 'applicationEvidence');
+    const applicationEvidence =
+      applicationEvidenceProperty === undefined
+        ? null
+        : ts.isStringLiteralLike(applicationEvidenceProperty.initializer)
+          ? applicationEvidenceProperty.initializer.text
+          : null;
+    if (applicationEvidenceProperty !== undefined && applicationEvidence === null) {
+      problems.push(`parity claim ${id} applicationEvidence must be a string literal`);
+      continue;
+    }
+    claims.push({ id, storyFile, storyExport, claim, applicationEvidence });
   }
   return claims;
 };
@@ -305,10 +322,13 @@ export const buildUiCatalog = (repositoryRoot = process.cwd()): UiCatalog => {
     if (item.excluded)
       problems.push(`parity tag ${PARITY_TAG_PREFIX}${item.claimId} is excluded in ${item.file}`);
   }
-  const claims = declared.map((item) => ({
+  const claims = declared.map(({ applicationEvidence: exemptionReason, ...item }) => ({
     ...item,
     ladle: evidenceFor(ladleEvidence, item.id, 'Ladle'),
-    application: evidenceFor(applicationEvidence, item.id, 'application'),
+    application:
+      exemptionReason !== null
+        ? { file: '(exempt)', test: exemptionReason }
+        : evidenceFor(applicationEvidence, item.id, 'application'),
   }));
 
   if (problems.length > 0) throw new UiCatalogError(problems);
