@@ -213,11 +213,6 @@ export default tseslint.config(
       // signature to satisfy `Record<string, unknown>`) and `interface` (option
       // bags). Enforcing one over the other would break that distinction.
       '@typescript-eslint/consistent-type-definitions': 'off',
-      // Adding a variant to a discriminated union should identify every
-      // incomplete consumer. A `default:` branch that silently absorbs a new
-      // domain variant is exactly the failure this prevents, so it earns no
-      // exemption: `AuthoringRefusal` (ADR 0057) is a union whose whole value is
-      // that a new refusal code changes the interface deliberately.
       // ADR 0062. The assertions already in the tree were examined in a reviewed
       // pass and stand on their `SAFETY:` comments; what has no gate is the next
       // one, because a comment requirement is satisfied by prose and prose is the
@@ -227,6 +222,11 @@ export default tseslint.config(
       // is unchanged and still applies to every surviving assertion — demands the
       // reason. Two rules, two jobs; weakening either loses one of them.
       '@typescript-eslint/no-unsafe-type-assertion': 'error',
+      // Adding a variant to a discriminated union should identify every
+      // incomplete consumer. A `default:` branch that silently absorbs a new
+      // domain variant is exactly the failure this prevents, so it earns no
+      // exemption: `AuthoringRefusal` (ADR 0057) is a union whose whole value is
+      // that a new refusal code changes the interface deliberately.
       '@typescript-eslint/switch-exhaustiveness-check': [
         'error',
         {

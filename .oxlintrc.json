@@ -443,6 +443,27 @@
       }
     },
     {
+      // The two parse boundaries the ADR 0061 toolchain check owns: a workspace
+      // `package.json`, read to learn which binary its `typecheck` script
+      // invokes, and `pnpm -r list --json`, read to learn which directories pnpm
+      // enumerates. Both are decoded by a named type predicate returning a named
+      // contract — `TypecheckingManifest` and `ListedWorkspace` — which is the
+      // shape the other rules ask for, and neither needs `no-runtime-typeof` or
+      // `no-unsafe-dictionary-type` off to get there.
+      //
+      // Only `no-unknown-parameters` is lifted, and only because a predicate that
+      // decides whether untrusted JSON has a shape must accept it before it has
+      // one. Narrower than the boundary exemption above on purpose: taking all
+      // three here would buy nothing and hide the two rules these files pass.
+      "files": [
+        "scripts/check-typescript-toolchain.ts",
+        "test/unit/check-typescript-toolchain.test.ts"
+      ],
+      "rules": {
+        "anti-slop/no-unknown-parameters": "off"
+      }
+    },
+    {
       // The `must-pass` typing fixtures (ADR 0062; see
       // `tools/typing-fixtures/README.md`). `unknown-at-parse-boundary.ts` is a
       // parse boundary and takes exactly the same three exemptions

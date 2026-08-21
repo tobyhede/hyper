@@ -1,6 +1,6 @@
 import { execFile } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { dirname, join, relative, resolve } from 'node:path';
+import { dirname, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { beforeAll, describe, expect, it } from 'vitest';
@@ -39,15 +39,59 @@ const mustPass = [
   'unknown-at-parse-boundary.ts',
 ] as const;
 
-/** Every diagnostic the toolchain produced, as `fixture name -> rule identities`. */
+/** The tools whose verdict this file reads. */
+type Tool = 'eslint' | 'oxlint' | 'tsc';
+
+/** Every fixture on disk, as `<half>/<name>`, which is how both maps below are keyed. */
+const fixturePaths = (half: string): readonly string[] =>
+  readdirSync(join(fixturesRoot, half))
+    .sort()
+    .map((name) => `${half}/${name}`);
+
+const allFixtures = (): readonly string[] => [
+  ...fixturePaths('must-fail'),
+  ...fixturePaths('must-pass'),
+];
+
+/**
+ * A fixture's key: its path below `tools/typing-fixtures`, not its basename.
+ * Keying by basename lets a `must-pass/as-any.ts` inherit the diagnostics of the
+ * `must-fail/as-any.ts` beside it, and nothing keeps the two halves' names apart.
+ */
+const fixtureKey = (path: string): string | null => {
+  const key = relative(fixturesRoot, path).split(sep).join('/');
+  return key.startsWith('..') || key === '' ? null : key;
+};
+
+/** Every diagnostic the toolchain produced, as `fixture path -> rule identities`. */
 const rejections = new Map<string, Set<string>>();
 
+/**
+ * Which tools actually read each fixture.
+ *
+ * The `must-pass` half asserts an empty diagnostic list, and a tool that never
+ * opened the file produces exactly that. Without this, excluding the whole half
+ * — one extra `ignorePatterns` entry does it — leaves all four `accepts …` tests
+ * green while the over-reach detector is dead, and `verify` never notices.
+ */
+const readBy = new Map<string, Set<Tool>>();
+
+const addTo = <Value>(index: Map<string, Set<Value>>, key: string, value: Value): void => {
+  const existing = index.get(key);
+  if (existing === undefined) index.set(key, new Set([value]));
+  else existing.add(value);
+};
+
+const noteRead = (tool: Tool, path: string): void => {
+  const fixture = fixtureKey(path);
+  if (fixture === null) return;
+  addTo(readBy, fixture, tool);
+};
+
 const noteRejection = (path: string, rule: string): void => {
-  const fixture = relative(fixturesRoot, path).split('/').at(-1);
-  if (fixture === undefined) return;
-  const existing = rejections.get(fixture);
-  if (existing === undefined) rejections.set(fixture, new Set([rule]));
-  else existing.add(rule);
+  const fixture = fixtureKey(path);
+  if (fixture === null) return;
+  addTo(rejections, fixture, rule);
 };
 
 /**
@@ -73,23 +117,36 @@ const readEslintFileResult = (value: unknown): readonly [string, readonly string
   return [filePath, rules];
 };
 
+/** What a tool printed, with the two streams kept apart. */
+interface ToolOutput {
+  readonly stdout: string;
+  readonly stderr: string;
+  /** Both streams, for the diagnostics a failure message wants to show in full. */
+  readonly combined: string;
+}
+
 /**
  * `execFile` rejects on a non-zero exit, which is the normal outcome here — the
  * fixtures are meant to fail. The output is what matters, not the status.
+ *
+ * `stdout` stays separate from `stderr` because the JSON readers below parse it.
+ * Concatenating the two appends any `pnpm WARN` or Node deprecation line after
+ * the report, and `JSON.parse` then throws on trailing input — failing all
+ * seventeen tests in this file with a parse error instead of a diagnosis.
  */
-const outputOf = async (command: string, args: readonly string[]): Promise<string> => {
-  try {
-    const { stdout, stderr } = await run(command, [...args], {
-      cwd: repositoryRoot,
-      maxBuffer: 32 * 1024 * 1024,
-    });
-    return `${stdout}${stderr}`;
-  } catch (error) {
-    if (error instanceof Error && 'stdout' in error && 'stderr' in error) {
-      return `${String(error.stdout)}${String(error.stderr)}`;
+const outputOf = async (command: string, args: readonly string[]): Promise<ToolOutput> => {
+  const captured = async (): Promise<{ stdout: string; stderr: string }> => {
+    try {
+      return await run(command, [...args], { cwd: repositoryRoot, maxBuffer: 32 * 1024 * 1024 });
+    } catch (error) {
+      if (error instanceof Error && 'stdout' in error && 'stderr' in error) {
+        return { stdout: String(error.stdout), stderr: String(error.stderr) };
+      }
+      throw error;
     }
-    throw error;
-  }
+  };
+  const { stdout, stderr } = await captured();
+  return { stdout, stderr, combined: `${stdout}${stderr}` };
 };
 
 const readEslint = async (): Promise<void> => {
@@ -101,26 +158,67 @@ const readEslint = async (): Promise<void> => {
     '--format',
     'json',
   ]);
-  const start = output.indexOf('[');
-  expect(start, `eslint printed no JSON:\n${output}`).toBeGreaterThanOrEqual(0);
-  const parsed: unknown = JSON.parse(output.slice(start));
-  expect(Array.isArray(parsed), `eslint printed no report:\n${output}`).toBe(true);
+  const start = output.stdout.indexOf('[');
+  expect(start, `eslint printed no JSON:\n${output.combined}`).toBeGreaterThanOrEqual(0);
+  const parsed: unknown = JSON.parse(output.stdout.slice(start));
+  expect(Array.isArray(parsed), `eslint printed no report:\n${output.combined}`).toBe(true);
   if (!Array.isArray(parsed)) return;
   for (const value of parsed) {
     const result = readEslintFileResult(value);
     if (result === null) continue;
     const [filePath, rules] = result;
+    // ESLint reports every file it linted, clean ones included, so the report is
+    // itself the record of what it read.
+    noteRead('eslint', filePath);
     for (const rule of rules) noteRejection(filePath, rule);
   }
 };
 
-const OXLINT_DIAGNOSTIC = /^(\S+\.ts):\d+:\d+: error (anti-slop\([^)]+\))/gm;
-
 /** The `ignorePatterns` entry in `.oxlintrc.json` that hides the fixtures. */
 const FIXTURE_IGNORE_ENTRY = '"tools/typing-fixtures/**"';
 
-/** The same entry with whatever comma joins it to its neighbour, so it can be lifted out. */
-const FIXTURE_IGNORE_ENTRY_WITH_COMMA = /,?\s*"tools\/typing-fixtures\/\*\*"/;
+/**
+ * Every `ignorePatterns` entry under the fixtures tree, with the comma that joins
+ * it to a neighbour.
+ *
+ * Matched by prefix rather than as one exact string. Lifting out only
+ * `"tools/typing-fixtures/**"` leaves a narrower entry such as
+ * `"tools/typing-fixtures/must-pass/**"` in place, which silently hides the half
+ * that catches a rule over-reaching. The optional leading comma is what keeps the
+ * strip valid when the entry is first in the array rather than last.
+ */
+const FIXTURE_IGNORE_ENTRIES = /\n[^\S\n]*"tools\/typing-fixtures[^"]*",?/g;
+
+/**
+ * The same shape without `g`, for asserting the strip worked.
+ *
+ * Both are anchored to the start of a line, which is what keeps them off the
+ * `overrides` block: `unknown-at-parse-boundary.ts` is named there as `"files":
+ * ["tools/typing-fixtures/…"]`, and that exemption has to survive into the
+ * derived config or the fixture stops proving what it claims.
+ */
+const ANY_FIXTURE_IGNORE_ENTRY = /\n[^\S\n]*"tools\/typing-fixtures[^"]*",?/;
+
+/** How many files oxlint reported linting. Emptiness proves nothing without this. */
+let oxlintFilesLinted = -1;
+
+/** oxlint's JSON report, as far as this file reads it. */
+interface OxlintReport {
+  /** How many files oxlint linted; -1 when the report did not say. */
+  readonly files: number;
+  readonly diagnostics: readonly unknown[];
+}
+
+/** oxlint's JSON report: the diagnostics, and how many files it actually read. */
+const readOxlintReport = (value: unknown): OxlintReport => {
+  if (!isJsonObject(value)) return { files: -1, diagnostics: [] };
+  const files = value['number_of_files'];
+  const diagnostics = value['diagnostics'];
+  return {
+    files: typeof files === 'number' ? files : -1,
+    diagnostics: Array.isArray(diagnostics) ? diagnostics : [],
+  };
+};
 
 /**
  * oxlint's `--no-ignore` disables `.eslintignore`-style files, not the config's
@@ -138,8 +236,11 @@ const readOxlint = async (): Promise<void> => {
     real.includes(FIXTURE_IGNORE_ENTRY),
     'the fixtures are no longer ignored by .oxlintrc.json, so `pnpm lint:anti-slop` would fail on them',
   ).toBe(true);
-  const derived = real.replace(FIXTURE_IGNORE_ENTRY_WITH_COMMA, '');
-  expect(derived).not.toContain(FIXTURE_IGNORE_ENTRY);
+  const derived = real.replace(FIXTURE_IGNORE_ENTRIES, '').replace(/,(\s*])/g, '$1');
+  expect(ANY_FIXTURE_IGNORE_ENTRY.test(derived), 'the fixtures are still ignored').toBe(false);
+  expect(derived, 'the parse-boundary exemption was stripped along with the ignores').toContain(
+    'must-pass/unknown-at-parse-boundary.ts',
+  );
   writeFileSync(derivedOxlintConfig, derived);
   try {
     const output = await outputOf('pnpm', [
@@ -147,13 +248,21 @@ const readOxlint = async (): Promise<void> => {
       'oxlint',
       '-c',
       '.oxlintrc.typing-fixtures.json',
+      '--format',
+      'json',
       'tools/typing-fixtures',
     ]);
-    expect(output, `oxlint could not read the fixtures:\n${output}`).not.toContain(
-      'No files found to lint',
-    );
-    for (const [, path, rule] of output.matchAll(OXLINT_DIAGNOSTIC)) {
-      if (path !== undefined && rule !== undefined) noteRejection(join(repositoryRoot, path), rule);
+    const start = output.stdout.indexOf('{');
+    expect(start, `oxlint printed no JSON:\n${output.combined}`).toBeGreaterThanOrEqual(0);
+    const parsed: unknown = JSON.parse(output.stdout.slice(start));
+    const { files, diagnostics } = readOxlintReport(parsed);
+    oxlintFilesLinted = files;
+    for (const diagnostic of diagnostics) {
+      if (!isJsonObject(diagnostic)) continue;
+      const filename = diagnostic['filename'];
+      const code = diagnostic['code'];
+      if (typeof filename !== 'string' || typeof code !== 'string') continue;
+      noteRejection(join(repositoryRoot, filename), code);
     }
   } finally {
     rmSync(derivedOxlintConfig, { force: true });
@@ -170,15 +279,26 @@ const rootTsconfigInclude = (): readonly string[] => {
 
 const TSC_DIAGNOSTIC = /^(\S+\.ts)\(\d+,\d+\): error (TS\d+)/gm;
 
+/** A `--listFiles` line: an absolute path to a file in the program, and nothing else. */
+const TSC_PROGRAM_FILE = /^(\/\S+\.tsx?)$/gm;
+
 const readTsc = async (): Promise<void> => {
+  // `--listFiles` names every file in the program alongside the diagnostics, so
+  // one invocation answers both "what did it object to" and "what did it read".
+  // Program membership is what makes a clean `must-pass` fixture evidence rather
+  // than the silence of a file the compiler never opened.
   const output = await outputOf('pnpm', [
     'exec',
     'tsc',
     '-p',
     'tools/typing-fixtures/tsconfig.json',
     '--noEmit',
+    '--listFiles',
   ]);
-  for (const [, path, code] of output.matchAll(TSC_DIAGNOSTIC)) {
+  for (const [, path] of output.combined.matchAll(TSC_PROGRAM_FILE)) {
+    if (path !== undefined) noteRead('tsc', path);
+  }
+  for (const [, path, code] of output.combined.matchAll(TSC_DIAGNOSTIC)) {
     if (path !== undefined && code !== undefined) noteRejection(join(repositoryRoot, path), code);
   }
 };
@@ -196,7 +316,7 @@ describe('constructs the toolchain must reject', () => {
 
   for (const [fixture, rules] of Object.entries(mustFail)) {
     it(`rejects ${fixture} — ${rules.join(', ')}`, () => {
-      const found = rejections.get(fixture) ?? new Set<string>();
+      const found = rejections.get(`must-fail/${fixture}`) ?? new Set<string>();
       // A fixture that passes is a gap in enforcement and a finding, not a
       // fixture to relax.
       expect([...found].sort(), `${fixture} was not rejected as expected`).toEqual(
@@ -213,9 +333,32 @@ describe('constructs that must survive', () => {
 
   for (const fixture of mustPass) {
     it(`accepts ${fixture}`, () => {
-      expect([...(rejections.get(fixture) ?? [])]).toEqual([]);
+      expect([...(rejections.get(`must-pass/${fixture}`) ?? [])]).toEqual([]);
     });
   }
+});
+
+describe('every tool actually read every fixture', () => {
+  // Without these, the `must-pass` half is vacuous. It asserts an empty
+  // diagnostic list, and a tool that never opened the file produces exactly that
+  // — so one extra `ignorePatterns` entry silently kills the only half that
+  // catches a rule over-reaching, with all four `accepts …` tests still green.
+  it.each(['eslint', 'tsc'] as const)('%s read every fixture', (tool) => {
+    const unread = allFixtures().filter((fixture) => !(readBy.get(fixture)?.has(tool) ?? false));
+    expect(unread, `${tool} never opened these fixtures, so their result proves nothing`).toEqual(
+      [],
+    );
+  });
+
+  it('oxlint linted every fixture', () => {
+    // oxlint's report names only files it had something to say about, so a clean
+    // `must-pass` fixture is absent from it either way. `number_of_files` is the
+    // one thing it prints that distinguishes "read and clean" from "never read".
+    expect(
+      oxlintFilesLinted,
+      'oxlint linted a different number of files than there are fixtures',
+    ).toBe(allFixtures().length);
+  });
 });
 
 describe('the fixtures stay out of the ordinary passes', () => {
@@ -227,7 +370,7 @@ describe('the fixtures stay out of the ordinary passes', () => {
       '.oxlintrc.json',
       'tools/typing-fixtures',
     ]);
-    expect(output).toContain('No files found to lint');
+    expect(output.combined).toContain('No files found to lint');
   }, 60_000);
 
   it('leaves no derived oxlint config behind', () => {

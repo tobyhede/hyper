@@ -14,10 +14,12 @@
  * not a rewrite.
  *
  * It probes every workspace and not only the root, because `pnpm -r typecheck` runs
- * each package's own `tsc` and a root-only check does not prove those.
+ * each package's own `tsc` and a root-only check does not prove those. It also reads
+ * each `typecheck` script, because what `tsc` resolves to proves nothing about a
+ * script that invokes `tsc6` instead.
  */
 import { execFile } from 'node:child_process';
-import { readdirSync, readFileSync, realpathSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, realpathSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
@@ -28,6 +30,17 @@ export const AUTHORITATIVE_MAJOR_MINIMUM = 7;
 /** The major version `import 'typescript'` must answer for while the bridge stands. */
 export const BRIDGE_MAJOR = 6;
 
+/**
+ * The binary a `typecheck` script must invoke.
+ *
+ * Probing `tsc --version` says what that name resolves to; it says nothing about
+ * which binary the script actually runs, and ADR 0061 installs `tsc6` beside it
+ * on purpose. A script switched to `tsc6` — a plausible edit while someone takes
+ * the one-off TypeScript 6 comparison the ADR says stays useful — typechecks on
+ * the wrong compiler with every version probe still reporting 7.
+ */
+export const AUTHORITATIVE_BINARY = 'tsc';
+
 /** One `tsc --version` probe, run in the directory whose `typecheck` script owns it. */
 export interface CompilerReading {
   /** Repository-relative directory the probe ran in; `.` is the root. */
@@ -36,6 +49,8 @@ export interface CompilerReading {
   readonly reported: string | null;
   /** Why the probe failed, when it did. The guard's job is to say what went wrong. */
   readonly failure: string | null;
+  /** The `typecheck` script this directory declares, or null when it declares none. */
+  readonly typecheckScript: string | null;
 }
 
 /** What the resolved `typescript` package answers for. */
@@ -75,12 +90,15 @@ export const compilerMajor = (reported: string): number | null => {
   return Number.parseInt(major, 10);
 };
 
+/** The binary a `typecheck` script invokes: the first word of its command line. */
+const invokedBinary = (script: string): string => script.trim().split(/\s+/)[0] ?? '';
+
 /** The permanent half: every workspace must run an authoritative compiler. */
 export const judgeCompilers = (compilers: readonly CompilerReading[]): ToolchainFinding => {
   const failures: string[] = [];
   const report: string[] = [];
   if (compilers.length === 0) failures.push('no workspace was probed, so nothing was proved');
-  for (const { workspace, reported, failure } of compilers) {
+  for (const { workspace, reported, failure, typecheckScript } of compilers) {
     if (reported === null) {
       failures.push(
         `${workspace}: \`tsc --version\` could not be run — ${failure ?? 'no reason given'}`,
@@ -97,6 +115,19 @@ export const judgeCompilers = (compilers: readonly CompilerReading[]): Toolchain
     if (major < AUTHORITATIVE_MAJOR_MINIMUM) {
       failures.push(
         `${workspace}: \`tsc\` resolves to ${reported.trim()}, but ADR 0061 requires ${AUTHORITATIVE_MAJOR_MINIMUM} or above`,
+      );
+      continue;
+    }
+    if (typecheckScript === null) {
+      failures.push(
+        `${workspace}: declares no \`typecheck\` script, so no compiler runs there at all`,
+      );
+      continue;
+    }
+    const binary = invokedBinary(typecheckScript);
+    if (binary !== AUTHORITATIVE_BINARY) {
+      failures.push(
+        `${workspace}: its \`typecheck\` script runs \`${binary}\`, not the authoritative \`${AUTHORITATIVE_BINARY}\``,
       );
       continue;
     }
@@ -159,8 +190,32 @@ const indent = (line: string): string => `  ${line}`;
 
 const run = promisify(execFile);
 
-/** The `packages:` globs in `pnpm-workspace.yaml`, which is what `pnpm -r` enumerates. */
+/** One `- <glob>` entry, matched inside the `packages:` block and nowhere else. */
 const WORKSPACE_GLOB = /^\s*-\s*'?([^'\s#]+)'?\s*$/gm;
+
+/**
+ * The body of the `packages:` block, which is what `pnpm -r` enumerates.
+ *
+ * Scoped to that block rather than matched across the whole document.
+ * `pnpm-workspace.yaml` carries other sequence keys — `onlyBuiltDependencies:`,
+ * which `pnpm approve-builds` writes itself, and `catalog:`,
+ * `ignoredBuiltDependencies:` and `packageExtensions:`, which have the same
+ * shape. Reading one of those as a workspace glob throws, and because
+ * `typecheck:toolchain` runs first, that fails the whole of `verify` at step one
+ * blaming the compiler toolchain for a dependency-build setting.
+ *
+ * A manifest with no block-style `packages:` key yields nothing, which
+ * `probedWorkspaces` then rejects — a workspace nobody probes is the gap, so the
+ * unreadable case fails rather than passing quietly.
+ */
+const packagesBlock = (manifest: string): string => {
+  const lines = manifest.split('\n');
+  const start = lines.findIndex((line) => /^packages:\s*(#.*)?$/.test(line));
+  if (start < 0) return '';
+  const body = lines.slice(start + 1);
+  const end = body.findIndex((line) => line.trim() !== '' && !/^\s/.test(line));
+  return (end < 0 ? body : body.slice(0, end)).join('\n');
+};
 
 /**
  * Every directory a compiler runs in: the repository root, plus each workspace
@@ -175,7 +230,7 @@ const WORKSPACE_GLOB = /^\s*-\s*'?([^'\s#]+)'?\s*$/gm;
 export const probedWorkspaces = (repositoryRoot: string): readonly string[] => {
   const manifest = readFileSync(join(repositoryRoot, 'pnpm-workspace.yaml'), 'utf8');
   const workspaces: string[] = [];
-  for (const [, glob] of manifest.matchAll(WORKSPACE_GLOB)) {
+  for (const [, glob] of packagesBlock(manifest).matchAll(WORKSPACE_GLOB)) {
     if (glob === undefined) continue;
     const parent = glob.endsWith('/*') ? glob.slice(0, -2) : null;
     if (parent === null || parent.includes('*'))
@@ -183,29 +238,61 @@ export const probedWorkspaces = (repositoryRoot: string): readonly string[] => {
     workspaces.push(
       ...readdirSync(join(repositoryRoot, parent), { withFileTypes: true })
         .filter((entry) => entry.isDirectory())
-        .map((entry) => `${parent}/${entry.name}`),
+        .map((entry) => `${parent}/${entry.name}`)
+        // A matching directory is only a workspace if it carries a manifest.
+        // `pnpm -r typecheck` enters no other kind, so probing one would report a
+        // compiler for a directory no typecheck ever runs in — the guard
+        // vouching for coverage it does not have.
+        .filter((workspace) => existsSync(join(repositoryRoot, workspace, 'package.json'))),
     );
   }
-  if (workspaces.length === 0) throw new Error('pnpm-workspace.yaml declares no workspaces');
+  if (workspaces.length === 0)
+    throw new Error('pnpm-workspace.yaml declares no workspaces under a `packages:` block');
   return ['.', ...workspaces.sort()];
+};
+
+/** As much of a `package.json` as this check reads: the one script it judges. */
+interface TypecheckingManifest {
+  readonly scripts: { readonly typecheck: string };
+}
+
+/** The parse boundary for a manifest, expressed as a predicate rather than a cast. */
+const isTypecheckingManifest = (value: unknown): value is TypecheckingManifest => {
+  if (typeof value !== 'object' || value === null || !('scripts' in value)) return false;
+  const { scripts } = value;
+  if (typeof scripts !== 'object' || scripts === null || !('typecheck' in scripts)) return false;
+  return typeof scripts.typecheck === 'string';
+};
+
+/**
+ * The `typecheck` script one workspace declares, read at the boundary with a type
+ * predicate rather than asserted into shape (ADR 0062).
+ */
+const typecheckScriptOf = (directory: string): string | null => {
+  const manifest = join(directory, 'package.json');
+  if (!existsSync(manifest)) return null;
+  const parsed: unknown = JSON.parse(readFileSync(manifest, 'utf8'));
+  return isTypecheckingManifest(parsed) ? parsed.scripts.typecheck : null;
 };
 
 const probeCompiler = async (
   repositoryRoot: string,
   workspace: string,
 ): Promise<CompilerReading> => {
+  const typecheckScript = typecheckScriptOf(join(repositoryRoot, workspace));
   try {
     // `pnpm exec` rather than a hand-built PATH, so the probe resolves the binary
     // by exactly the rule the `typecheck` script in this directory would.
     const { stdout } = await run('pnpm', ['exec', 'tsc', '--version'], {
       cwd: join(repositoryRoot, workspace),
     });
-    return { workspace, reported: stdout.trim(), failure: null };
+    return { workspace, reported: stdout.trim(), failure: null, typecheckScript };
   } catch (error) {
     return {
       workspace,
       reported: null,
       failure: error instanceof Error ? error.message : String(error),
+      typecheckScript,
     };
   }
 };
