@@ -8,7 +8,7 @@ export default { title: 'Components/Presenting Chrome' };
  * The presenter's controls, at the four shapes a traversal actually takes.
  *
  * Zero, one and many outgoing Edges are one mechanism (ADR 0024), so these are
- * four positions in one Graph walk rather than four modes: a one-member choice,
+ * four positions in one Traversal rather than four modes: a one-member choice,
  * a fork, the end of the Graph, and the same fork in a region too narrow to hold
  * it in a row. Every one of them is real Navigation over a purpose-built Space —
  * `present()` and, where a story has to be somewhere a Graph cannot be authored
@@ -25,7 +25,7 @@ export const Fork: Story = () => <PresentingChromeFixture space={deepDiveSpace} 
  * The end of the Graph, two moves in, with the way back still open.
  *
  * A sink cannot be the Card a traversal begins at — every Card a Graph can start
- * from has an Edge leaving it — so this is where the walk arrives rather than
+ * from has an Edge leaving it — so this is where the traversal arrives rather than
  * where it opens.
  */
 export const Sink: Story = () => <PresentingChromeFixture advances={2} />;

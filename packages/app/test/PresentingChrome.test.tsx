@@ -12,7 +12,7 @@ import type { Move } from '../src/navigation';
  * what belongs here is what the interface promises — the semantics of the
  * controls, which callback each one runs, what is announced, where focus lands
  * when a control it owns destroys itself, and which keyboard commands the
- * guidance claims are available. Whether a Graph walk arrives at the right Card
+ * guidance claims are available. Whether a traversal arrives at the right Card
  * is Navigation's own test (`navigation.test.ts`) and is not repeated here.
  */
 
@@ -157,6 +157,57 @@ describe('PresentingChrome', () => {
     expect(within(region).getByTestId('presenting-end')).toBeVisible();
   });
 
+  /**
+   * A changed selection is announced, and moving focus is not how it is said.
+   *
+   * Up and Down move the selection without moving the camera or focus, and they
+   * rewrite only `aria-label` and the variant class — neither of which is a text
+   * change, so the region reads nothing for them. A screen-reader presenter would
+   * arrow across a fork in silence and commit down a branch they were never told
+   * they had chosen. The region carries the selection as text so the press has
+   * something to announce.
+   */
+  it('announces the selected move when the selection changes', () => {
+    const { rerender } = render(chrome({ moves: movesTo(['B', 'C', 'D'], 0) }));
+    const region = screen.getByTestId('presenting-choices');
+    expect(region).toHaveTextContent('Go to B');
+
+    rerender(chrome({ moves: movesTo(['B', 'C', 'D'], 2) }));
+
+    expect(region).toHaveTextContent('Go to D');
+    expect(region).not.toHaveTextContent('Go to B');
+  });
+
+  /**
+   * The control that performs a shortcut is the one that announces it
+   * (`docs/agents/ui.md`, as `AddCardControl` does). The visible `Kbd` guidance is
+   * presentation only, so without this the binding reaches nobody who cannot see it.
+   *
+   * Only the non-native keys. Space and Enter activate any focused button by
+   * themselves, so announcing them would tell a screen-reader user what its own
+   * button semantics already say. An unselected move performs no key of its own:
+   * Up and Down move the selection rather than acting on one choice.
+   */
+  it('announces on each control the key that performs it', () => {
+    render(chrome({ moves: movesTo(['B', 'C'], 0), canRetreat: true }));
+
+    expect(screen.getByRole('button', { name: 'Go to B' })).toHaveAttribute(
+      'aria-keyshortcuts',
+      'ArrowRight',
+    );
+    expect(screen.getByRole('button', { name: 'Choose C' })).not.toHaveAttribute(
+      'aria-keyshortcuts',
+    );
+    expect(screen.getByRole('button', { name: 'Back' })).toHaveAttribute(
+      'aria-keyshortcuts',
+      'ArrowLeft',
+    );
+    expect(screen.getByRole('button', { name: 'Overview' })).toHaveAttribute(
+      'aria-keyshortcuts',
+      'Escape',
+    );
+  });
+
   /** Only the commands the presenter can actually run from where they are. */
   it('lists the keyboard commands currently available and no others', () => {
     const { rerender } = render(chrome({ moves: movesTo(['B', 'C'], 0), canRetreat: true }));
@@ -170,6 +221,21 @@ describe('PresentingChrome', () => {
 
     rerender(chrome({ moves: [], canRetreat: false }));
     expect(guidance()).toEqual(['Escoverview']);
+  });
+
+  /**
+   * Presentation begins with focus on the control that carries it forward.
+   *
+   * Entry is a mouse click on the Sidebar's Present button, and that button is
+   * the same DOM node that relabels to Overview — so React keeps focus on it and
+   * the presenter is left focused on the control that *leaves*. Space, which
+   * advances, would then defer to it and drop straight back to the overview. The
+   * chrome claims focus as it mounts, which is what makes Space advance.
+   */
+  it('takes focus onto its primary control when presentation begins', () => {
+    render(chrome({ moves: movesTo(['B', 'C'], 0) }));
+
+    expect(screen.getByRole('button', { name: 'Go to B' })).toHaveFocus();
   });
 
   /**
@@ -234,6 +300,23 @@ describe('PresentingChrome', () => {
    * changed with the arrow keys can therefore be off screen, and the row brings
    * it back.
    */
+  /**
+   * And only when it changes. `App` calls `navigation.moves()` during render, so
+   * the array identity is fresh every time — keyed on that, the row re-scrolled
+   * on every unrelated re-render and a presenter who had scrolled a wide fork
+   * sideways to read a distant choice had it snapped back under them.
+   */
+  it('leaves the choices row alone when the selection did not change', () => {
+    const scrollIntoView = vi.spyOn(Element.prototype, 'scrollIntoView');
+    const { rerender } = render(chrome({ moves: movesTo(['B', 'C', 'D'], 1) }));
+    const before = scrollIntoView.mock.calls.length;
+
+    // The same selection over a fresh array, which is what every App render hands it.
+    rerender(chrome({ moves: movesTo(['B', 'C', 'D'], 1) }));
+
+    expect(scrollIntoView.mock.calls.length).toBe(before);
+  });
+
   it('scrolls the selected choice into view when the selection changes', () => {
     const scrollIntoView = vi.spyOn(Element.prototype, 'scrollIntoView');
     const { rerender } = render(chrome({ moves: movesTo(['B', 'C', 'D'], 0) }));

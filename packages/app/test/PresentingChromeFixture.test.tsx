@@ -22,11 +22,11 @@ describe('the presenting story fixture', () => {
   });
 
   /**
-   * A sink is where a walk arrives rather than a Graph a story can author, so
+   * A sink is where a traversal arrives rather than a Graph a story can author, so
    * the opening `advances` are production moves and the history behind them is
    * Navigation's — which is what Back then has something to undo.
    */
-  it('walks to a sink through Navigation and keeps the history that got there', () => {
+  it('traverses to a sink through Navigation and keeps the history that got there', () => {
     render(<PresentingChromeFixture advances={2} />);
 
     expect(screen.getByTestId('presenting-end')).toBeVisible();

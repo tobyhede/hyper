@@ -21,7 +21,7 @@ import { canvasRenderers, currentRenderer } from './canvas-renderers';
 import { canvasContent } from './canvas-content';
 import { usePlacementRendering } from './placement-rendering';
 import { cardSizeVars } from './card';
-import { createNavigation } from './navigation';
+import { canRetreat, createNavigation } from './navigation';
 import { usePresentingKeys } from './presenting-keys';
 import { createWorkingSpaceReader } from './snapshot';
 import { nextCardTitle } from './titles';
@@ -129,7 +129,6 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
     // There is a Card to go back to only once a traversal has left its first, and only
     // presenting has Traversal history at all — the same narrowing the alias above already
     // makes, spent here on the value behind it rather than on the mode.
-    const canRetreat = presenting && navigationState.traversalHistory.length > 1;
     const present = navigation.present;
     const exitPresenting = navigation.exitPresenting;
     const advance = navigation.advance;
@@ -679,7 +678,7 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
           {presenting && (
             <PresentingChrome
               moves={moves}
-              canRetreat={canRetreat}
+              canRetreat={canRetreat(navigationState)}
               onSelectBranch={selectBranch}
               onAdvance={advance}
               onRetreat={retreat}
