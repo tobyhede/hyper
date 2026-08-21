@@ -446,7 +446,7 @@ export function createEdgeAuthoring({
    * The three outcomes are not interchangeable. A **refusal** is retained on the
    * channel the caller names; a **completion** clears whatever refusal was
    * there, because a refusal describes the proposal that produced it and this
-   * one has landed; and **unavailable** — no arrangement yet, or an invariant
+   * one has landed; and **unavailable** — no Cards on the canvas yet, or an invariant
    * already reported — says nothing either way, so a refusal already on screen
    * stands.
    */

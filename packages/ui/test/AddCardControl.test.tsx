@@ -120,7 +120,7 @@ describe('AddCardControl', () => {
 
   /**
    * Both halves go together. Card authoring is withdrawn while a Card is open
-   * over the graph, while presenting, and before the first arrangement resolves
+   * over the graph, while presenting, and before the first placement resolves
    * — and a menu that still opened onto an action nothing would perform would be
    * a control that says yes and does nothing.
    */

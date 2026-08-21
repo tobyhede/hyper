@@ -9,7 +9,7 @@ import type { AuthoringRefusal } from '../src/space-authoring';
  *
  * These assertions are a runtime no-op: `expectTypeOf` compiles to nothing and
  * `pnpm test` will pass this file whatever the props type says. The root
- * `pnpm typecheck` is what enforces it — the same arrangement, and the same
+ * `pnpm typecheck` is what enforces it — the same setup, and the same
  * caveat, as `packages/http/test/space-http-app-types.test.ts`.
  */
 

@@ -12,7 +12,7 @@ describe('canvasContent', () => {
   };
 
   it('waits for the editor to take a ready placement before drawing it', () => {
-    // A resolved placement is not yet an arrangement on screen: `syncProjection`
+    // A resolved placement is not yet Cards on the canvas: `syncProjection`
     // installs it, and drawing before that would hand React Flow a node array
     // the editor store does not own — the one thing a controlled flow must not
     // do, and the reason changes had to be filtered by ownership.
@@ -25,14 +25,14 @@ describe('canvasContent', () => {
     expect(canvasContent({ kind: 'pending' }, false)).toEqual({ kind: 'placeholder' });
   });
 
-  it('keeps drawing the arrangement on screen while a replacement placement is pending', () => {
-    // The arrangement on screen belongs to the editor, which owns its positions
-    // outright — it is the current state and not a stale copy of the placement
+  it('keeps drawing the Cards on the canvas while a replacement placement is pending', () => {
+    // The Cards on the canvas belong to the editor, which owns their positions
+    // outright — they are the current state and not a stale copy of the placement
     // being recomputed. Blanking the canvas here would throw away a live drag.
-    expect(canvasContent({ kind: 'pending' }, true)).toEqual({ kind: 'arrangement' });
+    expect(canvasContent({ kind: 'pending' }, true)).toEqual({ kind: 'cards' });
   });
 
-  it('reports a failed placement even when an arrangement is on screen', () => {
+  it('reports a failed placement even when Cards are on the canvas', () => {
     const error = new Error('Placement failed');
     expect(canvasContent({ kind: 'failed', error }, true)).toEqual({ kind: 'failure', error });
   });

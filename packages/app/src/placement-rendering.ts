@@ -33,7 +33,7 @@ export function usePlacementRendering(
   //
   // Keyed on the Placement's identity, which Space Authoring keeps stable while
   // the value is unchanged — so a projection reporting the geometry already on
-  // screen does not re-arrange a settled arrangement.
+  // screen does not re-arrange a settled graph.
   const authoredStrategy = useMemo<LayoutStrategy | null>(
     () => (authoredPlacement === null ? null : positionedStrategy(authoredPlacement)),
     [authoredPlacement],

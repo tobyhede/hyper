@@ -285,7 +285,7 @@ describe('render adapter', () => {
    * separation allowed: Edges surviving without the nodes declaring their
    * handles, and Edges being dropped by a change that concerns only nodes.
    */
-  it('has published no projection at all before the first arrangement resolves', () => {
+  it('has published no projection at all before the first placement resolves', () => {
     expect(adapter().getState().projection).toBeNull();
   });
 
@@ -559,9 +559,9 @@ describe('render adapter', () => {
   });
 
   it('keeps the Cards on screen when a connection completes with no fresh projection', () => {
-    // A Space change starts a replacement arrangement, so the render path has no
+    // A Space change starts a replacement placement, so the render path has no
     // projection to hand over — while the canvas deliberately keeps drawing the
-    // one already on screen, which is what makes it still connectable. Nothing
+    // Cards already on screen, which is what makes it still connectable. Nothing
     // fresh to merge means keep what is live: reconciling against an empty list
     // would blank the canvas until the strategy resolved.
     const spy = authoringSpy();
@@ -795,7 +795,7 @@ describe('render adapter', () => {
     spy.attach(store);
     store.getState().syncProjection(PROJECTED, [EDGE]);
 
-    // A layout's routed Edge geometry describes the arrangement it computed, so
+    // A layout's routed Edge geometry describes the placement it computed, so
     // it stops being true the moment a card leaves the place that routing
     // assumed. `App` reads this flag to fall back to plain curves; left false, a
     // dragged graph keeps drawing channels routed for positions nothing is at.

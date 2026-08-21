@@ -18,7 +18,7 @@ import { DEFAULT_ELK_LAYOUT_OPTIONS, elkPortId, PORT_ID_SEPARATOR } from './layo
  *
  * Automatic: it computes placement from the cards and graphs, so no Layout
  * stands behind it. A view of it is still editable — the edit **converts** the
- * arrangement into a Layout and is written there (ADR 0025).
+ * computed placement into a Layout and is written there (ADR 0025).
  */
 
 /** The slice of elkjs this module uses, so a fake can stand in for it. */

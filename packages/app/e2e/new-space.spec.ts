@@ -361,7 +361,7 @@ test(
   },
 );
 
-test('its one card is draggable once its automatic arrangement resolves (ADR 0025)', async ({
+test('its one card is draggable once its automatic placement resolves (ADR 0025)', async ({
   page,
 }) => {
   await page.goto('/');

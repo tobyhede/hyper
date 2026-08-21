@@ -153,7 +153,7 @@ export interface RenderAdapterState {
   dragOrigins: ReadonlyMap<string, LayoutPosition>;
   /**
    * Set once a card has actually moved. A layout's routed edge geometry
-   * describes the arrangement it computed, so it stops being true the moment a
+   * describes the placement it computed, so it stops being true the moment a
    * card leaves the place that routing assumed; from then on edges are drawn as
    * plain curves between wherever the cards now are.
    */
@@ -163,7 +163,7 @@ export interface RenderAdapterState {
   /** Publish projected Card nodes, their declared handles and Graph Edges together. */
   syncProjection: (nodes: readonly CardFlowNode[], edges: readonly Edge[]) => void;
   /**
-   * Navigate to another renderer. The replacement arrangement will arrive via
+   * Navigate to another renderer. The replacement placement will arrive via
    * `syncProjection`; renderer selection itself is not an edit.
    */
   selectRenderer: (placement: Placement | null) => void;
@@ -192,7 +192,7 @@ export interface RenderAdapterState {
   clearSelection: () => void;
   /**
    * The Placement the live nodes are currently drawn at, or `null` before the
-   * first arrangement resolves.
+   * first placement resolves.
    *
    * What a pointer gesture reports to Authoring: a completion is the only thing
    * that knows where React Flow has actually put the Cards, and this is that

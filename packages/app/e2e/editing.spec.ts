@@ -360,7 +360,7 @@ test('editing an Alias authors its metadata and survives reload', async ({ page 
  * Dragging a card writes its placement into the Layout.
  *
  * The fixture names no `defaultRenderer`, so it opens in Flow however many Layouts
- * it declares, and this first edit converts the resolved automatic arrangement
+ * it declares, and this first edit converts the resolved automatic placement
  * into a Layout of its own (ADR 0025). What this asserts is the point of
  * the whole pivot: a card goes where you put it and *nothing else moves*. Three
  * spike increments failed exactly here — a global optimiser reshuffled the rest
@@ -372,7 +372,7 @@ test('a dragged card stays where it is dropped, and nothing else moves', async (
   const a = nodeByTitle(page, 'A').first();
   await expect(a).toBeVisible();
 
-  // Wait for the arrangement to resolve — before it does, the space is not yet
+  // Wait for the placement to resolve — before it does, the space is not yet
   // draggable and every card sits at the origin.
   await expect(page.locator('.react-flow__edge-path').first()).toHaveAttribute('d', /L/);
 
@@ -595,7 +595,7 @@ test('edges follow a card that has been dragged', async ({ page }) => {
   // masquerading as an edge that did not redraw.
   expect((await positionOf(a)).y).toBeGreaterThan(from.y + 100);
 
-  // Whatever geometry the arrangement computed described where the cards were,
+  // Whatever geometry the placement computed described where the cards were,
   // so it is stale the moment one leaves it. The edge is redrawn between where
   // the cards now are.
   await expect.poll(edgePath).not.toBe(before);

@@ -56,7 +56,7 @@ export function CanvasCentre({ report }: { report: (centre: VisibleCentre | null
       };
     });
     // Withdrawn on the way out, because the reader outlives the reporter. This
-    // component is inside the arrangement branch — it needs React Flow's store —
+    // component is inside the canvas's `cards` branch — it needs React Flow's store —
     // and both controls that read the centre are outside it: the toolbar's Add
     // Card, and the Alias creation pane. A placement failure or a Space replaced
     // under the canvas unmounts this and leaves them holding a getter closed over

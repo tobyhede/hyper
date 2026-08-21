@@ -114,7 +114,7 @@ const cardTitles = (session: SpaceSession) => cardsOf(session).map((card) => car
 const settled = (session: SpaceSession): Promise<void> =>
   waitFor(() => expect(session.getState().persistence.kind).toBe('settled'));
 
-/** Wait for the arrangement, which is what makes Card authoring available. */
+/** Wait for the Cards to reach the canvas, which is what makes Card authoring available. */
 async function readyToAuthor(): Promise<HTMLElement> {
   const addCard = await screen.findByRole('button', { name: 'Add Card' });
   await waitFor(() => expect(addCard).toBeEnabled());
@@ -655,7 +655,7 @@ describe('retargeting an Alias', () => {
 
   /**
    * The Target field is the Alias's, and the fields under it author the Card
-   * that owns the content — two Cards, one pane, which is the arrangement ADR
+   * that owns the content — two Cards, one pane, which is the pairing ADR
    * 0039 warns about. The check is that the pane's *own* editor still writes
    * where it always did.
    */

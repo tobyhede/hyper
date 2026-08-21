@@ -47,7 +47,7 @@ const EDGE_TYPES: EdgeTypes = { routed: AuthorableEdge };
 
 /**
  * The renderer the story opens on: the Space's declared default, which is its
- * first positioned Layout — so the arrangement comes from authored positions
+ * first positioned Layout — so the placement comes from authored positions
  * rather than from running elkjs inside a story.
  */
 const RENDERER = createRendererResolver({ newGraphId: storyGraphIds() })(
