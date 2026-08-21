@@ -2,8 +2,7 @@ import type { CardId, LayoutPosition } from '@project/core';
 import { createNonThrowingReporter, type ObserverErrorReporter } from '@project/persistence';
 import type { CardFlowNode } from '@project/react-flow-adapter';
 import type { RenderAdapter } from './render-adapter';
-import { describeAuthoringRefusal } from './authoring-refusal';
-import type { SpaceAuthoring } from './space-authoring';
+import type { AuthoringRefusal, SpaceAuthoring } from './space-authoring';
 
 /**
  * The three steps a completed connection takes, in the one order that works.
@@ -22,16 +21,20 @@ import type { SpaceAuthoring } from './space-authoring';
  * What a connection attempt came to.
  *
  * Three outcomes rather than `CardId | null`, because the caller has to tell a
- * **refusal** — which owes the author the sentence carried here — from a gesture
+ * **refusal** — which owes the author the identity carried here — from a gesture
  * that simply had nowhere to land, which owes them nothing and must not wipe a
- * message already on screen. Answering the reason here is also what keeps
+ * message already on screen. Answering the refusal here is also what keeps
  * eligibility asked twice per gesture rather than three times: the coordinator
- * already asked it to decide, so a caller reaching for the sentence afterwards
- * would be asking the same question of a Space that has since moved.
+ * already asked it to decide, so a caller reaching for it afterwards would be
+ * asking the same question of a Space that has since moved.
+ *
+ * The **structured** refusal, never its prose: ADR 0057 puts the sentence and
+ * the field it belongs on with the surface conducting the interaction, and a
+ * `reason` string here would have decided both before the surface was reached.
  */
 export type ConnectionResult =
   | { readonly kind: 'completed'; readonly cardId: CardId }
-  | { readonly kind: 'refused'; readonly reason: string }
+  | { readonly kind: 'refused'; readonly refusal: AuthoringRefusal }
   /** No arrangement to write into, or an invariant already reported. */
   | { readonly kind: 'unavailable' };
 
@@ -107,9 +110,7 @@ export function createConnectionCompletion({
     continueAt: (result: { readonly createdCardId?: CardId }) => CardId | undefined,
   ): ConnectionResult => {
     const result = authoring.complete(completion);
-    if (result.kind === 'refused') {
-      return { kind: 'refused', reason: describeAuthoringRefusal(result.refusal) };
-    }
+    if (result.kind === 'refused') return { kind: 'refused', refusal: result.refusal };
     if (result.kind === 'queued') {
       report(
         new Error(
@@ -128,15 +129,17 @@ export function createConnectionCompletion({
   };
 
   /**
-   * Ask eligibility once, and answer its sentence rather than re-asking for it.
+   * Ask eligibility once, and answer its refusal rather than re-asking for it.
    *
    * Completion validates the same proposal again — the Space can change between
    * the preview and the release — so a refusal can arrive from either, and both
    * are the same answer to the author.
    */
-  const eligible = (proposal: Parameters<SpaceAuthoring['edgeEligibility']>[0]): string | null => {
+  const eligible = (
+    proposal: Parameters<SpaceAuthoring['edgeEligibility']>[0],
+  ): AuthoringRefusal | null => {
     const eligibility = authoring.edgeEligibility(proposal);
-    return eligibility.kind === 'refused' ? describeAuthoringRefusal(eligibility.refusal) : null;
+    return eligibility.kind === 'refused' ? eligibility.refusal : null;
   };
 
   return {
@@ -144,7 +147,7 @@ export function createConnectionCompletion({
       const rendered = adapter.getState().renderedPlacement();
       if (rendered === null) return UNAVAILABLE;
       const refusal = eligible({ kind: 'connect', from, to });
-      if (refusal !== null) return { kind: 'refused', reason: refusal };
+      if (refusal !== null) return { kind: 'refused', refusal };
       return complete({ kind: 'connected-cards', from, to, rendered }, projected, () => to);
     },
 
@@ -152,7 +155,7 @@ export function createConnectionCompletion({
       const rendered = adapter.getState().renderedPlacement();
       if (rendered === null) return UNAVAILABLE;
       const refusal = eligible({ kind: 'create-and-connect', from });
-      if (refusal !== null) return { kind: 'refused', reason: refusal };
+      if (refusal !== null) return { kind: 'refused', refusal };
       // The dropped Card is placed by `position` inside the completion itself.
       return complete(
         { kind: 'create-and-connect', from, position, rendered },

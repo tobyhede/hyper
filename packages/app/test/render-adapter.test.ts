@@ -703,9 +703,10 @@ describe('render adapter', () => {
         uuidSchema.parse(CARD_B),
         PROJECTED,
       ),
-      // The reason travels with the outcome, so nothing asks eligibility a
-      // second time to recover the sentence it already had.
-    ).toEqual({ kind: 'refused', reason: 'An Edge can only join Cards in this Layout.' });
+      // The refusal travels with the outcome, so nothing asks eligibility a
+      // second time to recover the identity it already had — and it travels
+      // structured, because the sentence is the surface's (ADR 0057).
+    ).toEqual({ kind: 'refused', refusal: { code: 'edge-card-outside-layout' } });
 
     expect(spy.completions).toEqual([]);
     expect(spy.installs).toHaveLength(installedBefore);
@@ -725,7 +726,7 @@ describe('render adapter', () => {
         { x: 420, y: 360 },
         null,
       ),
-    ).toEqual({ kind: 'refused', reason: 'An Edge can only join Cards in this Layout.' });
+    ).toEqual({ kind: 'refused', refusal: { code: 'edge-card-outside-layout' } });
 
     expect(spy.completions).toEqual([]);
     expect(spy.installs).toHaveLength(installedBefore);

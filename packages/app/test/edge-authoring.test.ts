@@ -174,17 +174,19 @@ describe('the one Edge interaction draft', () => {
 });
 
 /**
- * A refusal is not a cancellation. The draft and its message stand together so
+ * A refusal is not a cancellation. The draft and its refusal stand together so
  * the author can correct what they aimed at, rather than being returned to the
  * start of the gesture with a sentence and nothing to act on.
  */
 describe('a refused proposal', () => {
-  it('keeps the draft and the reason Space Authoring gave', () => {
+  it('keeps the draft, and retains the refusal on the endpoint editor channel', () => {
     const { edges } = open();
     edges.openEdgeEditor(SUBJECT);
 
     // A Card outside this Layout, so the rule is Authoring's rather than this
-    // module's — which is the point: the sentence comes from where the rule is.
+    // module's — which is the point: the identity comes from where the rule is,
+    // and the endpoint beside it is the only context presentation needs to mark
+    // one Field and not the other.
     expect(edges.reconnect('to', uuidSchema.parse('00000000-0000-4000-8000-0000000000aa'))).toBe(
       false,
     );
@@ -194,7 +196,11 @@ describe('a refused proposal', () => {
       graphId: GRAPH_ID,
       edge: EDGE,
     });
-    expect(edges.getState().refusal).toBe('An Edge can only join Cards in this Layout.');
+    expect(edges.getState().refusal).toEqual({
+      kind: 'reconnection',
+      endpoint: 'to',
+      refusal: { code: 'edge-card-outside-layout' },
+    });
   });
 
   it('clears the refusal when the next draft begins', () => {
@@ -270,14 +276,33 @@ describe('deleting an Edge', () => {
     expect(edges.takeFocusRequest()).toEqual({ kind: 'card', cardId: CARD_A });
   });
 
-  it('keeps the Edge and reports the reason when Authoring refuses', () => {
+  it('keeps the Edge and retains the refusal on the selected-Edge channel', () => {
     const { edges, session } = open();
     const before = session.getState().working;
 
     expect(edges.deleteEdge({ graphId: UNKNOWN_GRAPH, edge: EDGE })).toBe(false);
 
     expect(session.getState().working).toBe(before);
-    expect(edges.getState().refusal).toBe('That Graph is not one this Layout owns.');
+    // Deletion's own channel, not the canvas announcement: the Edge survives its
+    // refusal, so the controls that asked are still on screen.
+    expect(edges.getState().refusal).toEqual({
+      kind: 'deletion',
+      refusal: { code: 'graph-not-owned' },
+    });
+  });
+
+  /**
+   * A refused Delete is about the Edge that was selected when it was made, and
+   * the controls that carry it are drawn from the *current* selection.
+   */
+  it('drops a retained deletion refusal when the selection moves to another Edge', () => {
+    const { edges, adapter } = open();
+    edges.deleteEdge({ graphId: UNKNOWN_GRAPH, edge: EDGE });
+    expect(edges.getState().refusal).not.toBeNull();
+
+    adapter.getState().selectEdge({ graphId: GRAPH_ID, edge: { from: CARD_B, to: CARD_C } });
+
+    expect(edges.getState().refusal).toBeNull();
   });
 });
 
@@ -502,9 +527,9 @@ describe('completing a keyboard connection', () => {
   /**
    * The picker offered this target, so a refusal means the Space changed while
    * it was open — which is exactly why completion asks eligibility again. The
-   * draft and its sentence stand so the author can pick another Card.
+   * draft and its refusal stand so the author can pick another Card.
    */
-  it('keeps the draft and its reason when the completion is refused', () => {
+  it('keeps the draft and its refusal when the completion is refused', () => {
     const { edges, session } = open();
     const before = session.getState().working;
     edges.beginKeyboardConnect(CARD_A);
@@ -513,7 +538,10 @@ describe('completing a keyboard connection', () => {
 
     expect(session.getState().working).toBe(before);
     expect(edges.getState().draft).toEqual({ kind: 'keyboard-connect', from: CARD_A });
-    expect(edges.getState().refusal).toBe('These Cards are already connected in this Graph.');
+    expect(edges.getState().refusal).toEqual({
+      kind: 'connection',
+      refusal: { code: 'edge-already-exists' },
+    });
   });
 
   /**
@@ -564,7 +592,12 @@ describe('completing a pointer connection', () => {
     expect(edges.connect(CARD_A, CARD_B, PROJECTED)).toBeNull();
 
     expect(session.getState().working).toBe(before);
-    expect(edges.getState().refusal).toBe('These Cards are already connected in this Graph.');
+    // The canvas announcement channel: this gesture's drag is over by the time
+    // anything renders the refusal, so no surface of its own is left.
+    expect(edges.getState().refusal).toEqual({
+      kind: 'gesture',
+      refusal: { code: 'edge-already-exists' },
+    });
     expect(edges.endPointerDrag()).toBeNull();
   });
 
@@ -577,7 +610,7 @@ describe('completing a pointer connection', () => {
     const { edges } = open();
     edges.beginPointerConnect(CARD_A);
     edges.connect(CARD_A, CARD_B, null);
-    expect(edges.getState().refusal).toBe('These Cards are already connected in this Graph.');
+    expect(edges.getState().refusal).not.toBeNull();
 
     expect(edges.connect(CARD_A, CARD_C, null)).toBe(CARD_C);
 

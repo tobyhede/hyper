@@ -303,51 +303,14 @@ body {
   pointer-events: auto;
 }
 
-/* Controls drawn beside a selected Edge, portalled into React Flow's own
-   `EdgeLabelRenderer` layer so they pan and zoom with the canvas. `pointer-events`
-   is off on that layer by default and has to be restored per control. */
+/* Where a selected Edge's controls are placed, and nothing about how they look.
+   They are portalled into React Flow's own `EdgeLabelRenderer` layer so they pan
+   and zoom with the canvas; `pointer-events` is off on that layer by default and
+   has to be restored per control. Their own presentation belongs to
+   `SelectedEdgeControls`, which composes it from the shared primitives. */
 .edge-toolbar {
   position: absolute;
   pointer-events: all;
-}
-
-.edge-toolbar__anchor {
-  display: inline-flex;
-  overflow: hidden;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--card);
-  box-shadow: 0 6px 20px rgb(0 0 0 / 45%);
-}
-
-.edge-toolbar__button {
-  border: 0;
-  border-left: 1px solid var(--border);
-  padding: 0.2rem 0.5rem;
-  background: transparent;
-  color: var(--foreground);
-  font-size: 0.75rem;
-  cursor: pointer;
-}
-
-.edge-toolbar__button:first-child {
-  border-left: 0;
-}
-
-.edge-toolbar__button:hover {
-  background: var(--border);
-}
-
-.edge-editor__fields {
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
-}
-
-.edge-editor__refusal,
-.edge-connect-picker__refusal {
-  color: var(--destructive);
-  font-size: 0.75rem;
 }
 
 /* The sentence a pointer gesture's refusal leaves behind. Screen-fixed at the

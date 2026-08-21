@@ -72,10 +72,13 @@
 
 /*
  * Monorepo content detection: Tailwind only scans the app package by default.
- * The shadcn-style primitives live in `@project/ui`, so their utility classes
- * would be purged without an explicit source. Paths are relative to this file:
- *   ../          -> packages/app  (this app's own sources)
- *   ../../ui/src -> packages/ui/src
+ * The shadcn-style primitives live in `@project/ui` and the canvas HUD lives in
+ * `@project/react-flow-adapter`, so their utility classes would be purged
+ * without an explicit source. Paths are relative to this file:
+ *   ../                         -> packages/app  (this app's own sources)
+ *   ../../ui/src                -> packages/ui/src
+ *   ../../react-flow-adapter/src-> packages/react-flow-adapter/src
  */
 @source '../';
 @source '../../ui/src';
+@source '../../react-flow-adapter/src';

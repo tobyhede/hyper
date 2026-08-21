@@ -1111,38 +1111,43 @@ test('Escape on a focused Edge leaves focus on the canvas rather than the docume
 });
 
 /**
- * The toolbar an Edge draws for itself, and the two commands on it.
+ * The controls a selected Edge draws for itself, and the two commands on them.
  *
- * It is rendered through `EdgeLabelRenderer`, so it is ordinary DOM over the
- * canvas rather than SVG, and it appears on the selected Edge alone.
+ * `SelectedEdgeControls` is rendered through `EdgeLabelRenderer`, so it is
+ * ordinary DOM over the canvas rather than SVG, and it appears on the selected
+ * Edge alone. This is the spatial half of the story evidence: the catalogue
+ * proves the control semantics, and this proves they arrive over the real routed
+ * Edge, gated on selection, and that a completion redraws from the Space.
  */
-test('a selected Edge offers a toolbar that deletes it and opens its endpoint editor', async ({
-  page,
-}) => {
-  await page.goto('/');
-  await expect(nodeByTitle(page, 'A').first()).toBeVisible();
-  await expect(page.locator('.react-flow__edge-path').first()).toHaveAttribute('d', /L/);
-  await selectCanvas(page, 'Collection 1');
-  await settled(page);
-  const drawn = await page.locator('.react-flow__edge').count();
-  await expect(page.getByRole('button', { name: 'Delete this Edge' })).toHaveCount(0);
+test(
+  'a selected Edge offers controls that delete it and open its endpoint editor',
+  { tag: '@parity:selected-edge-controls-offer-edit-and-delete' },
+  async ({ page }) => {
+    await page.goto('/');
+    await expect(nodeByTitle(page, 'A').first()).toBeVisible();
+    await expect(page.locator('.react-flow__edge-path').first()).toHaveAttribute('d', /L/);
+    await selectCanvas(page, 'Collection 1');
+    await settled(page);
+    const drawn = await page.locator('.react-flow__edge').count();
+    await expect(page.getByRole('button', { name: 'Delete this Edge' })).toHaveCount(0);
 
-  await selectAnEdge(page);
-  await expect(page.getByRole('button', { name: 'Delete this Edge' })).toBeVisible();
+    await selectAnEdge(page);
+    await expect(page.getByRole('button', { name: 'Delete this Edge' })).toBeVisible();
 
-  // The endpoints, as the keyboard reaches them: two pickers over this Layout's
-  // Cards, each showing the Card the Edge currently names.
-  await page.getByRole('button', { name: 'Edit this Edge' }).click();
-  await expect(page.getByRole('combobox', { name: 'From' })).toBeVisible();
-  await expect(page.getByRole('combobox', { name: 'To' })).toBeVisible();
-  await page.keyboard.press('Escape');
+    // The endpoints, as the keyboard reaches them: two pickers over this Layout's
+    // Cards, each showing the Card the Edge currently names.
+    await page.getByRole('button', { name: 'Edit this Edge' }).click();
+    await expect(page.getByRole('combobox', { name: 'From' })).toBeVisible();
+    await expect(page.getByRole('combobox', { name: 'To' })).toBeVisible();
+    await page.keyboard.press('Escape');
 
-  await page.getByRole('button', { name: 'Delete this Edge' }).click();
+    await page.getByRole('button', { name: 'Delete this Edge' }).click();
 
-  await expect(page.locator('.react-flow__edge')).toHaveCount(drawn - 1);
-  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
-  await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
-});
+    await expect(page.locator('.react-flow__edge')).toHaveCount(drawn - 1);
+    await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
+    await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
+  },
+);
 
 /**
  * Moving an endpoint from the keyboard, through the same picker the pointer drag
@@ -1152,32 +1157,106 @@ test('a selected Edge offers a toolbar that deletes it and opens its endpoint ed
  * proves is that the picker reaches it and the projection redraws from the
  * completed Space rather than from a local React Flow change.
  */
-test('the Edge editor moves an endpoint and keeps the Edge in its Graph', async ({ page }) => {
-  await page.goto('/');
-  await expect(nodeByTitle(page, 'A').first()).toBeVisible();
-  await expect(page.locator('.react-flow__edge-path').first()).toHaveAttribute('d', /L/);
-  await selectCanvas(page, 'Collection 1');
-  await settled(page);
-  const drawn = await page.locator('.react-flow__edge').count();
+test(
+  'the Edge editor moves an endpoint and keeps the Edge in its Graph',
+  { tag: '@parity:selected-edge-editor-shows-both-endpoints' },
+  async ({ page }) => {
+    await page.goto('/');
+    await expect(nodeByTitle(page, 'A').first()).toBeVisible();
+    await expect(page.locator('.react-flow__edge-path').first()).toHaveAttribute('d', /L/);
+    await selectCanvas(page, 'Collection 1');
+    await settled(page);
+    const drawn = await page.locator('.react-flow__edge').count();
 
-  const selected = await selectAnEdge(page);
-  await page.getByRole('button', { name: 'Edit this Edge' }).click();
-  await page.getByRole('combobox', { name: 'To' }).press('ArrowDown');
-  //
-  // Here the filter excludes nothing, and that is the fixture rather than the
-  // rule: every Graph in it is a line, so no endpoint this list offers would
-  // duplicate an existing Edge, and self-Edges, cycles and the endpoint the Edge
-  // already names are all eligible (ADR 0032, ADR 0042). It is load-bearing at
-  // the keyboard Connect picker below, where B is disabled as a duplicate.
-  const option = page.locator('[role="option"]:not([data-disabled])');
-  await option.last().click();
+    const selected = await selectAnEdge(page);
+    await page.getByRole('button', { name: 'Edit this Edge' }).click();
+    await page.getByRole('combobox', { name: 'To' }).press('ArrowDown');
+    //
+    // Here the filter excludes nothing, and that is the fixture rather than the
+    // rule: every Graph in it is a line, so no endpoint this list offers would
+    // duplicate an existing Edge, and self-Edges, cycles and the endpoint the Edge
+    // already names are all eligible (ADR 0032, ADR 0042). It is load-bearing at
+    // the keyboard Connect picker below, where B is disabled as a duplicate.
+    const option = page.locator('[role="option"]:not([data-disabled])');
+    await option.last().click();
 
-  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
-  await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
-  // Replaced, not removed: the Graph still draws as many Edges as before.
-  await expect(page.locator('.react-flow__edge')).toHaveCount(drawn);
-  await expect(page.getByLabel(selected, { exact: true })).toHaveCount(0);
-});
+    await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
+    await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
+    // Replaced, not removed: the Graph still draws as many Edges as before.
+    await expect(page.locator('.react-flow__edge')).toHaveCount(drawn);
+    await expect(page.getByLabel(selected, { exact: true })).toHaveCount(0);
+  },
+);
+
+/**
+ * An Algorithmic View owns no Edge to move an endpoint of, and says so on every
+ * row rather than by offering a choice the Edit would then refuse.
+ *
+ * Reconnection is one of the seven **layout-required** actions
+ * (`docs/agents/authoring-refusal-cascade.md`): a View has no Layout to write
+ * into, and unlike a connection it cannot convert one, because there is no Edge
+ * on a freshly minted Graph to move. Eligibility asks the same rule the
+ * completion asks, so the whole list arrives disabled with the reason on each
+ * row — which is the production-reachable shape of the catalogue's
+ * disabled-choice state.
+ */
+test(
+  'endpoint choices on a computed View are offered disabled, with their reason',
+  { tag: '@parity:selected-edge-endpoint-refusal-disables-its-choice' },
+  async ({ page }) => {
+    await page.goto('/');
+    await expect(nodeByTitle(page, 'A').first()).toBeVisible();
+    await settled(page);
+    // The tracked fixture names no `defaultRenderer`, so this opens in Flow.
+    await expect(canvasKind(page)).toHaveText('Computed view');
+
+    await selectAnEdge(page);
+    await page.getByRole('button', { name: 'Edit this Edge' }).click();
+    await page.getByRole('combobox', { name: 'To' }).press('ArrowDown');
+
+    const options = page.getByRole('option');
+    await expect(options.first()).toBeVisible();
+    // Every row, not merely the first: a partially disabled list would mean
+    // eligibility and the completion were asking different questions.
+    expect(await options.filter({ hasNotText: 'Select a Layout to edit its Edges.' }).count()).toBe(
+      0,
+    );
+    await expect(options.first()).toHaveAttribute('aria-disabled', 'true');
+  },
+);
+
+/**
+ * A refused Delete stays on the controls that asked.
+ *
+ * Same rule, other command: `deleted-edge` is layout-required too, so pressing
+ * Delete on a computed View refuses. The Edge survives, so its controls survive
+ * with it — and the refusal belongs to them rather than to the endpoint fields
+ * or to the canvas announcement a finished pointer gesture leaves behind.
+ */
+test(
+  'a Delete a computed View refuses is reported on the selected Edge controls',
+  { tag: '@parity:selected-edge-deletion-refusal-stays-on-its-controls' },
+  async ({ page }) => {
+    await page.goto('/');
+    await expect(nodeByTitle(page, 'A').first()).toBeVisible();
+    await settled(page);
+    await expect(canvasKind(page)).toHaveText('Computed view');
+    const drawn = await page.locator('.react-flow__edge').count();
+
+    await selectAnEdge(page);
+    await page.getByRole('button', { name: 'Delete this Edge' }).click();
+
+    await expect(page.getByTestId('edge-delete-refusal')).toHaveText(
+      'Select a Layout to edit its Edges.',
+    );
+    // Local to these controls: not the canvas announcement, and not an endpoint
+    // error inside an editor that never opened.
+    await expect(page.getByTestId('edge-gesture-refusal')).toHaveCount(0);
+    await expect(page.getByTestId('edge-editor')).toHaveCount(0);
+    await expect(page.locator('.react-flow__edge')).toHaveCount(drawn);
+    await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '0');
+  },
+);
 
 /**
  * A selected Edge's reconnect anchors sit over the Card's four authoring handles
