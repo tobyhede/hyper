@@ -543,7 +543,7 @@ export function createEdgeAuthoring({
    * CONTEXT.md's **Selected Edge**: an Edge outside the Active Graph "cannot
    * remain selected". Activating another Graph is not an Edit and moves no
    * Edge, so the stored subject is simply no longer one an authoring gesture may
-   * act on — and the Edge's own toolbar reads the selection, so leaving it would
+   * act on — and `SelectedEdgeControls` reads the selection, so leaving it would
    * keep Delete live on an Edge the canvas has stopped offering.
    *
    * Registered as a second subscriber rather than folded into the draft pass
