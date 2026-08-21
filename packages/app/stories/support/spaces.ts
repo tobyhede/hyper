@@ -1,5 +1,6 @@
 import {
   uuidSchema,
+  type CardId,
   type GraphEdge,
   type GraphId,
   type LayoutPosition,
@@ -223,3 +224,127 @@ export const storyGraphIds = (): (() => GraphId) => {
     return uuidSchema.parse(`00000000-0000-4000-8000-${next.toString(16).padStart(12, '0')}`);
   };
 };
+
+/* -------------------------------------------------------------------------- */
+/* Traversal                                                                   */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The Spaces the presenting stories traverse.
+ *
+ * Purpose-built, and deliberately not the sidebar's `authoredSpace`: that one
+ * exists to draw four Graphs in a list and every one of them is a line, so it
+ * can show a one-member choice and nothing else. A fork needs a Card with
+ * several outgoing Edges, and there is no such Card anywhere in the tracked
+ * fixtures — the E2E fixture's Graphs are deliberately all lines too.
+ *
+ * Each **declares where it opens**, so `defaultRenderer` and ADR 0026's Active
+ * Graph rule answer for a story exactly as they do for the app: the Layout named
+ * here owns one Graph, and a Layout that names no `activeGraph` opens on the
+ * first it owns. A story therefore calls `present()` and nothing else to be
+ * presenting the Graph it is about.
+ *
+ * The titles are a talk's, not `Card N`: what the chrome draws is a choice
+ * between destinations, and the design pass this catalogue exists for cannot
+ * judge a row of choices whose labels are all the same length.
+ */
+const traversalPositions = (ids: readonly CardId[]): Record<string, LayoutPosition> =>
+  Object.fromEntries(ids.map((id, index) => [id, { x: index * 420, y: 0 }]));
+
+const traversalCards = (titled: readonly (readonly [CardId, string])[]): SpaceSnapshot['cards'] =>
+  titled.map(([id, title]) => ({ id, document: { title, kind: 'markdown', body: '' } }));
+
+const WALKTHROUGH_LAYOUT = uuidSchema.parse('00000000-0000-4000-8000-000000000060');
+const WALKTHROUGH_CARDS = [
+  [uuidSchema.parse('00000000-0000-4000-8000-000000000062'), 'Introduction'],
+  [uuidSchema.parse('00000000-0000-4000-8000-000000000063'), 'How it works'],
+  [uuidSchema.parse('00000000-0000-4000-8000-000000000064'), 'Wrap up'],
+] as const satisfies readonly (readonly [CardId, string])[];
+
+/**
+ * A line: one move at each Card, and a sink two moves in.
+ *
+ * The degenerate fork rather than a second mode (ADR 0024) — which is exactly
+ * what the one-move story has to show, and what a sink reached by advancing
+ * twice through it has to end.
+ */
+export const walkthroughSpace: Space = loaded(
+  loadSpaceSnapshot({
+    id: uuidSchema.parse('00000000-0000-4000-8000-000000000041'),
+    document: {
+      version: 1,
+      title: 'Walkthrough',
+      defaultRenderer: WALKTHROUGH_LAYOUT,
+      layouts: [
+        {
+          id: WALKTHROUGH_LAYOUT,
+          title: 'Walkthrough',
+          kind: 'positioned',
+          positions: traversalPositions(WALKTHROUGH_CARDS.map(([id]) => id)),
+          graphs: [
+            {
+              id: uuidSchema.parse('00000000-0000-4000-8000-000000000061'),
+              title: 'Walkthrough',
+              edges: [
+                { from: WALKTHROUGH_CARDS[0][0], to: WALKTHROUGH_CARDS[1][0] },
+                { from: WALKTHROUGH_CARDS[1][0], to: WALKTHROUGH_CARDS[2][0] },
+              ],
+            },
+          ],
+        },
+      ],
+    },
+    cards: traversalCards(WALKTHROUGH_CARDS),
+  }),
+);
+
+const DEEP_DIVE_LAYOUT = uuidSchema.parse('00000000-0000-4000-8000-000000000070');
+const DEEP_DIVE_CARDS = [
+  [uuidSchema.parse('00000000-0000-4000-8000-000000000072'), 'Introduction'],
+  [uuidSchema.parse('00000000-0000-4000-8000-000000000073'), 'Read path'],
+  [uuidSchema.parse('00000000-0000-4000-8000-000000000074'), 'Write path'],
+  [uuidSchema.parse('00000000-0000-4000-8000-000000000075'), 'Failure modes'],
+  [
+    uuidSchema.parse('00000000-0000-4000-8000-000000000076'),
+    'Operating notes, rollback and the on-call runbook',
+  ],
+] as const satisfies readonly (readonly [CardId, string])[];
+
+/**
+ * A fork: four Edges out of the Card a traversal begins at, each to a sink.
+ *
+ * Four rather than two, and one title deliberately longer than the bounded
+ * button can hold, because the row this chrome renders has to be judged on a
+ * choice set that can genuinely outrun it — a Graph's out-degree has no upper
+ * bound and a Card's title no length limit, so a design that only ever sees two
+ * short choices never shows what it does with either.
+ */
+export const deepDiveSpace: Space = loaded(
+  loadSpaceSnapshot({
+    id: uuidSchema.parse('00000000-0000-4000-8000-000000000042'),
+    document: {
+      version: 1,
+      title: 'Deep dive',
+      defaultRenderer: DEEP_DIVE_LAYOUT,
+      layouts: [
+        {
+          id: DEEP_DIVE_LAYOUT,
+          title: 'Deep dive',
+          kind: 'positioned',
+          positions: traversalPositions(DEEP_DIVE_CARDS.map(([id]) => id)),
+          graphs: [
+            {
+              id: uuidSchema.parse('00000000-0000-4000-8000-000000000071'),
+              title: 'Deep dive',
+              edges: DEEP_DIVE_CARDS.slice(1).map(([id]) => ({
+                from: DEEP_DIVE_CARDS[0][0],
+                to: id,
+              })),
+            },
+          ],
+        },
+      ],
+    },
+    cards: traversalCards(DEEP_DIVE_CARDS),
+  }),
+);

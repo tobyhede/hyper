@@ -76,6 +76,37 @@ export const parityClaims: readonly ParityClaim[] = [
     claim: 'Presenting replaces its entry action with Overview and withdraws authoring.',
   },
   {
+    id: 'presenting-line-offers-one-move',
+    storyFile: 'components/presenting-chrome.stories.tsx',
+    storyExport: 'Line',
+    claim: 'A line offers one move, named as the destination it goes to.',
+  },
+  {
+    id: 'presenting-space-activates-one-control-once',
+    storyFile: 'components/presenting-chrome.stories.tsx',
+    storyExport: 'Line',
+    claim:
+      'Space on a focused move activates that control once instead of also advancing globally.',
+  },
+  {
+    id: 'presenting-fork-selects-then-commits',
+    storyFile: 'components/presenting-chrome.stories.tsx',
+    storyExport: 'Fork',
+    claim: 'Choosing a fork branch selects it, and going commits down the branch chosen.',
+  },
+  {
+    id: 'presenting-sink-ends-the-graph-and-can-retreat',
+    storyFile: 'components/presenting-chrome.stories.tsx',
+    storyExport: 'Sink',
+    claim: 'A sink announces the end of the Graph and Back recovers the Card before it.',
+  },
+  {
+    id: 'presenting-narrow-keeps-choices-and-controls',
+    storyFile: 'components/presenting-chrome.stories.tsx',
+    storyExport: 'Narrow',
+    claim: 'A narrow chrome keeps the choices in their own row above Back, guidance and Overview.',
+  },
+  {
     id: 'operational-feedback-startup-failure',
     storyFile: 'components/operational-feedback.stories.tsx',
     storyExport: 'Startup',
