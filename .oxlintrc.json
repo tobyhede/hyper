@@ -22,7 +22,8 @@
     "**/src/prisma/contract.d.ts",
     "**/migrations/**/end-contract.d.ts",
     "**/migrations/**/start-contract.d.ts",
-    "tools/oxlint/anti-slop/**"
+    "tools/oxlint/anti-slop/**",
+    "tools/typing-fixtures/**"
   ],
   "jsPlugins": [{ "name": "anti-slop", "specifier": "./tools/oxlint/anti-slop/index.ts" }],
   "rules": {
@@ -424,6 +425,41 @@
       "files": ["test/unit/vite-hono-host.test.ts", "test/unit/vite-space-http-plugin.test.ts"],
       "rules": {
         "anti-slop/no-unknown-parameters": "off"
+      }
+    },
+    {
+      // ADR 0062's own gate tests. Both read tool output and repository-owned
+      // JSON at a boundary and narrow it with type predicates — the same
+      // category as `packages/persistence/src/http-protocol.ts` above, and the
+      // same three exemptions. They cannot take the `JSON.parse(...) as T`
+      // shortcut the older tests use, because `no-unsafe-type-assertion` now
+      // bans it and a test proving the ratchet bites must not be the one file
+      // evading it.
+      "files": ["test/unit/typing-fixtures.test.ts", "test/unit/assertion-ratchet.test.ts"],
+      "rules": {
+        "anti-slop/no-unknown-parameters": "off",
+        "anti-slop/no-runtime-typeof": "off",
+        "anti-slop/no-unsafe-dictionary-type": "off"
+      }
+    },
+    {
+      // The `must-pass` typing fixtures (ADR 0062; see
+      // `tools/typing-fixtures/README.md`). `unknown-at-parse-boundary.ts` is a
+      // parse boundary and takes exactly the same three exemptions
+      // `packages/persistence/src/http-protocol.ts` takes above, for the same
+      // reason: its `value: unknown` parameters and its record inspection are
+      // the boundary itself, not a missing one. A fixture claiming to prove a
+      // genuine parse boundary survives has to be declared the way this
+      // repository declares one, or it proves something else.
+      //
+      // `require-safety-comment-for-type-assertion` is deliberately NOT off
+      // here: ADR 0062 left it untouched, and `broadening-to-unknown.ts`
+      // carries its `SAFETY:` comment to show it still applies.
+      "files": ["tools/typing-fixtures/must-pass/*.ts"],
+      "rules": {
+        "anti-slop/no-unknown-parameters": "off",
+        "anti-slop/no-runtime-typeof": "off",
+        "anti-slop/no-unsafe-dictionary-type": "off"
       }
     }
   ]

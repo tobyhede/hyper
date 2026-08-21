@@ -168,6 +168,11 @@ export default tseslint.config(
       // source at a pinned commit, not repository-authored — not part of any
       // tsconfig project, and not ours to reformat or re-lint.
       'tools/oxlint/anti-slop/**',
+      // Typing fixtures (ADR 0062). Half of them are *meant* to fail, so the
+      // ordinary run must not see them. `test/unit/typing-fixtures.test.ts`
+      // reaches them deliberately with `--no-ignore` and asserts the outcome,
+      // which is the only place they should ever be linted.
+      'tools/typing-fixtures/**',
     ],
   },
   js.configs.recommended,
@@ -213,6 +218,15 @@ export default tseslint.config(
       // domain variant is exactly the failure this prevents, so it earns no
       // exemption: `AuthoringRefusal` (ADR 0057) is a union whose whole value is
       // that a new refusal code changes the interface deliberately.
+      // ADR 0062. The assertions already in the tree were examined in a reviewed
+      // pass and stand on their `SAFETY:` comments; what has no gate is the next
+      // one, because a comment requirement is satisfied by prose and prose is the
+      // cheapest thing an agent produces. The committed suppressions baseline
+      // records the existing sites and `--prune-suppressions` keeps the ceiling
+      // falling, so this caps the count while the anti-slop comment rule — which
+      // is unchanged and still applies to every surviving assertion — demands the
+      // reason. Two rules, two jobs; weakening either loses one of them.
+      '@typescript-eslint/no-unsafe-type-assertion': 'error',
       '@typescript-eslint/switch-exhaustiveness-check': [
         'error',
         {

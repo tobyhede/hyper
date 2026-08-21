@@ -52,3 +52,8 @@ packages/*/.scratch/
 # Local import scratch space left by earlier prototype increments. `pnpm
 # dev:new` explicitly ignores it and always mints a fresh memory workspace.
 packages/app/.space/
+
+# Derived from `.oxlintrc.json` by `test/unit/typing-fixtures.test.ts` for the
+# length of one run, so the fixtures can be linted at all. Ignored so a crashed
+# run cannot leave it to be committed.
+.oxlintrc.typing-fixtures.json

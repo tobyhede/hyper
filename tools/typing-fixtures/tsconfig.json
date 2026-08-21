@@ -1,0 +1,15 @@
+{
+  // The fixtures have their own project on purpose. They must be typechecked
+  // with the repository's real strictness — a fixture proved against a laxer
+  // compiler proves nothing — while staying out of `tsconfig.json` and out of
+  // `pnpm -r typecheck`, because the `must-fail` half is meant to fail.
+  //
+  // `projectService: true` resolves each file to its owning tsconfig, so this is
+  // also what gives ESLint the type information its type-aware rules need here.
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "types": [],
+    "noEmit": true
+  },
+  "include": ["must-fail", "must-pass"]
+}
