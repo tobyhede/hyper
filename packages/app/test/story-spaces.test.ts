@@ -1,14 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import { loadSpaceSnapshot } from '@project/graph';
+import { graphStartCard, loadSpaceSnapshot, outgoingEdges } from '@project/graph';
 import { canvasRenderers, currentRenderer } from '../src/canvas-renderers';
 import { defaultRenderer } from '../src/renderer';
 import {
   authoredSnapshot,
   authoredSpace,
+  deepDiveSpace,
   editedSnapshot,
   MINTED_GRAPH_ID_BASE,
   storyGraphIds,
   unauthoredSpace,
+  walkthroughSpace,
 } from '../stories/support/spaces';
 
 /**
@@ -95,7 +97,7 @@ describe('the story Spaces', () => {
 
     const declared = new Set<string>([
       authoredSnapshot.id,
-      ...[authoredSpace, edited.space].flatMap((space) => [
+      ...[authoredSpace, edited.space, walkthroughSpace, deepDiveSpace].flatMap((space) => [
         ...space.cards.map((card) => card.id),
         ...space.layouts.map((layout) => layout.id),
         ...space.graphs.map((graph) => graph.id),
@@ -127,6 +129,46 @@ describe('the story Spaces', () => {
       expect(id.startsWith(block), id).toBe(true);
       expect(Number.parseInt(id.slice(block.length), 16), id).toBeLessThan(MINTED_GRAPH_ID_BASE);
     }
+  });
+
+  /**
+   * The traversal Spaces open where they say, on the one Graph their Layout
+   * owns — so a presenting story calls `present()` and nothing else, and the
+   * Graph it presents is the one `defaultRenderer` and ADR 0026 answer rather
+   * than one the harness picked.
+   */
+  it('opens each traversal Space on the Layout and Graph it declares', () => {
+    for (const [space, title] of [
+      [walkthroughSpace, 'Walkthrough'],
+      [deepDiveSpace, 'Deep dive'],
+    ] as const) {
+      const opens = defaultRenderer(space);
+      expect(opens.kind).toBe('layout');
+      expect(currentRenderer(canvasRenderers(space), opens).title).toBe(title);
+      expect(space.graphs.map((graph) => graph.title)).toEqual([title]);
+    }
+  });
+
+  /**
+   * The one thing no tracked fixture has, and the reason these Spaces exist.
+   *
+   * The E2E fixture's Graphs are deliberately all lines and the sidebar's Space
+   * is four more of them, so nothing already in the tree gives the presenting
+   * chrome a Card with a real choice at it. This is the assertion that the fork
+   * story is a fork — and that the line beside it is still the degenerate one
+   * rather than a second kind (ADR 0024).
+   */
+  it('gives the fork story a Card with several ways on, and the line exactly one', () => {
+    const outDegree = (space: typeof deepDiveSpace): number => {
+      const graph = space.graphs[0];
+      if (graph === undefined) throw new Error('The traversal Space owns no Graph.');
+      const start = graphStartCard(graph);
+      if (start === undefined) throw new Error('The traversal Space has nowhere to begin.');
+      return outgoingEdges(graph, start).length;
+    };
+
+    expect(outDegree(deepDiveSpace)).toBe(4);
+    expect(outDegree(walkthroughSpace)).toBe(1);
   });
 
   /**

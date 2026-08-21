@@ -119,6 +119,7 @@ export {
   FieldTitle,
 } from './components/field';
 export { Input } from './components/input';
+export { Kbd, KbdGroup } from './components/kbd';
 export { Label } from './components/label';
 export { Separator } from './components/separator';
 export { Spinner } from './components/spinner';

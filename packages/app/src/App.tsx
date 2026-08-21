@@ -22,6 +22,7 @@ import { canvasContent } from './canvas-content';
 import { usePlacementRendering } from './placement-rendering';
 import { cardSizeVars } from './card';
 import { createNavigation } from './navigation';
+import { usePresentingKeys } from './presenting-keys';
 import { createWorkingSpaceReader } from './snapshot';
 import { nextCardTitle } from './titles';
 import { activeGraphColor } from './colors';
@@ -563,28 +564,14 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
         ?.focus();
     }, [openedCardId, presenting]);
 
-    // Traversing the graph (ADR 0027). Right commits the selected edge, Left traverses
-    // back, Up and Down move the selection among a fork's outgoing edges without
-    // moving the camera — the move a deck framework's per-key redirect cannot
-    // express, and the reason there is no framework here.
-    useEffect(() => {
-      if (!presenting || openedCardId) return;
-      const onKeyDown = (event: KeyboardEvent) => {
-        const handler = {
-          ArrowRight: advance,
-          ' ': advance,
-          ArrowLeft: retreat,
-          ArrowUp: () => selectBranch(-1),
-          ArrowDown: () => selectBranch(1),
-          Escape: exitPresenting,
-        }[event.key];
-        if (!handler) return;
-        event.preventDefault();
-        handler();
-      };
-      window.addEventListener('keydown', onKeyDown);
-      return () => window.removeEventListener('keydown', onKeyDown);
-    }, [presenting, openedCardId, advance, retreat, selectBranch, exitPresenting]);
+    // An opened Card covers the graph and owns its own keys, so the global
+    // Traversal commands are bound only while a traversal is the thing on screen.
+    usePresentingKeys(presenting && openedCardId === null, {
+      advance,
+      retreat,
+      selectBranch,
+      exitPresenting,
+    });
 
     const sidebar = (
       <WorkspaceSidebar
@@ -693,8 +680,9 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
             <PresentingChrome
               moves={moves}
               canRetreat={canRetreat}
-              onSelect={(index) => selectBranch(index - moves.findIndex((m) => m.selected))}
+              onSelectBranch={selectBranch}
               onAdvance={advance}
+              onRetreat={retreat}
               onExit={exitPresenting}
             />
           )}
