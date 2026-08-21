@@ -22,6 +22,7 @@
     "hyper": "tsx src/cli/entry.ts",
     "postgres:up": "docker compose up -d --wait",
     "postgres:down": "docker compose down",
+    "typecheck:toolchain": "tsx scripts/check-typescript-toolchain.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "typecheck:packages": "pnpm -r typecheck",
     "lint": "eslint . --max-warnings=0",
@@ -38,7 +39,7 @@
     "ui:catalog:check": "tsx scripts/ui-catalog.ts --check",
     "e2e:postgres": "playwright test --config playwright.postgres.config.ts",
     "test:integration:postgres": "pnpm contract:emit && pnpm db:migrate && vitest run --config vitest.integration.config.ts",
-    "verify": "pnpm typecheck && pnpm typecheck:packages && pnpm ui:catalog:check && pnpm lint && pnpm lint:anti-slop && pnpm format:check && pnpm test:coverage"
+    "verify": "pnpm typecheck:toolchain && pnpm typecheck && pnpm typecheck:packages && pnpm ui:catalog:check && pnpm lint && pnpm lint:anti-slop && pnpm format:check && pnpm test:coverage"
   },
   "pnpm": {
     "overrides": {
