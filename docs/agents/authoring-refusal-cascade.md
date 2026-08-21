@@ -73,5 +73,11 @@ names what gate 3 does for that action.
 3 universal (`placement-pending`, `layout-not-found`, `layout-required`) plus
 the 15 action-specific codes tabulated above — none is produced anywhere else.
 `describeAuthoringRefusal` in `authoring-refusal.ts` is the one place every
-code gets its copy and its field placement (`title` / `target` / `form`): the
-domain names the code, the application owns the sentence.
+code gets its copy, and the exhaustive placement records beside it are the one
+place each surface's field mapping lives: the domain names the code, the
+application owns the sentence. Six surfaces map it today — Markdown Card
+editing (`title`), Alias editing and Alias creation (`title` / `target`),
+keyboard connection (`target`), Edge endpoint editing (the attempted `from` or
+`to`, never both) and Edge deletion (form only). Every record is
+`Record<AuthoringRefusalCode, …>`, so a new code fails to compile until each
+surface has said where it goes.

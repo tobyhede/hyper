@@ -7,12 +7,12 @@ import {
 } from '@project/persistence';
 import type { CardFlowNode } from '@project/react-flow-adapter';
 import { CARD_SIZE } from './card';
-import { describeAuthoringRefusal } from './authoring-refusal';
 import type { ConnectionCompletion, ConnectionResult } from './connection-completion';
 import type { CanvasSelection, EdgeSubject, RenderAdapter } from './render-adapter';
 import { sameEdgeSubject, sameSelection } from './render-adapter';
 import type { CanvasRendererId } from './renderer';
 import type {
+  AuthoringRefusal,
   EdgeEligibility,
   EdgeEndpoint,
   EdgeProposal,
@@ -140,6 +140,60 @@ export type EdgeDraft =
   | ({ readonly kind: 'keyboard-reconnect' } & EdgeSubject);
 
 /**
+ * A refused Edge interaction: the domain's own identity, and the context that
+ * says which surface has to show it.
+ *
+ * ADR 0057 gives every expected refusal a stable identity and leaves the
+ * sentence, the field and the channel to the application surface conducting the
+ * interaction. This module conducts none of them — it translates events — so
+ * what it retains is the `AuthoringRefusal` untouched plus the least context a
+ * surface needs to recognise its own: **which interaction was refused**, and for
+ * a reconnection **which endpoint was attempted**, because only that endpoint's
+ * Field may be marked invalid.
+ *
+ * Four kinds, one per presentation channel:
+ *
+ * - `connection` — the keyboard connection picker, which owns a Target field;
+ * - `reconnection` — the open endpoint editor, which owns From and To;
+ * - `deletion` — the selected Edge's own controls, which own no field at all;
+ * - `gesture` — a completed pointer drag, whose initiating surface has gone, so
+ *   the canvas announcement is the only place left to say it.
+ *
+ * Nothing else belongs here. No React id, no copy and no derived error bag: a
+ * second presentation state stored beside the domain one is the thing that goes
+ * stale, and the adapters in `authoring-refusal.ts` derive both from this on
+ * every render instead.
+ */
+export type EdgeRefusal =
+  | { readonly kind: 'connection'; readonly refusal: AuthoringRefusal }
+  | {
+      readonly kind: 'reconnection';
+      readonly endpoint: EdgeEndpoint;
+      readonly refusal: AuthoringRefusal;
+    }
+  | { readonly kind: 'deletion'; readonly refusal: AuthoringRefusal }
+  | { readonly kind: 'gesture'; readonly refusal: AuthoringRefusal };
+
+/**
+ * The two channels the **selected Edge's own controls** own, and the narrowing.
+ *
+ * Beside the union rather than beside the component that consumes it: which of
+ * the four channels a surface owns is a fact about the channels, and
+ * `AuthorableEdge` had a hand-inlined copy of these two `kind`s in a file with
+ * no other reason to know them. The other two belong elsewhere — the keyboard
+ * connection picker's, and the canvas announcement a finished pointer gesture
+ * leaves behind — and narrowing here is what stops a sentence from an unrelated
+ * gesture appearing under whichever Edge happens to be selected.
+ */
+export type SelectedEdgeRefusal = Extract<
+  EdgeRefusal,
+  { readonly kind: 'reconnection' } | { readonly kind: 'deletion' }
+>;
+
+export const selectedEdgeRefusalOf = (refusal: EdgeRefusal | null): SelectedEdgeRefusal | null =>
+  refusal?.kind === 'reconnection' || refusal?.kind === 'deletion' ? refusal : null;
+
+/**
  * Where focus goes once the projection carrying a completed Edit has rendered.
  *
  * The Edge is named by subject rather than by React Flow's edge id, like every
@@ -154,11 +208,11 @@ export type FocusRequest =
 export interface EdgeAuthoringState {
   readonly draft: EdgeDraft | null;
   /**
-   * The reason the current draft was refused, retained until the author changes
+   * The refusal the current draft ran into, retained until the author changes
    * the proposal or cancels. A refusal is not a cancellation: the draft and its
-   * message stand together so the author can correct what they aimed at.
+   * refusal stand together so the author can correct what they aimed at.
    */
-  readonly refusal: string | null;
+  readonly refusal: EdgeRefusal | null;
   /**
    * A focus move Hyper owes the author, consumed once by the React layer.
    *
@@ -235,6 +289,9 @@ export interface EdgeAuthoringDependencies {
 }
 
 const IDLE: EdgeAuthoringState = { draft: null, refusal: null, focusRequest: null };
+
+/** The channel a finished pointer gesture leaves its refusal on. */
+const gestureRefusal = (refusal: AuthoringRefusal): EdgeRefusal => ({ kind: 'gesture', refusal });
 
 /**
  * The Card a draft is anchored at, if the draft has one.
@@ -322,14 +379,22 @@ export function createEdgeAuthoring({
     });
   };
 
-  /** The Edge a reconnect draft is about, whichever kind of reconnect it is. */
-  const draftedEdge = (): EdgeSubject | null => {
+  /**
+   * The reconnect draft in flight, whichever kind of reconnect it is.
+   *
+   * The draft rather than the Edge alone: which surface owns a refusal depends
+   * on *how* the reconnection was drafted, and re-reading the state a second
+   * time to find that out is a second answer to the same question.
+   */
+  type ReconnectDraft = Extract<
+    EdgeDraft,
+    { readonly kind: 'pointer-reconnect' } | { readonly kind: 'keyboard-reconnect' }
+  >;
+
+  const reconnectDraft = (): ReconnectDraft | null => {
     const { draft } = observable.getState();
     if (draft === null) return null;
-    if (draft.kind === 'pointer-reconnect' || draft.kind === 'keyboard-reconnect') {
-      return { graphId: draft.graphId, edge: draft.edge };
-    }
-    return null;
+    return draft.kind === 'pointer-reconnect' || draft.kind === 'keyboard-reconnect' ? draft : null;
   };
 
   /**
@@ -349,10 +414,13 @@ export function createEdgeAuthoring({
    * the drain reaches it, and because the invalidation pass cancels the draft
    * the instant its subject really goes.
    */
-  const completeStructural = (completion: Parameters<SpaceAuthoring['complete']>[0]): boolean => {
+  const completeStructural = (
+    completion: Parameters<SpaceAuthoring['complete']>[0],
+    channel: (refusal: AuthoringRefusal) => EdgeRefusal,
+  ): boolean => {
     const result = authoring.complete(completion);
     if (result.kind === 'refused') {
-      publish({ refusal: describeAuthoringRefusal(result.refusal) });
+      publish({ refusal: channel(result.refusal) });
       return false;
     }
     if (result.kind === 'queued') {
@@ -375,15 +443,19 @@ export function createEdgeAuthoring({
   /**
    * Take what a connection attempt came to, and say what the author sees.
    *
-   * The three outcomes are not interchangeable. A **refusal** shows its
-   * sentence; a **completion** clears whatever sentence was there, because a
-   * refusal describes the proposal that produced it and this one has landed;
-   * and **unavailable** — no arrangement yet, or an invariant already reported —
-   * says nothing either way, so a message already on screen stands.
+   * The three outcomes are not interchangeable. A **refusal** is retained on the
+   * channel the caller names; a **completion** clears whatever refusal was
+   * there, because a refusal describes the proposal that produced it and this
+   * one has landed; and **unavailable** — no arrangement yet, or an invariant
+   * already reported — says nothing either way, so a refusal already on screen
+   * stands.
    */
-  const settleConnection = (result: ConnectionResult): CardId | null => {
+  const settleConnection = (
+    result: ConnectionResult,
+    channel: (refusal: AuthoringRefusal) => EdgeRefusal,
+  ): CardId | null => {
     if (result.kind === 'refused') {
-      publish({ refusal: result.reason });
+      publish({ refusal: channel(result.refusal) });
       return null;
     }
     if (result.kind !== 'completed') return null;
@@ -451,8 +523,18 @@ export function createEdgeAuthoring({
   const unsubscribeAdapter = adapter.subscribe((state) => {
     if (sameSelection(state.selection, selection)) return;
     selection = state.selection;
-    const { draft } = observable.getState();
-    if (draft !== null && !selectionMatchesDraft(selection, draft)) clearDraft();
+    const { draft, refusal } = observable.getState();
+    if (draft !== null) {
+      if (!selectionMatchesDraft(selection, draft)) clearDraft();
+      return;
+    }
+    // **A refused Delete leaves no draft, and it is about the Edge that was
+    // selected when it was made.** Its channel is the selected Edge's own
+    // controls, which are drawn from the *current* selection — so moving the
+    // selection would put a sentence about the previous Edge under the new one.
+    // The other channels do not need this: a refused connection or reconnection
+    // retains the draft that ran into it, and the branch above cancels both.
+    if (refusal?.kind === 'deletion') publish({ refusal: null });
   });
 
   /**
@@ -461,7 +543,7 @@ export function createEdgeAuthoring({
    * CONTEXT.md's **Selected Edge**: an Edge outside the Active Graph "cannot
    * remain selected". Activating another Graph is not an Edit and moves no
    * Edge, so the stored subject is simply no longer one an authoring gesture may
-   * act on — and the Edge's own toolbar reads the selection, so leaving it would
+   * act on — and `SelectedEdgeControls` reads the selection, so leaving it would
    * keep Delete live on an Edge the canvas has stopped offering.
    *
    * Registered as a second subscriber rather than folded into the draft pass
@@ -483,11 +565,18 @@ export function createEdgeAuthoring({
 
     beginPointerConnect: (from) => begin({ kind: 'pointer-connect', from }),
 
+    // Both pointer completions land on the **canvas announcement** channel, and
+    // that is a fact about when they are asked rather than a default. React Flow
+    // reports a connection on release, and `endPointerDrag` takes the draft away
+    // in the same turn — so by the time anything renders the refusal there is no
+    // handle, no ghost and no picker left to attach it to.
     connect: (from, to, projected) =>
-      holdForDrag(settleConnection(connections.connect(from, to, projected))),
+      holdForDrag(settleConnection(connections.connect(from, to, projected), gestureRefusal)),
 
     createConnectedCard: (from, position, projected) =>
-      holdForDrag(settleConnection(connections.createAndConnect(from, position, projected))),
+      holdForDrag(
+        settleConnection(connections.createAndConnect(from, position, projected), gestureRefusal),
+      ),
 
     endPointerDrag: () => {
       const continuation = pendingContinuation;
@@ -507,7 +596,10 @@ export function createEdgeAuthoring({
       // The picker offered this target, so a refusal here means the Space
       // changed while it was open — which is the whole point of validating the
       // proposal again at completion. The draft stands with its reason.
-      const completed = settleConnection(connections.connect(draft.from, to, projected));
+      const completed = settleConnection(
+        connections.connect(draft.from, to, projected),
+        (refusal) => ({ kind: 'connection', refusal }),
+      );
       if (completed === null) return null;
       // "Successful keyboard connection selects and focuses the target Card."
       // Selection is the canvas's and happens beside this; the focus move is
@@ -524,15 +616,24 @@ export function createEdgeAuthoring({
     openEdgeEditor: ({ graphId, edge }) => begin({ kind: 'keyboard-reconnect', graphId, edge }),
 
     reconnect: (endpoint, cardId) => {
-      const drafted = draftedEdge();
+      const drafted = reconnectDraft();
       if (drafted === null) return false;
-      const settled = completeStructural({
-        kind: 'reconnected-edge',
-        graphId: drafted.graphId,
-        edge: drafted.edge,
-        endpoint,
-        cardId,
-      });
+      // **Which surface owns the refusal is the draft's kind, not the Edit's.**
+      // The endpoint editor stands through its own completion and can mark the
+      // attempted Field invalid; a pointer drag has already ended, so its
+      // refusal has nowhere to go but the canvas announcement.
+      const settled = completeStructural(
+        {
+          kind: 'reconnected-edge',
+          graphId: drafted.graphId,
+          edge: drafted.edge,
+          endpoint,
+          cardId,
+        },
+        drafted.kind === 'keyboard-reconnect'
+          ? (refusal) => ({ kind: 'reconnection', endpoint, refusal })
+          : gestureRefusal,
+      );
       if (!settled) return false;
       // **The author stays on the Edge they edited**, which is the matrix's
       // focus for a completed Reconnect and needs saying because nothing else
@@ -558,7 +659,14 @@ export function createEdgeAuthoring({
     },
 
     deleteEdge: ({ graphId, edge }) => {
-      const deleted = completeStructural({ kind: 'deleted-edge', graphId, edge });
+      // A refused Delete leaves the Edge selected, so its controls are still on
+      // screen and own the sentence. Falling through to the canvas announcement
+      // would say it somewhere the author is not looking, over a control that
+      // is.
+      const deleted = completeStructural({ kind: 'deleted-edge', graphId, edge }, (refusal) => ({
+        kind: 'deletion',
+        refusal,
+      }));
       // The Edge that held focus is about to leave the projection, and React
       // Flow moves focus only for elements it still draws.
       if (deleted) requestFocus({ kind: 'card', cardId: edge.from });

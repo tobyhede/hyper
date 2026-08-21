@@ -1,5 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
+import { uuidSchema } from '@project/core';
 import { CardSearchCombobox, type CardChoice } from '../src/index';
 
 /**
@@ -29,10 +30,15 @@ beforeAll(() => {
   );
 });
 
+/** Real `CardId`s, because that is what a choice's id now is. */
+const CARD_A = uuidSchema.parse('00000000-0000-4000-8000-00000000000a');
+const CARD_B = uuidSchema.parse('00000000-0000-4000-8000-00000000000b');
+const CARD_C = uuidSchema.parse('00000000-0000-4000-8000-00000000000c');
+
 const CHOICES: readonly CardChoice[] = [
-  { id: 'card-a', title: 'Alpha', kind: 'markdown' },
-  { id: 'card-b', title: 'Beta', kind: 'markdown' },
-  { id: 'card-c', title: 'Gamma', kind: 'markdown', refusal: 'That Edge already exists.' },
+  { id: CARD_A, title: 'Alpha', kind: 'markdown' },
+  { id: CARD_B, title: 'Beta', kind: 'markdown' },
+  { id: CARD_C, title: 'Gamma', kind: 'markdown', refusal: 'That Edge already exists.' },
 ];
 
 function open(onValueChange = vi.fn()) {
@@ -41,7 +47,7 @@ function open(onValueChange = vi.fn()) {
       label="To"
       testId="edge-to"
       choices={CHOICES}
-      value="card-a"
+      value={CARD_A}
       onValueChange={onValueChange}
     />,
   );
@@ -60,7 +66,7 @@ describe('CardSearchCombobox', () => {
       <CardSearchCombobox
         label="To"
         choices={CHOICES}
-        value="card-a"
+        value={CARD_A}
         onValueChange={() => undefined}
       />,
     );
@@ -86,7 +92,7 @@ describe('CardSearchCombobox', () => {
 
     fireEvent.click(screen.getByRole('option', { name: 'Markdown Card Beta' }));
 
-    expect(onValueChange).toHaveBeenCalledWith('card-b');
+    expect(onValueChange).toHaveBeenCalledWith(CARD_B);
   });
 
   /**

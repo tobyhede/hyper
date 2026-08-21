@@ -1,6 +1,7 @@
 import { createContext } from 'react';
 import type { CardId } from '@project/core';
 import type { CardChoice } from '@project/ui';
+import type { EdgeRefusal } from '../edge-authoring';
 import type { EdgeSubject } from '../render-adapter';
 import type { EdgeEndpoint } from '../space-authoring';
 
@@ -15,7 +16,15 @@ import type { EdgeEndpoint } from '../space-authoring';
 export interface EdgeAuthoringCommands {
   /** The Edge whose editor is open, if the open draft is an Edge editor. */
   readonly editing: EdgeSubject | null;
-  readonly refusal: string | null;
+  /**
+   * Edge Authoring's one retained refusal, structured and undecided.
+   *
+   * The whole module's, not this Edge's: it may name a channel the selected
+   * Edge's controls do not own, and narrowing it is the consuming surface's
+   * job rather than something this context should pre-empt. The prose is
+   * nobody's here — ADR 0057 puts the sentence and the field with the surface.
+   */
+  readonly refusal: EdgeRefusal | null;
   readonly openEditor: (subject: EdgeSubject) => void;
   readonly closeEditor: () => void;
   readonly reconnect: (endpoint: EdgeEndpoint, cardId: CardId) => void;

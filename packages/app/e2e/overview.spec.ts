@@ -103,6 +103,63 @@ test('selecting a Layout draws the Graphs it owns and only those', async ({ page
   await expect(persistence).toHaveAttribute('data-revision', '0');
 });
 
+/**
+ * The two surfaces that name a Graph, held to the same answer.
+ *
+ * ADR 0053 gave the workspace Sidebar a Graphs group carrying every Graph's
+ * title, colour and active state — which is what the canvas HUD's key already
+ * said. Issue 06 keeps the key: it is the on-canvas colour reference beside the
+ * Edges being read, and it is the only one of the two still on screen once the
+ * Sidebar is collapsed. What the decision costs is this test — the two must
+ * never disagree, which is why both resolve a colour through the one shared
+ * `graphColor` seam rather than each deriving its own.
+ */
+test(
+  'the Sidebar and the canvas HUD agree about every Graph, collapsed or not',
+  { tag: '@parity:graph-hud-and-sidebar-agree-on-the-active-graph' },
+  async ({ page }) => {
+    await page.goto('/');
+    const legendItems = page.getByTestId('graph-legend').locator('.legend__item');
+    await expect(legendItems).toHaveCount(4);
+
+    // Titles, in the same order: the flatten across Layouts, which both read
+    // off the renderer's subject.
+    expect(await legendItems.allInnerTexts()).toEqual(
+      await sidebar(page).getByTestId('graph-choice').allInnerTexts(),
+    );
+
+    // Colours. Lucide paints the Sidebar's glyph by `stroke`, the HUD paints its
+    // stripe as a background — two properties, one resolved value each.
+    const sidebarColors = await sidebar(page)
+      .getByTestId('graph-choice')
+      .locator('svg')
+      .evaluateAll((els) => els.map((el) => getComputedStyle(el).stroke));
+    const hudColors = await legendItems
+      .locator('[aria-hidden="true"]')
+      .evaluateAll((els) => els.map((el) => getComputedStyle(el).backgroundColor));
+    expect(hudColors).toEqual(sidebarColors);
+    expect(new Set(hudColors).size).toBe(4);
+
+    // Emphasis, through an activation neither surface owns — and asserted on
+    // **both** surfaces, because agreement is the claim. Reading only the HUD
+    // would leave the Sidebar free to stop marking the Active Graph entirely
+    // while the one test named for the two agreeing stayed green.
+    await activateGraph(page, 'Mid');
+    const emphasised = page.getByTestId('graph-legend').locator('li[data-active="true"]');
+    await expect(emphasised).toHaveCount(1);
+    await expect(emphasised).toHaveText('Mid');
+    const pressed = sidebar(page).locator('[data-testid="graph-choice"][aria-pressed="true"]');
+    await expect(pressed).toHaveCount(1);
+    await expect(pressed).toHaveText('Mid');
+
+    // And with the Sidebar gone, which is the whole reason the key was kept.
+    await page.getByRole('button', { name: 'Toggle Sidebar' }).click();
+    await expect(page.locator('[data-slot="sidebar"]')).toHaveAttribute('data-state', 'collapsed');
+    await expect(emphasised).toHaveText('Mid');
+    await expect(legendItems).toHaveCount(4);
+  },
+);
+
 test('handles stay measurable, so edges attach where the layout put them', async ({ page }) => {
   await page.goto('/');
 

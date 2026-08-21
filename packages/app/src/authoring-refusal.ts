@@ -1,4 +1,4 @@
-import type { AuthoringRefusal } from './space-authoring';
+import type { AuthoringRefusal, EdgeEndpoint } from './space-authoring';
 
 /** Application-owned copy for a stable Authoring refusal identity. */
 export const describeAuthoringRefusal = (refusal: AuthoringRefusal): string => {
@@ -131,3 +131,97 @@ export const presentAliasCardRefusal = (refusal: AuthoringRefusal): AliasCardRef
 /** Error placement for Alias creation, which owns Title and Target. */
 export const presentNewAliasRefusal = (refusal: AuthoringRefusal): NewAliasRefusalErrors =>
   presentRefusal(refusal, titleAndTargetPlacements);
+
+/**
+ * Whether choosing another Card would answer this refusal.
+ *
+ * A picker refusal is *correctable* exactly when it is about the choice: the
+ * Card lies outside this Layout, or the Edge it would produce is one the Graph
+ * already holds. Everything else — a placement still resolving, a Layout or
+ * Graph the Space no longer holds, an Edge that has gone — describes the
+ * subject rather than the choice, and no row in either list would fix it.
+ *
+ * One record for the two Card-choosing Edge surfaces, because the question is
+ * the same on both: keyboard connection names one Card and endpoint editing
+ * names two, and neither can correct a stale subject. It is exhaustive over the
+ * codes rather than a list of the two that are true, so a new refusal has to be
+ * decided here before it will compile.
+ */
+const correctableByCardChoice = {
+  'placement-pending': false,
+  'layout-not-found': false,
+  'layout-required': false,
+  'card-not-found': false,
+  'card-kind-immutable': false,
+  'card-title-required': false,
+  'alias-target-not-found': false,
+  'alias-target-must-own-content': false,
+  'card-already-in-layout': false,
+  'card-not-in-layout': false,
+  'card-has-aliases': false,
+  'graph-title-required': false,
+  'layout-must-keep-graph': false,
+  'graph-not-owned': false,
+  'edge-not-found': false,
+  'edge-card-outside-layout': true,
+  'edge-already-exists': true,
+  'layout-active-graph-required': false,
+} as const satisfies Readonly<Record<AuthoringRefusalCode, boolean>>;
+
+export type EdgeConnectionRefusalErrors = AuthoringRefusalErrors<'target'>;
+export type EdgeEndpointRefusalErrors = AuthoringRefusalErrors<EdgeEndpoint>;
+
+/**
+ * A refused Delete, which owns a form channel and no field.
+ *
+ * `form` is required rather than optional, and that is the surface's contract
+ * rather than a convenience: Delete offers nothing to correct, so every code
+ * reaches the form and the controls always have a sentence to draw.
+ */
+export interface EdgeDeletionRefusalErrors {
+  readonly fields: Readonly<Record<never, string>>;
+  readonly form: string;
+}
+
+/** The channel a refusal takes when no field on the surface could answer it. */
+const formChannel = <Field extends string>(
+  refusal: AuthoringRefusal,
+): AuthoringRefusalErrors<Field> => ({ fields: {}, form: describeAuthoringRefusal(refusal) });
+
+/** Error placement for the keyboard connection picker, which owns only Target. */
+export const presentEdgeConnectionRefusal = (
+  refusal: AuthoringRefusal,
+): EdgeConnectionRefusalErrors =>
+  correctableByCardChoice[refusal.code]
+    ? { fields: { target: describeAuthoringRefusal(refusal) } }
+    : formChannel(refusal);
+
+/**
+ * Error placement for endpoint editing, which owns From and To.
+ *
+ * **Only the endpoint the author attempted is marked invalid.** The other one
+ * names a Card the Edit never questioned, and marking it would ask for a
+ * correction to a value nothing refused.
+ */
+export const presentEdgeEndpointRefusal = (
+  refusal: AuthoringRefusal,
+  endpoint: EdgeEndpoint,
+): EdgeEndpointRefusalErrors =>
+  correctableByCardChoice[refusal.code]
+    ? { fields: { [endpoint]: describeAuthoringRefusal(refusal) } }
+    : formChannel(refusal);
+
+/**
+ * Error placement for a refused Delete, which stays on the controls that asked.
+ *
+ * Total by construction rather than by an exhaustive record: a surface with no
+ * field has nowhere else for a code to go, so a second eighteen-line table
+ * saying `form` eighteen times would be a thing to keep in step and never a
+ * thing to decide.
+ */
+export const presentEdgeDeletionRefusal = (
+  refusal: AuthoringRefusal,
+): EdgeDeletionRefusalErrors => ({
+  fields: {},
+  form: describeAuthoringRefusal(refusal),
+});

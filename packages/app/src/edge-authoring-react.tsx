@@ -22,8 +22,9 @@ import {
 import type { Card, CardId, Graph, GraphEdge, GraphId } from '@project/core';
 import { uuidSchema } from '@project/core';
 import type { CardFlowNode } from '@project/react-flow-adapter';
-import { CardSearchCombobox, type CardChoice } from '@project/ui';
-import { describeAuthoringRefusal } from './authoring-refusal';
+import { CardSearchCombobox, Field, FieldError, type CardChoice } from '@project/ui';
+import { describeAuthoringRefusal, presentEdgeConnectionRefusal } from './authoring-refusal';
+import { cardChoiceOf } from './card-choice';
 import {
   newCardDrop,
   type DropTarget,
@@ -137,6 +138,16 @@ const EDGE_TYPES: EdgeTypes = { routed: AuthorableEdge };
 
 /** One shared instance, for the identity `useKeyPress` reads. See the prop above. */
 const DELETE_KEYS: ['Backspace', 'Delete'] = ['Backspace', 'Delete'];
+
+/**
+ * The connection picker's error id, a constant rather than a `useId`.
+ *
+ * There is exactly one keyboard connection draft at a time and exactly one
+ * picker drawn for it, so the id cannot collide with a second instance — and a
+ * literal is what lets the `aria-describedby` and the `FieldError` be read as
+ * the same fact in one glance.
+ */
+const CONNECT_TARGET_ERROR = 'edge-connect-target-error';
 
 /**
  * Which `DropTarget` the element under the pointer is. Both class names are
@@ -581,7 +592,7 @@ export function useEdgeAuthoring({
         const interactive = enabled && subject.graphId === activeGraphId;
         // **Conjoined with `interactive`, not merely compared with the stored
         // subject.** An Edge outside the Active Graph cannot remain selected
-        // (CONTEXT.md), and this Edge draws its own toolbar from `selected` — so
+        // (CONTEXT.md), and this Edge draws its own controls from `selected` — so
         // reading the union alone would keep Delete live on an Edge activation
         // has just stopped offering, for as long as the union still named it.
         const selected = interactive && sameSelection(selection, subject);
@@ -621,23 +632,18 @@ export function useEdgeAuthoring({
     // whose own `kind` would overwrite the proposal's and ask a different
     // question of eligibility entirely.
     ({ graphId, edge }: EdgeSubject, endpoint: EdgeEndpoint): CardChoice[] =>
-      subjectCards.map((card) => {
-        const eligibility = latest.current.authoring.eligibility({
-          kind: 'reconnect',
-          graphId,
-          edge,
-          endpoint,
-          cardId: card.id,
-        });
-        return eligibility.kind === 'refused'
-          ? {
-              id: card.id,
-              title: card.title,
-              kind: card.kind,
-              refusal: describeAuthoringRefusal(eligibility.refusal),
-            }
-          : { id: card.id, title: card.title, kind: card.kind };
-      }),
+      subjectCards.map((card) =>
+        cardChoiceOf(
+          card,
+          latest.current.authoring.eligibility({
+            kind: 'reconnect',
+            graphId,
+            edge,
+            endpoint,
+            cardId: card.id,
+          }),
+        ),
+      ),
     [subjectCards],
   );
 
@@ -680,22 +686,27 @@ export function useEdgeAuthoring({
 
   const connectChoices = useMemo((): CardChoice[] => {
     if (connectTarget === null) return [];
-    return subjectCards.map((card) => {
-      const eligibility = authoring.eligibility({
-        kind: 'connect',
-        from: connectTarget,
-        to: card.id,
-      });
-      return eligibility.kind === 'refused'
-        ? {
-            id: card.id,
-            title: card.title,
-            kind: card.kind,
-            refusal: describeAuthoringRefusal(eligibility.refusal),
-          }
-        : { id: card.id, title: card.title, kind: card.kind };
-    });
+    return subjectCards.map((card) =>
+      cardChoiceOf(
+        card,
+        authoring.eligibility({ kind: 'connect', from: connectTarget, to: card.id }),
+      ),
+    );
   }, [connectTarget, subjectCards, authoring]);
+
+  /**
+   * The keyboard connection's own two channels, derived per render.
+   *
+   * Nothing is stored: the module retains the structured refusal and this maps
+   * it once, here, where the Target field and the form beneath it both exist
+   * (ADR 0057). A refusal from any other Edge channel is not this surface's and
+   * is left alone.
+   */
+  const connectionRefusal =
+    state.refusal?.kind === 'connection'
+      ? presentEdgeConnectionRefusal(state.refusal.refusal)
+      : null;
+  const connectTargetError = connectionRefusal?.fields.target ?? null;
 
   const layer = (
     <>
@@ -740,6 +751,13 @@ export function useEdgeAuthoring({
            * It stays because it is the rule this handler owns, and it becomes
            * load-bearing again the moment the picker moves to a primitive that
            * answers Escape from React rather than from a document listener.
+           *
+           * **Bubble here, capture in `SelectedEdgeControls`, and the two do not
+           * disagree.** This is a plain div in the app's own tree, so the event
+           * reaches React's delegated bubble listener normally. That editor is a
+           * Base UI popup, where a document listener stops the event before the
+           * bubble half of that delegation runs and only a capture handler is
+           * ever asked. The host decides the phase, not a preference.
            */
           onKeyDown={(event) => {
             if (event.key !== 'Escape') return;
@@ -749,45 +767,51 @@ export function useEdgeAuthoring({
             authoring.cancelDraft();
           }}
         >
-          <CardSearchCombobox
-            label="Connect to"
-            testId="connect-target"
-            choices={connectChoices}
-            value={null}
-            onValueChange={(cardId) => {
-              const to = uuidSchema.safeParse(cardId);
-              if (!to.success) return;
-              const completed = authoring.completeKeyboardConnect(
-                to.data,
-                latest.current.projectedNodes,
-              );
-              if (completed !== null) requestAnimationFrame(() => onSelectCard(completed));
-            }}
-          />
-          {state.refusal !== null && (
-            <span
-              role="alert"
-              className="edge-connect-picker__refusal"
-              data-testid="connect-refusal"
-            >
-              {state.refusal}
-            </span>
+          <Field data-invalid={connectTargetError !== null}>
+            <CardSearchCombobox
+              label="Connect to"
+              testId="connect-target"
+              choices={connectChoices}
+              value={null}
+              inputAttributes={{
+                'aria-invalid': connectTargetError !== null,
+                'aria-describedby': connectTargetError === null ? undefined : CONNECT_TARGET_ERROR,
+              }}
+              onValueChange={(cardId) => {
+                // No parse: `CardChoice` names its id a `CardId`, and this list
+                // is built from the subject Cards themselves.
+                const completed = authoring.completeKeyboardConnect(
+                  cardId,
+                  latest.current.projectedNodes,
+                );
+                if (completed !== null) requestAnimationFrame(() => onSelectCard(completed));
+              }}
+            />
+            <FieldError id={CONNECT_TARGET_ERROR} data-testid="connect-refusal">
+              {connectTargetError}
+            </FieldError>
+          </Field>
+          {/* The form channel: a Layout with no Active Graph, a placement still
+              resolving, a Space that has moved — none of which choosing another
+              Card would answer, so the Target field stays valid. */}
+          {connectionRefusal?.form !== undefined && (
+            <FieldError data-testid="connect-form-refusal">{connectionRefusal.form}</FieldError>
           )}
         </div>
       )}
       {/*
-        The refusal every *other* path produces, said somewhere the author can
-        read it.
+        The canvas announcement channel: the one refusal with no surface left.
 
-        A refusal is retained beside the draft that ran into it, and a keyboard
-        draft has a surface of its own — the picker above, or the Edge's
-        popover — that shows it in context. A **pointer** gesture has neither:
-        the drag is over, its draft is gone, and the sentence is the whole of
-        what the author is told. Without this it was stored and shown nowhere.
+        Every other channel is owned by a surface that is still on screen — the
+        picker above, the Edge's endpoint editor, the selected Edge's own
+        controls. A **completed pointer gesture** has none: the drag is over,
+        its draft is gone, and this sentence is the whole of what the author is
+        told. Which channel a refusal is on is Edge Authoring's answer, so this
+        no longer has to infer it from an absent draft.
       */}
-      {state.refusal !== null && draft === null && (
+      {state.refusal?.kind === 'gesture' && (
         <span role="alert" className="edge-refusal" data-testid="edge-gesture-refusal">
-          {state.refusal}
+          {describeAuthoringRefusal(state.refusal.refusal)}
         </span>
       )}
     </>
