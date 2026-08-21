@@ -140,11 +140,17 @@ test(
     expect(hudColors).toEqual(sidebarColors);
     expect(new Set(hudColors).size).toBe(4);
 
-    // Emphasis, through an activation neither surface owns.
+    // Emphasis, through an activation neither surface owns — and asserted on
+    // **both** surfaces, because agreement is the claim. Reading only the HUD
+    // would leave the Sidebar free to stop marking the Active Graph entirely
+    // while the one test named for the two agreeing stayed green.
     await activateGraph(page, 'Mid');
     const emphasised = page.getByTestId('graph-legend').locator('li[data-active="true"]');
     await expect(emphasised).toHaveCount(1);
     await expect(emphasised).toHaveText('Mid');
+    const pressed = sidebar(page).locator('[data-testid="graph-choice"][aria-pressed="true"]');
+    await expect(pressed).toHaveCount(1);
+    await expect(pressed).toHaveText('Mid');
 
     // And with the Sidebar gone, which is the whole reason the key was kept.
     await page.getByRole('button', { name: 'Toggle Sidebar' }).click();

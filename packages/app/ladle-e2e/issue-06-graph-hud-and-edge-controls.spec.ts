@@ -220,8 +220,22 @@ test(
     expect(await items.allInnerTexts()).toEqual(['Long', 'Mid', 'Short', 'Echo']);
     // The minimap is React Flow's own, drawing the nodes the flow measured —
     // the fixture supplies no substitute for it and no geometry of its own.
-    await expect(page.locator('.react-flow__minimap')).toBeVisible();
+    const minimap = page.locator('.react-flow__minimap');
+    await expect(minimap).toBeVisible();
     await expect(page.locator('.react-flow__minimap-node')).toHaveCount(5);
+
+    // **Geometry, because every other assertion here passes on a covered key.**
+    // `MiniMap` renders its own `<Panel>`, and a Panel is absolutely positioned
+    // at `bottom`/`right` 0 — nested in this HUD's Panel it leaves the flow and
+    // draws over every key row but the first. The rows stay in the DOM through
+    // all of it, so counts, text and `data-active` cannot see the difference;
+    // `position: relative` on the MiniMap is what puts it back below them, and
+    // this is the only assertion that fails when that line goes.
+    const lastRow = items.last();
+    const row = await lastRow.boundingBox();
+    const map = await minimap.boundingBox();
+    if (row === null || map === null) throw new Error('The HUD drew no measurable box.');
+    expect(row.y + row.height).toBeLessThanOrEqual(map.y);
 
     // Exactly one, and the others are dimmed rather than dropped.
     await expect(key.locator('li[data-active="true"]')).toHaveCount(1);

@@ -1211,6 +1211,10 @@ test(
     // already names are all eligible (ADR 0032, ADR 0042). It is load-bearing at
     // the keyboard Connect picker below, where B is disabled as a duplicate.
     const option = page.locator('[role="option"]:not([data-disabled])');
+    // Read before the click, because the list goes with the completion: this is
+    // the only moment the chosen Card's title is on screen to be observed rather
+    // than derived from the code under test.
+    const chosen = (await option.last().innerText()).trim();
     await option.last().click();
 
     await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
@@ -1232,10 +1236,17 @@ test(
           ? (active.closest('.react-flow__edge')?.getAttribute('aria-label') ?? null)
           : null;
       });
-    await expect.poll(focusedEdgeLabel).not.toBeNull();
-    // The *reconnected* Edge, not the one the author started on: that one is no
-    // longer in the Graph, and its label went with it.
-    expect(await focusedEdgeLabel()).not.toBe(selected);
+    // **The reconnected Edge by name, not merely "some other Edge".** A
+    // Layout overview draws every Graph at once, so "focus moved" is satisfied
+    // by any of a dozen Edges — including one with these very endpoints in
+    // another Graph. The decorated label carries all three facts the request is
+    // made of (`edge-authoring-react.tsx`: `Edge from X to Y in G`), so naming
+    // the expected one pins the unmoved endpoint, the chosen Card and the Graph
+    // together. `selected` and `chosen` are both read off the page, so this
+    // asserts against observed values rather than recomputed ones.
+    const reconnected = selected.replace(/ to .* in /, ` to ${chosen} in `);
+    expect(reconnected).not.toBe(selected);
+    await expect.poll(focusedEdgeLabel).toBe(reconnected);
   },
 );
 

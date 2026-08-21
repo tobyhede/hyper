@@ -10,7 +10,10 @@ import { AddCardControl, PersistenceIndicator, SidebarProvider } from '@project/
 import type { CanvasRenderer } from '../src/canvas-renderers';
 import { createNavigation } from '../src/navigation';
 import { createRenderAdapter, edgeSelectionOf } from '../src/render-adapter';
-import { createConnectionCompletion } from '../src/connection-completion';
+import {
+  createConnectionCompletion,
+  type ConnectionCompletion,
+} from '../src/connection-completion';
 import { createEdgeAuthoring } from '../src/edge-authoring';
 import { useEdgeAuthoring } from '../src/edge-authoring-react';
 import { createSpaceAuthoring } from '../src/space-authoring';
@@ -168,7 +171,16 @@ const EDGES = [
   flowEdge(`${OTHER_GRAPH_ID}::0`, OTHER_GRAPH_ID, CARD_B, CARD_C),
 ];
 
-function compose() {
+/**
+ * The composition every canvas test runs on.
+ *
+ * `connections` is overridable because `ConnectionCompletion` is a declared
+ * dependency of `createEdgeAuthoring`, and one refusal channel is reachable
+ * only through it: a code about the *subject* rather than the choice needs a
+ * Layout whose Active Graph has left it, which no gesture over this Space's one
+ * Layout can produce. Everything else composes the real collaborator.
+ */
+function compose({ connections }: { connections?: ConnectionCompletion | undefined } = {}) {
   const loaded = { snapshot, revision: 0n, exportedRevision: null };
   const session = openSpaceSession(new MemorySpaceBackend([loaded]), loaded);
   const currentSpace = () => {
@@ -196,7 +208,7 @@ function compose() {
   const edgeAuthoring = createEdgeAuthoring({
     authoring,
     adapter,
-    connections: createConnectionCompletion({ adapter, authoring }),
+    connections: connections ?? createConnectionCompletion({ adapter, authoring }),
   });
   adapter.getState().syncProjection(NODES, EDGES);
   return { session, navigation, authoring, adapter, edgeAuthoring, currentSpace };
@@ -254,9 +266,17 @@ afterAll(() => vi.unstubAllGlobals());
  */
 function mountCanvas(
   beside: ReactNode = null,
-  { covered = false, presenting = false }: { covered?: boolean; presenting?: boolean } = {},
+  {
+    covered = false,
+    presenting = false,
+    connections,
+  }: {
+    covered?: boolean;
+    presenting?: boolean;
+    connections?: ConnectionCompletion | undefined;
+  } = {},
 ) {
-  const composed = compose();
+  const composed = compose({ connections });
   const canvas = (paneOpen: boolean) => (
     <ReactFlowProvider>
       {beside}
@@ -1046,6 +1066,38 @@ describe('announcing a refusal', () => {
     // same thing twice, in a place the author is not looking.
     expect(screen.getByTestId('connect-refusal')).toBeVisible();
     expect(screen.queryByTestId('edge-gesture-refusal')).not.toBeInTheDocument();
+  });
+
+  /**
+   * The picker's *other* channel: a refusal no row in its list could answer.
+   *
+   * `edge-already-exists` above is about the Card chosen, so it marks Target and
+   * the author corrects it by choosing again. A Layout whose Active Graph has
+   * gone is about the subject — every row would be refused the same way — so it
+   * belongs beneath the field with the field left valid (ADR 0057).
+   */
+  it('says a refusal no Card choice could answer beneath the field, not on it', () => {
+    const { edgeAuthoring } = mountCanvas(null, {
+      connections: {
+        connect: () => ({ kind: 'refused', refusal: { code: 'layout-active-graph-required' } }),
+        createAndConnect: () => ({ kind: 'unavailable' }),
+      },
+    });
+
+    act(() => edgeAuthoring.beginKeyboardConnect(CARD_A));
+    act(() => {
+      edgeAuthoring.completeKeyboardConnect(CARD_B, null);
+    });
+
+    expect(screen.getByTestId('connect-form-refusal')).toHaveTextContent(
+      'This Layout has no active Graph for the connection to join.',
+    );
+    // Target stays valid, and says so: choosing another Card is not the fix.
+    expect(screen.queryByTestId('connect-refusal')).not.toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Connect to' })).toHaveAttribute(
+      'aria-invalid',
+      'false',
+    );
   });
 });
 
