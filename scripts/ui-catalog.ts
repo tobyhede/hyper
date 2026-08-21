@@ -139,8 +139,11 @@ const declaredParityClaims = (path: string, problems: string[]): readonly Declar
         : ts.isStringLiteralLike(applicationEvidenceProperty.initializer)
           ? applicationEvidenceProperty.initializer.text
           : null;
-    if (applicationEvidenceProperty !== undefined && applicationEvidence === null) {
-      problems.push(`parity claim ${id} applicationEvidence must be a string literal`);
+    if (
+      applicationEvidenceProperty !== undefined &&
+      (applicationEvidence === null || applicationEvidence.trim() === '')
+    ) {
+      problems.push(`parity claim ${id} applicationEvidence must be a non-empty string literal`);
       continue;
     }
     claims.push({ id, storyFile, storyExport, claim, applicationEvidence });
@@ -321,6 +324,16 @@ export const buildUiCatalog = (repositoryRoot = process.cwd()): UiCatalog => {
       problems.push(`unknown parity tag ${PARITY_TAG_PREFIX}${item.claimId} in ${item.file}`);
     if (item.excluded)
       problems.push(`parity tag ${PARITY_TAG_PREFIX}${item.claimId} is excluded in ${item.file}`);
+  }
+  const exemptedIds = new Set(
+    declared.filter((item) => item.applicationEvidence !== null).map((item) => item.id),
+  );
+  for (const item of applicationEvidence) {
+    if (exemptedIds.has(item.claimId)) {
+      problems.push(
+        `parity claim ${item.claimId} declares applicationEvidence but ${item.file} also tags it — drop the exemption or the tag`,
+      );
+    }
   }
   const claims = declared.map(({ applicationEvidence: exemptionReason, ...item }) => ({
     ...item,

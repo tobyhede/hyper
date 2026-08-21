@@ -525,15 +525,28 @@ test(
 /**
  * `usePlacementRendering` starts every strategy pending and only resolves
  * once it settles (`placement-rendering.ts`) — a fresh Space has no authored
- * Layout, so it opens on Flow, and elkjs's real (uninjected) layout
- * computation is slow enough that the pending state is reliably observable
- * on first paint rather than being a same-tick flash.
+ * Layout, so it opens on Flow. The elkjs chunk request is held open rather
+ * than timed, so the pending state is asserted deterministically instead of
+ * racing real layout latency.
  */
 test(
   'a fresh Space shows the busy state while elk is still arranging it',
   { tag: '@parity:operational-feedback-placement-pending' },
   async ({ page }) => {
-    await page.goto('/');
-    await expect(page.getByRole('status')).toHaveText('Arranging…');
+    let releaseElk = (): void => undefined;
+    const elkGate = new Promise<void>((resolve) => {
+      releaseElk = resolve;
+    });
+    await page.route('**/deps/elkjs*', async (route) => {
+      await elkGate;
+      await route.continue();
+    });
+
+    try {
+      await page.goto('/');
+      await expect(page.getByRole('status')).toHaveText('Arranging…');
+    } finally {
+      releaseElk();
+    }
   },
 );
