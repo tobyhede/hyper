@@ -6,7 +6,7 @@ import {
   waitFor,
   type RenderResult,
 } from '@testing-library/react';
-import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { spaceSnapshotSchema, uuidSchema, type SpaceSnapshot } from '@project/core';
 import { loadSpaceSnapshot } from '@project/graph';
 import { MemorySpaceBackend, openSpaceSession, type SpaceSession } from '@project/persistence';
@@ -182,18 +182,25 @@ const nodeOf = (id: string): HTMLElement => {
  * which jsdom reports as an uncaught exception rather than a failing assertion —
  * the test then passes and the run exits 1.
  */
+const withView = <E extends Event>(event: E, view: Window): E => {
+  Object.defineProperty(event, 'view', { value: view, configurable: true });
+  return event;
+};
+
 function beginDrag(node: HTMLElement): void {
   const view = node.ownerDocument.defaultView;
   if (view === null) throw new Error('The drag needs a window to bind its move listeners to.');
-  const withView = <E extends Event>(event: E): E => {
-    Object.defineProperty(event, 'view', { value: view, configurable: true });
-    return event;
-  };
-  fireEvent(node, withView(createEvent.mouseDown(node, { clientX: 0, clientY: 0, buttons: 1 })));
-  fireEvent(view, withView(createEvent.mouseMove(view, { clientX: 120, clientY: 60, buttons: 1 })));
+  fireEvent(
+    node,
+    withView(createEvent.mouseDown(node, { clientX: 0, clientY: 0, buttons: 1 }), view),
+  );
   fireEvent(
     view,
-    withView(createEvent.mouseMove(view, { clientX: 240, clientY: 120, buttons: 1 })),
+    withView(createEvent.mouseMove(view, { clientX: 120, clientY: 60, buttons: 1 }), view),
+  );
+  fireEvent(
+    view,
+    withView(createEvent.mouseMove(view, { clientX: 240, clientY: 120, buttons: 1 }), view),
   );
 }
 
@@ -215,6 +222,26 @@ beforeAll(() => {
 });
 
 afterAll(() => vi.unstubAllGlobals());
+
+/**
+ * Release any gesture a test left in flight.
+ *
+ * d3-drag binds `mousemove.drag`/`mouseup.drag` to the **window** and removes
+ * them only from its own `mouseupped`, and XYDrag's autopan
+ * `requestAnimationFrame` loop is cancelled only by that same release. So a test
+ * that ends mid-drag — which the drag case below does deliberately — leaves both
+ * running for the rest of the file.
+ *
+ * Neither can reach another test file: vitest isolates one jsdom per file. And
+ * the next gesture's `mousedown` rebinds the same d3 names over the stale ones,
+ * so a later test in this file would not inherit them either. This is here so
+ * that a third test added below inherits a quiet window rather than that
+ * argument, and it asserts nothing — the drag case makes its own claims before
+ * this runs.
+ */
+afterEach(() => {
+  fireEvent(window, withView(createEvent.mouseUp(window, { clientX: 240, clientY: 120 }), window));
+});
 
 describe('accepting a stored Space discards the open Interaction draft', () => {
   /**
@@ -264,6 +291,15 @@ describe('accepting a stored Space discards the open Interaction draft', () => {
    * drawing this Card where the pointer left it, under the accepted Space's
    * title. The unmount cannot cover that — it is a store the unmount does not
    * reach.
+   *
+   * The drag is left in flight on purpose and released by the `afterEach` above
+   * rather than here, because releasing it is not part of what this pins. What a
+   * late release *would* do was measured separately and is inert: no settled
+   * change is emitted after the replacement, so no `settled-card-movement`
+   * completion is derived and `working` does not move. That is React Flow's
+   * doing, not ours — `render-adapter.ts:249` falls back to `beforeById` when
+   * `dragOrigins` is empty, so nothing here refuses a stale settled change. The
+   * ticket's section 5 has the bisection and treats it as an open question.
    */
   it('drops an in-flight drag and redraws the Card where the accepted Space places it', async () => {
     const session = await mountedWorkspace();

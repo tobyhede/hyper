@@ -96,9 +96,11 @@ the skip, and fails if the drain breaks at the first stale entry instead.
 Interaction-draft invalidation — the other half of ADR 0042 — reads this same
 epoch, and is unevenly built rather than unbuilt. Two of the four drafts the
 ADR names, a picker's unconfirmed target and an armed destructive control, have
-nothing in the tree to invalidate; the two that do are discarded on every
-replacement already, by a subtree unmount and the render adapter's own epoch
-reset, behind a canvas key that is currently redundant. The ADR's one shared
+nothing in the tree to invalidate; of the two that do, every gesture but React
+Flow's connection attempt is discarded on every replacement already, by a subtree
+unmount, Navigation's reset and the render adapter's own epoch reset, behind a
+canvas key that is currently redundant. The connection attempt is the exception,
+its document listeners outliving every unmount. The ADR's one shared
 contract test is `packages/app/test/replacement-invalidation.test.tsx`, which
 pins that discard for the two drafts the app's own trigger can leave open — the
 opened-Card pane and an in-flight drag. The inline title field is not one of

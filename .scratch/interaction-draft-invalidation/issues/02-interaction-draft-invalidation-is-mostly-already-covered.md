@@ -11,17 +11,22 @@ subject: its ADR 0042 tickets are this effort, its ADR 0040/0041 tickets are
 
 ## Context
 
-AGENTS.md says, in the install-gate rule:
+Both quotations below are what the documents said when this investigation began.
+Section 4 of the Answer records that both have since been corrected, so neither
+sentence is in the tree any more; they are kept here because they are what the
+ticket exists to answer.
+
+AGENTS.md said, in the install-gate rule:
 
 > Interaction-draft invalidation, 0042's other half, reads the same epoch and is
 > not built.
 
-`03`'s answer closes with the same sentence:
+`01`'s answer closed with the same sentence:
 
 > Interaction-draft invalidation — the other half of ADR 0042 — is deliberately
 > still unbuilt. It reads this same epoch.
 
-**Both are misleading enough to send the next reader the wrong way.** Read as
+**Both were misleading enough to send the next reader the wrong way.** Read as
 written, they ask for a mechanism covering four drafts. Two of those four do not
 exist to cover. The two that do exist are already discarded on a replacement —
 but by mechanisms that were built for other reasons, that nothing tests, and one
@@ -51,47 +56,50 @@ implementation after that is small.
 > contract test and surface-specific focus tests**.
 
 The signal itself is built and correct: `SpaceAuthoringState.replacementEpoch`
-(`packages/app/src/space-authoring.ts:136-150`), advanced in `acceptStoredSpace`
-and nowhere else (`:1147-1167`, increment at `:1164`).
+(`packages/app/src/space-authoring.ts:221`), advanced in `acceptStoredSpace`
+and nowhere else (`:1344-1364`, increment at `:1361`).
 
 There are exactly **two** readers of it outside Authoring's own drain: the render
 adapter's subscriber (`render-adapter.ts:524-535`, which reads the epoch twice
 within the one subscription — before and after) and the canvas key
 (`App.tsx:639`). Nothing else. No component compares a captured epoch, and there
-is **no shared contract test**.
+was **no shared contract test** — section 5 of the Answer is where that stopped
+being true.
 
 ## Each draft the ADR names, against the tree
 
 | ADR 0042's draft | Exists? | Discarded on replacement? | By what |
 |---|---|---|---|
 | Title field — inline, on the graph | yes | **yes** | subtree unmount (over-determined, see below) |
-| Title field — the opened-Card pane | yes | **yes** | unmount, via Navigation clearing `openedCardId` |
-| A picker's unconfirmed target | **no** | n/a | no picker is built |
+| Title field — the opened-Card pane | yes | **yes** | `navigation.openFresh` clears `openedCardId` |
+| A picker's unconfirmed target | **no** | n/a | `NewAlias` is built and holds none |
 | React Flow's **drag** attempt | yes | **yes** | render adapter clears on epoch |
 | React Flow's **connection** attempt | yes | **no** | document listeners outlive every unmount |
-| An armed control's confirmation state | **no** | n/a | no destructive control is built |
+| An armed control's confirmation state | **no** | n/a | Edge delete is built and unarmed |
 | Selection (Cards, Edges) | yes | **yes** | unmount + render adapter |
 | Traversal history | yes | **yes** | `navigation.openFresh` publishes whole |
 
 ### The canvas key is not what does the work, and is currently redundant
 
-`App.tsx:518` keys `SpaceCanvas` on the epoch, with a comment saying it takes an
+`App.tsx:639` keys `SpaceCanvas` on the epoch, with a comment saying it takes an
 open title editor down with the Space it names. That outcome is real — everything
-`SpaceCanvas` owns goes with it: `connectionGesture` (`SpaceCanvas.tsx:218`),
-`modifierHeld` (`:219`), `selectedEdgeIds` (`:220`), `pointerOver` (`:224`),
-`editingTitleCardId` (`:225`), `cardAuthoringWasEnabled` (`:240`), and
-transitively `CardTitleEditor`'s `draft`/`error`/`cancelledBlur`
-(`packages/react-flow-adapter/src/CardNode.tsx:50-53`).
+`SpaceCanvas` owns goes with it: `editingTitleCardId`
+(`packages/app/src/components/SpaceCanvas.tsx:173`), `canvasAuthoringWasEnabled`
+(`:219`), `lastCreatedCardId` (`:231`), and transitively the title editor's
+`draft` and `error` (`packages/ui/src/CanvasCard.tsx:193-194`). The gesture state
+this ticket first listed here — `connectionGesture`, `modifierHeld`,
+`selectedEdgeIds`, `pointerOver` — has since moved to Edge Authoring, which the
+same subtree still owns.
 
 **But the key is not what causes it today.** The same publication that advances
-the epoch also nulls the projection (`render-adapter.ts:332`), which makes
-`hasArrangement` false (`App.tsx:198`), which makes `canvasContent` answer
+the epoch also nulls the projection (`render-adapter.ts:530`), which makes
+`hasCardsOnCanvas` false (`App.tsx:204`), which makes `canvasContent` answer
 `placeholder` (`canvas-content.ts:22-23`), which renders `<PlacementPending />`
-(`App.tsx:542`) **in place of the entire `ReactFlowProvider` subtree**. The
+(`App.tsx:676`) **in place of the entire `ReactFlowProvider` subtree**. The
 subtree unmounts whether or not the key changes.
 
 So the guarantee is over-determined, and the key alone is untested: deleting
-`key={authoringState.replacementEpoch}` from `App.tsx:518` fails nothing in
+`key={authoringState.replacementEpoch}` from `App.tsx:639` fails nothing in
 `pnpm verify` or `pnpm e2e`. That is fine as belt-and-braces and worth keeping —
 but nobody should reason "the key handles drafts", because what handles them is
 a placeholder branch that exists for an unrelated reason and could be changed by
@@ -99,14 +107,17 @@ someone who does not know it is load-bearing here.
 
 ### The opened-Card pane is covered by a third, different mechanism
 
-`OpenCard` holds `title`, `description` and `body`
-(`packages/app/src/components/OpenCard.tsx:69-71`) — the ADR's "title field owns
-its changed text", and the largest draft in the app. It renders at
-`App.tsx:561-572`, **outside** the keyed subtree and carrying no key of its own.
+`OpenCard`'s `MarkdownDraft` holds `title`, `body` and `titleError`
+(`packages/app/src/components/OpenCard.tsx:36-40`) — the ADR's "title field owns
+its changed text", and the largest draft in the app, since the body is Markdown
+prose. It renders at `App.tsx:692-711`, **outside** the keyed subtree and
+carrying no key of its own. (The ticket first named a `description` beside the
+other two; it is gone from this draft and from the domain — `git grep description
+-- 'packages/*/src'` now returns nothing.)
 
 It is nonetheless discarded, because `acceptStoredSpace` calls
-`navigation.openFresh` (`space-authoring.ts:1163`), `openFresh` publishes
-`openedState` whole (`navigation.ts:215-217`), and `openedState` sets
+`navigation.openFresh` (`space-authoring.ts:1360`), `openFresh` publishes
+`openedState` whole (`navigation.ts:215`), and `openedState` sets
 `openedCardId: null` (`:164`). No opened Card, no pane, no state.
 
 Correct outcome; incidental mechanism. It holds because Navigation resets, not
@@ -116,37 +127,45 @@ because anything observes the epoch, and no comment or test connects the two.
 
 **No picker.** ADR 0042 names Alias creation as the picker case — "Alias
 creation, by contrast, remains a local picker draft until a target makes the
-Alias valid" — and there is no Alias picker in the tree. The completion kinds
-`created-alias`, `added-card-to-layout`, `created-card`, `added-graph` and
-`recolored-graph` all exist behind Space Authoring with **no caller**: the only
-five `complete({...})` call sites in the app are `App.tsx:305`, `App.tsx:344`,
-`render-adapter.ts:254`, `:286` and `:309`. That is AGENTS.md's own "have no
-control that reaches them, which packages 5 and 6 build".
+Alias valid" — and Alias creation, now that it is built, holds no picker draft.
+`NewAlias` says so itself (`packages/app/src/components/NewAlias.tsx:61-64`):
+"Choosing the Target is therefore the completion rather than a step before one,
+which is why there is no Create button beside Cancel: a second activation would
+ask the author to confirm a choice they have already made, and the pane would
+have to hold an unconfirmed Target across it." An Alias without a Target is not
+a valid Card, so the pane holds local state and never an unconfirmed target.
 
-The toolbar's Radix selectors are not pickers in this sense — `onValueChange`
-commits immediately (`packages/ui/src/GraphSelector.tsx:44`), so there is no
-unconfirmed target to hold.
+`added-card-to-layout`, `added-graph` and `recolored-graph` do still exist behind
+Space Authoring with no caller, and that is AGENTS.md's own "have no control that
+reaches them, which packages 5 and 6 build" — but `created-card` and
+`created-alias` have since acquired theirs (`App.tsx:304`, `:337`), which is
+what made this row answerable from a built surface rather than from an absence.
 
-**No armed destructive control.** Structural deletion is unbuilt (ADR 0033);
-`SpaceCanvas.tsx:462` passes `deleteKeyCode={null}` with the comment "Deletion is
-not built"; and `packages/app/e2e/editing.spec.ts:913` pins it — "the graph does
-not advertise a delete action it does not implement".
+**No armed destructive control.** Structural deletion is still unbuilt (ADR
+0033). Edge deletion since has been: `deleteKeyCode` is `['Backspace', 'Delete']`
+(`edge-authoring-react.tsx:80`, `:832`), plumbed through `SpaceCanvas.tsx:427`
+and `:457`. It is not an *armed* control and so holds no confirmation state to
+invalidate — `SelectedEdgeControls.tsx:122` says so outright: "**Delete is
+immediate.** There is no confirmation step: a refused Delete says so on this
+surface, and an accepted one is undone by authoring the Edge again." The draft
+this row is about is a control that has been armed and is waiting; nothing in
+the tree waits.
 
 ### What no test pins
 
 Every path is exercised; no draft is ever open when it is.
 
 - `packages/app/test/Workspace.test.tsx:98` — the runtime and placement are
-  replaced. `:185`, `:204`, `:259` — the refusal paths.
+  replaced. `:188`, `:207`, `:262` — the refusal paths.
 - `packages/app/test/viewport.test.tsx:79` — the viewport scale stays finite.
-- `packages/app/test/render-adapter.test.ts:678` — the store drops its
+- `packages/app/test/render-adapter.test.ts:895` — the store drops its
   projection, selection and drag bookkeeping on epoch change. The closest thing
   to a draft-invalidation test, and it covers the store, not a surface.
-- `packages/app/test/space-authoring.test.ts:2189`, `:2411`, `:2477` — epoch
-  semantics and the queued-completion gate `03` built.
-- `packages/app/e2e/http-persistence.spec.ts:108` — the only browser test through
+- `packages/app/test/space-authoring.test.ts:2123`, `:2398`, `:2456` — epoch
+  semantics and the queued-completion gate `01` built.
+- `packages/app/e2e/http-persistence.spec.ts:176` — the only browser test through
   Accept remote. It asserts fresh Navigation and that `.graph-area` is *not*
-  remounted; it opens no draft.
+  remounted (`:217`, `:251`); it opens no draft.
 
 **None of them opens a title editor, starts a connection, or begins a drag
 first.** So every "yes" in the table held by construction and by reading, and not
@@ -158,9 +177,9 @@ described in the answer below. What it does *not* close is the argument above:
 two of its three cases still pass under either single mechanism, which is the
 over-determination measured rather than reasoned.
 
-The nearest precedent for the guarantee is `editing.spec.ts:1022`, "changing the
-renderer closes an opened Card rather than stranding its editor" — the same shape
-for a different trigger.
+The nearest precedent for the guarantee is `packages/app/test/navigation.test.ts:158`,
+"closes an opened Card when the renderer changes, so no editor outlives its
+placement" — the same shape for a different trigger.
 
 ## Acceptance
 
@@ -171,9 +190,9 @@ for a different trigger.
       inline rename, recorded here. Surfaced by 5 below: the modal that carries
       `Accept remote` blurs the field, and blur is that editor's commit.
 - [x] `docs/agents/editing-and-persistence.md` (where AGENTS.md's install-gate
-      rule now lives) and `03`'s answer no longer say the half is simply
+      rule now lives) and `01`'s answer no longer say the half is simply
       unbuilt. Both now carry the finding in a sentence and point here for the
-      argument; `03`'s Direction keeps what was believed when it was written,
+      argument; `01`'s Direction keeps what was believed when it was written,
       marked as corrected rather than rewritten.
 - [x] The *reachable* covered cases are pinned, so they stop holding by
       accident: an opened-Card draft and a drag, each open when a stored Space is
@@ -193,13 +212,21 @@ Read the heading as the answer to "is this built?", which was answerable from th
 tree, and not as the answer to "what should happen?", which is not.
 
 The half is not unbuilt — it is unevenly built, and nothing tests the part that
-works. Two of the four drafts ADR 0042 names have nothing to invalidate: no
-picker and no armed destructive control exist, only their callerless completion
-kinds. The two that do exist are discarded on every replacement already, by a
-subtree unmount and a key that is currently redundant. Three things are genuinely
-left in the code, and only the first is a defect an author can reach. Two further
-items needed no decision and are therefore done rather than deferred: the prose
-that sent this investigation the wrong way, and the contract test — which is what
+works. Two of the four drafts ADR 0042 names have nothing to invalidate. Both of
+those surfaces have since been built and neither holds a draft: choosing an
+Alias Target is itself the completion rather than a step before one, and Edge
+delete is immediate rather than armed, so there is no unconfirmed target and no
+confirmation state for a replacement to discard. The two that do exist are
+discarded on every replacement already, but by three separate mechanisms and not
+in every gesture: the opened-Card pane goes with Navigation's reset, an
+in-flight drag with the render adapter's epoch subscriber, an inline title
+editor with the subtree unmount, and the canvas key over all of them is
+currently redundant. React Flow's owner is the partial one — its drag is
+discarded and its connection attempt is not, because that gesture lives in
+document listeners no unmount reaches. Three things are genuinely left in the
+code, and only the first is a defect an author can reach. Two further items
+needed no decision and are therefore done rather than deferred: the prose that
+sent this investigation the wrong way, and the contract test — which is what
 makes "nothing tests them" a sentence about the past.
 
 ### 1. Focus after a replacement contradicts the ADR
@@ -207,7 +234,7 @@ makes "nothing tests them" a sentence about the past.
 The real defect, and it is not about a draft at all.
 
 The ADR requires "App composition focuses the canvas only after the replacement
-is complete". What App composition does instead is `App.tsx:361-369`: an effect
+is complete". What App composition does instead is `App.tsx:558-565`: an effect
 that, whenever `openedCardId` goes from a Card to `null` outside presenting,
 focuses the DOM node of the Card that *was* open —
 
@@ -228,7 +255,7 @@ ADR's:
   author never opened in a Space they have not seen.
 
 The effect is right for what it was written for — returning focus after closing a
-pane, argued at `App.tsx:347-359` — and simply cannot tell a replacement from a
+pane, argued at `App.tsx:543-556` — and simply cannot tell a replacement from a
 close.
 
 ### 2. React Flow's connection attempt survives every unmount
@@ -237,40 +264,51 @@ The provider subtree does unmount (above), so React Flow's store is reset by
 `StoreUpdater`'s cleanup. **The gesture is not in the store.**
 `XYHandle.onPointerDown` attaches `mousemove`/`mouseup`/`touchmove`/`touchend` to
 the *document* and removes them only inside its own `onPointerUp` — no React
-cleanup, no abort signal. Nothing in `packages/` calls `cancelConnection`; the
-grep returns zero hits. The surviving closures still hold the `onConnect` the
-old `StoreUpdater` installed, which is App's `connectCards`.
+cleanup, no abort signal. Nothing in `packages/` calls `cancelConnection` — the
+one hit is a doc comment in `edge-authoring-react.tsx:440-443`, which reaches the
+same reading from the other side and adds that React Flow does cancel from "the
+whole flow unmounting". That is its *store*, not these listeners, and the same
+comment says why the distinction holds: "the listeners are plain DOM ones with no
+React cleanup, so even an Edge that leaves the projection mid-drag still ends
+through here." The surviving closures still reach an `onConnect`, though not a
+captured one: `@xyflow/react` resolves it from `store.getState()` at call time,
+so a late release runs whichever handler the store holds — the Edge Authoring one
+(`edge-authoring-react.tsx:54`), not the `connectCards` this ticket first named,
+which survives only as a comment (`render-adapter.ts:352`).
 
 It is unreachable today: the only caller of `acceptStoredSpace` is the Accept
 remote `onClick`, a click needs a pointerup, and a pointerup is exactly when
 React Flow ends a connection. A connection drag and the replacement cannot
 overlap through any input this app offers.
 
-### 3. `completedConnectionTarget` is a second survivor of the same family
+### 3. The deferred connection continuation is a second survivor of the same family
 
-`App.tsx:201` holds a ref outside the key, and `finishConnection`
-(`App.tsx:265-272`) defers its use by a frame:
+Edge Authoring defers the continuation selection by a frame, so that React Flow
+has settled its own gesture before a Card is selected — twice, once for the
+pointer release (`edge-authoring-react.tsx:368`) and once for keyboard Connect
+(`:787`):
 
 ```ts
-requestAnimationFrame(() => {
-  useRenderAdapter.getState().selectCard(uuidSchema.parse(target));
-});
+requestAnimationFrame(() => onSelectCard(continuation));
 ```
 
-A replacement landing inside that frame leaves `selectCard` naming a Card from
+A replacement landing inside that frame leaves `onSelectCard` naming a Card from
 the Space that is gone. Same unreachability argument as 2, and the same question.
+(This was `completedConnectionTarget` and `finishConnection` on `App.tsx` when
+the ticket was written; the survivor moved with Edge Authoring and neither name
+is in the tree now.)
 
 ### 4. The prose that sent the next reader the wrong way — corrected
 
 This part needed no decision, so it is done rather than waiting with the rest.
 The "not built" sentence — which moved from AGENTS.md into
 `docs/agents/editing-and-persistence.md` when the scoped agent docs were split
-out — and `03`'s closing sentence now say what this ticket establishes: that the
+out — and `01`'s closing sentence now say what this ticket establishes: that the
 drafts which exist are already discarded, by an unmount and one redundant key;
 that the two drafts needing new work do not exist yet; that the contract test in
 5 below now pins the discard; and that what remains is focus behaviour and two
 survivors behind an unreachable trigger. Both point here rather than restating
-the argument. `03`'s Direction is left as written and marked as
+the argument. `01`'s Direction is left as written and marked as
 corrected — it is the record of what was believed when the epoch gate was built,
 and rewriting it would falsify the thing the ticket exists to preserve.
 
@@ -305,6 +343,38 @@ blur is `CardTitleEditor`'s own commit. Measured, not reasoned: with the field
 open and a rename typed, the input is gone from the DOM by the time
 `persistence-accept-remote` is on screen, and the typed text has been committed.
 There is no open draft left for the replacement to discard.
+
+**The drag left in flight exposed an unguarded path of the same family — not a
+fourth draft, but the absence of a guard on the one the drag uses.** The test
+never releases its drag, which raised the question of what a late `mouseup`
+would do — the gesture began against the Space that is gone. Tracing
+`changeNodes` answered it badly: `render-adapter.ts:249` reads
+`dragOrigins.get(change.id) ?? beforeById.get(change.id)`, so clearing
+`dragOrigins` on the epoch is **not** what would stop a stale settled change,
+and the only guards on that path are `projection === null` (`:423`) and the
+owned-id filter (`:431-433`). By the time a replacement has landed the
+projection is non-null again and the Card id is unchanged, so a settled change
+arriving then would reach `authoring.complete({ kind: 'settled-card-movement', …
+})` (`:481`). Authoring's epoch gate would not catch it either — that gate
+applies to *queued* completions, not to a fresh `complete` call.
+
+Measured rather than reasoned, by instrumenting `changeNodes` and bisecting:
+
+| what the test does | settled change emitted? | `working` after |
+|---|---|---|
+| drag, release, no replacement | yes, `{130,80}` | `{130,80}` |
+| drag, raise conflict, release | yes, `{145,95}` | `{145,95}` |
+| drag, **accept remote**, release | **none** | `{900,700}` |
+| drag, accept, move, release | **none** | `{900,700}` |
+
+So nothing stale is installed today — but not because this code refuses it. The
+leaked `mouseup.drag` listener does fire and does reach XYDrag's `end`; it falls
+through without emitting, because the keyed `SpaceCanvas` remount left its
+gesture state inert. **The protection is entirely React Flow's**, and a change to
+how that state machine settles would land here with no guard of ours in the way.
+Same unreachability as 2 and 3, and it belongs with them in the question below:
+closing it means capturing the epoch with the drag and dropping a settled change
+whose gesture began before it.
 
 Two things follow. First, the over-determination this ticket opened with is
 **undefended**: the canvas key and the projection reset are each sufficient for
@@ -342,7 +412,11 @@ Three separable answers are needed:
   it captured" as the ADR describes. Closing 3 means capturing the epoch with the
   ref and dropping the callback if it moved. Both are cheap; neither is
   reachable; doing them adds the first real instance of the pattern the ADR
-  describes, which has some value on its own.
+  describes, which has some value on its own. The unguarded settled-change path
+  measured in 5 belongs with them: it is the same unreachable trigger, but unlike
+  2 and 3 nothing of ours refuses it — only React Flow's gesture state does — so
+  it is the one where "leave it, it cannot happen" rests on a third party's
+  internals rather than on our own.
 
 Until the first is answered, building anything here is guessing at product
 behaviour. The answer's fourth item was the exception — the prose correction
