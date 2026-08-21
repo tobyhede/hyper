@@ -8,7 +8,7 @@
 
 - [ ] Every production UI component has representative real-component Ladle stories for its meaningful states; no proposal-only story is presented as production evidence. — **Half.** *Coverage* is enforced: every production `.tsx` is either rendered by a stable story or recorded with a reason, and `stories/review` is excluded so a proposal cannot supply evidence. *Meaningful states* is not, and cannot be mechanically: it is the same judgement the Answer already leaves with human review for the claim set's semantic completeness.
 - [ ] Legacy feature-owned visual styling is removed or explicitly limited to React Flow geometry and integration requirements. — **Half.** Seven dead rules are gone and every surviving block is recorded with its reason, so the file is a reviewed list rather than a claim. But two blocks are neither removed nor React Flow's: `card-editor` is product appearance ([Issue 16](16-move-the-card-editor-treatment-into-the-design-system.md)) and `workspace-selection` is condemned with its component (`space-cards/04`). Recording a reason is a third option this criterion does not offer.
-- [x] Automated checks prevent new product UI components or styles from bypassing `@project/ui`, and the complete verification suite remains green.
+- [x] Automated checks prevent new product UI components or styles from bypassing `@project/ui`, and the complete verification suite remains green. — Ticked where the two above are not, and the distinction is deliberate: this line asks the check to *stop a bypass going unnoticed*, which recording-with-a-reason does, since the reason is written, reviewed and fails when it stops being true. The line above asks the styling to be *gone or limited to React Flow*, which a reason cannot satisfy.
 - [x] `$shadcn-first-ui` exists and is the mandatory production-UI workflow.
 - [x] Root `AGENTS.md` routes production UI work to that skill near the beginning of the file.
 - [x] `pnpm ui:catalog` deterministically exposes the public design-system inventory.
@@ -151,7 +151,70 @@ reaches them. They are kept because the style audit this ticket *did* ask for is
 what surfaced the defect, and recording the block in the inventory without fixing
 it would have documented a broken cascade as intentional.
 
-**Verification.** `pnpm verify` green — 149 files, 1610 passed, 8 skipped.
+### 2026-08-21 — what a three-source review changed
+
+Three independent reviews ran over the branch — the two-axis Standards/Spec pass,
+a correctness pass over the new static analysis, and CodeRabbit. Every finding
+was re-derived against the code before being trusted; the checker was wrong in
+ways worth recording, because each one is a way a guardrail can look green while
+checking nothing.
+
+**Four holes let a check pass when it should have failed.** `#` subpath
+specifiers all resolved under `packages/app`, so `packages/ui`'s own
+`#components/*` map was ignored and `sheet`, `skeleton` and `label` were recorded
+as uncatalogued when the Sidebar renders them — the inventory was asserting
+something untrue. A re-export alias was read on the wrong side of `as`, so
+importing `CardContent` also reached the unrelated module exporting
+`CardContent as CardSection`. A `@media` or `@container` block hid every rule
+nested inside it from both stylesheet checks. And a whole-namespace import of a
+barrel silently catalogued the entire package, defeating the guarantee this
+file's own doc comment makes.
+
+**The dead-rule check was reading the wrong thing entirely.** It treated every
+string literal in production source as a possible class name, so `.card` was held
+"named" by `{ kind: 'card' }` in the render adapter and `type: 'card'` in the
+projection — neither a class. Deleting the real `className="card"` would have
+left the rule reported as live. It now reads only `className`/`class` attributes,
+`className` properties and `cn()`-style calls.
+
+**Two rules had no class to record, so the inventory could not see them at all.**
+`[data-card-search-combobox]` — product appearance, part of `card-editor`'s debt
+— and `#root`. A rule naming no class is now keyed by its leading attribute or
+id, and both are recorded.
+
+**Two entry reasons here were false statements about the tree.** `Command.tsx`
+claimed `CardSearchCombobox` composes it; it composes Base UI's `Combobox`
+instead. `components/empty.tsx` claimed the combobox empty message came from it;
+that is Base UI's `ComboboxEmpty`. Both are consumerless primitives like
+`Select`, and now say so. This is the failure the file warns about in its own
+header — an entry with neither a permanent reason nor an owner — and it took a
+reviewer, not the check, to find it.
+
+**One claim overstated its evidence.** `new-alias-completes-on-the-target-chosen`
+said the pane carries "the title exactly as typed", but only the Ladle test types
+one; the application test exercises the empty title that takes the Target's own
+(ADR 0049). The clause is gone rather than given a second proof it did not have.
+
+Smaller corrections: a default import beside a type-only specifier was treated as
+erased; a recorded module outside the scanned set could never come true or false;
+duplicate entries collapsed silently; a non-exported local declaration shadowed
+the exported list the checker meant to read; `stories/` and `stories/support` had
+no missing-directory guard while the other roots did; and colocated tests counted
+as production naming a class. `docs/agents/ui.md` also said the Card editor CSS
+belongs in `@project/ui`, which pre-decided the choice Issue 16 exists to make —
+`CardPane` and `OpenCard` are app-specific glue, and AGENTS.md keeps that in
+`app`.
+
+Two findings were examined and rejected. `manifest` is retired as a name for the
+space file — `packages/core/src/schema.ts` says exactly that — not as a name for
+`package.json`, which `scripts/check-typescript-toolchain.ts` already calls a
+manifest on `main`; the claim that this fails `current-domain-vocabulary.test.ts`
+is false, since that test governs Route and Walk. And `buildUiCatalog` running
+several policies over one `problems` array is a fair Divergent Change reading,
+but splitting the design-system gate into three modules is a bigger change than
+this ticket should make.
+
+**Verification.** `pnpm verify` green — 149 files, 1633 passed, 8 skipped.
 `pnpm e2e` 115 passed. `pnpm e2e:ladle` 38 passed.
 
 ### 2026-08-20 — the parity-evidence model lands before the remaining migrations

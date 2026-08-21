@@ -116,27 +116,12 @@ export const uncataloguedComponents = [
   {
     module: 'packages/ui/src/Command.tsx',
     reason:
-      'The cmdk search primitive behind `CardSearchCombobox`, kept as a foundation primitive after the Base UI migration (ADR 0050). The combobox that composes it is catalogued through every pane and endpoint editor that uses it.',
-  },
-  {
-    module: 'packages/ui/src/components/label.tsx',
-    reason:
-      'shadcn registry primitive, composed by `Field`. Catalogued through the pane and endpoint-editor stories that label their fields.',
+      'Deliberately without a consumer, like `Select` above. It wraps cmdk, which ADR 0050 kept rather than migrating; `CardSearchCombobox` composes Base UI’s `Combobox` from `components/combobox.tsx` and does not reach this. Retiring a primitive an ADR names is a foundation decision, not a surface one.',
   },
   {
     module: 'packages/ui/src/components/empty.tsx',
     reason:
-      'shadcn registry primitive for an empty result set. Its one product use is the combobox empty message, which `Review/Alias Pane Unreachable States` renders — the application cannot currently reach a Space with no eligible Target.',
-  },
-  {
-    module: 'packages/ui/src/components/sheet.tsx',
-    reason:
-      'The mobile branch of `Sidebar`: below 768px the whole command surface becomes this Sheet. Ladle renders one viewport per story, so the breakpoint is proven where it can be driven — `mobile-sidebar.spec.ts` sets the viewport and exercises the Sheet in the real application.',
-  },
-  {
-    module: 'packages/ui/src/components/skeleton.tsx',
-    reason:
-      "shadcn registry primitive, reached only by `SidebarMenuSkeleton`, which no Hyper surface renders — the Sidebar's contents are derived from a loaded Space and never pend.",
+      'Deliberately without a consumer, for the same reason. A shadcn registry primitive for an empty result set — the combobox empty message comes from Base UI’s own `ComboboxEmpty`, not from here.',
   },
 ] as const;
 
@@ -147,8 +132,12 @@ export const uncataloguedComponents = [
  *
  * A block earns its place by being React Flow's geometry, React Flow's
  * integration, or a placement the framework forces into the application layer.
- * Product appearance does not: it belongs in `@project/ui`, hand-rolled beside
- * its component the way `canvas-card.css` sits beside `CanvasCard`.
+ * Product appearance does not: it belongs beside the component that draws it,
+ * hand-rolled the way `canvas-card.css` sits beside `CanvasCard`.
+ *
+ * A rule naming no class at all — `[data-card-search-combobox]`, `#root` — is
+ * keyed by its leading attribute or id instead, so those cannot slip past by
+ * having no class to record.
  *
  * Two entries below are product appearance and say so, because the alternative
  * to recording them is not recording them. Each names the ticket that removes
@@ -180,6 +169,16 @@ export const handRolledStyles = [
   {
     block: 'graph-area',
     reason: 'The absolutely positioned box the `ReactFlow` instance fills.',
+  },
+  {
+    block: 'root',
+    reason:
+      'The React mount point, sized with `html` and `body` so the app owns exactly one viewport and the page never scrolls. Not a component and not stylable from one.',
+  },
+  {
+    block: 'data-card-search-combobox',
+    reason:
+      "Product appearance, and part of `card-editor`'s debt rather than a block of its own: it themes the combobox popup Base UI portals out of the pane, which is why it is reached by an attribute rather than a class. It goes with the treatment it belongs to, under Issue 16.",
   },
   {
     block: 'new-card-preview',
