@@ -31,24 +31,41 @@ const interaction = (
 
 type ProjectedCanvas = ReturnType<typeof pending.project>;
 
+/**
+ * A story that cannot lay out says so. Left unhandled, a rejected strategy
+ * leaves `projected` null for good — a permanently blank story that reads as
+ * "still loading" and reports to Ladle E2E as a missing element, with the cause
+ * visible only as an unhandled rejection in the console.
+ */
 function useProjection(
   activeGraphId: GraphId | null,
   selectedCardId: CardId | null = null,
-): ProjectedCanvas | null {
-  const [projected, setProjected] = useState<ProjectedCanvas | null>(null);
+): ProjectedCanvas | Error | null {
+  const [projected, setProjected] = useState<ProjectedCanvas | Error | null>(null);
 
   useEffect(() => {
-    let current = true;
-    void laidOut.then((resolved) => {
-      if (current)
-        setProjected(pending.project(resolved, interaction(activeGraphId, selectedCardId)));
-    });
+    const mounted = { current: true };
+    void (async () => {
+      try {
+        const resolved = await laidOut;
+        if (mounted.current)
+          setProjected(pending.project(resolved, interaction(activeGraphId, selectedCardId)));
+      } catch (error) {
+        if (mounted.current)
+          setProjected(error instanceof Error ? error : new Error(String(error)));
+      }
+    })();
     return () => {
-      current = false;
+      mounted.current = false;
     };
   }, [activeGraphId, selectedCardId]);
 
   return projected;
+}
+
+/** What a story draws in place of a canvas the strategy could not place. */
+function PlacementFailure({ reason }: { readonly reason: Error }) {
+  return <p role="alert">Placement failed: {reason.message}</p>;
 }
 
 function RealReactFlow({
@@ -108,6 +125,7 @@ export function CanvasCardNodeSpecimen({
 }: CanvasCardNodeSpecimenProps) {
   const projected = useProjection(graphIds.long);
   if (projected === null) return null;
+  if (projected instanceof Error) return <PlacementFailure reason={projected} />;
 
   const source = projected.nodes.find(({ id }) => id === cardId);
   if (source === undefined) throw new Error(`Missing fixture Card ${cardId}`);
@@ -129,21 +147,4 @@ export function CanvasCardNodeSpecimen({
   const node: CardFlowNode = { ...source, selected, data };
 
   return <RealReactFlow className="inv-card-node-stage" nodes={[node]} edges={[]} />;
-}
-
-export interface ReactFlowCanvasProps {
-  readonly activeGraphId?: GraphId | null;
-  readonly selectedCardId?: CardId | null;
-}
-
-/** The real production projection mounted under the same React Flow owners. */
-export function ReactFlowCanvas({
-  activeGraphId = graphIds.long,
-  selectedCardId = null,
-}: ReactFlowCanvasProps) {
-  const projected = useProjection(activeGraphId, selectedCardId);
-  if (projected === null) return null;
-
-  const { nodes, edges } = projected;
-  return <RealReactFlow className="inv-canvas" nodes={nodes} edges={edges} controls />;
 }

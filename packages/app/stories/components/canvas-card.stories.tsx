@@ -11,7 +11,7 @@ import '../support/inventory.css';
 export default { title: 'Components/Canvas Card' };
 
 export const States: Story = () => (
-  <div className="inv inv-sheet">
+  <div className="inv inv-sheet" style={cardSizeVars}>
     <CatalogueSection
       title="Card states"
       note="The shared CanvasCard presentation contract, drawn statically for rest, selected and dragging. Hover and keyboard reveal are proven live in Hover actions, and title editing in Title editing."
@@ -51,7 +51,7 @@ export const States: Story = () => (
 );
 
 export const Kinds: Story = () => (
-  <div className="inv inv-sheet">
+  <div className="inv inv-sheet" style={cardSizeVars}>
     <CatalogueSection
       title="Card kinds"
       note="Kind changes the icon and the border treatment (an Alias's dotted border) without adding a textual kind label. This story exercises CanvasCard's presentation interface directly."
@@ -72,7 +72,7 @@ export const Kinds: Story = () => (
 );
 
 export const Colours: Story = () => (
-  <div className="inv inv-sheet">
+  <div className="inv inv-sheet" style={cardSizeVars}>
     <CatalogueSection
       title="Card colours"
       note="The selected presentation state carries the Active Graph colour across its rail. These are the complete catalogue palette examples."
@@ -90,7 +90,7 @@ export const Colours: Story = () => (
 Colours.storyName = 'Colours';
 
 export const HoverActions: Story = () => (
-  <div className="inv inv-sheet">
+  <div className="inv inv-sheet" style={cardSizeVars}>
     <CatalogueSection
       title="Hover actions"
       note="Move the pointer over the real React Flow node to reveal its rail actions and Edge handles together — CanvasCard's own hover CSS drawn alongside the adapter-owned geometry it shares the node with."

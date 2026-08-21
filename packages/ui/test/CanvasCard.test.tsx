@@ -148,6 +148,33 @@ describe('CanvasCard title', () => {
     fireEvent.doubleClick(heading);
     expect(onBeginTitleEdit).toHaveBeenCalledOnce();
   });
+
+  /**
+   * ADR 0036: renaming is the title's own double click, and the Card's own
+   * double click opens it to read. The rename must not also be an open — the
+   * Card would draw its content over the field the author is about to type
+   * into. Guarding here rather than relying on the canvas is what keeps that
+   * true of the component wherever it is mounted.
+   */
+  it('does not let a rename double click reach the Card around it', () => {
+    const onBeginTitleEdit = vi.fn();
+    const openedCard = vi.fn();
+    render(
+      <div onDoubleClick={openedCard}>
+        <CanvasCard
+          front={{ kind: 'markdown' }}
+          state="rest"
+          title="A"
+          graphColor="#ffc53d"
+          onBeginTitleEdit={onBeginTitleEdit}
+        />
+      </div>,
+    );
+
+    fireEvent.doubleClick(screen.getByRole('heading', { name: 'A' }));
+    expect(onBeginTitleEdit).toHaveBeenCalledOnce();
+    expect(openedCard).not.toHaveBeenCalled();
+  });
 });
 
 describe('CanvasCard title editor', () => {
@@ -236,5 +263,43 @@ describe('CanvasCard title editor', () => {
     expect(leakedClick).not.toHaveBeenCalled();
     expect(leakedPointer).not.toHaveBeenCalled();
     expect(leakedKey).not.toHaveBeenCalled();
+  });
+
+  /**
+   * `closingByKey` suppresses the blur that a key exit's own focus move
+   * produces, so one completion is not counted twice. It is cleared by that
+   * blur — and a caller whose `onReturnFocus` moves no focus (React Flow
+   * declines to focus a node it is not making focusable) produces none, so the
+   * flag stays raised over an editor that is still open and still being typed
+   * into. Editing again is what says the exit did not happen, so it re-arms
+   * blur completion rather than waiting for a blur that never came.
+   */
+  it('still completes on blur after further editing when a key exit moved no focus', () => {
+    const onCompleteTitleEdit = vi.fn(() => null);
+    render(
+      <CanvasCard
+        front={{ kind: 'markdown' }}
+        state="editing"
+        title="A"
+        graphColor="#ffc53d"
+        onCompleteTitleEdit={onCompleteTitleEdit}
+        onCancelTitleEdit={vi.fn()}
+        onReturnFocus={() => {
+          /* a caller with nothing to focus: no blur follows */
+        }}
+      />,
+    );
+    const input = screen.getByRole('textbox', { name: 'Card title' });
+
+    fireEvent.change(input, { target: { value: 'Renamed' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(onCompleteTitleEdit).toHaveBeenCalledOnce();
+    expect(onCompleteTitleEdit).toHaveBeenCalledWith('Renamed');
+
+    // The caller left the editor open, so the author keeps typing and clicks away.
+    fireEvent.change(input, { target: { value: 'Renamed again' } });
+    fireEvent.blur(input);
+    expect(onCompleteTitleEdit).toHaveBeenCalledTimes(2);
+    expect(onCompleteTitleEdit).toHaveBeenLastCalledWith('Renamed again');
   });
 });

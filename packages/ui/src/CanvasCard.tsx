@@ -136,12 +136,27 @@ export function CanvasCard(props: CanvasCardProps) {
             data-editable={onBeginTitleEdit !== undefined}
             role="heading"
             aria-level={2}
-            onDoubleClick={onBeginTitleEdit === undefined ? undefined : () => onBeginTitleEdit()}
+            onDoubleClick={
+              onBeginTitleEdit === undefined
+                ? undefined
+                : (event) => {
+                    // ADR 0036: renaming is the title's own double click, and
+                    // the Card's is opening it to read. This one must not also
+                    // be that one — the content would be drawn over the field
+                    // the author is about to type into.
+                    event.stopPropagation();
+                    onBeginTitleEdit();
+                  }
+            }
           >
             {title}
           </CardTitle>
         )}
-        {front.kind === 'alias' && (
+        {/* The marker *is* the Target's name, so there is nothing to draw
+            without one. An empty line still takes its own top margin and still
+            answers a query for the marker, which reads as an Alias naming a
+            Card called "". */}
+        {front.kind === 'alias' && front.aliasOf !== '' && (
           <p className="canvas-card__alias-of" data-testid="alias-marker">
             {front.aliasOf}
           </p>
@@ -220,6 +235,12 @@ function TitleEditor({ title, onComplete, onCancel, onReturnFocus }: TitleEditor
         onChange={(event) => {
           setDraft(event.currentTarget.value);
           setError(null);
+          // Typing says the key exit did not take: the editor is still open and
+          // still being edited, so the blur ahead is a real completion rather
+          // than the one a focus move would have produced. Cleared here because
+          // a caller whose `onReturnFocus` moves no focus fires no blur to
+          // clear it, and a raised flag would swallow that completion.
+          closingByKey.current = false;
         }}
         onBlur={() => {
           if (closingByKey.current) {

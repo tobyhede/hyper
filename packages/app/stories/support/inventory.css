@@ -18,16 +18,10 @@
  */
 
 .inv {
-  --card-face-rest: #f4efe4;
-  --card-face-active: #fffaf0;
-  --card-ink: #0b0d11;
   --card-title: #12161c;
   --card-title-muted: #4a505c;
   --canvas: #efe9dc;
   --canvas-dot: #c9c0ad;
-
-  --card-width: 260px;
-  --card-height: 146px;
 }
 
 /*

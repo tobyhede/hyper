@@ -130,9 +130,6 @@ export const positions = {
   [cardIds.closing]: { x: 1060, y: 330 },
 } as const;
 
-export const CARD_WIDTH = 260;
-export const CARD_HEIGHT = 146;
-
 export const layouts: readonly Layout[] = [
   {
     id: layoutId,

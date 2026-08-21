@@ -70,10 +70,10 @@ export const parityClaims: readonly ParityClaim[] = [
     // measurable...") and unit-tested in CardNode.test.tsx. What this story
     // adds is mounting both through the same real `CardNode` in a real
     // `ReactFlow` instance side by side, which is exactly what
-    // `CanvasCardNodeSpecimen`/`ReactFlowCanvas` do — not a facsimile of
+    // `CanvasCardNodeSpecimen` does — not a facsimile of
     // either half.
     applicationEvidence:
-      "Hover revealing CanvasCard's rail actions is covered by editing.spec.ts; hover/selection revealing the adapter's authoring handles is covered by overview.spec.ts and CardNode.test.tsx. This story mounts the real CardNode in a real ReactFlow instance (CanvasCardNodeSpecimen/ReactFlowCanvas, no facsimile) to show both together, which is not a distinct browser-observable behaviour beyond those two.",
+      "Hover revealing CanvasCard's rail actions is covered by editing.spec.ts (asserted on the `canvas-card-actions` container, which is where the reveal's opacity lives — `opacity` does not inherit, so the same assertion on a button could not fail); hover/selection revealing the adapter's authoring handles is covered by overview.spec.ts and CardNode.test.tsx. This story mounts the real CardNode in a real ReactFlow instance (CanvasCardNodeSpecimen, no facsimile) to show both together, which is not a distinct browser-observable behaviour beyond those two.",
   },
   {
     id: 'canvas-card-owns-title-editing-and-refusal',

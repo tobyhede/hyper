@@ -208,8 +208,8 @@ body {
 
 /* The production Card front's own appearance — kind and interaction-state
    treatment, title, actions, title editor — lives with the production
-   `CanvasCard` module in `@project/ui` (Tailwind utility classes on the
-   component itself), not here. `.canvas-card` survives here only as a stable
+   `CanvasCard` module in `@project/ui`, as real CSS in the colocated
+   `canvas-card.css`, not here. `.canvas-card` survives here only as a stable
    selector for this one rule: React Flow's own "this is the actively
    presented Card" fact, which is adapter/app state and has no reason to be
    known inside the design-system package. */

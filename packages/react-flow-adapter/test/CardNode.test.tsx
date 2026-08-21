@@ -94,6 +94,7 @@ interface Overrides {
   isConnectable?: boolean;
   title?: string;
   kind?: CardNodeData['kind'];
+  aliasOf?: string;
   titleEditingEnabled?: boolean;
   cardEditingEnabled?: boolean;
   connectingEnabled?: boolean;
@@ -113,6 +114,7 @@ function props({
   isConnectable = true,
   title = 'A',
   kind = 'markdown',
+  aliasOf,
   titleEditingEnabled = false,
   cardEditingEnabled = false,
   connectingEnabled = false,
@@ -142,6 +144,7 @@ function props({
     sourceHandles,
     targetHandles,
   };
+  if (aliasOf !== undefined) data.aliasOf = aliasOf;
   if (onBeginConnect !== undefined) data.onBeginConnect = onBeginConnect;
   if (onEditCard !== undefined) data.onEditCard = onEditCard;
   if (onBeginTitleEditing !== undefined) data.onBeginTitleEditing = onBeginTitleEditing;
@@ -191,10 +194,29 @@ describe('CardNode canvas Card state adapter', () => {
   });
 
   it('renders an Alias through the shared kind treatment', () => {
+    render(<CardNode {...props({ kind: 'alias', title: 'A, again', aliasOf: 'A' })} />);
+
+    expect(screen.getByRole('article', { name: 'A, again' })).toHaveAttribute('data-kind', 'alias');
+    expect(screen.getByRole('img', { name: 'Alias' })).toBeVisible();
+    expect(screen.getByTestId('alias-marker')).toHaveTextContent('A');
+  });
+
+  /**
+   * `projection.ts` omits `aliasOf` whenever the Target title does not resolve.
+   * Intake makes that unreachable for a Space that loads — `validate.ts` refuses
+   * `unresolved-alias-target` and `alias-targets-alias` — but the adapter still
+   * has to hand `CanvasCard` a front, and the Alias front the spec specifies
+   * carries a required Target title. Naming nothing is what an absent Target
+   * means, so the line the Alias would have drawn is not drawn at all: the
+   * marker is the Target's name, and an empty one nudges the title down by its
+   * own margin while answering `getByTestId('alias-marker')` with nothing.
+   */
+  it('draws no Target line for an Alias whose Target title did not resolve', () => {
     render(<CardNode {...props({ kind: 'alias', title: 'A, again' })} />);
 
     expect(screen.getByRole('article', { name: 'A, again' })).toHaveAttribute('data-kind', 'alias');
     expect(screen.getByRole('img', { name: 'Alias' })).toBeVisible();
+    expect(screen.queryByTestId('alias-marker')).toBeNull();
   });
 
   it('draws a Markdown Card kind glyph like any other kind', () => {
@@ -481,4 +503,32 @@ describe('CardNode handle geometry', () => {
 
     expect(updateNodeInternals).not.toHaveBeenCalled();
   });
+});
+
+/**
+ * `canvas-card.css` keeps the Card's hover treatment alive while the pointer is
+ * on one of the four authoring handles, which sit centred on the border and so
+ * take the pointer out of `.canvas-card`'s own box without taking it off the
+ * Card. It reads that through `:has(~ .rf-card-node__authoring-handle:hover)`,
+ * a *following*-sibling selector — so every authoring handle has to be a
+ * sibling that follows the Card, and a handle rendered before it is one the
+ * rule silently cannot reach.
+ */
+test('renders every authoring handle as a sibling following the Card', () => {
+  render(<CardNode {...props()} />);
+
+  const card = screen.getByTestId('card');
+  const inner = card.parentElement;
+  expect(inner).not.toBeNull();
+
+  const children = [...inner!.children];
+  const cardIndex = children.indexOf(card);
+  const authoringHandles = children.filter((child) =>
+    child.classList.contains('rf-card-node__authoring-handle'),
+  );
+
+  expect(authoringHandles).toHaveLength(8);
+  for (const handle of authoringHandles) {
+    expect(children.indexOf(handle)).toBeGreaterThan(cardIndex);
+  }
 });

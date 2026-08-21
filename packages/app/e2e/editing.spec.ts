@@ -162,9 +162,15 @@ test(
     await settled(page);
     const before = await allPositions(page);
 
+    const actions = card.getByTestId('canvas-card-actions');
+    // Asserted on the container, not on the button: the reveal is
+    // `opacity`/`pointer-events` on `.canvas-card__actions`, and `opacity` does
+    // not inherit — a computed `opacity` read off the button is `1` whether the
+    // Card is hovered or not, so the same assertion there cannot fail.
+    await expect(actions).toHaveCSS('opacity', '0');
     await card.hover();
+    await expect(actions).toHaveCSS('opacity', '1');
     const edit = card.getByRole('button', { name: 'Edit Card A' });
-    await expect(edit).toHaveCSS('opacity', '1');
     // The affordance draws a glyph, so nothing about its own content keeps it in
     // shape or in place. Sized square in CSS and parked in the corner, clear of
     // the title — a name is what a screen reader gets, and the box is all a

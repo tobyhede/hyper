@@ -31,8 +31,9 @@ const AUTHORING_SIDES = [Position.Top, Position.Right, Position.Bottom, Position
 
 /** Strips `readonly` off a props type so an optional slice of it can be built by
  *  conditionally assigning keys rather than by a conditional empty-object
- *  spread — the props themselves stay readonly to every other caller. */
-type MutableOptional<T> = { -readonly [K in keyof T]: T[K] };
+ *  spread — the props themselves stay readonly to every other caller. The keys
+ *  are already optional; this changes nothing but their mutability. */
+type Mutable<T> = { -readonly [K in keyof T]: T[K] };
 
 /*
  * Handle geometry is *declared*, not measured, so nothing here reports a change
@@ -80,6 +81,12 @@ export function CardNode({ data, selected, dragging, isConnectable }: NodeProps<
    */
   const inner = useRef<HTMLDivElement>(null);
 
+  // An absent `aliasOf` means the Target title did not resolve — unreachable for
+  // a Space that survives intake (`validate.ts` refuses `unresolved-alias-target`
+  // and `alias-targets-alias`), but `projection.ts` types it optional and the
+  // Alias front carries the Target title as required. The empty string is how
+  // that reaches `CanvasCard` as "no Target to name", and `CanvasCard` draws no
+  // Target line for it rather than an empty one.
   const front: CanvasCardFront =
     data.kind === 'alias' ? { kind: 'alias', aliasOf: data.aliasOf ?? '' } : { kind: 'markdown' };
 
@@ -139,7 +146,7 @@ export function CardNode({ data, selected, dragging, isConnectable }: NodeProps<
     />
   );
 
-  const canvasCardOptionalProps: MutableOptional<
+  const canvasCardOptionalProps: Mutable<
     Pick<CanvasCardProps, 'onBeginTitleEdit' | 'onConnect' | 'onEdit'>
   > = {};
   if (data.titleEditingEnabled === true) {
@@ -166,7 +173,6 @@ export function CardNode({ data, selected, dragging, isConnectable }: NodeProps<
       data-connection-seeking={seeking ?? 'none'}
     >
       {data.targetHandles.map((handle) => renderHandle(handle, 'target'))}
-      {AUTHORING_SIDES.map((side) => renderAuthoringHandle(side, 'target'))}
       {data.showContent ? (
         <div className="rf-card-node__content">
           <CardContent title={data.title} markdown={data.body ?? ''} />
@@ -191,6 +197,17 @@ export function CardNode({ data, selected, dragging, isConnectable }: NodeProps<
           {...canvasCardOptionalProps}
         />
       )}
+      {/*
+        Every authoring handle renders *after* the Card, both roles together.
+        `canvas-card.css` keeps the Card's hover treatment alive while the
+        pointer sits on a handle through `:has(~ …__authoring-handle:hover)`,
+        and `~` reaches following siblings only — a handle rendered before the
+        Card is one that rule cannot see, which is what left the target handles
+        dropping the Card back to its rest face mid-connection. Position is
+        `position` on the handle itself, so the four sides are unaffected by the
+        order they are declared in. `CardNode.test.tsx` pins the ordering.
+      */}
+      {AUTHORING_SIDES.map((side) => renderAuthoringHandle(side, 'target'))}
       {AUTHORING_SIDES.map((side) => renderAuthoringHandle(side, 'source'))}
       {data.sourceHandles.map((handle) => renderHandle(handle, 'source'))}
     </div>
