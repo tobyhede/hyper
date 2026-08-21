@@ -171,4 +171,30 @@ describe('UI catalogue', () => {
       /button-is-operable requires exactly one Ladle test; found 0/,
     );
   });
+
+  it.each(['', '   '])('rejects %j as an applicationEvidence reason', (reason) => {
+    const root = fixture();
+    write(
+      root,
+      'packages/app/stories/parity-claims.ts',
+      `export const parityClaims = [{ id: 'button-is-operable', storyFile: 'components/button.stories.tsx', storyExport: 'Primary', claim: 'The Button can be operated.', applicationEvidence: ${JSON.stringify(reason)} }] as const;`,
+    );
+
+    expect(() => buildUiCatalog(root)).toThrowError(
+      /button-is-operable applicationEvidence must be a non-empty string literal/,
+    );
+  });
+
+  it('rejects a claim that is both exempted and tagged in an application test', () => {
+    const root = fixture();
+    write(
+      root,
+      'packages/app/stories/parity-claims.ts',
+      `export const parityClaims = [{ id: 'button-is-operable', storyFile: 'components/button.stories.tsx', storyExport: 'Primary', claim: 'The Button can be operated.', applicationEvidence: 'No production trigger exists.' }] as const;`,
+    );
+
+    expect(() => buildUiCatalog(root)).toThrowError(
+      /button-is-operable declares applicationEvidence but packages\/app\/e2e\/button\.spec\.ts also tags it/,
+    );
+  });
 });
