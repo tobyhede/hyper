@@ -49,12 +49,24 @@ running bundle, so treat it as the lead rather than the cause.
 ## The workaround
 
 `SelectedEdgeControls` handles Escape itself, in the **capture** phase, and
-defers to an open list by reading `[role="combobox"][aria-expanded="true"]`
-inside the popup. Capture is load-bearing: Base UI closes the list from a
-bubble-phase `document` listener, and the microtask checkpoint between listeners
-commits that close before React's delegated bubble listener runs — so a bubble
-handler would read the list as already closed on the first press and collapse
-both layers into one.
+defers to an open list by reading `[aria-expanded="true"]` inside the popup —
+the bare attribute, because the two endpoint comboboxes are the only controls in
+there that carry it and the Edit button that carries it too is outside.
+
+Capture is load-bearing, and the reason is stronger than first written. It is
+not that a bubble handler would read the list as already closed: **a bubble
+handler is never called at all.** Measured by swapping the one prop to
+`onKeyDown` and running the Ladle Escape spec — the editor then fails to close on
+*either* press. Base UI's `keydown` listener sits on `document` and stops the
+event before it reaches the root container React delegates from, so the bubble
+half of that delegation never fires for a press inside this popup. React's
+capture listener runs on the way down, before any document-level bubble
+listener, which is both early enough to be asked and early enough that the open
+list still reads `aria-expanded="true"`.
+
+This is also why the connect picker in `edge-authoring-react.tsx` answers Escape
+on the **bubble** phase and is right to: it is a plain div in the app's own tree,
+with no Base UI popup between it and React. The host decides the phase.
 
 The Ladle spec
 `packages/app/ladle-e2e/issue-06-graph-hud-and-edge-controls.spec.ts` pins both

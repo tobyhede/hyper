@@ -592,7 +592,7 @@ export function useEdgeAuthoring({
         const interactive = enabled && subject.graphId === activeGraphId;
         // **Conjoined with `interactive`, not merely compared with the stored
         // subject.** An Edge outside the Active Graph cannot remain selected
-        // (CONTEXT.md), and this Edge draws its own toolbar from `selected` — so
+        // (CONTEXT.md), and this Edge draws its own controls from `selected` — so
         // reading the union alone would keep Delete live on an Edge activation
         // has just stopped offering, for as long as the union still named it.
         const selected = interactive && sameSelection(selection, subject);
@@ -751,6 +751,13 @@ export function useEdgeAuthoring({
            * It stays because it is the rule this handler owns, and it becomes
            * load-bearing again the moment the picker moves to a primitive that
            * answers Escape from React rather than from a document listener.
+           *
+           * **Bubble here, capture in `SelectedEdgeControls`, and the two do not
+           * disagree.** This is a plain div in the app's own tree, so the event
+           * reaches React's delegated bubble listener normally. That editor is a
+           * Base UI popup, where a document listener stops the event before the
+           * bubble half of that delegation runs and only a capture handler is
+           * ever asked. The host decides the phase, not a preference.
            */
           onKeyDown={(event) => {
             if (event.key !== 'Escape') return;
