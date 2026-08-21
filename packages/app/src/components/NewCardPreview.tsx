@@ -1,7 +1,7 @@
 import { ViewportPortal, useConnection } from '@xyflow/react';
 import { CanvasCard } from '@project/ui';
 import { CARD_SIZE } from '../card';
-import { newCardDrop, type DropTarget } from '../edge-authoring';
+import { newCardDrop, type ElementDropTarget } from '../edge-authoring';
 
 export interface NewCardPreviewProps {
   /** Exact neutral title the authored Card will carry. */
@@ -9,7 +9,7 @@ export interface NewCardPreviewProps {
   /** Alt/Option, tracked on `window` so it survives leaving the canvas. */
   readonly modifierHeld: boolean;
   /** The container-local classification of what the pointer is over. */
-  readonly pointerOver: DropTarget;
+  readonly pointerOver: ElementDropTarget;
   readonly accepts: (from: string) => boolean;
 }
 

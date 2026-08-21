@@ -27,7 +27,7 @@ import { describeAuthoringRefusal, presentEdgeConnectionRefusal } from './author
 import { cardChoiceOf } from './card-choice';
 import {
   newCardDrop,
-  type DropTarget,
+  type ElementDropTarget,
   type EdgeAuthoring,
   type FocusRequest,
 } from './edge-authoring';
@@ -150,19 +150,15 @@ const DELETE_KEYS: ['Backspace', 'Delete'] = ['Backspace', 'Delete'];
 const CONNECT_TARGET_ERROR = 'edge-connect-target-error';
 
 /**
- * Which `DropTarget` the element under the pointer is. Both class names are
- * React Flow's published theming API.
- *
- * This is the DOM half of the question only — a connection target in range
- * outranks it, and both suppliers apply that precedence before asking
- * `newCardDrop`.
+ * Which `ElementDropTarget` the element under the pointer is. Both class names
+ * are React Flow's published theming API.
  *
  * React Flow's own `connectionState.isValid` does not answer this: it is `null`
  * — falsy — whenever no handle is in range, which is exactly what a release over
  * the toolbar produces. The canonical add-node-on-edge-drop example would author
  * a Card there too.
  */
-function dropTargetOf(target: EventTarget | null): DropTarget {
+function elementDropTargetOf(target: EventTarget | null): ElementDropTarget {
   if (!(target instanceof Element)) return 'off-canvas';
   if (target.closest('.react-flow__renderer') === null) return 'off-canvas';
   return target.closest('.react-flow__node') === null ? 'empty-canvas' : 'card';
@@ -214,7 +210,7 @@ export function useEdgeAuthoring({
   // Where the pointer is, not the point it is at: React bails out of an
   // unchanged state write, so a pointer moving across empty canvas no longer
   // re-renders the flow per frame.
-  const [pointerOver, setPointerOver] = useState<DropTarget>('off-canvas');
+  const [pointerOver, setPointerOver] = useState<ElementDropTarget>('off-canvas');
 
   // The latest projection and module, read by stable callbacks. React Flow warns
   // that handler identities changing per render can drive it into a re-render
@@ -342,7 +338,7 @@ export function useEdgeAuthoring({
                       // an implementation detail rather than a documented
                       // guarantee. `elementFromPoint` is what React Flow itself
                       // uses to resolve a drop target.
-                      dropTargetOf(document.elementFromPoint(event.clientX, event.clientY)),
+                      elementDropTargetOf(document.elementFromPoint(event.clientX, event.clientY)),
                 modifierHeld: event.altKey,
               },
               acceptsEmptyDrop,
@@ -373,7 +369,7 @@ export function useEdgeAuthoring({
 
   const handleMouseMove = useCallback((event: ReactMouseEvent<HTMLDivElement>) => {
     if (!connecting.current) return;
-    const over = dropTargetOf(event.target);
+    const over = elementDropTargetOf(event.target);
     setPointerOver(over);
     if (over === 'empty-canvas') setModifierHeld(event.altKey);
   }, []);
@@ -457,7 +453,7 @@ export function useEdgeAuthoring({
         const over =
           state.toNode !== null
             ? 'connection-target'
-            : dropTargetOf(document.elementFromPoint(event.clientX, event.clientY));
+            : elementDropTargetOf(document.elementFromPoint(event.clientX, event.clientY));
         if (over === 'empty-canvas') latest.current.authoring.deleteEdge(subject);
       }
       // Whatever it produced, the drag is over: the draft goes and a refusal's

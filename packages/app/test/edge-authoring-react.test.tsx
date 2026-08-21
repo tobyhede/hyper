@@ -235,7 +235,7 @@ const FINISHED_CONNECTION = {
 beforeAll(() => {
   // jsdom implements no hit-testing, and the reconnect release asks for one.
   // Answering `null` is what a release over nothing really produces, which
-  // `dropTargetOf` reads as off-canvas — so these tests exercise the cancelling
+  // `elementDropTargetOf` reads as off-canvas — so these tests exercise the cancelling
   // path rather than the deleting one.
   document.elementFromPoint = () => null;
   vi.stubGlobal(
