@@ -5,7 +5,7 @@ import { usePresentingKeys, type TraversalCommands } from '../src/presenting-key
 /**
  * The global Traversal keys, and what they decline to do.
  *
- * Every command here is Navigation's, so the walk itself is `navigation.test.ts`'s
+ * Every command here is Navigation's, so the traversal itself is `navigation.test.ts`'s
  * business. What this owns is the binding: which key runs which operation, when
  * the listener is live at all, and the rule that keeps a global `keydown` from
  * running one command while the browser runs another on the same press.

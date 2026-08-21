@@ -3,6 +3,7 @@ import type { Space } from '@project/graph';
 // Through the package's own subpath imports, as `#components/*` already is: a
 // story sits two directories above `src`, and climbing there by relative path is
 // how a package boundary gets crossed without naming one (AGENTS.md).
+import { canRetreat } from '#src/navigation';
 import { usePresentingKeys } from '#src/presenting-keys';
 import { PresentingChrome } from '#components/PresentingChrome';
 import { useStoryNavigation } from './navigation';
@@ -15,9 +16,9 @@ export interface PresentingChromeFixtureProps {
    * How many production `advance()` calls the story opens with.
    *
    * A sink is not a state a Graph can be authored into — every Card a traversal
-   * may begin at has an Edge leaving it — so the only way to show one is to walk
+   * may begin at has an Edge leaving it — so the only way to show one is to traverse
    * there. These are Navigation's own moves made once at composition, so the
-   * Traversal history behind the story is one Navigation really walked rather
+   * Traversal history behind the story is one Navigation really traversed rather
    * than a starting value the harness invented (ADR 0052).
    */
   readonly advances?: number;
@@ -37,7 +38,7 @@ export interface PresentingChromeFixtureProps {
  *
  * Everything the chrome draws comes from Navigation: the moves and which one is
  * selected, whether Traversal history can retreat, and every operation the
- * controls call. The fixture supplies a Space, an opening walk and a box to sit
+ * controls call. The fixture supplies a Space, an opening traversal and a box to sit
  * in, and holds no selected index, no history and no copy of either.
  *
  * It also binds the **production** global Traversal keys, because one of the
@@ -70,19 +71,16 @@ export function PresentingChromeFixture({
 
   return (
     <div
-      data-testid="presenting-stage"
       className="relative overflow-hidden rounded-md border border-border bg-background"
       style={{ width, height: '20rem' }}
     >
       {presenting && (
         <PresentingChrome
           moves={navigation.moves()}
-          // There is a Card to go back to only once a traversal has left its
-          // first, and only presenting has Traversal history at all — the same
-          // narrowing `App` makes, spent on the value behind it rather than on
-          // the mode. `presenting` above is what narrows `state` to the mode
-          // that carries a history.
-          canRetreat={state.traversalHistory.length > 1}
+          // Production's own rule, called rather than copied: a retreat rule
+          // written out again here is one this story could go on asserting after
+          // `App` had changed it.
+          canRetreat={canRetreat(state)}
           onSelectBranch={navigation.selectBranch}
           onAdvance={navigation.advance}
           onRetreat={navigation.retreat}

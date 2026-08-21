@@ -257,6 +257,27 @@ test(
 );
 
 /**
+ * Entering presentation with the pointer, then advancing with Space.
+ *
+ * The Sidebar's Present button is the one DOM node that relabels to Overview, so
+ * React keeps focus on it across the click. Left there, the presenter holds the
+ * control that *leaves* — and Space, which advances, defers to whatever has
+ * focus, so the first press dropped straight back to the overview. The chrome
+ * claims focus as it mounts, so the press reaches the move it is aimed at.
+ */
+test('Space advances on the first press after entering with the pointer', async ({ page }) => {
+  await present(page);
+
+  // Claimed by the chrome rather than left on the control that entered.
+  await expect(page.getByRole('button', { name: 'Go to B' })).toBeFocused();
+
+  await page.keyboard.press('Space');
+
+  await expect(page.getByTestId('presenting-chrome')).toBeVisible();
+  await expect(activeCard(page)).toHaveAttribute('data-id', '00000000-0000-4000-8000-000000000003');
+});
+
+/**
  * The same deference, on a control the chrome does not own.
  *
  * The rule is about interactive controls rather than about one button, and the

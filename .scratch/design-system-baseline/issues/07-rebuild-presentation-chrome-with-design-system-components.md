@@ -131,7 +131,7 @@ choice and responsive behavior. Application E2E proves its real composition
 with Edge Authoring, Navigation, canvas and camera. Expand the current
 sink-only module test into interface-level coverage of semantics, callbacks,
 live announcements, focus restoration, overflow and applicable guidance;
-retain Graph-walk correctness in Navigation's own tests rather than duplicating
+retain Traversal correctness in Navigation's own tests rather than duplicating
 it here.
 
 Close the accounting with exact parity mappings and real results from
@@ -215,7 +215,7 @@ because every E2E test owns a fresh memory repository.
   `Fork`, `Sink`, `Narrow`, each rendering the unchanged production
   `PresentingChrome` through real Navigation.
 - `packages/app/stories/support/PresentingChromeFixture.tsx` — supplies a Space,
-  an opening walk made of production `present()`/`advance()` calls, and a
+  an opening traversal made of production `present()`/`advance()` calls, and a
   bounded positioned region. It also binds the production
   `usePresentingKeys`. It keeps no selected index and no Traversal history; it
   is not a canvas facsimile.
@@ -237,7 +237,7 @@ because every E2E test owns a fresh memory repository.
 - `packages/app/test/PresentingChrome.test.tsx` — expanded from one sink
   assertion to fourteen interface-level tests: control semantics, each callback,
   the shared live region, focus restoration in all four directions, the
-  applicable guidance, and scroll-into-view on a changed selection. Graph-walk
+  applicable guidance, and scroll-into-view on a changed selection. Traversal
   correctness stays in `navigation.test.ts`.
 - `packages/app/test/presenting-keys.test.tsx` — the binding, the inactive case,
   Space deferring to a focused control, and arrows staying global on one.
@@ -248,7 +248,7 @@ because every E2E test owns a fresh memory repository.
 
 - **A *starting* sink is not reachable as an opening state.** A Graph's start is
   a Card an Edge leaves, so `present()` never opens on a sink; the reachable
-  sink is one a traversal walks to. The `Sink` story is therefore two production
+  sink is one a traversal reaches. The `Sink` story is therefore two production
   `advance()` calls in, and the no-moves-no-retreat combination is covered at
   module level rather than as a stable story, which is what ADR 0052 asks for a
   state production cannot reach.

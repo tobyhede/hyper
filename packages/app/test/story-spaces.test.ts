@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { graphStartCard, loadSpaceSnapshot, outgoingEdges } from '@project/graph';
+import { graphStartCard, loadSpaceSnapshot, outgoingEdges, type Space } from '@project/graph';
 import { canvasRenderers, currentRenderer } from '../src/canvas-renderers';
 import { defaultRenderer } from '../src/renderer';
 import {
@@ -159,7 +159,7 @@ describe('the story Spaces', () => {
    * rather than a second kind (ADR 0024).
    */
   it('gives the fork story a Card with several ways on, and the line exactly one', () => {
-    const outDegree = (space: typeof deepDiveSpace): number => {
+    const outDegree = (space: Space): number => {
       const graph = space.graphs[0];
       if (graph === undefined) throw new Error('The traversal Space owns no Graph.');
       const start = graphStartCard(graph);

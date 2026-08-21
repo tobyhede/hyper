@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import {
   Alert,
@@ -17,6 +17,8 @@ import {
   FieldGroup,
   FieldLabel,
   Input,
+  Kbd,
+  KbdGroup,
   Separator,
   Spinner,
   Textarea,
@@ -53,6 +55,10 @@ describe('design-system baseline', () => {
             <Textarea id="body" />
           </Field>
         </FieldGroup>
+        <KbdGroup aria-label="Traversal keys">
+          <Kbd>→</Kbd>
+          <Kbd>Esc</Kbd>
+        </KbdGroup>
         <Separator />
         <Spinner aria-label="Loading" />
       </>,
@@ -65,5 +71,10 @@ describe('design-system baseline', () => {
     expect(screen.getByLabelText('Title')).toBeInstanceOf(HTMLInputElement);
     expect(screen.getByLabelText('Markdown')).toBeInstanceOf(HTMLTextAreaElement);
     expect(screen.getByLabelText('Loading')).toBeVisible();
+    // Both render `kbd`, so the group's props are a `kbd`'s. Typed as a `div`'s
+    // it typechecked and handed a caller an `HTMLDivElement` that is not one.
+    const keys = screen.getByLabelText('Traversal keys');
+    expect(keys.tagName).toBe('KBD');
+    expect(within(keys).getByText('→').tagName).toBe('KBD');
   });
 });

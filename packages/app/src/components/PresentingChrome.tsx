@@ -25,8 +25,24 @@ export interface PresentingChromeProps {
   onExit: () => void;
 }
 
-/** Where focus is owed after a chrome-originated command destroys the control that ran it. */
-type FocusDebt = 'traversed' | null;
+/**
+ * How a move names itself: the action it performs, then the Card it goes to.
+ *
+ * One wording, used by the control's accessible name and by the line that
+ * announces the selection, so the two cannot drift into saying different things
+ * about the same move.
+ */
+function moveLabel(move: Move): string {
+  return `${move.selected ? 'Go to' : 'Choose'} ${move.title}`;
+}
+
+/** One line of the keyboard guidance: the keys, and what pressing them does. */
+interface KeyboardCommand {
+  /** The keys that run it, as the guidance draws them. */
+  readonly keys: readonly string[];
+  /** What running it does, in the guidance's own words. */
+  readonly action: string;
+}
 
 /**
  * The commands available right now, in the order the guidance lists them.
@@ -38,8 +54,8 @@ type FocusDebt = 'traversed' | null;
 function availableCommands(
   moves: readonly Move[],
   canRetreat: boolean,
-): readonly { readonly keys: readonly string[]; readonly action: string }[] {
-  const commands: { readonly keys: readonly string[]; readonly action: string }[] = [];
+): readonly KeyboardCommand[] {
+  const commands: KeyboardCommand[] = [];
   if (moves.length > 1) commands.push({ keys: ['↑', '↓'], action: 'choose' });
   if (moves.length > 0) commands.push({ keys: ['→'], action: 'go' });
   if (canRetreat) commands.push({ keys: ['←'], action: 'back' });
@@ -79,11 +95,13 @@ export function PresentingChrome({
   onExit,
 }: PresentingChromeProps) {
   const selectedIndex = moves.findIndex((move) => move.selected);
+  const selected = moves[selectedIndex];
+  const selectedCardId = selected?.cardId;
   const selectedMove = useRef<HTMLButtonElement>(null);
   const back = useRef<HTMLButtonElement>(null);
   const overview = useRef<HTMLButtonElement>(null);
   /**
-   * Focus owed by a command this chrome started, and by nothing else.
+   * Focus owed by this chrome, and by nothing else.
    *
    * Advancing and retreating destroy the control that ran them — the move list
    * is rebuilt from the Card arrived at — so a pointer or keyboard user who
@@ -91,21 +109,28 @@ export function PresentingChrome({
    * handler and paid in the effect below, once the replacement controls are in
    * the tree.
    *
+   * It **begins owed**, because entering presentation strands focus in the same
+   * way. The Sidebar's Present button is the one DOM node that relabels to
+   * Overview, so React keeps focus on it and the presenter is left holding the
+   * control that *leaves* — and Space, which advances, defers to whatever has
+   * focus and would drop straight back to the overview. Claiming focus here is
+   * what makes the first Space advance.
+   *
    * It is deliberately **not** set for a traversal performed with the global
    * arrow keys: focus is wherever the presenter left it, and moving it into the
    * chrome merely because Navigation changed is exactly what the shared live
    * region exists to avoid.
    */
-  const focusDebt = useRef<FocusDebt>(null);
+  const focusOwed = useRef(true);
 
   const traversed = (command: () => void) => (): void => {
-    focusDebt.current = 'traversed';
+    focusOwed.current = true;
     command();
   };
 
   useEffect(() => {
-    if (focusDebt.current === null) return;
-    focusDebt.current = null;
+    if (!focusOwed.current) return;
+    focusOwed.current = false;
     // The newly selected move, or — at a sink — Back where there is one and
     // Overview otherwise. Each is the control that took the place of the one
     // just activated.
@@ -114,9 +139,16 @@ export function PresentingChrome({
 
   // A bounded row scrolls rather than wraps, so the selected choice can be off
   // screen after an Up or Down that never touched the chrome.
+  //
+  // Keyed on which move is selected, and deliberately **not** on `moves`: `App`
+  // calls `navigation.moves()` during render, so that array is a fresh identity
+  // every time and the effect would run on every render of the application. A
+  // presenter who had scrolled a wide fork's row sideways to read a distant
+  // choice would have it snapped back by any unrelated publish. The Card's id
+  // rather than the index, so advancing to a new choice set scrolls too.
   useEffect(() => {
     selectedMove.current?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
-  }, [selectedIndex, moves]);
+  }, [selectedCardId]);
 
   return (
     <div
@@ -148,50 +180,65 @@ export function PresentingChrome({
               End of Graph
             </p>
           ) : (
-            <ul
-              data-testid="presenting-moves"
-              // `overflow-x-auto` clips vertically as well as horizontally, and
-              // this row is where the chrome puts focus — so the padding has to
-              // clear `Button`'s 2px focus outline at its 2px offset, or the
-              // indicator this component goes out of its way to place lands
-              // half-cut.
-              className="flex [scrollbar-width:thin] gap-2 overflow-x-auto py-1.5"
-            >
-              {moves.map((move, index) => (
-                <li key={move.cardId} className="shrink-0">
-                  <Button
-                    ref={move.selected ? selectedMove : null}
-                    variant={move.selected ? 'default' : 'secondary'}
-                    // The Card this move goes to. There is deliberately no
-                    // `data-selected` beside it any more: which one is selected
-                    // is in the control's own name and its variant, and a third
-                    // spelling of it would be one a test could read while the
-                    // other two said something else.
-                    data-card-id={move.cardId}
-                    // The action, not the destination. The visible text is the
-                    // Card's title and the name is that title with the verb in
-                    // front of it, so voice control can still say what is
-                    // written on the control.
-                    aria-label={`${move.selected ? 'Go to' : 'Choose'} ${move.title}`}
-                    className="max-w-[16rem] @max-3xl:min-h-11"
-                    onClick={
-                      move.selected
-                        ? traversed(onAdvance)
-                        : () => onSelectBranch(index - selectedIndex)
-                    }
-                  >
-                    {/* Truncation belongs on this span rather than on the
+            <>
+              {/*
+                The selection, as text, because nothing else in this region is.
+                Up and Down rewrite an `aria-label` and a variant class, and
+                neither is a text change — so with `aria-atomic="false"` the
+                region had nothing to read and a screen-reader presenter arrowed
+                across a fork in silence. Focus deliberately does not move for
+                those keys, so this is the only thing left that can say what
+                changed. It carries the same wording as the control it names.
+              */}
+              {selected !== undefined && (
+                <span className="sr-only" data-testid="presenting-selection">
+                  {moveLabel(selected)}
+                </span>
+              )}
+              <ul
+                data-testid="presenting-moves"
+                // `overflow-x-auto` clips vertically as well as horizontally, and
+                // this row is where the chrome puts focus — so the padding has to
+                // clear `Button`'s 2px focus outline at its 2px offset, or the
+                // indicator this component goes out of its way to place lands
+                // half-cut.
+                className="flex [scrollbar-width:thin] gap-2 overflow-x-auto py-1.5"
+              >
+                {moves.map((move, index) => (
+                  <li key={move.cardId} className="shrink-0">
+                    <Button
+                      ref={move.selected ? selectedMove : null}
+                      variant={move.selected ? 'default' : 'secondary'}
+                      // The action, not the destination. The visible text is the
+                      // Card's title and the name is that title with the verb in
+                      // front of it, so voice control can still say what is
+                      // written on the control.
+                      aria-label={moveLabel(move)}
+                      // The control that performs the shortcut announces it. Only
+                      // the selected move has one: Up and Down move the selection
+                      // rather than acting on any single choice, and Space is a
+                      // button's own activation rather than a shortcut of ours.
+                      aria-keyshortcuts={move.selected ? 'ArrowRight' : undefined}
+                      className="max-w-[16rem] @max-3xl:min-h-11"
+                      onClick={
+                        move.selected
+                          ? traversed(onAdvance)
+                          : () => onSelectBranch(index - selectedIndex)
+                      }
+                    >
+                      {/* Truncation belongs on this span rather than on the
                         Button. `Button` is `inline-flex`, so a bare string is
                         an anonymous flex item that `text-overflow` never
                         reaches — a long title then overflows past *both* ends
                         of a centred button and is hard-clipped at each, losing
                         the beginning of the Card's name with no ellipsis to
                         say so. */}
-                    <span className="min-w-0 truncate">{move.title}</span>
-                  </Button>
-                </li>
-              ))}
-            </ul>
+                      <span className="min-w-0 truncate">{move.title}</span>
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            </>
           )}
         </div>
 
@@ -200,7 +247,7 @@ export function PresentingChrome({
             <Button
               ref={back}
               variant="secondary"
-              data-testid="presenting-back"
+              aria-keyshortcuts="ArrowLeft"
               className="@max-3xl:min-h-11"
               onClick={traversed(onRetreat)}
             >
@@ -231,6 +278,7 @@ export function PresentingChrome({
           <Button
             ref={overview}
             variant="secondary"
+            aria-keyshortcuts="Escape"
             data-testid="exit-presenting"
             className="@max-3xl:min-h-11"
             onClick={onExit}

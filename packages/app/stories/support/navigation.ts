@@ -79,7 +79,7 @@ function composeStoryNavigation(
  * `begin` runs **once**, against the freshly composed Navigation, and is how a
  * story arrives in the state it is about — presenting, or three moves into a
  * Graph. It drives production operations rather than seeding a state of its
- * own, so the Traversal history a story shows is one Navigation walked.
+ * own, so the Traversal history a story shows is one Navigation traversed.
  * Subsequent renders do not re-run it: a story that then clicks its way
  * somewhere else must not have its own opening argued back at it.
  */

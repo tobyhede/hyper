@@ -46,6 +46,19 @@ export type NavigationState =
       readonly branchIndex: number;
     });
 
+/**
+ * Whether Traversal history holds a Card to go back to.
+ *
+ * One rule, because two surfaces ask it: `App` draws the chrome over the real
+ * Space and `PresentingChromeFixture` draws it over a story's. Written out twice
+ * it can drift, and the copy that drifts is the story's — so the Ladle parity
+ * proof would go on asserting a retreat rule production no longer follows, which
+ * is the gap ADR 0052 exists to close. Only presenting has a history at all.
+ */
+export function canRetreat(state: NavigationState): boolean {
+  return state.mode === 'presenting' && state.traversalHistory.length > 1;
+}
+
 /** Navigation through the current working Space, independent of any UI framework. */
 export interface Navigation {
   readonly getState: () => NavigationState;
