@@ -4,7 +4,10 @@
 
 **Blocked by:** 01 — Establish the shadcn design-system baseline.
 
-**Status:** ready-for-human
+**Status:** resolved — delivered in `03cc3ff`, with the review and follow-up work
+in `6afeb37`, `f7d945a`, `a0c2dd5`, `0ce9aa9` and `2e2e56b`. See "Results" below.
+One defect was found and deliberately left, recorded at
+`.scratch/design-system-baseline/findings/reconnected-edge-loses-its-selection.md`.
 
 - [x] Graph legend, minimap framing, separators and status affordances use shared visual primitives and semantic tokens.
 - [x] The selected Edge toolbar and endpoint picker use shared button, popover and form patterns while preserving their active-Graph and focus rules.

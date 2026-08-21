@@ -5,6 +5,10 @@ Status: ready-for-human
 Surfaced by: investigating AGENTS.md's standing claim that ADR 0042's other half
 is "not built", before building it
 
+Moved from `.scratch/adr-0040-0042/issues/07` when that effort was split by
+subject: its ADR 0042 tickets are this effort, its ADR 0040/0041 tickets are
+`.scratch/layout-ownership-review/`.
+
 ## Context
 
 AGENTS.md says, in the install-gate rule:

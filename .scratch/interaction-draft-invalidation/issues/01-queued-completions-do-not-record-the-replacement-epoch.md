@@ -4,6 +4,10 @@ Status: resolved
 
 Surfaced by: review of PR #39
 
+Moved from `.scratch/adr-0040-0042/issues/03` when that effort was split by
+subject: its ADR 0042 tickets are this effort, its ADR 0040/0041 tickets are
+`.scratch/layout-ownership-review/`.
+
 ## Context
 
 ADR 0042 rules what a Space replacement does to work already queued:

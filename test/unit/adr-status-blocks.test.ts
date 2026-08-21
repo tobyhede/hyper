@@ -15,11 +15,11 @@ import { describe, expect, it } from 'vitest';
  * This reads the blocks themselves, in the idiom `conflict-markers.test.ts`
  * established here for the same shape of problem: one scan over everything,
  * rather than a hand-kept list of the pairs someone remembered to check. It is
- * the scan `.scratch/adr-0040-0042/issues/05-two-refinement-links-point-only-one-way.md`
+ * the scan `.scratch/layout-ownership-review/issues/05-two-refinement-links-point-only-one-way.md`
  * asked for a decision on, and this file is that decision.
  *
  * Supersession is asserted reciprocal too, which it could not be until issue
- * `.scratch/adr-0040-0042/issues/04-adr-0040-claims-to-supersede-an-already-superseded-adr.md`
+ * `.scratch/layout-ownership-review/issues/04-adr-0040-claims-to-supersede-an-already-superseded-adr.md`
  * settled the convention: one superseder per ADR, with a two-stage retirement
  * read transitively rather than named at both stages. A guard written before
  * that would have decided the question by accident, which is why this half was

@@ -4,7 +4,8 @@
 
 **Blocked by:** 01 — Establish the shadcn design-system baseline.
 
-**Status:** ready-for-human
+**Status:** resolved — delivered in `107a54e`, with the review findings addressed
+in `ca22964`. See "Answer" and "Verification" below.
 
 - [x] Available moves, selected moves and the end state are visually and accessibly distinct without changing traversal behaviour.
 - [x] Keyboard guidance and the Overview exit preserve their current actions and remain usable at narrow viewport sizes.

@@ -22,7 +22,7 @@ ADR 0040's "Algorithmic Views have explicit subjects" section named two kinds of
 
 Two defects went with it.
 
-The first was found in review of PR #39 and recorded as `.scratch/adr-0040-0042/issues/02-graph-scoped-conversion-can-break-0040s-closure-rule.md`. Nothing required a Graph-scoped View's subject to be *all* of its source Graph's Cards, so selecting a subset and converting produced a Layout whose copied Edges named non-members — violating the closure invariant stated three paragraphs earlier in the same document. The closure obligation removes that by construction rather than by adding a sentence about conversion.
+The first was found in review of PR #39 and recorded as `.scratch/layout-ownership-review/issues/02-graph-scoped-conversion-can-break-0040s-closure-rule.md`. Nothing required a Graph-scoped View's subject to be *all* of its source Graph's Cards, so selecting a subset and converting produced a Layout whose copied Edges named non-members — violating the closure invariant stated three paragraphs earlier in the same document. The closure obligation removes that by construction rather than by adding a sentence about conversion.
 
 The second was an over-claim. ADR 0040 said "The ownership rules here prevent that future feature from reopening the aggregate when it is designed" and supplied no mechanism that would. The fresh-identity rule is that mechanism, and with it the claim is true.
 
@@ -54,7 +54,7 @@ Activating a Graph on an Algorithmic View is visual emphasis and nothing else. I
 
 ## What it cost
 
-**Duplication is now the only way to get one narrative into two arrangements, and the interface enforces it.** ADR 0040 accepted that price; the fresh-identity rule removes the last route around it. Two Layouts that want the same Graph get two Graphs, and nothing tells the author when they diverge. The alternative was examined at length in `.scratch/adr-0040-0042/issues/06-is-a-graph-owned-by-one-layout-or-curated-once-and-placed.md` and rejected: under sharing, removing a Card from one Layout either leaves an Edge whose endpoint is absent there or mutates every other Layout drawing that Graph, and both horns are wrong before any interface exists.
+**Duplication is now the only way to get one narrative into two arrangements, and the interface enforces it.** ADR 0040 accepted that price; the fresh-identity rule removes the last route around it. Two Layouts that want the same Graph get two Graphs, and nothing tells the author when they diverge. The alternative was examined at length in `.scratch/layout-ownership-review/issues/06-is-a-graph-owned-by-one-layout-or-curated-once-and-placed.md` and rejected: under sharing, removing a Card from one Layout either leaves an Edge whose endpoint is absent there or mutates every other Layout drawing that Graph, and both horns are wrong before any interface exists.
 
 **A View's freedom is real, so a badly written View can produce a poor Layout.** The obligations constrain validity, not judgement: returning every Space Card when the author was looking at four of them satisfies both rules and is still wrong. The boundary catches corruption, not taste.
 
