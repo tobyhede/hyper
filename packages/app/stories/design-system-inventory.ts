@@ -15,6 +15,11 @@
  * ticket. Both kinds say which they are, and an entry with neither a permanent
  * reason nor an owner is the one to be suspicious of.
  *
+ * **A reason must be a property of its subject, never of this check.** One entry
+ * currently breaks that rule and says so — `CardNode.tsx` is rendered by a stable
+ * story the walk cannot follow — and it is a defect with a ticket rather than an
+ * entry to keep.
+ *
  * What this cannot decide: it proves a component is *rendered* by a stable
  * story, never that the story shows its meaningful states. That judgement stays
  * with human review, as the parity claim set's own semantic completeness does.
@@ -91,7 +96,7 @@ export const uncataloguedComponents = [
   {
     module: 'packages/react-flow-adapter/src/CardNode.tsx',
     reason:
-      'Catalogued through what it draws rather than as itself. `canvas-card-hover-reveals-actions-and-handles-together` mounts the real `CardNode` inside a real `ReactFlow`, which is the only honest way to show it; the node wrapper adds handle geometry to a `CanvasCard` whose own states are catalogued directly.',
+      "A limit of the walk, not a property of the component — the one entry here that is a defect rather than a design fact, and `.scratch/architecture-review/issues/09` owns removing it. A stable story does render this: `canvas-card-hover-reveals-actions-and-handles-together` mounts the real `CardNode` in a real `ReactFlow`. The checker cannot see it because the story reaches it through `nodeTypes`, which the adapter's index declares as a local `const` rather than re-exporting, so resolving the barrel by the names taken through it finds nothing.",
   },
   {
     module: 'packages/react-flow-adapter/src/RoutedEdge.tsx',
@@ -135,9 +140,10 @@ export const uncataloguedComponents = [
  * Product appearance does not: it belongs beside the component that draws it,
  * hand-rolled the way `canvas-card.css` sits beside `CanvasCard`.
  *
- * A rule naming no class at all — `[data-card-search-combobox]`, `#root` — is
- * keyed by its leading attribute or id instead, so those cannot slip past by
- * having no class to record.
+ * A rule naming no class at all — `[data-card-search-combobox]`, `#root`, the
+ * `*` and `body` resets — is keyed by its leading attribute or id, or failing
+ * both by its leading element name, so those cannot slip past by having no
+ * class to record.
  *
  * Two entries below are product appearance and say so, because the alternative
  * to recording them is not recording them. Each names the ticket that removes
@@ -174,6 +180,16 @@ export const handRolledStyles = [
     block: 'root',
     reason:
       'The React mount point, sized with `html` and `body` so the app owns exactly one viewport and the page never scrolls. Not a component and not stylable from one.',
+  },
+  {
+    block: '*',
+    reason:
+      'The `box-sizing: border-box` reset. A document-wide default no component can own, and every rule in this file and in `@project/ui` is written against it.',
+  },
+  {
+    block: 'body',
+    reason:
+      'The base font stack and the page background and foreground colours, set once on the document. Not a component and not stylable from one — the `html, body, #root` sizing that gives the app its one viewport is recorded as `root` above.',
   },
   {
     block: 'data-card-search-combobox',

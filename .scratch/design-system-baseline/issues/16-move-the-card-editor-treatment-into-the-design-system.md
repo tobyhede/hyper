@@ -12,6 +12,10 @@ beside `CanvasCard`.
 - [ ] No `card-editor` block remains in `packages/app/src/styles.css`, and its
       `handRolledStyles` entry is dropped from
       `packages/app/stories/design-system-inventory.ts`.
+- [ ] `[data-card-search-combobox]` goes with it, entry and all. The inventory
+      already routes it here: it themes the combobox popup Base UI portals out
+      of this pane, so it is part of the same treatment and is reached by an
+      attribute only because the popup is not inside the pane's own subtree.
 - [ ] The treatment lives with its component and travels with it, so a consumer
       that renders the editor gets its appearance without importing an app
       stylesheet.
@@ -24,12 +28,16 @@ beside `CanvasCard`.
 
 ## Why this exists
 
-Issue 08 made `packages/app/src/styles.css` a recorded list: every class block in
-it carries the React Flow or integration requirement that keeps it out of
-`@project/ui`. Twelve of the thirteen entries earn that. `card-editor` does not —
+Issue 08 made `packages/app/src/styles.css` a recorded list: every block in it —
+keyed by class, or, where a rule names no class, by its leading attribute, id or element —
+carries the React Flow or integration requirement that keeps it out of
+`@project/ui`. Fourteen of the seventeen entries earn that — counted 2026-08-21,
+after the element-name fallback added `*` and `body`. `card-editor` does not —
 it is roughly 200 lines of product appearance, hard-coded ink (`#0b0d11`), paper
 (`#fffaf0`) and rule colours, a type scale and a footer treatment. Nothing about
-it is React Flow's.
+it is React Flow's. Two more fall short with it: `[data-card-search-combobox]`
+themes the popup this editor portals out of the pane and travels with it, and
+`workspace-selection` is condemned with its component under `space-cards/04`.
 
 That is why Issue 08's second acceptance line — "legacy feature-owned visual
 styling is **removed or explicitly limited** to React Flow geometry and

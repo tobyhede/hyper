@@ -87,11 +87,12 @@ catalogue anything — following relative paths, `packages/app/package.json`'s o
 them*. That last part is what makes it bite: following a barrel whole would have
 marked all of `@project/ui` catalogued the moment one story imported `Button`.
 
-**`handRolledStyles`** names every class block `packages/app/src/styles.css`
-still declares, with the React Flow or integration requirement that keeps it out
-of `@project/ui`. Both lists fail in both directions — a new component or block
-fails until it is built from the design system or recorded with a reason, and an
-entry that stops being true fails too.
+**`handRolledStyles`** names every block `packages/app/src/styles.css` still
+declares — by class, or, for a rule that names no class at all, by its leading
+attribute, id or element — with the React Flow or integration requirement that keeps it
+out of `@project/ui`. Both lists fail in both directions — a new component or
+block fails until it is built from the design system or recorded with a reason,
+and an entry that stops being true fails too.
 
 The check also rejects a rule no production module names, which found seven dead
 ones: `.btn`, `.btn--primary`, `.controls__btn`, `.controls__btn--exit`,
@@ -214,8 +215,10 @@ several policies over one `problems` array is a fair Divergent Change reading,
 but splitting the design-system gate into three modules is a bigger change than
 this ticket should make.
 
-**Verification.** `pnpm verify` green — 149 files, 1633 passed, 8 skipped.
-`pnpm e2e` 115 passed. `pnpm e2e:ladle` 38 passed.
+**Verification.** `pnpm verify` green — 149 files, 1638 passed, 8 skipped.
+`pnpm e2e` 115 passed. `pnpm e2e:ladle` 38 passed. (An earlier revision of this
+line said 1633, which no run had produced — a transposed figure in a verification
+claim, which is the one number here that has to be copied rather than recalled.)
 
 ### 2026-08-20 — the parity-evidence model lands before the remaining migrations
 

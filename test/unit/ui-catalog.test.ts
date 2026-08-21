@@ -62,6 +62,17 @@ const inventory = (
   `export const uncataloguedComponents = ${JSON.stringify(uncataloguedComponents)} as const;\n` +
   `export const handRolledStyles = ${JSON.stringify(handRolledStyles)} as const;\n`;
 
+/** Every problem one build reports, for a case about how often one is said. */
+const problemsOf = (root: string): readonly string[] => {
+  try {
+    buildUiCatalog(root);
+  } catch (error) {
+    if (error instanceof UiCatalogError) return error.problems;
+    throw error;
+  }
+  return [];
+};
+
 afterEach(() => {
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
 });
@@ -293,6 +304,26 @@ describe('production component coverage', () => {
     expect(buildUiCatalog(root).uncataloguedComponents).toEqual([]);
   });
 
+  it('resolves a wildcard subpath entry listed after an exact alias', () => {
+    const root = fixture();
+    // An exact alias matches only itself, so a specifier it does not match has
+    // to fall through to the later entries rather than end the search.
+    write(
+      root,
+      'packages/app/package.json',
+      '{"imports":{"#shell":"./src/Shell.tsx","#components/*":"./src/components/*.tsx"}}',
+    );
+    write(root, 'packages/app/src/Shell.tsx', 'export const Shell = null;');
+    write(root, 'packages/app/src/components/NewAlias.tsx', 'export const Thing = null;');
+    write(
+      root,
+      'packages/app/stories/components/button.stories.tsx',
+      `import { Thing } from '#components/NewAlias';\nimport { Shell } from '#shell';\nexport default { title: 'Components/Button' };\nexport const Primary = () => [Thing, Shell];\n`,
+    );
+
+    expect(buildUiCatalog(root).uncataloguedComponents).toEqual([]);
+  });
+
   it('follows the package subpath imports declared in packages/app/package.json', () => {
     const root = fixture();
     write(
@@ -465,6 +496,15 @@ describe('production component coverage', () => {
     );
   });
 
+  it('reports a missing inventory module once, not once per list it declares', () => {
+    const root = fixture();
+    rmSync(join(root, 'packages/app/stories/design-system-inventory.ts'), { force: true });
+
+    expect(problemsOf(root)).toEqual([
+      'packages/app/stories/design-system-inventory.ts is missing',
+    ]);
+  });
+
   it('takes a recorded reason in place of a story, and reports it', () => {
     const root = fixture();
     write(root, 'packages/app/src/components/NewAlias.tsx', 'export const NewAlias = () => null;');
@@ -536,11 +576,22 @@ describe('hand-rolled application styles', () => {
   it('requires a recorded reason for every block the stylesheet declares', () => {
     const root = fixture();
     write(root, 'packages/app/src/styles.css', '.btn--primary { color: red; }');
-    write(root, 'packages/app/src/App.tsx', "export const App = () => 'btn--primary';");
-
-    expect(() => buildUiCatalog(root)).toThrowError(
-      /packages\/app\/src\/styles\.css declares \.btn--primary, whose block btn is not recorded/,
+    write(
+      root,
+      'packages/app/src/App.tsx',
+      'export const App = () => <div className="btn--primary" />;',
     );
+    write(
+      root,
+      'packages/app/stories/design-system-inventory.ts',
+      inventory([{ module: 'packages/app/src/App.tsx', reason: 'Composition root.' }], []),
+    );
+
+    // The unrecorded block is the whole complaint: the class is named where a
+    // class is written, and the module naming it is accounted for.
+    expect(problemsOf(root)).toEqual([
+      'packages/app/src/styles.css declares .btn--primary, whose block btn is not recorded — build it from @project/ui, or record why in packages/app/stories/design-system-inventory.ts',
+    ]);
   });
 
   it('reports a recorded block the stylesheet no longer declares', () => {
@@ -594,11 +645,12 @@ describe('hand-rolled application styles', () => {
   it('does not take a punctuation stem as naming every class beneath it', () => {
     const root = fixture();
     write(root, 'packages/app/src/styles.css', '.-unused { color: red; }');
-    // `translate(${x}, ${y})` leaves a lone `-` as its middle fragment.
+    // A class built from two interpolations leaves a lone `-` as its middle
+    // fragment, and a stem of `-` would call every class beneath it named.
     write(
       root,
       'packages/app/src/App.tsx',
-      'export const App = (x: number, y: number) => `translate(${x}, ${y})`;',
+      'export const App = (x: string, y: string) => <div className={`${x}-${y}`} />;',
     );
     write(
       root,
@@ -676,12 +728,19 @@ describe('hand-rolled application styles', () => {
     expect(buildUiCatalog(root).handRolledStyles).toEqual([]);
   });
 
-  it('requires a reason for a rule that names no class at all', () => {
+  it.each([
+    ['[data-card-search-combobox]', 'data-card-search-combobox'],
+    ['#root', 'root'],
+    ['html,\nbody,\n#root', 'root'],
+    ['*', '*'],
+    ['body', 'body'],
+    ['main > div', 'main'],
+  ])('requires a reason for the class-less rule %j, keyed by %j', (selector, subject) => {
     const root = fixture();
-    write(root, 'packages/app/src/styles.css', '[data-card-search-combobox] { border: 0; }\n');
+    write(root, 'packages/app/src/styles.css', `${selector} { border: 0; }\n`);
 
     expect(() => buildUiCatalog(root)).toThrowError(
-      /styles\.css declares \[data-card-search-combobox\], whose block data-card-search-combobox is not recorded/,
+      `styles.css declares a rule for ${subject}, which is not recorded`,
     );
   });
 
@@ -765,7 +824,11 @@ describe('story support harnesses', () => {
   it('rejects a support harness that names a production class instead of rendering its owner', () => {
     const root = fixture();
     write(root, 'packages/app/src/styles.css', '.card-pane { inset: 0; }');
-    write(root, 'packages/app/src/App.tsx', "export const App = () => 'card-pane';");
+    write(
+      root,
+      'packages/app/src/App.tsx',
+      'export const App = () => <div className="card-pane" />;',
+    );
     write(
       root,
       'packages/app/stories/design-system-inventory.ts',
@@ -780,8 +843,10 @@ describe('story support harnesses', () => {
       'export const Facsimile = () => <div className="card-pane" />;',
     );
 
-    expect(() => buildUiCatalog(root)).toThrowError(
-      /packages\/app\/stories\/support\/Facsimile\.tsx names the production class card-pane/,
-    );
+    // The reproduction is the whole complaint: production really does name the
+    // class, so the rule is live and the harness is copying a real surface.
+    expect(problemsOf(root)).toEqual([
+      'packages/app/stories/support/Facsimile.tsx names the production class card-pane — render the production component instead of reproducing it (ADR 0052)',
+    ]);
   });
 });

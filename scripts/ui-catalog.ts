@@ -159,18 +159,17 @@ interface InventoryEntry {
  * application still styles by hand. Every entry carries its own reason, so a new
  * gap costs a written justification rather than passing unnoticed — and an entry
  * that stops being true fails the check.
+ *
+ * The module is parsed once by the caller and read once per list: reading it
+ * per declaration said "is missing" once for each list it was meant to declare.
  */
 const declaredInventory = (
-  path: string,
+  source: ts.SourceFile,
   declaration: string,
   subjectKey: string,
   problems: string[],
 ): readonly InventoryEntry[] => {
-  if (!existsSync(path)) {
-    problems.push(`${INVENTORY_MODULE} is missing`);
-    return [];
-  }
-  const array = literalArrayNamed(sourceFile(path), declaration);
+  const array = literalArrayNamed(source, declaration);
   if (array === null) {
     problems.push(`${INVENTORY_MODULE} must declare a literal ${declaration} array`);
     return [];
@@ -396,10 +395,14 @@ const resolveModule = (specifier: string, from: string, repositoryRoot: string):
     if (packageDirectory === null) return null;
     for (const [pattern, target] of subpathImports(packageDirectory)) {
       // An entry without a `*` is an exact alias — `"#env": "./src/env.ts"` —
-      // and matches only itself.
+      // and matches only itself. A miss falls through to the entries after it:
+      // ending the search there let an exact alias listed first hide the
+      // wildcard pattern that does match.
       const [prefix, suffix] = pattern.split('*');
-      if (suffix === undefined)
-        return specifier === pattern ? resolvedExtension(join(packageDirectory, target)) : null;
+      if (suffix === undefined) {
+        if (specifier !== pattern) continue;
+        return resolvedExtension(join(packageDirectory, target));
+      }
       if (prefix === undefined || !specifier.startsWith(prefix)) continue;
       const [targetPrefix, targetSuffix] = target.split('*');
       if (targetPrefix === undefined || targetSuffix === undefined) continue;
@@ -581,12 +584,29 @@ const declaredClasses = (css: string): ReadonlySet<string> =>
  */
 const NON_CLASS_SUBJECT = /(?:\[([\w-]+)|#(-?[_a-zA-Z][\w-]*))/u;
 
+/**
+ * And a selector naming only elements — `*`, `html, body`, `main > div` — is
+ * keyed by its leading element name, or it would owe no reason at all: an
+ * attribute-or-id-only key let the reset rules at the top of `styles.css`
+ * through, which is the one way a rule could be added to that file for free.
+ * The attribute or id wins where a selector has both, so `html, body, #root`
+ * stays recorded as `root`. A pseudo-class-only rule (`:root { … }`) still
+ * yields no subject; nothing in the tree writes one.
+ */
+const LEADING_ELEMENT = /^(\*|[a-zA-Z][\w-]*)/u;
+
+const nonClassSubject = (selector: string): string => {
+  const attributeOrId = NON_CLASS_SUBJECT.exec(selector);
+  return attributeOrId !== null
+    ? (attributeOrId[1] ?? attributeOrId[2] ?? '')
+    : (LEADING_ELEMENT.exec(selector)?.[1] ?? '');
+};
+
 const declaredNonClassSubjects = (css: string): ReadonlySet<string> =>
   new Set(
     ruleSelectors(css)
       .filter((selector) => classesIn(selector).length === 0)
-      .map((selector) => NON_CLASS_SUBJECT.exec(selector))
-      .map((match) => match?.[1] ?? match?.[2] ?? '')
+      .map(nonClassSubject)
       .filter((subject) => subject !== ''),
   );
 
@@ -611,8 +631,8 @@ const lastFragment = (text: string): string => text.split(/\s+/u).at(-1) ?? '';
 
 /**
  * A template stem only counts as the start of a class name if it reads like one.
- * The tree's stems include a lone `-` (from `translate(${x}, ${y})`) and several
- * ending in `:` or `=`, and a stem of `-` would call every class named.
+ * A class built from two interpolations leaves a lone `-` as its middle
+ * fragment, and a stem of `-` would call every class named.
  */
 const CLASS_STEM = /^[a-zA-Z][\w-]*$/u;
 
@@ -796,8 +816,13 @@ export const buildUiCatalog = (repositoryRoot = process.cwd()): UiCatalog => {
       problems.push(`${root} is missing — its half of the catalogue check would cover nothing`);
 
   const inventoryPath = join(repositoryRoot, INVENTORY_MODULE);
+  const inventorySource = existsSync(inventoryPath) ? sourceFile(inventoryPath) : null;
+  if (inventorySource === null) problems.push(`${INVENTORY_MODULE} is missing`);
   const recorded = (declaration: string, subjectKey: string): ReadonlyMap<string, string> => {
-    const entries = declaredInventory(inventoryPath, declaration, subjectKey, problems);
+    const entries =
+      inventorySource === null
+        ? []
+        : declaredInventory(inventorySource, declaration, subjectKey, problems);
     const bySubject = new Map<string, string>();
     for (const entry of entries) {
       if (bySubject.has(entry.subject))
@@ -809,7 +834,10 @@ export const buildUiCatalog = (repositoryRoot = process.cwd()): UiCatalog => {
 
   const rendered = modulesRenderedBy(stableStoryFiles, repositoryRoot);
   const recordedGaps = recorded('uncataloguedComponents', 'module');
-  for (const path of productionComponents(repositoryRoot)) {
+  // One scan, read by both halves: what the coverage check holds to a story, and
+  // what a recorded entry has to be one of.
+  const components = productionComponents(repositoryRoot);
+  for (const path of components) {
     const module = repositoryPath(repositoryRoot, path);
     if (rendered.has(path) && recordedGaps.has(module))
       problems.push(
@@ -820,9 +848,7 @@ export const buildUiCatalog = (repositoryRoot = process.cwd()): UiCatalog => {
         `${module} is rendered by no stable story — add one, or record why in ${INVENTORY_MODULE}`,
       );
   }
-  const scanned = new Set(
-    productionComponents(repositoryRoot).map((path) => repositoryPath(repositoryRoot, path)),
-  );
+  const scanned = new Set(components.map((path) => repositoryPath(repositoryRoot, path)));
   for (const module of recordedGaps.keys()) {
     if (!existsSync(join(repositoryRoot, module)))
       problems.push(`uncatalogued component ${module} does not exist — drop its entry`);
@@ -861,13 +887,14 @@ export const buildUiCatalog = (repositoryRoot = process.cwd()): UiCatalog => {
       );
   }
   // A rule naming no class is styling something too, and needs its own reason.
-  // The dead-rule half does not apply: an attribute or id is not a class name,
-  // so no module will ever "name" one the way `className` names a class.
+  // The dead-rule half does not apply: an attribute, an id or an element name is
+  // not a class name, so no module will ever "name" one the way `className`
+  // names a class.
   for (const subject of [...declaredNonClassSubjects(stylesheetSource)].sort()) {
     declaredBlocks.add(subject);
     if (!recordedBlocks.has(subject))
       problems.push(
-        `${HAND_ROLLED_STYLESHEET} declares [${subject}], whose block ${subject} is not recorded — build it from @project/ui, or record why in ${INVENTORY_MODULE}`,
+        `${HAND_ROLLED_STYLESHEET} declares a rule for ${subject}, which is not recorded — build it from @project/ui, or record why in ${INVENTORY_MODULE}`,
       );
   }
   for (const block of recordedBlocks.keys()) {
