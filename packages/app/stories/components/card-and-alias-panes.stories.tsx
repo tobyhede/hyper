@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { Story } from '@ladle/react';
 import { uuidSchema, type Card } from '@project/core';
+import { NewAlias } from '#components/NewAlias';
 import { OpenCard } from '#components/OpenCard';
 
 export default { title: 'Components/Card and Alias Panes' };
@@ -74,3 +75,29 @@ export const Alias: Story = () => {
   );
 };
 Alias.meta = { iframed: true };
+
+/**
+ * The same editor opened on an Alias that does not exist yet.
+ *
+ * The Target list is the completion, not a step before one, so there is no
+ * Create beside Cancel — which is the state worth showing, because every other
+ * pane in this catalogue finishes on a labelled action.
+ */
+export const NewAliasPane: Story = () => {
+  const [created, setCreated] = useState<string | null>(null);
+
+  return created === null ? (
+    <NewAlias
+      targets={[markdown]}
+      refusal={null}
+      onCreate={(target, title) =>
+        setCreated(`Created ${title === '' ? '(the Target’s title)' : title} on ${target}.`)
+      }
+      onCancel={() => setCreated('Cancelled, creating nothing.')}
+      onRefusalStale={() => undefined}
+    />
+  ) : (
+    <p>{created}</p>
+  );
+};
+NewAliasPane.meta = { iframed: true };

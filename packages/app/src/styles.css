@@ -100,45 +100,6 @@ body {
   display: none;
 }
 
-/* ---- Toolbar controls ---- */
-.btn {
-  background: var(--secondary);
-  color: var(--foreground);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 0.4rem 0.8rem;
-  font-size: 0.85rem;
-  cursor: pointer;
-}
-
-.btn:hover:not(:disabled) {
-  border-color: var(--accent);
-}
-
-.btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.btn--primary {
-  background: var(--primary);
-  border-color: var(--primary);
-  color: var(--primary-foreground);
-}
-
-/* A refused remote snapshot. The reason is a sentence and then a line per broken
-   reference, and it is read in the alert itself — a `title` would announce
-   nothing and reach no keyboard or touch user. Newlines are the message's own,
-   hence `pre-wrap`; the bounds keep a space with many broken references from
-   pushing the toolbar off screen. */
-.persistence-refusal {
-  font-size: 0.85rem;
-  white-space: pre-wrap;
-  max-width: 40ch;
-  max-height: 4.5em;
-  overflow-y: auto;
-}
-
 /* ---- Graph area ---- */
 .graph-area {
   position: absolute;
@@ -270,6 +231,22 @@ body {
   font-size: 0.95rem;
 }
 
+/* `CardContent` always emits `card card--full`, so these are its own base
+   appearance, and they sit here rather than after the traversal block below on
+   purpose. `.card--full .card__title` and `.rf-card-node__content .card__title`
+   have the same specificity, so whichever is written second wins — and with
+   these last, a presented Card's title took a fixed 1.3rem and stopped scaling
+   with the frame, which is exactly what the comment below forbids. */
+.card--full {
+  background: transparent;
+  border: none;
+  padding: 0.5rem 0;
+}
+
+.card--full .card__title {
+  font-size: 1.3rem;
+}
+
 /* ---- The Card reached during traversal ---- */
 /* Presenting draws the active card's content instead of its title (ADR 0027).
    Same box as every other card — the layout's 16:9 frame, which the camera then
@@ -327,41 +304,6 @@ body {
   padding: 2cqw;
   border-radius: 4px;
   background: var(--secondary);
-}
-
-/* ---- React Flow edges ---- */
-.rf-edge--reference .react-flow__edge-path {
-  stroke-dasharray: 6 4;
-}
-
-.card--full {
-  background: transparent;
-  border: none;
-  padding: 0.5rem 0;
-}
-
-.card--full .card__title {
-  font-size: 1.3rem;
-}
-
-.controls__btn {
-  background: var(--secondary);
-  color: var(--foreground);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 0.35rem 0.8rem;
-  font-size: 0.85rem;
-  cursor: pointer;
-}
-
-.controls__btn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
-.controls__btn--exit {
-  margin-left: 0.5rem;
-  border-color: #7f1d1d;
 }
 
 /* ---- Card pane ---- */
@@ -467,11 +409,6 @@ body {
   background: var(--secondary);
   color: var(--foreground);
   font: inherit;
-}
-
-.card-pane__field--source {
-  flex: 1;
-  min-height: 0;
 }
 
 .card-pane__field textarea {

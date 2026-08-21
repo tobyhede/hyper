@@ -21,7 +21,6 @@
   --card-title: #12161c;
   --card-title-muted: #4a505c;
   --canvas: #efe9dc;
-  --canvas-dot: #c9c0ad;
 }
 
 /*
@@ -34,31 +33,13 @@
  * shell's title near-black on the dark panel. An inventory whose chrome does
  * not look like the app's chrome is not evidence about the app.
  */
-.inv-sheet,
-.inv-canvas {
+.inv-sheet {
   font-family: 'Inter Tight', ui-sans-serif, system-ui, sans-serif;
   color: var(--card-title);
 }
 
 .inv-mono {
   font-family: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
-}
-
-/* ---- The paper canvas ---- */
-
-/*
- * 22px pitch, 1.4px dots, per the token table. The gradient stop is at 0.7px —
- * half the dot — because `radial-gradient` measures a radius and the token
- * states a diameter.
- */
-.inv-canvas {
-  width: 1720px;
-  height: 530px;
-  position: relative;
-  background-color: var(--canvas);
-  background-image: radial-gradient(circle at 1px 1px, var(--canvas-dot) 0.7px, transparent 0.7px);
-  background-size: 22px 22px;
-  overflow: hidden;
 }
 
 .inv-card-node-stage {
@@ -73,21 +54,6 @@
 
 /* ---- Inventory page furniture ----
    Not part of the design. The frame the specimens are shown in. */
-
-/*
- * A full-bleed app surface needs the app's own ground under it.
- *
- * `styles.css` paints `--bg` on `body`, and Ladle covers `body` with its own
- * white story canvas — so a surface that expects to sit on the app background
- * (the workspace chooser is the whole of it) drew light text onto white and its
- * heading disappeared. This restores the ground for exactly those stories,
- * rather than painting every story dark and losing the paper canvas.
- */
-.inv-app-surface {
-  min-height: 520px;
-  color: var(--text);
-  background: var(--bg);
-}
 
 .inv-sheet {
   padding: 28px 32px;

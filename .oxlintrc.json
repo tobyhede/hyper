@@ -455,9 +455,17 @@
       // decides whether untrusted JSON has a shape must accept it before it has
       // one. Narrower than the boundary exemption above on purpose: taking all
       // three here would buy nothing and hide the two rules these files pass.
+      // `scripts/ui-catalog.ts` is the same category and joins it rather than
+      // opening a fifth: it reads `packages/app/package.json` to learn the
+      // `#components/*` subpath patterns a story's imports resolve through, and
+      // reading them is the point — a second copy of that mapping kept in the
+      // checker would be the thing that drifts. It decodes through the same
+      // named predicate returning a named contract, and passes
+      // `no-runtime-typeof` and `no-unsafe-dictionary-type` unaided.
       "files": [
         "scripts/check-typescript-toolchain.ts",
-        "test/unit/check-typescript-toolchain.test.ts"
+        "test/unit/check-typescript-toolchain.test.ts",
+        "scripts/ui-catalog.ts"
       ],
       "rules": {
         "anti-slop/no-unknown-parameters": "off"

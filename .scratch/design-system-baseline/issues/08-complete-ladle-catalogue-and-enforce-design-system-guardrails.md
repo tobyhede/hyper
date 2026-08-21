@@ -4,26 +4,26 @@
 
 **Blocked by:** 03 — Recompose Card and Alias panes from form primitives; 04 — Bring workspace selection and operational feedback into the system; 05 — Make the production canvas Card a design-system component; 06 — Systematise Graph HUD and Edge authoring surfaces; 07 — Rebuild presentation chrome with design-system components; 11 — Deliver ADR 0052 and its production-parity operating rule to `main`; 14 — Replace the workspace toolbar with a workspace Sidebar. Issue 14 supersedes resolved Issue 02's withdrawn Menubar and interim selector designs.
 
-**Status:** ready-for-agent
+**Status:** ready-for-human — the enforcement is delivered and two acceptance lines are honestly short. See "What is not ticked, and why" in the 2026-08-21 comment; whether to accept the residual or open follow-ups is the call being handed over.
 
-- [ ] Every production UI component has representative real-component Ladle stories for its meaningful states; no proposal-only story is presented as production evidence.
-- [ ] Legacy feature-owned visual styling is removed or explicitly limited to React Flow geometry and integration requirements.
-- [ ] Automated checks prevent new product UI components or styles from bypassing `@project/ui`, and the complete verification suite remains green.
-- [ ] `$shadcn-first-ui` exists and is the mandatory production-UI workflow.
-- [ ] Root `AGENTS.md` routes production UI work to that skill near the beginning of the file.
-- [ ] `pnpm ui:catalog` deterministically exposes the public design-system inventory.
-- [ ] `pnpm ui:catalog:check` is part of verification.
-- [ ] Codex has project-scoped access to the official shadcn MCP server.
-- [ ] App and React Flow adapter code cannot import Base UI, cmdk, Lucide, or `@project/ui` internals directly.
-- [ ] `stories/components` contains only real production components.
-- [ ] `stories/surfaces` contains real production compositions.
-- [ ] `stories/review` is the only home for proposal-only UI.
-- [ ] `stories/support` contains no product visual facsimiles.
-- [ ] A custom replacement for existing shadcn/Base UI behavior requires an explicit documented deviation.
-- [ ] Every meaningful stable-story claim is verified both through the rendered Ladle story and through the real application composition (ADR 0052).
-- [ ] A deterministic parity inventory maps every meaningful stable-story claim to both its Ladle behavior test and its corresponding application behavior test, and `pnpm ui:catalog:check` rejects missing or stale mappings (ADR 0052).
-- [ ] `pnpm ui:catalog` prints the resolved story, claim, Ladle evidence and application evidence matrix for review.
-- [ ] Each Playwright suite validates at runtime that every expected parity test was collected once and passed without a flaky retry.
+- [ ] Every production UI component has representative real-component Ladle stories for its meaningful states; no proposal-only story is presented as production evidence. — **Half.** *Coverage* is enforced: every production `.tsx` is either rendered by a stable story or recorded with a reason, and `stories/review` is excluded so a proposal cannot supply evidence. *Meaningful states* is not, and cannot be mechanically: it is the same judgement the Answer already leaves with human review for the claim set's semantic completeness.
+- [ ] Legacy feature-owned visual styling is removed or explicitly limited to React Flow geometry and integration requirements. — **Half.** Seven dead rules are gone and every surviving block is recorded with its reason, so the file is a reviewed list rather than a claim. But two blocks are neither removed nor React Flow's: `card-editor` is product appearance ([Issue 16](16-move-the-card-editor-treatment-into-the-design-system.md)) and `workspace-selection` is condemned with its component (`space-cards/04`). Recording a reason is a third option this criterion does not offer.
+- [x] Automated checks prevent new product UI components or styles from bypassing `@project/ui`, and the complete verification suite remains green.
+- [x] `$shadcn-first-ui` exists and is the mandatory production-UI workflow.
+- [x] Root `AGENTS.md` routes production UI work to that skill near the beginning of the file.
+- [x] `pnpm ui:catalog` deterministically exposes the public design-system inventory.
+- [x] `pnpm ui:catalog:check` is part of verification.
+- [x] Codex has project-scoped access to the official shadcn MCP server.
+- [x] App and React Flow adapter code cannot import Base UI, cmdk, Lucide, or `@project/ui` internals directly.
+- [x] `stories/components` contains only real production components.
+- [x] `stories/surfaces` contains real production compositions.
+- [x] `stories/review` is the only home for proposal-only UI.
+- [x] `stories/support` contains no product visual facsimiles.
+- [x] A custom replacement for existing shadcn/Base UI behavior requires an explicit documented deviation.
+- [x] Every meaningful stable-story claim is verified both through the rendered Ladle story and through the real application composition (ADR 0052).
+- [x] A deterministic parity inventory maps every meaningful stable-story claim to both its Ladle behavior test and its corresponding application behavior test, and `pnpm ui:catalog:check` rejects missing or stale mappings (ADR 0052).
+- [x] `pnpm ui:catalog` prints the resolved story, claim, Ladle evidence and application evidence matrix for review.
+- [x] Each Playwright suite validates at runtime that every expected parity test was collected once and passed without a flaky retry.
 - [ ] **Delegated to [Issue 15](15-run-the-ladle-parity-suite-in-ci.md); not this ticket's to build.** Ladle E2E runs as its own required CI job, and CI fails when any Playwright test is flaky even if a diagnostic retry passes. — The job landed in PR #83 and the flake policy is settled; what remains is the branch-protection rule that makes it *required*, which is a GitHub setting rather than a file. Close this line against Issue 15's Answer, not against work here. See the Comments below.
 
 ## Audit note
@@ -71,6 +71,88 @@ job land coherently: there is no grandfather list. A stable state without both
 proofs moves to `review` or is removed.
 
 ## Comments
+
+### 2026-08-21 — the two gaps become a checked inventory
+
+The audit note's two limits are closed by one mechanism rather than two.
+`packages/app/stories/design-system-inventory.ts` declares two literal lists
+beside `parity-claims.ts`, and `pnpm ui:catalog:check` holds both to the tree.
+
+**`uncataloguedComponents`** names every production `.tsx` under
+`packages/{ui,app,react-flow-adapter}/src` that no stable story renders.
+Reachability is resolved through the real import graph from `stories/components`
+and `stories/surfaces` — `stories/review` is excluded, so a proposal cannot
+catalogue anything — following relative paths, `packages/app/package.json`'s own
+`#components/*` subpath map, and `@project/*` barrels *by the names taken through
+them*. That last part is what makes it bite: following a barrel whole would have
+marked all of `@project/ui` catalogued the moment one story imported `Button`.
+
+**`handRolledStyles`** names every class block `packages/app/src/styles.css`
+still declares, with the React Flow or integration requirement that keeps it out
+of `@project/ui`. Both lists fail in both directions — a new component or block
+fails until it is built from the design system or recorded with a reason, and an
+entry that stops being true fails too.
+
+The check also rejects a rule no production module names, which found seven dead
+ones: `.btn`, `.btn--primary`, `.controls__btn`, `.controls__btn--exit`,
+`.persistence-refusal`, `.rf-edge--reference` and `.card-pane__field--source`,
+all deleted. One of them was being kept alive by a test *about* it —
+`ui-theme-contrast.test.ts` asserted `.btn--primary` used the semantic token, so
+the only thing referencing that rule was the assertion; it now asks `Button`'s
+own `default` variant instead. Two facsimile rules went from
+`stories/support/inventory.css` the same way: `.inv-canvas`, the paper canvas,
+and `.inv-app-surface`, which existed for the condemned Space chooser.
+
+**A real defect fell out of the style audit.** `.card--full .card__title` sat
+*after* the `.rf-card-node__content` container-query block at equal specificity,
+so a presented Card's title drew at a fixed `1.3rem` rather than scaling with its
+frame — precisely what the block's own comment and ADR 0027 forbid. The two
+`.card--full` rules moved above it, and `presenting.spec.ts` now pins the
+computed `13px` (5cqw of the 260px frame) so source order cannot drift back.
+
+**One missing production story was backfilled.** `NewAlias` — the pane that
+authors an Alias that does not exist yet — had no stable story, only the *opened*
+Alias did. `Components/Card and Alias Panes → NewAliasPane` renders the
+production component, and the claim
+`new-alias-completes-on-the-target-chosen` carries a Ladle proof and a real
+application proof in `editing.spec.ts`. Adding it also removed
+`packages/ui/src/components/input.tsx` from the uncatalogued list, which is the
+check working in the other direction.
+
+**What is not ticked, and why.** Two acceptance lines are half-met, and are left
+unticked rather than argued into place.
+
+*"…for its meaningful states"* — the check proves a production component is
+**rendered** by a stable story, not that the story shows its meaningful states.
+No mechanical check can decide the second, which is why the Answer above already
+leaves the claim set's semantic completeness with human review; the same
+judgement governs states. What changed is that the gap is now enumerated and
+dated rather than invisible, and the Audit note's other limit — detecting a
+product visual facsimile under `stories/support` — is fully closed.
+
+*"…removed or explicitly limited to React Flow geometry and integration
+requirements"* — every surviving block now carries its reason, but two of them
+are not React Flow's and are not removed. `card-editor` is product appearance:
+hard-coded ink, paper and rule colours, the largest thing left in `styles.css`.
+It now has an owner, [Issue 16](16-move-the-card-editor-treatment-into-the-design-system.md),
+rather than sitting in the inventory as debt with none. `workspace-selection` is
+condemned with its component under ADR 0058 and goes with `space-cards/04`.
+Recording a reason is a third option the criterion does not offer, so the box
+stays open until those two land.
+
+`AuthorableEdge` and `RoutedEdge` are a third recorded gap with an owner already:
+their review story carries no parity claim because promoting it is blocked on the
+reconnected-Edge selection defect at
+`findings/reconnected-edge-loses-its-selection.md`.
+
+**One thing here was not asked for.** The `.card--full` cascade fix and its
+`presenting.spec.ts` assertion are a rendering change, and no acceptance line
+reaches them. They are kept because the style audit this ticket *did* ask for is
+what surfaced the defect, and recording the block in the inventory without fixing
+it would have documented a broken cascade as intentional.
+
+**Verification.** `pnpm verify` green — 149 files, 1610 passed, 8 skipped.
+`pnpm e2e` 115 passed. `pnpm e2e:ladle` 38 passed.
 
 ### 2026-08-20 — the parity-evidence model lands before the remaining migrations
 

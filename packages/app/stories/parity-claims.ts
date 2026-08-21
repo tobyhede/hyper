@@ -95,6 +95,13 @@ export const parityClaims: readonly ParityClaim[] = [
     claim: 'An Alias opens its own title and Target editor without exposing Target content.',
   },
   {
+    id: 'new-alias-completes-on-the-target-chosen',
+    storyFile: 'components/card-and-alias-panes.stories.tsx',
+    storyExport: 'NewAliasPane',
+    claim:
+      'Adding an Alias offers Title and Target with no create action, and completes on the Target chosen, carrying the title exactly as typed.',
+  },
+  {
     id: 'persistence-indicator-shows-save-lifecycle',
     storyFile: 'components/persistence-indicator.stories.tsx',
     storyExport: 'Lifecycle',
