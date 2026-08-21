@@ -44,6 +44,15 @@ export const noConditionalEmptyObjectSpreadRule = defineRule({
           context.report({ node, messageId: "avoid" });
         }
       },
+      // A JSX spread attribute (`<Foo {...expr} />`) is its own node type, not
+      // a `SpreadElement` inside an `ObjectExpression` — the same hidden
+      // omission-behind-an-empty-object idiom reaches JSX props unseen by the
+      // visitor above.
+      JSXSpreadAttribute(node) {
+        if (isConditionalEmptyObjectSpread(node.argument)) {
+          context.report({ node, messageId: "avoid" });
+        }
+      },
     };
   },
 });

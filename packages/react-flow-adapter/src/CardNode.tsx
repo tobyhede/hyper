@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
+import { useRef } from 'react';
 import { Handle, Position, useConnection, type NodeProps } from '@xyflow/react';
-import { CardContent, CardKindIcon, ConnectIcon, EditIcon } from '@project/ui';
+import { CanvasCard, CardContent, type CanvasCardFront, type CanvasCardProps } from '@project/ui';
 import type { CardFlowNode, CardHandle } from './projection';
 import { AUTHORING_HANDLE_DIAMETER, GRAPH_PORT_DIAMETER } from './authoring-handle';
 
@@ -17,112 +17,23 @@ import { AUTHORING_HANDLE_DIAMETER, GRAPH_PORT_DIAMETER } from './authoring-hand
  * fills the screen (ADR 0027), so at that zoom the content is exactly what is
  * legible. It is still the same node — nothing is transformed into anything, and
  * there is no second artefact (ADR 0024).
+ *
+ * The Card front itself — Markdown and Alias treatment, title editing, refusal
+ * display, Connect/Edit controls and interaction-state visuals — is the
+ * production `@project/ui` `CanvasCard`. This module owns everything React
+ * Flow: handles and their declared geometry, connection state, translating
+ * selection/dragging into the Card's four external visual states, keeping a
+ * Card's controls from leaking into node opening, dragging, panning or canvas
+ * keyboard handling, and returning focus to this node once the title editor
+ * completes or cancels from the keyboard.
  */
 const AUTHORING_SIDES = [Position.Top, Position.Right, Position.Bottom, Position.Left] as const;
 
-interface CardTitleEditorProps {
-  readonly cardId: string;
-  readonly title: string;
-  readonly onComplete?: (title: string) => string | null;
-  readonly onCancel?: () => void;
-}
-
-function CardTitleEditor({ cardId, title, onComplete, onCancel }: CardTitleEditorProps) {
-  const [draft, setDraft] = useState(title);
-  const [error, setError] = useState<string | null>(null);
-  const input = useRef<HTMLInputElement>(null);
-  const closingByKey = useRef(false);
-
-  // Focus on mount whichever control opened this editor, pointer or keyboard.
-  // A created Card enters here with its neutral title *selected*, and an
-  // unfocused input has no selection an author can type over — so the accepted
-  // prototype's separate sentence about keyboard activation restates that
-  // requirement rather than restricting it to the keyboard path. "Pointer
-  // placement selects without forcing keyboard focus" is about placement
-  // gestures, which end at a placed Card rather than in a field.
-  useEffect(() => {
-    input.current?.focus();
-    input.current?.select();
-  }, []);
-
-  /**
-   * Submit the draft and show whatever came back, answering the refusal so a
-   * caller can tell an accepted completion from a refused one — which is the
-   * only thing the two exits disagree about.
-   */
-  const complete = (): string | null => {
-    const refusal = onComplete?.(draft) ?? null;
-    setError(refusal);
-    return refusal;
-  };
-
-  /**
-   * Enter and Escape both leave the editor, and neither may leave focus on
-   * `<body>` — a Card created from the toolbar or from `C` opens straight into
-   * this field, so where focus lands when the naming ends is where the whole
-   * gesture ends. The Card is what the author was working on, it survives the
-   * editor, and outside presenting it is focusable, so it is the answer.
-   *
-   * Taken *before* the parent unmounts the input: focus moves to a node that is
-   * already in the tree, and the unmount that follows has nothing left to
-   * displace. That move blurs the input, which is why `closingByKey` is raised
-   * first — the blur handler completes the draft, and it must not complete a
-   * second time on the way out of a completion, nor at all on the way out of a
-   * cancellation.
-   *
-   * Only the keyboard paths restore. A blur is the author clicking somewhere
-   * else, and taking focus back from wherever they clicked would be a steal.
-   */
-  const returnFocusToCard = (): void => {
-    closingByKey.current = true;
-    input.current?.closest<HTMLElement>('.react-flow__node')?.focus();
-  };
-
-  return (
-    <div className="card__title-editor nodrag nopan nowheel">
-      <input
-        ref={input}
-        className="card__title-input"
-        aria-label="Card title"
-        aria-invalid={error !== null}
-        aria-describedby={error === null ? undefined : `card-title-error-${cardId}`}
-        value={draft}
-        onChange={(event) => {
-          setDraft(event.currentTarget.value);
-          setError(null);
-        }}
-        onBlur={() => {
-          if (closingByKey.current) {
-            closingByKey.current = false;
-            return;
-          }
-          complete();
-        }}
-        onClick={(event) => event.stopPropagation()}
-        onPointerDown={(event) => event.stopPropagation()}
-        onKeyDown={(event) => {
-          event.stopPropagation();
-          if (event.key === 'Enter') {
-            event.preventDefault();
-            // A refused draft keeps the editor open, so focus stays in the
-            // field with the message beside it rather than leaving for a Card
-            // whose name the author has not settled.
-            if (complete() === null) returnFocusToCard();
-          } else if (event.key === 'Escape') {
-            event.preventDefault();
-            returnFocusToCard();
-            onCancel?.();
-          }
-        }}
-      />
-      {error !== null && (
-        <span id={`card-title-error-${cardId}`} role="alert" className="card__field-error">
-          {error}
-        </span>
-      )}
-    </div>
-  );
-}
+/** Strips `readonly` off a props type so an optional slice of it can be built by
+ *  conditionally assigning keys rather than by a conditional empty-object
+ *  spread — the props themselves stay readonly to every other caller. The keys
+ *  are already optional; this changes nothing but their mutability. */
+type Mutable<T> = { -readonly [K in keyof T]: T[K] };
 
 /*
  * Handle geometry is *declared*, not measured, so nothing here reports a change
@@ -143,7 +54,7 @@ function CardTitleEditor({ cardId, title, onComplete, onCancel }: CardTitleEdito
  * lets an Edge completed onto this Card resolve in the render that first makes
  * it incident, before the projection catches up.
  */
-export function CardNode({ data, selected, isConnectable }: NodeProps<CardFlowNode>) {
+export function CardNode({ data, selected, dragging, isConnectable }: NodeProps<CardFlowNode>) {
   /**
    * Which handle role the live drag is looking for, or `null` when none is.
    *
@@ -159,6 +70,25 @@ export function CardNode({ data, selected, isConnectable }: NodeProps<CardFlowNo
     connection.inProgress ? (connection.fromHandle.type === 'target' ? 'source' : 'target') : null,
   );
   const connectionInProgress = seeking !== null;
+  const visuallySelected = selected || data.selectedForAuthoring;
+
+  /**
+   * The DOM subtree this node renders, kept only to reach the React Flow node
+   * wrapper that contains it (`.react-flow__node`) — an ancestor React Flow
+   * itself renders around whatever this component returns. It is what
+   * `onReturnFocus` gives the Card's title editor a way to ask for without the
+   * design-system component knowing React Flow exists.
+   */
+  const inner = useRef<HTMLDivElement>(null);
+
+  // An absent `aliasOf` means the Target title did not resolve — unreachable for
+  // a Space that survives intake (`validate.ts` refuses `unresolved-alias-target`
+  // and `alias-targets-alias`), but `projection.ts` types it optional and the
+  // Alias front carries the Target title as required. The empty string is how
+  // that reaches `CanvasCard` as "no Target to name", and `CanvasCard` draws no
+  // Target line for it rather than an empty one.
+  const front: CanvasCardFront =
+    data.kind === 'alias' ? { kind: 'alias', aliasOf: data.aliasOf ?? '' } : { kind: 'markdown' };
 
   const renderHandle = (handle: CardHandle, type: 'source' | 'target') => (
     <Handle
@@ -216,123 +146,83 @@ export function CardNode({ data, selected, isConnectable }: NodeProps<CardFlowNo
     />
   );
 
+  /*
+   * A control reaches the Card only when the composition both offered it and
+   * said how it is performed. The flag and the operation answer different
+   * questions — whether this Card takes part at all, and what happens when the
+   * control is used — and `SpaceCanvas` supplies them together, but the type
+   * lets them diverge. Taking the flag alone put a live control on the Card
+   * whose activation ran nothing; forwarding the operation with `?.` made the
+   * miss silent. `CanvasCard` draws no control it has no operation for, so
+   * withholding it here is the same answer one layer up.
+   */
+  const canvasCardOptionalProps: Mutable<
+    Pick<CanvasCardProps, 'onBeginTitleEdit' | 'onConnect' | 'onEdit'>
+  > = {};
+  if (data.titleEditingEnabled === true && data.onBeginTitleEditing !== undefined) {
+    canvasCardOptionalProps.onBeginTitleEdit = data.onBeginTitleEditing;
+  }
+  if (data.connectingEnabled === true && data.onBeginConnect !== undefined) {
+    canvasCardOptionalProps.onConnect = data.onBeginConnect;
+  }
+  if (data.cardEditingEnabled === true && data.onEditCard !== undefined) {
+    canvasCardOptionalProps.onEdit = data.onEditCard;
+  }
+
+  /* The editor's presence is the editing state, and it arrives with the two
+     operations that end it — so nothing here has to stand in for a completion
+     the composition did not supply. */
+  const titleEditor = data.titleEditor;
+
+  const onReturnFocus = () => {
+    inner.current?.closest<HTMLElement>('.react-flow__node')?.focus();
+  };
+
   return (
     <div
+      ref={inner}
       className="rf-card-node__inner"
       data-active={data.active}
-      data-selected={selected || data.selectedForAuthoring}
+      data-selected={visuallySelected}
       data-connection-in-progress={connectionInProgress}
       data-connection-seeking={seeking ?? 'none'}
     >
       {data.targetHandles.map((handle) => renderHandle(handle, 'target'))}
-      {AUTHORING_SIDES.map((side) => renderAuthoringHandle(side, 'target'))}
       {data.showContent ? (
         <div className="rf-card-node__content">
           <CardContent title={data.title} markdown={data.body ?? ''} />
         </div>
+      ) : titleEditor !== undefined ? (
+        <CanvasCard
+          front={front}
+          title={data.title}
+          graphColor={data.activeGraphColor}
+          state="editing"
+          onCompleteTitleEdit={titleEditor.onComplete}
+          onCancelTitleEdit={titleEditor.onCancel}
+          onReturnFocus={onReturnFocus}
+          {...canvasCardOptionalProps}
+        />
       ) : (
-        <article className="card card--node" data-testid="card">
-          {data.editingTitle ? (
-            <CardTitleEditor
-              cardId={data.cardId}
-              title={data.title}
-              {...(data.onCompleteTitleEditing !== undefined
-                ? { onComplete: data.onCompleteTitleEditing }
-                : {})}
-              {...(data.onCancelTitleEditing !== undefined
-                ? { onCancel: data.onCancelTitleEditing }
-                : {})}
-            />
-          ) : (
-            // The kind is drawn beside the title and never instead of it: an
-            // Alias is a Card with a name of its own, and Markdown is the
-            // visual default with no glyph at all. Persistent rather than
-            // revealed on hover, because what kind a Card is does not depend on
-            // where the pointer happens to be.
-            <div className="card__heading">
-              {data.kind !== 'markdown' && <CardKindIcon kind={data.kind} size={12} />}
-              {/* Renaming is the title's own gesture (ADR 0036). A double click
-                  here must not also reach the Card, which would open it and
-                  bury the field the author is about to type into. */}
-              <h2
-                className={
-                  data.titleEditingEnabled ? 'card__title card__title--editable' : 'card__title'
-                }
-                onDoubleClick={
-                  data.titleEditingEnabled
-                    ? (event) => {
-                        event.stopPropagation();
-                        data.onBeginTitleEditing?.();
-                      }
-                    : undefined
-                }
-              >
-                {data.title}
-              </h2>
-            </div>
-          )}
-          {/* The Target's title, read-only, under the Alias's own — so a
-              redraw reads as a deliberate return rather than repetition, and
-              stays legible when the two titles match. The glyph that used to
-              sit here now names the kind beside the title, where it says the
-              same thing about the Card rather than about this one line. */}
-          {data.aliasOf && (
-            <p className="card__alias-of" data-testid="alias-marker">
-              {data.aliasOf}
-            </p>
-          )}
-          {/* The keyboard's way into an Edge. The four spatial handles (ADR
-              0033) are drag affordances and reach no keyboard author, so this
-              is the one tab stop that begins a connection — it opens a target
-              picker rather than starting a drag. Same event discipline as the
-              Edit control beside it. */}
-          {data.connectingEnabled && !data.editingTitle && (
-            <button
-              type="button"
-              className="card__connect nodrag nopan"
-              data-testid="connect-from-card"
-              aria-label={`Connect from ${data.title}`}
-              onClick={(event) => {
-                event.stopPropagation();
-                data.onBeginConnect?.();
-              }}
-              onPointerDown={(event) => event.stopPropagation()}
-              onKeyDown={(event) => event.stopPropagation()}
-            >
-              <ConnectIcon />
-            </button>
-          )}
-          {data.cardEditingEnabled && !data.editingTitle && (
-            <button
-              type="button"
-              className="card__edit nodrag nopan"
-              aria-label={`Edit Card ${data.title}`}
-              onClick={(event) => {
-                event.stopPropagation();
-                data.onEditCard?.();
-              }}
-              onPointerDown={(event) => event.stopPropagation()}
-              // A real button in the tab order, and its activation keys are the
-              // same two the graph reads as "open this Card". The graph's
-              // handler sits on an ancestor and sees them first, so Enter and
-              // Space opened the Card and called `preventDefault`, cancelling
-              // the activation this button never got — unusable by the very
-              // input it is here for.
-              onKeyDown={(event) => event.stopPropagation()}
-            >
-              {/* The glyph is `aria-hidden`, so the `aria-label` above is the
-                  button's *only* accessible name — not a refinement of visible
-                  text the way it was when this read "Edit title". Removing it
-                  leaves the control unnamed rather than coarsely named.
-
-                  It opens the Card's *content* editor, which is why it is absent
-                  on an Alias: an Alias owns a title and a pointer, and its title
-                  is renamed on the graph. */}
-              <EditIcon />
-            </button>
-          )}
-        </article>
+        <CanvasCard
+          front={front}
+          title={data.title}
+          graphColor={data.activeGraphColor}
+          state={dragging ? 'dragging' : visuallySelected ? 'selected' : 'rest'}
+          {...canvasCardOptionalProps}
+        />
       )}
+      {/*
+        Every authoring handle renders *after* the Card, both roles together.
+        `canvas-card.css` keeps the Card's hover treatment alive while the
+        pointer sits on a handle through `:has(~ …__authoring-handle:hover)`,
+        and `~` reaches following siblings only — a handle rendered before the
+        Card is one that rule cannot see, which is what left the target handles
+        dropping the Card back to its rest face mid-connection. Position is
+        `position` on the handle itself, so the four sides are unaffected by the
+        order they are declared in. `CardNode.test.tsx` pins the ordering.
+      */}
+      {AUTHORING_SIDES.map((side) => renderAuthoringHandle(side, 'target'))}
       {AUTHORING_SIDES.map((side) => renderAuthoringHandle(side, 'source'))}
       {data.sourceHandles.map((handle) => renderHandle(handle, 'source'))}
     </div>

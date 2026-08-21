@@ -174,7 +174,8 @@ body {
 }
 
 .rf-card-node__authoring-handle.react-flow__handle {
-  border: 1px solid #0b0d11;
+  z-index: 1;
+  border: 3px solid #0b0d11;
   border-radius: 50%;
   opacity: 0;
   pointer-events: none;
@@ -205,102 +206,16 @@ body {
   overflow: hidden;
 }
 
-.rf-card-node--active .card {
+/* The production Card front's own appearance — kind and interaction-state
+   treatment, title, actions, title editor — lives with the production
+   `CanvasCard` module in `@project/ui`, as real CSS in the colocated
+   `canvas-card.css`, not here. `.canvas-card` survives here only as a stable
+   selector for this one rule: React Flow's own "this is the actively
+   presented Card" fact, which is adapter/app state and has no reason to be
+   known inside the design-system package. */
+.rf-card-node--active :is(.card, .canvas-card) {
   border-color: var(--accent);
-  box-shadow: 0 0 0 2px var(--primary);
-}
-
-.card--node {
-  /* Size comes from `card.ts`, so the layout and the render agree. */
-  height: var(--card-height);
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 0.35rem;
-  text-align: center;
-}
-
-/* The kind glyph and the title on one line, so a Card's kind is read with its
-   name rather than hunted for. Markdown draws no glyph, so the row collapses to
-   the title alone and the common Card is unchanged. */
-.card__heading {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.35rem;
-  max-width: 100%;
-}
-
-.card--node .card__title {
-  margin: 0;
-  font-size: 1.05rem;
-  line-height: 1.35;
-}
-
-/* Renaming is the title's own double click (ADR 0036), so it must claim only the
-   pixels it draws — a Card centres its title, and a block `h2` spans the full
-   width with most of it empty, which would put the rename target across the
-   middle of the Card. Shrunk to fit, so a double click on the band either side
-   of a short title renames nothing. `cursor: text` is the only thing telling the
-   title apart from the Card around it, which is why it is not decoration. */
-.card--node .card__title--editable {
-  width: fit-content;
-  max-width: 100%;
-  cursor: text;
-}
-
-/* A square icon button in the Card's corner. Sized in its own right rather than
-   from its content, so the glyph cannot drag the box out of square, and kept
-   clear of the title.
-
-   The Connect control is the same box in the opposite corner: the keyboard's
-   way into an Edge, since the four spatial handles are drag affordances. Both
-   appear and withdraw on the same hover, focus and selection rules. */
-.card__connect,
-.card__edit {
-  position: absolute;
-  top: 0.4rem;
-  right: 0.4rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 1.5rem;
-  height: 1.5rem;
-  border: 1px solid var(--border);
-  border-radius: 5px;
-  padding: 0;
-  background: var(--secondary);
-  color: var(--muted-foreground);
-  opacity: 0;
-  pointer-events: none;
-  cursor: pointer;
-  transition:
-    opacity 100ms ease,
-    color 100ms ease,
-    border-color 100ms ease;
-}
-
-.card__connect {
-  right: auto;
-  left: 0.4rem;
-}
-
-.card__connect:hover,
-.card__edit:hover {
-  border-color: var(--accent);
-  color: var(--foreground);
-}
-
-.react-flow__node:hover .card__connect,
-.react-flow__node:hover .card__edit,
-.card__connect:focus-visible,
-.card__edit:focus-visible,
-.rf-card-node__inner[data-selected='true'] .card__connect,
-.rf-card-node__inner[data-selected='true'] .card__edit {
-  opacity: 1;
-  pointer-events: auto;
+  outline: 2px solid var(--primary);
 }
 
 /* Where a selected Edge's controls are placed, and nothing about how they look.
@@ -348,43 +263,6 @@ body {
   background: var(--card);
   box-shadow: 0 12px 40px rgb(0 0 0 / 50%);
   transform: translateX(-50%);
-}
-
-.card__title-editor {
-  width: 100%;
-}
-
-.card__title-input {
-  width: 100%;
-  border: 1px solid var(--accent);
-  border-radius: 5px;
-  padding: 0.4rem 0.5rem;
-  background: var(--secondary);
-  color: var(--foreground);
-  font: inherit;
-  text-align: center;
-}
-
-.card__field-error {
-  display: block;
-  margin-top: 0.3rem;
-  color: #fca5a5;
-  font-size: 0.72rem;
-  line-height: 1.25;
-}
-
-/* An alias names the card it redraws, so a redraw reads as a deliberate return
-   rather than repetition — and stays legible even when titles match. The kind
-   glyph that used to lead this line now sits beside the title, where it names
-   the Card rather than the line. */
-.card__alias-of {
-  margin: 0;
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 0.8rem;
-  color: var(--muted-foreground);
 }
 
 .card__title {

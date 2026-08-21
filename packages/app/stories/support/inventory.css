@@ -1,0 +1,142 @@
+/*
+ * The locked card design — option `8a`, "Flat" — plus the paper canvas it sits
+ * on. Written from the design handoff's token table and geometry section.
+ *
+ * Card visuals come from the same `@project/ui` CanvasCard that CardNode uses.
+ * This stylesheet owns only the paper catalogue and explanatory furniture.
+ *
+ * Two deliberate departures from the handoff's numbers, both recorded rather
+ * than silently taken:
+ *
+ *  - **Card size is 260x146, not the prototype's 230x129.** The handoff says
+ *    "pick one size and derive the rest", and 260x146 is the repo's own
+ *    `card.ts` constant, which ELK lays out against and which
+ *    `.card-pane__panel` mirrors. Both are 16:9; taking the prototype's would
+ *    mean changing the layout seam to match a drawing.
+ *  - **Dark mode is absent.** Three candidates exist and none is chosen, so
+ *    there is nothing here to render one from. See `.ladle/components.tsx`.
+ */
+
+.inv {
+  --card-title: #12161c;
+  --card-title-muted: #4a505c;
+  --canvas: #efe9dc;
+  --canvas-dot: #c9c0ad;
+}
+
+/*
+ * Type and ink go on the design's own surfaces, never on `.inv`.
+ *
+ * `.inv` wraps every story, the app's real chrome included, and it declares
+ * tokens — which inherit harmlessly because nothing else reads those names. A
+ * `color` or `font-family` there does not: it inherits into `AppShell`'s `h1`
+ * and the persistence status, neither of which sets its own, and painted the
+ * shell's title near-black on the dark panel. An inventory whose chrome does
+ * not look like the app's chrome is not evidence about the app.
+ */
+.inv-sheet,
+.inv-canvas {
+  font-family: 'Inter Tight', ui-sans-serif, system-ui, sans-serif;
+  color: var(--card-title);
+}
+
+.inv-mono {
+  font-family: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+/* ---- The paper canvas ---- */
+
+/*
+ * 22px pitch, 1.4px dots, per the token table. The gradient stop is at 0.7px —
+ * half the dot — because `radial-gradient` measures a radius and the token
+ * states a diameter.
+ */
+.inv-canvas {
+  width: 1720px;
+  height: 530px;
+  position: relative;
+  background-color: var(--canvas);
+  background-image: radial-gradient(circle at 1px 1px, var(--canvas-dot) 0.7px, transparent 0.7px);
+  background-size: 22px 22px;
+  overflow: hidden;
+}
+
+.inv-card-node-stage {
+  width: 320px;
+  height: 210px;
+  position: relative;
+  overflow: hidden;
+  background: var(--canvas);
+}
+
+/* Canvas-card visuals live with CanvasCard in the shared UI package. Ladle owns only the catalogue furniture below. */
+
+/* ---- Inventory page furniture ----
+   Not part of the design. The frame the specimens are shown in. */
+
+/*
+ * A full-bleed app surface needs the app's own ground under it.
+ *
+ * `styles.css` paints `--bg` on `body`, and Ladle covers `body` with its own
+ * white story canvas — so a surface that expects to sit on the app background
+ * (the workspace chooser is the whole of it) drew light text onto white and its
+ * heading disappeared. This restores the ground for exactly those stories,
+ * rather than painting every story dark and losing the paper canvas.
+ */
+.inv-app-surface {
+  min-height: 520px;
+  color: var(--text);
+  background: var(--bg);
+}
+
+.inv-sheet {
+  padding: 28px 32px;
+  background: var(--canvas);
+  min-height: 100%;
+}
+
+.inv-section + .inv-section {
+  margin-top: 34px;
+}
+
+.inv-section__title {
+  margin: 0 0 4px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--card-title-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+
+.inv-section__note {
+  max-width: 62ch;
+  margin: 0 0 18px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--card-title-muted);
+}
+
+.inv-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 42px;
+  align-items: flex-start;
+}
+
+.inv-specimen {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.inv-specimen__label {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--card-title-muted);
+  letter-spacing: 0.04em;
+}
+
+/* Room for the handles and the drag shadow, which both sit outside the card. */
+.inv-specimen__stage {
+  padding: 20px;
+}

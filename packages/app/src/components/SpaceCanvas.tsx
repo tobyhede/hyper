@@ -338,28 +338,35 @@ export function SpaceCanvas({
   const deleteEdges = edgeSurface.deleteEdges;
   const editableNodes = useMemo(
     () =>
-      nodes.map((node) => ({
-        ...node,
-        data: {
+      nodes.map((node) => {
+        const data: CardFlowNode['data'] = {
           ...node.data,
           // Three controls, three flags. The title's double click is offered on
           // every Card; the affordance only on one that owns content to edit;
-          // the Connect control wherever an Edge may begin.
+          // the Connect control wherever an Edge may begin. Each flag travels
+          // with the operation that performs it — `CardNode` withholds a control
+          // it was offered without one.
           titleEditingEnabled: canAuthorOnCanvas,
           cardEditingEnabled: canAuthorOnCanvas && editableCardIds.has(node.id),
           connectingEnabled: canAuthorOnCanvas,
-          editingTitle: canAuthorOnCanvas && node.id === editingTitleCardId,
           onBeginConnect: () => beginConnectFrom(node.id),
           onEditCard: () => onOpenCard(node.id),
           onBeginTitleEditing: () => setEditingTitleCardId(node.id),
-          onCompleteTitleEditing: (title: string) => {
-            const error = onCompleteCardTitle(node.id, title);
-            if (error === null) setEditingTitleCardId(null);
-            return error;
-          },
-          onCancelTitleEditing: () => setEditingTitleCardId(null),
-        },
-      })),
+        };
+        // The editor is the Card being renamed, and it arrives with what ends
+        // it rather than as a flag beside two callbacks that might not be there.
+        if (canAuthorOnCanvas && node.id === editingTitleCardId) {
+          data.titleEditor = {
+            onComplete: (title: string) => {
+              const error = onCompleteCardTitle(node.id, title);
+              if (error === null) setEditingTitleCardId(null);
+              return error;
+            },
+            onCancel: () => setEditingTitleCardId(null),
+          };
+        }
+        return { ...node, data };
+      }),
     [
       nodes,
       canAuthorOnCanvas,

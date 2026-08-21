@@ -1,4 +1,5 @@
 import { ViewportPortal, useConnection } from '@xyflow/react';
+import { CanvasCard } from '@project/ui';
 import { CARD_SIZE } from '../card';
 import { newCardDrop, type DropTarget } from '../edge-authoring';
 
@@ -53,14 +54,23 @@ export function NewCardPreview({ title, modifierHeld, pointerOver, accepts }: Ne
       <div
         className="new-card-preview"
         data-testid="new-card-preview"
+        // A ghost of a Card the author has not created. It draws through the
+        // production `CanvasCard` so the preview and the real thing cannot
+        // drift, and that component names itself an `article` for the Card it
+        // is — which this is not one of yet. Hidden from the accessibility tree
+        // so no Card is announced before there is a Card.
+        aria-hidden="true"
         style={{
           transform: `translate(${drop.position.x}px, ${drop.position.y}px)`,
           width: CARD_SIZE.width,
         }}
       >
-        <article className="card card--node">
-          <h2 className="card__title">{title}</h2>
-        </article>
+        <CanvasCard
+          front={{ kind: 'markdown' }}
+          state="rest"
+          title={title}
+          graphColor="var(--accent)"
+        />
       </div>
     </ViewportPortal>
   );

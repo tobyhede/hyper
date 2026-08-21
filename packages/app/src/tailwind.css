@@ -57,6 +57,16 @@
   --border: #2b303b;
   --input: var(--border);
   --ring: var(--accent);
+  --canvas-card-ink-color: #0b0d11;
+  --canvas-card-face-rest: #f4efe4;
+  --canvas-card-face-active: #fffaf0;
+  --canvas-card-title-color: #12161c;
+  /* Text roles the Card draws on its own cream faces. The app's own
+     `--muted-foreground` and the old `#fca5a5` refusal red were both picked
+     against the dark `--card` face and fall under 2.5:1 here;
+     `test/unit/canvas-card-contrast.test.ts` holds these to AA on both faces. */
+  --canvas-card-muted-color: #4a505c;
+  --canvas-card-error-color: #b3261e;
   --radius-md: 0.5rem;
   --sidebar: var(--card);
   --sidebar-foreground: var(--foreground);

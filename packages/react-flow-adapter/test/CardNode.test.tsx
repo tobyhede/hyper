@@ -5,7 +5,7 @@ import { Position, type NodeProps } from '@xyflow/react';
 import type { HTMLAttributes } from 'react';
 import { vi } from 'vitest';
 import { CardNode } from '../src/CardNode';
-import type { CardFlowNode, CardHandle, CardNodeData } from '../src/projection';
+import type { CardFlowNode, CardHandle, CardNodeData, CardTitleEditor } from '../src/projection';
 import { uuid } from './uuid';
 
 /**
@@ -89,33 +89,37 @@ const outHandle = (graph: typeof graphId, offsetY: number): CardHandle => ({
 
 interface Overrides {
   selected?: boolean;
+  dragging?: boolean;
   /** What React Flow answers for this node from `nodesConnectable`/`node.connectable`. */
   isConnectable?: boolean;
   title?: string;
   kind?: CardNodeData['kind'];
+  aliasOf?: string;
   titleEditingEnabled?: boolean;
   cardEditingEnabled?: boolean;
-  editingTitle?: boolean;
+  connectingEnabled?: boolean;
+  titleEditor?: CardTitleEditor;
+  onBeginConnect?: () => void;
   onEditCard?: () => void;
   onBeginTitleEditing?: () => void;
-  onCompleteTitleEditing?: (title: string) => string | null;
-  onCancelTitleEditing?: () => void;
   sourceHandles?: CardHandle[];
   targetHandles?: CardHandle[];
 }
 
 function props({
   selected = false,
+  dragging = false,
   isConnectable = true,
   title = 'A',
   kind = 'markdown',
+  aliasOf,
   titleEditingEnabled = false,
   cardEditingEnabled = false,
-  editingTitle = false,
+  connectingEnabled = false,
+  titleEditor,
+  onBeginConnect,
   onEditCard,
   onBeginTitleEditing,
-  onCompleteTitleEditing,
-  onCancelTitleEditing,
   sourceHandles = [outHandle(graphId, 50)],
   targetHandles = [],
 }: Overrides = {}): NodeProps<CardFlowNode> {
@@ -125,7 +129,7 @@ function props({
     kind,
     titleEditingEnabled,
     cardEditingEnabled,
-    editingTitle,
+    connectingEnabled,
     active: false,
     selectedForAuthoring: false,
     showContent: false,
@@ -135,10 +139,11 @@ function props({
     sourceHandles,
     targetHandles,
   };
+  if (aliasOf !== undefined) data.aliasOf = aliasOf;
+  if (onBeginConnect !== undefined) data.onBeginConnect = onBeginConnect;
   if (onEditCard !== undefined) data.onEditCard = onEditCard;
   if (onBeginTitleEditing !== undefined) data.onBeginTitleEditing = onBeginTitleEditing;
-  if (onCompleteTitleEditing !== undefined) data.onCompleteTitleEditing = onCompleteTitleEditing;
-  if (onCancelTitleEditing !== undefined) data.onCancelTitleEditing = onCancelTitleEditing;
+  if (titleEditor !== undefined) data.titleEditor = titleEditor;
 
   return {
     id: cardId,
@@ -146,7 +151,7 @@ function props({
     draggable: true,
     selectable: true,
     deletable: true,
-    dragging: false,
+    dragging,
     zIndex: 0,
     isConnectable,
     positionAbsoluteX: 0,
@@ -156,33 +161,76 @@ function props({
   };
 }
 
-describe('CardNode title authoring', () => {
-  it('draws no shared Description slot on the Card front', () => {
-    render(<CardNode {...props()} />);
+/**
+ * `CardNode`'s focus-restoration operation reaches for the `.react-flow__node`
+ * ancestor React Flow itself renders around whatever this component returns —
+ * an ancestor this test has to supply, since `CardNode` never renders it. The
+ * class is React Flow's own, not a fixture invention: `SpaceCanvas.tsx` reads
+ * it back the same way to focus a created or renamed Card (`editing.spec.ts`,
+ * `card-creation.test.tsx`).
+ */
+function renderInNode(node: NodeProps<CardFlowNode>): void {
+  render(
+    <div className="react-flow__node" tabIndex={-1}>
+      <CardNode {...node} />
+    </div>,
+  );
+}
 
-    expect(screen.queryByTestId('card-description')).not.toBeInTheDocument();
+describe('CardNode canvas Card state adapter', () => {
+  it('translates React Flow selection and dragging into shared visual states', () => {
+    const { rerender } = render(<CardNode {...props({ selected: true })} />);
+
+    expect(screen.getByRole('article', { name: 'A' })).toHaveAttribute('data-state', 'selected');
+
+    rerender(<CardNode {...props({ dragging: true })} />);
+    expect(screen.getByRole('article', { name: 'A' })).toHaveAttribute('data-state', 'dragging');
   });
 
-  it('begins inline title editing from a double click on the title', () => {
-    const onBeginTitleEditing = vi.fn();
+  it('renders an Alias through the shared kind treatment', () => {
+    render(<CardNode {...props({ kind: 'alias', title: 'A, again', aliasOf: 'A' })} />);
+
+    expect(screen.getByRole('article', { name: 'A, again' })).toHaveAttribute('data-kind', 'alias');
+    expect(screen.getByRole('img', { name: 'Alias' })).toBeVisible();
+    expect(screen.getByTestId('alias-marker')).toHaveTextContent('A');
+  });
+
+  /**
+   * `projection.ts` omits `aliasOf` whenever the Target title does not resolve.
+   * Intake makes that unreachable for a Space that loads — `validate.ts` refuses
+   * `unresolved-alias-target` and `alias-targets-alias` — but the adapter still
+   * has to hand `CanvasCard` a front, and the Alias front the spec specifies
+   * carries a required Target title. Naming nothing is what an absent Target
+   * means, so the line the Alias would have drawn is not drawn at all: the
+   * marker is the Target's name, and an empty one nudges the title down by its
+   * own margin while answering `getByTestId('alias-marker')` with nothing.
+   */
+  it('draws no Target line for an Alias whose Target title did not resolve', () => {
+    render(<CardNode {...props({ kind: 'alias', title: 'A, again' })} />);
+
+    expect(screen.getByRole('article', { name: 'A, again' })).toHaveAttribute('data-kind', 'alias');
+    expect(screen.getByRole('img', { name: 'Alias' })).toBeVisible();
+    expect(screen.queryByTestId('alias-marker')).toBeNull();
+  });
+
+  it('draws a Markdown Card kind glyph like any other kind', () => {
+    render(<CardNode {...props({ kind: 'markdown' })} />);
+
+    expect(screen.getByRole('img', { name: 'Markdown Card' })).toBeVisible();
+  });
+});
+
+describe('CardNode Connect and Edit authoring', () => {
+  it('offers Connect only once the domain flag enables it', () => {
+    const onBeginConnect = vi.fn();
     const { rerender } = render(
-      <CardNode {...props({ selected: true, titleEditingEnabled: true, onBeginTitleEditing })} />,
+      <CardNode {...props({ selected: true, connectingEnabled: false, onBeginConnect })} />,
     );
+    expect(screen.queryByRole('button', { name: 'Connect from A' })).not.toBeInTheDocument();
 
-    fireEvent.doubleClick(screen.getByRole('heading', { name: 'A' }));
-    expect(onBeginTitleEditing).toHaveBeenCalledOnce();
-
-    rerender(
-      <CardNode
-        {...props({
-          selected: true,
-          titleEditingEnabled: true,
-          editingTitle: true,
-          onBeginTitleEditing,
-        })}
-      />,
-    );
-    expect(screen.getByRole('textbox', { name: 'Card title' })).toHaveValue('A');
+    rerender(<CardNode {...props({ selected: true, connectingEnabled: true, onBeginConnect })} />);
+    screen.getByRole('button', { name: 'Connect from A' }).click();
+    expect(onBeginConnect).toHaveBeenCalledOnce();
   });
 
   /**
@@ -216,20 +264,77 @@ describe('CardNode title authoring', () => {
     expect(screen.queryByRole('button', { name: /^Edit Card/ })).not.toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'A' })).toBeVisible();
   });
+});
 
-  it('keeps an invalid title local and completes a valid title with Enter', () => {
-    const onCompleteTitleEditing = vi.fn((title: string) =>
-      title.length === 0 ? 'A Card title is required.' : null,
+/**
+ * A flag says the composition *offers* a control; the operation is how the
+ * control is performed, and the two travel together from `SpaceCanvas`. Raised
+ * over a missing operation, the flag alone used to draw a live control that did
+ * nothing when activated. `CanvasCard` omits a control it has no operation for,
+ * and the adapter must not manufacture one on its behalf.
+ */
+describe('CardNode withholds a control the composition supplied no operation for', () => {
+  it('draws no Connect control for a flag raised over a missing operation', () => {
+    render(<CardNode {...props({ selected: true, connectingEnabled: true })} />);
+
+    expect(screen.queryByRole('button', { name: 'Connect from A' })).not.toBeInTheDocument();
+  });
+
+  it('draws no Edit control for a flag raised over a missing operation', () => {
+    render(<CardNode {...props({ selected: true, cardEditingEnabled: true })} />);
+
+    expect(screen.queryByRole('button', { name: /^Edit Card/ })).not.toBeInTheDocument();
+  });
+
+  it('leaves the title unrenameable for a flag raised over a missing operation', () => {
+    render(<CardNode {...props({ selected: true, titleEditingEnabled: true })} />);
+    const heading = screen.getByRole('heading', { name: 'A' });
+
+    expect(heading).toHaveAttribute('data-editable', 'false');
+    fireEvent.doubleClick(heading);
+    expect(screen.queryByRole('textbox', { name: 'Card title' })).not.toBeInTheDocument();
+  });
+});
+
+describe('CardNode title authoring', () => {
+  it('draws no shared Description slot on the Card front', () => {
+    render(<CardNode {...props()} />);
+
+    expect(screen.queryByTestId('card-description')).not.toBeInTheDocument();
+  });
+
+  it('begins inline title editing from a double click on the title', () => {
+    const onBeginTitleEditing = vi.fn();
+    const { rerender } = render(
+      <CardNode {...props({ selected: true, titleEditingEnabled: true, onBeginTitleEditing })} />,
     );
-    render(
+
+    fireEvent.doubleClick(screen.getByRole('heading', { name: 'A' }));
+    expect(onBeginTitleEditing).toHaveBeenCalledOnce();
+
+    rerender(
       <CardNode
         {...props({
           selected: true,
           titleEditingEnabled: true,
-          editingTitle: true,
-          onCompleteTitleEditing,
+          titleEditor: { onComplete: () => null, onCancel: () => undefined },
+          onBeginTitleEditing,
         })}
       />,
+    );
+    expect(screen.getByRole('textbox', { name: 'Card title' })).toHaveValue('A');
+  });
+
+  it('keeps an invalid title local, completes a valid one with Enter, and returns focus to the node', () => {
+    const onCompleteTitleEditing = vi.fn((title: string) =>
+      title.length === 0 ? 'A Card title is required.' : null,
+    );
+    renderInNode(
+      props({
+        selected: true,
+        titleEditingEnabled: true,
+        titleEditor: { onComplete: onCompleteTitleEditing, onCancel: () => undefined },
+      }),
     );
     const input = screen.getByRole('textbox', { name: 'Card title' });
 
@@ -237,30 +342,35 @@ describe('CardNode title authoring', () => {
     fireEvent.keyDown(input, { key: 'Enter' });
     expect(screen.getByRole('alert')).toHaveTextContent('A Card title is required.');
     expect(onCompleteTitleEditing).toHaveBeenLastCalledWith('');
+    expect(document.querySelector('.react-flow__node')).not.toHaveFocus();
 
     fireEvent.change(input, { target: { value: 'Renamed A' } });
     fireEvent.keyDown(input, { key: 'Enter' });
     expect(onCompleteTitleEditing).toHaveBeenLastCalledWith('Renamed A');
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(document.querySelector('.react-flow__node')).toHaveFocus();
   });
 
-  it('completes on blur and cancels on Escape without leaking editor events', () => {
+  it('completes on blur, cancels and returns focus to the node on Escape, without leaking editor events', () => {
     const onCompleteTitleEditing = vi.fn(() => null);
     const onCancelTitleEditing = vi.fn();
     const leakedClick = vi.fn();
     const leakedPointer = vi.fn();
     const leakedKey = vi.fn();
     render(
-      <div onClick={leakedClick} onPointerDown={leakedPointer} onKeyDown={leakedKey}>
-        <CardNode
-          {...props({
-            selected: true,
-            titleEditingEnabled: true,
-            editingTitle: true,
-            onCompleteTitleEditing,
-            onCancelTitleEditing,
-          })}
-        />
+      <div className="react-flow__node" tabIndex={-1} onClick={leakedClick}>
+        <div onPointerDown={leakedPointer} onKeyDown={leakedKey}>
+          <CardNode
+            {...props({
+              selected: true,
+              titleEditingEnabled: true,
+              titleEditor: {
+                onComplete: onCompleteTitleEditing,
+                onCancel: onCancelTitleEditing,
+              },
+            })}
+          />
+        </div>
       </div>,
     );
     const input = screen.getByRole('textbox', { name: 'Card title' });
@@ -270,9 +380,12 @@ describe('CardNode title authoring', () => {
     fireEvent.click(input);
     fireEvent.blur(input);
     expect(onCompleteTitleEditing).toHaveBeenCalledWith('Blurred A');
+    // A blur is the author clicking elsewhere; taking focus back would be a steal.
+    expect(document.querySelector('.react-flow__node')).not.toHaveFocus();
 
     fireEvent.keyDown(input, { key: 'Escape' });
     expect(onCancelTitleEditing).toHaveBeenCalledOnce();
+    expect(document.querySelector('.react-flow__node')).toHaveFocus();
     expect(leakedClick).not.toHaveBeenCalled();
     expect(leakedPointer).not.toHaveBeenCalled();
     expect(leakedKey).not.toHaveBeenCalled();
@@ -414,4 +527,32 @@ describe('CardNode handle geometry', () => {
 
     expect(updateNodeInternals).not.toHaveBeenCalled();
   });
+});
+
+/**
+ * `canvas-card.css` keeps the Card's hover treatment alive while the pointer is
+ * on one of the four authoring handles, which sit centred on the border and so
+ * take the pointer out of `.canvas-card`'s own box without taking it off the
+ * Card. It reads that through `:has(~ .rf-card-node__authoring-handle:hover)`,
+ * a *following*-sibling selector — so every authoring handle has to be a
+ * sibling that follows the Card, and a handle rendered before it is one the
+ * rule silently cannot reach.
+ */
+test('renders every authoring handle as a sibling following the Card', () => {
+  render(<CardNode {...props()} />);
+
+  const card = screen.getByTestId('card');
+  const inner = card.parentElement;
+  expect(inner).not.toBeNull();
+
+  const children = [...inner!.children];
+  const cardIndex = children.indexOf(card);
+  const authoringHandles = children.filter((child) =>
+    child.classList.contains('rf-card-node__authoring-handle'),
+  );
+
+  expect(authoringHandles).toHaveLength(8);
+  for (const handle of authoringHandles) {
+    expect(children.indexOf(handle)).toBeGreaterThan(cardIndex);
+  }
 });
