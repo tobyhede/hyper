@@ -152,61 +152,65 @@ async function selectAnEdge(page: Page): Promise<string> {
   return (await selected.getAttribute('aria-label')) ?? '';
 }
 
-test('inline title editing persists without moving or opening the Card', async ({ page }) => {
-  await page.goto('/');
-  const card = nodeByTitle(page, 'A').first();
-  await expect(card).toBeVisible();
-  await settled(page);
-  const before = await allPositions(page);
+test(
+  'inline title editing persists without moving or opening the Card',
+  { tag: '@parity:canvas-card-owns-title-editing-and-refusal' },
+  async ({ page }) => {
+    await page.goto('/');
+    const card = nodeByTitle(page, 'A').first();
+    await expect(card).toBeVisible();
+    await settled(page);
+    const before = await allPositions(page);
 
-  await card.hover();
-  const edit = card.getByRole('button', { name: 'Edit Card A' });
-  await expect(edit).toHaveCSS('opacity', '1');
-  // The affordance draws a glyph, so nothing about its own content keeps it in
-  // shape or in place. Sized square in CSS and parked in the corner, clear of
-  // the title — a name is what a screen reader gets, and the box is all a
-  // pointer gets.
-  const editBox = await boxOf(edit, 'the Card affordance');
-  const cardBox = await boxOf(card, 'Card A');
-  const titleBox = await boxOf(card.getByRole('heading', { name: 'A' }), "Card A's title");
-  expect(Math.abs(editBox.width - editBox.height)).toBeLessThanOrEqual(1);
-  expect(editBox.x).toBeGreaterThanOrEqual(cardBox.x);
-  expect(editBox.x + editBox.width).toBeLessThanOrEqual(cardBox.x + cardBox.width);
-  expect(editBox.y).toBeGreaterThanOrEqual(cardBox.y);
-  expect(editBox.y + editBox.height).toBeLessThanOrEqual(titleBox.y);
+    await card.hover();
+    const edit = card.getByRole('button', { name: 'Edit Card A' });
+    await expect(edit).toHaveCSS('opacity', '1');
+    // The affordance draws a glyph, so nothing about its own content keeps it in
+    // shape or in place. Sized square in CSS and parked in the corner, clear of
+    // the title — a name is what a screen reader gets, and the box is all a
+    // pointer gets.
+    const editBox = await boxOf(edit, 'the Card affordance');
+    const cardBox = await boxOf(card, 'Card A');
+    const titleBox = await boxOf(card.getByRole('heading', { name: 'A' }), "Card A's title");
+    expect(Math.abs(editBox.width - editBox.height)).toBeLessThanOrEqual(1);
+    expect(editBox.x).toBeGreaterThanOrEqual(cardBox.x);
+    expect(editBox.x + editBox.width).toBeLessThanOrEqual(cardBox.x + cardBox.width);
+    expect(editBox.y).toBeGreaterThanOrEqual(cardBox.y);
+    expect(editBox.y + editBox.height).toBeLessThanOrEqual(titleBox.y);
 
-  // Renaming is the title's own double click (ADR 0036), and it must not open
-  // the Card — an opened Card covers the field being typed into.
-  await card.getByRole('heading', { name: 'A' }).dblclick();
-  await expect(page.getByTestId('open-card')).toHaveCount(0);
-  const title = page.getByRole('textbox', { name: 'Card title' });
-  await title.fill('Renamed A');
-  await title.press('Enter');
+    // Renaming is the title's own double click (ADR 0036), and it must not open
+    // the Card — an opened Card covers the field being typed into.
+    await card.getByRole('heading', { name: 'A' }).dblclick();
+    await expect(page.getByTestId('open-card')).toHaveCount(0);
+    const title = page.getByRole('textbox', { name: 'Card title' });
+    await title.fill('Renamed A');
+    await title.press('Enter');
 
-  const renamed = nodeByTitle(page, 'Renamed A').first();
-  await expect(renamed).toBeVisible();
-  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
-  await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
-  expect(await allPositions(page)).toEqual(before);
+    const renamed = nodeByTitle(page, 'Renamed A').first();
+    await expect(renamed).toBeVisible();
+    await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
+    await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
+    expect(await allPositions(page)).toEqual(before);
 
-  await openCard(renamed, 'Renamed A');
-  await page.getByRole('button', { name: 'Cancel' }).click();
-  await renamed.click();
-  await page.keyboard.press('F2');
-  const keyboardTitle = page.getByRole('textbox', { name: 'Card title' });
-  await expect(keyboardTitle).toBeVisible();
-  await keyboardTitle.fill('');
-  await nodeByTitle(page, 'B').first().click();
-  await expect(keyboardTitle).toHaveAttribute('aria-invalid', 'true');
-  await expect(page.getByTestId('open-card')).toHaveCount(0);
-  await quiescent(page);
-  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
-  await keyboardTitle.focus();
-  await page.keyboard.press('Escape');
+    await openCard(renamed, 'Renamed A');
+    await page.getByRole('button', { name: 'Cancel' }).click();
+    await renamed.click();
+    await page.keyboard.press('F2');
+    const keyboardTitle = page.getByRole('textbox', { name: 'Card title' });
+    await expect(keyboardTitle).toBeVisible();
+    await keyboardTitle.fill('');
+    await nodeByTitle(page, 'B').first().click();
+    await expect(keyboardTitle).toHaveAttribute('aria-invalid', 'true');
+    await expect(page.getByTestId('open-card')).toHaveCount(0);
+    await quiescent(page);
+    await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
+    await keyboardTitle.focus();
+    await page.keyboard.press('Escape');
 
-  await page.reload();
-  await expect(nodeByTitle(page, 'Renamed A').first()).toBeVisible();
-});
+    await page.reload();
+    await expect(nodeByTitle(page, 'Renamed A').first()).toBeVisible();
+  },
+);
 
 test("a short title's rename hit-area hugs its text, not the whole card body", async ({ page }) => {
   await page.goto('/');

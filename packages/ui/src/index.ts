@@ -11,7 +11,7 @@ export type { StatusBusyProps, StatusFailureProps } from './StatusPanel';
 export { CardContent } from './CardContent';
 export type { CardContentProps } from './CardContent';
 export { CanvasCard } from './CanvasCard';
-export type { CanvasCardKind, CanvasCardProps, CanvasCardState } from './CanvasCard';
+export type { CanvasCardFront, CanvasCardProps, CanvasCardState } from './CanvasCard';
 export { CardKindIcon } from './CardKindIcon';
 export type { CardKindIconProps } from './CardKindIcon';
 export { CardSearchCombobox } from './CardSearchCombobox';

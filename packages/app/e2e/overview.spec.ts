@@ -4,6 +4,7 @@ import { expect, test, type Locator, type Page } from './fixtures';
 import {
   activateGraph,
   activeGraph,
+  graphLegendSwatchColor,
   openCard,
   selectCanvas,
   selectedCanvas,
@@ -69,7 +70,12 @@ test('draws every graph at once, each in its own color', async ({ page }) => {
 
 test(
   'production Canvas Cards expose Alias identity and keyboard authoring actions',
-  { tag: '@parity:canvas-card-exposes-kind-and-keyboard-actions' },
+  {
+    tag: [
+      '@parity:canvas-card-exposes-kind-and-keyboard-actions',
+      '@parity:canvas-card-shows-kind-treatment',
+    ],
+  },
   async ({ page }) => {
     await page.goto('/');
 
@@ -84,6 +90,20 @@ test(
     await expect(connect).toBeFocused();
     await connect.press('Enter');
     await expect(page.getByRole('combobox', { name: 'Connect to' })).toBeVisible();
+  },
+);
+
+test(
+  "a selected Card's rail carries the Active Graph's own colour",
+  { tag: '@parity:canvas-card-shows-active-graph-colour' },
+  async ({ page }) => {
+    await page.goto('/');
+    await activateGraph(page, 'Long');
+    const graphColor = await graphLegendSwatchColor(page, 'Long');
+
+    const card = nodeByTitle(page, 'A').first();
+    await card.click();
+    await expect(card.locator('.canvas-card__rail')).toHaveCSS('background-color', graphColor);
   },
 );
 

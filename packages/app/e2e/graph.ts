@@ -146,6 +146,17 @@ export async function activateGraph(page: Page, title: string): Promise<void> {
   await expect(activeGraph(page)).toHaveText(title);
 }
 
+/** The resolved colour drawn on one Graph's legend swatch, by its title. */
+export async function graphLegendSwatchColor(page: Page, title: string): Promise<string> {
+  const swatch = page
+    .getByTestId('graph-legend')
+    .locator('.legend__item')
+    .filter({ hasText: title })
+    .locator('span')
+    .first();
+  return swatch.evaluate((el) => getComputedStyle(el).backgroundColor);
+}
+
 /** Where React Flow has actually put a node, in flow coordinates. */
 export async function positionOf(node: Locator): Promise<{ x: number; y: number }> {
   return node.evaluate((el) => {

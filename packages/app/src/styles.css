@@ -155,191 +155,6 @@ body {
   width: var(--card-width);
 }
 
-/* The production Card front is a shared shadcn Card composition. Its visual
-   treatment stays here with the graph/card CSS, while @project/ui owns the
-   markup and semantic state interface. */
-.canvas-card {
-  --canvas-card-ink: var(--canvas-card-ink-color);
-  --canvas-card-face: var(--canvas-card-face-rest);
-  --canvas-card-active-face: var(--canvas-card-face-active);
-  --canvas-card-title: var(--canvas-card-title-color);
-
-  position: relative;
-  box-sizing: border-box;
-  width: var(--card-width);
-  height: var(--card-height);
-  gap: 0;
-  padding: 0;
-  overflow: hidden;
-  border: 4px solid var(--canvas-card-ink);
-  border-radius: 0;
-  background: var(--canvas-card-face);
-  box-shadow: none;
-  transition:
-    box-shadow 120ms ease,
-    transform 120ms ease,
-    background-color 120ms ease;
-}
-
-.canvas-card[data-kind='alias'] {
-  border-style: dotted;
-}
-
-.canvas-card:not([data-state='rest']) {
-  background: var(--canvas-card-active-face);
-}
-
-.canvas-card[data-kind='alias']:not([data-state='rest']) {
-  border-style: solid;
-}
-
-.canvas-card[data-state='selected'],
-.canvas-card[data-state='selected-hover'],
-.canvas-card[data-state='editing'] {
-  box-shadow: 0 0 0 3px var(--canvas-card-ink);
-}
-
-.canvas-card[data-state='dragging'] {
-  box-shadow: 7px 7px 0 var(--canvas-card-ink);
-  transform: rotate(-1deg);
-}
-
-.canvas-card__rail {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  height: 34px;
-  min-height: 34px;
-  padding: 0 8px;
-  border-radius: 0;
-  background: transparent;
-  transition: background-color 120ms ease;
-}
-
-.canvas-card:not([data-state='rest']) .canvas-card__rail {
-  background: var(--canvas-card-graph);
-}
-
-.canvas-card__kind {
-  display: flex;
-  align-items: center;
-  color: var(--canvas-card-ink);
-  opacity: 0.28;
-  transition: opacity 120ms ease;
-}
-
-.canvas-card__kind [data-card-kind] {
-  color: currentcolor;
-}
-
-.canvas-card:not([data-state='rest']) .canvas-card__kind {
-  opacity: 1;
-}
-
-.canvas-card__actions {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 100ms ease;
-}
-
-.canvas-card:is([data-state='hover'], [data-state='selected'], [data-state='selected-hover'])
-  .canvas-card__actions,
-.canvas-card__actions:focus-within {
-  opacity: 1;
-  pointer-events: auto;
-}
-
-.canvas-card :is(.card__connect, .card__edit) {
-  width: 22px;
-  height: 22px;
-  border: 2px solid var(--canvas-card-ink);
-  border-radius: 0;
-  padding: 0;
-  background: var(--canvas-card-face);
-  color: var(--canvas-card-ink);
-  transition:
-    color 100ms ease,
-    background-color 100ms ease;
-}
-
-.canvas-card :is(.card__connect, .card__edit):hover {
-  border-color: var(--canvas-card-ink);
-  background: var(--canvas-card-ink);
-  color: var(--canvas-card-graph);
-}
-
-.canvas-card :is(.card__connect, .card__edit):focus-visible {
-  outline: 2px solid var(--canvas-card-ink);
-  outline-offset: 2px;
-}
-
-.canvas-card__body {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  justify-content: flex-end;
-  min-height: 0;
-  padding: 10px 12px;
-}
-
-.canvas-card__title {
-  display: -webkit-box;
-  margin: 0;
-  overflow: hidden;
-  color: var(--canvas-card-title);
-  font-size: 18px;
-  font-weight: 600;
-  line-height: 1.12;
-  letter-spacing: -0.02em;
-  text-wrap: balance;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
-}
-
-/* Renaming is the title's own double click (ADR 0036), so it must claim only
-   the pixels it draws — the body is a left-aligned column, and a block title
-   spans its full width with most of it blank, which would put the rename
-   target across the band beside a short title rather than just the title
-   itself. Shrunk to fit, so that band renames nothing. */
-.canvas-card__title[data-editable='true'] {
-  width: fit-content;
-  max-width: 100%;
-  cursor: text;
-}
-
-.canvas-card__alias-of {
-  margin: 4px 0 0;
-  overflow: hidden;
-  color: var(--muted-foreground);
-  font-size: 12px;
-  line-height: 1.2;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.canvas-card .card__title-editor,
-.canvas-card .card__title-input {
-  width: 100%;
-}
-
-.canvas-card .card__title-input {
-  padding: 0 0 3px;
-  border: 0;
-  border-radius: 0;
-  outline: 0;
-  background: transparent;
-  box-shadow: inset 0 -3px 0 var(--canvas-card-graph);
-  color: var(--canvas-card-title);
-  font: inherit;
-  font-size: 18px;
-  font-weight: 600;
-  line-height: 1.12;
-  text-align: left;
-}
-
 .new-card-preview {
   position: absolute;
   opacity: 0.55;
@@ -360,7 +175,7 @@ body {
 
 .rf-card-node__authoring-handle.react-flow__handle {
   z-index: 1;
-  border: 1px solid #0b0d11;
+  border: 3px solid #0b0d11;
   border-radius: 50%;
   opacity: 0;
   pointer-events: none;
@@ -391,18 +206,16 @@ body {
   overflow: hidden;
 }
 
+/* The production Card front's own appearance — kind and interaction-state
+   treatment, title, actions, title editor — lives with the production
+   `CanvasCard` module in `@project/ui` (Tailwind utility classes on the
+   component itself), not here. `.canvas-card` survives here only as a stable
+   selector for this one rule: React Flow's own "this is the actively
+   presented Card" fact, which is adapter/app state and has no reason to be
+   known inside the design-system package. */
 .rf-card-node--active :is(.card, .canvas-card) {
   border-color: var(--accent);
   outline: 2px solid var(--primary);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .canvas-card,
-  .canvas-card__rail,
-  .canvas-card__kind,
-  .canvas-card__actions {
-    transition: none;
-  }
 }
 
 /* Where a selected Edge's controls are placed, and nothing about how they look.
@@ -450,43 +263,6 @@ body {
   background: var(--card);
   box-shadow: 0 12px 40px rgb(0 0 0 / 50%);
   transform: translateX(-50%);
-}
-
-.card__title-editor {
-  width: 100%;
-}
-
-.card__title-input {
-  width: 100%;
-  border: 1px solid var(--accent);
-  border-radius: 5px;
-  padding: 0.4rem 0.5rem;
-  background: var(--secondary);
-  color: var(--foreground);
-  font: inherit;
-  text-align: center;
-}
-
-.card__field-error {
-  display: block;
-  margin-top: 0.3rem;
-  color: #fca5a5;
-  font-size: 0.72rem;
-  line-height: 1.25;
-}
-
-/* An alias names the card it redraws, so a redraw reads as a deliberate return
-   rather than repetition — and stays legible even when titles match. The kind
-   glyph that used to lead this line now sits beside the title, where it names
-   the Card rather than the line. */
-.card__alias-of {
-  margin: 0;
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 0.8rem;
-  color: var(--muted-foreground);
 }
 
 .card__title {

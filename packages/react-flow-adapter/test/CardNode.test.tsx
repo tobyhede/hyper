@@ -96,7 +96,9 @@ interface Overrides {
   kind?: CardNodeData['kind'];
   titleEditingEnabled?: boolean;
   cardEditingEnabled?: boolean;
+  connectingEnabled?: boolean;
   editingTitle?: boolean;
+  onBeginConnect?: () => void;
   onEditCard?: () => void;
   onBeginTitleEditing?: () => void;
   onCompleteTitleEditing?: (title: string) => string | null;
@@ -113,7 +115,9 @@ function props({
   kind = 'markdown',
   titleEditingEnabled = false,
   cardEditingEnabled = false,
+  connectingEnabled = false,
   editingTitle = false,
+  onBeginConnect,
   onEditCard,
   onBeginTitleEditing,
   onCompleteTitleEditing,
@@ -127,6 +131,7 @@ function props({
     kind,
     titleEditingEnabled,
     cardEditingEnabled,
+    connectingEnabled,
     editingTitle,
     active: false,
     selectedForAuthoring: false,
@@ -137,6 +142,7 @@ function props({
     sourceHandles,
     targetHandles,
   };
+  if (onBeginConnect !== undefined) data.onBeginConnect = onBeginConnect;
   if (onEditCard !== undefined) data.onEditCard = onEditCard;
   if (onBeginTitleEditing !== undefined) data.onBeginTitleEditing = onBeginTitleEditing;
   if (onCompleteTitleEditing !== undefined) data.onCompleteTitleEditing = onCompleteTitleEditing;
@@ -158,6 +164,22 @@ function props({
   };
 }
 
+/**
+ * `CardNode`'s focus-restoration operation reaches for the `.react-flow__node`
+ * ancestor React Flow itself renders around whatever this component returns —
+ * an ancestor this test has to supply, since `CardNode` never renders it. The
+ * class is React Flow's own, not a fixture invention: `SpaceCanvas.tsx` reads
+ * it back the same way to focus a created or renamed Card (`editing.spec.ts`,
+ * `card-creation.test.tsx`).
+ */
+function renderInNode(node: NodeProps<CardFlowNode>): void {
+  render(
+    <div className="react-flow__node" tabIndex={-1}>
+      <CardNode {...node} />
+    </div>,
+  );
+}
+
 describe('CardNode canvas Card state adapter', () => {
   it('translates React Flow selection and dragging into shared visual states', () => {
     const { rerender } = render(<CardNode {...props({ selected: true })} />);
@@ -166,17 +188,6 @@ describe('CardNode canvas Card state adapter', () => {
 
     rerender(<CardNode {...props({ dragging: true })} />);
     expect(screen.getByRole('article', { name: 'A' })).toHaveAttribute('data-state', 'dragging');
-  });
-
-  it('preserves hover alone and together with selection', () => {
-    const { rerender } = render(<CardNode {...props()} />);
-    const card = screen.getByRole('article', { name: 'A' });
-
-    fireEvent.pointerEnter(card.parentElement!);
-    expect(card).toHaveAttribute('data-state', 'hover');
-
-    rerender(<CardNode {...props({ selected: true })} />);
-    expect(card).toHaveAttribute('data-state', 'selected-hover');
   });
 
   it('renders an Alias through the shared kind treatment', () => {
@@ -193,33 +204,17 @@ describe('CardNode canvas Card state adapter', () => {
   });
 });
 
-describe('CardNode title authoring', () => {
-  it('draws no shared Description slot on the Card front', () => {
-    render(<CardNode {...props()} />);
-
-    expect(screen.queryByTestId('card-description')).not.toBeInTheDocument();
-  });
-
-  it('begins inline title editing from a double click on the title', () => {
-    const onBeginTitleEditing = vi.fn();
+describe('CardNode Connect and Edit authoring', () => {
+  it('offers Connect only once the domain flag enables it', () => {
+    const onBeginConnect = vi.fn();
     const { rerender } = render(
-      <CardNode {...props({ selected: true, titleEditingEnabled: true, onBeginTitleEditing })} />,
+      <CardNode {...props({ selected: true, connectingEnabled: false, onBeginConnect })} />,
     );
+    expect(screen.queryByRole('button', { name: 'Connect from A' })).not.toBeInTheDocument();
 
-    fireEvent.doubleClick(screen.getByRole('heading', { name: 'A' }));
-    expect(onBeginTitleEditing).toHaveBeenCalledOnce();
-
-    rerender(
-      <CardNode
-        {...props({
-          selected: true,
-          titleEditingEnabled: true,
-          editingTitle: true,
-          onBeginTitleEditing,
-        })}
-      />,
-    );
-    expect(screen.getByRole('textbox', { name: 'Card title' })).toHaveValue('A');
+    rerender(<CardNode {...props({ selected: true, connectingEnabled: true, onBeginConnect })} />);
+    screen.getByRole('button', { name: 'Connect from A' }).click();
+    expect(onBeginConnect).toHaveBeenCalledOnce();
   });
 
   /**
@@ -253,20 +248,48 @@ describe('CardNode title authoring', () => {
     expect(screen.queryByRole('button', { name: /^Edit Card/ })).not.toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'A' })).toBeVisible();
   });
+});
 
-  it('keeps an invalid title local and completes a valid title with Enter', () => {
-    const onCompleteTitleEditing = vi.fn((title: string) =>
-      title.length === 0 ? 'A Card title is required.' : null,
+describe('CardNode title authoring', () => {
+  it('draws no shared Description slot on the Card front', () => {
+    render(<CardNode {...props()} />);
+
+    expect(screen.queryByTestId('card-description')).not.toBeInTheDocument();
+  });
+
+  it('begins inline title editing from a double click on the title', () => {
+    const onBeginTitleEditing = vi.fn();
+    const { rerender } = render(
+      <CardNode {...props({ selected: true, titleEditingEnabled: true, onBeginTitleEditing })} />,
     );
-    render(
+
+    fireEvent.doubleClick(screen.getByRole('heading', { name: 'A' }));
+    expect(onBeginTitleEditing).toHaveBeenCalledOnce();
+
+    rerender(
       <CardNode
         {...props({
           selected: true,
           titleEditingEnabled: true,
           editingTitle: true,
-          onCompleteTitleEditing,
+          onBeginTitleEditing,
         })}
       />,
+    );
+    expect(screen.getByRole('textbox', { name: 'Card title' })).toHaveValue('A');
+  });
+
+  it('keeps an invalid title local, completes a valid one with Enter, and returns focus to the node', () => {
+    const onCompleteTitleEditing = vi.fn((title: string) =>
+      title.length === 0 ? 'A Card title is required.' : null,
+    );
+    renderInNode(
+      props({
+        selected: true,
+        titleEditingEnabled: true,
+        editingTitle: true,
+        onCompleteTitleEditing,
+      }),
     );
     const input = screen.getByRole('textbox', { name: 'Card title' });
 
@@ -274,30 +297,34 @@ describe('CardNode title authoring', () => {
     fireEvent.keyDown(input, { key: 'Enter' });
     expect(screen.getByRole('alert')).toHaveTextContent('A Card title is required.');
     expect(onCompleteTitleEditing).toHaveBeenLastCalledWith('');
+    expect(document.querySelector('.react-flow__node')).not.toHaveFocus();
 
     fireEvent.change(input, { target: { value: 'Renamed A' } });
     fireEvent.keyDown(input, { key: 'Enter' });
     expect(onCompleteTitleEditing).toHaveBeenLastCalledWith('Renamed A');
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(document.querySelector('.react-flow__node')).toHaveFocus();
   });
 
-  it('completes on blur and cancels on Escape without leaking editor events', () => {
+  it('completes on blur, cancels and returns focus to the node on Escape, without leaking editor events', () => {
     const onCompleteTitleEditing = vi.fn(() => null);
     const onCancelTitleEditing = vi.fn();
     const leakedClick = vi.fn();
     const leakedPointer = vi.fn();
     const leakedKey = vi.fn();
     render(
-      <div onClick={leakedClick} onPointerDown={leakedPointer} onKeyDown={leakedKey}>
-        <CardNode
-          {...props({
-            selected: true,
-            titleEditingEnabled: true,
-            editingTitle: true,
-            onCompleteTitleEditing,
-            onCancelTitleEditing,
-          })}
-        />
+      <div className="react-flow__node" tabIndex={-1} onClick={leakedClick}>
+        <div onPointerDown={leakedPointer} onKeyDown={leakedKey}>
+          <CardNode
+            {...props({
+              selected: true,
+              titleEditingEnabled: true,
+              editingTitle: true,
+              onCompleteTitleEditing,
+              onCancelTitleEditing,
+            })}
+          />
+        </div>
       </div>,
     );
     const input = screen.getByRole('textbox', { name: 'Card title' });
@@ -307,9 +334,12 @@ describe('CardNode title authoring', () => {
     fireEvent.click(input);
     fireEvent.blur(input);
     expect(onCompleteTitleEditing).toHaveBeenCalledWith('Blurred A');
+    // A blur is the author clicking elsewhere; taking focus back would be a steal.
+    expect(document.querySelector('.react-flow__node')).not.toHaveFocus();
 
     fireEvent.keyDown(input, { key: 'Escape' });
     expect(onCancelTitleEditing).toHaveBeenCalledOnce();
+    expect(document.querySelector('.react-flow__node')).toHaveFocus();
     expect(leakedClick).not.toHaveBeenCalled();
     expect(leakedPointer).not.toHaveBeenCalled();
     expect(leakedKey).not.toHaveBeenCalled();

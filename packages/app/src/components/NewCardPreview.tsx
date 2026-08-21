@@ -59,7 +59,12 @@ export function NewCardPreview({ title, modifierHeld, pointerOver, accepts }: Ne
           width: CARD_SIZE.width,
         }}
       >
-        <CanvasCard kind="markdown" state="rest" title={title} graphColor="var(--accent)" />
+        <CanvasCard
+          front={{ kind: 'markdown' }}
+          state="rest"
+          title={title}
+          graphColor="var(--accent)"
+        />
       </div>
     </ViewportPortal>
   );

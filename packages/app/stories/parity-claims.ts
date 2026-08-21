@@ -18,8 +18,69 @@ export const parityClaims: readonly ParityClaim[] = [
   {
     id: 'canvas-card-exposes-kind-and-keyboard-actions',
     storyFile: 'components/canvas-card.stories.tsx',
-    storyExport: 'States',
+    storyExport: 'Interaction',
     claim: 'The production canvas Card exposes Alias identity and keyboard-focusable actions.',
+  },
+  {
+    id: 'canvas-card-shows-rest-selected-and-dragging-states',
+    storyFile: 'components/canvas-card.stories.tsx',
+    storyExport: 'States',
+    claim:
+      'Rest, selected and dragging are visually distinct states for both the Markdown and Alias front.',
+    // React Flow's own selection/dragging booleans, and CardNode's translation
+    // of them into CanvasCard's four-value `state`, are unit-tested directly
+    // (`CardNode.test.tsx`, "translates React Flow selection and dragging into
+    // shared visual states"). Dragging a real Card is exercised throughout
+    // `editing.spec.ts`'s drag-and-drop coverage, and selection through
+    // `canvas-card-exposes-kind-and-keyboard-actions`'s own application
+    // evidence above. What this story adds beyond those is the *visual*
+    // pairing of state with treatment (box-shadow ring, rotated drop shadow)
+    // side by side for review — and it renders through `CanvasCardSpecimen`,
+    // a thin pass-through to the shipped `CanvasCard`, so there is no
+    // facsimile that could drift from what the translated state actually
+    // draws.
+    applicationEvidence:
+      'React Flow selection/dragging and their translation into state are covered by CardNode.test.tsx and by editing.spec.ts drag coverage; selection is also exercised by canvas-card-exposes-kind-and-keyboard-actions. This story renders the shipped CanvasCard through CanvasCardSpecimen (no facsimile) to pin the visual treatment per state for review, which is not itself a distinct browser-observable product behaviour beyond those.',
+  },
+  {
+    id: 'canvas-card-shows-kind-treatment',
+    storyFile: 'components/canvas-card.stories.tsx',
+    storyExport: 'Kinds',
+    claim:
+      "An Alias front's dotted border and redraw glyph, and a long Markdown title's three-line clamp, are the kind's own presentation.",
+  },
+  {
+    id: 'canvas-card-shows-active-graph-colour',
+    storyFile: 'components/canvas-card.stories.tsx',
+    storyExport: 'Colours',
+    claim: "A selected Card's rail carries the Active Graph's own colour.",
+  },
+  {
+    id: 'canvas-card-hover-reveals-actions-and-handles-together',
+    storyFile: 'components/canvas-card.stories.tsx',
+    storyExport: 'HoverActions',
+    claim:
+      "Hovering the real React Flow node reveals CanvasCard's own rail actions and the adapter's Edge handles together.",
+    // The two halves of this claim already have real application evidence
+    // separately: hover revealing CanvasCard's rail actions is asserted in
+    // `editing.spec.ts` ("inline title editing persists without moving or
+    // opening the Card", `await card.hover(); ... toHaveCSS('opacity', '1')`
+    // on the Edit control), and hover/selection revealing the adapter's
+    // authoring handles is asserted in `overview.spec.ts` ("handles stay
+    // measurable...") and unit-tested in CardNode.test.tsx. What this story
+    // adds is mounting both through the same real `CardNode` in a real
+    // `ReactFlow` instance side by side, which is exactly what
+    // `CanvasCardNodeSpecimen`/`ReactFlowCanvas` do — not a facsimile of
+    // either half.
+    applicationEvidence:
+      "Hover revealing CanvasCard's rail actions is covered by editing.spec.ts; hover/selection revealing the adapter's authoring handles is covered by overview.spec.ts and CardNode.test.tsx. This story mounts the real CardNode in a real ReactFlow instance (CanvasCardNodeSpecimen/ReactFlowCanvas, no facsimile) to show both together, which is not a distinct browser-observable behaviour beyond those two.",
+  },
+  {
+    id: 'canvas-card-owns-title-editing-and-refusal',
+    storyFile: 'components/canvas-card.stories.tsx',
+    storyExport: 'TitleEditing',
+    claim:
+      "The canvas Card's own title editor begins on a double click, keeps a refused draft field-local, completes on Enter and cancels on Escape.",
   },
   {
     id: 'markdown-pane-refusal-is-field-local',
