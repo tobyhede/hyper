@@ -25,7 +25,7 @@
     "typecheck:toolchain": "tsx scripts/check-typescript-toolchain.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "typecheck:packages": "pnpm -r typecheck",
-    "lint": "eslint . --max-warnings=0",
+    "lint": "eslint . --max-warnings=0 --prune-suppressions",
     "lint:anti-slop": "oxlint -c .oxlintrc.json .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",

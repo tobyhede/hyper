@@ -23,3 +23,13 @@ migrations/**/*.d.ts
 # Vendored anti-slop Oxlint plugin — third-party source at a pinned commit,
 # not ours to reformat.
 tools/oxlint/anti-slop/**
+
+# ESLint owns this one and rewrites it on every `--prune-suppressions`, so
+# formatting it here would just be undone on the next run — and it is never
+# hand-edited in any case (ADR 0062).
+eslint-suppressions.json
+
+# Typing fixtures (ADR 0062). Half of them are meant to fail; they are excluded
+# from lint and typecheck for that reason, and reformatting a fixture is the
+# kind of incidental edit that could quietly change what it proves.
+tools/typing-fixtures/**
