@@ -60,9 +60,42 @@ export type ElementDropTarget = 'card' | 'empty-canvas' | 'off-canvas';
  * DOM half and an Alt-release onto a Card's body authors a Card on top of it;
  * drop React Flow's half and a release just outside a Card authors one where the
  * author was aiming at a handle. A connection target in range therefore outranks
- * what lies underneath, and both suppliers apply that precedence before asking.
+ * what lies underneath, which is what `dropTarget` below composes.
  */
 export type DropTarget = 'connection-target' | ElementDropTarget;
+
+/**
+ * The one drop target, from the two sources that each answer half of it.
+ *
+ * `connectionTarget` is React Flow's answer — `toNode !== null`, resolved by
+ * `getClosestHandle` from handle distance — and `element` is the DOM's. A
+ * connection target in range outranks what lies underneath, for the reasons
+ * `DropTarget` above states.
+ *
+ * **Every supplier asks this, including the reconnect release**, which composes
+ * the same two answers and then asks a *different* question of the result:
+ * whether to delete the Edge rather than whether to author a Card. That site is
+ * why the rule is a function and not a paragraph — it is the one nobody greps
+ * when changing how drops are classified.
+ *
+ * **What each supplier hands in is its own, deliberately.** The preview reads
+ * the last classification the flow container's `onMouseMove` wrote; the release
+ * hit-tests the DOM at the moment it happens. Closing that gap would add a
+ * document-level pointer listener and a per-frame hit-test, defeating the
+ * narrowed non-positional state write that avoids per-frame flow rerenders. The
+ * difference belongs in the argument, not in here
+ * (`.scratch/card-route-editing/edge-authoring-design.md`).
+ *
+ * An object argument rather than two positional ones: `dropTarget(true, 'card')`
+ * gives a reader no way to tell which source is which, and the site this exists
+ * for is one nobody reads twice.
+ */
+export function dropTarget(over: {
+  readonly connectionTarget: boolean;
+  readonly element: ElementDropTarget;
+}): DropTarget {
+  return over.connectionTarget ? 'connection-target' : over.element;
+}
 
 /**
  * An unfinished connection drag — as much of one as deciding an empty-drop needs.

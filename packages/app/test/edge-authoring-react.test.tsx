@@ -1,7 +1,13 @@
 import { act, fireEvent, render, renderHook, screen, waitFor } from '@testing-library/react';
 import { useContext, type ReactNode } from 'react';
-import { Position, ReactFlowProvider, type Edge } from '@xyflow/react';
-import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import {
+  Position,
+  ReactFlowProvider,
+  type Edge,
+  type FinalConnectionState,
+  type InternalNode,
+} from '@xyflow/react';
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { uuidSchema, type SpaceSnapshot } from '@project/core';
 import { inHandleId, outHandleId, Placement } from '@project/graph';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
@@ -648,26 +654,27 @@ describe('a pane covering the graph', () => {
  * the endpoint that stays put, and the module has to stand its connection
  * handlers down for the duration or it eats its own gesture.
  */
-describe("React Flow's reconnect callback order", () => {
-  const surface = (composed: ReturnType<typeof compose>) =>
-    renderHook(
-      () =>
-        useEdgeAuthoring({
-          authoring: composed.edgeAuthoring,
-          edges: EDGES,
-          projectedNodes: null,
-          selection: { kind: 'edge', ...SUBJECT },
-          activeGraphId: GRAPH_ID,
-          graphs: composed.currentSpace().graphs,
-          subjectCards: composed.currentSpace().cards,
-          newCardTitle: 'Card 4',
-          enabled: true,
-          onSelectCard: NO_OP,
-          onSelectEdge: NO_OP,
-        }),
-      { wrapper: ({ children }) => <ReactFlowProvider>{children}</ReactFlowProvider> },
-    );
+/** The hook over a composed Space, with the drafted Edge selected. */
+const surface = (composed: ReturnType<typeof compose>) =>
+  renderHook(
+    () =>
+      useEdgeAuthoring({
+        authoring: composed.edgeAuthoring,
+        edges: EDGES,
+        projectedNodes: null,
+        selection: { kind: 'edge', ...SUBJECT },
+        activeGraphId: GRAPH_ID,
+        graphs: composed.currentSpace().graphs,
+        subjectCards: composed.currentSpace().cards,
+        newCardTitle: 'Card 4',
+        enabled: true,
+        onSelectCard: NO_OP,
+        onSelectEdge: NO_OP,
+      }),
+    { wrapper: ({ children }) => <ReactFlowProvider>{children}</ReactFlowProvider> },
+  );
 
+describe("React Flow's reconnect callback order", () => {
   const startDrag = (props: ReturnType<typeof surface>['result']['current'], edge: Edge) => {
     // The order React Flow uses, verbatim.
     props.reactFlowProps.onReconnectStart(null, edge, 'target');
@@ -870,6 +877,119 @@ describe("React Flow's reconnect callback order", () => {
     });
 
     expect(composed.session.getState().working).toBe(before);
+  });
+});
+
+/**
+ * What a reconnect release decides, and the precedence it decides it by.
+ *
+ * This is the third site of the rule `docs/agents/rendering.md:29` states, and
+ * the one that is easiest to miss: it composes React Flow's answer with the
+ * DOM's exactly as the connect path does, and then asks a different question of
+ * the result — delete this Edge, rather than author a Card. Nothing but
+ * `editing.spec.ts` used to cover it.
+ *
+ * jsdom performs no hit-testing, so `elementFromPoint` is answered with a
+ * **real mounted element** rather than a fabricated verdict: `closest` then
+ * walks the tree for real, which is the half of the rule under test. Both class
+ * names are React Flow's published theming API.
+ */
+describe('what a reconnect release decides', () => {
+  const mountFlowDom = () => {
+    const renderer = document.createElement('div');
+    renderer.className = 'react-flow__renderer';
+    const card = document.createElement('div');
+    card.className = 'react-flow__node';
+    renderer.append(card);
+    document.body.append(renderer);
+    return { renderer, card };
+  };
+
+  const internalNode = (id: string): InternalNode => {
+    const userNode = { id, position: { x: 0, y: 0 }, data: {} };
+    return {
+      ...userNode,
+      measured: { width: CARD_SIZE.width, height: CARD_SIZE.height },
+      internals: { positionAbsolute: { x: 0, y: 0 }, z: 0, userNode },
+    };
+  };
+
+  /**
+   * A release React Flow **did** resolve a target for — the in-progress branch
+   * of `FinalConnectionState`. It is written out in full because the type
+   * requires the whole branch, not because the handler reads more than
+   * `toNode`.
+   */
+  const RESOLVED_CONNECTION: FinalConnectionState = {
+    isValid: true,
+    from: { x: 0, y: 0 },
+    fromHandle: {
+      id: null,
+      nodeId: CARD_A,
+      type: 'source',
+      position: Position.Right,
+      x: 0,
+      y: 0,
+      width: 6,
+      height: 6,
+    },
+    fromPosition: Position.Right,
+    fromNode: internalNode(CARD_A),
+    to: { x: 400, y: 0 },
+    toHandle: null,
+    toPosition: Position.Left,
+    toNode: internalNode(CARD_B),
+    pointer: { x: 400, y: 0 },
+  };
+
+  const release = (
+    composed: ReturnType<typeof compose>,
+    at: Element,
+    state: FinalConnectionState,
+  ) => {
+    const { result } = surface(composed);
+    document.elementFromPoint = () => at;
+    act(() => {
+      result.current.reactFlowProps.onReconnectStart(null, EDGES[0]!, 'target');
+      result.current.reactFlowProps.onReconnectEnd(
+        new MouseEvent('mouseup', { clientX: 10, clientY: 10 }),
+        EDGES[0]!,
+        'target',
+        state,
+      );
+    });
+  };
+
+  afterEach(() => {
+    document.querySelector('.react-flow__renderer')?.remove();
+    document.elementFromPoint = () => null;
+  });
+
+  it('deletes the Edge when the release lands on empty canvas', () => {
+    const composed = compose();
+    release(composed, mountFlowDom().renderer, FINISHED_CONNECTION);
+
+    expect(graphsOf(composed.session.getState().working)[0]?.edges).toEqual([]);
+  });
+
+  it('keeps the Edge when the release lands on a Card body', () => {
+    const composed = compose();
+    release(composed, mountFlowDom().card, FINISHED_CONNECTION);
+
+    expect(graphsOf(composed.session.getState().working)[0]?.edges).toEqual([EDGE]);
+  });
+
+  /**
+   * **The precedence itself.** The DOM says empty canvas — the same fact that
+   * deletes in the first case — and React Flow says a handle is in range. A drag
+   * that merely *missed* a handle cancels rather than deleting, so the Edge
+   * survives.
+   */
+  it('keeps the Edge when a connection target in range outranks the empty canvas underneath', () => {
+    const composed = compose();
+    release(composed, mountFlowDom().renderer, RESOLVED_CONNECTION);
+
+    expect(graphsOf(composed.session.getState().working)[0]?.edges).toEqual([EDGE]);
   });
 });
 

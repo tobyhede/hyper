@@ -1,7 +1,7 @@
 import { ViewportPortal, useConnection } from '@xyflow/react';
 import { CanvasCard } from '@project/ui';
 import { CARD_SIZE } from '../card';
-import { newCardDrop, type ElementDropTarget } from '../edge-authoring';
+import { dropTarget, newCardDrop, type ElementDropTarget } from '../edge-authoring';
 
 export interface NewCardPreviewProps {
   /** Exact neutral title the authored Card will carry. */
@@ -42,7 +42,7 @@ export function NewCardPreview({ title, modifierHeld, pointerOver, accepts }: Ne
           kind: 'dragging',
           sourceId,
           point: endpoint,
-          over: overNode ? 'connection-target' : pointerOver,
+          over: dropTarget({ connectionTarget: overNode, element: pointerOver }),
           modifierHeld,
         },
     accepts,
