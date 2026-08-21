@@ -33,6 +33,17 @@ test(
 
     await expect(page.getByTestId('edge-editor')).toBeVisible();
     await expect(edit).toHaveAttribute('aria-expanded', 'true');
+
+    // **Edit toggles, and pressing it again is the close.** The control
+    // advertises that with `aria-expanded`, so it has to be true: a button that
+    // says it owns an expanded thing and cannot collapse it leaves Escape as the
+    // only way out. It is the popup's registered trigger for exactly this
+    // reason — an unregistered button counts as an *outside press*, which closes
+    // the popup on pointerdown and lets the click that follows reopen it.
+    await edit.click();
+
+    await expect(page.getByTestId('edge-editor')).toHaveCount(0);
+    await expect(edit).toHaveAttribute('aria-expanded', 'false');
   },
 );
 

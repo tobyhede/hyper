@@ -7,6 +7,7 @@ import {
   FieldError,
   Popover,
   PopoverContent,
+  PopoverTrigger,
   Separator,
   cn,
   type CardChoice,
@@ -53,13 +54,21 @@ const GROUPED_COMMAND = 'rounded-none border-0 text-[0.75rem] text-foreground';
  * The reproduction is written up in
  * `.scratch/design-system-baseline/findings/base-ui-popover-escape-and-combobox-value.md`.
  *
- * **Capture phase, and that is the whole of why it is layered correctly.** Base
- * UI closes the combobox list from a bubble-phase `keydown` listener on
- * `document`, and the browser's microtask checkpoint commits that close before
- * React's delegated bubble listener runs — so a bubble handler here would read
- * `aria-expanded="false"` on the *first* press and collapse both layers into
- * one. React's delegated capture listener runs before any of that, while the
- * list is still open and still says so.
+ * **Capture phase, and the reason is that a bubble handler is never called at
+ * all.** Measured by swapping this one prop to `onKeyDown` and running the Ladle
+ * Escape spec: the editor then fails to close on *either* press, not merely the
+ * first. Base UI's own `keydown` listener sits on `document` and stops the event
+ * before it reaches the root container React delegates from, so the bubble half
+ * of that delegation never fires for a press inside this popup. React's capture
+ * listener runs on the way *down* — root container before document-level bubble
+ * listeners — which is early enough to be asked, and early enough that the open
+ * list still reads `aria-expanded="true"`, which is what makes the guard below
+ * load-bearing rather than decorative.
+ *
+ * The connect picker in `edge-authoring-react.tsx` answers Escape on the bubble
+ * phase and is right to: it is a plain div in the app's own tree rather than a
+ * Base UI popup, so nothing intercepts the event on its way to React. The two
+ * differ because their hosts do, not because one of them is stale.
  */
 const dismissOnEscape =
   (close: () => void) =>
@@ -139,17 +148,28 @@ export function SelectedEdgeControls({
     <Popover open={editorOpen} onOpenChange={(next) => (next ? onOpenEditor() : onCloseEditor())}>
       <div className="flex flex-col items-center gap-1">
         <div ref={anchor} className={cn('flex items-stretch overflow-hidden', RAISED_SURFACE)}>
-          <Button
-            variant="ghost"
-            size="toolbar"
-            className={GROUPED_COMMAND}
-            data-testid="edge-edit"
-            aria-label="Edit this Edge"
-            aria-expanded={editorOpen}
-            onClick={() => (editorOpen ? onCloseEditor() : onOpenEditor())}
-          >
-            Edit
-          </Button>
+          {/*
+            **Registered as the popup's trigger, not merely a button that opens
+            it.** Base UI dismisses a popup on an outside press, and a button it
+            does not know as the trigger *is* outside: the pointerdown closed the
+            editor and the click that followed reopened it, so Edit could never
+            be the close. Being the trigger is also what supplies `aria-expanded`
+            and `aria-haspopup` — the controlled `open` above stays Edge
+            Authoring's, and the toggle arrives through `onOpenChange`.
+          */}
+          <PopoverTrigger
+            render={
+              <Button
+                variant="ghost"
+                size="toolbar"
+                className={GROUPED_COMMAND}
+                data-testid="edge-edit"
+                aria-label="Edit this Edge"
+              >
+                Edit
+              </Button>
+            }
+          />
           <Separator orientation="vertical" />
           <Button
             variant="ghost"
@@ -239,11 +259,7 @@ function EdgeEndpointFields({
             'aria-invalid': fromError !== null,
             'aria-describedby': fromError === null ? undefined : FROM_ERROR,
           }}
-          // SAFETY: `CardSearchCombobox` is `ui`'s generic primitive and reports
-          // the picked choice's `id` as plain `string`, but these choices are
-          // `endpointChoices`'s own `{ id: card.id, … }` list — every id it can
-          // report back here is a real `CardId`.
-          onValueChange={(cardId) => onReconnect('from', cardId as CardId)}
+          onValueChange={(cardId) => onReconnect('from', cardId)}
         />
         <FieldError id={FROM_ERROR} data-testid="edge-from-refusal">
           {fromError}
@@ -259,9 +275,7 @@ function EdgeEndpointFields({
             'aria-invalid': toError !== null,
             'aria-describedby': toError === null ? undefined : TO_ERROR,
           }}
-          // SAFETY: same as `from` above — these ids are `endpointChoices`'s own
-          // `CardId`-derived ids, widened to `string` by the primitive.
-          onValueChange={(cardId) => onReconnect('to', cardId as CardId)}
+          onValueChange={(cardId) => onReconnect('to', cardId)}
         />
         <FieldError id={TO_ERROR} data-testid="edge-to-refusal">
           {toError}

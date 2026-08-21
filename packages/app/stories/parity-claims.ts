@@ -123,7 +123,8 @@ export const parityClaims: readonly ParityClaim[] = [
     id: 'selected-edge-editor-shows-both-endpoints',
     storyFile: 'components/selected-edge-controls.stories.tsx',
     storyExport: 'EndpointEditor',
-    claim: 'The endpoint editor names both endpoints and completes on the Card chosen.',
+    claim:
+      'The endpoint editor names both endpoints, completes on the Card chosen, and dismisses its list then itself on Escape.',
   },
   {
     id: 'selected-edge-endpoint-refusal-disables-its-choice',
