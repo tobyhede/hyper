@@ -15,10 +15,32 @@ Do not reshape honest code merely to evade a syntactic rule: renaming an error t
 
 - `no-known-value-widening` and `no-widen-then-assert`: keep a known value precise through use. Remove redundant broad annotations; use inference, `satisfies`, or a named owner contract.
 - `no-chained-type-assertions`: a double assertion discards the missing proof. Preserve the source type or parse the value; `as const` chains are allowed.
-- `require-safety-comment-for-type-assertion`: every non-const assertion needs an immediately preceding `SAFETY:` comment stating the checked invariant TypeScript cannot express. A comment that restates the target type is incomplete. Delete an avoidable assertion instead of documenting it.
+- `require-safety-comment-for-type-assertion`: every non-const assertion needs an immediately preceding `SAFETY:` comment stating the checked invariant TypeScript cannot express. A comment that restates the target type is incomplete. Delete an avoidable assertion instead of documenting it. **This rule is unchanged by ADR 0062 and still applies to every surviving assertion** — see "Two rules on assertions" below, because it is no longer the whole of the policy.
 - `no-object-parameters`, `no-unknown-parameters`, `no-unknown-returns`, and `no-unknown-type-aliases`: functions exchange parsed, named contracts. Keep `unknown` visible only inside an honest parsing, caught-error, or external-contract boundary; do not conceal it behind an alias.
 - `no-unsafe-dictionary-type`: dictionaries carry a concrete owner/schema-derived value type. Parse an external payload before insertion.
 - `no-runtime-typeof`: decode representations at I/O boundaries, then branch on domain values. Type predicates may use `typeof`; `.oxlintrc.json` records the boundary, platform-detection, closed-union, and value-under-test exceptions.
+
+## Two rules on assertions
+
+Since ADR 0062 a narrowing assertion faces two gates doing different jobs, and satisfying one says nothing about the other.
+
+- `anti-slop/require-safety-comment-for-type-assertion` (oxlint) **demands a reason**. Unchanged, and it applies to every assertion still in the tree, including the ones the baseline below records.
+- `@typescript-eslint/no-unsafe-type-assertion` (ESLint, type-aware) **caps the count**. A narrowing assertion is an error anywhere in the repository.
+
+Do not weaken either to reduce the overlap. ADR 0062's reasoning is that a `SAFETY:` comment is satisfied by prose, prose is the cheapest thing an agent produces, and a comment does not survive the refactoring that moves the code it justifies — so the comment rule was never going to be the gate on new code. Equally, a count with no stated reason tells a reviewer nothing. Each rule is the other's blind spot.
+
+### The suppressions baseline
+
+`eslint-suppressions.json` at the repository root records the 79 narrowing assertions that predate the rule, across 36 files. A committed list of violations invites two wrong readings, and both are wrong:
+
+- **It is not evidence the rule is decorative.** Those sites were examined in a reviewed pass (`.scratch/anti-slop/` issue 07) under exactly the test the rule applies, and none was found to be a missing type boundary. The file is the record of what review already accepted. A new assertion fails lint even in a file the baseline lists — and adding one to a listed file reports *every* assertion in that file, because a count-based baseline cannot tell which is new. That is the intended pressure.
+- **It is not a backlog to schedule.** ADR 0062 rejected the cleanup on the evidence. `--prune-suppressions` runs in the `lint` that `verify` performs, so the file shrinks on its own as assertions go for other reasons, and the ceiling never rises. A project to empty it is the cleanup the ADR rejected, arriving under another name.
+
+It is **generated and never hand-edited** — not to add an entry, not to raise a count, not to reformat (it is in `.prettierignore` for that reason). Regenerate it only with `eslint . --suppress-rule @typescript-eslint/no-unsafe-type-assertion`. `test/unit/assertion-ratchet.test.ts` fails if it goes missing, empties, grows a second rule, or takes a shape ESLint would not have written.
+
+### Proving the gates still bite
+
+`tools/typing-fixtures/` holds one small file per construct — seven that must be rejected and four that must survive — and `test/unit/typing-fixtures.test.ts` runs `tsc`, `eslint` and `oxlint` over them for real. **A `must-fail` fixture that passes is a gap in enforcement and a finding**, not a fixture to relax. The `must-pass` half is what catches a rule over-reaching; without it, rejecting everything would score full marks. They are excluded from lint, format and the root program on purpose, and three tests pin that they stay excluded.
 
 ## Ownership
 

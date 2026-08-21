@@ -2,7 +2,7 @@
 
 Status: accepted
 Related: 0054, 0056
-Build status: not built
+Build status: built
 
 `tsc` is TypeScript 7 and its diagnostics are the only type-checking truth in this repository. `pnpm typecheck` and every package's own `typecheck` run that compiler, and a program TypeScript 7 accepts is a correct program whether or not an older compiler agrees.
 
@@ -15,6 +15,12 @@ The bridge is temporary and its removal condition is written down: a stable Type
 We rejected waiting for `typescript-eslint`: the compiler is ready, the repository typechecks clean under it, and waiting means the migration lands later bundled with unrelated churn. We rejected dropping typed linting to install TypeScript 7 alone, because typed rules are the enforcement half of this codebase's typing policy and losing them to gain a compiler is a net loss. We rejected installing plain `typescript@7` beside `typescript-eslint` and ignoring the peer break, which produces a linter running against an API it was not built for and diagnostics nobody should trust. We rejected keeping TypeScript 6 as a second mandatory oracle: two compilers that must both agree makes the older one's limitations into repository policy, which is the outcome this decision exists to prevent.
 
 The accepted cost is two TypeScript installations in the lockfile, a package name that means the opposite of what it says, and a check that must run before typechecking rather than being an implicit property of the install. A one-off comparison against `tsc6` remains useful while migrating and is not normative afterwards.
+
+## As built
+
+TypeScript 7.0.2 owns `tsc` under the alias `@typescript/typescript7`; `typescript` resolves to `@typescript/typescript6@6.0.2`, which exposes `tsc6` and reports compiler version 6.0.3. `scripts/check-typescript-toolchain.ts` is the assertion, wired as `typecheck:toolchain` and first in `verify`; it probes the root and all seven packages, because `pnpm -r typecheck` runs each package's own binary. Its bridge half is one function and its reader, so removal is an edit.
+
+One casualty, recorded because it will otherwise look arbitrary. `@ladle/react` ships `.tsx` **source** inside its `types` entry point, so `skipLibCheck` does not cover it and every consumer typechecks it. Its `ui.tsx` has two JSX prop errors upstream already knows about and suppressed with `//@ts-ignore` above each opening tag. TypeScript 7 moved those diagnostics onto the offending attribute a line or two further down, out from under the suppression. Both compilers include and check the file — measured with `--listFiles`, and by injecting an error that both report — so this is not a program-membership difference and there is nothing to exclude. `5.1.1` is npm `latest`, so there is no bump to take. Fixed by a tracked `pnpm` patch adding `// @ts-nocheck` to that one file, which is what the sibling `dialog.tsx` in the same package already does. Remove the patch when the package ships declarations rather than source, or relocates its own suppressions.
 
 ## The negative to remember
 
