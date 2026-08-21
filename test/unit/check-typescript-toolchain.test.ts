@@ -1,14 +1,7 @@
 import { execFile } from 'node:child_process';
-import {
-  mkdtempSync,
-  readdirSync,
-  readFileSync,
-  rmSync,
-  symlinkSync,
-  writeFileSync,
-} from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { describe, expect, it } from 'vitest';
@@ -24,6 +17,15 @@ import {
   type CompilerReading,
 } from '../../scripts/check-typescript-toolchain';
 
+/** One entry of `pnpm -r list --json`: the directory pnpm enumerates. */
+interface ListedWorkspace {
+  readonly path: string;
+}
+
+/** The parse boundary for that listing, expressed as a predicate rather than a cast. */
+const isListedWorkspace = (value: unknown): value is ListedWorkspace =>
+  typeof value === 'object' && value !== null && 'path' in value && typeof value.path === 'string';
+
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const SCRIPT = join(repositoryRoot, 'scripts/check-typescript-toolchain.ts');
 
@@ -33,11 +35,19 @@ const at = (
   workspace: string,
   reported: string | null,
   failure: string | null = null,
+  typecheckScript: string | null = 'tsc -p tsconfig.json --noEmit',
 ): CompilerReading => ({
   workspace,
   reported,
   failure,
+  typecheckScript,
 });
+
+/** A directory `pnpm -r` would enumerate: one that carries a manifest. */
+const workspaceAt = (root: string, relativePath: string): void => {
+  mkdirSync(join(root, relativePath), { recursive: true });
+  writeFileSync(join(root, relativePath, 'package.json'), '{ "name": "fixture" }\n');
+};
 
 const everyWorkspaceOn = (version: string): readonly CompilerReading[] =>
   probedWorkspaces(repositoryRoot).map((workspace) => at(workspace, `Version ${version}`));
@@ -80,6 +90,37 @@ describe('the authoritative compiler', () => {
     if (verdict.ok) return;
     expect(verdict.failures).toEqual([
       'packages/core: `tsc --version` could not be run — spawn pnpm ENOENT',
+    ]);
+  });
+
+  it('rejects a typecheck script that runs tsc6, which probing `tsc` cannot see', () => {
+    // The probe asks what the binary named `tsc` resolves to. It says nothing
+    // about which binary the `typecheck` script invokes, and ADR 0061 installs a
+    // second one on purpose — so a script switched to `tsc6` typechecks on
+    // TypeScript 6 with the guard still reporting 7 and exiting 0.
+    const verdict = judgeToolchain({
+      compilers: [
+        at('.', 'Version 7.0.2'),
+        at('packages/app', 'Version 7.0.2', null, 'tsc6 -p tsconfig.json --noEmit'),
+      ],
+      bridge: workingBridge,
+    });
+    expect(verdict.ok).toBe(false);
+    if (verdict.ok) return;
+    expect(verdict.failures).toEqual([
+      'packages/app: its `typecheck` script runs `tsc6`, not the authoritative `tsc`',
+    ]);
+  });
+
+  it('rejects a workspace that declares no typecheck script, so nothing runs there', () => {
+    const verdict = judgeToolchain({
+      compilers: [at('.', 'Version 7.0.2'), at('packages/core', 'Version 7.0.2', null, null)],
+      bridge: workingBridge,
+    });
+    expect(verdict.ok).toBe(false);
+    if (verdict.ok) return;
+    expect(verdict.failures).toEqual([
+      'packages/core: declares no `typecheck` script, so no compiler runs there at all',
     ]);
   });
 
@@ -133,21 +174,58 @@ describe('the TypeScript 6 bridge', () => {
 });
 
 describe('what the check probes', () => {
-  it('probes the root and every workspace `pnpm -r typecheck` reaches', () => {
-    // Derived from `pnpm-workspace.yaml` and the directories on disk rather than
-    // restated here, so a new package is covered the day it exists instead of the
-    // day someone remembers to edit this list.
-    const expected = readFileSync(join(repositoryRoot, 'pnpm-workspace.yaml'), 'utf8')
-      .split('\n')
-      .flatMap((line) => /^\s*-\s*'?([^'\s#]+)\/\*'?\s*$/.exec(line)?.[1] ?? [])
-      .flatMap((parent) =>
-        readdirSync(join(repositoryRoot, parent), { withFileTypes: true })
-          .filter((entry) => entry.isDirectory())
-          .map((entry) => `${parent}/${entry.name}`),
-      )
+  it('probes the root and every workspace `pnpm -r typecheck` reaches', async () => {
+    // Asked of pnpm rather than re-derived here. An expectation rebuilt from the
+    // same manifest with the same globbing rule can only ever agree with the code
+    // under test; `pnpm -r list` is the enumeration `pnpm -r typecheck` itself
+    // walks, so this compares the claim against the thing it is a claim about.
+    const { stdout } = await promisify(execFile)(
+      'pnpm',
+      ['-r', 'list', '--depth', '-1', '--json'],
+      { cwd: repositoryRoot, maxBuffer: 8 * 1024 * 1024 },
+    );
+    const listed: unknown = JSON.parse(stdout);
+    if (!Array.isArray(listed)) throw new Error('`pnpm -r list` printed no array');
+    const expected = listed
+      .filter(isListedWorkspace)
+      .map(({ path }) => relative(repositoryRoot, path) || '.')
       .sort();
     expect(expected.length).toBeGreaterThan(1);
-    expect(probedWorkspaces(repositoryRoot)).toEqual(['.', ...expected]);
+    expect([...probedWorkspaces(repositoryRoot)].sort()).toEqual(expected);
+  }, 60_000);
+
+  it('reads only the packages: block, so an unrelated pnpm key is not a workspace glob', () => {
+    const root = mkdtempSync(join(tmpdir(), 'hyper-toolchain-'));
+    try {
+      workspaceAt(root, 'packages/app');
+      workspaceAt(root, 'packages/core');
+      // `pnpm approve-builds` writes `onlyBuiltDependencies:` itself, and
+      // `catalog:`, `ignoredBuiltDependencies:` and `packageExtensions:` have the
+      // same shape. None of them is a workspace glob, and reading one as one
+      // fails `verify` at its first step blaming the compiler toolchain.
+      writeFileSync(
+        join(root, 'pnpm-workspace.yaml'),
+        "packages:\n  - 'packages/*'\n\nonlyBuiltDependencies:\n  - esbuild\n",
+      );
+      expect(probedWorkspaces(root)).toEqual(['.', 'packages/app', 'packages/core']);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('skips a directory with no manifest, which `pnpm -r typecheck` never enters', () => {
+    const root = mkdtempSync(join(tmpdir(), 'hyper-toolchain-'));
+    try {
+      workspaceAt(root, 'packages/app');
+      // A leftover after a rename, or a plain assets directory. `pnpm -r` skips
+      // it, so probing it reports a compiler no typecheck ever runs there — the
+      // guard vouching for a directory it does not actually cover.
+      mkdirSync(join(root, 'packages/shared-assets'), { recursive: true });
+      writeFileSync(join(root, 'pnpm-workspace.yaml'), "packages:\n  - 'packages/*'\n");
+      expect(probedWorkspaces(root)).toEqual(['.', 'packages/app']);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 
   it('refuses a workspace glob it cannot expand rather than probing fewer', () => {
