@@ -53,6 +53,11 @@ export interface FeatureRoadmap {
   readonly issues: readonly ScratchIssue[];
   /** Specs, maps, findings and handoffs — anything with a status that is not a ticket. */
   readonly documents: readonly ScratchIssue[];
+  /**
+   * Files under `issues/` carrying no `Status:` line at all. Reported rather than
+   * skipped: a ticket the roll-up cannot see reads as work that does not exist.
+   */
+  readonly unstatused: readonly string[];
 }
 
 export interface Roadmap {
@@ -211,17 +216,25 @@ interface ScannedFeature {
   readonly slug: string;
   readonly issues: readonly ParsedIssue[];
   readonly documents: readonly ParsedIssue[];
+  readonly unstatused: readonly string[];
 }
 
 const scanFeature = (root: string, slug: string): ScannedFeature => {
   const directory = join(root, slug);
-  const issues = markdownFilesIn(join(directory, 'issues'))
-    .map((file) => parseFile(root, file))
+  const tickets = markdownFilesIn(join(directory, 'issues')).map((file) => ({
+    file,
+    issue: parseFile(root, file),
+  }));
+  const issues = tickets
+    .map((ticket) => ticket.issue)
     .filter((issue): issue is ParsedIssue => issue !== null);
+  const unstatused = tickets
+    .filter((ticket) => ticket.issue === null)
+    .map((ticket) => relative(root, ticket.file));
   const documents = markdownFilesIn(directory)
     .map((file) => parseFile(root, file))
     .filter((document): document is ParsedIssue => document !== null);
-  return { slug, issues, documents };
+  return { slug, issues, documents, unstatused };
 };
 
 const blockerKey = (feature: string, number: string): string => `${feature}/${number}`;
@@ -261,6 +274,7 @@ export const buildRoadmap = (root: string): Roadmap => {
       settledCount,
       issues,
       documents: feature.documents.map((document) => ({ ...document, unmetBlockers: [] })),
+      unstatused: feature.unstatused,
     };
   });
 
@@ -339,6 +353,9 @@ export const renderRoadmap = (roadmap: Roadmap, intent: string | null = null): s
       .filter((issue) => issue.state === 'unrecognised')
       .map((issue) => `  ${issue.path}  →  ${issue.status}`),
   );
+  const unstatused = roadmap.features.flatMap((feature) =>
+    feature.unstatused.map((path) => `  ${path}`),
+  );
 
   const lines: string[] = [
     `.scratch — ${roadmap.features.length} efforts · ${roadmap.issueCount} issues · ${roadmap.openCount} open`,
@@ -358,6 +375,9 @@ export const renderRoadmap = (roadmap: Roadmap, intent: string | null = null): s
   }
   if (unrecognised.length > 0) {
     lines.push('', `UNRECOGNISED STATUS — ${unrecognised.length}`, ...unrecognised);
+  }
+  if (unstatused.length > 0) {
+    lines.push('', `NO STATUS LINE — ${unstatused.length} (invisible to this scan)`, ...unstatused);
   }
   lines.push('', `COMPLETE — ${complete.length}`, ...wrapSlugs(complete));
   lines.push(
@@ -575,6 +595,7 @@ export const renderRoadmapHtml = (roadmap: Roadmap, intent: string | null = null
           `<li><span class="path">${escapeHtml(issue.path)}</span>${escapeHtml(issue.status)}</li>`,
       ),
   );
+  const unstatused = roadmap.features.flatMap((feature) => feature.unstatused);
 
   return [
     '<!doctype html>',
@@ -601,6 +622,18 @@ export const renderRoadmapHtml = (roadmap: Roadmap, intent: string | null = null
       'Unrecognised status',
       unrecognised.length,
       unrecognised.length === 0 ? '' : `<details open><ul>${unrecognised.join('')}</ul></details>`,
+    ),
+    htmlSection(
+      'No status line — invisible to this scan',
+      unstatused.length,
+      unstatused.length === 0
+        ? ''
+        : `<details open><ul>${unstatused
+            .map(
+              (path) =>
+                `<li><a class="path" href="${escapeHtml(path)}">${escapeHtml(path)}</a></li>`,
+            )
+            .join('')}</ul></details>`,
     ),
     htmlSection(
       'Deferred work inside settled issues',

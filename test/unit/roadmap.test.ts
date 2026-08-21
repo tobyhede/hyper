@@ -67,6 +67,18 @@ describe('status lines', () => {
 
     expect(featureNamed(buildRoadmap(root), 'effort').issues).toEqual([]);
   });
+
+  it('reports a ticket carrying no status rather than passing over it', () => {
+    const root = scratch();
+    write(root, 'effort/issues/01-a.md', 'Status: resolved\n');
+    write(root, 'effort/issues/02-handoff.md', '# Handoff\n\nWhat went wrong.\n');
+
+    const roadmap = buildRoadmap(root);
+
+    expect(featureNamed(roadmap, 'effort').unstatused).toEqual(['effort/issues/02-handoff.md']);
+    expect(renderRoadmap(roadmap)).toContain('NO STATUS LINE — 1');
+    expect(renderRoadmapHtml(roadmap)).toContain('effort/issues/02-handoff.md');
+  });
 });
 
 describe('feature phase', () => {

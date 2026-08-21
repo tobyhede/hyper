@@ -4,7 +4,10 @@
 
 **Blocked by:** 01 — Establish the shadcn design-system baseline.
 
-**Status:** ready-for-human
+**Status:** resolved — delivered in `77deaa9` (PR #104), through three rounds of
+correction recorded under "Comments". See "Verification" below.
+`05-handoff-regression-2026-08-21.md` is the record of the round that went wrong,
+not open work.
 
 - [x] The production Card, rather than a Ladle-only facsimile, renders the accepted visual treatment for kinds and interaction states.
 - [x] Title editing, card editing, connection controls and handle visibility retain their existing keyboard, pointer and focus behaviour.
