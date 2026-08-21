@@ -2,7 +2,7 @@
 
 Status: accepted
 Related: 0010, 0057, 0061
-Build status: not built
+Build status: built
 
 A type assertion that tells TypeScript a value is *more specific* than TypeScript can prove is a claim the compiler cannot check. `@typescript-eslint/no-unsafe-type-assertion` runs as an error, and the assertions already in the tree are recorded once in a committed ESLint suppressions baseline. Nothing new joins that list. A new narrowing assertion fails lint, and the only way past it is to narrow, to parse at the boundary that owns the representation, to change the signature to ask for what the function needs, to prove the fact by construction — or to add an explicit, argued exception that a reviewer sees.
 
@@ -17,6 +17,16 @@ What has changed is not the verdict on those sites but who writes the next one. 
 We rejected the full cleanup. It contradicts a reviewed outcome without new evidence, it lands on the hard tail by construction — the anti-slop sweep already deleted every assertion with an easy fix — and it moves judgment out of the code and into a config file, trading inline invariants a reviewer reads in context for exception entries further away that can go stale unnoticed. We rejected leaving the rule off, which puts no gate at all on what gets written next and leaves the standard resting entirely on a comment requirement prose satisfies. We rejected file-scoped grandfathering through ordinary config overrides, which would hand a permanent pass to exactly the files most likely to grow new assertions.
 
 The accepted costs are two. A committed suppressions file is a second place violations live, and it is only honest while `--prune-suppressions` runs, so the pruning is part of `verify` rather than a habit. And the baseline counts per file and rule rather than per site, so removing one assertion and adding another in the same file passes silently until the next prune — a swap is invisible where an addition is not.
+
+## As built
+
+79 findings across 36 file entries in `eslint-suppressions.json` at the repository root, generated and in `.prettierignore` because ESLint rewrites it on every prune. `--prune-suppressions` runs in the `lint` script, which is what `verify` calls.
+
+The pruning has a property worth stating: it means a stale baseline never *fails*, it is silently rewritten. So the ceiling falls when someone runs `verify` locally and commits the smaller file; in CI the rewrite is discarded and the run passes. That is the right trade — failing on stale would fail every branch that deletes an assertion — but the file's accuracy rests on local runs.
+
+`test/unit/assertion-ratchet.test.ts` holds the three pieces together, since deleting any one leaves the other two looking enforced. `tools/typing-fixtures/` and `test/unit/typing-fixtures.test.ts` are the executable evidence, and were proved non-vacuous by turning the rule off and watching two of seventeen fail.
+
+An unforeseen cost: `JSON.parse(...) as T` behind a `SAFETY:` comment — the idiom the existing tests use to read repository-owned JSON, and now itself in the baseline — is exactly what the rule bans for new code. Tests that read JSON must now narrow with type predicates, which is more work and takes the boundary exemptions `packages/persistence/src/http-protocol.ts` takes. That is the rule working as intended, not a defect, but it is a real tax on a common shape.
 
 ## The negative to remember
 
