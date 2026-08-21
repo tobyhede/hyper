@@ -95,6 +95,17 @@ export const parityClaims: readonly ParityClaim[] = [
     claim: 'An Alias opens its own title and Target editor without exposing Target content.',
   },
   {
+    id: 'new-alias-completes-on-the-target-chosen',
+    storyFile: 'components/card-and-alias-panes.stories.tsx',
+    storyExport: 'NewAliasPane',
+    // Deliberately says nothing about the title the pane carries. The Ladle test
+    // types one and reads it back, but the application test exercises the empty
+    // title that takes the Target's own (ADR 0049), so a clause about a typed
+    // title would have one proof rather than the two ADR 0052 requires.
+    claim:
+      'Adding an Alias offers Title and Target with no create action, and completes on the Target chosen rather than on a second confirmation.',
+  },
+  {
     id: 'persistence-indicator-shows-save-lifecycle',
     storyFile: 'components/persistence-indicator.stories.tsx',
     storyExport: 'Lifecycle',

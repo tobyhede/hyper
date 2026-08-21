@@ -1,8 +1,8 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import { buttonVariants } from '@project/ui';
 
 const theme = readFileSync(new URL('../../packages/app/src/tailwind.css', import.meta.url), 'utf8');
-const styles = readFileSync(new URL('../../packages/app/src/styles.css', import.meta.url), 'utf8');
 
 const variables = new Map(
   [...theme.matchAll(/^\s*(--[\w-]+):\s*([^;]+);/gm)].map((match) => [match[1]!, match[2]!]),
@@ -55,7 +55,14 @@ describe('semantic theme contrast', () => {
     ).toBeGreaterThanOrEqual(4.5);
   });
 
+  // Asked of the classes `Button` actually resolves rather than of any file's
+  // text. It used to read a `.btn--primary` rule out of the app stylesheet,
+  // which no module had emitted since the toolbar was replaced — so the only
+  // thing keeping that rule alive was this assertion about it.
   it('uses the semantic foreground token for primary buttons', () => {
-    expect(styles).toMatch(/\.btn--primary\s*{[^}]*color:\s*var\(--primary-foreground\)/s);
+    const classes = buttonVariants({ variant: 'default' }).split(/\s+/);
+
+    expect(classes).toContain('bg-primary');
+    expect(classes).toContain('text-primary-foreground');
   });
 });

@@ -101,6 +101,13 @@ test('a body heading is just a heading, drawn once alongside the title (ADR 0020
   await expect(content.locator('.card__title')).toHaveText('C');
   await expect(content.locator('h1')).toHaveText('Where Short ends');
   await expect(content.locator('h1')).toHaveCount(1);
+
+  // Sized in container units against the 260px frame the camera magnifies, not
+  // in pixels against a box about to be scaled by an arbitrary factor (ADR
+  // 0027). 5cqw of 260px is 13px; `.card--full .card__title`'s fixed 1.3rem has
+  // the same specificity, so the two are separated only by their order in
+  // `styles.css` and this is what says which order that has to be.
+  await expect(content.locator('.card__title')).toHaveCSS('font-size', '13px');
 });
 
 test('the camera closes in on the active card, and pulls back on exit', async ({ page }) => {

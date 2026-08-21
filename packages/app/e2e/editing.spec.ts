@@ -2101,32 +2101,41 @@ test('Escape discards a typed Alias title and closes the pane', async ({ page })
 /**
  * Choosing a Target is the creation, and the editor stays open on what it made.
  */
-test('choosing a Target creates the Alias and leaves its editor open', async ({ page }) => {
-  await page.goto('/');
-  await expect(nodeByTitle(page, 'A').first()).toBeVisible();
-  await settled(page);
-  const nodes = await page.locator('.react-flow__node').count();
+test(
+  'choosing a Target creates the Alias and leaves its editor open',
+  { tag: '@parity:new-alias-completes-on-the-target-chosen' },
+  async ({ page }) => {
+    await page.goto('/');
+    await expect(nodeByTitle(page, 'A').first()).toBeVisible();
+    await settled(page);
+    const nodes = await page.locator('.react-flow__node').count();
 
-  await page.getByTestId('add-card-menu').click();
-  await page.getByRole('menuitem', { name: 'Add Alias' }).click();
-  await page.getByRole('combobox', { name: 'Target' }).fill('B');
-  await page.getByRole('option', { name: 'Markdown Card B' }).click();
+    await page.getByTestId('add-card-menu').click();
+    await page.getByRole('menuitem', { name: 'Add Alias' }).click();
+    // No create action beside Cancel — the Target chosen is the completion, and
+    // a second activation would confirm a choice already made.
+    const pane = page.getByTestId('new-alias');
+    await expect(pane.getByRole('button', { name: 'Cancel' })).toBeVisible();
+    await expect(pane.getByRole('button', { name: /create|add|done|save/i })).toHaveCount(0);
+    await page.getByRole('combobox', { name: 'Target' }).fill('B');
+    await page.getByRole('option', { name: 'Markdown Card B' }).click();
 
-  // The pane it is now on is the Alias's own editor: its Title and its Target,
-  // and nothing belonging to the Card its Target resolves to (ADR 0049).
-  await expect(page.getByTestId('new-alias')).toHaveCount(0);
-  await expect(page.getByTestId('open-card')).toBeVisible();
-  await expect(page.getByRole('textbox', { name: 'Title' })).toHaveValue('B');
-  await expect(page.getByRole('combobox', { name: 'Target' })).toBeVisible();
-  await expect(page.getByRole('textbox', { name: 'Markdown source' })).toHaveCount(0);
-  await page.getByRole('button', { name: 'Cancel' }).click();
+    // The pane it is now on is the Alias's own editor: its Title and its Target,
+    // and nothing belonging to the Card its Target resolves to (ADR 0049).
+    await expect(page.getByTestId('new-alias')).toHaveCount(0);
+    await expect(page.getByTestId('open-card')).toBeVisible();
+    await expect(page.getByRole('textbox', { name: 'Title' })).toHaveValue('B');
+    await expect(page.getByRole('combobox', { name: 'Target' })).toBeVisible();
+    await expect(page.getByRole('textbox', { name: 'Markdown source' })).toHaveCount(0);
+    await page.getByRole('button', { name: 'Cancel' }).click();
 
-  // An empty title takes the Target's, so the Alias is a second Card called B.
-  await expect(page.locator('.react-flow__node')).toHaveCount(nodes + 1);
-  await expect(nodeByTitle(page, 'B')).toHaveCount(2);
-  await expect(selectedCanvas(page)).toContainText('Layout 1');
-  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
-});
+    // An empty title takes the Target's, so the Alias is a second Card called B.
+    await expect(page.locator('.react-flow__node')).toHaveCount(nodes + 1);
+    await expect(nodeByTitle(page, 'B')).toHaveCount(2);
+    await expect(selectedCanvas(page)).toContainText('Layout 1');
+    await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
+  },
+);
 
 /**
  * The whole gesture, and the reason the Title field had to exist.

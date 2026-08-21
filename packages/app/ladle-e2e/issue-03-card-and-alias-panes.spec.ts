@@ -46,6 +46,31 @@ test(
   },
 );
 
+test(
+  'adding an Alias completes on the Target chosen, with no create action beside Cancel',
+  { tag: '@parity:new-alias-completes-on-the-target-chosen' },
+  async ({ page }) => {
+    await page.goto('/?story=components--card-and-alias-panes--new-alias-pane&mode=preview');
+
+    const dialog = page.getByRole('dialog', { name: 'New Alias' });
+    const target = dialog.getByRole('combobox', { name: 'Target' });
+    await expect(target).toBeFocused();
+    await expect(dialog.getByRole('button', { name: 'Cancel' })).toBeVisible();
+    await expect(dialog.getByRole('button', { name: /create|add|done|save/i })).toHaveCount(0);
+
+    await dialog.getByRole('textbox', { name: 'Title' }).fill('Placement recap');
+    await target.fill('Architecture');
+    await page.getByRole('option', { name: 'Architecture notes' }).click();
+
+    await expect(dialog).toBeHidden();
+    // The Markdown Card's own id, so the story reports the Target it was handed
+    // rather than only that something completed.
+    await expect(
+      page.getByText('Created Placement recap on 00000000-0000-4000-8000-000000000101.'),
+    ).toBeVisible();
+  },
+);
+
 test('review Alias empty state explains that no Target is eligible', async ({ page }) => {
   await page.goto('/?story=review--alias-pane-unreachable-states--empty&mode=preview');
 
