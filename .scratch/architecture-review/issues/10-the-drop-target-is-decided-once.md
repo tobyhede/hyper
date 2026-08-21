@@ -1,6 +1,6 @@
 # The drop target is decided once
 
-Status: ready-for-agent
+Status: resolved
 
 Surfaced by: the 2026-08-21 architecture review's fifth candidate, then grilled.
 The review's proposed signature was widened during grilling — see §1, which is
@@ -171,15 +171,15 @@ passes still fails the run, which is the wrong trade for this.
 
 ## Acceptance criteria
 
-- [ ] `ElementDropTarget` exists in `edge-authoring.ts` and `DropTarget` is declared over it; `dropTargetOf`'s return, `useState` at `edge-authoring-react.tsx:217` and `NewCardPreviewProps.pointerOver` are all narrowed to it.
-- [ ] No `dropTargetOf` remains; `elementDropTargetOf` is called at `:345`, `:376` and `:460`, and the comment at `edge-authoring-react.test.tsx:239-243` names it.
-- [ ] `dropTarget({ connectionTarget, element })` is exported from `edge-authoring.ts` and called at all three sites. No ternary composing `toNode` with a DOM answer survives anywhere in `packages/app/src`.
-- [ ] `newCardDrop`'s signature and body are unchanged.
-- [ ] `over === 'empty-canvas'` is still asked inline at `edge-authoring-react.tsx:460`; no named verdict function was added.
-- [ ] A six-row exhaustive table covers `dropTarget`; the property test at `edge-authoring.test.ts:668` is byte-identical.
-- [ ] Three `handleReconnectEnd` cases exist in `edge-authoring-react.test.tsx`, including a `toNode` non-null case that does not delete.
-- [ ] The rename and the extraction are separate commits, in that order, each `pnpm verify` green.
-- [ ] `pnpm verify` and `pnpm e2e` pass with real output quoted. **`pnpm e2e` must be green and unchanged** — this is behaviour-preserving and that is the guard that proves it. `pnpm e2e:ladle` is not required: no component with a story changes.
+- [x] `ElementDropTarget` exists in `edge-authoring.ts` and `DropTarget` is declared over it; `dropTargetOf`'s return, `useState` at `edge-authoring-react.tsx:217` and `NewCardPreviewProps.pointerOver` are all narrowed to it.
+- [x] No `dropTargetOf` remains; `elementDropTargetOf` is called at `:345`, `:376` and `:460`, and the comment at `edge-authoring-react.test.tsx:239-243` names it.
+- [x] `dropTarget({ connectionTarget, element })` is exported from `edge-authoring.ts` and called at all three sites. No ternary composing `toNode` with a DOM answer survives anywhere in `packages/app/src`.
+- [x] `newCardDrop`'s signature and body are unchanged.
+- [x] `over === 'empty-canvas'` is still asked inline at `edge-authoring-react.tsx:460`; no named verdict function was added.
+- [x] A six-row exhaustive table covers `dropTarget`; the property test at `edge-authoring.test.ts:668` is byte-identical.
+- [x] Three `handleReconnectEnd` cases exist in `edge-authoring-react.test.tsx`, including a `toNode` non-null case that does not delete.
+- [x] The rename and the extraction are separate commits, in that order, each `pnpm verify` green.
+- [x] `pnpm verify` and `pnpm e2e` pass with real output quoted. **`pnpm e2e` must be green and unchanged** — this is behaviour-preserving and that is the guard that proves it. `pnpm e2e:ladle` is not required: no component with a story changes.
 
 ## Decided — do not re-open
 
@@ -190,3 +190,44 @@ passes still fails the run, which is the wrong trade for this.
 - **`card` and `off-canvas` stay two values.** They refuse for the same reason today, but they are facts a supplier reports, not a verdict it reaches. Collapsing them would name an input after the answer it produces (`edge-authoring.ts:50-52`).
 - **The deletion site takes the same function, not merely the same rule.** It is the reason this ticket exists.
 - **No e2e test is added.** See §5.
+
+## Answer
+
+Three commits on `refactor/drop-target-decided-once`, branched from `b64284f`.
+
+`2fd4a7f` split the type and renamed the DOM helper: `ElementDropTarget` names
+the three values a hit-test can produce, `DropTarget` is declared over it, and
+`dropTargetOf` became `elementDropTargetOf`. `useState` and
+`NewCardPreviewProps.pointerOver` narrowed with it, so neither can now hold the
+`connection-target` it could never mean. `pnpm verify` green on that commit
+alone.
+
+`d82493a` added `dropTarget({ connectionTarget, element })` and pointed all
+three sites at it. `newCardDrop`'s signature and body are untouched, and
+`edge-authoring-react.tsx:460` still asks `over === 'empty-canvas'` inline.
+The literal `'connection-target'` now appears nowhere in `packages/app/src`
+outside `edge-authoring.ts` — once in the type, once in the function.
+
+**TDD.** The six-row table was written first and failed with
+`(0, dropTarget) is not a function` — 6 failed, 87 passed. The three
+reconnect-release cases were written to pass before the change, which is what
+makes them the behaviour-preserving guard. After the extraction: 93 passed.
+
+**The tests bite.** Inverting the rule to `return over.element` fails four of
+them, including the site-3 precedence case — so the pin is real and not a test
+written to match the fix.
+
+**Deviation from §5, agreed during grilling.** The precedence table uses two
+`it.each` blocks over `ELEMENTS` rather than six literal rows, with a
+`satisfies Record<ElementDropTarget, …>` making exhaustiveness compiler-checked:
+a member added to the union stops the file building until both the table and
+`ELEMENTS` name it. The annotated `Record` this started as tripped
+`anti-slop(no-known-value-widening)`; `satisfies` is what that rule asks for.
+
+**Verification.** `pnpm verify` exit 0 — 149 test files, 1647 passed, 8 skipped,
+up from 1638 by the nine tests added. `pnpm e2e` exit 0 — 115 passed in 1.8m,
+and `git diff main -- packages/app/e2e/` is empty, so green **and** unchanged.
+`pnpm e2e:ladle` was not required and not run: the only component touched is
+`NewCardPreview.tsx`, which `design-system-inventory.ts:82-85` records as
+deliberately uncatalogued — reachable only mid-gesture, so it has no stable
+story.
