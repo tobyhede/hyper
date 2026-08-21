@@ -115,15 +115,18 @@ Behaviour-preserving, as predicted: there were no callers.
 `pnpm verify` green: 100 test files, 1058 tests. `pnpm e2e` green: 72 passed.
 Both were run at the tip of `chore/clear-small-items`, with this change already
 in it as commit `9a734db`, rather than at the moment it was committed — the
-acceptance box above was ticked without recording anything, and these are the
-numbers it should have carried. The tip also carries
+acceptance boxes above were ticked without recording anything, and these are the
+numbers they should have carried. The tip also carries
 `packages/app/test/replacement-invalidation.test.tsx`, which is the one file by
 which these numbers exceed what this change alone would give; it touches no
 source and nothing here depends on it.
 
-`chore/clear-small-items` was never merged, and these notes reached `main`
-through a later salvage instead. The numbers above are the record of that branch
-and are left as measured; the salvage, rebased onto `main` at `86ed160`, ran
-`pnpm verify` green at 150 test files and 1595 tests, and `pnpm e2e` green at 115
-passed. The contract test arrived there as two tests rather than three —
-`02-…`'s section 5 says which case was dropped and why.
+The acceptance boxes above cover that run and no other: it is the one that
+carried this change. `chore/clear-small-items` was never merged, and these notes
+reached `main` through a later salvage instead, so everything below is the
+salvage's record rather than this change's. Rebased onto `main` at `86ed160` it
+ran `pnpm verify` green at 150 test files and 1595 tests (8 skipped, 1603
+collected) and `pnpm e2e` green at 115 passed; re-run unchanged after the review
+changes made to `02-…` and to the contract test, which add no test and leave
+both totals where they were. The contract test arrived there as two tests rather
+than three — `02-…`'s section 5 says which case was dropped and why.
