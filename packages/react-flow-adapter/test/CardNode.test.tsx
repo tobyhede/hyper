@@ -5,7 +5,7 @@ import { Position, type NodeProps } from '@xyflow/react';
 import type { HTMLAttributes } from 'react';
 import { vi } from 'vitest';
 import { CardNode } from '../src/CardNode';
-import type { CardFlowNode, CardHandle, CardNodeData } from '../src/projection';
+import type { CardFlowNode, CardHandle, CardNodeData, CardTitleEditor } from '../src/projection';
 import { uuid } from './uuid';
 
 /**
@@ -98,12 +98,10 @@ interface Overrides {
   titleEditingEnabled?: boolean;
   cardEditingEnabled?: boolean;
   connectingEnabled?: boolean;
-  editingTitle?: boolean;
+  titleEditor?: CardTitleEditor;
   onBeginConnect?: () => void;
   onEditCard?: () => void;
   onBeginTitleEditing?: () => void;
-  onCompleteTitleEditing?: (title: string) => string | null;
-  onCancelTitleEditing?: () => void;
   sourceHandles?: CardHandle[];
   targetHandles?: CardHandle[];
 }
@@ -118,12 +116,10 @@ function props({
   titleEditingEnabled = false,
   cardEditingEnabled = false,
   connectingEnabled = false,
-  editingTitle = false,
+  titleEditor,
   onBeginConnect,
   onEditCard,
   onBeginTitleEditing,
-  onCompleteTitleEditing,
-  onCancelTitleEditing,
   sourceHandles = [outHandle(graphId, 50)],
   targetHandles = [],
 }: Overrides = {}): NodeProps<CardFlowNode> {
@@ -134,7 +130,6 @@ function props({
     titleEditingEnabled,
     cardEditingEnabled,
     connectingEnabled,
-    editingTitle,
     active: false,
     selectedForAuthoring: false,
     showContent: false,
@@ -148,8 +143,7 @@ function props({
   if (onBeginConnect !== undefined) data.onBeginConnect = onBeginConnect;
   if (onEditCard !== undefined) data.onEditCard = onEditCard;
   if (onBeginTitleEditing !== undefined) data.onBeginTitleEditing = onBeginTitleEditing;
-  if (onCompleteTitleEditing !== undefined) data.onCompleteTitleEditing = onCompleteTitleEditing;
-  if (onCancelTitleEditing !== undefined) data.onCancelTitleEditing = onCancelTitleEditing;
+  if (titleEditor !== undefined) data.titleEditor = titleEditor;
 
   return {
     id: cardId,
@@ -272,6 +266,36 @@ describe('CardNode Connect and Edit authoring', () => {
   });
 });
 
+/**
+ * A flag says the composition *offers* a control; the operation is how the
+ * control is performed, and the two travel together from `SpaceCanvas`. Raised
+ * over a missing operation, the flag alone used to draw a live control that did
+ * nothing when activated. `CanvasCard` omits a control it has no operation for,
+ * and the adapter must not manufacture one on its behalf.
+ */
+describe('CardNode withholds a control the composition supplied no operation for', () => {
+  it('draws no Connect control for a flag raised over a missing operation', () => {
+    render(<CardNode {...props({ selected: true, connectingEnabled: true })} />);
+
+    expect(screen.queryByRole('button', { name: 'Connect from A' })).not.toBeInTheDocument();
+  });
+
+  it('draws no Edit control for a flag raised over a missing operation', () => {
+    render(<CardNode {...props({ selected: true, cardEditingEnabled: true })} />);
+
+    expect(screen.queryByRole('button', { name: /^Edit Card/ })).not.toBeInTheDocument();
+  });
+
+  it('leaves the title unrenameable for a flag raised over a missing operation', () => {
+    render(<CardNode {...props({ selected: true, titleEditingEnabled: true })} />);
+    const heading = screen.getByRole('heading', { name: 'A' });
+
+    expect(heading).toHaveAttribute('data-editable', 'false');
+    fireEvent.doubleClick(heading);
+    expect(screen.queryByRole('textbox', { name: 'Card title' })).not.toBeInTheDocument();
+  });
+});
+
 describe('CardNode title authoring', () => {
   it('draws no shared Description slot on the Card front', () => {
     render(<CardNode {...props()} />);
@@ -293,7 +317,7 @@ describe('CardNode title authoring', () => {
         {...props({
           selected: true,
           titleEditingEnabled: true,
-          editingTitle: true,
+          titleEditor: { onComplete: () => null, onCancel: () => undefined },
           onBeginTitleEditing,
         })}
       />,
@@ -309,8 +333,7 @@ describe('CardNode title authoring', () => {
       props({
         selected: true,
         titleEditingEnabled: true,
-        editingTitle: true,
-        onCompleteTitleEditing,
+        titleEditor: { onComplete: onCompleteTitleEditing, onCancel: () => undefined },
       }),
     );
     const input = screen.getByRole('textbox', { name: 'Card title' });
@@ -341,9 +364,10 @@ describe('CardNode title authoring', () => {
             {...props({
               selected: true,
               titleEditingEnabled: true,
-              editingTitle: true,
-              onCompleteTitleEditing,
-              onCancelTitleEditing,
+              titleEditor: {
+                onComplete: onCompleteTitleEditing,
+                onCancel: onCancelTitleEditing,
+              },
             })}
           />
         </div>

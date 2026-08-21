@@ -135,13 +135,15 @@ export function CanvasCardNodeSpecimen({
     titleEditingEnabled: true,
     cardEditingEnabled: cardEditingEnabled ?? source.data.kind === 'markdown',
     connectingEnabled: true,
-    editingTitle,
     onBeginConnect: () => undefined,
     onEditCard,
     onBeginTitleEditing: () => undefined,
-    onCompleteTitleEditing: () => null,
-    onCancelTitleEditing: () => undefined,
   };
+  // The editor is the state, so a specimen that asks to be renaming supplies
+  // what ends the edit along with it.
+  if (editingTitle) {
+    data.titleEditor = { onComplete: () => null, onCancel: () => undefined };
+  }
   if (graphColor !== undefined) data.activeGraphColor = graphColor;
 
   const node: CardFlowNode = { ...source, selected, data };

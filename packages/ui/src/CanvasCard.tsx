@@ -52,6 +52,16 @@ export type CanvasCardProps = CanvasCardCommonProps &
   );
 
 /**
+ * The one CSS custom property this Card publishes to `canvas-card.css`.
+ *
+ * `CSSProperties` does not type CSS custom properties (`--*`), so the style
+ * object is *declared* as the intersection it is actually built as rather than
+ * asserted into `CSSProperties` after the fact — the fact is true by
+ * construction and needs no claim the compiler cannot check (ADR 0062).
+ */
+type CanvasCardStyle = CSSProperties & { readonly '--canvas-card-graph': string };
+
+/**
  * The one visual Card front shared by the production canvas and its stories.
  *
  * The deep production module for Markdown and Alias Card fronts, title
@@ -67,6 +77,7 @@ export function CanvasCard(props: CanvasCardProps) {
     state !== 'dragging' &&
     state !== 'editing' &&
     (onConnect !== undefined || onEdit !== undefined);
+  const style: CanvasCardStyle = { '--canvas-card-graph': graphColor };
 
   return (
     <Card
@@ -76,9 +87,7 @@ export function CanvasCard(props: CanvasCardProps) {
       data-testid="card"
       data-kind={front.kind}
       data-state={state}
-      // SAFETY: CSSProperties doesn't type CSS custom properties (`--*`);
-      // this value is read only by canvas-card.css.
-      style={{ '--canvas-card-graph': graphColor } as CSSProperties}
+      style={style}
     >
       <CardHeader className="canvas-card__rail">
         <span className="canvas-card__kind">

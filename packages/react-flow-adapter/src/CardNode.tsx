@@ -146,18 +146,33 @@ export function CardNode({ data, selected, dragging, isConnectable }: NodeProps<
     />
   );
 
+  /*
+   * A control reaches the Card only when the composition both offered it and
+   * said how it is performed. The flag and the operation answer different
+   * questions — whether this Card takes part at all, and what happens when the
+   * control is used — and `SpaceCanvas` supplies them together, but the type
+   * lets them diverge. Taking the flag alone put a live control on the Card
+   * whose activation ran nothing; forwarding the operation with `?.` made the
+   * miss silent. `CanvasCard` draws no control it has no operation for, so
+   * withholding it here is the same answer one layer up.
+   */
   const canvasCardOptionalProps: Mutable<
     Pick<CanvasCardProps, 'onBeginTitleEdit' | 'onConnect' | 'onEdit'>
   > = {};
-  if (data.titleEditingEnabled === true) {
-    canvasCardOptionalProps.onBeginTitleEdit = () => data.onBeginTitleEditing?.();
+  if (data.titleEditingEnabled === true && data.onBeginTitleEditing !== undefined) {
+    canvasCardOptionalProps.onBeginTitleEdit = data.onBeginTitleEditing;
   }
-  if (data.connectingEnabled === true) {
-    canvasCardOptionalProps.onConnect = () => data.onBeginConnect?.();
+  if (data.connectingEnabled === true && data.onBeginConnect !== undefined) {
+    canvasCardOptionalProps.onConnect = data.onBeginConnect;
   }
-  if (data.cardEditingEnabled === true) {
-    canvasCardOptionalProps.onEdit = () => data.onEditCard?.();
+  if (data.cardEditingEnabled === true && data.onEditCard !== undefined) {
+    canvasCardOptionalProps.onEdit = data.onEditCard;
   }
+
+  /* The editor's presence is the editing state, and it arrives with the two
+     operations that end it — so nothing here has to stand in for a completion
+     the composition did not supply. */
+  const titleEditor = data.titleEditor;
 
   const onReturnFocus = () => {
     inner.current?.closest<HTMLElement>('.react-flow__node')?.focus();
@@ -177,14 +192,14 @@ export function CardNode({ data, selected, dragging, isConnectable }: NodeProps<
         <div className="rf-card-node__content">
           <CardContent title={data.title} markdown={data.body ?? ''} />
         </div>
-      ) : data.editingTitle ? (
+      ) : titleEditor !== undefined ? (
         <CanvasCard
           front={front}
           title={data.title}
           graphColor={data.activeGraphColor}
           state="editing"
-          onCompleteTitleEdit={(title) => data.onCompleteTitleEditing?.(title) ?? null}
-          onCancelTitleEdit={() => data.onCancelTitleEditing?.()}
+          onCompleteTitleEdit={titleEditor.onComplete}
+          onCancelTitleEdit={titleEditor.onCancel}
           onReturnFocus={onReturnFocus}
           {...canvasCardOptionalProps}
         />

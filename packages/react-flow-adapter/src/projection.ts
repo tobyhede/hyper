@@ -42,6 +42,14 @@ export type CardHandle = {
   offsetY: number;
 };
 
+/** What ends an inline title edit. Answers a refusal reason, or `null` when the
+ *  new title was accepted — the same contract `CanvasCard`'s editor reads, where
+ *  `null` keeps the editor closed and a string keeps it open beside the message. */
+export type CardTitleEditor = {
+  onComplete: (title: string) => string | null;
+  onCancel: () => void;
+};
+
 /** Data carried by each custom card node. Kept as a type alias so it satisfies
  *  React Flow's `Record<string, unknown>` data constraint, and it includes the
  *  handle arrays the ELK layout needs. */
@@ -62,7 +70,6 @@ export type CardNodeData = {
   titleEditingEnabled?: boolean;
   /** Whether this Card owns content to edit — an Alias does not. */
   cardEditingEnabled?: boolean;
-  editingTitle?: boolean;
   /**
    * Whether this Card offers the one tab-stop control that begins an Edge from
    * the keyboard. The four spatial handles are a pointer affordance and reach no
@@ -72,8 +79,20 @@ export type CardNodeData = {
   onBeginConnect?: () => void;
   onEditCard?: () => void;
   onBeginTitleEditing?: () => void;
-  onCompleteTitleEditing?: (title: string) => string | null;
-  onCancelTitleEditing?: () => void;
+  /**
+   * The inline title editor this Card is currently showing, absent on one that
+   * is not being renamed. Its presence *is* the editing state, and it carries
+   * the two operations that end the edit — so a composition cannot ask for the
+   * editor without also saying what completes and cancels it.
+   *
+   * This is the pairing `CanvasCardProps` already makes for its own
+   * `state: 'editing'`, held one layer up. Split into a boolean and two
+   * independent optional callbacks, the adapter had to manufacture total
+   * functions out of partial data, and an absent completion answered `null` —
+   * which `CanvasCard` reads as *accepted*, closing the editor on a rename that
+   * never happened.
+   */
+  titleEditor?: CardTitleEditor;
   /** For an alias, the title of the card it shows — so the node can name what it
    *  redraws. Absent on non-alias cards. */
   aliasOf?: string;
