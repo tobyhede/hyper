@@ -1,7 +1,7 @@
 {
   "packages/app/e2e/editing.spec.ts": {
     "@typescript-eslint/no-unsafe-type-assertion": {
-      "count": 1
+      "count": 2
     }
   },
   "packages/app/e2e/graph.ts": {
@@ -27,11 +27,6 @@
   "packages/app/src/card.ts": {
     "@typescript-eslint/no-unsafe-type-assertion": {
       "count": 1
-    }
-  },
-  "packages/app/src/components/AuthorableEdge.tsx": {
-    "@typescript-eslint/no-unsafe-type-assertion": {
-      "count": 2
     }
   },
   "packages/app/src/components/OpenCard.tsx": {

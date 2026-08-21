@@ -12,9 +12,13 @@ import { describe, expect, it } from 'vitest';
  */
 const RULE = '@typescript-eslint/no-unsafe-type-assertion';
 
-/** What ADR 0062 recorded. These only ever go down. */
-const CEILING = 79;
-const CEILING_FILES = 36;
+/**
+ * These only ever go down. ADR 0062 recorded 79 across 36 files; merging `main`
+ * mid-review took it to 78 across 35, because that branch deleted more assertion
+ * sites than the one it added. Lower these when the count drops; never raise them.
+ */
+const CEILING = 78;
+const CEILING_FILES = 35;
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 
