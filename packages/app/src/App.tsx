@@ -59,7 +59,7 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
   const initialRenderer = resolveRenderer(space, initialSelection);
   const navigation = createNavigation(currentSpace, resolveRenderer, initialSelection, space);
 
-  // Live nodes hold whichever arrangement is on screen. A selected Layout also
+  // Live nodes hold whichever positions are on screen. A selected Layout also
   // supplies its already-authored, possibly sparse map; a View starts null and
   // is promoted only by a completed edit (ADR 0025).
   const initialPlacement =
@@ -169,8 +169,9 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
     const laidOut = placement.kind === 'ready' ? placement.strategyGraph : null;
 
     // Nothing is worth projecting before a strategy resolves — every card would
-    // sit at the origin — and `project` will not take a null arrangement, so this
-    // is the whole of that gate rather than a rule the sync effect remembers.
+    // sit at the origin — and `project` will not take a null `LayoutStrategyGraph`,
+    // so this is the whole of that gate rather than a rule the sync effect
+    // remembers.
     const projected = useMemo(
       () =>
         laidOut === null
@@ -196,13 +197,13 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
     const liveProjection = useRenderAdapter((s) => s.projection);
     const changeNodes = useRenderAdapter((s) => s.changeNodes);
     const changeEdges = useRenderAdapter((s) => s.changeEdges);
-    // There is an arrangement to drag once the layout has resolved and the store
-    // has taken it. Not a permission — every view is editable (ADR 0025) — but it
-    // is false for the frame before the first placement resolves, and again after
-    // `selectRenderer` clears the projection until the next one is published.
-    const hasArrangement = liveProjection !== null;
-    const canvas = canvasContent(placement, hasArrangement);
-    const editable = hasArrangement;
+    // There are Cards on the canvas to drag once the layout has resolved and the
+    // store has taken it. Not a permission — every view is editable (ADR 0025) —
+    // but it is false for the frame before the first placement resolves, and again
+    // after `selectRenderer` clears the projection until the next one is published.
+    const hasCardsOnCanvas = liveProjection !== null;
+    const canvas = canvasContent(placement, hasCardsOnCanvas);
+    const editable = hasCardsOnCanvas;
 
     // One decision resolved from one Space, applied in an order that cannot
     // leave the two collaborators disagreeing.
@@ -266,8 +267,8 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
     const reportVisibleCentre = useCallback((centre: VisibleCentre | null) => {
       visibleCentre.current = centre;
     }, []);
-    // The origin is unreachable in practice — the control is withdrawn until an
-    // arrangement resolves, and the reporter is mounted with it — but a created
+    // The origin is unreachable in practice — the control is withdrawn until Cards
+    // are on the canvas, and the reporter is mounted with them — but a created
     // Card must land *somewhere*, and a refusal would be the wrong answer to a
     // question about geometry.
     const centreAnchor = (): LayoutPosition => visibleCentre.current?.() ?? { x: 0, y: 0 };
@@ -287,8 +288,8 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
      *
      * Both refusals it can produce also turn on state the control is already
      * withdrawn in. `disabled` on `AddCardControl` and `canAuthorCards` in
-     * `SpaceCanvas` are both gated on `editable`, which is `hasArrangement` —
-     * and no arrangement is the first refusal ("nowhere to write yet"). The
+     * `SpaceCanvas` are both gated on `editable`, which is `hasCardsOnCanvas` —
+     * and no Cards on the canvas is the first refusal ("nowhere to write yet"). The
      * second is a Layout that has left the Space, which would have taken the
      * canvas drawing it, and `editable` with it. Neither is reachable from
      * either path, so a surface built for them could not be exercised, and an
@@ -620,7 +621,7 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
         <div className="graph-area" style={cardSizeVars}>
           {canvas.kind === 'failure' ? (
             <PlacementFailure error={canvas.error} />
-          ) : canvas.kind === 'arrangement' ? (
+          ) : canvas.kind === 'cards' ? (
             <ReactFlowProvider>
               {/* Inside the provider and outside the canvas: it reads React
                   Flow's viewport for controls that live in the toolbar and in
@@ -638,8 +639,8 @@ export const createApp = ({ space, spaceSession }: OpenedSpace) => {
                 key={authoringState.replacementEpoch}
                 nodes={liveProjection?.nodes ?? []}
                 edges={liveProjection?.edges ?? []}
-                // Null while a replacement arrangement resolves. The canvas keeps
-                // drawing the one on screen through that window — deliberately, so
+                // Null while a replacement placement resolves. The canvas keeps
+                // drawing the Cards on screen through that window — deliberately, so
                 // a gesture is never interrupted — so a connection is reachable
                 // with no fresh projection to hand over, and the store keeps its
                 // live nodes rather than reconciling against nothing.

@@ -264,7 +264,7 @@ describe('Workspace conflict recovery', () => {
 
     expect(screen.getByText('Local workspace')).toBeVisible();
     // Awaited because placement is asynchronous — the Card arrives with the
-    // arrangement, not with the mount.
+    // placement, not with the mount.
     expect(await screen.findByRole('heading', { name: 'Local card', hidden: true })).toBeVisible();
     expect(screen.getByTestId('persistence-accept-remote')).toBeVisible();
     expect(screen.queryByTestId('workspace-failure')).not.toBeInTheDocument();

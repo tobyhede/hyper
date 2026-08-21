@@ -22,10 +22,10 @@ import type { ResolvedRenderer } from './renderer';
  * What the canvas draws, derived from a Space and the renderer drawing it.
  *
  * Everything here is a pure function of the Space, the resolved renderer and the
- * interaction state — no store, no React, no DOM. It is split in two because an
- * arrangement is asynchronous: the outer call answers everything a strategy
- * needs and everything the canvas draws *around* the cards, and `project` turns
- * the resolved arrangement into React Flow's nodes and edges.
+ * interaction state — no store, no React, no DOM. It is split in two because a
+ * layout strategy runs asynchronously: the outer call answers everything a
+ * strategy needs and everything the canvas draws *around* the cards, and
+ * `project` turns the resolved placement into React Flow's nodes and edges.
  */
 
 /** The transient state a projection is coloured by, owned by nobody here. */
@@ -38,7 +38,7 @@ export interface CanvasInteraction {
   readonly selectedCardId: CardId | null;
   /** Presenting draws the active Card's content rather than its title. */
   readonly presenting: boolean;
-  /** Whether a Card has been dragged out of the arrangement. */
+  /** Whether a Card has been dragged out of the placement the strategy computed. */
   readonly moved: boolean;
 }
 
@@ -56,7 +56,7 @@ export interface PendingCanvasProjection {
   /** The Graphs this renderer draws — its subject's, in authored order. */
   readonly visibleGraphs: readonly Graph[];
   /**
-   * The arrangement, coloured by the interaction state.
+   * The placed cards and their Edges, coloured by the interaction state.
    *
    * Takes a resolved `LayoutStrategyGraph` rather than a nullable one on
    * purpose: there is nothing worth projecting before a strategy has run, and
@@ -104,7 +104,7 @@ export function canvasProjection(
       // Activating a Graph emphasises it; it never hides the rest of the Space.
       const emphasis: GraphEmphasis = activeGraphId === null ? 'equal' : 'subtle';
 
-      // A layout's routed Edge geometry describes the arrangement it computed,
+      // A layout's routed Edge geometry describes the placement it computed,
       // so it stops being true once a Card is dragged out of it. From then on
       // the Edges fall back to plain curves between wherever the Cards now are
       // — which is what a positioned view draws anyway, since it routes nothing.

@@ -35,7 +35,7 @@ import type { AuthoringRefusal, SpaceAuthoring } from './space-authoring';
 export type ConnectionResult =
   | { readonly kind: 'completed'; readonly cardId: CardId }
   | { readonly kind: 'refused'; readonly refusal: AuthoringRefusal }
-  /** No arrangement to write into, or an invariant already reported. */
+  /** No Cards on the canvas to write into, or an invariant already reported. */
   | { readonly kind: 'unavailable' };
 
 export interface ConnectionCompletion {
@@ -44,8 +44,8 @@ export interface ConnectionCompletion {
    *
    * `projected` is the render path's next projection, merged onto the live
    * nodes so the Edge draws without waiting for a strategy. It is `null` while
-   * a replacement arrangement is still resolving — the canvas keeps drawing the
-   * one already on screen, so a connection stays reachable through that window
+   * a replacement placement is still resolving — the canvas keeps drawing the
+   * Cards already on screen, so a connection stays reachable through that window
    * — and then there is nothing to merge and the live nodes stand until the
    * next `syncProjection`.
    */

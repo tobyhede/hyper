@@ -12,7 +12,7 @@ import type { LayoutStrategyGraph, LayoutStrategy } from './layout';
  *
  * Automatic: it computes placement from the cards alone, so no Layout stands
  * behind it. That does not make a view of it read-only — editing one is legal
- * and **converts** it, copying this arrangement into the Layout the edit is
+ * and **converts** it, copying this placement into the Layout the edit is
  * written to (ADR 0025).
  */
 

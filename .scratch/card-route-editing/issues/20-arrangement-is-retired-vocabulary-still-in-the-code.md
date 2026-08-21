@@ -1,6 +1,6 @@
 # `arrangement` is retired vocabulary and the code is full of it
 
-Status: ready-for-agent
+Status: resolved
 
 Surfaced by: a review comment on one occurrence in `edge-authoring-react.tsx`
 
@@ -76,3 +76,27 @@ sweeping them into an Edge Authoring branch is what that rule exists to prevent.
    will take it too.
 
 Run alone, and before anything else queued, per the rule above.
+
+## Answer
+
+Superseded by `.scratch/render-layer-vocabulary/issues/01-purge-arrangement-from-app.md`,
+which did the sweep. Read that ticket's Answer for what landed; the line numbers
+quoted above no longer exist.
+
+**Item 2 of "What the work is" was wrong and was deliberately not done.** The
+discriminant is `{ kind: 'cards' }` and the parameter `hasCardsOnCanvas`, not
+`'placement'` / `hasPlacement`. That rename would have collided with
+**Placement** on the one case the seam exists for: `hasCardsOnCanvas` stays true
+while a *replacement* placement is still `'pending'`, because the editor keeps
+drawing the previous Cards rather than blanking mid-recompute — so naming it
+after the placement would have named it after the very thing it can disagree
+with. `AGENTS.md` now carries that as a standing rule so the suggestion does not
+come back.
+
+**Item 4 is answered: the verb stays legal, and `CONTEXT.md` needed no edit to
+say so.** It already defines a Layout strategy as "a named strategy for
+arranging a space's cards". The `_Avoid_` entries are about the noun naming an
+entity ADR 0005 rejected; `arrangeFixture`, the `arrange` test helper and "the
+thing that arranges Cards" are all correct as they stand. `AGENTS.md` records
+this alongside the rule above, which is where a sweeping agent will actually
+read it.

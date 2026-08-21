@@ -197,8 +197,8 @@ export function createNavigation(
         activeGraphId: openingGraphId(renderer),
         mode: 'overview',
         // An opened Card closes with the renderer it was opened over. This once
-        // retained it, because opening was reading and a re-arrangement beneath
-        // a Card being read changes nothing about it — but opening is editing
+        // retained it, because opening was reading and Cards moving beneath a
+        // Card being read change nothing about it — but opening is editing
         // now (ADR 0037), and an Algorithmic View installs no placement until
         // its strategy resolves. An Edit completed in that window is refused for
         // having no positions to write, and the pane closed on `Done` either

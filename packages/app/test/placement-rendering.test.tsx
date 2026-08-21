@@ -65,7 +65,7 @@ describe('usePlacementRendering', () => {
     // snapshot, and the `LayoutStrategyGraph` derived from it re-fires this effect on
     // its own. Nothing here touches the placement — the same object is handed
     // back on every render, so only the strategyGraph half can produce the second
-    // arrangement.
+    // layout run.
     const authored = Placement.fromEntries([
       [CARD_A, { x: 80, y: 120 }],
       [CARD_B, { x: 400, y: 260 }],
@@ -116,7 +116,7 @@ describe('usePlacementRendering', () => {
 
   it('makes a placement unavailable when the same strategy is handed a different strategyGraph', async () => {
     // The strategy identity never changes here, so only the `input === strategyGraph`
-    // half of the freshness guard can hold the stale arrangement back.
+    // half of the freshness guard can hold the stale placement back.
     const strategy = gridStrategy();
     const nextGraph: LayoutStrategyGraph = {
       cards: [

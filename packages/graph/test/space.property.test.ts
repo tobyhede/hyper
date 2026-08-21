@@ -52,7 +52,7 @@ describe('loadSpace over card files', () => {
   it('breaks a title tie on id, so two cards sharing a title still order totally', () => {
     // Sorting by title alone is *stable*, not total: cards with equal titles keep
     // the order they arrived in, which is the directory's. That would make the
-    // arrangement depend on scan order — the thing the sort exists to prevent.
+    // resulting order depend on scan order — the thing the sort exists to prevent.
     const same = (id: string) => cardFile(id, 'Same title');
     const forwards = loadSpace(emptySpaceFile, [
       same('00000000-0000-4000-8000-000000000005'),

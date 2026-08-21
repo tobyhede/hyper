@@ -136,7 +136,7 @@ describe('canvasProjection', () => {
     expect(byId[CARD_B]?.showContent).toBe(false);
   });
 
-  it('drops routed Edge geometry once a Card has been dragged out of the arrangement', async () => {
+  it('drops routed Edge geometry once a Card has been dragged out of the placement', async () => {
     const space = spaceWith({ layouts: [layoutOwning(DRAWN)] });
 
     const settled = await projectThrough(space);

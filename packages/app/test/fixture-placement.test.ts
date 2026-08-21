@@ -12,7 +12,7 @@ const resolveRenderer = createRendererResolver({
 });
 
 /**
- * The fixture's authored positions are ELK's own arrangement of it.
+ * The fixture's authored positions are ELK's own placement of it.
  *
  * The fixture declares two Layouts because a Graph is owned by one (ADR 0040),
  * and it names no `defaultRenderer`, so it still opens in Flow over the flatten
@@ -22,16 +22,16 @@ const resolveRenderer = createRendererResolver({
  *
  * "First paint is unchanged" is not something a reader can confirm by eye and
  * there is no screenshot baseline in the suite, so it is this instead: the
- * seeded numbers are checked against the arrangement they were generated from.
+ * seeded numbers are checked against the placement they were generated from.
  * It survives as a regression net — a change to `DEFAULT_ELK_LAYOUT_OPTIONS`
  * that would silently move the fixture fails here rather than going unnoticed.
  *
  * The run is over the *whole* fixture rather than per Layout on purpose: what it
- * pins is the Space-subject view's arrangement, which is what an author opening
+ * pins is the Space-subject view's placement, which is what an author opening
  * the fixture actually sees.
  */
 
-/** Half a pixel. Tight enough that a real re-arrangement fails, loose enough
+/** Half a pixel. Tight enough that a real re-layout fails, loose enough
  *  that neither JSON's decimals nor elkjs's floats do. */
 const TOLERANCE = 0.5;
 
@@ -59,7 +59,7 @@ async function arrangeFixture(space: Space): Promise<Map<string, { x: number; y:
   );
 }
 
-it("seeds every Layout position from ELK's own arrangement of the whole fixture", async () => {
+it("seeds every Layout position from ELK's own placement of the whole fixture", async () => {
   const space = loadFixture();
   const arranged = await arrangeFixture(space);
 

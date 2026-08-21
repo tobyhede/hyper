@@ -88,7 +88,7 @@ export interface SpaceCanvasProps {
   activeCardId: string | null;
   presenting: boolean;
   /**
-   * Whether there is an arrangement to drag yet: false for the one frame before
+   * Whether there are Cards on the canvas to drag yet: false for the one frame before
    * the layout resolves, true afterwards, for every view. Every view is editable
    * (ADR 0025) — an automatic one gets its Layout by being edited — so this is a
    * readiness gate and not a permission. Not an edit mode either: there is
@@ -182,16 +182,16 @@ export function SpaceCanvas({
    * `editing.spec.ts` authors a self-Edge mid-presentation and asserts the
    * chrome offers it.
    *
-   * A pane is different, and so is an unresolved arrangement — one covers the
-   * graph, the other has nowhere to write.
+   * A pane is different, and so is a canvas with no Cards on it yet — one covers
+   * the graph, the other has nowhere to write.
    */
   const canConnectOnCanvas = editable && titleEditingEnabled;
   /**
    * One rule for everything this canvas authors — the Card controls *and* the
    * whole Edge lifecycle.
    *
-   * The three conditions are three ways there is nothing to author: no
-   * arrangement to write into, a modal pane covering the graph, and a
+   * The three conditions are three ways there is nothing to author: no Cards on
+   * the canvas to write into, a modal pane covering the graph, and a
    * presentation running. `AddCardControl` in the toolbar is withdrawn on
    * exactly these, and so is every control drawn on a Card.
    *

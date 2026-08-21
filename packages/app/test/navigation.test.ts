@@ -142,7 +142,7 @@ it('selects a renderer and its active Graph without changing the Space', () => {
 /**
  * Selecting a renderer closes an opened Card, and that is a change: this used to
  * retain it, on the reasoning that the author was still *reading* it and the
- * arrangement underneath was none of that reading's business.
+ * Cards underneath were none of that reading's business.
  *
  * ADR 0037 removed the reading state, so what is retained now is an editor — and
  * an Algorithmic View installs no placement until its strategy resolves, which
