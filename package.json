@@ -43,6 +43,9 @@
   "pnpm": {
     "overrides": {
       "vite": "^6.4.3"
+    },
+    "patchedDependencies": {
+      "@ladle/react@5.1.1": "patches/@ladle__react@5.1.1.patch"
     }
   },
   "devDependencies": {
@@ -59,6 +62,7 @@
     "@types/node": "^24.13.3",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
+    "@typescript/typescript7": "npm:typescript@^7.0.0",
     "@vitejs/plugin-react": "^4.3.4",
     "@vitest/coverage-v8": "^2.1.9",
     "eslint": "^10.7.0",
@@ -74,7 +78,7 @@
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "tsx": "4.20.6",
-    "typescript": "^6.0.3",
+    "typescript": "npm:@typescript/typescript6@6.0.2",
     "typescript-eslint": "^8.65.0",
     "vite": "^6.0.5",
     "vitest": "^2.1.8"
