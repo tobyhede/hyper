@@ -91,3 +91,17 @@ The idiom `JSON.parse(...) as { ... }` with a `SAFETY:` comment — used by `tes
 ### Verification
 
 `pnpm verify` — exit 0; 142 test files, 1481 passed, 8 skipped.
+
+### Review follow-up
+
+A read-only review found three real weaknesses here; all fixed in `1a-review`.
+
+**"The rule is on as an error" was a text grep**, so a later `files: ['**/test/**']` override turning the rule off would have left it green — the file-scoped grandfathering ADR 0062 explicitly rejected, and one that would have removed most of the ratchet, since 23 of the 36 entries are test or e2e files. The fixtures could not have caught it either, since they live under `tools/`. It now resolves the real severity through `ESLint#calculateConfigForFile` for a production, a test, an e2e and a script file, using the idiom `test/unit/http-node-builtin-restrictions.test.ts` already uses. Adding that override now fails two tests.
+
+**Nothing pinned the ceiling, and the documented regeneration command raises it.** `eslint . --suppress-rule …` *merges and overwrites with current counts*, so an agent that hits the rule, reads `docs/agents/anti-slop.md`, and runs the regeneration command silently re-baselines its own new assertion in — with `verify` green and all four ratchet tests passing. That is the ADR's own *negative to remember*, reached through the doc's instruction. There is now a ceiling of 79 across 36 files that only ever goes down, and the doc says outright not to regenerate to make a finding go away.
+
+**The `must-pass` exemption was too broad.** Turning off three boundary rules for `must-pass/*.ts` meant those fixtures could not detect exactly the rules that were off — the one job that half has. Scoped to `unknown-at-parse-boundary.ts`, the only fixture that needs it; the other three now face every rule. Both the README and `docs/agents/anti-slop.md` state the limit rather than claiming the half is unqualified.
+
+**One ADR sentence was factually wrong.** It said a one-for-one assertion swap in the same file "passes silently until the next prune". Pruning only fires when the count *falls*; a swap leaves it equal, so the swap is invisible permanently. Corrected — it was in the accepted-costs section, which is where a reader judges how much the ratchet guarantees.
+
+Also: `is outside the root TypeScript program` was renamed to what it checks (the spelling of `include`, not program membership), and `expect(script('verify')).toContain('pnpm lint ')` no longer leans on `lint` not being verify's last step.

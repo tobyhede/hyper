@@ -1,6 +1,16 @@
-import { readFileSync } from 'node:fs';
+import { execFile } from 'node:child_process';
+import {
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { promisify } from 'node:util';
 import { describe, expect, it } from 'vitest';
 import {
   AUTHORITATIVE_MAJOR_MINIMUM,
@@ -15,12 +25,18 @@ import {
 } from '../../scripts/check-typescript-toolchain';
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
+const SCRIPT = join(repositoryRoot, 'scripts/check-typescript-toolchain.ts');
 
-const workingBridge: BridgeReading = { version: '6.0.3', hasCreateProgram: true };
+const workingBridge: BridgeReading = { version: '6.0.3', hasCreateProgram: true, failure: null };
 
-const at = (workspace: string, reported: string | null): CompilerReading => ({
+const at = (
+  workspace: string,
+  reported: string | null,
+  failure: string | null = null,
+): CompilerReading => ({
   workspace,
   reported,
+  failure,
 });
 
 const everyWorkspaceOn = (version: string): readonly CompilerReading[] =>
@@ -57,12 +73,14 @@ describe('the authoritative compiler', () => {
 
   it('rejects a workspace whose binary could not be run', () => {
     const verdict = judgeToolchain({
-      compilers: [at('.', 'Version 7.0.2'), at('packages/core', null)],
+      compilers: [at('.', 'Version 7.0.2'), at('packages/core', null, 'spawn pnpm ENOENT')],
       bridge: workingBridge,
     });
     expect(verdict.ok).toBe(false);
     if (verdict.ok) return;
-    expect(verdict.failures).toEqual(['packages/core: `tsc --version` could not be run']);
+    expect(verdict.failures).toEqual([
+      'packages/core: `tsc --version` could not be run — spawn pnpm ENOENT',
+    ]);
   });
 
   it('rejects output that names no version rather than reading a major out of noise', () => {
@@ -89,37 +107,57 @@ describe('the TypeScript 6 bridge', () => {
   });
 
   it('rejects a library unified onto the authoritative major', () => {
-    const finding = judgeBridge({ version: '7.0.2', hasCreateProgram: true });
+    const finding = judgeBridge({ version: '7.0.2', hasCreateProgram: true, failure: null });
     expect(finding.failures).toEqual([
       "`import 'typescript'` is 7.0.2, but typescript-eslint needs the 6.x compatibility API",
     ]);
   });
 
   it('rejects a library that no longer exposes createProgram', () => {
-    const finding = judgeBridge({ version: '6.0.3', hasCreateProgram: false });
+    const finding = judgeBridge({ version: '6.0.3', hasCreateProgram: false, failure: null });
     expect(finding.failures).toEqual([
       "`import 'typescript'` exposes no `createProgram`, so the linter cannot run",
     ]);
   });
 
   it('rejects a library that could not be loaded at all', () => {
-    const finding = judgeBridge({ version: null, hasCreateProgram: false });
-    expect(finding.failures).toEqual(["`import 'typescript'` could not be loaded"]);
+    const finding = judgeBridge({
+      version: null,
+      hasCreateProgram: false,
+      failure: 'Cannot find module',
+    });
+    expect(finding.failures).toEqual([
+      "`import 'typescript'` could not be loaded — Cannot find module",
+    ]);
   });
 });
 
 describe('what the check probes', () => {
-  it('probes the root and every package, because `pnpm -r typecheck` runs each own binary', () => {
-    expect(probedWorkspaces(repositoryRoot)).toEqual([
-      '.',
-      'packages/app',
-      'packages/core',
-      'packages/graph',
-      'packages/http',
-      'packages/persistence',
-      'packages/react-flow-adapter',
-      'packages/ui',
-    ]);
+  it('probes the root and every workspace `pnpm -r typecheck` reaches', () => {
+    // Derived from `pnpm-workspace.yaml` and the directories on disk rather than
+    // restated here, so a new package is covered the day it exists instead of the
+    // day someone remembers to edit this list.
+    const expected = readFileSync(join(repositoryRoot, 'pnpm-workspace.yaml'), 'utf8')
+      .split('\n')
+      .flatMap((line) => /^\s*-\s*'?([^'\s#]+)\/\*'?\s*$/.exec(line)?.[1] ?? [])
+      .flatMap((parent) =>
+        readdirSync(join(repositoryRoot, parent), { withFileTypes: true })
+          .filter((entry) => entry.isDirectory())
+          .map((entry) => `${parent}/${entry.name}`),
+      )
+      .sort();
+    expect(expected.length).toBeGreaterThan(1);
+    expect(probedWorkspaces(repositoryRoot)).toEqual(['.', ...expected]);
+  });
+
+  it('refuses a workspace glob it cannot expand rather than probing fewer', () => {
+    const root = mkdtempSync(join(tmpdir(), 'hyper-toolchain-'));
+    try {
+      writeFileSync(join(root, 'pnpm-workspace.yaml'), "packages:\n  - 'apps/**/nested'\n");
+      expect(() => probedWorkspaces(root)).toThrow(/cannot expand/);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 
   it('runs first in verify, ahead of the typechecks it vouches for', () => {
@@ -128,6 +166,41 @@ describe('what the check probes', () => {
     expect(verify).toBeDefined();
     expect(verify?.startsWith('pnpm typecheck:toolchain && ')).toBe(true);
   });
+});
+
+describe('the script the verify step actually runs', () => {
+  // The pure core above proves the verdict. This proves the shell reaches it —
+  // and it is not decoration: the entry-point guard compares `import.meta.url`
+  // against the invocation path, and comparing with `resolve` rather than
+  // `realpathSync` makes the whole body a silent no-op under any symlinked
+  // ancestor. A guard that prints nothing and exits 0 is exactly the silent pass
+  // it exists to prevent, and only spawning it catches that.
+  it('prints the verdict and exits 0 against the real toolchain', async () => {
+    const { stdout } = await promisify(execFile)('pnpm', ['exec', 'tsx', SCRIPT], {
+      cwd: repositoryRoot,
+    });
+    expect(stdout).toContain('TypeScript toolchain is the one ADR 0061 describes');
+    for (const workspace of probedWorkspaces(repositoryRoot)) {
+      expect(stdout, `${workspace} was not reported`).toContain(`${workspace}: tsc Version `);
+    }
+    expect(stdout).toContain('typescript (library): 6.');
+  }, 120_000);
+
+  it('still prints the verdict when invoked through a symlink to itself', async () => {
+    // The regression this pins. Node sets `import.meta.url` to the realpath, so a
+    // symlinked invocation is where a `resolve`-based guard silently stops running.
+    const link = join(repositoryRoot, 'scripts/.check-typescript-toolchain.link.ts');
+    rmSync(link, { force: true });
+    symlinkSync(SCRIPT, link);
+    try {
+      const { stdout } = await promisify(execFile)('pnpm', ['exec', 'tsx', link], {
+        cwd: repositoryRoot,
+      });
+      expect(stdout).toContain('TypeScript toolchain is the one ADR 0061 describes');
+    } finally {
+      rmSync(link, { force: true });
+    }
+  }, 120_000);
 });
 
 describe('the version line', () => {

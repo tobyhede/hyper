@@ -57,3 +57,7 @@ packages/app/.space/
 # length of one run, so the fixtures can be linted at all. Ignored so a crashed
 # run cannot leave it to be committed.
 .oxlintrc.typing-fixtures.json
+
+# Symlink minted by `test/unit/check-typescript-toolchain.test.ts` for the length
+# of one run, to prove the entry-point guard survives a symlinked invocation.
+scripts/.check-typescript-toolchain.link.ts

@@ -45,3 +45,13 @@ TypeScript toolchain is the one ADR 0061 describes:
   ... (all seven packages)
   typescript (library): 6.0.3
 ```
+
+### Review follow-up
+
+A read-only review of the five commits found ten items; all were addressed in `1a-review` (see that commit). The two that mattered:
+
+**The toolchain guard failed open under a symlinked path.** `resolve()` does not resolve symlinks but `import.meta.url` is the realpath, so under any symlinked ancestor — a symlinked checkout, macOS `/tmp`, a container bind-mount — the entry-point comparison never matched and the script's whole body was skipped: no output, exit 0. That is precisely the silent pass the guard exists to prevent, and no test spawned the script, so it was undetectable. Now `realpathSync`, with two tests that actually spawn it — one plain, one through a symlink to itself. Reverting to `resolve()` fails the second.
+
+**`probedWorkspaces` hard-coded `packages/*`** while `pnpm -r` reads `pnpm-workspace.yaml`. It now parses that file and throws on a glob it cannot expand, rather than silently probing fewer than `pnpm -r` runs. The test's hard-coded list of seven packages — which contradicted "covered the day it exists" — is derived the same way.
+
+Probe failures also now carry their cause; `tsc --version could not be run` with no reason defeats the point of a guard that runs before eight typechecks.

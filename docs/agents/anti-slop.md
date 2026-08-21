@@ -36,11 +36,19 @@ Do not weaken either to reduce the overlap. ADR 0062's reasoning is that a `SAFE
 - **It is not evidence the rule is decorative.** Those sites were examined in a reviewed pass (`.scratch/anti-slop/` issue 07) under exactly the test the rule applies, and none was found to be a missing type boundary. The file is the record of what review already accepted. A new assertion fails lint even in a file the baseline lists — and adding one to a listed file reports *every* assertion in that file, because a count-based baseline cannot tell which is new. That is the intended pressure.
 - **It is not a backlog to schedule.** ADR 0062 rejected the cleanup on the evidence. `--prune-suppressions` runs in the `lint` that `verify` performs, so the file shrinks on its own as assertions go for other reasons, and the ceiling never rises. A project to empty it is the cleanup the ADR rejected, arriving under another name.
 
-It is **generated and never hand-edited** — not to add an entry, not to raise a count, not to reformat (it is in `.prettierignore` for that reason). Regenerate it only with `eslint . --suppress-rule @typescript-eslint/no-unsafe-type-assertion`. `test/unit/assertion-ratchet.test.ts` fails if it goes missing, empties, grows a second rule, or takes a shape ESLint would not have written.
+It is **generated and never hand-edited** — not to add an entry, not to raise a count, not to reformat (it is in `.prettierignore` for that reason).
+
+**Do not regenerate it to make a new finding go away.** `eslint . --suppress-rule @typescript-eslint/no-unsafe-type-assertion` *merges and overwrites with current counts*, so running it on a tree that has grown assertions silently re-baselines them in and leaves `verify` green. That is the "answer a new finding by adding it to the suppressions file" ADR 0062's *negative to remember* forbids, reached through a command rather than an editor. `test/unit/assertion-ratchet.test.ts` pins the total against a ceiling for exactly this reason, and fails if the file goes missing, empties, grows a second rule, rises, or takes a shape ESLint would not have written.
+
+The one gap left, recorded so nobody assumes otherwise: the baseline counts per file and rule rather than per site, so removing one assertion and adding another **in the same file** leaves the count equal and is never detected.
 
 ### Proving the gates still bite
 
-`tools/typing-fixtures/` holds one small file per construct — seven that must be rejected and four that must survive — and `test/unit/typing-fixtures.test.ts` runs `tsc`, `eslint` and `oxlint` over them for real. **A `must-fail` fixture that passes is a gap in enforcement and a finding**, not a fixture to relax. The `must-pass` half is what catches a rule over-reaching; without it, rejecting everything would score full marks. They are excluded from lint, format and the root program on purpose, and three tests pin that they stay excluded.
+`tools/typing-fixtures/` holds one small file per construct — seven that must be rejected and four that must survive — and `test/unit/typing-fixtures.test.ts` runs `tsc`, `eslint` and `oxlint` over them for real. **A `must-fail` fixture that passes is a gap in enforcement and a finding**, not a fixture to relax. The `must-pass` half is what catches a rule over-reaching; without it, rejecting everything would score full marks.
+
+One limit on that half is worth knowing before relying on it. `must-pass/unknown-at-parse-boundary.ts` takes the same three boundary exemptions `packages/persistence/src/http-protocol.ts` takes (`no-unknown-parameters`, `no-runtime-typeof`, `no-unsafe-dictionary-type`), because a fixture claiming a genuine parse boundary survives has to be declared the way this repository declares one. It therefore **cannot** detect those three over-reaching. The exemption is scoped to that one file, so the other three `must-pass` fixtures still face every rule.
+
+The fixtures are excluded from lint, format and the root program on purpose. ESLint and oxlint exclusion are pinned by tests; the root program is pinned only by the shape of `tsconfig.json`'s `include`, and Prettier exclusion is not pinned at all — a leak there would show up as a confusing `verify` failure rather than a silent pass.
 
 ## Ownership
 

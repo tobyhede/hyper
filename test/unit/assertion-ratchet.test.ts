@@ -12,6 +12,10 @@ import { describe, expect, it } from 'vitest';
  */
 const RULE = '@typescript-eslint/no-unsafe-type-assertion';
 
+/** What ADR 0062 recorded. These only ever go down. */
+const CEILING = 79;
+const CEILING_FILES = 36;
+
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 
 const read = (path: string): string => readFileSync(join(repositoryRoot, path), 'utf8');
@@ -64,9 +68,46 @@ const script = (name: string): string => {
   return found;
 };
 
+/** How the rule is set for one file, once ESLint has resolved every override. */
+type Severity = 'unconfigured' | 'off' | 'warn' | 'error';
+
+/**
+ * The severity ESLint will actually apply to a file, not the severity the config
+ * text mentions somewhere. A grep for `'rule': 'error'` stays green while a
+ * later file-scoped override turns the rule off for `**\/test/**` — which is the
+ * grandfathering ADR 0062 explicitly rejected, and which would silently remove
+ * most of the ratchet, since 23 of the 36 baseline entries are test or e2e files.
+ */
+const severityFor = async (file: string): Promise<Severity> => {
+  const { ESLint } = await import('eslint');
+  const config: unknown = await new ESLint({ cwd: repositoryRoot }).calculateConfigForFile(file);
+  if (!isJsonObject(config)) throw new Error(`ESLint resolved no config for ${file}`);
+  const rules = config['rules'];
+  if (!isJsonObject(rules)) throw new Error(`ESLint resolved no rules for ${file}`);
+  // ESLint normalises a resolved entry to `[severity]` or `[severity, ...options]`.
+  const entry = rules[RULE];
+  const severity: unknown = Array.isArray(entry) ? entry[0] : entry;
+  if (severity === undefined) return 'unconfigured';
+  if (severity === 0 || severity === 'off') return 'off';
+  if (severity === 1 || severity === 'warn') return 'warn';
+  if (severity === 2 || severity === 'error') return 'error';
+  throw new Error(`ESLint resolved an unreadable severity for ${file}`);
+};
+
 describe('the rule', () => {
   it('is on as an error, not a warning', () => {
     expect(read('eslint.config.js')).toContain(`'${RULE}': 'error'`);
+  });
+
+  it.each([
+    ['production', 'packages/app/src/render-adapter.ts'],
+    ['tests', 'packages/app/test/space-authoring.property.test.ts'],
+    ['e2e', 'packages/app/e2e/new-space.spec.ts'],
+    ['root scripts', 'scripts/ui-catalog.ts'],
+  ])('errors for %s, with no file-scoped grandfathering', async (_where, file) => {
+    // A downgrade to `warn` leaves it "configured" while only `--max-warnings=0`
+    // stops it, and `off` removes it outright.
+    expect(await severityFor(file)).toBe('error');
   });
 
   it('has not been traded against the comment rule, which does a different job', () => {
@@ -80,6 +121,19 @@ describe('the rule', () => {
 describe('the suppressions baseline', () => {
   it('exists and is not empty, so the rule is capped rather than decorative', () => {
     expect(suppressions().length).toBeGreaterThan(0);
+  });
+
+  it('never rises above the ceiling ADR 0062 recorded', () => {
+    // The ratchet's whole claim is that this number only falls. Nothing else
+    // enforces it: `eslint . --suppress-rule ...` MERGES current counts, so the
+    // documented regeneration command silently re-baselines new assertions in,
+    // and `--prune-suppressions` lowers entries without ever objecting. Lower
+    // this constant when the count drops; never raise it.
+    const total = suppressions()
+      .flatMap((file) => file.rules)
+      .reduce((sum, entry) => sum + (entry.count ?? 0), 0);
+    expect(total).toBeLessThanOrEqual(CEILING);
+    expect(suppressions().length).toBeLessThanOrEqual(CEILING_FILES);
   });
 
   it('records only this rule, so nothing else is quietly riding along', () => {
@@ -108,7 +162,7 @@ describe('the suppressions baseline', () => {
   it('is pruned by the lint verify runs, so a removed assertion lowers the ceiling', () => {
     // Without this the file goes stale and the ratchet stops being one.
     expect(script('lint')).toContain('--prune-suppressions');
-    expect(script('verify')).toContain('pnpm lint ');
+    expect(script('verify').split(' && ')).toContain('pnpm lint');
   });
 
   it('still runs under --max-warnings=0, which a suppressed finding must not evade', () => {

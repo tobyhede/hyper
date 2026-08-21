@@ -17,7 +17,7 @@
  * each package's own `tsc` and a root-only check does not prove those.
  */
 import { execFile } from 'node:child_process';
-import { readdirSync } from 'node:fs';
+import { readdirSync, readFileSync, realpathSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
@@ -34,12 +34,16 @@ export interface CompilerReading {
   readonly workspace: string;
   /** Exactly what `tsc --version` printed, or null when the binary could not be run. */
   readonly reported: string | null;
+  /** Why the probe failed, when it did. The guard's job is to say what went wrong. */
+  readonly failure: string | null;
 }
 
 /** What the resolved `typescript` package answers for. */
 export interface BridgeReading {
   /** The resolved package's compiler version, or null when the module could not be loaded. */
   readonly version: string | null;
+  /** Why the module could not be loaded, when it could not. */
+  readonly failure: string | null;
   /** Whether the resolved module exposes the `createProgram` entry point tooling calls. */
   readonly hasCreateProgram: boolean;
 }
@@ -76,9 +80,11 @@ export const judgeCompilers = (compilers: readonly CompilerReading[]): Toolchain
   const failures: string[] = [];
   const report: string[] = [];
   if (compilers.length === 0) failures.push('no workspace was probed, so nothing was proved');
-  for (const { workspace, reported } of compilers) {
+  for (const { workspace, reported, failure } of compilers) {
     if (reported === null) {
-      failures.push(`${workspace}: \`tsc --version\` could not be run`);
+      failures.push(
+        `${workspace}: \`tsc --version\` could not be run — ${failure ?? 'no reason given'}`,
+      );
       continue;
     }
     const major = compilerMajor(reported);
@@ -106,7 +112,12 @@ export const judgeCompilers = (compilers: readonly CompilerReading[]): Toolchain
 export const judgeBridge = (bridge: BridgeReading): ToolchainFinding => {
   const failures: string[] = [];
   if (bridge.version === null)
-    return { failures: ["`import 'typescript'` could not be loaded"], report: [] };
+    return {
+      failures: [
+        `\`import 'typescript'\` could not be loaded — ${bridge.failure ?? 'no reason given'}`,
+      ],
+      report: [],
+    };
   const major = compilerMajor(`Version ${bridge.version}`);
   if (major === null)
     failures.push(
@@ -148,14 +159,36 @@ const indent = (line: string): string => `  ${line}`;
 
 const run = promisify(execFile);
 
-/** Every directory a compiler runs in: the root, plus each package `pnpm -r` reaches. */
-export const probedWorkspaces = (repositoryRoot: string): readonly string[] => [
-  '.',
-  ...readdirSync(join(repositoryRoot, 'packages'), { withFileTypes: true })
-    .filter((entry) => entry.isDirectory())
-    .map((entry) => `packages/${entry.name}`)
-    .sort(),
-];
+/** The `packages:` globs in `pnpm-workspace.yaml`, which is what `pnpm -r` enumerates. */
+const WORKSPACE_GLOB = /^\s*-\s*'?([^'\s#]+)'?\s*$/gm;
+
+/**
+ * Every directory a compiler runs in: the repository root, plus each workspace
+ * `pnpm -r typecheck` reaches.
+ *
+ * The list comes from `pnpm-workspace.yaml` rather than a hard-coded `packages/*`,
+ * so adding a second glob there does not silently shrink what this covers while
+ * the script still claims to probe every workspace. Only single-segment `<dir>/*`
+ * globs are understood, which is the only form this repository uses; anything else
+ * is reported rather than skipped, because a workspace nobody probes is the gap.
+ */
+export const probedWorkspaces = (repositoryRoot: string): readonly string[] => {
+  const manifest = readFileSync(join(repositoryRoot, 'pnpm-workspace.yaml'), 'utf8');
+  const workspaces: string[] = [];
+  for (const [, glob] of manifest.matchAll(WORKSPACE_GLOB)) {
+    if (glob === undefined) continue;
+    const parent = glob.endsWith('/*') ? glob.slice(0, -2) : null;
+    if (parent === null || parent.includes('*'))
+      throw new Error(`pnpm-workspace.yaml declares a glob this check cannot expand: ${glob}`);
+    workspaces.push(
+      ...readdirSync(join(repositoryRoot, parent), { withFileTypes: true })
+        .filter((entry) => entry.isDirectory())
+        .map((entry) => `${parent}/${entry.name}`),
+    );
+  }
+  if (workspaces.length === 0) throw new Error('pnpm-workspace.yaml declares no workspaces');
+  return ['.', ...workspaces.sort()];
+};
 
 const probeCompiler = async (
   repositoryRoot: string,
@@ -167,9 +200,13 @@ const probeCompiler = async (
     const { stdout } = await run('pnpm', ['exec', 'tsc', '--version'], {
       cwd: join(repositoryRoot, workspace),
     });
-    return { workspace, reported: stdout.trim() };
-  } catch {
-    return { workspace, reported: null };
+    return { workspace, reported: stdout.trim(), failure: null };
+  } catch (error) {
+    return {
+      workspace,
+      reported: null,
+      failure: error instanceof Error ? error.message : String(error),
+    };
   }
 };
 
@@ -181,9 +218,14 @@ const readBridge = async (): Promise<BridgeReading> => {
     return {
       version: typescript.version,
       hasCreateProgram: Object.hasOwn(typescript, 'createProgram'),
+      failure: null,
     };
-  } catch {
-    return { version: null, hasCreateProgram: false };
+  } catch (error) {
+    return {
+      version: null,
+      hasCreateProgram: false,
+      failure: error instanceof Error ? error.message : String(error),
+    };
   }
 };
 
@@ -198,7 +240,12 @@ export const readToolchain = async (repositoryRoot: string): Promise<ToolchainRe
 };
 
 const entryPoint = process.argv[1];
-if (entryPoint !== undefined && import.meta.url === pathToFileURL(resolve(entryPoint)).href) {
+// `realpathSync`, not `resolve`: `import.meta.url` is the realpath, so under any
+// symlinked ancestor — a symlinked checkout, macOS `/tmp`, a container bind-mount
+// — `resolve` alone leaves the two unequal and this whole body is skipped. The
+// guard would then print nothing and exit 0, which is exactly the silent pass it
+// exists to prevent.
+if (entryPoint !== undefined && import.meta.url === pathToFileURL(realpathSync(entryPoint)).href) {
   const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
   const verdict = judgeToolchain(await readToolchain(repositoryRoot));
   if (verdict.ok) console.log(formatVerdict(verdict));

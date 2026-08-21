@@ -252,8 +252,9 @@ jobs:
     # memory executed `pnpm e2e:ladle`, so the evidence accumulated ungated.
     #
     # It is its own job rather than a step in `verify` because `verify` —
-    # typecheck, typecheck:packages, ui:catalog:check, lint, format:check,
-    # test:coverage — has never needed a browser binary, runs on a plain
+    # typecheck:toolchain, typecheck, typecheck:packages, ui:catalog:check,
+    # lint, lint:anti-slop, format:check, test:coverage — has never needed a
+    # browser binary, runs on a plain
     # `ubuntu-latest`, and is the loop developers run constantly. Two commands,
     # two jobs. It is its own job rather than a second command in `e2e` because
     # a red catalogue and a red application are different diagnoses, and the
