@@ -163,9 +163,14 @@ test('Alt empty-drop creates, connects and selects Card 2 at the previewed posit
 
   const source = authoringHandle(sourceCard, 'source', 'right');
   const from = (await source.boundingBox())!;
+  // Up and to the right, not down: the canvas HUD is anchored bottom-right and
+  // is some 218px tall once its Graph key and minimap are both drawn, so a Card
+  // dropped below the source's line lands under it — and the hover further down
+  // this test, which reveals the created Card's own controls, then never reaches
+  // it. The direction is incidental to what this proves; the collision is not.
   const dropPoint = {
     x: Math.floor(from.x + from.width / 2 + 220),
-    y: Math.floor(from.y + from.height / 2 + 180),
+    y: Math.floor(from.y + from.height / 2 - 180),
   };
   await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
   await page.mouse.down();

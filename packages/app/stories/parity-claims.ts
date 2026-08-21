@@ -113,4 +113,68 @@ export const parityClaims: readonly ParityClaim[] = [
     storyExport: 'Arranging',
     claim: 'The canvas shows a busy state while a strategy is still arranging Cards.',
   },
+  {
+    id: 'selected-edge-controls-offer-edit-and-delete',
+    storyFile: 'components/selected-edge-controls.stories.tsx',
+    storyExport: 'Closed',
+    claim: 'A selected Edge offers Edit and Delete, and only Edit opens the endpoint editor.',
+  },
+  {
+    id: 'selected-edge-editor-shows-both-endpoints',
+    storyFile: 'components/selected-edge-controls.stories.tsx',
+    storyExport: 'EndpointEditor',
+    claim: 'The endpoint editor names both endpoints and completes on the Card chosen.',
+  },
+  {
+    id: 'selected-edge-endpoint-refusal-disables-its-choice',
+    storyFile: 'components/selected-edge-controls.stories.tsx',
+    storyExport: 'DisabledChoice',
+    claim: 'An endpoint the Edit would refuse stays listed, disabled, with its reason.',
+  },
+  {
+    id: 'selected-edge-from-refusal-is-field-local',
+    storyFile: 'components/selected-edge-controls.stories.tsx',
+    storyExport: 'FromRefusal',
+    claim: 'A refused From endpoint marks only that Field and carries its own description.',
+    // A reconnection refusal is only reachable once the Space has moved under an
+    // *open* editor: eligibility disables every ineligible row when the editor
+    // opens, and Base UI will not let a disabled row be chosen, so no browser
+    // gesture can propose one. Producing the race through the app would mean
+    // driving a second writer against the same session mid-interaction, which
+    // no `packages/app/e2e` fixture exposes and which would prove the harness
+    // rather than the surface. The *mapping* it exercises is covered in the node
+    // environment by `packages/app/test/authoring-refusal.test.ts`, exhaustively
+    // over all eighteen codes, and the surface's own placement by
+    // `packages/app/test/SelectedEdgeControls.test.tsx`.
+    applicationEvidence:
+      'Unreachable through any browser gesture — the editor snapshots eligibility on opening and disables every refusable row, so a refused reconnection needs the Space to change under an open editor. Covered instead by packages/app/test/authoring-refusal.test.ts (the exhaustive placement) and packages/app/test/SelectedEdgeControls.test.tsx (the Field it lands on).',
+  },
+  {
+    id: 'selected-edge-to-refusal-is-field-local',
+    storyFile: 'components/selected-edge-controls.stories.tsx',
+    storyExport: 'ToRefusal',
+    claim: 'A refused To endpoint marks only that Field, leaving From valid.',
+    applicationEvidence:
+      'Unreachable for the same reason as the From refusal above — a refused reconnection needs the Space to change under an open editor, which no browser gesture produces. Covered instead by packages/app/test/authoring-refusal.test.ts and packages/app/test/SelectedEdgeControls.test.tsx.',
+  },
+  {
+    id: 'selected-edge-stale-reconnection-uses-the-form-channel',
+    storyFile: 'components/selected-edge-controls.stories.tsx',
+    storyExport: 'ReconnectionRefusal',
+    claim: 'A stale Layout, Graph or Edge reports on the form channel and marks neither Field.',
+    applicationEvidence:
+      'The reachable stale conditions on a computed View disable every row before a reconnection can be proposed, and the rest need the Space to change under an open editor. Covered instead by packages/app/test/authoring-refusal.test.ts and packages/app/test/SelectedEdgeControls.test.tsx.',
+  },
+  {
+    id: 'selected-edge-deletion-refusal-stays-on-its-controls',
+    storyFile: 'components/selected-edge-controls.stories.tsx',
+    storyExport: 'DeletionRefusal',
+    claim: 'A refused Delete stays on the surviving selected-Edge controls.',
+  },
+  {
+    id: 'graph-hud-and-sidebar-agree-on-the-active-graph',
+    storyFile: 'surfaces/graph-hud.stories.tsx',
+    storyExport: 'Retained',
+    claim: 'The canvas HUD keys every Graph and emphasises the active one, beside a real MiniMap.',
+  },
 ] as const;

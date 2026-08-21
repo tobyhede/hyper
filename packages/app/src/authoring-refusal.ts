@@ -1,4 +1,4 @@
-import type { AuthoringRefusal } from './space-authoring';
+import type { AuthoringRefusal, EdgeEndpoint } from './space-authoring';
 
 const unreachable = (value: never): never => {
   throw new Error(`Unknown Authoring refusal: ${JSON.stringify(value)}`);
@@ -137,3 +137,112 @@ export const presentAliasCardRefusal = (refusal: AuthoringRefusal): AliasCardRef
 /** Error placement for Alias creation, which owns Title and Target. */
 export const presentNewAliasRefusal = (refusal: AuthoringRefusal): NewAliasRefusalErrors =>
   presentRefusal(refusal, titleAndTargetPlacements);
+
+/**
+ * The Edge surfaces' one placement rule, stated as the codes it lets through.
+ *
+ * A picker refusal is *correctable* exactly when choosing another Card answers
+ * it: the Card lies outside this Layout, or the Edge it would produce is one
+ * the Graph already holds. Everything else — a placement still resolving, a
+ * Layout or Graph the Space no longer holds, an Edge that has gone — describes
+ * the subject rather than the choice, and no row in the list would fix it.
+ *
+ * Written once and shared by the two Card-choosing Edge surfaces, because the
+ * question is the same on both: keyboard connection names one Card and endpoint
+ * editing names two, and neither can correct a stale subject.
+ */
+const cardChoicePlacements = {
+  'placement-pending': form,
+  'layout-not-found': form,
+  'layout-required': form,
+  'card-not-found': form,
+  'card-kind-immutable': form,
+  'card-title-required': form,
+  'alias-target-not-found': form,
+  'alias-target-must-own-content': form,
+  'card-already-in-layout': form,
+  'card-not-in-layout': form,
+  'card-has-aliases': form,
+  'graph-title-required': form,
+  'layout-must-keep-graph': form,
+  'graph-not-owned': form,
+  'edge-not-found': form,
+  'edge-card-outside-layout': 'card',
+  'edge-already-exists': 'card',
+  'layout-active-graph-required': form,
+} as const satisfies Readonly<Record<AuthoringRefusalCode, 'card' | null>>;
+
+/**
+ * Deletion names no field at all, so every code reaches its form channel.
+ *
+ * Spelled out as its own exhaustive record rather than derived from "no
+ * placements", because the record is what fails to compile when a new code
+ * arrives — and a refused Delete staying on the selected Edge's own controls,
+ * rather than falling through to the canvas announcement, is the whole of what
+ * this surface owns.
+ */
+const deletionPlacements = {
+  'placement-pending': form,
+  'layout-not-found': form,
+  'layout-required': form,
+  'card-not-found': form,
+  'card-kind-immutable': form,
+  'card-title-required': form,
+  'alias-target-not-found': form,
+  'alias-target-must-own-content': form,
+  'card-already-in-layout': form,
+  'card-not-in-layout': form,
+  'card-has-aliases': form,
+  'graph-title-required': form,
+  'layout-must-keep-graph': form,
+  'graph-not-owned': form,
+  'edge-not-found': form,
+  'edge-card-outside-layout': form,
+  'edge-already-exists': form,
+  'layout-active-graph-required': form,
+} as const satisfies Readonly<Record<AuthoringRefusalCode, null>>;
+
+export type EdgeConnectionRefusalErrors = AuthoringRefusalErrors<'target'>;
+export type EdgeEndpointRefusalErrors = AuthoringRefusalErrors<EdgeEndpoint>;
+export type EdgeDeletionRefusalErrors = AuthoringRefusalErrors<never>;
+
+/**
+ * The sentence a Card choice could correct, or `null` for one it could not.
+ *
+ * The two Card-choosing surfaces differ only in which field they hang it on, so
+ * the decision is taken once here and the field named by the caller that owns
+ * it.
+ */
+const correctableCardChoice = (refusal: AuthoringRefusal): string | null =>
+  cardChoicePlacements[refusal.code] === null ? null : describeAuthoringRefusal(refusal);
+
+/** Error placement for the keyboard connection picker, which owns only Target. */
+export const presentEdgeConnectionRefusal = (
+  refusal: AuthoringRefusal,
+): EdgeConnectionRefusalErrors => {
+  const message = correctableCardChoice(refusal);
+  return message === null
+    ? { fields: {}, form: describeAuthoringRefusal(refusal) }
+    : { fields: { target: message } };
+};
+
+/**
+ * Error placement for endpoint editing, which owns From and To.
+ *
+ * **Only the endpoint the author attempted is marked invalid.** The other one
+ * names a Card the Edit never questioned, and marking it would ask for a
+ * correction to a value nothing refused.
+ */
+export const presentEdgeEndpointRefusal = (
+  refusal: AuthoringRefusal,
+  endpoint: EdgeEndpoint,
+): EdgeEndpointRefusalErrors => {
+  const message = correctableCardChoice(refusal);
+  return message === null
+    ? { fields: {}, form: describeAuthoringRefusal(refusal) }
+    : { fields: { [endpoint]: message } };
+};
+
+/** Error placement for a refused Delete, which stays on the controls that asked. */
+export const presentEdgeDeletionRefusal = (refusal: AuthoringRefusal): EdgeDeletionRefusalErrors =>
+  presentRefusal<never>(refusal, deletionPlacements);
