@@ -339,3 +339,45 @@ that drive the real composition are unchanged by design.
 
 `pnpm verify` and `pnpm e2e` re-run green after the fixes: 150 files / 1602
 passed / 8 skipped, and 115 e2e passed — still the count the branch inherited.
+
+## Review comment: the injected `connections` factory
+
+A follow-up review comment asked for the `connections` factory to be removed
+from the composition and from all three test files that touch it. Two delegated
+investigations checked it against the code rather than taking it at its word,
+and it splits: right about one file, wrong about the other.
+
+**Right about `edge-authoring.test.ts`.** Its `open()` helper supplied the real
+completion for one reason — to silence `reportInvariant`. That sink has exactly
+one call site (`connection-completion.ts:115`), guarded by a `queued` result,
+which is Authoring's answer to a completion made re-entrantly from inside its
+own publication. An instrumented run of all 43 tests in that file recorded
+**zero** invocations, and zero console output from any other sink. The silencer
+was dead weight and the comment justifying it was wrong on its own terms: it
+claimed the sink hears refusals, which it never does (`:113` returns without
+reporting). Factory and import removed; a future re-entrancy regression is now
+audible rather than swallowed.
+
+**Wrong about `edge-authoring-react.test.tsx`.** The comment proposed arranging
+fixture state so the *real* completion refuses with
+`layout-active-graph-required`. No legal Space can be in that state — not merely
+no gesture over that fixture. Four invariants close it: `spaceFileSchema` gives a
+Layout `graphs: z.array(graphSchema).min(1)`; `ResolvedLayout.activeGraph`
+resolves named-or-first and is never null; Navigation writes only an Active Graph
+the selected renderer's subject holds; and Graph deletion refuses the last one
+(`layout-must-keep-graph`). It is also the only refusal that reaches that form
+channel — the rest are `correctableByCardChoice` and mark the Target field. The
+stand-in is the sole way to exercise the channel, so `connections` stays for its
+one consumer, and the helper's doc comment now names those invariants and cites
+`core/test/persistence-schema.test.ts`, which already asserts the load-bearing
+one.
+
+No regression test was added for the removal: it deletes a branch nothing
+reaches, so there is no behaviour to guard, and the invariant the stand-in
+depends on was already covered. This is the answer to the comment, written down
+so the question is not re-raised: §4's "keeps substituting `ConnectionCompletion`
+… and does not change" stands, and the reason is now stronger than the ticket
+stated it.
+
+`pnpm verify` exit 0 (150 files / 1602 passed / 8 skipped) and `pnpm e2e` exit 0
+(115 passed) after this round too.
