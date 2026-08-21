@@ -308,7 +308,7 @@ body {
    and zoom with the canvas; `pointer-events` is off on that layer by default and
    has to be restored per control. Their own presentation belongs to
    `SelectedEdgeControls`, which composes it from the shared primitives. */
-.edge-toolbar {
+.edge-control-layer {
   position: absolute;
   pointer-events: all;
 }

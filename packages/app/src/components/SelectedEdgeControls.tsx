@@ -8,6 +8,7 @@ import {
   Popover,
   PopoverContent,
   Separator,
+  cn,
   type CardChoice,
 } from '@project/ui';
 import {
@@ -15,18 +16,9 @@ import {
   presentEdgeEndpointRefusal,
   type EdgeEndpointRefusalErrors,
 } from '../authoring-refusal';
-import type { EdgeRefusal } from '../edge-authoring';
+import type { SelectedEdgeRefusal } from '../edge-authoring';
 import type { EdgeEndpoint } from '../space-authoring';
 
-/**
- * The two refusals this surface owns, and the whole of what it will accept.
- *
- * Edge Authoring retains one refusal for the whole module, and three of its four
- * channels belong elsewhere — the keyboard connection picker's, and the canvas
- * announcement a finished pointer gesture leaves behind. Narrowing here is what
- * stops a sentence from an unrelated gesture appearing under whichever Edge
- * happens to be selected, which is exactly what the retired toolbar copy did.
- */
 /**
  * The two Field error ids, literals rather than a `useId`.
  *
@@ -40,10 +32,12 @@ import type { EdgeEndpoint } from '../space-authoring';
 const FROM_ERROR = 'edge-from-error';
 const TO_ERROR = 'edge-to-error';
 
-export type SelectedEdgeRefusal = Extract<
-  EdgeRefusal,
-  { readonly kind: 'reconnection' } | { readonly kind: 'deletion' }
->;
+/** The raised card these controls and their refusal are both drawn on. */
+const RAISED_SURFACE =
+  'rounded-[6px] border border-border bg-card shadow-[0_6px_20px_rgb(0_0_0/45%)]';
+
+/** Two commands in one group: square edges, and the group's border around them. */
+const GROUPED_COMMAND = 'rounded-none border-0 text-[0.75rem] text-foreground';
 
 /**
  * Escape closes the topmost layer: the open endpoint list first, this editor
@@ -56,7 +50,8 @@ export type SelectedEdgeRefusal = Extract<
  * while an outside press still closes it, so the popup's dismissal is live and
  * only the Escape branch is suppressed. Both endpoint pickers always name the
  * Card they currently point at, so this editor is never in the case that works.
- * `.scratch/design-system-baseline/` records the reproduction.
+ * The reproduction is written up in
+ * `.scratch/design-system-baseline/findings/base-ui-popover-escape-and-combobox-value.md`.
  *
  * **Capture phase, and that is the whole of why it is layered correctly.** Base
  * UI closes the combobox list from a bubble-phase `keydown` listener on
@@ -143,14 +138,11 @@ export function SelectedEdgeControls({
   return (
     <Popover open={editorOpen} onOpenChange={(next) => (next ? onOpenEditor() : onCloseEditor())}>
       <div className="flex flex-col items-center gap-1">
-        <div
-          ref={anchor}
-          className="flex items-stretch overflow-hidden rounded-[6px] border border-border bg-card shadow-[0_6px_20px_rgb(0_0_0/45%)]"
-        >
+        <div ref={anchor} className={cn('flex items-stretch overflow-hidden', RAISED_SURFACE)}>
           <Button
             variant="ghost"
             size="toolbar"
-            className="rounded-none border-0 text-[0.75rem] text-foreground"
+            className={GROUPED_COMMAND}
             data-testid="edge-edit"
             aria-label="Edit this Edge"
             aria-expanded={editorOpen}
@@ -162,7 +154,7 @@ export function SelectedEdgeControls({
           <Button
             variant="ghost"
             size="toolbar"
-            className="rounded-none border-0 text-[0.75rem] text-foreground"
+            className={GROUPED_COMMAND}
             data-testid="edge-delete"
             aria-label="Delete this Edge"
             onClick={onDelete}
@@ -170,10 +162,10 @@ export function SelectedEdgeControls({
             Delete
           </Button>
         </div>
-        {deletion?.form !== undefined && (
+        {deletion !== null && (
           <FieldError
             data-testid="edge-delete-refusal"
-            className="max-w-[15rem] rounded-[6px] border border-border bg-card px-[0.5rem] py-[0.25rem] text-[0.75rem] shadow-[0_6px_20px_rgb(0_0_0/45%)]"
+            className={cn('max-w-[15rem] px-[0.5rem] py-[0.25rem] text-[0.75rem]', RAISED_SURFACE)}
           >
             {deletion.form}
           </FieldError>

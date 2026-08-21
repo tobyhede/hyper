@@ -132,9 +132,9 @@ channels the selected Edge owns.
 `FALLBACK_GRAPH_COLOR` move to `packages/ui/src/graph-color.ts` and stay shared,
 because the Sidebar's Graphs group and the HUD's key are two real consumers.
 `packages/app/src/tailwind.css` gains `@source '../../react-flow-adapter/src'`,
-without which the HUD's utilities are purged. `styles.css` keeps `.edge-toolbar`
-— portal positioning only — and loses the four rules that were the controls'
-own presentation.
+without which the HUD's utilities are purged. `styles.css` keeps the portal layer —
+renamed `.edge-control-layer`, since placement is all it is — and loses the four
+rules that were the controls' own presentation.
 
 ### Structured refusals
 
@@ -147,7 +147,18 @@ gains three exhaustive adapters; `cardChoicePlacements` is shared by the two
 Card-choosing surfaces because the question is the same on both. A retained
 `deletion` refusal is dropped when the canvas selection moves.
 
-### Two defects found on the way
+### One defect found and left
+
+A completed reconnection leaves the Edge **focused but not selected**, so the
+Edge the author is standing on offers no controls — while `EdgeAuthoring.reconnect`
+plainly intends the opposite and says so in a comment. It is untouched by this
+change and is Edge Authoring's selection folding rather than a HUD or controls
+question, so it is recorded at
+`.scratch/design-system-baseline/findings/reconnected-edge-loses-its-selection.md`
+with the measurement and the lead, and left for its own change. The application
+evidence asserts the focus half, which holds, and claims nothing about the other.
+
+### Two defects found and fixed
 
 **The minimap covered the Graph key.** `MiniMap` renders its own React Flow
 `Panel`, which is `position: absolute` with a `bottom`/`right` of 0 — so nested
@@ -168,8 +179,8 @@ an expanded endpoint list so the two layers still take one press each.
 
 | Claim | Story | Ladle | Application |
 | --- | --- | --- | --- |
-| `selected-edge-controls-offer-edit-and-delete` | `components/selected-edge-controls.stories.tsx#Closed` | `issue-06-graph-hud-and-edge-controls.spec.ts` — the selected Edge controls offer Edit and Delete, and open nothing on their own | `editing.spec.ts` — a selected Edge offers controls that delete it and open its endpoint editor |
-| `selected-edge-editor-shows-both-endpoints` | `#EndpointEditor` | the endpoint editor names both endpoints and dismisses on Escape | `editing.spec.ts` — the Edge editor moves an endpoint and keeps the Edge in its Graph |
+| `selected-edge-controls-offer-edit-and-delete` | `components/selected-edge-controls.stories.tsx#Closed` | `issue-06-graph-hud-and-edge-controls.spec.ts` — the selected Edge controls offer Edit and Delete, and open nothing on their own | `editing.spec.ts` — a selected Edge offers controls that delete it and open its endpoint editor: selection gating, **spatial placement** read off the drawn routed path, **Active Graph gating** through an activation, and the completion |
+| `selected-edge-editor-shows-both-endpoints` | `#EndpointEditor` | the endpoint editor names both endpoints and dismisses on Escape | `editing.spec.ts` — the Edge editor moves an endpoint and keeps the Edge in its Graph, and **focus lands on the reconnected Edge** once the projection carrying it arrives |
 | `selected-edge-endpoint-refusal-disables-its-choice` | `#DisabledChoice` | an ineligible endpoint keeps its place in the list, disabled, with its reason | `editing.spec.ts` — endpoint choices on a computed View are offered disabled, with their reason |
 | `selected-edge-from-refusal-is-field-local` | `#FromRefusal` | a refused From endpoint marks only that Field and describes it | exempt — unreachable through any browser gesture |
 | `selected-edge-to-refusal-is-field-local` | `#ToRefusal` | a refused To endpoint marks only that Field and describes it | exempt — same reason |

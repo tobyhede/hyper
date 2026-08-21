@@ -190,9 +190,12 @@ test(
 /**
  * The HUD on a real canvas: React Flow's own MiniMap over nodes it measured.
  *
- * What the story fixes is the key beside it — the titles, the resolved colours
- * and which Graph is emphasised — and that activating another Graph moves the
- * emphasis without changing what the Layout draws (ADR 0040).
+ * What the story fixes is the key beside it — every Graph the renderer draws,
+ * each with its resolved colour, and exactly one emphasised. **Emphasis is not
+ * filtering** (ADR 0040): the inactive Graphs stay listed and stay coloured.
+ * That the emphasis *moves* with an activation, and that the Sidebar agrees
+ * when it does, is the paired application evidence's claim — activation is the
+ * Sidebar's command and a story-only button for it would prove nothing here.
  */
 test(
   'the Graph HUD keys every Graph and emphasises the active one',
@@ -209,12 +212,13 @@ test(
     await expect(page.locator('.react-flow__minimap')).toBeVisible();
     await expect(page.locator('.react-flow__minimap-node')).toHaveCount(5);
 
+    // Exactly one, and the others are dimmed rather than dropped.
+    await expect(key.locator('li[data-active="true"]')).toHaveCount(1);
     await expect(key.locator('li[data-active="true"]')).toHaveText('Long');
-
-    await page.getByTestId('activate-Short').click();
-
-    await expect(key.locator('li[data-active="true"]')).toHaveText('Short');
-    // Emphasis, not filtering: activation never changes what the Layout draws.
-    await expect(items).toHaveCount(4);
+    await expect(key.locator('li[data-active="false"]')).toHaveCount(3);
+    const stripes = await items
+      .locator('[aria-hidden="true"]')
+      .evaluateAll((els) => els.map((el) => getComputedStyle(el).backgroundColor));
+    expect(new Set(stripes).size).toBe(4);
   },
 );

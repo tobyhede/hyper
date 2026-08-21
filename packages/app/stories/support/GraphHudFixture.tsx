@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { Background, ReactFlow, ReactFlowProvider, type Node } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import type { GraphId } from '@project/core';
@@ -63,7 +62,15 @@ const NODES: readonly Node[] = SPACE.cards.map((card, index) => ({
 }));
 
 export interface GraphHudFixtureProps {
-  /** Which Graph opens emphasised. A Ladle spec activates the others. */
+  /**
+   * Which Graph is emphasised.
+   *
+   * A fixture input, and deliberately not a control: activation belongs to the
+   * workspace Sidebar, and a story-only button that moved the emphasis would be
+   * evidence of the button rather than of the HUD. That the two surfaces agree
+   * *through* an activation is the paired application evidence's claim (ADR
+   * 0052), in `overview.spec.ts`.
+   */
   readonly activeGraphId?: GraphId | null;
 }
 
@@ -76,36 +83,20 @@ export interface GraphHudFixtureProps {
  * has no workspace around it to size one.
  */
 export function GraphHudFixture({ activeGraphId = openingGraph() }: GraphHudFixtureProps) {
-  const [active, setActive] = useState<GraphId | null>(activeGraphId);
-  const activeGraphCardIds = new Set(active === null ? [] : graphCardIds(SPACE, active));
+  const activeGraphCardIds = new Set(
+    activeGraphId === null ? [] : graphCardIds(SPACE, activeGraphId),
+  );
 
   return (
-    <div className="flex h-[26rem] w-full flex-col gap-[0.75rem] bg-background p-[0.75rem] text-foreground">
-      {/* The Sidebar's job in the application, reduced to the one thing this
-          story pairs it with: activating a Graph, so the HUD's emphasis can be
-          watched moving. The Sidebar's own rendering is Issue 14's story. */}
-      <div role="group" aria-label="Graphs" className="flex gap-[0.5rem]">
-        {SPACE.graphs.map((graph) => (
-          <button
-            key={graph.id}
-            type="button"
-            aria-pressed={graph.id === active}
-            data-testid={`activate-${graph.title}`}
-            className="rounded-[6px] border border-border bg-secondary px-[0.6rem] py-[0.3rem] text-[0.8rem] aria-pressed:border-accent"
-            onClick={() => setActive(graph.id)}
-          >
-            {graph.title}
-          </button>
-        ))}
-      </div>
-      <div className="min-h-0 flex-1 overflow-hidden rounded-[8px] border border-border">
+    <div className="h-[26rem] w-full bg-background p-[0.75rem] text-foreground">
+      <div className="h-full overflow-hidden rounded-[8px] border border-border">
         <ReactFlowProvider>
           <ReactFlow nodes={[...NODES]} edges={[]} fitView minZoom={0.05}>
             <Background gap={24} />
             <GraphHud
               graphs={SPACE.graphs}
               colorByGraphId={COLORS}
-              activeGraphId={active}
+              activeGraphId={activeGraphId}
               activeGraphCardIds={activeGraphCardIds}
             />
           </ReactFlow>

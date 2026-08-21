@@ -5,7 +5,8 @@ import type { CardChoice } from '@project/ui';
 // story sits two directories above `src`, and climbing there by relative path is
 // how a package boundary gets crossed without naming one (AGENTS.md).
 import { cardChoiceOf } from '#src/card-choice';
-import { SelectedEdgeControls, type SelectedEdgeRefusal } from '#components/SelectedEdgeControls';
+import type { SelectedEdgeRefusal } from '#src/edge-authoring';
+import { SelectedEdgeControls } from '#components/SelectedEdgeControls';
 import { authoredSpace } from './spaces';
 
 /**

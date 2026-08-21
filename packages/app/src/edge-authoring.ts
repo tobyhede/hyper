@@ -175,6 +175,25 @@ export type EdgeRefusal =
   | { readonly kind: 'gesture'; readonly refusal: AuthoringRefusal };
 
 /**
+ * The two channels the **selected Edge's own controls** own, and the narrowing.
+ *
+ * Beside the union rather than beside the component that consumes it: which of
+ * the four channels a surface owns is a fact about the channels, and
+ * `AuthorableEdge` had a hand-inlined copy of these two `kind`s in a file with
+ * no other reason to know them. The other two belong elsewhere — the keyboard
+ * connection picker's, and the canvas announcement a finished pointer gesture
+ * leaves behind — and narrowing here is what stops a sentence from an unrelated
+ * gesture appearing under whichever Edge happens to be selected.
+ */
+export type SelectedEdgeRefusal = Extract<
+  EdgeRefusal,
+  { readonly kind: 'reconnection' } | { readonly kind: 'deletion' }
+>;
+
+export const selectedEdgeRefusalOf = (refusal: EdgeRefusal | null): SelectedEdgeRefusal | null =>
+  refusal?.kind === 'reconnection' || refusal?.kind === 'deletion' ? refusal : null;
+
+/**
  * Where focus goes once the projection carrying a completed Edit has rendered.
  *
  * The Edge is named by subject rather than by React Flow's edge id, like every
@@ -360,14 +379,22 @@ export function createEdgeAuthoring({
     });
   };
 
-  /** The Edge a reconnect draft is about, whichever kind of reconnect it is. */
-  const draftedEdge = (): EdgeSubject | null => {
+  /**
+   * The reconnect draft in flight, whichever kind of reconnect it is.
+   *
+   * The draft rather than the Edge alone: which surface owns a refusal depends
+   * on *how* the reconnection was drafted, and re-reading the state a second
+   * time to find that out is a second answer to the same question.
+   */
+  type ReconnectDraft = Extract<
+    EdgeDraft,
+    { readonly kind: 'pointer-reconnect' } | { readonly kind: 'keyboard-reconnect' }
+  >;
+
+  const reconnectDraft = (): ReconnectDraft | null => {
     const { draft } = observable.getState();
     if (draft === null) return null;
-    if (draft.kind === 'pointer-reconnect' || draft.kind === 'keyboard-reconnect') {
-      return { graphId: draft.graphId, edge: draft.edge };
-    }
-    return null;
+    return draft.kind === 'pointer-reconnect' || draft.kind === 'keyboard-reconnect' ? draft : null;
   };
 
   /**
@@ -589,13 +616,12 @@ export function createEdgeAuthoring({
     openEdgeEditor: ({ graphId, edge }) => begin({ kind: 'keyboard-reconnect', graphId, edge }),
 
     reconnect: (endpoint, cardId) => {
-      const drafted = draftedEdge();
+      const drafted = reconnectDraft();
       if (drafted === null) return false;
       // **Which surface owns the refusal is the draft's kind, not the Edit's.**
       // The endpoint editor stands through its own completion and can mark the
       // attempted Field invalid; a pointer drag has already ended, so its
       // refusal has nowhere to go but the canvas announcement.
-      const drafting = observable.getState().draft?.kind;
       const settled = completeStructural(
         {
           kind: 'reconnected-edge',
@@ -604,7 +630,7 @@ export function createEdgeAuthoring({
           endpoint,
           cardId,
         },
-        drafting === 'keyboard-reconnect'
+        drafted.kind === 'keyboard-reconnect'
           ? (refusal) => ({ kind: 'reconnection', endpoint, refusal })
           : gestureRefusal,
       );

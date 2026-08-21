@@ -3,6 +3,7 @@ import { EdgeLabelRenderer, type EdgeProps } from '@xyflow/react';
 import { RoutedEdge, routedEdgeGeometry, type RoutedFlowEdge } from '@project/react-flow-adapter';
 import { edgeSelectionOf, sameEdgeSubject } from '../render-adapter';
 import { EdgeAuthoringContext } from './edge-authoring-context';
+import { selectedEdgeRefusalOf } from '../edge-authoring';
 import { SelectedEdgeControls } from './SelectedEdgeControls';
 
 /**
@@ -30,7 +31,7 @@ function EdgeControlLayer({
   return (
     <EdgeLabelRenderer>
       <div
-        className="edge-toolbar nodrag nopan nokey"
+        className="edge-control-layer nodrag nopan nokey"
         style={{ transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)` }}
       >
         {children}
@@ -69,7 +70,6 @@ export function AuthorableEdge(props: EdgeProps<RoutedFlowEdge>) {
     return <RoutedEdge {...props} />;
   }
   const open = commands.editing !== null && sameEdgeSubject(subject, commands.editing);
-  const refusal = commands.refusal;
 
   return (
     <>
@@ -80,9 +80,7 @@ export function AuthorableEdge(props: EdgeProps<RoutedFlowEdge>) {
           to={subject.edge.to}
           editorOpen={open}
           endpointChoices={(endpoint) => commands.endpointChoices(subject, endpoint)}
-          refusal={
-            refusal?.kind === 'reconnection' || refusal?.kind === 'deletion' ? refusal : null
-          }
+          refusal={selectedEdgeRefusalOf(commands.refusal)}
           onOpenEditor={() => commands.openEditor(subject)}
           onCloseEditor={commands.closeEditor}
           onReconnect={commands.reconnect}
