@@ -771,10 +771,10 @@ export function useEdgeAuthoring({
                 'aria-describedby': connectTargetError === null ? undefined : CONNECT_TARGET_ERROR,
               }}
               onValueChange={(cardId) => {
-                const to = uuidSchema.safeParse(cardId);
-                if (!to.success) return;
+                // No parse: `CardChoice` names its id a `CardId`, and this list
+                // is built from the subject Cards themselves.
                 const completed = authoring.completeKeyboardConnect(
-                  to.data,
+                  cardId,
                   latest.current.projectedNodes,
                 );
                 if (completed !== null) requestAnimationFrame(() => onSelectCard(completed));
