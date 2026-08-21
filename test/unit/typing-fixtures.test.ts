@@ -234,9 +234,12 @@ describe('the fixtures stay out of the ordinary passes', () => {
     expect(existsSync(join(repositoryRoot, '.oxlintrc.typing-fixtures.json'))).toBe(false);
   });
 
-  it('is outside the root TypeScript program, which would fail on must-fail', () => {
-    // `tsc -p tsconfig.json` reports TS2366 for `missing-union-case.ts`, so a
-    // leak here would already be red in `verify`. This pins the reason it is not.
+  it('is named by no entry in the root tsconfig include list', () => {
+    // Deliberately weaker than "is outside the root program": this reads the
+    // `include` spelling, and a broad glob or a `files`/`references` entry could
+    // still reach the fixtures while passing. The real backstop is that a leak
+    // makes `pnpm typecheck` report TS2366 for `missing-union-case.ts`, so it
+    // fails loudly in `verify` rather than passing quietly. This pins the reason.
     const include = rootTsconfigInclude();
     expect(include.length).toBeGreaterThan(0);
     expect(include.filter((entry) => entry.includes('tools'))).toEqual([]);

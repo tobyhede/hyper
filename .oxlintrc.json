@@ -455,7 +455,12 @@
       // `require-safety-comment-for-type-assertion` is deliberately NOT off
       // here: ADR 0062 left it untouched, and `broadening-to-unknown.ts`
       // carries its `SAFETY:` comment to show it still applies.
-      "files": ["tools/typing-fixtures/must-pass/*.ts"],
+      //
+      // Scoped to this one file, not the whole `must-pass` directory. The half's
+      // job is to catch a rule over-reaching, and a fixture cannot catch a rule
+      // that is off for it — so the exemption buys the parse-boundary fixture
+      // and costs nothing on the other three, which still face every rule.
+      "files": ["tools/typing-fixtures/must-pass/unknown-at-parse-boundary.ts"],
       "rules": {
         "anti-slop/no-unknown-parameters": "off",
         "anti-slop/no-runtime-typeof": "off",
