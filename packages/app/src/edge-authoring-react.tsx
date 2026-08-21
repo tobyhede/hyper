@@ -26,6 +26,7 @@ import { CardSearchCombobox, Field, FieldError, type CardChoice } from '@project
 import { describeAuthoringRefusal, presentEdgeConnectionRefusal } from './authoring-refusal';
 import { cardChoiceOf } from './card-choice';
 import {
+  dropTarget,
   newCardDrop,
   type ElementDropTarget,
   type EdgeAuthoring,
@@ -329,16 +330,18 @@ export function useEdgeAuthoring({
                 kind: 'dragging',
                 sourceId: connection.fromNode.id,
                 point: screenToFlowPosition({ x: event.clientX, y: event.clientY }),
-                over:
-                  connection.toNode !== null
-                    ? 'connection-target'
-                    : // Resolved from the point rather than read off the event:
-                      // `event.target` is only the released-over element because
-                      // `XYHandle` happens not to capture the pointer, which is
-                      // an implementation detail rather than a documented
-                      // guarantee. `elementFromPoint` is what React Flow itself
-                      // uses to resolve a drop target.
-                      elementDropTargetOf(document.elementFromPoint(event.clientX, event.clientY)),
+                over: dropTarget({
+                  connectionTarget: connection.toNode !== null,
+                  // Resolved from the point rather than read off the event:
+                  // `event.target` is only the released-over element because
+                  // `XYHandle` happens not to capture the pointer, which is an
+                  // implementation detail rather than a documented guarantee.
+                  // `elementFromPoint` is what React Flow itself uses to resolve
+                  // a drop target.
+                  element: elementDropTargetOf(
+                    document.elementFromPoint(event.clientX, event.clientY),
+                  ),
+                }),
                 modifierHeld: event.altKey,
               },
               acceptsEmptyDrop,
@@ -450,10 +453,10 @@ export function useEdgeAuthoring({
       proposedReconnection.current = false;
       const subject = edgeSelectionOf(edge);
       if (!proposed && subject !== null && 'clientX' in event && 'clientY' in event) {
-        const over =
-          state.toNode !== null
-            ? 'connection-target'
-            : elementDropTargetOf(document.elementFromPoint(event.clientX, event.clientY));
+        const over = dropTarget({
+          connectionTarget: state.toNode !== null,
+          element: elementDropTargetOf(document.elementFromPoint(event.clientX, event.clientY)),
+        });
         if (over === 'empty-canvas') latest.current.authoring.deleteEdge(subject);
       }
       // Whatever it produced, the drag is over: the draft goes and a refusal's
