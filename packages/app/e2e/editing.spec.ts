@@ -1141,6 +1141,39 @@ test(
     await expect(page.getByRole('combobox', { name: 'To' })).toBeVisible();
     await page.keyboard.press('Escape');
 
+    // **Where they are drawn**, not merely that they exist: the controls are
+    // portalled into `EdgeLabelRenderer` at the point `routedEdgeGeometry`
+    // calls the routed polyline's middle, so they pan and zoom with the canvas
+    // and sit on the Edge they act on. Read off the drawn path rather than
+    // recomputed, which is the disagreement the shared geometry exists to stop.
+    const middle = await page
+      .locator('.react-flow__edge.selected .react-flow__edge-path')
+      .evaluate((path) => {
+        // SAFETY: `.react-flow__edge-path` only ever matches the `<path>`
+        // React Flow's SVG edge renderer draws.
+        const geometry = path as SVGPathElement;
+        const transform = geometry.getScreenCTM();
+        if (transform === null) throw new Error('The selected Edge has no screen transform.');
+        const at = geometry
+          .getPointAtLength(geometry.getTotalLength() / 2)
+          .matrixTransform(transform);
+        return { x: at.x, y: at.y };
+      });
+    const controls = await boxOf(page.getByTestId('edge-edit'), 'the Edit control');
+    expect(Math.abs(controls.y + controls.height / 2 - middle.y)).toBeLessThan(8);
+    expect(Math.abs(controls.x + controls.width / 2 - middle.x)).toBeLessThan(controls.width + 8);
+
+    // **Gated on the Active Graph, not on selection alone.** Activating another
+    // Graph is not an Edit and moves no Edge, but an Edge outside the Active
+    // Graph cannot remain selected (CONTEXT.md) — so the controls go with it,
+    // rather than leaving Delete live on an Edge the canvas has stopped
+    // offering.
+    await activateGraph(page, 'Mid');
+    await expect(page.getByRole('button', { name: 'Delete this Edge' })).toHaveCount(0);
+    await expect(page.locator('.react-flow__edge.selected')).toHaveCount(0);
+    await activateGraph(page, 'Long');
+
+    await selectAnEdge(page);
     await page.getByRole('button', { name: 'Delete this Edge' }).click();
 
     await expect(page.locator('.react-flow__edge')).toHaveCount(drawn - 1);
@@ -1185,6 +1218,24 @@ test(
     // Replaced, not removed: the Graph still draws as many Edges as before.
     await expect(page.locator('.react-flow__edge')).toHaveCount(drawn);
     await expect(page.getByLabel(selected, { exact: true })).toHaveCount(0);
+
+    // **Focus after the reprojection**, which is a move nothing else supplies:
+    // the popover that held focus unmounts with the Edge the completion
+    // replaced, and React Flow moves focus only for elements it still draws.
+    // Edge Authoring's focus request names the Edge by domain subject, and the
+    // projection carrying it arrives a strategy later — so the request has to
+    // outlive the render that made it, and this is what proves it does.
+    const focusedEdgeLabel = () =>
+      page.evaluate(() => {
+        const active = document.activeElement;
+        return active instanceof Element
+          ? (active.closest('.react-flow__edge')?.getAttribute('aria-label') ?? null)
+          : null;
+      });
+    await expect.poll(focusedEdgeLabel).not.toBeNull();
+    // The *reconnected* Edge, not the one the author started on: that one is no
+    // longer in the Graph, and its label went with it.
+    expect(await focusedEdgeLabel()).not.toBe(selected);
   },
 );
 
