@@ -8,9 +8,9 @@ import {
   type CardId,
   type LayoutPosition,
 } from '@project/core';
-import { Placement, graphCardIds, type ResolvedContentCard } from '@project/graph';
+import { graphCardIds, type ResolvedContentCard } from '@project/graph';
 import type { OpenedSpace } from './space';
-import { composeApp } from './compose-app';
+import { composeApp, openingPlacement } from './compose-app';
 import type { AuthoringRefusal } from './space-authoring';
 import { describeAuthoringRefusal } from './authoring-refusal';
 import { selectedCardOf, type EdgeSubject } from './render-adapter';
@@ -182,11 +182,7 @@ export const createApp = ({ spaceSession }: OpenedSpace) => {
     const selectCanvasRenderer = useCallback((selection: CanvasRendererId) => {
       const resolved = resolveRenderer(currentSpace(), selection);
       navigation.selectRenderer(selection);
-      useRenderAdapter
-        .getState()
-        .selectRenderer(
-          resolved.kind === 'view' ? null : Placement.fromLayout(resolved.resolvedLayout.layout),
-        );
+      useRenderAdapter.getState().selectRenderer(openingPlacement(resolved));
     }, []);
 
     // Leaving while persistence is not settled asks first. The handler is absent

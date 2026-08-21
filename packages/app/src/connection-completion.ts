@@ -68,7 +68,7 @@ export interface ConnectionCompletionDependencies {
   readonly adapter: RenderAdapter;
   readonly authoring: SpaceAuthoring;
   /** Where an invariant violation at the React Flow seam is reported. */
-  readonly reportInvariant?: ObserverErrorReporter | undefined;
+  readonly reportInvariant?: ObserverErrorReporter;
 }
 
 export function createConnectionCompletion({

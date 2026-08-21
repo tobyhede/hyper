@@ -3,6 +3,7 @@ import { uuidSchema, type SpaceSnapshot } from '@project/core';
 import { Placement } from '@project/graph';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
 import { composeApp, composeCore } from '../src/compose-app';
+import { createConnectionCompletion } from '../src/connection-completion';
 import { mintingGraphIds, mintingIds } from './minting';
 
 /**
@@ -116,6 +117,29 @@ describe('what the composition opens on', () => {
     });
 
     expect(authoring.authoredPlacement()).toBeNull();
+  });
+});
+
+describe('the connection completion Edge Authoring is given', () => {
+  /**
+   * A `ConnectionCompletion` is written in terms of an adapter and an Authoring,
+   * and the composition creates both — so a caller cannot hand in a finished one
+   * without binding Edge Authoring to a foreign pair. It supplies the *making*
+   * of one instead, and is handed the collaborators this composition built.
+   */
+  it('builds a supplied completion over the collaborators this composition made', () => {
+    const seen: { adapter: unknown; authoring: unknown }[] = [];
+    const composed = composeApp({
+      spaceSession: openSession(),
+      connections: (collaborators) => {
+        seen.push(collaborators);
+        return createConnectionCompletion(collaborators);
+      },
+    });
+
+    expect(seen).toHaveLength(1);
+    expect(seen[0]?.adapter).toBe(composed.adapter);
+    expect(seen[0]?.authoring).toBe(composed.authoring);
   });
 });
 

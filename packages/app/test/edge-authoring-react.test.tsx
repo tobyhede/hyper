@@ -8,7 +8,7 @@ import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
 import type { CardFlowNode } from '@project/react-flow-adapter';
 import { AddCardControl, PersistenceIndicator, SidebarProvider } from '@project/ui';
 import type { CanvasRenderer } from '../src/canvas-renderers';
-import { composeApp } from '../src/compose-app';
+import { composeApp, type EdgeCollaborators } from '../src/compose-app';
 import { edgeSelectionOf } from '../src/render-adapter';
 import type { ConnectionCompletion } from '../src/connection-completion';
 import { useEdgeAuthoring } from '../src/edge-authoring-react';
@@ -177,7 +177,11 @@ const EDGES = [
  * Layout whose Active Graph has left it, which no gesture over this Space's one
  * Layout can produce. Everything else composes the real collaborator.
  */
-function compose({ connections }: { connections?: ConnectionCompletion | undefined } = {}) {
+function compose({
+  connections,
+}: {
+  connections?: ((collaborators: EdgeCollaborators) => ConnectionCompletion) | undefined;
+} = {}) {
   const loaded = { snapshot, revision: 0n, exportedRevision: null };
   const session = openSpaceSession(new MemorySpaceBackend([loaded]), loaded);
   const composed = composeApp({
@@ -254,7 +258,7 @@ function mountCanvas(
   }: {
     covered?: boolean;
     presenting?: boolean;
-    connections?: ConnectionCompletion | undefined;
+    connections?: ((collaborators: EdgeCollaborators) => ConnectionCompletion) | undefined;
   } = {},
 ) {
   const composed = compose({ connections });
@@ -1059,10 +1063,10 @@ describe('announcing a refusal', () => {
    */
   it('says a refusal no Card choice could answer beneath the field, not on it', () => {
     const { edgeAuthoring } = mountCanvas(null, {
-      connections: {
+      connections: () => ({
         connect: () => ({ kind: 'refused', refusal: { code: 'layout-active-graph-required' } }),
         createAndConnect: () => ({ kind: 'unavailable' }),
-      },
+      }),
     });
 
     act(() => edgeAuthoring.beginKeyboardConnect(CARD_A));

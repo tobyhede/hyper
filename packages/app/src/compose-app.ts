@@ -91,8 +91,23 @@ export interface ComposeAppDependencies extends ComposeCoreDependencies {
    * default, which is what names the collaborator in production.
    */
   readonly reportObserverError?: ObserverErrorReporter | undefined;
-  /** The connection completion Edge Authoring consumes; the real one when absent. */
-  readonly connections?: ConnectionCompletion | undefined;
+  /**
+   * How the connection completion Edge Authoring consumes is made.
+   *
+   * A factory rather than a finished instance, because a `ConnectionCompletion`
+   * is written in terms of an adapter and an Authoring and this module is what
+   * creates both: a caller handing in a completed one could only bind Edge
+   * Authoring to a *different* pair, which is the split composition this module
+   * exists to prevent. Given the collaborators, a caller can build the real one
+   * with an option of its own, or answer a stand-in. The real one when absent.
+   */
+  readonly connections?: ((collaborators: EdgeCollaborators) => ConnectionCompletion) | undefined;
+}
+
+/** The pair a connection completion is written in terms of. */
+export interface EdgeCollaborators {
+  readonly adapter: RenderAdapter;
+  readonly authoring: SpaceAuthoring;
 }
 
 export interface AppCore {
@@ -108,6 +123,14 @@ export interface AppCore {
   readonly currentSpace: () => Space;
   readonly resolveRenderer: ResolveRenderer;
   readonly navigation: Navigation;
+  /**
+   * The renderer selection this composition opened in.
+   *
+   * Answered rather than read back off Navigation: it is what `composeCore`
+   * decided, and recovering it through `navigation.getState()` makes the
+   * decision look like Navigation's when it is this module's.
+   */
+  readonly openingSelection: CanvasRendererId;
 }
 
 export interface ComposedApp extends AppCore {
@@ -116,8 +139,14 @@ export interface ComposedApp extends AppCore {
   readonly edgeAuthoring: EdgeAuthoring;
 }
 
-/** The placement a resolved renderer opens on (ADR 0025). */
-const openingPlacement = (renderer: ResolvedRenderer): Placement | null =>
+/**
+ * The placement a resolved renderer opens on (ADR 0025).
+ *
+ * Exported because selecting a renderer asks the same question again
+ * (`App.tsx`), and a Space that opens on one placement while re-selecting the
+ * same renderer installs another is two sources of truth for one rule.
+ */
+export const openingPlacement = (renderer: ResolvedRenderer): Placement | null =>
   renderer.kind === 'view' ? null : Placement.fromLayout(renderer.resolvedLayout.layout);
 
 /**
@@ -146,9 +175,9 @@ export function composeCore({
   // Which renderer this space opens in. It also answers which graphs are drawn
   // and which of them opens active (ADR 0026), so it has to resolve before
   // anything that reads the canvas is built.
-  const opening = selection ?? defaultRenderer(currentSpace());
-  const navigation = createNavigation(currentSpace, resolveRenderer, opening);
-  return { readWorkingSpace, currentSpace, resolveRenderer, navigation };
+  const openingSelection = selection ?? defaultRenderer(currentSpace());
+  const navigation = createNavigation(currentSpace, resolveRenderer, openingSelection);
+  return { readWorkingSpace, currentSpace, resolveRenderer, navigation, openingSelection };
 }
 
 /** The whole composition: Navigation, Space Authoring, the render adapter and Edge Authoring. */
@@ -161,20 +190,20 @@ export function composeApp(dependencies: ComposeAppDependencies): ComposedApp {
     connections,
   } = dependencies;
   const core = composeCore(dependencies);
-  const { currentSpace, resolveRenderer, navigation } = core;
+  const { currentSpace, resolveRenderer, navigation, openingSelection } = core;
   // Live nodes hold whichever positions are on screen. Absent an argument, the
   // renderer the composition opened in answers what they start as; an explicit
   // one — `null` included — is the caller's own statement and stands.
-  const opening =
+  const placement =
     initialPlacement === undefined
-      ? openingPlacement(resolveRenderer(currentSpace(), navigation.getState().selectedRenderer))
+      ? openingPlacement(resolveRenderer(currentSpace(), openingSelection))
       : initialPlacement;
   const authoring = createSpaceAuthoring({
     session: spaceSession,
     navigation,
     currentSpace,
     resolveRenderer,
-    initialPlacement: opening,
+    initialPlacement: placement,
     newId,
     reportObserverError,
   });
@@ -185,7 +214,7 @@ export function composeApp(dependencies: ComposeAppDependencies): ComposedApp {
   const edgeAuthoring = createEdgeAuthoring({
     authoring,
     adapter,
-    connections: connections ?? createConnectionCompletion({ adapter, authoring }),
+    connections: (connections ?? createConnectionCompletion)({ adapter, authoring }),
     reportObserverError,
   });
   return { ...core, authoring, adapter, edgeAuthoring };

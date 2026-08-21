@@ -329,7 +329,7 @@ describe('Workspace failure reporting', () => {
     });
     // React reports a boundary-caught error to `console.error` as well as to the
     // boundary. The report is the point; the duplicate is noise this test owns.
-    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const reported = vi.spyOn(console, 'error').mockImplementation(() => undefined);
 
     expect(() =>
       mountWorkspace({ space: runtime(valid), spaceSession: session }, (app) => {
@@ -339,6 +339,10 @@ describe('Workspace failure reporting', () => {
 
     expect(screen.getByTestId('workspace-failure')).toHaveTextContent(MISSING_CARD_ID);
     expect(screen.getByRole('heading', { name: 'Unable to open this space' })).toBeVisible();
+    // Logged as well as reported: nothing else traces this path. React logs the
+    // boundary's own catch, so only this one would otherwise leave a developer a
+    // sentence and an empty console.
+    expect(reported).toHaveBeenCalledWith('Composing the workspace failed', expect.any(Error));
   });
 
   /**

@@ -289,3 +289,53 @@ the guard §2 asked for:
 
 `pnpm e2e:ladle` was not run: no component with a story changed, and
 `stories/support/` is untouched by design (§5).
+
+## Review round
+
+Three independent reviewers over `main...HEAD` — the repo's Standards/Spec pass,
+the built-in correctness review, and CodeRabbit. CodeRabbit returned **zero
+findings** on the branch's own work. The other two agreed on ten, every one
+confirmed by reading the code before it was acted on, and all ten are fixed.
+
+Two mattered.
+
+**`App.tsx` restated the rule `compose-app.ts` was created to state once.**
+`selectCanvasRenderer` wrote out `renderer.kind === 'view' ? null :
+Placement.fromLayout(...)` verbatim, so a Space could open on one placement and
+install another the moment the author re-selected the same renderer.
+`openingPlacement` is exported and both paths call it — the ticket's own thesis,
+missed at the one site outside the module.
+
+**The migrated `edge-authoring.test.ts` helper silently lost `reportInvariant:
+() => undefined`.** `composeApp` built the connection completion itself and
+offered no way to supply one bound to its own adapter, so the silencer had
+nowhere to go. `connections` is now a **factory** taking the composition's own
+`{ adapter, authoring }` rather than a finished `ConnectionCompletion` — which
+also closes a hole the reviewers found independently: a finished one could only
+ever have been bound to a *different* adapter and authoring, the split
+composition this module exists to prevent. `compose-app.test.ts` pins that the
+factory receives this composition's collaborators.
+
+The rest: `CLAUDE.md`'s ADR 0016 paragraph still said `newId` defaults to
+`newUuid` and that `createApp` composes the resolver — both now false, both
+rewritten, and the `app` bullet names the new module; `mountWorkspace`'s catch
+now logs as well as reports, with a test, because React traces the boundary path
+and nothing traced this one; its comment no longer claims a production route
+that `openStoredWorkspace` makes unreachable; `composeCore` answers
+`openingSelection` instead of `composeApp` reading it back off Navigation; `let
+App` is typed; `opening` no longer names two types in one file; and
+`connection-completion.ts`'s `| undefined` widening is reverted, having lost its
+only would-be caller.
+
+**Recorded, not acted on.** `OpenedSpace.space` now has no reader in
+`packages/app/src` — a direct consequence of dropping `space` from `composeCore`,
+and a parsed Space held for the page's lifetime for nothing. Removing the field
+touches `open-workspace.ts` and four test files and is its own mechanical change;
+the `loadSpaceSnapshot` call above it still earns its keep as fail-fast intake.
+Also left: `createNavigation`'s fourth argument now has no production caller
+(tests and stories still pass it, and §5 keeps them), and `createApp` forwards
+neither minter — acceptance criterion 1 pinned its signature, so the three tests
+that drive the real composition are unchanged by design.
+
+`pnpm verify` and `pnpm e2e` re-run green after the fixes: 150 files / 1602
+passed / 8 skipped, and 115 e2e passed — still the count the branch inherited.
