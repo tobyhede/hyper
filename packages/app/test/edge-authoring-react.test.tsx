@@ -3,21 +3,16 @@ import { useContext, type ReactNode } from 'react';
 import { Position, ReactFlowProvider, type Edge } from '@xyflow/react';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { uuidSchema, type SpaceSnapshot } from '@project/core';
-import { inHandleId, loadSpaceSnapshot, outHandleId, Placement } from '@project/graph';
+import { inHandleId, outHandleId, Placement } from '@project/graph';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
 import type { CardFlowNode } from '@project/react-flow-adapter';
 import { AddCardControl, PersistenceIndicator, SidebarProvider } from '@project/ui';
 import type { CanvasRenderer } from '../src/canvas-renderers';
-import { createNavigation } from '../src/navigation';
-import { createRenderAdapter, edgeSelectionOf } from '../src/render-adapter';
-import {
-  createConnectionCompletion,
-  type ConnectionCompletion,
-} from '../src/connection-completion';
-import { createEdgeAuthoring } from '../src/edge-authoring';
+import { composeApp } from '../src/compose-app';
+import { edgeSelectionOf } from '../src/render-adapter';
+import type { ConnectionCompletion } from '../src/connection-completion';
 import { useEdgeAuthoring } from '../src/edge-authoring-react';
-import { createSpaceAuthoring } from '../src/space-authoring';
-import { createRendererResolver } from '../src/renderer';
+import { mintingGraphIds } from './minting';
 import { SpaceCanvas } from '../src/components/SpaceCanvas';
 import { EdgeAuthoringContext } from '../src/components/edge-authoring-context';
 import { WorkspaceSidebar } from '../src/components/WorkspaceSidebar';
@@ -39,6 +34,8 @@ const CARD_C = uuidSchema.parse('00000000-0000-4000-8000-000000000007');
 const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
 const OTHER_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
 const LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000021');
+/** Named, never reached: this composition opens on a Layout, so nothing converts. */
+const MINTED_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000041');
 
 const EDGE = { from: CARD_A, to: CARD_B } as const;
 /** The one row this chrome draws, named so `selected` can be that very value. */
@@ -183,35 +180,19 @@ const EDGES = [
 function compose({ connections }: { connections?: ConnectionCompletion | undefined } = {}) {
   const loaded = { snapshot, revision: 0n, exportedRevision: null };
   const session = openSpaceSession(new MemorySpaceBackend([loaded]), loaded);
-  const currentSpace = () => {
-    const result = loadSpaceSnapshot(session.getState().working);
-    if (!result.ok) throw new Error(result.errors.map((error) => error.message).join('; '));
-    return result.space;
-  };
-  const resolveRenderer = createRendererResolver({
-    newGraphId: () => uuidSchema.parse('00000000-0000-4000-8000-0000000000ff'),
-  });
-  const selection = { kind: 'layout', layoutId: LAYOUT_ID } as const;
-  const navigation = createNavigation(currentSpace, resolveRenderer, selection);
-  const authoring = createSpaceAuthoring({
-    session,
-    navigation,
-    currentSpace,
-    resolveRenderer,
+  const composed = composeApp({
+    spaceSession: session,
+    selection: { kind: 'layout', layoutId: LAYOUT_ID },
+    newGraphId: mintingGraphIds(MINTED_GRAPH_ID),
     initialPlacement: Placement.fromEntries([
       [CARD_A, { x: 0, y: 0 }],
       [CARD_B, { x: 400, y: 0 }],
       [CARD_C, { x: 800, y: 0 }],
     ]),
+    connections,
   });
-  const adapter = createRenderAdapter(authoring);
-  const edgeAuthoring = createEdgeAuthoring({
-    authoring,
-    adapter,
-    connections: connections ?? createConnectionCompletion({ adapter, authoring }),
-  });
-  adapter.getState().syncProjection(NODES, EDGES);
-  return { session, navigation, authoring, adapter, edgeAuthoring, currentSpace };
+  composed.adapter.getState().syncProjection(NODES, EDGES);
+  return { session, ...composed };
 }
 
 const graphsOf = (working: SpaceSnapshot) =>

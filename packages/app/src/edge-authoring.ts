@@ -285,7 +285,7 @@ export interface EdgeAuthoringDependencies {
   readonly authoring: SpaceAuthoring;
   readonly adapter: RenderAdapter;
   readonly connections: ConnectionCompletion;
-  readonly reportObserverError?: ObserverErrorReporter;
+  readonly reportObserverError?: ObserverErrorReporter | undefined;
 }
 
 const IDLE: EdgeAuthoringState = { draft: null, refusal: null, focusRequest: null };

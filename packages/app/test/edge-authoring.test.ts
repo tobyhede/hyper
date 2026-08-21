@@ -1,22 +1,14 @@
 import fc from 'fast-check';
 import { describe, expect, it, vi } from 'vitest';
 import { uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
-import { loadSpaceSnapshot, Placement } from '@project/graph';
+import { Placement } from '@project/graph';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
 import type { CardFlowNode } from '@project/react-flow-adapter';
-import { createNavigation } from '../src/navigation';
-import { createRenderAdapter } from '../src/render-adapter';
-import { createConnectionCompletion } from '../src/connection-completion';
-import {
-  createEdgeAuthoring,
-  newCardDrop,
-  type ConnectionGesture,
-  type DropTarget,
-} from '../src/edge-authoring';
-import { createSpaceAuthoring } from '../src/space-authoring';
-import { createRendererResolver, type CanvasRendererId } from '../src/renderer';
+import { composeApp } from '../src/compose-app';
+import { newCardDrop, type ConnectionGesture, type DropTarget } from '../src/edge-authoring';
+import type { CanvasRendererId } from '../src/renderer';
 import { CARD_SIZE } from '../src/card';
-import { mintingIds } from './minting';
+import { mintingGraphIds, mintingIds } from './minting';
 import { node } from './render-adapter-fixtures';
 
 /**
@@ -92,18 +84,10 @@ function open(
 ) {
   const loaded = { snapshot, revision: 0n, exportedRevision: null };
   const session = openSpaceSession(new MemorySpaceBackend([loaded]), loaded);
-  const currentSpace = () => {
-    const result = loadSpaceSnapshot(session.getState().working);
-    if (!result.ok) throw new Error(result.errors.map((error) => error.message).join('; '));
-    return result.space;
-  };
-  const resolveRenderer = createRendererResolver({ newGraphId: () => MINTED_GRAPH });
-  const navigation = createNavigation(currentSpace, resolveRenderer, renderer);
-  const authoring = createSpaceAuthoring({
-    session,
-    navigation,
-    currentSpace,
-    resolveRenderer,
+  const { navigation, authoring, adapter, edgeAuthoring } = composeApp({
+    spaceSession: session,
+    selection: renderer,
+    newGraphId: mintingGraphIds(MINTED_GRAPH),
     newId,
     initialPlacement: Placement.fromEntries([
       [CARD_A, { x: 10, y: 20 }],
@@ -111,18 +95,8 @@ function open(
       [CARD_C, { x: 600, y: 40 }],
     ]),
   });
-  const adapter = createRenderAdapter(authoring);
-  const edges = createEdgeAuthoring({
-    authoring,
-    adapter,
-    connections: createConnectionCompletion({
-      adapter,
-      authoring,
-      reportInvariant: () => undefined,
-    }),
-  });
   adapter.getState().syncProjection(PROJECTED, []);
-  return { session, navigation, authoring, adapter, edges };
+  return { session, navigation, authoring, adapter, edges: edgeAuthoring };
 }
 
 const graphsOf = (snapshot: SpaceSnapshot) =>
@@ -348,30 +322,15 @@ describe('draft invalidation', () => {
       { snapshot: stored, revision: 1n, exportedRevision: null },
     ]);
     const session = openSpaceSession(backend, loaded);
-    const currentSpace = () => {
-      const result = loadSpaceSnapshot(session.getState().working);
-      if (!result.ok) throw new Error(result.errors.map((error) => error.message).join('; '));
-      return result.space;
-    };
-    const resolveRenderer = createRendererResolver({ newGraphId: () => MINTED_GRAPH });
-    const selection: CanvasRendererId = { kind: 'layout', layoutId: LAYOUT_ID };
-    const navigation = createNavigation(currentSpace, resolveRenderer, selection);
-    const authoring = createSpaceAuthoring({
-      session,
-      navigation,
-      currentSpace,
-      resolveRenderer,
+    const { authoring, edgeAuthoring: edges } = composeApp({
+      spaceSession: session,
+      selection: { kind: 'layout', layoutId: LAYOUT_ID },
+      newGraphId: mintingGraphIds(MINTED_GRAPH),
       initialPlacement: Placement.fromEntries([
         [CARD_A, { x: 10, y: 20 }],
         [CARD_B, { x: 300, y: 40 }],
         [CARD_C, { x: 600, y: 40 }],
       ]),
-    });
-    const adapter = createRenderAdapter(authoring);
-    const edges = createEdgeAuthoring({
-      authoring,
-      adapter,
-      connections: createConnectionCompletion({ adapter, authoring }),
     });
     edges.openEdgeEditor(SUBJECT);
     // Force the conflict the accept resolves.

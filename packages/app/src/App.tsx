@@ -3,7 +3,6 @@ import { ReactFlowProvider } from '@xyflow/react';
 import { AppShell } from '@project/ui';
 import {
   cardDocumentSchema,
-  newUuid,
   uuidSchema,
   type Card,
   type CardId,
@@ -11,22 +10,20 @@ import {
 } from '@project/core';
 import { Placement, graphCardIds, type ResolvedContentCard } from '@project/graph';
 import type { OpenedSpace } from './space';
-import { createSpaceAuthoring, type AuthoringRefusal } from './space-authoring';
+import { composeApp } from './compose-app';
+import type { AuthoringRefusal } from './space-authoring';
 import { describeAuthoringRefusal } from './authoring-refusal';
-import { createRenderAdapter, selectedCardOf, type EdgeSubject } from './render-adapter';
-import { createConnectionCompletion } from './connection-completion';
-import { createEdgeAuthoring } from './edge-authoring';
+import { selectedCardOf, type EdgeSubject } from './render-adapter';
 import { canvasProjection } from './canvas-projection';
 import { canvasRenderers, currentRenderer } from './canvas-renderers';
 import { canvasContent } from './canvas-content';
 import { usePlacementRendering } from './placement-rendering';
 import { cardSizeVars } from './card';
-import { canRetreat, createNavigation } from './navigation';
+import { canRetreat } from './navigation';
 import { usePresentingKeys } from './presenting-keys';
-import { createWorkingSpaceReader } from './snapshot';
 import { nextCardTitle } from './titles';
 import { activeGraphColor } from './colors';
-import { createRendererResolver, defaultRenderer, type CanvasRendererId } from './renderer';
+import type { CanvasRendererId } from './renderer';
 import { ADD_CARD_KEY, SpaceCanvas } from './components/SpaceCanvas';
 import { CanvasCentre, type VisibleCentre } from './components/CanvasCentre';
 import { NewAlias } from './components/NewAlias';
@@ -37,51 +34,19 @@ import { PresentingChrome } from './components/PresentingChrome';
 import { PersistenceControl, PersistenceNotice } from './components/PersistenceControl';
 import { SelectedCanvasRenderer, WorkspaceSidebar } from './components/WorkspaceSidebar';
 
-export const createApp = ({ space, spaceSession }: OpenedSpace) => {
-  // One validated aggregate per working snapshot, shared by the render path and
-  // by Navigation. Both read the same reader, so in the steady state a snapshot
-  // is parsed and indexed once rather than once per render — and both see the
-  // same `Space` identity, which is what the render memos below hang on.
-  const readWorkingSpace = createWorkingSpaceReader();
-  const currentSpace = () => readWorkingSpace(spaceSession.getState().working);
-  // **One resolver for the whole composition**, handed to every collaborator
-  // that needs one. Nondeterminism is injected here rather than reached for
-  // inside a domain operation: a converted Graph's identity comes from
-  // `newGraphId`, so a test composes a deterministic resolver instead of mocking
-  // a global, and nothing downstream has to name identity minting at all.
-  const resolveRenderer = createRendererResolver({ newGraphId: newUuid });
-  // Which renderer this space opens in, and the strategy that arranges it. The
-  // fixture declares no view, so this resolves to the graph-driven ELK graph —
-  // exactly what the hardcoded `elkStrategy()` here used to do. It also answers
-  // which graphs are drawn and which of them opens active (ADR 0026), so it has
-  // to resolve before the store is built.
-  const initialSelection = defaultRenderer(space);
-  const initialRenderer = resolveRenderer(space, initialSelection);
-  const navigation = createNavigation(currentSpace, resolveRenderer, initialSelection, space);
-
-  // Live nodes hold whichever positions are on screen. A selected Layout also
-  // supplies its already-authored, possibly sparse map; a View starts null and
-  // is promoted only by a completed edit (ADR 0025).
-  const initialPlacement =
-    initialRenderer.kind === 'view'
-      ? null
-      : Placement.fromLayout(initialRenderer.resolvedLayout.layout);
-  const authoring = createSpaceAuthoring({
-    session: spaceSession,
-    navigation,
+export const createApp = ({ spaceSession }: OpenedSpace) => {
+  // What an opened Space is composed of, stated once (`compose-app.ts`): one
+  // working-space reader every collaborator shares, one renderer resolver, and
+  // the order the six of them have to be built in.
+  const {
+    readWorkingSpace,
     currentSpace,
     resolveRenderer,
-    initialPlacement,
-  });
-  const useRenderAdapter = createRenderAdapter(authoring);
-  // The Edge lifecycle, composed once beside the two collaborators it consumes.
-  // It owns neither: the render adapter stays authoritative for the projection
-  // and the canvas selection, Space Authoring for eligibility and every Edit.
-  const edgeAuthoring = createEdgeAuthoring({
+    navigation,
     authoring,
     adapter: useRenderAdapter,
-    connections: createConnectionCompletion({ adapter: useRenderAdapter, authoring }),
-  });
+    edgeAuthoring,
+  } = composeApp({ spaceSession });
 
   function App() {
     const authoringState = useSyncExternalStore(authoring.subscribe, authoring.getState);

@@ -10,7 +10,7 @@ import {
   type SpaceSnapshot,
   type UUID,
 } from '@project/core';
-import { loadSpaceSnapshot, Placement } from '@project/graph';
+import { Placement } from '@project/graph';
 import {
   MemorySpaceBackend,
   MemorySpaceBackendTestControl,
@@ -19,14 +19,15 @@ import {
   type SpaceSession,
 } from '@project/persistence';
 import { GRAPH_PALETTE } from '../src/colors';
-import { mintingIds } from './minting';
-import { createNavigation, type Navigation, type NavigationState } from '../src/navigation';
+import { mintingGraphIds, mintingIds } from './minting';
+import { composeApp, composeCore } from '../src/compose-app';
+import type { Navigation, NavigationState } from '../src/navigation';
 import {
   createSpaceAuthoring,
   type AuthoringResult,
   type SpaceAuthoring,
 } from '../src/space-authoring';
-import { createRendererResolver, type CanvasRendererId } from '../src/renderer';
+import type { CanvasRendererId } from '../src/renderer';
 
 /**
  * The eligibility query, asked in the shape the two connecting gestures ask it.
@@ -55,6 +56,8 @@ const MINTED_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000008')
 const CONVERTED_LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000031');
 /** What a *second* conversion of one Algorithmic View would mint, and must not. */
 const COMPETING_LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000032');
+/** The Graph identity that second conversion would carry with it. */
+const COMPETING_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000a02');
 const CREATED_CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
 
 /** A Card identity no fixture Space holds, so any Layout naming it fails intake. */
@@ -168,93 +171,54 @@ function complete(
 }
 
 /**
- * Compose one workspace exactly as `createApp` does, so a test never sees a seam
- * production does not have — in particular the Layout's own map as the opening
- * placement. `openAuthoring` below leaves that null on purpose, for the tests
- * that install one themselves.
- */
-/**
  * What a test supplies to the composition instead of reaching past it.
  *
  * `newId` is the replacement for `vi.spyOn(crypto, 'randomUUID')`, which
  * controlled the ambient generator rather than the module that mints from it.
  * ADR 0016 rejected that for `loadSpace` and the grounds are the same here.
+ *
+ * Each option is spelled `| undefined` so it forwards into `composeApp`
+ * untouched — the composition declares its own the same way, which is what
+ * retires the conditional-spread block this pair used to need.
  */
 interface AuthoringOptions {
-  readonly reportObserverError?: (error: unknown) => void;
-  readonly newId?: () => UUID;
+  readonly reportObserverError?: ((error: unknown) => void) | undefined;
+  readonly newId?: (() => UUID) | undefined;
 }
 
 /**
- * The composition's renderer resolver, with its own nondeterministic input
- * supplied the same way `newId` is: at composition, never by mocking a global.
+ * The Graph identities a composition's conversions mint.
  *
  * Two seams rather than one, because they are minted in two places. The Card
  * and Layout ids of a completed Edit come from `newId`, which Space Authoring
  * took when it was composed; a converted Graph's identity is minted inside the
- * conversion boundary, which the resolver closes over (ADR 0045), so the
- * resolver is what takes that one.
+ * conversion boundary, which the *resolver* closes over (ADR 0045), so the
+ * composition is what takes that one.
  *
  * A fresh sequence per composition, because a Space that is converted twice
  * needs two identities and the boundary refuses a repeat outright.
  */
-function testResolver() {
-  let minted = 0;
-  return createRendererResolver({
-    newGraphId: () => {
-      minted += 1;
-      return minted === 1
-        ? MINTED_GRAPH_ID
-        : uuidSchema.parse(
-            `00000000-0000-4000-8000-${(0xa00 + minted).toString(16).padStart(12, '0')}`,
-          );
-    },
-  });
-}
+const graphIds = () => mintingGraphIds(MINTED_GRAPH_ID, COMPETING_GRAPH_ID);
 
-/** Builds `AuthoringOptions`: mutable so a key can be added only when present. */
-interface AuthoringExtras {
-  reportObserverError?: (error: unknown) => void;
-  newId?: () => UUID;
-}
-
-/** `AuthoringOptions`, built so an absent option is an absent key rather than an explicit `undefined`. */
-function authoringExtras({
-  reportObserverError,
-  newId,
-}: {
-  reportObserverError: ((error: unknown) => void) | undefined;
-  newId: (() => UUID) | undefined;
-}): AuthoringOptions {
-  const extras: AuthoringExtras = {};
-  if (reportObserverError !== undefined) extras.reportObserverError = reportObserverError;
-  if (newId !== undefined) extras.newId = newId;
-  return extras;
-}
-
+/**
+ * Compose one workspace exactly as `createApp` does, so a test never sees a seam
+ * production does not have — in particular the Layout's own map as the opening
+ * placement, which the composition derives from the renderer it opens in.
+ * `openAuthoring` below asks for none on purpose, for the tests that install one
+ * themselves.
+ */
 function attachAuthoring(
   backend: SpaceBackend,
   loaded: LoadedFixture,
   renderer: CanvasRendererId,
-  { reportObserverError, newId }: AuthoringOptions = {},
+  options: AuthoringOptions = {},
 ) {
   const session = openSpaceSession(backend, loaded);
-  const currentSpace = () => {
-    const result = loadSpaceSnapshot(session.getState().working);
-    if (!result.ok) throw new Error(result.errors.map((error) => error.message).join('; '));
-    return result.space;
-  };
-  const resolveRenderer = testResolver();
-  const navigation = createNavigation(currentSpace, resolveRenderer, renderer);
-  const resolved = resolveRenderer(currentSpace(), renderer);
-  const authoring = createSpaceAuthoring({
-    session,
-    navigation,
-    currentSpace,
-    resolveRenderer,
-    initialPlacement:
-      resolved.kind === 'view' ? null : Placement.fromLayout(resolved.resolvedLayout.layout),
-    ...authoringExtras({ reportObserverError, newId }),
+  const { navigation, authoring } = composeApp({
+    spaceSession: session,
+    selection: renderer,
+    newGraphId: graphIds(),
+    ...options,
   });
   return { backend, session, navigation, authoring };
 }
@@ -262,30 +226,19 @@ function attachAuthoring(
 function openAuthoring(
   snapshot: SpaceSnapshot = automaticSnapshot,
   renderer: CanvasRendererId = { kind: 'view', view: 'flow' },
-  { reportObserverError, newId }: AuthoringOptions = {},
+  options: AuthoringOptions = {},
 ) {
   const loaded = { snapshot, revision: 0n, exportedRevision: null };
   const backend = new MemorySpaceBackend([loaded]);
   const session = openSpaceSession(backend, loaded);
-  const currentSpace = () => {
-    const result = loadSpaceSnapshot(session.getState().working);
-    if (!result.ok) throw new Error(result.errors.map((error) => error.message).join('; '));
-    return result.space;
-  };
-  const resolveRenderer = testResolver();
-  const navigation = createNavigation(currentSpace, resolveRenderer, renderer);
-  return {
-    backend,
-    session,
-    navigation,
-    authoring: createSpaceAuthoring({
-      session,
-      navigation,
-      currentSpace,
-      resolveRenderer,
-      ...authoringExtras({ reportObserverError, newId }),
-    }),
-  };
+  const { navigation, authoring } = composeApp({
+    spaceSession: session,
+    selection: renderer,
+    newGraphId: graphIds(),
+    initialPlacement: null,
+    ...options,
+  });
+  return { backend, session, navigation, authoring };
 }
 
 /**
@@ -964,13 +917,15 @@ describe('Space Authoring', () => {
     };
     const loaded = { snapshot: structureLess, revision: 0n, exportedRevision: null };
     const session = openSpaceSession(new MemorySpaceBackend([loaded]), loaded);
-    const currentSpace = () => {
-      const result = loadSpaceSnapshot(session.getState().working);
-      if (!result.ok) throw new Error(result.errors.map((error) => error.message).join('; '));
-      return result.space;
-    };
-    const resolveRenderer = testResolver();
-    const real = createNavigation(currentSpace, resolveRenderer, { kind: 'view', view: 'flow' });
+    const {
+      currentSpace,
+      resolveRenderer,
+      navigation: real,
+    } = composeCore({
+      spaceSession: session,
+      selection: { kind: 'view', view: 'flow' },
+      newGraphId: graphIds(),
+    });
     const adopted: { renderer: CanvasRendererId; graphId: GraphId | null }[] = [];
     const navigation: Navigation = {
       ...real,
@@ -1336,17 +1291,12 @@ describe('Space Authoring', () => {
     control.queueResult({ kind: 'retryable-failure', code: 'network', message: 'Offline' });
     const backend = new MemorySpaceBackend([loaded], control);
     const session = openSpaceSession(backend, loaded);
-    const currentSpace = () => {
-      const result = loadSpaceSnapshot(session.getState().working);
-      if (!result.ok) throw new Error(result.errors.map((error) => error.message).join('; '));
-      return result.space;
-    };
-    const resolveRenderer = testResolver();
-    const navigation = createNavigation(currentSpace, resolveRenderer, {
-      kind: 'layout',
-      layoutId: LAYOUT_ID,
+    const { authoring } = composeApp({
+      spaceSession: session,
+      selection: { kind: 'layout', layoutId: LAYOUT_ID },
+      newGraphId: graphIds(),
+      initialPlacement: null,
     });
-    const authoring = createSpaceAuthoring({ session, navigation, currentSpace, resolveRenderer });
     replacePlacementForTest(
       authoring,
       Placement.fromEntries([
@@ -1631,27 +1581,17 @@ describe('Space Authoring', () => {
         real.submit(snapshot);
       },
     };
-    const currentSpace = () => {
-      const result = loadSpaceSnapshot(session.getState().working);
-      if (!result.ok) throw new Error(result.errors.map((error) => error.message).join('; '));
-      return result.space;
-    };
-    const resolveRenderer = testResolver();
-    const navigation = createNavigation(currentSpace, resolveRenderer, {
-      kind: 'view',
-      view: 'flow',
-    });
     const reported: unknown[] = [];
-    const authoring = createSpaceAuthoring({
-      session,
-      navigation,
-      currentSpace,
-      resolveRenderer,
+    const { authoring } = composeApp({
+      spaceSession: session,
+      selection: { kind: 'view', view: 'flow' },
+      newGraphId: graphIds(),
+      newId: mintingIds(LAYOUT_ID),
+      initialPlacement: null,
       reportObserverError: (error) => {
         reported.push(error);
         throw new Error('reporter failed');
       },
-      newId: mintingIds(LAYOUT_ID),
     });
     replacePlacementForTest(
       authoring,
@@ -1739,28 +1679,17 @@ describe('Space Authoring', () => {
         real.submit(snapshot);
       },
     };
-    const currentSpace = () => {
-      const result = loadSpaceSnapshot(session.getState().working);
-      if (!result.ok) throw new Error(result.errors.map((error) => error.message).join('; '));
-      return result.space;
-    };
-    const resolveRenderer = testResolver();
-    const navigation = createNavigation(currentSpace, resolveRenderer, {
-      kind: 'layout',
-      layoutId: LAYOUT_ID,
-    });
     const reported: unknown[] = [];
-    const authoring = createSpaceAuthoring({
-      session,
-      navigation,
-      currentSpace,
-      resolveRenderer,
+    const { authoring } = composeApp({
+      spaceSession: session,
+      selection: { kind: 'layout', layoutId: LAYOUT_ID },
+      newGraphId: graphIds(),
+      newId: mintingIds(CREATED_CARD_ID),
       initialPlacement: Placement.fromEntries([
         [CARD_A, { x: 10, y: 20 }],
         [CARD_B, { x: 300, y: 40 }],
       ]),
       reportObserverError: (error) => reported.push(error),
-      newId: mintingIds(CREATED_CARD_ID),
     });
     let queuedOnce = false;
     authoring.subscribe(() => {
@@ -1808,17 +1737,12 @@ describe('Space Authoring', () => {
         throw new Error('submit failed');
       },
     };
-    const currentSpace = () => {
-      const result = loadSpaceSnapshot(session.getState().working);
-      if (!result.ok) throw new Error(result.errors.map((error) => error.message).join('; '));
-      return result.space;
-    };
-    const resolveRenderer = testResolver();
-    const navigation = createNavigation(currentSpace, resolveRenderer, {
-      kind: 'layout',
-      layoutId: LAYOUT_ID,
+    const { authoring } = composeApp({
+      spaceSession: session,
+      selection: { kind: 'layout', layoutId: LAYOUT_ID },
+      newGraphId: graphIds(),
+      initialPlacement: null,
     });
-    const authoring = createSpaceAuthoring({ session, navigation, currentSpace, resolveRenderer });
     replacePlacementForTest(
       authoring,
       Placement.fromEntries([
@@ -1869,13 +1793,15 @@ describe('Space Authoring', () => {
     };
     const loaded = { snapshot: graphLess, revision: 0n, exportedRevision: null };
     const session = openSpaceSession(new MemorySpaceBackend([loaded]), loaded);
-    const currentSpace = () => {
-      const result = loadSpaceSnapshot(session.getState().working);
-      if (!result.ok) throw new Error(result.errors.map((error) => error.message).join('; '));
-      return result.space;
-    };
-    const resolveRenderer = testResolver();
-    const real = createNavigation(currentSpace, resolveRenderer, { kind: 'view', view: 'flow' });
+    const {
+      currentSpace,
+      resolveRenderer,
+      navigation: real,
+    } = composeCore({
+      spaceSession: session,
+      selection: { kind: 'view', view: 'flow' },
+      newGraphId: graphIds(),
+    });
     const navigation: Navigation = {
       ...real,
       continueInRenderer: () => {
@@ -1926,24 +1852,14 @@ describe('Space Authoring', () => {
         real.submit(snapshot);
       },
     };
-    const currentSpace = () => {
-      const result = loadSpaceSnapshot(session.getState().working);
-      if (!result.ok) throw new Error(result.errors.map((error) => error.message).join('; '));
-      return result.space;
-    };
-    const resolveRenderer = testResolver();
-    const navigation = createNavigation(currentSpace, resolveRenderer, {
-      kind: 'view',
-      view: 'flow',
-    });
     const reported: unknown[] = [];
-    const authoring = createSpaceAuthoring({
-      session,
-      navigation,
-      currentSpace,
-      resolveRenderer,
-      reportObserverError: (error) => reported.push(error),
+    const { authoring } = composeApp({
+      spaceSession: session,
+      selection: { kind: 'view', view: 'flow' },
+      newGraphId: graphIds(),
       newId: mintingIds(LAYOUT_ID),
+      initialPlacement: null,
+      reportObserverError: (error) => reported.push(error),
     });
     replacePlacementForTest(
       authoring,
@@ -2027,18 +1943,20 @@ describe('Space Authoring', () => {
   it('treats a selected Layout the Space no longer holds as no Edit', () => {
     const loaded = { snapshot: automaticSnapshot, revision: 0n, exportedRevision: null };
     const session = openSpaceSession(new MemorySpaceBackend([loaded]), loaded);
-    const currentSpace = () => {
-      const result = loadSpaceSnapshot(session.getState().working);
-      if (!result.ok) throw new Error(result.errors.map((error) => error.message).join('; '));
-      return result.space;
-    };
     // Navigation refuses a renderer the Space does not hold, so this state is
     // only reachable by the Space losing the Layout under a selection that was
     // valid when it was made — an accepted remote Space that dropped it, say.
     // Authoring may not resurrect it, so the Edit is refused rather than
     // written to a fresh Layout under the missing id.
-    const resolveRenderer = testResolver();
-    const real = createNavigation(currentSpace, resolveRenderer, { kind: 'view', view: 'flow' });
+    const {
+      currentSpace,
+      resolveRenderer,
+      navigation: real,
+    } = composeCore({
+      spaceSession: session,
+      selection: { kind: 'view', view: 'flow' },
+      newGraphId: graphIds(),
+    });
     const navigation: Navigation = {
       ...real,
       getState: () => ({
@@ -2061,6 +1979,9 @@ describe('Space Authoring', () => {
       navigation,
       currentSpace,
       resolveRenderer,
+      // Named although the Edit under test is refused: an unexpected mint
+      // exhausts this and fails here rather than in the assertions below.
+      newId: mintingIds(LAYOUT_ID),
     });
     replacePlacementForTest(
       authoring,
@@ -2536,21 +2457,10 @@ describe('Space Authoring', () => {
         throw new Error('accept failed');
       },
     };
-    const currentSpace = () => {
-      const result = loadSpaceSnapshot(session.getState().working);
-      if (!result.ok) throw new Error(result.errors.map((error) => error.message).join('; '));
-      return result.space;
-    };
-    const resolveRenderer = testResolver();
-    const navigation = createNavigation(currentSpace, resolveRenderer, {
-      kind: 'layout',
-      layoutId: LAYOUT_ID,
-    });
-    const authoring = createSpaceAuthoring({
-      session,
-      navigation,
-      currentSpace,
-      resolveRenderer,
+    const { authoring } = composeApp({
+      spaceSession: session,
+      selection: { kind: 'layout', layoutId: LAYOUT_ID },
+      newGraphId: graphIds(),
       initialPlacement: Placement.fromEntries([
         [CARD_A, { x: 10, y: 20 }],
         [CARD_B, { x: 300, y: 40 }],

@@ -311,6 +311,14 @@ describe('Workspace permanent save refusal', () => {
 });
 
 describe('Workspace failure reporting', () => {
+  /**
+   * The snapshot is already unloadable when the workspace is composed, so
+   * nothing has rendered yet: `createApp` builds Navigation, which resolves the
+   * renderer the Space opens in against the session's working Space, and that
+   * throws before there is a tree for the error boundary to catch it in. What is
+   * pinned is that `mountWorkspace` reports it anyway rather than throwing at
+   * its caller and leaving a blank page.
+   */
   it('names a working snapshot that stopped loading instead of blanking the page', () => {
     const valid = snapshot('Workspace', 'Card', 10, 20);
     const dangling = withDanglingGraph(valid, valid.document.title);
@@ -328,6 +336,35 @@ describe('Workspace failure reporting', () => {
         render(app);
       }),
     ).not.toThrow();
+
+    expect(screen.getByTestId('workspace-failure')).toHaveTextContent(MISSING_CARD_ID);
+    expect(screen.getByRole('heading', { name: 'Unable to open this space' })).toBeVisible();
+  });
+
+  /**
+   * The other path to the same sentence, and the one the error boundary itself
+   * is for: a workspace that composed and mounted, whose snapshot then stops
+   * passing intake under it. `App` re-derives the whole aggregate on every
+   * render, so the throw lands in the boundary rather than in `mountWorkspace`.
+   */
+  it('names a working snapshot that stops loading under a mounted workspace', () => {
+    const valid = snapshot('Workspace', 'Card', 10, 20);
+    const session = openSpaceSession(new MemorySpaceBackend(), {
+      snapshot: valid,
+      revision: 0n,
+      exportedRevision: null,
+    });
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    mountWorkspace({ space: runtime(valid), spaceSession: session }, (app) => {
+      render(app);
+    });
+
+    // Written straight onto the session, past the validation every authoring
+    // path performs first: reaching this state means an invariant has already
+    // broken, and what is pinned is that it reports rather than blanking.
+    act(() => {
+      session.submit(withDanglingGraph(valid, valid.document.title));
+    });
 
     expect(screen.getByTestId('workspace-failure')).toHaveTextContent(MISSING_CARD_ID);
     expect(screen.getByRole('heading', { name: 'Unable to open this space' })).toBeVisible();
