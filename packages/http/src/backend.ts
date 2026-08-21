@@ -190,11 +190,5 @@ const commitFailureForProblem = (problem: ProblemDetails, response: Response): C
     case 'payload-too-large':
     case 'method-not-allowed':
       return protocolFailure(problem.detail);
-    default:
-      return assertNever(code);
   }
-};
-
-const assertNever = (value: never): never => {
-  throw new Error(`Unmapped problem code: ${String(value)}`);
 };

@@ -1,9 +1,5 @@
 import type { AuthoringRefusal } from './space-authoring';
 
-const unreachable = (value: never): never => {
-  throw new Error(`Unknown Authoring refusal: ${JSON.stringify(value)}`);
-};
-
 /** Application-owned copy for a stable Authoring refusal identity. */
 export const describeAuthoringRefusal = (refusal: AuthoringRefusal): string => {
   switch (refusal.code) {
@@ -53,8 +49,6 @@ export const describeAuthoringRefusal = (refusal: AuthoringRefusal): string => {
       return 'These Cards are already connected in this Graph.';
     case 'layout-active-graph-required':
       return 'This Layout has no active Graph for the connection to join.';
-    default:
-      return unreachable(refusal);
   }
 };
 

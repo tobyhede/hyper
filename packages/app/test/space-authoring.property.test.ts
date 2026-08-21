@@ -291,7 +291,7 @@ function resolve(
         graphId,
         edge: pick(graph?.edges ?? [], generated.edge) ?? { from: NOTHING, to: NOTHING },
       };
-    default:
+    case 'reconnected-edge':
       return {
         kind: 'reconnected-edge',
         graphId,
