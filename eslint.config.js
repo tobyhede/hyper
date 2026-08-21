@@ -208,6 +208,19 @@ export default tseslint.config(
       // signature to satisfy `Record<string, unknown>`) and `interface` (option
       // bags). Enforcing one over the other would break that distinction.
       '@typescript-eslint/consistent-type-definitions': 'off',
+      // Adding a variant to a discriminated union should identify every
+      // incomplete consumer. A `default:` branch that silently absorbs a new
+      // domain variant is exactly the failure this prevents, so it earns no
+      // exemption: `AuthoringRefusal` (ADR 0057) is a union whose whole value is
+      // that a new refusal code changes the interface deliberately.
+      '@typescript-eslint/switch-exhaustiveness-check': [
+        'error',
+        {
+          allowDefaultCaseForExhaustiveSwitch: false,
+          considerDefaultExhaustiveForUnions: false,
+          requireDefaultForNonUnion: false,
+        },
+      ],
     },
   },
   {
