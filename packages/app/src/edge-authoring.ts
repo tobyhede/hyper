@@ -34,6 +34,21 @@ import type {
  */
 
 /**
+ * What the DOM says lies under the pointer — the half of a drop target React
+ * Flow does not answer.
+ *
+ * `connection-target` is deliberately absent. That is React Flow's answer,
+ * resolved from handle distance, and no hit-test of the element underneath can
+ * reach it. Declaring the DOM half over three values rather than four is what
+ * stops a supplier handing on an answer it could not have produced.
+ *
+ * `card` and `off-canvas` are refused for the same reason today and are still
+ * two values, because this is a fact a supplier reports rather than a verdict it
+ * reaches. Collapsing them would name an input after the answer it produces.
+ */
+export type ElementDropTarget = 'card' | 'empty-canvas' | 'off-canvas';
+
+/**
  * What a connection drag currently points at.
  *
  * Two sources answer this and neither is sufficient alone. React Flow resolves
@@ -41,17 +56,13 @@ import type {
  * within `connectionRadius` — 20 in the pinned 12.11.2 — so it is non-null over
  * blank canvas near a handle, and **null over the middle of a Card**, whose
  * centre is some 73px from the nearest handle at 260x146. The DOM answers the
- * rest, from the element under the pointer. Drop the DOM half and an Alt-release
- * onto a Card's body authors a Card on top of it; drop React Flow's half and a
- * release just outside a Card authors one where the author was aiming at a
- * handle. A connection target in range therefore outranks what lies underneath,
- * and both suppliers apply that precedence before asking.
- *
- * `card` and `off-canvas` are refused for the same reason today and are still
- * two values, because this is a fact a supplier reports rather than a verdict it
- * reaches. Collapsing them would name an input after the answer it produces.
+ * rest, from the element under the pointer — an `ElementDropTarget`. Drop the
+ * DOM half and an Alt-release onto a Card's body authors a Card on top of it;
+ * drop React Flow's half and a release just outside a Card authors one where the
+ * author was aiming at a handle. A connection target in range therefore outranks
+ * what lies underneath, and both suppliers apply that precedence before asking.
  */
-export type DropTarget = 'connection-target' | 'card' | 'empty-canvas' | 'off-canvas';
+export type DropTarget = 'connection-target' | ElementDropTarget;
 
 /**
  * An unfinished connection drag — as much of one as deciding an empty-drop needs.
