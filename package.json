@@ -35,6 +35,8 @@
     "e2e": "playwright test",
     "e2e:fixture": "playwright test --project=chromium",
     "e2e:ladle": "playwright test --config playwright.ladle.config.ts",
+    "roadmap": "tsx scripts/roadmap.ts",
+    "roadmap:html": "tsx scripts/roadmap.ts --html --open",
     "ui:catalog": "tsx scripts/ui-catalog.ts",
     "ui:catalog:check": "tsx scripts/ui-catalog.ts --check",
     "e2e:postgres": "playwright test --config playwright.postgres.config.ts",
