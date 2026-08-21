@@ -173,9 +173,22 @@ const EDGES = [
  *
  * `connections` is overridable because `ConnectionCompletion` is a declared
  * dependency of `createEdgeAuthoring`, and one refusal channel is reachable
- * only through it: a code about the *subject* rather than the choice needs a
- * Layout whose Active Graph has left it, which no gesture over this Space's one
- * Layout can produce. Everything else composes the real collaborator.
+ * only through it. `layout-active-graph-required` is the sole refusal that can
+ * reach `connect-form-refusal` on a connect gesture — the others are
+ * `correctableByCardChoice` and mark the Target field instead (ADR 0057,
+ * `authoring-refusal.ts`) — and it needs a selected Layout whose Active Graph
+ * the Layout does not own. **No legal Space can be in that state**, not merely
+ * no gesture over this fixture: `spaceFileSchema` gives a Layout
+ * `graphs: z.array(graphSchema).min(1)` (`core/src/schema.ts`, asserted by
+ * `core/test/persistence-schema.test.ts`), `ResolvedLayout.activeGraph`
+ * resolves named-or-first and is never null, Navigation writes only an Active
+ * Graph the selected renderer's subject holds, and Graph deletion refuses the
+ * last one (`layout-must-keep-graph`).
+ *
+ * So the stand-in is what exercises the channel at all, and the alternative —
+ * arranging the fixture so the real completion refuses this way — is not
+ * available. Everything else composes the real collaborator; only the one test
+ * at the bottom of this file passes anything here.
  */
 function compose({
   connections,

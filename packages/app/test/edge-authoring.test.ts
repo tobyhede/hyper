@@ -5,7 +5,6 @@ import { Placement } from '@project/graph';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
 import type { CardFlowNode } from '@project/react-flow-adapter';
 import { composeApp } from '../src/compose-app';
-import { createConnectionCompletion } from '../src/connection-completion';
 import { newCardDrop, type ConnectionGesture, type DropTarget } from '../src/edge-authoring';
 import type { CanvasRendererId } from '../src/renderer';
 import { CARD_SIZE } from '../src/card';
@@ -95,12 +94,6 @@ function open(
       [CARD_B, { x: 300, y: 40 }],
       [CARD_C, { x: 600, y: 40 }],
     ]),
-    // The real completion over this composition's own collaborators, with its
-    // invariant sink silenced: what a gesture leaves standing is asserted
-    // through Edge Authoring's own state, and these cases deliberately drive
-    // refusals past it.
-    connections: (collaborators) =>
-      createConnectionCompletion({ ...collaborators, reportInvariant: () => undefined }),
   });
   adapter.getState().syncProjection(PROJECTED, []);
   return { session, navigation, authoring, adapter, edges: edgeAuthoring };
