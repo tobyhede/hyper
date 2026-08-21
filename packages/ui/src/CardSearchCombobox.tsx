@@ -1,5 +1,5 @@
 import { useId, useRef, type InputHTMLAttributes, type Ref } from 'react';
-import type { Card } from '@project/core';
+import type { Card, CardId } from '@project/core';
 import { CardKindIcon } from './CardKindIcon';
 import {
   Combobox,
@@ -14,8 +14,8 @@ import { InputGroupAddon } from './components/input-group';
 export interface CardSearchComboboxProps {
   readonly label: string;
   readonly choices: readonly CardChoice[];
-  readonly value: string | null;
-  readonly onValueChange: (cardId: string) => void;
+  readonly value: CardId | null;
+  readonly onValueChange: (cardId: CardId) => void;
   readonly inputId?: string;
   readonly inputRef?: Ref<HTMLInputElement>;
   readonly inputAttributes?: InputHTMLAttributes<HTMLInputElement>;
@@ -25,9 +25,16 @@ export interface CardSearchComboboxProps {
   readonly emptyMessage?: string;
 }
 
-/** One Card the production picker may offer, and why it cannot be chosen. */
+/**
+ * One Card the production picker may offer, and why it cannot be chosen.
+ *
+ * `id` is a `CardId` rather than a plain string, and that is what keeps the
+ * boundary answered once: every caller builds a choice from a `Card`, so a
+ * widened id here only bought each of them a parse or an assertion on the way
+ * back out of `onValueChange`.
+ */
 export interface CardChoice {
-  readonly id: string;
+  readonly id: CardId;
   readonly title: string;
   readonly kind: Card['kind'];
   readonly refusal?: string;
