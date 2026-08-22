@@ -1,10 +1,10 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterAll, beforeAll, expect, it, vi } from 'vitest';
-import { RetryableWorkspaceSidebarFixture } from '../stories/support/WorkspaceSidebarFixture';
+import { RetryableSpaceSidebarFixture } from '../stories/support/SpaceSidebarFixture';
 
 /**
  * jsdom ships none, and the Sidebar primitive observes its own container.
- * `WorkspaceSidebar.test.tsx` installs the same stub for the same reason.
+ * `SpaceSidebar.test.tsx` installs the same stub for the same reason.
  */
 beforeAll(() => {
   vi.stubGlobal(
@@ -42,12 +42,12 @@ afterAll(() => vi.unstubAllGlobals());
  * and retries the latest Space` in `space-authoring.test.ts`, which proves the
  * working state survives a failure; `story-spaces.test.ts` holds the Edit to
  * appending, which is what keeps this story renderable at all. This one says
- * the workspace draws that state. `issue-14-workspace-sidebar.spec.ts` presses
+ * the Sidebar draws that state. `issue-14-space-sidebar.spec.ts` presses
  * it in a browser too, and this is here as well because `pnpm verify` does not
  * run Ladle.
  */
 it('keeps the unsaved Layout drawn through the failure and the retry', async () => {
-  render(<RetryableWorkspaceSidebarFixture />);
+  render(<RetryableSpaceSidebarFixture />);
 
   await screen.findByTestId('persistence-failure');
   expect(screen.getByRole('button', { name: 'Collection 3' })).toBeInTheDocument();

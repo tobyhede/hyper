@@ -1,21 +1,21 @@
 import { useRef, useState } from 'react';
 import type { UUID } from '@project/core';
 import type { SpaceSummary } from '@project/persistence';
-import type { OpenedSpace } from './open-workspace';
+import type { OpenedSpace } from './open-space';
 
-interface WorkspaceSelectionProps {
+interface SpaceSelectionProps {
   spaces: readonly SpaceSummary[];
   openSelected: (id: UUID) => Promise<OpenedSpace>;
   onOpened: (opened: OpenedSpace) => void;
   onError: (error: unknown) => void;
 }
 
-export const WorkspaceSelection = ({
+export const SpaceSelection = ({
   spaces,
   openSelected,
   onOpened,
   onError,
-}: WorkspaceSelectionProps) => {
+}: SpaceSelectionProps) => {
   const opening = useRef(false);
   const [isOpening, setIsOpening] = useState(false);
 
@@ -27,10 +27,10 @@ export const WorkspaceSelection = ({
   };
 
   return (
-    <main className="workspace-selection">
-      <section className="workspace-selection__panel">
+    <main className="space-selection">
+      <section className="space-selection__panel">
         <h1>Choose a space</h1>
-        <div className="workspace-selection__choices" aria-busy={isOpening}>
+        <div className="space-selection__choices" aria-busy={isOpening}>
           {spaces.map((space) => (
             <button
               key={space.id}

@@ -27,9 +27,9 @@ import {
 import type { CanvasRenderers, CanvasRenderer } from '../canvas-renderers';
 import { canvasRendererKey, type CanvasRendererId } from '../renderer';
 
-export interface WorkspaceSidebarProps {
+export interface SpaceSidebarProps {
   /** The Space's title. The canvas header names what is drawing it (ADR 0053). */
-  readonly workspaceTitle: string;
+  readonly spaceTitle: string;
   readonly canvas: {
     /** The computed and authored rows `canvasRenderers` derives from the Space. */
     readonly renderers: CanvasRenderers;
@@ -77,7 +77,7 @@ export interface WorkspaceSidebarProps {
 
 /**
  * Keyed by the ids `core` ships, so a new built-in View is a compile error here
- * rather than a View the workspace quietly draws without a glyph.
+ * rather than a View the Sidebar quietly draws without a glyph.
  *
  * It stays here rather than moving beside the View's strategy and title:
  * exactly one module draws a row today, so a glyph declared next to the strategy
@@ -157,19 +157,19 @@ function NothingYet({ children, testId }: { readonly children: string; readonly 
 }
 
 /**
- * The workspace's command surface (ADR 0053).
+ * The Space's command surface (ADR 0053).
  *
  * Everything persistent lives here: what draws the canvas, which Graph is
  * active, Card creation, presenting, and how saving is going. The canvas header
  * carries only the trigger that reopens this and the name of what is drawing.
  */
-export function WorkspaceSidebar({
-  workspaceTitle,
+export function SpaceSidebar({
+  spaceTitle,
   canvas,
   graph,
   addCard,
   persistence,
-}: WorkspaceSidebarProps) {
+}: SpaceSidebarProps) {
   // Below the primitive's breakpoint this whole surface is a modal Sheet drawn
   // *over* the canvas, with a focus trap and everything behind it inert. Every
   // command here acts on the canvas, so every one of them dismisses the sheet
@@ -199,10 +199,10 @@ export function WorkspaceSidebar({
     !graph.presenting && (activeGraph === undefined || activeGraph.edges.length === 0);
 
   return (
-    <Sidebar collapsible="offcanvas" data-testid="workspace-sidebar">
+    <Sidebar collapsible="offcanvas" data-testid="space-sidebar">
       <SidebarHeader>
-        <h1 data-testid="workspace-title" className="truncate px-2 text-sm font-semibold">
-          {workspaceTitle}
+        <h1 data-testid="space-title" className="truncate px-2 text-sm font-semibold">
+          {spaceTitle}
         </h1>
       </SidebarHeader>
       <SidebarSeparator />

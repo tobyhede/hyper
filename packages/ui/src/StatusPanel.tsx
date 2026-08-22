@@ -33,9 +33,9 @@ export interface StatusFailureProps {
 }
 
 /**
- * Common accessible framing for a startup, workspace-render or placement
- * failure: an announced Alert holding the diagnostic detail in a bounded,
- * focusable region.
+ * Common accessible framing for a startup, render or placement failure: an
+ * announced Alert holding the diagnostic detail in a bounded, focusable
+ * region.
  *
  * The detail is bounded and scrolls, so it needs to take focus or a
  * keyboard-only reader cannot reach a long failure. Focusable scroll regions

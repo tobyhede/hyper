@@ -2,10 +2,10 @@ import { StrictMode, type ReactNode } from 'react';
 import type { UUID } from '@project/core';
 import type { SpaceSummary } from '@project/persistence';
 import { createAppRouter } from './router';
-import type { OpenedSpace } from './open-workspace';
-import { mountWorkspace } from './Workspace';
+import type { OpenedSpace } from './open-space';
+import { mountSpaceApp } from './SpaceApp';
 import { StartupFailure } from './components/StartupFailure';
-import { WorkspaceSelection } from './WorkspaceSelection';
+import { SpaceSelection } from './SpaceSelection';
 
 export interface ApplicationRoot {
   render(children: ReactNode): void;
@@ -24,10 +24,10 @@ export interface SelectionApplicationStartup {
 export type ApplicationStartupResult = OpenedApplicationStartup | SelectionApplicationStartup;
 
 export type ApplicationStartupResolver = () => Promise<ApplicationStartupResult>;
-export type WorkspaceSelectionOpener = (id: UUID) => Promise<OpenedSpace>;
+export type SpaceSelectionOpener = (id: UUID) => Promise<OpenedSpace>;
 
-const renderOpenedWorkspace = (root: ApplicationRoot, opened: OpenedSpace): void => {
-  mountWorkspace(opened, (app) => {
+const renderOpenedSpace = (root: ApplicationRoot, opened: OpenedSpace): void => {
+  mountSpaceApp(opened, (app) => {
     const AppRouter = createAppRouter(() => app);
     root.render(
       <StrictMode>
@@ -48,21 +48,21 @@ const renderStartupError = (root: ApplicationRoot, error: unknown): void => {
 export const startApplication = async (
   root: ApplicationRoot,
   resolveStartup: ApplicationStartupResolver,
-  openSelected?: WorkspaceSelectionOpener,
+  openSelected?: SpaceSelectionOpener,
 ): Promise<void> => {
   try {
     const startup = await resolveStartup();
     if (startup.kind === 'selection') {
       if (openSelected === undefined) {
-        throw new Error('No workspace selection opener was configured.');
+        throw new Error('No space selection opener was configured.');
       }
       root.render(
         <StrictMode>
-          <WorkspaceSelection
+          <SpaceSelection
             spaces={startup.spaces}
             openSelected={openSelected}
             onOpened={(opened) => {
-              renderOpenedWorkspace(root, opened);
+              renderOpenedSpace(root, opened);
             }}
             onError={(error) => {
               renderStartupError(root, error);
@@ -74,7 +74,7 @@ export const startApplication = async (
     }
 
     const { opened } = startup;
-    renderOpenedWorkspace(root, opened);
+    renderOpenedSpace(root, opened);
   } catch (error) {
     renderStartupError(root, error);
   }

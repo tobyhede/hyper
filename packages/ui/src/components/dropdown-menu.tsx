@@ -33,7 +33,7 @@ function DropdownMenuContent({
     <MenuPrimitive.Portal>
       <MenuPrimitive.Positioner
         // `z-50`, as every other portalled surface in this package carries:
-        // the workspace Sidebar's container is `fixed` at `z-10`, and a popup
+        // the Space Sidebar's container is `fixed` at `z-10`, and a popup
         // left at the auto stacking level opens behind it.
         className="z-50 outline-none"
         align={align}

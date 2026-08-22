@@ -4,7 +4,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import { uuidSchema } from '@project/core';
 import { PersistenceIndicator, SidebarProvider, SidebarTrigger } from '@project/ui';
 import type { CanvasRenderer } from '../src/canvas-renderers';
-import { WorkspaceSidebar, type WorkspaceSidebarProps } from '../src/components/WorkspaceSidebar';
+import { SpaceSidebar, type SpaceSidebarProps } from '../src/components/SpaceSidebar';
 
 const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const CARD_A = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
@@ -76,8 +76,8 @@ const LAYOUT: CanvasRenderer = {
   title: 'Layout 1',
 };
 
-const settledProps = (): WorkspaceSidebarProps => ({
-  workspaceTitle: 'Workspace',
+const settledProps = (): SpaceSidebarProps => ({
+  spaceTitle: 'Space',
   canvas: {
     renderers: { computed: [FLOW, GRID], authored: [] },
     current: FLOW,
@@ -104,17 +104,17 @@ const settledProps = (): WorkspaceSidebarProps => ({
   },
 });
 
-const withLayout = (props: WorkspaceSidebarProps): WorkspaceSidebarProps => ({
+const withLayout = (props: SpaceSidebarProps): SpaceSidebarProps => ({
   ...props,
   canvas: { ...props.canvas, renderers: { ...props.canvas.renderers, authored: [LAYOUT] } },
 });
 
-describe('WorkspaceSidebar', () => {
-  it('renders the persistent workspace commands and forwards Card creation', () => {
+describe('SpaceSidebar', () => {
+  it('renders the persistent Sidebar commands and forwards Card creation', () => {
     const props = settledProps();
-    draw(<WorkspaceSidebar {...props} />);
+    draw(<SpaceSidebar {...props} />);
 
-    expect(screen.getByTestId('workspace-title')).toHaveTextContent('Workspace');
+    expect(screen.getByTestId('space-title')).toHaveTextContent(/^Space$/);
     expect(screen.getByRole('button', { name: 'Flow' })).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByRole('button', { name: 'Present' })).toBeDisabled();
 
@@ -130,11 +130,11 @@ describe('WorkspaceSidebar', () => {
    */
   it('draws one exclusive canvas choice over Views and Layouts', () => {
     const base = withLayout(settledProps());
-    const props: WorkspaceSidebarProps = {
+    const props: SpaceSidebarProps = {
       ...base,
       canvas: { ...base.canvas, current: LAYOUT },
     };
-    draw(<WorkspaceSidebar {...props} />);
+    draw(<SpaceSidebar {...props} />);
 
     const pressed = screen
       .getAllByTestId('canvas-renderer')
@@ -164,7 +164,7 @@ describe('WorkspaceSidebar', () => {
     };
     expect(rebuilt).not.toBe(LAYOUT);
 
-    draw(<WorkspaceSidebar {...base} canvas={{ ...base.canvas, current: rebuilt }} />);
+    draw(<SpaceSidebar {...base} canvas={{ ...base.canvas, current: rebuilt }} />);
 
     const pressed = screen
       .getAllByTestId('canvas-renderer')
@@ -175,7 +175,7 @@ describe('WorkspaceSidebar', () => {
 
   it('forwards the selection', () => {
     const props = withLayout(settledProps());
-    draw(<WorkspaceSidebar {...props} />);
+    draw(<SpaceSidebar {...props} />);
 
     fireEvent.click(screen.getByRole('button', { name: 'Grid' }));
     expect(props.canvas.onSelect).toHaveBeenCalledWith({ kind: 'view', view: 'grid' });
@@ -186,7 +186,7 @@ describe('WorkspaceSidebar', () => {
 
   /** A Space authors its first Layout by editing a View (ADR 0025), so this is how it opens. */
   it('says a Space owns no Layout yet rather than offering an empty value', () => {
-    draw(<WorkspaceSidebar {...settledProps()} />);
+    draw(<SpaceSidebar {...settledProps()} />);
 
     expect(screen.getByTestId('no-authored-layouts')).toBeVisible();
     expect(screen.getByTestId('no-graphs')).toBeVisible();
@@ -194,7 +194,7 @@ describe('WorkspaceSidebar', () => {
 
   it('activates a Graph and colours its glyph from the resolved colour', () => {
     const base = settledProps();
-    const props: WorkspaceSidebarProps = {
+    const props: SpaceSidebarProps = {
       ...base,
       graph: {
         ...base.graph,
@@ -202,7 +202,7 @@ describe('WorkspaceSidebar', () => {
         activeGraphId: GRAPH_ID,
       },
     };
-    draw(<WorkspaceSidebar {...props} />);
+    draw(<SpaceSidebar {...props} />);
 
     const choice = screen.getByTestId('graph-choice');
     expect(choice).toHaveAttribute('aria-pressed', 'true');
@@ -221,7 +221,7 @@ describe('WorkspaceSidebar', () => {
    */
   it('cannot present an active Graph that holds no Edges', () => {
     const base = settledProps();
-    const props: WorkspaceSidebarProps = {
+    const props: SpaceSidebarProps = {
       ...base,
       graph: {
         ...base.graph,
@@ -229,7 +229,7 @@ describe('WorkspaceSidebar', () => {
         activeGraphId: GRAPH_ID,
       },
     };
-    draw(<WorkspaceSidebar {...props} />);
+    draw(<SpaceSidebar {...props} />);
 
     const present = screen.getByRole('button', { name: 'Present Graph 1' });
     expect(present).toBeDisabled();
@@ -239,7 +239,7 @@ describe('WorkspaceSidebar', () => {
 
   it('exits presenting through the Overview action', () => {
     const base = settledProps();
-    const props: WorkspaceSidebarProps = {
+    const props: SpaceSidebarProps = {
       ...base,
       graph: {
         ...base.graph,
@@ -248,7 +248,7 @@ describe('WorkspaceSidebar', () => {
         presenting: true,
       },
     };
-    draw(<WorkspaceSidebar {...props} />);
+    draw(<SpaceSidebar {...props} />);
 
     fireEvent.click(screen.getByRole('button', { name: 'Overview' }));
 
@@ -258,7 +258,7 @@ describe('WorkspaceSidebar', () => {
 
   it('names and colours Present with the active Graph', () => {
     const base = settledProps();
-    const props: WorkspaceSidebarProps = {
+    const props: SpaceSidebarProps = {
       ...base,
       graph: {
         ...base.graph,
@@ -273,7 +273,7 @@ describe('WorkspaceSidebar', () => {
         activeGraphId: GRAPH_ID,
       },
     };
-    draw(<WorkspaceSidebar {...props} />);
+    draw(<SpaceSidebar {...props} />);
 
     const present = screen.getByRole('button', { name: 'Present Authored' });
     expect(present).toBeEnabled();
@@ -294,19 +294,19 @@ describe('WorkspaceSidebar', () => {
     beforeEach(() => stubViewport(true));
     afterEach(() => stubViewport(false));
 
-    const openSheet = (props: WorkspaceSidebarProps) => {
+    const openSheet = (props: SpaceSidebarProps) => {
       render(
         <SidebarProvider>
-          <WorkspaceSidebar {...props} />
+          <SpaceSidebar {...props} />
           <SidebarTrigger />
         </SidebarProvider>,
       );
       fireEvent.click(screen.getByRole('button', { name: 'Toggle Sidebar' }));
-      expect(screen.getByTestId('workspace-title')).toBeVisible();
+      expect(screen.getByTestId('space-title')).toBeVisible();
     };
 
     const dismissed = () =>
-      waitFor(() => expect(screen.queryByTestId('workspace-title')).not.toBeInTheDocument());
+      waitFor(() => expect(screen.queryByTestId('space-title')).not.toBeInTheDocument());
 
     it('dismisses itself when Card creation opens an editor on the canvas', async () => {
       const props = settledProps();
@@ -330,7 +330,7 @@ describe('WorkspaceSidebar', () => {
 
     it('dismisses itself when a Graph is activated', async () => {
       const base = settledProps();
-      const props: WorkspaceSidebarProps = {
+      const props: SpaceSidebarProps = {
         ...base,
         graph: {
           ...base.graph,
@@ -348,7 +348,7 @@ describe('WorkspaceSidebar', () => {
 
     it('dismisses itself when presenting begins', async () => {
       const base = settledProps();
-      const props: WorkspaceSidebarProps = {
+      const props: SpaceSidebarProps = {
         ...base,
         graph: {
           ...base.graph,
@@ -368,13 +368,13 @@ describe('WorkspaceSidebar', () => {
   /** Status is not a command, so it sits outside every list rather than inside one. */
   it('keeps persistence feedback out of the choice lists', () => {
     const props = withLayout(settledProps());
-    const { rerender } = draw(<WorkspaceSidebar {...props} />);
+    const { rerender } = draw(<SpaceSidebar {...props} />);
 
     expect(screen.queryByRole('button', { name: 'Changes saved' })).not.toBeInTheDocument();
 
     rerender(
       <SidebarProvider>
-        <WorkspaceSidebar
+        <SpaceSidebar
           {...props}
           persistence={{
             control: <PersistenceIndicator state="pending" />,

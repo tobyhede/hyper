@@ -8,7 +8,7 @@ describe('StatusFailure', () => {
       <StatusFailure
         title="Unable to open this space"
         detail="The backend could not load space 00000000-0000-4000-8000-000000000001"
-        detailLabel="Workspace failure detail"
+        detailLabel="Space app failure detail"
       />,
     );
 
@@ -53,12 +53,12 @@ describe('StatusFailure', () => {
       <StatusFailure
         title="Unable to open this space"
         detail="boom"
-        detailLabel="Workspace failure detail"
-        testId="workspace-failure"
+        detailLabel="Space app failure detail"
+        testId="space-app-failure"
       />,
     );
 
-    expect(screen.getByTestId('workspace-failure')).toHaveAttribute('role', 'alert');
+    expect(screen.getByTestId('space-app-failure')).toHaveAttribute('role', 'alert');
   });
 
   it('exposes the title as a heading, so it is reachable by heading navigation', () => {
@@ -107,7 +107,7 @@ describe('StatusFailure', () => {
       <StatusFailure
         title="Unable to open this space"
         detail="boom"
-        detailLabel="Workspace failure detail"
+        detailLabel="Space app failure detail"
       />,
     );
 

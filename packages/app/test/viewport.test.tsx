@@ -3,14 +3,14 @@ import { beforeAll, afterAll, describe, expect, it, vi } from 'vitest';
 import { spaceSnapshotSchema, uuidSchema, type SpaceSnapshot } from '@project/core';
 import { loadSpaceSnapshot } from '@project/graph';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
-import { mountWorkspace } from '../src/Workspace';
+import { mountSpaceApp } from '../src/SpaceApp';
 
 /**
  * React Flow positions the whole graph with one viewport transform, and derives
  * everything else from its scale — `Background`'s pattern geometry included.
  *
  * `fitView` computes that scale by dividing the container's size by the bounds of
- * the nodes. Remounting the workspace runs it again, and a Card carries declared
+ * the nodes. Remounting the Space app runs it again, and a Card carries declared
  * dimensions (`projection.ts`) so it is measured immediately — which means the
  * division can happen before the container has been measured at all. Zero over
  * zero is `NaN`, and a `NaN` scale renders the graph nowhere.
@@ -77,8 +77,8 @@ const viewportTransform = (): string =>
 
 describe('graph viewport', () => {
   it('keeps a finite scale when accepted remote placement replaces live nodes', async () => {
-    const local = snapshot('Local workspace', 'Local card', 10, 20);
-    const remote = snapshot('Remote workspace', 'Remote card', 900, 700);
+    const local = snapshot('Local space', 'Local card', 10, 20);
+    const remote = snapshot('Remote space', 'Remote card', 900, 700);
     const backend = new MemorySpaceBackend([
       { snapshot: remote, revision: 4n, exportedRevision: null },
     ]);
@@ -100,15 +100,15 @@ describe('graph viewport', () => {
     });
 
     let view: RenderResult | undefined;
-    mountWorkspace({ space: runtime(local), spaceSession: session }, (app) => {
+    mountSpaceApp({ space: runtime(local), spaceSession: session }, (app) => {
       if (view === undefined) view = render(app);
       else view.rerender(app);
     });
-    await screen.findByText('Local workspace');
+    await screen.findByText('Local space');
     expect(viewportTransform()).not.toMatch(/NaN/);
 
     fireEvent.click(screen.getByTestId('persistence-accept-remote'));
-    await screen.findByText('Remote workspace');
+    await screen.findByText('Remote space');
 
     expect(viewportTransform()).not.toMatch(/NaN/);
   });

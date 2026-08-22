@@ -70,18 +70,18 @@ describe('Sidebar', () => {
     stubViewport(true);
     render(
       <SidebarProvider>
-        <Sidebar data-testid="workspace-sidebar">Commands</Sidebar>
+        <Sidebar data-testid="sidebar-under-test">Commands</Sidebar>
         <SidebarTrigger />
       </SidebarProvider>,
     );
 
     fireEvent.click(screen.getByRole('button', { name: 'Toggle Sidebar' }));
 
-    const mobileSidebar = await screen.findByTestId('workspace-sidebar');
+    const mobileSidebar = await screen.findByTestId('sidebar-under-test');
     expect(mobileSidebar).toBeVisible();
     expect(mobileSidebar).not.toHaveClass('[&>button]:hidden');
     fireEvent.click(screen.getByRole('button', { name: 'Close' }));
-    await waitFor(() => expect(screen.queryByTestId('workspace-sidebar')).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByTestId('sidebar-under-test')).not.toBeInTheDocument());
   });
 
   it('takes skeleton width from its composer instead of generating it during render', () => {

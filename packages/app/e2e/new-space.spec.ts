@@ -405,7 +405,7 @@ test('persists a completed edit through the backend session', async ({ page }) =
   await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
 });
 
-test('a completed edit and workspace identity survive reload', async ({ page }) => {
+test('a completed edit and space identity survive reload', async ({ page }) => {
   await page.goto('/');
   const first = nodeByTitle(page, 'Card 1');
   await expect(first).toBeVisible();
@@ -429,8 +429,8 @@ test('a completed edit and workspace identity survive reload', async ({ page }) 
 });
 
 /**
- * `openStoredWorkspace` validates the backend's response before opening it
- * (`open-workspace.ts`) — a real backend can return a snapshot referencing a
+ * `openStoredSpace` validates the backend's response before opening it
+ * (`open-space.ts`) — a real backend can return a snapshot referencing a
  * card it does not hold (a partial write, a migration gap), and this proves
  * that reaches `StartupFailure` rather than an unhandled rejection. The
  * response is wire-valid (it parses as a `SpaceSnapshot`) and only fails

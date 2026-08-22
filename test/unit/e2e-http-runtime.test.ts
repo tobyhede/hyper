@@ -20,7 +20,7 @@ describe('e2e HTTP runtime', () => {
       { id: FIXTURE_ID, title: 'Layout fixture' },
     ]);
     const loaded = await first.loadSpace(FIXTURE_ID);
-    if (loaded === undefined) throw new Error('Expected fixture workspace');
+    if (loaded === undefined) throw new Error('Expected fixture space');
     expect(loaded.snapshot.id).toBe(FIXTURE_ID);
     const changed = {
       ...loaded.snapshot,

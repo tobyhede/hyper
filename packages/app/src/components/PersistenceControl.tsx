@@ -68,7 +68,7 @@ export interface PersistenceNoticeProps {
  * persistence state that is neither fine nor final.
  *
  * It is not a dialog on purpose. A retryable failure leaves the local work
- * intact and the workspace fully usable — the author can keep editing, and the
+ * intact and the canvas fully usable — the author can keep editing, and the
  * next commit may succeed on its own — so blocking the canvas would overstate
  * it. Contrast the two dialogs above: a conflict has no safe dismissal and a
  * rejection needs acknowledging.
@@ -112,7 +112,7 @@ function ConflictControl({
     // itself, so every close reason (Escape included — AlertDialog's
     // `disablePointerDismissal` only blocks outside-press) is ignored until
     // Reload or Keep local and retry is chosen. Contrast RejectionControl below, which honors
-    // onOpenChange because rejection returns to an unchanged, safe workspace.
+    // onOpenChange because rejection returns to an unchanged, safe Space.
     <AlertDialog open onOpenChange={() => undefined}>
       <AlertDialogContent>
         <AlertDialogHeader>

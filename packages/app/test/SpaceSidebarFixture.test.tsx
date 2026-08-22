@@ -2,11 +2,11 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { loadSpaceSnapshot } from '@project/graph';
 import { editedSnapshot } from '../stories/support/spaces';
-import { WorkspaceSidebarFixture } from '../stories/support/WorkspaceSidebarFixture';
+import { SpaceSidebarFixture } from '../stories/support/SpaceSidebarFixture';
 
 /**
  * jsdom ships none, and the Sidebar primitive observes its own container.
- * `WorkspaceSidebar.test.tsx` installs the same stub for the same reason.
+ * `SpaceSidebar.test.tsx` installs the same stub for the same reason.
  */
 beforeAll(() => {
   vi.stubGlobal(
@@ -36,16 +36,16 @@ afterAll(() => vi.unstubAllGlobals());
  * the fixture's props, which is two problems at once — React is free to discard
  * a memo, since a memo is a caching hint rather than a place to keep state, and
  * a key that changes rebuilds it outright. Either way every click the spec had
- * already made is silently undone, and the story then draws a workspace nobody
+ * already made is silently undone, and the story then draws a Space nobody
  * navigated to.
  */
-describe('the workspace sidebar story fixture', () => {
+describe('the Space Sidebar story fixture', () => {
   it('keeps the renderer a story selected when a prop changes under it', () => {
-    const { rerender } = render(<WorkspaceSidebarFixture />);
+    const { rerender } = render(<SpaceSidebarFixture />);
     fireEvent.click(screen.getByRole('button', { name: 'Collection 2' }));
     expect(screen.getByTestId('selected-canvas')).toHaveTextContent('Collection 2');
 
-    rerender(<WorkspaceSidebarFixture presenting />);
+    rerender(<SpaceSidebarFixture presenting />);
 
     expect(screen.getByTestId('selected-canvas')).toHaveTextContent('Collection 2');
   });
@@ -60,13 +60,13 @@ describe('the workspace sidebar story fixture', () => {
    * exit while a traversal is on, and `Present` otherwise.
    */
   it('still starts and ends presenting when the prop that says so changes', () => {
-    const { rerender } = render(<WorkspaceSidebarFixture />);
+    const { rerender } = render(<SpaceSidebarFixture />);
     expect(screen.getByTestId('present-button')).toBeInTheDocument();
 
-    rerender(<WorkspaceSidebarFixture presenting />);
+    rerender(<SpaceSidebarFixture presenting />);
     expect(screen.getByTestId('exit-presenting-button')).toBeInTheDocument();
 
-    rerender(<WorkspaceSidebarFixture />);
+    rerender(<SpaceSidebarFixture />);
     expect(screen.getByTestId('present-button')).toBeInTheDocument();
   });
 
@@ -82,7 +82,7 @@ describe('the workspace sidebar story fixture', () => {
    * `Collection 3` against a Space with two Layouts and throw
    * `resolveRenderer`'s own refusal.
    *
-   * `RetryableWorkspaceSidebarFixture` is the case in the catalogue: its Space
+   * `RetryableSpaceSidebarFixture` is the case in the catalogue: its Space
    * changes under the story when the session's submission lands. It supplies a
    * stable `currentSpace` of its own and so never depended on this — which is
    * exactly why nothing would have reported the loss.
@@ -91,8 +91,8 @@ describe('the workspace sidebar story fixture', () => {
     const edited = loadSpaceSnapshot(editedSnapshot);
     if (!edited.ok) throw new Error(edited.errors.map((error) => error.message).join('\n'));
 
-    const { rerender } = render(<WorkspaceSidebarFixture />);
-    rerender(<WorkspaceSidebarFixture space={edited.space} />);
+    const { rerender } = render(<SpaceSidebarFixture />);
+    rerender(<SpaceSidebarFixture space={edited.space} />);
 
     fireEvent.click(screen.getByRole('button', { name: 'Collection 3' }));
 

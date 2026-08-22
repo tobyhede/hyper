@@ -14,8 +14,8 @@ export interface OpenedSpace {
   spaceSession: SpaceSession;
 }
 
-/** Open one exact workspace already stored by the configured backend. */
-export const openStoredWorkspace = async (
+/** Open one exact Space already stored by the configured backend. */
+export const openStoredSpace = async (
   spaceBackend: SpaceBackend,
   id: UUID,
 ): Promise<OpenedSpace> => {
@@ -34,8 +34,8 @@ export const openStoredWorkspace = async (
   };
 };
 
-/** Import files into the configured backend, then open its first workspace. */
-export const openImportedWorkspace = async (
+/** Import files into the configured backend, then open its first Space. */
+export const openImportedSpace = async (
   spaceFile: unknown,
   cardFiles: readonly CardFile[],
 ): Promise<OpenedSpace> => {
@@ -53,5 +53,5 @@ export const openImportedWorkspace = async (
     },
   ]);
 
-  return openStoredWorkspace(spaceBackend, imported.space.id);
+  return openStoredSpace(spaceBackend, imported.space.id);
 };

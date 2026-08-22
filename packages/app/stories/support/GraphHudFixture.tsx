@@ -16,7 +16,7 @@ import { authoredSpace } from './spaces';
  *
  * `graphColorMap` is the application's own resolution and `GraphHud` reads it
  * through the shared `graphColor` seam the Sidebar reads — so a colour on screen
- * here is one the workspace would agree with, rather than a hex literal a
+ * here is one the Space app would agree with, rather than a hex literal a
  * fixture chose. The Graphs are the tracked story Space's, flattened across its
  * Layouts in declared order exactly as `space.graphs` is.
  */
@@ -66,7 +66,7 @@ export interface GraphHudFixtureProps {
    * Which Graph is emphasised.
    *
    * A fixture input, and deliberately not a control: activation belongs to the
-   * workspace Sidebar, and a story-only button that moved the emphasis would be
+   * Space Sidebar, and a story-only button that moved the emphasis would be
    * evidence of the button rather than of the HUD. That the two surfaces agree
    * *through* an activation is the paired application evidence's claim (ADR
    * 0052), in `overview.spec.ts`.
@@ -80,7 +80,7 @@ export interface GraphHudFixtureProps {
  * Nothing is replaced or stubbed: this is `<ReactFlow>` with actual nodes and
  * React Flow's own MiniMap drawing them. The one thing the fixture supplies
  * beyond the Space is the viewport the canvas is given, because a story frame
- * has no workspace around it to size one.
+ * has no Space app around it to size one.
  */
 export function GraphHudFixture({ activeGraphId = openingGraph() }: GraphHudFixtureProps) {
   const activeGraphCardIds = new Set(

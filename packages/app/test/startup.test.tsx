@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { afterAll, beforeAll, expect, it } from 'vitest';
 import { spaceSnapshotSchema, uuidSchema, type SpaceSnapshot } from '@project/core';
 import { MemorySpaceBackend } from '@project/persistence';
-import { openStoredWorkspace } from '../src/open-workspace';
+import { openStoredSpace } from '../src/open-space';
 import { startApplication } from '../src/startup';
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
@@ -58,7 +58,7 @@ it('mounts an opened startup result', async () => {
   document.body.append(container);
   const root = createRoot(container);
   const backend = new MemorySpaceBackend([{ snapshot, revision: 0n, exportedRevision: null }]);
-  const opened = await openStoredWorkspace(backend, SPACE_ID);
+  const opened = await openStoredSpace(backend, SPACE_ID);
 
   try {
     await act(async () => {
@@ -73,7 +73,7 @@ it('mounts an opened startup result', async () => {
   }
 });
 
-it('renders every database workspace title and UUID as an accessible choice', async () => {
+it('renders every stored space title and UUID as an accessible choice', async () => {
   const container = document.createElement('div');
   document.body.append(container);
   const root = createRoot(container);
@@ -94,7 +94,7 @@ it('renders every database workspace title and UUID as an accessible choice', as
               { id: OTHER_SPACE_ID, title: 'Release walkthrough' },
             ],
           }),
-        (id) => openStoredWorkspace(backend, id),
+        (id) => openStoredSpace(backend, id),
       );
     });
 
@@ -114,7 +114,7 @@ it('renders every database workspace title and UUID as an accessible choice', as
   }
 });
 
-it('opens and mounts the exact workspace UUID chosen from the catalog', async () => {
+it('opens and mounts the exact space UUID chosen from the catalog', async () => {
   const container = document.createElement('div');
   document.body.append(container);
   const root = createRoot(container);
@@ -135,7 +135,7 @@ it('opens and mounts the exact workspace UUID chosen from the catalog', async ()
               { id: OTHER_SPACE_ID, title: 'Exact selected space' },
             ],
           }),
-        (id) => openStoredWorkspace(backend, id),
+        (id) => openStoredSpace(backend, id),
       );
     });
 
@@ -158,7 +158,7 @@ it('opens and mounts the exact workspace UUID chosen from the catalog', async ()
   }
 });
 
-it('allows only one workspace selection to open at a time', async () => {
+it('allows only one space selection to open at a time', async () => {
   const container = document.createElement('div');
   document.body.append(container);
   const root = createRoot(container);
@@ -185,7 +185,7 @@ it('allows only one workspace selection to open at a time', async () => {
           }),
         async (id) => {
           await firstOpenGate;
-          return openStoredWorkspace(backend, id);
+          return openStoredSpace(backend, id);
         },
       );
     });
@@ -237,7 +237,7 @@ it('renders the complete startup error when the chosen UUID has disappeared', as
             kind: 'selection',
             spaces: [{ id: SPACE_ID, title: 'Disappeared space' }],
           }),
-        (id) => openStoredWorkspace(backend, id),
+        (id) => openStoredSpace(backend, id),
       );
     });
 

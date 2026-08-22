@@ -2,13 +2,13 @@ import type { ReactNode } from 'react';
 import { SidebarInset, SidebarProvider, SidebarTrigger } from './components/sidebar';
 
 export interface AppShellProps {
-  /** The workspace's own `Sidebar`: the persistent command surface (ADR 0053). */
+  /** The application's own `Sidebar`: the persistent command surface (ADR 0053). */
   sidebar: ReactNode;
   /** What the canvas header says beside the sidebar trigger — the current canvas. */
   header?: ReactNode;
   /**
    * Standing chrome pinned to the top right of the main area, directly under
-   * the canvas header. For a condition the workspace stays usable through — one
+   * the canvas header. For a condition the canvas stays usable through — one
    * the chrome can only point at, and a dialog would overstate by blocking the
    * work that caused it.
    */
@@ -21,7 +21,7 @@ export interface AppShellProps {
  *
  * The header is the inset's, not the page's, so it survives the sidebar being
  * closed and keeps the one control that reopens it. It deliberately carries no
- * Space title: the sidebar header names the workspace and this names what is
+ * Space title: the sidebar header names the Space and this names what is
  * drawing it (ADR 0053).
  */
 export function AppShell({ sidebar, header, notice, children }: AppShellProps) {

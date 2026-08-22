@@ -415,7 +415,7 @@ describe('the canvas renderer is named once (ADR 0055)', () => {
     // held one identifier over two things, and the agent-facing document that
     // pointed at a deleted module. A file list that quietly stopped resolving
     // would report nothing forever.
-    expect(scanned).toContain('packages/app/src/components/WorkspaceSidebar.tsx');
+    expect(scanned).toContain('packages/app/src/components/SpaceSidebar.tsx');
     expect(scanned).toContain('docs/agents/ui.md');
     expect(scanned.filter((file) => file.endsWith('.tsx')).length).toBeGreaterThan(0);
   });
