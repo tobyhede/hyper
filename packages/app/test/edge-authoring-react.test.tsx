@@ -3,21 +3,16 @@ import { useContext, type ReactNode } from 'react';
 import { Position, ReactFlowProvider, type Edge } from '@xyflow/react';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { uuidSchema, type SpaceSnapshot } from '@project/core';
-import { inHandleId, loadSpaceSnapshot, outHandleId, Placement } from '@project/graph';
+import { inHandleId, outHandleId, Placement } from '@project/graph';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
 import type { CardFlowNode } from '@project/react-flow-adapter';
 import { AddCardControl, PersistenceIndicator, SidebarProvider } from '@project/ui';
 import type { CanvasRenderer } from '../src/canvas-renderers';
-import { createNavigation } from '../src/navigation';
-import { createRenderAdapter, edgeSelectionOf } from '../src/render-adapter';
-import {
-  createConnectionCompletion,
-  type ConnectionCompletion,
-} from '../src/connection-completion';
-import { createEdgeAuthoring } from '../src/edge-authoring';
+import { composeApp, type EdgeCollaborators } from '../src/compose-app';
+import { edgeSelectionOf } from '../src/render-adapter';
+import type { ConnectionCompletion } from '../src/connection-completion';
 import { useEdgeAuthoring } from '../src/edge-authoring-react';
-import { createSpaceAuthoring } from '../src/space-authoring';
-import { createRendererResolver } from '../src/renderer';
+import { mintingGraphIds } from './minting';
 import { SpaceCanvas } from '../src/components/SpaceCanvas';
 import { EdgeAuthoringContext } from '../src/components/edge-authoring-context';
 import { WorkspaceSidebar } from '../src/components/WorkspaceSidebar';
@@ -39,6 +34,8 @@ const CARD_C = uuidSchema.parse('00000000-0000-4000-8000-000000000007');
 const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
 const OTHER_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
 const LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000021');
+/** Named, never reached: this composition opens on a Layout, so nothing converts. */
+const MINTED_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000041');
 
 const EDGE = { from: CARD_A, to: CARD_B } as const;
 /** The one row this chrome draws, named so `selected` can be that very value. */
@@ -176,42 +173,43 @@ const EDGES = [
  *
  * `connections` is overridable because `ConnectionCompletion` is a declared
  * dependency of `createEdgeAuthoring`, and one refusal channel is reachable
- * only through it: a code about the *subject* rather than the choice needs a
- * Layout whose Active Graph has left it, which no gesture over this Space's one
- * Layout can produce. Everything else composes the real collaborator.
+ * only through it. `layout-active-graph-required` is the sole refusal that can
+ * reach `connect-form-refusal` on a connect gesture — the others are
+ * `correctableByCardChoice` and mark the Target field instead (ADR 0057,
+ * `authoring-refusal.ts`) — and it needs a selected Layout whose Active Graph
+ * the Layout does not own. **No legal Space can be in that state**, not merely
+ * no gesture over this fixture: `spaceFileSchema` gives a Layout
+ * `graphs: z.array(graphSchema).min(1)` (`core/src/schema.ts`, asserted by
+ * `core/test/persistence-schema.test.ts`), `ResolvedLayout.activeGraph`
+ * resolves named-or-first and is never null, Navigation writes only an Active
+ * Graph the selected renderer's subject holds, and Graph deletion refuses the
+ * last one (`layout-must-keep-graph`).
+ *
+ * So the stand-in is what exercises the channel at all, and the alternative —
+ * arranging the fixture so the real completion refuses this way — is not
+ * available. Everything else composes the real collaborator; only the one test
+ * at the bottom of this file passes anything here.
  */
-function compose({ connections }: { connections?: ConnectionCompletion | undefined } = {}) {
+function compose({
+  connections,
+}: {
+  connections?: ((collaborators: EdgeCollaborators) => ConnectionCompletion) | undefined;
+} = {}) {
   const loaded = { snapshot, revision: 0n, exportedRevision: null };
   const session = openSpaceSession(new MemorySpaceBackend([loaded]), loaded);
-  const currentSpace = () => {
-    const result = loadSpaceSnapshot(session.getState().working);
-    if (!result.ok) throw new Error(result.errors.map((error) => error.message).join('; '));
-    return result.space;
-  };
-  const resolveRenderer = createRendererResolver({
-    newGraphId: () => uuidSchema.parse('00000000-0000-4000-8000-0000000000ff'),
-  });
-  const selection = { kind: 'layout', layoutId: LAYOUT_ID } as const;
-  const navigation = createNavigation(currentSpace, resolveRenderer, selection);
-  const authoring = createSpaceAuthoring({
-    session,
-    navigation,
-    currentSpace,
-    resolveRenderer,
+  const composed = composeApp({
+    spaceSession: session,
+    selection: { kind: 'layout', layoutId: LAYOUT_ID },
+    newGraphId: mintingGraphIds(MINTED_GRAPH_ID),
     initialPlacement: Placement.fromEntries([
       [CARD_A, { x: 0, y: 0 }],
       [CARD_B, { x: 400, y: 0 }],
       [CARD_C, { x: 800, y: 0 }],
     ]),
+    connections,
   });
-  const adapter = createRenderAdapter(authoring);
-  const edgeAuthoring = createEdgeAuthoring({
-    authoring,
-    adapter,
-    connections: connections ?? createConnectionCompletion({ adapter, authoring }),
-  });
-  adapter.getState().syncProjection(NODES, EDGES);
-  return { session, navigation, authoring, adapter, edgeAuthoring, currentSpace };
+  composed.adapter.getState().syncProjection(NODES, EDGES);
+  return { session, ...composed };
 }
 
 const graphsOf = (working: SpaceSnapshot) =>
@@ -273,7 +271,7 @@ function mountCanvas(
   }: {
     covered?: boolean;
     presenting?: boolean;
-    connections?: ConnectionCompletion | undefined;
+    connections?: ((collaborators: EdgeCollaborators) => ConnectionCompletion) | undefined;
   } = {},
 ) {
   const composed = compose({ connections });
@@ -1078,10 +1076,10 @@ describe('announcing a refusal', () => {
    */
   it('says a refusal no Card choice could answer beneath the field, not on it', () => {
     const { edgeAuthoring } = mountCanvas(null, {
-      connections: {
+      connections: () => ({
         connect: () => ({ kind: 'refused', refusal: { code: 'layout-active-graph-required' } }),
         createAndConnect: () => ({ kind: 'unavailable' }),
-      },
+      }),
     });
 
     act(() => edgeAuthoring.beginKeyboardConnect(CARD_A));

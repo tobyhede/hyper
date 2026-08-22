@@ -1,5 +1,4 @@
 import {
-  newUuid,
   type CardDocument,
   type CardId,
   type Graph,
@@ -364,7 +363,7 @@ interface SpaceAuthoringDependencies {
    */
   readonly resolveRenderer: ResolveRenderer;
   readonly initialPlacement?: Placement | null;
-  readonly reportObserverError?: ObserverErrorReporter;
+  readonly reportObserverError?: ObserverErrorReporter | undefined;
   /**
    * Mints the identity of every Card, Layout and Graph a completed Edit creates.
    *
@@ -384,8 +383,12 @@ interface SpaceAuthoringDependencies {
    * One function for all three kinds, because they are one type — the ids of
    * different entity kinds may legally share a UUID (ADR 0030) — and because
    * what a test needs to say is *which ids this Edit mints, in order*.
+   *
+   * Required, not defaulted: `compose-app.ts` states what an opened Space is
+   * composed of, and a collaborator that quietly falls back to `newUuid` puts a
+   * second source of minted identity behind the one the composition names.
    */
-  readonly newId?: () => UUID;
+  readonly newId: () => UUID;
 }
 
 /** The Cards a snapshot carries, in the shape a snapshot carries them. */
@@ -606,7 +609,7 @@ export function createSpaceAuthoring({
   resolveRenderer,
   initialPlacement = null,
   reportObserverError = (error) => console.error('SpaceAuthoring observer failed', error),
-  newId = newUuid,
+  newId,
 }: SpaceAuthoringDependencies): SpaceAuthoring {
   let placement: Placement | null = initialPlacement;
   let replacementEpoch = 0;

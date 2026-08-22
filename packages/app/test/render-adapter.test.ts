@@ -1,21 +1,20 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Position, type Edge } from '@xyflow/react';
 import { uuidSchema, type LayoutPosition, type SpaceSnapshot, type UUID } from '@project/core';
-import { loadSpaceSnapshot, Placement } from '@project/graph';
+import { Placement } from '@project/graph';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
 import type { CardFlowNode } from '@project/react-flow-adapter';
-import { mintingIds } from './minting';
-import { createNavigation } from '../src/navigation';
+import { mintingGraphIds, mintingIds } from './minting';
+import { composeApp } from '../src/compose-app';
 import { createRenderAdapter, type RenderAdapter } from '../src/render-adapter';
 import { createConnectionCompletion } from '../src/connection-completion';
-import {
-  createSpaceAuthoring,
-  type AuthoringResult,
-  type EdgeEligibility,
-  type EdgeProposal,
-  type SpaceAuthoring,
+import type {
+  AuthoringResult,
+  EdgeEligibility,
+  EdgeProposal,
+  SpaceAuthoring,
 } from '../src/space-authoring';
-import { createRendererResolver, type CanvasRendererId } from '../src/renderer';
+import type { CanvasRendererId } from '../src/renderer';
 import { completeDrag, moving, node, settled } from './render-adapter-fixtures';
 
 const CARD_A = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
@@ -25,6 +24,8 @@ const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
 const LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000021');
 const CREATED_CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000006');
+/** Named, never reached: these compositions open on a Layout, so nothing converts. */
+const MINTED_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000041');
 
 const PROJECTED = [node(CARD_A, 10, 20), node(CARD_B, 300, 20)];
 const SPARSE_PROJECTED = [...PROJECTED, node(CARD_C, 600, 20)];
@@ -121,21 +122,19 @@ function connections(
   return createConnectionCompletion({ adapter: store, authoring, reportInvariant });
 }
 
-/** The two `createSpaceAuthoring` options `sessionBackedAdapter` forwards, present only when given. */
-interface SessionBackedAdapterExtras {
-  initialPlacement?: Placement;
-  newId?: () => UUID;
-}
-
 /**
  * A real Session, Navigation and Authoring behind one render adapter. The spy
  * above answers what the adapter was *told*; this answers what a Space ends up
  * holding, so the two are not interchangeable.
+ *
+ * `initialPlacement` is `null` rather than absent, because these cases install
+ * whatever geometry they are about; absent, the composition would open on the
+ * selected Layout's own map (ADR 0025), which is a different starting state.
  */
 function sessionBackedAdapter(
   snapshot: SpaceSnapshot,
   renderer: CanvasRendererId,
-  initialPlacement?: Placement,
+  initialPlacement: Placement | null = null,
   /** A newer stored state, so the first commit conflicts rather than settling. */
   stored?: SpaceSnapshot,
   /** The ids this workspace's Edits mint, supplied rather than mocked. */
@@ -146,26 +145,14 @@ function sessionBackedAdapter(
     stored === undefined ? loaded : { snapshot: stored, revision: 1n, exportedRevision: null },
   ]);
   const session = openSpaceSession(backend, loaded);
-  const currentSpace = () => {
-    const result = loadSpaceSnapshot(session.getState().working);
-    if (!result.ok) throw new Error(result.errors.map((error) => error.message).join('; '));
-    return result.space;
-  };
-  const resolveRenderer = createRendererResolver({
-    newGraphId: () => uuidSchema.parse('00000000-0000-4000-8000-0000000000ff'),
+  const { authoring, adapter } = composeApp({
+    spaceSession: session,
+    selection: renderer,
+    newGraphId: mintingGraphIds(MINTED_GRAPH_ID),
+    initialPlacement,
+    newId,
   });
-  const navigation = createNavigation(currentSpace, resolveRenderer, renderer);
-  const extras: SessionBackedAdapterExtras = {};
-  if (initialPlacement !== undefined) extras.initialPlacement = initialPlacement;
-  if (newId !== undefined) extras.newId = newId;
-  const authoring = createSpaceAuthoring({
-    session,
-    navigation,
-    currentSpace,
-    resolveRenderer,
-    ...extras,
-  });
-  return { session, authoring, store: createRenderAdapter(authoring) };
+  return { session, authoring, store: adapter };
 }
 
 /**

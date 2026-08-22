@@ -4,10 +4,10 @@ import { uuidSchema, type Card, type Graph, type Layout, type SpaceSnapshot } fr
 import { loadSpaceSnapshot, Placement } from '@project/graph';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
 import { GRAPH_PALETTE } from '../src/colors';
-import { createNavigation } from '../src/navigation';
+import { composeApp } from '../src/compose-app';
 import type { AuthoringCompletion, AuthoringResult } from '../src/space-authoring';
-import { createSpaceAuthoring } from '../src/space-authoring';
-import { createRendererResolver, type CanvasRendererId } from '../src/renderer';
+import type { CanvasRendererId } from '../src/renderer';
+import { mintingGraphIds } from './minting';
 
 /**
  * What every semantic operation owes, whatever order they arrive in.
@@ -147,6 +147,14 @@ type GeneratedOperation = ReturnType<typeof operation.generate>['value'];
 /** An identity that is nothing, so an out-of-range index still names something. */
 const NOTHING = uuidSchema.parse('00000000-0000-4000-8000-0000000000ff');
 
+/** The Graph identities a converted Algorithmic View may mint in one case. */
+const MINTED_GRAPH_IDS = [
+  uuidSchema.parse('00000000-0000-4000-8000-000000000a01'),
+  uuidSchema.parse('00000000-0000-4000-8000-000000000a02'),
+  uuidSchema.parse('00000000-0000-4000-8000-000000000a03'),
+  uuidSchema.parse('00000000-0000-4000-8000-000000000a04'),
+] as const;
+
 const pick = <T>(items: readonly T[], at: number): T | undefined => items[at];
 
 it('keeps the working Space loadable through any sequence of semantic operations', () => {
@@ -161,26 +169,16 @@ it('keeps the working Space loadable through any sequence of semantic operations
       (operations, renderer) => {
         const loaded = { snapshot: start, revision: 0n, exportedRevision: null };
         const session = openSpaceSession(new MemorySpaceBackend([loaded]), loaded);
-        const currentSpace = () => {
-          const result = loadSpaceSnapshot(session.getState().working);
-          if (!result.ok) throw new Error(result.errors.map((error) => error.message).join('; '));
-          return result.space;
-        };
-        let mintedGraphs = 0;
-        const resolveRenderer = createRendererResolver({
-          newGraphId: () => {
-            mintedGraphs += 1;
-            return uuidSchema.parse(
-              `00000000-0000-4000-8000-${(0xa00 + mintedGraphs).toString(16).padStart(12, '0')}`,
-            );
-          },
-        });
-        const navigation = createNavigation(currentSpace, resolveRenderer, renderer);
-        const authoring = createSpaceAuthoring({
-          session,
-          navigation,
-          currentSpace,
-          resolveRenderer,
+        const { currentSpace, navigation, authoring } = composeApp({
+          spaceSession: session,
+          selection: renderer,
+          // Deterministic, so a shrunk counterexample replays: converting this
+          // Space's one Algorithmic View mints one Graph, and the rest of the
+          // block is the margin that makes an exhaustion a real signal.
+          newGraphId: mintingGraphIds(...MINTED_GRAPH_IDS),
+          // These cases install the geometry a renderer would have reported by
+          // now, immediately below.
+          initialPlacement: null,
         });
         // The geometry the renderer would have reported by the time an author
         // could reach any of these controls. An Algorithmic View's placement is

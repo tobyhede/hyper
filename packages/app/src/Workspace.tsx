@@ -9,6 +9,10 @@ interface WorkspaceFailureState {
   readonly message: string | null;
 }
 
+/** What a failure says, whichever of the two paths below caught it. */
+const failureMessage = (error: unknown): string =>
+  error instanceof Error ? error.message : String(error);
+
 /**
  * Reports what broke rather than letting it take the page down.
  *
@@ -28,7 +32,7 @@ class WorkspaceFailure extends Component<{ children: ReactNode }, WorkspaceFailu
   override state: WorkspaceFailureState = { message: null };
 
   static getDerivedStateFromError(error: unknown): WorkspaceFailureState {
-    return { message: error instanceof Error ? error.message : String(error) };
+    return { message: failureMessage(error) };
   }
 
   override render(): ReactNode {
@@ -37,9 +41,32 @@ class WorkspaceFailure extends Component<{ children: ReactNode }, WorkspaceFailu
   }
 }
 
-/** Mount one workspace-local application for the lifetime of the opened Space. */
+/**
+ * Mount one workspace-local application for the lifetime of the opened Space.
+ *
+ * Composition is guarded as well as rendering, because it reads the same
+ * snapshot: `createApp` builds Navigation, which resolves the renderer the
+ * Space opens in against the session's working Space (`compose-app.ts`), so a
+ * snapshot that fails domain intake throws here — before there is a tree for
+ * the boundary to catch it in. Both paths report the same sentence, for the
+ * same reason: an uncaught throw leaves a blank page, which says nothing.
+ *
+ * `openStoredWorkspace` validates the snapshot and the session then clones that
+ * same value, so the two halves of an `OpenedSpace` agree on every route this
+ * app actually opens by. This guard is therefore a backstop, not a path with a
+ * caller: it catches a composition assembled from halves that disagree, and it
+ * logs as well as reports because — unlike the boundary below, which React
+ * traces for us — nothing else would say what threw.
+ */
 export function mountWorkspace(opened: OpenedSpace, render: WorkspaceRenderer): void {
-  const App = createApp(opened);
+  let App: ReturnType<typeof createApp>;
+  try {
+    App = createApp(opened);
+  } catch (error) {
+    console.error('Composing the workspace failed', error);
+    render(<WorkspaceFailureView message={failureMessage(error)} />);
+    return;
+  }
   render(
     <WorkspaceFailure>
       <App />

@@ -3,10 +3,10 @@ import { uuidSchema, type Graph, type SpaceSnapshot, type UUID } from '@project/
 import { loadSpaceSnapshot, Placement } from '@project/graph';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
 import { GRAPH_PALETTE } from '../src/colors';
-import { createNavigation } from '../src/navigation';
-import { createSpaceAuthoring, type SpaceAuthoring } from '../src/space-authoring';
-import { createRendererResolver, type CanvasRendererId } from '../src/renderer';
-import { mintingIds } from './minting';
+import { composeApp } from '../src/compose-app';
+import type { SpaceAuthoring } from '../src/space-authoring';
+import type { CanvasRendererId } from '../src/renderer';
+import { mintingGraphIds, mintingIds } from './minting';
 
 /**
  * The semantic operations Space Authoring gained for the complete Card and
@@ -38,6 +38,8 @@ const SECOND_MINTED = uuidSchema.parse('00000000-0000-4000-8000-000000000032');
  * and does *not* name a Graph id among the ids it hands `mintingIds`.
  */
 const MINTED_GRAPH = uuidSchema.parse('00000000-0000-4000-8000-000000000041');
+/** What a *second* conversion of one Algorithmic View would mint. */
+const SECOND_MINTED_GRAPH = uuidSchema.parse('00000000-0000-4000-8000-000000000042');
 const UNKNOWN_CARD = uuidSchema.parse('00000000-0000-4000-8000-000000000099');
 const UNKNOWN_GRAPH = uuidSchema.parse('00000000-0000-4000-8000-000000000098');
 
@@ -79,20 +81,11 @@ const graphsOf = (snapshot: SpaceSnapshot): readonly Graph[] =>
 const layoutOf = (snapshot: SpaceSnapshot, layoutId: string) =>
   (snapshot.document.layouts ?? []).find((layout) => layout.id === layoutId);
 
-/** A fresh sequence per composition: a Space converted twice needs two identities. */
-function testResolver() {
-  let minted = 0;
-  return createRendererResolver({
-    newGraphId: () => {
-      minted += 1;
-      return minted === 1
-        ? MINTED_GRAPH
-        : uuidSchema.parse(
-            `00000000-0000-4000-8000-${(0xa00 + minted).toString(16).padStart(12, '0')}`,
-          );
-    },
-  });
-}
+/**
+ * A fresh sequence per composition: a Space converted twice needs two
+ * identities, and the conversion boundary refuses a repeat outright.
+ */
+const graphIds = () => mintingGraphIds(MINTED_GRAPH, SECOND_MINTED_GRAPH);
 
 function open(
   snapshot: SpaceSnapshot = positionedSnapshot,
@@ -103,19 +96,13 @@ function open(
 ) {
   const loaded = { snapshot, revision: 0n, exportedRevision: null };
   const session = openSpaceSession(new MemorySpaceBackend([loaded]), loaded);
-  const currentSpace = () => {
-    const result = loadSpaceSnapshot(session.getState().working);
-    if (!result.ok) throw new Error(result.errors.map((error) => error.message).join('; '));
-    return result.space;
-  };
-  const resolveRenderer = testResolver();
-  const navigation = createNavigation(currentSpace, resolveRenderer, renderer);
-  const authoring = createSpaceAuthoring({
-    session,
-    navigation,
-    currentSpace,
-    resolveRenderer,
+  const { navigation, authoring } = composeApp({
+    spaceSession: session,
+    selection: renderer,
+    newGraphId: graphIds(),
     newId,
+    // These cases install whatever geometry they are about through `place`.
+    initialPlacement: null,
   });
   return { session, navigation, authoring };
 }
@@ -1156,17 +1143,12 @@ describe('Keep local', () => {
     ]);
     const local = { snapshot: positionedSnapshot, revision: 3n, exportedRevision: null };
     const session = openSpaceSession(backend, local);
-    const currentSpace = () => {
-      const result = loadSpaceSnapshot(session.getState().working);
-      if (!result.ok) throw new Error(result.errors.map((error) => error.message).join('; '));
-      return result.space;
-    };
-    const resolveRenderer = testResolver();
-    const navigation = createNavigation(currentSpace, resolveRenderer, {
-      kind: 'layout',
-      layoutId: LAYOUT_ID,
+    const { authoring } = composeApp({
+      spaceSession: session,
+      selection: { kind: 'layout', layoutId: LAYOUT_ID },
+      newGraphId: graphIds(),
+      initialPlacement: null,
     });
-    const authoring = createSpaceAuthoring({ session, navigation, currentSpace, resolveRenderer });
     place(authoring, { [CARD_A]: [10, 20], [CARD_B]: [300, 40] });
 
     authoring.complete({ kind: 'renamed-graph', graphId: GRAPH_ID, title: 'Before conflict' });
