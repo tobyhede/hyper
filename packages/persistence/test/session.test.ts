@@ -1,6 +1,7 @@
+import fc from 'fast-check';
 import { describe, expect, it, vi } from 'vitest';
 import { uuidSchema } from '@project/core';
-import type { LoadedSpace, SpaceSessionState } from '../src/index';
+import type { LoadedSpace, SpaceSession, SpaceSessionState } from '../src/index';
 import { MemorySpaceBackend, openSpaceSession } from '../src/index';
 import { MemorySpaceBackendTestControl } from '../src/memory';
 
@@ -41,7 +42,63 @@ const changedTitle = (title: string) => {
   return snapshot;
 };
 
+/** Every persistence state a session can be in other than `conflicted`. */
+type UnconflictedKind = 'settled' | 'pending' | 'failed' | 'rejected';
+
+interface DrivenSession {
+  readonly session: SpaceSession;
+  readonly control: MemorySpaceBackendTestControl;
+  /** Releases the gate held for `pending`; a no-op for the settled kinds. */
+  readonly release: () => void;
+}
+
+/**
+ * Open a session and drive it into one non-conflicted persistence state.
+ *
+ * All four are reached the same way — one `submit` and one commit outcome —
+ * so the state under test is the one the state machine actually produces
+ * rather than one assembled for the test. `settled` is deliberately the
+ * *post-commit* settled rather than the state a session opens in, which the
+ * first test in this file covers on its own.
+ */
+const openSessionIn = async (kind: UnconflictedKind): Promise<DrivenSession> => {
+  const control = new MemorySpaceBackendTestControl();
+  if (kind === 'failed') {
+    control.queueResult({ kind: 'retryable-failure', code: 'unavailable', message: 'Try later' });
+  }
+  if (kind === 'rejected') {
+    control.queueResult({ kind: 'permanent-failure', code: 'forbidden', message: 'No access' });
+  }
+  const release = kind === 'pending' ? control.deferNextCommit() : (): void => undefined;
+  const session = openSpaceSession(new MemorySpaceBackend([loaded], control), loaded);
+
+  session.submit(changedTitle(`Drove into ${kind}`));
+  await waitFor(session.getState, session.subscribe, (state) => state.persistence.kind === kind);
+
+  return { session, control, release };
+};
+
 describe('openSpaceSession', () => {
+  /*
+   * The state a session is in the instant it opens, asserted whole. Every other
+   * test in this file reads `getState()` only after a `submit`, by which point
+   * the transition into `pending` has overwritten the state `openSpaceSession`
+   * installed — so nothing said what a caller reads before it submits anything.
+   * Asserting the complete object rather than the one field is deliberate: a
+   * sixth persistence kind, or a fifth state field, has to be accounted for
+   * here rather than slipping past a `toMatchObject`.
+   */
+  it('opens settled on the loaded snapshot before anything is submitted', () => {
+    const session = openSpaceSession(new MemorySpaceBackend([loaded]), loaded);
+
+    expect(session.getState()).toEqual({
+      working: loaded.snapshot,
+      acknowledgedRevision: 3n,
+      changedSinceExport: true,
+      persistence: { kind: 'settled' },
+    });
+  });
+
   it('persists an optimistic Edit and notifies later observers when one observer fails', async () => {
     const backend = new MemorySpaceBackend([loaded]);
     const reported: unknown[] = [];
@@ -604,5 +661,73 @@ describe('openSpaceSession', () => {
     expect(observedTitles).toContain('Changed despite async observer');
     await vi.waitFor(() => expect(reported).toHaveLength(observedTitles.length));
     expect(new Set(reported.map(String))).toEqual(new Set(['Error: observer rejected']));
+  });
+
+  /*
+   * The two conflict-only operations, quantified over the states they refuse in.
+   *
+   * `acceptRemote` and `resolveConflict` each answer a conflict and nothing
+   * else, and the refusal is the half no example reached: every conflict test
+   * above calls them only after waiting for `conflicted`. The rule is one rule
+   * across both operations and every other persistence state, so it is stated
+   * once and quantified rather than written out eight times — and quantifying
+   * over *sequences* says the refusal is repeatable, not merely true of a first
+   * call. `pending` and `rejected` are covered here for free; no mutant pointed
+   * at either, and the same guard governs them.
+   *
+   * What it asserts is deliberately not "did not throw". A guard replaced by a
+   * silent early return that also wiped the session would pass that and fail
+   * this: the published state must be the same object *and* the same value, no
+   * subscriber may be notified, and the backend must record no further attempt.
+   * The app depends on exactly this — `space-authoring.ts`'s `keepLocalWork`
+   * calls `resolveConflict` unguarded and says in a comment that the session
+   * ignores the call outside a conflict.
+   */
+  it('refuses acceptRemote and resolveConflict in every state but conflicted', async () => {
+    await fc.assert(
+      fc.asyncProperty(
+        fc.constantFrom<UnconflictedKind>('settled', 'pending', 'failed', 'rejected'),
+        fc.array(
+          fc.record({
+            operation: fc.constantFrom<'acceptRemote' | 'resolveConflict'>(
+              'acceptRemote',
+              'resolveConflict',
+            ),
+            title: fc.string(),
+          }),
+          { minLength: 1, maxLength: 4 },
+        ),
+        async (kind, calls) => {
+          const { session, control, release } = await openSessionIn(kind);
+          const before = session.getState();
+          const valueBefore = structuredClone(before);
+          const attemptsBefore = control.attempts.length;
+          let notifications = 0;
+          session.subscribe(() => {
+            notifications += 1;
+          });
+
+          for (const call of calls) {
+            if (call.operation === 'acceptRemote') session.acceptRemote();
+            else session.resolveConflict(changedTitle(call.title));
+          }
+
+          // Identity, because a publication would replace the object a
+          // `useSyncExternalStore` reader compares; value, because an in-place
+          // edit would keep the identity and still have changed the session.
+          expect(session.getState()).toBe(before);
+          expect(session.getState()).toEqual(valueBefore);
+          expect(notifications).toBe(0);
+          expect(control.attempts).toHaveLength(attemptsBefore);
+
+          release();
+          await waitFor(
+            session.getState,
+            session.subscribe,
+            (state) => state.persistence.kind !== 'pending',
+          );
+        },
+      ),
+    );
   });
 });
