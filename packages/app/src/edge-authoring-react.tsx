@@ -455,6 +455,7 @@ export function useEdgeAuthoring({
       if (!proposed && subject !== null && 'clientX' in event && 'clientY' in event) {
         const over = dropTarget({
           connectionTarget: state.toNode !== null,
+          // From the point, not `event.target` — see the connect release above.
           element: elementDropTargetOf(document.elementFromPoint(event.clientX, event.clientY)),
         });
         if (over === 'empty-canvas') latest.current.authoring.deleteEdge(subject);

@@ -217,12 +217,20 @@ makes them the behaviour-preserving guard. After the extraction: 93 passed.
 them, including the site-3 precedence case — so the pin is real and not a test
 written to match the fix.
 
-**Deviation from §5, agreed during grilling.** The precedence table uses two
-`it.each` blocks over `ELEMENTS` rather than six literal rows, with a
-`satisfies Record<ElementDropTarget, …>` making exhaustiveness compiler-checked:
-a member added to the union stops the file building until both the table and
-`ELEMENTS` name it. The annotated `Record` this started as tripped
-`anti-slop(no-known-value-widening)`; `satisfies` is what that rule asks for.
+**Two deviations from the spec.**
+
+- **§5.** The precedence table is two `it.each` blocks over a derived list rather
+  than six literal rows. `EVERY_ELEMENT = Object.values({…} satisfies
+  { [K in ElementDropTarget]: K })` makes exhaustiveness compiler-checked in both
+  directions: the mapped type demands each member as a key *and* as its own
+  value, and the list the tables run over is derived from that object, so the
+  enumeration cannot fall behind the union. The annotated `Record` this started
+  as tripped `anti-slop(no-known-value-widening)`; `satisfies` is what that rule
+  asks for.
+- **§1.** "Its final paragraph stays" was read as *survives*, not *stays put*: the
+  `card`/`off-canvas` paragraph moved from `DropTarget`'s doc comment onto
+  `ElementDropTarget`, which is where those two values now live. The decision it
+  protects is unchanged and still stated once.
 
 **Verification.** `pnpm verify` exit 0 — 149 test files, 1647 passed, 8 skipped,
 up from 1638 by the nine tests added. `pnpm e2e` exit 0 — 115 passed in 1.8m,
@@ -231,3 +239,31 @@ and `git diff main -- packages/app/e2e/` is empty, so green **and** unchanged.
 `NewCardPreview.tsx`, which `design-system-inventory.ts:82-85` records as
 deliberately uncatalogued — reachable only mid-gesture, so it has no stable
 story.
+
+### Review round
+
+`/code-review-loop` against `b64284f` — `mattpocock-skills:code-review` (Standards
++ Spec), the built-in `code-review` at medium, and the CodeRabbit CLI, run in
+parallel. Nine findings survived verification; four were dropped as not defects
+(the `rendering.md` edit, which `workflow.md`'s Capture step requires; the
+`surface` hoist; the now-eager `elementFromPoint`, once per drag release; and the
+rename commit's message).
+
+Two were substantive and neither was caught by `verify` or `e2e`:
+
+- **The exhaustiveness guarantee was one-sided.** All three reviewers found it.
+  `satisfies Record<ElementDropTarget, (typeof ELEMENTS)[number]>` forced the
+  key but not the value, so `toolbar: 'card'` compiled and `ELEMENTS` never grew
+  — the block advertising the whole domain would have covered five of eight
+  cases. Proved by making that exact mutation compile clean, then proved closed
+  by the same mutation failing `tsc`.
+- **The precedence pin used a state React Flow cannot produce.** `isValid: true`
+  with a non-null `toNode` is unreachable at `handleReconnectEnd`: `onReconnect`
+  fires for a valid release and sets `proposedReconnection`, so the handler
+  returns at its `!proposed` guard first. The reachable case — and now the
+  fixture — is a handle in range whose connection the *validator* refused.
+
+The rest were prose: a new `describe` had orphaned the neighbouring block's doc
+comment, the `beforeAll` stub comment had gone stale, and two line-pinned
+`rendering.md:29` references were the first of their kind in tracked code and now
+cite the bullet by its opening phrase.

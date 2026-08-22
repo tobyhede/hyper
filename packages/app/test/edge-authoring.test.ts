@@ -629,44 +629,6 @@ describe('completing a pointer connection', () => {
  * `over` classification is the DOM's answer *arriving*, and how each supplier
  * reaches it is the browser's business.
  */
-/**
- * The precedence rule: two sources, one answer.
- *
- * `docs/agents/rendering.md:29` is the argument. `getClosestHandle` resolves
- * `toNode` by distance to a *handle* within `connectionRadius` — 20 at the
- * pinned 12.11.2 — so it is non-null over blank canvas near a handle and null
- * over the middle of a Card, whose centre is some 73px from the nearest handle
- * at 260x146. Neither source answers alone, and a connection target in range
- * outranks the element underneath.
- *
- * Six cases is the **whole** domain rather than a sample of it, which is why
- * there is no property test here: fast-check would resample these same six and
- * prove less.
- */
-describe('composing the two answers to a drop target', () => {
-  const ELEMENTS = ['card', 'empty-canvas', 'off-canvas'] as const;
-
-  /**
-   * What the DOM's answer means when React Flow resolved no target — and the
-   * exhaustiveness check. A `Record` over `ElementDropTarget` rather than a
-   * list, so a member added to the union stops this file building until both
-   * this table and `ELEMENTS` name it.
-   */
-  const UNDERNEATH = {
-    card: 'card',
-    'empty-canvas': 'empty-canvas',
-    'off-canvas': 'off-canvas',
-  } satisfies Record<ElementDropTarget, (typeof ELEMENTS)[number]>;
-
-  it.each(ELEMENTS)('reports %s underneath when React Flow resolved no target', (element) => {
-    expect(dropTarget({ connectionTarget: false, element })).toBe(UNDERNEATH[element]);
-  });
-
-  it.each(ELEMENTS)('lets a connection target in range outrank %s underneath', (element) => {
-    expect(dropTarget({ connectionTarget: true, element })).toBe('connection-target');
-  });
-});
-
 describe('the Option/Alt empty drop', () => {
   const dragging = (over: DropTarget, modifierHeld: boolean): ConnectionGesture => ({
     kind: 'dragging',
@@ -726,5 +688,46 @@ describe('the Option/Alt empty drop', () => {
         },
       ),
     );
+  });
+});
+
+/**
+ * The precedence rule: two sources, one answer.
+ *
+ * The argument is `docs/agents/rendering.md`'s bullet beginning *"Neither React
+ * Flow's `toNode` nor the DOM alone answers"*. `getClosestHandle` resolves
+ * `toNode` by distance to a *handle* within `connectionRadius` — 20 at the
+ * pinned 12.11.2 — so it is non-null over blank canvas near a handle and null
+ * over the middle of a Card, whose centre is some 73px from the nearest handle
+ * at 260x146. Neither source answers alone, and a connection target in range
+ * outranks the element underneath.
+ *
+ * Six cases is the **whole** domain rather than a sample of it, which is why
+ * there is no property test here: fast-check would resample these same six and
+ * prove less.
+ */
+describe('composing the two answers to a drop target', () => {
+  /**
+   * Every `ElementDropTarget`, enumerated once and compiler-checked both ways.
+   *
+   * The mapped type demands each member as a key **and** as its own value, so a
+   * member added to the union cannot be answered with an existing one; and the
+   * list both tables run over is derived from it, so the enumeration and the
+   * union cannot fall out of step. A `Record<ElementDropTarget, …>` over a
+   * separate tuple checked only the keys — `toolbar: 'card'` compiled, and the
+   * new member went untested.
+   */
+  const EVERY_ELEMENT = Object.values({
+    card: 'card',
+    'empty-canvas': 'empty-canvas',
+    'off-canvas': 'off-canvas',
+  } satisfies { [K in ElementDropTarget]: K });
+
+  it.each(EVERY_ELEMENT)('reports %s underneath when React Flow resolved no target', (element) => {
+    expect(dropTarget({ connectionTarget: false, element })).toBe(element);
+  });
+
+  it.each(EVERY_ELEMENT)('lets a connection target in range outrank %s underneath', (element) => {
+    expect(dropTarget({ connectionTarget: true, element })).toBe('connection-target');
   });
 });
