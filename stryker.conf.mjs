@@ -50,9 +50,10 @@ export default {
      * `vitest related` reproduces it with no Stryker involved, so this is not a
      * Stryker bug and not something a Stryker upgrade will fix.
      *
-     * `coverageAnalysis: 'perTest'` below recovers most of the narrowing this
-     * gives up — it ran 3.37 tests per mutant on the SpaceSession baseline
-     * rather than all 17.
+     * The cost is smaller than it looks, because the runner does per-test
+     * coverage analysis of its own regardless — 2.94 tests per mutant on the
+     * SpaceSession campaign rather than all 19. That narrowing is the runner's,
+     * not something the `coverageAnalysis` line below buys; see its comment.
      */
     related: false,
   },
@@ -74,9 +75,14 @@ export default {
   checkers: [],
 
   /*
-   * `perTest` records which tests cover which mutant, which is what makes a
-   * survivor triageable: the report names the tests that ran and did not die.
-   * Without it a survivor is a diff with no suspects.
+   * Set for intent only — this line changes nothing, twice over. `perTest` is
+   * already Stryker's default, and the Vitest runner ignores the option
+   * outright: it always collects per-test coverage, which is what makes a
+   * survivor triageable by naming the tests that ran and did not die. Measured
+   * rather than assumed — `--coverageAnalysis off` produces an identical
+   * campaign (98 mutants, 93 killed, 94.90%, 2.94 tests per mutant, 36s). It
+   * stays because per-test is what this repo wants if a future runner ever
+   * honours the option, and because an explicit value beats an inherited one.
    *
    * Its companion `ignoreStatic` is deliberately **not** set, which reverses
    * the spike's own verdict — `spike-stryker.md` recommended `ignoreStatic:
@@ -88,6 +94,14 @@ export default {
    * them (`"static": true` with an empty `coveredBy`) and every one has been
    * falsified by hand. A visible known-false survivor a reader can check beats
    * a silently absent one.
+   *
+   * Those false survivors have a named upstream cause, and it is tied to the
+   * `testFiles` this repo cannot avoid: with a test filter in play the planner
+   * picks runtime activation, and Vitest activates the mutant only after the
+   * importing module has loaded, so a *covered* static mutant survives.
+   * stryker-mutator/stryker-js#6145 ("fix(core): activate static mutants before
+   * module load") is the fix and is **still open**, so the hand-check is
+   * standing practice rather than a wait for the next upgrade.
    */
   coverageAnalysis: 'perTest',
 

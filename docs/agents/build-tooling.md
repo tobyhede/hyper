@@ -1,6 +1,6 @@
 # Build & Tooling
 
-Vite config gotchas, Prettier scope, and the spike-harness rule. Read before touching a root `*.config.ts`, `packages/app/vite*.ts`, or leaving a throwaway harness behind.
+Vite config gotchas, Prettier scope, the mutation-testing engine, and the spike-harness rule. Read before touching a root `*.config.ts`, `stryker.conf.mjs`, the `@stryker-mutator/*` dependencies or the `mutate:*` scripts, `packages/app/vite*.ts`, or leaving a throwaway harness behind.
 
 - **Markdown is excluded from Prettier** (`.prettierignore`) — don't rely on `format` to touch `*.md`.
 - **Don't import a workspace package by name into `vite.config.ts`.** Vite loads the config in Node and externalizes bare specifiers, so `@project/core` hands *Node* the TypeScript source, whose extensionless relative imports (`export * from './schema'`) Node's ESM resolver rejects — the config then fails to load at all and the dev server will not start. Import by relative path (`../core/src/index`) so esbuild bundles it. This is the one place the repo's extensionless-import convention does not hold.

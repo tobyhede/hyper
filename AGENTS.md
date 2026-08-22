@@ -100,7 +100,7 @@ UI components, operational feedback, shadcn, Base UI, Lucide, and the Escape/com
 
 ### Build & tooling
 
-Vite config gotchas, Prettier scope, and the spike-harness rule. Read before touching a root `*.config.ts` or `packages/app/vite*.ts`. See `docs/agents/build-tooling.md`.
+Vite config gotchas, Prettier scope, the mutation-testing engine, and the spike-harness rule. Read before touching a root `*.config.ts`, `stryker.conf.mjs`, the `@stryker-mutator/*` dependencies or the `mutate:*` scripts, or `packages/app/vite*.ts`. See `docs/agents/build-tooling.md`.
 
 ### Anti-slop
 
