@@ -8,7 +8,7 @@ The bake-off asked for by issue `01`. Both engines were spiked in their own disp
 
 | # | Axis | StrykerJS 10.0.0 | mewt 4.0.0 | Winner |
 |---|---|---|---|---|
-| 1 | Vitest correctness | Runs the real test file through the real root config in a sandbox copy; dry run reports exactly 17 tests, matching plain `vitest run`. **Defect: two `static: true` mutants reported Survived that in fact fail all 17 tests.** | Shells out to the real command; baseline saw `17 passed (17)`; aliases resolve. **Defects: a compile error is scored as a kill, and timeouts are dropped from the score entirely.** | **Stryker** |
+| 1 | Vitest correctness | Runs the real test file through the real root config in a sandbox copy; dry run reports exactly 17 tests, matching plain `vitest run`. **Defect: two `static: true` mutants reported Survived that in fact fail tests when applied by hand (17/17 and 3/17 respectively).** | Shells out to the real command; baseline saw `17 passed (17)`; aliases resolve. **Defects: a compile error is scored as a kill, and timeouts are dropped from the score entirely.** | **Stryker** |
 | 2 | TS 7 / TS 6 toolchain | Unaffected with `checkers: []` — instruments with Babel, never type-checks. `typescript-checker` works only *because* the bridge points `typescript` at TS 6, and is excluded. | Provably indifferent: own tree-sitter grammar, never loads the `typescript` package, parses the file in a bare directory with no `node_modules` at all. | mewt |
 | 3 | Mutant targeting | File and `:startLine[:startCol]-endLine[:endCol]` ranges, composable, verified as 1 of 901 files with no leak. | File and directory targeting precise and leak-free; sub-file is a two-step `print mutants --line` → `test --ids`, and `--line` over-matches on spans. | **Stryker** |
 | 4 | Report usefulness | Mutator, `file:line:col`, `-`/`+` diff, **and the names of the covering tests**, plus a per-test kill count that showed five of 17 tests killing nothing. Standard elements JSON, self-contained HTML. | Status, operator, line, original vs mutated, full test output, JSON and SARIF. **No coverage mapping at all** — triage is unaided reasoning from the diff. | **Stryker** |
@@ -21,7 +21,7 @@ Stryker takes the highest-priority axis and three of the remaining four. mewt ta
 
 Both engines lie. They lie in opposite directions, and only one direction is survivable for a tool whose entire job is finding gaps.
 
-Stryker's defect produces a **false survivor**: it reports a gap that is not there. The spike falsified it by hand — applying the mutation to the real source fails all 17 tests — and traced it to activation delivery for static mutants in the vitest runner. It is confined to `static: true` mutants, it is visible in the report (`"static": true`, `"coveredBy": []`), and the cost of it is a reviewer's wasted half hour.
+Stryker's defect produces a **false survivor**: it reports a gap that is not there. The spike falsified it by hand — applying the mutation to the real source fails tests that Stryker reported as passing — and traced it to activation delivery for static mutants in the vitest runner. It is confined to `static: true` mutants, it is visible in the report (`"static": true`, `"coveredBy": []`), and the cost of it is a reviewer's wasted half hour.
 
 mewt's defects produce **false kills**: they hide gaps. A mutant that breaks the build collects zero tests, exits non-zero, and is scored as caught — there is no status distinguishing a failed assertion from a failed compile. Separately, timeouts are excluded from the numerator *and* the denominator, so on this async state machine between 17% and 33% of the corpus vanished from the score depending on one config value. Neither is detectable from the report, and neither has a flag.
 
@@ -56,6 +56,6 @@ Each was found by a failed run, and none of the failures pointed at its own fix.
 ## Standing limits on what the number means
 
 - **Never a gate.** `thresholds.break` is `null`, it is absent from `verify` and from CI, and no score is a target.
-- **`static: true` survivors must be checked by hand** until the runner defect is fixed. On `session.ts` two of eleven survivors are false for this reason.
+- **`static: true` survivors must be checked by hand** until the runner defect is fixed. On `session.ts` two of eleven survivors are false for this reason. **How much they fail by is not a usable signal**: one fails 17/17 tests, the other only 3/17, so "it would fail everything" is not the detection heuristic — `"static": true` with an empty `coveredBy` is. See `baseline-space-session.md`, which established this by falsifying both rather than inheriting the spike's single data point.
 - A repo-wide campaign is **not** currently possible: it would need every git-shelling repo-meta test excluded, or `--inPlace`, which is untested and carries its own safety problem.
 - Everything measured here is macOS, single machine. CI behaviour is unverified, and there is no reason to verify it while this stays a local tool.
