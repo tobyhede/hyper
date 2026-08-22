@@ -137,7 +137,7 @@ function sessionBackedAdapter(
   initialPlacement: Placement | null = null,
   /** A newer stored state, so the first commit conflicts rather than settling. */
   stored?: SpaceSnapshot,
-  /** The ids this workspace's Edits mint, supplied rather than mocked. */
+  /** The ids this Space's Edits mint, supplied rather than mocked. */
   newId?: () => UUID,
 ) {
   const loaded = { snapshot, revision: 0n, exportedRevision: null };

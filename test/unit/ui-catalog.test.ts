@@ -107,8 +107,8 @@ describe('UI catalogue', () => {
     const root = fixture();
     write(
       root,
-      'packages/app/stories/surfaces/workspace.stories.tsx',
-      "export default { title: 'Review/Workspace' };",
+      'packages/app/stories/surfaces/canvas.stories.tsx',
+      "export default { title: 'Review/Canvas' };",
     );
 
     expect(() => buildUiCatalog(root)).toThrowError(UiCatalogError);

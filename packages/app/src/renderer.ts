@@ -359,7 +359,7 @@ const BUILT_IN_VIEWS = {
  * What a built-in View is called, for the chrome that lists every one of them.
  *
  * A lookup and not the registration seam the collection above declines to be:
- * the workspace sidebar draws one row per built-in View (ADR 0053) and needs a
+ * the Space Sidebar draws one row per built-in View (ADR 0053) and needs a
  * title for each, where `ResolvedViewRenderer.title` answers only for the View
  * currently drawing. Titles stay defined once, beside the strategy and subject
  * they belong to.

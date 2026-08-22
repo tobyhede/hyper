@@ -74,7 +74,7 @@ describe('openSpaceSession', () => {
   });
 
   /*
-   * The app opens its session without options (`open-workspace.ts`), so the
+   * The app opens its session without options (`open-space.ts`), so the
    * console default is the reporter every real observer failure goes through.
    */
   it('reports an observer failure to the console when no reporter is supplied', async () => {

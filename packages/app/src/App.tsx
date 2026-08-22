@@ -32,7 +32,7 @@ import { PlacementFailure } from './components/PlacementFailure';
 import { PlacementPending } from './components/PlacementPending';
 import { PresentingChrome } from './components/PresentingChrome';
 import { PersistenceControl, PersistenceNotice } from './components/PersistenceControl';
-import { SelectedCanvasRenderer, WorkspaceSidebar } from './components/WorkspaceSidebar';
+import { SelectedCanvasRenderer, SpaceSidebar } from './components/SpaceSidebar';
 
 export const createApp = ({ spaceSession }: OpenedSpace) => {
   // What an opened Space is composed of, stated once (`compose-app.ts`): one
@@ -535,8 +535,8 @@ export const createApp = ({ spaceSession }: OpenedSpace) => {
     });
 
     const sidebar = (
-      <WorkspaceSidebar
-        workspaceTitle={rendererSpace.title}
+      <SpaceSidebar
+        spaceTitle={rendererSpace.title}
         canvas={{ renderers, current, onSelect: selectCanvasRenderer }}
         graph={{
           graphs: projection.visibleGraphs,

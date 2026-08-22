@@ -2,7 +2,7 @@ import type { Story } from '@ladle/react';
 import { PlacementFailure } from '#components/PlacementFailure';
 import { PlacementPending } from '#components/PlacementPending';
 import { StartupFailure } from '#components/StartupFailure';
-import { WorkspaceFailureView } from '#components/WorkspaceFailureView';
+import { SpaceAppFailureView } from '#components/SpaceAppFailureView';
 
 export default { title: 'Components/Operational Feedback' };
 
@@ -11,9 +11,9 @@ export const Startup: Story = () => (
   <StartupFailure message="Space document version 2 is not supported; this build reads version 1" />
 );
 
-/** What `WorkspaceFailure`'s error boundary renders when the mounted app throws. */
-export const Workspace: Story = () => (
-  <WorkspaceFailureView message="Graph names an absent card 00000000-0000-4000-8000-000000000005" />
+/** What `SpaceAppFailure`'s error boundary renders when the mounted app throws. */
+export const SpaceApp: Story = () => (
+  <SpaceAppFailureView message="Graph names an absent card 00000000-0000-4000-8000-000000000005" />
 );
 
 /** The canvas when no strategy produced positions for the active Layout. */

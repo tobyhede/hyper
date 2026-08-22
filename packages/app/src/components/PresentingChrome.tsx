@@ -154,7 +154,7 @@ export function PresentingChrome({
     <div
       data-testid="presenting-chrome"
       // Its own container, so the responsive rule below reads the width the
-      // chrome actually has rather than the viewport's: the workspace Sidebar
+      // chrome actually has rather than the viewport's: the Space Sidebar
       // takes 16rem of it above the breakpoint and none below.
       className="@container absolute inset-x-0 bottom-0 z-20 border-t border-border bg-background/90"
     >

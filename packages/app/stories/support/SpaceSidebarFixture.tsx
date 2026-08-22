@@ -14,11 +14,11 @@ import { canvasRenderers, currentRenderer } from '#src/canvas-renderers';
 import { graphColorMap } from '#src/colors';
 import { createWorkingSpaceReader } from '#src/snapshot';
 import { PersistenceControl, PersistenceNotice } from '#components/PersistenceControl';
-import { SelectedCanvasRenderer, WorkspaceSidebar } from '#components/WorkspaceSidebar';
+import { SelectedCanvasRenderer, SpaceSidebar } from '#components/SpaceSidebar';
 import { useStoryNavigation } from './navigation';
 import { authoredSnapshot, authoredSpace, editedSnapshot } from './spaces';
 
-export interface WorkspaceSidebarFixtureProps {
+export interface SpaceSidebarFixtureProps {
   /** Which Space the sidebar reports on. See `./spaces`. */
   readonly space?: Space;
   /** The live Space Navigation reads; supplied by session-backed fixtures. */
@@ -39,7 +39,7 @@ export interface WorkspaceSidebarFixtureProps {
  * made in the sidebar — and a retryable failure reports in two places at once,
  * as a cue in the footer and as the notice the shell pins beneath the header.
  */
-export function WorkspaceSidebarFixture({
+export function SpaceSidebarFixture({
   space = authoredSpace,
   currentSpace,
   persistence = { kind: 'settled' },
@@ -48,7 +48,7 @@ export function WorkspaceSidebarFixture({
   remoteRefusal = null,
   acknowledgedRevision = 4n,
   onRetry = () => undefined,
-}: WorkspaceSidebarFixtureProps) {
+}: SpaceSidebarFixtureProps) {
   const suppliedSpace = useCallback(() => space, [space]);
   const readCurrentSpace = currentSpace ?? suppliedSpace;
   const {
@@ -84,8 +84,8 @@ export function WorkspaceSidebarFixture({
   return (
     <AppShell
       sidebar={
-        <WorkspaceSidebar
-          workspaceTitle={space.title}
+        <SpaceSidebar
+          spaceTitle={space.title}
           canvas={{ renderers, current, onSelect: navigation.selectRenderer }}
           graph={{
             graphs: renderer.subject.graphs,
@@ -119,7 +119,7 @@ export function WorkspaceSidebarFixture({
       header={<SelectedCanvasRenderer renderer={current} />}
       notice={<PersistenceNotice persistence={persistence} onRetry={onRetry} />}
     >
-      <div data-testid="workspace-canvas-stand-in" />
+      <div data-testid="space-canvas-stand-in" />
     </AppShell>
   );
 }
@@ -135,7 +135,7 @@ export function WorkspaceSidebarFixture({
  * pair in the application is `keeps persistence failure visible, accepts
  * another Edit, and retries the latest Space`, in
  * `packages/app/test/space-authoring.test.ts`: that one proves the working
- * state survives a failure, this one proves the workspace draws it (ADR 0052).
+ * state survives a failure, this one proves the Sidebar draws it (ADR 0052).
  *
  * The Space comes from one `createWorkingSpaceReader`, the same translation the
  * application's render path runs — a second `loadSpaceSnapshot` here would be a
@@ -144,7 +144,7 @@ export function WorkspaceSidebarFixture({
  * does, so the two states this story passes through cost two parses and hand
  * `canvasRenderers` a stable `Space` in between.
  */
-export function RetryableWorkspaceSidebarFixture() {
+export function RetryableSpaceSidebarFixture() {
   const session = useMemo(() => {
     const control = new MemorySpaceBackendTestControl();
     control.queueResult({
@@ -179,7 +179,7 @@ export function RetryableWorkspaceSidebarFixture() {
   }, [session]);
 
   return (
-    <WorkspaceSidebarFixture
+    <SpaceSidebarFixture
       space={currentSpace()}
       currentSpace={currentSpace}
       persistence={state.persistence}

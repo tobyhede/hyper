@@ -494,7 +494,7 @@ export function useEdgeAuthoring({
    * Repair the focus React Flow's native Edge Escape leaves on `body`.
    *
    * Its handler clears the selection and calls `blur()`, which is right for an
-   * element it is deselecting and wrong for a workspace whose commands need a
+   * element it is deselecting and wrong for a canvas whose commands need a
    * defined graph focus. Deferred past React Flow's own handling, and applied
    * only when nothing else has taken focus in the meantime.
    */

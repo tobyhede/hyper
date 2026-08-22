@@ -187,7 +187,7 @@ describe('canvasRenderers', () => {
    * Stated here because the sidebar is handed a list and a current row and
    * nothing in the type says they came from one call. Under an object-identity
    * pressed test that pairing drew a Layout list with nothing pressed, silently.
-   * `WorkspaceSidebar.test.tsx` pins the other half of it.
+   * `SpaceSidebar.test.tsx` pins the other half of it.
    */
   it('builds a fresh authored row on each call', () => {
     const selection: CanvasRendererId = { kind: 'layout', layoutId: FIRST_LAYOUT };

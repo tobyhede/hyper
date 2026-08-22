@@ -13,14 +13,14 @@ test(
 );
 
 test(
-  'workspace story announces the failure with its diagnostic detail reachable by keyboard',
-  { tag: '@parity:operational-feedback-workspace-failure' },
+  'space app story announces the failure with its diagnostic detail reachable by keyboard',
+  { tag: '@parity:operational-feedback-space-app-failure' },
   async ({ page }) => {
-    await page.goto('/?story=components--operational-feedback--workspace&mode=preview');
+    await page.goto('/?story=components--operational-feedback--space-app&mode=preview');
 
     const alert = page.getByRole('alert');
     await expect(alert.getByText('Unable to open this space')).toBeVisible();
-    const detail = page.getByRole('region', { name: 'Workspace failure detail' });
+    const detail = page.getByRole('region', { name: 'Space app failure detail' });
     await detail.focus();
     await expect(detail).toBeFocused();
   },

@@ -1,12 +1,9 @@
 import type { Story } from '@ladle/react';
 import { uuidSchema } from '@project/core';
-import {
-  RetryableWorkspaceSidebarFixture,
-  WorkspaceSidebarFixture,
-} from '../support/WorkspaceSidebarFixture';
+import { RetryableSpaceSidebarFixture, SpaceSidebarFixture } from '../support/SpaceSidebarFixture';
 import { unauthoredSpace } from '../support/spaces';
 
-export default { title: 'Components/Workspace Sidebar' };
+export default { title: 'Components/Space Sidebar' };
 
 /**
  * Every state is framed, and that is the primitive's doing rather than a
@@ -22,21 +19,21 @@ export default { title: 'Components/Workspace Sidebar' };
  * and rejects anything that is not an object literal.
  */
 
-export const Settled: Story = () => <WorkspaceSidebarFixture />;
+export const Settled: Story = () => <SpaceSidebarFixture />;
 Settled.meta = { iframed: true };
 
 /** A Space before its first Edit authors a Layout: two groups with nothing in them. */
-export const Unauthored: Story = () => <WorkspaceSidebarFixture space={unauthoredSpace} />;
+export const Unauthored: Story = () => <SpaceSidebarFixture space={unauthoredSpace} />;
 Unauthored.meta = { iframed: true };
 
-export const Pending: Story = () => <WorkspaceSidebarFixture persistence={{ kind: 'pending' }} />;
+export const Pending: Story = () => <SpaceSidebarFixture persistence={{ kind: 'pending' }} />;
 Pending.meta = { iframed: true };
 
-export const Failed: Story = () => <RetryableWorkspaceSidebarFixture />;
+export const Failed: Story = () => <RetryableSpaceSidebarFixture />;
 Failed.meta = { iframed: true };
 
 export const Rejected: Story = () => (
-  <WorkspaceSidebarFixture
+  <SpaceSidebarFixture
     persistence={{
       kind: 'rejected',
       failure: { kind: 'permanent-failure', code: 'forbidden', message: 'Permission denied' },
@@ -46,13 +43,13 @@ export const Rejected: Story = () => (
 Rejected.meta = { iframed: true };
 
 export const Conflicted: Story = () => (
-  <WorkspaceSidebarFixture
+  <SpaceSidebarFixture
     persistence={{
       kind: 'conflicted',
       current: {
         snapshot: {
           id: uuidSchema.parse('00000000-0000-4000-8000-000000000005'),
-          document: { version: 1, title: 'Remote workspace' },
+          document: { version: 1, title: 'Remote space' },
           cards: [],
         },
         revision: 5n,
@@ -64,5 +61,5 @@ export const Conflicted: Story = () => (
 );
 Conflicted.meta = { iframed: true };
 
-export const Presenting: Story = () => <WorkspaceSidebarFixture presenting authoringDisabled />;
+export const Presenting: Story = () => <SpaceSidebarFixture presenting authoringDisabled />;
 Presenting.meta = { iframed: true };

@@ -174,7 +174,7 @@ test(
 );
 
 test(
-  'a stale browser reports conflict and accepts the remote workspace without overwriting it',
+  'a stale browser reports conflict and accepts the remote space without overwriting it',
   { tag: '@parity:space-sidebar-resolves-conflict' },
   async ({ page }) => {
     const stalePage = await page.context().newPage();
@@ -218,7 +218,7 @@ test(
       expect(mountedGraphArea).not.toBeNull();
 
       // The conflict AlertDialog is modal, so prepare the race while the stale PUT
-      // is parked: leave the local workspace in unrelated navigation and start an
+      // is parked: leave the local space in unrelated navigation and start an
       // automatic placement, then let the conflict arrive. Any placement result
       // still arriving after Reload belongs to the Space that is being replaced.
       try {

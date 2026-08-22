@@ -42,7 +42,7 @@ export interface ComposeCoreDependencies {
    * The session the whole composition reads its Space from — and the only place
    * it reads one.
    *
-   * There is deliberately no second `Space` argument. `openStoredWorkspace`
+   * There is deliberately no second `Space` argument. `openStoredSpace`
    * parses the stored snapshot and `openSpaceSession` then `structuredClone`s
    * it, so the Space a caller holds at open and the session's `working` are
    * equal values with different identities; taking both is how production came

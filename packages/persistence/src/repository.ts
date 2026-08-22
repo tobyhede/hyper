@@ -4,7 +4,7 @@ import type { LoadedSpace, SpaceSummary } from './backend';
 /**
  * The stored side of the seam, and the narrowest form of it.
  *
- * A `SpaceBackend` is what the browser holds — one already-open workspace behind
+ * A `SpaceBackend` is what the browser holds — one already-open Space behind
  * a transport that can fail in transport-shaped ways. A repository is what sits
  * on the other side of that transport: it either commits, loses a revision race,
  * or refuses the snapshot outright. There is no `retryable-failure` here because

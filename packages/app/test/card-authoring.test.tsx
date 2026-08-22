@@ -3,7 +3,7 @@ import { beforeAll, afterAll, describe, expect, it, vi } from 'vitest';
 import { spaceSnapshotSchema, uuidSchema, type SpaceSnapshot } from '@project/core';
 import { loadSpaceSnapshot } from '@project/graph';
 import { MemorySpaceBackend, openSpaceSession, type SpaceSession } from '@project/persistence';
-import { mountWorkspace } from '../src/Workspace';
+import { mountSpaceApp } from '../src/SpaceApp';
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
@@ -22,7 +22,7 @@ const snapshot: SpaceSnapshot = spaceSnapshotSchema.parse({
   id: SPACE_ID,
   document: {
     version: 1,
-    title: 'Workspace',
+    title: 'Space',
     layouts: [
       {
         id: LAYOUT_ID,
@@ -81,7 +81,7 @@ function mount(value: SpaceSnapshot = snapshot): SpaceSession {
   const stored = { snapshot: value, revision: 0n, exportedRevision: null };
   const session = openSpaceSession(new MemorySpaceBackend([stored]), stored);
   let view: RenderResult | undefined;
-  mountWorkspace({ space: runtime(value), spaceSession: session }, (app) => {
+  mountSpaceApp({ space: runtime(value), spaceSession: session }, (app) => {
     if (view === undefined) view = render(app);
     else view.rerender(app);
   });
@@ -176,7 +176,7 @@ describe('authoring a Card title on the graph', () => {
 describe('presenting after a conversion', () => {
   const noLayouts: SpaceSnapshot = spaceSnapshotSchema.parse({
     ...snapshot,
-    document: { version: 1, title: 'Workspace' },
+    document: { version: 1, title: 'Space' },
   });
 
   it('offers no Present action while the converted Layout’s Graph is empty', async () => {

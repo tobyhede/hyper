@@ -1332,10 +1332,10 @@ export function createSpaceAuthoring({
    * state, so the conflict that could still have been resolved was gone. And the
    * check cannot report by throwing: the caller is an `onClick` handler, which
    * React error boundaries do not catch, so the throw escaped to the window
-   * leaving the stale workspace on screen.
+   * leaving the stale Space on screen.
    *
    * Refusing changes nothing — local work, conflict and every control survive —
-   * so it answers with the reason and leaves the workspace alone. The caller
+   * so it answers with the reason and leaves the Space alone. The caller
    * shows it; taking the page down over a refusal would remove the author's
    * unsaved work to explain why it could not be replaced.
    *

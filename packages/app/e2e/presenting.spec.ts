@@ -416,7 +416,7 @@ test(
 );
 
 /**
- * The chrome at a phone width, where the workspace Sidebar is a Sheet and the
+ * The chrome at a phone width, where the Space Sidebar is a Sheet and the
  * canvas — and so the chrome — has the whole viewport.
  *
  * The primary Traversal choices stay choices: their own full-width row, not a
@@ -426,12 +426,12 @@ test.describe('at a phone width', () => {
   test.use({ viewport: { width: 390, height: 844 } });
 
   /**
-   * The workspace Sheet is a modal drawn *over* the canvas, and its trigger
+   * The Sidebar Sheet is a modal drawn *over* the canvas, and its trigger
    * survives into presentation — so it can be reopened mid-traversal. While it
    * is up it owns every key pressed inside it: one Escape dismisses the sheet
    * and leaves the traversal exactly where it was, rather than doing both.
    */
-  test('a reopened workspace Sheet owns its own keys while presenting', async ({ page }) => {
+  test('a reopened Sidebar Sheet owns its own keys while presenting', async ({ page }) => {
     await page.goto('/');
     await expect(nodeByTitle(page, 'A').first()).toBeVisible();
     await settled(page);
@@ -440,14 +440,14 @@ test.describe('at a phone width', () => {
     await toggle.click();
     await page.getByTestId('present-button').click();
     await expect(page.getByTestId('presenting-chrome')).toBeVisible();
-    await expect(page.getByTestId('workspace-sidebar')).toHaveCount(0);
+    await expect(page.getByTestId('space-sidebar')).toHaveCount(0);
     await settled(page);
 
     await toggle.click();
-    await expect(page.getByTestId('workspace-sidebar')).toBeVisible();
+    await expect(page.getByTestId('space-sidebar')).toBeVisible();
     await page.keyboard.press('Escape');
 
-    await expect(page.getByTestId('workspace-sidebar')).toHaveCount(0);
+    await expect(page.getByTestId('space-sidebar')).toHaveCount(0);
     await expect(page.getByTestId('presenting-chrome')).toBeVisible();
     await expect(activeCard(page)).toHaveAttribute(
       'data-id',
@@ -468,7 +468,7 @@ test.describe('at a phone width', () => {
       await expect(page.getByTestId('presenting-chrome')).toBeVisible();
       // The Sheet is modal and covers the canvas, so nothing here is a fair
       // reading of the chrome until it is gone (ADR 0053).
-      await expect(page.getByTestId('workspace-sidebar')).toHaveCount(0);
+      await expect(page.getByTestId('space-sidebar')).toHaveCount(0);
       await settled(page);
 
       // One move on, taken with the pointer, which is the affordance a narrow
