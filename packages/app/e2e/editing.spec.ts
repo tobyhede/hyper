@@ -284,6 +284,36 @@ test('the Card affordance opens the Card on its editable fields', async ({ page 
   );
 });
 
+/**
+ * The flat paper treatment ADR 0051 settled: cream face, heavy ink rule, and a
+ * mono body that is the writing surface rather than a form control.
+ *
+ * Pinned because nothing else asserts it. The treatment's rules and the general
+ * `.card-pane__panel` rules they override have equal specificity, so only source
+ * order separates them — the same cascade trap `presenting.spec.ts` pins for
+ * `.card--full`. With the treatment colocated in its own stylesheet, that order
+ * is now a fact about the module graph rather than about one file's line
+ * numbers, and a reordered import would silently return the editor to the
+ * generic dark pane with every other assertion still green.
+ */
+test('the opened Card draws the flat paper treatment on its own surface', async ({ page }) => {
+  await page.goto('/');
+  const card = nodeByTitle(page, 'A').first();
+  await expect(card).toBeVisible();
+  await settled(page);
+
+  await openCard(card, 'A');
+
+  const panel = page.getByTestId('open-card').locator('.card-pane__panel--card-editor');
+  await expect(panel).toHaveCSS('background-color', 'rgb(255, 250, 240)');
+  await expect(panel).toHaveCSS('border-top-color', 'rgb(11, 13, 17)');
+  await expect(panel).toHaveCSS('border-top-width', '4px');
+
+  const source = page.getByRole('textbox', { name: 'Markdown source' });
+  await expect(source).toHaveCSS('background-color', 'rgb(255, 250, 240)');
+  await expect(source).toHaveCSS('color', 'rgb(43, 48, 59)');
+});
+
 test(
   'a refused Card title stays in the dialog and is attached to its field',
   { tag: '@parity:markdown-pane-refusal-is-field-local' },

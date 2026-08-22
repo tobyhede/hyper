@@ -26,6 +26,32 @@ test(
   },
 );
 
+/**
+ * The same paper treatment `editing.spec.ts` pins in the application, pinned here
+ * because the catalogue is a different bundle: `.ladle/components.tsx` loads
+ * `styles.css` before `tailwind.css`, the reverse of `main.tsx`. The editor's own
+ * stylesheet arrives through the component either way, but only a computed-style
+ * assertion in both bundles proves it — a Tailwind or cascade divergence between
+ * the two surfaces is precisely what looked correct in one and wrong in the other
+ * when this treatment was last rewritten.
+ *
+ * Untagged on purpose: it guards the move, and is not a parity claim of its own.
+ */
+test('the Markdown story draws the flat paper treatment in the catalogue bundle', async ({
+  page,
+}) => {
+  await page.goto('/?story=components--card-and-alias-panes--markdown&mode=preview');
+
+  const panel = page.locator('.card-pane__panel--card-editor');
+  await expect(panel).toHaveCSS('background-color', 'rgb(255, 250, 240)');
+  await expect(panel).toHaveCSS('border-top-color', 'rgb(11, 13, 17)');
+  await expect(panel).toHaveCSS('border-top-width', '4px');
+
+  const body = page.getByRole('textbox', { name: 'Markdown source' });
+  await expect(body).toHaveCSS('background-color', 'rgb(255, 250, 240)');
+  await expect(body).toHaveCSS('color', 'rgb(43, 48, 59)');
+});
+
 test(
   'Alias Card story is present in the production catalogue',
   { tag: '@parity:alias-pane-authors-metadata' },
@@ -70,6 +96,33 @@ test(
     ).toBeVisible();
   },
 );
+
+/**
+ * The Card-choice popup's paper theme, pinned for the same reason as the editor's
+ * above: it now survives only on the side-effect `import './card-search-combobox.css'`
+ * in `CardSearchCombobox`, and every behavioural assertion in both suites passes
+ * against the stock dark `bg-popover` treatment. This popup is portalled out of the
+ * pane, so it is reached from the page rather than the dialog.
+ *
+ * Untagged: it guards the stylesheet, and is not a parity claim.
+ */
+test('the Card-choice popup draws its paper theme from the component that owns it', async ({
+  page,
+}) => {
+  await page.goto('/?story=components--card-and-alias-panes--new-alias-pane&mode=preview');
+
+  const dialog = page.getByRole('dialog', { name: 'New Alias' });
+  await dialog.getByRole('combobox', { name: 'Target' }).fill('Architecture');
+
+  const popup = page.locator('[data-card-search-combobox]');
+  await expect(popup).toHaveCSS('background-color', 'rgb(255, 250, 240)');
+  await expect(popup).toHaveCSS('border-top-color', 'rgb(11, 13, 17)');
+  await expect(popup).toHaveCSS('border-top-width', '3px');
+  await expect(page.getByRole('option', { name: 'Architecture notes' })).toHaveCSS(
+    'border-bottom-color',
+    'rgb(222, 214, 199)',
+  );
+});
 
 test('review Alias empty state explains that no Target is eligible', async ({ page }) => {
   await page.goto('/?story=review--alias-pane-unreachable-states--empty&mode=preview');

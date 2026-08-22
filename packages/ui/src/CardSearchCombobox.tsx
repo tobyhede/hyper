@@ -10,6 +10,7 @@ import {
   ComboboxList,
 } from './components/combobox';
 import { InputGroupAddon } from './components/input-group';
+import './card-search-combobox.css';
 
 export interface CardSearchComboboxProps {
   readonly label: string;

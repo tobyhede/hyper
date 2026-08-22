@@ -23,6 +23,7 @@ import {
   Textarea,
 } from '@project/ui';
 import { CardPane } from './CardPane';
+import './card-editor.css';
 import { paneInitialFocus } from './pane-focus';
 import { presentAliasCardRefusal, presentMarkdownCardRefusal } from '../authoring-refusal';
 import { GRAPH_PALETTE } from '../colors';

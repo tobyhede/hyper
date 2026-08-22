@@ -140,16 +140,18 @@ export const uncataloguedComponents = [
  * Product appearance does not: it belongs beside the component that draws it,
  * hand-rolled the way `canvas-card.css` sits beside `CanvasCard`.
  *
- * A rule naming no class at all — `[data-card-search-combobox]`, `#root`, the
- * `*` and `body` resets — is keyed by its leading attribute or id, or failing
- * both by its leading element name, so those cannot slip past by having no
- * class to record.
+ * A rule naming no class at all — `#root`, the `*` and `body` resets — is keyed by
+ * its leading attribute or id, or failing both by its leading element name, so those
+ * cannot slip past by having no class to record.
  *
- * Two entries below are product appearance and say so, because the alternative
- * to recording them is not recording them. Each names the ticket that removes
- * it, and design-system baseline Issue 08 leaves its "removed or explicitly
- * limited" acceptance line unticked until both land — a reason is not a
- * substitute for the move.
+ * One entry below is product appearance and says so, because the alternative to
+ * recording it is not recording it. `workspace-selection` is condemned with its
+ * component under ADR 0058 and goes with `space-cards/04`; design-system baseline
+ * Issue 08 leaves its "removed or explicitly limited" acceptance line unticked until
+ * it lands — a reason is not a substitute for the move. `card-editor` was the other,
+ * and Issue 16 moved it to `src/components/card-editor.css` beside `OpenCard`, taking
+ * the Card-choice popup's theme with it to `packages/ui/src/card-search-combobox.css`
+ * beside `CardSearchCombobox`, which is the component it actually styles.
  */
 export const handRolledStyles = [
   {
@@ -192,11 +194,6 @@ export const handRolledStyles = [
       'The base font stack and the page background and foreground colours, set once on the document. Not a component and not stylable from one — the `html, body, #root` sizing that gives the app its one viewport is recorded as `root` above.',
   },
   {
-    block: 'data-card-search-combobox',
-    reason:
-      "Product appearance, and part of `card-editor`'s debt rather than a block of its own: it themes the combobox popup Base UI portals out of the pane, which is why it is reached by an attribute rather than a class. It goes with the treatment it belongs to, under Issue 16.",
-  },
-  {
     block: 'new-card-preview',
     reason:
       'Placement and opacity for the ghost Card drawn over the canvas mid-drag. What it draws is a real `CanvasCard`; this is only where it sits.',
@@ -225,11 +222,6 @@ export const handRolledStyles = [
     block: 'card-pane',
     reason:
       "The modal frame a Card is authored on: the 16:9 silhouette that matches `card.ts`, and the scroll boundary that keeps Cancel and Done reachable. Base UI's Dialog owns modality, focus and dismissal; this owns the frame's geometry against the canvas behind it.",
-  },
-  {
-    block: 'card-editor',
-    reason:
-      "Product appearance, not React Flow's, and it is going: the opened-Card editor's flat-paper treatment — hard-coded ink, paper and rule colours — belongs beside the component that draws it, the way `canvas-card.css` does. The largest thing left in this file, and design-system baseline Issue 16 moves it.",
   },
   {
     block: 'workspace-selection',
