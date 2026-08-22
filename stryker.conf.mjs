@@ -1,0 +1,110 @@
+/**
+ * StrykerJS — the mutation engine, chosen over mewt by the bake-off recorded in
+ * `.scratch/mutation-testing/engine.md`.
+ *
+ * This is a **diagnostic tool, run on purpose, never a gate.** It is not in
+ * `verify`, not in CI, and `thresholds.break` is `null` below so that no score
+ * can ever fail a run. A mutation score is evidence for a conversation about
+ * the oracle; it is not a number to move.
+ *
+ * The campaign targets are supplied per run by the `mutate:*` scripts in
+ * `package.json`, because `mutate` and `testFiles` must be chosen as a pair —
+ * see `testFiles` below.
+ */
+
+/** @type {import('@stryker-mutator/api/core').PartialStrykerOptions} */
+export default {
+  packageManager: 'pnpm',
+  testRunner: 'vitest',
+
+  /*
+   * `plugins` must name the runner explicitly. The Stryker default is the glob
+   * `@stryker-mutator/*`, which does not resolve through pnpm's non-flat
+   * `node_modules`; without this line the run dies with `Cannot find TestRunner
+   * plugin "vitest" … no TestRunner plugins were loaded`, and reports the
+   * `vitest` key below as an unknown option on the way past.
+   */
+  plugins: ['@stryker-mutator/vitest-runner'],
+
+  vitest: {
+    // The real root config, consumed as-is. Its `@project/*` aliases resolve
+    // relative to the config file, so they land on the sandbox's own packages
+    // and the mutated copy is what the tests import. Nothing extra is needed.
+    configFile: 'vitest.config.ts',
+    /*
+     * Stryker's default is `true`, which narrows per-mutant tests using
+     * vitest's related mode. That mode cannot run in this repo at all: it
+     * performs import analysis over every file, and the markdown fixtures
+     * loaded through `import.meta.glob(…, { query: '?raw' })` in
+     * `packages/app/test/{space-files,fixture-placement}.test.ts` make it throw
+     * `Failed to parse source for import analysis … .md file format`. Plain
+     * `vitest related` reproduces it with no Stryker involved, so this is not a
+     * Stryker bug and not something a Stryker upgrade will fix.
+     *
+     * `coverageAnalysis: 'perTest'` below recovers most of the narrowing this
+     * gives up — it ran 3.37 tests per mutant on the SpaceSession baseline
+     * rather than all 17.
+     */
+    related: false,
+  },
+
+  /*
+   * No type checker, deliberately.
+   *
+   * `@stryker-mutator/typescript-checker` *works* here, and that is the
+   * problem. It reads `require('typescript')`, which ADR 0061 points at the
+   * TypeScript **6** compatibility compiler, so it gets the `createProgram` API
+   * it wants and runs without a single warning. It then rejected 56 of 98
+   * SpaceSession mutants as `CompileError` — including 10 of the 11 survivors —
+   * lifting the reported score from 88.78% to 97.62% by deleting the signal the
+   * campaign exists to produce, at 3.4x the runtime.
+   *
+   * It is also welded to exactly the half of the bridge ADR 0061 declares
+   * non-normative and slates for removal.
+   */
+  checkers: [],
+
+  /*
+   * `perTest` records which tests cover which mutant, which is what makes a
+   * survivor triageable: the report names the tests that ran and did not die.
+   * Without it a survivor is a diff with no suspects.
+   */
+  coverageAnalysis: 'perTest',
+
+  /*
+   * The sandbox is a plain directory copy made with `fs.copyFile`, and
+   * `.claude/skills/shadcn` and `.claude/skills/shadcn-first-ui` are
+   * git-tracked symlinks to *directories* (deliberately — CLAUDE.md tracks both
+   * harnesses' skill paths). Copying a directory symlink that way fails on
+   * macOS with `ENOTSUP: operation not supported on socket, copyfile`, which
+   * kills the run before any mutant is tested.
+   *
+   * `node_modules`, `.git`, `/reports`, `.stryker-tmp` and `/stryker.log` are
+   * always ignored by Stryker and do not need listing.
+   */
+  ignorePatterns: ['.claude/**', '.worktrees/**'],
+
+  reporters: ['clear-text', 'progress', 'html', 'json'],
+
+  /*
+   * No gate. `break: null` is Stryker's own "never fail the process" value and
+   * is set explicitly so the intent is visible rather than inherited: this tool
+   * reports, it does not refuse. `high`/`low` only colour the report.
+   */
+  thresholds: { high: 80, low: 60, break: null },
+
+  timeoutMS: 20000,
+  tempDirName: '.stryker-tmp',
+
+  /*
+   * Both are supplied per campaign on the command line, and they are a pair.
+   *
+   * `testFiles` is not merely scoping: the whole suite **cannot** run inside
+   * the sandbox. `test/unit`'s repo-meta test shells out to `git ls-files`,
+   * which returns `[]` in a plain directory copy, so the initial test run fails
+   * and Stryker refuses to start. Any new campaign must therefore name the test
+   * files that are the oracle for the code it mutates.
+   */
+  mutate: [],
+  testFiles: [],
+};
