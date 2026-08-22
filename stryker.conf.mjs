@@ -12,6 +12,15 @@
  * see `testFiles` below.
  */
 
+/*
+ * `@stryker-mutator/api` is a devDependency for this annotation alone. It
+ * arrives transitively with `core` either way, but pnpm's non-flat layout means
+ * an undeclared package does not resolve from the root — so without the
+ * declaration the type below silently resolves to nothing and claims a checking
+ * that is not happening. Note that `verify` typechecks neither this file nor
+ * any `.mjs`: the root program's `include` is `"*.config.ts"`. The annotation
+ * buys editor completion, not a gate.
+ */
 /** @type {import('@stryker-mutator/api/core').PartialStrykerOptions} */
 export default {
   packageManager: 'pnpm',
@@ -104,6 +113,13 @@ export default {
    * which returns `[]` in a plain directory copy, so the initial test run fails
    * and Stryker refuses to start. Any new campaign must therefore name the test
    * files that are the oracle for the code it mutates.
+   *
+   * That list lives in the `mutate:*` scripts, and **nothing keeps it honest**:
+   * add a test file for a target and forget to list it, and the campaign simply
+   * runs against a smaller oracle and reports more survivors. Because a run is
+   * a deliberate diagnostic a human reads, the failure is a misleading report
+   * rather than a broken build — so check the pairing when you read the result,
+   * as `.scratch/mutation-testing/graph-control-and-adoption.md` did.
    */
   mutate: [],
   testFiles: [],
