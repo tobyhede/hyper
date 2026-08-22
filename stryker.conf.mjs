@@ -77,6 +77,17 @@ export default {
    * `perTest` records which tests cover which mutant, which is what makes a
    * survivor triageable: the report names the tests that ran and did not die.
    * Without it a survivor is a diff with no suspects.
+   *
+   * Its companion `ignoreStatic` is deliberately **not** set, which reverses
+   * the spike's own verdict — `spike-stryker.md` recommended `ignoreStatic:
+   * true` alongside `checkers: []`, and only the second was kept. Setting it
+   * would drop this runner's `static: true` false survivors out of the score,
+   * but it drops every module-scope mutant with them, tested or not, and the
+   * campaigns since have measured the tax at 2 of 98 mutants on one target and
+   * 1 of 148 on the other. `engine.md` names the heuristic that identifies
+   * them (`"static": true` with an empty `coveredBy`) and every one has been
+   * falsified by hand. A visible known-false survivor a reader can check beats
+   * a silently absent one.
    */
   coverageAnalysis: 'perTest',
 
@@ -88,10 +99,28 @@ export default {
    * macOS with `ENOTSUP: operation not supported on socket, copyfile`, which
    * kills the run before any mutant is tested.
    *
+   * `.worktrees/**` is load-bearing for a different reason: a git worktree is a
+   * full checkout, so without it every branch checked out beside this one is
+   * copied into the sandbox. Both directories have held worktrees — `.claude/`
+   * historically, `.worktrees/` now — and ignoring one covers only that one,
+   * which is the same pairing `eslint.config.js` makes for the same reason.
+   *
    * `node_modules`, `.git`, `/reports`, `.stryker-tmp` and `/stryker.log` are
    * always ignored by Stryker and do not need listing.
    */
   ignorePatterns: ['.claude/**', '.worktrees/**'],
+
+  /*
+   * `'always'`, not the `true` default, which deletes the temp dir only after a
+   * *successful* run. Two crash modes are documented in this file, and each one
+   * otherwise leaves a complete repo copy — every package's sources and its own
+   * `tsconfig.json` included — in `.stryker-tmp/sandbox-XXXXXX/`. ESLint
+   * then sees several candidate TSConfig roots and reports a parse error for
+   * every file in the repository, so a crashed campaign breaks the next
+   * `pnpm verify`. The ignore entries in `eslint.config.js` and `.oxlintrc.json`
+   * are the belt; this is the braces.
+   */
+  cleanTempDir: 'always',
 
   reporters: ['clear-text', 'progress', 'html', 'json'],
 

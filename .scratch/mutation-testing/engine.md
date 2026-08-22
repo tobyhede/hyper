@@ -39,20 +39,21 @@ Two further facts, recorded but not load-bearing: mewt is AGPL-3.0, and the proj
 - `stryker.conf.mjs` — the shared engine settings, with every load-bearing knob carrying the reason it is set. `.mjs` rather than `.json` precisely so those reasons can be written down.
 - `pnpm mutate:session` and `pnpm mutate:graph` in `package.json`, each pairing a `--mutate` target with the `--testFiles` that are its oracle. Issue `01` asks for *a* command and there are two: `mutate:graph` was written here for issue `04`'s control, ahead of the campaign that exercised it, and it went unrun until then. Recorded rather than tidied away — the second command is `04`'s, landing in `01`'s commit.
 - `@stryker-mutator/api` is a devDependency for the one type annotation in `stryker.conf.mjs`. It arrives transitively with `core`, but pnpm's non-flat layout means an undeclared package does not resolve from the root, and an annotation that resolves to nothing claims a checking that is not happening.
-- `.stryker-tmp/` and `reports/` added to `.gitignore` and `.prettierignore`.
+- `/.stryker-tmp/` and `/reports/` added to `.gitignore`, `.prettierignore`, `eslint.config.js` and `.oxlintrc.json`. All four, because none of them reads any of the others: flat ESLint config does not read `.gitignore`, and `.oxlintrc.json` mirrors ESLint's list by hand. Rooted, because Stryker only writes them beside the config and a bare `reports/` would match the name at any depth.
 
 **Not retained, deliberately:** `@stryker-mutator/typescript-checker`. It ran cleanly on the TS 6 bridge and then rejected 56 of 98 mutants as `CompileError` — 10 of the 11 survivors among them — raising the reported score from 88.78% to 97.62% by deleting the signal, at 3.4× the runtime. It is welded to the half of the bridge ADR 0061 slates for removal.
 
 **Removed completely:** both spike worktrees and their branches, mewt's contained 25 MB binary (it went with its worktree; `~/.config/mewt` was never created and `which mewt` finds nothing), the `mewt.toml`, the SQLite campaign store, and every report either engine produced.
 
-## Four settings that exist only because of this repo
+## Five settings that exist only because of this repo
 
 Each was found by a failed run, and none of the failures pointed at its own fix. They are the configuration burden, and they are written into `stryker.conf.mjs` with their reasons.
 
 1. `plugins` must name `@stryker-mutator/vitest-runner` explicitly — the default glob does not resolve through pnpm's non-flat `node_modules`.
-2. `ignorePatterns` must exclude `.claude/**` — the git-tracked *directory* symlinks under `.claude/skills/` make the sandbox copier die with `ENOTSUP … copyfile`.
+2. `ignorePatterns` must exclude `.claude/**` and `.worktrees/**` — the git-tracked *directory* symlinks under `.claude/skills/` make the sandbox copier die with `ENOTSUP … copyfile`, and a git worktree is a full checkout that would otherwise be copied whole into the sandbox. Both directories have held worktrees, so ignoring one covers only that one.
 3. `vitest.related` must be `false` — vitest's related mode throws on the `import.meta.glob(…, { query: '?raw' })` markdown fixtures. Plain `vitest related` reproduces it, so no Stryker upgrade fixes it.
 4. `testFiles` must be named per campaign — the full suite cannot run in the sandbox, because `test/unit`'s repo-meta test shells out to `git ls-files` and gets `[]` from a plain directory copy.
+5. `cleanTempDir` must be `'always'`, not the `true` default — `true` removes the sandbox only after a *successful* run, and settings 1, 2 and 4 each describe a way a run dies. A surviving sandbox is a complete repo copy carrying its own `tsconfig.json`, which makes `eslint` report a parse error for every file in the repository and breaks the next `pnpm verify`.
 
 ## Standing limits on what the number means
 
