@@ -43,7 +43,25 @@ const changedTitle = (title: string) => {
 };
 
 /** Every persistence state a session can be in other than `conflicted`. */
-type UnconflictedKind = 'settled' | 'pending' | 'failed' | 'rejected';
+type UnconflictedKind = Exclude<SpaceSessionState['persistence']['kind'], 'conflicted'>;
+
+/**
+ * One sample of every kind the property below quantifies over, keyed by kind
+ * for exhaustive generation.
+ *
+ * The type alias above derives from `SpaceSessionState`, but a derived union is
+ * not on its own a guard: neither `fc.constantFrom` nor the `switch` in
+ * `openSessionIn` demands that every member be named, so a sixth persistence
+ * kind would drop out of the property in silence. `Record<UnconflictedKind, _>`
+ * is what makes it a compile error here — and the case it then needs in
+ * `openSessionIn` is a line away.
+ */
+const EVERY_UNCONFLICTED_KIND = {
+  settled: 'settled',
+  pending: 'pending',
+  failed: 'failed',
+  rejected: 'rejected',
+} as const satisfies Readonly<Record<UnconflictedKind, UnconflictedKind>>;
 
 interface DrivenSession {
   readonly session: SpaceSession;
@@ -81,17 +99,33 @@ const openSessionIn = async (kind: UnconflictedKind): Promise<DrivenSession> => 
   const session = openSpaceSession(new MemorySpaceBackend([loaded], control), loaded);
 
   session.submit(changedTitle(`Drove into ${kind}`));
-  await waitFor(session.getState, session.subscribe, (state) => state.persistence.kind === kind);
+  const driven = await waitFor(
+    session.getState,
+    session.subscribe,
+    (state) => state.persistence.kind === kind,
+  );
 
   /*
-   * The commit really was attempted, which for `settled` is the whole point.
-   * `submit` publishes `pending` synchronously today, so waiting for `settled`
-   * waits for a *round trip*. If that ever became asynchronous the predicate
-   * would match the state the session opened in, and this helper would go on
-   * returning a session that had never reached the backend — testing the
-   * opening state twice and the post-commit state never, without failing.
-   * Asserting the attempt is what turns that into a red test.
+   * The acknowledged revision says which `settled` this is. `submit` publishes
+   * `pending` synchronously today, so waiting for `settled` waits for a *round
+   * trip*. If that ever became asynchronous the predicate would match the
+   * optimistic state instead, and this helper would go on returning a session
+   * that had never reached the backend — testing that state twice and the
+   * post-commit one never, without failing.
+   *
+   * Neither of the two weaker guards catches that. The attempt count cannot:
+   * `MemorySpaceBackend.commitSpace` records the attempt before its first
+   * `await`, so `attempts` proves a commit *started*, never that one finished.
+   * Nor can state identity: `submit`'s optimistic publication already installs
+   * a fresh object in `settled` before any commit begins. Only the revision
+   * separates the two, because only an acknowledged commit advances it —
+   * deferring `startCommit` by a microtask leaves it at `loaded.revision` and
+   * turns this line red. The count stays as the weaker statement it can
+   * honestly make, that the backend was reached at all.
    */
+  expect(driven.acknowledgedRevision).toBe(
+    kind === 'settled' ? loaded.revision + 1n : loaded.revision,
+  );
   expect(control.attempts).toHaveLength(1);
 
   return { session, control, release };
@@ -104,8 +138,10 @@ describe('openSpaceSession', () => {
    * the transition into `pending` has overwritten the state `openSpaceSession`
    * installed — so nothing said what a caller reads before it submits anything.
    * Asserting the complete object rather than the one field is deliberate: a
-   * sixth persistence kind, or a fifth state field, has to be accounted for
-   * here rather than slipping past a `toMatchObject`.
+   * fifth state field has to be accounted for here rather than slipping past a
+   * `toMatchObject`. A sixth *persistence* kind would not: it does not change
+   * the value `{ kind: 'settled' }`, so no runtime assertion can see it, and
+   * `EVERY_UNCONFLICTED_KIND` above is what catches that instead.
    */
   it('opens settled on the loaded snapshot before anything is submitted', () => {
     const session = openSpaceSession(new MemorySpaceBackend([loaded]), loaded);
@@ -705,7 +741,7 @@ describe('openSpaceSession', () => {
   it('refuses acceptRemote and resolveConflict in every state but conflicted', async () => {
     await fc.assert(
       fc.asyncProperty(
-        fc.constantFrom<UnconflictedKind>('settled', 'pending', 'failed', 'rejected'),
+        fc.constantFrom(...Object.values(EVERY_UNCONFLICTED_KIND)),
         fc.array(
           fc.record({
             operation: fc.constantFrom<'acceptRemote' | 'resolveConflict'>(
@@ -726,25 +762,30 @@ describe('openSpaceSession', () => {
             notifications += 1;
           });
 
-          for (const call of calls) {
-            if (call.operation === 'acceptRemote') session.acceptRemote();
-            else session.resolveConflict(changedTitle(call.title));
+          try {
+            for (const call of calls) {
+              if (call.operation === 'acceptRemote') session.acceptRemote();
+              else session.resolveConflict(changedTitle(call.title));
+            }
+
+            // Identity, because a publication would replace the object a
+            // `useSyncExternalStore` reader compares; value, because an in-place
+            // edit would keep the identity and still have changed the session.
+            expect(session.getState()).toBe(before);
+            expect(session.getState()).toEqual(valueBefore);
+            expect(notifications).toBe(0);
+            expect(control.attempts).toHaveLength(attemptsBefore);
+          } finally {
+            // In `finally` because a failed assertion above would otherwise
+            // strand the gate: `commitSpace` would never settle, and fast-check
+            // leaves one unsettled promise behind per shrink attempt.
+            release();
+            await waitFor(
+              session.getState,
+              session.subscribe,
+              (state) => state.persistence.kind !== 'pending',
+            );
           }
-
-          // Identity, because a publication would replace the object a
-          // `useSyncExternalStore` reader compares; value, because an in-place
-          // edit would keep the identity and still have changed the session.
-          expect(session.getState()).toBe(before);
-          expect(session.getState()).toEqual(valueBefore);
-          expect(notifications).toBe(0);
-          expect(control.attempts).toHaveLength(attemptsBefore);
-
-          release();
-          await waitFor(
-            session.getState,
-            session.subscribe,
-            (state) => state.persistence.kind !== 'pending',
-          );
         },
       ),
     );

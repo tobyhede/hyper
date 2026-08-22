@@ -56,8 +56,8 @@ assertion.
 baseline recommended. Four survivors across two functions express one rule, and
 the rule is naturally quantified:
 
-> For every persistence state that is not `conflicted`, and every finite
-> sequence of `acceptRemote()` / `resolveConflict(snapshot)` calls, the session
+> For every persistence state that is not `conflicted`, and every sequence of
+> one to four `acceptRemote()` / `resolveConflict(snapshot)` calls, the session
 > is unchanged: `getState()` returns the same object *and* the same value, no
 > subscriber is notified, and the backend records no further commit attempt.
 
@@ -227,9 +227,14 @@ Six steps, all checkable against `session.ts` as it stands:
    `createObservableState.publish` assigns `state = nextState` *before* it
    notifies. So the window in which `inFlight` is true and the state is not yet
    `pending` spans two assignments and is unobservable to any caller.
-3. While `inFlight` stays true, the only code that can run is a subscriber
-   notified from inside that publication — the `.then()` sets `inFlight = false`
-   before it publishes anything, so nothing it does counts.
+3. `inFlight` stays true across the `await` on `backend.commitSpace`, not
+   merely across the publication that set it, so the code that can run in that
+   window is not only a subscriber notified from inside that publication — a
+   React handler, `SpaceAuthoring` or a test can call in too. What is bounded
+   is not the caller but the entry point: the only code that can install a new
+   state is one of the session's own operations, enumerated in step 4. The
+   `.then()` is not among them, because it sets `inFlight = false` before it
+   publishes anything, so nothing it does counts.
 4. Enumerate what such a subscriber can publish. `submit` line 149 publishes
    `{ ...getState(), working }`, which preserves `persistence`; it then cannot
    reach `startCommit`, because line 152 returns while `inFlight`. `retry`
@@ -315,8 +320,11 @@ the ids in the table above are the baseline's.
 
 One caveat on determinism the baseline did not have to carry: the new property
 uses fast-check with the repo's usual unseeded default, so the *inputs* differ
-run to run. The kills do not depend on a lucky draw — three of the four entry
-states and both operations kill `#98` and `#89`, and 100 runs make a draw that
-misses them vanishingly unlikely — but a future campaign that wants
+run to run. The kills do not depend on a lucky draw — *every* entry state kills
+`#98` and `#89`, since under both the guard falls through in any non-conflicted
+state and `current.exportedRevision` throws, and three of the four kill `#99`
+and `#100`, `pending` being the exception because under both of those the guard
+still returns while `inFlight` is true; 100 runs make a draw that misses them
+vanishingly unlikely — but a future campaign that wants
 bit-identical per-test attribution should expect the property's counterexample
 reporting, not its verdict, to vary.
