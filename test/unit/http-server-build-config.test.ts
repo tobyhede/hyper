@@ -21,7 +21,7 @@ describe('http server build config', () => {
     build?: { ssr?: string; outDir?: string };
   };
 
-  it('resolves every workspace alias to a real file regardless of cwd', () => {
+  it('resolves every `@project/*` alias to a real file regardless of cwd', () => {
     const alias = resolved.resolve?.alias ?? {};
     expect(Object.keys(alias)).toHaveLength(4);
     for (const [name, target] of Object.entries(alias)) {

@@ -153,6 +153,14 @@ const trackedFiles = (): readonly string[] =>
       return REGULAR_FILE_MODES.has(entry.slice(0, 6)) ? [entry.slice(separator + 1)] : [];
     });
 
+/**
+ * Every tracked file the historical trees do not account for — what all three
+ * blocks below start from, and the reason none of them writes the exclusion out
+ * again. The one that narrows further does so on top of this.
+ */
+const scannableFiles = (): readonly string[] =>
+  trackedFiles().filter((file) => !HISTORICAL_TREES.some((tree) => file.startsWith(tree)));
+
 /** Every line of `text` matching `pattern`, as `line: text` for a readable failure. */
 const hits = (text: string, pattern: RegExp): string[] =>
   text
@@ -178,15 +186,26 @@ const readTracked = (file: string): string | null => {
   return existsSync(absolute) ? readFileSync(absolute, 'utf8') : null;
 };
 
+/**
+ * An exemption outlives its reason silently, and the scan then covers less than
+ * it reads as covering. Each one has to still be doing something, so each is
+ * read against the pattern it was granted against.
+ */
+const expectEachExemptionEarned = (files: readonly string[], pattern: RegExp): void => {
+  for (const file of files) {
+    const source = readTracked(file);
+    expect(source, `${file} is exempted but no longer tracked`).not.toBeNull();
+    expect(hits(source ?? '', pattern), `${file} no longer needs its exemption`).not.toEqual([]);
+  }
+};
+
 describe('the retired domain vocabulary is gone from tracked files', () => {
   // SAFETY: `includes` only needs to compare `file` against the literal
   // members of `QUALIFIED_FILES` at runtime — the cast doesn't claim `file`
   // is one of them, it just lets a plain `string` be checked against a
   // narrower tuple's `includes` signature.
-  const scanned = trackedFiles().filter(
-    (file) =>
-      !HISTORICAL_TREES.some((tree) => file.startsWith(tree)) &&
-      !QUALIFIED_FILES.includes(file as (typeof QUALIFIED_FILES)[number]),
+  const scanned = scannableFiles().filter(
+    (file) => !QUALIFIED_FILES.includes(file as (typeof QUALIFIED_FILES)[number]),
   );
 
   it('reaches the kinds of file the rename actually touched', () => {
@@ -228,16 +247,7 @@ describe('the retired domain vocabulary is gone from tracked files', () => {
   });
 
   it('keeps no exemption that has stopped earning itself', () => {
-    // An exemption outlives its reason silently, and the scan then covers less
-    // than it reads as covering. Each one has to still be doing something.
-    for (const file of QUALIFIED_FILES) {
-      const source = readTracked(file);
-      expect(source, `${file} is exempted but no longer tracked`).not.toBeNull();
-      expect(
-        hits(source ?? '', RETIRED_COMPOUND),
-        `${file} no longer needs its exemption`,
-      ).not.toEqual([]);
-    }
+    expectEachExemptionEarned(QUALIFIED_FILES, RETIRED_COMPOUND);
   });
 });
 
@@ -406,9 +416,7 @@ const RETIRED_RENDERER_NAME = new RegExp(
 );
 
 describe('the canvas renderer is named once (ADR 0055)', () => {
-  const scanned = trackedFiles().filter(
-    (file) => !HISTORICAL_TREES.some((tree) => file.startsWith(tree)),
-  );
+  const scanned = scannableFiles();
 
   it('reaches the kinds of file this rename actually touched', () => {
     // The two files the rename left something behind in: the sidebar, which
@@ -463,5 +471,298 @@ describe('the canvas renderer is named once (ADR 0055)', () => {
     for (const line of kept) {
       expect(RETIRED_RENDERER_NAME.test(line), line).toBe(false);
     }
+  });
+});
+
+/**
+ * `CONTEXT.md` lists the retired chrome word under Space's `_Avoid_` for two
+ * readings — the loaded Space itself, and the app chrome around it — and the
+ * code drifted from that entry for months with nothing reading for it. Issue
+ * 08 closed the drift. This is what stops it reopening, and the word is the
+ * one most likely to try: unlike the names above, it is what every other tool
+ * in the ecosystem calls this shape of thing, so an agent reaches for it
+ * unprompted.
+ *
+ * Neither block above transfers. ADR 0041's trick was that a *compound* is
+ * unambiguous while the bare English word is fine, and here that is inverted —
+ * pnpm's sense is written in compounds too, so no shape rule separates the two
+ * senses in code. A bare-word scan over the whole tree reports 25 files and
+ * ~131 occurrences, every one of them pnpm's, which is the ever-growing
+ * exception list ADR 0041's own comment rejects.
+ *
+ * So the senses are separated by **where they can live** rather than by how
+ * they are spelled. The bare word is read over the source the repo authors —
+ * `packages/**`, `src/**`, `test/**`, `scripts/**` and the root `.ts` configs
+ * — and the root tool configuration is out, because `eslint.config.js`,
+ * `.oxlintrc.json`, `.coderabbit.yaml`, `ci.yml` and the two `pnpm-*.yaml`
+ * files are each written in some tool's vocabulary and hold no domain name.
+ * That falls outside by construction rather than by exemption.
+ *
+ * The first draft stopped at `packages/**` and `src/**`, which is what the
+ * ticket measured. It was wrong: issue 08's rename also had to clean
+ * `vitest.setup.ts` and four files under `test/unit/`, so the guard could not
+ * see the places the drift had actually reached. Widening cost two exemptions,
+ * both pnpm's toolchain check and its test.
+ */
+const RETIRED_LOOSE_NAME = ['work', 'space'].join('');
+const RETIRED_LOOSE_NAME_CAPITAL = ['Work', 'space'].join('');
+
+/**
+ * The bare word, in any casing. Inside the scanned paths there is no other
+ * sense left to confuse it with, so nothing narrower is needed there.
+ */
+const RETIRED_LOOSE_BARE = new RegExp(RETIRED_LOOSE_NAME, 'i');
+
+/**
+ * The retired word in the **shapes issue 08 actually wrote it in**, which is
+ * what makes a second arm safe to run over documents the path scope cannot
+ * reach. Every monorepo mention in a document is bare and lowercase — pnpm's
+ * packages, a pnpm one, the `exports` Vite resolves through — while the domain
+ * sense only ever appeared as an identifier, a test id, a CSS block or a module
+ * name. Measured over the 46 tracked Markdown files outside the historical
+ * trees, this pattern reports none of them, so that arm carries no exemption
+ * list at all.
+ *
+ * Two carve-outs are shape rather than exception, in the idiom ADR 0041's
+ * `Routed*` uses: pnpm's own kebab compound is the alias module's name, and
+ * `pnpm-` prefixes the manifest that lists the packages. Both have to stay
+ * writable, because the AGENTS.md line saying where the monorepo sense is
+ * allowed has to be able to name them.
+ *
+ * **Three seams are known and taken deliberately, because the shapes that
+ * close them are the ones worth reading.** The capitalised bare word opening a
+ * sentence is reported; so is a kebab modifier pnpm could legitimately write;
+ * and so are pnpm's two exported camelCase names, which `build-tooling.md`
+ * would trip on the day it explains the alias table by identifier rather than
+ * by module. None is in the tree. What those arms buy is the retired entity
+ * written as a proper noun — every domain noun here is capitalised — the
+ * retired module a document sends the next agent to, and the retired
+ * component. A false positive fails loudly with a file:line and is one
+ * decision to take; a document quietly naming a deleted module is the defect
+ * that has already happened twice. The camelCase seam is left open rather than
+ * carved out because no document names those two today, and an exception
+ * without a live justification is what the ticket warns against.
+ */
+const RETIRED_LOOSE_COMPOUND = new RegExp(
+  [
+    // PascalCase compounds opening with it: the sidebar, the selection, the
+    // failure view, the startup.
+    `${RETIRED_LOOSE_NAME_CAPITAL}[A-Z]`,
+    // Compounds ending in it: what opened one, what mounted one.
+    `[A-Za-z]${RETIRED_LOOSE_NAME_CAPITAL}\\b`,
+    // The bare capitalised word, which is the retired module and the entity
+    // `CONTEXT.md` says to call a Space.
+    `\\b${RETIRED_LOOSE_NAME_CAPITAL}\\b`,
+    // camelCase compounds opening with it: its title, its chrome.
+    `\\b${RETIRED_LOOSE_NAME}[A-Z]`,
+    // A test id, a CSS block, a story id — minus pnpm's alias module.
+    `\\b${RETIRED_LOOSE_NAME}-(?!aliases\\b)[a-z]`,
+    // ...and the same positions with it on the right: the retired module the
+    // Space is opened by, minus the manifest that lists the packages.
+    `(?<!pnpm)-${RETIRED_LOOSE_NAME}\\b`,
+  ].join('|'),
+);
+
+/**
+ * The source the repo authors, which is everywhere the domain can be written.
+ * Deliberately broader than `isImplementationSource` — the rename crossed E2E
+ * specs, Ladle stories, story fixtures, `styles.css`, the root unit tests and
+ * `vitest.setup.ts`, and only the first of those sits under a `src/`.
+ */
+const AUTHORED_TREES = ['packages/', 'src/', 'test/', 'scripts/'] as const;
+
+const isAuthoredSource = (file: string): boolean =>
+  AUTHORED_TREES.some((tree) => file.startsWith(tree)) ||
+  (!file.includes('/') && file.endsWith('.ts'));
+
+/**
+ * The five modules that are pnpm's vocabulary rather than ours: the alias
+ * table, the two Vite configs that import it, and the toolchain check that
+ * reads the package list plus its test. Composed from the fragment above for
+ * the same reason every retired name in this file is — written out, this file
+ * would hold the word it bans, and it is scanned now that `test/` is in scope.
+ */
+const MONOREPO_VOCABULARY: readonly string[] = [
+  `packages/app/${RETIRED_LOOSE_NAME}-aliases.ts`,
+  'packages/app/vite.config.ts',
+  'packages/app/http-server-build.config.ts',
+  'scripts/check-typescript-toolchain.ts',
+  'test/unit/check-typescript-toolchain.test.ts',
+];
+
+/** A package manifest, anchored at a package root rather than by filename. */
+const MONOREPO_MANIFEST = /^packages\/[^/]+\/package\.json$/;
+
+/**
+ * The bare-word hits a file is answerable for.
+ *
+ * A manifest is exempted **for the dependency protocol and nothing else**, so
+ * the protocol line is what is forgiven rather than the file: a script name, an
+ * `imports` entry or a renamed package lands in a manifest and nowhere else,
+ * and exempting the file would let all three through. That also keeps the
+ * exemption one rule rather than six paths — the protocol is in every manifest
+ * that depends on a sibling, and a new package brings another.
+ */
+const reportableHits = (file: string, source: string): string[] => {
+  const found = hits(source, RETIRED_LOOSE_BARE);
+  return MONOREPO_MANIFEST.test(file)
+    ? found.filter((hit) => !hit.includes(`"${RETIRED_LOOSE_NAME}:`))
+    : found;
+};
+
+describe('the name used loosely for a Space and its chrome is gone', () => {
+  const scanned = scannableFiles();
+  const authored = scanned
+    .filter(isAuthoredSource)
+    .filter((file) => !MONOREPO_VOCABULARY.includes(file));
+  const documents = scanned.filter((file) => file.endsWith('.md'));
+
+  it('reaches the kinds of file the rename actually touched', () => {
+    // The component the chrome was named after, the stylesheet whose block
+    // names moved with it, and the two outside `packages/` that the first draft
+    // of this scope could not see. A file list that quietly stopped resolving
+    // would report nothing forever.
+    expect(authored).toContain('packages/app/src/components/SpaceSidebar.tsx');
+    expect(authored).toContain('packages/app/src/styles.css');
+    expect(authored).toContain('test/unit/app-http-startup.test.ts');
+    expect(authored).toContain('vitest.setup.ts');
+    expect(authored.filter((file) => file.endsWith('.tsx')).length).toBeGreaterThan(0);
+    expect(authored.filter((file) => file.endsWith('.ts')).length).toBeGreaterThan(0);
+    expect(authored.filter((file) => file.endsWith('.css')).length).toBeGreaterThan(0);
+  });
+
+  it('finds no retired word in the source the repo authors', () => {
+    const found = authored.flatMap((file) => {
+      const source = readTracked(file);
+      return source === null ? [] : reportableHits(file, source).map((hit) => `${file}:${hit}`);
+    });
+
+    expect(found).toEqual([]);
+  });
+
+  it('reads the documents an agent is sent to before touching the code', () => {
+    // The second arm is worth having because documents are where both blocks
+    // above found their bug: ADR 0055's caught `docs/agents/ui.md` pointing the
+    // next agent at a deleted module, and issue 08's own third review round
+    // caught the same file again. These three are read-before-touching
+    // authorities, and none of them is authored source.
+    expect(documents).toContain('AGENTS.md');
+    expect(documents).toContain('CONTEXT.md');
+    expect(documents).toContain('docs/agents/ui.md');
+  });
+
+  it('finds no retired compound in the documents that direct the next agent', () => {
+    const found = documents.flatMap((file) => {
+      const source = readTracked(file);
+      return source === null
+        ? []
+        : hits(source, RETIRED_LOOSE_COMPOUND).map((hit) => `${file}:${hit}`);
+    });
+
+    expect(found).toEqual([]);
+  });
+
+  it('keeps no exemption that has stopped earning itself', () => {
+    expectEachExemptionEarned(MONOREPO_VOCABULARY, RETIRED_LOOSE_BARE);
+
+    // The protocol rule earns itself as a rule rather than per manifest:
+    // `core` declares no sibling and holds no hit, and requiring every manifest
+    // to carry one would fail on a package that is simply a leaf. What has to
+    // still be true is that the forgiveness is forgiving something.
+    const manifests = scanned.filter((file) => MONOREPO_MANIFEST.test(file));
+    expect(manifests.length, 'the protocol rule exempts nothing').toBeGreaterThan(0);
+    expect(
+      manifests.filter((file) => {
+        const source = readTracked(file) ?? '';
+        return hits(source, RETIRED_LOOSE_BARE).length > reportableHits(file, source).length;
+      }),
+      'no manifest still uses the protocol its exemption exists for',
+    ).not.toEqual([]);
+  });
+});
+
+/**
+ * Both patterns above are only as sharp as what they match, and one that
+ * silently stopped matching would pass every file forever. Read them against
+ * the names issue 08 retired, and against pnpm's.
+ *
+ * The two arms are kept honest differently, and this says which does which.
+ * The bare word matches pnpm's spellings too — it is *where* they sit that
+ * keeps them silent — so the domain arm's half of this reads the exemption
+ * predicate rather than the pattern.
+ */
+describe('the vocabulary the loose-name guard reads', () => {
+  it('reports the retired names in every shape they were written in', () => {
+    const retired = [
+      `export function ${RETIRED_LOOSE_NAME_CAPITAL}Sidebar({ navigation }: Props) {`,
+      `const opened = openStored${RETIRED_LOOSE_NAME_CAPITAL}(repository);`,
+      `mount${RETIRED_LOOSE_NAME_CAPITAL}(document.getElementById('root'));`,
+      `const ${RETIRED_LOOSE_NAME}Title = space.title;`,
+      `<div data-testid="${RETIRED_LOOSE_NAME}-sidebar">`,
+      `.${RETIRED_LOOSE_NAME}-selection { display: grid; }`,
+      `components--${RETIRED_LOOSE_NAME}-sidebar--settled`,
+      // A document naming the retired module, which is the failure ADR 0055's
+      // block caught: the word is on the right of the kebab there.
+      `see \`packages/app/src/open-${RETIRED_LOOSE_NAME}.ts\``,
+      // The bare capitalised word, which is the entity CONTEXT.md renames.
+      `The ${RETIRED_LOOSE_NAME_CAPITAL} is the app chrome around the canvas.`,
+    ];
+
+    for (const line of retired) {
+      expect(RETIRED_LOOSE_BARE.test(line), line).toBe(true);
+      expect(RETIRED_LOOSE_COMPOUND.test(line), line).toBe(true);
+    }
+  });
+
+  it('stays silent on the monorepo prose the document arm reads', () => {
+    const kept = [
+      `Seven \`@project/*\` ${RETIRED_LOOSE_NAME} packages under \`packages/\`:`,
+      `A pnpm ${RETIRED_LOOSE_NAME} with strict TypeScript and enforced boundaries`,
+      `Vite needs no alias at all — it resolves through the ${RETIRED_LOOSE_NAME} \`exports\``,
+      `a bare specifier is externalized and hands Node the ${RETIRED_LOOSE_NAME} TypeScript`,
+      // The two names the AGENTS.md gotcha line has to be able to write.
+      `the pnpm sense stays in \`packages/app/${RETIRED_LOOSE_NAME}-aliases.ts\``,
+      `\`pnpm-${RETIRED_LOOSE_NAME}.yaml\` lists the packages`,
+    ];
+
+    for (const line of kept) {
+      expect(RETIRED_LOOSE_COMPOUND.test(line), line).toBe(false);
+    }
+  });
+
+  it('leaves pnpm the compounds it writes in code, by the file and by the line', () => {
+    // The bare word cannot tell the senses apart, so all three of pnpm's own
+    // spellings are hits. Naming both halves is the point: the pattern matching
+    // them is exactly what the two mechanisms below exist for.
+    const pnpmCompounds = [
+      `import { ${RETIRED_LOOSE_NAME}Aliases } from './${RETIRED_LOOSE_NAME}-aliases';`,
+      `export const ${RETIRED_LOOSE_NAME}Packages = Object.keys(${RETIRED_LOOSE_NAME}Aliases());`,
+      `    "@project/core": "${RETIRED_LOOSE_NAME}:*",`,
+    ];
+
+    for (const line of pnpmCompounds) {
+      expect(RETIRED_LOOSE_BARE.test(line), line).toBe(true);
+    }
+
+    // The first two are silent because the module holding them is pnpm's.
+    expect(MONOREPO_VOCABULARY).toContain(`packages/app/${RETIRED_LOOSE_NAME}-aliases.ts`);
+    expect(MONOREPO_VOCABULARY).not.toContain('packages/app/src/components/SpaceSidebar.tsx');
+
+    // The third is silent because of the line it is on, and a manifest is
+    // forgiven that line and nothing else — a script name, an `imports` entry
+    // or a renamed package lands in a manifest and is still reported.
+    const manifest = 'packages/app/package.json';
+    expect(reportableHits(manifest, pnpmCompounds[2] ?? '')).toEqual([]);
+    expect(
+      reportableHits(manifest, `  "scripts": { "dev:${RETIRED_LOOSE_NAME}": "vite" }`),
+    ).not.toEqual([]);
+    expect(reportableHits(manifest, `  "name": "@project/${RETIRED_LOOSE_NAME}-ui",`)).not.toEqual(
+      [],
+    );
+
+    // Nothing outside a manifest is forgiven a line at all.
+    expect(
+      reportableHits('packages/app/src/space.ts', `const ${RETIRED_LOOSE_NAME}: Space = load();`),
+    ).not.toEqual([]);
   });
 });
