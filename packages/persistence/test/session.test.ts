@@ -63,17 +63,36 @@ interface DrivenSession {
  */
 const openSessionIn = async (kind: UnconflictedKind): Promise<DrivenSession> => {
   const control = new MemorySpaceBackendTestControl();
-  if (kind === 'failed') {
-    control.queueResult({ kind: 'retryable-failure', code: 'unavailable', message: 'Try later' });
+  const noRelease = (): void => undefined;
+  let release = noRelease;
+  switch (kind) {
+    case 'settled':
+      break;
+    case 'pending':
+      release = control.deferNextCommit();
+      break;
+    case 'failed':
+      control.queueResult({ kind: 'retryable-failure', code: 'unavailable', message: 'Try later' });
+      break;
+    case 'rejected':
+      control.queueResult({ kind: 'permanent-failure', code: 'forbidden', message: 'No access' });
+      break;
   }
-  if (kind === 'rejected') {
-    control.queueResult({ kind: 'permanent-failure', code: 'forbidden', message: 'No access' });
-  }
-  const release = kind === 'pending' ? control.deferNextCommit() : (): void => undefined;
   const session = openSpaceSession(new MemorySpaceBackend([loaded], control), loaded);
 
   session.submit(changedTitle(`Drove into ${kind}`));
   await waitFor(session.getState, session.subscribe, (state) => state.persistence.kind === kind);
+
+  /*
+   * The commit really was attempted, which for `settled` is the whole point.
+   * `submit` publishes `pending` synchronously today, so waiting for `settled`
+   * waits for a *round trip*. If that ever became asynchronous the predicate
+   * would match the state the session opened in, and this helper would go on
+   * returning a session that had never reached the backend — testing the
+   * opening state twice and the post-commit state never, without failing.
+   * Asserting the attempt is what turns that into a red test.
+   */
+  expect(control.attempts).toHaveLength(1);
 
   return { session, control, release };
 };

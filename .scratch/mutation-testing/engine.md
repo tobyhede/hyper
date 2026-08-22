@@ -37,7 +37,8 @@ Two further facts, recorded but not load-bearing: mewt is AGPL-3.0, and the proj
 
 - `@stryker-mutator/core` and `@stryker-mutator/vitest-runner`, both `10.0.0`, as root devDependencies.
 - `stryker.conf.mjs` — the shared engine settings, with every load-bearing knob carrying the reason it is set. `.mjs` rather than `.json` precisely so those reasons can be written down.
-- `pnpm mutate:session` and `pnpm mutate:graph` in `package.json`, each pairing a `--mutate` target with the `--testFiles` that are its oracle.
+- `pnpm mutate:session` and `pnpm mutate:graph` in `package.json`, each pairing a `--mutate` target with the `--testFiles` that are its oracle. Issue `01` asks for *a* command and there are two: `mutate:graph` was written here for issue `04`'s control, ahead of the campaign that exercised it, and it went unrun until then. Recorded rather than tidied away — the second command is `04`'s, landing in `01`'s commit.
+- `@stryker-mutator/api` is a devDependency for the one type annotation in `stryker.conf.mjs`. It arrives transitively with `core`, but pnpm's non-flat layout means an undeclared package does not resolve from the root, and an annotation that resolves to nothing claims a checking that is not happening.
 - `.stryker-tmp/` and `reports/` added to `.gitignore` and `.prettierignore`.
 
 **Not retained, deliberately:** `@stryker-mutator/typescript-checker`. It ran cleanly on the TS 6 bridge and then rejected 56 of 98 mutants as `CompileError` — 10 of the 11 survivors among them — raising the reported score from 88.78% to 97.62% by deleting the signal, at 3.4× the runtime. It is welded to the half of the bridge ADR 0061 slates for removal.
