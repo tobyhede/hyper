@@ -775,12 +775,12 @@ reconfigured by this ticket:
 - `stryker.conf.mjs`, with every load-bearing knob carrying its reason.
 - `pnpm mutate:session` and `pnpm mutate:graph`, each pairing one `--mutate`
   target with the `--testFiles` that are its oracle.
-- `.stryker-tmp/` and `reports/` gitignored and prettier-ignored.
+- `/.stryker-tmp/` and `/reports/` ignored by `.gitignore`, `.prettierignore`, `eslint.config.js` and `.oxlintrc.json`.
 
 **Confirmation that no threshold and no gate exists — all three checked, at this
 commit:**
 
-1. `thresholds: { high: 80, low: 60, break: null }` in `stryker.conf.mjs:94`.
+1. `thresholds: { high: 80, low: 60, break: null }` in `stryker.conf.mjs` (the `thresholds` key, cited by name because a later commit moved its line).
    `break: null` is Stryker's own "never fail the process" value; `high`/`low`
    only colour the report.
 2. `grep -rn "mutate\|stryker" .github/workflows/` → **no matches** (exit 1).
