@@ -241,8 +241,9 @@ const FINISHED_CONNECTION = {
 beforeAll(() => {
   // jsdom implements no hit-testing, and the reconnect release asks for one.
   // Answering `null` is what a release over nothing really produces, which
-  // `elementDropTargetOf` reads as off-canvas — so these tests exercise the cancelling
-  // path rather than the deleting one.
+  // `elementDropTargetOf` reads as off-canvas — so every test that leaves this
+  // stub alone exercises the cancelling path. `what a reconnect release decides`
+  // answers it with a real mounted element instead, and drives the other paths.
   document.elementFromPoint = () => null;
   vi.stubGlobal(
     'ResizeObserver',
@@ -883,7 +884,8 @@ describe("React Flow's reconnect callback order", () => {
 /**
  * What a reconnect release decides, and the precedence it decides it by.
  *
- * This is the third site of the rule `docs/agents/rendering.md:29` states, and
+ * This is the third site of the rule `docs/agents/rendering.md` states in its
+ * *"Neither React Flow's `toNode` nor the DOM alone answers"* bullet, and
  * the one that is easiest to miss: it composes React Flow's answer with the
  * DOM's exactly as the connect path does, and then asks a different question of
  * the result — delete this Edge, rather than author a Card. Nothing but
@@ -902,8 +904,12 @@ describe('what a reconnect release decides', () => {
     card.className = 'react-flow__node';
     renderer.append(card);
     document.body.append(renderer);
+    mounted = renderer;
     return { renderer, card };
   };
+
+  /** The node `mountFlowDom` put in the document, so cleanup removes that one. */
+  let mounted: Element | null = null;
 
   const internalNode = (id: string): InternalNode => {
     const userNode = { id, position: { x: 0, y: 0 }, data: {} };
@@ -915,13 +921,20 @@ describe('what a reconnect release decides', () => {
   };
 
   /**
-   * A release React Flow **did** resolve a target for — the in-progress branch
-   * of `FinalConnectionState`. It is written out in full because the type
-   * requires the whole branch, not because the handler reads more than
-   * `toNode`.
+   * A release React Flow resolved a target for and **refused** — the only shape
+   * that reaches the precedence with a non-null `toNode`.
+   *
+   * `isValid: true` would be unreachable here: `onReconnect` fires for a valid
+   * release and sets `proposedReconnection`, so `handleReconnectEnd` returns at
+   * its `!proposed` guard before the precedence is consulted. What is left is a
+   * handle in range whose connection the validator refused — the author aimed at
+   * a handle and missed the rule, not the handle.
+   *
+   * Written out in full because the type requires the whole in-progress branch,
+   * not because the handler reads more than `toNode`.
    */
-  const RESOLVED_CONNECTION: FinalConnectionState = {
-    isValid: true,
+  const RESOLVED_CONNECTION = {
+    isValid: false,
     from: { x: 0, y: 0 },
     fromHandle: {
       id: null,
@@ -940,7 +953,7 @@ describe('what a reconnect release decides', () => {
     toPosition: Position.Left,
     toNode: internalNode(CARD_B),
     pointer: { x: 400, y: 0 },
-  };
+  } satisfies FinalConnectionState;
 
   const release = (
     composed: ReturnType<typeof compose>,
@@ -961,7 +974,9 @@ describe('what a reconnect release decides', () => {
   };
 
   afterEach(() => {
-    document.querySelector('.react-flow__renderer')?.remove();
+    mounted?.remove();
+    mounted = null;
+    // Restores what `beforeAll` installed for every other block in this file.
     document.elementFromPoint = () => null;
   });
 
