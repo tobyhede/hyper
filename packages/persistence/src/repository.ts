@@ -15,7 +15,7 @@ import type { LoadedSpace, SpaceSummary } from './backend';
  * the PostgreSQL adapter because it is the only home both sides can reach. ADR
  * 0034 keeps `@project/http` browser-safe — its `paths` do not resolve the
  * server tree and lint blocks the relative escape — while server code imports
- * workspace packages by name like everything else.
+ * `@project/*` packages by name like everything else.
  */
 export type RepositoryCommitResult =
   | { kind: 'committed'; revision: bigint }
