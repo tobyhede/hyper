@@ -135,6 +135,7 @@ export const MarkdownSourceEditor = forwardRef<
     <CodeMirror
       ref={codeMirror}
       data-slot="markdown-source-editor"
+      data-line-numbers="visible"
       className={cn('markdown-source-editor', className)}
       value={value}
       height="100%"
@@ -145,6 +146,8 @@ export const MarkdownSourceEditor = forwardRef<
       onChange={(nextValue) => onValueChange(nextValue)}
       basicSetup={{
         lineNumbers: true,
+        syntaxHighlighting: false,
+        indentOnInput: false,
         drawSelection: false,
         highlightActiveLine: false,
         highlightActiveLineGutter: false,

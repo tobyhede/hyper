@@ -1,5 +1,6 @@
 import type { Locator, Page } from '@playwright/test';
 import { expect, test } from './fixtures';
+import { markdownSource } from './markdown-source';
 import {
   activateGraph,
   activeCard,
@@ -42,19 +43,6 @@ async function quiescent(page: Page): Promise<void> {
   await settled(page);
   await page.waitForTimeout(250);
 }
-
-/** Read the browser selection CodeMirror exposes, preserving source line breaks and spaces. */
-const markdownSource = (editor: Locator): Promise<string> =>
-  editor.evaluate((element) => {
-    const selection = window.getSelection();
-    const range = document.createRange();
-    range.selectNodeContents(element);
-    selection?.removeAllRanges();
-    selection?.addRange(range);
-    const source = selection?.toString() ?? '';
-    selection?.removeAllRanges();
-    return source;
-  });
 
 /**
  * A point on the pane far enough from every handle that React Flow resolves no
@@ -313,9 +301,10 @@ test(
     await expect(title).toBeFocused();
     await title.press('Enter');
     await expect(source).toBeFocused();
-    await expect(
-      page.locator('[data-slot="markdown-source-editor"] .cm-lineNumbers'),
-    ).toBeVisible();
+    await expect(page.locator('[data-slot="markdown-source-editor"]')).toHaveAttribute(
+      'data-line-numbers',
+      'visible',
+    );
 
     const exact = '# Exact\n\n  two spaces and `code`';
     await source.fill(exact);
@@ -332,6 +321,7 @@ test(
     await source.press(`${PRIMARY_MODIFIER}+a`);
     await source.press('Escape');
     await expect(page.getByTestId('open-card')).toHaveCount(0);
+    await expect(cardA).toBeFocused();
 
     await openCard(cardA, 'A');
     await expect(page.getByRole('textbox', { name: 'Markdown source' })).toContainText(

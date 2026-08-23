@@ -1,19 +1,7 @@
-import { expect, test, type Locator } from '@playwright/test';
+import { expect, test } from '@playwright/test';
+import { markdownSource } from '../e2e/markdown-source';
 
 const PRIMARY_MODIFIER = process.platform === 'darwin' ? 'Meta' : 'Control';
-
-/** Read the browser selection CodeMirror exposes, preserving source line breaks and spaces. */
-const markdownSource = (editor: Locator): Promise<string> =>
-  editor.evaluate((element) => {
-    const selection = window.getSelection();
-    const range = document.createRange();
-    range.selectNodeContents(element);
-    selection?.removeAllRanges();
-    selection?.addRange(range);
-    const source = selection?.toString() ?? '';
-    selection?.removeAllRanges();
-    return source;
-  });
 
 test(
   'Markdown Card story validates atomically and Escape cancels the whole draft',
@@ -53,9 +41,10 @@ test(
     await expect(title).toBeFocused();
     await title.press('Enter');
     await expect(source).toBeFocused();
-    await expect(
-      dialog.locator('[data-slot="markdown-source-editor"] .cm-lineNumbers'),
-    ).toBeVisible();
+    await expect(dialog.locator('[data-slot="markdown-source-editor"]')).toHaveAttribute(
+      'data-line-numbers',
+      'visible',
+    );
 
     const exact = '# Exact\n\n  two spaces and `code`';
     await source.fill(exact);

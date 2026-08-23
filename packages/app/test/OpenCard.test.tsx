@@ -37,6 +37,37 @@ beforeAll(() => {
 });
 
 describe('the opened Card', () => {
+  it('replaces editor-local source, selection and history when the Card identity changes', () => {
+    const onComplete = vi.fn(() => null);
+    const { rerender } = render(
+      <OpenCard
+        card={markdown({ body: 'Card A source' })}
+        onComplete={onComplete}
+        onCancel={vi.fn()}
+      />,
+    );
+    const firstSource = screen.getByRole('textbox', { name: 'Markdown source' });
+    firstSource.focus();
+    fireEvent.keyDown(firstSource, { key: 'a', ctrlKey: true });
+    fireEvent.paste(firstSource, { clipboardData: { getData: () => 'Card A draft' } });
+
+    rerender(
+      <OpenCard
+        card={{ ...markdown({ body: 'Card B source' }), id: OTHER_CARD_ID, title: 'B' }}
+        onComplete={onComplete}
+        onCancel={vi.fn()}
+      />,
+    );
+
+    const secondSource = screen.getByRole('textbox', { name: 'Markdown source' });
+    expect(secondSource).not.toBe(firstSource);
+    expect(secondSource).toHaveTextContent('Card B source');
+    fireEvent.keyDown(secondSource, { key: 'z', ctrlKey: true });
+    expect(secondSource).toHaveTextContent('Card B source');
+    expect(secondSource).not.toHaveTextContent('Card A draft');
+    expect(window.getSelection()?.containsNode(firstSource, true)).toBe(false);
+  });
+
   it('keeps the title pending until Done without changing the Markdown source', () => {
     const onComplete = vi.fn(() => null);
     render(<OpenCard card={markdown()} onComplete={onComplete} onCancel={vi.fn()} />);

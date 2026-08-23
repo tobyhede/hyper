@@ -101,19 +101,26 @@ describe('MarkdownSourceEditor', () => {
     expect(onValueChange).toHaveBeenLastCalledWith('edited `source`');
   });
 
-  it('keeps read-only source focusable without making it editable', () => {
+  it('keeps read-only source focusable and refuses edits', () => {
+    const onValueChange = vi.fn();
     render(
       <MarkdownSourceEditor
         value="source"
         ariaLabel="Markdown source"
         readOnly
-        onValueChange={vi.fn()}
+        onValueChange={onValueChange}
       />,
     );
 
     const editor = screen.getByRole('textbox', { name: 'Markdown source' });
     expect(editor).toHaveAttribute('contenteditable', 'true');
     expect(editor).toHaveAttribute('aria-readonly', 'true');
+    editor.focus();
+    fireEvent.keyDown(editor, { key: 'a', ctrlKey: true });
+    fireEvent.paste(editor, { clipboardData: { getData: () => 'replacement' } });
+
+    expect(onValueChange).not.toHaveBeenCalled();
+    expect(editor).toHaveTextContent('source');
   });
 
   it.each(['Tab', 'Escape'])('leaves %s available to its containing surface', (key) => {
