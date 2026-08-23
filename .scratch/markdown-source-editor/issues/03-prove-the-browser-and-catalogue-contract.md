@@ -98,8 +98,10 @@ Final verification:
   `markdown-source-editor.css`. Only that half: colocation is the approved home
   for product appearance, so those owe no inventory entry.
 
-Verification after the review follow-up:
+Verification after the review follow-up, on the branch merged with `main`
+(which had moved on by the retired-chrome-vocabulary rename and the
+mutation-testing chain):
 
-- `pnpm verify`: passed — 154 files, 1,674 tests passed, 8 skipped.
+- `pnpm verify`: passed — 154 files, 1,684 tests passed, 8 skipped.
 - `pnpm e2e`: passed — 119 tests.
 - `pnpm e2e:ladle`: passed — 41 tests.
