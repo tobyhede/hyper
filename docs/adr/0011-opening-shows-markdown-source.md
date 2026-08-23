@@ -2,7 +2,7 @@
 
 Status: accepted
 Refines: 0006, 0008
-Refined by: 0037
+Refined by: 0037, 0063
 Related: 0024
 
 Opening a Markdown card shows its **source** — the verbatim Markdown, read-only, in a monospace block. It is not rendered to formatted prose. The one place a card's Markdown is parsed and drawn rendered is the **Presentation** deck.

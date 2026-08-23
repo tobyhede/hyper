@@ -1,4 +1,19 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Locator } from '@playwright/test';
+
+const PRIMARY_MODIFIER = process.platform === 'darwin' ? 'Meta' : 'Control';
+
+/** Read the browser selection CodeMirror exposes, preserving source line breaks and spaces. */
+const markdownSource = (editor: Locator): Promise<string> =>
+  editor.evaluate((element) => {
+    const selection = window.getSelection();
+    const range = document.createRange();
+    range.selectNodeContents(element);
+    selection?.removeAllRanges();
+    selection?.addRange(range);
+    const source = selection?.toString() ?? '';
+    selection?.removeAllRanges();
+    return source;
+  });
 
 test(
   'Markdown Card story validates atomically and Escape cancels the whole draft',
@@ -10,7 +25,7 @@ test(
     const title = dialog.getByRole('textbox', { name: 'Title' });
     const body = dialog.getByRole('textbox', { name: 'Markdown source' });
     await expect(title).toBeFocused();
-    await expect(body).toHaveValue(/## Placement/);
+    await expect(body).toContainText('## Placement');
 
     await title.fill('   ');
     await body.fill('A pending replacement');
@@ -21,6 +36,42 @@ test(
     await expect(dialog).toBeVisible();
 
     await body.press('Escape');
+    await expect(dialog).toBeHidden();
+    await expect(page.getByText('No edit completed.')).toBeVisible();
+  },
+);
+
+test(
+  'Markdown source keeps exact bytes while the pane owns Tab and Escape',
+  { tag: '@parity:markdown-source-editor-preserves-pane-ownership' },
+  async ({ page }) => {
+    await page.goto('/?story=components--card-and-alias-panes--markdown&mode=preview');
+
+    const dialog = page.getByRole('dialog', { name: 'Architecture notes' });
+    const title = dialog.getByRole('textbox', { name: 'Title' });
+    const source = dialog.getByRole('textbox', { name: 'Markdown source' });
+    await expect(title).toBeFocused();
+    await title.press('Enter');
+    await expect(source).toBeFocused();
+    await expect(
+      dialog.locator('[data-slot="markdown-source-editor"] .cm-lineNumbers'),
+    ).toBeVisible();
+
+    const exact = '# Exact\n\n  two spaces and `code`';
+    await source.fill(exact);
+    expect(await markdownSource(source)).toBe(exact);
+    await source.press(`${PRIMARY_MODIFIER}+z`);
+    await expect(source).toContainText('## Placement');
+    await source.press(`${PRIMARY_MODIFIER}+Shift+z`);
+    expect(await markdownSource(source)).toBe(exact);
+
+    await source.press('Tab');
+    await expect(dialog.getByRole('button', { name: 'Cancel' })).toBeFocused();
+    await page.keyboard.press('Shift+Tab');
+    await expect(source).toBeFocused();
+    await source.press(`${PRIMARY_MODIFIER}+a`);
+    await source.press('Escape');
+
     await expect(dialog).toBeHidden();
     await expect(page.getByText('No edit completed.')).toBeVisible();
   },
@@ -47,7 +98,7 @@ test('the Markdown story draws the flat paper treatment in the catalogue bundle'
   await expect(panel).toHaveCSS('border-top-color', 'rgb(11, 13, 17)');
   await expect(panel).toHaveCSS('border-top-width', '4px');
 
-  const body = page.getByRole('textbox', { name: 'Markdown source' });
+  const body = page.locator('[data-slot="markdown-source-editor"]');
   await expect(body).toHaveCSS('background-color', 'rgb(255, 250, 240)');
   await expect(body).toHaveCSS('color', 'rgb(43, 48, 59)');
 });

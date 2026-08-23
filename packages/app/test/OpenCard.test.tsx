@@ -37,7 +37,7 @@ beforeAll(() => {
 });
 
 describe('the opened Card', () => {
-  it('keeps all content fields pending until Done', () => {
+  it('keeps the title pending until Done without changing the Markdown source', () => {
     const onComplete = vi.fn(() => null);
     render(<OpenCard card={markdown()} onComplete={onComplete} onCancel={vi.fn()} />);
 
@@ -45,10 +45,6 @@ describe('the opened Card', () => {
     fireEvent.change(screen.getByRole('textbox', { name: 'Title' }), {
       target: { value: 'Renamed A' },
     });
-    fireEvent.change(screen.getByRole('textbox', { name: 'Markdown source' }), {
-      target: { value: 'New body' },
-    });
-
     expect(onComplete).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: 'Done' }));
 
@@ -56,7 +52,7 @@ describe('the opened Card', () => {
       id: CARD_ID,
       title: 'Renamed A',
       kind: 'markdown',
-      body: 'New body',
+      body: '**A** source',
     });
   });
 
@@ -65,9 +61,6 @@ describe('the opened Card', () => {
     const onCancel = vi.fn();
     render(<OpenCard card={markdown()} onComplete={onComplete} onCancel={onCancel} />);
 
-    fireEvent.change(screen.getByRole('textbox', { name: 'Markdown source' }), {
-      target: { value: 'abandoned' },
-    });
     fireEvent.keyDown(screen.getByRole('textbox', { name: 'Markdown source' }), { key: 'Escape' });
 
     expect(onCancel).toHaveBeenCalledOnce();
@@ -281,6 +274,16 @@ describe('the opened Card as a dialog', () => {
   it('uses Base UI modal containment rather than a local Tab handler', () => {
     render(<OpenCard card={markdown()} onComplete={vi.fn(() => null)} onCancel={vi.fn()} />);
     expect(screen.getByRole('dialog').closest('[data-base-ui-portal]')).not.toBeNull();
+  });
+
+  it('moves from Title to Markdown source on unmodified Enter', async () => {
+    render(<OpenCard card={markdown()} onComplete={vi.fn(() => null)} onCancel={vi.fn()} />);
+    const title = screen.getByRole('textbox', { name: 'Title' });
+    await waitFor(() => expect(title).toHaveFocus());
+
+    fireEvent.keyDown(title, { key: 'Enter' });
+
+    expect(screen.getByRole('textbox', { name: 'Markdown source' })).toHaveFocus();
   });
 
   it('opens an Alias on its Target picker, since the title stays editable from the Card front', async () => {

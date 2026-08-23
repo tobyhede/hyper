@@ -1,0 +1,11 @@
+.markdown-source-editor {
+  height: 100%;
+  min-height: 0;
+  color: var(--foreground);
+  background: transparent;
+}
+
+.markdown-source-editor:focus-within {
+  outline: 2px solid var(--ring);
+  outline-offset: -2px;
+}

@@ -118,25 +118,20 @@
 }
 
 .card-editor__markdown {
-  field-sizing: fixed;
   flex: 1;
   min-height: 0;
-  resize: none;
-  padding: 14px;
   color: var(--card-editor-body-color);
-  font-family: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 12px;
-  line-height: 22px;
   background: var(--card-editor-paper-color);
-  border: 0;
-  border-radius: 0;
-  outline: 0;
-  box-shadow: none;
 }
 
-.card-editor__markdown:focus-visible {
-  border: 0;
-  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--card-editor-graph) 65%, transparent);
+.card-editor__markdown:focus-within {
+  outline-color: color-mix(in srgb, var(--card-editor-graph) 65%, transparent);
+}
+
+.card-editor__markdown .cm-gutters {
+  color: var(--card-editor-label-color);
+  border-right-color: var(--card-editor-rule-color);
 }
 
 .card-editor__alias-target {

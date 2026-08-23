@@ -262,8 +262,12 @@ describe('accepting a stored Space discards the open Interaction draft', () => {
     const session = await mountedWorkspace();
     fireEvent.click(screen.getByRole('button', { name: 'Edit Card Local card' }));
     const source = screen.getByRole('textbox', { name: 'Markdown source' });
-    fireEvent.change(source, { target: { value: 'Prose nobody pressed Done on' } });
-    expect(source).toHaveValue('Prose nobody pressed Done on');
+    source.focus();
+    fireEvent.keyDown(source, { key: 'a', ctrlKey: true });
+    fireEvent.paste(source, {
+      clipboardData: { getData: () => 'Prose nobody pressed Done on' },
+    });
+    expect(source).toHaveTextContent('Prose nobody pressed Done on');
 
     await raiseConflict(session);
     acceptRemote();

@@ -299,7 +299,7 @@ test('a card shows its title in the graph, and opens to show its Markdown source
   await openCard(a, 'A');
   const opened = page.getByTestId('open-card');
   await expect(opened).toBeVisible();
-  await expect(opened.getByRole('textbox', { name: 'Markdown source' })).toHaveValue(/\*\*A\*\*/);
+  await expect(opened.getByRole('textbox', { name: 'Markdown source' })).toContainText('**A**');
 
   await page.getByRole('button', { name: 'Cancel' }).click();
   await expect(opened).toBeHidden();
@@ -323,7 +323,7 @@ test('a card can be opened even when it is not on the selected graph', async ({ 
   await openCard(nodeByTitle(page, 'E'), 'E');
   await expect(
     page.getByTestId('open-card').getByRole('textbox', { name: 'Markdown source' }),
-  ).toHaveValue(/Echo collection/);
+  ).toContainText('Echo collection');
 });
 
 test('cards are drawn at exactly the size the layout placed them at', async ({ page }) => {
@@ -389,7 +389,7 @@ test('content that exceeds the frame scrolls inside it, keeping controls reachab
   // resize, so the overflow is exercised all the same.
   await page.goto('/');
   await openCard(nodeByTitle(page, 'D'), 'D');
-  const content = page.getByRole('textbox', { name: 'Markdown source' });
+  const content = page.locator('[data-slot="markdown-source-editor"] .cm-scroller');
   await expect(content).toBeVisible();
 
   await page.setViewportSize({ width: 520, height: 380 });

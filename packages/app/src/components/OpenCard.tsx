@@ -20,7 +20,8 @@ import {
   FieldError,
   FieldGroup,
   FieldLabel,
-  Textarea,
+  MarkdownSourceEditor,
+  type MarkdownSourceEditorHandle,
 } from '@project/ui';
 import { CardPane } from './CardPane';
 import './card-editor.css';
@@ -280,7 +281,7 @@ function MarkdownCardEditor({
   const [draft, setDraft] = useState<MarkdownDraft>(() => seedMarkdown(content));
   const [contentRefusal, setContentRefusal] = useState<string | null>(null);
   const [authoringRefusal, setAuthoringRefusal] = useState<AuthoringRefusal | null>(null);
-  const body = useRef<HTMLTextAreaElement>(null);
+  const body = useRef<MarkdownSourceEditorHandle>(null);
   const authoringErrors =
     authoringRefusal === null ? { fields: {} } : presentMarkdownCardRefusal(authoringRefusal);
   const titleError = draft.titleError ?? authoringErrors.fields.title ?? null;
@@ -323,17 +324,13 @@ function MarkdownCardEditor({
       onCancel={onCancel}
     >
       <Field className="card-editor__body">
-        <FieldLabel className="sr-only" htmlFor="open-card-markdown">
-          Markdown source
-        </FieldLabel>
-        <Textarea
+        <MarkdownSourceEditor
           ref={body}
-          id="open-card-markdown"
           className="card-editor__markdown"
           value={draft.body}
-          {...paneInitialFocus(!titleStartsFocused)}
-          onChange={(event) => {
-            setDraft({ ...draft, body: event.currentTarget.value });
+          ariaLabel="Markdown source"
+          onValueChange={(nextBody) => {
+            setDraft({ ...draft, body: nextBody });
             setContentRefusal(null);
             setAuthoringRefusal(null);
           }}
