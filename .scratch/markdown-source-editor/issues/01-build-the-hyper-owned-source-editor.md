@@ -20,7 +20,6 @@ interface MarkdownSourceEditorProps {
   readonly onValueChange: (value: string) => void;
   readonly ariaLabel: string;
   readonly className?: string;
-  readonly readOnly?: boolean;
 }
 
 interface MarkdownSourceEditorHandle {
@@ -36,7 +35,8 @@ already declines Base UI's generic autofocus so product composition can choose
 the first field.
 
 Configure standard Markdown, line numbers, soft wrapping and history. Remove
-CodeMirror ownership of Escape and Tab; do not install `indentWithTab`. Disable
+CodeMirror ownership of every key the surface owns; do not install
+`indentWithTab`. Disable
 folding, completion, search/lint keymaps and active-line treatment that would
 turn the Card into an IDE. Give the content element its supplied accessible name.
 
@@ -57,8 +57,8 @@ Add `@project/ui` tests for the contract Hyper owns:
 - whitespace and Markdown punctuation are not normalized;
 - the focus handle focuses the editable content and returns that element;
 - the content has the supplied accessible name;
-- read-only prevents editing;
-- Escape and Tab are not consumed by a Hyper-installed CodeMirror binding.
+- Escape, Tab and the pane's commit shortcut are not consumed by a
+  Hyper-installed CodeMirror binding.
 
 Use only the narrow browser API shim CodeMirror actually needs under jsdom. Do
 not mock CodeMirror or assert incidental internal DOM beyond the public editable
@@ -69,8 +69,8 @@ belong to Issue 03.
 
 - [x] `@project/ui` is the only package that imports CodeMirror.
 - [x] The wrapper exposes no CodeMirror types or configuration.
-- [x] Source editing, controlled updates, accessibility, read-only and focus are
-      covered by component tests.
+- [x] Source editing, controlled updates, accessibility and focus are covered by
+      component tests.
 - [x] Line numbers, wrapping, history and the restrained Hyper theme are enabled;
       IDE chrome and Tab indentation are absent.
 - [x] The component is exported through the public
@@ -89,3 +89,28 @@ The narrow public subpath is the production split point: `OpenCard` remains
 mounted to own modality while only a Markdown Card loads the editor chunk.
 
 `pnpm verify` passed: 152 test files, 1,669 tests passed and 8 skipped.
+
+## Review follow-up
+
+Three defects the branch review found in this ticket's work, each fixed with a
+regression test:
+
+- **`Mod-Enter` was never withheld.** The filter named `Escape`, `Tab` and
+  `Shift-Tab`; `defaultKeymap` binds `Mod-Enter` to `insertBlankLine`, which is
+  the key `CardEditorShell` commits on. CodeMirror's keymap calls
+  `preventDefault` without `stopPropagation`, so the shortcut inserted a blank
+  line *and* still submitted, committing a draft that no longer matched what the
+  editor was showing. The withheld set is now `PANE_OWNED_KEYS`, and it is stated
+  as what the *surface* owns rather than as a list of keys to skip.
+- **The test proving that contract could not fail.** It asserted only that a
+  parent `onKeyDown` fired, which happens whether or not CodeMirror consumed the
+  key — which is why the `Mod-Enter` collision shipped. It now asserts
+  `defaultPrevented === false`, and passing the whole unfiltered `defaultKeymap`
+  fails it. `Tab` and `Shift-Tab` left the filter with it: `defaultKeymap` binds
+  no Tab at all, so naming them was a guard over nothing, and the appearance of
+  protection is what hid the real gap.
+- **`readOnly` was a capability with no requirement**, which this spec forbids.
+  Its only reference outside the component was its own test. Removed; the
+  contract above is updated.
+
+`pnpm verify` output is recorded in Issue 03 alongside the browser suites.

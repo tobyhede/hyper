@@ -1,4 +1,4 @@
-import { createRef } from 'react';
+import { createRef, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 
@@ -112,38 +112,42 @@ describe('MarkdownSourceEditor', () => {
     expect(onValueChange).toHaveBeenLastCalledWith('edited `source`');
   });
 
-  it('keeps read-only source focusable and refuses edits', () => {
+  /**
+   * Reaching the containing surface is not the contract — CodeMirror's keymap calls
+   * `preventDefault` without `stopPropagation`, so a consumed key still bubbles and a
+   * call count alone passes against the whole unfiltered `defaultKeymap`. What the pane
+   * owns is whether the key arrives *unconsumed*, which is `defaultPrevented === false`.
+   *
+   * `Mod-Enter` is here because `defaultKeymap` binds it to `insertBlankLine`, and it is
+   * the key `CardEditorShell` commits on: consuming it edits the document underneath the
+   * commit it triggers. Pressed with Control, because CodeMirror reads `Mod` off the
+   * user agent and jsdom is not a Mac — the Command half is the browser suites' to prove,
+   * where the platform is real and `PRIMARY_MODIFIER` names it.
+   */
+  it.each([
+    { key: 'Escape', press: { key: 'Escape' } },
+    { key: 'Tab', press: { key: 'Tab' } },
+    { key: 'Mod-Enter', press: { key: 'Enter', ctrlKey: true } },
+  ])('leaves $key unconsumed for its containing surface', ({ press }) => {
+    const received: ReactKeyboardEvent[] = [];
     const onValueChange = vi.fn();
     render(
-      <MarkdownSourceEditor
-        value="source"
-        ariaLabel="Markdown source"
-        readOnly
-        onValueChange={onValueChange}
-      />,
-    );
-
-    const editor = screen.getByRole('textbox', { name: 'Markdown source' });
-    expect(editor).toHaveAttribute('contenteditable', 'true');
-    expect(editor).toHaveAttribute('aria-readonly', 'true');
-    editor.focus();
-    fireEvent.keyDown(editor, { key: 'a', ctrlKey: true });
-    fireEvent.paste(editor, { clipboardData: { getData: () => 'replacement' } });
-
-    expect(onValueChange).not.toHaveBeenCalled();
-    expect(editor).toHaveTextContent('source');
-  });
-
-  it.each(['Tab', 'Escape'])('leaves %s available to its containing surface', (key) => {
-    const onKeyDown = vi.fn();
-    render(
-      <div onKeyDown={onKeyDown}>
-        <MarkdownSourceEditor value="source" ariaLabel="Markdown source" onValueChange={vi.fn()} />
+      <div onKeyDown={(event) => received.push(event)}>
+        <MarkdownSourceEditor
+          value={'source'}
+          ariaLabel="Markdown source"
+          onValueChange={onValueChange}
+        />
       </div>,
     );
+    const editor = screen.getByRole('textbox', { name: 'Markdown source' });
+    editor.focus();
 
-    fireEvent.keyDown(screen.getByRole('textbox', { name: 'Markdown source' }), { key });
+    fireEvent.keyDown(editor, press);
 
-    expect(onKeyDown).toHaveBeenCalledOnce();
+    expect(received).toHaveLength(1);
+    expect(received[0]?.defaultPrevented).toBe(false);
+    expect(onValueChange).not.toHaveBeenCalled();
+    expect(editor).toHaveTextContent('source');
   });
 });

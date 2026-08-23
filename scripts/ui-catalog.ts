@@ -147,6 +147,8 @@ const literalArrayNamed = (
 /** The module declaring the two gaps, and the stylesheet one of them is about. */
 const INVENTORY_MODULE = 'packages/app/stories/design-system-inventory.ts';
 const HAND_ROLLED_STYLESHEET = 'packages/app/src/styles.css';
+/** The theme layer, whose classes are Tailwind's to emit rather than a module's to name. */
+const THEME_STYLESHEET = 'packages/app/src/tailwind.css';
 
 interface InventoryEntry {
   readonly subject: string;
@@ -911,6 +913,32 @@ export const buildUiCatalog = (repositoryRoot = process.cwd()): UiCatalog => {
       problems.push(
         `hand-rolled style block ${block} is recorded but ${HAND_ROLLED_STYLESHEET} declares no rule for it`,
       );
+  }
+
+  /**
+   * The dead-rule half of the ratchet, over the stylesheets that live beside their
+   * component rather than in `styles.css` — `canvas-card.css` beside `CanvasCard`,
+   * `card-editor.css` beside `OpenCard`, `card-search-combobox.css` beside
+   * `CardSearchCombobox`.
+   *
+   * Only that half. Colocation is the *approved* home for product appearance, so these
+   * owe no inventory entry — recording them would turn the inventory into a list of
+   * things that are fine. But a rule no production module names is dead wherever it
+   * lives, and without this, moving a block out of `styles.css` and beside its component
+   * is a way to stop the ratchet reading it at all.
+   *
+   * `tailwind.css` is excluded with `styles.css`: it is the theme layer, and the classes
+   * in it are Tailwind's to emit rather than any module's to name.
+   */
+  for (const root of PRODUCTION_UI_ROOTS) {
+    for (const path of filesBelow(join(repositoryRoot, root), '.css')) {
+      const sheet = repositoryPath(repositoryRoot, path);
+      if (sheet === HAND_ROLLED_STYLESHEET || sheet === THEME_STYLESHEET) continue;
+      for (const className of [...declaredClasses(readFileSync(path, 'utf8'))].sort()) {
+        if (!className.startsWith(FRAMEWORK_OWNED) && !isNamed(className, production))
+          problems.push(`${sheet} declares .${className}, which no production module names`);
+      }
+    }
   }
 
   for (const path of filesBelow(supportRoot, '.css')) {

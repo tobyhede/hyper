@@ -25,7 +25,6 @@ export interface MarkdownSourceEditorProps {
   readonly onValueChange: (value: string) => void;
   readonly ariaLabel: string;
   readonly className?: string;
-  readonly readOnly?: boolean;
 }
 
 export interface MarkdownSourceEditorHandle {
@@ -55,9 +54,9 @@ const markdownSourceTheme = EditorView.theme({
   },
   '.cm-gutters': {
     backgroundColor: 'transparent',
-    color: 'var(--muted-foreground)',
+    color: 'var(--markdown-source-gutter-color, var(--muted-foreground))',
     border: '0',
-    borderRight: '1px solid var(--border)',
+    borderRight: '1px solid var(--markdown-source-gutter-rule-color, var(--border))',
   },
   '.cm-lineNumbers .cm-gutterElement': {
     minWidth: '3rem',
@@ -95,8 +94,27 @@ const markdownSourceHighlighting = syntaxHighlighting(
   ]),
 );
 
+/**
+ * Keys the *surface* owns, withheld from CodeMirror so a Hyper-installed binding
+ * cannot answer them first (ADR 0048, ADR 0063).
+ *
+ * `Escape` is the pane's dismissal; `defaultKeymap` would spend it on
+ * `simplifySelection`. `Mod-Enter` is the pane's commit; `defaultKeymap` would spend
+ * it on `insertBlankLine` — and because CodeMirror's keymap calls `preventDefault`
+ * without `stopPropagation`, the key would edit the document *and* still reach the
+ * form, committing a draft that no longer matches what the editor is showing.
+ *
+ * `Tab` is deliberately absent: `defaultKeymap` binds no Tab at all — it arrives only
+ * through `indentWithTab`, which this component sets `false`. Naming it here would be
+ * a guard over nothing, which is how the `Mod-Enter` collision stayed hidden.
+ */
+const PANE_OWNED_KEYS: ReadonlySet<string> = new Set(['Escape', 'Mod-Enter']);
+
 const paneSafeDefaultKeymap = defaultKeymap.filter(
-  (binding) => binding.key !== 'Escape' && binding.key !== 'Tab' && binding.key !== 'Shift-Tab',
+  (binding) =>
+    ![binding.key, binding.mac, binding.win, binding.linux].some(
+      (bound) => bound !== undefined && PANE_OWNED_KEYS.has(bound),
+    ),
 );
 
 const markdownBasicSetup = {
@@ -149,16 +167,20 @@ const stableLineNumberLocator = ViewPlugin.define((view) => {
  * Existing Hyper component considered: `Textarea`, which has no language,
  * gutter or editor-local history behavior. shadcn has no source-editor primitive,
  * so the canonical specialist library is wrapped here rather than exposed to
- * application callers. Escape and Tab are deliberately omitted from its keymap;
- * browser tests prove those keys remain owned by `CardPane` and its focus trap.
+ * application callers. `PANE_OWNED_KEYS` below states which keys are withheld from
+ * it and why; unit and browser tests prove each arrives at the surface unconsumed.
+ *
+ * Two custom properties are the gutter's whole styling contract —
+ * `--markdown-source-gutter-color` and `--markdown-source-gutter-rule-color`, each
+ * falling back to the ambient token. A caller sets them on this component and never
+ * names a `.cm-*` class: those are CodeMirror's, they are renamed by CodeMirror, and a
+ * rule that stops matching one fails by silently reverting rather than by breaking.
+ * `test/unit/codemirror-encapsulation.test.ts` holds every stylesheet to that.
  */
 export const MarkdownSourceEditor = forwardRef<
   MarkdownSourceEditorHandle,
   MarkdownSourceEditorProps
->(function MarkdownSourceEditor(
-  { value, onValueChange, ariaLabel, className, readOnly = false },
-  ref,
-) {
+>(function MarkdownSourceEditor({ value, onValueChange, ariaLabel, className }, ref) {
   const codeMirror = useRef<ReactCodeMirrorRef>(null);
   const latestOnValueChange = useRef(onValueChange);
 
@@ -205,7 +227,6 @@ export const MarkdownSourceEditor = forwardRef<
       value={value}
       height="100%"
       theme="none"
-      readOnly={readOnly}
       indentWithTab={false}
       extensions={extensions}
       onChange={reportValueChange}

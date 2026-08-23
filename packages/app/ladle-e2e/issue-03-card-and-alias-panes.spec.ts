@@ -98,6 +98,10 @@ test('the Markdown story draws the flat paper treatment in the catalogue bundle'
   const body = page.locator('[data-slot="markdown-source-editor"]');
   await expect(body).toHaveCSS('background-color', 'rgb(255, 250, 240)');
   await expect(body).toHaveCSS('color', 'rgb(43, 48, 59)');
+  await expect(page.locator('[data-slot="markdown-source-line-numbers"]')).toHaveCSS(
+    'color',
+    'rgb(107, 99, 83)',
+  );
 });
 
 test(

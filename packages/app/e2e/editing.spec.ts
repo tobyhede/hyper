@@ -356,6 +356,50 @@ test(
   },
 );
 
+/**
+ * The two things Done and Escape do not cover.
+ *
+ * Cancel is a *discard*, and every other Cancel in this suite is clicked on a pane
+ * whose source was never touched — so nothing failed if Cancel committed. And the
+ * pane's commit shortcut is a key CodeMirror also binds (`insertBlankLine`): withheld
+ * from its keymap, it must reach the form having changed nothing. Pressed with the
+ * real platform modifier, which is the half a jsdom test cannot prove.
+ */
+test('Cancel discards edited source and the commit shortcut commits it unchanged', async ({
+  page,
+}) => {
+  await page.goto('/');
+  const cardA = nodeByTitle(page, 'A').first();
+  await settled(page);
+
+  await openCard(cardA, 'A');
+  const source = page.getByRole('textbox', { name: 'Markdown source' });
+  const original = await markdownSource(source);
+  expect(original).toContain('entry point');
+  await source.fill('Discarded rewrite');
+  expect(await markdownSource(source)).toBe('Discarded rewrite');
+  await page.getByRole('button', { name: 'Cancel' }).click();
+  await expect(page.getByTestId('open-card')).toHaveCount(0);
+
+  await openCard(cardA, 'A');
+  expect(await markdownSource(page.getByRole('textbox', { name: 'Markdown source' }))).toBe(
+    original,
+  );
+
+  const committed = '# Committed\n\n  by the shortcut';
+  const reopened = page.getByRole('textbox', { name: 'Markdown source' });
+  await reopened.fill(committed);
+  await reopened.press(`${PRIMARY_MODIFIER}+Enter`);
+  await expect(page.getByTestId('open-card')).toHaveCount(0);
+  await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
+
+  await page.reload();
+  await openCard(nodeByTitle(page, 'A').first(), 'A');
+  expect(await markdownSource(page.getByRole('textbox', { name: 'Markdown source' }))).toBe(
+    committed,
+  );
+});
+
 test('the Markdown editor code loads only when a Markdown Card opens', async ({ page }) => {
   const editorRequests: string[] = [];
   page.on('request', (request) => {
@@ -406,6 +450,14 @@ test('the opened Card draws the flat paper treatment on its own surface', async 
   const source = page.locator('[data-slot="markdown-source-editor"]');
   await expect(source).toHaveCSS('background-color', 'rgb(255, 250, 240)');
   await expect(source).toHaveCSS('color', 'rgb(43, 48, 59)');
+
+  // The gutter takes the paper palette through the editor's two custom properties,
+  // which is the only way the app is allowed to reach it (ADR 0063). Without them it
+  // falls back to the ambient `--muted-foreground`, which is illegible on cream.
+  await expect(page.locator('[data-slot="markdown-source-line-numbers"]')).toHaveCSS(
+    'color',
+    'rgb(107, 99, 83)',
+  );
 });
 
 test(

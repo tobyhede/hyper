@@ -308,6 +308,10 @@ function MarkdownCardEditor({
 
   const titleStartsFocused = true;
   const changeTitle = useCallback((title: string) => {
+    // Typing here withdraws any body focus still waiting on the lazy editor: the
+    // author has stopped waiting for it, and a caret arriving mid-word would put the
+    // rest of the title into the Markdown.
+    focusBodyOnMount.current = false;
     setDraft((current) => ({ ...current, title, titleError: null }));
     setContentRefusal(null);
     setAuthoringRefusal(null);

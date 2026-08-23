@@ -15,6 +15,15 @@ const markdown = (over: { body?: string } = {}) => ({
   body: over.body ?? '**A** source',
 });
 
+/** Replace CodeMirror source through its public editable surface. */
+const replaceMarkdownSource = (value: string): HTMLElement => {
+  const source = screen.getByRole('textbox', { name: 'Markdown source' });
+  source.focus();
+  fireEvent.keyDown(source, { key: 'a', ctrlKey: true });
+  fireEvent.paste(source, { clipboardData: { getData: () => value } });
+  return source;
+};
+
 /** The ids a field points assistive technology at, in the order it names them. */
 const described = (field: HTMLElement): readonly string[] =>
   (field.getAttribute('aria-describedby') ?? '').split(' ').filter(Boolean);
@@ -68,22 +77,27 @@ describe('the opened Card', () => {
     expect(window.getSelection()?.containsNode(firstSource, true)).toBe(false);
   });
 
-  it('keeps the title pending until Done without changing the Markdown source', () => {
+  it('keeps both the title and the edited Markdown source pending until Done', async () => {
     const onComplete = vi.fn(() => null);
     render(<OpenCard card={markdown()} onComplete={onComplete} onCancel={vi.fn()} />);
 
     expect(screen.queryByRole('textbox', { name: 'Description' })).not.toBeInTheDocument();
+    await screen.findByRole('textbox', { name: 'Markdown source' });
+    replaceMarkdownSource('Rewritten source');
     fireEvent.change(screen.getByRole('textbox', { name: 'Title' }), {
       target: { value: 'Renamed A' },
     });
+    // Neither field completes on its own: the pane commits once, on Done (ADR 0048).
     expect(onComplete).not.toHaveBeenCalled();
+
     fireEvent.click(screen.getByRole('button', { name: 'Done' }));
 
+    expect(onComplete).toHaveBeenCalledOnce();
     expect(onComplete).toHaveBeenCalledWith({
       id: CARD_ID,
       title: 'Renamed A',
       kind: 'markdown',
-      body: '**A** source',
+      body: 'Rewritten source',
     });
   });
 

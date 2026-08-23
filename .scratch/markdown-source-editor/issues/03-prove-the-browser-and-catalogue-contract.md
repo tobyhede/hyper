@@ -67,3 +67,39 @@ Final verification:
 - `pnpm e2e`: passed — 118 tests.
 - `pnpm e2e:ladle`: passed — 41 tests.
 - `pnpm build`: passed; Vite reported its existing large-chunk advisory.
+
+## Review follow-up
+
+- **"Cancel discards source" was ticked without evidence.** Every Cancel click in
+  the suite landed on a pane whose source had never been edited, so wiring Cancel
+  to commit the draft would have left both browser suites green; only Escape
+  actually proved discard. A new application test edits the source, cancels,
+  reopens and asserts the original bytes — and presses the commit shortcut with
+  the real platform modifier, which is the half of the `Mod-Enter` contract a
+  jsdom test cannot reach.
+- **The code-split evidence proved the dev module graph, not the bundle.** The
+  request watcher matches `MarkdownSourceEditor` in a URL, which only holds under
+  Vite's unbundled dev server; a built chunk is content-hashed. What decides the
+  split is the import, so `test/unit/codemirror-encapsulation.test.ts` now holds
+  `packages/app/src` to reaching the module by dynamic import only — a type-only
+  static import is erased and still allowed, a value import fails.
+- **Computed appearance was pinned everywhere except the gutter.** The gutter was
+  coloured by an app rule naming `.cm-gutters`, against this effort's own
+  ownership boundary: an upgrade renaming that class reverts it to the ambient
+  `--muted-foreground`, illegible on cream, with every assertion still green. The
+  gutter now takes its colours through two custom properties the component's own
+  theme reads, both runtimes assert the computed result, and no stylesheet in the
+  repository may name a `.cm-*` class.
+- **The design-system ratchet lost the relocated CSS.** `ui-catalog`'s scan was
+  hard-coded to `packages/app/src/styles.css`, so moving 220 lines beside
+  `OpenCard` removed them from the dead-rule check rather than just from the
+  inventory list. The dead-rule half now runs over the colocated stylesheets too
+  — `canvas-card.css`, `card-editor.css`, `card-search-combobox.css`,
+  `markdown-source-editor.css`. Only that half: colocation is the approved home
+  for product appearance, so those owe no inventory entry.
+
+Verification after the review follow-up:
+
+- `pnpm verify`: passed — 154 files, 1,674 tests passed, 8 skipped.
+- `pnpm e2e`: passed — 119 tests.
+- `pnpm e2e:ladle`: passed — 41 tests.

@@ -44,6 +44,10 @@ props only when a requirement exists.
 
 - Escape from the editor closes the pane and discards the whole draft in one
   press, including when source is selected.
+- The pane's commit shortcut reaches the pane having changed nothing. CodeMirror
+  binds `Mod-Enter` to `insertBlankLine` by default and consumes it without
+  stopping propagation, so leaving it installed edits the document underneath the
+  commit it triggers.
 - Tab and Shift+Tab leave the editor and participate in Base UI's focus trap;
   `indentWithTab` is not installed.
 - Undo and redo affect the current opened Card's source draft only.
@@ -72,8 +76,12 @@ exact set.
 The component's styles live beside it in `packages/ui`, use existing tokens, and
 must not depend on source order against `packages/app/src/styles.css`; the Ladle
 and application import orders differ. App-owned layout rules may size the editor
-region, but a new hand-rolled app stylesheet block must be recorded in the design
-system inventory with its reason.
+region and set the custom properties the component's own theme reads, but no
+stylesheet may name a `.cm-*` class: those are CodeMirror's, they are renamed by
+CodeMirror, and a rule that stops matching one fails by silently reverting. A new
+hand-rolled app stylesheet block must be recorded in the design system inventory
+with its reason; a block colocated with its component owes no entry but is still
+held to the dead-rule check.
 
 ## Non-goals
 

@@ -68,3 +68,21 @@ treatment; CodeMirror scrolls inside the body region.
 
 `pnpm verify` passed with 152 test files, 1,669 tests passed and 8 skipped.
 `pnpm e2e` passed all 118 tests. `pnpm e2e:ladle` passed all 41 tests.
+
+## Review follow-up
+
+- **A dropped assertion, not a replaced one.** "Keeps the title pending until
+  Done without changing the Markdown source" had its body edit removed rather
+  than re-expressed against the editor's public behavior, so it asserted the
+  unchanged seed body and proved nothing about an edited body pending until
+  Done — exactly what this ticket says not to do. It now edits both fields and
+  asserts both pend to one Done; mutating `settleMarkdown` to read the seed body
+  fails it, and it is the only test in the file that catches that.
+- **A deferred body focus was never cancelled.** Enter on Title asks for the
+  body, and the body is a lazily loaded chunk, so the ask is deferred until it
+  arrives. Nothing withdrew it: an author who pressed Enter before the chunk
+  resolved and went on typing the title had the caret jump into the Markdown
+  mid-word when it did, with the rest of the title landing in the source.
+  `changeTitle` now withdraws it, proved by a test in its own file — `lazy()`
+  caches its resolution, so a cold chunk cannot be observed in a file that has
+  already rendered one.
