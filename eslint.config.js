@@ -150,6 +150,15 @@ export default tseslint.config(
       '**/test-results/**',
       '**/coverage/**',
       '**/.tanstack/**',
+      // StrykerJS campaign state, root-anchored because that is the only place
+      // it is written. `.stryker-tmp/` holds a *complete repo copy* per sandbox,
+      // `tsconfig.json` included, and `cleanTempDir` removes it only after a
+      // successful run — so every crash leaves one behind, and `stryker.conf.mjs`
+      // documents two crash modes. Linting into one hits exactly the
+      // multiple-candidate-TSConfigRootDirs failure described under `.worktrees/`
+      // below. Gitignored too, which flat config does not read.
+      '.stryker-tmp/**',
+      'reports/**',
       // Throwaway local working dirs — spikes, issue tracker, tool state.
       '**/.scratch/**',
       '**/.serena/**',

@@ -228,7 +228,7 @@ if (typeof Range !== 'undefined' && !('getBoundingClientRect' in Range.prototype
  * jsdom ships no `matchMedia`, and the shared Sidebar asks for one.
  *
  * `useIsMobile` subscribes to `(max-width: 767px)` to decide whether the
- * workspace chrome draws as a sidebar or as a Sheet (ADR 0053). jsdom has no
+ * app's chrome draws as a sidebar or as a Sheet (ADR 0053). jsdom has no
  * layout and no media engine, so the honest answer is a query that never
  * matches and never changes: every rendering test then exercises the desktop
  * sidebar, which is the surface those tests are about.

@@ -201,7 +201,7 @@ interface AuthoringOptions {
 const graphIds = () => mintingGraphIds(MINTED_GRAPH_ID, COMPETING_GRAPH_ID);
 
 /**
- * Compose one workspace exactly as `createApp` does, so a test never sees a seam
+ * Compose one Space app exactly as `createApp` does, so a test never sees a seam
  * production does not have — in particular the Layout's own map as the opening
  * placement, which the composition derives from the renderer it opens in.
  * `openAuthoring` below asks for none on purpose, for the tests that install one
@@ -273,7 +273,7 @@ const openRefusalFixture = () => {
 };
 
 /**
- * A workspace held in conflict against a stored Space that differs from local
+ * A Space app held in conflict against a stored Space that differs from local
  * work in the positions it carries.
  *
  * Both replacement-epoch tests start here and diverge only in what their
@@ -396,7 +396,7 @@ describe('Space Authoring', () => {
   });
 
   it('treats an unchanged Card as no Edit before converting or submitting', () => {
-    // Counting this workspace's own minting, rather than every call the process
+    // Counting this Space's own minting, rather than every call the process
     // makes to the ambient generator: what the refusal has to leave untouched is
     // the identity *this* Edit would have created.
     const minted = vi.fn(newUuid);

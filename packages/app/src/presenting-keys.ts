@@ -18,7 +18,7 @@ const MODAL = '[role="dialog"],[role="alertdialog"]';
  * Whether a modal surface owns this press.
  *
  * Deference is not only about a control that activates itself. Below the
- * Sidebar's breakpoint the workspace surface is a Base UI Sheet — a modal
+ * Sidebar's breakpoint the whole command surface is a Base UI Sheet — a modal
  * dialog drawn *over* the canvas — and it can be reopened during a traversal,
  * because the header trigger stays. Its focus trap means every press then
  * originates inside it, and a window listener that went on traversing would run

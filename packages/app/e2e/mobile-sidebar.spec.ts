@@ -2,7 +2,7 @@ import { expect, test, type Page } from './fixtures';
 import { nodeByTitle, selectedCanvas, settled, sidebar } from './graph';
 
 /**
- * The workspace chrome below the Sidebar's breakpoint, where it is a modal
+ * The app's chrome below the Sidebar's breakpoint, where it is a modal
  * Sheet drawn *over* the canvas rather than beside it.
  *
  * That changes what a command in it has to do. The Sheet is a Base UI Dialog:

@@ -10,7 +10,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest
 import { spaceSnapshotSchema, uuidSchema, type SpaceSnapshot } from '@project/core';
 import { loadSpaceSnapshot } from '@project/graph';
 import { MemorySpaceBackend, openSpaceSession, type SpaceSession } from '@project/persistence';
-import { mountWorkspace } from '../src/Workspace';
+import { mountSpaceApp } from '../src/SpaceApp';
 
 /**
  * ADR 0042's "one shared contract test": an Interaction draft open when a stored
@@ -99,8 +99,8 @@ const snapshot = (
     cards: [{ id: CARD_ID, document: { title: cardTitle, kind: 'markdown', body } }],
   });
 
-const LOCAL = snapshot('Local workspace', 'Local card', 'Local source', 10, 20);
-const REMOTE = snapshot('Remote workspace', 'Remote card', 'Remote source', 900, 700);
+const LOCAL = snapshot('Local space', 'Local card', 'Local source', 10, 20);
+const REMOTE = snapshot('Remote space', 'Remote card', 'Remote source', 900, 700);
 
 const runtime = (value: SpaceSnapshot) => {
   const loaded = loadSpaceSnapshot(value);
@@ -109,15 +109,15 @@ const runtime = (value: SpaceSnapshot) => {
 };
 
 /**
- * A mounted workspace over a session whose stored Space has already moved to
+ * A mounted Space app over a session whose stored Space has already moved to
  * `REMOTE`, but which has not yet discovered that.
  *
  * The conflict is raised *after* the draft is open rather than before, and the
  * order is load-bearing: a conflicted session draws its `Accept remote` in a
- * modal AlertDialog that marks the rest of the shell inert, so a workspace
+ * modal AlertDialog that marks the rest of the shell inert, so a Space app
  * mounted already-conflicted has no reachable Card to open a draft on.
  */
-async function mountedWorkspace(): Promise<SpaceSession> {
+async function mountedSpaceApp(): Promise<SpaceSession> {
   const backend = new MemorySpaceBackend([
     { snapshot: REMOTE, revision: 4n, exportedRevision: null },
   ]);
@@ -128,7 +128,7 @@ async function mountedWorkspace(): Promise<SpaceSession> {
   });
 
   let view: RenderResult | undefined;
-  mountWorkspace({ space: runtime(LOCAL), spaceSession: session }, (app) => {
+  mountSpaceApp({ space: runtime(LOCAL), spaceSession: session }, (app) => {
     if (view === undefined) view = render(app);
     else view.rerender(app);
   });
@@ -154,7 +154,7 @@ const acceptRemote = (): void => {
 
 /**
  * The accepted Space is the one on screen — read off the shell's title, which is
- * the workspace's own name and the one thing the replacement renames that no
+ * the Space's own name and the one thing the replacement renames that no
  * draft, Card or placement is involved in.
  *
  * Waited for *before* each draft assertion so that a surviving draft fails on the
@@ -162,7 +162,7 @@ const acceptRemote = (): void => {
  * the Card the open editor was covering.
  */
 const replacementLanded = async (): Promise<void> => {
-  expect(await screen.findByText('Remote workspace')).toBeVisible();
+  expect(await screen.findByText('Remote space')).toBeVisible();
 };
 
 const nodeOf = (id: string): HTMLElement => {
@@ -259,7 +259,7 @@ describe('accepting a stored Space discards the open Interaction draft', () => {
    * reseed from the accepted Card.
    */
   it('closes an opened Card whose editor holds an uncompleted draft', async () => {
-    const session = await mountedWorkspace();
+    const session = await mountedSpaceApp();
     fireEvent.click(screen.getByRole('button', { name: 'Edit Card Local card' }));
     const source = await screen.findByRole('textbox', { name: 'Markdown source' });
     source.focus();
@@ -306,7 +306,7 @@ describe('accepting a stored Space discards the open Interaction draft', () => {
    * ticket's section 5 has the bisection and treats it as an open question.
    */
   it('drops an in-flight drag and redraws the Card where the accepted Space places it', async () => {
-    const session = await mountedWorkspace();
+    const session = await mountedSpaceApp();
     const dragged = nodeOf(CARD_ID);
     expect(dragged).toHaveStyle({ transform: 'translate(10px,20px)' });
 

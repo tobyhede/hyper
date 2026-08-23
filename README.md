@@ -16,7 +16,7 @@ Engine or Docker Desktop with Compose v2.
 ```sh
 pnpm install
 pnpm dev             # PostgreSQL-backed app at http://localhost:5173 (needs the database up)
-pnpm dev:new         # fresh one-card memory workspace at http://localhost:5174
+pnpm dev:new         # fresh one-card memory space at http://localhost:5174
 pnpm dev:fixture     # tracked test fixture in memory at http://localhost:5175
 ```
 

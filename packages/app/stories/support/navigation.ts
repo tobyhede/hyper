@@ -10,13 +10,13 @@ import { storyGraphIds } from './spaces';
 /**
  * Production Navigation, composed the way a story needs it and no other way.
  *
- * Two surfaces now open a real Navigation — the workspace Sidebar and the
+ * Two surfaces now open a real Navigation — the Space Sidebar and the
  * presenting chrome — and what they share is genuinely the composition rather
  * than a look: the deterministic resolver, the Space reader Navigation resolves
  * every selection against, the rule that the instance is *state* rather than a
  * memo, and the one call that puts a story in the state it is about. Delete this
  * module and both fixtures grow the same twenty lines back, including the
- * lifecycle rule `WorkspaceSidebarFixture.test.tsx` exists to pin.
+ * lifecycle rule `SpaceSidebarFixture.test.tsx` exists to pin.
  *
  * It is deliberately **not** a second lifecycle owner and not a visual facsimile
  * (ADR 0052). It holds no selected index, no Traversal history and no copy of

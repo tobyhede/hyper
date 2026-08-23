@@ -132,7 +132,7 @@ test(
 );
 
 /**
- * The chrome reads its own width rather than the viewport's — the workspace
+ * The chrome reads its own width rather than the viewport's — the Space
  * Sidebar takes 16rem of that width above the breakpoint and none below — so a
  * narrow *region* is the same question a narrow window asks.
  */

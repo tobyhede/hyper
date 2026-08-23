@@ -21,7 +21,7 @@ import { useEdgeAuthoring } from '../src/edge-authoring-react';
 import { mintingGraphIds } from './minting';
 import { SpaceCanvas } from '../src/components/SpaceCanvas';
 import { EdgeAuthoringContext } from '../src/components/edge-authoring-context';
-import { WorkspaceSidebar } from '../src/components/WorkspaceSidebar';
+import { SpaceSidebar } from '../src/components/SpaceSidebar';
 import { CARD_SIZE } from '../src/card';
 
 /**
@@ -46,11 +46,11 @@ const MINTED_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000041')
 const EDGE = { from: CARD_A, to: CARD_B } as const;
 /** The one row this chrome draws, named so `selected` can be that very value. */
 const FLOW: CanvasRenderer = { selection: { kind: 'view', view: 'flow' }, title: 'Flow' };
-/** The real workspace chrome, composed as `App` composes it, outside the canvas. */
-const workspaceChrome = (
+/** The real app chrome, composed as `App` composes it, outside the canvas. */
+const appChrome = (
   <SidebarProvider>
-    <WorkspaceSidebar
-      workspaceTitle="Space"
+    <SpaceSidebar
+      spaceTitle="Space"
       canvas={{
         renderers: { computed: [FLOW], authored: [] },
         current: FLOW,
@@ -525,7 +525,7 @@ describe("React Flow's document-level delete key", () => {
     // entirely, with no portal involved and so nothing for a `.nokey` inside
     // the canvas to reach. A canvas choice is a focusable `button` that no
     // input tag excludes, which is exactly the exposure this covers.
-    const { adapter, session } = mountCanvas(workspaceChrome);
+    const { adapter, session } = mountCanvas(appChrome);
     act(() => adapter.getState().selectEdge(SUBJECT));
 
     fireEvent.keyDown(screen.getByRole('button', { name: 'Flow' }), { key });

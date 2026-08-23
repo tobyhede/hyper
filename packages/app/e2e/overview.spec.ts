@@ -146,7 +146,7 @@ test('selecting a Layout draws the Graphs it owns and only those', async ({ page
 /**
  * The two surfaces that name a Graph, held to the same answer.
  *
- * ADR 0053 gave the workspace Sidebar a Graphs group carrying every Graph's
+ * ADR 0053 gave the Space Sidebar a Graphs group carrying every Graph's
  * title, colour and active state — which is what the canvas HUD's key already
  * said. Issue 06 keeps the key: it is the on-canvas colour reference beside the
  * Edges being read, and it is the only one of the two still on screen once the

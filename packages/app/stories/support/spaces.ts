@@ -88,7 +88,7 @@ export const authoredSnapshot: SpaceSnapshot = {
   id: uuidSchema.parse('00000000-0000-4000-8000-000000000040'),
   document: {
     version: 1,
-    title: 'Workspace',
+    title: 'Space',
     defaultRenderer: COLLECTION_ONE,
     layouts: [
       {

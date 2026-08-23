@@ -22,7 +22,7 @@ import {
  * `space.defaultRenderer` — so the story fixture must not answer that question
  * itself, and these Spaces have to *declare* what the Ladle specs then assert.
  *
- * That is what this file pins. `issue-14-workspace-sidebar.spec.ts` proves the
+ * That is what this file pins. `issue-14-space-sidebar.spec.ts` proves the
  * rendered story presses Collection 1; this proves the story is entitled to,
  * because the Space says so through the same call production makes. Delete the
  * `defaultRenderer` and this fails here rather than in a browser.

@@ -106,9 +106,9 @@ export async function openCard(node: Locator, title: string): Promise<void> {
   await node.getByRole('button', { name: `Edit Card ${title}` }).click();
 }
 
-/** The workspace's command surface: one list of everything the canvas can draw. */
+/** The Space's command surface: one list of everything the canvas can draw. */
 export function sidebar(page: Page): Locator {
-  return page.getByTestId('workspace-sidebar');
+  return page.getByTestId('space-sidebar');
 }
 
 /** What the canvas header says is drawing, computed View or authored Layout alike. */
@@ -135,7 +135,7 @@ export function canvasKind(page: Page): Locator {
   return page.getByTestId('selected-canvas-kind');
 }
 
-/** The row of the Graph the workspace is emphasising, or nothing when none is. */
+/** The row of the Graph the Sidebar is emphasising, or nothing when none is. */
 export function activeGraph(page: Page): Locator {
   return sidebar(page).locator('[data-testid="graph-choice"][aria-pressed="true"]');
 }
@@ -286,7 +286,7 @@ export async function connectHandles(
   const start = { x: from.x + from.width / 2, y: from.y + from.height / 2 };
   // The opening nudge goes *towards* the target rather than always rightwards.
   // React Flow auto-pans while a connection is dragged within 40px of the
-  // container edge, and the workspace Sidebar took 256px of that container
+  // container edge, and the Space Sidebar took 256px of that container
   // (ADR 0053): parking the pointer 36px from the right edge made the canvas
   // pan for as long as the drag lasted, and Playwright waits forever for a box
   // that never stops moving. Aiming at the target is also the truer gesture.

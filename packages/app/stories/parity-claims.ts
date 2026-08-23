@@ -120,43 +120,43 @@ export const parityClaims: readonly ParityClaim[] = [
   },
   {
     id: 'space-sidebar-marks-one-current-renderer',
-    storyFile: 'components/workspace-sidebar.stories.tsx',
+    storyFile: 'components/space-sidebar.stories.tsx',
     storyExport: 'Settled',
     claim: 'Exactly one computed View or authored Layout is the current renderer.',
   },
   {
     id: 'space-sidebar-names-unauthored-state',
-    storyFile: 'components/workspace-sidebar.stories.tsx',
+    storyFile: 'components/space-sidebar.stories.tsx',
     storyExport: 'Unauthored',
     claim: 'An unauthored Space names its empty Layout and Graph groups and cannot present.',
   },
   {
     id: 'space-sidebar-shows-pending-persistence',
-    storyFile: 'components/workspace-sidebar.stories.tsx',
+    storyFile: 'components/space-sidebar.stories.tsx',
     storyExport: 'Pending',
     claim: 'A pending commit is exposed as saving in the Space Sidebar.',
   },
   {
     id: 'space-sidebar-recovers-retryable-failure',
-    storyFile: 'components/workspace-sidebar.stories.tsx',
+    storyFile: 'components/space-sidebar.stories.tsx',
     storyExport: 'Failed',
     claim: 'Retryable persistence failure keeps local work visible and offers retry.',
   },
   {
     id: 'space-sidebar-reports-permanent-rejection',
-    storyFile: 'components/workspace-sidebar.stories.tsx',
+    storyFile: 'components/space-sidebar.stories.tsx',
     storyExport: 'Rejected',
     claim: 'Permanent persistence rejection explains the reason and can be acknowledged.',
   },
   {
     id: 'space-sidebar-resolves-conflict',
-    storyFile: 'components/workspace-sidebar.stories.tsx',
+    storyFile: 'components/space-sidebar.stories.tsx',
     storyExport: 'Conflicted',
     claim: 'A revision conflict blocks dismissal until local or remote work is chosen.',
   },
   {
     id: 'space-sidebar-withdraws-authoring-while-presenting',
-    storyFile: 'components/workspace-sidebar.stories.tsx',
+    storyFile: 'components/space-sidebar.stories.tsx',
     storyExport: 'Presenting',
     claim: 'Presenting replaces its entry action with Overview and withdraws authoring.',
   },
@@ -198,24 +198,24 @@ export const parityClaims: readonly ParityClaim[] = [
     claim: 'A Space the backend cannot open fails startup with the real diagnostic detail.',
   },
   {
-    id: 'operational-feedback-workspace-failure',
+    id: 'operational-feedback-space-app-failure',
     storyFile: 'components/operational-feedback.stories.tsx',
-    storyExport: 'Workspace',
+    storyExport: 'SpaceApp',
     claim:
-      "Workspace's error boundary reports a mounted app's render throw instead of leaving a blank page.",
+      "The Space app's error boundary reports a mounted app's render throw instead of leaving a blank page.",
     // Every production write path that could hand `App` a bad working
     // snapshot validates first and refuses inline rather than installing it:
-    // `openStoredWorkspace` (initial load), Space Authoring's edit completion,
+    // `openStoredSpace` (initial load), Space Authoring's edit completion,
     // and the conflict accept/reload flow (`acceptStoredSpace` in
     // space-authoring.ts, guarding exactly this). Reaching this boundary means
-    // an invariant already broke — see `Workspace.tsx`'s own doc comment — and
-    // the only place that is exercised is `packages/app/test/Workspace.test.tsx`,
+    // an invariant already broke — see `SpaceApp.tsx`'s own doc comment — and
+    // the only place that is exercised is `packages/app/test/SpaceApp.test.tsx`,
     // which opens a session directly with a pre-corrupted snapshot: an
     // internal API no browser-driven `packages/app/e2e` test can reach. There
     // is no legitimate user- or network-observable flow left to drive it
     // through the real app, so this claim is Ladle-only.
     applicationEvidence:
-      'Unreachable through any current legitimate browser-driven flow — every production path that could install a bad working snapshot validates first (openStoredWorkspace, Space Authoring edit completion, conflict accept/reload). Covered instead by packages/app/test/Workspace.test.tsx, which reaches the boundary only via the internal openSpaceSession API.',
+      'Unreachable through any current legitimate browser-driven flow — every production path that could install a bad working snapshot validates first (openStoredSpace, Space Authoring edit completion, conflict accept/reload). Covered instead by packages/app/test/SpaceApp.test.tsx, which reaches the boundary only via the internal openSpaceSession API.',
   },
   {
     id: 'operational-feedback-placement-failure',

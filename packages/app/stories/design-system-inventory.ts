@@ -41,12 +41,12 @@ export const uncataloguedComponents = [
       'Composition root. It wires Navigation, Space Authoring, the render adapter and every surface below into one tree; it has no visual state of its own, and a story of it would be the application rather than a catalogue entry.',
   },
   {
-    module: 'packages/app/src/Workspace.tsx',
+    module: 'packages/app/src/SpaceApp.tsx',
     reason:
-      "Composition root, and an error boundary. What it draws when it catches is catalogued — `operational-feedback-workspace-failure` renders the boundary's own failure panel — and the rest of it is the session wiring around App.",
+      "Composition root, and an error boundary. What it draws when it catches is catalogued — `operational-feedback-space-app-failure` renders the boundary's own failure panel — and the rest of it is the session wiring around App.",
   },
   {
-    module: 'packages/app/src/WorkspaceSelection.tsx',
+    module: 'packages/app/src/SpaceSelection.tsx',
     reason:
       'Condemned. ADR 0058 deletes the Space chooser rather than designing it, and `space-cards/04` owns retiring this module with `importSpaces`. Giving it a stable story now would be parity evidence for a surface that is going.',
   },
@@ -145,7 +145,7 @@ export const uncataloguedComponents = [
  * cannot slip past by having no class to record.
  *
  * One entry below is product appearance and says so, because the alternative to
- * recording it is not recording it. `workspace-selection` is condemned with its
+ * recording it is not recording it. `space-selection` is condemned with its
  * component under ADR 0058 and goes with `space-cards/04`; design-system baseline
  * Issue 08 leaves its "removed or explicitly limited" acceptance line unticked until
  * it lands — a reason is not a substitute for the move. `card-editor` was the other,
@@ -224,7 +224,7 @@ export const handRolledStyles = [
       "The modal frame a Card is authored on: the 16:9 silhouette that matches `card.ts`, and the scroll boundary that keeps Cancel and Done reachable. Base UI's Dialog owns modality, focus and dismissal; this owns the frame's geometry against the canvas behind it.",
   },
   {
-    block: 'workspace-selection',
+    block: 'space-selection',
     reason:
       "Product appearance too, and also going. Condemned with the component: ADR 0058 deletes the Space chooser rather than designing it, and `space-cards/04` owns retiring it. These rules go when it does — restyling them first would be work on a surface that isn't staying.",
   },

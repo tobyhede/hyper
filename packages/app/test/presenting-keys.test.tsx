@@ -32,9 +32,9 @@ function Presenting({
       <button type="button" onClick={() => undefined}>
         Overview
       </button>
-      {/* A surface over the canvas, of the shape the workspace Sheet takes
-          below the Sidebar's breakpoint. */}
-      <div role="dialog" aria-label="Workspace">
+      {/* A surface over the canvas, of the shape the Sidebar Sheet takes
+          below its breakpoint. */}
+      <div role="dialog" aria-label="Sidebar">
         <button type="button">Present</button>
       </div>
     </>
@@ -93,7 +93,7 @@ describe('the global Presenting keys', () => {
   /**
    * A modal surface owns every key pressed inside it.
    *
-   * Below the Sidebar's breakpoint the workspace is a Sheet drawn over the
+   * Below the Sidebar's breakpoint the command surface is a Sheet drawn over the
    * canvas and can be reopened mid-traversal. Its focus trap means every press
    * then starts inside it, and a window listener that went on traversing would
    * run a command behind a surface the presenter is looking at — one Escape

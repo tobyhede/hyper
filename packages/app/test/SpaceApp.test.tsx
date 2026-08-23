@@ -8,7 +8,7 @@ import {
   openSpaceSession,
   type SpaceSession,
 } from '@project/persistence';
-import { mountWorkspace } from '../src/Workspace';
+import { mountSpaceApp } from '../src/SpaceApp';
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
@@ -94,10 +94,10 @@ beforeAll(() => {
 
 afterAll(() => vi.unstubAllGlobals());
 
-describe('Workspace conflict recovery', () => {
+describe('Space app conflict recovery', () => {
   it('replaces the visible runtime and editor placement when remote state is accepted', async () => {
-    const local = snapshot('Local workspace', 'Local card', 10, 20);
-    const remote = snapshot('Remote workspace', 'Remote card', 900, 700);
+    const local = snapshot('Local space', 'Local card', 10, 20);
+    const remote = snapshot('Remote space', 'Remote card', 900, 700);
     const backend = new MemorySpaceBackend([
       { snapshot: remote, revision: 4n, exportedRevision: null },
     ]);
@@ -119,18 +119,18 @@ describe('Workspace conflict recovery', () => {
     });
 
     let view: RenderResult | undefined;
-    mountWorkspace({ space: runtime(local), spaceSession: session }, (app) => {
+    mountSpaceApp({ space: runtime(local), spaceSession: session }, (app) => {
       if (view === undefined) view = render(app);
       else view.rerender(app);
     });
-    expect(screen.getByText('Local workspace')).toBeVisible();
+    expect(screen.getByText('Local space')).toBeVisible();
     expect(screen.getByRole('alertdialog', { name: 'Changes conflict' })).toBeVisible();
     expect(screen.getByRole('button', { name: 'Reload' })).toBeVisible();
     expect(screen.getByRole('button', { name: 'Keep local and retry' })).toBeVisible();
 
     fireEvent.click(screen.getByTestId('persistence-accept-remote'));
 
-    expect(await screen.findByText('Remote workspace')).toBeVisible();
+    expect(await screen.findByText('Remote space')).toBeVisible();
     expect(await screen.findByRole('heading', { name: 'Remote card' })).toBeVisible();
     expect(screen.queryByRole('heading', { name: 'Local card' })).not.toBeInTheDocument();
     expect(session.getState().working).toEqual(remote);
@@ -146,8 +146,8 @@ describe('Workspace conflict recovery', () => {
    * behind.
    */
   const refusedRemote = async (): Promise<{ local: SpaceSnapshot; session: SpaceSession }> => {
-    const local = snapshot('Local workspace', 'Local card', 10, 20);
-    const dangling = withDanglingGraph(local, 'Remote workspace');
+    const local = snapshot('Local space', 'Local card', 10, 20);
+    const dangling = withDanglingGraph(local, 'Remote space');
     const control = new MemorySpaceBackendTestControl();
     control.queueResult({
       kind: 'conflict',
@@ -168,7 +168,7 @@ describe('Workspace conflict recovery', () => {
     });
 
     let view: RenderResult | undefined;
-    mountWorkspace({ space: runtime(local), spaceSession: session }, (app) => {
+    mountSpaceApp({ space: runtime(local), spaceSession: session }, (app) => {
       if (view === undefined) view = render(app);
       else view.rerender(app);
     });
@@ -180,9 +180,9 @@ describe('Workspace conflict recovery', () => {
   /**
    * `acceptRemote` is an `onClick` handler (`App.tsx`), and React error
    * boundaries do not catch throws from event handlers — so a throw here escapes
-   * to the window rather than reaching `WorkspaceFailure`, and the session has
+   * to the window rather than reaching `SpaceAppFailure`, and the session has
    * *already* published the unloadable snapshot as settled working state. The
-   * page then still shows the stale local workspace with no conflict left to
+   * page then still shows the stale local Space with no conflict left to
    * resolve and no way back. Validate the remote snapshot before accepting it.
    */
   it('refuses an unloadable remote snapshot instead of accepting it into the session', async () => {
@@ -205,9 +205,9 @@ describe('Workspace conflict recovery', () => {
    * it tells the author their work cannot be replaced when in fact it can.
    */
   it('drops a refusal once a different remote snapshot is the one in conflict', async () => {
-    const local = snapshot('Local workspace', 'Local card', 10, 20);
+    const local = snapshot('Local space', 'Local card', 10, 20);
     const dangling = withDanglingGraph(local, 'Broken remote');
-    const loadable = snapshot('Remote workspace', 'Remote card', 900, 700);
+    const loadable = snapshot('Remote space', 'Remote card', 900, 700);
     const control = new MemorySpaceBackendTestControl();
     control.queueResult({
       kind: 'conflict',
@@ -226,7 +226,7 @@ describe('Workspace conflict recovery', () => {
     await waitFor(() => expect(session.getState().persistence.kind).toBe('conflicted'));
 
     let view: RenderResult | undefined;
-    mountWorkspace({ space: runtime(local), spaceSession: session }, (app) => {
+    mountSpaceApp({ space: runtime(local), spaceSession: session }, (app) => {
       if (view === undefined) view = render(app);
       else view.rerender(app);
     });
@@ -253,27 +253,27 @@ describe('Workspace conflict recovery', () => {
   });
 
   /**
-   * Refusing is not a failure of the workspace: the local work is intact and the
+   * Refusing is not a failure of the Space app: the local work is intact and the
    * conflict is still the session's state, so the page that owns both has to
    * stay. Reporting through the failure panel unmounted the whole tree, which
    * left the author reading why their unsaved work could not be replaced on a
    * screen that no longer showed it — and no control to do anything else.
    */
-  it('keeps the conflicted workspace on screen when it refuses the remote snapshot', async () => {
+  it('keeps the conflicted Space on screen when it refuses the remote snapshot', async () => {
     await refusedRemote();
 
-    expect(screen.getByText('Local workspace')).toBeVisible();
+    expect(screen.getByText('Local space')).toBeVisible();
     // Awaited because placement is asynchronous — the Card arrives with the
     // placement, not with the mount.
     expect(await screen.findByRole('heading', { name: 'Local card', hidden: true })).toBeVisible();
     expect(screen.getByTestId('persistence-accept-remote')).toBeVisible();
-    expect(screen.queryByTestId('workspace-failure')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('space-app-failure')).not.toBeInTheDocument();
   });
 });
 
-describe('Workspace permanent save refusal', () => {
+describe('Space app permanent save refusal', () => {
   it('explains the server refusal and returns the author to their local work', async () => {
-    const local = snapshot('Local workspace', 'Local card', 10, 20);
+    const local = snapshot('Local space', 'Local card', 10, 20);
     const control = new MemorySpaceBackendTestControl();
     control.queueResult({
       kind: 'permanent-failure',
@@ -289,7 +289,7 @@ describe('Workspace permanent save refusal', () => {
     await waitFor(() => expect(session.getState().persistence.kind).toBe('rejected'));
 
     let view: RenderResult | undefined;
-    mountWorkspace({ space: runtime(local), spaceSession: session }, (app) => {
+    mountSpaceApp({ space: runtime(local), spaceSession: session }, (app) => {
       if (view === undefined) view = render(app);
       else view.rerender(app);
     });
@@ -310,17 +310,17 @@ describe('Workspace permanent save refusal', () => {
   });
 });
 
-describe('Workspace failure reporting', () => {
+describe('Space app failure reporting', () => {
   /**
-   * The snapshot is already unloadable when the workspace is composed, so
+   * The snapshot is already unloadable when the Space app is composed, so
    * nothing has rendered yet: `createApp` builds Navigation, which resolves the
    * renderer the Space opens in against the session's working Space, and that
    * throws before there is a tree for the error boundary to catch it in. What is
-   * pinned is that `mountWorkspace` reports it anyway rather than throwing at
+   * pinned is that `mountSpaceApp` reports it anyway rather than throwing at
    * its caller and leaving a blank page.
    */
   it('names a working snapshot that stopped loading instead of blanking the page', () => {
-    const valid = snapshot('Workspace', 'Card', 10, 20);
+    const valid = snapshot('Space', 'Card', 10, 20);
     const dangling = withDanglingGraph(valid, valid.document.title);
     const session = openSpaceSession(new MemorySpaceBackend(), {
       snapshot: dangling,
@@ -332,34 +332,34 @@ describe('Workspace failure reporting', () => {
     const reported = vi.spyOn(console, 'error').mockImplementation(() => undefined);
 
     expect(() =>
-      mountWorkspace({ space: runtime(valid), spaceSession: session }, (app) => {
+      mountSpaceApp({ space: runtime(valid), spaceSession: session }, (app) => {
         render(app);
       }),
     ).not.toThrow();
 
-    expect(screen.getByTestId('workspace-failure')).toHaveTextContent(MISSING_CARD_ID);
+    expect(screen.getByTestId('space-app-failure')).toHaveTextContent(MISSING_CARD_ID);
     expect(screen.getByRole('heading', { name: 'Unable to open this space' })).toBeVisible();
     // Logged as well as reported: nothing else traces this path. React logs the
     // boundary's own catch, so only this one would otherwise leave a developer a
     // sentence and an empty console.
-    expect(reported).toHaveBeenCalledWith('Composing the workspace failed', expect.any(Error));
+    expect(reported).toHaveBeenCalledWith('Composing the Space app failed', expect.any(Error));
   });
 
   /**
    * The other path to the same sentence, and the one the error boundary itself
-   * is for: a workspace that composed and mounted, whose snapshot then stops
+   * is for: a Space app that composed and mounted, whose snapshot then stops
    * passing intake under it. `App` re-derives the whole aggregate on every
-   * render, so the throw lands in the boundary rather than in `mountWorkspace`.
+   * render, so the throw lands in the boundary rather than in `mountSpaceApp`.
    */
-  it('names a working snapshot that stops loading under a mounted workspace', () => {
-    const valid = snapshot('Workspace', 'Card', 10, 20);
+  it('names a working snapshot that stops loading under a mounted Space app', () => {
+    const valid = snapshot('Space', 'Card', 10, 20);
     const session = openSpaceSession(new MemorySpaceBackend(), {
       snapshot: valid,
       revision: 0n,
       exportedRevision: null,
     });
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
-    mountWorkspace({ space: runtime(valid), spaceSession: session }, (app) => {
+    mountSpaceApp({ space: runtime(valid), spaceSession: session }, (app) => {
       render(app);
     });
 
@@ -370,7 +370,7 @@ describe('Workspace failure reporting', () => {
       session.submit(withDanglingGraph(valid, valid.document.title));
     });
 
-    expect(screen.getByTestId('workspace-failure')).toHaveTextContent(MISSING_CARD_ID);
+    expect(screen.getByTestId('space-app-failure')).toHaveTextContent(MISSING_CARD_ID);
     expect(screen.getByRole('heading', { name: 'Unable to open this space' })).toBeVisible();
   });
 });

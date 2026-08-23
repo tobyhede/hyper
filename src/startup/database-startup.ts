@@ -16,7 +16,7 @@ export interface DatabaseStartupSelection {
 
 export type DatabaseStartupResult = OpenedDatabaseStartup | DatabaseStartupSelection;
 
-/** Open the durable workspace selected from the database catalog. */
+/** Open the durable Space selected from the database catalog. */
 export const openDatabaseSelection = async (
   repository: SpaceRepository,
   id: UUID,
@@ -40,7 +40,7 @@ const createNewSpaceImport = (): ImportSpace => {
   return { document, cards };
 };
 
-/** Resolve the initial durable workspace from the database catalog. */
+/** Resolve the initial durable Space from the database catalog. */
 export const resolveDatabaseStartup = async (
   repository: SpaceRepository,
   importedSpaces?: readonly LoadedSpace[],

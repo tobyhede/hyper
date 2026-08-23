@@ -1,28 +1,28 @@
 import { HttpSpaceBackend } from '@project/http';
 import type { SpaceBackend } from '@project/persistence';
-import { openStoredWorkspace, type OpenedSpace } from './open-workspace';
+import { openStoredSpace, type OpenedSpace } from './open-space';
 import type { ApplicationStartupResult } from './startup';
 
-export type { OpenedSpace } from './open-workspace';
+export type { OpenedSpace } from './open-space';
 
-export interface WorkspaceStartup {
+export interface SpaceStartup {
   resolve(): Promise<ApplicationStartupResult>;
-  openSelected(id: Parameters<typeof openStoredWorkspace>[1]): Promise<OpenedSpace>;
+  openSelected(id: Parameters<typeof openStoredSpace>[1]): Promise<OpenedSpace>;
 }
 
 /** Compose browser startup around one fixed persistence backend. */
-export const createWorkspaceStartup = (
+export const createSpaceStartup = (
   backend: SpaceBackend = new HttpSpaceBackend(),
-): WorkspaceStartup => ({
+): SpaceStartup => ({
   resolve: async () => {
     const spaces = await backend.listSpaces();
     if (spaces.length === 0) {
-      throw new Error('The persistence service returned no database workspaces.');
+      throw new Error('The persistence service returned no database spaces.');
     }
     if (spaces.length > 1) return { kind: 'selection', spaces };
     const [space] = spaces;
     if (space === undefined) throw new Error('The database catalog changed unexpectedly.');
-    return { kind: 'opened', opened: await openStoredWorkspace(backend, space.id) };
+    return { kind: 'opened', opened: await openStoredSpace(backend, space.id) };
   },
-  openSelected: (id) => openStoredWorkspace(backend, id),
+  openSelected: (id) => openStoredSpace(backend, id),
 });

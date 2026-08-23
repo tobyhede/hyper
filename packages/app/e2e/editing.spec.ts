@@ -1299,7 +1299,7 @@ test('only Active Graph Edges are focusable, and focus selects the one reached',
 /**
  * React Flow's native Edge Escape clears the selection and calls `blur()`, which
  * can leave focus on `body` — not an authoring context, and not somewhere a
- * workspace command can be issued from. Hyper repairs that and only that: focus
+ * canvas command can be issued from. Hyper repairs that and only that: focus
  * already taken by another control is left alone.
  */
 test('Escape on a focused Edge leaves focus on the canvas rather than the document', async ({

@@ -20,7 +20,7 @@ test(
  * that names it.
  */
 test(
-  'Workspace Sidebar story renders one exclusive canvas choice',
+  'Space Sidebar story renders one exclusive canvas choice',
   {
     tag: [
       '@parity:space-sidebar-marks-one-current-renderer',
@@ -28,7 +28,7 @@ test(
     ],
   },
   async ({ page }) => {
-    await page.goto('/?story=components--workspace-sidebar--pending&mode=preview');
+    await page.goto('/?story=components--space-sidebar--pending&mode=preview');
 
     const flow = page.getByRole('button', { name: 'Flow' });
     const grid = page.getByRole('button', { name: 'Grid' });
@@ -55,8 +55,8 @@ test(
  * Menubar's: Tab reaches each row, Enter activates the row it is on, and no
  * popup opens, dismisses or has focus to return.
  */
-test('Workspace Sidebar story defines the canvas renderer keyboard contract', async ({ page }) => {
-  await page.goto('/?story=components--workspace-sidebar--pending&mode=preview');
+test('Space Sidebar story defines the canvas renderer keyboard contract', async ({ page }) => {
+  await page.goto('/?story=components--space-sidebar--pending&mode=preview');
 
   const flow = page.getByRole('button', { name: 'Flow' });
   const grid = page.getByRole('button', { name: 'Grid' });
@@ -71,8 +71,8 @@ test('Workspace Sidebar story defines the canvas renderer keyboard contract', as
   await expect(page.getByTestId('selected-canvas')).toContainText('Grid');
 });
 
-test('Workspace Sidebar story keeps the Add Card split control whole', async ({ page }) => {
-  await page.goto('/?story=components--workspace-sidebar--pending&mode=preview');
+test('Space Sidebar story keeps the Add Card split control whole', async ({ page }) => {
+  await page.goto('/?story=components--space-sidebar--pending&mode=preview');
 
   const moreKinds = page.getByRole('button', { name: 'More Card kinds' });
   await moreKinds.click();
@@ -92,10 +92,10 @@ test('Workspace Sidebar story keeps the Add Card split control whole', async ({ 
  * a hand-built stand-in wearing the catalogue's label.
  */
 test(
-  'Workspace Sidebar story says an unauthored Space has nothing yet',
+  'Space Sidebar story says an unauthored Space has nothing yet',
   { tag: '@parity:space-sidebar-names-unauthored-state' },
   async ({ page }) => {
-    await page.goto('/?story=components--workspace-sidebar--unauthored&mode=preview');
+    await page.goto('/?story=components--space-sidebar--unauthored&mode=preview');
 
     await expect(page.getByRole('button', { name: 'Flow' })).toHaveAttribute(
       'aria-pressed',
@@ -103,7 +103,7 @@ test(
     );
     await expect(page.getByTestId('selected-canvas')).toContainText('Flow');
     await expect(page.getByTestId('selected-canvas-kind')).toHaveText('Computed view');
-    await expect(page.getByTestId('workspace-title')).toHaveText('New space');
+    await expect(page.getByTestId('space-title')).toHaveText('New space');
     await expect(page.getByTestId('no-authored-layouts')).toBeVisible();
     await expect(page.getByTestId('no-graphs')).toBeVisible();
     await expect(page.getByTestId('present-button')).toBeDisabled();
@@ -111,7 +111,7 @@ test(
 );
 
 test(
-  'Workspace Sidebar stories render quiet, retryable, and presenting states',
+  'Space Sidebar stories render quiet, retryable, and presenting states',
   {
     tag: [
       '@parity:space-sidebar-recovers-retryable-failure',
@@ -119,11 +119,11 @@ test(
     ],
   },
   async ({ page }) => {
-    await page.goto('/?story=components--workspace-sidebar--settled&mode=preview');
+    await page.goto('/?story=components--space-sidebar--settled&mode=preview');
     await expect(page.getByRole('button', { name: 'Collection 1' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Changes saved' })).toBeHidden();
 
-    await page.goto('/?story=components--workspace-sidebar--failed&mode=preview');
+    await page.goto('/?story=components--space-sidebar--failed&mode=preview');
     // Two surfaces for one condition: a red dot that leaves the sidebar footer's
     // geometry alone, and the notice pinned under the canvas header carrying
     // reason and action.
@@ -148,7 +148,7 @@ test(
     // And the retry saves that same work rather than replacing it.
     await expect(unsaved).toBeVisible();
 
-    await page.goto('/?story=components--workspace-sidebar--presenting&mode=preview');
+    await page.goto('/?story=components--space-sidebar--presenting&mode=preview');
     await expect(page.getByTestId('exit-presenting-button')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Add Card' })).toBeDisabled();
   },
@@ -161,10 +161,10 @@ test(
  * - `navigation.test.ts`: "activating a Graph ends the current Traversal history without changing the Space"
  * - `navigation.test.ts`: "leaves no Traversal history behind when presenting ends"
  */
-test('Workspace Sidebar story draws and activates only the selected Layout graphs', async ({
+test('Space Sidebar story draws and activates only the selected Layout graphs', async ({
   page,
 }) => {
-  await page.goto('/?story=components--workspace-sidebar--settled&mode=preview');
+  await page.goto('/?story=components--space-sidebar--settled&mode=preview');
 
   await expect(page.getByRole('button', { name: 'Long', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Mid', exact: true })).toBeVisible();
@@ -191,7 +191,7 @@ test('Workspace Sidebar story draws and activates only the selected Layout graph
 });
 
 test(
-  'Workspace Sidebar stories render production conflict and rejection recovery',
+  'Space Sidebar stories render production conflict and rejection recovery',
   {
     tag: [
       '@parity:space-sidebar-reports-permanent-rejection',
@@ -199,7 +199,7 @@ test(
     ],
   },
   async ({ page }) => {
-    await page.goto('/?story=components--workspace-sidebar--conflicted&mode=preview');
+    await page.goto('/?story=components--space-sidebar--conflicted&mode=preview');
 
     await expect(page.getByRole('alertdialog', { name: 'Changes conflict' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Reload' })).toBeVisible();
@@ -211,7 +211,7 @@ test(
       'The remote space is invalid and was not accepted.',
     );
 
-    await page.goto('/?story=components--workspace-sidebar--rejected&mode=preview');
+    await page.goto('/?story=components--space-sidebar--rejected&mode=preview');
     await expect(
       page.getByRole('alertdialog', { name: 'Changes couldn’t be saved' }),
     ).toBeVisible();
@@ -226,8 +226,8 @@ test(
  * framed — a modal's focus trap is only the loudest reason. Proven by clicking
  * real catalogue navigation while the story owns its own viewport.
  */
-test('Workspace Sidebar stories are isolated from the Ladle catalogue', async ({ page }) => {
-  await page.goto('/?story=components--workspace-sidebar--conflicted');
+test('Space Sidebar stories are isolated from the Ladle catalogue', async ({ page }) => {
+  await page.goto('/?story=components--space-sidebar--conflicted');
 
   const storyFrame = page.frameLocator('iframe');
   await expect(storyFrame.getByRole('alertdialog', { name: 'Changes conflict' })).toBeVisible();
@@ -238,7 +238,7 @@ test('Workspace Sidebar stories are isolated from the Ladle catalogue', async ({
   await page.getByRole('link', { name: 'Lifecycle' }).click();
   await expect(page).toHaveURL(/story=components--persistence-indicator--lifecycle/);
 
-  await page.goto('/?story=components--workspace-sidebar--settled');
-  await expect(page.frameLocator('iframe').getByTestId('workspace-sidebar')).toBeVisible();
+  await page.goto('/?story=components--space-sidebar--settled');
+  await expect(page.frameLocator('iframe').getByTestId('space-sidebar')).toBeVisible();
   await expect(page.getByLabel('Search stories')).toBeVisible();
 });

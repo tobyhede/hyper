@@ -23,24 +23,24 @@ body {
   color: var(--foreground);
 }
 
-/* ---- Workspace selection ---- */
-.workspace-selection {
+/* ---- Space selection ---- */
+.space-selection {
   display: grid;
   min-height: 100%;
   place-items: center;
   padding: 2rem;
 }
 
-.workspace-selection__panel {
+.space-selection__panel {
   width: min(42rem, 100%);
 }
 
-.workspace-selection__choices {
+.space-selection__choices {
   display: grid;
   gap: 0.75rem;
 }
 
-.workspace-selection__choices button {
+.space-selection__choices button {
   display: flex;
   justify-content: space-between;
   gap: 1rem;
