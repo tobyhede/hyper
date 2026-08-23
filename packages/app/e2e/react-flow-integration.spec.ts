@@ -13,7 +13,7 @@ test('a focused Card opens with Enter and Space', async ({ page }) => {
   await card.focus();
   await expect(card).toBeFocused();
   await page.keyboard.press('Enter');
-  await expect(source).toHaveValue(/\*\*A\*\*/);
+  await expect(source).toContainText('**A**');
 
   await page.getByRole('button', { name: 'Cancel' }).click();
   await expect(page.getByTestId('open-card')).toBeHidden();
@@ -21,7 +21,7 @@ test('a focused Card opens with Enter and Space', async ({ page }) => {
   await expect(card).toBeFocused();
   const scrollBefore = await page.evaluate(() => window.scrollY);
   await page.keyboard.press('Space');
-  await expect(source).toHaveValue(/\*\*A\*\*/);
+  await expect(source).toContainText('**A**');
   expect(await page.evaluate(() => window.scrollY)).toBe(scrollBefore);
 });
 

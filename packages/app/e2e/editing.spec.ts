@@ -1,5 +1,6 @@
 import type { Locator, Page } from '@playwright/test';
 import { expect, test } from './fixtures';
+import { markdownSource, PRIMARY_MODIFIER } from './markdown-source';
 import {
   activateGraph,
   activeCard,
@@ -272,15 +273,190 @@ test('the Card affordance opens the Card on its editable fields', async ({ page 
 
   const source = page.getByRole('textbox', { name: 'Markdown source' });
   await expect(page.getByRole('textbox', { name: 'Title' })).toHaveValue('A');
-  await expect(source).toHaveValue(/entry point/);
+  await expect(source).toContainText('entry point');
   await source.fill('Authored from the graph');
   await page.getByRole('button', { name: 'Done' }).click();
   await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
 
   await page.reload();
   await openCard(nodeByTitle(page, 'A').first(), 'A');
-  await expect(page.getByRole('textbox', { name: 'Markdown source' })).toHaveValue(
+  expect(await markdownSource(page.getByRole('textbox', { name: 'Markdown source' }))).toBe(
     'Authored from the graph',
+  );
+});
+
+test(
+  'the Markdown source editor preserves source while the pane owns focus travel and dismissal',
+  { tag: '@parity:markdown-source-editor-preserves-pane-ownership' },
+  async ({ page }) => {
+    await page.goto('/');
+    const cardA = nodeByTitle(page, 'A').first();
+    await settled(page);
+    await openCard(cardA, 'A');
+
+    const title = page.getByRole('textbox', { name: 'Title' });
+    const source = page.getByRole('textbox', { name: 'Markdown source' });
+    await expect(title).toBeFocused();
+    await title.press('Enter');
+    await expect(source).toBeFocused();
+    const lineNumbers = page.locator('[data-slot="markdown-source-line-numbers"]');
+    await expect(lineNumbers).toBeVisible();
+    const originalLineNumbers = await lineNumbers.elementHandle();
+    expect(originalLineNumbers).not.toBeNull();
+
+    expect(
+      await source.evaluate((element) =>
+        getComputedStyle(element.firstElementChild ?? element, '::selection').getPropertyValue(
+          'background-color',
+        ),
+      ),
+    ).toBe('rgb(110, 168, 254)');
+
+    const exact = '# Exact\n\n  two spaces and `code`';
+    await source.fill(exact);
+    expect(await originalLineNumbers?.evaluate((element) => element.isConnected)).toBe(true);
+    await expect(lineNumbers).toBeVisible();
+    expect(await markdownSource(source)).toBe(exact);
+    await source.press(`${PRIMARY_MODIFIER}+z`);
+    await expect(source).toContainText('entry point');
+    await source.press(`${PRIMARY_MODIFIER}+Shift+z`);
+    expect(await markdownSource(source)).toBe(exact);
+
+    await source.press('Tab');
+    await expect(page.getByRole('button', { name: 'Cancel' })).toBeFocused();
+    await page.keyboard.press('Shift+Tab');
+    await expect(source).toBeFocused();
+    await source.press(`${PRIMARY_MODIFIER}+a`);
+    await source.press('Escape');
+    await expect(page.getByTestId('open-card')).toHaveCount(0);
+    await expect(cardA).toBeFocused();
+
+    await openCard(cardA, 'A');
+    await expect(page.getByRole('textbox', { name: 'Markdown source' })).toContainText(
+      'entry point',
+    );
+    await page.getByRole('button', { name: 'Cancel' }).click();
+
+    await openCard(nodeByTitle(page, 'B').first(), 'B');
+    const sourceB = page.getByRole('textbox', { name: 'Markdown source' });
+    const beforeUndo = await markdownSource(sourceB);
+    await sourceB.press(`${PRIMARY_MODIFIER}+z`);
+    expect(await markdownSource(sourceB)).toBe(beforeUndo);
+    await page.getByRole('button', { name: 'Cancel' }).click();
+
+    await openCard(cardA, 'A');
+    await page.getByRole('textbox', { name: 'Markdown source' }).fill(exact);
+    await page.getByRole('button', { name: 'Done' }).click();
+    await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
+    await page.reload();
+    await openCard(nodeByTitle(page, 'A').first(), 'A');
+    expect(await markdownSource(page.getByRole('textbox', { name: 'Markdown source' }))).toBe(
+      exact,
+    );
+  },
+);
+
+/**
+ * The two things Done and Escape do not cover.
+ *
+ * Cancel is a *discard*, and every other Cancel in this suite is clicked on a pane
+ * whose source was never touched — so nothing failed if Cancel committed. And the
+ * pane's commit shortcut is a key CodeMirror also binds (`insertBlankLine`): withheld
+ * from its keymap, it must reach the form having changed nothing. Pressed with the
+ * real platform modifier, which is the half a jsdom test cannot prove.
+ */
+test('Cancel discards edited source and the commit shortcut commits it unchanged', async ({
+  page,
+}) => {
+  await page.goto('/');
+  const cardA = nodeByTitle(page, 'A').first();
+  await settled(page);
+
+  await openCard(cardA, 'A');
+  const source = page.getByRole('textbox', { name: 'Markdown source' });
+  const original = await markdownSource(source);
+  expect(original).toContain('entry point');
+  await source.fill('Discarded rewrite');
+  expect(await markdownSource(source)).toBe('Discarded rewrite');
+  await page.getByRole('button', { name: 'Cancel' }).click();
+  await expect(page.getByTestId('open-card')).toHaveCount(0);
+
+  await openCard(cardA, 'A');
+  expect(await markdownSource(page.getByRole('textbox', { name: 'Markdown source' }))).toBe(
+    original,
+  );
+
+  const committed = '# Committed\n\n  by the shortcut';
+  const reopened = page.getByRole('textbox', { name: 'Markdown source' });
+  await reopened.fill(committed);
+  await reopened.press(`${PRIMARY_MODIFIER}+Enter`);
+  await expect(page.getByTestId('open-card')).toHaveCount(0);
+  await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
+
+  await page.reload();
+  await openCard(nodeByTitle(page, 'A').first(), 'A');
+  expect(await markdownSource(page.getByRole('textbox', { name: 'Markdown source' }))).toBe(
+    committed,
+  );
+});
+
+test('the Markdown editor code loads only when a Markdown Card opens', async ({ page }) => {
+  const editorRequests: string[] = [];
+  page.on('request', (request) => {
+    if (request.url().includes('MarkdownSourceEditor')) editorRequests.push(request.url());
+  });
+
+  await page.goto('/');
+  const card = nodeByTitle(page, 'A').first();
+  await expect(card).toBeVisible();
+  await settled(page);
+  expect(editorRequests).toEqual([]);
+
+  await openCard(nodeByTitle(page, 'A′').first(), 'A′');
+  await expect(page.getByRole('textbox', { name: 'Title' })).toHaveValue('A′');
+  expect(editorRequests).toEqual([]);
+  await page.getByRole('button', { name: 'Cancel' }).click();
+
+  await openCard(card, 'A');
+  await expect(page.getByRole('textbox', { name: 'Markdown source' })).toBeVisible();
+  expect(editorRequests).toHaveLength(1);
+});
+
+/**
+ * The flat paper treatment ADR 0051 settled: cream face, heavy ink rule, and a
+ * mono body that is the writing surface rather than a form control.
+ *
+ * Pinned because nothing else asserts it. The treatment's rules and the general
+ * `.card-pane__panel` rules they override have equal specificity, so only source
+ * order separates them — the same cascade trap `presenting.spec.ts` pins for
+ * `.card--full`. With the treatment colocated in its own stylesheet, that order
+ * is now a fact about the module graph rather than about one file's line
+ * numbers, and a reordered import would silently return the editor to the
+ * generic dark pane with every other assertion still green.
+ */
+test('the opened Card draws the flat paper treatment on its own surface', async ({ page }) => {
+  await page.goto('/');
+  const card = nodeByTitle(page, 'A').first();
+  await expect(card).toBeVisible();
+  await settled(page);
+
+  await openCard(card, 'A');
+
+  const panel = page.getByTestId('open-card').locator('.card-pane__panel--card-editor');
+  await expect(panel).toHaveCSS('background-color', 'rgb(255, 250, 240)');
+  await expect(panel).toHaveCSS('border-top-color', 'rgb(11, 13, 17)');
+  await expect(panel).toHaveCSS('border-top-width', '4px');
+
+  const source = page.locator('[data-slot="markdown-source-editor"]');
+  await expect(source).toHaveCSS('background-color', 'rgb(255, 250, 240)');
+  await expect(source).toHaveCSS('color', 'rgb(43, 48, 59)');
+
+  // The gutter takes the paper palette through the editor's two custom properties,
+  // which is the only way the app is allowed to reach it (ADR 0063). Without them it
+  // falls back to the ambient `--muted-foreground`, which is illegible on cream.
+  await expect(page.locator('[data-slot="markdown-source-line-numbers"]')).toHaveCSS(
+    'color',
+    'rgb(107, 99, 83)',
   );
 });
 
@@ -345,7 +521,7 @@ test('opened Markdown editing persists source without moving Cards', async ({ pa
   await page.reload();
   const persisted = nodeByTitle(page, 'A').first();
   await openCard(persisted, 'A');
-  await expect(page.getByRole('textbox', { name: 'Markdown source' })).toHaveValue(
+  expect(await markdownSource(page.getByRole('textbox', { name: 'Markdown source' }))).toBe(
     '# Edited\n\nNew source',
   );
 });
@@ -378,7 +554,7 @@ test('editing an Alias authors its metadata and survives reload', async ({ page 
   // The Alias pane authored the Alias and nothing else: the Card it used to
   // point at still holds its own source (ADR 0049).
   await openCard(target, 'A');
-  await expect(page.getByRole('textbox', { name: 'Markdown source' })).toHaveValue(/entry point/);
+  await expect(page.getByRole('textbox', { name: 'Markdown source' })).toContainText('entry point');
   await page.getByRole('button', { name: 'Cancel' }).click();
 
   await page.reload();

@@ -48,4 +48,19 @@ describe('application UI import restrictions', () => {
       expect(messages).toEqual([]);
     },
   );
+
+  it('permits the public Markdown editor split point from app composition only', async () => {
+    expect(
+      await lintImport(
+        '@project/ui/MarkdownSourceEditor',
+        'packages/app/src/components/OpenCard.tsx',
+      ),
+    ).toEqual([]);
+    expect(
+      await lintImport(
+        '@project/ui/MarkdownSourceEditor',
+        'packages/react-flow-adapter/src/CardNode.tsx',
+      ),
+    ).toHaveLength(1);
+  });
 });

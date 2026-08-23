@@ -15,7 +15,8 @@
       "@project/http": ["../http/src/index.ts"],
       "@project/persistence": ["../persistence/src/index.ts"],
       "@project/react-flow-adapter": ["../react-flow-adapter/src/index.ts"],
-      "@project/ui": ["../ui/src/index.ts"]
+      "@project/ui": ["../ui/src/index.ts"],
+      "@project/ui/MarkdownSourceEditor": ["../ui/src/MarkdownSourceEditor.tsx"]
     }
   },
   "include": [

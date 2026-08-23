@@ -1,4 +1,6 @@
 import {
+  Suspense,
+  useCallback,
   useRef,
   useState,
   type CSSProperties,
@@ -20,9 +22,11 @@ import {
   FieldError,
   FieldGroup,
   FieldLabel,
-  Textarea,
 } from '@project/ui';
+import type { MarkdownSourceEditorHandle } from '@project/ui/MarkdownSourceEditor';
 import { CardPane } from './CardPane';
+import { MarkdownSourceEditor } from './markdown-source-editor-lazy';
+import './card-editor.css';
 import { paneInitialFocus } from './pane-focus';
 import { presentAliasCardRefusal, presentMarkdownCardRefusal } from '../authoring-refusal';
 import { GRAPH_PALETTE } from '../colors';
@@ -279,7 +283,8 @@ function MarkdownCardEditor({
   const [draft, setDraft] = useState<MarkdownDraft>(() => seedMarkdown(content));
   const [contentRefusal, setContentRefusal] = useState<string | null>(null);
   const [authoringRefusal, setAuthoringRefusal] = useState<AuthoringRefusal | null>(null);
-  const body = useRef<HTMLTextAreaElement>(null);
+  const body = useRef<MarkdownSourceEditorHandle | null>(null);
+  const focusBodyOnMount = useRef(false);
   const authoringErrors =
     authoringRefusal === null ? { fields: {} } : presentMarkdownCardRefusal(authoringRefusal);
   const titleError = draft.titleError ?? authoringErrors.fields.title ?? null;
@@ -302,6 +307,38 @@ function MarkdownCardEditor({
   };
 
   const titleStartsFocused = true;
+  const changeTitle = useCallback((title: string) => {
+    // Typing here withdraws any body focus still waiting on the lazy editor: the
+    // author has stopped waiting for it, and a caret arriving mid-word would put the
+    // rest of the title into the Markdown.
+    focusBodyOnMount.current = false;
+    setDraft((current) => ({ ...current, title, titleError: null }));
+    setContentRefusal(null);
+    setAuthoringRefusal(null);
+  }, []);
+  const changeBody = useCallback((body: string) => {
+    setDraft((current) => ({ ...current, body }));
+    setContentRefusal(null);
+    setAuthoringRefusal(null);
+  }, []);
+  const receiveBody = useCallback((handle: MarkdownSourceEditorHandle | null) => {
+    body.current = handle;
+    if (handle !== null && focusBodyOnMount.current) {
+      requestAnimationFrame(() => {
+        if (body.current === handle && focusBodyOnMount.current) {
+          focusBodyOnMount.current = false;
+          handle.focus();
+        }
+      });
+    }
+  }, []);
+  const focusBody = (): void => {
+    if (body.current === null) {
+      focusBodyOnMount.current = true;
+      return;
+    }
+    body.current.focus();
+  };
 
   return (
     <CardEditorShell
@@ -310,33 +347,23 @@ function MarkdownCardEditor({
       title={draft.title}
       titleError={titleError}
       titleStartsFocused={titleStartsFocused}
-      onTitleChange={(title) => {
-        setDraft({ ...draft, title, titleError: null });
-        setContentRefusal(null);
-        setAuthoringRefusal(null);
-      }}
-      onTitleEnter={() => body.current?.focus()}
+      onTitleChange={changeTitle}
+      onTitleEnter={focusBody}
       error={formError}
       errorId="open-card-error"
       onSubmit={submit}
       onCancel={onCancel}
     >
       <Field className="card-editor__body">
-        <FieldLabel className="sr-only" htmlFor="open-card-markdown">
-          Markdown source
-        </FieldLabel>
-        <Textarea
-          ref={body}
-          id="open-card-markdown"
-          className="card-editor__markdown"
-          value={draft.body}
-          {...paneInitialFocus(!titleStartsFocused)}
-          onChange={(event) => {
-            setDraft({ ...draft, body: event.currentTarget.value });
-            setContentRefusal(null);
-            setAuthoringRefusal(null);
-          }}
-        />
+        <Suspense fallback={<div className="card-editor__markdown" aria-hidden="true" />}>
+          <MarkdownSourceEditor
+            ref={receiveBody}
+            className="card-editor__markdown"
+            value={draft.body}
+            ariaLabel="Markdown source"
+            onValueChange={changeBody}
+          />
+        </Suspense>
       </Field>
     </CardEditorShell>
   );

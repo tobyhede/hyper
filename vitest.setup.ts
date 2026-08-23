@@ -202,6 +202,29 @@ if (typeof window !== 'undefined') {
 }
 
 /**
+ * CodeMirror measures text ranges to size its viewport after an edit. jsdom
+ * supplies `Range` but no layout-backed rectangle methods, so the measurement
+ * otherwise throws asynchronously after an editor test has already passed.
+ * Empty geometry is the honest jsdom answer and keeps browser layout behavior
+ * in Playwright, where the real methods exist.
+ */
+if (typeof Range !== 'undefined' && !('getClientRects' in Range.prototype)) {
+  Object.defineProperty(Range.prototype, 'getClientRects', {
+    configurable: true,
+    writable: true,
+    value: () => [],
+  });
+}
+
+if (typeof Range !== 'undefined' && !('getBoundingClientRect' in Range.prototype)) {
+  Object.defineProperty(Range.prototype, 'getBoundingClientRect', {
+    configurable: true,
+    writable: true,
+    value: () => new DOMRect(),
+  });
+}
+
+/**
  * jsdom ships no `matchMedia`, and the shared Sidebar asks for one.
  *
  * `useIsMobile` subscribes to `(max-width: 767px)` to decide whether the

@@ -89,6 +89,13 @@ export const parityClaims: readonly ParityClaim[] = [
     claim: 'A refused Markdown Card title stays field-local and the whole draft can be cancelled.',
   },
   {
+    id: 'markdown-source-editor-preserves-pane-ownership',
+    storyFile: 'components/card-and-alias-panes.stories.tsx',
+    storyExport: 'Markdown',
+    claim:
+      'The Markdown source editor preserves exact source while Tab remains focus navigation and Escape remains pane dismissal.',
+  },
+  {
     id: 'alias-pane-authors-metadata',
     storyFile: 'components/card-and-alias-panes.stories.tsx',
     storyExport: 'Alias',

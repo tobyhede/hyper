@@ -15,6 +15,15 @@ const markdown = (over: { body?: string } = {}) => ({
   body: over.body ?? '**A** source',
 });
 
+/** Replace CodeMirror source through its public editable surface. */
+const replaceMarkdownSource = (value: string): HTMLElement => {
+  const source = screen.getByRole('textbox', { name: 'Markdown source' });
+  source.focus();
+  fireEvent.keyDown(source, { key: 'a', ctrlKey: true });
+  fireEvent.paste(source, { clipboardData: { getData: () => value } });
+  return source;
+};
+
 /** The ids a field points assistive technology at, in the order it names them. */
 const described = (field: HTMLElement): readonly string[] =>
   (field.getAttribute('aria-describedby') ?? '').split(' ').filter(Boolean);
@@ -37,38 +46,69 @@ beforeAll(() => {
 });
 
 describe('the opened Card', () => {
-  it('keeps all content fields pending until Done', () => {
+  it('replaces editor-local source, selection and history when the Card identity changes', async () => {
+    const onComplete = vi.fn(() => null);
+    const { rerender } = render(
+      <OpenCard
+        card={markdown({ body: 'Card A source' })}
+        onComplete={onComplete}
+        onCancel={vi.fn()}
+      />,
+    );
+    const firstSource = await screen.findByRole('textbox', { name: 'Markdown source' });
+    firstSource.focus();
+    fireEvent.keyDown(firstSource, { key: 'a', ctrlKey: true });
+    fireEvent.paste(firstSource, { clipboardData: { getData: () => 'Card A draft' } });
+
+    rerender(
+      <OpenCard
+        card={{ ...markdown({ body: 'Card B source' }), id: OTHER_CARD_ID, title: 'B' }}
+        onComplete={onComplete}
+        onCancel={vi.fn()}
+      />,
+    );
+
+    const secondSource = await screen.findByRole('textbox', { name: 'Markdown source' });
+    expect(secondSource).not.toBe(firstSource);
+    expect(secondSource).toHaveTextContent('Card B source');
+    fireEvent.keyDown(secondSource, { key: 'z', ctrlKey: true });
+    expect(secondSource).toHaveTextContent('Card B source');
+    expect(secondSource).not.toHaveTextContent('Card A draft');
+    expect(window.getSelection()?.containsNode(firstSource, true)).toBe(false);
+  });
+
+  it('keeps both the title and the edited Markdown source pending until Done', async () => {
     const onComplete = vi.fn(() => null);
     render(<OpenCard card={markdown()} onComplete={onComplete} onCancel={vi.fn()} />);
 
     expect(screen.queryByRole('textbox', { name: 'Description' })).not.toBeInTheDocument();
+    await screen.findByRole('textbox', { name: 'Markdown source' });
+    replaceMarkdownSource('Rewritten source');
     fireEvent.change(screen.getByRole('textbox', { name: 'Title' }), {
       target: { value: 'Renamed A' },
     });
-    fireEvent.change(screen.getByRole('textbox', { name: 'Markdown source' }), {
-      target: { value: 'New body' },
-    });
-
+    // Neither field completes on its own: the pane commits once, on Done (ADR 0048).
     expect(onComplete).not.toHaveBeenCalled();
+
     fireEvent.click(screen.getByRole('button', { name: 'Done' }));
 
+    expect(onComplete).toHaveBeenCalledOnce();
     expect(onComplete).toHaveBeenCalledWith({
       id: CARD_ID,
       title: 'Renamed A',
       kind: 'markdown',
-      body: 'New body',
+      body: 'Rewritten source',
     });
   });
 
-  it('cancels every pending field on Escape', () => {
+  it('cancels every pending field on Escape', async () => {
     const onComplete = vi.fn(() => null);
     const onCancel = vi.fn();
     render(<OpenCard card={markdown()} onComplete={onComplete} onCancel={onCancel} />);
 
-    fireEvent.change(screen.getByRole('textbox', { name: 'Markdown source' }), {
-      target: { value: 'abandoned' },
+    fireEvent.keyDown(await screen.findByRole('textbox', { name: 'Markdown source' }), {
+      key: 'Escape',
     });
-    fireEvent.keyDown(screen.getByRole('textbox', { name: 'Markdown source' }), { key: 'Escape' });
 
     expect(onCancel).toHaveBeenCalledOnce();
     expect(onComplete).not.toHaveBeenCalled();
@@ -281,6 +321,16 @@ describe('the opened Card as a dialog', () => {
   it('uses Base UI modal containment rather than a local Tab handler', () => {
     render(<OpenCard card={markdown()} onComplete={vi.fn(() => null)} onCancel={vi.fn()} />);
     expect(screen.getByRole('dialog').closest('[data-base-ui-portal]')).not.toBeNull();
+  });
+
+  it('moves from Title to Markdown source on unmodified Enter', async () => {
+    render(<OpenCard card={markdown()} onComplete={vi.fn(() => null)} onCancel={vi.fn()} />);
+    const title = screen.getByRole('textbox', { name: 'Title' });
+    await waitFor(() => expect(title).toHaveFocus());
+
+    fireEvent.keyDown(title, { key: 'Enter' });
+
+    expect(screen.getByRole('textbox', { name: 'Markdown source' })).toHaveFocus();
   });
 
   it('opens an Alias on its Target picker, since the title stays editable from the Card front', async () => {

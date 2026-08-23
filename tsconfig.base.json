@@ -40,7 +40,8 @@
       "@project/persistence": ["./packages/persistence/src/index.ts"],
       "@project/persistence/test-support": ["./packages/persistence/test/backend-contract.ts"],
       "@project/react-flow-adapter": ["./packages/react-flow-adapter/src/index.ts"],
-      "@project/ui": ["./packages/ui/src/index.ts"]
+      "@project/ui": ["./packages/ui/src/index.ts"],
+      "@project/ui/MarkdownSourceEditor": ["./packages/ui/src/MarkdownSourceEditor.tsx"]
     }
   }
 }

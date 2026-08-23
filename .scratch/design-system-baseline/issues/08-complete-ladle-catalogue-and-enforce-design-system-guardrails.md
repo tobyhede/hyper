@@ -152,6 +152,23 @@ reaches them. They are kept because the style audit this ticket *did* ask for is
 what surfaced the defect, and recording the block in the inventory without fixing
 it would have documented a broken cascade as intentional.
 
+### 2026-08-22 — the card-editor half of the second line landed
+
+[Issue 16](16-move-the-card-editor-treatment-into-the-design-system.md) is resolved.
+`card-editor` is out of `packages/app/src/styles.css` and beside `OpenCard` as
+`src/components/card-editor.css`, its colours are `--card-editor-*-color` tokens in
+`tailwind.css`, and the Card-choice popup's theme went to
+`packages/ui/src/card-search-combobox.css` beside `CardSearchCombobox` — not with the
+editor, because those rules are unscoped and style every consumer, which the entry
+here had recorded wrongly. Both `handRolledStyles` entries are gone and
+`pnpm ui:catalog:check` is valid without them.
+
+**The second acceptance line stays unticked**, deliberately: it needs
+`workspace-selection` gone too, which is condemned with its component under ADR 0058
+and belongs to `space-cards/04`, blocked behind `space-cards/03`. Whether this ticket
+closes against Issue 16 with that block explicitly deferred, or waits for
+`space-cards`, is part of the call this ticket is handed over on.
+
 ### 2026-08-21 — what a three-source review changed
 
 Three independent reviews ran over the branch — the two-axis Standards/Spec pass,

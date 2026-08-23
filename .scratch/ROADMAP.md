@@ -26,8 +26,10 @@ scheduling the second closes the effort.
 
 What is left here:
 
-- `16` — move the Card editor's flat-paper treatment beside its component: the
-  larger half of what `08` left.
+- `16` — **resolved.** The Card editor's flat-paper treatment now sits beside
+  `OpenCard`, and the Card-choice popup's theme beside `CardSearchCombobox`. That was
+  the larger half of what `08` left; `workspace-selection` is the remainder, and it
+  belongs to `space-cards/04`.
 - `13` — the shared extraction contract, which owes its own closing step rather
   than a migration: the donor-to-landed audit, every path in
   `main...feat/surface-inventory` accounted for to a landed owner or to one of

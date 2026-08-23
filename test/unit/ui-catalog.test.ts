@@ -295,6 +295,18 @@ describe('production component coverage', () => {
     expect(buildUiCatalog(root).uncataloguedComponents).toEqual([]);
   });
 
+  it('follows a public package subpath directly to the component it renders', () => {
+    const root = fixture();
+    write(root, 'packages/ui/src/MarkdownSourceEditor.tsx', 'export const Thing = null;');
+    write(
+      root,
+      'packages/app/stories/components/button.stories.tsx',
+      storyRendering('@project/ui/MarkdownSourceEditor'),
+    );
+
+    expect(buildUiCatalog(root).uncataloguedComponents).toEqual([]);
+  });
+
   it('resolves a subpath entry declared without a wildcard', () => {
     const root = fixture();
     write(root, 'packages/app/package.json', '{"imports":{"#shell":"./src/Shell.tsx"}}');
@@ -606,6 +618,33 @@ describe('hand-rolled application styles', () => {
     expect(() => buildUiCatalog(root)).toThrowError(
       /hand-rolled style block btn is recorded but packages\/app\/src\/styles\.css declares no rule/,
     );
+  });
+
+  /**
+   * A colocated component stylesheet is not inventory debt — `canvas-card.css` beside
+   * `CanvasCard` is the pattern, not the exception — so the *recorded block* half does
+   * not apply to it. The dead-rule half does: moving a block out of `styles.css` and
+   * beside its component must not be a way to stop the ratchet reading it.
+   */
+  it('reports a dead rule in a stylesheet colocated with its component', () => {
+    const root = fixture();
+    write(root, 'packages/ui/src/canvas-card.css', '.canvas-card__ghost { color: red; }');
+
+    expect(() => buildUiCatalog(root)).toThrowError(
+      /packages\/ui\/src\/canvas-card\.css declares \.canvas-card__ghost, which no production module names/,
+    );
+  });
+
+  it('asks a colocated stylesheet for no inventory entry', () => {
+    const root = fixture();
+    write(root, 'packages/ui/src/canvas-card.css', '.canvas-card__rail { color: red; }');
+    write(
+      root,
+      'packages/ui/src/CanvasCard.tsx',
+      'export const CanvasCard = () => <div className="canvas-card__rail" />;',
+    );
+
+    expect(() => buildUiCatalog(root)).not.toThrowError(/canvas-card__rail.*is not recorded/);
   });
 
   it('reports a rule no production module names', () => {

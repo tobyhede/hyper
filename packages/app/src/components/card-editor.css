@@ -1,0 +1,220 @@
+/* The opened Card's flat paper treatment (ADR 0051): the same paper object as a
+   Card on the canvas, at a larger writing scale.
+
+   Colocated with `OpenCard`, which imports it, the way `packages/ui/src/canvas-card.css`
+   sits beside `CanvasCard`. Nothing here is React Flow's, so it is not recorded in
+   `packages/app/stories/design-system-inventory.ts` and does not belong in
+   `packages/app/src/styles.css`.
+
+   The two `.card-pane` rules below travel with the treatment rather than with the
+   pane: `styles.css` keeps the shared modal frame — the 16:9 silhouette matching
+   `card.ts` and the scroll boundary that keeps Cancel and Done reachable — while
+   these are the editor's own paper face and writing size, expressed through the
+   frame's classes because that is the element they paint.
+
+   They also override `.card-pane__panel` at equal specificity, so only source order
+   separates them. This file is imported from the component, which the module graph
+   reaches after `main.tsx` loads `styles.css`, so the order holds in the application
+   and in the Ladle catalogue alike. `editing.spec.ts` and
+   `ladle-e2e/issue-03-card-and-alias-panes.spec.ts` both pin the computed result,
+   because every other assertion here passes against the generic dark pane. */
+.card-pane[data-variant='card-editor'] {
+  padding: 2rem 1rem;
+}
+
+.card-pane[data-variant='card-editor'] .card-pane__backdrop {
+  background: color-mix(in srgb, var(--card-editor-ink-color) 12%, transparent);
+}
+
+.card-pane__panel--card-editor {
+  width: min(528px, 100%);
+  height: min(420px, calc(100vh - 4rem));
+  min-height: min(340px, calc(100vh - 4rem));
+  aspect-ratio: auto;
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
+  background: var(--card-editor-paper-color);
+  border: 4px solid var(--card-editor-ink-color);
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.card-editor {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
+  color: var(--card-editor-ink-color);
+  font-family: 'Inter Tight', Inter, ui-sans-serif, system-ui, sans-serif;
+}
+
+.card-editor__fields {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  gap: 0;
+}
+
+.card-editor__rail {
+  display: flex;
+  flex: none;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px;
+  background: var(--card-editor-graph);
+  border-bottom: 3px solid var(--card-editor-ink-color);
+}
+
+.card-editor__title-field {
+  min-width: 0;
+  gap: 2px;
+}
+
+.card-editor__title {
+  width: 100%;
+  min-width: 0;
+  padding: 0 0 2px;
+  color: var(--card-editor-ink-color);
+  font: inherit;
+  font-size: 21px;
+  font-weight: 600;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  outline: 0;
+  box-shadow: inset 0 -1px 0 var(--card-editor-rule-color);
+  caret-color: var(--card-editor-ink-color);
+}
+
+.card-editor__title:focus-visible {
+  box-shadow: inset 0 -3px 0 var(--card-editor-field-color);
+}
+
+.card-editor__close {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  color: var(--card-editor-ink-color);
+  background: var(--card-editor-rule-color);
+  border: 2px solid var(--card-editor-ink-color);
+  border-radius: 0;
+}
+
+.card-editor__close:hover {
+  color: var(--card-editor-graph);
+  background: var(--card-editor-ink-color);
+  border-color: var(--card-editor-ink-color);
+}
+
+.card-editor__body {
+  flex: 1;
+  min-height: 0;
+  gap: 0;
+}
+
+.card-editor__markdown.markdown-source-editor {
+  /* The editor's own gutter contract: set the properties, never the `.cm-*` classes
+     they are read by (ADR 0063). */
+  --markdown-source-gutter-color: var(--card-editor-label-color);
+  --markdown-source-gutter-rule-color: var(--card-editor-rule-color);
+
+  flex: 1;
+  min-height: 0;
+  color: var(--card-editor-body-color);
+  font-size: 12px;
+  background: var(--card-editor-paper-color);
+}
+
+.card-editor__markdown.markdown-source-editor:focus-within {
+  outline-color: color-mix(in srgb, var(--card-editor-graph) 65%, transparent);
+}
+
+.card-editor__alias-target {
+  align-items: stretch;
+  justify-content: flex-start;
+  padding: 14px;
+  background: var(--card-editor-paper-color);
+}
+
+.card-editor__alias-label {
+  color: var(--card-editor-label-color);
+  font-family: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.card-editor__alias-target [data-slot='input-group'] {
+  width: 100%;
+  min-height: 48px;
+  color: var(--card-editor-ink-color);
+  font-size: 15px;
+  background: var(--card-editor-field-color);
+  border: 3px solid var(--card-editor-ink-color);
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.card-editor__alias-target [data-slot='input-group-control'] {
+  color: var(--card-editor-ink-color);
+  font-size: 15px;
+}
+
+.card-editor__alias-target [data-slot='input-group']:focus-within {
+  border-color: var(--card-editor-ink-color);
+  box-shadow: none;
+}
+
+.card-editor__error {
+  flex: none;
+  margin: 12px 14px 0;
+}
+
+.card-editor__footer {
+  display: flex;
+  flex: none;
+  justify-content: flex-end;
+  gap: 20px;
+  padding: 12px 14px;
+  background: var(--card-editor-paper-color);
+  border-top: 3px solid var(--card-editor-ink-color);
+}
+
+.card-editor__cancel,
+.card-editor__commit {
+  padding: 7px 12px;
+  border-width: 3px;
+  border-radius: 0;
+  font-size: 13px;
+  line-height: 1;
+}
+
+.card-editor__cancel {
+  color: var(--card-editor-cancel-color);
+  background: transparent;
+  border-color: transparent;
+}
+
+.card-editor__cancel:hover {
+  color: var(--card-editor-ink-color);
+  background: transparent;
+  border-color: var(--card-editor-cancel-border-color);
+}
+
+.card-editor__commit {
+  padding-inline: 16px;
+  color: var(--card-editor-ink-color);
+  font-weight: 600;
+  border-bottom-color: var(--card-editor-graph);
+}
+
+.card-editor__commit:hover {
+  background: transparent;
+  border-color: var(--card-editor-graph);
+}

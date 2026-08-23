@@ -1,0 +1,69 @@
+/* The Card-choice popup's paper appearance, beside the component that draws it.
+
+   Reached by an attribute rather than a class because Base UI portals the popup out
+   of whatever surface opened it, so no ancestor selector can find it.
+
+   It is deliberately unscoped, which is what it already was: the same treatment
+   reaches every consumer — the opened Card's Alias Target, a new Alias, both
+   selected-Edge endpoints, and the keyboard Connect picker. The design-system
+   inventory used to record this as part of the Card editor's debt, which was true
+   about where the colours came from and wrong about what they style.
+
+   Most of the palette is stated through the primitive's own shadcn variables, which
+   is the theming seam `components/combobox.tsx` reads — that is why the values sit
+   here rather than in a second app-owned token family: this rule set already is the
+   one place the popup's palette is declared. The two names prefixed `--csc-` are not
+   part of that seam and are deliberately private. A shadcn token redeclared here
+   reaches the whole portalled subtree, so `--border` in particular must not be used
+   for a one-rule colour: `@theme inline` maps it to `--color-border`, which
+   `ComboboxSeparator`, `Button`'s secondary and ghost variants and `DropdownMenu`
+   all consume, and any of them rendered in this popup would silently take cream. */
+[data-card-search-combobox] {
+  --foreground: #0b0d11;
+  --popover: #fffaf0;
+  --popover-foreground: var(--foreground);
+  --accent: #f0ebe1;
+  --accent-foreground: var(--foreground);
+  --muted-foreground: #9aa3b3;
+  --csc-divider: #ded6c7;
+  --csc-refused-foreground: #887f70;
+
+  width: var(--anchor-width);
+  min-width: var(--anchor-width);
+  color: var(--popover-foreground);
+  background: var(--popover);
+  border: 3px solid var(--foreground);
+  border-radius: 0;
+  box-shadow: none;
+}
+
+[data-card-search-combobox] [data-slot='combobox-list'] {
+  max-height: 15rem;
+  padding: 0;
+  background: var(--popover);
+  border: 0;
+  border-radius: 0;
+}
+
+[data-card-search-combobox] [data-slot='combobox-item'] {
+  min-height: 48px;
+  gap: 12px;
+  padding: 10px 20px;
+  color: var(--foreground);
+  font-size: 15px;
+  font-weight: 600;
+  border-bottom: 1px solid var(--csc-divider);
+  border-radius: 0;
+}
+
+/* A refused choice stays legible rather than dimmed: the Combobox's own disabled
+   opacity is overridden, not its semantics. Its reason is drawn in
+   `--muted-foreground`, which on this cream face is under AA — the same defect
+   `tailwind.css` records for the canvas Card and fixed there with a token of its own.
+   Recorded, not fixed here: changing what the popup looks like is a design decision
+   rather than part of moving this stylesheet. */
+[data-card-search-combobox] [data-slot='combobox-item'][data-disabled] {
+  color: var(--csc-refused-foreground);
+  background: var(--popover);
+  opacity: 1;
+}
