@@ -63,7 +63,7 @@ facsimile was added.
 
 Final verification:
 
-- `pnpm verify`: passed — 152 files, 1,666 tests passed, 8 skipped.
-- `pnpm e2e`: passed — 117 tests.
+- `pnpm verify`: passed — 152 files, 1,669 tests passed, 8 skipped.
+- `pnpm e2e`: passed — 118 tests.
 - `pnpm e2e:ladle`: passed — 41 tests.
 - `pnpm build`: passed; Vite reported its existing large-chunk advisory.

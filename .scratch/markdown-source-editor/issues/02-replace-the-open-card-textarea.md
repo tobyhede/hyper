@@ -66,5 +66,5 @@ exact source and the existing Card-id remount boundary remain intact. The Card
 editor stylesheet owns the pane-specific paper, gutter, focus and sizing
 treatment; CodeMirror scrolls inside the body region.
 
-`pnpm verify` passed. `pnpm e2e` passed all 117 tests. `pnpm e2e:ladle`
-passed all 41 tests.
+`pnpm verify` passed with 152 test files, 1,669 tests passed and 8 skipped.
+`pnpm e2e` passed all 118 tests. `pnpm e2e:ladle` passed all 41 tests.

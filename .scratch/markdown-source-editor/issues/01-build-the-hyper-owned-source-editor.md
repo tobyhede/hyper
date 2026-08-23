@@ -88,4 +88,4 @@ public value, controlled update, focus, accessibility, read-only and key contrac
 The narrow public subpath is the production split point: `OpenCard` remains
 mounted to own modality while only a Markdown Card loads the editor chunk.
 
-`pnpm verify` passed: 152 test files, 1,666 tests passed and 8 skipped.
+`pnpm verify` passed: 152 test files, 1,669 tests passed and 8 skipped.
