@@ -368,6 +368,11 @@ test('the Markdown editor code loads only when a Markdown Card opens', async ({ 
   await settled(page);
   expect(editorRequests).toEqual([]);
 
+  await openCard(nodeByTitle(page, 'A′').first(), 'A′');
+  await expect(page.getByRole('textbox', { name: 'Title' })).toHaveValue('A′');
+  expect(editorRequests).toEqual([]);
+  await page.getByRole('button', { name: 'Cancel' }).click();
+
   await openCard(card, 'A');
   await expect(page.getByRole('textbox', { name: 'Markdown source' })).toBeVisible();
   expect(editorRequests).toHaveLength(1);

@@ -18,6 +18,12 @@ visual policy through that wrapper: Escape remains the pane's dismissal key,
 Tab remains focus navigation, and the editor introduces no toolbar, preview,
 format-on-save behavior or independent panel chrome.
 
+The wrapper is exported from the narrow public
+`@project/ui/MarkdownSourceEditor` subpath rather than the package root. The
+application lazy-loads that subpath inside an already-mounted `CardPane`: the
+pane and its focus trap therefore exist throughout loading, Alias editing never
+loads CodeMirror, and the specialist dependency stays out of the initial bundle.
+
 ## Why
 
 Hyper authors Markdown source. A source editor preserves the one representation
@@ -39,4 +45,3 @@ directly by the wrapper are direct dependencies of `@project/ui`, and Hyper
 maintains browser evidence for the focus, keyboard and modal boundary. Rich-text
 editing, preview, formatting commands, autocomplete and Hyper-specific Markdown
 dialects are separate future decisions, not latent configuration exposed now.
-

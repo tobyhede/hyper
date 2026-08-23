@@ -1,12 +1,4 @@
-import {
-  Suspense,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  useSyncExternalStore,
-} from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { ReactFlowProvider } from '@xyflow/react';
 import { AppShell } from '@project/ui';
 import {
@@ -35,7 +27,7 @@ import type { CanvasRendererId } from './renderer';
 import { ADD_CARD_KEY, SpaceCanvas } from './components/SpaceCanvas';
 import { CanvasCentre, type VisibleCentre } from './components/CanvasCentre';
 import { NewAlias } from './components/NewAlias';
-import { OpenCard } from './components/open-card-lazy';
+import { OpenCard } from './components/OpenCard';
 import { PlacementFailure } from './components/PlacementFailure';
 import { PlacementPending } from './components/PlacementPending';
 import { PresentingChrome } from './components/PresentingChrome';
@@ -658,35 +650,26 @@ export const createApp = ({ spaceSession }: OpenedSpace) => {
 
           {/* An Alias authors only its own metadata. Its Target must be opened
               explicitly to author shared content (ADR 0049). */}
-          {openedCard && (
-            <Suspense
-              fallback={
-                <span className="sr-only" role="status">
-                  Loading Card editor…
-                </span>
-              }
-            >
-              {openedCard.kind === 'alias' ? (
-                <OpenCard
-                  through={openedCard}
-                  graphColor={editorGraphColor}
-                  occurrence={{
-                    targets: aliasTargets,
-                    onEdit: (change: { title: string; target: CardId }) =>
-                      editAlias(openedCard, change),
-                  }}
-                  onCancel={closeCard}
-                />
-              ) : (
-                <OpenCard
-                  card={openedCard}
-                  graphColor={editorGraphColor}
-                  onComplete={completeOpenedCard}
-                  onCancel={closeCard}
-                />
-              )}
-            </Suspense>
-          )}
+          {openedCard &&
+            (openedCard.kind === 'alias' ? (
+              <OpenCard
+                through={openedCard}
+                graphColor={editorGraphColor}
+                occurrence={{
+                  targets: aliasTargets,
+                  onEdit: (change: { title: string; target: CardId }) =>
+                    editAlias(openedCard, change),
+                }}
+                onCancel={closeCard}
+              />
+            ) : (
+              <OpenCard
+                card={openedCard}
+                graphColor={editorGraphColor}
+                onComplete={completeOpenedCard}
+                onCancel={closeCard}
+              />
+            ))}
 
           {creatingAlias && openedCardId === null && (
             <NewAlias

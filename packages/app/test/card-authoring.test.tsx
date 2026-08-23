@@ -227,6 +227,7 @@ describe('presenting after a conversion', () => {
 async function openEditor(): Promise<void> {
   fireEvent.click(await screen.findByRole('button', { name: 'Edit Card A' }));
   await screen.findByTestId('open-card');
+  await screen.findByRole('textbox', { name: 'Markdown source' });
 }
 
 describe('authoring an opened Card', () => {
@@ -287,6 +288,7 @@ describe('authoring an opened Card', () => {
 
     fireEvent.click(await screen.findByRole('button', { name: 'Edit Card A' }));
     await screen.findByTestId('open-card');
+    await screen.findByRole('textbox', { name: 'Markdown source' });
     replaceMarkdownSource('Written once, shown everywhere');
     fireEvent.click(screen.getByRole('button', { name: 'Done' }));
 

@@ -8,6 +8,11 @@ the literal `Card.body` string. This effort changes one editing control; it does
 not change the Card model, Space Authoring, persistence, the Done/Cancel
 lifecycle, or `CardContent`'s `marked` and DOMPurify rendering boundary.
 
+The branch includes `dda7e72` as an explicit prerequisite: it moves the already
+accepted Card-editor treatment into its owning stylesheet before the specialist
+editor adds its own colocated treatment. That design-system relocation is not a
+CodeMirror requirement and remains a separable commit for review or cherry-pick.
+
 ## Product result
 
 The opened Card keeps its present paper panel, rail, Title field and footer. The

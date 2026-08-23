@@ -37,7 +37,7 @@ beforeAll(() => {
 });
 
 describe('the opened Card', () => {
-  it('replaces editor-local source, selection and history when the Card identity changes', () => {
+  it('replaces editor-local source, selection and history when the Card identity changes', async () => {
     const onComplete = vi.fn(() => null);
     const { rerender } = render(
       <OpenCard
@@ -46,7 +46,7 @@ describe('the opened Card', () => {
         onCancel={vi.fn()}
       />,
     );
-    const firstSource = screen.getByRole('textbox', { name: 'Markdown source' });
+    const firstSource = await screen.findByRole('textbox', { name: 'Markdown source' });
     firstSource.focus();
     fireEvent.keyDown(firstSource, { key: 'a', ctrlKey: true });
     fireEvent.paste(firstSource, { clipboardData: { getData: () => 'Card A draft' } });
@@ -59,7 +59,7 @@ describe('the opened Card', () => {
       />,
     );
 
-    const secondSource = screen.getByRole('textbox', { name: 'Markdown source' });
+    const secondSource = await screen.findByRole('textbox', { name: 'Markdown source' });
     expect(secondSource).not.toBe(firstSource);
     expect(secondSource).toHaveTextContent('Card B source');
     fireEvent.keyDown(secondSource, { key: 'z', ctrlKey: true });
@@ -87,12 +87,14 @@ describe('the opened Card', () => {
     });
   });
 
-  it('cancels every pending field on Escape', () => {
+  it('cancels every pending field on Escape', async () => {
     const onComplete = vi.fn(() => null);
     const onCancel = vi.fn();
     render(<OpenCard card={markdown()} onComplete={onComplete} onCancel={onCancel} />);
 
-    fireEvent.keyDown(screen.getByRole('textbox', { name: 'Markdown source' }), { key: 'Escape' });
+    fireEvent.keyDown(await screen.findByRole('textbox', { name: 'Markdown source' }), {
+      key: 'Escape',
+    });
 
     expect(onCancel).toHaveBeenCalledOnce();
     expect(onComplete).not.toHaveBeenCalled();

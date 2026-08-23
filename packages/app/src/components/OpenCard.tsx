@@ -1,4 +1,5 @@
 import {
+  Suspense,
   useCallback,
   useRef,
   useState,
@@ -22,11 +23,9 @@ import {
   FieldGroup,
   FieldLabel,
 } from '@project/ui';
-import {
-  MarkdownSourceEditor,
-  type MarkdownSourceEditorHandle,
-} from '@project/ui/MarkdownSourceEditor';
+import type { MarkdownSourceEditorHandle } from '@project/ui/MarkdownSourceEditor';
 import { CardPane } from './CardPane';
+import { MarkdownSourceEditor } from './markdown-source-editor-lazy';
 import './card-editor.css';
 import { paneInitialFocus } from './pane-focus';
 import { presentAliasCardRefusal, presentMarkdownCardRefusal } from '../authoring-refusal';
@@ -284,7 +283,8 @@ function MarkdownCardEditor({
   const [draft, setDraft] = useState<MarkdownDraft>(() => seedMarkdown(content));
   const [contentRefusal, setContentRefusal] = useState<string | null>(null);
   const [authoringRefusal, setAuthoringRefusal] = useState<AuthoringRefusal | null>(null);
-  const body = useRef<MarkdownSourceEditorHandle>(null);
+  const body = useRef<MarkdownSourceEditorHandle | null>(null);
+  const focusBodyOnMount = useRef(false);
   const authoringErrors =
     authoringRefusal === null ? { fields: {} } : presentMarkdownCardRefusal(authoringRefusal);
   const titleError = draft.titleError ?? authoringErrors.fields.title ?? null;
@@ -317,6 +317,24 @@ function MarkdownCardEditor({
     setContentRefusal(null);
     setAuthoringRefusal(null);
   }, []);
+  const receiveBody = useCallback((handle: MarkdownSourceEditorHandle | null) => {
+    body.current = handle;
+    if (handle !== null && focusBodyOnMount.current) {
+      requestAnimationFrame(() => {
+        if (body.current === handle && focusBodyOnMount.current) {
+          focusBodyOnMount.current = false;
+          handle.focus();
+        }
+      });
+    }
+  }, []);
+  const focusBody = (): void => {
+    if (body.current === null) {
+      focusBodyOnMount.current = true;
+      return;
+    }
+    body.current.focus();
+  };
 
   return (
     <CardEditorShell
@@ -326,20 +344,22 @@ function MarkdownCardEditor({
       titleError={titleError}
       titleStartsFocused={titleStartsFocused}
       onTitleChange={changeTitle}
-      onTitleEnter={() => body.current?.focus()}
+      onTitleEnter={focusBody}
       error={formError}
       errorId="open-card-error"
       onSubmit={submit}
       onCancel={onCancel}
     >
       <Field className="card-editor__body">
-        <MarkdownSourceEditor
-          ref={body}
-          className="card-editor__markdown"
-          value={draft.body}
-          ariaLabel="Markdown source"
-          onValueChange={changeBody}
-        />
+        <Suspense fallback={<div className="card-editor__markdown" aria-hidden="true" />}>
+          <MarkdownSourceEditor
+            ref={receiveBody}
+            className="card-editor__markdown"
+            value={draft.body}
+            ariaLabel="Markdown source"
+            onValueChange={changeBody}
+          />
+        </Suspense>
       </Field>
     </CardEditorShell>
   );

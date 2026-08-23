@@ -44,7 +44,9 @@ Put the restrained theme beside the component, use Hyper tokens and monospace
 typography, and make the editor fill and scroll inside a parent-sized region.
 Import every CodeMirror/Lezer package used by source code directly from a direct
 `@project/ui` dependency. Export the component and its public types from the
-curated package index.
+curated `@project/ui/MarkdownSourceEditor` subpath. Keep it out of the root
+barrel so an application can lazy-load the specialist editor without importing
+CodeMirror into its initial bundle.
 
 ## Tests
 
@@ -71,7 +73,8 @@ belong to Issue 03.
       covered by component tests.
 - [x] Line numbers, wrapping, history and the restrained Hyper theme are enabled;
       IDE chrome and Tab indentation are absent.
-- [x] The component is exported through `@project/ui`.
+- [x] The component is exported through the public
+      `@project/ui/MarkdownSourceEditor` subpath.
 - [x] `pnpm verify` passes and its real output is recorded in this ticket.
 
 ## Answer
@@ -82,5 +85,7 @@ wrapping, local history, restrained token-based treatment and pane-safe keys.
 The shadcn registry search found no source-editor primitive, so ADR 0063 records
 the canonical specialist-widget deviation. Seven component tests cover the
 public value, controlled update, focus, accessibility, read-only and key contract.
+The narrow public subpath is the production split point: `OpenCard` remains
+mounted to own modality while only a Markdown Card loads the editor chunk.
 
 `pnpm verify` passed: 152 test files, 1,666 tests passed and 8 skipped.

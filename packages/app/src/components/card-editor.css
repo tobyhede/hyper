@@ -117,7 +117,7 @@
   gap: 0;
 }
 
-.card-editor__markdown {
+.card-editor__markdown.markdown-source-editor {
   flex: 1;
   min-height: 0;
   color: var(--card-editor-body-color);
@@ -125,7 +125,7 @@
   background: var(--card-editor-paper-color);
 }
 
-.card-editor__markdown:focus-within {
+.card-editor__markdown.markdown-source-editor:focus-within {
   outline-color: color-mix(in srgb, var(--card-editor-graph) 65%, transparent);
 }
 
