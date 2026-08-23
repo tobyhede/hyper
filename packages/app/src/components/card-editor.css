@@ -118,12 +118,13 @@
 }
 
 .card-editor__markdown.markdown-source-editor {
-  flex: 1;
-  min-height: 0;
   /* The editor's own gutter contract: set the properties, never the `.cm-*` classes
      they are read by (ADR 0063). */
   --markdown-source-gutter-color: var(--card-editor-label-color);
   --markdown-source-gutter-rule-color: var(--card-editor-rule-color);
+
+  flex: 1;
+  min-height: 0;
   color: var(--card-editor-body-color);
   font-size: 12px;
   background: var(--card-editor-paper-color);
