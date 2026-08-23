@@ -295,6 +295,18 @@ describe('production component coverage', () => {
     expect(buildUiCatalog(root).uncataloguedComponents).toEqual([]);
   });
 
+  it('follows a public package subpath directly to the component it renders', () => {
+    const root = fixture();
+    write(root, 'packages/ui/src/MarkdownSourceEditor.tsx', 'export const Thing = null;');
+    write(
+      root,
+      'packages/app/stories/components/button.stories.tsx',
+      storyRendering('@project/ui/MarkdownSourceEditor'),
+    );
+
+    expect(buildUiCatalog(root).uncataloguedComponents).toEqual([]);
+  });
+
   it('resolves a subpath entry declared without a wildcard', () => {
     const root = fixture();
     write(root, 'packages/app/package.json', '{"imports":{"#shell":"./src/Shell.tsx"}}');

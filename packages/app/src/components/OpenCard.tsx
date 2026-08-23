@@ -1,4 +1,5 @@
 import {
+  useCallback,
   useRef,
   useState,
   type CSSProperties,
@@ -20,9 +21,11 @@ import {
   FieldError,
   FieldGroup,
   FieldLabel,
+} from '@project/ui';
+import {
   MarkdownSourceEditor,
   type MarkdownSourceEditorHandle,
-} from '@project/ui';
+} from '@project/ui/MarkdownSourceEditor';
 import { CardPane } from './CardPane';
 import './card-editor.css';
 import { paneInitialFocus } from './pane-focus';
@@ -304,6 +307,16 @@ function MarkdownCardEditor({
   };
 
   const titleStartsFocused = true;
+  const changeTitle = useCallback((title: string) => {
+    setDraft((current) => ({ ...current, title, titleError: null }));
+    setContentRefusal(null);
+    setAuthoringRefusal(null);
+  }, []);
+  const changeBody = useCallback((body: string) => {
+    setDraft((current) => ({ ...current, body }));
+    setContentRefusal(null);
+    setAuthoringRefusal(null);
+  }, []);
 
   return (
     <CardEditorShell
@@ -312,11 +325,7 @@ function MarkdownCardEditor({
       title={draft.title}
       titleError={titleError}
       titleStartsFocused={titleStartsFocused}
-      onTitleChange={(title) => {
-        setDraft({ ...draft, title, titleError: null });
-        setContentRefusal(null);
-        setAuthoringRefusal(null);
-      }}
+      onTitleChange={changeTitle}
       onTitleEnter={() => body.current?.focus()}
       error={formError}
       errorId="open-card-error"
@@ -329,11 +338,7 @@ function MarkdownCardEditor({
           className="card-editor__markdown"
           value={draft.body}
           ariaLabel="Markdown source"
-          onValueChange={(nextBody) => {
-            setDraft({ ...draft, body: nextBody });
-            setContentRefusal(null);
-            setAuthoringRefusal(null);
-          }}
+          onValueChange={changeBody}
         />
       </Field>
     </CardEditorShell>

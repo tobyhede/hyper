@@ -412,8 +412,17 @@ const resolveModule = (specifier: string, from: string, repositoryRoot: string):
     return null;
   }
   if (!specifier.startsWith(PROJECT_SCOPE)) return null;
-  const packageName = specifier.slice(PROJECT_SCOPE.length);
-  return resolvedExtension(join(repositoryRoot, 'packages', packageName, 'src/index'));
+  const [packageName, ...publicPath] = specifier.slice(PROJECT_SCOPE.length).split('/');
+  if (packageName === undefined) return null;
+  return resolvedExtension(
+    join(
+      repositoryRoot,
+      'packages',
+      packageName,
+      'src',
+      ...(publicPath.length === 0 ? ['index'] : publicPath),
+    ),
+  );
 };
 
 interface ModuleReference {

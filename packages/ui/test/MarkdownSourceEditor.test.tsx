@@ -40,14 +40,16 @@ describe('MarkdownSourceEditor', () => {
     expect(ref.current?.getContentElement()).toBe(editor);
   });
 
-  it('accepts a controlled replacement without replacing its content element', () => {
+  it('accepts a controlled replacement through the latest callback without replacing its content element', () => {
     const ref = createRef<MarkdownSourceEditorHandle>();
+    const firstOnValueChange = vi.fn();
+    const latestOnValueChange = vi.fn();
     const { rerender } = render(
       <MarkdownSourceEditor
         ref={ref}
         value="first"
         ariaLabel="Markdown source"
-        onValueChange={vi.fn()}
+        onValueChange={firstOnValueChange}
       />,
     );
     const content = ref.current?.getContentElement();
@@ -57,13 +59,22 @@ describe('MarkdownSourceEditor', () => {
         ref={ref}
         value={'second\n\n  exact'}
         ariaLabel="Markdown source"
-        onValueChange={vi.fn()}
+        onValueChange={latestOnValueChange}
       />,
     );
 
     expect(ref.current?.getContentElement()).toBe(content);
     expect(content).toHaveTextContent('second');
     expect(content?.textContent).toContain('  exact');
+    if (content === null || content === undefined)
+      throw new Error('Editor content was not mounted');
+    content.focus();
+    fireEvent.keyDown(content, { key: 'a', ctrlKey: true });
+    fireEvent.paste(content, {
+      clipboardData: { getData: () => 'latest source' },
+    });
+    expect(firstOnValueChange).not.toHaveBeenCalled();
+    expect(latestOnValueChange).toHaveBeenLastCalledWith('latest source');
   });
 
   it('focuses the content element through its product handle', () => {

@@ -299,10 +299,23 @@ test(
     await expect(title).toBeFocused();
     await title.press('Enter');
     await expect(source).toBeFocused();
-    await expect(page.locator('[data-slot="markdown-source-line-numbers"]')).toBeVisible();
+    const lineNumbers = page.locator('[data-slot="markdown-source-line-numbers"]');
+    await expect(lineNumbers).toBeVisible();
+    const originalLineNumbers = await lineNumbers.elementHandle();
+    expect(originalLineNumbers).not.toBeNull();
+
+    expect(
+      await source.evaluate((element) =>
+        getComputedStyle(element.firstElementChild ?? element, '::selection').getPropertyValue(
+          'background-color',
+        ),
+      ),
+    ).toBe('rgb(110, 168, 254)');
 
     const exact = '# Exact\n\n  two spaces and `code`';
     await source.fill(exact);
+    expect(await originalLineNumbers?.evaluate((element) => element.isConnected)).toBe(true);
+    await expect(lineNumbers).toBeVisible();
     expect(await markdownSource(source)).toBe(exact);
     await source.press(`${PRIMARY_MODIFIER}+z`);
     await expect(source).toContainText('entry point');
@@ -342,6 +355,23 @@ test(
     );
   },
 );
+
+test('the Markdown editor code loads only when a Markdown Card opens', async ({ page }) => {
+  const editorRequests: string[] = [];
+  page.on('request', (request) => {
+    if (request.url().includes('MarkdownSourceEditor')) editorRequests.push(request.url());
+  });
+
+  await page.goto('/');
+  const card = nodeByTitle(page, 'A').first();
+  await expect(card).toBeVisible();
+  await settled(page);
+  expect(editorRequests).toEqual([]);
+
+  await openCard(card, 'A');
+  await expect(page.getByRole('textbox', { name: 'Markdown source' })).toBeVisible();
+  expect(editorRequests).toHaveLength(1);
+});
 
 /**
  * The flat paper treatment ADR 0051 settled: cream face, heavy ink rule, and a

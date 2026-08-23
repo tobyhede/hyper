@@ -63,6 +63,21 @@ const UI_IMPLEMENTATION_PATTERN = {
   message: UI_IMPLEMENTATION_MESSAGE,
 };
 
+/** One exported specialist-widget entry is a deliberate application split
+ * point: keeping CodeMirror behind the root barrel puts its entire editor stack
+ * in the initial bundle. It remains owned by and imported from `@project/ui`;
+ * the adapter receives no exception, and every other UI subpath stays barred. */
+const APP_UI_IMPLEMENTATION_PATTERN = {
+  group: [
+    '@base-ui/react/*',
+    'cmdk/*',
+    'lucide-react/*',
+    '@project/ui/*',
+    '!@project/ui/MarkdownSourceEditor',
+  ],
+  message: UI_IMPLEMENTATION_MESSAGE,
+};
+
 /**
  * Node builtins, barred from the portable Fetch module. `node:fs` and a bare
  * `fs` are the same import, and ESLint matches specifiers literally, so a
@@ -284,7 +299,19 @@ export default tseslint.config(
     },
   },
   {
-    files: ['packages/app/**/*.{ts,tsx}', 'packages/react-flow-adapter/**/*.{ts,tsx}'],
+    files: ['packages/app/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: UI_IMPLEMENTATION_DEPENDENCIES,
+          patterns: [ESCAPE_PATTERN, APP_UI_IMPLEMENTATION_PATTERN],
+        },
+      ],
+    },
+  },
+  {
+    files: ['packages/react-flow-adapter/**/*.{ts,tsx}'],
     rules: {
       'no-restricted-imports': [
         'error',

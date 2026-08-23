@@ -1,5 +1,15 @@
-import { forwardRef, useImperativeHandle, useMemo, useRef } from 'react';
-import CodeMirror, { type ReactCodeMirrorRef } from '@uiw/react-codemirror';
+import {
+  forwardRef,
+  useCallback,
+  useImperativeHandle,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+} from 'react';
+import CodeMirror, {
+  type ReactCodeMirrorProps,
+  type ReactCodeMirrorRef,
+} from '@uiw/react-codemirror';
 import { defaultKeymap, historyKeymap } from '@codemirror/commands';
 import { HighlightStyle, syntaxHighlighting } from '@codemirror/language';
 import { markdown } from '@codemirror/lang-markdown';
@@ -62,6 +72,9 @@ const markdownSourceTheme = EditorView.theme({
   '&.cm-focused .cm-selectionBackground, .cm-selectionBackground': {
     backgroundColor: 'var(--accent)',
   },
+  '&.cm-focused .cm-content ::selection, .cm-content ::selection': {
+    backgroundColor: 'var(--accent)',
+  },
 });
 
 const markdownSourceHighlighting = syntaxHighlighting(
@@ -86,18 +99,47 @@ const paneSafeDefaultKeymap = defaultKeymap.filter(
   (binding) => binding.key !== 'Escape' && binding.key !== 'Tab' && binding.key !== 'Shift-Tab',
 );
 
-const stableLineNumberLocator = ViewPlugin.define((view) => {
+const markdownBasicSetup = {
+  lineNumbers: true,
+  syntaxHighlighting: false,
+  indentOnInput: false,
+  drawSelection: false,
+  highlightActiveLine: false,
+  highlightActiveLineGutter: false,
+  foldGutter: false,
+  autocompletion: false,
+  bracketMatching: false,
+  closeBrackets: false,
+  highlightSelectionMatches: false,
+  defaultKeymap: false,
+  historyKeymap: false,
+  searchKeymap: false,
+  foldKeymap: false,
+  completionKeymap: false,
+  lintKeymap: false,
+} satisfies Exclude<ReactCodeMirrorProps['basicSetup'], boolean | undefined>;
+
+const lineNumberMeasure = {};
+
+const markLineNumbers = (view: EditorView): void => {
   view.requestMeasure({
+    key: lineNumberMeasure,
     read() {
-      return undefined;
+      return view.dom.querySelector('.cm-lineNumbers');
     },
-    write() {
-      view.dom
-        .querySelector('.cm-lineNumbers')
-        ?.setAttribute('data-slot', 'markdown-source-line-numbers');
+    write(lineNumbers) {
+      lineNumbers?.setAttribute('data-slot', 'markdown-source-line-numbers');
     },
   });
-  return {};
+};
+
+const stableLineNumberLocator = ViewPlugin.define((view) => {
+  markLineNumbers(view);
+  return {
+    update(update) {
+      if (update.geometryChanged) markLineNumbers(update.view);
+    },
+  };
 });
 
 /**
@@ -118,6 +160,15 @@ export const MarkdownSourceEditor = forwardRef<
   ref,
 ) {
   const codeMirror = useRef<ReactCodeMirrorRef>(null);
+  const latestOnValueChange = useRef(onValueChange);
+
+  useLayoutEffect(() => {
+    latestOnValueChange.current = onValueChange;
+  }, [onValueChange]);
+
+  const reportValueChange = useCallback((nextValue: string) => {
+    latestOnValueChange.current(nextValue);
+  }, []);
 
   useImperativeHandle(
     ref,
@@ -157,26 +208,8 @@ export const MarkdownSourceEditor = forwardRef<
       readOnly={readOnly}
       indentWithTab={false}
       extensions={extensions}
-      onChange={(nextValue) => onValueChange(nextValue)}
-      basicSetup={{
-        lineNumbers: true,
-        syntaxHighlighting: false,
-        indentOnInput: false,
-        drawSelection: false,
-        highlightActiveLine: false,
-        highlightActiveLineGutter: false,
-        foldGutter: false,
-        autocompletion: false,
-        bracketMatching: false,
-        closeBrackets: false,
-        highlightSelectionMatches: false,
-        defaultKeymap: false,
-        historyKeymap: false,
-        searchKeymap: false,
-        foldKeymap: false,
-        completionKeymap: false,
-        lintKeymap: false,
-      }}
+      onChange={reportValueChange}
+      basicSetup={markdownBasicSetup}
     />
   );
 });

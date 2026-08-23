@@ -39,10 +39,23 @@ test(
     await expect(title).toBeFocused();
     await title.press('Enter');
     await expect(source).toBeFocused();
-    await expect(dialog.locator('[data-slot="markdown-source-line-numbers"]')).toBeVisible();
+    const lineNumbers = dialog.locator('[data-slot="markdown-source-line-numbers"]');
+    await expect(lineNumbers).toBeVisible();
+    const originalLineNumbers = await lineNumbers.elementHandle();
+    expect(originalLineNumbers).not.toBeNull();
+
+    expect(
+      await source.evaluate((element) =>
+        getComputedStyle(element.firstElementChild ?? element, '::selection').getPropertyValue(
+          'background-color',
+        ),
+      ),
+    ).toBe('rgb(110, 168, 254)');
 
     const exact = '# Exact\n\n  two spaces and `code`';
     await source.fill(exact);
+    expect(await originalLineNumbers?.evaluate((element) => element.isConnected)).toBe(true);
+    await expect(lineNumbers).toBeVisible();
     expect(await markdownSource(source)).toBe(exact);
     await source.press(`${PRIMARY_MODIFIER}+z`);
     await expect(source).toContainText('## Placement');

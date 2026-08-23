@@ -26,6 +26,7 @@ export default defineConfig({
       ),
       '@project/persistence': resolve('./packages/persistence/src/index.ts'),
       '@project/react-flow-adapter': resolve('./packages/react-flow-adapter/src/index.ts'),
+      '@project/ui/MarkdownSourceEditor': resolve('./packages/ui/src/MarkdownSourceEditor.tsx'),
       '@project/ui': resolve('./packages/ui/src/index.ts'),
     },
   },

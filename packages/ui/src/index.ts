@@ -12,8 +12,6 @@ export { CardContent } from './CardContent';
 export type { CardContentProps } from './CardContent';
 export { CanvasCard } from './CanvasCard';
 export type { CanvasCardFront, CanvasCardProps, CanvasCardState } from './CanvasCard';
-export { MarkdownSourceEditor } from './MarkdownSourceEditor';
-export type { MarkdownSourceEditorHandle, MarkdownSourceEditorProps } from './MarkdownSourceEditor';
 export { CardKindIcon } from './CardKindIcon';
 export type { CardKindIconProps } from './CardKindIcon';
 export { CardSearchCombobox } from './CardSearchCombobox';
