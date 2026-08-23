@@ -1,6 +1,6 @@
 import type { Locator, Page } from '@playwright/test';
 import { expect, test } from './fixtures';
-import { markdownSource } from './markdown-source';
+import { markdownSource, PRIMARY_MODIFIER } from './markdown-source';
 import {
   activateGraph,
   activeCard,
@@ -24,8 +24,6 @@ import {
   sidebar,
   viewportTransform,
 } from './graph';
-
-const PRIMARY_MODIFIER = process.platform === 'darwin' ? 'Meta' : 'Control';
 
 /**
  * The barrier a *negative* assertion needs.
@@ -301,10 +299,7 @@ test(
     await expect(title).toBeFocused();
     await title.press('Enter');
     await expect(source).toBeFocused();
-    await expect(page.locator('[data-slot="markdown-source-editor"]')).toHaveAttribute(
-      'data-line-numbers',
-      'visible',
-    );
+    await expect(page.locator('[data-slot="markdown-source-line-numbers"]')).toBeVisible();
 
     const exact = '# Exact\n\n  two spaces and `code`';
     await source.fill(exact);

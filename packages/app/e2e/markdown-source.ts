@@ -1,5 +1,7 @@
 import type { Locator } from '@playwright/test';
 
+export const PRIMARY_MODIFIER = process.platform === 'darwin' ? 'Meta' : 'Control';
+
 /** Read the browser selection CodeMirror exposes, preserving source line breaks and spaces. */
 export const markdownSource = (editor: Locator): Promise<string> =>
   editor.evaluate((element) => {

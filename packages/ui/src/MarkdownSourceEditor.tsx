@@ -4,7 +4,7 @@ import { defaultKeymap, historyKeymap } from '@codemirror/commands';
 import { HighlightStyle, syntaxHighlighting } from '@codemirror/language';
 import { markdown } from '@codemirror/lang-markdown';
 import { EditorState } from '@codemirror/state';
-import { EditorView, keymap } from '@codemirror/view';
+import { EditorView, keymap, ViewPlugin } from '@codemirror/view';
 import { tags } from '@lezer/highlight';
 
 import { cn } from './lib/utils';
@@ -86,6 +86,20 @@ const paneSafeDefaultKeymap = defaultKeymap.filter(
   (binding) => binding.key !== 'Escape' && binding.key !== 'Tab' && binding.key !== 'Shift-Tab',
 );
 
+const stableLineNumberLocator = ViewPlugin.define((view) => {
+  view.requestMeasure({
+    read() {
+      return undefined;
+    },
+    write() {
+      view.dom
+        .querySelector('.cm-lineNumbers')
+        ?.setAttribute('data-slot', 'markdown-source-line-numbers');
+    },
+  });
+  return {};
+});
+
 /**
  * Hyper's Markdown source field. CodeMirror owns text editing; its surrounding
  * product surface owns drafts, focus order, dismissal and completion (ADR 0063).
@@ -127,6 +141,7 @@ export const MarkdownSourceEditor = forwardRef<
       keymap.of([...paneSafeDefaultKeymap, ...historyKeymap]),
       markdownSourceTheme,
       markdownSourceHighlighting,
+      stableLineNumberLocator,
     ],
     [ariaLabel],
   );
@@ -135,7 +150,6 @@ export const MarkdownSourceEditor = forwardRef<
     <CodeMirror
       ref={codeMirror}
       data-slot="markdown-source-editor"
-      data-line-numbers="visible"
       className={cn('markdown-source-editor', className)}
       value={value}
       height="100%"

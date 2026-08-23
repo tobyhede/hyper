@@ -1,7 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { markdownSource } from '../e2e/markdown-source';
-
-const PRIMARY_MODIFIER = process.platform === 'darwin' ? 'Meta' : 'Control';
+import { markdownSource, PRIMARY_MODIFIER } from '../e2e/markdown-source';
 
 test(
   'Markdown Card story validates atomically and Escape cancels the whole draft',
@@ -41,10 +39,7 @@ test(
     await expect(title).toBeFocused();
     await title.press('Enter');
     await expect(source).toBeFocused();
-    await expect(dialog.locator('[data-slot="markdown-source-editor"]')).toHaveAttribute(
-      'data-line-numbers',
-      'visible',
-    );
+    await expect(dialog.locator('[data-slot="markdown-source-line-numbers"]')).toBeVisible();
 
     const exact = '# Exact\n\n  two spaces and `code`';
     await source.fill(exact);
