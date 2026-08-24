@@ -185,9 +185,11 @@ test(
     expect(editBox.y).toBeGreaterThanOrEqual(cardBox.y);
     expect(editBox.y + editBox.height).toBeLessThanOrEqual(titleBox.y);
 
-    // Renaming is the title's own double click (ADR 0036), and it must not open
-    // the Card — an opened Card covers the field being typed into.
-    await card.getByRole('heading', { name: 'A' }).dblclick();
+    // The displayed Title is its own control (ADR 0065): activating it neither
+    // selects nor opens the Card around it.
+    await expect(page.locator('.react-flow__node.selected')).toHaveCount(0);
+    await card.getByRole('button', { name: 'Edit Title A' }).click();
+    await expect(page.locator('.react-flow__node.selected')).toHaveCount(0);
     await expect(page.getByTestId('open-card')).toHaveCount(0);
     const title = page.getByRole('textbox', { name: 'Card title' });
     await title.fill('Renamed A');
@@ -219,16 +221,21 @@ test(
   },
 );
 
-test("a short title's rename hit-area hugs its text, not the whole card body", async ({ page }) => {
+test("a short Title control's hit-area hugs its text, not the whole Card body", async ({
+  page,
+}) => {
   await page.goto('/');
   const card = nodeByTitle(page, 'A').first();
   await expect(card).toBeVisible();
   await settled(page);
 
   const cardBox = await boxOf(card, 'Card A');
-  const titleBox = await boxOf(card.getByRole('heading', { name: 'A' }), "Card A's title");
+  const titleBox = await boxOf(
+    card.getByRole('button', { name: 'Edit Title A' }),
+    "Card A's Title",
+  );
 
-  // Renaming is the title's own double click (ADR 0036), so its rename target
+  // Editing is the Title's own activation (ADR 0065), so its target
   // must claim only the pixels it draws — a one-letter title next to a much
   // wider card is the case that tells a shrunk-to-fit title apart from one
   // stretched to the card's full width.
@@ -240,7 +247,7 @@ test("a short title's rename hit-area hugs its text, not the whole card body", a
     x: (titleBox.x + titleBox.width + cardBox.x + cardBox.width) / 2,
     y: titleBox.y + titleBox.height / 2,
   };
-  await page.mouse.dblclick(blankSpace.x, blankSpace.y);
+  await page.mouse.click(blankSpace.x, blankSpace.y);
   await expect(page.getByRole('textbox', { name: 'Card title' })).toHaveCount(0);
   await expect(page.getByTestId('open-card')).toHaveCount(0);
 });
@@ -256,8 +263,8 @@ test('a click selects a Card, and no pointer gesture on its body opens it', asyn
   await expect(card).toHaveClass(/selected/);
   await expect(page.getByTestId('open-card')).toHaveCount(0);
 
-  // Off the title, which has its own double click. React Flow zooms on a double
-  // click by default and its filter exempts only `.nopan`, which a Card is not.
+  // Off the Title, which has its own control. React Flow zooms on a double click
+  // by default and its filter exempts only `.nopan`, which a Card is not.
   await card.dblclick({ position: { x: 24, y: 12 } });
   await expect(page.getByTestId('open-card')).toHaveCount(0);
   expect(await viewportTransform(page)).toEqual(transform);

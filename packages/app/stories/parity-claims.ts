@@ -80,7 +80,7 @@ export const parityClaims: readonly ParityClaim[] = [
     storyFile: 'components/canvas-card.stories.tsx',
     storyExport: 'TitleEditing',
     claim:
-      "The canvas Card's own title editor begins on a double click, keeps a refused draft field-local, completes on Enter and cancels on Escape.",
+      "The canvas Card's displayed Title is a named pointer and keyboard control that opens its field with the value selected, keeps a refused draft field-local, completes on Enter and cancels on Escape.",
   },
   {
     id: 'markdown-pane-refusal-is-field-local',

@@ -179,8 +179,8 @@ export const Interaction: Story = () => (
 );
 
 /**
- * The Card's own title editor, entirely private to this component: begins on
- * a double click, keeps a refused draft local with a field-local `role="alert"`
+ * The Card's own title editor, entirely private to this component: begins from
+ * the Title's native control, keeps a refused draft local with a field-local `role="alert"`
  * error, completes and exits on a valid Enter, cancels on Escape, and asks its
  * caller to hand focus back once either keyboard path ends — proven here by
  * focusing the surrounding group the same way `CardNode` focuses the React

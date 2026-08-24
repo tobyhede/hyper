@@ -441,7 +441,7 @@ test(
     await page.getByRole('button', { name: 'Cancel' }).click();
 
     // Its own title is still authored, inline on the graph.
-    await recap.getByRole('heading', { name: 'A′', exact: true }).dblclick();
+    await recap.getByRole('button', { name: 'Edit Title A′', exact: true }).click();
     await expect(page.getByRole('textbox', { name: 'Card title' })).toHaveValue('A′');
   },
 );

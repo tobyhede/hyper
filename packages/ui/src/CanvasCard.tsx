@@ -24,7 +24,7 @@ interface CanvasCardCommonProps {
   readonly front: CanvasCardFront;
   readonly title: string;
   readonly graphColor: string;
-  /** Present only when double-clicking the title may begin a rename. */
+  /** Present only when activating the displayed Title may begin a rename. */
   readonly onBeginTitleEdit?: () => void;
   /** Present only when this Card may be connected from. */
   readonly onConnect?: () => void;
@@ -145,20 +145,29 @@ export function CanvasCard(props: CanvasCardProps) {
             data-editable={onBeginTitleEdit !== undefined}
             role="heading"
             aria-level={2}
-            onDoubleClick={
-              onBeginTitleEdit === undefined
-                ? undefined
-                : (event) => {
-                    // ADR 0036: renaming is the title's own double click, and
-                    // the Card's is opening it to read. This one must not also
-                    // be that one — the content would be drawn over the field
-                    // the author is about to type into.
-                    event.stopPropagation();
-                    onBeginTitleEdit();
-                  }
-            }
+            aria-label={title}
           >
-            {title}
+            {onBeginTitleEdit === undefined ? (
+              title
+            ) : (
+              // ADR 0065 composes the shared shadcn/Base Button inside the
+              // heading: the primitive owns Enter/Space activation and button
+              // semantics, while the wrapper preserves the Title's document
+              // relationship and this variant keeps its heading treatment.
+              <Button
+                variant="ghost"
+                className="canvas-card__title-control nodrag nopan"
+                aria-label={`Edit Title ${title}`}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onBeginTitleEdit();
+                }}
+                onPointerDown={(event) => event.stopPropagation()}
+                onKeyDown={(event) => event.stopPropagation()}
+              >
+                {title}
+              </Button>
+            )}
           </CardTitle>
         )}
         {/* The marker *is* the Target's name, so there is nothing to draw

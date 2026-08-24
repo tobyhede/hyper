@@ -143,16 +143,24 @@ test(
 );
 
 test(
-  "the Card's own title editor begins on a double click, stays field-local on a refusal, and completes or cancels from the keyboard",
+  "the Card's Title control begins editing by pointer or keyboard, stays field-local on a refusal, and completes or cancels from the keyboard",
   { tag: '@parity:canvas-card-owns-title-editing-and-refusal' },
   async ({ page }) => {
     await page.goto('/?story=components--canvas-card--title-editing&mode=preview');
 
     const group = page.getByTestId('card-group');
-    await group.getByRole('heading', { name: 'Draft entry' }).dblclick();
+    const control = group.getByRole('button', { name: 'Edit Title Draft entry' });
+    await expect(group.getByRole('heading', { name: 'Draft entry' })).toContainText('Draft entry');
+    await control.hover();
+    await expect(control).toHaveCSS('text-decoration-line', 'underline');
+    await control.focus();
+    await expect(control).toHaveCSS('outline-style', 'solid');
+    await control.click();
 
     const input = page.getByRole('textbox', { name: 'Card title' });
     await expect(input).toBeFocused();
+    await expect(input).toHaveJSProperty('selectionStart', 0);
+    await expect(input).toHaveJSProperty('selectionEnd', 'Draft entry'.length);
 
     // A refused draft keeps the editor open and the error attached to the field.
     await input.fill('');
@@ -167,12 +175,21 @@ test(
     await expect(page.getByRole('heading', { name: 'Named entry' })).toBeVisible();
     await expect(group).toBeFocused();
 
-    // Escape cancels the draft, discarding it, and also returns focus.
-    await page.getByRole('heading', { name: 'Named entry' }).dblclick();
+    // Enter on the displayed Title is native button activation.
+    const renamedControl = page.getByRole('button', { name: 'Edit Title Named entry' });
+    await renamedControl.focus();
+    await renamedControl.press('Enter');
     const reopened = page.getByRole('textbox', { name: 'Card title' });
     await reopened.fill('Abandoned');
     await reopened.press('Escape');
     await expect(page.getByRole('heading', { name: 'Named entry' })).toBeVisible();
+    await expect(group).toBeFocused();
+
+    // Space is the equivalent native activation and Escape still cancels.
+    const spaceControl = page.getByRole('button', { name: 'Edit Title Named entry' });
+    await spaceControl.focus();
+    await spaceControl.press('Space');
+    await page.getByRole('textbox', { name: 'Card title' }).press('Escape');
     await expect(group).toBeFocused();
   },
 );

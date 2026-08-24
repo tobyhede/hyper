@@ -262,9 +262,9 @@ export function SpaceCanvas({
   // than an oversight.
 
   // No pointer gesture on a Card's body opens it (ADR 0036). A click is left to
-  // React Flow, which selects; the double click belongs to the title, which
-  // centres in a Card and would otherwise be competing with the Card underneath
-  // it for the same pixels. Opening is the affordance and the keyboard.
+  // React Flow, which selects; the Title is its own one-activation control
+  // (ADR 0065), whose events stop before this canvas handler. Opening is the
+  // affordance and the Card-level keyboard command.
 
   const handleKeyDown = useCallback(
     (event: ReactKeyboardEvent<HTMLDivElement>) => {
@@ -341,7 +341,7 @@ export function SpaceCanvas({
       nodes.map((node) => {
         const data: CardFlowNode['data'] = {
           ...node.data,
-          // Three controls, three flags. The title's double click is offered on
+          // Three controls, three flags. The Title's direct edit is offered on
           // every Card; the affordance only on one that owns content to edit;
           // the Connect control wherever an Edge may begin. Each flag travels
           // with the operation that performs it — `CardNode` withholds a control
@@ -467,10 +467,12 @@ export function SpaceCanvas({
       tabIndex={-1}
       fitView
       fitViewOptions={OVERVIEW_FIT}
-      // Double click on a title renames the Card (ADR 0036); opening is reached
-      // through the Card's own control or the keyboard. React Flow's own
-      // double-click zoom would fire underneath the rename — its filter exempts
-      // only `.nopan`, which a Card is not. Off for the whole canvas rather than
+      // Nothing on a Card answers a double click. ADR 0065 made the Title a
+      // one-activation control, so the second click of a pair lands in the field
+      // the first one opened — and that field, like the control, carries
+      // `.nopan`, the one thing React Flow's zoom filter exempts. The Card body
+      // carries no such class, so a double click there would zoom the canvas
+      // while meaning nothing to the Card. Off for the whole canvas rather than
       // per node, so the gesture does not change meaning two pixels away from a
       // Card.
       zoomOnDoubleClick={false}
