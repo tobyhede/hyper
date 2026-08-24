@@ -127,11 +127,11 @@ describe('CanvasCard title', () => {
 
     const heading = screen.getByRole('heading', { name: 'A' });
     expect(heading).toHaveAttribute('data-editable', 'false');
-    fireEvent.doubleClick(heading);
+    fireEvent.click(heading);
     expect(screen.queryByRole('textbox', { name: 'Card title' })).not.toBeInTheDocument();
   });
 
-  it('begins editing from a double click only when the operation is supplied', () => {
+  it('exposes the editable Title as a named control inside its heading', () => {
     const onBeginTitleEdit = vi.fn();
     render(
       <CanvasCard
@@ -145,22 +145,24 @@ describe('CanvasCard title', () => {
 
     const heading = screen.getByRole('heading', { name: 'A' });
     expect(heading).toHaveAttribute('data-editable', 'true');
-    fireEvent.doubleClick(heading);
+    expect(heading).toHaveAccessibleName('A');
+    const control = screen.getByRole('button', { name: 'Edit Title A' });
+    expect(heading).toContainElement(control);
+
+    fireEvent.click(control);
     expect(onBeginTitleEdit).toHaveBeenCalledOnce();
   });
 
   /**
-   * ADR 0036: renaming is the title's own double click, and the Card's own
-   * double click opens it to read. The rename must not also be an open — the
-   * Card would draw its content over the field the author is about to type
-   * into. Guarding here rather than relying on the canvas is what keeps that
-   * true of the component wherever it is mounted.
+   * ADR 0065: the Title is its own control. Its pointer and keyboard events
+   * must not also become the Card body's selection or Opening gestures.
    */
-  it('does not let a rename double click reach the Card around it', () => {
+  it('does not let Title activation reach the Card around it', () => {
     const onBeginTitleEdit = vi.fn();
-    const openedCard = vi.fn();
+    const selectedCard = vi.fn();
+    const pressedCard = vi.fn();
     render(
-      <div onDoubleClick={openedCard}>
+      <div onClick={selectedCard} onKeyDown={pressedCard}>
         <CanvasCard
           front={{ kind: 'markdown' }}
           state="rest"
@@ -171,9 +173,12 @@ describe('CanvasCard title', () => {
       </div>,
     );
 
-    fireEvent.doubleClick(screen.getByRole('heading', { name: 'A' }));
+    const control = screen.getByRole('button', { name: 'Edit Title A' });
+    fireEvent.click(control);
+    fireEvent.keyDown(control, { key: 'Enter' });
     expect(onBeginTitleEdit).toHaveBeenCalledOnce();
-    expect(openedCard).not.toHaveBeenCalled();
+    expect(selectedCard).not.toHaveBeenCalled();
+    expect(pressedCard).not.toHaveBeenCalled();
   });
 });
 

@@ -139,8 +139,6 @@ function mountGraph(nodes: CardFlowNode[] = [cardNode('A')]): Harness {
 }
 
 /**
- * The node element React Flow dispatches `onNodeDoubleClick` from.
- *
  * By id, not by heading: half these tests run with the title editor open, and
  * then there is no heading to find — `getByRole` throws rather than falling back.
  */
@@ -157,7 +155,7 @@ function nodeOf(id: string): HTMLElement {
  */
 function refuseTitleEdit(settle: 'enter' | 'blur' = 'enter'): Harness {
   const harness = mountGraph([cardNode('A', CARD_ID, true), cardNode('B', OTHER_CARD_ID)]);
-  fireEvent.doubleClick(screen.getByRole('heading', { name: 'A' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Edit Title A' }));
   const input = screen.getByRole('textbox', { name: 'Card title' });
   fireEvent.change(input, { target: { value: '' } });
   if (settle === 'enter') fireEvent.keyDown(input, { key: 'Enter' });
@@ -187,9 +185,9 @@ afterAll(() => vi.unstubAllGlobals());
 
 /**
  * Leaving a refused title used to open the Card underneath, because the click
- * that blurred the field was also the click that opened — so the graph carried a
- * ref that ate exactly one click to stop it. The gesture delivers that now
- * (ADR 0036): a click selects, and only a double click opens.
+ * that blurred the field was also the click that selected the Card — so the
+ * graph carried a ref that ate exactly one click to stop it. The field now
+ * contains its own events, while the Card body keeps selection (ADR 0065).
  */
 describe('a title Edit the graph refused', () => {
   it('does not open a Card on the click that blurred it', () => {
@@ -234,10 +232,10 @@ describe('opening a Card', () => {
     expect(openCard).toHaveBeenCalledWith(CARD_ID);
   });
 
-  it('leaves the title free to rename on a double click', () => {
+  it('leaves the Title control free to rename without Opening the Card', () => {
     const { openCard } = mountGraph();
 
-    fireEvent.doubleClick(screen.getByRole('heading', { name: 'A' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Title A' }));
 
     expect(screen.getByRole('textbox', { name: 'Card title' })).toHaveValue('A');
     expect(openCard).not.toHaveBeenCalled();
@@ -371,7 +369,7 @@ describe('the C shortcut', () => {
    */
   it('is a letter while the caret is in the title editor', () => {
     const { addCard } = mountGraph();
-    fireEvent.doubleClick(screen.getByRole('heading', { name: 'A' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Title A' }));
 
     fireEvent.keyDown(screen.getByRole('textbox', { name: 'Card title' }), { key: 'c' });
 

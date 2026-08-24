@@ -262,9 +262,9 @@ export function SpaceCanvas({
   // than an oversight.
 
   // No pointer gesture on a Card's body opens it (ADR 0036). A click is left to
-  // React Flow, which selects; the double click belongs to the title, which
-  // centres in a Card and would otherwise be competing with the Card underneath
-  // it for the same pixels. Opening is the affordance and the keyboard.
+  // React Flow, which selects; the Title is its own one-activation control
+  // (ADR 0065), whose events stop before this canvas handler. Opening is the
+  // affordance and the Card-level keyboard command.
 
   const handleKeyDown = useCallback(
     (event: ReactKeyboardEvent<HTMLDivElement>) => {
@@ -341,7 +341,7 @@ export function SpaceCanvas({
       nodes.map((node) => {
         const data: CardFlowNode['data'] = {
           ...node.data,
-          // Three controls, three flags. The title's double click is offered on
+          // Three controls, three flags. The Title's direct edit is offered on
           // every Card; the affordance only on one that owns content to edit;
           // the Connect control wherever an Edge may begin. Each flag travels
           // with the operation that performs it — `CardNode` withholds a control

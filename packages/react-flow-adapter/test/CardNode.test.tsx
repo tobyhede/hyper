@@ -291,7 +291,7 @@ describe('CardNode withholds a control the composition supplied no operation for
     const heading = screen.getByRole('heading', { name: 'A' });
 
     expect(heading).toHaveAttribute('data-editable', 'false');
-    fireEvent.doubleClick(heading);
+    fireEvent.click(heading);
     expect(screen.queryByRole('textbox', { name: 'Card title' })).not.toBeInTheDocument();
   });
 });
@@ -303,13 +303,13 @@ describe('CardNode title authoring', () => {
     expect(screen.queryByTestId('card-description')).not.toBeInTheDocument();
   });
 
-  it('begins inline title editing from a double click on the title', () => {
+  it('begins inline title editing from the Title control', () => {
     const onBeginTitleEditing = vi.fn();
     const { rerender } = render(
       <CardNode {...props({ selected: true, titleEditingEnabled: true, onBeginTitleEditing })} />,
     );
 
-    fireEvent.doubleClick(screen.getByRole('heading', { name: 'A' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Title A' }));
     expect(onBeginTitleEditing).toHaveBeenCalledOnce();
 
     rerender(

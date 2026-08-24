@@ -160,15 +160,39 @@
   -webkit-line-clamp: 3;
 }
 
-/* Renaming is the title's own double click (ADR 0036), so it must claim only
-   the pixels it draws — the body is a left-aligned column, and a block title
-   spans its full width with most of it blank, which would put the rename
-   target across the band beside a short title rather than just the title
-   itself. Shrunk to fit, so that band renames nothing. */
+/* The Title's one-activation control (ADR 0065) must claim only the pixels it
+   draws — the body is a left-aligned column, and a block title spans its full
+   width with most of it blank, which would put the edit target across the band
+   beside a short title rather than just the title itself. */
 .canvas-card__title[data-editable='true'] {
   width: fit-content;
   max-width: 100%;
+}
+
+.canvas-card__title-control {
+  max-width: 100%;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  text-align: inherit;
   cursor: text;
+}
+
+.canvas-card__title-control:hover {
+  text-decoration: underline;
+  text-decoration-color: var(--canvas-card-graph);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+}
+
+.canvas-card__title-control:focus-visible {
+  border-radius: 2px;
+  outline: 2px solid var(--canvas-card-graph);
+  outline-offset: 2px;
 }
 
 .canvas-card__alias-of {

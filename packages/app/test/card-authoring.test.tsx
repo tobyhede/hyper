@@ -142,7 +142,7 @@ describe('authoring a Card title on the graph', () => {
    */
   it('refuses a blank title and leaves the stored Card alone', async () => {
     const session = mount();
-    fireEvent.doubleClick(await screen.findByRole('heading', { name: 'A' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit Title A' }));
     const input = screen.getByRole('textbox', { name: 'Card title' });
 
     fireEvent.change(input, { target: { value: '   ' } });
@@ -156,7 +156,7 @@ describe('authoring a Card title on the graph', () => {
 
   it('stores a title without the whitespace surrounding it', async () => {
     const session = mount();
-    fireEvent.doubleClick(await screen.findByRole('heading', { name: 'A' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit Title A' }));
     const input = screen.getByRole('textbox', { name: 'Card title' });
 
     fireEvent.change(input, { target: { value: '  Renamed A  ' } });
@@ -194,7 +194,7 @@ describe('presenting after a conversion', () => {
     // has no Graphs at all, so there is no Active Graph.
     expect(await screen.findByTestId('present-button')).toBeDisabled();
 
-    fireEvent.doubleClick(await screen.findByRole('heading', { name: 'A' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit Title A' }));
     const input = screen.getByRole('textbox', { name: 'Card title' });
     fireEvent.change(input, { target: { value: 'Renamed A' } });
     fireEvent.keyDown(input, { key: 'Enter' });
@@ -445,8 +445,8 @@ describe('the Card affordance on the graph', () => {
   });
 
   /**
-   * No gesture on a Card's body opens it (ADR 0036) — the title centres in a
-   * Card, so a body gesture and the rename would want the same pixels.
+   * No gesture on a Card's body opens it (ADR 0036); the Title and Opening each
+   * have their own explicit control.
    */
   it('is the only pointer graph in — the Card body opens nothing', async () => {
     const session = mount();
