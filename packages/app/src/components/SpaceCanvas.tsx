@@ -467,10 +467,12 @@ export function SpaceCanvas({
       tabIndex={-1}
       fitView
       fitViewOptions={OVERVIEW_FIT}
-      // Double click on a title renames the Card (ADR 0036); opening is reached
-      // through the Card's own control or the keyboard. React Flow's own
-      // double-click zoom would fire underneath the rename — its filter exempts
-      // only `.nopan`, which a Card is not. Off for the whole canvas rather than
+      // Nothing on a Card answers a double click. ADR 0065 made the Title a
+      // one-activation control, so the second click of a pair lands in the field
+      // the first one opened — and that field, like the control, carries
+      // `.nopan`, the one thing React Flow's zoom filter exempts. The Card body
+      // carries no such class, so a double click there would zoom the canvas
+      // while meaning nothing to the Card. Off for the whole canvas rather than
       // per node, so the gesture does not change meaning two pixels away from a
       // Card.
       zoomOnDoubleClick={false}
