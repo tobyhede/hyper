@@ -1,6 +1,7 @@
 # A card selects on click, and no click opens it
 
 Status: accepted
+Refined by: 0065
 Related: 0006, 0011, 0033, 0035, 0037
 
 A card drawn in the graph answers two pointer gestures. A **single click selects** it. A **double click on its title** renames it in place. Nothing a pointer does to the body of a card opens it: opening is reached through the card's own control (ADR 0037). Selecting is not authoring and not reading — it names the card the next gesture acts on.
