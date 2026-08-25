@@ -1,5 +1,6 @@
 import { Suspense, useCallback, useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { Button } from './Button';
+import { Kbd, KbdGroup } from './components/kbd';
 import { RenderedMarkdown } from './CardContent';
 import { EditIcon } from './icons';
 import { MarkdownSourceEditor } from './markdown-source-editor-lazy';
@@ -9,14 +10,24 @@ import './markdown-card-body.css';
 
 /**
  * What ends a body edit. Its presence on {@link MarkdownCardBodyProps} *is* the
- * caret, so a caller cannot ask for one without saying what commits and what
- * abandons it — the pairing `CanvasCard` already makes for its own title editor
- * and `CardNodeData` for the adapter's.
+ * caret, so a caller cannot ask for one without saying what commits it and what
+ * takes the caret back — the pairing `CanvasCard` already makes for its own
+ * title editor and `CardNodeData` for the adapter's.
  */
 export interface MarkdownCardBodyEditor {
   /** Commit the draft. Unlike a title's, a body has nothing to refuse. */
   onComplete: (body: string) => void;
-  onCancel: () => void;
+  /**
+   * Withdraw the caret. Fires on **every** exit — after `onComplete` on the two
+   * committing paths as well as on `Escape` — because what it means is "this
+   * edit is over", and the caret has to go back either way.
+   *
+   * Deliberately not `onCancel`, which is what `CardTitleEditor` calls the
+   * Escape-only half of its own pair. A caller reading that name here would
+   * give this the abandon meaning — revert the body, drop the draft — and then
+   * undo every successful commit, because this fires after those too.
+   */
+  onEnd: () => void;
 }
 
 export interface MarkdownCardBodyProps {
@@ -117,14 +128,18 @@ export function MarkdownCardBody({
   }, []);
 
   useEffect(() => {
+    // A fresh edit is not on its way out, and that is true of *every* fresh
+    // edit — not only one that takes the caret. Cleared above the `autoFocus`
+    // guard because the flag says what this exit is doing, so an edit that
+    // inherits the previous one's flag finds its own blur already spoken for
+    // and commits nothing. Cleared here rather than in the render that begins
+    // an edit: a ref is not render state, and no blur can arrive before this
+    // runs, since the author has not been given the caret yet.
+    if (editing) closing.current = false;
     if (!editing || !autoFocus) {
       wantsCaret.current = false;
       return;
     }
-    // A fresh edit is not on its way out. Cleared here rather than in the render
-    // that begins one: a ref is not render state, and no blur can arrive before
-    // this runs, since the author has not been given the caret yet.
-    closing.current = false;
     if (handle.current === null) {
       wantsCaret.current = true;
       return;
@@ -138,8 +153,18 @@ export function MarkdownCardBody({
     if (commit) editor.onComplete(draft);
     // A committed draft *is* the source the caller is about to hand back, so the
     // document already agrees with it and there is nothing to rebuild.
-    else setGeneration((current) => current + 1);
-    editor.onCancel();
+    //
+    // Abandoning rebuilds, and the rebuilt editor is handed `draft` — so the
+    // draft has to go back to the source in the same breath. Bumping the key
+    // alone remounts the editor onto the very text just abandoned, which is the
+    // thing this is here to prevent. Both are needed because a caller may keep
+    // the editor mounted across its own `onEnd`; a caller that withdraws it
+    // synchronously never sees either.
+    else {
+      setDraft(source);
+      setGeneration((current) => current + 1);
+    }
+    editor.onEnd();
   };
 
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>): void => {
@@ -188,8 +213,24 @@ export function MarkdownCardBody({
               onValueChange={setDraft}
             />
           </Suspense>
+          {/* The design system draws a key (`docs/agents/ui.md`), so the hint
+              composes `Kbd` rather than setting its own type. Both commit
+              modifiers are named because `onKeyDown` accepts both: a hint
+              reading ⌘ alone tells a Windows or Linux author to press a key
+              they have not got, and never mentions the one they have. Naming
+              the pair is what the repository can say honestly — it carries no
+              platform detection anywhere, and one seam for that belongs to a
+              surface that needs it rather than to this hint. */}
           <div className="markdown-card-body__shortcut-hint" aria-hidden="true">
-            ⌘↵ Save · Esc Cancel
+            <KbdGroup>
+              <Kbd>Ctrl/⌘</Kbd>
+              <Kbd>↵</Kbd>
+            </KbdGroup>
+            <span>Save</span>
+            <KbdGroup>
+              <Kbd>Esc</Kbd>
+            </KbdGroup>
+            <span>Cancel</span>
           </div>
         </>
       ) : (

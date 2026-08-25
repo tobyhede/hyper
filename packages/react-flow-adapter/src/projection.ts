@@ -113,8 +113,13 @@ export type CardNodeData = {
    *
    * Its presence *is* the caret, carrying the two operations that end the edit —
    * the same pairing `titleEditor` above makes, for the same reason: a
-   * composition cannot ask for the caret without saying what commits and what
-   * abandons it.
+   * composition cannot ask for the caret without saying what commits it and what
+   * takes the caret back.
+   *
+   * The second of those is `onEnd`, **not** `titleEditor`'s `onCancel`. A body
+   * edit ends the same way whichever exit it took, so `onEnd` fires after a
+   * commit as well as after `Escape`; a composition that gave it the abandon
+   * meaning would undo every save.
    *
    * Independent of `titleEditor` on purpose. Expansion is what the Layout
    * authored and the caret is a gesture the author just made, so a Card can be
@@ -153,11 +158,18 @@ export type CardNodeData = {
    * 0027). Set on the active card alone, never on the whole graph.
    */
   showContent: boolean;
-  /** The Markdown to draw when `showContent` or `expanded`, resolved through an
-   *  alias to its target's body. Absent otherwise — content is not embedded in
-   *  every node (ADR 0006), which is the constraint that made this per-card, and
-   *  which ADR 0064 narrows rather than lifts: an Expanded Card carries its
-   *  source because the author asked for that one, not because every Card does. */
+  /** The Markdown to draw when `showContent`, resolved through an alias to its
+   *  target's body. Absent otherwise — content is not embedded in every node
+   *  (ADR 0006), which is the constraint that made this per-card.
+   *
+   *  **An Expanded Card does not carry one yet.** ADR 0064 narrows ADR 0006
+   *  rather than lifting it — an Expanded Card should carry its source because
+   *  the author asked for that one, not because every Card does — but nothing
+   *  tells this projection which Cards the Layout Expanded, so there is no
+   *  `expanded` to read here. Wiring that is issue 02's, and it has to supply
+   *  `body` in the same change: `CardNode` reads `data.body ?? ''`, so an
+   *  Expanded Card left out of this would draw an empty document over a working
+   *  editor rather than fail. */
   body?: string;
   /** The graph being emphasised, if any. Drives handle dimming. */
   activeGraphId: GraphId | null;

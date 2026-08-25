@@ -35,7 +35,7 @@ export const Markdown: Story = () => {
       autoFocus={mode === 'focused'}
       editor={{
         onComplete: setSource,
-        onCancel: () => setMode('rendered'),
+        onEnd: () => setMode('rendered'),
       }}
     />
   ) : (

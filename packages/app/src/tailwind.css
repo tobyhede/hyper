@@ -1,24 +1,6 @@
 @import 'tailwindcss';
 
 /*
- * Animate.css (https://animate.style) is the keyframe vocabulary — `animate__animated`
- * plus one named entrance or exit — so reach for a named class before writing
- * `@keyframes` anywhere in this repository. It is imported here rather than from `main.tsx` because
- * `.ladle/components.tsx` loads this same file: one import site is what stops a story
- * animating differently from the application it claims parity with (ADR 0052).
- *
- * Two things it does not cover, and neither is a gap to close with a class. A Card's
- * rect growing and its neighbours displacing is movement between two placements, which
- * a fixed keyframe pair cannot express — that is a transition. And a React Flow node
- * wrapper already carries React Flow's own `transform`, so an animation that keyframes
- * `transform` goes on an element inside the node and never on the wrapper.
- *
- * The library's own `prefers-reduced-motion: reduce` block cuts every animation it
- * defines to 1ms, so that floor arrives with the import.
- */
-@import 'animate.css/animate.css';
-
-/*
  * The shared semantic vocabulary consumed by the app, `@project/ui`, and the
  * React Flow integration.
  */
@@ -100,10 +82,6 @@
   --card-editor-cancel-color: #6b7484;
   --card-editor-cancel-border-color: #cfc6b3;
   --radius-md: 0.5rem;
-  /* Animate.css defaults this to 1s, which is a stage effect rather than a UI one.
-     Every `animate__animated` element reads it, so the duration is a token like the
-     palette above; an animation that needs its own sets the property on itself. */
-  --animate-duration: 200ms;
   --sidebar: var(--card);
   --sidebar-foreground: var(--foreground);
   --sidebar-primary: var(--primary);

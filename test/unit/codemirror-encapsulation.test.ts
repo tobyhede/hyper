@@ -41,18 +41,42 @@ const SPECIALIST_IMPORTS = [
 ] as const;
 
 /**
- * A static `import ... from '<specifier>'`, capturing the `type` keyword when it is
- * there. Bounded by `[^;]` so the match cannot start at an earlier import statement and
- * run through to this specifier's `from` — leftmost-match would otherwise report the
- * bindings of a different, unrelated import.
+ * A specifier as a literal, not a pattern. Interpolated raw, `./MarkdownSourceEditor`
+ * spends its `.` as a wildcard and matches `x/MarkdownSourceEditor` too — a guard that
+ * accepts an import it was written to catch.
+ */
+const literal = (specifier: string) => specifier.replace(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
+
+/**
+ * A static `import ... from '<specifier>'`, capturing its bindings. Bounded by `[^;]`
+ * so the match cannot start at an earlier import statement and run through to this
+ * specifier's `from` — leftmost-match would otherwise report the bindings of a
+ * different, unrelated import.
  */
 const staticImport = (specifier: string) =>
   new RegExp(
-    String.raw`^[ \t]*import[ \t]+(type[ \t]+)?[^;]*?from[ \t]*['"]` + specifier + String.raw`['"]`,
+    String.raw`^[ \t]*import[ \t]+([^;]*?)from[ \t]*['"]` + literal(specifier) + String.raw`['"]`,
     'gm',
   );
 const dynamicImport = (specifier: string) =>
-  new RegExp(String.raw`import\(\s*['"]` + specifier + String.raw`['"]\s*\)`);
+  new RegExp(String.raw`import\(\s*['"]` + literal(specifier) + String.raw`['"]\s*\)`);
+
+/**
+ * Whether an import's bindings survive compilation — the only kind that can pull the
+ * stack back into the bundle.
+ *
+ * Both spellings are erased, so both are allowed: `import type { X } from` and
+ * `import { type X } from`. Reading only the leading keyword classified the inline
+ * form as a value import and failed the split test over an import that costs nothing.
+ */
+const isValueImport = (bindings: string): boolean => {
+  const clause = bindings.trim();
+  if (clause.startsWith('type ') || clause === 'type') return false;
+  const braced = /^\{([^}]*)\}$/.exec(clause);
+  if (braced === null) return true;
+  const named = braced[1]!.split(',').filter((entry) => entry.trim() !== '');
+  return named.length === 0 || !named.every((entry) => entry.trim().startsWith('type '));
+};
 
 const sourcesUnder = (directory: string): readonly string[] =>
   readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
@@ -102,8 +126,8 @@ describe('CodeMirror stays behind its wrapper', () => {
       const STATIC_IMPORT = staticImport(specifier);
       const DYNAMIC_IMPORT = dynamicImport(specifier);
       const valueImports = sources.filter((path) =>
-        [...readFileSync(path, 'utf8').matchAll(STATIC_IMPORT)].some(
-          (match) => match[1] === undefined,
+        [...readFileSync(path, 'utf8').matchAll(STATIC_IMPORT)].some((match) =>
+          isValueImport(match[1] ?? ''),
         ),
       );
       const dynamicImports = sources.filter((path) =>

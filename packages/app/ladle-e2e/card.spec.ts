@@ -150,15 +150,19 @@ test(
 
     const group = page.getByTestId('card-group');
     const control = group.getByRole('button', { name: 'Edit Title Draft entry' });
-    await expect(group.getByRole('heading', { name: 'Draft entry' })).toContainText('Draft entry', {
+    const heading = group.getByRole('heading', { name: 'Draft entry' });
+    await expect(heading).toContainText('Draft entry', {
       timeout: 20_000,
     });
     await control.hover();
+    // The pointer is on the control, but the treatment is the Title's:
+    // `canvas-card.css` draws it on `.canvas-card__title:has(…__title-control:hover)`
+    // so the tint and rule span the whole heading rather than the text's own box.
     await expect
-      .poll(() => control.evaluate((element) => getComputedStyle(element).boxShadow))
+      .poll(() => heading.evaluate((element) => getComputedStyle(element).boxShadow))
       .not.toBe('none');
     await expect
-      .poll(() => control.evaluate((element) => getComputedStyle(element).backgroundColor))
+      .poll(() => heading.evaluate((element) => getComputedStyle(element).backgroundColor))
       .not.toBe('rgba(0, 0, 0, 0)');
     await control.focus();
     await expect(control).toHaveCSS('outline-style', 'solid');

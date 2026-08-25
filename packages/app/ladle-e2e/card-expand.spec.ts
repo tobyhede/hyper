@@ -21,7 +21,7 @@ test('compact and Expanded Cards retain one Title treatment', async ({ page }) =
     'class',
     (await compactTitle.getAttribute('class')) ?? '',
   );
-  const titleStyle = async (element: HTMLElement) => {
+  const titleStyle = (element: HTMLElement) => {
     const style = getComputedStyle(element);
     return {
       fontSize: style.fontSize,
@@ -56,7 +56,12 @@ test('the body editor shows its shortcut hint only with actual focus', async ({ 
   await open(page, markdownStory);
   await page.getByRole('button', { name: 'Focused edit', exact: true }).click();
   const editor = page.getByRole('textbox', { name: 'Markdown source of Strategies' });
-  const hint = page.getByText('⌘↵ Save · Esc Cancel');
+  // Located by its own element, not its copy: the keys are drawn by the shared
+  // `Kbd` primitive, so the hint is several nodes and the text between them is
+  // the design system's to change.
+  const hint = page.locator('.markdown-card-body__shortcut-hint');
+  await expect(hint).toContainText('Save');
+  await expect(hint).toContainText('Cancel');
   await expect(editor).toBeFocused();
   await expect(hint).not.toHaveCSS('opacity', '0');
 
@@ -65,7 +70,7 @@ test('the body editor shows its shortcut hint only with actual focus', async ({ 
   const unfocused = page.getByRole('button', { name: 'Unfocused edit' });
   await unfocused.click();
   await expect(unfocused).toBeFocused();
-  await expect(page.getByText('⌘↵ Save · Esc Cancel')).toHaveCSS('opacity', '0');
+  await expect(hint).toHaveCSS('opacity', '0');
 });
 
 test('rendered and source modes keep one content column', async ({ page }) => {

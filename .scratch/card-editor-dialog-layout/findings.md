@@ -117,5 +117,8 @@ by the application. Whichever candidate wins is reimplemented through `OpenCard`
 and `card-editor.css` by the production workflow, with the Ladle and application
 behaviour tests ADR 0052 requires.
 
-Nothing in `packages/app/src`, `packages/ui/src` or `packages/*/package.json`
-changed, so no dependency was added and no production surface moved.
+The prototype itself adds nothing to `packages/app/src`, `packages/ui/src` or
+`packages/*/package.json`. Read that as a claim about *this exploration* rather
+than about the branch: the commit carrying it also lands the Expanded Markdown
+Card, which changes all three. Check the diff rather than this paragraph before
+concluding a production surface stood still.

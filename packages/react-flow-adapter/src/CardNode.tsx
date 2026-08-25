@@ -61,6 +61,25 @@ type Mutable<T> = { -readonly [K in keyof T]: T[K] };
  * lets an Edge completed onto this Card resolve in the render that first makes
  * it incident, before the projection catches up.
  */
+/**
+ * Whether a resize drag in this direction leaves the Card's top-left where the
+ * author placed it.
+ *
+ * `CardNodeData.resize.onResize` answers a size and no origin, which is what
+ * keeps a resize out of the family of gestures that must go back through the
+ * authored placement. React Flow's eight controls do not all respect that: a
+ * top or left drag moves the node's top-left in React Flow's own store, and the
+ * composition hears only the new size — so the authored origin stays where it
+ * was and the next projection publish snaps the Card back under the author's
+ * pointer. Refusing those drags is what makes a reported size sufficient.
+ *
+ * React Flow reports direction as `[x, y]`, where `-1` is the leading edge
+ * moving. If a resize is ever allowed to move the top-left, this goes and
+ * `onResize` reports an origin (`projection.ts`).
+ */
+export const growsFromOrigin = (direction: readonly number[]): boolean =>
+  direction[0] !== -1 && direction[1] !== -1;
+
 export function CardNode({ data, selected, dragging, isConnectable }: NodeProps<CardFlowNode>) {
   /**
    * Which handle role the live drag is looking for, or `null` when none is.
@@ -247,6 +266,7 @@ export function CardNode({ data, selected, dragging, isConnectable }: NodeProps<
           minHeight={resize.minHeight}
           lineClassName="rf-card-node__resize-line"
           handleClassName="rf-card-node__resize-handle"
+          shouldResize={(_event, params) => growsFromOrigin(params.direction)}
           onResize={(_event, next) => resize.onResize({ width: next.width, height: next.height })}
         />
       )}

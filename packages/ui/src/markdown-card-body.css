@@ -13,7 +13,7 @@
    - Custom behavior being introduced: none; Button and MarkdownSourceEditor
      retain activation, keyboard and focus behavior.
    - Tests proving the deviation: MarkdownCardBody.test.tsx and
-     expanded-markdown-card.spec.ts.
+     packages/app/ladle-e2e/card-expand.spec.ts.
 
    Geometry and the editor's two published contracts only. Everything about how
    the source *looks* — type, gutter, line numbers, wrapping, highlighting — is
@@ -78,13 +78,13 @@
 .markdown-card-body__rendered a {
   color: inherit;
   text-decoration: underline;
-  text-decoration-color: var(--canvas-card-graph);
+  text-decoration-color: var(--canvas-card-graph, currentcolor);
   text-underline-offset: 2px;
 }
 
 .markdown-card-body__rendered blockquote {
   padding-left: 0.75em;
-  border-left: 3px solid var(--canvas-card-graph);
+  border-left: 3px solid var(--canvas-card-graph, currentcolor);
 }
 
 .markdown-card-body__rendered :is(code, pre) {
@@ -114,18 +114,18 @@
   padding: 0;
   border: 0;
   border-radius: 0;
-  color: var(--canvas-card-muted-color);
+  color: var(--canvas-card-muted-color, currentcolor);
   background: transparent;
   cursor: default;
 }
 
 .markdown-card-body__edit-control:hover {
   border-color: transparent;
-  background: color-mix(in srgb, var(--canvas-card-graph) 4%, transparent);
+  background: color-mix(in srgb, var(--canvas-card-graph, currentcolor) 4%, transparent);
 }
 
 .markdown-card-body__edit-control:focus-visible {
-  outline-color: var(--canvas-card-graph);
+  outline-color: var(--canvas-card-graph, currentcolor);
   outline-offset: -3px;
 }
 
@@ -134,8 +134,9 @@
   width: 14px;
   height: 14px;
   padding: 3px;
-  border: 1px solid color-mix(in srgb, var(--canvas-card-muted-color) 55%, transparent);
-  background: color-mix(in srgb, var(--canvas-card-face-active) 82%, transparent);
+  border: 1px solid
+    color-mix(in srgb, var(--canvas-card-muted-color, currentcolor) 55%, transparent);
+  background: color-mix(in srgb, var(--canvas-card-face-active, transparent) 82%, transparent);
   opacity: 0;
 }
 
@@ -152,6 +153,8 @@
   --markdown-source-line-number-font-size: 12px;
 }
 
+/* Geometry and placement only. The keys themselves are `Kbd`'s, so this sets no
+   type on them — it sizes the row and spaces the labels between the groups. */
 .markdown-card-body__shortcut-hint {
   position: absolute;
   inset-block-start: 0;
@@ -159,13 +162,11 @@
   z-index: 2;
   display: flex;
   align-items: center;
+  gap: 4px;
   height: 34px;
-  color: var(--canvas-card-muted-color);
-  font:
-    10px/14px ui-monospace,
-    SFMono-Regular,
-    Menlo,
-    monospace;
+  color: var(--canvas-card-muted-color, currentcolor);
+  font-size: 10px;
+  line-height: 14px;
   letter-spacing: 0.02em;
   opacity: 0;
   pointer-events: none;
@@ -175,11 +176,12 @@
   opacity: 0.52;
 }
 
-/* While the caret is in, CodeMirror may scroll to keep it visible. The editor
-   exists only during that explicit writing gesture; at rest the rendered
-   Markdown clips and the wheel belongs to the canvas everywhere (ADR 0064). */
+/* While the caret is in, CodeMirror may scroll to keep it visible — and the
+   caret being in is the only time this element is mounted, so `auto` is the
+   whole of its scroll contract. At rest the rendered Markdown clips instead,
+   and the wheel belongs to the canvas everywhere (ADR 0064). */
 .markdown-card-body__source.markdown-source-editor {
-  --markdown-source-scroll: hidden;
+  --markdown-source-scroll: auto;
 
   flex: 1;
   min-height: 0;
@@ -188,10 +190,6 @@
      hands the colour back to whatever mounted the body. */
   color: inherit;
   background: transparent;
-}
-
-.markdown-card-body--editing .markdown-card-body__source.markdown-source-editor {
-  --markdown-source-scroll: auto;
 }
 
 /* The frame the lazily-loaded editor arrives into, so the Card does not change

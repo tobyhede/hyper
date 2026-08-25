@@ -372,7 +372,7 @@ function Canvas({
         if (caret?.cardId === cardId && caret.field === 'body') {
           data.bodyEditor = {
             onComplete: (next) => write(cardId, next, title),
-            onCancel: () => setCaret(null),
+            onEnd: () => setCaret(null),
           };
         }
       }

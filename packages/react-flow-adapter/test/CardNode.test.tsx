@@ -4,7 +4,7 @@ import type * as ReactFlowReact from '@xyflow/react';
 import { Position, type NodeProps } from '@xyflow/react';
 import type { HTMLAttributes } from 'react';
 import { vi } from 'vitest';
-import { CardNode } from '../src/CardNode';
+import { CardNode, growsFromOrigin } from '../src/CardNode';
 import type { CardFlowNode, CardHandle, CardNodeData, CardTitleEditor } from '../src/projection';
 import { uuid } from './uuid';
 
@@ -50,6 +50,10 @@ type MockResizerProps = {
   isVisible?: boolean;
   minWidth?: number;
   minHeight?: number;
+  /** React Flow's own veto. Its argument is a d3 drag event no stand-in can
+   *  build, so the mock reports only *that* one was supplied — what it decides
+   *  is `growsFromOrigin`'s, tested directly below. */
+  shouldResize?: ReactFlowReact.NodeResizerProps['shouldResize'];
 };
 
 vi.mock('@xyflow/react', async (importOriginal) => {
@@ -64,12 +68,13 @@ vi.mock('@xyflow/react', async (importOriginal) => {
      * Flow here: what matters is the box `CardNode` told it to respect and when
      * it asked for it to be visible.
      */
-    NodeResizer: ({ isVisible, minWidth, minHeight }: MockResizerProps) => (
+    NodeResizer: ({ isVisible, minWidth, minHeight, shouldResize }: MockResizerProps) => (
       <div
         data-testid="node-resizer"
         data-visible={String(isVisible)}
         data-min-width={String(minWidth)}
         data-min-height={String(minHeight)}
+        data-vetoes-resizes={String(shouldResize !== undefined)}
       />
     ),
     Handle: ({
@@ -652,6 +657,31 @@ describe('CardNode Expanded Card front', () => {
     // made these exclusive; the slot is a prop precisely so they are not.
     expect(screen.getByRole('textbox', { name: 'Card title' })).toBeVisible();
     expect(screen.getByRole('heading', { name: 'Strategies' })).toBeVisible();
+  });
+
+  it('refuses the resizes that would move the Card away from its authored origin', () => {
+    // `onResize` answers a size and no origin, which is what keeps a resize out
+    // of the family of gestures that must go back through authored placement.
+    // The eight controls do not all respect that: dragging a top or left one
+    // moves the node's top-left in React Flow's own store, and the composition
+    // is told only the new size — so the authored origin stays put and the next
+    // projection publish snaps the Card back. Offering only the drags that grow
+    // the box away from its origin is what makes the reported size sufficient.
+    const resize = { minWidth: 260, minHeight: 146, onResize: () => undefined };
+    render(<CardNode {...props({ expanded: true, body: SOURCE, selected: true, resize })} />);
+
+    // The two drags that differ: one grows the box away from its origin, the
+    // other would move the origin the Card is placed at.
+    expect(growsFromOrigin([1, 1])).toBe(true);
+    expect(growsFromOrigin([1, 0])).toBe(true);
+    expect(growsFromOrigin([0, 1])).toBe(true);
+    expect(growsFromOrigin([-1, -1])).toBe(false);
+    expect(growsFromOrigin([-1, 1])).toBe(false);
+    expect(growsFromOrigin([1, -1])).toBe(false);
+
+    // And the resizer is actually asked. Without this the policy above could be
+    // correct and unwired.
+    expect(screen.getByTestId('node-resizer')).toHaveAttribute('data-vetoes-resizes', 'true');
   });
 
   it('offers resizing only where the composition supplied the operation and its floor', () => {

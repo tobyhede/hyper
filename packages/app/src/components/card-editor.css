@@ -68,7 +68,7 @@
 
 /* Geometry, the Active-Graph band and the kind glyph are `CardRail`'s, in
    `packages/ui/src/card-rail.css` — the same rail the canvas Card draws, which is
-   the point: this dialog is that Card expanded. What is left here is the one
+   the point: this pane is that Card expanded. What is left here is the one
    thing the opened Card adds, which is that it never hides its rail. `flex: none`
    keeps the band its own height while the body takes the rest. */
 .card-editor__rail {
@@ -110,16 +110,22 @@
   caret-color: var(--card-editor-ink-color);
 }
 
-/* Focus draws nothing of its own. The rule exists to suppress the ring `Input`
-   brings from the design system, which is what `box-shadow: none` is doing —
-   without it shadcn's focus ring lands on the field.
+/* This rule suppresses the ring `Input` brings from the design system, which is
+   what `box-shadow: none` is doing — without it shadcn's focus ring lands on the
+   field. It must still leave focus *visible*: the resting border is already
+   `2px solid var(--card-editor-ink-color)`, so re-stating that colour and
+   removing the ring left keyboard focus drawing nothing at all (WCAG 2.4.7).
+   The outline is the same one `.card-editor__close` draws below, so the pane
+   answers focus one way throughout.
 
    The Graph-coloured underline this used to draw is `canvas-card.css`'s, on
    `.card__title-input`, and stays there: it is what says a Card's bare title has
    become editable, on a title with no frame of its own. This title is already a
-   boxed field with a visible label. */
+   boxed field with a visible label, so it needs an indicator rather than a
+   second statement of what it is. */
 .card-editor__title:focus-visible {
-  border-color: var(--card-editor-ink-color);
+  outline: 2px solid var(--card-editor-ink-color);
+  outline-offset: 2px;
   box-shadow: none;
 }
 
