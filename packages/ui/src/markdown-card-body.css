@@ -240,13 +240,7 @@
   opacity: 1;
 }
 
-/* While the caret is in, CodeMirror may scroll to keep it visible — and the
-   caret being in is the only time this element is mounted, so `auto` is the
-   whole of its scroll contract. At rest the rendered Markdown clips instead,
-   and the wheel belongs to the canvas everywhere (ADR 0064). */
 .markdown-card-body__source.markdown-source-editor {
-  --markdown-source-scroll: auto;
-
   flex: 1;
   min-height: 0;
   /* `markdown-source-editor.css` sets `--foreground` on itself, which wins over

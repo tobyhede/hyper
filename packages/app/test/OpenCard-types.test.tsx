@@ -35,13 +35,3 @@ it('will not take a delegated open apart', () => {
   // An Alias with no authoring capability is incomplete.
   expectTypeOf<{ through: Card; onCancel: () => void }>().not.toExtend<OpenCardProps>();
 });
-
-/**
- * A directly opened Card is its own content, so the direct form takes only a
- * Card that owns some — an Alias reaching this variant is exactly the state
- * that would draw a Title field over a Card whose title is not the one on
- * screen behind the pane.
- */
-it('refuses every direct content Card open', () => {
-  expectTypeOf<{ card: Card; onCancel: () => void }>().not.toExtend<OpenCardProps>();
-});

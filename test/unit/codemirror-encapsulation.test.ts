@@ -16,50 +16,21 @@ import { describe, expect, it } from 'vitest';
 const CODEMIRROR_SELECTOR = /^[^@/*]*\.cm-[\w-]+/m;
 
 /**
- * How the editor is named from each tree that reaches it, and the one module in
- * that tree allowed to name it.
- *
- * Two, because the split point moved. `app` reached the editor through the
- * package subpath, which is the single negated entry in an ESLint zone that
- * otherwise bars `@project/ui/*`. `MarkdownCardBody` is the second consumer and
- * it lives in `ui`, so `ui` owns a lazy module of its own and names the editor
- * by relative path — and a static import from *there* would put the whole
- * CodeMirror stack in the barrel, and from the barrel into the adapter and every
- * other consumer, with nothing in `app` left to catch it.
+ * The editor's one dynamic-import boundary. `MarkdownCardBody` lives in `ui`,
+ * so `ui` owns the lazy module and names the editor by relative path. A static
+ * import from anywhere in that tree would put the CodeMirror stack in the
+ * barrel, and from the barrel into the adapter and every other consumer.
  */
 const SPECIALIST_IMPORTS = [
   {
-    tree: 'packages/app/src',
-    specifier: '@project/ui/MarkdownSourceEditor',
-    lazyModule: 'packages/app/src/components/markdown-source-editor-lazy.ts',
-  },
-  {
     tree: 'packages/ui/src',
-    specifier: './MarkdownSourceEditor',
     lazyModule: 'packages/ui/src/markdown-source-editor-lazy.ts',
   },
 ] as const;
 
-/**
- * A specifier as a literal, not a pattern. Interpolated raw, `./MarkdownSourceEditor`
- * spends its `.` as a wildcard and matches `x/MarkdownSourceEditor` too — a guard that
- * accepts an import it was written to catch.
- */
-const literal = (specifier: string) => specifier.replace(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
-
-/**
- * A static `import ... from '<specifier>'`, capturing its bindings. Bounded by `[^;]`
- * so the match cannot start at an earlier import statement and run through to this
- * specifier's `from` — leftmost-match would otherwise report the bindings of a
- * different, unrelated import.
- */
-const staticImport = (specifier: string) =>
-  new RegExp(
-    String.raw`^[ \t]*import[ \t]+([^;]*?)from[ \t]*['"]` + literal(specifier) + String.raw`['"]`,
-    'gm',
-  );
-const dynamicImport = (specifier: string) =>
-  new RegExp(String.raw`import\(\s*['"]` + literal(specifier) + String.raw`['"]\s*\)`);
+const MARKDOWN_SOURCE_EDITOR_SPECIFIER = /(?:^|\/)MarkdownSourceEditor$/;
+const STATIC_IMPORT = /^[ \t]*import(?:[ \t]+([^;\n]*?)[ \t]+from)?[ \t]*['"]([^'"]+)['"]/gm;
+const DYNAMIC_IMPORT = /import\(\s*['"]([^'"]+)['"]\s*\)/g;
 
 /**
  * Whether an import's bindings survive compilation — the only kind that can pull the
@@ -78,6 +49,12 @@ const isValueImport = (bindings: string): boolean => {
   return named.length === 0 || !named.every((entry) => entry.trim().startsWith('type '));
 };
 
+const hasStaticEditorValueImport = (source: string): boolean =>
+  [...source.matchAll(STATIC_IMPORT)].some(
+    (match) =>
+      MARKDOWN_SOURCE_EDITOR_SPECIFIER.test(match[2] ?? '') && isValueImport(match[1] ?? ''),
+  );
+
 const sourcesUnder = (directory: string): readonly string[] =>
   readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
     const path = join(directory, entry.name);
@@ -94,6 +71,18 @@ const stylesheetsUnder = (directory: string): readonly string[] =>
   });
 
 describe('CodeMirror stays behind its wrapper', () => {
+  it('recognises side-effect and nested relative editor imports as value imports', () => {
+    expect(hasStaticEditorValueImport("import '../MarkdownSourceEditor';")).toBe(true);
+    expect(
+      hasStaticEditorValueImport("import { MarkdownSourceEditor } from '../MarkdownSourceEditor';"),
+    ).toBe(true);
+    expect(
+      hasStaticEditorValueImport(
+        "import { type MarkdownSourceEditorHandle } from '../MarkdownSourceEditor';",
+      ),
+    ).toBe(false);
+  });
+
   it('is styled by no stylesheet in the repository', () => {
     const root = join(import.meta.dirname, '../..');
     const stylesheets = stylesheetsUnder(join(root, 'packages'));
@@ -118,21 +107,18 @@ describe('CodeMirror stays behind its wrapper', () => {
    */
   it.each(SPECIALIST_IMPORTS)(
     'is reached from $tree by dynamic import only',
-    ({ tree, specifier, lazyModule }) => {
+    ({ tree, lazyModule }) => {
       const root = join(import.meta.dirname, '../..');
       const sources = sourcesUnder(join(root, tree));
       expect(sources.length).toBeGreaterThan(0);
 
-      const STATIC_IMPORT = staticImport(specifier);
-      const DYNAMIC_IMPORT = dynamicImport(specifier);
-      const valueImports = sources.filter((path) =>
-        [...readFileSync(path, 'utf8').matchAll(STATIC_IMPORT)].some((match) =>
-          isValueImport(match[1] ?? ''),
-        ),
-      );
-      const dynamicImports = sources.filter((path) =>
-        DYNAMIC_IMPORT.test(readFileSync(path, 'utf8')),
-      );
+      const valueImports = sources.filter((path) => {
+        return hasStaticEditorValueImport(readFileSync(path, 'utf8'));
+      });
+      const dynamicImports = sources.filter((path) => {
+        const imports = readFileSync(path, 'utf8').matchAll(DYNAMIC_IMPORT);
+        return [...imports].some((match) => MARKDOWN_SOURCE_EDITOR_SPECIFIER.test(match[1] ?? ''));
+      });
 
       expect(valueImports.map((path) => relative(root, path))).toEqual([]);
       expect(dynamicImports.map((path) => relative(root, path))).toEqual([lazyModule]);

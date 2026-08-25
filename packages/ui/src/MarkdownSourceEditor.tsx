@@ -25,32 +25,15 @@ export interface MarkdownSourceEditorProps {
   readonly onValueChange: (value: string) => void;
   readonly ariaLabel: string;
   readonly className?: string;
-  /**
-   * Whether the author may put a caret in the source. `true` by default, which
-   * is every surface that opens straight into writing.
-   *
-   * `false` draws the same editor showing the same bytes with no caret and no
-   * tab stop — the source *at rest*, which a Card that has been expanded but not
-   * yet double-clicked shows (ADR 0064). It is the same component either way on
-   * purpose: the gutter, the line numbers, the wrapping and the type are one
-   * theme's, so entering the editor adds a caret without moving a word. A
-   * lookalike drawn beside it would have to restate that theme's padding, gutter
-   * width and line height, and would drift the first time any of them changed.
-   */
-  readonly editable?: boolean;
 }
 
 export interface MarkdownSourceEditorHandle {
   /**
    * Put the caret in the source, as soon as the editor can hold one.
    *
-   * Deliberately not "focus now". `EditorView.focus()` calls `contentDOM.focus()`,
-   * and a content element still marked `contenteditable="false"` is not focusable
-   * — the call succeeds and does nothing, which is a silent failure a caller
-   * cannot see. `editable` reaches CodeMirror through a reconfiguring effect
-   * inside the wrapper, so a caller that flips the prop and focuses in the same
-   * commit can arrive before the element can take a caret. Waiting for that is
-   * this module's job, because when it happens is a fact about CodeMirror.
+   * The wrapper can arrive through React.lazy one commit before CodeMirror has
+   * installed its view ref. Waiting for that implementation detail belongs here,
+   * rather than making callers race the specialist editor's mount.
    */
   focus(): void;
   getContentElement(): HTMLElement | null;
@@ -73,13 +56,7 @@ const markdownSourceTheme = EditorView.theme({
     fontFamily: "'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace",
   },
   '.cm-scroller': {
-    // A third custom property on the gutter's contract (ADR 0063): a caller
-    // that must not scroll sets it and never names `.cm-scroller`. The Card on
-    // the canvas is that caller — an Expanded Card showing less than its source
-    // is resized rather than scrolled, because the wheel belongs to the canvas
-    // everywhere and a scrollable region inside a Card is a hole to wheel-pan
-    // across (ADR 0064). `auto` for every surface that has a frame of its own.
-    overflow: 'var(--markdown-source-scroll, auto)',
+    overflow: 'auto',
     fontFamily: 'inherit',
     lineHeight: '1.65',
   },
@@ -211,14 +188,13 @@ const stableLineNumberLocator = ViewPlugin.define((view) => {
  * application callers. `PANE_OWNED_KEYS` below states which keys are withheld from
  * it and why; unit and browser tests prove each arrives at the surface unconsumed.
  *
- * Nine custom properties are the whole styling contract —
+ * Eight custom properties are the whole styling contract —
  * `--markdown-source-gutter-color` and `--markdown-source-gutter-rule-color`, each
  * falling back to the ambient token; `--markdown-source-gutter-width`,
  * `--markdown-source-gutter-padding`, `--markdown-source-content-inset`,
  * `--markdown-source-content-padding-top` and
  * `--markdown-source-line-number-font-size`, falling back to the shared editor
- * geometry; and `--markdown-source-scroll`, falling back to `auto`. A caller sets
- * them on this component. `--markdown-source-focus-outline` similarly lets its
+ * geometry. A caller sets them on this component. `--markdown-source-focus-outline` similarly lets its
  * containing surface quiet the wrapper's focus ring without reaching into the
  * editor. A caller never names a `.cm-*` class: those are CodeMirror's, they are renamed by CodeMirror, and a
  * rule that stops matching one fails by silently reverting rather than by breaking.
@@ -227,10 +203,7 @@ const stableLineNumberLocator = ViewPlugin.define((view) => {
 export const MarkdownSourceEditor = forwardRef<
   MarkdownSourceEditorHandle,
   MarkdownSourceEditorProps
->(function MarkdownSourceEditor(
-  { value, onValueChange, ariaLabel, className, editable = true },
-  ref,
-) {
+>(function MarkdownSourceEditor({ value, onValueChange, ariaLabel, className }, ref) {
   const codeMirror = useRef<ReactCodeMirrorRef>(null);
   const latestOnValueChange = useRef(onValueChange);
 
@@ -251,9 +224,8 @@ export const MarkdownSourceEditor = forwardRef<
           const view = codeMirror.current?.view;
           // The forwarded product handle can be installed one commit before
           // the wrapper has installed CodeMirror's own view ref (notably when
-          // this module arrives through React.lazy). That is the same deferred
-          // readiness as `editable`, so keep the one bounded retry loop around
-          // both facts rather than silently dropping the caller's caret.
+          // this module arrives through React.lazy), so retry rather than
+          // silently dropping the caller's caret.
           if (view === undefined) {
             if (frames++ < FOCUS_FRAMES) requestAnimationFrame(attempt);
             return;
@@ -300,14 +272,6 @@ export const MarkdownSourceEditor = forwardRef<
       value={value}
       height="100%"
       theme="none"
-      // The wrapper's own prop rather than `EditorView.editable` in the
-      // extensions below: it concatenates its defaults *before* the extensions
-      // it is given, and `EditorView.editable` is a facet whose first value
-      // wins — so an entry of ours would be silently outranked. It is also in
-      // the dependency array of the effect that reconfigures the view, so
-      // flipping this places a caret in the editor already on screen instead of
-      // rebuilding one.
-      editable={editable}
       indentWithTab={false}
       extensions={extensions}
       onChange={reportValueChange}

@@ -95,6 +95,9 @@ function AliasEditorForm({
   readonly onSubmit: (event: FormEvent<HTMLFormElement>) => void;
   readonly onCancel: () => void;
 }) {
+  const style: CSSProperties & { '--card-editor-graph': string | undefined } = {
+    '--card-editor-graph': graphColor,
+  };
   const submitShortcut = (event: KeyboardEvent<HTMLFormElement>): void => {
     if (event.key !== 'Enter' || (!event.metaKey && !event.ctrlKey)) return;
     event.preventDefault();
@@ -110,9 +113,7 @@ function AliasEditorForm({
     >
       <form
         className="card-editor"
-        // SAFETY: CSSProperties doesn't type CSS custom properties (`--*`);
-        // this one is read only by the stylesheet, which is its actual contract.
-        style={{ '--card-editor-graph': graphColor } as CSSProperties}
+        style={style}
         aria-invalid={error !== null}
         aria-describedby={error === null ? undefined : 'open-alias-error'}
         onSubmit={onSubmit}

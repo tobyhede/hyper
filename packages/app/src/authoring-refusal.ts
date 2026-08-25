@@ -75,28 +75,6 @@ const presentRefusal = <Field extends string>(
 
 const form = null;
 
-const markdownCardPlacements = {
-  'placement-pending': form,
-  'layout-not-found': form,
-  'layout-required': form,
-  'card-not-found': form,
-  'card-kind-immutable': form,
-  'card-title-required': 'title',
-  'alias-target-not-found': form,
-  'alias-target-must-own-content': form,
-  'card-already-in-layout': form,
-  'card-not-in-layout': form,
-  'card-not-expanded': form,
-  'card-has-aliases': form,
-  'graph-title-required': form,
-  'layout-must-keep-graph': form,
-  'graph-not-owned': form,
-  'edge-not-found': form,
-  'edge-card-outside-layout': form,
-  'edge-already-exists': form,
-  'layout-active-graph-required': form,
-} as const satisfies Readonly<Record<AuthoringRefusalCode, 'title' | null>>;
-
 /** Alias editing and Alias creation both own Title and Target, and nothing else. */
 const titleAndTargetPlacements = {
   'placement-pending': form,
@@ -120,13 +98,8 @@ const titleAndTargetPlacements = {
   'layout-active-graph-required': form,
 } as const satisfies Readonly<Record<AuthoringRefusalCode, 'title' | 'target' | null>>;
 
-export type MarkdownCardRefusalErrors = AuthoringRefusalErrors<'title'>;
 export type AliasCardRefusalErrors = AuthoringRefusalErrors<'title' | 'target'>;
 export type NewAliasRefusalErrors = AuthoringRefusalErrors<'title' | 'target'>;
-
-/** Error placement for a Markdown Card editor, which owns only Title. */
-export const presentMarkdownCardRefusal = (refusal: AuthoringRefusal): MarkdownCardRefusalErrors =>
-  presentRefusal(refusal, markdownCardPlacements);
 
 /** Error placement for an Alias editor, which owns Title and Target. */
 export const presentAliasCardRefusal = (refusal: AuthoringRefusal): AliasCardRefusalErrors =>

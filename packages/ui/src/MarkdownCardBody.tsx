@@ -276,7 +276,6 @@ export function MarkdownCardBody({
               className="markdown-card-body__source"
               value={draft}
               ariaLabel={ariaLabel}
-              editable
               onValueChange={setDraft}
             />
           </Suspense>

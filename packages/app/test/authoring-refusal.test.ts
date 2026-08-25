@@ -5,7 +5,6 @@ import {
   presentAliasCardRefusal,
   presentEdgeDeletionRefusal,
   presentEdgeEndpointRefusal,
-  presentMarkdownCardRefusal,
   presentNewAliasRefusal,
 } from '../src/authoring-refusal';
 import type { AuthoringRefusal } from '../src/space-authoring';
@@ -38,23 +37,6 @@ const EVERY_REFUSAL = {
 describe('Alias Card editing and New Alias creation place every refusal identically', () => {
   it.each(Object.values(EVERY_REFUSAL))('for $code', (refusal) => {
     expect(presentAliasCardRefusal(refusal)).toEqual(presentNewAliasRefusal(refusal));
-  });
-});
-
-describe('presentMarkdownCardRefusal', () => {
-  it('attaches a title refusal to the title field and nothing else', () => {
-    expect(presentMarkdownCardRefusal({ code: 'card-title-required' })).toEqual({
-      fields: { title: 'A Card title is required.' },
-    });
-  });
-
-  it('routes every other refusal to the form, since Markdown editing owns no other field', () => {
-    for (const [code, refusal] of Object.entries(EVERY_REFUSAL)) {
-      if (code === 'card-title-required') continue;
-      const errors = presentMarkdownCardRefusal(refusal);
-      expect(errors.fields).toEqual({});
-      expect(errors.form).toBe(describeAuthoringRefusal(refusal));
-    }
   });
 });
 
