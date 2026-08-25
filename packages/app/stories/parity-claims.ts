@@ -97,19 +97,6 @@ export const parityClaims: readonly ParityClaim[] = [
       "The canvas Card's displayed Title is a named pointer and keyboard control that opens its field with the value selected, keeps a refused draft field-local, completes on Enter and cancels on Escape.",
   },
   {
-    id: 'markdown-pane-refusal-is-field-local',
-    storyFile: 'components/card-and-alias-panes.stories.tsx',
-    storyExport: 'Markdown',
-    claim: 'A refused Markdown Card title stays field-local and the whole draft can be cancelled.',
-  },
-  {
-    id: 'markdown-source-editor-preserves-pane-ownership',
-    storyFile: 'components/card-and-alias-panes.stories.tsx',
-    storyExport: 'Markdown',
-    claim:
-      'The Markdown source editor preserves exact source while Tab remains focus navigation and Escape remains pane dismissal.',
-  },
-  {
     id: 'alias-pane-authors-metadata',
     storyFile: 'components/card-and-alias-panes.stories.tsx',
     storyExport: 'Alias',

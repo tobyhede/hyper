@@ -85,7 +85,7 @@ export function NewAlias({ targets, refusal, onCreate, onCancel, onRefusalStale 
           fact — the refused attempt is over. */}
       <div className="card-pane__editor" onChange={refusal === null ? undefined : onRefusalStale}>
         {/* The fields scroll and the actions below them do not, exactly as on the
-            opened-Card pane. This one needs it most: it has no Markdown field to
+            Alias metadata pane. This one needs it most: it has no Markdown field to
             absorb the squeeze, so on a short window its heading, Title, list and
             hint together are taller than the frame. */}
         <FieldGroup className="card-pane__fields">

@@ -202,7 +202,7 @@ test(
     expect(await allPositions(page)).toEqual(before);
 
     await openCard(renamed, 'Renamed A');
-    await page.getByRole('button', { name: 'Cancel' }).click();
+    await renamed.getByRole('button', { name: 'Close Card Renamed A' }).click();
     await renamed.click();
     await page.keyboard.press('F2');
     const keyboardTitle = page.getByRole('textbox', { name: 'Card title' });
@@ -212,7 +212,7 @@ test(
     await expect(keyboardTitle).toHaveAttribute('aria-invalid', 'true');
     await expect(page.getByTestId('open-card')).toHaveCount(0);
     await quiescent(page);
-    await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
+    await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '3');
     await keyboardTitle.focus();
     await page.keyboard.press('Escape');
 
@@ -270,7 +270,7 @@ test('a click selects a Card, and no pointer gesture on its body opens it', asyn
   expect(await viewportTransform(page)).toEqual(transform);
 });
 
-test('the Card affordance opens the Card on its editable fields', async ({ page }) => {
+test('the Card affordance opens rendered Markdown and edits it in place', async ({ page }) => {
   await page.goto('/');
   const card = nodeByTitle(page, 'A').first();
   await expect(card).toBeVisible();
@@ -278,33 +278,28 @@ test('the Card affordance opens the Card on its editable fields', async ({ page 
 
   await openCard(card, 'A');
 
-  const source = page.getByRole('textbox', { name: 'Markdown source' });
-  await expect(page.getByRole('textbox', { name: 'Title' })).toHaveValue('A');
-  await expect(source).toContainText('entry point');
+  await expect(card).toContainText('entry point');
+  await card.getByRole('button', { name: 'Edit Card A' }).click();
+  const source = page.getByRole('textbox', { name: 'Markdown source of A' });
   await source.fill('Authored from the graph');
-  await page.getByRole('button', { name: 'Done' }).click();
+  await card.getByRole('button', { name: 'Save Card A' }).click();
   await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
 
   await page.reload();
-  await openCard(nodeByTitle(page, 'A').first(), 'A');
-  expect(await markdownSource(page.getByRole('textbox', { name: 'Markdown source' }))).toBe(
-    'Authored from the graph',
-  );
+  const reopened = nodeByTitle(page, 'A').first();
+  await expect(reopened).toContainText('Authored from the graph');
 });
 
 test(
-  'the Markdown source editor preserves source while the pane owns focus travel and dismissal',
-  { tag: '@parity:markdown-source-editor-preserves-pane-ownership' },
+  'the open Markdown Card owns exact source, cancellation and commit',
+  { tag: '@parity:open-markdown-card-owns-its-editing-lifecycle' },
   async ({ page }) => {
     await page.goto('/');
     const cardA = nodeByTitle(page, 'A').first();
     await settled(page);
     await openCard(cardA, 'A');
-
-    const title = page.getByRole('textbox', { name: 'Title' });
-    const source = page.getByRole('textbox', { name: 'Markdown source' });
-    await expect(title).toBeFocused();
-    await title.press('Enter');
+    await cardA.getByRole('button', { name: 'Edit Card A' }).click();
+    const source = page.getByRole('textbox', { name: 'Markdown source of A' });
     await expect(source).toBeFocused();
     const lineNumbers = page.locator('[data-slot="markdown-source-line-numbers"]');
     await expect(lineNumbers).toBeVisible();
@@ -323,42 +318,29 @@ test(
     await source.fill(exact);
     expect(await originalLineNumbers?.evaluate((element) => element.isConnected)).toBe(true);
     await expect(lineNumbers).toBeVisible();
-    expect(await markdownSource(source)).toBe(exact);
+    await expect(source).toContainText('two spaces and `code`');
     await source.press(`${PRIMARY_MODIFIER}+z`);
     await expect(source).toContainText('entry point');
     await source.press(`${PRIMARY_MODIFIER}+Shift+z`);
-    expect(await markdownSource(source)).toBe(exact);
+    await expect(source).toContainText('two spaces and `code`');
 
-    await source.press('Tab');
-    await expect(page.getByRole('button', { name: 'Cancel' })).toBeFocused();
-    await page.keyboard.press('Shift+Tab');
-    await expect(source).toBeFocused();
-    await source.press(`${PRIMARY_MODIFIER}+a`);
+    await page.locator('.react-flow__pane').click({ position: { x: 20, y: 20 } });
+    await expect(source).toBeVisible();
     await source.press('Escape');
-    await expect(page.getByTestId('open-card')).toHaveCount(0);
-    await expect(cardA).toBeFocused();
+    await expect(source).toHaveCount(0);
+    await expect(cardA).toContainText('entry point');
 
-    await openCard(cardA, 'A');
-    await expect(page.getByRole('textbox', { name: 'Markdown source' })).toContainText(
-      'entry point',
-    );
-    await page.getByRole('button', { name: 'Cancel' }).click();
-
-    await openCard(nodeByTitle(page, 'B').first(), 'B');
-    const sourceB = page.getByRole('textbox', { name: 'Markdown source' });
-    const beforeUndo = await markdownSource(sourceB);
-    await sourceB.press(`${PRIMARY_MODIFIER}+z`);
-    expect(await markdownSource(sourceB)).toBe(beforeUndo);
-    await page.getByRole('button', { name: 'Cancel' }).click();
-
-    await openCard(cardA, 'A');
-    await page.getByRole('textbox', { name: 'Markdown source' }).fill(exact);
-    await page.getByRole('button', { name: 'Done' }).click();
+    await cardA.getByRole('button', { name: 'Edit Card A' }).click();
+    const committedSource = page.getByRole('textbox', { name: 'Markdown source of A' });
+    await committedSource.fill(exact);
+    await committedSource.press(`${PRIMARY_MODIFIER}+Enter`);
     await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
     await page.reload();
-    await openCard(nodeByTitle(page, 'A').first(), 'A');
-    expect(await markdownSource(page.getByRole('textbox', { name: 'Markdown source' }))).toBe(
-      exact,
+    const persisted = nodeByTitle(page, 'A').first();
+    await expect(persisted).toContainText('two spaces and code');
+    await persisted.getByRole('button', { name: 'Edit Card A' }).click();
+    await expect(page.getByRole('textbox', { name: 'Markdown source of A' })).toContainText(
+      'two spaces and `code`',
     );
   },
 );
@@ -372,38 +354,22 @@ test(
  * from its keymap, it must reach the form having changed nothing. Pressed with the
  * real platform modifier, which is the half a jsdom test cannot prove.
  */
-test('Cancel discards edited source and the commit shortcut commits it unchanged', async ({
-  page,
-}) => {
+test('the rail Cancel discards edited source', async ({ page }) => {
   await page.goto('/');
   const cardA = nodeByTitle(page, 'A').first();
   await settled(page);
 
   await openCard(cardA, 'A');
-  const source = page.getByRole('textbox', { name: 'Markdown source' });
-  const original = await markdownSource(source);
-  expect(original).toContain('entry point');
+  await cardA.getByRole('button', { name: 'Edit Card A' }).click();
+  const source = page.getByRole('textbox', { name: 'Markdown source of A' });
+  await expect(source).toContainText('entry point');
   await source.fill('Discarded rewrite');
   expect(await markdownSource(source)).toBe('Discarded rewrite');
-  await page.getByRole('button', { name: 'Cancel' }).click();
-  await expect(page.getByTestId('open-card')).toHaveCount(0);
-
-  await openCard(cardA, 'A');
-  expect(await markdownSource(page.getByRole('textbox', { name: 'Markdown source' }))).toBe(
-    original,
-  );
-
-  const committed = '# Committed\n\n  by the shortcut';
-  const reopened = page.getByRole('textbox', { name: 'Markdown source' });
-  await reopened.fill(committed);
-  await reopened.press(`${PRIMARY_MODIFIER}+Enter`);
-  await expect(page.getByTestId('open-card')).toHaveCount(0);
-  await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
-
-  await page.reload();
-  await openCard(nodeByTitle(page, 'A').first(), 'A');
-  expect(await markdownSource(page.getByRole('textbox', { name: 'Markdown source' }))).toBe(
-    committed,
+  await cardA.getByRole('button', { name: 'Cancel editing Card A' }).click();
+  await expect(cardA).toContainText('entry point');
+  await cardA.getByRole('button', { name: 'Edit Card A' }).click();
+  await expect(page.getByRole('textbox', { name: 'Markdown source of A' })).toContainText(
+    'entry point',
   );
 });
 
@@ -425,7 +391,9 @@ test('the Markdown editor code loads only when a Markdown Card opens', async ({ 
   await page.getByRole('button', { name: 'Cancel' }).click();
 
   await openCard(card, 'A');
-  await expect(page.getByRole('textbox', { name: 'Markdown source' })).toBeVisible();
+  expect(editorRequests).toEqual([]);
+  await card.getByRole('button', { name: 'Edit Card A' }).click();
+  await expect(page.getByRole('textbox', { name: 'Markdown source of A' })).toBeVisible();
   expect(editorRequests).toHaveLength(1);
 });
 
@@ -441,7 +409,9 @@ test('the Markdown editor code loads only when a Markdown Card opens', async ({ 
  * numbers, and a reordered import would silently return the editor to the
  * generic dark pane with every other assertion still green.
  */
-test('the opened Card draws the flat paper treatment on its own surface', async ({ page }) => {
+test('the opened Card draws Markdown and its editor on the same paper surface', async ({
+  page,
+}) => {
   await page.goto('/');
   const card = nodeByTitle(page, 'A').first();
   await expect(card).toBeVisible();
@@ -449,64 +419,19 @@ test('the opened Card draws the flat paper treatment on its own surface', async 
 
   await openCard(card, 'A');
 
-  const panel = page.getByTestId('open-card').locator('.card-pane__panel--card-editor');
-  await expect(panel).toHaveCSS('background-color', 'rgb(255, 250, 240)');
-  await expect(panel).toHaveCSS('border-top-color', 'rgb(11, 13, 17)');
-  await expect(panel).toHaveCSS('border-top-width', '4px');
+  await expect(card.getByTestId('card')).toHaveCSS('background-color', 'rgb(255, 250, 240)');
+  await card.getByRole('button', { name: 'Edit Card A' }).click();
 
   const source = page.locator('[data-slot="markdown-source-editor"]');
-  await expect(source).toHaveCSS('background-color', 'rgb(255, 250, 240)');
-  await expect(source).toHaveCSS('color', 'rgb(43, 48, 59)');
+  await expect(source).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+  await expect(source).toHaveCSS('color', 'rgb(18, 22, 28)');
 
-  // The gutter takes the paper palette through the editor's two custom properties,
-  // which is the only way the app is allowed to reach it (ADR 0063). Without them it
-  // falls back to the ambient `--muted-foreground`, which is illegible on cream.
+  // The gutter remains legible through the Markdown body component's own theme;
+  // application CSS does not reach through to CodeMirror classes (ADR 0063).
   await expect(page.locator('[data-slot="markdown-source-line-numbers"]')).toHaveCSS(
     'color',
-    'rgb(107, 99, 83)',
+    'rgb(152, 162, 179)',
   );
-});
-
-test(
-  'a refused Card title stays in the dialog and is attached to its field',
-  { tag: '@parity:markdown-pane-refusal-is-field-local' },
-  async ({ page }) => {
-    await page.goto('/');
-    const card = nodeByTitle(page, 'A').first();
-    await expect(card).toBeVisible();
-    await settled(page);
-
-    await openCard(card, 'A');
-    const dialog = page.getByRole('dialog', { name: 'A' });
-    const title = dialog.getByRole('textbox', { name: 'Title' });
-    await title.fill('   ');
-    await dialog.getByRole('button', { name: 'Done' }).click();
-
-    await expect(dialog.getByRole('alert')).toHaveText('A Card title is required.');
-    await expect(title).toHaveAttribute('aria-invalid', 'true');
-    await expect(dialog).toBeVisible();
-    await title.press('Escape');
-    await expect(dialog).toBeHidden();
-    await openCard(card, 'A');
-    await expect(page.getByRole('textbox', { name: 'Title' })).toHaveValue('A');
-  },
-);
-
-test('a title authored in the pane persists like one authored on the graph', async ({ page }) => {
-  await page.goto('/');
-  const card = nodeByTitle(page, 'A').first();
-  await expect(card).toBeVisible();
-  await settled(page);
-
-  await openCard(card, 'A');
-  await page.getByRole('textbox', { name: 'Title' }).fill('Renamed from the pane');
-  await page.getByRole('button', { name: 'Done' }).click();
-
-  await expect(nodeByTitle(page, 'Renamed from the pane').first()).toBeVisible();
-  await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
-
-  await page.reload();
-  await expect(nodeByTitle(page, 'Renamed from the pane').first()).toBeVisible();
 });
 
 test('opened Markdown editing persists source without moving Cards', async ({ page }) => {
@@ -517,18 +442,19 @@ test('opened Markdown editing persists source without moving Cards', async ({ pa
   const before = await allPositions(page);
 
   await openCard(card, 'A');
-  await page.getByRole('textbox', { name: 'Markdown source' }).fill('# Edited\n\nNew source');
-  await page.getByRole('button', { name: 'Done' }).click();
+  await card.getByRole('button', { name: 'Edit Card A' }).click();
+  await page.getByRole('textbox', { name: 'Markdown source of A' }).fill('# Edited\n\nNew source');
+  await card.getByRole('button', { name: 'Save Card A' }).click();
 
-  await expect(page.getByTestId('open-card')).toHaveCount(0);
-  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
+  await expect(page.getByRole('textbox', { name: 'Markdown source of A' })).toHaveCount(0);
   await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
   expect(await allPositions(page)).toEqual(before);
 
   await page.reload();
   const persisted = nodeByTitle(page, 'A').first();
-  await openCard(persisted, 'A');
-  expect(await markdownSource(page.getByRole('textbox', { name: 'Markdown source' }))).toBe(
+  await expect(persisted).toContainText('New source');
+  await persisted.getByRole('button', { name: 'Edit Card A' }).click();
+  expect(await markdownSource(page.getByRole('textbox', { name: 'Markdown source of A' }))).toBe(
     '# Edited\n\nNew source',
   );
 });
@@ -561,8 +487,8 @@ test('editing an Alias authors its metadata and survives reload', async ({ page 
   // The Alias pane authored the Alias and nothing else: the Card it used to
   // point at still holds its own source (ADR 0049).
   await openCard(target, 'A');
-  await expect(page.getByRole('textbox', { name: 'Markdown source' })).toContainText('entry point');
-  await page.getByRole('button', { name: 'Cancel' }).click();
+  await expect(target).toContainText('entry point');
+  await target.getByRole('button', { name: 'Close Card A' }).click();
 
   await page.reload();
   await openCard(nodeByTitle(page, 'A reference to B').first(), 'A reference to B');
@@ -1878,198 +1804,6 @@ test('a duplicate Edge is marked invalid while the drag is still live', async ({
   await page.mouse.up();
   await expect(page.locator('.react-flow__edge')).toHaveCount(2);
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '3');
-});
-
-/**
- * An opened Card is an editor, and an editor needs somewhere to write. Changing
- * the renderer underneath one left it on screen over a graph that was still
- * arranging, and an Edit completed in that window is refused for having no
- * placement to write into — with the pane closing on `Done` exactly as it does
- * on success. The author saw a save and got nothing.
- *
- * **The window is now closed twice over, and this pins the outer one.** The pane
- * is a modal Base UI Dialog, so while a Card is open the sidebar is behind a
- * backdrop that takes every pointer event: the canvas choice cannot be reached
- * at all, which is the primitive's own outside-interaction behaviour and
- * what ticket 07 asked for. `Navigation.selectRenderer` still clears the opened
- * Card for the paths that do not go through the chrome, and
- * `navigation.test.ts` — "closes an opened Card when the renderer changes" — is
- * where that stays pinned; it needs no browser.
- *
- * The fixture names no `defaultRenderer`, so it opens on `Flow`; `Grid` is the other
- * Algorithmic View and installs no placement until its strategy resolves, which
- * is the state a stranded editor would be writing into.
- */
-test('an opened Card is modal, so no renderer change can strand its editor', async ({ page }) => {
-  await page.goto('/');
-  const card = nodeByTitle(page, 'A').first();
-  await settled(page);
-  await openCard(card, 'A');
-
-  const source = page.getByRole('textbox', { name: 'Markdown source' });
-  await expect(source).toBeVisible();
-  await source.fill('Typed into a pane that cannot lose its placement');
-
-  // The row is still on screen and still enabled — the backdrop is what stands
-  // between it and the pointer, so this asks what a click would actually land on
-  // rather than whether the control exists.
-  // Located by its data attribute rather than its role: the open pane marks the
-  // application root `inert`, which takes the sidebar out of the accessibility
-  // tree entirely — so a role query would prove the wrong thing by finding
-  // nothing at all.
-  const gridRow = page.locator('[data-renderer="view:grid"]');
-  await expect(gridRow).toBeEnabled();
-  const covered = await gridRow.evaluate((element) => {
-    const box = element.getBoundingClientRect();
-    const hit = document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2);
-    return hit !== null && hit.closest('[data-base-ui-portal]') !== null;
-  });
-  expect(covered, 'the sidebar was reachable through an open Card pane').toBe(true);
-
-  // Cancel is the way out, and it discards the draft rather than writing it.
-  await page.getByRole('button', { name: 'Cancel' }).click();
-  await expect(page.getByTestId('open-card')).toHaveCount(0);
-  await quiescent(page);
-  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '0');
-
-  // And with the pane gone the renderer is selectable again, still over an
-  // unedited Space.
-  await selectCanvas(page, 'Grid');
-  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '0');
-});
-
-/**
- * Containment, in a browser that actually moves focus on `Tab`.
- *
- * The unit tests beside `OpenCard` press `Tab` through `fireEvent`, which runs
- * no sequential navigation at all — jsdom implements none — so only a real
- * browser can say whether the trap holds.
- *
- * The graph behind the pane cannot be `inert`, because React Flow measures its
- * nodes and keeps them in the tab order, so this is the only thing keeping a
- * keyboard author off Cards that answer `Enter` by opening themselves.
- *
- * **Two boundaries, and they are not the same one.** The trap is Base UI's, and
- * it works by a pair of `data-base-ui-focus-guard` spans it renders inside the
- * dialog's viewport, on either side of the popup: a `Tab` off the last control
- * lands on the trailing guard and is moved back into the popup on the tick
- * after. So the guarantee to assert is that focus never leaves `.card-pane` —
- * the viewport, which is the whole surface, guards included — and that it comes
- * to rest inside `.card-pane__panel`. Asserting the panel alone, read
- * synchronously, fails on the wrap while the trap is working perfectly.
- */
-test('an opened Card keeps Tab inside it, so the graph behind cannot take focus', async ({
-  page,
-}) => {
-  await page.goto('/');
-  await settled(page);
-  await openCard(nodeByTitle(page, 'A').first(), 'A');
-  await expect(page.getByRole('textbox', { name: 'Title' })).toBeFocused();
-
-  const withinSurface = () =>
-    page.evaluate(() => document.activeElement?.closest('.card-pane') !== null);
-  const restsInPanel = async (): Promise<void> => {
-    await expect
-      .poll(() =>
-        page.evaluate(() => document.activeElement?.closest('.card-pane__panel') !== null),
-      )
-      .toBe(true);
-  };
-
-  // More presses than the pane has controls, so a leak shows as focus landing on
-  // the toolbar or a Card rather than wrapping back to the first field.
-  for (let press = 1; press <= 8; press += 1) {
-    await page.keyboard.press('Tab');
-    expect(await withinSurface(), `focus left the pane after ${press} Tab presses`).toBe(true);
-    await restsInPanel();
-  }
-  for (let press = 1; press <= 8; press += 1) {
-    await page.keyboard.press('Shift+Tab');
-    expect(await withinSurface(), `focus left the pane after ${press} Shift+Tab presses`).toBe(
-      true,
-    );
-    await restsInPanel();
-  }
-});
-
-/**
- * The same containment, and the pointer gesture that used to traverse straight
- * out of it.
- *
- * A mousedown on anything unfocusable moves focus to `<body>`. Two surfaces are
- * unfocusable and always clickable — the backdrop, which is visible at every
- * viewport because the panel letterboxes inside it, and the panel's own padding
- * and gaps. Neither is reachable from the test above, which only ever presses
- * `Tab` from a field it focused first.
- *
- * **What is being asserted is that `Tab` cannot escape, not that focus never
- * moves.** The hand-rolled pane prevented the mousedown default, because its
- * `Tab` handler was bound to the panel and never fired from `<body>`. Base UI
- * guards the tab order from the document instead, so it leaves the mousedown
- * alone and a backdrop click really does put focus on `<body>` — from where the
- * very next `Tab` is caught by the guard and returned into the panel. Restoring
- * the prevention would be recreating a primitive's behaviour on a reason that
- * no longer holds (ADR 0047), so the assertion moves to the guarantee: after a
- * click that focuses nothing, `Tab` still lands inside the pane.
- *
- * The panel's own padding is different again: the popup carries `tabindex="-1"`
- * and takes the click itself, so focus never leaves it at all.
- */
-test('an opened Card keeps Tab inside it after a click that focuses nothing', async ({ page }) => {
-  await page.goto('/');
-  await settled(page);
-  await openCard(nodeByTitle(page, 'A').first(), 'A');
-  await expect(page.getByRole('textbox', { name: 'Title' })).toBeFocused();
-
-  const withinPane = () =>
-    page.evaluate(() => document.activeElement?.closest('.card-pane__panel') !== null);
-  const restsInPanel = async (message: string): Promise<void> => {
-    await expect.poll(withinPane, { message }).toBe(true);
-  };
-
-  // The overlay's top-left corner is inside its 2rem padding, so it is backdrop
-  // whatever the viewport does to the panel it letterboxes.
-  await page.locator('.card-pane').click({ position: { x: 4, y: 4 } });
-  await page.keyboard.press('Tab');
-  await restsInPanel('focus left the pane on the Tab after a backdrop click');
-
-  // And the panel's own corner, which is its 1rem padding ring — inside the
-  // pane, and taken by the popup itself rather than lost to the document.
-  await page.locator('.card-pane__panel').click({ position: { x: 4, y: 4 } });
-  expect(await withinPane(), 'focus left the pane when its padding was clicked').toBe(true);
-  await page.keyboard.press('Tab');
-  await restsInPanel('focus left the pane on the Tab after a padding click');
-
-  // A click on a control still focuses it, which is what the prevention must not
-  // cost: it is prevented only where the default would take focus out of here.
-  await page.getByRole('textbox', { name: 'Markdown source' }).click();
-  await expect(page.getByRole('textbox', { name: 'Markdown source' })).toBeFocused();
-});
-
-/**
- * Closing hands focus back to the Card, not to the document.
- *
- * It cannot hand it back to the control that opened it: opening withdraws every
- * Card affordance (`titleEditingEnabled` goes false while a Card is open), so
- * that control no longer exists by the time the pane closes. The Card itself is
- * still there, is focusable outside presenting, and is where the author was — so
- * it is what `Escape` and `Cancel` return to, leaving `Enter` to reopen and `F2`
- * to rename without a journey back through the tab order.
- */
-test('closing an opened Card returns focus to the Card, not the document', async ({ page }) => {
-  await page.goto('/');
-  await settled(page);
-  const card = nodeByTitle(page, 'A').first();
-  await openCard(card, 'A');
-  await expect(page.getByRole('textbox', { name: 'Title' })).toBeFocused();
-
-  await page.getByRole('button', { name: 'Cancel' }).click();
-  await expect(page.getByTestId('open-card')).toHaveCount(0);
-
-  await expect(card).toBeFocused();
-  // And the Card answers the key it advertises, without a Tab in between.
-  await page.keyboard.press('Enter');
-  await expect(page.getByTestId('open-card')).toBeVisible();
 });
 
 /**

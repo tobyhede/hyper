@@ -1,6 +1,4 @@
 import {
-  Suspense,
-  useCallback,
   useRef,
   useState,
   type CSSProperties,
@@ -8,8 +6,7 @@ import {
   type KeyboardEvent,
   type ReactNode,
 } from 'react';
-import { markdownCardSchema, uuidSchema, type Card, type CardId } from '@project/core';
-import type { ResolvedContentCard } from '@project/graph';
+import { uuidSchema, type Card, type CardId } from '@project/core';
 import {
   Alert,
   AlertDescription,
@@ -25,79 +22,12 @@ import {
   FieldLabel,
   Input,
 } from '@project/ui';
-import type { MarkdownSourceEditorHandle } from '@project/ui/MarkdownSourceEditor';
 import { CardPane } from './CardPane';
-import { MarkdownSourceEditor } from './markdown-source-editor-lazy';
 import './card-editor.css';
 import { paneInitialFocus } from './pane-focus';
-import { presentAliasCardRefusal, presentMarkdownCardRefusal } from '../authoring-refusal';
+import { presentAliasCardRefusal } from '../authoring-refusal';
 import { GRAPH_PALETTE } from '../colors';
 import type { AuthoringRefusal } from '../space-authoring';
-
-/**
- * The two values the Card dialog authors. Description remains valid domain
- * metadata, but it is not Card-front copy and it is not duplicated in this
- * writing surface.
- */
-type MarkdownDraft = {
-  readonly title: string;
-  readonly body: string;
-  readonly titleError: string | null;
-};
-
-type MarkdownCard = Extract<ResolvedContentCard, { kind: 'markdown' }>;
-
-const seedMarkdown = (card: MarkdownCard): MarkdownDraft => ({
-  title: card.title,
-  body: card.body,
-  titleError: null,
-});
-
-function settleMarkdown(
-  card: MarkdownCard,
-  draft: MarkdownDraft,
-):
-  | { readonly ok: true; readonly card: MarkdownCard }
-  | { readonly ok: false; readonly draft: MarkdownDraft; readonly refusal: string | null } {
-  // The title is trimmed for the same reason as the graph's inline editor:
-  // `min(1)` counts spaces. The Markdown body is preserved byte-for-byte.
-  const named = draft.title.trim();
-  const parsed = markdownCardSchema.safeParse({
-    ...card,
-    title: named,
-    body: draft.body,
-  });
-  if (parsed.success) return { ok: true, card: parsed.data };
-
-  const forTitle = parsed.error.issues.find((candidate) => candidate.path[0] === 'title');
-  const titleError =
-    forTitle === undefined
-      ? null
-      : named.length === 0
-        ? 'A Card title is required.'
-        : forTitle.message;
-  const unattributed = parsed.error.issues.some((candidate) => candidate.path[0] !== 'title');
-  return {
-    ok: false,
-    draft: { ...draft, titleError },
-    refusal: unattributed ? 'The Card could not be completed.' : null,
-  };
-}
-
-/**
- * A Card opened on its own content — the ordinary case, and one Card.
- *
- * `through` is declared absent so this variant cannot also be an Alias open.
- */
-interface DirectOpen {
-  /** The Card that was opened, which owns the content this pane authors. */
-  readonly card: ResolvedContentCard;
-  /** Active Graph colour carried from the canvas into the Card's writing rail. */
-  readonly graphColor?: string;
-  readonly through?: never;
-  readonly occurrence?: never;
-  readonly onComplete: (card: ResolvedContentCard) => AuthoringRefusal | null;
-}
 
 /**
  * Authoring the Alias itself: its title, and which Card it points at.
@@ -128,26 +58,16 @@ interface OccurrenceAuthoring {
 /**
  * An Alias opened on its own metadata.
  */
-interface AliasOpen {
+export interface OpenCardProps {
   /** The Alias whose own metadata this pane authors. */
   readonly through: Extract<Card, { kind: 'alias' }>;
   /** Active Graph colour carried from the canvas into the Card's writing rail. */
   readonly graphColor?: string;
   /** The one canonical capability for changing its title and Target. */
   readonly occurrence: OccurrenceAuthoring;
-  readonly card?: never;
-  readonly onComplete?: never;
-}
-
-/**
- * What the pane was opened on, in exactly one of its two forms. A content Card
- * carries its completion; an Alias carries only the capability that authors
- * its metadata. The props cannot express content authoring through an Alias.
- */
-export type OpenCardProps = {
   /** Close this pane; invoked after a completed Done action as well as cancellation. */
   readonly onCancel: () => void;
-} & (DirectOpen | AliasOpen);
+}
 
 /**
  * The stable Card-writing surface shared by every Card kind.
@@ -270,110 +190,6 @@ function CardEditorShell({
   );
 }
 
-/**
- * The content Card's form. Every field belongs to that one Card.
- */
-function MarkdownCardEditor({
-  content,
-  graphColor,
-  onComplete,
-  onCancel,
-}: {
-  readonly content: MarkdownCard;
-  readonly graphColor: string;
-  readonly onComplete: (card: ResolvedContentCard) => AuthoringRefusal | null;
-  readonly onCancel: () => void;
-}) {
-  const [draft, setDraft] = useState<MarkdownDraft>(() => seedMarkdown(content));
-  const [contentRefusal, setContentRefusal] = useState<string | null>(null);
-  const [authoringRefusal, setAuthoringRefusal] = useState<AuthoringRefusal | null>(null);
-  const body = useRef<MarkdownSourceEditorHandle | null>(null);
-  const focusBodyOnMount = useRef(false);
-  const authoringErrors =
-    authoringRefusal === null ? { fields: {} } : presentMarkdownCardRefusal(authoringRefusal);
-  const titleError = draft.titleError ?? authoringErrors.fields.title ?? null;
-  const formError = contentRefusal ?? authoringErrors.form ?? null;
-
-  const submit = (event: FormEvent<HTMLFormElement>): void => {
-    event.preventDefault();
-    const settled = settleMarkdown(content, draft);
-    if (!settled.ok) {
-      setDraft(settled.draft);
-      setContentRefusal(settled.refusal);
-      return;
-    }
-    const refusal = onComplete(settled.card);
-    if (refusal !== null) {
-      setAuthoringRefusal(refusal);
-      return;
-    }
-    onCancel();
-  };
-
-  const titleStartsFocused = true;
-  const changeTitle = useCallback((title: string) => {
-    // Typing here withdraws any body focus still waiting on the lazy editor: the
-    // author has stopped waiting for it, and a caret arriving mid-word would put the
-    // rest of the title into the Markdown.
-    focusBodyOnMount.current = false;
-    setDraft((current) => ({ ...current, title, titleError: null }));
-    setContentRefusal(null);
-    setAuthoringRefusal(null);
-  }, []);
-  const changeBody = useCallback((body: string) => {
-    setDraft((current) => ({ ...current, body }));
-    setContentRefusal(null);
-    setAuthoringRefusal(null);
-  }, []);
-  const receiveBody = useCallback((handle: MarkdownSourceEditorHandle | null) => {
-    body.current = handle;
-    if (handle !== null && focusBodyOnMount.current) {
-      requestAnimationFrame(() => {
-        if (body.current === handle && focusBodyOnMount.current) {
-          focusBodyOnMount.current = false;
-          handle.focus();
-        }
-      });
-    }
-  }, []);
-  const focusBody = (): void => {
-    if (body.current === null) {
-      focusBodyOnMount.current = true;
-      return;
-    }
-    body.current.focus();
-  };
-
-  return (
-    <CardEditorShell
-      subjectTitle={content.title}
-      kind="markdown"
-      graphColor={graphColor}
-      title={draft.title}
-      titleError={titleError}
-      titleStartsFocused={titleStartsFocused}
-      onTitleChange={changeTitle}
-      onTitleEnter={focusBody}
-      error={formError}
-      errorId="open-card-error"
-      onSubmit={submit}
-      onCancel={onCancel}
-    >
-      <Field className="card-editor__body">
-        <Suspense fallback={<div className="card-editor__markdown" aria-hidden="true" />}>
-          <MarkdownSourceEditor
-            ref={receiveBody}
-            className="card-editor__markdown"
-            value={draft.body}
-            ariaLabel="Markdown source"
-            onValueChange={changeBody}
-          />
-        </Suspense>
-      </Field>
-    </CardEditorShell>
-  );
-}
-
 /** The Alias pane authors one Card too: the Alias, never its Target. */
 function AliasCardEditor({
   alias,
@@ -463,46 +279,14 @@ function AliasCardEditor({
   );
 }
 
-/**
- * A card opened over the graph — one editable surface, and the only one.
- *
- * Opening a card *is* editing it (ADR 0037). There was a reading state in front
- * of this, and it drew the same bytes in the same order: a `CardRenderer` put
- * the Markdown source in a `<pre>`, the editor puts it in a `<textarea>`, and
- * the only difference was whether the caret could enter. The mode around that
- * non-difference is gone, along with the action that crossed it — and so, now,
- * is the component, which outlived its last caller by one release.
- *
- * The surface it is drawn on — the covering panel, its focus trap and its
- * Escape — is `CardPane`, a Base UI Dialog shared with the Alias creation state.
- * What is left here is what the pane is *for*: which Card is being authored, by
- * which fields, and what one commit over them means.
- *
- * Source, still — not rendered prose. ADR 0011 removed the reading pane's
- * Markdown renderer so a card could not read one way and present another, and
- * that half holds: presenting remains the one place a card is drawn rendered.
- *
- * A content Card authors its title and Markdown. Description metadata is left
- * untouched. An Alias authors only its own title and Target; its Target must be
- * opened separately to author that Card's content.
- */
-export function OpenCard(props: OpenCardProps) {
-  const { onCancel } = props;
-
-  return props.through === undefined ? (
-    <MarkdownCardEditor
-      key={props.card.id}
-      content={props.card}
-      graphColor={props.graphColor ?? GRAPH_PALETTE[0]}
-      onComplete={props.onComplete}
-      onCancel={onCancel}
-    />
-  ) : (
+/** The modal metadata editor retained for Alias Cards, which have no open front. */
+export function OpenCard({ through, graphColor, occurrence, onCancel }: OpenCardProps) {
+  return (
     <AliasCardEditor
-      key={props.through.id}
-      alias={props.through}
-      graphColor={props.graphColor ?? GRAPH_PALETTE[0]}
-      occurrence={props.occurrence}
+      key={through.id}
+      alias={through}
+      graphColor={graphColor ?? GRAPH_PALETTE[0]}
+      occurrence={occurrence}
       onCancel={onCancel}
     />
   );

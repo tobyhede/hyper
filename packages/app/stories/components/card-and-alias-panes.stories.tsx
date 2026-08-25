@@ -34,7 +34,7 @@ function PaneSheet({
   );
 }
 
-export default { title: 'Components/Card and Alias Panes' };
+export default { title: 'Components/Alias Panes' };
 
 const MARKDOWN_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000101');
 const ALIAS_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000103');
@@ -62,33 +62,6 @@ const alias: Extract<Card, { kind: 'alias' }> = {
   kind: 'alias',
   target: MARKDOWN_ID,
 };
-
-/** Long content, local validation, atomic completion and dismissal through the production pane. */
-export const Markdown: Story = () => {
-  const [open, setOpen] = useState(true);
-  const [message, setMessage] = useState('No edit completed.');
-
-  return (
-    <PaneSheet
-      title="Markdown Card editor"
-      note="The opened Card is that Card expanded: the selected Card's cream face, ink border and ring, and the same rail. Long content, local validation, atomic completion and dismissal, all through the production pane."
-    >
-      {open ? (
-        <OpenCard
-          card={markdown}
-          onComplete={(card) => {
-            setMessage(`Completed ${card.title}.`);
-            return null;
-          }}
-          onCancel={() => setOpen(false)}
-        />
-      ) : (
-        <p>{message}</p>
-      )}
-    </PaneSheet>
-  );
-};
-Markdown.meta = { iframed: true };
 
 /** The production Alias metadata editor with its current Target available. */
 export const Alias: Story = () => {

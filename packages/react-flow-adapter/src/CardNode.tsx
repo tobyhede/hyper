@@ -37,6 +37,7 @@ type Mutable<T> = { -readonly [K in keyof T]: T[K] };
 type MarkdownOperations = Mutable<
   Pick<Extract<CanvasCardFront, { kind: 'markdown' }>, 'onOpenChange' | 'onBeginEdit'>
 >;
+type AliasFront = Mutable<Extract<CanvasCardFront, { kind: 'alias' }>>;
 
 /*
  * Handle geometry is *declared*, not measured, so nothing here reports a change
@@ -133,8 +134,14 @@ export function CardNode({ data, selected, dragging, isConnectable }: NodeProps<
             open: false,
             ...markdownOperations,
           };
-  const front: CanvasCardFront =
-    data.kind === 'alias' ? { kind: 'alias', aliasOf: data.aliasOf ?? '' } : markdownFront;
+  const aliasFront: AliasFront = {
+    kind: 'alias',
+    aliasOf: data.aliasOf ?? '',
+  };
+  if (data.cardEditingEnabled === true && data.onEditCard !== undefined) {
+    aliasFront.onOpen = () => data.onEditCard?.(true);
+  }
+  const front: CanvasCardFront = data.kind === 'alias' ? aliasFront : markdownFront;
 
   const renderHandle = (handle: CardHandle, type: 'source' | 'target') => (
     <Handle

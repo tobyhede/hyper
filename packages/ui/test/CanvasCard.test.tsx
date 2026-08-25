@@ -41,6 +41,22 @@ describe('CanvasCard kind and interaction state', () => {
     expect(screen.getByTestId('alias-marker')).toHaveTextContent('Opening');
   });
 
+  it('offers an Alias its metadata Open operation without Markdown state', () => {
+    const onOpen = vi.fn();
+    render(
+      <CanvasCard
+        front={{ kind: 'alias', aliasOf: 'Opening', onOpen }}
+        state="selected"
+        title="Return"
+        graphColor="#ffc53d"
+      />,
+    );
+
+    screen.getByRole('button', { name: 'Open Card Return' }).click();
+    expect(onOpen).toHaveBeenCalledOnce();
+    expect(screen.queryByRole('button', { name: 'Close Card Return' })).not.toBeInTheDocument();
+  });
+
   it('reflects dragging as its own external state, distinct from selected', () => {
     render(
       <CanvasCard

@@ -1,6 +1,5 @@
 import { expectTypeOf, it } from 'vitest';
 import { uuidSchema, type Card } from '@project/core';
-import type { ResolvedContentCard } from '@project/graph';
 import type { OpenCardProps } from '../src/components/OpenCard';
 import type { AuthoringRefusal } from '../src/space-authoring';
 
@@ -15,11 +14,6 @@ import type { AuthoringRefusal } from '../src/space-authoring';
 
 const CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 /** The half of the props that never varies, kept out of every assertion below. */
-type Handlers = {
-  onComplete: (card: ResolvedContentCard) => AuthoringRefusal | null;
-  onCancel: () => void;
-};
-
 type AliasHandlers = {
   through: Extract<Card, { kind: 'alias' }>;
   occurrence: {
@@ -29,10 +23,7 @@ type AliasHandlers = {
   onCancel: () => void;
 };
 
-it('takes an open in exactly one of its two forms', () => {
-  // Directly opened: one Card, which owns the content it is about to author.
-  expectTypeOf<Handlers & { card: ResolvedContentCard }>().toExtend<OpenCardProps>();
-  // Alias metadata: one Alias and the capability that authors it.
+it('takes only the Alias metadata form', () => {
   expectTypeOf<AliasHandlers>().toExtend<OpenCardProps>();
 });
 
@@ -42,9 +33,7 @@ it('takes an open in exactly one of its two forms', () => {
  */
 it('will not take a delegated open apart', () => {
   // An Alias with no authoring capability is incomplete.
-  expectTypeOf<Handlers & { through: Card }>().not.toExtend<OpenCardProps>();
-  // Neither half, which is what a caller that forgot the Card entirely writes.
-  expectTypeOf<Handlers>().not.toExtend<OpenCardProps>();
+  expectTypeOf<{ through: Card; onCancel: () => void }>().not.toExtend<OpenCardProps>();
 });
 
 /**
@@ -53,6 +42,6 @@ it('will not take a delegated open apart', () => {
  * that would draw a Title field over a Card whose title is not the one on
  * screen behind the pane.
  */
-it('refuses a direct open of a Card that owns no content', () => {
-  expectTypeOf<Handlers & { card: Card }>().not.toExtend<OpenCardProps>();
+it('refuses every direct content Card open', () => {
+  expectTypeOf<{ card: Card; onCancel: () => void }>().not.toExtend<OpenCardProps>();
 });

@@ -14,4 +14,6 @@
 
 ## Answer
 
-The React Flow adapter now passes one Markdown front carrying source, authored open state and the optional live editor. The public package barrel no longer exports `MarkdownCardBody`; consumers can use only the deep Card interface and its small editor-operation type. The focused UI/adapter suite passes 69 tests and the complete Ladle suite passes 49. Full verification and application E2E continue to fail only on the pane-era expectations already left obsolete by issue 02.
+The React Flow adapter now passes one Markdown front carrying source, authored open state and the optional live editor. The public package barrel no longer exports `MarkdownCardBody`; consumers can use only the deep Card interface and its small editor-operation type. The unused Markdown branch of `OpenCard`, its stable pane story and its pane-specific tests are removed. Alias keeps a distinct `onOpen` capability on its own front, so its metadata pane remains reachable without acquiring Markdown expansion state.
+
+Application tests now exercise rendered Markdown, Open/Close and body editing through the real in-place Canvas Card. The component, adapter and application unit seams pass; Ladle passes 46 tests; the affected application browser specs pass 39 tests. Final repository-wide command results are recorded in the implementation handoff.

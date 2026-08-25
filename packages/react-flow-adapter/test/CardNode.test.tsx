@@ -230,6 +230,24 @@ describe('CardNode canvas Card state adapter', () => {
     expect(screen.getByTestId('alias-marker')).toHaveTextContent('A');
   });
 
+  it('passes the Alias metadata Open operation through its own front', () => {
+    const onEditCard = vi.fn();
+    render(
+      <CardNode
+        {...props({
+          kind: 'alias',
+          title: 'A, again',
+          aliasOf: 'A',
+          cardEditingEnabled: true,
+          onEditCard,
+        })}
+      />,
+    );
+
+    screen.getByRole('button', { name: 'Open Card A, again' }).click();
+    expect(onEditCard).toHaveBeenCalledWith(true);
+  });
+
   /**
    * `projection.ts` omits `aliasOf` whenever the Target title does not resolve.
    * Intake makes that unreachable for a Space that loads — `validate.ts` refuses

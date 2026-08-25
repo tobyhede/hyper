@@ -42,7 +42,12 @@ export type CanvasCardFront =
       /** Whether a newly supplied body editor takes focus. */
       readonly autoFocusEditor?: boolean;
     })
-  | { readonly kind: 'alias'; readonly aliasOf: string };
+  | {
+      readonly kind: 'alias';
+      readonly aliasOf: string;
+      /** Open this Alias's metadata editor; Alias Cards do not expand. */
+      readonly onOpen?: () => void;
+    };
 
 /** The two authored operations that end a live Markdown body edit. */
 export type CanvasCardBodyEditor = MarkdownCardBodyEditor;
@@ -133,6 +138,7 @@ export function CanvasCard(props: CanvasCardProps) {
   const { front, title, graphColor, onBeginTitleEdit, state } = props;
   const open = front.kind === 'markdown' && front.open;
   const onOpenChange = front.kind === 'markdown' ? front.onOpenChange : undefined;
+  const onOpenAlias = front.kind === 'alias' ? front.onOpen : undefined;
   const onBeginContentEdit = front.kind === 'markdown' ? front.onBeginEdit : undefined;
   /**
    * The edit running inside the Markdown front this Card owns.
@@ -148,7 +154,10 @@ export function CanvasCard(props: CanvasCardProps) {
   const showActions =
     state !== 'dragging' &&
     state !== 'editing' &&
-    (contentEdit !== null || onOpenChange !== undefined || beginContentEdit !== undefined);
+    (contentEdit !== null ||
+      onOpenChange !== undefined ||
+      onOpenAlias !== undefined ||
+      beginContentEdit !== undefined);
   const style: CanvasCardStyle = { '--canvas-card-graph': graphColor };
   const markdownBodyProps: Mutable<
     Pick<MarkdownCardBodyProps, 'onBeginEdit' | 'editor' | 'autoFocus'>
@@ -234,6 +243,22 @@ export function CanvasCard(props: CanvasCardProps) {
                 ) : (
                   <OpenCardIcon data-icon="inline-start" />
                 )}
+              </Button>
+            )}
+            {onOpenAlias !== undefined && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="card__rail-action nodrag nopan"
+                aria-label={`Open Card ${title}`}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onOpenAlias();
+                }}
+                onPointerDown={(event) => event.stopPropagation()}
+                onKeyDown={(event) => event.stopPropagation()}
+              >
+                <OpenCardIcon data-icon="inline-start" />
               </Button>
             )}
           </div>

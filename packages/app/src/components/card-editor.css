@@ -1,5 +1,4 @@
-/* The opened Card's flat paper treatment (ADR 0051): the same paper object as a
-   Card on the canvas, at a larger writing scale.
+/* The Alias metadata editor's flat paper treatment (ADR 0051).
 
    Colocated with `OpenCard`, which imports it, the way `packages/ui/src/canvas-card.css`
    sits beside `CanvasCard`. Nothing here is React Flow's, so it is not recorded in
@@ -7,17 +6,13 @@
    `packages/app/src/styles.css`.
 
    The two `.card-pane` rules below travel with the treatment rather than with the
-   pane: `styles.css` keeps the shared modal frame — the 16:9 silhouette matching
-   `card.ts` and the scroll boundary that keeps Cancel and Done reachable — while
-   these are the editor's own paper face and writing size, expressed through the
-   frame's classes because that is the element they paint.
+   pane: `styles.css` keeps the shared modal frame while these are the Alias
+   editor's own paper face and writing size.
 
    They also override `.card-pane__panel` at equal specificity, so only source order
    separates them. This file is imported from the component, which the module graph
    reaches after `main.tsx` loads `styles.css`, so the order holds in the application
-   and in the Ladle catalogue alike. `editing.spec.ts` and
-   `ladle-e2e/issue-03-card-and-alias-panes.spec.ts` both pin the computed result,
-   because every other assertion here passes against the generic dark pane. */
+   and in the Ladle catalogue alike. */
 .card-pane[data-variant='card-editor'] {
   padding: 2rem 1rem;
 }
@@ -26,12 +21,7 @@
   background: color-mix(in srgb, var(--card-editor-ink-color) 12%, transparent);
 }
 
-/* Sized by what it holds, not by one frame both kinds have to fill. The Markdown
-   editor reaches the cap because its writing surface asks for the room; the Alias
-   editor is a Title and a Target and stops there, rather than claiming the
-   Markdown editor's height and leaving the difference as empty paper. The cap is
-   the writing surface's, so it is expressed as `max-height` and the floor lives on
-   `.card-editor__markdown` where the surface that needs it is. */
+/* Sized by its Title and Target rather than claiming a content editor's height. */
 .card-pane__panel--card-editor {
   width: min(528px, 100%);
   max-height: min(420px, calc(100vh - 4rem));
@@ -160,32 +150,6 @@
   min-height: 0;
   gap: 4px;
   padding-bottom: 14px;
-}
-
-/* The room the writing surface asks the pane for. It is a `flex-basis` and not a
-   `min-height` on purpose: the basis is what the auto-height panel adds up, so the
-   Markdown editor reaches the cap while the Alias editor stops at its two fields —
-   but a minimum would also block this item from shrinking, and on a viewport too
-   short for the cap the surface shrinking is exactly what keeps Cancel and Done in
-   reach. `min-height: 0` is what lets it. */
-.card-editor__markdown {
-  flex: 1 1 220px;
-  min-height: 0;
-}
-
-.card-editor__markdown.markdown-source-editor {
-  /* The editor's own gutter contract: set the properties, never the `.cm-*` classes
-     they are read by (ADR 0063). */
-  --markdown-source-gutter-color: var(--card-editor-label-color);
-  --markdown-source-gutter-rule-color: var(--card-editor-rule-color);
-
-  color: var(--card-editor-body-color);
-  font-size: 12px;
-  background: var(--card-editor-paper-color);
-}
-
-.card-editor__markdown.markdown-source-editor:focus-within {
-  outline-color: color-mix(in srgb, var(--card-editor-graph) 65%, transparent);
 }
 
 /* The Target is the last thing on the paper before the buttons, and on a pane
