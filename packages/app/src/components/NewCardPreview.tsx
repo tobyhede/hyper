@@ -66,7 +66,7 @@ export function NewCardPreview({ title, modifierHeld, pointerOver, accepts }: Ne
         }}
       >
         <CanvasCard
-          front={{ kind: 'markdown', source: '', open: false }}
+          front={{ kind: 'preview' }}
           state="rest"
           title={title}
           graphColor="var(--accent)"

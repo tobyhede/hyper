@@ -139,7 +139,8 @@ export function CardNode({ data, selected, dragging, isConnectable }: NodeProps<
     aliasOf: data.aliasOf ?? '',
   };
   if (data.cardEditingEnabled === true && data.onEditCard !== undefined) {
-    aliasFront.onOpen = () => data.onEditCard?.(true);
+    const openAlias = data.onEditCard;
+    aliasFront.onOpen = () => openAlias(true);
   }
   const front: CanvasCardFront = data.kind === 'alias' ? aliasFront : markdownFront;
 

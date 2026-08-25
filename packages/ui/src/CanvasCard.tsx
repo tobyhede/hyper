@@ -28,6 +28,10 @@ interface CanvasMarkdownCardFront {
 }
 
 export type CanvasCardFront =
+  | {
+      /** A creation ghost: Markdown treatment without authored content or open state. */
+      readonly kind: 'preview';
+    }
   | (CanvasMarkdownCardFront & {
       /** Closed authored state cannot carry a body editor. */
       readonly open: false;
@@ -136,6 +140,7 @@ const contentEditAction = (
 
 export function CanvasCard(props: CanvasCardProps) {
   const { front, title, graphColor, onBeginTitleEdit, state } = props;
+  const visualKind = front.kind === 'preview' ? 'markdown' : front.kind;
   const open = front.kind === 'markdown' && front.open;
   const onOpenChange = front.kind === 'markdown' ? front.onOpenChange : undefined;
   const onOpenAlias = front.kind === 'alias' ? front.onOpen : undefined;
@@ -181,7 +186,7 @@ export function CanvasCard(props: CanvasCardProps) {
       aria-label={title}
       className="canvas-card"
       data-testid="card"
-      data-kind={front.kind}
+      data-kind={visualKind}
       data-state={state}
       // Read by `canvas-card.css` for the two things Expanding changes about
       // the Card itself: it fills the box the Layout gave it rather than the
@@ -195,7 +200,7 @@ export function CanvasCard(props: CanvasCardProps) {
       data-content-editing={contentEdit !== null}
       style={style}
     >
-      <CardRail kind={front.kind} graphColor={graphColor} className="canvas-card__rail">
+      <CardRail kind={visualKind} graphColor={graphColor} className="canvas-card__rail">
         {showActions && (
           <div className="canvas-card__actions" data-testid="canvas-card-actions">
             {contentEdit === null ? (

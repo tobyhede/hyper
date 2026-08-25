@@ -70,38 +70,28 @@ export interface OpenCardProps {
 }
 
 /**
- * The stable Card-writing surface shared by every Card kind.
- *
- * It owns dialog and form presentation only. Each kind-specific editor owns
- * its draft, validation and completion so a field that belongs to one kind
- * cannot accidentally appear on another.
+ * The Alias metadata form. Markdown Cards author their front in `CanvasCard`.
  */
-function CardEditorShell({
+function AliasEditorForm({
   subjectTitle,
-  kind,
   graphColor,
   title,
   titleError,
-  titleStartsFocused,
   onTitleChange,
   onTitleEnter,
   children,
   error,
-  errorId,
   onSubmit,
   onCancel,
 }: {
   readonly subjectTitle: string;
-  readonly kind: Card['kind'];
   readonly graphColor: string;
   readonly title: string;
   readonly titleError: string | null;
-  readonly titleStartsFocused: boolean;
   readonly onTitleChange: (title: string) => void;
-  readonly onTitleEnter?: () => void;
+  readonly onTitleEnter: () => void;
   readonly children: ReactNode;
   readonly error: string | null;
-  readonly errorId: string;
   readonly onSubmit: (event: FormEvent<HTMLFormElement>) => void;
   readonly onCancel: () => void;
 }) {
@@ -124,11 +114,11 @@ function CardEditorShell({
         // this one is read only by the stylesheet, which is its actual contract.
         style={{ '--card-editor-graph': graphColor } as CSSProperties}
         aria-invalid={error !== null}
-        aria-describedby={error === null ? undefined : errorId}
+        aria-describedby={error === null ? undefined : 'open-alias-error'}
         onSubmit={onSubmit}
         onKeyDown={submitShortcut}
       >
-        <CardRail kind={kind} graphColor={graphColor} className="card-editor__rail">
+        <CardRail kind="alias" graphColor={graphColor} className="card-editor__rail">
           <Button
             type="button"
             variant="secondary"
@@ -151,15 +141,9 @@ function CardEditorShell({
               aria-invalid={titleError !== null}
               aria-describedby={titleError === null ? undefined : 'open-card-title-error'}
               value={title}
-              {...paneInitialFocus(titleStartsFocused)}
               onChange={(event) => onTitleChange(event.currentTarget.value)}
               onKeyDown={(event) => {
-                if (
-                  event.key !== 'Enter' ||
-                  event.metaKey ||
-                  event.ctrlKey ||
-                  onTitleEnter === undefined
-                ) {
+                if (event.key !== 'Enter' || event.metaKey || event.ctrlKey) {
                   return;
                 }
                 event.preventDefault();
@@ -171,7 +155,7 @@ function CardEditorShell({
           {children}
         </FieldGroup>
         {error !== null && (
-          <Alert id={errorId} variant="destructive" className="card-editor__error">
+          <Alert id="open-alias-error" variant="destructive" className="card-editor__error">
             <AlertIcon />
             <AlertTitle>Couldn’t save changes</AlertTitle>
             <AlertDescription>{error}</AlertDescription>
@@ -224,20 +208,17 @@ function AliasCardEditor({
   };
 
   return (
-    <CardEditorShell
+    <AliasEditorForm
       subjectTitle={alias.title}
-      kind="alias"
       graphColor={graphColor}
       title={title}
       titleError={titleError}
-      titleStartsFocused={false}
       onTitleChange={(nextTitle) => {
         setTitle(nextTitle);
         setAuthoringRefusal(null);
       }}
       onTitleEnter={() => targetInput.current?.focus()}
       error={formError}
-      errorId="open-alias-error"
       onSubmit={submit}
       onCancel={onCancel}
     >
@@ -275,7 +256,7 @@ function AliasCardEditor({
         />
         <FieldError id="open-alias-target-error">{targetError}</FieldError>
       </Field>
-    </CardEditorShell>
+    </AliasEditorForm>
   );
 }
 

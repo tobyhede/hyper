@@ -32,8 +32,8 @@
   background: var(--card-editor-paper-color);
   border: 4px solid var(--card-editor-ink-color);
   border-radius: 0;
-  /* The opened Card is its Card expanded, and the Card it expands is the
-     selected one — so it carries the selected treatment `canvas-card.css` draws,
+  /* The Alias metadata editor belongs to the selected Card, so it carries the
+     selected treatment `canvas-card.css` draws:
      the same 3px ink ring outside the same 4px ink border on the same active
      cream face. */
   box-shadow: 0 0 0 3px var(--card-editor-ink-color);
@@ -58,8 +58,7 @@
 
 /* Geometry, the Active-Graph band and the kind glyph are `CardRail`'s, in
    `packages/ui/src/card-rail.css` — the same rail the canvas Card draws, which is
-   the point: this pane is that Card expanded. What is left here is the one
-   thing the opened Card adds, which is that it never hides its rail. `flex: none`
+   the point: this pane authors that Card's metadata. It never hides its rail. `flex: none`
    keeps the band its own height while the body takes the rest. */
 .card-editor__rail {
   flex: none;

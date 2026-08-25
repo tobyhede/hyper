@@ -4,6 +4,18 @@ import { describe, expect, it, vi } from 'vitest';
 import { CanvasCard } from '../src';
 
 describe('CanvasCard kind and interaction state', () => {
+  it('draws a creation preview without authored Markdown or open state', () => {
+    render(
+      <CanvasCard front={{ kind: 'preview' }} state="rest" title="Card 2" graphColor="#ffc53d" />,
+    );
+
+    expect(screen.getByRole('article', { name: 'Card 2' })).toHaveAttribute(
+      'data-kind',
+      'markdown',
+    );
+    expect(screen.queryByRole('button')).not.toBeInTheDocument();
+  });
+
   it('presents a Markdown front and its resting state', () => {
     render(
       <CanvasCard

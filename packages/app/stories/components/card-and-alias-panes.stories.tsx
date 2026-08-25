@@ -71,7 +71,7 @@ export const Alias: Story = () => {
   return (
     <PaneSheet
       title="Alias editor"
-      note="The same expanded Card, opened on an Alias: it authors the Alias's own Title and Target and never its Target's content (ADR 0049)."
+      note="The Alias metadata editor authors the Alias's own Title and Target and never its Target's content (ADR 0049). Alias Cards do not expand."
     >
       {open ? (
         <OpenCard
