@@ -101,7 +101,7 @@
   pointer-events: auto;
 }
 
-.canvas-card .card__open-change {
+.canvas-card .card__rail-action {
   width: 22px;
   height: 22px;
   border: 2px solid var(--canvas-card-ink);
@@ -114,13 +114,13 @@
     background-color 100ms ease;
 }
 
-.canvas-card .card__open-change:hover {
+.canvas-card .card__rail-action:hover {
   border-color: var(--canvas-card-ink);
   background: var(--canvas-card-ink);
   color: var(--canvas-card-graph);
 }
 
-.canvas-card .card__open-change:focus-visible {
+.canvas-card .card__rail-action:focus-visible {
   outline: 2px solid var(--canvas-card-ink);
   outline-offset: 2px;
 }

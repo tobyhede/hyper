@@ -2,7 +2,7 @@ import { useEffect, useId, useRef, useState, type CSSProperties, type ReactNode 
 import { Button } from './Button';
 import { CardRail } from './CardRail';
 import { Card, CardContent, CardTitle } from './components/card';
-import { CloseCardIcon, OpenCardIcon } from './icons';
+import { CloseCardIcon, EditIcon, OpenCardIcon } from './icons';
 import './canvas-card.css';
 
 /**
@@ -46,6 +46,8 @@ interface CanvasCardCommonProps {
   readonly onBeginTitleEdit?: () => void;
   /** Toggle this Card between its collapsed and Expanded states. */
   readonly onOpenChange?: (open: boolean) => void;
+  /** Present only while Expanded, when its kind-owned content may be edited. */
+  readonly onBeginContentEdit?: () => void;
 }
 
 /**
@@ -88,8 +90,20 @@ type CanvasCardStyle = CSSProperties & { readonly '--canvas-card-graph': string 
  * own visual treatment lives in `canvas-card.css`, colocated with this module.
  */
 export function CanvasCard(props: CanvasCardProps) {
-  const { front, title, graphColor, content, onBeginTitleEdit, onOpenChange, state } = props;
-  const showActions = state !== 'dragging' && state !== 'editing' && onOpenChange !== undefined;
+  const {
+    front,
+    title,
+    graphColor,
+    content,
+    onBeginTitleEdit,
+    onOpenChange,
+    onBeginContentEdit,
+    state,
+  } = props;
+  const showActions =
+    state !== 'dragging' &&
+    state !== 'editing' &&
+    (onOpenChange !== undefined || (content !== undefined && onBeginContentEdit !== undefined));
   const style: CanvasCardStyle = { '--canvas-card-graph': graphColor };
 
   return (
@@ -111,20 +125,38 @@ export function CanvasCard(props: CanvasCardProps) {
       <CardRail kind={front.kind} graphColor={graphColor} className="canvas-card__rail">
         {showActions && (
           <div className="canvas-card__actions" data-testid="canvas-card-actions">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="card__open-change nodrag nopan"
-              aria-label={`${content === undefined ? 'Open' : 'Close'} Card ${title}`}
-              onClick={(event) => {
-                event.stopPropagation();
-                onOpenChange(content === undefined);
-              }}
-              onPointerDown={(event) => event.stopPropagation()}
-              onKeyDown={(event) => event.stopPropagation()}
-            >
-              {content === undefined ? <OpenCardIcon /> : <CloseCardIcon />}
-            </Button>
+            {content !== undefined && onBeginContentEdit !== undefined && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="card__rail-action nodrag nopan"
+                aria-label={`Edit Card ${title}`}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onBeginContentEdit();
+                }}
+                onPointerDown={(event) => event.stopPropagation()}
+                onKeyDown={(event) => event.stopPropagation()}
+              >
+                <EditIcon />
+              </Button>
+            )}
+            {onOpenChange !== undefined && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="card__rail-action nodrag nopan"
+                aria-label={`${content === undefined ? 'Open' : 'Close'} Card ${title}`}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onOpenChange(content === undefined);
+                }}
+                onPointerDown={(event) => event.stopPropagation()}
+                onKeyDown={(event) => event.stopPropagation()}
+              >
+                {content === undefined ? <OpenCardIcon /> : <CloseCardIcon />}
+              </Button>
+            )}
           </div>
         )}
       </CardRail>

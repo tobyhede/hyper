@@ -71,7 +71,9 @@ describe('MarkdownCardBody', () => {
     const onCardClick = vi.fn();
     render(<div onClick={onCardClick}>{body({ onBeginEdit })}</div>);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Edit Markdown source of Strategies' }));
+    const panel = screen.getByRole('button', { name: 'Edit Markdown source of Strategies' });
+    expect(panel.querySelector('svg')).not.toBeInTheDocument();
+    fireEvent.click(panel);
 
     expect(onBeginEdit).toHaveBeenCalledTimes(1);
     expect(onCardClick).not.toHaveBeenCalled();

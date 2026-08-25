@@ -100,6 +100,43 @@ describe('CanvasCard Open and Close operation', () => {
     expect(onOpenChange).toHaveBeenLastCalledWith(false);
   });
 
+  it('offers Edit before Close only while the Card is open', () => {
+    const onBeginContentEdit = vi.fn();
+    const { rerender } = render(
+      <CanvasCard
+        front={{ kind: 'markdown' }}
+        state="selected"
+        title="A"
+        graphColor="#ffc53d"
+        onOpenChange={vi.fn()}
+        onBeginContentEdit={onBeginContentEdit}
+      />,
+    );
+
+    expect(screen.queryByRole('button', { name: 'Edit Card A' })).not.toBeInTheDocument();
+
+    rerender(
+      <CanvasCard
+        front={{ kind: 'markdown' }}
+        state="selected"
+        title="A"
+        graphColor="#ffc53d"
+        content={<p>Markdown</p>}
+        onOpenChange={vi.fn()}
+        onBeginContentEdit={onBeginContentEdit}
+      />,
+    );
+
+    const actions = screen.getByTestId('canvas-card-actions');
+    const buttons = Array.from(actions.querySelectorAll('button'));
+    expect(buttons.map((button) => button.getAttribute('aria-label'))).toEqual([
+      'Edit Card A',
+      'Close Card A',
+    ]);
+    screen.getByRole('button', { name: 'Edit Card A' }).click();
+    expect(onBeginContentEdit).toHaveBeenCalledTimes(1);
+  });
+
   it('hides both actions while the title is being edited', () => {
     render(
       <CanvasCard

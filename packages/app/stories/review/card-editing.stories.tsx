@@ -66,6 +66,7 @@ export const Markdown: Story = () => {
           title="Strategies"
           graphColor="#ffc53d"
           content={body}
+          onBeginContentEdit={() => setMode('focused')}
         />
       </div>
     </div>

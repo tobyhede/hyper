@@ -183,13 +183,16 @@ export function CardNode({ data, selected, dragging, isConnectable }: NodeProps<
    * withholding it here is the same answer one layer up.
    */
   const canvasCardOptionalProps: Mutable<
-    Pick<CanvasCardProps, 'onBeginTitleEdit' | 'onOpenChange'>
+    Pick<CanvasCardProps, 'onBeginTitleEdit' | 'onOpenChange' | 'onBeginContentEdit'>
   > = {};
   if (data.titleEditingEnabled === true && data.onBeginTitleEditing !== undefined) {
     canvasCardOptionalProps.onBeginTitleEdit = data.onBeginTitleEditing;
   }
   if (data.cardEditingEnabled === true && data.onEditCard !== undefined) {
     canvasCardOptionalProps.onOpenChange = data.onEditCard;
+  }
+  if (data.expanded === true && data.onBeginBodyEditing !== undefined) {
+    canvasCardOptionalProps.onBeginContentEdit = data.onBeginBodyEditing;
   }
 
   /* The editor's presence is the editing state, and it arrives with the two

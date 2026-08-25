@@ -2,7 +2,6 @@ import { Suspense, useCallback, useEffect, useRef, useState, type KeyboardEvent 
 import { Button } from './Button';
 import { Kbd, KbdGroup } from './components/kbd';
 import { RenderedMarkdown } from './CardContent';
-import { EditIcon } from './icons';
 import { MarkdownSourceEditor } from './markdown-source-editor-lazy';
 import type { MarkdownSourceEditorHandle } from './MarkdownSourceEditor';
 import { cn } from './lib/utils';
@@ -49,14 +48,7 @@ interface MarkdownEditControlProps {
   readonly onBeginEdit: () => void;
 }
 
-/**
- * The rendered Markdown's one edit target.
- *
- * This stays beside `MarkdownCardBody` rather than becoming a `Button` variant:
- * its full-surface geometry, Card colours and disclosed pencil describe this
- * composite alone. The shared Button continues to own native activation,
- * keyboard behavior and focus semantics.
- */
+/** The rendered Markdown's full-surface edit target. */
 function MarkdownEditControl({ ariaLabel, onBeginEdit }: MarkdownEditControlProps) {
   return (
     <Button
@@ -68,9 +60,7 @@ function MarkdownEditControl({ ariaLabel, onBeginEdit }: MarkdownEditControlProp
         onBeginEdit();
       }}
       onKeyDown={(event) => event.stopPropagation()}
-    >
-      <EditIcon />
-    </Button>
+    />
   );
 }
 
@@ -83,11 +73,10 @@ function MarkdownEditControl({ ariaLabel, onBeginEdit }: MarkdownEditControlProp
  * the Card reached during traversal. It omits only presentation mode's title
  * and frame, which the surrounding `CanvasCard` already owns.
  *
- * **The same click-to-edit structure as the title.** At rest a shared `Button`
- * covers the rendered field and begins the edit on one activation; while
- * editing that display is replaced by `MarkdownSourceEditor`. The transparent
- * sibling control avoids nesting headings, lists or links inside a `<button>`,
- * while the Markdown remains semantic content a reader can navigate.
+ * At rest this surface is semantic rendered content beneath a transparent
+ * click-to-edit target; the surrounding Card rail supplies the only visible
+ * Edit icon. Both begin the same edit. While editing, the display is replaced
+ * by `MarkdownSourceEditor`.
  *
  * **The keys this surface spends are the two the editor withholds from
  * CodeMirror** (ADR 0063, `PANE_OWNED_KEYS`): `Escape` abandons the draft and

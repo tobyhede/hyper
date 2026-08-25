@@ -37,7 +37,7 @@
 .markdown-card-body__rendered {
   flex: 1;
   min-height: 0;
-  padding: 34px 22px 22px
+  padding: 18px 22px 22px
     calc(var(--markdown-card-gutter-width) + var(--markdown-card-content-gap) + 1px);
   overflow: hidden;
   font-size: 15px;
@@ -100,8 +100,7 @@
 
 /* A sibling overlay rather than a Button containing the rendered HTML: Markdown
    may contain headings, lists and links, none of which belongs inside a native
-   button. The same shared primitive and one-activation structure as the Title
-   remain, without invalidating the rendered document. */
+   button. */
 .markdown-card-body__edit-control {
   position: absolute;
   inset: 0;
@@ -129,26 +128,16 @@
   outline-offset: -3px;
 }
 
-.markdown-card-body__edit-control svg {
-  box-sizing: content-box;
-  width: 14px;
-  height: 14px;
-  padding: 3px;
-  border: 1px solid
-    color-mix(in srgb, var(--canvas-card-muted-color, currentcolor) 55%, transparent);
-  background: color-mix(in srgb, var(--canvas-card-face-active, transparent) 82%, transparent);
-  opacity: 0;
-}
-
-.markdown-card-body__edit-control:is(:hover, :focus-visible) svg {
-  opacity: 0.52;
-}
-
 .markdown-card-body--editing {
   --markdown-source-content-inset: var(--markdown-card-content-gap);
-  --markdown-source-content-padding-top: calc(34px + 1rem);
+  --markdown-source-content-padding-top: 18px;
   --markdown-source-focus-outline: none;
   --markdown-source-gutter-padding: 0 6px 0 4px;
+  --markdown-source-gutter-rule-color: color-mix(
+    in srgb,
+    var(--canvas-card-muted-color, currentcolor) 28%,
+    transparent
+  );
   --markdown-source-gutter-width: var(--markdown-card-gutter-width);
   --markdown-source-line-number-font-size: 12px;
 }

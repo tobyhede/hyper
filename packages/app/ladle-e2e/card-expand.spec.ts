@@ -49,19 +49,29 @@ test('compact and Expanded Cards retain one Title treatment', async ({ page }) =
   await expect(page.getByRole('region', { name: 'Long Expanded Card' })).toBeVisible();
 });
 
-test('the rendered Markdown surface discloses one edit target to pointer and keyboard', async ({
-  page,
-}) => {
+test('the Expanded Card rail offers its edit action before Close', async ({ page }) => {
   await open(page, markdownStory);
-  const edit = page.getByRole('button', { name: 'Edit Markdown source of Strategies' });
-  const pencil = edit.locator('svg');
+  const card = page.getByRole('article', { name: 'Strategies' });
+  const edit = card.getByRole('button', { name: 'Edit Card Strategies' });
 
-  await expect(pencil).toHaveCSS('opacity', '0');
-  await edit.hover();
-  await expect(pencil).not.toHaveCSS('opacity', '0');
+  await card.hover();
+  await expect(edit).toBeVisible();
+  const labels = await card
+    .getByTestId('canvas-card-actions')
+    .getByRole('button')
+    .evaluateAll((buttons) => buttons.map((button) => button.getAttribute('aria-label')));
+  expect(labels[0]).toBe('Edit Card Strategies');
   await edit.focus();
-  await expect(pencil).not.toHaveCSS('opacity', '0');
   await edit.press('Enter');
+  await expect(page.getByRole('textbox', { name: 'Markdown source of Strategies' })).toBeFocused();
+});
+
+test('the Markdown panel remains an icon-free click-to-edit target', async ({ page }) => {
+  await open(page, markdownStory);
+  const panel = page.getByRole('button', { name: 'Edit Markdown source of Strategies' });
+
+  await expect(panel.locator('svg')).toHaveCount(0);
+  await panel.click();
   await expect(page.getByRole('textbox', { name: 'Markdown source of Strategies' })).toBeFocused();
 });
 
@@ -88,11 +98,13 @@ test('the body editor shows its shortcut hint only with actual focus', async ({ 
 
 test('rendered and source modes keep one content column', async ({ page }) => {
   await open(page, markdownStory);
-  const renderedLeft = (
-    await page.getByRole('heading', { name: 'Placement is authored' }).boundingBox()
-  )?.x;
+  const renderedBox = await page
+    .getByRole('heading', { name: 'Placement is authored' })
+    .boundingBox();
   await page.getByRole('button', { name: 'Focused edit', exact: true }).click();
   const firstLine = page.locator('.cm-line').first();
   await expect(firstLine).toBeVisible();
-  expect((await firstLine.boundingBox())?.x).toBeCloseTo(renderedLeft ?? 0, 0);
+  const sourceBox = await firstLine.boundingBox();
+  expect(sourceBox?.x).toBeCloseTo(renderedBox?.x ?? 0, 0);
+  expect(sourceBox?.y).toBeCloseTo(renderedBox?.y ?? 0, 0);
 });

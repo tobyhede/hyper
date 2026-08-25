@@ -97,7 +97,7 @@
 }
 
 .proto-canvas--sectioned .markdown-card-body__rendered {
-  padding: 34px 22px 22px
+  padding: 18px 22px 22px
     calc(var(--proto-markdown-gutter-width) + var(--proto-markdown-content-gap));
   font-size: 15px;
   line-height: 1.55;
@@ -119,24 +119,10 @@
   cursor: default;
 }
 
-.proto-canvas--sectioned .markdown-card-body__edit-control svg {
-  box-sizing: content-box;
-  width: 14px;
-  height: 14px;
-  padding: 3px;
-  border: 1px solid color-mix(in srgb, var(--canvas-card-muted-color) 55%, transparent);
-  background: color-mix(in srgb, var(--canvas-card-face-active) 82%, transparent);
-  opacity: 0;
-}
-
 .proto-canvas--sectioned .markdown-card-body__edit-control:hover {
   border-color: transparent;
   color: var(--canvas-card-muted-color);
   background: color-mix(in srgb, var(--canvas-card-graph) 4%, transparent);
-}
-
-.proto-canvas--sectioned .markdown-card-body__edit-control:is(:hover, :focus-visible) svg {
-  opacity: 0.52;
 }
 
 .proto-canvas--sectioned .markdown-card-body__shortcut-hint {
@@ -166,9 +152,14 @@
 
 .proto-canvas--sectioned .markdown-card-body--editing {
   --markdown-source-content-inset: var(--proto-markdown-content-gap);
-  --markdown-source-content-padding-top: calc(34px + 1rem);
+  --markdown-source-content-padding-top: 18px;
   --markdown-source-focus-outline: none;
   --markdown-source-gutter-padding: 0 6px 0 4px;
+  --markdown-source-gutter-rule-color: color-mix(
+    in srgb,
+    var(--canvas-card-muted-color) 28%,
+    transparent
+  );
   --markdown-source-gutter-width: var(--proto-markdown-gutter-width);
   --markdown-source-line-number-font-size: 12px;
 
