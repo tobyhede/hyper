@@ -158,6 +158,9 @@ importers:
       '@xyflow/react':
         specifier: 12.11.2
         version: 12.11.2(@types/react-dom@18.3.7(@types/react@18.3.31))(@types/react@18.3.31)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      animate.css:
+        specifier: ^4.1.1
+        version: 4.1.1
       react:
         specifier: ^18.3.1
         version: 18.3.1
@@ -2772,6 +2775,9 @@ packages:
   angular-html-parser@10.11.0:
     resolution: {integrity: sha512-3vERzJ65UFDr3C7uozLJwsNcQS3FS784dSh583oDgDTTZMgXe3/pdyXgKndxiP5R2lvYRfW6gSl145Hnyf2OFA==}
     engines: {node: '>= 14'}
+
+  animate.css@4.1.1:
+    resolution: {integrity: sha512-+mRmCTv6SbCmtYJCN4faJMNFVNN5EuCTTprDTAo7YzIGji2KADmakjVA3+8mVDkZ2Bf09vayB35lSQIex2+QaQ==}
 
   ansi-align@3.0.1:
     resolution: {integrity: sha512-IOfwwBF5iczOjp/WeY4YxyjqAFMQoZufdQWDd19SEExbVLNXqvpzSJ/M7Za4/sCPmQ0+GRquoA7bGcINcxew6w==}
@@ -7892,6 +7898,8 @@ snapshots:
       require-from-string: 2.0.2
 
   angular-html-parser@10.11.0: {}
+
+  animate.css@4.1.1: {}
 
   ansi-align@3.0.1:
     dependencies:

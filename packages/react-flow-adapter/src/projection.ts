@@ -1,5 +1,6 @@
 import type { Edge, Node, NodeHandle } from '@xyflow/react';
 import { MarkerType, Position } from '@xyflow/react';
+import type { MarkdownCardBodyEditor } from '@project/ui';
 import type { Card, CardId, LayoutPosition, GraphId } from '@project/core';
 import { inHandleId, outHandleId, resolveContentCard } from '@project/graph';
 import type {
@@ -93,6 +94,53 @@ export type CardNodeData = {
    * never happened.
    */
   titleEditor?: CardTitleEditor;
+  /**
+   * Whether the Layout has Expanded this Card, so it draws its content on the
+   * Card rather than its title alone (ADR 0064).
+   *
+   * Authored, not derived: it is a fact about the Layout, and the Card's rect
+   * follows from it rather than the other way round. The adapter cannot read it
+   * off the geometry — a Card is not Expanded because it is large.
+   *
+   * The Alias kind has no Expanded front yet (ADR 0064 leaves it open), so
+   * nothing sets this for one.
+   */
+  expanded?: boolean;
+  /** Present only when activating the Expanded body may place a caret. */
+  onBeginBodyEditing?: () => void;
+  /**
+   * The live body edit, absent on a Card whose rendered Markdown is at rest.
+   *
+   * Its presence *is* the caret, carrying the two operations that end the edit —
+   * the same pairing `titleEditor` above makes, for the same reason: a
+   * composition cannot ask for the caret without saying what commits and what
+   * abandons it.
+   *
+   * Independent of `titleEditor` on purpose. Expansion is what the Layout
+   * authored and the caret is a gesture the author just made, so a Card can be
+   * Expanded while its *title* is being renamed (ADR 0064).
+   */
+  bodyEditor?: MarkdownCardBodyEditor;
+  /**
+   * Resizing this Expanded Card, absent on one that may not be resized.
+   *
+   * Presence is the capability and it carries its own floor, for the same reason
+   * the two editors above carry their own completions: the collapsed size is
+   * `CARD_SIZE`, which belongs to the composition and not to this package —
+   * an adapter that hardcoded a minimum would be a second opinion about a
+   * constant `app` already owns.
+   *
+   * `onResize` answers a size and no origin. Displacement moves Cards and does
+   * not scale them, so a reported size needs no inversion — which is what keeps
+   * this out of the family of gestures that must go back through the authored
+   * placement. If a resize is ever allowed to move the Card's top-left, it joins
+   * that family.
+   */
+  resize?: {
+    readonly minWidth: number;
+    readonly minHeight: number;
+    onResize: (size: { width: number; height: number }) => void;
+  };
   /** For an alias, the title of the card it shows — so the node can name what it
    *  redraws. Absent on non-alias cards. */
   aliasOf?: string;
@@ -105,9 +153,11 @@ export type CardNodeData = {
    * 0027). Set on the active card alone, never on the whole graph.
    */
   showContent: boolean;
-  /** The Markdown to draw when `showContent`, resolved through an alias to its
-   *  target's body. Absent otherwise — content is not embedded in every node
-   *  (ADR 0006), which is the constraint that made this per-card. */
+  /** The Markdown to draw when `showContent` or `expanded`, resolved through an
+   *  alias to its target's body. Absent otherwise — content is not embedded in
+   *  every node (ADR 0006), which is the constraint that made this per-card, and
+   *  which ADR 0064 narrows rather than lifts: an Expanded Card carries its
+   *  source because the author asked for that one, not because every Card does. */
   body?: string;
   /** The graph being emphasised, if any. Drives handle dimming. */
   activeGraphId: GraphId | null;
@@ -281,8 +331,15 @@ export function projectCardNodes(
     // An alias shows its target's content under its own title (ADR 0009).
     const body = showContent ? (resolveContentCard(space, card.id)?.body ?? '') : undefined;
     const portsById = new Map((cardLayout?.ports ?? []).map((port) => [port.id, port]));
-    const sourceHandles = resolveHandles(handles.sourceHandles, colors, portsById, nodeHeight);
-    const targetHandles = resolveHandles(handles.targetHandles, colors, portsById, nodeHeight);
+    // The Card's own height once a layout has placed it, and the constant only
+    // before one has. The two agree for every collapsed Card — the strategies
+    // arrange at `CARD_SIZE` — and differ exactly for an Expanded one, whose
+    // anchors have to spread down the box it actually occupies (ADR 0064).
+    // Read from the same rect `declaredHandles` reasons about below, so a
+    // Graph's drawn anchor and its declared one cannot land in different places.
+    const spread = cardLayout?.height ?? nodeHeight;
+    const sourceHandles = resolveHandles(handles.sourceHandles, colors, portsById, spread);
+    const targetHandles = resolveHandles(handles.targetHandles, colors, portsById, spread);
 
     const node: CardFlowNode = {
       id: card.id,

@@ -1,7 +1,7 @@
-import { useEffect, useId, useRef, useState, type CSSProperties } from 'react';
+import { useEffect, useId, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { Button } from './Button';
-import { CardKindIcon } from './CardKindIcon';
-import { Card, CardContent, CardHeader, CardTitle } from './components/card';
+import { CardRail } from './CardRail';
+import { Card, CardContent, CardTitle } from './components/card';
 import { ConnectIcon, EditIcon } from './icons';
 import './canvas-card.css';
 
@@ -24,6 +24,24 @@ interface CanvasCardCommonProps {
   readonly front: CanvasCardFront;
   readonly title: string;
   readonly graphColor: string;
+  /**
+   * What this Card draws below its Title, present exactly when the Layout has
+   * Expanded it (ADR 0064).
+   *
+   * A slot rather than an `expanded` flag or a second component. The ADR's claim
+   * is that an Expanded Card *is* the Card, bigger — one component with a region
+   * makes that structural: the same paper, the same rail, the same Title, the
+   * same `data-state` matrix, plus this. An `ExpandedCanvasCard` beside it would
+   * assert the claim in prose and deny it in the module graph, and would double
+   * the interaction-state union `CanvasCardProps` already encodes.
+   *
+   * The presence of the slot *is* the Expanded state, so the two cannot
+   * disagree. What fills it belongs to the Card's kind, which owns everything
+   * past the Title (ADR 0051): the Markdown kind's is `MarkdownCardBody`. The
+   * Alias kind has no Expanded front yet — ADR 0064 leaves it open — so nothing
+   * offers this for one.
+   */
+  readonly content?: ReactNode;
   /** Present only when activating the displayed Title may begin a rename. */
   readonly onBeginTitleEdit?: () => void;
   /** Present only when this Card may be connected from. */
@@ -72,7 +90,7 @@ type CanvasCardStyle = CSSProperties & { readonly '--canvas-card-graph': string 
  * own visual treatment lives in `canvas-card.css`, colocated with this module.
  */
 export function CanvasCard(props: CanvasCardProps) {
-  const { front, title, graphColor, onBeginTitleEdit, onConnect, onEdit, state } = props;
+  const { front, title, graphColor, content, onBeginTitleEdit, onConnect, onEdit, state } = props;
   const showActions =
     state !== 'dragging' &&
     state !== 'editing' &&
@@ -87,12 +105,15 @@ export function CanvasCard(props: CanvasCardProps) {
       data-testid="card"
       data-kind={front.kind}
       data-state={state}
+      // Read by `canvas-card.css` for the two things Expanding changes about
+      // the Card itself: it fills the box the Layout gave it rather than the
+      // collapsed constant, and its Title moves to the top of that box because
+      // there is now something under it. Derived from the slot, so there is one
+      // fact here and not two that can disagree.
+      data-expanded={content !== undefined}
       style={style}
     >
-      <CardHeader className="canvas-card__rail">
-        <span className="canvas-card__kind">
-          <CardKindIcon kind={front.kind} />
-        </span>
+      <CardRail kind={front.kind} graphColor={graphColor} className="canvas-card__rail">
         {showActions && (
           <div className="canvas-card__actions" data-testid="canvas-card-actions">
             {onConnect !== undefined && (
@@ -130,7 +151,7 @@ export function CanvasCard(props: CanvasCardProps) {
             )}
           </div>
         )}
-      </CardHeader>
+      </CardRail>
       <CardContent className="canvas-card__body">
         {state === 'editing' ? (
           <TitleEditor
@@ -180,6 +201,11 @@ export function CanvasCard(props: CanvasCardProps) {
           </p>
         )}
       </CardContent>
+      {/* A sibling of the Title's body rather than a child of it. The body is
+          inset so a Title sits off the Card's border; a writing surface brings
+          its own gutter and padding and has to reach the paper's edges, and
+          nesting it would draw one inset inside another. */}
+      {content !== undefined && <div className="canvas-card__content">{content}</div>}
     </Card>
   );
 }

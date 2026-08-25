@@ -61,6 +61,13 @@
   min-height: 100%;
 }
 
+/* A modal story's ground has to fill the frame: the pane portals to the document
+   body and covers the viewport, so whatever the sheet does not reach shows the
+   catalogue's own white through the backdrop instead of the canvas. */
+.inv-sheet--viewport {
+  min-height: 100vh;
+}
+
 .inv-section + .inv-section {
   margin-top: 34px;
 }

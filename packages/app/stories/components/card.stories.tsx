@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import type { Story } from '@ladle/react';
 import { CanvasCard, type CanvasCardState } from '@project/ui';
 import { cardSizeVars } from '#src/card';
@@ -8,7 +8,7 @@ import { CanvasCardNodeSpecimen } from '../support/ReactFlowCanvas';
 import { GRAPH_PALETTE } from '../support/fixture';
 import '../support/inventory.css';
 
-export default { title: 'Components/Canvas Card' };
+export default { title: 'Components/Card' };
 
 export const States: Story = () => (
   <div className="inv inv-sheet" style={cardSizeVars}>
@@ -89,7 +89,7 @@ export const Colours: Story = () => (
 );
 Colours.storyName = 'Colours';
 
-export const HoverActions: Story = () => (
+export const Hover: Story = () => (
   <div className="inv inv-sheet" style={cardSizeVars}>
     <CatalogueSection
       title="Hover actions"
@@ -106,7 +106,6 @@ export const HoverActions: Story = () => (
     </CatalogueSection>
   </div>
 );
-HoverActions.storyName = 'Hover actions';
 
 /**
  * One instance wired the way `CardNode` wires the production component: real
@@ -171,60 +170,9 @@ function Instance({
  * same handler React Flow attaches. `States` above is the visual reference;
  * this is its behaviour proof.
  */
-export const Interaction: Story = () => (
+export const Actions: Story = () => (
   <div className="flex flex-wrap gap-8 p-8" style={cardSizeVars}>
     <Instance initialTitle="Strategies" />
     <Instance initialTitle="Opening, again" aliasOf="Opening" />
   </div>
 );
-
-/**
- * The Card's own title editor, entirely private to this component: begins from
- * the Title's native control, keeps a refused draft local with a field-local `role="alert"`
- * error, completes and exits on a valid Enter, cancels on Escape, and asks its
- * caller to hand focus back once either keyboard path ends — proven here by
- * focusing the surrounding group the same way `CardNode` focuses the React
- * Flow node around it.
- */
-export const TitleEditing: Story = () => {
-  const [title, setTitle] = useState('Draft entry');
-  const [editing, setEditing] = useState(false);
-  const group = useRef<HTMLDivElement>(null);
-
-  return (
-    <div style={cardSizeVars}>
-      <div
-        role="group"
-        aria-label={`${title} on the canvas`}
-        tabIndex={-1}
-        ref={group}
-        data-testid="card-group"
-      >
-        {editing ? (
-          <CanvasCard
-            front={{ kind: 'markdown' }}
-            state="editing"
-            title={title}
-            graphColor="#ffc53d"
-            onCompleteTitleEdit={(draft) => {
-              if (draft.trim().length === 0) return 'A Card title is required.';
-              setTitle(draft);
-              setEditing(false);
-              return null;
-            }}
-            onCancelTitleEdit={() => setEditing(false)}
-            onReturnFocus={() => group.current?.focus()}
-          />
-        ) : (
-          <CanvasCard
-            front={{ kind: 'markdown' }}
-            state="rest"
-            title={title}
-            graphColor="#ffc53d"
-            onBeginTitleEdit={() => setEditing(true)}
-          />
-        )}
-      </div>
-    </div>
-  );
-};

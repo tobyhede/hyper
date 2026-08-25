@@ -15,7 +15,30 @@ import { describe, expect, it } from 'vitest';
  */
 const CODEMIRROR_SELECTOR = /^[^@/*]*\.cm-[\w-]+/m;
 
-const SPECIALIST_MODULE = '@project/ui/MarkdownSourceEditor';
+/**
+ * How the editor is named from each tree that reaches it, and the one module in
+ * that tree allowed to name it.
+ *
+ * Two, because the split point moved. `app` reached the editor through the
+ * package subpath, which is the single negated entry in an ESLint zone that
+ * otherwise bars `@project/ui/*`. `MarkdownCardBody` is the second consumer and
+ * it lives in `ui`, so `ui` owns a lazy module of its own and names the editor
+ * by relative path — and a static import from *there* would put the whole
+ * CodeMirror stack in the barrel, and from the barrel into the adapter and every
+ * other consumer, with nothing in `app` left to catch it.
+ */
+const SPECIALIST_IMPORTS = [
+  {
+    tree: 'packages/app/src',
+    specifier: '@project/ui/MarkdownSourceEditor',
+    lazyModule: 'packages/app/src/components/markdown-source-editor-lazy.ts',
+  },
+  {
+    tree: 'packages/ui/src',
+    specifier: './MarkdownSourceEditor',
+    lazyModule: 'packages/ui/src/markdown-source-editor-lazy.ts',
+  },
+] as const;
 
 /**
  * A static `import ... from '<specifier>'`, capturing the `type` keyword when it is
@@ -23,15 +46,13 @@ const SPECIALIST_MODULE = '@project/ui/MarkdownSourceEditor';
  * run through to this specifier's `from` — leftmost-match would otherwise report the
  * bindings of a different, unrelated import.
  */
-const STATIC_IMPORT = new RegExp(
-  String.raw`^[ \t]*import[ \t]+(type[ \t]+)?[^;]*?from[ \t]*['"]` +
-    SPECIALIST_MODULE +
-    String.raw`['"]`,
-  'gm',
-);
-const DYNAMIC_IMPORT = new RegExp(
-  String.raw`import\(\s*['"]` + SPECIALIST_MODULE + String.raw`['"]\s*\)`,
-);
+const staticImport = (specifier: string) =>
+  new RegExp(
+    String.raw`^[ \t]*import[ \t]+(type[ \t]+)?[^;]*?from[ \t]*['"]` + specifier + String.raw`['"]`,
+    'gm',
+  );
+const dynamicImport = (specifier: string) =>
+  new RegExp(String.raw`import\(\s*['"]` + specifier + String.raw`['"]\s*\)`);
 
 const sourcesUnder = (directory: string): readonly string[] =>
   readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
@@ -71,23 +92,26 @@ describe('CodeMirror stays behind its wrapper', () => {
    * A type-only import is erased and costs nothing, which is why `OpenCard` may keep
    * one for the handle. A value import is what would pull the stack back in.
    */
-  it('is reached from the application by dynamic import only', () => {
-    const root = join(import.meta.dirname, '../..');
-    const sources = sourcesUnder(join(root, 'packages/app/src'));
-    expect(sources.length).toBeGreaterThan(0);
+  it.each(SPECIALIST_IMPORTS)(
+    'is reached from $tree by dynamic import only',
+    ({ tree, specifier, lazyModule }) => {
+      const root = join(import.meta.dirname, '../..');
+      const sources = sourcesUnder(join(root, tree));
+      expect(sources.length).toBeGreaterThan(0);
 
-    const valueImports = sources.filter((path) =>
-      [...readFileSync(path, 'utf8').matchAll(STATIC_IMPORT)].some(
-        (match) => match[1] === undefined,
-      ),
-    );
-    const dynamicImports = sources.filter((path) =>
-      DYNAMIC_IMPORT.test(readFileSync(path, 'utf8')),
-    );
+      const STATIC_IMPORT = staticImport(specifier);
+      const DYNAMIC_IMPORT = dynamicImport(specifier);
+      const valueImports = sources.filter((path) =>
+        [...readFileSync(path, 'utf8').matchAll(STATIC_IMPORT)].some(
+          (match) => match[1] === undefined,
+        ),
+      );
+      const dynamicImports = sources.filter((path) =>
+        DYNAMIC_IMPORT.test(readFileSync(path, 'utf8')),
+      );
 
-    expect(valueImports.map((path) => relative(root, path))).toEqual([]);
-    expect(dynamicImports.map((path) => relative(root, path))).toEqual([
-      'packages/app/src/components/markdown-source-editor-lazy.ts',
-    ]);
-  });
+      expect(valueImports.map((path) => relative(root, path))).toEqual([]);
+      expect(dynamicImports.map((path) => relative(root, path))).toEqual([lazyModule]);
+    },
+  );
 });

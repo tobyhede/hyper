@@ -36,6 +36,11 @@
  */
 export const uncataloguedComponents = [
   {
+    module: 'packages/ui/src/MarkdownCardBody.tsx',
+    reason:
+      "The Markdown kind's Expanded Card front (ADR 0064), built ahead of the state that reaches it. Production cannot open a Card into it yet — `openedCardId` and the covering pane are still what opening a Card does — and ADR 0052 is explicit that a state production cannot reach cannot carry a stable story. It is exercised by `packages/ui/test/MarkdownCardBody.test.tsx` and drawn by `stories/review/expanding-cards`, which is a proposal rather than evidence. This entry is deleted along with the pane, in the slice that makes Expanding how a Card opens.",
+  },
+  {
     module: 'packages/app/src/App.tsx',
     reason:
       'Composition root. It wires Navigation, Space Authoring, the render adapter and every surface below into one tree; it has no visual state of its own, and a story of it would be the application rather than a catalogue entry.',
@@ -162,7 +167,7 @@ export const handRolledStyles = [
   {
     block: 'rf-card-node',
     reason:
-      "The adapter's node wrapper: card sizing from `--card-width`/`--card-height`, per-Graph port and authoring-handle geometry, handle reveal driven by the connection state, and the one rule naming the actively presented Card. React Flow measures against this box, so it cannot move into the component it wraps.",
+      "The adapter's node wrapper: card sizing from `--card-width`/`--card-height` and the Expanded Card's fill of the box the Layout authored, per-Graph port and authoring-handle geometry, handle reveal driven by the connection state, React Flow's own `NodeResizer` in the Card's palette, and the one rule naming the actively presented Card. React Flow measures against this box, so it cannot move into the component it wraps.",
   },
   {
     block: 'card',

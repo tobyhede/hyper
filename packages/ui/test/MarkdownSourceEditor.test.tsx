@@ -151,3 +151,42 @@ describe('MarkdownSourceEditor', () => {
     expect(editor).toHaveTextContent('source');
   });
 });
+
+describe('MarkdownSourceEditor at rest', () => {
+  it('draws the same source with no caret when the surface withholds editing', () => {
+    render(
+      <MarkdownSourceEditor
+        value={'# Heading\n\nbytes'}
+        ariaLabel="Markdown source"
+        editable={false}
+        onValueChange={vi.fn()}
+      />,
+    );
+
+    const editor = screen.getByRole('textbox', { name: 'Markdown source' });
+    expect(editor).toHaveTextContent('# Heading');
+    expect(editor).toHaveAttribute('contenteditable', 'false');
+  });
+
+  it('takes a caret when editing is restored, without replacing the content element', () => {
+    const { rerender } = render(
+      <MarkdownSourceEditor
+        value="bytes"
+        ariaLabel="Markdown source"
+        editable={false}
+        onValueChange={vi.fn()}
+      />,
+    );
+    const before = screen.getByRole('textbox', { name: 'Markdown source' });
+
+    rerender(
+      <MarkdownSourceEditor value="bytes" ariaLabel="Markdown source" onValueChange={vi.fn()} />,
+    );
+
+    const after = screen.getByRole('textbox', { name: 'Markdown source' });
+    // The same element throughout, which is what lets entering the editor add a
+    // caret without moving a word.
+    expect(after).toBe(before);
+    expect(after).toHaveAttribute('contenteditable', 'true');
+  });
+});

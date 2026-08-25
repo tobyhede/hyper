@@ -45,12 +45,33 @@ type MockHandleProps = HTMLAttributes<HTMLButtonElement> & {
   isConnectableEnd?: boolean;
 };
 
+/** The constraint and visibility `CardNode` hands React Flow's resizer. */
+type MockResizerProps = {
+  isVisible?: boolean;
+  minWidth?: number;
+  minHeight?: number;
+};
+
 vi.mock('@xyflow/react', async (importOriginal) => {
   const actual = await importOriginal<typeof ReactFlowReact>();
   return {
     ...actual,
     useUpdateNodeInternals: () => updateNodeInternals,
     useConnection: <T,>(selector: (state: MockConnectionState) => T): T => selector(connection),
+    /**
+     * React Flow's own resizer, which reaches for the flow store and so cannot
+     * render outside a provider. Stood in for like every other piece of React
+     * Flow here: what matters is the box `CardNode` told it to respect and when
+     * it asked for it to be visible.
+     */
+    NodeResizer: ({ isVisible, minWidth, minHeight }: MockResizerProps) => (
+      <div
+        data-testid="node-resizer"
+        data-visible={String(isVisible)}
+        data-min-width={String(minWidth)}
+        data-min-height={String(minHeight)}
+      />
+    ),
     Handle: ({
       className,
       style,
@@ -102,6 +123,11 @@ interface Overrides {
   onBeginConnect?: () => void;
   onEditCard?: () => void;
   onBeginTitleEditing?: () => void;
+  expanded?: boolean;
+  body?: string;
+  onBeginBodyEditing?: () => void;
+  bodyEditor?: CardNodeData['bodyEditor'];
+  resize?: CardNodeData['resize'];
   sourceHandles?: CardHandle[];
   targetHandles?: CardHandle[];
 }
@@ -120,6 +146,11 @@ function props({
   onBeginConnect,
   onEditCard,
   onBeginTitleEditing,
+  expanded,
+  body,
+  onBeginBodyEditing,
+  bodyEditor,
+  resize,
   sourceHandles = [outHandle(graphId, 50)],
   targetHandles = [],
 }: Overrides = {}): NodeProps<CardFlowNode> {
@@ -144,6 +175,11 @@ function props({
   if (onEditCard !== undefined) data.onEditCard = onEditCard;
   if (onBeginTitleEditing !== undefined) data.onBeginTitleEditing = onBeginTitleEditing;
   if (titleEditor !== undefined) data.titleEditor = titleEditor;
+  if (expanded !== undefined) data.expanded = expanded;
+  if (body !== undefined) data.body = body;
+  if (onBeginBodyEditing !== undefined) data.onBeginBodyEditing = onBeginBodyEditing;
+  if (bodyEditor !== undefined) data.bodyEditor = bodyEditor;
+  if (resize !== undefined) data.resize = resize;
 
   return {
     id: cardId,
@@ -555,4 +591,86 @@ test('renders every authoring handle as a sibling following the Card', () => {
   for (const handle of authoringHandles) {
     expect(children.indexOf(handle)).toBeGreaterThan(cardIndex);
   }
+});
+
+describe('CardNode Expanded Card front', () => {
+  const SOURCE = '# Strategies\n\nNo strategy is privileged.';
+
+  it("draws the Card's rendered Markdown on the Card, and says the Card is Expanded", () => {
+    const { container } = render(<CardNode {...props({ expanded: true, body: SOURCE })} />);
+
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Strategies' })).toBeVisible();
+    expect(screen.getByText('No strategy is privileged.')).toBeVisible();
+    // Both are read off the same fact — the slot's presence — so a Card cannot
+    // be sized as Expanded while drawing nothing, or the reverse.
+    expect(screen.getByTestId('card')).toHaveAttribute('data-expanded', 'true');
+    expect(container.querySelector('.rf-card-node__inner')).toHaveAttribute(
+      'data-expanded',
+      'true',
+    );
+  });
+
+  it('draws its title alone until the Layout Expands it', () => {
+    const { container } = render(<CardNode {...props({ body: SOURCE })} />);
+
+    expect(
+      screen.queryByRole('button', { name: 'Edit Markdown source of A' }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByTestId('card')).toHaveAttribute('data-expanded', 'false');
+    expect(container.querySelector('.rf-card-node__inner')).toHaveAttribute(
+      'data-expanded',
+      'false',
+    );
+  });
+
+  it('leaves an Alias collapsed, because the Alias kind has no Expanded front yet', () => {
+    render(<CardNode {...props({ kind: 'alias', aliasOf: 'Strategies', expanded: true })} />);
+
+    // ADR 0064 leaves this open. Drawing a Markdown writing surface on a Card
+    // that owns no Markdown would be answering it by accident.
+    expect(
+      screen.queryByRole('button', { name: 'Edit Markdown source of Strategies' }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByTestId('card')).toHaveAttribute('data-expanded', 'false');
+    expect(screen.getByTestId('alias-marker')).toHaveTextContent('Strategies');
+  });
+
+  it('keeps Expanding and renaming independent, because one is authored and the other a gesture', () => {
+    render(
+      <CardNode
+        {...props({
+          expanded: true,
+          body: SOURCE,
+          titleEditingEnabled: true,
+          titleEditor: { onComplete: () => null, onCancel: () => undefined },
+        })}
+      />,
+    );
+
+    // The title editor is open *and* the rendered body is drawn. A branch would have
+    // made these exclusive; the slot is a prop precisely so they are not.
+    expect(screen.getByRole('textbox', { name: 'Card title' })).toBeVisible();
+    expect(screen.getByRole('heading', { name: 'Strategies' })).toBeVisible();
+  });
+
+  it('offers resizing only where the composition supplied the operation and its floor', () => {
+    const resize = { minWidth: 260, minHeight: 146, onResize: () => undefined };
+    const { rerender } = render(
+      <CardNode {...props({ expanded: true, body: SOURCE, selected: true })} />,
+    );
+    // The capability carries its own floor, so a Card offered no operation is
+    // offered no resizer either — there is no minimum for this package to guess.
+    expect(screen.queryByTestId('node-resizer')).not.toBeInTheDocument();
+
+    rerender(<CardNode {...props({ expanded: true, body: SOURCE, selected: true, resize })} />);
+    const resizer = screen.getByTestId('node-resizer');
+    expect(resizer).toHaveAttribute('data-visible', 'true');
+    expect(resizer).toHaveAttribute('data-min-width', '260');
+    expect(resizer).toHaveAttribute('data-min-height', '146');
+
+    // A collapsed Card has no box the author drew, so nothing to resize.
+    rerender(<CardNode {...props({ body: SOURCE, selected: true, resize })} />);
+    expect(screen.queryByTestId('node-resizer')).not.toBeInTheDocument();
+  });
 });

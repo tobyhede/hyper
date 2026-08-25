@@ -1,0 +1,444 @@
+/* Prototype layouts for the opened-Card dialog. Review-only — see
+   `card-editor-layouts.tsx` for what is real here and what is not.
+
+   The palette is the shipped one: `--card-editor-*` are published globally by
+   `packages/app/src/tailwind.css`, so these variations are the same paper and
+   ink as the application and differ in geometry alone. Every class is
+   `proto-`-prefixed so nothing here can be confused for
+   `packages/app/src/components/card-editor.css`, and none of it is scanned by
+   `pnpm ui:catalog:check`, whose hand-rolled-style half reads
+   `packages/app/src/styles.css` only. */
+
+.proto-pane {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.proto-pane__backdrop {
+  position: absolute;
+  inset: 0;
+  background: color-mix(in srgb, var(--card-editor-ink-color) 12%, transparent);
+  pointer-events: auto;
+}
+
+/* The shared paper object: `canvas-card.css`'s selected treatment at writing
+   scale — a 4px ink border with a 3px ink ring outside it, on the active cream
+   face. Only the box the five variations put it in differs. */
+.proto-panel {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  background: var(--card-editor-paper-color);
+  border: 4px solid var(--card-editor-ink-color);
+  border-radius: 0;
+  box-shadow: 0 0 0 3px var(--card-editor-ink-color);
+  overflow: hidden;
+  pointer-events: auto;
+}
+
+/* ---- A. Drag corner ------------------------------------------------------
+   `resize: both` is the whole mechanism. It needs `overflow` other than
+   `visible`, which the panel already has, and it needs a box the flex viewport
+   is not re-centring on every frame — hence the absolute anchor. `left`
+   evaluates to where centring would have put a 720px panel and then stays
+   there, so the box grows right and down from a fixed origin and the corner
+   tracks the pointer 1:1. */
+.proto-panel--drag-corner {
+  position: absolute;
+  inset-block-start: 2.5rem;
+  inset-inline-start: max(1.5rem, calc(50% - 360px));
+  width: 720px;
+  height: 540px;
+  min-width: 420px;
+  min-height: 300px;
+  max-width: calc(100vw - 3rem);
+  max-height: calc(100vh - 5rem);
+  resize: both;
+}
+
+/* The UA's own gripper is three grey diagonal lines on a transparent ground and
+   belongs to no palette. It is painted out and redrawn in ink below; the hotspot
+   is unaffected, because `resize` owns the region and not the pixels. */
+.proto-panel--drag-corner::-webkit-resizer,
+.proto-panel--rail-actions::-webkit-resizer {
+  background: transparent;
+}
+
+/* Drawn by the form so it sits above the paper, and `pointer-events: none` so
+   the UA's resize region underneath still takes the drag. */
+.proto-panel__grip {
+  position: absolute;
+  inset-block-end: 3px;
+  inset-inline-end: 3px;
+  width: 14px;
+  height: 14px;
+  pointer-events: none;
+  background: linear-gradient(
+    135deg,
+    transparent 0 42%,
+    var(--card-editor-ink-color) 42% 54%,
+    transparent 54% 68%,
+    var(--card-editor-ink-color) 68% 80%,
+    transparent 80%
+  );
+}
+
+/* ---- B. Fill frame ------------------------------------------------------- */
+.proto-panel--fill-frame {
+  width: min(1040px, calc(100% - 4rem));
+  height: min(760px, calc(100% - 4rem));
+}
+
+/* ---- C. Rail actions ----------------------------------------------------- */
+.proto-panel--rail-actions {
+  position: absolute;
+  inset-block-start: 2.5rem;
+  inset-inline-start: max(1.5rem, calc(50% - 340px));
+  width: 680px;
+  height: 500px;
+  min-width: 420px;
+  min-height: 260px;
+  max-width: calc(100vw - 3rem);
+  max-height: calc(100vh - 5rem);
+  resize: both;
+}
+
+/* ---- D. Size presets ----------------------------------------------------- */
+.proto-panel--size-preset {
+  max-width: calc(100% - 3rem);
+  max-height: calc(100% - 3rem);
+  transition:
+    width 140ms ease,
+    height 140ms ease;
+}
+
+/* The chosen size is the editor's own state, so it stays on the form as
+   `data-size` — and the panel above it is the box that state asks for. A custom
+   property would not carry it: properties inherit down, and no ancestor ever
+   reads a descendant's. `:has()` is what lifts it, which is what lets the state
+   live with the component that owns it rather than being hoisted to the pane. */
+.proto-panel--size-preset:has(.proto-editor[data-size='compact']) {
+  width: 520px;
+  height: 380px;
+}
+
+.proto-panel--size-preset:has(.proto-editor[data-size='comfortable']) {
+  width: 760px;
+  height: 560px;
+}
+
+.proto-panel--size-preset:has(.proto-editor[data-size='full']) {
+  width: 1200px;
+  height: 900px;
+}
+
+/* ---- E. Full bleed ------------------------------------------------------- */
+.proto-panel--full-bleed {
+  position: absolute;
+  inset: 2rem;
+  width: auto;
+  height: auto;
+}
+
+/* ---- The editor inside the box -----------------------------------------
+   Shared by all five. The chain that makes CodeMirror follow the box is here
+   and it is entirely declarative: every step is a flex item that may shrink
+   (`min-height: 0`) and grow (`flex: 1`), ending at `.markdown-source-editor`,
+   which is `height: 100%`, and at CodeMirror's own `&{height:100%}` theme rule.
+   No measurement, no ResizeObserver, no JavaScript. */
+.proto-editor {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
+  color: var(--card-editor-ink-color);
+  font-family: 'Inter Tight', Inter, ui-sans-serif, system-ui, sans-serif;
+}
+
+.proto-editor__rail {
+  flex: none;
+  color: var(--card-editor-ink-color);
+}
+
+.proto-editor__fields {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px 14px 0;
+}
+
+/* C gives the surface the footer's room, so the fields run to the paper's
+   bottom edge instead of stopping above a rule. */
+.proto-editor__fields--flush {
+  padding-bottom: 14px;
+}
+
+/* E puts the writing surface against the paper, with the title as a line on it
+   rather than a control in a frame. */
+.proto-editor__fields--bleed {
+  gap: 4px;
+  padding: 20px 24px 0;
+}
+
+.proto-editor__title-field {
+  flex: none;
+  min-width: 0;
+  gap: 4px;
+}
+
+.proto-editor__label {
+  color: var(--card-editor-label-color);
+  font-family: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.proto-editor__title {
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  padding: 6px 10px;
+  color: var(--card-editor-ink-color);
+  font: inherit;
+  font-size: 21px;
+  font-weight: 600;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  background: var(--card-editor-field-color);
+  border: 2px solid var(--card-editor-ink-color);
+  border-radius: 0;
+  outline: 0;
+  box-shadow: none;
+  caret-color: var(--card-editor-ink-color);
+}
+
+.proto-editor__title:focus-visible {
+  border-color: var(--card-editor-ink-color);
+  box-shadow: none;
+}
+
+/* E's title: no frame, no label, no field background — a heading on the paper,
+   underlined in the Active Graph's colour the way the canvas Card's own inline
+   title editor is. */
+.proto-editor__title--bare {
+  min-height: 0;
+  padding: 0 0 6px;
+  font-size: 28px;
+  background: transparent;
+  border: 0;
+  border-bottom: 2px solid transparent;
+}
+
+.proto-editor__title--bare:focus-visible {
+  border-bottom-color: var(--proto-graph);
+  box-shadow: none;
+}
+
+.proto-editor__body {
+  flex: 1;
+  min-height: 0;
+  gap: 4px;
+  padding-bottom: 14px;
+}
+
+.proto-editor__fields--flush .proto-editor__body,
+.proto-editor__fields--bleed .proto-editor__body {
+  padding-bottom: 0;
+}
+
+.proto-editor__markdown {
+  flex: 1;
+  min-height: 0;
+}
+
+.proto-editor__markdown.markdown-source-editor {
+  --markdown-source-gutter-color: var(--card-editor-label-color);
+  --markdown-source-gutter-rule-color: var(--card-editor-rule-color);
+
+  color: var(--card-editor-body-color);
+  font-size: 12px;
+  background: var(--card-editor-paper-color);
+}
+
+.proto-editor__markdown.markdown-source-editor:focus-within {
+  outline-color: color-mix(in srgb, var(--proto-graph) 65%, transparent);
+}
+
+/* ---- Chrome ------------------------------------------------------------- */
+.proto-editor__close {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  color: var(--card-editor-ink-color);
+  background: var(--card-editor-paper-color);
+  border: 2px solid var(--card-editor-ink-color);
+  border-radius: 0;
+}
+
+.proto-editor__close:hover {
+  color: var(--proto-graph);
+  background: var(--card-editor-ink-color);
+  border-color: var(--card-editor-ink-color);
+}
+
+.proto-editor__close:focus-visible {
+  outline: 2px solid var(--card-editor-ink-color);
+  outline-offset: 2px;
+}
+
+.proto-editor__footer {
+  display: flex;
+  flex: none;
+  justify-content: flex-end;
+  gap: 20px;
+  padding: 12px 14px;
+  background: var(--card-editor-paper-color);
+  border-top: 3px solid var(--card-editor-ink-color);
+}
+
+.proto-editor__footer--bleed {
+  padding: 10px 24px;
+  border-top-width: 2px;
+}
+
+.proto-editor__actions {
+  display: flex;
+  gap: 20px;
+}
+
+/* C's actions ride the rail, so they are drawn on the Graph colour rather than
+   on paper: ink text in an ink frame, and the hover inverts to Graph-on-ink the
+   way the close button already does. Cancel and Done join the close button
+   rather than replacing it — dismissal keeps the affordance every other pane in
+   the catalogue gives it, and the discarding pair reads as one group. */
+.proto-editor__rail-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.proto-editor__actions--compact {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.proto-editor__cancel,
+.proto-editor__commit {
+  padding: 7px 12px;
+  border-width: 3px;
+  border-radius: 0;
+  font-size: 13px;
+  line-height: 1;
+}
+
+.proto-editor__cancel {
+  color: var(--card-editor-cancel-color);
+  background: transparent;
+  border-color: transparent;
+}
+
+.proto-editor__cancel:hover {
+  color: var(--card-editor-ink-color);
+  background: transparent;
+  border-color: var(--card-editor-cancel-border-color);
+}
+
+.proto-editor__commit {
+  padding-inline: 16px;
+  color: var(--card-editor-ink-color);
+  font-weight: 600;
+  border-bottom-color: var(--proto-graph);
+}
+
+.proto-editor__commit:hover {
+  background: transparent;
+  border-color: var(--proto-graph);
+}
+
+.proto-editor__cancel--compact,
+.proto-editor__commit--compact {
+  height: 22px;
+  padding: 0 10px;
+  border-width: 2px;
+  font-size: 12px;
+}
+
+.proto-editor__cancel--compact {
+  color: var(--card-editor-ink-color);
+  border-color: transparent;
+}
+
+.proto-editor__cancel--compact:hover {
+  background: color-mix(in srgb, var(--card-editor-paper-color) 40%, transparent);
+  border-color: transparent;
+}
+
+.proto-editor__commit--compact {
+  color: var(--card-editor-ink-color);
+  background: var(--card-editor-paper-color);
+  border-color: var(--card-editor-ink-color);
+}
+
+.proto-editor__commit--compact:hover {
+  color: var(--proto-graph);
+  background: var(--card-editor-ink-color);
+  border-color: var(--card-editor-ink-color);
+}
+
+/* D's presets. Drawn as three peers on the rail with the pressed one inverted,
+   so the current size reads without a label of its own. */
+.proto-editor__sizes {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.proto-editor__size {
+  height: 22px;
+  padding: 0 8px;
+  color: var(--card-editor-ink-color);
+  font-family: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  background: var(--card-editor-paper-color);
+  border: 2px solid var(--card-editor-ink-color);
+  border-radius: 0;
+}
+
+.proto-editor__size[aria-pressed='true'] {
+  color: var(--proto-graph);
+  background: var(--card-editor-ink-color);
+}
+
+.proto-editor__size:hover {
+  color: var(--proto-graph);
+  background: var(--card-editor-ink-color);
+}
+
+/* ---- Catalogue instrumentation ------------------------------------------ */
+.proto-readout {
+  margin: 0;
+  color: var(--card-title-muted, #4a505c);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .proto-panel--size-preset {
+    transition: none;
+  }
+}

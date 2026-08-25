@@ -17,13 +17,13 @@ export interface ParityClaim {
 export const parityClaims: readonly ParityClaim[] = [
   {
     id: 'canvas-card-exposes-kind-and-keyboard-actions',
-    storyFile: 'components/canvas-card.stories.tsx',
-    storyExport: 'Interaction',
+    storyFile: 'components/card.stories.tsx',
+    storyExport: 'Actions',
     claim: 'The production canvas Card exposes Alias identity and keyboard-focusable actions.',
   },
   {
     id: 'canvas-card-shows-rest-selected-and-dragging-states',
-    storyFile: 'components/canvas-card.stories.tsx',
+    storyFile: 'components/card.stories.tsx',
     storyExport: 'States',
     claim:
       'Rest, selected and dragging are visually distinct states for both the Markdown and Alias front.',
@@ -44,21 +44,21 @@ export const parityClaims: readonly ParityClaim[] = [
   },
   {
     id: 'canvas-card-shows-kind-treatment',
-    storyFile: 'components/canvas-card.stories.tsx',
+    storyFile: 'components/card.stories.tsx',
     storyExport: 'Kinds',
     claim:
       "An Alias front's dotted border and redraw glyph, and a long Markdown title's three-line clamp, are the kind's own presentation.",
   },
   {
     id: 'canvas-card-shows-active-graph-colour',
-    storyFile: 'components/canvas-card.stories.tsx',
+    storyFile: 'components/card.stories.tsx',
     storyExport: 'Colours',
     claim: "A selected Card's rail carries the Active Graph's own colour.",
   },
   {
     id: 'canvas-card-hover-reveals-actions-and-handles-together',
-    storyFile: 'components/canvas-card.stories.tsx',
-    storyExport: 'HoverActions',
+    storyFile: 'components/card.stories.tsx',
+    storyExport: 'Hover',
     claim:
       "Hovering the real React Flow node reveals CanvasCard's own rail actions and the adapter's Edge handles together.",
     // The two halves of this claim already have real application evidence
@@ -77,8 +77,8 @@ export const parityClaims: readonly ParityClaim[] = [
   },
   {
     id: 'canvas-card-owns-title-editing-and-refusal',
-    storyFile: 'components/canvas-card.stories.tsx',
-    storyExport: 'TitleEditing',
+    storyFile: 'components/card-editing.stories.tsx',
+    storyExport: 'Title',
     claim:
       "The canvas Card's displayed Title is a named pointer and keyboard control that opens its field with the value selected, keeps a refused draft field-local, completes on Enter and cancels on Escape.",
   },

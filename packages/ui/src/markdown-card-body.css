@@ -1,0 +1,202 @@
+/* The Markdown kind's Expanded front, beside the component that draws it.
+
+   Custom composite record (shadcn-first-ui):
+   - Existing Hyper component considered: CanvasCard, Button, RenderedMarkdown
+     and MarkdownSourceEditor are composed here rather than duplicated.
+   - shadcn/Base UI component considered: Button supplies the one semantic edit
+     target; no registry primitive owns rendered/source Markdown geometry.
+   - Product requirement that cannot be expressed: read and edit modes reserve
+     one stable line-number gutter inside an authored Card rect.
+   - Why composition or a variant is insufficient: the gutter, paper inset and
+     focus disclosure are the Markdown kind's visual contract, not a reusable
+     control variant.
+   - Custom behavior being introduced: none; Button and MarkdownSourceEditor
+     retain activation, keyboard and focus behavior.
+   - Tests proving the deviation: MarkdownCardBody.test.tsx and
+     expanded-markdown-card.spec.ts.
+
+   Geometry and the editor's two published contracts only. Everything about how
+   the source *looks* — type, gutter, line numbers, wrapping, highlighting — is
+   `MarkdownSourceEditor`'s own theme, and this file names no `.cm-*` class
+   (ADR 0063). */
+.markdown-card-body {
+  --markdown-card-content-gap: 8px;
+  --markdown-card-gutter-width: 29px;
+
+  position: relative;
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
+}
+
+.markdown-card-body[data-editable='true'] {
+  cursor: default;
+}
+
+.markdown-card-body__rendered {
+  flex: 1;
+  min-height: 0;
+  padding: 34px 22px 22px
+    calc(var(--markdown-card-gutter-width) + var(--markdown-card-content-gap) + 1px);
+  overflow: hidden;
+  font-size: 15px;
+  line-height: 1.55;
+}
+
+.markdown-card-body__rendered > * {
+  margin: 0 0 0.75em;
+}
+
+.markdown-card-body__rendered > :last-child {
+  margin-bottom: 0;
+}
+
+.markdown-card-body__rendered :is(h1, h2, h3, h4) {
+  margin-bottom: 0.5em;
+  font-size: 1.2em;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.markdown-card-body__rendered :is(ul, ol) {
+  padding-left: 1.5em;
+}
+
+.markdown-card-body__rendered ul {
+  list-style: disc;
+}
+
+.markdown-card-body__rendered ol {
+  list-style: decimal;
+}
+
+.markdown-card-body__rendered strong {
+  font-weight: 700;
+}
+
+.markdown-card-body__rendered a {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-color: var(--canvas-card-graph);
+  text-underline-offset: 2px;
+}
+
+.markdown-card-body__rendered blockquote {
+  padding-left: 0.75em;
+  border-left: 3px solid var(--canvas-card-graph);
+}
+
+.markdown-card-body__rendered :is(code, pre) {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.9em;
+}
+
+.markdown-card-body__rendered pre {
+  padding: 0.75em;
+  overflow: hidden;
+  background: color-mix(in srgb, currentcolor 8%, transparent);
+}
+
+/* A sibling overlay rather than a Button containing the rendered HTML: Markdown
+   may contain headings, lists and links, none of which belongs inside a native
+   button. The same shared primitive and one-activation structure as the Title
+   remain, without invalidating the rendered document. */
+.markdown-card-body__edit-control {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  color: var(--canvas-card-muted-color);
+  background: transparent;
+  cursor: default;
+}
+
+.markdown-card-body__edit-control:hover {
+  border-color: transparent;
+  background: color-mix(in srgb, var(--canvas-card-graph) 4%, transparent);
+}
+
+.markdown-card-body__edit-control:focus-visible {
+  outline-color: var(--canvas-card-graph);
+  outline-offset: -3px;
+}
+
+.markdown-card-body__edit-control svg {
+  box-sizing: content-box;
+  width: 14px;
+  height: 14px;
+  padding: 3px;
+  border: 1px solid color-mix(in srgb, var(--canvas-card-muted-color) 55%, transparent);
+  background: color-mix(in srgb, var(--canvas-card-face-active) 82%, transparent);
+  opacity: 0;
+}
+
+.markdown-card-body__edit-control:is(:hover, :focus-visible) svg {
+  opacity: 0.52;
+}
+
+.markdown-card-body--editing {
+  --markdown-source-content-inset: var(--markdown-card-content-gap);
+  --markdown-source-content-padding-top: calc(34px + 1rem);
+  --markdown-source-focus-outline: none;
+  --markdown-source-gutter-padding: 0 6px 0 4px;
+  --markdown-source-gutter-width: var(--markdown-card-gutter-width);
+  --markdown-source-line-number-font-size: 12px;
+}
+
+.markdown-card-body__shortcut-hint {
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline-end: 8px;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  height: 34px;
+  color: var(--canvas-card-muted-color);
+  font:
+    10px/14px ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    monospace;
+  letter-spacing: 0.02em;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.markdown-card-body--editing:focus-within .markdown-card-body__shortcut-hint {
+  opacity: 0.52;
+}
+
+/* While the caret is in, CodeMirror may scroll to keep it visible. The editor
+   exists only during that explicit writing gesture; at rest the rendered
+   Markdown clips and the wheel belongs to the canvas everywhere (ADR 0064). */
+.markdown-card-body__source.markdown-source-editor {
+  --markdown-source-scroll: hidden;
+
+  flex: 1;
+  min-height: 0;
+  /* `markdown-source-editor.css` sets `--foreground` on itself, which wins over
+     anything the surface inherits. A Card's body is the Card's ink, so this
+     hands the colour back to whatever mounted the body. */
+  color: inherit;
+  background: transparent;
+}
+
+.markdown-card-body--editing .markdown-card-body__source.markdown-source-editor {
+  --markdown-source-scroll: auto;
+}
+
+/* The frame the lazily-loaded editor arrives into, so the Card does not change
+   height as it lands. */
+.markdown-card-body__pending {
+  flex: 1;
+  min-height: 0;
+}

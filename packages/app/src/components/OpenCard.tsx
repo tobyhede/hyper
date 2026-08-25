@@ -16,12 +16,14 @@ import {
   AlertIcon,
   AlertTitle,
   Button,
+  CardRail,
   CardSearchCombobox,
   CloseIcon,
   Field,
   FieldError,
   FieldGroup,
   FieldLabel,
+  Input,
 } from '@project/ui';
 import type { MarkdownSourceEditorHandle } from '@project/ui/MarkdownSourceEditor';
 import { CardPane } from './CardPane';
@@ -156,6 +158,7 @@ export type OpenCardProps = {
  */
 function CardEditorShell({
   subjectTitle,
+  kind,
   graphColor,
   title,
   titleError,
@@ -169,6 +172,7 @@ function CardEditorShell({
   onCancel,
 }: {
   readonly subjectTitle: string;
+  readonly kind: Card['kind'];
   readonly graphColor: string;
   readonly title: string;
   readonly titleError: string | null;
@@ -204,46 +208,46 @@ function CardEditorShell({
         onSubmit={onSubmit}
         onKeyDown={submitShortcut}
       >
+        <CardRail kind={kind} graphColor={graphColor} className="card-editor__rail">
+          <Button
+            type="button"
+            variant="secondary"
+            size="icon"
+            className="card-editor__close"
+            aria-label="Close Card editor"
+            onClick={onCancel}
+          >
+            <CloseIcon />
+          </Button>
+        </CardRail>
         <FieldGroup className="card-editor__fields">
-          <header className="card-editor__rail">
-            <Field className="card-editor__title-field" data-invalid={titleError !== null}>
-              <FieldLabel className="sr-only" htmlFor="open-card-title">
-                Title
-              </FieldLabel>
-              <input
-                id="open-card-title"
-                className="card-editor__title"
-                aria-invalid={titleError !== null}
-                aria-describedby={titleError === null ? undefined : 'open-card-title-error'}
-                value={title}
-                {...paneInitialFocus(titleStartsFocused)}
-                onChange={(event) => onTitleChange(event.currentTarget.value)}
-                onKeyDown={(event) => {
-                  if (
-                    event.key !== 'Enter' ||
-                    event.metaKey ||
-                    event.ctrlKey ||
-                    onTitleEnter === undefined
-                  ) {
-                    return;
-                  }
-                  event.preventDefault();
-                  onTitleEnter();
-                }}
-              />
-              <FieldError id="open-card-title-error">{titleError}</FieldError>
-            </Field>
-            <Button
-              type="button"
-              variant="secondary"
-              size="icon"
-              className="card-editor__close"
-              aria-label="Close Card editor"
-              onClick={onCancel}
-            >
-              <CloseIcon />
-            </Button>
-          </header>
+          <Field className="card-editor__title-field" data-invalid={titleError !== null}>
+            <FieldLabel className="card-editor__label" htmlFor="open-card-title">
+              Title
+            </FieldLabel>
+            <Input
+              id="open-card-title"
+              className="card-editor__title"
+              aria-invalid={titleError !== null}
+              aria-describedby={titleError === null ? undefined : 'open-card-title-error'}
+              value={title}
+              {...paneInitialFocus(titleStartsFocused)}
+              onChange={(event) => onTitleChange(event.currentTarget.value)}
+              onKeyDown={(event) => {
+                if (
+                  event.key !== 'Enter' ||
+                  event.metaKey ||
+                  event.ctrlKey ||
+                  onTitleEnter === undefined
+                ) {
+                  return;
+                }
+                event.preventDefault();
+                onTitleEnter();
+              }}
+            />
+            <FieldError id="open-card-title-error">{titleError}</FieldError>
+          </Field>
           {children}
         </FieldGroup>
         {error !== null && (
@@ -343,6 +347,7 @@ function MarkdownCardEditor({
   return (
     <CardEditorShell
       subjectTitle={content.title}
+      kind="markdown"
       graphColor={graphColor}
       title={draft.title}
       titleError={titleError}
@@ -405,6 +410,7 @@ function AliasCardEditor({
   return (
     <CardEditorShell
       subjectTitle={alias.title}
+      kind="alias"
       graphColor={graphColor}
       title={title}
       titleError={titleError}
@@ -423,7 +429,7 @@ function AliasCardEditor({
         className="card-editor__body card-editor__alias-target"
         data-invalid={targetError !== null}
       >
-        <FieldLabel className="card-editor__alias-label" htmlFor="open-alias-target">
+        <FieldLabel className="card-editor__label" htmlFor="open-alias-target">
           Alias of
         </FieldLabel>
         <CardSearchCombobox

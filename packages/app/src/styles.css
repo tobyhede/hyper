@@ -116,6 +116,33 @@ body {
   width: var(--card-width);
 }
 
+/* An Expanded Card is whatever rect the Layout authored, so the node's own
+   subtree stops declaring the collapsed constant and fills the box React Flow
+   sized from `node.width`/`node.height` (ADR 0064). The declared width stays the
+   default because a Card is drawn before any layout resolves, and 100% of an
+   unsized wrapper is nothing. */
+.rf-card-node__inner[data-expanded='true'] {
+  width: 100%;
+  height: 100%;
+}
+
+/* React Flow's own `NodeResizer`, in the Card's palette. Drawn through the two
+   `className` props it publishes rather than by naming its internal selectors,
+   and here rather than beside `CanvasCard` because the resizer is the
+   framework's — the Card being resized knows nothing about it. */
+.rf-card-node__resize-line {
+  border-color: color-mix(in srgb, var(--canvas-card-ink-color) 40%, transparent);
+  border-width: 1px;
+}
+
+.rf-card-node__resize-handle {
+  width: 10px;
+  height: 10px;
+  background: var(--canvas-card-face-active);
+  border: 2px solid var(--canvas-card-ink-color);
+  border-radius: 0;
+}
+
 .new-card-preview {
   position: absolute;
   opacity: 0.55;

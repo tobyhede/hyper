@@ -308,3 +308,74 @@ describe('CanvasCard title editor', () => {
     expect(onCompleteTitleEdit).toHaveBeenLastCalledWith('Renamed again');
   });
 });
+
+describe('CanvasCard Expanded content slot', () => {
+  it('draws nothing below its Title, and says so, until a caller fills the slot', () => {
+    render(
+      <CanvasCard
+        front={{ kind: 'markdown' }}
+        state="rest"
+        title="Strategies"
+        graphColor="#ffc53d"
+      />,
+    );
+
+    expect(screen.getByRole('article', { name: 'Strategies' })).toHaveAttribute(
+      'data-expanded',
+      'false',
+    );
+  });
+
+  it('draws the slot below its Title and reports itself Expanded when one is supplied', () => {
+    render(
+      <CanvasCard
+        front={{ kind: 'markdown' }}
+        state="rest"
+        title="Strategies"
+        graphColor="#ffc53d"
+        content={<p>the Card’s own source</p>}
+      />,
+    );
+
+    const card = screen.getByRole('article', { name: 'Strategies' });
+    // The slot's presence *is* the Expanded state — one fact, so a Card cannot
+    // be sized as Expanded while drawing nothing (ADR 0064).
+    expect(card).toHaveAttribute('data-expanded', 'true');
+    expect(screen.getByText('the Card’s own source')).toBeVisible();
+  });
+
+  it('keeps the Alias Target line above the slot, as one more thing the Card front draws', () => {
+    render(
+      <CanvasCard
+        front={{ kind: 'alias', aliasOf: 'Strategies' }}
+        state="rest"
+        title="Strategy overview"
+        graphColor="#35d6c3"
+        content={<p>a body</p>}
+      />,
+    );
+
+    expect(screen.getByTestId('alias-marker')).toHaveTextContent('Strategies');
+    expect(screen.getByText('a body')).toBeVisible();
+  });
+
+  it('holds the slot open while the Title is being renamed', () => {
+    render(
+      <CanvasCard
+        front={{ kind: 'markdown' }}
+        state="editing"
+        title="Strategies"
+        graphColor="#ffc53d"
+        content={<p>the Card’s own source</p>}
+        onCompleteTitleEdit={() => null}
+        onCancelTitleEdit={vi.fn()}
+        onReturnFocus={vi.fn()}
+      />,
+    );
+
+    // Expansion is what the Layout authored and the caret is a gesture, so the
+    // two are independent rather than exclusive (ADR 0064).
+    expect(screen.getByRole('textbox', { name: 'Card title' })).toBeVisible();
+    expect(screen.getByText('the Card’s own source')).toBeVisible();
+  });
+});

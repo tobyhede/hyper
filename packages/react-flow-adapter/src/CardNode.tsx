@@ -1,6 +1,13 @@
 import { useRef } from 'react';
-import { Handle, Position, useConnection, type NodeProps } from '@xyflow/react';
-import { CanvasCard, CardContent, type CanvasCardFront, type CanvasCardProps } from '@project/ui';
+import { Handle, NodeResizer, Position, useConnection, type NodeProps } from '@xyflow/react';
+import {
+  CanvasCard,
+  CardContent,
+  MarkdownCardBody,
+  type CanvasCardFront,
+  type CanvasCardProps,
+  type MarkdownCardBodyProps,
+} from '@project/ui';
 import type { CardFlowNode, CardHandle } from './projection';
 import { AUTHORING_HANDLE_DIAMETER, GRAPH_PORT_DIAMETER } from './authoring-handle';
 
@@ -174,6 +181,35 @@ export function CardNode({ data, selected, dragging, isConnectable }: NodeProps<
      the composition did not supply. */
   const titleEditor = data.titleEditor;
 
+  /*
+   * What an Expanded Card draws below its title (ADR 0064).
+   *
+   * **Not a fourth arm of the branch below.** It is a prop handed to whichever
+   * arm the *title* state selects, so a Card can be Expanded while it is being
+   * renamed — expansion is what the Layout authored and the caret is a gesture,
+   * and a branch would have made them exclusive. It is not `showContent`
+   * either: both presenting and expanding draw through the one rendered-Markdown
+   * seam, while the Expanded Card swaps that display for source only during an
+   * edit.
+   *
+   * The Alias kind has no Expanded front yet, so it answers `undefined` and the
+   * Card draws its collapsed self. `CanvasCard` reads the slot's presence as the
+   * Expanded state, so this is also what says whether the Card fills its box —
+   * one fact, not two that can disagree.
+   */
+  const resize = data.resize;
+  const bodyProps: Mutable<Pick<MarkdownCardBodyProps, 'onBeginEdit' | 'editor'>> = {};
+  if (data.onBeginBodyEditing !== undefined) bodyProps.onBeginEdit = data.onBeginBodyEditing;
+  if (data.bodyEditor !== undefined) bodyProps.editor = data.bodyEditor;
+  const content =
+    data.expanded === true && data.kind === 'markdown' ? (
+      <MarkdownCardBody
+        source={data.body ?? ''}
+        ariaLabel={`Markdown source of ${data.title}`}
+        {...bodyProps}
+      />
+    ) : undefined;
+
   const onReturnFocus = () => {
     inner.current?.closest<HTMLElement>('.react-flow__node')?.focus();
   };
@@ -186,7 +222,34 @@ export function CardNode({ data, selected, dragging, isConnectable }: NodeProps<
       data-selected={visuallySelected}
       data-connection-in-progress={connectionInProgress}
       data-connection-seeking={seeking ?? 'none'}
+      // The wrapper React Flow sizes from `node.width`/`node.height` is this
+      // element's parent, so an Expanded Card only reaches its own rect if this
+      // one stops declaring the collapsed constant. Read by `styles.css`.
+      data-expanded={content !== undefined}
     >
+      {/*
+        React Flow's own resizer, on an Expanded Card the author has selected.
+        An Expanded Card is whatever box the author drew — there is no ratio on
+        it, because the collapsed Card is what keeps the silhouette that predicts
+        what an audience sees (ADR 0064).
+
+        Rendered *before* the Card, which is not cosmetic: `canvas-card.css`
+        keeps the Card's hover treatment alive while the pointer is on an
+        authoring handle through `:has(~ …__authoring-handle:hover)`, and `~`
+        reaches following siblings only. Anything inserted between the Card and
+        those handles would be invisible to that rule; anything before the Card
+        is harmless to it.
+      */}
+      {content !== undefined && resize !== undefined && (
+        <NodeResizer
+          isVisible={visuallySelected}
+          minWidth={resize.minWidth}
+          minHeight={resize.minHeight}
+          lineClassName="rf-card-node__resize-line"
+          handleClassName="rf-card-node__resize-handle"
+          onResize={(_event, next) => resize.onResize({ width: next.width, height: next.height })}
+        />
+      )}
       {data.targetHandles.map((handle) => renderHandle(handle, 'target'))}
       {data.showContent ? (
         <div className="rf-card-node__content">
@@ -198,6 +261,7 @@ export function CardNode({ data, selected, dragging, isConnectable }: NodeProps<
           title={data.title}
           graphColor={data.activeGraphColor}
           state="editing"
+          content={content}
           onCompleteTitleEdit={titleEditor.onComplete}
           onCancelTitleEdit={titleEditor.onCancel}
           onReturnFocus={onReturnFocus}
@@ -209,6 +273,7 @@ export function CardNode({ data, selected, dragging, isConnectable }: NodeProps<
           title={data.title}
           graphColor={data.activeGraphColor}
           state={dragging ? 'dragging' : visuallySelected ? 'selected' : 'rest'}
+          content={content}
           {...canvasCardOptionalProps}
         />
       )}
