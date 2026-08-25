@@ -171,7 +171,7 @@ test(
     await expect(actions).toHaveCSS('opacity', '0');
     await card.hover();
     await expect(actions).toHaveCSS('opacity', '1');
-    const edit = card.getByRole('button', { name: 'Edit Card A' });
+    const edit = card.getByRole('button', { name: 'Open Card A' });
     // The affordance draws a glyph, so nothing about its own content keeps it in
     // shape or in place. Sized square in CSS and parked in the corner, clear of
     // the title — a name is what a screen reader gets, and the box is all a
@@ -1812,91 +1812,6 @@ test('an Alt-drop released over a Card body creates no Card', async ({ page }) =
 
   await quiescent(page);
   await expect(page.locator('.react-flow__node')).toHaveCount(FIXTURE_CARD_COUNT);
-  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '0');
-});
-
-/**
- * The keyboard's way into an Edge: a real control on the Card, then a picker.
- *
- * The four spatial handles are drag affordances and reach no keyboard author, so
- * a Card that can be connected from carries one tab stop that opens a target
- * list over this Layout's Cards.
- */
-test('a Card offers a keyboard Connect control that authors an Edge', async ({ page }) => {
-  await page.goto('/');
-  const source = nodeByTitle(page, 'A').first();
-  await expect(source).toBeVisible();
-  await expect(page.locator('.react-flow__edge-path').first()).toHaveAttribute('d', /L/);
-  await selectCanvas(page, 'Collection 1');
-  await settled(page);
-  const drawn = await page.locator('.react-flow__edge').count();
-
-  await source.hover();
-  await source.getByRole('button', { name: 'Connect from A' }).click();
-  await expect(page.getByTestId('connect-target-picker')).toBeVisible();
-  await page.getByRole('combobox', { name: 'Connect to' }).press('ArrowDown');
-  await page.locator('[role="option"]:not([data-disabled])').last().click();
-
-  await expect(page.locator('.react-flow__edge')).toHaveCount(drawn + 1);
-  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
-  await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
-  await expect(page.getByTestId('connect-target-picker')).toHaveCount(0);
-});
-
-/**
- * The same two-stage Escape rule the Alias pane keeps, on the connect picker:
- * the first press belongs to the open list, and only the second cancels the
- * connection. An author who opens the list to look must be able to back out of
- * it without losing the gesture.
- *
- * **Only a browser answers this one.** Two of the facts it turns on are the
- * host's rather than the app's. The press goes wherever focus really is, not to
- * an element a test names — so the second stage exists only if closing the list
- * really does hand focus back inside the picker. And Base UI closes from a
- * document listener whose React flush lands in the microtask checkpoint
- * *between* listeners, which unmounts the list before React's own delegated
- * listener can dispatch the press anywhere; jsdom performs no such checkpoint,
- * dispatching a whole event in one JS frame, so it reaches the two stages by a
- * different route. `edge-authoring-react.test.tsx` pins the handler's rule; this
- * pins what the author gets.
- */
-test('Escape closes the connect picker’s list before it cancels the connection', async ({
-  page,
-}) => {
-  await page.goto('/');
-  const source = nodeByTitle(page, 'A').first();
-  await expect(source).toBeVisible();
-  await expect(page.locator('.react-flow__edge-path').first()).toHaveAttribute('d', /L/);
-  await settled(page);
-  const drawn = await page.locator('.react-flow__edge').count();
-
-  await source.hover();
-  await source.getByRole('button', { name: 'Connect from A' }).click();
-  const picker = page.getByTestId('connect-target-picker');
-  await expect(picker).toBeVisible();
-  const trigger = page.getByRole('combobox', { name: 'Connect to' });
-  await trigger.press('ArrowDown');
-  await expect(trigger).toHaveAttribute('aria-expanded', 'true');
-  await expect(page.getByRole('listbox', { name: 'Connect to' })).toBeVisible();
-
-  await page.keyboard.press('Escape');
-
-  await expect(page.getByRole('listbox', { name: 'Connect to' })).toHaveCount(0);
-  await expect(trigger).toHaveAttribute('aria-expanded', 'false');
-  await expect(picker).toBeVisible();
-  // **The handoff, asserted rather than assumed.** Base UI restores focus from
-  // a `queueMicrotask` in the focus manager's unmount, so for a moment after
-  // the list goes there is nothing focused inside the picker and a press would
-  // reach no handler at all. A human never presses that fast; a test does.
-  await expect(trigger).toBeFocused();
-
-  await page.keyboard.press('Escape');
-
-  await expect(picker).toHaveCount(0);
-  // Cancelling authors nothing — no Edge, and no conversion of the View the
-  // fixture opens in, which is what a commit here would have to have made first.
-  await quiescent(page);
-  await expect(page.locator('.react-flow__edge')).toHaveCount(drawn);
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '0');
 });
 

@@ -126,19 +126,20 @@ test(
 
     const markdown = page.getByRole('article', { name: 'Strategies' });
     const actions = markdown.getByTestId('canvas-card-actions');
-    const connect = page.getByRole('button', { name: 'Connect from Strategies' });
+    const open = page.getByRole('button', { name: 'Open Card Strategies' });
     // Hidden at rest and revealed on pointer hover, the same rule the actions
     // rail draws by everywhere it appears.
     await expect(actions).toHaveCSS('opacity', '0');
     await markdown.hover();
     await expect(actions).toHaveCSS('opacity', '1');
-    await expect(connect).toBeVisible();
+    await expect(open).toBeVisible();
 
     // Reachable and activatable from the keyboard alone, independent of hover.
-    await connect.focus();
-    await expect(connect).toBeFocused();
-    await connect.press('Enter');
-    await expect(page.getByText('Connected from Strategies.')).toBeVisible();
+    await open.focus();
+    await expect(open).toBeFocused();
+    await open.press('Enter');
+    await expect(page.getByText('Strategies is open.')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Close Card Strategies' })).toBeVisible();
   },
 );
 

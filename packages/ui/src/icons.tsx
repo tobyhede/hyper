@@ -1,11 +1,12 @@
 import {
-  ArrowRightFromLine,
   Check,
   ChevronDown,
   CircleAlert,
   CornerDownRight,
   FileText,
   Grid2x2,
+  Maximize2,
+  Minimize2,
   Network,
   PanelsTopLeft,
   Pencil,
@@ -39,6 +40,12 @@ export const PresentIcon = ({ color }: { color: string }) => <Play color={color}
 /** Edit the content of a Markdown Card. */
 export const EditIcon = () => <Pencil size={14} />;
 
+/** Open a Card in place. */
+export const OpenCardIcon = () => <Maximize2 size={14} />;
+
+/** Close a Card that is open in place. */
+export const CloseCardIcon = () => <Minimize2 size={14} />;
+
 /** The shared affordance for a trigger that opens a list or menu. */
 export const ChevronDownIcon = () => <ChevronDown size={14} />;
 
@@ -47,9 +54,6 @@ export const PlusIcon = () => <Plus size={14} />;
 
 /** The Card kind that points at another Card's content (ADR 0009). */
 export const AliasIcon = ({ size = 14 }: { size?: number }) => <CornerDownRight size={size} />;
-
-/** Start a Graph connection from the Card that carries the control. */
-export const ConnectIcon = ({ size = 12 }: { size?: number }) => <ArrowRightFromLine size={size} />;
 
 /** The Card kind that owns the Markdown it draws. */
 export const MarkdownIcon = ({ size = 14 }: { size?: number }) => <FileText size={size} />;

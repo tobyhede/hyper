@@ -225,7 +225,7 @@ describe('presenting after a conversion', () => {
 
 /** Open Card A, which is to say edit it (ADR 0037). */
 async function openEditor(): Promise<void> {
-  fireEvent.click(await screen.findByRole('button', { name: 'Edit Card A' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Open Card A' }));
   await screen.findByTestId('open-card');
   await screen.findByRole('textbox', { name: 'Markdown source' });
 }
@@ -260,7 +260,7 @@ describe('authoring an opened Card', () => {
     });
     const session = mount(aliased);
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Edit Card A again' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Open Card A again' }));
     await screen.findByTestId('open-card');
     expect(screen.getByRole('textbox', { name: 'Title' })).toHaveValue('A again');
     expect(screen.queryByRole('textbox', { name: /Markdown source/ })).not.toBeInTheDocument();
@@ -286,7 +286,7 @@ describe('authoring an opened Card', () => {
   it('updates shared content only when its Target is opened explicitly', async () => {
     const session = mount(twiceAliased);
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Edit Card A' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Open Card A' }));
     await screen.findByTestId('open-card');
     await screen.findByRole('textbox', { name: 'Markdown source' });
     replaceMarkdownSource('Written once, shown everywhere');
@@ -305,14 +305,14 @@ describe('authoring an opened Card', () => {
   it('opens a second Alias on its own metadata, not the draft abandoned in the first', async () => {
     const session = mount(twiceAliased);
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Edit Card A again' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Open Card A again' }));
     await screen.findByTestId('open-card');
     fireEvent.change(screen.getByRole('textbox', { name: 'Title' }), {
       target: { value: 'Never completed' },
     });
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Edit Card A once more' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Open Card A once more' }));
     await screen.findByTestId('open-card');
 
     expect(screen.getByRole('textbox', { name: 'Title' })).toHaveValue('A once more');
@@ -354,7 +354,7 @@ describe('authoring an opened Card', () => {
     fireEvent.click(screen.getByTestId('present-button'));
 
     expect(screen.queryByTestId('open-card')).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /^Edit Card/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Open Card/ })).not.toBeInTheDocument();
     await settled(session);
   });
 
@@ -435,12 +435,12 @@ describe('the Card affordance on the graph', () => {
   it('opens the Card on its editable fields, with no reading state in front', async () => {
     const session = mount();
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Edit Card A' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Open Card A' }));
     await screen.findByTestId('open-card');
 
     expect(screen.getByRole('textbox', { name: 'Title' })).toHaveValue('A');
     expect(screen.getByRole('textbox', { name: 'Markdown source' })).toHaveTextContent('A source');
-    expect(screen.queryByRole('button', { name: /^Edit Card/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Open Card/ })).not.toBeInTheDocument();
     await settled(session);
   });
 

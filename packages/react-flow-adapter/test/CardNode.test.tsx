@@ -123,9 +123,7 @@ interface Overrides {
   aliasOf?: string;
   titleEditingEnabled?: boolean;
   cardEditingEnabled?: boolean;
-  connectingEnabled?: boolean;
   titleEditor?: CardTitleEditor;
-  onBeginConnect?: () => void;
   onEditCard?: () => void;
   onBeginTitleEditing?: () => void;
   expanded?: boolean;
@@ -146,9 +144,7 @@ function props({
   aliasOf,
   titleEditingEnabled = false,
   cardEditingEnabled = false,
-  connectingEnabled = false,
   titleEditor,
-  onBeginConnect,
   onEditCard,
   onBeginTitleEditing,
   expanded,
@@ -165,7 +161,6 @@ function props({
     kind,
     titleEditingEnabled,
     cardEditingEnabled,
-    connectingEnabled,
     active: false,
     selectedForAuthoring: false,
     showContent: false,
@@ -176,7 +171,6 @@ function props({
     targetHandles,
   };
   if (aliasOf !== undefined) data.aliasOf = aliasOf;
-  if (onBeginConnect !== undefined) data.onBeginConnect = onBeginConnect;
   if (onEditCard !== undefined) data.onEditCard = onEditCard;
   if (onBeginTitleEditing !== undefined) data.onBeginTitleEditing = onBeginTitleEditing;
   if (titleEditor !== undefined) data.titleEditor = titleEditor;
@@ -261,19 +255,7 @@ describe('CardNode canvas Card state adapter', () => {
   });
 });
 
-describe('CardNode Connect and Edit authoring', () => {
-  it('offers Connect only once the domain flag enables it', () => {
-    const onBeginConnect = vi.fn();
-    const { rerender } = render(
-      <CardNode {...props({ selected: true, connectingEnabled: false, onBeginConnect })} />,
-    );
-    expect(screen.queryByRole('button', { name: 'Connect from A' })).not.toBeInTheDocument();
-
-    rerender(<CardNode {...props({ selected: true, connectingEnabled: true, onBeginConnect })} />);
-    screen.getByRole('button', { name: 'Connect from A' }).click();
-    expect(onBeginConnect).toHaveBeenCalledOnce();
-  });
-
+describe('CardNode Open authoring', () => {
   /**
    * The pencil edits the Card, not one field of it — it opens the Markdown
    * surface. Renaming is the title's own gesture and `F2`.
@@ -293,7 +275,7 @@ describe('CardNode Connect and Edit authoring', () => {
       />,
     );
 
-    screen.getByRole('button', { name: 'Edit Card A' }).click();
+    screen.getByRole('button', { name: 'Open Card A' }).click();
 
     expect(onEditCard).toHaveBeenCalledOnce();
     expect(onBeginTitleEditing).not.toHaveBeenCalled();
@@ -302,7 +284,7 @@ describe('CardNode Connect and Edit authoring', () => {
   it('offers no affordance on a Card that owns no content to edit', () => {
     render(<CardNode {...props({ selected: true, titleEditingEnabled: true })} />);
 
-    expect(screen.queryByRole('button', { name: /^Edit Card/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Open Card/ })).not.toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'A' })).toBeVisible();
   });
 });
@@ -315,16 +297,10 @@ describe('CardNode Connect and Edit authoring', () => {
  * and the adapter must not manufacture one on its behalf.
  */
 describe('CardNode withholds a control the composition supplied no operation for', () => {
-  it('draws no Connect control for a flag raised over a missing operation', () => {
-    render(<CardNode {...props({ selected: true, connectingEnabled: true })} />);
-
-    expect(screen.queryByRole('button', { name: 'Connect from A' })).not.toBeInTheDocument();
-  });
-
   it('draws no Edit control for a flag raised over a missing operation', () => {
     render(<CardNode {...props({ selected: true, cardEditingEnabled: true })} />);
 
-    expect(screen.queryByRole('button', { name: /^Edit Card/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Open Card/ })).not.toBeInTheDocument();
   });
 
   it('leaves the title unrenameable for a flag raised over a missing operation', () => {

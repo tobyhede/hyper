@@ -58,31 +58,46 @@ describe('CanvasCard kind and interaction state', () => {
   });
 });
 
-describe('CanvasCard Connect and Edit operations', () => {
+describe('CanvasCard Open and Close operation', () => {
   it('offers no action when neither operation is supplied', () => {
     render(
       <CanvasCard front={{ kind: 'markdown' }} state="selected" title="A" graphColor="#ffc53d" />,
     );
 
-    expect(screen.queryByRole('button', { name: /^Connect from/ })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /^Edit Card/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Card A$/ })).not.toBeInTheDocument();
   });
 
-  it('offers exactly the operation supplied, with no separate enabled flag', () => {
-    const onConnect = vi.fn();
-    render(
+  it('names and draws the same working operation for each open state', () => {
+    const onOpenChange = vi.fn();
+    const { rerender } = render(
       <CanvasCard
         front={{ kind: 'markdown' }}
         state="selected"
         title="A"
         graphColor="#ffc53d"
-        onConnect={onConnect}
+        onOpenChange={onOpenChange}
       />,
     );
 
-    screen.getByRole('button', { name: 'Connect from A' }).click();
-    expect(onConnect).toHaveBeenCalledOnce();
-    expect(screen.queryByRole('button', { name: /^Edit Card/ })).not.toBeInTheDocument();
+    const open = screen.getByRole('button', { name: 'Open Card A' });
+    expect(open.querySelector('svg')).toHaveClass('lucide-maximize-2');
+    open.click();
+    expect(onOpenChange).toHaveBeenCalledWith(true);
+
+    rerender(
+      <CanvasCard
+        front={{ kind: 'markdown' }}
+        state="selected"
+        title="A"
+        graphColor="#ffc53d"
+        content={<p>Markdown</p>}
+        onOpenChange={onOpenChange}
+      />,
+    );
+    const close = screen.getByRole('button', { name: 'Close Card A' });
+    expect(close.querySelector('svg')).toHaveClass('lucide-minimize-2');
+    close.click();
+    expect(onOpenChange).toHaveBeenLastCalledWith(false);
   });
 
   it('hides both actions while the title is being edited', () => {
@@ -92,16 +107,14 @@ describe('CanvasCard Connect and Edit operations', () => {
         state="editing"
         title="A"
         graphColor="#ffc53d"
-        onConnect={() => undefined}
-        onEdit={() => undefined}
+        onOpenChange={() => undefined}
         onCompleteTitleEdit={() => null}
         onCancelTitleEdit={() => undefined}
         onReturnFocus={() => undefined}
       />,
     );
 
-    expect(screen.queryByRole('button', { name: /^Connect from/ })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /^Edit Card/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Card A$/ })).not.toBeInTheDocument();
   });
 
   it('hides both actions while dragging', () => {
@@ -111,13 +124,11 @@ describe('CanvasCard Connect and Edit operations', () => {
         state="dragging"
         title="A"
         graphColor="#ffc53d"
-        onConnect={() => undefined}
-        onEdit={() => undefined}
+        onOpenChange={() => undefined}
       />,
     );
 
-    expect(screen.queryByRole('button', { name: /^Connect from/ })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /^Edit Card/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Card A$/ })).not.toBeInTheDocument();
   });
 });
 

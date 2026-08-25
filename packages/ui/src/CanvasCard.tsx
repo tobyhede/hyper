@@ -2,7 +2,7 @@ import { useEffect, useId, useRef, useState, type CSSProperties, type ReactNode 
 import { Button } from './Button';
 import { CardRail } from './CardRail';
 import { Card, CardContent, CardTitle } from './components/card';
-import { ConnectIcon, EditIcon } from './icons';
+import { CloseCardIcon, OpenCardIcon } from './icons';
 import './canvas-card.css';
 
 /**
@@ -44,10 +44,8 @@ interface CanvasCardCommonProps {
   readonly content?: ReactNode;
   /** Present only when activating the displayed Title may begin a rename. */
   readonly onBeginTitleEdit?: () => void;
-  /** Present only when this Card may be connected from. */
-  readonly onConnect?: () => void;
-  /** Present only when this Card owns content or metadata to edit. */
-  readonly onEdit?: () => void;
+  /** Toggle this Card between its collapsed and Expanded states. */
+  readonly onOpenChange?: (open: boolean) => void;
 }
 
 /**
@@ -90,11 +88,8 @@ type CanvasCardStyle = CSSProperties & { readonly '--canvas-card-graph': string 
  * own visual treatment lives in `canvas-card.css`, colocated with this module.
  */
 export function CanvasCard(props: CanvasCardProps) {
-  const { front, title, graphColor, content, onBeginTitleEdit, onConnect, onEdit, state } = props;
-  const showActions =
-    state !== 'dragging' &&
-    state !== 'editing' &&
-    (onConnect !== undefined || onEdit !== undefined);
+  const { front, title, graphColor, content, onBeginTitleEdit, onOpenChange, state } = props;
+  const showActions = state !== 'dragging' && state !== 'editing' && onOpenChange !== undefined;
   const style: CanvasCardStyle = { '--canvas-card-graph': graphColor };
 
   return (
@@ -107,48 +102,29 @@ export function CanvasCard(props: CanvasCardProps) {
       data-state={state}
       // Read by `canvas-card.css` for the two things Expanding changes about
       // the Card itself: it fills the box the Layout gave it rather than the
-      // collapsed constant, and its Title moves to the top of that box because
-      // there is now something under it. Derived from the slot, so there is one
-      // fact here and not two that can disagree.
+      // collapsed constant, and its content fills the space above the Title.
+      // Derived from the slot, so there is one fact here and not two that can
+      // disagree.
       data-expanded={content !== undefined}
       style={style}
     >
       <CardRail kind={front.kind} graphColor={graphColor} className="canvas-card__rail">
         {showActions && (
           <div className="canvas-card__actions" data-testid="canvas-card-actions">
-            {onConnect !== undefined && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="card__connect nodrag nopan"
-                data-testid="connect-from-card"
-                aria-label={`Connect from ${title}`}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  onConnect();
-                }}
-                onPointerDown={(event) => event.stopPropagation()}
-                onKeyDown={(event) => event.stopPropagation()}
-              >
-                <ConnectIcon />
-              </Button>
-            )}
-            {onEdit !== undefined && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="card__edit nodrag nopan"
-                aria-label={`Edit Card ${title}`}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  onEdit();
-                }}
-                onPointerDown={(event) => event.stopPropagation()}
-                onKeyDown={(event) => event.stopPropagation()}
-              >
-                <EditIcon />
-              </Button>
-            )}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="card__open-change nodrag nopan"
+              aria-label={`${content === undefined ? 'Open' : 'Close'} Card ${title}`}
+              onClick={(event) => {
+                event.stopPropagation();
+                onOpenChange(content === undefined);
+              }}
+              onPointerDown={(event) => event.stopPropagation()}
+              onKeyDown={(event) => event.stopPropagation()}
+            >
+              {content === undefined ? <OpenCardIcon /> : <CloseCardIcon />}
+            </Button>
           </div>
         )}
       </CardRail>

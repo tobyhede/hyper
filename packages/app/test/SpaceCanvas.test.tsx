@@ -201,7 +201,7 @@ describe('a title Edit the graph refused', () => {
   it('leaves the rest of the graph working', () => {
     const { openCard } = refuseTitleEdit('blur');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Edit Card B' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Open Card B' }));
 
     expect(openCard).toHaveBeenCalledWith(OTHER_CARD_ID);
   });
@@ -227,7 +227,7 @@ describe('opening a Card', () => {
   it('happens from the Card affordance', () => {
     const { openCard } = mountGraph();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Edit Card A' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Open Card A' }));
 
     expect(openCard).toHaveBeenCalledWith(CARD_ID);
   });
@@ -254,7 +254,7 @@ describe('F2 while a control has focus', () => {
   it('does not rename the selected Card from a control on a different Card', () => {
     mountGraph([cardNode('A', CARD_ID, true), cardNode('B', OTHER_CARD_ID)]);
 
-    fireEvent.keyDown(screen.getByRole('button', { name: 'Edit Card B' }), { key: 'F2' });
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Open Card B' }), { key: 'F2' });
 
     expect(screen.queryByRole('textbox', { name: 'Card title' })).not.toBeInTheDocument();
   });
@@ -286,7 +286,7 @@ describe.each([
 ] as const)('%s on the focused Card affordance', (_name, key) => {
   it("does not open the Card twice — the keydown is the button's, not the graph's", () => {
     const { openCard } = mountGraph();
-    const button = screen.getByRole('button', { name: 'Edit Card A' });
+    const button = screen.getByRole('button', { name: 'Open Card A' });
     button.focus();
 
     fireEvent.keyDown(button, { key });
@@ -296,7 +296,7 @@ describe.each([
 
   it('opens the Card', () => {
     const { openCard } = mountGraph();
-    const button = screen.getByRole('button', { name: 'Edit Card A' });
+    const button = screen.getByRole('button', { name: 'Open Card A' });
     button.focus();
 
     fireEvent.keyDown(button, { key });
@@ -310,7 +310,7 @@ describe('the Card affordance', () => {
   it('opens the Card rather than renaming its title on the graph', () => {
     const { openCard } = mountGraph();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Edit Card A' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Open Card A' }));
 
     expect(openCard).toHaveBeenCalledWith(CARD_ID);
     expect(screen.queryByRole('textbox', { name: 'Card title' })).not.toBeInTheDocument();
@@ -341,7 +341,7 @@ describe('withdrawing title editing', () => {
 
     setTitleEditing(false);
     setTitleEditing(true);
-    fireEvent.click(screen.getByRole('button', { name: 'Edit Card A' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Open Card A' }));
 
     expect(openCard).toHaveBeenCalledWith(CARD_ID);
   });

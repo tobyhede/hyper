@@ -101,7 +101,7 @@
   pointer-events: auto;
 }
 
-.canvas-card :is(.card__connect, .card__edit) {
+.canvas-card .card__open-change {
   width: 22px;
   height: 22px;
   border: 2px solid var(--canvas-card-ink);
@@ -114,13 +114,13 @@
     background-color 100ms ease;
 }
 
-.canvas-card :is(.card__connect, .card__edit):hover {
+.canvas-card .card__open-change:hover {
   border-color: var(--canvas-card-ink);
   background: var(--canvas-card-ink);
   color: var(--canvas-card-graph);
 }
 
-.canvas-card :is(.card__connect, .card__edit):focus-visible {
+.canvas-card .card__open-change:focus-visible {
   outline: 2px solid var(--canvas-card-ink);
   outline-offset: 2px;
 }
@@ -206,10 +206,10 @@
    size because a Card is also mounted outside a sized box — the component
    stories do exactly that — and 100% of an auto-height parent is nothing.
 
-   The Title moves to the top because something now sits under it. Collapsed,
-   `justify-content: flex-end` rests the Title on the Card's floor; Expanded,
-   the body shrinks to the Title it holds and the writing surface takes the
-   rest. */
+   Expansion adds the writing surface above the Title rather than moving the
+   Title away from the Card's floor. The DOM keeps the shared Title before the
+   kind-owned content; flex order changes only their visual placement in this
+   Expanded state. */
 .canvas-card[data-expanded='true'] {
   gap: 0;
   width: 100%;
@@ -217,17 +217,17 @@
 }
 
 .canvas-card[data-expanded='true'] .canvas-card__body {
+  order: 2;
   flex: none;
-  justify-content: flex-start;
-  padding: 10px 12px;
-  border-bottom: 1px solid color-mix(in srgb, var(--canvas-card-ink-color) 22%, transparent);
 }
 
 .canvas-card__content {
+  order: 1;
   display: flex;
   flex: 1;
   min-height: 0;
   flex-direction: column;
+  border-bottom: 2px solid var(--canvas-card-ink);
   /* The Card's ink, not the ambient `--foreground`. A Card's face is its own
      paper and a body drawn in the surrounding theme's text colour is the one
      part of an Expanded Card that would not look like the Card. */

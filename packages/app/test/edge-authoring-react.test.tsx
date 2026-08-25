@@ -551,8 +551,8 @@ describe("React Flow's document-level delete key", () => {
 });
 
 /**
- * A pane over the graph withdraws the Edge lifecycle exactly as it withdraws the
- * Card controls — one authoring surface at a time.
+ * A pane over the graph withdraws the Edge lifecycle — one authoring surface at
+ * a time.
  *
  * `titleEditingEnabled` is named for the first control it took away and means
  * "no modal pane covers the graph": `App` passes
@@ -562,28 +562,25 @@ describe("React Flow's document-level delete key", () => {
  * *not* to Edge authoring, so the two disagreed about when the graph is
  * authorable.
  *
- * Hidden control, live gesture is the asymmetry that matters, and the delete key
- * is where it bites. `useGlobalKeyHandler` subscribes `deleteKeyCode` on
+ * A hidden live gesture is the asymmetry that matters, and the delete key is
+ * where it bites. `useGlobalKeyHandler` subscribes `deleteKeyCode` on
  * `document`, and its one exclusion, `isInputDOMNode`, covers
  * `INPUT`/`SELECT`/`TEXTAREA`, `contenteditable` and `.nokey` — a pane's `Done`
  * and `Cancel` are `Button`s with none of those, so a `Backspace` aimed at the
  * dialog the author is working in deleted the Edge selected behind it.
  */
 describe('a pane covering the graph', () => {
-  it('withdraws the Edge surface with the Connect control, not after it', () => {
+  it('withdraws the Edge surface while the pane covers it', () => {
     mountCanvas(null, { covered: true });
 
-    expect(screen.queryAllByRole('button', { name: /^Connect from/ })).toEqual([]);
     expect(edgeElement(`${GRAPH_ID}::0`)).not.toHaveAttribute('tabindex');
   });
 
-  it('offers both again once the pane closes', () => {
+  it('offers the Edge surface again once the pane closes', () => {
     const { setCovered } = mountCanvas(null, { covered: true });
-    expect(screen.queryAllByRole('button', { name: /^Connect from/ })).toEqual([]);
 
     setCovered(false);
 
-    expect(screen.queryAllByRole('button', { name: /^Connect from/ })).not.toEqual([]);
     expect(edgeElement(`${GRAPH_ID}::0`)).toHaveAttribute('tabindex', '0');
   });
 

@@ -334,7 +334,6 @@ export function SpaceCanvas({
   // The operations, not the surface holding them: `useEdgeAuthoring` answers a
   // fresh object literal per render while each of these is stable, and a hook
   // that depended on the object would be rebuilt every time.
-  const beginConnectFrom = edgeSurface.beginConnectFrom;
   const deleteEdges = edgeSurface.deleteEdges;
   const editableNodes = useMemo(
     () =>
@@ -348,8 +347,6 @@ export function SpaceCanvas({
           // it was offered without one.
           titleEditingEnabled: canAuthorOnCanvas,
           cardEditingEnabled: canAuthorOnCanvas && editableCardIds.has(node.id),
-          connectingEnabled: canAuthorOnCanvas,
-          onBeginConnect: () => beginConnectFrom(node.id),
           onEditCard: () => onOpenCard(node.id),
           onBeginTitleEditing: () => setEditingTitleCardId(node.id),
         };
@@ -374,7 +371,6 @@ export function SpaceCanvas({
       editingTitleCardId,
       onCompleteCardTitle,
       onOpenCard,
-      beginConnectFrom,
     ],
   );
 

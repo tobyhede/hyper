@@ -226,7 +226,7 @@ test('returning to the overview restores the space and its gestures', async ({ p
   // pointer graph to it (ADR 0036, 0037).
   const b = nodeByTitle(page, 'B');
   await b.hover();
-  await b.getByRole('button', { name: 'Edit Card B' }).click();
+  await b.getByRole('button', { name: 'Open Card B' }).click();
   await expect(page.getByTestId('open-card')).toBeVisible();
 });
 

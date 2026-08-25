@@ -337,8 +337,6 @@ function Canvas({
         title,
         titleEditingEnabled: true,
         cardEditingEnabled: node.data.kind === 'markdown',
-        connectingEnabled: true,
-        onBeginConnect: () => undefined,
         onEditCard: () => {
           setCaret(null);
           setResizing(false);

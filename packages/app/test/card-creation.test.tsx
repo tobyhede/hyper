@@ -640,7 +640,7 @@ describe('retargeting an Alias', () => {
   it('moves the Target while keeping the Alias’s identity, title and position', async () => {
     const session = mount(aliased);
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Edit Card A again' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Open Card A again' }));
     fireEvent.keyDown(screen.getByRole('combobox', { name: 'Target' }), { key: 'ArrowDown' });
     fireEvent.click(screen.getByRole('option', { name: 'Markdown Card B' }));
     fireEvent.click(screen.getByRole('button', { name: 'Done' }));
@@ -662,7 +662,7 @@ describe('retargeting an Alias', () => {
   it.skip('replaced by ADR 0049: an Alias pane never authors Target content', async () => {
     const session = mount(aliased);
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Edit Card A again' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Open Card A again' }));
     fireEvent.change(screen.getByRole('textbox', { name: 'Markdown source of A' }), {
       target: { value: 'Written through the Alias' },
     });
@@ -685,7 +685,7 @@ describe('retargeting an Alias', () => {
   it('opens on the Alias’s Target, since the title stays editable from the Card front', async () => {
     const session = mount(aliased);
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Edit Card A again' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Open Card A again' }));
 
     await waitFor(() => expect(screen.getByRole('combobox', { name: 'Target' })).toHaveFocus());
     expect(screen.getByRole('textbox', { name: 'Title' })).not.toHaveFocus();
@@ -696,7 +696,7 @@ describe('retargeting an Alias', () => {
   it('is not offered on a Card opened on its own content', async () => {
     const session = mount();
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Edit Card A' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Open Card A' }));
 
     expect(screen.queryByRole('combobox', { name: 'Target' })).not.toBeInTheDocument();
     await settled(session);

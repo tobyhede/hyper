@@ -69,7 +69,7 @@ test('draws every graph at once, each in its own color', async ({ page }) => {
 });
 
 test(
-  'production Canvas Cards expose Alias identity and keyboard authoring actions',
+  'production Canvas Cards expose Alias identity and a keyboard Open action',
   {
     tag: [
       '@parity:canvas-card-exposes-kind-and-keyboard-actions',
@@ -85,11 +85,11 @@ test(
 
     const markdown = nodeByTitle(page, 'A').first();
     await markdown.click();
-    const connect = markdown.getByRole('button', { name: 'Connect from A' });
-    await connect.focus();
-    await expect(connect).toBeFocused();
-    await connect.press('Enter');
-    await expect(page.getByRole('combobox', { name: 'Connect to' })).toBeVisible();
+    const open = markdown.getByRole('button', { name: 'Open Card A' });
+    await open.focus();
+    await expect(open).toBeFocused();
+    await open.press('Enter');
+    await expect(page.getByRole('textbox', { name: 'Markdown source' })).toBeVisible();
   },
 );
 

@@ -260,7 +260,7 @@ describe('accepting a stored Space discards the open Interaction draft', () => {
    */
   it('closes an opened Card whose editor holds an uncompleted draft', async () => {
     const session = await mountedSpaceApp();
-    fireEvent.click(screen.getByRole('button', { name: 'Edit Card Local card' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Open Card Local card' }));
     const source = await screen.findByRole('textbox', { name: 'Markdown source' });
     source.focus();
     fireEvent.keyDown(source, { key: 'a', ctrlKey: true });

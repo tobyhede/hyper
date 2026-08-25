@@ -5,13 +5,14 @@ import {
   CardKindIcon,
   CheckIcon,
   ChevronDownIcon,
-  ConnectIcon,
+  CloseCardIcon,
   EditIcon,
   FlowIcon,
   GraphIcon,
   GridIcon,
   LayoutIcon,
   MarkdownIcon,
+  OpenCardIcon,
   PlusIcon,
   PresentIcon,
 } from '../src/index';
@@ -47,8 +48,11 @@ describe('the public icon facade', () => {
         <span data-testid="alias">
           <AliasIcon />
         </span>
-        <span data-testid="connect">
-          <ConnectIcon />
+        <span data-testid="open-card">
+          <OpenCardIcon />
+        </span>
+        <span data-testid="close-card">
+          <CloseCardIcon />
         </span>
         <span data-testid="markdown">
           <MarkdownIcon />
@@ -69,7 +73,8 @@ describe('the public icon facade', () => {
       chevron: 'chevron-down',
       plus: 'plus',
       alias: 'corner-down-right',
-      connect: 'arrow-right-from-line',
+      'open-card': 'maximize-2',
+      'close-card': 'minimize-2',
       markdown: 'file-text',
       check: 'check',
     } as const;
@@ -87,7 +92,6 @@ describe('the public icon facade', () => {
         <GraphIcon color="#123456" size={13} />
         <PresentIcon color="#654321" />
         <AliasIcon size={11} />
-        <ConnectIcon size={12} />
         <MarkdownIcon size={14} />
       </>,
     );
@@ -98,8 +102,7 @@ describe('the public icon facade', () => {
     expect(glyphs[0]).toHaveAttribute('stroke', '#123456');
     expect(glyphs[1]).toHaveAttribute('stroke', '#654321');
     expect(glyphs[2]).toHaveAttribute('width', '11');
-    expect(glyphs[3]).toHaveAttribute('width', '12');
-    expect(glyphs[4]).toHaveAttribute('width', '14');
+    expect(glyphs[3]).toHaveAttribute('width', '14');
   });
 
   it('keeps Card-kind glyphs decorative while their wrapper names the kind', () => {

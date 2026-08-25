@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import type { Story } from '@ladle/react';
 import { CanvasCard, type CanvasCardState } from '@project/ui';
 import { cardSizeVars } from '#src/card';
@@ -49,6 +49,11 @@ export const States: Story = () => (
     </CatalogueSection>
   </div>
 );
+
+interface OpenProps {
+  content?: ReactNode;
+  onOpenChange?: (open: boolean) => void;
+}
 
 export const Kinds: Story = () => (
   <div className="inv inv-sheet" style={cardSizeVars}>
@@ -123,7 +128,7 @@ function Instance({
   const [title] = useState(initialTitle);
   const [selected, setSelected] = useState(false);
   const [dragging, setDragging] = useState(false);
-  const [connected, setConnected] = useState(false);
+  const [open, setOpen] = useState(false);
   const front =
     aliasOf === undefined ? ({ kind: 'markdown' } as const) : { kind: 'alias' as const, aliasOf };
   const state: Exclude<CanvasCardState, 'editing'> = dragging
@@ -131,6 +136,11 @@ function Instance({
     : selected
       ? 'selected'
       : 'rest';
+  const openProps: OpenProps = {};
+  if (front.kind === 'markdown') {
+    if (open) openProps.content = <p>Markdown content</p>;
+    openProps.onOpenChange = setOpen;
+  }
 
   return (
     <div className="flex flex-col items-start gap-2">
@@ -140,13 +150,7 @@ function Instance({
         tabIndex={-1}
         onClick={() => setSelected(true)}
       >
-        <CanvasCard
-          front={front}
-          state={state}
-          title={title}
-          graphColor="#ffc53d"
-          onConnect={() => setConnected(true)}
-        />
+        <CanvasCard front={front} state={state} title={title} graphColor="#ffc53d" {...openProps} />
       </div>
       <label className="flex items-center gap-1 text-xs text-muted-foreground">
         <input
@@ -156,9 +160,11 @@ function Instance({
         />
         Dragging
       </label>
-      <p className="text-xs text-muted-foreground" data-testid="connect-report">
-        {connected ? `Connected from ${title}.` : 'Not connected.'}
-      </p>
+      {front.kind === 'markdown' && (
+        <p className="text-xs text-muted-foreground" data-testid="open-report">
+          {open ? `${title} is open.` : `${title} is closed.`}
+        </p>
+      )}
     </div>
   );
 }

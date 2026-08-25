@@ -30,6 +30,19 @@ test('compact and Expanded Cards retain one Title treatment', async ({ page }) =
     };
   };
   expect(await expandedTitle.evaluate(titleStyle)).toEqual(await compactTitle.evaluate(titleStyle));
+  const titleInset = async (card: typeof compact, title: typeof compactTitle) => {
+    const cardBox = await card.getByRole('article', { name: 'Strategies' }).boundingBox();
+    const titleBox = await title.boundingBox();
+    if (cardBox === null || titleBox === null)
+      throw new Error('Card title geometry is unavailable');
+    return {
+      left: titleBox.x - cardBox.x,
+      bottom: cardBox.y + cardBox.height - (titleBox.y + titleBox.height),
+    };
+  };
+  expect(await titleInset(expanded, expandedTitle)).toEqual(
+    await titleInset(compact, compactTitle),
+  );
   await expect(
     expanded.getByRole('heading', { name: 'Placement is authored' }).first(),
   ).toBeVisible();

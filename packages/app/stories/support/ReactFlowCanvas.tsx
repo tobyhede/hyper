@@ -134,8 +134,6 @@ export function CanvasCardNodeSpecimen({
     ...source.data,
     titleEditingEnabled: true,
     cardEditingEnabled: cardEditingEnabled ?? source.data.kind === 'markdown',
-    connectingEnabled: true,
-    onBeginConnect: () => undefined,
     onEditCard,
     onBeginTitleEditing: () => undefined,
   };

@@ -102,8 +102,6 @@ export interface EdgeAuthoringSurface {
   readonly provide: (children: ReactNode) => ReactNode;
   /** The Edge-only half of the canvas's `onBeforeDelete` dispatch. */
   readonly deleteEdges: (edges: readonly Edge[]) => void;
-  /** Begin a keyboard connection from a Card, for the Card's own control. */
-  readonly beginConnectFrom: (cardId: string) => void;
 }
 
 export interface EdgeAuthoringInput {
@@ -485,11 +483,6 @@ export function useEdgeAuthoring({
     }
   }, []);
 
-  const beginConnectFrom = useCallback((cardId: string) => {
-    const from = uuidSchema.safeParse(cardId);
-    if (from.success) latest.current.authoring.beginKeyboardConnect(from.data);
-  }, []);
-
   /**
    * Repair the focus React Flow's native Edge Escape leaves on `body`.
    *
@@ -860,6 +853,5 @@ export function useEdgeAuthoring({
     layer,
     provide,
     deleteEdges,
-    beginConnectFrom,
   };
 }
