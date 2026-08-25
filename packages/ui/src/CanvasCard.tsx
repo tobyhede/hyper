@@ -21,6 +21,10 @@ interface CanvasMarkdownCardFront {
   readonly kind: 'markdown';
   /** The Markdown bytes this Card owns. */
   readonly source: string;
+  /** Request that authored state open or close this Card. */
+  readonly onOpenChange?: (open: boolean) => void;
+  /** Put a caret in this Card's Markdown source. */
+  readonly onBeginEdit?: () => void;
 }
 
 export type CanvasCardFront =
@@ -55,19 +59,6 @@ interface CanvasCardCommonProps {
   readonly graphColor: string;
   /** Present only when activating the displayed Title may begin a rename. */
   readonly onBeginTitleEdit?: () => void;
-  /** Request that authored state open or close this Card. */
-  readonly onOpenChange?: (open: boolean) => void;
-  /**
-   * Put a caret in this Card's kind-owned content.
-   *
-   * Offered whatever the Card's size (ADR 0066): opening and editing are
-   * separate actions, and Edit is something an author does to a Card rather than
-   * something available only inside one already open. On a collapsed Card the
-   * rail's Edit control runs `onOpenChange(true)` first and this second — the
-   * same two calls the Open and Edit controls make in sequence, so there is no
-   * second expansion path and no transient approximation of opening.
-   */
-  readonly onBeginContentEdit?: () => void;
 }
 
 /**
@@ -139,14 +130,16 @@ const contentEditAction = (
 };
 
 export function CanvasCard(props: CanvasCardProps) {
-  const { front, title, graphColor, onBeginTitleEdit, onOpenChange, onBeginContentEdit, state } =
-    props;
+  const { front, title, graphColor, onBeginTitleEdit, state } = props;
   const open = front.kind === 'markdown' && front.open;
+  const onOpenChange = front.kind === 'markdown' ? front.onOpenChange : undefined;
+  const onBeginContentEdit = front.kind === 'markdown' ? front.onBeginEdit : undefined;
   /**
    * The edit running inside the Markdown front this Card owns.
    *
-   * State rather than a second prop because the caret lives inside the body —
-   * `CanvasCard` asks its body, and the body answers (`card-content-edit.ts`).
+   * State rather than a second prop because the draft and caret live inside
+   * the body. `front.editor` supplies domain completion; the body publishes
+   * the Save and Cancel closures for its current draft (`card-content-edit.ts`).
    */
   const [contentEdit, setContentEdit] = useState<CardContentEdit | null>(null);
   const editControl = useRef<HTMLButtonElement>(null);

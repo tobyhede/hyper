@@ -625,6 +625,25 @@ describe('CardNode Expanded Card front', () => {
     );
   });
 
+  it('does not mount a stale body editor until the Layout Expands the Card', () => {
+    const { container } = render(
+      <CardNode
+        {...props({
+          expanded: false,
+          body: SOURCE,
+          bodyEditor: { onComplete: vi.fn(), onEnd: vi.fn() },
+        })}
+      />,
+    );
+
+    expect(screen.queryByRole('textbox', { name: 'Markdown source of A' })).not.toBeInTheDocument();
+    expect(screen.getByTestId('card')).toHaveAttribute('data-expanded', 'false');
+    expect(container.querySelector('.rf-card-node__inner')).toHaveAttribute(
+      'data-expanded',
+      'false',
+    );
+  });
+
   it('leaves an Alias collapsed, because the Alias kind has no Expanded front yet', () => {
     render(<CardNode {...props({ kind: 'alias', aliasOf: 'Strategies', expanded: true })} />);
 

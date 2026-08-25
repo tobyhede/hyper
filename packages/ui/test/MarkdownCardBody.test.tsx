@@ -54,18 +54,23 @@ const onCard = (props: Partial<Parameters<typeof MarkdownCardBody>[0]> = {}) => 
   <CanvasCard
     front={
       props.editor === undefined
-        ? { kind: 'markdown', source: '# Strategies\n\nNo strategy is privileged.', open: true }
+        ? {
+            kind: 'markdown',
+            source: '# Strategies\n\nNo strategy is privileged.',
+            open: true,
+            onBeginEdit: props.onBeginEdit ?? vi.fn(),
+          }
         : {
             kind: 'markdown',
             source: '# Strategies\n\nNo strategy is privileged.',
             open: true,
             editor: props.editor,
+            onBeginEdit: props.onBeginEdit ?? vi.fn(),
           }
     }
     state="rest"
     title="Strategies"
     graphColor="#ffc53d"
-    onBeginContentEdit={props.onBeginEdit ?? vi.fn()}
   />
 );
 
@@ -80,17 +85,18 @@ function EditingCard() {
               source: '# Strategies\n\nNo strategy is privileged.',
               open: true,
               editor: { onComplete: vi.fn(), onEnd: () => setEditing(false) },
+              onBeginEdit: () => setEditing(true),
             }
           : {
               kind: 'markdown',
               source: '# Strategies\n\nNo strategy is privileged.',
               open: true,
+              onBeginEdit: () => setEditing(true),
             }
       }
       state="rest"
       title="Strategies"
       graphColor="#ffc53d"
-      onBeginContentEdit={() => setEditing(true)}
     />
   );
 }

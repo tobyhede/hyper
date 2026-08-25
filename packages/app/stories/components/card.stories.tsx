@@ -1,6 +1,6 @@
 import { useState, type CSSProperties } from 'react';
 import type { Story } from '@ladle/react';
-import { CanvasCard, type CanvasCardState } from '@project/ui';
+import { CanvasCard, type CanvasCardFront, type CanvasCardState } from '@project/ui';
 import { cardSizeVars } from '#src/card';
 import { CanvasCardSpecimen } from '../support/CanvasCardSpecimen';
 import { CatalogueSection, Specimen } from '../support/Catalogue';
@@ -49,10 +49,6 @@ export const States: Story = () => (
     </CatalogueSection>
   </div>
 );
-
-interface OpenProps {
-  onOpenChange?: (open: boolean) => void;
-}
 
 export const Kinds: Story = () => (
   <div className="inv inv-sheet" style={cardSizeVars}>
@@ -128,20 +124,17 @@ function Instance({
   const [selected, setSelected] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [open, setOpen] = useState(false);
-  const front =
+  const front: CanvasCardFront =
     aliasOf === undefined
-      ? ({ kind: 'markdown', source: 'Markdown content', open } as const)
-      : { kind: 'alias' as const, aliasOf };
+      ? open
+        ? { kind: 'markdown', source: 'Markdown content', open: true, onOpenChange: setOpen }
+        : { kind: 'markdown', source: 'Markdown content', open: false, onOpenChange: setOpen }
+      : { kind: 'alias', aliasOf };
   const state: Exclude<CanvasCardState, 'editing'> = dragging
     ? 'dragging'
     : selected
       ? 'selected'
       : 'rest';
-  const openProps: OpenProps = {};
-  if (front.kind === 'markdown') {
-    openProps.onOpenChange = setOpen;
-  }
-
   return (
     <div className="flex flex-col items-start gap-2">
       <div
@@ -150,7 +143,7 @@ function Instance({
         tabIndex={-1}
         onClick={() => setSelected(true)}
       >
-        <CanvasCard front={front} state={state} title={title} graphColor="#ffc53d" {...openProps} />
+        <CanvasCard front={front} state={state} title={title} graphColor="#ffc53d" />
       </div>
       <label className="flex items-center gap-1 text-xs text-muted-foreground">
         <input
@@ -221,13 +214,12 @@ export const OpenAndClose: Story = () => {
           <CanvasCard
             front={
               open
-                ? { kind: 'markdown', source: openMarkdown, open: true }
-                : { kind: 'markdown', source: openMarkdown, open: false }
+                ? { kind: 'markdown', source: openMarkdown, open: true, onOpenChange: setOpen }
+                : { kind: 'markdown', source: openMarkdown, open: false, onOpenChange: setOpen }
             }
             state="rest"
             title="Strategies"
             graphColor="#ffc53d"
-            onOpenChange={setOpen}
           />
         </div>
       </section>
@@ -243,17 +235,18 @@ export const OpenAndClose: Story = () => {
                     kind: 'markdown',
                     source: `${openMarkdown}\n\n### A deliberately long section\n\n${openMarkdown}\n\n${openMarkdown}`,
                     open: true,
+                    onOpenChange: setLongOpen,
                   }
                 : {
                     kind: 'markdown',
                     source: `${openMarkdown}\n\n### A deliberately long section\n\n${openMarkdown}\n\n${openMarkdown}`,
                     open: false,
+                    onOpenChange: setLongOpen,
                   }
             }
             state="rest"
             title="Long Markdown"
             graphColor="#ffc53d"
-            onOpenChange={setLongOpen}
           />
         </div>
       </section>

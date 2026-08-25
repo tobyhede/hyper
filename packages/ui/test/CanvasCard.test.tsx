@@ -63,11 +63,15 @@ describe('CanvasCard Open and Close operation', () => {
     const onOpenChange = vi.fn();
     render(
       <CanvasCard
-        front={{ kind: 'markdown', source: '## Authored placement', open: true }}
+        front={{
+          kind: 'markdown',
+          source: '## Authored placement',
+          open: true,
+          onOpenChange,
+        }}
         state="rest"
         title="A"
         graphColor="#ffc53d"
-        onOpenChange={onOpenChange}
       />,
     );
 
@@ -93,11 +97,10 @@ describe('CanvasCard Open and Close operation', () => {
     const onOpenChange = vi.fn();
     const { rerender } = render(
       <CanvasCard
-        front={{ kind: 'markdown', source: '', open: false }}
+        front={{ kind: 'markdown', source: '', open: false, onOpenChange }}
         state="selected"
         title="A"
         graphColor="#ffc53d"
-        onOpenChange={onOpenChange}
       />,
     );
 
@@ -108,11 +111,10 @@ describe('CanvasCard Open and Close operation', () => {
 
     rerender(
       <CanvasCard
-        front={{ kind: 'markdown', source: 'Markdown', open: true }}
+        front={{ kind: 'markdown', source: 'Markdown', open: true, onOpenChange }}
         state="selected"
         title="A"
         graphColor="#ffc53d"
-        onOpenChange={onOpenChange}
       />,
     );
     const close = screen.getByRole('button', { name: 'Close Card A' });
@@ -126,12 +128,16 @@ describe('CanvasCard Open and Close operation', () => {
     const onOpenChange = vi.fn();
     const { rerender } = render(
       <CanvasCard
-        front={{ kind: 'markdown', source: '', open: false }}
+        front={{
+          kind: 'markdown',
+          source: '',
+          open: false,
+          onOpenChange,
+          onBeginEdit: onBeginContentEdit,
+        }}
         state="selected"
         title="A"
         graphColor="#ffc53d"
-        onOpenChange={onOpenChange}
-        onBeginContentEdit={onBeginContentEdit}
       />,
     );
 
@@ -151,12 +157,16 @@ describe('CanvasCard Open and Close operation', () => {
 
     rerender(
       <CanvasCard
-        front={{ kind: 'markdown', source: 'Markdown', open: true }}
+        front={{
+          kind: 'markdown',
+          source: 'Markdown',
+          open: true,
+          onOpenChange,
+          onBeginEdit: onBeginContentEdit,
+        }}
         state="selected"
         title="A"
         graphColor="#ffc53d"
-        onOpenChange={onOpenChange}
-        onBeginContentEdit={onBeginContentEdit}
       />,
     );
 
@@ -170,11 +180,10 @@ describe('CanvasCard Open and Close operation', () => {
   it('withholds Edit from a collapsed Card that cannot be opened', () => {
     render(
       <CanvasCard
-        front={{ kind: 'markdown', source: '', open: false }}
+        front={{ kind: 'markdown', source: '', open: false, onBeginEdit: vi.fn() }}
         state="selected"
         title="A"
         graphColor="#ffc53d"
-        onBeginContentEdit={vi.fn()}
       />,
     );
 
@@ -194,12 +203,12 @@ describe('CanvasCard Open and Close operation', () => {
           source: 'Markdown',
           open: true,
           editor: { onComplete, onEnd },
+          onOpenChange: vi.fn(),
+          onBeginEdit: onBeginContentEdit,
         }}
         state="rest"
         title="A"
         graphColor="#ffc53d"
-        onOpenChange={vi.fn()}
-        onBeginContentEdit={onBeginContentEdit}
         onBeginTitleEdit={vi.fn()}
       />,
     );
@@ -237,11 +246,11 @@ describe('CanvasCard Open and Close operation', () => {
           source: 'Markdown',
           open: true,
           editor: { onComplete: vi.fn(), onEnd: vi.fn() },
+          onOpenChange: vi.fn(),
         }}
         state="rest"
         title="A"
         graphColor="#ffc53d"
-        onOpenChange={vi.fn()}
       />,
     );
 
@@ -269,11 +278,11 @@ describe('CanvasCard Open and Close operation', () => {
           source: 'Markdown',
           open: true,
           editor: { onComplete: vi.fn(), onEnd: vi.fn() },
+          onOpenChange: vi.fn(),
         }}
         state="rest"
         title="A"
         graphColor="#ffc53d"
-        onOpenChange={vi.fn()}
       />,
     );
 
@@ -289,11 +298,10 @@ describe('CanvasCard Open and Close operation', () => {
   it('hides both actions while the title is being edited', () => {
     render(
       <CanvasCard
-        front={{ kind: 'markdown', source: '', open: false }}
+        front={{ kind: 'markdown', source: '', open: false, onOpenChange: () => undefined }}
         state="editing"
         title="A"
         graphColor="#ffc53d"
-        onOpenChange={() => undefined}
         onCompleteTitleEdit={() => null}
         onCancelTitleEdit={() => undefined}
         onReturnFocus={() => undefined}
@@ -306,11 +314,10 @@ describe('CanvasCard Open and Close operation', () => {
   it('hides both actions while dragging', () => {
     render(
       <CanvasCard
-        front={{ kind: 'markdown', source: '', open: false }}
+        front={{ kind: 'markdown', source: '', open: false, onOpenChange: () => undefined }}
         state="dragging"
         title="A"
         graphColor="#ffc53d"
-        onOpenChange={() => undefined}
       />,
     );
 

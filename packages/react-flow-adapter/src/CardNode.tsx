@@ -34,6 +34,9 @@ const AUTHORING_SIDES = [Position.Top, Position.Right, Position.Bottom, Position
  *  spread — the props themselves stay readonly to every other caller. The keys
  *  are already optional; this changes nothing but their mutability. */
 type Mutable<T> = { -readonly [K in keyof T]: T[K] };
+type MarkdownOperations = Mutable<
+  Pick<Extract<CanvasCardFront, { kind: 'markdown' }>, 'onOpenChange' | 'onBeginEdit'>
+>;
 
 /*
  * Handle geometry is *declared*, not measured, so nothing here reports a change
@@ -106,20 +109,29 @@ export function CardNode({ data, selected, dragging, isConnectable }: NodeProps<
   // Alias front carries the Target title as required. The empty string is how
   // that reaches `CanvasCard` as "no Target to name", and `CanvasCard` draws no
   // Target line for it rather than an empty one.
+  const markdownOperations: MarkdownOperations = {};
+  if (data.cardEditingEnabled === true && data.onEditCard !== undefined) {
+    markdownOperations.onOpenChange = data.onEditCard;
+  }
+  if (data.onBeginBodyEditing !== undefined) {
+    markdownOperations.onBeginEdit = data.onBeginBodyEditing;
+  }
   const markdownFront: CanvasCardFront =
-    data.bodyEditor !== undefined
+    data.expanded === true && data.bodyEditor !== undefined
       ? {
           kind: 'markdown',
           source: data.body ?? '',
           open: true,
           editor: data.bodyEditor,
+          ...markdownOperations,
         }
       : data.expanded === true
-        ? { kind: 'markdown', source: data.body ?? '', open: true }
+        ? { kind: 'markdown', source: data.body ?? '', open: true, ...markdownOperations }
         : {
             kind: 'markdown',
             source: data.body ?? '',
             open: false,
+            ...markdownOperations,
           };
   const front: CanvasCardFront =
     data.kind === 'alias' ? { kind: 'alias', aliasOf: data.aliasOf ?? '' } : markdownFront;
@@ -190,24 +202,13 @@ export function CardNode({ data, selected, dragging, isConnectable }: NodeProps<
    * miss silent. `CanvasCard` draws no control it has no operation for, so
    * withholding it here is the same answer one layer up.
    */
-  const canvasCardOptionalProps: Mutable<
-    Pick<CanvasCardProps, 'onBeginTitleEdit' | 'onOpenChange' | 'onBeginContentEdit'>
-  > = {};
+  const canvasCardOptionalProps: Mutable<Pick<CanvasCardProps, 'onBeginTitleEdit'>> = {};
   if (
     data.bodyEditor === undefined &&
     data.titleEditingEnabled === true &&
     data.onBeginTitleEditing !== undefined
   ) {
     canvasCardOptionalProps.onBeginTitleEdit = data.onBeginTitleEditing;
-  }
-  if (data.cardEditingEnabled === true && data.onEditCard !== undefined) {
-    canvasCardOptionalProps.onOpenChange = data.onEditCard;
-  }
-  // Not gated on `expanded`: Edit is offered on a collapsed Card too, and there
-  // `CanvasCard` runs it after `onOpenChange(true)` — the two calls the Open and
-  // Edit controls make in sequence, and no third path through opening.
-  if (data.kind === 'markdown' && data.onBeginBodyEditing !== undefined) {
-    canvasCardOptionalProps.onBeginContentEdit = data.onBeginBodyEditing;
   }
 
   /* The editor's presence is the editing state, and it arrives with the two

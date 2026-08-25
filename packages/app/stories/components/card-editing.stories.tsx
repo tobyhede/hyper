@@ -30,13 +30,22 @@ function TitleEditingCard({ initiallyOpen }: { readonly initiallyOpen: boolean }
           <CanvasCard
             front={
               open
-                ? { kind: 'markdown', source: '## Open Card body', open: true }
-                : { kind: 'markdown', source: '## Open Card body', open: false }
+                ? {
+                    kind: 'markdown',
+                    source: '## Open Card body',
+                    open: true,
+                    onOpenChange: setOpen,
+                  }
+                : {
+                    kind: 'markdown',
+                    source: '## Open Card body',
+                    open: false,
+                    onOpenChange: setOpen,
+                  }
             }
             state="editing"
             title={title}
             graphColor="#ffc53d"
-            onOpenChange={setOpen}
             onCompleteTitleEdit={(draft) => {
               if (draft.trim().length === 0) return 'A Card title is required.';
               setTitle(draft);
@@ -50,13 +59,22 @@ function TitleEditingCard({ initiallyOpen }: { readonly initiallyOpen: boolean }
           <CanvasCard
             front={
               open
-                ? { kind: 'markdown', source: '## Open Card body', open: true }
-                : { kind: 'markdown', source: '## Open Card body', open: false }
+                ? {
+                    kind: 'markdown',
+                    source: '## Open Card body',
+                    open: true,
+                    onOpenChange: setOpen,
+                  }
+                : {
+                    kind: 'markdown',
+                    source: '## Open Card body',
+                    open: false,
+                    onOpenChange: setOpen,
+                  }
             }
             state="rest"
             title={title}
             graphColor="#ffc53d"
-            onOpenChange={setOpen}
             onBeginTitleEdit={() => setEditing(true)}
           />
         )}
@@ -108,10 +126,24 @@ export const Markdown: Story = () => {
         open: true,
         autoFocusEditor: mode === 'focused',
         editor: { onComplete: setSource, onEnd: () => setMode('rendered') },
+        onOpenChange: setOpen,
+        onBeginEdit: () => setMode('focused'),
       }
     : open
-      ? { kind: 'markdown', source, open: true }
-      : { kind: 'markdown', source, open: false };
+      ? {
+          kind: 'markdown',
+          source,
+          open: true,
+          onOpenChange: setOpen,
+          onBeginEdit: () => setMode('focused'),
+        }
+      : {
+          kind: 'markdown',
+          source,
+          open: false,
+          onOpenChange: setOpen,
+          onBeginEdit: () => setMode('focused'),
+        };
 
   return (
     <div className="flex flex-col items-start gap-3 p-8">
@@ -127,14 +159,7 @@ export const Markdown: Story = () => {
         </Button>
       </div>
       <div style={openFrame}>
-        <CanvasCard
-          front={front}
-          state="rest"
-          title="Strategies"
-          graphColor="#ffc53d"
-          onOpenChange={setOpen}
-          onBeginContentEdit={() => setMode('focused')}
-        />
+        <CanvasCard front={front} state="rest" title="Strategies" graphColor="#ffc53d" />
       </div>
     </div>
   );
