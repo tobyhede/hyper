@@ -100,18 +100,19 @@ test('the open Card rail offers its edit action before Close', async ({ page }) 
   await expect(page.getByRole('textbox', { name: 'Markdown source of Strategies' })).toBeFocused();
 });
 
-test('the Markdown panel discloses its boxed pencil to pointer and keyboard', async ({ page }) => {
+test('hover reveals only the rail Edit and Close actions', async ({ page }) => {
   await open(page, markdownStory);
-  const panel = page.getByRole('button', { name: 'Edit Markdown source of Strategies' });
-  const pencil = panel.locator('svg');
+  const card = page.getByRole('article', { name: 'Strategies' });
+  await card.hover();
 
-  await expect(pencil).toHaveCSS('opacity', '0');
-  await panel.hover();
-  await expect(pencil).not.toHaveCSS('opacity', '0');
-  await panel.focus();
-  await expect(pencil).not.toHaveCSS('opacity', '0');
-  await panel.press('Enter');
-  await expect(page.getByRole('textbox', { name: 'Markdown source of Strategies' })).toBeFocused();
+  const labels = await card
+    .getByTestId('canvas-card-actions')
+    .getByRole('button')
+    .evaluateAll((buttons) => buttons.map((button) => button.getAttribute('aria-label')));
+  expect(labels).toEqual(['Edit Card Strategies', 'Close Card Strategies']);
+  await expect(
+    card.getByRole('button', { name: 'Edit Markdown source of Strategies' }),
+  ).toHaveCount(0);
 });
 
 test('the rail replaces its Edit action with the two ends of a running edit', async ({ page }) => {

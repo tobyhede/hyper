@@ -50,7 +50,7 @@ const body = (props: Partial<Parameters<typeof MarkdownCardBody>[0]> = {}) => (
  * (`card-content-edit.ts`). Mounted alone, the body keeps its keys and offers no
  * control of its own.
  */
-const onCard = (props: Partial<Parameters<typeof MarkdownCardBody>[0]> = {}) => (
+const onCard = (props: Partial<Pick<Parameters<typeof MarkdownCardBody>[0], 'editor'>> = {}) => (
   <CanvasCard
     front={
       props.editor === undefined
@@ -58,14 +58,14 @@ const onCard = (props: Partial<Parameters<typeof MarkdownCardBody>[0]> = {}) => 
             kind: 'markdown',
             source: '# Strategies\n\nNo strategy is privileged.',
             open: true,
-            onBeginEdit: props.onBeginEdit ?? vi.fn(),
+            onBeginEdit: vi.fn(),
           }
         : {
             kind: 'markdown',
             source: '# Strategies\n\nNo strategy is privileged.',
             open: true,
             editor: props.editor,
-            onBeginEdit: props.onBeginEdit ?? vi.fn(),
+            onBeginEdit: vi.fn(),
           }
     }
     state="rest"
@@ -116,37 +116,12 @@ describe('MarkdownCardBody', () => {
     expect(container.querySelectorAll('li')).toHaveLength(2);
   });
 
-  it('offers no gesture when the caller supplied nothing to begin an edit with', () => {
+  it('renders no body-level edit control', () => {
     const { container } = render(body());
 
     const surface = container.querySelector('.markdown-card-body');
-    expect(surface).toHaveAttribute('data-editable', 'false');
+    expect(surface).toBeInTheDocument();
     expect(screen.queryByRole('button')).not.toBeInTheDocument();
-  });
-
-  it('makes the complete rendered Markdown surface the semantic edit control', () => {
-    const onBeginEdit = vi.fn();
-    render(body({ onBeginEdit }));
-
-    const control = screen.getByRole('button', {
-      name: 'Edit Markdown source of Strategies',
-    });
-    expect(control.querySelector('svg')).toBeInTheDocument();
-    expect(control.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
-    fireEvent.click(control);
-
-    expect(onBeginEdit).toHaveBeenCalledTimes(1);
-  });
-
-  it('leaves pointer-down available to begin a Card drag at rest', () => {
-    const onPointerDown = vi.fn();
-    render(<div onPointerDown={onPointerDown}>{body({ onBeginEdit: vi.fn() })}</div>);
-
-    fireEvent.pointerDown(
-      screen.getByRole('button', { name: 'Edit Markdown source of Strategies' }),
-    );
-
-    expect(onPointerDown).toHaveBeenCalledTimes(1);
   });
 
   it('takes a caret when the caller supplies an editor, and lets it go when the caller withdraws one', async () => {

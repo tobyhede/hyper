@@ -8,11 +8,9 @@ import {
   useState,
   type KeyboardEvent,
 } from 'react';
-import { Button } from './Button';
 import { usePublishCardContentEdit, type CardContentEdit } from './card-content-edit';
 import { Kbd, KbdGroup } from './components/kbd';
 import { RenderedMarkdown } from './CardContent';
-import { EditIcon } from './icons';
 import { MarkdownSourceEditor } from './markdown-source-editor-lazy';
 import type { MarkdownSourceEditorHandle } from './MarkdownSourceEditor';
 import { cn } from './lib/utils';
@@ -49,43 +47,11 @@ export interface MarkdownCardBodyProps {
   readonly source: string;
   /** Names the writing surface for a screen reader, e.g. the Card's title. */
   readonly ariaLabel: string;
-  /** Present only when activating the rendered Markdown may put a caret in its source. */
-  readonly onBeginEdit?: () => void;
   /** The live edit, absent when the source is at rest. */
   readonly editor?: MarkdownCardBodyEditor;
   /** Whether a newly supplied editor takes the caret. Defaults to the product path. */
   readonly autoFocus?: boolean;
   readonly className?: string;
-}
-
-interface MarkdownEditControlProps {
-  readonly ariaLabel: string;
-  readonly onBeginEdit: () => void;
-}
-
-/**
- * The rendered Markdown's semantic edit control.
- *
- * It is a sibling overlay because Markdown may contain headings, lists and
- * links, none of which may be nested inside a native Button. This is the body
- * equivalent of ADR 0065's Title control: the displayed value is what the
- * author activates, with Button supplying pointer, keyboard and focus behavior.
- */
-function MarkdownEditControl({ ariaLabel, onBeginEdit }: MarkdownEditControlProps) {
-  return (
-    <Button
-      variant="ghost"
-      className="markdown-card-body__edit-control"
-      aria-label={`Edit ${ariaLabel}`}
-      onClick={(event) => {
-        event.stopPropagation();
-        onBeginEdit();
-      }}
-      onKeyDown={(event) => event.stopPropagation()}
-    >
-      <EditIcon />
-    </Button>
-  );
 }
 
 /**
@@ -97,10 +63,9 @@ function MarkdownEditControl({ ariaLabel, onBeginEdit }: MarkdownEditControlProp
  * the Card reached during traversal. It omits only presentation mode's title
  * and frame, which the surrounding `CanvasCard` already owns.
  *
- * At rest this surface is semantic rendered content beneath its semantic
- * click-to-edit control; the surrounding Card rail supplies the visible Edit
- * icon. Both begin the same edit. While editing, the display is replaced by
- * `MarkdownSourceEditor`.
+ * At rest this surface is semantic rendered content. The surrounding Card rail
+ * owns the one Edit action; the body contains no second control or affordance.
+ * While editing, the display is replaced by `MarkdownSourceEditor`.
  *
  * **The keys this surface spends are the two the editor withholds from
  * CodeMirror** (ADR 0063, `PANE_OWNED_KEYS`): `Escape` abandons the draft and
@@ -132,7 +97,6 @@ function MarkdownEditControl({ ariaLabel, onBeginEdit }: MarkdownEditControlProp
 export function MarkdownCardBody({
   source,
   ariaLabel,
-  onBeginEdit,
   editor,
   autoFocus = true,
   className,
@@ -264,7 +228,6 @@ export function MarkdownCardBody({
         editing && 'markdown-card-body--editing nodrag nopan nokey',
         className,
       )}
-      data-editable={onBeginEdit !== undefined}
       onKeyDown={onKeyDown}
     >
       {editing ? (
@@ -304,12 +267,7 @@ export function MarkdownCardBody({
           </div>
         </>
       ) : (
-        <>
-          <RenderedMarkdown markdown={source} className="markdown-card-body__rendered card__body" />
-          {onBeginEdit !== undefined && (
-            <MarkdownEditControl ariaLabel={ariaLabel} onBeginEdit={onBeginEdit} />
-          )}
-        </>
+        <RenderedMarkdown markdown={source} className="markdown-card-body__rendered card__body" />
       )}
     </div>
   );
