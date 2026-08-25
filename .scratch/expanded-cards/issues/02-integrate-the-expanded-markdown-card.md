@@ -8,9 +8,9 @@
 
 ## Integration boundary
 
-- [ ] Consume the production `CanvasCard` and `MarkdownCardBody` contract from issue 01 without copying its markup or treatment into `CardNode`, `SpaceCanvas` or application CSS.
+- [ ] Consume the production deep `CanvasCard` contract from issues 04 and 05 without constructing its Markdown body or copying its markup or treatment into `CardNode`, `SpaceCanvas` or application CSS.
 - [ ] Complete the prerequisite domain and authoring slices in `.scratch/expanded-cards/spec.md`: authored Card rects, displacement and its inverse, open/close/resize completions, per-Card strategy sizes and conversion from an Algorithmic View where required by ADR 0064.
-- [ ] `CardNode` supplies the Expanded Markdown content slot and React Flow-owned behavior only: node geometry, handles, resize integration, z-index and drag/pan containment.
+- [ ] `CardNode` supplies Markdown source and authored open/edit operations alongside React Flow-owned behavior only: node geometry, handles, resize integration, z-index and drag/pan containment. `CanvasCard` owns construction of the kind-owned body.
 - [ ] Replace the legacy no-argument `onEditCard` adapter capability with authored operations that represent Open and Close distinctly. No adapter may assign that callback to `onOpenChange(open)` and discard the requested state.
 - [ ] `SpaceCanvas` owns the one canvas-local caret identity and coordinates completed edits through Space Authoring. The story's local expansion, movement, content and resize state does not move into production as a second authoring model.
 - [ ] Opening expands the existing Card in place. No covering pane, camera follow, `nowheel`, or 16:9 Expanded Card is introduced; ADR 0064 has decided those off.

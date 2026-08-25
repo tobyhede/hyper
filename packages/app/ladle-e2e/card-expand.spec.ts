@@ -48,7 +48,12 @@ test(
     await card.getByRole('button', { name: 'Close Card Strategies' }).click();
     await expect(card.getByRole('heading', { name: 'Placement is authored' })).toHaveCount(0);
     await expect(card.getByRole('button', { name: 'Open Card Strategies' })).toBeVisible();
-    await expect(page.getByRole('region', { name: 'Long Open Card' })).toBeVisible();
+    const longCard = page.getByRole('region', { name: 'Long Markdown Card' });
+    await expect(longCard).toBeVisible();
+    await longCard.getByRole('article', { name: 'Long Markdown' }).hover();
+    await longCard.getByRole('button', { name: 'Close Card Long Markdown' }).click();
+    await expect(longCard.getByRole('heading', { name: 'Placement is authored' })).toHaveCount(0);
+    await expect(longCard.getByRole('button', { name: 'Open Card Long Markdown' })).toBeVisible();
   },
 );
 

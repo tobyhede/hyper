@@ -1,6 +1,6 @@
 import type { Edge, Node, NodeHandle } from '@xyflow/react';
 import { MarkerType, Position } from '@xyflow/react';
-import type { MarkdownCardBodyEditor } from '@project/ui';
+import type { CanvasCardBodyEditor } from '@project/ui';
 import type { Card, CardId, LayoutPosition, GraphId } from '@project/core';
 import { inHandleId, outHandleId, resolveContentCard } from '@project/graph';
 import type {
@@ -118,7 +118,7 @@ export type CardNodeData = {
    * authored and the caret is a gesture the author just made, so a Card can be
    * Expanded while its *title* is being renamed (ADR 0064).
    */
-  bodyEditor?: MarkdownCardBodyEditor;
+  bodyEditor?: CanvasCardBodyEditor;
   /**
    * Resizing this Expanded Card, absent on one that may not be resized.
    *

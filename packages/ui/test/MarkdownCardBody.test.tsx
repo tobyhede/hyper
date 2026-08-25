@@ -2,7 +2,8 @@ import '@testing-library/jest-dom/vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { useState } from 'react';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
-import { CanvasCard, MarkdownCardBody } from '../src';
+import { CanvasCard } from '../src';
+import { MarkdownCardBody } from '../src/MarkdownCardBody';
 
 beforeAll(() => {
   vi.stubGlobal(
@@ -51,12 +52,20 @@ const body = (props: Partial<Parameters<typeof MarkdownCardBody>[0]> = {}) => (
  */
 const onCard = (props: Partial<Parameters<typeof MarkdownCardBody>[0]> = {}) => (
   <CanvasCard
-    front={{ kind: 'markdown' }}
+    front={
+      props.editor === undefined
+        ? { kind: 'markdown', source: '# Strategies\n\nNo strategy is privileged.', open: true }
+        : {
+            kind: 'markdown',
+            source: '# Strategies\n\nNo strategy is privileged.',
+            open: true,
+            editor: props.editor,
+          }
+    }
     state="rest"
     title="Strategies"
     graphColor="#ffc53d"
-    content={body(props)}
-    onBeginContentEdit={vi.fn()}
+    onBeginContentEdit={props.onBeginEdit ?? vi.fn()}
   />
 );
 
@@ -64,13 +73,23 @@ function EditingCard() {
   const [editing, setEditing] = useState(true);
   return (
     <CanvasCard
-      front={{ kind: 'markdown' }}
+      front={
+        editing
+          ? {
+              kind: 'markdown',
+              source: '# Strategies\n\nNo strategy is privileged.',
+              open: true,
+              editor: { onComplete: vi.fn(), onEnd: () => setEditing(false) },
+            }
+          : {
+              kind: 'markdown',
+              source: '# Strategies\n\nNo strategy is privileged.',
+              open: true,
+            }
+      }
       state="rest"
       title="Strategies"
       graphColor="#ffc53d"
-      content={
-        editing ? body({ editor: { onComplete: vi.fn(), onEnd: () => setEditing(false) } }) : body()
-      }
       onBeginContentEdit={() => setEditing(true)}
     />
   );

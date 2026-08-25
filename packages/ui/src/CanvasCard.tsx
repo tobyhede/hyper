@@ -1,17 +1,14 @@
-import {
-  useEffect,
-  useId,
-  useLayoutEffect,
-  useRef,
-  useState,
-  type CSSProperties,
-  type ReactNode,
-} from 'react';
+import { useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
 import { Button } from './Button';
 import { CardContentEditProvider, type CardContentEdit } from './card-content-edit';
 import { CardRail } from './CardRail';
 import { Card, CardContent, CardTitle } from './components/card';
 import { AbandonEditIcon, CloseCardIcon, CommitEditIcon, EditIcon, OpenCardIcon } from './icons';
+import {
+  MarkdownCardBody,
+  type MarkdownCardBodyEditor,
+  type MarkdownCardBodyProps,
+} from './MarkdownCardBody';
 import './canvas-card.css';
 
 /**
@@ -20,8 +17,31 @@ import './canvas-card.css';
  * Space Card variant is deliberately not modelled here — building one ahead
  * of the domain schema would be a Card front nothing can render.
  */
+interface CanvasMarkdownCardFront {
+  readonly kind: 'markdown';
+  /** The Markdown bytes this Card owns. */
+  readonly source: string;
+}
+
 export type CanvasCardFront =
-  { readonly kind: 'markdown' } | { readonly kind: 'alias'; readonly aliasOf: string };
+  | (CanvasMarkdownCardFront & {
+      /** Closed authored state cannot carry a body editor. */
+      readonly open: false;
+      readonly editor?: never;
+      readonly autoFocusEditor?: never;
+    })
+  | (CanvasMarkdownCardFront & {
+      /** Authored Layout state. CanvasCard renders it; it does not own it. */
+      readonly open: true;
+      /** Present exactly while the Markdown body holds the canvas caret. */
+      readonly editor?: CanvasCardBodyEditor;
+      /** Whether a newly supplied body editor takes focus. */
+      readonly autoFocusEditor?: boolean;
+    })
+  | { readonly kind: 'alias'; readonly aliasOf: string };
+
+/** The two authored operations that end a live Markdown body edit. */
+export type CanvasCardBodyEditor = MarkdownCardBodyEditor;
 
 /** External visual facts the adapter knows and CanvasCard cannot derive:
  *  React Flow selection, drag and inline-title-editing. Hover and the
@@ -33,27 +53,9 @@ interface CanvasCardCommonProps {
   readonly front: CanvasCardFront;
   readonly title: string;
   readonly graphColor: string;
-  /**
-   * What this Card draws below its Title, present exactly when the Layout has
-   * Expanded it (ADR 0064).
-   *
-   * A slot rather than an `expanded` flag or a second component. The ADR's claim
-   * is that an Expanded Card *is* the Card, bigger — one component with a region
-   * makes that structural: the same paper, the same rail, the same Title, the
-   * same `data-state` matrix, plus this. An `ExpandedCanvasCard` beside it would
-   * assert the claim in prose and deny it in the module graph, and would double
-   * the interaction-state union `CanvasCardProps` already encodes.
-   *
-   * The presence of the slot *is* the Expanded state, so the two cannot
-   * disagree. What fills it belongs to the Card's kind, which owns everything
-   * past the Title (ADR 0051): the Markdown kind's is `MarkdownCardBody`. The
-   * Alias kind has no Expanded front yet — ADR 0064 leaves it open — so nothing
-   * offers this for one.
-   */
-  readonly content?: ReactNode;
   /** Present only when activating the displayed Title may begin a rename. */
   readonly onBeginTitleEdit?: () => void;
-  /** Toggle this Card between its collapsed and Expanded states. */
+  /** Request that authored state open or close this Card. */
   readonly onOpenChange?: (open: boolean) => void;
   /**
    * Put a caret in this Card's kind-owned content.
@@ -96,6 +98,7 @@ export type CanvasCardProps = CanvasCardCommonProps &
  * construction and needs no claim the compiler cannot check (ADR 0062).
  */
 type CanvasCardStyle = CSSProperties & { readonly '--canvas-card-graph': string };
+type Mutable<T> = { -readonly [K in keyof T]: T[K] };
 
 /**
  * The one visual Card front shared by the production canvas and its stories.
@@ -111,23 +114,23 @@ type CanvasCardStyle = CSSProperties & { readonly '--canvas-card-graph': string 
  * What the rail's Edit control runs, or `undefined` when the Card has no such
  * control to draw.
  *
- * On an Expanded Card it is simply the caret operation the caller supplied. On a
- * **collapsed** one it is ADR 0066's rule — open the Card, then place the caret
+ * On an open Card it is simply the caret operation the caller supplied. On a
+ * **closed** one it is ADR 0066's rule — open the Card, then place the caret
  * — composed from the Card's own two existing operations and nothing else. Opening is not reimplemented or
  * approximated here: `onOpenChange` is the same call the Open control makes, so
  * the growth, the neighbours' displacement and the transition are the ones
  * opening always produces.
  *
- * A collapsed Card that cannot be opened has no Edit control, because the first
+ * A closed Card that cannot be opened has no Edit control, because the first
  * half of that pair would be missing and the caret would have nowhere to land.
  */
 const contentEditAction = (
-  content: ReactNode | undefined,
+  open: boolean,
   onOpenChange: ((open: boolean) => void) | undefined,
   onBeginContentEdit: (() => void) | undefined,
 ): (() => void) | undefined => {
   if (onBeginContentEdit === undefined) return undefined;
-  if (content !== undefined) return onBeginContentEdit;
+  if (open) return onBeginContentEdit;
   if (onOpenChange === undefined) return undefined;
   return () => {
     onOpenChange(true);
@@ -136,32 +139,34 @@ const contentEditAction = (
 };
 
 export function CanvasCard(props: CanvasCardProps) {
-  const {
-    front,
-    title,
-    graphColor,
-    content,
-    onBeginTitleEdit,
-    onOpenChange,
-    onBeginContentEdit,
-    state,
-  } = props;
+  const { front, title, graphColor, onBeginTitleEdit, onOpenChange, onBeginContentEdit, state } =
+    props;
+  const open = front.kind === 'markdown' && front.open;
   /**
-   * The edit running inside the content slot, published by whatever fills it.
+   * The edit running inside the Markdown front this Card owns.
    *
-   * State rather than a prop because the slot is an opaque `ReactNode` and the
-   * caret is not in anything this component or its caller holds — `CanvasCard`
-   * asks the content, and the content answers (`card-content-edit.ts`).
+   * State rather than a second prop because the caret lives inside the body —
+   * `CanvasCard` asks its body, and the body answers (`card-content-edit.ts`).
    */
   const [contentEdit, setContentEdit] = useState<CardContentEdit | null>(null);
   const editControl = useRef<HTMLButtonElement>(null);
   const contentEditingWas = useRef(false);
-  const beginContentEdit = contentEditAction(content, onOpenChange, onBeginContentEdit);
+  const beginContentEdit = contentEditAction(open, onOpenChange, onBeginContentEdit);
   const showActions =
     state !== 'dragging' &&
     state !== 'editing' &&
     (contentEdit !== null || onOpenChange !== undefined || beginContentEdit !== undefined);
   const style: CanvasCardStyle = { '--canvas-card-graph': graphColor };
+  const markdownBodyProps: Mutable<
+    Pick<MarkdownCardBodyProps, 'onBeginEdit' | 'editor' | 'autoFocus'>
+  > = {};
+  if (onBeginContentEdit !== undefined) markdownBodyProps.onBeginEdit = onBeginContentEdit;
+  if (front.kind === 'markdown' && front.editor !== undefined) {
+    markdownBodyProps.editor = front.editor;
+  }
+  if (front.kind === 'markdown' && front.autoFocusEditor !== undefined) {
+    markdownBodyProps.autoFocus = front.autoFocusEditor;
+  }
 
   useLayoutEffect(() => {
     if (contentEditingWas.current && contentEdit === null) editControl.current?.focus();
@@ -178,10 +183,9 @@ export function CanvasCard(props: CanvasCardProps) {
       data-state={state}
       // Read by `canvas-card.css` for the two things Expanding changes about
       // the Card itself: it fills the box the Layout gave it rather than the
-      // collapsed constant, and its content fills the space above the Title.
-      // Derived from the slot, so there is one fact here and not two that can
-      // disagree.
-      data-expanded={content !== undefined}
+      // closed constant, and its content fills the space above the Title.
+      // Derived from the Markdown front's authored state.
+      data-expanded={open}
       // The rail is normally revealed with the Card and hidden again at rest.
       // A running edit is not a hover, so the controls that end it are read off
       // this instead — an author writing in the body must be able to see the way
@@ -218,7 +222,7 @@ export function CanvasCard(props: CanvasCardProps) {
                 variant="ghost"
                 size="icon"
                 className="card__rail-action nodrag nopan"
-                aria-label={`${content === undefined ? 'Open' : 'Close'} Card ${title}`}
+                aria-label={`${open ? 'Close' : 'Open'} Card ${title}`}
                 // Closing mid-edit would drop the Card's box out from under a
                 // live caret with a draft in it. The control keeps its slot and
                 // goes disabled rather than disappearing: the rail's row does not
@@ -227,15 +231,15 @@ export function CanvasCard(props: CanvasCardProps) {
                 disabled={contentEdit !== null}
                 onClick={(event) => {
                   event.stopPropagation();
-                  onOpenChange(content === undefined);
+                  onOpenChange(!open);
                 }}
                 onPointerDown={(event) => event.stopPropagation()}
                 onKeyDown={(event) => event.stopPropagation()}
               >
-                {content === undefined ? (
-                  <OpenCardIcon data-icon="inline-start" />
-                ) : (
+                {open ? (
                   <CloseCardIcon data-icon="inline-start" />
+                ) : (
+                  <OpenCardIcon data-icon="inline-start" />
                 )}
               </Button>
             )}
@@ -295,9 +299,15 @@ export function CanvasCard(props: CanvasCardProps) {
           inset so a Title sits off the Card's border; a writing surface brings
           its own gutter and padding and has to reach the paper's edges, and
           nesting it would draw one inset inside another. */}
-      {content !== undefined && (
+      {front.kind === 'markdown' && front.open && (
         <div className="canvas-card__content">
-          <CardContentEditProvider value={setContentEdit}>{content}</CardContentEditProvider>
+          <CardContentEditProvider value={setContentEdit}>
+            <MarkdownCardBody
+              source={front.source}
+              ariaLabel={`Markdown source of ${title}`}
+              {...markdownBodyProps}
+            />
+          </CardContentEditProvider>
         </div>
       )}
     </Card>

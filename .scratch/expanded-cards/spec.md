@@ -15,7 +15,7 @@ Read ADR 0064 first. Nothing here reopens it.
 | `core` | A Layout's per-Card value becomes a rect. One new schema, split from the shared point. |
 | `graph` | `Placement` becomes card-to-rect and gains the displacement, in both directions. |
 | `react-flow-adapter` | `CardNode` draws an expanded front. Node size and handle geometry already come per Card. |
-| `ui` | `CanvasCard` gains a content slot; the Markdown kind gains a body surface that owns its caret. |
+| `ui` | `CanvasCard` becomes the deep Markdown front; its body surface and caret are internal implementation. |
 | `app` | `openedCardId` and the pane are deleted; three completions are added; the projection carries rects. |
 | `persistence`, `http` | Nothing. The Space is one `Json` document (`src/prisma/contract.prisma`), so an additive field needs no migration. |
 
@@ -114,20 +114,15 @@ Two things this rule does **not** reach, both of which stay discontinuous and sh
 
 The node's `zIndex` must be raised while Expanded. React Flow paints in node order, so without it a Card grows *underneath* whatever was declared after it. Two Cards Expanded at the same z-index still resolve by document order, which is nobody's rule — decide it (most recently opened on top is the obvious answer, and it needs a per-Card ordinal the Layout does not have, so the honest first answer is document order, stated).
 
-## 5. `ui` — one Card, one slot, and the kind's own body
+## 5. `ui` — one deep Card and the kind's own body
 
-**`CanvasCard` gains a content slot, not an expanded variant.**
+**`CanvasCard` owns its kind's complete front, not a content slot callers assemble.**
 
-```ts
-/** What this Card draws below its Title, present exactly when the Card is Expanded. */
-readonly content?: ReactNode;
-```
+The claim of ADR 0064 is that an open Card *is* the Card, bigger. One deep component makes that structural: same rail, same title, same paper and the same interaction-state matrix, with the Markdown source rendered when authored open state says it is present. A second open variant would deny that claim in the module graph; an opaque slot would instead make every caller reconstruct the Card's implementation and coordinate body presence with Open/Close themselves.
 
-The claim of ADR 0064 is that an Expanded Card *is* the Card, bigger. One component with a slot makes that structural: same rail, same title, same paper, same `data-state` matrix, plus a region. A second `ExpandedCanvasCard` component would assert the claim in prose while denying it in the module graph, and would double the interaction-state matrix that `CanvasCardProps`'s discriminated union already encodes.
+The interface accepts the Markdown source, authored open state and operations. It does not own Layout state or geometry: those remain with application authoring and React Flow. The implementation constructs the **kind's** body surface, because the kind owns everything beyond the Title (ADR 0051):
 
-The slot is filled by the **kind's** body surface, because the kind owns everything beyond the Title (ADR 0051):
-
-- `MarkdownCardBody` — the source. Draws the bytes at rest; a double click puts a caret in it. It owns the draft, `Escape` (abandon) and `Mod-Enter` (commit), which are exactly the keys `MarkdownSourceEditor` withholds from CodeMirror for its surface to spend (ADR 0063, ADR 0048). A blur ends nothing: those two keys and the two rail controls that pair with them are the whole of how an edit ends (ADR 0066). Its at-rest padding is set to land the text where the editor will put it, so entering adds a caret, a gutter rule and line numbers without moving a word — the prototype's CSS has the working values.
+- `MarkdownCardBody` — private implementation of the Markdown Card front. Draws the bytes at rest and owns the draft, `Escape` (abandon) and `Mod-Enter` (commit), which are exactly the keys `MarkdownSourceEditor` withholds from CodeMirror for its surface to spend (ADR 0063, ADR 0048). A blur ends nothing: those two keys and the two rail controls that pair with them are the whole of how one ends (ADR 0066). Its at-rest padding is set to land the text where the editor will put it, so entering adds a caret, a gutter rule and line numbers without moving a word.
 - Alias and Space: not in this change (ADR 0064).
 
 **The lazy split has to move, and this is the part to think hardest about.** `MarkdownSourceEditor` is reached today through `packages/app/src/components/markdown-source-editor-lazy.ts`, the single negated entry in an ESLint zone that otherwise bars `@project/ui/*`, and `test/unit/codemirror-encapsulation.test.ts` holds `packages/app/src` to dynamic-import-only. If `MarkdownCardBody` lives in `ui` and imports the editor statically, the CodeMirror stack returns to the initial bundle and ADR 0063's stated payoff is gone.

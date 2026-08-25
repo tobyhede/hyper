@@ -1,6 +1,6 @@
 import { useRef, useState, type CSSProperties } from 'react';
 import type { Story } from '@ladle/react';
-import { Button, CanvasCard, MarkdownCardBody } from '@project/ui';
+import { Button, CanvasCard, type CanvasCardFront } from '@project/ui';
 import { cardSizeVars } from '#src/card';
 
 export default { title: 'Components/Card/Editing' };
@@ -28,18 +28,14 @@ function TitleEditingCard({ initiallyOpen }: { readonly initiallyOpen: boolean }
       >
         {editing ? (
           <CanvasCard
-            front={{ kind: 'markdown' }}
+            front={
+              open
+                ? { kind: 'markdown', source: '## Open Card body', open: true }
+                : { kind: 'markdown', source: '## Open Card body', open: false }
+            }
             state="editing"
             title={title}
             graphColor="#ffc53d"
-            content={
-              open ? (
-                <MarkdownCardBody
-                  source="## Open Card body"
-                  ariaLabel={`Markdown source of ${title}`}
-                />
-              ) : undefined
-            }
             onOpenChange={setOpen}
             onCompleteTitleEdit={(draft) => {
               if (draft.trim().length === 0) return 'A Card title is required.';
@@ -52,18 +48,14 @@ function TitleEditingCard({ initiallyOpen }: { readonly initiallyOpen: boolean }
           />
         ) : (
           <CanvasCard
-            front={{ kind: 'markdown' }}
+            front={
+              open
+                ? { kind: 'markdown', source: '## Open Card body', open: true }
+                : { kind: 'markdown', source: '## Open Card body', open: false }
+            }
             state="rest"
             title={title}
             graphColor="#ffc53d"
-            content={
-              open ? (
-                <MarkdownCardBody
-                  source="## Open Card body"
-                  ariaLabel={`Markdown source of ${title}`}
-                />
-              ) : undefined
-            }
             onOpenChange={setOpen}
             onBeginTitleEdit={() => setEditing(true)}
           />
@@ -109,21 +101,17 @@ export const Markdown: Story = () => {
   const [mode, setMode] = useState<Mode>('rendered');
   const [open, setOpen] = useState(true);
   const editing = mode !== 'rendered';
-  const body = editing ? (
-    <MarkdownCardBody
-      source={source}
-      ariaLabel="Markdown source of Strategies"
-      onBeginEdit={() => setMode('focused')}
-      autoFocus={mode === 'focused'}
-      editor={{ onComplete: setSource, onEnd: () => setMode('rendered') }}
-    />
-  ) : (
-    <MarkdownCardBody
-      source={source}
-      ariaLabel="Markdown source of Strategies"
-      onBeginEdit={() => setMode('focused')}
-    />
-  );
+  const front: CanvasCardFront = editing
+    ? {
+        kind: 'markdown',
+        source,
+        open: true,
+        autoFocusEditor: mode === 'focused',
+        editor: { onComplete: setSource, onEnd: () => setMode('rendered') },
+      }
+    : open
+      ? { kind: 'markdown', source, open: true }
+      : { kind: 'markdown', source, open: false };
 
   return (
     <div className="flex flex-col items-start gap-3 p-8">
@@ -140,11 +128,10 @@ export const Markdown: Story = () => {
       </div>
       <div style={openFrame}>
         <CanvasCard
-          front={{ kind: 'markdown' }}
+          front={front}
           state="rest"
           title="Strategies"
           graphColor="#ffc53d"
-          content={open ? body : undefined}
           onOpenChange={setOpen}
           onBeginContentEdit={() => setMode('focused')}
         />

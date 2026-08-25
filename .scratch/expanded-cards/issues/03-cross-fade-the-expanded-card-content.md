@@ -2,7 +2,7 @@
 
 **What to build:** Give the Expanded Card's content a real enter and exit, so nothing inside the Card appears or vanishes at full opacity while the box around it is still moving.
 
-**Blocked by:** 02 — the node box must be the single animated element and `.canvas-card` must declare no size before content timing means anything. Fading content against a box that snaps just moves the discontinuity.
+**Blocked by:** 02 — the node box must be the single animated element; and 05 — the Card must own Markdown body presence before it can own that body's exit. Fading content against a box that snaps or a body callers mount just moves the discontinuity.
 
 **Status:** ready-for-agent
 

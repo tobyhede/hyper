@@ -1,13 +1,6 @@
 import { useRef } from 'react';
 import { Handle, NodeResizer, Position, useConnection, type NodeProps } from '@xyflow/react';
-import {
-  CanvasCard,
-  CardContent,
-  MarkdownCardBody,
-  type CanvasCardFront,
-  type CanvasCardProps,
-  type MarkdownCardBodyProps,
-} from '@project/ui';
+import { CanvasCard, CardContent, type CanvasCardFront, type CanvasCardProps } from '@project/ui';
 import type { CardFlowNode, CardHandle } from './projection';
 import { AUTHORING_HANDLE_DIAMETER, GRAPH_PORT_DIAMETER } from './authoring-handle';
 
@@ -113,8 +106,23 @@ export function CardNode({ data, selected, dragging, isConnectable }: NodeProps<
   // Alias front carries the Target title as required. The empty string is how
   // that reaches `CanvasCard` as "no Target to name", and `CanvasCard` draws no
   // Target line for it rather than an empty one.
+  const markdownFront: CanvasCardFront =
+    data.bodyEditor !== undefined
+      ? {
+          kind: 'markdown',
+          source: data.body ?? '',
+          open: true,
+          editor: data.bodyEditor,
+        }
+      : data.expanded === true
+        ? { kind: 'markdown', source: data.body ?? '', open: true }
+        : {
+            kind: 'markdown',
+            source: data.body ?? '',
+            open: false,
+          };
   const front: CanvasCardFront =
-    data.kind === 'alias' ? { kind: 'alias', aliasOf: data.aliasOf ?? '' } : { kind: 'markdown' };
+    data.kind === 'alias' ? { kind: 'alias', aliasOf: data.aliasOf ?? '' } : markdownFront;
 
   const renderHandle = (handle: CardHandle, type: 'source' | 'target') => (
     <Handle
@@ -208,33 +216,22 @@ export function CardNode({ data, selected, dragging, isConnectable }: NodeProps<
   const titleEditor = data.bodyEditor === undefined ? data.titleEditor : undefined;
 
   /*
-   * What an Expanded Card draws below its title (ADR 0064).
+   * What an open Card draws below its title (ADR 0064).
    *
    * **Not a fourth arm of the branch below.** It is a prop handed to whichever
-   * arm the *title* state selects, so a Card can be Expanded while it is being
+   * arm the *title* state selects, so a Card can be open while it is being
    * renamed — expansion is what the Layout authored and the caret is a gesture,
    * and a branch would have made them exclusive. It is not `showContent`
    * either: both presenting and expanding draw through the one rendered-Markdown
-   * seam, while the Expanded Card swaps that display for source only during an
+   * seam, while the open Card swaps that display for source only during an
    * edit.
    *
-   * The Alias kind has no Expanded front yet, so it answers `undefined` and the
-   * Card draws its collapsed self. `CanvasCard` reads the slot's presence as the
-   * Expanded state, so this is also what says whether the Card fills its box —
-   * one fact, not two that can disagree.
+   * The Alias kind has no open front yet, so authored `expanded` state is false
+   * for one. `CanvasCard` receives the Markdown source, authored open state and
+   * live editor as one front rather than receiving body markup from this adapter.
    */
   const resize = data.resize;
-  const bodyProps: Mutable<Pick<MarkdownCardBodyProps, 'onBeginEdit' | 'editor'>> = {};
-  if (data.onBeginBodyEditing !== undefined) bodyProps.onBeginEdit = data.onBeginBodyEditing;
-  if (data.bodyEditor !== undefined) bodyProps.editor = data.bodyEditor;
-  const content =
-    data.expanded === true && data.kind === 'markdown' ? (
-      <MarkdownCardBody
-        source={data.body ?? ''}
-        ariaLabel={`Markdown source of ${data.title}`}
-        {...bodyProps}
-      />
-    ) : undefined;
+  const open = data.expanded === true && data.kind === 'markdown';
 
   const onReturnFocus = () => {
     inner.current?.closest<HTMLElement>('.react-flow__node')?.focus();
@@ -251,7 +248,7 @@ export function CardNode({ data, selected, dragging, isConnectable }: NodeProps<
       // The wrapper React Flow sizes from `node.width`/`node.height` is this
       // element's parent, so an Expanded Card only reaches its own rect if this
       // one stops declaring the collapsed constant. Read by `styles.css`.
-      data-expanded={content !== undefined}
+      data-expanded={open}
     >
       {/*
         React Flow's own resizer, on an Expanded Card the author has selected.
@@ -266,7 +263,7 @@ export function CardNode({ data, selected, dragging, isConnectable }: NodeProps<
         those handles would be invisible to that rule; anything before the Card
         is harmless to it.
       */}
-      {content !== undefined && resize !== undefined && (
+      {open && resize !== undefined && (
         <NodeResizer
           isVisible={visuallySelected}
           minWidth={resize.minWidth}
@@ -290,7 +287,6 @@ export function CardNode({ data, selected, dragging, isConnectable }: NodeProps<
           title={data.title}
           graphColor={data.activeGraphColor}
           state="editing"
-          content={content}
           onCompleteTitleEdit={titleEditor.onComplete}
           onCancelTitleEdit={titleEditor.onCancel}
           onReturnFocus={onReturnFocus}
@@ -302,7 +298,6 @@ export function CardNode({ data, selected, dragging, isConnectable }: NodeProps<
           title={data.title}
           graphColor={data.activeGraphColor}
           state={dragging ? 'dragging' : visuallySelected ? 'selected' : 'rest'}
-          content={content}
           {...canvasCardOptionalProps}
         />
       )}

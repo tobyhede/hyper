@@ -11,11 +11,14 @@ export type { StatusBusyProps, StatusFailureProps } from './StatusPanel';
 export { CardContent } from './CardContent';
 export type { CardContentProps } from './CardContent';
 export { CanvasCard } from './CanvasCard';
-export type { CanvasCardFront, CanvasCardProps, CanvasCardState } from './CanvasCard';
+export type {
+  CanvasCardBodyEditor,
+  CanvasCardFront,
+  CanvasCardProps,
+  CanvasCardState,
+} from './CanvasCard';
 export { CardRail } from './CardRail';
 export type { CardRailProps } from './CardRail';
-export { MarkdownCardBody } from './MarkdownCardBody';
-export type { MarkdownCardBodyEditor, MarkdownCardBodyProps } from './MarkdownCardBody';
 export { CardKindIcon } from './CardKindIcon';
 export type { CardKindIconProps } from './CardKindIcon';
 export { CardSearchCombobox } from './CardSearchCombobox';

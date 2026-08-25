@@ -1,6 +1,6 @@
-import { useState, type CSSProperties, type ReactNode } from 'react';
+import { useState, type CSSProperties } from 'react';
 import type { Story } from '@ladle/react';
-import { CanvasCard, MarkdownCardBody, type CanvasCardState } from '@project/ui';
+import { CanvasCard, type CanvasCardState } from '@project/ui';
 import { cardSizeVars } from '#src/card';
 import { CanvasCardSpecimen } from '../support/CanvasCardSpecimen';
 import { CatalogueSection, Specimen } from '../support/Catalogue';
@@ -51,7 +51,6 @@ export const States: Story = () => (
 );
 
 interface OpenProps {
-  content?: ReactNode;
   onOpenChange?: (open: boolean) => void;
 }
 
@@ -130,7 +129,9 @@ function Instance({
   const [dragging, setDragging] = useState(false);
   const [open, setOpen] = useState(false);
   const front =
-    aliasOf === undefined ? ({ kind: 'markdown' } as const) : { kind: 'alias' as const, aliasOf };
+    aliasOf === undefined
+      ? ({ kind: 'markdown', source: 'Markdown content', open } as const)
+      : { kind: 'alias' as const, aliasOf };
   const state: Exclude<CanvasCardState, 'editing'> = dragging
     ? 'dragging'
     : selected
@@ -138,7 +139,6 @@ function Instance({
       : 'rest';
   const openProps: OpenProps = {};
   if (front.kind === 'markdown') {
-    if (open) openProps.content = <p>Markdown content</p>;
     openProps.onOpenChange = setOpen;
   }
 
@@ -211,6 +211,7 @@ A **Layout** owns explicit Card rects. The strategy only supplies a computed Vie
 /** The Card's actual Open and Close operation, including its change in authored size. */
 export const OpenAndClose: Story = () => {
   const [open, setOpen] = useState(false);
+  const [longOpen, setLongOpen] = useState(true);
 
   return (
     <div className="flex flex-wrap items-start gap-8 p-8">
@@ -218,34 +219,41 @@ export const OpenAndClose: Story = () => {
         <p className="text-xs text-muted-foreground">{open ? 'Open' : 'Closed'}</p>
         <div style={open ? openFrame : closedFrame}>
           <CanvasCard
-            front={{ kind: 'markdown' }}
+            front={
+              open
+                ? { kind: 'markdown', source: openMarkdown, open: true }
+                : { kind: 'markdown', source: openMarkdown, open: false }
+            }
             state="rest"
             title="Strategies"
             graphColor="#ffc53d"
-            content={
-              open ? (
-                <MarkdownCardBody source={openMarkdown} ariaLabel="Markdown source of Strategies" />
-              ) : undefined
-            }
             onOpenChange={setOpen}
           />
         </div>
       </section>
-      <section aria-label="Long Open Card" className="flex flex-col gap-2">
-        <p className="text-xs text-muted-foreground">Open · long Markdown</p>
-        <div style={openFrame}>
+      <section aria-label="Long Markdown Card" className="flex flex-col gap-2">
+        <p className="text-xs text-muted-foreground">
+          {longOpen ? 'Open' : 'Closed'} · long Markdown
+        </p>
+        <div style={longOpen ? openFrame : closedFrame}>
           <CanvasCard
-            front={{ kind: 'markdown' }}
+            front={
+              longOpen
+                ? {
+                    kind: 'markdown',
+                    source: `${openMarkdown}\n\n### A deliberately long section\n\n${openMarkdown}\n\n${openMarkdown}`,
+                    open: true,
+                  }
+                : {
+                    kind: 'markdown',
+                    source: `${openMarkdown}\n\n### A deliberately long section\n\n${openMarkdown}\n\n${openMarkdown}`,
+                    open: false,
+                  }
+            }
             state="rest"
             title="Long Markdown"
             graphColor="#ffc53d"
-            content={
-              <MarkdownCardBody
-                source={`${openMarkdown}\n\n### A deliberately long section\n\n${openMarkdown}\n\n${openMarkdown}`}
-                ariaLabel="Markdown source of Long Markdown"
-              />
-            }
-            onOpenChange={() => undefined}
+            onOpenChange={setLongOpen}
           />
         </div>
       </section>

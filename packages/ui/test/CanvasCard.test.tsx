@@ -1,39 +1,13 @@
 import '@testing-library/jest-dom/vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
-import { useEffect } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { CanvasCard } from '../src';
-import { usePublishCardContentEdit } from '../src/card-content-edit';
-
-/**
- * The smallest thing that fills a Card's content slot and says it holds a caret.
- *
- * Stands in for `MarkdownCardBody`, which reaches CodeMirror across a dynamic
- * import — what is under test here is the Card's half of the seam: that it draws
- * what the content published and withdraws its own controls while it does.
- * `MarkdownCardBody.test.tsx` runs the same rail against the real body.
- */
-function ContentRunningAnEdit({
-  onSave,
-  onCancel,
-}: {
-  readonly onSave: () => void;
-  readonly onCancel: () => void;
-}) {
-  const publish = usePublishCardContentEdit();
-  useEffect(() => {
-    if (publish === null) return undefined;
-    publish({ onSave, onCancel });
-    return () => publish(null);
-  }, [onCancel, onSave, publish]);
-  return <p>Markdown</p>;
-}
 
 describe('CanvasCard kind and interaction state', () => {
   it('presents a Markdown front and its resting state', () => {
     render(
       <CanvasCard
-        front={{ kind: 'markdown' }}
+        front={{ kind: 'markdown', source: 'Markdown', open: true }}
         state="rest"
         title="Strategies"
         graphColor="#ffc53d"
@@ -70,7 +44,7 @@ describe('CanvasCard kind and interaction state', () => {
   it('reflects dragging as its own external state, distinct from selected', () => {
     render(
       <CanvasCard
-        front={{ kind: 'markdown' }}
+        front={{ kind: 'markdown', source: 'Markdown', open: true }}
         state="dragging"
         title="Closing"
         graphColor="#ffc53d"
@@ -85,9 +59,31 @@ describe('CanvasCard kind and interaction state', () => {
 });
 
 describe('CanvasCard Open and Close operation', () => {
+  it('owns the rendered body of an open Markdown front', () => {
+    const onOpenChange = vi.fn();
+    render(
+      <CanvasCard
+        front={{ kind: 'markdown', source: '## Authored placement', open: true }}
+        state="rest"
+        title="A"
+        graphColor="#ffc53d"
+        onOpenChange={onOpenChange}
+      />,
+    );
+
+    expect(screen.getByRole('heading', { name: 'Authored placement' })).toBeVisible();
+    screen.getByRole('button', { name: 'Close Card A' }).click();
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+
   it('offers no action when neither operation is supplied', () => {
     render(
-      <CanvasCard front={{ kind: 'markdown' }} state="selected" title="A" graphColor="#ffc53d" />,
+      <CanvasCard
+        front={{ kind: 'markdown', source: '', open: false }}
+        state="selected"
+        title="A"
+        graphColor="#ffc53d"
+      />,
     );
 
     expect(screen.queryByRole('button', { name: /Card A$/ })).not.toBeInTheDocument();
@@ -97,7 +93,7 @@ describe('CanvasCard Open and Close operation', () => {
     const onOpenChange = vi.fn();
     const { rerender } = render(
       <CanvasCard
-        front={{ kind: 'markdown' }}
+        front={{ kind: 'markdown', source: '', open: false }}
         state="selected"
         title="A"
         graphColor="#ffc53d"
@@ -112,11 +108,10 @@ describe('CanvasCard Open and Close operation', () => {
 
     rerender(
       <CanvasCard
-        front={{ kind: 'markdown' }}
+        front={{ kind: 'markdown', source: 'Markdown', open: true }}
         state="selected"
         title="A"
         graphColor="#ffc53d"
-        content={<p>Markdown</p>}
         onOpenChange={onOpenChange}
       />,
     );
@@ -131,7 +126,7 @@ describe('CanvasCard Open and Close operation', () => {
     const onOpenChange = vi.fn();
     const { rerender } = render(
       <CanvasCard
-        front={{ kind: 'markdown' }}
+        front={{ kind: 'markdown', source: '', open: false }}
         state="selected"
         title="A"
         graphColor="#ffc53d"
@@ -156,11 +151,10 @@ describe('CanvasCard Open and Close operation', () => {
 
     rerender(
       <CanvasCard
-        front={{ kind: 'markdown' }}
+        front={{ kind: 'markdown', source: 'Markdown', open: true }}
         state="selected"
         title="A"
         graphColor="#ffc53d"
-        content={<p>Markdown</p>}
         onOpenChange={onOpenChange}
         onBeginContentEdit={onBeginContentEdit}
       />,
@@ -176,7 +170,7 @@ describe('CanvasCard Open and Close operation', () => {
   it('withholds Edit from a collapsed Card that cannot be opened', () => {
     render(
       <CanvasCard
-        front={{ kind: 'markdown' }}
+        front={{ kind: 'markdown', source: '', open: false }}
         state="selected"
         title="A"
         graphColor="#ffc53d"
@@ -190,16 +184,20 @@ describe('CanvasCard Open and Close operation', () => {
   });
 
   it('replaces Edit with the two ends of the edit its content is running, keeping Close', () => {
-    const onSave = vi.fn();
-    const onCancel = vi.fn();
+    const onComplete = vi.fn();
+    const onEnd = vi.fn();
     const onBeginContentEdit = vi.fn();
     render(
       <CanvasCard
-        front={{ kind: 'markdown' }}
+        front={{
+          kind: 'markdown',
+          source: 'Markdown',
+          open: true,
+          editor: { onComplete, onEnd },
+        }}
         state="rest"
         title="A"
         graphColor="#ffc53d"
-        content={<ContentRunningAnEdit onSave={onSave} onCancel={onCancel} />}
         onOpenChange={vi.fn()}
         onBeginContentEdit={onBeginContentEdit}
         onBeginTitleEdit={vi.fn()}
@@ -224,21 +222,25 @@ describe('CanvasCard Open and Close operation', () => {
       'true',
     );
 
-    screen.getByRole('button', { name: 'Save Card A' }).click();
-    expect(onSave).toHaveBeenCalledOnce();
-    screen.getByRole('button', { name: 'Cancel editing Card A' }).click();
-    expect(onCancel).toHaveBeenCalledOnce();
+    fireEvent.click(screen.getByRole('button', { name: 'Save Card A' }));
+    expect(onComplete).toHaveBeenCalledOnce();
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel editing Card A' }));
+    expect(onEnd).toHaveBeenCalledTimes(2);
     expect(onBeginContentEdit).not.toHaveBeenCalled();
   });
 
   it('draws those two ends as the rail actions beside them, not as a second kind', () => {
     render(
       <CanvasCard
-        front={{ kind: 'markdown' }}
+        front={{
+          kind: 'markdown',
+          source: 'Markdown',
+          open: true,
+          editor: { onComplete: vi.fn(), onEnd: vi.fn() },
+        }}
         state="rest"
         title="A"
         graphColor="#ffc53d"
-        content={<ContentRunningAnEdit onSave={vi.fn()} onCancel={vi.fn()} />}
         onOpenChange={vi.fn()}
       />,
     );
@@ -262,11 +264,15 @@ describe('CanvasCard Open and Close operation', () => {
   it('keeps the caret in the content when one of those two ends is pressed', () => {
     render(
       <CanvasCard
-        front={{ kind: 'markdown' }}
+        front={{
+          kind: 'markdown',
+          source: 'Markdown',
+          open: true,
+          editor: { onComplete: vi.fn(), onEnd: vi.fn() },
+        }}
         state="rest"
         title="A"
         graphColor="#ffc53d"
-        content={<ContentRunningAnEdit onSave={vi.fn()} onCancel={vi.fn()} />}
         onOpenChange={vi.fn()}
       />,
     );
@@ -283,7 +289,7 @@ describe('CanvasCard Open and Close operation', () => {
   it('hides both actions while the title is being edited', () => {
     render(
       <CanvasCard
-        front={{ kind: 'markdown' }}
+        front={{ kind: 'markdown', source: '', open: false }}
         state="editing"
         title="A"
         graphColor="#ffc53d"
@@ -300,7 +306,7 @@ describe('CanvasCard Open and Close operation', () => {
   it('hides both actions while dragging', () => {
     render(
       <CanvasCard
-        front={{ kind: 'markdown' }}
+        front={{ kind: 'markdown', source: '', open: false }}
         state="dragging"
         title="A"
         graphColor="#ffc53d"
@@ -314,7 +320,14 @@ describe('CanvasCard Open and Close operation', () => {
 
 describe('CanvasCard title', () => {
   it('draws a heading, not an editor, when no title-edit operation is supplied', () => {
-    render(<CanvasCard front={{ kind: 'markdown' }} state="rest" title="A" graphColor="#ffc53d" />);
+    render(
+      <CanvasCard
+        front={{ kind: 'markdown', source: '', open: false }}
+        state="rest"
+        title="A"
+        graphColor="#ffc53d"
+      />,
+    );
 
     const heading = screen.getByRole('heading', { name: 'A' });
     expect(heading).toHaveAttribute('data-editable', 'false');
@@ -326,7 +339,7 @@ describe('CanvasCard title', () => {
     const onBeginTitleEdit = vi.fn();
     render(
       <CanvasCard
-        front={{ kind: 'markdown' }}
+        front={{ kind: 'markdown', source: '', open: false }}
         state="rest"
         title="A"
         graphColor="#ffc53d"
@@ -355,7 +368,7 @@ describe('CanvasCard title', () => {
     render(
       <div onClick={selectedCard} onKeyDown={pressedCard}>
         <CanvasCard
-          front={{ kind: 'markdown' }}
+          front={{ kind: 'markdown', source: '', open: false }}
           state="rest"
           title="A"
           graphColor="#ffc53d"
@@ -377,7 +390,7 @@ describe('CanvasCard title editor', () => {
   it('focuses and selects the draft on mount', () => {
     render(
       <CanvasCard
-        front={{ kind: 'markdown' }}
+        front={{ kind: 'markdown', source: '', open: false }}
         state="editing"
         title="A"
         graphColor="#ffc53d"
@@ -399,7 +412,7 @@ describe('CanvasCard title editor', () => {
     const onReturnFocus = vi.fn();
     render(
       <CanvasCard
-        front={{ kind: 'markdown' }}
+        front={{ kind: 'markdown', source: '', open: false }}
         state="editing"
         title="A"
         graphColor="#ffc53d"
@@ -433,7 +446,7 @@ describe('CanvasCard title editor', () => {
     render(
       <div onClick={leakedClick} onPointerDown={leakedPointer} onKeyDown={leakedKey}>
         <CanvasCard
-          front={{ kind: 'markdown' }}
+          front={{ kind: 'markdown', source: '', open: false }}
           state="editing"
           title="A"
           graphColor="#ffc53d"
@@ -474,7 +487,7 @@ describe('CanvasCard title editor', () => {
     const onCompleteTitleEdit = vi.fn(() => null);
     render(
       <CanvasCard
-        front={{ kind: 'markdown' }}
+        front={{ kind: 'markdown', source: '', open: false }}
         state="editing"
         title="A"
         graphColor="#ffc53d"
@@ -500,11 +513,11 @@ describe('CanvasCard title editor', () => {
   });
 });
 
-describe('CanvasCard Expanded content slot', () => {
-  it('draws nothing below its Title, and says so, until a caller fills the slot', () => {
+describe('CanvasCard open Markdown front', () => {
+  it('draws nothing below its Title while authored closed state says so', () => {
     render(
       <CanvasCard
-        front={{ kind: 'markdown' }}
+        front={{ kind: 'markdown', source: '', open: false }}
         state="rest"
         title="Strategies"
         graphColor="#ffc53d"
@@ -517,47 +530,42 @@ describe('CanvasCard Expanded content slot', () => {
     );
   });
 
-  it('draws the slot below its Title and reports itself Expanded when one is supplied', () => {
+  it('draws its Markdown below the Title and reports itself open', () => {
     render(
       <CanvasCard
-        front={{ kind: 'markdown' }}
+        front={{ kind: 'markdown', source: 'the Card’s own source', open: true }}
         state="rest"
         title="Strategies"
         graphColor="#ffc53d"
-        content={<p>the Card’s own source</p>}
       />,
     );
 
     const card = screen.getByRole('article', { name: 'Strategies' });
-    // The slot's presence *is* the Expanded state — one fact, so a Card cannot
-    // be sized as Expanded while drawing nothing (ADR 0064).
     expect(card).toHaveAttribute('data-expanded', 'true');
     expect(screen.getByText('the Card’s own source')).toBeVisible();
   });
 
-  it('keeps the Alias Target line above the slot, as one more thing the Card front draws', () => {
+  it('keeps the Alias front limited to the Target it owns', () => {
     render(
       <CanvasCard
         front={{ kind: 'alias', aliasOf: 'Strategies' }}
         state="rest"
         title="Strategy overview"
         graphColor="#35d6c3"
-        content={<p>a body</p>}
       />,
     );
 
     expect(screen.getByTestId('alias-marker')).toHaveTextContent('Strategies');
-    expect(screen.getByText('a body')).toBeVisible();
+    expect(screen.queryByText('a body')).not.toBeInTheDocument();
   });
 
-  it('holds the slot open while the Title is being renamed', () => {
+  it('holds the Markdown body open while the Title is being renamed', () => {
     render(
       <CanvasCard
-        front={{ kind: 'markdown' }}
+        front={{ kind: 'markdown', source: 'the Card’s own source', open: true }}
         state="editing"
         title="Strategies"
         graphColor="#ffc53d"
-        content={<p>the Card’s own source</p>}
         onCompleteTitleEdit={() => null}
         onCancelTitleEdit={vi.fn()}
         onReturnFocus={vi.fn()}

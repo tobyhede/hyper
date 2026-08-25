@@ -16,7 +16,7 @@ Ladle is the development surface for this ticket. A story may supply a state and
 
 - [ ] ADR 0066 owns the interaction this ticket builds — a closed Card offers Edit and Open, Edit on a closed Card opens it and then begins the edit, Save and Cancel replace Edit while one runs, and Close stays visible but disabled. Read it before the checklist below.
 - [ ] Start with `$shadcn-first-ui`; search `@project/ui` first and record any required deviation before adding interactive behavior or a new style block.
-- [ ] `CanvasCard` remains one component. Expansion is the presence of its kind-owned content slot, not a second `ExpandedCanvasCard` variant or an independent boolean that can disagree with the slot.
+- [ ] `CanvasCard` remains one deep component. Its Markdown front accepts source and authored open state and owns construction of the kind-owned body; callers do not fill an opaque content slot or introduce a second open variant.
 - [ ] The compact and Expanded Card use the same rail, paper, Title component, Title typography and horizontal inset. Expansion changes the Title's vertical position because content is revealed beneath it; it does not introduce an expanded-only font size, margin or line height.
 - [ ] Do not ship the review prototype's Animate.css or measured-FLIP experiments as the component contract. Motion is optional in this ticket; if included, it must animate the real layout displacement without changing typography or requiring magic distances, and reduced motion must be honored.
 - [ ] `MarkdownCardBody` owns rendered, editable and actively editing states. At rest it uses the same `RenderedMarkdown` parser and sanitizer as presentation mode.
@@ -54,4 +54,3 @@ These may remain review/development stories until issue 02 supplies ADR 0052's a
 ## Not in scope
 
 React Flow node sizing or animation, Layout authoring, displacement, resize completion, persistence, application camera behavior, or replacing the covering Card pane. Those are application integration and belong to issue 02 or to the earlier domain slices in `.scratch/expanded-cards/spec.md`.
-
