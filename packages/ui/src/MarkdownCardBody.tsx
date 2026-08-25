@@ -44,6 +44,36 @@ export interface MarkdownCardBodyProps {
   readonly className?: string;
 }
 
+interface MarkdownEditControlProps {
+  readonly ariaLabel: string;
+  readonly onBeginEdit: () => void;
+}
+
+/**
+ * The rendered Markdown's one edit target.
+ *
+ * This stays beside `MarkdownCardBody` rather than becoming a `Button` variant:
+ * its full-surface geometry, Card colours and disclosed pencil describe this
+ * composite alone. The shared Button continues to own native activation,
+ * keyboard behavior and focus semantics.
+ */
+function MarkdownEditControl({ ariaLabel, onBeginEdit }: MarkdownEditControlProps) {
+  return (
+    <Button
+      variant="ghost"
+      className="markdown-card-body__edit-control"
+      aria-label={`Edit ${ariaLabel}`}
+      onClick={(event) => {
+        event.stopPropagation();
+        onBeginEdit();
+      }}
+      onKeyDown={(event) => event.stopPropagation()}
+    >
+      <EditIcon />
+    </Button>
+  );
+}
+
 /**
  * The Markdown kind's Expanded front: rendered Markdown, on the Card (ADR 0064).
  *
@@ -213,42 +243,19 @@ export function MarkdownCardBody({
               onValueChange={setDraft}
             />
           </Suspense>
-          {/* The design system draws a key (`docs/agents/ui.md`), so the hint
-              composes `Kbd` rather than setting its own type. Both commit
-              modifiers are named because `onKeyDown` accepts both: a hint
-              reading ⌘ alone tells a Windows or Linux author to press a key
-              they have not got, and never mentions the one they have. Naming
-              the pair is what the repository can say honestly — it carries no
-              platform detection anywhere, and one seam for that belongs to a
-              surface that needs it rather than to this hint. */}
           <div className="markdown-card-body__shortcut-hint" aria-hidden="true">
-            <KbdGroup>
-              <Kbd>Ctrl/⌘</Kbd>
-              <Kbd>↵</Kbd>
-            </KbdGroup>
-            <span>Save</span>
-            <KbdGroup>
-              <Kbd>Esc</Kbd>
-            </KbdGroup>
-            <span>Cancel</span>
+            <KbdGroup className="markdown-card-body__shortcut-keys">
+              <Kbd keyName="modifier" variant="compact" />
+              <Kbd variant="compact">↵</Kbd>
+            </KbdGroup>{' '}
+            Save · <Kbd variant="compact">Esc</Kbd> Cancel
           </div>
         </>
       ) : (
         <>
           <RenderedMarkdown markdown={source} className="markdown-card-body__rendered card__body" />
           {onBeginEdit !== undefined && (
-            <Button
-              variant="ghost"
-              className="markdown-card-body__edit-control"
-              aria-label={`Edit ${ariaLabel}`}
-              onClick={(event) => {
-                event.stopPropagation();
-                onBeginEdit();
-              }}
-              onKeyDown={(event) => event.stopPropagation()}
-            >
-              <EditIcon />
-            </Button>
+            <MarkdownEditControl ariaLabel={ariaLabel} onBeginEdit={onBeginEdit} />
           )}
         </>
       )}

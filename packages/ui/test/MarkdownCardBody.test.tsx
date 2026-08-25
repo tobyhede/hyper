@@ -134,7 +134,11 @@ describe('MarkdownCardBody', () => {
     expect(editor.onComplete).toHaveBeenCalledTimes(1);
   });
 
-  it('names both commit modifiers in the shared key primitive', async () => {
+  it.each([
+    ['MacIntel', '⌘↵ Save · Esc Cancel'],
+    ['Win32', 'Ctrl↵ Save · Esc Cancel'],
+  ])('names the modifier for %s without changing the compact hint', async (platform, label) => {
+    const platformGetter = vi.spyOn(navigator, 'platform', 'get').mockReturnValue(platform);
     const { container } = render(
       body({ onBeginEdit: vi.fn(), editor: { onComplete: vi.fn(), onEnd: vi.fn() } }),
     );
@@ -142,13 +146,9 @@ describe('MarkdownCardBody', () => {
     const hint = container.querySelector('.markdown-card-body__shortcut-hint');
     if (hint === null) throw new Error('missing shortcut hint');
 
-    // The design system draws a key, not this surface (`docs/agents/ui.md`).
-    expect(hint.querySelectorAll('[data-slot="kbd"]').length).toBeGreaterThan(0);
-    // `onKeyDown` accepts `metaKey || ctrlKey`, so a hint naming only ⌘ tells a
-    // Windows or Linux author to press a key they do not have — and hides the
-    // binding they do.
-    expect(hint.textContent).toContain('Ctrl');
-    expect(hint.textContent).toContain('⌘');
+    expect(hint).toHaveTextContent(label);
+    expect(hint.querySelectorAll('[data-slot="kbd"]')).toHaveLength(3);
+    platformGetter.mockRestore();
   });
 
   // Two separate edits, so the lazy editor mounts twice — past the default budget.

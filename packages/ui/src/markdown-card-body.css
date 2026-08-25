@@ -153,8 +153,6 @@
   --markdown-source-line-number-font-size: 12px;
 }
 
-/* Geometry and placement only. The keys themselves are `Kbd`'s, so this sets no
-   type on them — it sizes the row and spaces the labels between the groups. */
 .markdown-card-body__shortcut-hint {
   position: absolute;
   inset-block-start: 0;
@@ -162,14 +160,20 @@
   z-index: 2;
   display: flex;
   align-items: center;
-  gap: 4px;
   height: 34px;
   color: var(--canvas-card-muted-color, currentcolor);
-  font-size: 10px;
-  line-height: 14px;
+  font:
+    10px/14px ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    monospace;
   letter-spacing: 0.02em;
   opacity: 0;
   pointer-events: none;
+}
+
+.markdown-card-body__shortcut-keys {
+  gap: 0;
 }
 
 .markdown-card-body--editing:focus-within .markdown-card-body__shortcut-hint {
