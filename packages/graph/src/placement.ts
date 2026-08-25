@@ -1,4 +1,10 @@
-import { COLLAPSED_CARD_SIZE, type CardId, type CardPlacement, type Layout } from '@project/core';
+import {
+  COLLAPSED_CARD_SIZE,
+  type CardId,
+  type CardPlacement,
+  type Layout,
+  type LayoutPosition,
+} from '@project/core';
 import type { LayoutStrategyGraph } from './layout';
 
 /** The brand's carrier. See `Placement` below for what the type means. */
@@ -177,18 +183,18 @@ function next(
   if (placed.length === 0) return authored;
 
   const merged = new Map<CardId, CardPlacement>(authored);
-  const displacement = drawn(authored);
   for (const cardId of placed) {
     const at = rendered.get(cardId);
-    const shifted = displacement.get(cardId);
     const original = authored.get(cardId);
     if (at !== undefined) {
+      const authoredAt = authoredPoint(authored, at, cardId);
       merged.set(
         cardId,
         point({
           ...at,
-          x: at.x - ((shifted?.x ?? 0) - (original?.x ?? 0)),
-          y: at.y - ((shifted?.y ?? 0) - (original?.y ?? 0)),
+          ...original,
+          x: authoredAt.x,
+          y: authoredAt.y,
         }),
       );
     }
@@ -196,6 +202,50 @@ function next(
 
   const nextPlacement = brand(merged);
   return equals(authored, nextPlacement) ? authored : nextPlacement;
+}
+
+/**
+ * Convert one point from drawn canvas coordinates back to Layout authorship.
+ *
+ * Each Expanded Card creates a step after its authored origin. In drawn space
+ * that step ends after the accumulated growth before it, so walking origins in
+ * order identifies exactly the growth already present in a reachable drawn
+ * coordinate. `movingCardId` excludes the Card being moved: a Card never
+ * displaces itself, even when it is Expanded.
+ *
+ * Coordinates inside a step's unreachable gap stay on its near side. That is
+ * ADR 0064's accepted step boundary; every coordinate produced by `drawn`
+ * remains an exact inverse.
+ */
+function authoredPoint(
+  placement: Placement,
+  at: LayoutPosition,
+  movingCardId?: CardId,
+): LayoutPosition {
+  const expanded = [...placement]
+    .filter(([cardId, point]) => cardId !== movingCardId && point.expanded !== undefined)
+    .map(([, point]) => point);
+
+  const invert = (coordinate: 'x' | 'y', size: 'width' | 'height', collapsed: number): number => {
+    const ordered = [...expanded].sort((left, right) => left[coordinate] - right[coordinate]);
+    let growth = 0;
+    let authored = at[coordinate];
+    for (const point of ordered) {
+      // The filter above establishes this for every entry.
+      const rect = point.expanded;
+      if (rect === undefined) continue;
+      growth += rect[size] - collapsed;
+      if (at[coordinate] > point[coordinate] + growth) {
+        authored -= rect[size] - collapsed;
+      }
+    }
+    return authored;
+  };
+
+  return {
+    x: invert('x', 'width', COLLAPSED_CARD_SIZE.width),
+    y: invert('y', 'height', COLLAPSED_CARD_SIZE.height),
+  };
 }
 
 /**
@@ -265,6 +315,7 @@ export const Placement = {
   fromEntries,
   equals,
   drawn,
+  authoredPoint,
   next,
   place,
   remove,

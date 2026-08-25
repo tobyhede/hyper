@@ -995,10 +995,11 @@ export function createSpaceAuthoring({
       }
       // Membership and a position, and nothing else: a re-added Card is detached,
       // and the Edges it once had are never inferred back.
+      const authoredAnchor = Placement.authoredPoint(completedPlacement, completion.anchor);
       completedPlacement = Placement.place(
         completedPlacement,
         completion.cardId,
-        freeAnchor(completedPlacement, completion.anchor),
+        freeAnchor(completedPlacement, authoredAnchor),
       );
     } else if (completion.kind === 'removed-card-from-layout') {
       if (!completedPlacement.has(completion.cardId)) {
@@ -1084,12 +1085,16 @@ export function createSpaceAuthoring({
     // Applied only now: conversion is over the Space as it stands, and these are
     // what the Edit adds to it and takes away.
     if (createdCard !== null) {
+      const authoredPosition = Placement.authoredPoint(
+        completedPlacement,
+        createdCard.position,
+      );
       completedPlacement = Placement.place(
         completedPlacement,
         createdCard.id,
         createdCard.avoidingOverlap
-          ? freeAnchor(completedPlacement, createdCard.position)
-          : createdCard.position,
+          ? freeAnchor(completedPlacement, authoredPosition)
+          : authoredPosition,
       );
     }
     if (deletedCardId !== undefined) {

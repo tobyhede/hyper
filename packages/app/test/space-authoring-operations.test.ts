@@ -174,6 +174,38 @@ describe('Add Card', () => {
     expect(stacked).toEqual([CENTRE, { x: CENTRE.x + 24, y: CENTRE.y + 24 }]);
   });
 
+  it('stores a canvas anchor without the displacement already drawn into it', () => {
+    const expandedSnapshot: SpaceSnapshot = {
+      ...positionedSnapshot,
+      document: {
+        ...positionedSnapshot.document,
+        layouts: [
+          {
+            ...positionedSnapshot.document.layouts![0]!,
+            positions: {
+              [CARD_A]: { x: 10, y: 20, expanded: { width: 560, height: 420 } },
+              [CARD_B]: { x: 300, y: 40 },
+            },
+          },
+        ],
+      },
+    };
+    const { authoring, session } = open(expandedSnapshot);
+    authoring.replacePlacement(
+      Placement.fromEntries([
+        [CARD_A, { x: 10, y: 20, expanded: { width: 560, height: 420 } }],
+        [CARD_B, { x: 300, y: 40 }],
+      ]),
+    );
+
+    authoring.complete({ kind: 'created-card', anchor: { x: 500, y: 400 } });
+
+    expect(layoutOf(session.getState().working, LAYOUT_ID)?.positions[MINTED]).toEqual({
+      x: 200,
+      y: 126,
+    });
+  });
+
   it('converts an Algorithmic View in the same Edit, leaving the Cards on screen where they are', () => {
     const { authoring, session, navigation } = openAutomatic(mintingIds(MINTED, LAYOUT_ID));
 
@@ -912,6 +944,42 @@ describe('Layout membership', () => {
       [CARD_C]: CENTRE,
     });
     expect(graphsOf(session.getState().working)).toEqual([MAIN_GRAPH]);
+  });
+
+  it('inverts drawn displacement when adding an absent Card to a Layout', () => {
+    const expandedSparse: SpaceSnapshot = {
+      ...sparse,
+      document: {
+        ...sparse.document,
+        layouts: [
+          {
+            ...sparse.document.layouts![0]!,
+            positions: {
+              [CARD_A]: { x: 10, y: 20, expanded: { width: 560, height: 420 } },
+              [CARD_B]: { x: 300, y: 40 },
+            },
+          },
+        ],
+      },
+    };
+    const { authoring, session } = open(expandedSparse);
+    authoring.replacePlacement(
+      Placement.fromEntries([
+        [CARD_A, { x: 10, y: 20, expanded: { width: 560, height: 420 } }],
+        [CARD_B, { x: 300, y: 40 }],
+      ]),
+    );
+
+    authoring.complete({
+      kind: 'added-card-to-layout',
+      cardId: CARD_C,
+      anchor: { x: 500, y: 400 },
+    });
+
+    expect(layoutOf(session.getState().working, LAYOUT_ID)?.positions[CARD_C]).toEqual({
+      x: 200,
+      y: 126,
+    });
   });
 
   it('refuses a Card the Space no longer holds', () => {

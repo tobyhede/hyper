@@ -719,22 +719,54 @@ describe('render adapter', () => {
     expect(spy.installs).toHaveLength(installedBefore);
   });
 
-  it('keeps a live node position across a reprojection', () => {
+  it('applies projected rect and stacking to an existing live node', () => {
+    const spy = authoringSpy();
+    const store = createRenderAdapter(spy.authoring);
+    spy.attach(store);
+
+    const closed = node(CARD_A, 10, 20);
+    closed.width = 260;
+    closed.height = 146;
+    store.getState().syncProjection([closed], []);
+
+    const expanded = node(CARD_A, 40, 60);
+    expanded.width = 560;
+    expanded.height = 420;
+    expanded.zIndex = 10;
+    expanded.data.expanded = true;
+    store.getState().syncProjection([expanded], []);
+
+    expect(store.getState().projection?.nodes[0]).toMatchObject({
+      position: { x: 40, y: 60 },
+      width: 560,
+      height: 420,
+      zIndex: 10,
+      data: { expanded: true },
+    });
+  });
+
+  it('keeps an in-flight drag position while applying projected expanded geometry', () => {
     const spy = authoringSpy();
     const store = createRenderAdapter(spy.authoring);
     spy.attach(store);
 
     store.getState().syncProjection([node(CARD_A, 10, 20)], []);
-    completeDrag(store, CARD_A, 111, 222);
+    store.getState().changeNodes(moving(CARD_A, 111, 222));
 
-    // A projection carries the title and handles, never the position — the live
-    // node owns that. Re-projecting at the origin must not move a dragged card.
-    store.getState().syncProjection([node(CARD_A, 0, 0)], []);
+    const expanded = node(CARD_A, 40, 60);
+    expanded.width = 560;
+    expanded.height = 420;
+    expanded.zIndex = 10;
+    expanded.data.expanded = true;
+    store.getState().syncProjection([expanded], []);
 
-    expect(store.getState().projection?.nodes[0]?.position).toEqual({ x: 111, y: 222 });
-    expect(spy.installs.at(-1)?.placement).toEqual(
-      Placement.fromEntries([[CARD_A, { x: 111, y: 222 }]]),
-    );
+    expect(store.getState().projection?.nodes[0]).toMatchObject({
+      position: { x: 111, y: 222 },
+      width: 560,
+      height: 420,
+      zIndex: 10,
+      data: { expanded: true },
+    });
   });
 
   it('completes no Edit for a drag that returns to where it began', () => {
