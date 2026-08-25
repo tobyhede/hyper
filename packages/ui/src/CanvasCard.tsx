@@ -115,7 +115,7 @@ type Mutable<T> = { -readonly [K in keyof T]: T[K] };
  * control to draw.
  *
  * On an open Card it is simply the caret operation the caller supplied. On a
- * **closed** one it is ADR 0066's rule — open the Card, then place the caret
+ * **closed** one it is ADR 0064's rule — open the Card, then place the caret
  * — composed from the Card's own two existing operations and nothing else. Opening is not reimplemented or
  * approximated here: `onOpenChange` is the same call the Open control makes, so
  * the growth, the neighbours' displacement and the transition are the ones

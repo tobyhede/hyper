@@ -102,7 +102,7 @@ function MarkdownEditControl({ ariaLabel, onBeginEdit }: MarkdownEditControlProp
  * CodeMirror** (ADR 0063, `PANE_OWNED_KEYS`): `Escape` abandons the draft and
  * `Mod-Enter` commits it.
  *
- * **A focus that leaves does not end the edit** (ADR 0066). Those two keys and
+ * **A focus that leaves does not end the edit** (ADR 0064). Those two keys and
  * the two controls that pair with them are the whole of how an edit ends —
  * nothing a pointer does elsewhere on the canvas decides for the author what
  * happens to their draft. It is the one place this surface departs from the

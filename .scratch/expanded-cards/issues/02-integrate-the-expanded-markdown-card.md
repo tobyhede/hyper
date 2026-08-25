@@ -17,7 +17,7 @@
 - [ ] An open Card offers Edit then Close in its rail; while Markdown editing runs, Save and Cancel replace Edit and Close remains present but disabled. The complete rendered Markdown surface remains the same semantic edit control issue 01 established, aligned with the Title control under ADR 0065 rather than treated as a second command area.
 - [ ] Rendered Markdown remains ordinary Card drag surface until editing begins. Its sibling Button preserves valid Markdown structure while making the displayed body the edit target. A live CodeMirror caret owns text selection and keyboard input without disabling unrelated Card gestures after the edit ends.
 - [ ] Title and Markdown editing are mutually exclusive: the one canvas-local caret may name exactly one Card field, title activation is unavailable while a body edit runs, and a stale projection cannot mount both editors. Save, Cancel, `Mod-Enter` and Escape intentionally restore focus to the resulting Edit action; React Flow selection changes silently commit or cancel nothing.
-- [ ] Preserve or deliberately rehome keyboard Edge authoring. A Card retains a keyboard-reachable Connect operation with its Escape and focus-return behavior; spatial React Flow handles are not its keyboard replacement.
+- [ ] Edge creation is spatial and handle-driven for now. Remove the withdrawn keyboard Connect control, target-picker workflow, tests, stale comments and parity claims; do not invent a replacement in this ticket.
 - [ ] Expansion and neighbour displacement animate only where the production geometry supports a real before/after transition. Do not carry forward the review prototype's broken Animate.css entrance or magic-distance FLIP experiment.
 
 ## Motion geometry
@@ -54,7 +54,7 @@ The prototype animates on open and snaps on close because two things drive the s
 - [ ] The test asserts the shortcut hint is visible only while CodeMirror has focus, that its two key-and-word pairs are set apart from each other more than each key is from its own word, and that no bright editor-wide focus frame returns.
 - [ ] The test asserts the rail replaces its Edit action with Save and Cancel while the edit runs, disables Close for its duration, draws all three as the one rail-action treatment, and that a press on Save or Cancel leaves the caret in the document rather than pulling it out to the rail.
 - [ ] The test asserts the editing treatment is installed atomically: immediately after body editing begins, Edit is absent, Close cannot fire and title editing cannot begin, without waiting for a passive effect to settle.
-- [ ] Application proof covers the keyboard-reachable Connect operation, its Escape path and focus return so Card rail changes cannot silently remove Edge authoring accessibility.
+- [ ] Application proof covers pointer Edge creation through the Card's spatial handles so Card rail changes cannot silently remove the accepted Edge-authoring path.
 - [ ] Existing camera, Edge authoring, selection, dragging and presentation behavior remain green.
 
 ## Catalogue consolidation

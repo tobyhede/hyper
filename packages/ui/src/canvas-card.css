@@ -79,7 +79,7 @@
 
    A running edit belongs in that set because it outlives every other reason the
    rail is up. The caret is in the body, so no hover, selection or focus of the
-   rail's own is true — and a blur ends nothing (ADR 0066), so deselecting a Card
+   rail's own is true — and a blur ends nothing (ADR 0064), so deselecting a Card
    mid-edit used to quiet the band and the glyph while leaving Save, Cancel and
    Close lit on top of nothing. The exits stay visible because the ADR says they
    do; this is what stops them being the only thing left. */
