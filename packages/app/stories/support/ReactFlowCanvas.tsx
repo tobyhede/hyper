@@ -108,7 +108,7 @@ export interface CanvasCardNodeSpecimenProps {
   readonly editingTitle?: boolean;
   readonly graphColor?: string;
   readonly cardEditingEnabled?: boolean;
-  readonly onEditCard?: () => void;
+  readonly onEditCard?: () => 'completed' | 'retained';
 }
 
 /**
@@ -121,7 +121,7 @@ export function CanvasCardNodeSpecimen({
   editingTitle = false,
   graphColor,
   cardEditingEnabled,
-  onEditCard = () => undefined,
+  onEditCard = () => 'completed',
 }: CanvasCardNodeSpecimenProps) {
   const projected = useProjection(graphIds.long);
   if (projected === null) return null;

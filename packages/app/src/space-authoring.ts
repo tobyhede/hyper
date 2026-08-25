@@ -194,6 +194,7 @@ export type AuthoringRefusal =
   | { readonly code: 'alias-target-must-own-content'; readonly targetId: CardId }
   | { readonly code: 'card-already-in-layout' }
   | { readonly code: 'card-not-in-layout' }
+  | { readonly code: 'card-not-expanded' }
   | {
       readonly code: 'card-has-aliases';
       readonly aliasTitles: readonly string[];
@@ -954,9 +955,7 @@ export function createSpaceAuthoring({
     } else if (completion.kind === 'resized-card') {
       const at = completedPlacement.get(completion.cardId);
       if (at === undefined) return refuse({ code: 'card-not-in-layout' });
-      if (at.expanded === undefined) {
-        throw new Error('Cannot resize a Card that is not Expanded');
-      }
+      if (at.expanded === undefined) return refuse({ code: 'card-not-expanded' });
       if (
         at.expanded.width === completion.size.width &&
         at.expanded.height === completion.size.height
@@ -1085,10 +1084,7 @@ export function createSpaceAuthoring({
     // Applied only now: conversion is over the Space as it stands, and these are
     // what the Edit adds to it and takes away.
     if (createdCard !== null) {
-      const authoredPosition = Placement.authoredPoint(
-        completedPlacement,
-        createdCard.position,
-      );
+      const authoredPosition = Placement.authoredPoint(completedPlacement, createdCard.position);
       completedPlacement = Placement.place(
         completedPlacement,
         createdCard.id,

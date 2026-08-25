@@ -15,6 +15,10 @@ function TitleEditingCard({ initiallyOpen }: { readonly initiallyOpen: boolean }
   const [title, setTitle] = useState('Draft entry');
   const [editing, setEditing] = useState(false);
   const [open, setOpen] = useState(initiallyOpen);
+  const changeOpen = (next: boolean) => {
+    setOpen(next);
+    return 'completed' as const;
+  };
   const group = useRef<HTMLDivElement>(null);
 
   return (
@@ -34,13 +38,13 @@ function TitleEditingCard({ initiallyOpen }: { readonly initiallyOpen: boolean }
                     kind: 'markdown',
                     source: '## Open Card body',
                     open: true,
-                    onOpenChange: setOpen,
+                    onOpenChange: changeOpen,
                   }
                 : {
                     kind: 'markdown',
                     source: '## Open Card body',
                     open: false,
-                    onOpenChange: setOpen,
+                    onOpenChange: changeOpen,
                   }
             }
             state="editing"
@@ -63,13 +67,13 @@ function TitleEditingCard({ initiallyOpen }: { readonly initiallyOpen: boolean }
                     kind: 'markdown',
                     source: '## Open Card body',
                     open: true,
-                    onOpenChange: setOpen,
+                    onOpenChange: changeOpen,
                   }
                 : {
                     kind: 'markdown',
                     source: '## Open Card body',
                     open: false,
-                    onOpenChange: setOpen,
+                    onOpenChange: changeOpen,
                   }
             }
             state="rest"
@@ -118,6 +122,10 @@ export const Markdown: Story = () => {
   const [source, setSource] = useState(markdown);
   const [mode, setMode] = useState<Mode>('rendered');
   const [open, setOpen] = useState(true);
+  const changeOpen = (next: boolean) => {
+    setOpen(next);
+    return 'completed' as const;
+  };
   const editing = mode !== 'rendered';
   const front: CanvasCardFront = editing
     ? {
@@ -125,8 +133,14 @@ export const Markdown: Story = () => {
         source,
         open: true,
         autoFocusEditor: mode === 'focused',
-        editor: { onComplete: setSource, onEnd: () => setMode('rendered') },
-        onOpenChange: setOpen,
+        editor: {
+          onComplete: (next) => {
+            setSource(next);
+            return 'completed';
+          },
+          onEnd: () => setMode('rendered'),
+        },
+        onOpenChange: changeOpen,
         onBeginEdit: () => setMode('focused'),
       }
     : open
@@ -134,14 +148,14 @@ export const Markdown: Story = () => {
           kind: 'markdown',
           source,
           open: true,
-          onOpenChange: setOpen,
+          onOpenChange: changeOpen,
           onBeginEdit: () => setMode('focused'),
         }
       : {
           kind: 'markdown',
           source,
           open: false,
-          onOpenChange: setOpen,
+          onOpenChange: changeOpen,
           onBeginEdit: () => setMode('focused'),
         };
 

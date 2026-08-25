@@ -290,6 +290,22 @@ describe('Edit Card', () => {
   });
 });
 
+describe('Expanded Card geometry', () => {
+  it('refuses a stale resize completion for a Card that is no longer Expanded', () => {
+    const { authoring, session } = openPositioned();
+    const before = session.getState().working;
+
+    expect(
+      authoring.complete({
+        kind: 'resized-card',
+        cardId: CARD_A,
+        size: { width: 560, height: 420 },
+      }),
+    ).toEqual({ kind: 'refused', refusal: { code: 'card-not-expanded' } });
+    expect(session.getState().working).toBe(before);
+  });
+});
+
 describe('Add Alias', () => {
   it('creates and places an Alias on its Target, taking the Target title when none was typed', () => {
     const { authoring, session } = openPositioned();

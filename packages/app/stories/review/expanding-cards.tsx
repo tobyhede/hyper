@@ -341,6 +341,7 @@ function Canvas({
           setCaret(null);
           setResizing(false);
           toggle(cardId);
+          return 'completed';
         },
         onBeginTitleEditing: () => setCaret({ cardId, field: 'title' }),
       };
@@ -374,7 +375,10 @@ function Canvas({
         };
         if (caret?.cardId === cardId && caret.field === 'body') {
           data.bodyEditor = {
-            onComplete: (next) => write(cardId, next, title),
+            onComplete: (next) => {
+              write(cardId, next, title);
+              return 'completed';
+            },
             onEnd: () => setCaret(null),
           };
         }

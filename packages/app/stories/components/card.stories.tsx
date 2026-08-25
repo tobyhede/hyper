@@ -124,11 +124,15 @@ function Instance({
   const [selected, setSelected] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [open, setOpen] = useState(false);
+  const changeOpen = (next: boolean) => {
+    setOpen(next);
+    return 'completed' as const;
+  };
   const front: CanvasCardFront =
     aliasOf === undefined
       ? open
-        ? { kind: 'markdown', source: 'Markdown content', open: true, onOpenChange: setOpen }
-        : { kind: 'markdown', source: 'Markdown content', open: false, onOpenChange: setOpen }
+        ? { kind: 'markdown', source: 'Markdown content', open: true, onOpenChange: changeOpen }
+        : { kind: 'markdown', source: 'Markdown content', open: false, onOpenChange: changeOpen }
       : { kind: 'alias', aliasOf };
   const state: Exclude<CanvasCardState, 'editing'> = dragging
     ? 'dragging'
@@ -205,6 +209,14 @@ A **Layout** owns explicit Card rects. The strategy only supplies a computed Vie
 export const OpenAndClose: Story = () => {
   const [open, setOpen] = useState(false);
   const [longOpen, setLongOpen] = useState(true);
+  const changeOpen = (next: boolean) => {
+    setOpen(next);
+    return 'completed' as const;
+  };
+  const changeLongOpen = (next: boolean) => {
+    setLongOpen(next);
+    return 'completed' as const;
+  };
 
   return (
     <div className="flex flex-wrap items-start gap-8 p-8">
@@ -214,8 +226,8 @@ export const OpenAndClose: Story = () => {
           <CanvasCard
             front={
               open
-                ? { kind: 'markdown', source: openMarkdown, open: true, onOpenChange: setOpen }
-                : { kind: 'markdown', source: openMarkdown, open: false, onOpenChange: setOpen }
+                ? { kind: 'markdown', source: openMarkdown, open: true, onOpenChange: changeOpen }
+                : { kind: 'markdown', source: openMarkdown, open: false, onOpenChange: changeOpen }
             }
             state="rest"
             title="Strategies"
@@ -235,13 +247,13 @@ export const OpenAndClose: Story = () => {
                     kind: 'markdown',
                     source: `${openMarkdown}\n\n### A deliberately long section\n\n${openMarkdown}\n\n${openMarkdown}`,
                     open: true,
-                    onOpenChange: setLongOpen,
+                    onOpenChange: changeLongOpen,
                   }
                 : {
                     kind: 'markdown',
                     source: `${openMarkdown}\n\n### A deliberately long section\n\n${openMarkdown}\n\n${openMarkdown}`,
                     open: false,
-                    onOpenChange: setLongOpen,
+                    onOpenChange: changeLongOpen,
                   }
             }
             state="rest"

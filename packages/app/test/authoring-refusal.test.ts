@@ -25,6 +25,7 @@ const EVERY_REFUSAL = {
   'alias-target-must-own-content': { code: 'alias-target-must-own-content', targetId: TARGET_ID },
   'card-already-in-layout': { code: 'card-already-in-layout' },
   'card-not-in-layout': { code: 'card-not-in-layout' },
+  'card-not-expanded': { code: 'card-not-expanded' },
   'card-has-aliases': { code: 'card-has-aliases', aliasTitles: ['Recap'] },
   'graph-title-required': { code: 'graph-title-required' },
   'layout-must-keep-graph': { code: 'layout-must-keep-graph' },

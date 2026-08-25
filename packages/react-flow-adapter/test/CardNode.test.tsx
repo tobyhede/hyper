@@ -124,7 +124,7 @@ interface Overrides {
   titleEditingEnabled?: boolean;
   cardEditingEnabled?: boolean;
   titleEditor?: CardTitleEditor;
-  onEditCard?: () => void;
+  onEditCard?: (open: boolean) => void;
   onBeginTitleEditing?: () => void;
   expanded?: boolean;
   body?: string;
@@ -171,7 +171,11 @@ function props({
     targetHandles,
   };
   if (aliasOf !== undefined) data.aliasOf = aliasOf;
-  if (onEditCard !== undefined) data.onEditCard = onEditCard;
+  if (onEditCard !== undefined)
+    data.onEditCard = (open) => {
+      onEditCard(open);
+      return 'completed';
+    };
   if (onBeginTitleEditing !== undefined) data.onBeginTitleEditing = onBeginTitleEditing;
   if (titleEditor !== undefined) data.titleEditor = titleEditor;
   if (expanded !== undefined) data.expanded = expanded;

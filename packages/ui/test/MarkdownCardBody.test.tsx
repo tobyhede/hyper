@@ -177,6 +177,18 @@ describe('MarkdownCardBody', () => {
     expect(editor.onEnd).toHaveBeenCalledTimes(2);
   });
 
+  it('keeps the draft and caret when the application retains a refused save', async () => {
+    const editor = { onComplete: vi.fn(() => 'retained' as const), onEnd: vi.fn() };
+    render(body({ editor }));
+    const editable = await source();
+
+    fireEvent.keyDown(editable, { key: 'Enter', metaKey: true });
+
+    expect(editor.onComplete).toHaveBeenCalledWith('# Strategies\n\nNo strategy is privileged.');
+    expect(editor.onEnd).not.toHaveBeenCalled();
+    expect(await source()).toBeVisible();
+  });
+
   it('keeps a draft the author clicked away from, committing and abandoning nothing', async () => {
     const editor = { onComplete: vi.fn(), onEnd: vi.fn() };
     const { container } = render(body({ editor }));

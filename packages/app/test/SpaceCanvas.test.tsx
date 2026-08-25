@@ -112,8 +112,8 @@ function mountGraph(nodes: CardFlowNode[] = [cardNode('A')]): Harness {
         onAddCard={addCard}
         nameOnCreation={named}
         onOpenCard={openCard}
-        onCloseCard={() => undefined}
-        onCompleteCardBody={() => undefined}
+        onCloseCard={() => 'completed'}
+        onCompleteCardBody={() => 'completed'}
         onResizeCard={() => undefined}
         onCompleteCardTitle={() => 'A Card needs a title'}
         editableCardIds={editableCardIds}
@@ -347,6 +347,42 @@ describe('withdrawing title editing', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Open Card A' }));
 
     expect(openCard).toHaveBeenCalledWith(CARD_ID);
+  });
+});
+
+describe('withdrawing canvas authoring from an Expanded Card', () => {
+  it('withdraws body editing and resize through the same complete gate', () => {
+    const expanded = cardNode('A', CARD_ID, true);
+    expanded.data.expanded = true;
+    expanded.data.body = '# A';
+    const { view, setTitleEditing } = mountGraph([expanded]);
+
+    expect(screen.getByRole('button', { name: 'Edit Markdown source of A' })).toBeVisible();
+    expect(view.container.querySelector('.react-flow__resize-control')).toBeInTheDocument();
+
+    setTitleEditing(false);
+
+    expect(screen.queryByRole('button', { name: 'Edit Markdown source of A' })).toBeNull();
+    expect(view.container.querySelector('.react-flow__resize-control')).toBeNull();
+  });
+
+  it('does not let another edit or Card creation replace a live body caret', () => {
+    const a = cardNode('A');
+    a.data.expanded = true;
+    a.data.body = '# A';
+    const b = cardNode('B', OTHER_CARD_ID);
+    b.data.expanded = true;
+    b.data.body = '# B';
+    const { addCard } = mountGraph([a, b]);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Markdown source of A' }));
+
+    expect(screen.queryByRole('button', { name: 'Edit Title B' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Edit Markdown source of B' })).toBeNull();
+    fireEvent.keyDown(nodeOf(OTHER_CARD_ID), { key: 'c' });
+    fireEvent.keyDown(document.body, { key: 'F2' });
+    expect(addCard).not.toHaveBeenCalled();
+    expect(screen.queryByRole('textbox', { name: 'Card title' })).toBeNull();
   });
 });
 

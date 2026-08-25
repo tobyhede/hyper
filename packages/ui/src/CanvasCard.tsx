@@ -22,7 +22,7 @@ interface CanvasMarkdownCardFront {
   /** The Markdown bytes this Card owns. */
   readonly source: string;
   /** Request that authored state open or close this Card. */
-  readonly onOpenChange?: (open: boolean) => void;
+  readonly onOpenChange?: (open: boolean) => 'completed' | 'retained';
   /** Put a caret in this Card's Markdown source. */
   readonly onBeginEdit?: () => void;
 }
@@ -126,15 +126,14 @@ type Mutable<T> = { -readonly [K in keyof T]: T[K] };
  */
 const contentEditAction = (
   open: boolean,
-  onOpenChange: ((open: boolean) => void) | undefined,
+  onOpenChange: ((open: boolean) => 'completed' | 'retained') | undefined,
   onBeginContentEdit: (() => void) | undefined,
 ): (() => void) | undefined => {
   if (onBeginContentEdit === undefined) return undefined;
   if (open) return onBeginContentEdit;
   if (onOpenChange === undefined) return undefined;
   return () => {
-    onOpenChange(true);
-    onBeginContentEdit();
+    if (onOpenChange(true) === 'completed') onBeginContentEdit();
   };
 };
 

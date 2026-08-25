@@ -71,7 +71,7 @@ export type CardNodeData = {
   titleEditingEnabled?: boolean;
   /** Whether this Card owns content to edit — an Alias does not. */
   cardEditingEnabled?: boolean;
-  onEditCard?: (open: boolean) => void;
+  onEditCard?: (open: boolean) => 'completed' | 'retained';
   onBeginTitleEditing?: () => void;
   /**
    * The inline title editor this Card is currently showing, absent on one that
@@ -110,9 +110,10 @@ export type CardNodeData = {
    * takes the caret back.
    *
    * The second of those is `onEnd`, **not** `titleEditor`'s `onCancel`. A body
-   * edit ends the same way whichever exit it took, so `onEnd` fires after a
-   * commit as well as after `Escape`; a composition that gave it the abandon
-   * meaning would undo every save.
+   * edit ends the same way whichever accepted exit it took, so `onEnd` fires
+   * after an accepted commit as well as after `Escape`; a retained commit keeps
+   * the editor mounted. A composition that gave `onEnd` the abandon meaning
+   * would undo every accepted save.
    *
    * Independent of `titleEditor` on purpose. Expansion is what the Layout
    * authored and the caret is a gesture the author just made, so a Card can be

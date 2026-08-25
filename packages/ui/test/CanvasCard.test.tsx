@@ -88,7 +88,7 @@ describe('CanvasCard kind and interaction state', () => {
 
 describe('CanvasCard Open and Close operation', () => {
   it('owns the rendered body of an open Markdown front', () => {
-    const onOpenChange = vi.fn();
+    const onOpenChange = vi.fn(() => 'completed' as const);
     render(
       <CanvasCard
         front={{
@@ -153,7 +153,7 @@ describe('CanvasCard Open and Close operation', () => {
 
   it('offers Edit before Close whether or not the Card is open', () => {
     const onBeginContentEdit = vi.fn();
-    const onOpenChange = vi.fn();
+    const onOpenChange = vi.fn(() => 'completed' as const);
     const { rerender } = render(
       <CanvasCard
         front={{
@@ -218,6 +218,28 @@ describe('CanvasCard Open and Close operation', () => {
     // The first half of the pair is missing, so the caret would have nowhere to
     // land — a control that ran half of what it names is worse than none.
     expect(screen.queryByRole('button', { name: 'Edit Card A' })).not.toBeInTheDocument();
+  });
+
+  it('does not place the content caret when opening a collapsed Card is retained', () => {
+    const onBeginContentEdit = vi.fn();
+    render(
+      <CanvasCard
+        front={{
+          kind: 'markdown',
+          source: '',
+          open: false,
+          onOpenChange: () => 'retained',
+          onBeginEdit: onBeginContentEdit,
+        }}
+        state="selected"
+        title="A"
+        graphColor="#ffc53d"
+      />,
+    );
+
+    screen.getByRole('button', { name: 'Edit Card A' }).click();
+
+    expect(onBeginContentEdit).not.toHaveBeenCalled();
   });
 
   it('replaces Edit with the two ends of the edit its content is running, keeping Close', () => {
@@ -326,7 +348,7 @@ describe('CanvasCard Open and Close operation', () => {
   it('hides both actions while the title is being edited', () => {
     render(
       <CanvasCard
-        front={{ kind: 'markdown', source: '', open: false, onOpenChange: () => undefined }}
+        front={{ kind: 'markdown', source: '', open: false, onOpenChange: () => 'completed' }}
         state="editing"
         title="A"
         graphColor="#ffc53d"
@@ -342,7 +364,7 @@ describe('CanvasCard Open and Close operation', () => {
   it('hides both actions while dragging', () => {
     render(
       <CanvasCard
-        front={{ kind: 'markdown', source: '', open: false, onOpenChange: () => undefined }}
+        front={{ kind: 'markdown', source: '', open: false, onOpenChange: () => 'completed' }}
         state="dragging"
         title="A"
         graphColor="#ffc53d"

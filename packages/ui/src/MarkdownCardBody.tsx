@@ -25,12 +25,16 @@ import './markdown-card-body.css';
  * title editor and `CardNodeData` for the adapter's.
  */
 export interface MarkdownCardBodyEditor {
-  /** Commit the draft. Unlike a title's, a body has nothing to refuse. */
-  onComplete: (body: string) => void;
   /**
-   * Withdraw the caret. Fires on **every** exit — after `onComplete` when the
-   * draft was committed as well as on an abandon — because what it means is
-   * "this edit is over", and the caret has to go back either way.
+   * Commit the draft, or retain it when application authoring cannot accept the
+   * operation yet. Retaining leaves the editor and caret exactly where they are.
+   */
+  onComplete: (body: string) => 'completed' | 'retained';
+  /**
+   * Withdraw the caret. Fires on every completed exit — after `onComplete` when
+   * the draft was accepted as well as on an abandon — because what it means is
+   * "this edit is over", and the caret has to go back either way. A retained
+   * completion is not an exit and therefore does not call this.
    *
    * Deliberately not `onCancel`, which is what `CardTitleEditor` calls the
    * Escape-only half of its own pair. A caller reading that name here would
@@ -210,7 +214,7 @@ export function MarkdownCardBody({
 
   const leave = (commit: boolean): void => {
     if (editor === undefined) return;
-    if (commit) editor.onComplete(draft);
+    if (commit && editor.onComplete(draft) === 'retained') return;
     // A committed draft *is* the source the caller is about to hand back, so the
     // document already agrees with it and there is nothing to rebuild.
     //

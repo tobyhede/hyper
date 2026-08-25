@@ -134,9 +134,9 @@ export interface SpaceCanvasProps {
    */
   nameOnCreation: string | null;
   /** Opening a card is a view gesture; the graph only reports which was picked. */
-  onOpenCard: (cardId: string) => void;
-  onCloseCard: (cardId: CardId) => void;
-  onCompleteCardBody: (cardId: CardId, body: string) => void;
+  onOpenCard: (cardId: string) => 'completed' | 'retained';
+  onCloseCard: (cardId: CardId) => 'completed' | 'retained';
+  onCompleteCardBody: (cardId: CardId, body: string) => 'completed' | 'retained';
   onResizeCard: (cardId: CardId, size: { width: number; height: number }) => void;
   /** Complete one locally validated title draft, or return its field error. */
   onCompleteCardTitle: (cardId: string, title: string) => string | null;
@@ -178,6 +178,7 @@ export function SpaceCanvas({
   activeGraphCardIds,
 }: SpaceCanvasProps) {
   const [caret, setCaret] = useState<{ cardId: string; field: 'title' | 'body' } | null>(null);
+  const bodyEditing = caret?.field === 'body';
   const editingTitleCardId = caret?.field === 'title' ? caret.cardId : null;
   /**
    * Whether a drag may begin at a Card's authoring handles.
@@ -239,7 +240,9 @@ export function SpaceCanvas({
   const [lastCreatedCardId, setLastCreatedCardId] = useState(nameOnCreation);
   if (lastCreatedCardId !== nameOnCreation) {
     setLastCreatedCardId(nameOnCreation);
-    if (nameOnCreation !== null) setCaret({ cardId: nameOnCreation, field: 'title' });
+    if (nameOnCreation !== null && !bodyEditing) {
+      setCaret({ cardId: nameOnCreation, field: 'title' });
+    }
   }
 
   const edgeSurface = useEdgeAuthoring({
@@ -310,11 +313,11 @@ export function SpaceCanvas({
       // The default is prevented only where the command can actually run
       // (`docs/agents/rendering.md`'s keyboard contract), so a `c` typed while authoring is
       // withdrawn is left to whatever else would have had it.
-      if (!canAuthorOnCanvas) return;
+      if (!canAuthorOnCanvas || bodyEditing) return;
       event.preventDefault();
       onAddCard();
     },
-    [presenting, onOpenCard, canAuthorOnCanvas, onAddCard],
+    [presenting, onOpenCard, canAuthorOnCanvas, bodyEditing, onAddCard],
   );
 
   // `F2` renames the selected Card, and this is the *only* handler that answers
@@ -324,7 +327,7 @@ export function SpaceCanvas({
   // handlers for one key means one of them is the unguarded one; don't add a
   // second back.
   useEffect(() => {
-    if (!canAuthorOnCanvas) return;
+    if (!canAuthorOnCanvas || bodyEditing) return;
     const beginSelectedTitleEdit = (event: KeyboardEvent): void => {
       if (event.key !== 'F2') return;
       if (event.target instanceof Element && event.target.closest(NOT_A_CANVAS_COMMAND) !== null) {
@@ -337,7 +340,7 @@ export function SpaceCanvas({
     };
     window.addEventListener('keydown', beginSelectedTitleEdit);
     return () => window.removeEventListener('keydown', beginSelectedTitleEdit);
-  }, [canAuthorOnCanvas, nodes]);
+  }, [canAuthorOnCanvas, bodyEditing, nodes]);
 
   // The operations, not the surface holding them: `useEdgeAuthoring` answers a
   // fresh object literal per render while each of these is stable, and a hook
@@ -353,21 +356,25 @@ export function SpaceCanvas({
           // the Connect control wherever an Edge may begin. Each flag travels
           // with the operation that performs it — `CardNode` withholds a control
           // it was offered without one.
-          titleEditingEnabled: canAuthorOnCanvas,
+          titleEditingEnabled: canAuthorOnCanvas && !bodyEditing,
           cardEditingEnabled: canAuthorOnCanvas && editableCardIds.has(node.id),
           onEditCard: (open) => (open ? onOpenCard(node.id) : onCloseCard(node.data.cardId)),
-          onBeginTitleEditing: () => setCaret({ cardId: node.id, field: 'title' }),
         };
-        if (node.data.kind === 'markdown') {
+        if (canAuthorOnCanvas && !bodyEditing) {
+          data.onBeginTitleEditing = () => setCaret({ cardId: node.id, field: 'title' });
+        }
+        if (canAuthorOnCanvas && !bodyEditing && node.data.kind === 'markdown') {
           data.onBeginBodyEditing = () => setCaret({ cardId: node.id, field: 'body' });
         }
         if (node.data.expanded === true && node.data.kind === 'markdown') {
-          data.resize = {
-            minWidth: CARD_SIZE.width,
-            minHeight: CARD_SIZE.height,
-            onResize: (size) => onResizeCard(node.data.cardId, size),
-          };
-          if (caret?.cardId === node.id && caret.field === 'body') {
+          if (canAuthorOnCanvas) {
+            data.resize = {
+              minWidth: CARD_SIZE.width,
+              minHeight: CARD_SIZE.height,
+              onResize: (size) => onResizeCard(node.data.cardId, size),
+            };
+          }
+          if (canAuthorOnCanvas && caret?.cardId === node.id && caret.field === 'body') {
             data.bodyEditor = {
               onComplete: (body) => onCompleteCardBody(node.data.cardId, body),
               onEnd: () => setCaret(null),
@@ -391,6 +398,7 @@ export function SpaceCanvas({
     [
       nodes,
       canAuthorOnCanvas,
+      bodyEditing,
       editableCardIds,
       editingTitleCardId,
       onCompleteCardTitle,

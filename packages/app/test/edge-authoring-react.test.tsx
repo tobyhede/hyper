@@ -337,9 +337,9 @@ function CanvasHarness({
       newCardTitle="Card 4"
       onAddCard={() => undefined}
       nameOnCreation={null}
-      onOpenCard={() => undefined}
-      onCloseCard={() => undefined}
-      onCompleteCardBody={() => undefined}
+      onOpenCard={() => 'completed'}
+      onCloseCard={() => 'completed'}
+      onCompleteCardBody={() => 'completed'}
       onResizeCard={() => undefined}
       onCompleteCardTitle={() => null}
       editableCardIds={new Set([CARD_A, CARD_B, CARD_C])}
