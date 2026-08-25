@@ -169,8 +169,7 @@ function Instance({
 /**
  * The production component's keyboard, pointer and callback behaviour: real
  * hover, click-to-select, a dragging toggle standing in for React Flow's own,
- * and the keyboard-focusable Connect control the graph reaches through the
- * same handler React Flow attaches. `States` above is the visual reference;
+ * and keyboard-focusable Card actions. `States` above is the visual reference;
  * this is its behaviour proof.
  */
 export const Actions: Story = () => (

@@ -112,8 +112,8 @@ describe('the one Edge interaction draft', () => {
   it('holds at most one draft, whichever kind starts next', () => {
     const { edges } = open();
 
-    edges.beginKeyboardConnect(CARD_A);
-    expect(edges.getState().draft).toEqual({ kind: 'keyboard-connect', from: CARD_A });
+    edges.beginPointerConnect(CARD_A);
+    expect(edges.getState().draft).toEqual({ kind: 'pointer-connect', from: CARD_A });
 
     edges.openEdgeEditor(SUBJECT);
     expect(edges.getState().draft).toEqual({
@@ -133,7 +133,7 @@ describe('the one Edge interaction draft', () => {
 
   it('cancels the draft and asks for focus back at the Card the author was on', () => {
     const { edges } = open();
-    edges.beginKeyboardConnect(CARD_A);
+    edges.beginPointerConnect(CARD_A);
 
     edges.cancelDraft();
 
@@ -188,7 +188,7 @@ describe('a refused proposal', () => {
     edges.openEdgeEditor(SUBJECT);
     edges.reconnect('to', uuidSchema.parse('00000000-0000-4000-8000-0000000000aa'));
 
-    edges.beginKeyboardConnect(CARD_A);
+    edges.beginPointerConnect(CARD_A);
 
     expect(edges.getState().refusal).toBeNull();
   });
@@ -293,7 +293,7 @@ describe('deleting an Edge', () => {
 describe('draft invalidation', () => {
   it('cancels the draft when the selected renderer changes', () => {
     const { edges, navigation } = open();
-    edges.beginKeyboardConnect(CARD_A);
+    edges.beginPointerConnect(CARD_A);
 
     navigation.selectRenderer({ kind: 'view', view: 'flow' });
 
@@ -350,13 +350,13 @@ describe('draft invalidation', () => {
 
   /**
    * Presenting withdraws Edge authoring, so a draft made before it cannot
-   * survive into it. Left standing, the keyboard picker goes on rendering over
-   * the presentation and can author an Edge the canvas is no longer offering —
-   * and an Edge editor hidden behind it reopens when the author returns.
+   * survive into it. Left standing, a pointer draft can author an Edge the
+   * canvas is no longer offering — and an Edge editor hidden behind it reopens
+   * when the author returns.
    */
   it('cancels the draft when presenting withdraws Edge authoring', () => {
     const { edges, navigation } = open();
-    edges.beginKeyboardConnect(CARD_A);
+    edges.beginPointerConnect(CARD_A);
 
     navigation.present();
 
@@ -444,9 +444,9 @@ describe('draft invalidation', () => {
     });
   });
 
-  it('cancels a keyboard connection when the canvas selects another Card', () => {
+  it('cancels a pointer connection when the canvas selects another Card', () => {
     const { edges, adapter } = open();
-    edges.beginKeyboardConnect(CARD_A);
+    edges.beginPointerConnect(CARD_A);
 
     adapter.getState().selectCard(CARD_B);
 
@@ -466,72 +466,6 @@ describe('draft invalidation', () => {
     adapter.getState().clearSelection();
 
     expect(edges.getState().draft).toEqual({ kind: 'pointer-connect', from: CARD_A });
-  });
-});
-
-/**
- * The keyboard path settles differently from the pointer's, and owes one thing
- * the pointer does not: the picker holding focus unmounts with the draft, so a
- * completed connection has to say where focus goes.
- */
-describe('completing a keyboard connection', () => {
-  it('authors the Edge, settles the draft and asks for focus at the target', () => {
-    const { edges, session } = open();
-    edges.beginKeyboardConnect(CARD_B);
-
-    expect(edges.completeKeyboardConnect(CARD_C, PROJECTED)).toBe(CARD_C);
-
-    expect(graphsOf(session.getState().working)[0]?.edges).toEqual([
-      EDGE,
-      { from: CARD_B, to: CARD_C },
-    ]);
-    expect(edges.getState().draft).toBeNull();
-    expect(edges.takeFocusRequest()).toEqual({ kind: 'card', cardId: CARD_C });
-  });
-
-  /**
-   * The picker offered this target, so a refusal means the Space changed while
-   * it was open — which is exactly why completion asks eligibility again. The
-   * draft and its refusal stand so the author can pick another Card.
-   */
-  it('keeps the draft and its refusal when the completion is refused', () => {
-    const { edges, session } = open();
-    const before = session.getState().working;
-    edges.beginKeyboardConnect(CARD_A);
-
-    expect(edges.completeKeyboardConnect(CARD_B, PROJECTED)).toBeNull();
-
-    expect(session.getState().working).toBe(before);
-    expect(edges.getState().draft).toEqual({ kind: 'keyboard-connect', from: CARD_A });
-    expect(edges.getState().refusal).toEqual({
-      kind: 'connection',
-      refusal: { code: 'edge-already-exists' },
-    });
-  });
-
-  /**
-   * The continuation a drag hands back is the **pointer** path's, and it is
-   * drained only when a drag ends. A keyboard connection that left one behind
-   * would be collected by the next pointer gesture — including one that authored
-   * nothing — and select a Card that gesture never named.
-   */
-  it('leaves no continuation behind for the next pointer drag to collect', () => {
-    const { edges } = open();
-    edges.beginKeyboardConnect(CARD_B);
-    expect(edges.completeKeyboardConnect(CARD_C, PROJECTED)).toBe(CARD_C);
-
-    edges.beginPointerConnect(CARD_A);
-
-    expect(edges.endPointerDrag()).toBeNull();
-  });
-
-  it('does nothing without an open keyboard draft', () => {
-    const { edges, session } = open();
-    const before = session.getState().working;
-
-    expect(edges.completeKeyboardConnect(CARD_C, PROJECTED)).toBeNull();
-
-    expect(session.getState().working).toBe(before);
   });
 });
 

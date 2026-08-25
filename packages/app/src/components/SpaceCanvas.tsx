@@ -208,11 +208,8 @@ export function SpaceCanvas({
    * not cosmetic. React Flow subscribes the delete key on `document`, excluding
    * only inputs and `.nokey`; a pane's `Done` and `Cancel` are neither, so a
    * `Backspace` aimed at the open dialog deleted whichever Edge was selected
-   * behind it. Hiding the Connect control while leaving the gesture live is the
-   * asymmetry — the two agree here, and `edge-authoring-react.test.tsx` holds
-   * them to it. Loosening the control to match Edge authoring was the other way
-   * to close it, and it is the wrong one: it would put a Connect button on every
-   * Card behind a modal dialog.
+   * behind it. The Card controls and spatial Edge gestures agree here, and
+   * `edge-authoring-react.test.tsx` holds them to it.
    */
   const canAuthorOnCanvas = canConnectOnCanvas && !presenting;
 
@@ -351,9 +348,8 @@ export function SpaceCanvas({
       nodes.map((node) => {
         const data: CardFlowNode['data'] = {
           ...node.data,
-          // Three controls, three flags. The Title's direct edit is offered on
-          // every Card; the affordance only on one that owns content to edit;
-          // the Connect control wherever an Edge may begin. Each flag travels
+          // The Title's direct edit is offered on every Card; the Card
+          // affordance only on one that owns content to edit. Each flag travels
           // with the operation that performs it — `CardNode` withholds a control
           // it was offered without one.
           titleEditingEnabled: canAuthorOnCanvas && !bodyEditing,

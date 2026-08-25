@@ -66,7 +66,7 @@ export const uncataloguedComponents = [
   {
     module: 'packages/app/src/edge-authoring-react.tsx',
     reason:
-      'The canvas-wide Edge gesture layer: React Flow connection callbacks, the keyboard Connect picker and the pointer-refusal announcement, bound to a live `ReactFlow` instance. Its rendered surfaces are catalogued through `Components/Selected Edge Controls` and reviewed on a real canvas in `Review/Selected Edge On Canvas`; the gesture layer itself has no state a story can hold still.',
+      'The canvas-wide Edge gesture layer: React Flow connection callbacks and the pointer-refusal announcement, bound to a live `ReactFlow` instance. Its rendered surfaces are catalogued through `Components/Selected Edge Controls` and reviewed on a real canvas in `Review/Selected Edge On Canvas`; the gesture layer itself has no state a story can hold still.',
   },
   {
     module: 'packages/app/src/components/SpaceCanvas.tsx',
@@ -202,11 +202,6 @@ export const handRolledStyles = [
     block: 'edge-refusal',
     reason:
       'Screen-fixed placement for the sentence a finished pointer gesture leaves behind. The gesture is over, so there is no surface left on the canvas to attach it to.',
-  },
-  {
-    block: 'edge-connect-picker',
-    reason:
-      "Screen-fixed placement for the keyboard connection's Target picker, which opens from a control whose Card may be anywhere in the viewport. The picker itself is `CardSearchCombobox`.",
   },
   {
     block: 'shell',

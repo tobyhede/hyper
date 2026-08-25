@@ -145,11 +145,9 @@ export const presentNewAliasRefusal = (refusal: AuthoringRefusal): NewAliasRefus
  * Graph the Space no longer holds, an Edge that has gone — describes the
  * subject rather than the choice, and no row in either list would fix it.
  *
- * One record for the two Card-choosing Edge surfaces, because the question is
- * the same on both: keyboard connection names one Card and endpoint editing
- * names two, and neither can correct a stale subject. It is exhaustive over the
- * codes rather than a list of the two that are true, so a new refusal has to be
- * decided here before it will compile.
+ * Endpoint editing names two Cards and cannot correct a stale subject. The
+ * record is exhaustive over the codes rather than a list of the two that are
+ * true, so a new refusal has to be decided here before it will compile.
  */
 const correctableByCardChoice = {
   'placement-pending': false,
@@ -173,7 +171,6 @@ const correctableByCardChoice = {
   'layout-active-graph-required': false,
 } as const satisfies Readonly<Record<AuthoringRefusalCode, boolean>>;
 
-export type EdgeConnectionRefusalErrors = AuthoringRefusalErrors<'target'>;
 export type EdgeEndpointRefusalErrors = AuthoringRefusalErrors<EdgeEndpoint>;
 
 /**
@@ -192,14 +189,6 @@ export interface EdgeDeletionRefusalErrors {
 const formChannel = <Field extends string>(
   refusal: AuthoringRefusal,
 ): AuthoringRefusalErrors<Field> => ({ fields: {}, form: describeAuthoringRefusal(refusal) });
-
-/** Error placement for the keyboard connection picker, which owns only Target. */
-export const presentEdgeConnectionRefusal = (
-  refusal: AuthoringRefusal,
-): EdgeConnectionRefusalErrors =>
-  correctableByCardChoice[refusal.code]
-    ? { fields: { target: describeAuthoringRefusal(refusal) } }
-    : formChannel(refusal);
 
 /**
  * Error placement for endpoint editing, which owns From and To.

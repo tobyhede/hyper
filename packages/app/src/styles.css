@@ -251,25 +251,6 @@ body {
   transform: translateX(-50%);
 }
 
-/* The keyboard connection's target picker. Screen-fixed rather than drawn at the
-   source Card: it opens from a control the author has just activated, and the
-   Card it belongs to may be anywhere in the viewport. */
-.edge-connect-picker {
-  position: absolute;
-  top: 0.75rem;
-  left: 50%;
-  z-index: 10;
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 0.5rem;
-  background: var(--card);
-  box-shadow: 0 12px 40px rgb(0 0 0 / 50%);
-  transform: translateX(-50%);
-}
-
 .card__title {
   margin: 0 0 0.4rem;
   font-size: 0.95rem;

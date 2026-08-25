@@ -338,6 +338,7 @@ test(
     await page.reload();
     const persisted = nodeByTitle(page, 'A').first();
     await expect(persisted).toContainText('two spaces and code');
+    await persisted.hover();
     await persisted.getByRole('button', { name: 'Edit Card A' }).click();
     await expect(page.getByRole('textbox', { name: 'Markdown source of A' })).toContainText(
       'two spaces and `code`',
@@ -434,29 +435,43 @@ test('the opened Card draws Markdown and its editor on the same paper surface', 
   );
 });
 
-test('opened Markdown editing persists source without moving Cards', async ({ page }) => {
+test('opened Markdown editing persists source while expansion displaces and restores Cards', async ({
+  page,
+}) => {
   await page.goto('/');
   const card = nodeByTitle(page, 'A').first();
   await expect(card).toBeVisible();
   await settled(page);
   const before = await allPositions(page);
+  const openedId = await card.getAttribute('data-id');
 
   await openCard(card, 'A');
+  const expanded = await allPositions(page);
+  expect(expanded[openedId ?? '']).toEqual(before[openedId ?? '']);
+  expect(
+    Object.entries(before).some(
+      ([id, position]) =>
+        id !== openedId && JSON.stringify(expanded[id]) !== JSON.stringify(position),
+    ),
+  ).toBe(true);
   await card.getByRole('button', { name: 'Edit Card A' }).click();
   await page.getByRole('textbox', { name: 'Markdown source of A' }).fill('# Edited\n\nNew source');
   await card.getByRole('button', { name: 'Save Card A' }).click();
 
   await expect(page.getByRole('textbox', { name: 'Markdown source of A' })).toHaveCount(0);
   await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
+  expect(await allPositions(page)).toEqual(expanded);
+
+  await card.getByRole('button', { name: 'Close Card A' }).click();
   expect(await allPositions(page)).toEqual(before);
 
   await page.reload();
   const persisted = nodeByTitle(page, 'A').first();
-  await expect(persisted).toContainText('New source');
+  await persisted.hover();
   await persisted.getByRole('button', { name: 'Edit Card A' }).click();
-  expect(await markdownSource(page.getByRole('textbox', { name: 'Markdown source of A' }))).toBe(
-    '# Edited\n\nNew source',
-  );
+  const persistedSource = page.getByRole('textbox', { name: 'Markdown source of A' });
+  await expect(persistedSource).toContainText('# Edited');
+  await expect(persistedSource).toContainText('New source');
 });
 
 test('editing an Alias authors its metadata and survives reload', async ({ page }) => {
@@ -1354,7 +1369,7 @@ test(
     // rule: every Graph in it is a line, so no endpoint this list offers would
     // duplicate an existing Edge, and self-Edges, cycles and the endpoint the Edge
     // already names are all eligible (ADR 0032, ADR 0042). It is load-bearing at
-    // the keyboard Connect picker below, where B is disabled as a duplicate.
+    // the endpoint picker below, where B is disabled as a duplicate.
     const option = page.locator('[role="option"]:not([data-disabled])');
     // Read before the click, because the list goes with the completion: this is
     // the only moment the chosen Card's title is on screen to be observed rather

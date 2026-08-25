@@ -71,8 +71,6 @@ function inertEdgeAuthoring(): EdgeAuthoring {
     connect: () => null,
     createConnectedCard: () => null,
     endPointerDrag: () => null,
-    beginKeyboardConnect: () => undefined,
-    completeKeyboardConnect: () => null,
     beginPointerReconnect: () => undefined,
     openEdgeEditor: () => undefined,
     reconnect: () => false,

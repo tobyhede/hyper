@@ -3,7 +3,6 @@ import { uuidSchema } from '@project/core';
 import {
   describeAuthoringRefusal,
   presentAliasCardRefusal,
-  presentEdgeConnectionRefusal,
   presentEdgeDeletionRefusal,
   presentEdgeEndpointRefusal,
   presentMarkdownCardRefusal,
@@ -73,26 +72,6 @@ const CORRECTABLE_BY_CHOOSING_ANOTHER_CARD = [
 
 /** The same list, widened once so the loops below can ask it about any code. */
 const correctable: ReadonlySet<string> = new Set(CORRECTABLE_BY_CHOOSING_ANOTHER_CARD);
-
-describe('presentEdgeConnectionRefusal', () => {
-  it('puts a refusal another target could correct on the Target field', () => {
-    for (const code of CORRECTABLE_BY_CHOOSING_ANOTHER_CARD) {
-      const refusal = EVERY_REFUSAL[code];
-      expect(presentEdgeConnectionRefusal(refusal)).toEqual({
-        fields: { target: describeAuthoringRefusal(refusal) },
-      });
-    }
-  });
-
-  it('routes every other refusal to the form channel', () => {
-    for (const [code, refusal] of Object.entries(EVERY_REFUSAL)) {
-      if (correctable.has(code)) continue;
-      const errors = presentEdgeConnectionRefusal(refusal);
-      expect(errors.fields).toEqual({});
-      expect(errors.form).toBe(describeAuthoringRefusal(refusal));
-    }
-  });
-});
 
 describe('presentEdgeEndpointRefusal', () => {
   it.each(['from', 'to'] as const)('marks only the attempted %s Field invalid', (endpoint) => {

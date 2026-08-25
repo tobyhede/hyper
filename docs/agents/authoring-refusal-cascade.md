@@ -78,9 +78,9 @@ the 15 action-specific codes tabulated above — none is produced anywhere else.
 `describeAuthoringRefusal` in `authoring-refusal.ts` is the one place every
 code gets its copy, and the exhaustive placement records beside it are the one
 place each surface's field mapping lives: the domain names the code, the
-application owns the sentence. Six surfaces map it today — Markdown Card
+application owns the sentence. Five surfaces map it today — Markdown Card
 editing (`title`), Alias editing and Alias creation (`title` / `target`),
-keyboard connection (`target`), Edge endpoint editing (the attempted `from` or
-`to`, never both) and Edge deletion (form only). Every record is
+Edge endpoint editing (the attempted `from` or `to`, never both) and Edge
+deletion (form only). Every record is
 `Record<AuthoringRefusalCode, …>`, so a new code fails to compile until each
 surface has said where it goes.

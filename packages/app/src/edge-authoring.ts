@@ -170,15 +170,13 @@ export function newCardDrop(
 /**
  * The one Edge interaction in progress.
  *
- * Four kinds, mutually exclusive by type: starting one cancels whatever was
+ * Three kinds, mutually exclusive by type: starting one cancels whatever was
  * there. A connect draft names the Card an Edge would leave; a reconnect draft
- * names the Edge whose endpoint is being moved. The pointer and keyboard
- * variants are distinct because only the pointer ones are bounded by a drag —
- * a keyboard draft outlives every event until the author settles or cancels it.
+ * names the Edge whose endpoint is being moved. The selected Edge's endpoint
+ * editor outlives browser events until the author settles or cancels it.
  */
 export type EdgeDraft =
   | { readonly kind: 'pointer-connect'; readonly from: CardId }
-  | { readonly kind: 'keyboard-connect'; readonly from: CardId }
   | ({ readonly kind: 'pointer-reconnect'; readonly endpoint: EdgeEndpoint } & EdgeSubject)
   /** The Edge popover: both endpoints are editable while it stands. */
   | ({ readonly kind: 'keyboard-reconnect' } & EdgeSubject);
@@ -195,9 +193,8 @@ export type EdgeDraft =
  * a reconnection **which endpoint was attempted**, because only that endpoint's
  * Field may be marked invalid.
  *
- * Four kinds, one per presentation channel:
+ * Three kinds, one per presentation channel:
  *
- * - `connection` — the keyboard connection picker, which owns a Target field;
  * - `reconnection` — the open endpoint editor, which owns From and To;
  * - `deletion` — the selected Edge's own controls, which own no field at all;
  * - `gesture` — a completed pointer drag, whose initiating surface has gone, so
@@ -209,7 +206,6 @@ export type EdgeDraft =
  * every render instead.
  */
 export type EdgeRefusal =
-  | { readonly kind: 'connection'; readonly refusal: AuthoringRefusal }
   | {
       readonly kind: 'reconnection';
       readonly endpoint: EdgeEndpoint;
@@ -222,12 +218,11 @@ export type EdgeRefusal =
  * The two channels the **selected Edge's own controls** own, and the narrowing.
  *
  * Beside the union rather than beside the component that consumes it: which of
- * the four channels a surface owns is a fact about the channels, and
+ * the three channels a surface owns is a fact about the channels, and
  * `AuthorableEdge` had a hand-inlined copy of these two `kind`s in a file with
- * no other reason to know them. The other two belong elsewhere — the keyboard
- * connection picker's, and the canvas announcement a finished pointer gesture
- * leaves behind — and narrowing here is what stops a sentence from an unrelated
- * gesture appearing under whichever Edge happens to be selected.
+ * no other reason to know them. The canvas announcement belongs elsewhere, and
+ * narrowing here is what stops a sentence from an unrelated gesture appearing
+ * under whichever Edge happens to be selected.
  */
 export type SelectedEdgeRefusal = Extract<
   EdgeRefusal,
@@ -300,19 +295,6 @@ export interface EdgeAuthoring {
    */
   readonly endPointerDrag: () => CardId | null;
 
-  readonly beginKeyboardConnect: (from: CardId) => void;
-  /**
-   * Settle the open keyboard connection at a chosen target, answering the Card
-   * to continue at.
-   *
-   * Separate from {@link EdgeAuthoring.connect} because the keyboard path owes
-   * the author a focus move the pointer path does not: the picker holding focus
-   * unmounts with the draft, so without one focus would land on `body`.
-   */
-  readonly completeKeyboardConnect: (
-    to: CardId,
-    projected: readonly CardFlowNode[] | null,
-  ) => CardId | null;
   readonly beginPointerReconnect: (subject: EdgeSubject, endpoint: EdgeEndpoint) => void;
   readonly openEdgeEditor: (subject: EdgeSubject) => void;
   /** Move one endpoint of the drafted Edge to a Card. */
@@ -344,7 +326,7 @@ const gestureRefusal = (refusal: AuthoringRefusal): EdgeRefusal => ({ kind: 'ges
  * where the author was, and both are where focus returns after a cancellation.
  */
 const anchorCardOf = (draft: EdgeDraft): CardId => {
-  if (draft.kind === 'pointer-connect' || draft.kind === 'keyboard-connect') return draft.from;
+  if (draft.kind === 'pointer-connect') return draft.from;
   if (draft.kind === 'keyboard-reconnect') return draft.edge.from;
   return draft.endpoint === 'from' ? draft.edge.to : draft.edge.from;
 };
@@ -364,7 +346,7 @@ const sameRenderer = (left: CanvasRendererId, right: CanvasRendererId): boolean 
 
 /** Whether a canvas selection names the thing this draft is about. */
 const selectionMatchesDraft = (selection: CanvasSelection, draft: EdgeDraft): boolean => {
-  if (draft.kind === 'pointer-connect' || draft.kind === 'keyboard-connect') {
+  if (draft.kind === 'pointer-connect') {
     // A pointer connect deliberately survives an empty selection: React Flow
     // clears the Card as the drag begins, and cancelling there would end the
     // gesture on its first frame.
@@ -411,7 +393,7 @@ export function createEdgeAuthoring({
    * confuse it.
    */
   const subjectSurvives = (draft: EdgeDraft): boolean => {
-    if (draft.kind === 'pointer-connect' || draft.kind === 'keyboard-connect') {
+    if (draft.kind === 'pointer-connect') {
       return accepts({ kind: 'create-and-connect', from: draft.from });
     }
     return accepts({
@@ -508,13 +490,7 @@ export function createEdgeAuthoring({
   };
 
   /**
-   * Hold the Card a **pointer** connection continues at until its drag ends.
-   *
-   * Deliberately not inside `settleConnection`, which the keyboard path shares:
-   * `pendingContinuation` is drained only by `endPointerDrag`, so a keyboard
-   * connection that set it would leave it for the next pointer gesture to
-   * collect — and that gesture would select a Card it never named. The keyboard
-   * path says where focus goes itself, through the focus request.
+   * Hold the Card a pointer connection continues at until its drag ends.
    */
   const holdForDrag = (cardId: CardId | null): CardId | null => {
     if (cardId !== null) pendingContinuation = cardId;
@@ -630,26 +606,6 @@ export function createEdgeAuthoring({
         publish({ draft: null });
       }
       return continuation;
-    },
-
-    beginKeyboardConnect: (from) => begin({ kind: 'keyboard-connect', from }),
-
-    completeKeyboardConnect: (to, projected) => {
-      const { draft } = observable.getState();
-      if (draft?.kind !== 'keyboard-connect') return null;
-      // The picker offered this target, so a refusal here means the Space
-      // changed while it was open — which is the whole point of validating the
-      // proposal again at completion. The draft stands with its reason.
-      const completed = settleConnection(
-        connections.connect(draft.from, to, projected),
-        (refusal) => ({ kind: 'connection', refusal }),
-      );
-      if (completed === null) return null;
-      // "Successful keyboard connection selects and focuses the target Card."
-      // Selection is the canvas's and happens beside this; the focus move is
-      // Hyper's own, because the picker that had focus is about to unmount.
-      publish({ draft: null, refusal: null, focusRequest: { kind: 'card', cardId: completed } });
-      return completed;
     },
 
     // Destructured rather than spread: the caller usually holds an
