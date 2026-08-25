@@ -12,6 +12,7 @@ import { Button } from './Button';
 import { usePublishCardContentEdit, type CardContentEdit } from './card-content-edit';
 import { Kbd, KbdGroup } from './components/kbd';
 import { RenderedMarkdown } from './CardContent';
+import { EditIcon } from './icons';
 import { MarkdownSourceEditor } from './markdown-source-editor-lazy';
 import type { MarkdownSourceEditorHandle } from './MarkdownSourceEditor';
 import { cn } from './lib/utils';
@@ -77,7 +78,9 @@ function MarkdownEditControl({ ariaLabel, onBeginEdit }: MarkdownEditControlProp
         onBeginEdit();
       }}
       onKeyDown={(event) => event.stopPropagation()}
-    />
+    >
+      <EditIcon />
+    </Button>
   );
 }
 

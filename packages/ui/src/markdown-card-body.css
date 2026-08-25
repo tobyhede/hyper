@@ -137,6 +137,21 @@
   outline-offset: -3px;
 }
 
+.markdown-card-body__edit-control svg {
+  box-sizing: content-box;
+  width: 14px;
+  height: 14px;
+  padding: 3px;
+  border: 1px solid
+    color-mix(in srgb, var(--canvas-card-muted-color, currentcolor) 55%, transparent);
+  background: color-mix(in srgb, var(--canvas-card-face-active, transparent) 82%, transparent);
+  opacity: 0;
+}
+
+.markdown-card-body__edit-control:is(:hover, :focus-visible) svg {
+  opacity: 0.52;
+}
+
 .markdown-card-body--editing {
   --markdown-source-content-inset: var(--markdown-card-content-gap);
   --markdown-source-content-padding-top: var(--markdown-card-content-top);

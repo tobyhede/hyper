@@ -131,7 +131,8 @@ describe('MarkdownCardBody', () => {
     const control = screen.getByRole('button', {
       name: 'Edit Markdown source of Strategies',
     });
-    expect(control.querySelector('svg')).not.toBeInTheDocument();
+    expect(control.querySelector('svg')).toBeInTheDocument();
+    expect(control.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
     fireEvent.click(control);
 
     expect(onBeginEdit).toHaveBeenCalledTimes(1);

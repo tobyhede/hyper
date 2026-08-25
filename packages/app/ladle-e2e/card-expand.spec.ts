@@ -74,12 +74,17 @@ test('the open Card rail offers its edit action before Close', async ({ page }) 
   await expect(page.getByRole('textbox', { name: 'Markdown source of Strategies' })).toBeFocused();
 });
 
-test('the Markdown panel remains an icon-free click-to-edit target', async ({ page }) => {
+test('the Markdown panel discloses its boxed pencil to pointer and keyboard', async ({ page }) => {
   await open(page, markdownStory);
   const panel = page.getByRole('button', { name: 'Edit Markdown source of Strategies' });
+  const pencil = panel.locator('svg');
 
-  await expect(panel.locator('svg')).toHaveCount(0);
-  await panel.click();
+  await expect(pencil).toHaveCSS('opacity', '0');
+  await panel.hover();
+  await expect(pencil).not.toHaveCSS('opacity', '0');
+  await panel.focus();
+  await expect(pencil).not.toHaveCSS('opacity', '0');
+  await panel.press('Enter');
   await expect(page.getByRole('textbox', { name: 'Markdown source of Strategies' })).toBeFocused();
 });
 
