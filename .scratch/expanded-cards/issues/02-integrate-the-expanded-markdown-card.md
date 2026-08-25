@@ -18,12 +18,25 @@
 - [ ] Title and Markdown editing are mutually coherent: the application permits only the caret state the component contract can represent, returns focus intentionally, and does not silently commit or cancel through React Flow selection changes.
 - [ ] Expansion and neighbour displacement animate only where the production geometry supports a real before/after transition. Do not carry forward the review prototype's broken Animate.css entrance or magic-distance FLIP experiment.
 
+## Motion geometry
+
+The prototype animates on open and snaps on close because two things drive the same growth and disagree in one direction. `spec.md` §4 states the rule; this is what satisfying it looks like here.
+
+- [ ] The React Flow node wrapper is the **only** animated element. Everything inside it is a passenger with no opinion about its own size: `.canvas-card` declares no width or height in either state, and the collapsed pixel constant moves to `.rf-card-node__inner` (with `min-width`/`min-height` covering the pre-layout and bare-mount cases).
+- [ ] `data-expanded` governs content only — order, borders, what is rendered. It must not switch geometry, or close stops animating again.
+- [ ] One duration and one easing token govern the growing Card, the shrinking Card and every displaced neighbour. Do not write a duration twice.
+- [ ] The transition is declared in CSS on the node class, not rebuilt as a per-node inline style on every render. Suppression during drag and resize is a class the projection composes alongside `rf-card-node`.
+- [ ] `prefers-reduced-motion` is honored in one place — the token — not repeated per rule.
+- [ ] Ladle E2E asserts the symmetry deterministically through `getAnimations()` rather than mid-flight screenshots: after a close, a running `width` transition on `.react-flow__node` **and** a `.canvas-card` computed box equal to the wrapper's. That assertion fails against the prototype today and is the one-line statement of the defect.
+- [ ] Content enter/exit is **not** in this ticket. The body still mounts and unmounts at full opacity; issue 03 gives it a cross-fade. Do not solve it here with a bespoke delay.
+
 ## Application proof
 
-- [ ] Application Playwright proves: expand a Markdown Card, read rendered Markdown, disclose and activate the body edit affordance, edit and commit with `Mod-Enter`, edit and cancel with `Escape`, commit on the accepted blur path, drag outside editing, resize, collapse and reload the authored result.
+- [ ] Application Playwright proves: expand a Markdown Card, read rendered Markdown, disclose and activate the body edit affordance, edit and commit with `Mod-Enter`, edit and cancel with `Escape`, prove a click away leaves the draft and the editor up, drag outside editing, resize, collapse and reload the authored result.
 - [ ] Application proof covers opening from an Algorithmic View converting to a Layout and proves drawn displacement is inverted before authored placement is stored.
 - [ ] The test asserts rendered Markdown and source text keep the same content column while the gutter toggles on and off.
-- [ ] The test asserts the shortcut hint is visible only while CodeMirror has focus and that no bright editor-wide focus frame returns.
+- [ ] The test asserts the shortcut hint is visible only while CodeMirror has focus, that its two key-and-word pairs are set apart from each other more than each key is from its own word, and that no bright editor-wide focus frame returns.
+- [ ] The test asserts the rail replaces its Edit action with Save and Cancel while the edit runs, disables Close for its duration, draws all three as the one rail-action treatment, and that a press on Save or Cancel leaves the caret in the document rather than pulling it out to the rail.
 - [ ] Existing camera, Edge authoring, selection, dragging and presentation behavior remain green.
 
 ## Catalogue consolidation

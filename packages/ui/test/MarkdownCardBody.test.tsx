@@ -1,7 +1,7 @@
 import '@testing-library/jest-dom/vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
-import { MarkdownCardBody } from '../src';
+import { CanvasCard, MarkdownCardBody } from '../src';
 
 beforeAll(() => {
   vi.stubGlobal(
@@ -39,6 +39,22 @@ const body = (props: Partial<Parameters<typeof MarkdownCardBody>[0]> = {}) => (
     source={'# Strategies\n\nNo strategy is privileged.'}
     ariaLabel="Markdown source of Strategies"
     {...props}
+  />
+);
+
+/**
+ * The body in the Card that mounts it, which is the only place the two ends of
+ * an edit are drawn: this surface publishes them and the Card's rail draws them
+ * (`card-content-edit.ts`). Mounted alone, the body keeps its keys and offers no
+ * control of its own.
+ */
+const onCard = (props: Partial<Parameters<typeof MarkdownCardBody>[0]> = {}) => (
+  <CanvasCard
+    front={{ kind: 'markdown' }}
+    state="rest"
+    title="Strategies"
+    graphColor="#ffc53d"
+    content={body(props)}
   />
 );
 
@@ -120,26 +136,29 @@ describe('MarkdownCardBody', () => {
     expect(editor.onEnd).toHaveBeenCalledTimes(2);
   });
 
-  it('commits a draft the author clicked away from, and not one they moved within', async () => {
+  it('keeps a draft the author clicked away from, committing and abandoning nothing', async () => {
     const editor = { onComplete: vi.fn(), onEnd: vi.fn() };
     const { container } = render(body({ onBeginEdit: vi.fn(), editor }));
     const editable = await source();
     const surface = container.querySelector('.markdown-card-body');
     if (surface === null) throw new Error('missing body surface');
 
-    // `focusout` bubbles, so a move *inside* the editor arrives here too and is
-    // not the author leaving.
+    // Four exits and no more: two keys and the two controls that pair with them.
+    // A pointer landing elsewhere on the canvas does not get to decide what
+    // happens to a document — losing one to a stray click is not a cost worth
+    // paying to save the author from saying which exit they wanted.
     fireEvent.blur(surface, { relatedTarget: editable });
-    expect(editor.onComplete).not.toHaveBeenCalled();
-
     fireEvent.blur(surface, { relatedTarget: document.body });
-    expect(editor.onComplete).toHaveBeenCalledTimes(1);
+
+    expect(editor.onComplete).not.toHaveBeenCalled();
+    expect(editor.onEnd).not.toHaveBeenCalled();
+    expect(await source()).toBeVisible();
   });
 
   it.each([
-    ['MacIntel', '⌘↵ Save · Esc Cancel'],
-    ['Win32', 'Ctrl↵ Save · Esc Cancel'],
-  ])('names the modifier for %s without changing the compact hint', async (platform, label) => {
+    ['MacIntel', '⌘+↵Save'],
+    ['Win32', 'Ctrl+↵Save'],
+  ])('names the modifier for %s and sets each key beside its word', async (platform, save) => {
     const platformGetter = vi.spyOn(navigator, 'platform', 'get').mockReturnValue(platform);
     const { container } = render(
       body({ onBeginEdit: vi.fn(), editor: { onComplete: vi.fn(), onEnd: vi.fn() } }),
@@ -148,34 +167,79 @@ describe('MarkdownCardBody', () => {
     const hint = container.querySelector('.markdown-card-body__shortcut-hint');
     if (hint === null) throw new Error('missing shortcut hint');
 
-    expect(hint).toHaveTextContent(label);
+    // Two pairs, each its own element, so what sets them apart is a `gap` rule
+    // rather than a separator character wedged into one run of glyphs. The gap
+    // itself is a computed style and belongs to the browser test.
+    expect(
+      Array.from(hint.querySelectorAll('.markdown-card-body__shortcut')).map(
+        (pair) => pair.textContent,
+      ),
+    ).toEqual([save, 'EscCancel']);
     expect(hint.querySelectorAll('[data-slot="kbd"]')).toHaveLength(3);
     platformGetter.mockRestore();
   });
 
+  it('offers no control of its own when nothing published a rail to draw one on', async () => {
+    render(body({ onBeginEdit: vi.fn(), editor: { onComplete: vi.fn(), onEnd: vi.fn() } }));
+    await source();
+
+    expect(screen.queryByRole('button', { name: /^Save Card/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Cancel editing Card/ })).not.toBeInTheDocument();
+  });
+
+  it('takes the same two exits from the rail as from its own keys', async () => {
+    const editor = { onComplete: vi.fn(), onEnd: vi.fn() };
+    render(onCard({ onBeginEdit: vi.fn(), editor }));
+    await source();
+
+    // Abandoning has nothing to commit — the pairing `onEnd` deliberately does
+    // not repeat, since it fires on every exit including the committing ones.
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel editing Card Strategies' }));
+    expect(editor.onComplete).not.toHaveBeenCalled();
+    expect(editor.onEnd).toHaveBeenCalledOnce();
+
+    await source();
+    fireEvent.click(screen.getByRole('button', { name: 'Save Card Strategies' }));
+    expect(editor.onComplete).toHaveBeenCalledOnce();
+    expect(editor.onComplete).toHaveBeenCalledWith('# Strategies\n\nNo strategy is privileged.');
+    expect(editor.onEnd).toHaveBeenCalledTimes(2);
+  });
+
+  it('withdraws those two ends from the rail when the caret goes back', async () => {
+    const { rerender } = render(
+      onCard({ onBeginEdit: vi.fn(), editor: { onComplete: vi.fn(), onEnd: vi.fn() } }),
+    );
+    await source();
+    expect(screen.getByRole('button', { name: 'Save Card Strategies' })).toBeVisible();
+
+    rerender(onCard({ onBeginEdit: vi.fn() }));
+
+    expect(screen.queryByRole('button', { name: 'Save Card Strategies' })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Cancel editing Card Strategies' }),
+    ).not.toBeInTheDocument();
+  });
+
   // Two separate edits, so the lazy editor mounts twice — past the default budget.
   it(
-    'still commits on blur in an edit that was never given the caret',
+    'ends a second edit from its own keys, including one never given the caret',
     { timeout: 20_000 },
     async () => {
-      // An editor supplied with `autoFocus={false}` never runs the arm that clears
-      // the closing flag, so a *previous* exit's flag survived into it and the
-      // blur below found the surface already "leaving" — the author's draft went
-      // nowhere, with nothing to see. The flag says what *this* exit is doing, so
-      // no edit may inherit one from the edit before it.
       const editor = { onComplete: vi.fn(), onEnd: vi.fn() };
-      const { container, rerender } = render(body({ onBeginEdit: vi.fn(), editor }));
+      const { rerender } = render(body({ onBeginEdit: vi.fn(), editor }));
       await source();
       fireEvent.keyDown(await source(), { key: 'Escape' });
 
+      // An editor supplied with `autoFocus={false}` is one the caret was never
+      // placed in. Its keys are still its own — nothing about a previous exit
+      // may survive into it and spend this edit's.
       rerender(body({ onBeginEdit: vi.fn() }));
       rerender(body({ onBeginEdit: vi.fn(), editor, autoFocus: false }));
-      await source();
-      const surface = container.querySelector('.markdown-card-body');
-      if (surface === null) throw new Error('missing body surface');
+      const editable = await source();
 
-      fireEvent.blur(surface, { relatedTarget: document.body });
+      fireEvent.keyDown(editable, { key: 'Enter', metaKey: true });
       expect(editor.onComplete).toHaveBeenCalledTimes(1);
+      expect(editor.onEnd).toHaveBeenCalledTimes(2);
     },
   );
 

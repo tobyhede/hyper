@@ -40,6 +40,12 @@ export const PresentIcon = ({ color }: { color: string }) => <Play color={color}
 /** Edit the content of a Markdown Card. */
 export const EditIcon = () => <Pencil size={14} />;
 
+/** Commit the edit running on a Card's content. */
+export const CommitEditIcon = () => <Check size={14} />;
+
+/** Abandon the edit running on a Card's content. */
+export const AbandonEditIcon = () => <X size={14} strokeWidth={3} />;
+
 /** Open a Card in place. */
 export const OpenCardIcon = () => <Maximize2 size={14} />;
 

@@ -1,7 +1,33 @@
 import '@testing-library/jest-dom/vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
+import { useEffect } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { CanvasCard } from '../src';
+import { usePublishCardContentEdit } from '../src/card-content-edit';
+
+/**
+ * The smallest thing that fills a Card's content slot and says it holds a caret.
+ *
+ * Stands in for `MarkdownCardBody`, which reaches CodeMirror across a dynamic
+ * import — what is under test here is the Card's half of the seam: that it draws
+ * what the content published and withdraws its own controls while it does.
+ * `MarkdownCardBody.test.tsx` runs the same rail against the real body.
+ */
+function ContentRunningAnEdit({
+  onSave,
+  onCancel,
+}: {
+  readonly onSave: () => void;
+  readonly onCancel: () => void;
+}) {
+  const publish = usePublishCardContentEdit();
+  useEffect(() => {
+    if (publish === null) return undefined;
+    publish({ onSave, onCancel });
+    return () => publish(null);
+  }, [onCancel, onSave, publish]);
+  return <p>Markdown</p>;
+}
 
 describe('CanvasCard kind and interaction state', () => {
   it('presents a Markdown front and its resting state', () => {
@@ -100,20 +126,33 @@ describe('CanvasCard Open and Close operation', () => {
     expect(onOpenChange).toHaveBeenLastCalledWith(false);
   });
 
-  it('offers Edit before Close only while the Card is open', () => {
+  it('offers Edit before Close whether or not the Card is open', () => {
     const onBeginContentEdit = vi.fn();
+    const onOpenChange = vi.fn();
     const { rerender } = render(
       <CanvasCard
         front={{ kind: 'markdown' }}
         state="selected"
         title="A"
         graphColor="#ffc53d"
-        onOpenChange={vi.fn()}
+        onOpenChange={onOpenChange}
         onBeginContentEdit={onBeginContentEdit}
       />,
     );
 
-    expect(screen.queryByRole('button', { name: 'Edit Card A' })).not.toBeInTheDocument();
+    const labels = () =>
+      Array.from(screen.getByTestId('canvas-card-actions').querySelectorAll('button')).map(
+        (button) => button.getAttribute('aria-label'),
+      );
+    expect(labels()).toEqual(['Edit Card A', 'Open Card A']);
+
+    // Collapsed, Edit is the two gestures an author would otherwise make in
+    // order, and both are the Card's own operations — opening is the same call
+    // the Open control makes, so nothing about it has a second implementation.
+    screen.getByRole('button', { name: 'Edit Card A' }).click();
+    expect(onOpenChange).toHaveBeenCalledOnce();
+    expect(onOpenChange).toHaveBeenCalledWith(true);
+    expect(onBeginContentEdit).toHaveBeenCalledOnce();
 
     rerender(
       <CanvasCard
@@ -122,19 +161,120 @@ describe('CanvasCard Open and Close operation', () => {
         title="A"
         graphColor="#ffc53d"
         content={<p>Markdown</p>}
+        onOpenChange={onOpenChange}
+        onBeginContentEdit={onBeginContentEdit}
+      />,
+    );
+
+    expect(labels()).toEqual(['Edit Card A', 'Close Card A']);
+    // Open, it is only the caret: the Card is already the size it needs to be.
+    screen.getByRole('button', { name: 'Edit Card A' }).click();
+    expect(onOpenChange).toHaveBeenCalledOnce();
+    expect(onBeginContentEdit).toHaveBeenCalledTimes(2);
+  });
+
+  it('withholds Edit from a collapsed Card that cannot be opened', () => {
+    render(
+      <CanvasCard
+        front={{ kind: 'markdown' }}
+        state="selected"
+        title="A"
+        graphColor="#ffc53d"
+        onBeginContentEdit={vi.fn()}
+      />,
+    );
+
+    // The first half of the pair is missing, so the caret would have nowhere to
+    // land — a control that ran half of what it names is worse than none.
+    expect(screen.queryByRole('button', { name: 'Edit Card A' })).not.toBeInTheDocument();
+  });
+
+  it('replaces Edit with the two ends of the edit its content is running, keeping Close', () => {
+    const onSave = vi.fn();
+    const onCancel = vi.fn();
+    const onBeginContentEdit = vi.fn();
+    render(
+      <CanvasCard
+        front={{ kind: 'markdown' }}
+        state="rest"
+        title="A"
+        graphColor="#ffc53d"
+        content={<ContentRunningAnEdit onSave={onSave} onCancel={onCancel} />}
         onOpenChange={vi.fn()}
         onBeginContentEdit={onBeginContentEdit}
       />,
     );
 
     const actions = screen.getByTestId('canvas-card-actions');
+    // Close belongs to the Card rather than to the edit, so it keeps its slot
+    // and says it is unavailable instead of vanishing — closing mid-edit would
+    // drop the Card's box out from under a live caret holding a draft.
+    expect(
+      Array.from(actions.querySelectorAll('button')).map((button) =>
+        button.getAttribute('aria-label'),
+      ),
+    ).toEqual(['Save Card A', 'Cancel editing Card A', 'Close Card A']);
+    expect(screen.getByRole('button', { name: 'Close Card A' })).toBeDisabled();
+    // The one fact the stylesheet reads to keep the rail up while the caret is
+    // in the body, where no hover or focus of the rail's own is true.
+    expect(screen.getByRole('article', { name: 'A' })).toHaveAttribute(
+      'data-content-editing',
+      'true',
+    );
+
+    screen.getByRole('button', { name: 'Save Card A' }).click();
+    expect(onSave).toHaveBeenCalledOnce();
+    screen.getByRole('button', { name: 'Cancel editing Card A' }).click();
+    expect(onCancel).toHaveBeenCalledOnce();
+    expect(onBeginContentEdit).not.toHaveBeenCalled();
+  });
+
+  it('draws those two ends as the rail actions beside them, not as a second kind', () => {
+    render(
+      <CanvasCard
+        front={{ kind: 'markdown' }}
+        state="rest"
+        title="A"
+        graphColor="#ffc53d"
+        content={<ContentRunningAnEdit onSave={vi.fn()} onCancel={vi.fn()} />}
+        onOpenChange={vi.fn()}
+      />,
+    );
+
+    const actions = screen.getByTestId('canvas-card-actions');
     const buttons = Array.from(actions.querySelectorAll('button'));
-    expect(buttons.map((button) => button.getAttribute('aria-label'))).toEqual([
-      'Edit Card A',
-      'Close Card A',
-    ]);
-    screen.getByRole('button', { name: 'Edit Card A' }).click();
-    expect(onBeginContentEdit).toHaveBeenCalledTimes(1);
+    // One rail, one control treatment. A commit control that carried its own box
+    // or its own type would read as a different kind of thing to the Close
+    // button it sits beside.
+    for (const button of buttons) {
+      expect(button).toHaveClass('card__rail-action');
+      expect(button.textContent).toBe('');
+    }
+    // The key each performs is still stated, which is how a control that
+    // performs a shortcut announces it (`AddCardControl` does the same).
+    expect(buttons[0]).toHaveAttribute('aria-keyshortcuts', 'Meta+Enter Control+Enter');
+    expect(buttons[1]).toHaveAttribute('aria-keyshortcuts', 'Escape');
+  });
+
+  it('keeps the caret in the content when one of those two ends is pressed', () => {
+    render(
+      <CanvasCard
+        front={{ kind: 'markdown' }}
+        state="rest"
+        title="A"
+        graphColor="#ffc53d"
+        content={<ContentRunningAnEdit onSave={vi.fn()} onCancel={vi.fn()} />}
+        onOpenChange={vi.fn()}
+      />,
+    );
+
+    // The rail is outside the writing surface, so a press on it would otherwise
+    // pull the caret and the selection out of the document the author is still
+    // in. `fireEvent` answers `false` for an event whose default was prevented,
+    // which is what stops the browser moving focus to the button.
+    for (const name of ['Save Card A', 'Cancel editing Card A']) {
+      expect(fireEvent.mouseDown(screen.getByRole('button', { name }))).toBe(false);
+    }
   });
 
   it('hides both actions while the title is being edited', () => {

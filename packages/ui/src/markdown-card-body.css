@@ -11,7 +11,10 @@
      focus disclosure are the Markdown kind's visual contract, not a reusable
      control variant.
    - Custom behavior being introduced: none; Button and MarkdownSourceEditor
-     retain activation, keyboard and focus behavior.
+     retain activation, keyboard and focus behavior. The two ends of a running
+     edit are published to the surrounding `CanvasCard`, whose existing rail
+     actions draw them, so this surface has no control of its own past the
+     at-rest edit target.
    - Tests proving the deviation: MarkdownCardBody.test.tsx and
      packages/app/ladle-e2e/card-expand.spec.ts.
 
@@ -142,31 +145,76 @@
   --markdown-source-line-number-font-size: 12px;
 }
 
+/* The keys this surface spends, named where the author is typing.
+
+   Drawn the way every application that names an inline shortcut draws one: the
+   key as a **cap** — filled, bordered, its own small box — and the word beside
+   it in plain muted text. A cap is recognised as an object without being read;
+   glyphs set into running text at low contrast have to be parsed, and that is
+   what made the earlier line illegible. `Kbd`'s default variant is that cap and
+   the design system already ships it; the only thing added here is the Card's
+   own palette, because `bg-muted` is the application's paper and this sits on
+   the Card's.
+
+   No panel behind it: the Card's face is a shade darker than the editor's own
+   surface, so a filled backing reads as a grey box floated over the document.
+   It sits in the reserved band above the first line instead.
+
+   Grouping is the second rule: one gap holds a cap to its word, a wider one
+   separates the pairs, so the eye takes `⌘+↵ Save` and `Esc Cancel` as two
+   things rather than one run. */
 .markdown-card-body__shortcut-hint {
   position: absolute;
   inset-block-start: 0;
-  inset-inline-end: 8px;
+  inset-inline-end: 10px;
+  height: 34px;
   z-index: 2;
   display: flex;
   align-items: center;
-  height: 34px;
+  gap: 14px;
   color: var(--canvas-card-muted-color, currentcolor);
-  font:
-    10px/14px ui-monospace,
-    SFMono-Regular,
-    Menlo,
-    monospace;
-  letter-spacing: 0.02em;
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 1;
   opacity: 0;
   pointer-events: none;
 }
 
+.markdown-card-body__shortcut {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
 .markdown-card-body__shortcut-keys {
-  gap: 0;
+  gap: 3px;
+}
+
+/* The Card's palette over `Kbd`'s theme tokens, and a cap sized for a 10px line
+   rather than the 14px one the default variant assumes.
+
+   Outlined rather than filled: the rule is drawn on the Card's own paper, and a
+   second grey fill inside it adds a value the Card's palette does not have. The
+   border alone is what makes a cap read as a key, and it does that at any
+   size. */
+.markdown-card-body__shortcut-hint [data-slot='kbd'] {
+  height: 14px;
+  min-width: 14px;
+  padding: 0 3px;
+  border: 1px solid color-mix(in srgb, currentcolor 42%, transparent);
+  border-radius: 3px;
+  background: transparent;
+  /* One ink for the whole line. A cap set in the Card's full-strength ink beside
+     a muted word reads as two different kinds of text; the cap is already told
+     apart by its outline, and nothing is gained by also making it darker. */
+  color: inherit;
+  font-size: 9px;
+  font-weight: 600;
+  line-height: 1;
 }
 
 .markdown-card-body--editing:focus-within .markdown-card-body__shortcut-hint {
-  opacity: 0.52;
+  opacity: 1;
 }
 
 /* While the caret is in, CodeMirror may scroll to keep it visible — and the

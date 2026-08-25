@@ -100,6 +100,10 @@ They are all **Layout-required** operations, so they join `LayoutRequiredOperati
 
 `projection.ts` already reads `cardLayout.width`/`cardLayout.height` per Card, sets `node.width`/`node.height` from them, and computes `declaredHandles` from that rect — the four authoring handles and the graph ports are already functions of `card.width`/`card.height`. **Nothing there changes.** What changes is that the strategy now produces varying rects for it to read, which is the point: the render layer was built for this and has been fed a constant.
 
+**The node's box owns the rect, and `.canvas-card` fills it in both states.** This is what makes opening and closing *one* transition rather than two behaviours. `node.width`/`node.height` are declared for every placed Card, collapsed ones included, so a single `width`/`height`/`transform` transition on the React Flow node wrapper carries the growth, the shrink, and every displaced neighbour, on one duration and one easing.
+
+The Card must hold no second opinion about its own size. A `.canvas-card` that declares the collapsed constant and overrides it to `100%` while Expanded is a passenger that *leaves* the transition the instant the Expanded flag flips — which is precisely what the review prototype does, and why it animates on open and snaps on close: one frame after a close the node wrapper is still 560x420 while the Card inside is already 260x146, easing a box nothing is attached to while the neighbours glide home. The collapsed pixel default therefore belongs to the container — `.rf-card-node__inner`, with `min-width`/`min-height` answering the bare mount a component story makes — and `data-expanded` governs content only: order, borders, what is rendered. Never geometry.
+
 `CardNode` gains one branch. It has two today — `showContent` (presenting) and the `CanvasCard` front. Expanded is a third, and it is *not* `showContent`: presenting draws rendered Markdown at the frame's scale (ADR 0011, ADR 0027), expanding draws source. Do not collapse them; they differ in exactly the way ADR 0011 ruled on.
 
 The node's `zIndex` must be raised while Expanded. React Flow paints in node order, so without it a Card grows *underneath* whatever was declared after it. Two Cards Expanded at the same z-index still resolve by document order, which is nobody's rule — decide it (most recently opened on top is the obvious answer, and it needs a per-Card ordinal the Layout does not have, so the honest first answer is document order, stated).
@@ -117,7 +121,7 @@ The claim of ADR 0064 is that an Expanded Card *is* the Card, bigger. One compon
 
 The slot is filled by the **kind's** body surface, because the kind owns everything beyond the Title (ADR 0051):
 
-- `MarkdownCardBody` — the source. Draws the bytes at rest; a double click puts a caret in it. It owns the draft, `Escape` (abandon), `Mod-Enter` (commit) and commit-on-blur, which are exactly the keys `MarkdownSourceEditor` withholds from CodeMirror for its surface to spend (ADR 0063, ADR 0048). Its at-rest padding is set to land the text where the editor will put it, so entering adds a caret, a gutter rule and line numbers without moving a word — the prototype's CSS has the working values.
+- `MarkdownCardBody` — the source. Draws the bytes at rest; a double click puts a caret in it. It owns the draft, `Escape` (abandon) and `Mod-Enter` (commit), which are exactly the keys `MarkdownSourceEditor` withholds from CodeMirror for its surface to spend (ADR 0063, ADR 0048). A blur ends nothing: those two keys and the two rail controls that pair with them are the whole of how an edit ends, which diverges from ADR 0064's "a click away completes either" and is recorded in issue 01. Its at-rest padding is set to land the text where the editor will put it, so entering adds a caret, a gutter rule and line numbers without moving a word — the prototype's CSS has the working values.
 - Alias and Space: not in this change (ADR 0064).
 
 **The lazy split has to move, and this is the part to think hardest about.** `MarkdownSourceEditor` is reached today through `packages/app/src/components/markdown-source-editor-lazy.ts`, the single negated entry in an ESLint zone that otherwise bars `@project/ui/*`, and `test/unit/codemirror-encapsulation.test.ts` holds `packages/app/src` to dynamic-import-only. If `MarkdownCardBody` lives in `ui` and imports the editor statically, the CodeMirror stack returns to the initial bundle and ADR 0063's stated payoff is gone.
@@ -145,6 +149,7 @@ One at a time, canvas-wide — which is what makes "several Cards Expanded" not 
 | A drawn coordinate never reaches a Layout un-inverted | `Placement.next` is the only door; property test round-trips `next(p, drawn(p), …) === p` |
 | Closing restores the neighbours exactly | The same property test, with an Expanded Card closed between the two halves |
 | A collapsed Card carries no size | `cardPlacementSchema` — presence of `expanded` is the state |
+| Opening and closing animate identically | The node box owns the rect and `.canvas-card` declares no size — Ladle E2E asserts a running `width` transition on the node wrapper *and* that the Card's computed box matches it |
 | An Expanded Card's declared box is the box the strategy reasoned about | `canvas-projection` property test (extends the existing handle-resolution one) |
 | The bundle does not gain CodeMirror | `codemirror-encapsulation.test.ts`, with its scan moved to both trees |
 | No stylesheet names a CodeMirror class | Same test, unchanged |

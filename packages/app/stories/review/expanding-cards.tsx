@@ -344,6 +344,12 @@ function Canvas({
         },
         onBeginTitleEditing: () => setCaret({ cardId, field: 'title' }),
       };
+      // Offered whether or not this Card is Expanded. On a collapsed one the
+      // rail's Edit control opens the Card through `onEditCard` first, so this
+      // caret lands in the body that opening just revealed.
+      if (node.data.kind === 'markdown') {
+        data.onBeginBodyEditing = () => setCaret({ cardId, field: 'body' });
+      }
       if (caret?.cardId === cardId && caret.field === 'title') {
         data.titleEditor = {
           onComplete: (next) => {
@@ -358,7 +364,6 @@ function Canvas({
       if (grown !== undefined) {
         data.expanded = true;
         data.body = written?.body ?? source?.body ?? '';
-        data.onBeginBodyEditing = () => setCaret({ cardId, field: 'body' });
         data.resize = {
           minWidth: CARD_WIDTH,
           minHeight: CARD_HEIGHT,

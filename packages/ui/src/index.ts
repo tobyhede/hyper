@@ -39,9 +39,11 @@ export {
 export { FALLBACK_GRAPH_COLOR, graphColor } from './graph-color';
 export { Popover, PopoverContent, PopoverTrigger } from './Popover';
 export {
+  AbandonEditIcon,
   AlertIcon,
   AliasIcon,
   CheckIcon,
+  CommitEditIcon,
   ChevronDownIcon,
   CloseIcon,
   CloseCardIcon,

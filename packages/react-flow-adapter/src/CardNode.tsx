@@ -191,7 +191,10 @@ export function CardNode({ data, selected, dragging, isConnectable }: NodeProps<
   if (data.cardEditingEnabled === true && data.onEditCard !== undefined) {
     canvasCardOptionalProps.onOpenChange = data.onEditCard;
   }
-  if (data.expanded === true && data.onBeginBodyEditing !== undefined) {
+  // Not gated on `expanded`: Edit is offered on a collapsed Card too, and there
+  // `CanvasCard` runs it after `onOpenChange(true)` — the two calls the Open and
+  // Edit controls make in sequence, and no third path through opening.
+  if (data.kind === 'markdown' && data.onBeginBodyEditing !== undefined) {
     canvasCardOptionalProps.onBeginContentEdit = data.onBeginBodyEditing;
   }
 

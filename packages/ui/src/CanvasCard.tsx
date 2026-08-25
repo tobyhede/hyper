@@ -1,8 +1,9 @@
 import { useEffect, useId, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { Button } from './Button';
+import { CardContentEditProvider, type CardContentEdit } from './card-content-edit';
 import { CardRail } from './CardRail';
 import { Card, CardContent, CardTitle } from './components/card';
-import { CloseCardIcon, EditIcon, OpenCardIcon } from './icons';
+import { AbandonEditIcon, CloseCardIcon, CommitEditIcon, EditIcon, OpenCardIcon } from './icons';
 import './canvas-card.css';
 
 /**
@@ -46,7 +47,15 @@ interface CanvasCardCommonProps {
   readonly onBeginTitleEdit?: () => void;
   /** Toggle this Card between its collapsed and Expanded states. */
   readonly onOpenChange?: (open: boolean) => void;
-  /** Present only while Expanded, when its kind-owned content may be edited. */
+  /**
+   * Put a caret in this Card's kind-owned content.
+   *
+   * Offered whatever the Card's size, because Edit is something an author does
+   * to a Card rather than something available only inside one already open. On a
+   * collapsed Card the rail's Edit control runs `onOpenChange(true)` first and
+   * this second — the same two calls the Open and Edit controls make in
+   * sequence, so nothing about opening is reimplemented for that path.
+   */
   readonly onBeginContentEdit?: () => void;
 }
 
@@ -89,6 +98,35 @@ type CanvasCardStyle = CSSProperties & { readonly '--canvas-card-graph': string 
  * `CardNode`) — nothing here imports React Flow or reaches into its DOM. Its
  * own visual treatment lives in `canvas-card.css`, colocated with this module.
  */
+/**
+ * What the rail's Edit control runs, or `undefined` when the Card has no such
+ * control to draw.
+ *
+ * On an Expanded Card it is simply the caret operation the caller supplied. On a
+ * **collapsed** one it is the two gestures the author would otherwise have made
+ * in order — open the Card, then place the caret — composed from the Card's own
+ * two existing operations and nothing else. Opening is not reimplemented or
+ * approximated here: `onOpenChange` is the same call the Open control makes, so
+ * the growth, the neighbours' displacement and the transition are the ones
+ * opening always produces.
+ *
+ * A collapsed Card that cannot be opened has no Edit control, because the first
+ * half of that pair would be missing and the caret would have nowhere to land.
+ */
+const contentEditAction = (
+  content: ReactNode | undefined,
+  onOpenChange: ((open: boolean) => void) | undefined,
+  onBeginContentEdit: (() => void) | undefined,
+): (() => void) | undefined => {
+  if (onBeginContentEdit === undefined) return undefined;
+  if (content !== undefined) return onBeginContentEdit;
+  if (onOpenChange === undefined) return undefined;
+  return () => {
+    onOpenChange(true);
+    onBeginContentEdit();
+  };
+};
+
 export function CanvasCard(props: CanvasCardProps) {
   const {
     front,
@@ -100,10 +138,19 @@ export function CanvasCard(props: CanvasCardProps) {
     onBeginContentEdit,
     state,
   } = props;
+  /**
+   * The edit running inside the content slot, published by whatever fills it.
+   *
+   * State rather than a prop because the slot is an opaque `ReactNode` and the
+   * caret is not in anything this component or its caller holds — `CanvasCard`
+   * asks the content, and the content answers (`card-content-edit.ts`).
+   */
+  const [contentEdit, setContentEdit] = useState<CardContentEdit | null>(null);
+  const beginContentEdit = contentEditAction(content, onOpenChange, onBeginContentEdit);
   const showActions =
     state !== 'dragging' &&
     state !== 'editing' &&
-    (onOpenChange !== undefined || (content !== undefined && onBeginContentEdit !== undefined));
+    (contentEdit !== null || onOpenChange !== undefined || beginContentEdit !== undefined);
   const style: CanvasCardStyle = { '--canvas-card-graph': graphColor };
 
   return (
@@ -120,26 +167,35 @@ export function CanvasCard(props: CanvasCardProps) {
       // Derived from the slot, so there is one fact here and not two that can
       // disagree.
       data-expanded={content !== undefined}
+      // The rail is normally revealed with the Card and hidden again at rest.
+      // A running edit is not a hover, so the controls that end it are read off
+      // this instead — an author writing in the body must be able to see the way
+      // out without going looking for it with the pointer.
+      data-content-editing={contentEdit !== null}
       style={style}
     >
       <CardRail kind={front.kind} graphColor={graphColor} className="canvas-card__rail">
         {showActions && (
           <div className="canvas-card__actions" data-testid="canvas-card-actions">
-            {content !== undefined && onBeginContentEdit !== undefined && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="card__rail-action nodrag nopan"
-                aria-label={`Edit Card ${title}`}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  onBeginContentEdit();
-                }}
-                onPointerDown={(event) => event.stopPropagation()}
-                onKeyDown={(event) => event.stopPropagation()}
-              >
-                <EditIcon />
-              </Button>
+            {contentEdit === null ? (
+              beginContentEdit !== undefined && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="card__rail-action nodrag nopan"
+                  aria-label={`Edit Card ${title}`}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    beginContentEdit();
+                  }}
+                  onPointerDown={(event) => event.stopPropagation()}
+                  onKeyDown={(event) => event.stopPropagation()}
+                >
+                  <EditIcon />
+                </Button>
+              )
+            ) : (
+              <ContentEditActions title={title} edit={contentEdit} />
             )}
             {onOpenChange !== undefined && (
               <Button
@@ -147,6 +203,12 @@ export function CanvasCard(props: CanvasCardProps) {
                 size="icon"
                 className="card__rail-action nodrag nopan"
                 aria-label={`${content === undefined ? 'Open' : 'Close'} Card ${title}`}
+                // Closing mid-edit would drop the Card's box out from under a
+                // live caret with a draft in it. The control keeps its slot and
+                // goes disabled rather than disappearing: the rail's row does not
+                // reshuffle while the author writes, and what is unavailable says
+                // so instead of vanishing.
+                disabled={contentEdit !== null}
                 onClick={(event) => {
                   event.stopPropagation();
                   onOpenChange(content === undefined);
@@ -213,8 +275,74 @@ export function CanvasCard(props: CanvasCardProps) {
           inset so a Title sits off the Card's border; a writing surface brings
           its own gutter and padding and has to reach the paper's edges, and
           nesting it would draw one inset inside another. */}
-      {content !== undefined && <div className="canvas-card__content">{content}</div>}
+      {content !== undefined && (
+        <div className="canvas-card__content">
+          <CardContentEditProvider value={setContentEdit}>{content}</CardContentEditProvider>
+        </div>
+      )}
     </Card>
+  );
+}
+
+interface ContentEditActionsProps {
+  readonly title: string;
+  readonly edit: CardContentEdit;
+}
+
+/**
+ * The two ends of an edit running inside the Card's content, in the rail slot
+ * the Edit control had. Close keeps its own slot beside them — it belongs to the
+ * Card rather than to the edit, and a Card stays closable while one runs.
+ *
+ * The same `card__rail-action` icon buttons as everything else on the rail: same
+ * box, same border, same paper and ink, same hover inversion. The key each one
+ * spends is stated with `aria-keyshortcuts` and drawn by the body's own shortcut
+ * hint, which is where a canvas Card names a key.
+ *
+ * **A press here must not take the caret with it.** These controls sit on the
+ * Card's rail and the caret sits in its content, so the pointer press that
+ * activates one is also a focus leaving the writing surface — taking the
+ * author's selection and the editor's own focus treatment with it, mid-edit and
+ * for a control that may well be Cancel. Suppressing the default on `mousedown`
+ * keeps the focus where it is, so the edit stays intact right up to the exit the
+ * author actually chose.
+ */
+function ContentEditActions({ title, edit }: ContentEditActionsProps) {
+  const hold = (event: { preventDefault: () => void }): void => event.preventDefault();
+  const run = (operation: () => void) => (event: { stopPropagation: () => void }) => {
+    event.stopPropagation();
+    operation();
+  };
+
+  return (
+    <>
+      <Button
+        variant="ghost"
+        size="icon"
+        className="card__rail-action nodrag nopan"
+        aria-label={`Save Card ${title}`}
+        aria-keyshortcuts="Meta+Enter Control+Enter"
+        onClick={run(edit.onSave)}
+        onMouseDown={hold}
+        onPointerDown={(event) => event.stopPropagation()}
+        onKeyDown={(event) => event.stopPropagation()}
+      >
+        <CommitEditIcon />
+      </Button>
+      <Button
+        variant="ghost"
+        size="icon"
+        className="card__rail-action nodrag nopan"
+        aria-label={`Cancel editing Card ${title}`}
+        aria-keyshortcuts="Escape"
+        onClick={run(edit.onCancel)}
+        onMouseDown={hold}
+        onPointerDown={(event) => event.stopPropagation()}
+        onKeyDown={(event) => event.stopPropagation()}
+      >
+        <AbandonEditIcon />
+      </Button>
+    </>
   );
 }
 

@@ -1,5 +1,14 @@
-import { Suspense, useCallback, useEffect, useRef, useState, type KeyboardEvent } from 'react';
+import {
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent,
+} from 'react';
 import { Button } from './Button';
+import { usePublishCardContentEdit, type CardContentEdit } from './card-content-edit';
 import { Kbd, KbdGroup } from './components/kbd';
 import { RenderedMarkdown } from './CardContent';
 import { MarkdownSourceEditor } from './markdown-source-editor-lazy';
@@ -17,9 +26,9 @@ export interface MarkdownCardBodyEditor {
   /** Commit the draft. Unlike a title's, a body has nothing to refuse. */
   onComplete: (body: string) => void;
   /**
-   * Withdraw the caret. Fires on **every** exit — after `onComplete` on the two
-   * committing paths as well as on `Escape` — because what it means is "this
-   * edit is over", and the caret has to go back either way.
+   * Withdraw the caret. Fires on **every** exit — after `onComplete` when the
+   * draft was committed as well as on an abandon — because what it means is
+   * "this edit is over", and the caret has to go back either way.
    *
    * Deliberately not `onCancel`, which is what `CardTitleEditor` calls the
    * Escape-only half of its own pair. A caller reading that name here would
@@ -80,9 +89,24 @@ function MarkdownEditControl({ ariaLabel, onBeginEdit }: MarkdownEditControlProp
  *
  * **The keys this surface spends are the two the editor withholds from
  * CodeMirror** (ADR 0063, `PANE_OWNED_KEYS`): `Escape` abandons the draft and
- * `Mod-Enter` commits it. A focus that leaves commits too, which is the rule the
- * Card's title editor already follows — a Card on a canvas has no `Done` button
- * to be the only way out.
+ * `Mod-Enter` commits it.
+ *
+ * **A focus that leaves does not end the edit.** Those two keys and the two
+ * controls that pair with them are the whole of how an edit ends — nothing a
+ * pointer does elsewhere on the canvas decides for the author what happens to
+ * their draft. It is the one place this surface departs from the Card's title
+ * editor, which does complete on blur: a title is one refusable line and a body
+ * is a document, and losing a document to a stray click is not a cost worth
+ * paying for the convenience of not saying so. (ADR 0064 as accepted says a
+ * click away completes either; this is a deliberate divergence, and the ADR is
+ * the thing to change if it stands.)
+ *
+ * Those same two exits are published to the surrounding Card through
+ * `CardContentEdit`, which draws them on its rail in place of the control that
+ * began this edit. They are published rather than drawn here because the rail is
+ * the Card's — this surface reaches the paper's edges and has no corner of its
+ * own that is not the author's text. The hint below names the keys; the rail
+ * names the same two exits as controls, and each is drawn where it belongs.
  *
  * Three React Flow escape-hatch classes are applied while the caret is in, and
  * each answers a different collision: `nodrag` stops a text selection dragging
@@ -103,7 +127,6 @@ export function MarkdownCardBody({
   const editing = editor !== undefined;
   const [draft, setDraft] = useState(source);
   const handle = useRef<MarkdownSourceEditorHandle | null>(null);
-  const closing = useRef(false);
   /**
    * Bumped when a draft is abandoned, to rebuild the editor from the source.
    *
@@ -138,6 +161,24 @@ export function MarkdownCardBody({
    */
   const wantsCaret = useRef(false);
 
+  /**
+   * The two exits, as operations the surrounding Card can draw.
+   *
+   * Built once and never rebuilt, so the Card is not re-rendered on every
+   * keystroke: each reads the current {@link leave} through a ref rather than
+   * closing over the draft. The ref is refreshed in an effect rather than during
+   * render, which is what keeps this safe to build once.
+   */
+  const leaveLatest = useRef<(commit: boolean) => void>(() => undefined);
+  const publish = usePublishCardContentEdit();
+  const exits = useMemo<CardContentEdit>(
+    () => ({
+      onSave: () => leaveLatest.current(true),
+      onCancel: () => leaveLatest.current(false),
+    }),
+    [],
+  );
+
   const receiveEditor = useCallback((next: MarkdownSourceEditorHandle | null) => {
     handle.current = next;
     if (next !== null && wantsCaret.current) {
@@ -147,14 +188,6 @@ export function MarkdownCardBody({
   }, []);
 
   useEffect(() => {
-    // A fresh edit is not on its way out, and that is true of *every* fresh
-    // edit — not only one that takes the caret. Cleared above the `autoFocus`
-    // guard because the flag says what this exit is doing, so an edit that
-    // inherits the previous one's flag finds its own blur already spoken for
-    // and commits nothing. Cleared here rather than in the render that begins
-    // an edit: a ref is not render state, and no blur can arrive before this
-    // runs, since the author has not been given the caret yet.
-    if (editing) closing.current = false;
     if (!editing || !autoFocus) {
       wantsCaret.current = false;
       return;
@@ -168,7 +201,6 @@ export function MarkdownCardBody({
 
   const leave = (commit: boolean): void => {
     if (editor === undefined) return;
-    closing.current = true;
     if (commit) editor.onComplete(draft);
     // A committed draft *is* the source the caller is about to hand back, so the
     // document already agrees with it and there is nothing to rebuild.
@@ -186,6 +218,19 @@ export function MarkdownCardBody({
     editor.onEnd();
   };
 
+  useEffect(() => {
+    leaveLatest.current = leave;
+  });
+
+  // Published only while a caret is in, and withdrawn on the way out — the
+  // Card's rail reads the presence of an edit from the same fact this surface
+  // reads it from, so the two cannot disagree about whether one is running.
+  useEffect(() => {
+    if (publish === null || !editing) return undefined;
+    publish(exits);
+    return () => publish(null);
+  }, [editing, exits, publish]);
+
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>): void => {
     if (!editing) return;
     if (event.key === 'Escape') {
@@ -199,15 +244,6 @@ export function MarkdownCardBody({
     }
   };
 
-  const onBlur = (event: React.FocusEvent<HTMLDivElement>): void => {
-    // `focusout` bubbles, so this fires for moves *inside* the editor too — only
-    // a focus that has left the surface is the author leaving it. A key exit has
-    // already committed or abandoned by the time its own focus move arrives.
-    if (!editing || closing.current) return;
-    if (event.currentTarget.contains(event.relatedTarget)) return;
-    leave(true);
-  };
-
   return (
     <div
       className={cn(
@@ -217,7 +253,6 @@ export function MarkdownCardBody({
       )}
       data-editable={onBeginEdit !== undefined}
       onKeyDown={onKeyDown}
-      onBlur={onBlur}
     >
       {editing ? (
         <>
@@ -232,12 +267,28 @@ export function MarkdownCardBody({
               onValueChange={setDraft}
             />
           </Suspense>
+          {/* `Kbd`'s **default** variant, which draws a key as a key: a filled,
+              bordered cap. That is the treatment every application that names a
+              shortcut inline uses, and it is what makes this legible — a cap is
+              read as an object at a glance, where set-back inline glyphs are
+              read as more prose and have to be parsed. The `compact` variant
+              this used before exists for running text and was the wrong one
+              here. Each cap sits with the word it belongs to; the two pairs are
+              set apart at a wider gap; the chord is written with the `+` that
+              names it, and `Kbd` supplies the platform's own modifier. */}
           <div className="markdown-card-body__shortcut-hint" aria-hidden="true">
-            <KbdGroup className="markdown-card-body__shortcut-keys">
-              <Kbd keyName="modifier" variant="compact" />
-              <Kbd variant="compact">↵</Kbd>
-            </KbdGroup>{' '}
-            Save · <Kbd variant="compact">Esc</Kbd> Cancel
+            <span className="markdown-card-body__shortcut">
+              <KbdGroup className="markdown-card-body__shortcut-keys">
+                <Kbd keyName="modifier" />+<Kbd>&#8629;</Kbd>
+              </KbdGroup>
+              Save
+            </span>
+            <span className="markdown-card-body__shortcut">
+              <KbdGroup className="markdown-card-body__shortcut-keys">
+                <Kbd>Esc</Kbd>
+              </KbdGroup>
+              Cancel
+            </span>
           </div>
         </>
       ) : (

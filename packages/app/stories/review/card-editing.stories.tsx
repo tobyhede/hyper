@@ -25,6 +25,11 @@ type Mode = 'rendered' | 'focused' | 'unfocused';
 export const Markdown: Story = () => {
   const [source, setSource] = useState(markdown);
   const [mode, setMode] = useState<Mode>('rendered');
+  // Opens Expanded, because the body is what this story is about. Close is wired
+  // rather than withheld so the Card draws its whole production rail — Edit and
+  // Close — and so a running edit is seen replacing the first of them and
+  // disabling the second.
+  const [expanded, setExpanded] = useState(true);
   const editing = mode !== 'rendered';
 
   const body = editing ? (
@@ -65,7 +70,8 @@ export const Markdown: Story = () => {
           state="rest"
           title="Strategies"
           graphColor="#ffc53d"
-          content={body}
+          content={expanded ? body : undefined}
+          onOpenChange={setExpanded}
           onBeginContentEdit={() => setMode('focused')}
         />
       </div>
