@@ -163,7 +163,10 @@ export function CanvasCard(props: CanvasCardProps) {
       onOpenAlias !== undefined ||
       beginContentEdit !== undefined);
   const style: CanvasCardStyle = { '--canvas-card-graph': graphColor };
-  const markdownBodyProps: Mutable<Pick<MarkdownCardBodyProps, 'editor' | 'autoFocus'>> = {};
+  const markdownBodyProps: Mutable<
+    Pick<MarkdownCardBodyProps, 'onBeginEdit' | 'editor' | 'autoFocus'>
+  > = {};
+  if (onBeginContentEdit !== undefined) markdownBodyProps.onBeginEdit = onBeginContentEdit;
   if (front.kind === 'markdown' && front.editor !== undefined) {
     markdownBodyProps.editor = front.editor;
   }

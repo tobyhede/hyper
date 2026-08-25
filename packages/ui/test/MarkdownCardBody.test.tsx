@@ -124,6 +124,16 @@ describe('MarkdownCardBody', () => {
     expect(screen.queryByRole('button')).not.toBeInTheDocument();
   });
 
+  it('keeps rendered Markdown click-to-edit without drawing an icon', () => {
+    const onBeginEdit = vi.fn();
+    render(body({ onBeginEdit }));
+
+    const target = screen.getByTestId('markdown-card-body-edit-target');
+    expect(target).toBeEmptyDOMElement();
+    fireEvent.click(target);
+    expect(onBeginEdit).toHaveBeenCalledTimes(1);
+  });
+
   it('takes a caret when the caller supplies an editor, and lets it go when the caller withdraws one', async () => {
     const editor = { onComplete: vi.fn(), onEnd: vi.fn() };
     const { rerender } = render(body({ editor }));

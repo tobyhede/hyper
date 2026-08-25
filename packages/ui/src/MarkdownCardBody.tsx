@@ -8,6 +8,7 @@ import {
   useState,
   type KeyboardEvent,
 } from 'react';
+import { Button } from './Button';
 import { usePublishCardContentEdit, type CardContentEdit } from './card-content-edit';
 import { Kbd, KbdGroup } from './components/kbd';
 import { RenderedMarkdown } from './CardContent';
@@ -47,6 +48,8 @@ export interface MarkdownCardBodyProps {
   readonly source: string;
   /** Names the writing surface for a screen reader, e.g. the Card's title. */
   readonly ariaLabel: string;
+  /** Activates source editing from a pointer press on the rendered body. */
+  readonly onBeginEdit?: () => void;
   /** The live edit, absent when the source is at rest. */
   readonly editor?: MarkdownCardBodyEditor;
   /** Whether a newly supplied editor takes the caret. Defaults to the product path. */
@@ -63,9 +66,10 @@ export interface MarkdownCardBodyProps {
  * the Card reached during traversal. It omits only presentation mode's title
  * and frame, which the surrounding `CanvasCard` already owns.
  *
- * At rest this surface is semantic rendered content. The surrounding Card rail
- * owns the one Edit action; the body contains no second control or affordance.
- * While editing, the display is replaced by `MarkdownSourceEditor`.
+ * At rest the rendered body remains pointer-activatable through a fully
+ * transparent sibling Button. It draws no icon, hover treatment or visible
+ * command; the surrounding Card rail owns the only visible Edit action. While
+ * editing, the display is replaced by `MarkdownSourceEditor`.
  *
  * **The keys this surface spends are the two the editor withholds from
  * CodeMirror** (ADR 0063, `PANE_OWNED_KEYS`): `Escape` abandons the draft and
@@ -97,6 +101,7 @@ export interface MarkdownCardBodyProps {
 export function MarkdownCardBody({
   source,
   ariaLabel,
+  onBeginEdit,
   editor,
   autoFocus = true,
   className,
@@ -267,7 +272,23 @@ export function MarkdownCardBody({
           </div>
         </>
       ) : (
-        <RenderedMarkdown markdown={source} className="markdown-card-body__rendered card__body" />
+        <>
+          <RenderedMarkdown markdown={source} className="markdown-card-body__rendered card__body" />
+          {onBeginEdit !== undefined && (
+            <Button
+              variant="ghost"
+              className="markdown-card-body__edit-target"
+              data-testid="markdown-card-body-edit-target"
+              aria-label={`Edit ${ariaLabel}`}
+              tabIndex={-1}
+              onClick={(event) => {
+                event.stopPropagation();
+                onBeginEdit();
+              }}
+              onKeyDown={(event) => event.stopPropagation()}
+            />
+          )}
+        </>
       )}
     </div>
   );

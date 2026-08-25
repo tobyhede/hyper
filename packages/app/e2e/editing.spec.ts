@@ -299,14 +299,16 @@ test(
     await settled(page);
     await openCard(cardA, 'A');
     await cardA.hover();
-    await expect(cardA.getByRole('button', { name: 'Edit Markdown source of A' })).toHaveCount(0);
+    const bodyTarget = cardA.getByTestId('markdown-card-body-edit-target');
+    await expect(bodyTarget).toHaveCSS('opacity', '0');
+    await expect(bodyTarget.locator('svg')).toHaveCount(0);
     expect(
       await cardA
         .getByTestId('canvas-card-actions')
         .getByRole('button')
         .evaluateAll((buttons) => buttons.map((button) => button.getAttribute('aria-label'))),
     ).toEqual(['Edit Card A', 'Close Card A']);
-    await cardA.getByRole('button', { name: 'Edit Card A' }).click();
+    await bodyTarget.click();
     const source = page.getByRole('textbox', { name: 'Markdown source of A' });
     await expect(source).toBeFocused();
     const lineNumbers = page.locator('[data-slot="markdown-source-line-numbers"]');

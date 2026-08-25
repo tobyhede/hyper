@@ -110,9 +110,11 @@ test('hover reveals only the rail Edit and Close actions', async ({ page }) => {
     .getByRole('button')
     .evaluateAll((buttons) => buttons.map((button) => button.getAttribute('aria-label')));
   expect(labels).toEqual(['Edit Card Strategies', 'Close Card Strategies']);
-  await expect(
-    card.getByRole('button', { name: 'Edit Markdown source of Strategies' }),
-  ).toHaveCount(0);
+  const bodyTarget = card.getByTestId('markdown-card-body-edit-target');
+  await expect(bodyTarget).toHaveCSS('opacity', '0');
+  await expect(bodyTarget.locator('svg')).toHaveCount(0);
+  await bodyTarget.click();
+  await expect(page.getByRole('textbox', { name: 'Markdown source of Strategies' })).toBeFocused();
 });
 
 test('the rail replaces its Edit action with the two ends of a running edit', async ({ page }) => {

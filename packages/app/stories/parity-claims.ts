@@ -34,7 +34,7 @@ export const parityClaims: readonly ParityClaim[] = [
     storyFile: 'components/card-editing.stories.tsx',
     storyExport: 'Markdown',
     claim:
-      'An open Markdown Card begins editing only from its rail, keeps blur inert, and ends through Save, Cancel, Escape or Mod-Enter while Close remains disabled.',
+      'An open Markdown Card begins editing from its rendered body or rail without a second visible affordance, keeps blur inert, and ends through Save, Cancel, Escape or Mod-Enter while Close remains disabled.',
   },
   {
     id: 'canvas-card-exposes-kind-and-keyboard-actions',
