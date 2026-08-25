@@ -2,6 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 
 const openCloseStory = '/?story=components--card--open-and-close&mode=preview';
 const markdownStory = '/?story=components--card--editing--markdown&mode=preview';
+const containmentStory = '/?story=components--card--node-containment&mode=preview';
 
 const open = async (page: Page, story: string): Promise<void> => {
   await page.goto(story);
@@ -54,6 +55,31 @@ test(
     await longCard.getByRole('button', { name: 'Close Card Long Markdown' }).click();
     await expect(longCard.getByRole('heading', { name: 'Placement is authored' })).toHaveCount(0);
     await expect(longCard.getByRole('button', { name: 'Open Card Long Markdown' })).toBeVisible();
+  },
+);
+
+test(
+  'the Card fills a React Flow node whose rect differs from the collapsed default',
+  { tag: '@parity:canvas-card-fills-authored-node-rect' },
+  async ({ page }) => {
+    await page.goto(containmentStory);
+    const node = page.locator('.react-flow__node').first();
+    const card = node.getByRole('article', { name: 'Strategies' });
+    await expect(card).toBeVisible({ timeout: 20_000 });
+
+    const boxes = await node.evaluate((element) => {
+      const cardElement = element.querySelector('.canvas-card');
+      if (cardElement === null) throw new Error('The React Flow node contains no CanvasCard');
+      const nodeBox = element.getBoundingClientRect();
+      const cardBox = cardElement.getBoundingClientRect();
+      return {
+        node: { width: nodeBox.width, height: nodeBox.height },
+        card: { width: cardBox.width, height: cardBox.height },
+      };
+    });
+    expect(boxes.node.width).not.toBeCloseTo(260, 0);
+    expect(boxes.node.height).not.toBeCloseTo(146, 0);
+    expect(boxes.card).toEqual(boxes.node);
   },
 );
 

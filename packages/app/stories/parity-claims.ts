@@ -16,6 +16,13 @@ export interface ParityClaim {
 
 export const parityClaims: readonly ParityClaim[] = [
   {
+    id: 'canvas-card-fills-authored-node-rect',
+    storyFile: 'components/card.stories.tsx',
+    storyExport: 'NodeContainment',
+    claim:
+      'The production CanvasCard fills a React Flow node whose authored rect differs from the collapsed default.',
+  },
+  {
     id: 'markdown-card-opens-and-closes-in-place',
     storyFile: 'components/card.stories.tsx',
     storyExport: 'OpenAndClose',

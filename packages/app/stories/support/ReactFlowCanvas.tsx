@@ -109,6 +109,7 @@ export interface CanvasCardNodeSpecimenProps {
   readonly graphColor?: string;
   readonly cardEditingEnabled?: boolean;
   readonly onEditCard?: () => 'completed' | 'retained';
+  readonly nodeSize?: { readonly width: number; readonly height: number };
 }
 
 /**
@@ -122,6 +123,7 @@ export function CanvasCardNodeSpecimen({
   graphColor,
   cardEditingEnabled,
   onEditCard = () => 'completed',
+  nodeSize,
 }: CanvasCardNodeSpecimenProps) {
   const projected = useProjection(graphIds.long);
   if (projected === null) return null;
@@ -144,7 +146,7 @@ export function CanvasCardNodeSpecimen({
   }
   if (graphColor !== undefined) data.activeGraphColor = graphColor;
 
-  const node: CardFlowNode = { ...source, selected, data };
+  const node: CardFlowNode = { ...source, ...nodeSize, selected, data };
 
   return <RealReactFlow className="inv-card-node-stage" nodes={[node]} edges={[]} />;
 }

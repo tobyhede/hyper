@@ -607,6 +607,113 @@ test(
   },
 );
 
+test('opening from Flow converts once and keeps the computed Card positions', async ({ page }) => {
+  await page.goto('/');
+  const card = nodeByTitle(page, 'A').first();
+  await expect(card).toBeVisible();
+  await settled(page);
+  const before = await allPositions(page);
+  const persistence = page.getByTestId('persistence-status');
+  await expect(canvasKind(page)).toHaveText('Computed view');
+  await expect(persistence).toHaveAttribute('data-revision', '0');
+
+  await openCard(card, 'A');
+
+  await expect(canvasKind(page)).toHaveText('Authored layout');
+  await expect(selectedCanvas(page)).toContainText('Layout 1');
+  await expect(persistence).toHaveAttribute('data-revision', '1');
+  await expect(persistence).toHaveText('Persisted');
+  expect(await allPositions(page)).not.toEqual(before);
+  expect((await positionOf(card)).x).toBe(before[(await card.getAttribute('data-id')) ?? '']?.x);
+});
+
+test(
+  'resizing an open Card persists its authored rect through reload',
+  {
+    tag: '@parity:canvas-card-fills-authored-node-rect',
+  },
+  async ({ page }) => {
+    await page.goto('/');
+    await selectCanvas(page, 'Collection 1');
+    const card = nodeByTitle(page, 'A').first();
+    await expect(card).toBeVisible();
+    await openCard(card, 'A');
+    await card.click({ position: { x: 8, y: 8 } });
+
+    const size = async () =>
+      card.evaluate((element) => ({
+        width: Number.parseFloat(getComputedStyle(element).width),
+        height: Number.parseFloat(getComputedStyle(element).height),
+      }));
+    const beforeSize = await size();
+    const beforePosition = await positionOf(card);
+    const handle = card.locator('.react-flow__resize-control.handle.bottom.right');
+    await expect(handle).toBeVisible();
+    const box = await boxOf(handle, 'the bottom-right Card resize handle');
+
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(box.x + box.width / 2 + 120, box.y + box.height / 2 + 80, { steps: 6 });
+    await page.mouse.up();
+
+    await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
+    await card.evaluate(async (element) => {
+      await Promise.all(element.getAnimations().map((animation) => animation.finished));
+    });
+    const resized = await size();
+    expect(resized.width).toBeGreaterThan(beforeSize.width);
+    expect(resized.height).toBeGreaterThan(beforeSize.height);
+    expect(await positionOf(card)).toEqual(beforePosition);
+
+    await page.reload();
+    await selectCanvas(page, 'Collection 1');
+    const persisted = nodeByTitle(page, 'A').first();
+    await expect(persisted.getByRole('button', { name: 'Close Card A' })).toBeVisible();
+    const persistedSize = await persisted.evaluate((element) => ({
+      width: Number.parseFloat(getComputedStyle(element).width),
+      height: Number.parseFloat(getComputedStyle(element).height),
+    }));
+    expect(persistedSize).toEqual(resized);
+    expect(await positionOf(persisted)).toEqual(beforePosition);
+  },
+);
+
+test('opening animates the Card wrapper and displaced neighbours from one duration token', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await selectCanvas(page, 'Collection 1');
+  await page.addStyleTag({
+    content: '.graph-area { --card-placement-duration: 10s !important; }',
+  });
+  const card = nodeByTitle(page, 'A').first();
+  await openCard(card, 'A');
+
+  const animatedProperties = async () =>
+    page.locator('.react-flow__node').evaluateAll((nodes) =>
+      nodes.map((node) => ({
+        id: node.getAttribute('data-id'),
+        properties: node.getAnimations().flatMap((animation) => {
+          animation.pause();
+          return animation.effect instanceof KeyframeEffect
+            ? animation.effect.getKeyframes().flatMap((frame) => Object.keys(frame))
+            : [];
+        }),
+      })),
+    );
+  const openedId = await card.getAttribute('data-id');
+  await expect
+    .poll(async () => (await animatedProperties()).some(({ properties }) => properties.length > 0))
+    .toBe(true);
+  const animations = await animatedProperties();
+  expect(animations.find(({ id }) => id === openedId)?.properties).toEqual(
+    expect.arrayContaining(['width', 'height']),
+  );
+  expect(
+    animations.some(({ id, properties }) => id !== openedId && properties.includes('transform')),
+  ).toBe(true);
+});
+
 test('connecting from Flow and Grid converts atomically without moving Cards', async ({ page }) => {
   await page.goto('/');
   for (const [index, view, targetTitle] of [

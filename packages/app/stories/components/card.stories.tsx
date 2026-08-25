@@ -107,6 +107,22 @@ export const Hover: Story = () => (
   </div>
 );
 
+export const NodeContainment: Story = () => (
+  <div className="inv inv-sheet" style={cardSizeVars}>
+    <CatalogueSection
+      title="React Flow node containment"
+      note="The production CanvasCard fills the rect React Flow declares. This specimen deliberately differs from the collapsed default so equality cannot pass by coincidence."
+    >
+      <div className="inv-row">
+        <Specimen label="340 × 210 node">
+          <CanvasCardNodeSpecimen nodeSize={{ width: 340, height: 210 }} />
+        </Specimen>
+      </div>
+    </CatalogueSection>
+  </div>
+);
+NodeContainment.storyName = 'Node containment';
+
 /**
  * One instance wired the way `CardNode` wires the production component: real
  * selection and dragging toggles standing in for React Flow's own, a real
