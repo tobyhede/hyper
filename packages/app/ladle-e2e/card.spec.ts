@@ -134,12 +134,28 @@ test(
     await expect(actions).toHaveCSS('opacity', '1');
     await expect(open).toBeVisible();
 
+    const title = markdown.getByRole('heading', { name: 'Strategies' });
+    const titleTreatment = async () => {
+      const titleBox = await title.boundingBox();
+      const cardBox = await markdown.boundingBox();
+      if (titleBox === null || cardBox === null) throw new Error('Card title geometry unavailable');
+      return {
+        left: titleBox.x - cardBox.x,
+        bottom: cardBox.y + cardBox.height - (titleBox.y + titleBox.height),
+        bodyPadding: await title
+          .locator('..')
+          .evaluate((element) => getComputedStyle(element).padding),
+      };
+    };
+    const closedTitleTreatment = await titleTreatment();
+
     // Reachable and activatable from the keyboard alone, independent of hover.
     await open.focus();
     await expect(open).toBeFocused();
     await open.press('Enter');
     await expect(page.getByText('Strategies is open.')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Close Card Strategies' })).toBeVisible();
+    expect(await titleTreatment()).toEqual(closedTitleTreatment);
   },
 );
 

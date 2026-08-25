@@ -84,14 +84,11 @@
   gap: 0;
 }
 
-/* Expansion changes only where the Title sits. Its compact typography and
-   inset stay untouched while Animate.css supplies the short upward arrival. */
+/* Expansion leaves the shared Title exactly where the compact Card draws it.
+   The Markdown surface owns its own gutter; applying that gutter to the Title
+   would shift the Title on open. */
 .proto-canvas--sectioned .canvas-card[data-expanded='true'] .canvas-card__body {
-  padding: 10px 12px;
-  padding-inline-start: calc(
-    var(--proto-markdown-gutter-width) + var(--proto-markdown-content-gap)
-  );
-  border-bottom: 1px solid color-mix(in srgb, var(--canvas-card-ink-color) 22%, transparent);
+  border-bottom: 0;
 }
 
 .proto-canvas--sectioned .canvas-card[data-expanded='true'] .canvas-card__content {
