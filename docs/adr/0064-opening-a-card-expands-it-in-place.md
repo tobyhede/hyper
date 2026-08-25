@@ -92,6 +92,11 @@ The transient `openedCardId`, its `openCard`/`closeCard` navigation operations a
 the covering Card pane are replaced by Layout-owned expansion. Alias creation is
 unaffected: creating a Card that does not exist yet is not opening one.
 
+An Alias has no content front of its own to expand. Its existing Open action remains
+the metadata-authoring dialog for the two fields the Alias owns, Title and Target;
+that dialog does not make the Alias Expanded and is not Layout-owned content Opening.
+Opening the Target's content still means opening the Target Card itself.
+
 ## The negative to remember
 
 Open/Close and Edit/Save/Cancel are separate state machines with one composition:

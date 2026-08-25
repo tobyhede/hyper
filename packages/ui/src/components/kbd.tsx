@@ -7,8 +7,6 @@ const kbdVariants = cva('pointer-events-none select-none', {
     variant: {
       default:
         "inline-flex h-5 w-fit min-w-5 items-center justify-center gap-1 rounded-sm bg-muted px-1 font-sans text-xs font-medium text-muted-foreground in-data-[slot=tooltip-content]:bg-background/20 in-data-[slot=tooltip-content]:text-background dark:in-data-[slot=tooltip-content]:bg-background/10 [&_svg:not([class*='size-'])]:size-3",
-      compact:
-        'inline h-auto min-w-0 rounded-none bg-transparent p-0 [letter-spacing:inherit] text-[inherit] [font:inherit]',
     },
   },
   defaultVariants: {
