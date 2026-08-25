@@ -508,7 +508,7 @@ describe('non-incident graph anchors versus the authoring handles', () => {
       cardIds,
       handlesByCard,
       buildGraphRenderEdges(singleGraphSpace),
-      { width: 260, height: 146 },
+      () => ({ width: 260, height: 146 }),
     );
     const colors = { '00000000-0000-4000-8000-000000000004': '#6ea8fe' };
     const nodes = projectCardNodes(singleGraphSpace, handlesByCard, colors, { strategyGraph });
@@ -537,7 +537,7 @@ describe('non-incident graph anchors versus the authoring handles', () => {
       cardIds,
       handlesByCard,
       buildGraphRenderEdges(singleGraphSpace),
-      { width: 260, height: 146 },
+      () => ({ width: 260, height: 146 }),
     );
     const colors = { '00000000-0000-4000-8000-000000000004': '#6ea8fe' };
     const nodes = projectCardNodes(singleGraphSpace, handlesByCard, colors, { strategyGraph });

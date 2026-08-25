@@ -107,9 +107,9 @@
   background: color-mix(in srgb, currentcolor 8%, transparent);
 }
 
-/* A sibling overlay rather than a Button containing the rendered HTML: Markdown
-   may contain headings, lists and links, none of which belongs inside a native
-   button. */
+/* The displayed Markdown is the editing control, aligned with ADR 0065's Title
+   control. A sibling overlay preserves valid rendered-Markdown structure:
+   headings, lists and links cannot be children of a native Button. */
 .markdown-card-body__edit-control {
   position: absolute;
   inset: 0;

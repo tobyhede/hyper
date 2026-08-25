@@ -22,6 +22,7 @@ import {
   type CardFlowNode,
 } from '@project/react-flow-adapter';
 import { activeGraphColor } from '../colors';
+import { CARD_SIZE } from '../card';
 import { useEdgeAuthoring } from '../edge-authoring-react';
 import type { EdgeAuthoring } from '../edge-authoring';
 import type { CanvasSelection, EdgeSubject } from '../render-adapter';
@@ -134,6 +135,9 @@ export interface SpaceCanvasProps {
   nameOnCreation: string | null;
   /** Opening a card is a view gesture; the graph only reports which was picked. */
   onOpenCard: (cardId: string) => void;
+  onCloseCard: (cardId: CardId) => void;
+  onCompleteCardBody: (cardId: CardId, body: string) => void;
+  onResizeCard: (cardId: CardId, size: { width: number; height: number }) => void;
   /** Complete one locally validated title draft, or return its field error. */
   onCompleteCardTitle: (cardId: string, title: string) => string | null;
   /** Which Cards may be opened for editing — every Card of the Space (ADR 0049). */
@@ -163,6 +167,9 @@ export function SpaceCanvas({
   onAddCard,
   nameOnCreation,
   onOpenCard,
+  onCloseCard,
+  onCompleteCardBody,
+  onResizeCard,
   onCompleteCardTitle,
   editableCardIds,
   graphs,
@@ -170,7 +177,8 @@ export function SpaceCanvas({
   activeGraphId,
   activeGraphCardIds,
 }: SpaceCanvasProps) {
-  const [editingTitleCardId, setEditingTitleCardId] = useState<string | null>(null);
+  const [caret, setCaret] = useState<{ cardId: string; field: 'title' | 'body' } | null>(null);
+  const editingTitleCardId = caret?.field === 'title' ? caret.cardId : null;
   /**
    * Whether a drag may begin at a Card's authoring handles.
    *
@@ -219,7 +227,7 @@ export function SpaceCanvas({
   const [canvasAuthoringWasEnabled, setCanvasAuthoringWasEnabled] = useState(canAuthorOnCanvas);
   if (canvasAuthoringWasEnabled !== canAuthorOnCanvas) {
     setCanvasAuthoringWasEnabled(canAuthorOnCanvas);
-    if (!canAuthorOnCanvas) setEditingTitleCardId(null);
+    if (!canAuthorOnCanvas) setCaret(null);
   }
 
   // A created Card is named in place, in the editor that already exists for
@@ -231,7 +239,7 @@ export function SpaceCanvas({
   const [lastCreatedCardId, setLastCreatedCardId] = useState(nameOnCreation);
   if (lastCreatedCardId !== nameOnCreation) {
     setLastCreatedCardId(nameOnCreation);
-    if (nameOnCreation !== null) setEditingTitleCardId(nameOnCreation);
+    if (nameOnCreation !== null) setCaret({ cardId: nameOnCreation, field: 'title' });
   }
 
   const edgeSurface = useEdgeAuthoring({
@@ -325,7 +333,7 @@ export function SpaceCanvas({
       const selected = nodes.find((node) => node.selected);
       if (selected === undefined) return;
       event.preventDefault();
-      setEditingTitleCardId(selected.id);
+      setCaret({ cardId: selected.id, field: 'title' });
     };
     window.addEventListener('keydown', beginSelectedTitleEdit);
     return () => window.removeEventListener('keydown', beginSelectedTitleEdit);
@@ -347,19 +355,35 @@ export function SpaceCanvas({
           // it was offered without one.
           titleEditingEnabled: canAuthorOnCanvas,
           cardEditingEnabled: canAuthorOnCanvas && editableCardIds.has(node.id),
-          onEditCard: () => onOpenCard(node.id),
-          onBeginTitleEditing: () => setEditingTitleCardId(node.id),
+          onEditCard: (open) => (open ? onOpenCard(node.id) : onCloseCard(node.data.cardId)),
+          onBeginTitleEditing: () => setCaret({ cardId: node.id, field: 'title' }),
         };
+        if (node.data.kind === 'markdown') {
+          data.onBeginBodyEditing = () => setCaret({ cardId: node.id, field: 'body' });
+        }
+        if (node.data.expanded === true && node.data.kind === 'markdown') {
+          data.resize = {
+            minWidth: CARD_SIZE.width,
+            minHeight: CARD_SIZE.height,
+            onResize: (size) => onResizeCard(node.data.cardId, size),
+          };
+          if (caret?.cardId === node.id && caret.field === 'body') {
+            data.bodyEditor = {
+              onComplete: (body) => onCompleteCardBody(node.data.cardId, body),
+              onEnd: () => setCaret(null),
+            };
+          }
+        }
         // The editor is the Card being renamed, and it arrives with what ends
         // it rather than as a flag beside two callbacks that might not be there.
         if (canAuthorOnCanvas && node.id === editingTitleCardId) {
           data.titleEditor = {
             onComplete: (title: string) => {
               const error = onCompleteCardTitle(node.id, title);
-              if (error === null) setEditingTitleCardId(null);
+              if (error === null) setCaret(null);
               return error;
             },
-            onCancel: () => setEditingTitleCardId(null),
+            onCancel: () => setCaret(null),
           };
         }
         return { ...node, data };
@@ -371,6 +395,10 @@ export function SpaceCanvas({
       editingTitleCardId,
       onCompleteCardTitle,
       onOpenCard,
+      onCloseCard,
+      onCompleteCardBody,
+      onResizeCard,
+      caret,
     ],
   );
 

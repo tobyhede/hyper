@@ -1,4 +1,4 @@
-import type { CardId, Layout, LayoutPosition } from '@project/core';
+import { COLLAPSED_CARD_SIZE, type CardId, type CardPlacement, type Layout } from '@project/core';
 import type { LayoutStrategyGraph } from './layout';
 
 /** The brand's carrier. See `Placement` below for what the type means. */
@@ -49,7 +49,7 @@ declare const PLACEMENT: unique symbol;
  * `placement.get(id)!.x = 1` would author a position past `next` and `place`
  * both — the only two things allowed to decide what a placement authors.
  */
-export type Placement = ReadonlyMap<CardId, Readonly<LayoutPosition>> & {
+export type Placement = ReadonlyMap<CardId, Readonly<CardPlacement>> & {
   readonly [PLACEMENT]: true;
 };
 
@@ -68,14 +68,20 @@ export type Placement = ReadonlyMap<CardId, Readonly<LayoutPosition>> & {
  * `CardId` keys, because a constructor open to plain strings would re-open the
  * seam the brand exists to hold — pinned by `identity-types.test.ts`.
  */
-const brand = (positions: ReadonlyMap<CardId, Readonly<LayoutPosition>>): Placement =>
+const brand = (positions: ReadonlyMap<CardId, Readonly<CardPlacement>>): Placement =>
   positions as Placement;
 
-const point = (at: LayoutPosition): LayoutPosition => ({ x: at.x, y: at.y });
+const point = (at: CardPlacement): CardPlacement => {
+  const copied: CardPlacement = { x: at.x, y: at.y };
+  if (at.expanded !== undefined) {
+    copied.expanded = { width: at.expanded.width, height: at.expanded.height };
+  }
+  return copied;
+};
 
 /** The placement a Layout holds. */
 function fromLayout(layout: Layout): Placement {
-  const positions = new Map<CardId, LayoutPosition>();
+  const positions = new Map<CardId, CardPlacement>();
   for (const [cardId, at] of Object.entries(layout.positions)) {
     if (at !== undefined) {
       // SAFETY: `Object.entries` widens this key to `string`, but it was
@@ -97,7 +103,7 @@ function fromLayout(layout: Layout): Placement {
  * collapsing that to `(0, 0)` would assert a placement no strategy made.
  */
 function fromLayoutStrategyGraph(strategyGraph: LayoutStrategyGraph): Placement {
-  const positions = new Map<CardId, LayoutPosition>();
+  const positions = new Map<CardId, CardPlacement>();
   for (const card of strategyGraph.cards) {
     if (card.x === undefined || card.y === undefined) continue;
     positions.set(card.id, { x: card.x, y: card.y });
@@ -112,8 +118,8 @@ function fromLayoutStrategyGraph(strategyGraph: LayoutStrategyGraph): Placement 
  * is never installed directly over an authored placement. `next` decides what
  * any of it is allowed to author.
  */
-function fromEntries(entries: Iterable<readonly [CardId, LayoutPosition]>): Placement {
-  const positions = new Map<CardId, LayoutPosition>();
+function fromEntries(entries: Iterable<readonly [CardId, CardPlacement]>): Placement {
+  const positions = new Map<CardId, CardPlacement>();
   for (const [cardId, at] of entries) positions.set(cardId, point(at));
   return brand(positions);
 }
@@ -127,6 +133,8 @@ function equals(a: Placement | null, b: Placement | null): boolean {
     const other = b.get(cardId);
     if (other === undefined) return false;
     if (other.x !== at.x || other.y !== at.y) return false;
+    if (other.expanded?.width !== at.expanded?.width) return false;
+    if (other.expanded?.height !== at.expanded?.height) return false;
   }
   return true;
 }
@@ -168,10 +176,22 @@ function next(
   if (authored === null) return rendered;
   if (placed.length === 0) return authored;
 
-  const merged = new Map<CardId, LayoutPosition>(authored);
+  const merged = new Map<CardId, CardPlacement>(authored);
+  const displacement = drawn(authored);
   for (const cardId of placed) {
     const at = rendered.get(cardId);
-    if (at !== undefined) merged.set(cardId, point(at));
+    const shifted = displacement.get(cardId);
+    const original = authored.get(cardId);
+    if (at !== undefined) {
+      merged.set(
+        cardId,
+        point({
+          ...at,
+          x: at.x - ((shifted?.x ?? 0) - (original?.x ?? 0)),
+          y: at.y - ((shifted?.y ?? 0) - (original?.y ?? 0)),
+        }),
+      );
+    }
   }
 
   const nextPlacement = brand(merged);
@@ -185,7 +205,7 @@ function next(
  * dropped it, which is authorship rather than a report — no renderer has drawn
  * that Card yet, so it cannot come through `next`.
  */
-function place(placement: Placement, cardId: CardId, at: LayoutPosition): Placement {
+function place(placement: Placement, cardId: CardId, at: CardPlacement): Placement {
   const placed = new Map(placement);
   placed.set(cardId, point(at));
   return brand(placed);
@@ -211,7 +231,7 @@ function remove(placement: Placement, cardId: CardId): Placement {
 }
 
 /** The record a Layout stores. Keys are already card ids; this only widens them. */
-function toPositions(placement: Placement): Record<CardId, LayoutPosition> {
+function toPositions(placement: Placement): Record<CardId, CardPlacement> {
   return Object.fromEntries([...placement].map(([cardId, at]) => [cardId, point(at)]));
 }
 
@@ -222,12 +242,29 @@ function toPositions(placement: Placement): Record<CardId, LayoutPosition> {
  */
 const empty = (): Placement => brand(new Map());
 
+/** The derived rects drawn on the canvas, including displacement from Expanded Cards. */
+function drawn(placement: Placement): Placement {
+  const result = new Map<CardId, CardPlacement>();
+  for (const [cardId, at] of placement) {
+    let x = at.x;
+    let y = at.y;
+    for (const [otherId, other] of placement) {
+      if (otherId === cardId || other.expanded === undefined) continue;
+      if (at.x > other.x) x += other.expanded.width - COLLAPSED_CARD_SIZE.width;
+      if (at.y > other.y) y += other.expanded.height - COLLAPSED_CARD_SIZE.height;
+    }
+    result.set(cardId, point({ ...at, x, y }));
+  }
+  return brand(result);
+}
+
 export const Placement = {
   empty,
   fromLayout,
   fromLayoutStrategyGraph,
   fromEntries,
   equals,
+  drawn,
   next,
   place,
   remove,

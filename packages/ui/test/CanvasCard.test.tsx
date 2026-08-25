@@ -202,6 +202,7 @@ describe('CanvasCard Open and Close operation', () => {
         content={<ContentRunningAnEdit onSave={onSave} onCancel={onCancel} />}
         onOpenChange={vi.fn()}
         onBeginContentEdit={onBeginContentEdit}
+        onBeginTitleEdit={vi.fn()}
       />,
     );
 
@@ -215,6 +216,7 @@ describe('CanvasCard Open and Close operation', () => {
       ),
     ).toEqual(['Save Card A', 'Cancel editing Card A', 'Close Card A']);
     expect(screen.getByRole('button', { name: 'Close Card A' })).toBeDisabled();
+    expect(screen.queryByRole('button', { name: 'Edit Title A' })).not.toBeInTheDocument();
     // The one fact the stylesheet reads to keep the rail up while the caret is
     // in the body, where no hover or focus of the rail's own is true.
     expect(screen.getByRole('article', { name: 'A' })).toHaveAttribute(
@@ -249,6 +251,7 @@ describe('CanvasCard Open and Close operation', () => {
     for (const button of buttons) {
       expect(button).toHaveClass('card__rail-action');
       expect(button.textContent).toBe('');
+      expect(button.querySelector('svg')).toHaveAttribute('data-icon');
     }
     // The key each performs is still stated, which is how a control that
     // performs a shortcut announces it (`AddCardControl` does the same).

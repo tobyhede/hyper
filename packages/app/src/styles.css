@@ -102,6 +102,8 @@ body {
 
 /* ---- Graph area ---- */
 .graph-area {
+  --card-placement-duration: 200ms;
+  --card-placement-easing: ease;
   position: absolute;
   inset: 0;
 }
@@ -109,11 +111,16 @@ body {
 /* ---- Card node ---- */
 .rf-card-node {
   border-radius: 10px;
+  transition:
+    width var(--card-placement-duration) var(--card-placement-easing),
+    height var(--card-placement-duration) var(--card-placement-easing),
+    transform var(--card-placement-duration) var(--card-placement-easing);
 }
 
 .rf-card-node__inner {
   position: relative;
-  width: var(--card-width);
+  width: 100%;
+  height: 100%;
 }
 
 /* An Expanded Card is whatever rect the Layout authored, so the node's own
@@ -121,9 +128,19 @@ body {
    sized from `node.width`/`node.height` (ADR 0064). The declared width stays the
    default because a Card is drawn before any layout resolves, and 100% of an
    unsized wrapper is nothing. */
-.rf-card-node__inner[data-expanded='true'] {
+.rf-card-node__inner > .canvas-card {
   width: 100%;
   height: 100%;
+}
+
+.react-flow__node[class~='dragging'].rf-card-node {
+  transition: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .graph-area {
+    --card-placement-duration: 1ms;
+  }
 }
 
 /* React Flow's own `NodeResizer`, in the Card's palette. Drawn through the two

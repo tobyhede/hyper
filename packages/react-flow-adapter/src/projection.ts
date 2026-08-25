@@ -71,7 +71,7 @@ export type CardNodeData = {
   titleEditingEnabled?: boolean;
   /** Whether this Card owns content to edit — an Alias does not. */
   cardEditingEnabled?: boolean;
-  onEditCard?: () => void;
+  onEditCard?: (open: boolean) => void;
   onBeginTitleEditing?: () => void;
   /**
    * The inline title editor this Card is currently showing, absent on one that
@@ -201,6 +201,8 @@ export interface ProjectCardNodesOptions {
   nodeHeight?: number;
   /** Restrict the projection to these card ids (e.g. one graph's cards). */
   cardIds?: readonly CardId[];
+  /** Layout-authored Expanded Cards whose Markdown body is drawn in place. */
+  expandedCardIds?: ReadonlySet<CardId>;
 }
 
 function resolveHandles(
@@ -331,10 +333,12 @@ export function projectCardNodes(
     const cardLayout = laidOut.get(card.id);
     const active = card.id === activeCardId;
     const showContent = active && showActiveCardContent;
+    const expanded = options.expandedCardIds?.has(card.id) === true && card.kind === 'markdown';
     // An alias names the card it redraws; a markdown card names nothing (ADR 0009).
     const aliasOf = card.kind === 'alias' ? resolveContentCard(space, card.id)?.title : undefined;
     // An alias shows its target's content under its own title (ADR 0009).
-    const body = showContent ? (resolveContentCard(space, card.id)?.body ?? '') : undefined;
+    const body =
+      showContent || expanded ? (resolveContentCard(space, card.id)?.body ?? '') : undefined;
     const portsById = new Map((cardLayout?.ports ?? []).map((port) => [port.id, port]));
     // The Card's own height once a layout has placed it, and the constant only
     // before one has. The two agree for every collapsed Card — the strategies
@@ -393,6 +397,10 @@ export function projectCardNodes(
     // Omit rather than set undefined: absent means "not an alias" (ADR 0009).
     if (aliasOf !== undefined) node.data.aliasOf = aliasOf;
     if (body !== undefined) node.data.body = body;
+    if (expanded) {
+      node.data.expanded = true;
+      node.zIndex = 10;
+    }
     return node;
   });
 }

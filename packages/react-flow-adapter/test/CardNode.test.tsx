@@ -342,6 +342,26 @@ describe('CardNode title authoring', () => {
     expect(screen.getByRole('textbox', { name: 'Card title' })).toHaveValue('A');
   });
 
+  it('does not offer or mount title editing while the Markdown body owns the caret', () => {
+    const onBeginTitleEditing = vi.fn();
+    render(
+      <CardNode
+        {...props({
+          expanded: true,
+          body: 'Markdown',
+          titleEditingEnabled: true,
+          onBeginTitleEditing,
+          titleEditor: { onComplete: () => null, onCancel: vi.fn() },
+          bodyEditor: { onComplete: vi.fn(), onEnd: vi.fn() },
+        })}
+      />,
+    );
+
+    expect(screen.queryByRole('textbox', { name: 'Card title' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Edit Title A' })).not.toBeInTheDocument();
+    expect(onBeginTitleEditing).not.toHaveBeenCalled();
+  });
+
   it('keeps an invalid title local, completes a valid one with Enter, and returns focus to the node', () => {
     const onCompleteTitleEditing = vi.fn((title: string) =>
       title.length === 0 ? 'A Card title is required.' : null,

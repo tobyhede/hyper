@@ -2,6 +2,7 @@ import {
   Suspense,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -57,7 +58,14 @@ interface MarkdownEditControlProps {
   readonly onBeginEdit: () => void;
 }
 
-/** The rendered Markdown's full-surface edit target. */
+/**
+ * The rendered Markdown's semantic edit control.
+ *
+ * It is a sibling overlay because Markdown may contain headings, lists and
+ * links, none of which may be nested inside a native Button. This is the body
+ * equivalent of ADR 0065's Title control: the displayed value is what the
+ * author activates, with Button supplying pointer, keyboard and focus behavior.
+ */
 function MarkdownEditControl({ ariaLabel, onBeginEdit }: MarkdownEditControlProps) {
   return (
     <Button
@@ -82,10 +90,10 @@ function MarkdownEditControl({ ariaLabel, onBeginEdit }: MarkdownEditControlProp
  * the Card reached during traversal. It omits only presentation mode's title
  * and frame, which the surrounding `CanvasCard` already owns.
  *
- * At rest this surface is semantic rendered content beneath a transparent
- * click-to-edit target; the surrounding Card rail supplies the only visible
- * Edit icon. Both begin the same edit. While editing, the display is replaced
- * by `MarkdownSourceEditor`.
+ * At rest this surface is semantic rendered content beneath its semantic
+ * click-to-edit control; the surrounding Card rail supplies the visible Edit
+ * icon. Both begin the same edit. While editing, the display is replaced by
+ * `MarkdownSourceEditor`.
  *
  * **The keys this surface spends are the two the editor withholds from
  * CodeMirror** (ADR 0063, `PANE_OWNED_KEYS`): `Escape` abandons the draft and
@@ -216,14 +224,14 @@ export function MarkdownCardBody({
     editor.onEnd();
   };
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     leaveLatest.current = leave;
   });
 
   // Published only while a caret is in, and withdrawn on the way out — the
   // Card's rail reads the presence of an edit from the same fact this surface
   // reads it from, so the two cannot disagree about whether one is running.
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (publish === null || !editing) return undefined;
     publish(exits);
     return () => publish(null);

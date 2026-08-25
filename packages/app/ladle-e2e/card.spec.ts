@@ -165,7 +165,8 @@ test(
   async ({ page }) => {
     await page.goto('/?story=components--card--editing--title&mode=preview');
 
-    const group = page.getByTestId('card-group');
+    const closedSpecimen = page.getByRole('region', { name: 'Closed Card title editing' });
+    const group = closedSpecimen.getByTestId('card-group');
     const control = group.getByRole('button', { name: 'Edit Title Draft entry' });
     const heading = group.getByRole('heading', { name: 'Draft entry' });
     await expect(heading).toContainText('Draft entry', {
@@ -223,5 +224,14 @@ test(
     await spaceControl.press('Space');
     await page.getByRole('textbox', { name: 'Card title' }).press('Escape');
     await expect(group).toBeFocused();
+
+    // The dedicated Title story also proves that opening a Card does not
+    // introduce a second title editor or hide the Card body while it runs.
+    const openSpecimen = page.getByRole('region', { name: 'Open Card title editing' });
+    const openGroup = openSpecimen.getByTestId('card-group');
+    await expect(openGroup.getByRole('heading', { name: 'Open Card body' })).toBeVisible();
+    await openGroup.getByRole('button', { name: 'Edit Title Draft entry' }).click();
+    await expect(openGroup.getByRole('textbox', { name: 'Card title' })).toBeFocused();
+    await expect(openGroup.getByRole('heading', { name: 'Open Card body' })).toBeVisible();
   },
 );

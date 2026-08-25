@@ -150,7 +150,7 @@ async function arrange(space: Space) {
     space.cards.map((c) => c.id),
     new Map(),
     [],
-    CARD_SIZE,
+    () => CARD_SIZE,
   );
   const laid = await renderer.strategy(graph);
   return Object.fromEntries(laid.cards.map((c) => [c.id, { x: c.x, y: c.y }]));
@@ -170,7 +170,7 @@ describe('resolving a renderer', () => {
       space.cards.map((card) => card.id),
       new Map(),
       [],
-      CARD_SIZE,
+      () => CARD_SIZE,
     );
     const laid = await renderer.strategy(graph);
     expect(laid.cards[0]).toMatchObject({ x: 0, y: 0 });
@@ -189,7 +189,7 @@ describe('resolving a renderer', () => {
       space.cards.map((card) => card.id),
       new Map(),
       [],
-      CARD_SIZE,
+      () => CARD_SIZE,
     );
     const laid = await renderer.strategy(graph);
     expect(laid.cards.map(({ x, y }) => ({ x, y }))).toEqual([

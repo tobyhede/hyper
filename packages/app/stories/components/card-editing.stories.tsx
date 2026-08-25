@@ -1,6 +1,6 @@
-import { useRef, useState } from 'react';
+import { useRef, useState, type CSSProperties } from 'react';
 import type { Story } from '@ladle/react';
-import { CanvasCard } from '@project/ui';
+import { Button, CanvasCard, MarkdownCardBody } from '@project/ui';
 import { cardSizeVars } from '#src/card';
 
 export default { title: 'Components/Card/Editing' };
@@ -11,13 +11,14 @@ export default { title: 'Components/Card/Editing' };
  * error, completes and exits on Enter, cancels on Escape, and returns focus to
  * the Card around it.
  */
-export const Title: Story = () => {
+function TitleEditingCard({ initiallyOpen }: { readonly initiallyOpen: boolean }) {
   const [title, setTitle] = useState('Draft entry');
   const [editing, setEditing] = useState(false);
+  const [open, setOpen] = useState(initiallyOpen);
   const group = useRef<HTMLDivElement>(null);
 
   return (
-    <div style={cardSizeVars}>
+    <div style={open ? openFrame : cardSizeVars}>
       <div
         role="group"
         aria-label={`${title} on the canvas`}
@@ -31,6 +32,15 @@ export const Title: Story = () => {
             state="editing"
             title={title}
             graphColor="#ffc53d"
+            content={
+              open ? (
+                <MarkdownCardBody
+                  source="## Open Card body"
+                  ariaLabel={`Markdown source of ${title}`}
+                />
+              ) : undefined
+            }
+            onOpenChange={setOpen}
             onCompleteTitleEdit={(draft) => {
               if (draft.trim().length === 0) return 'A Card title is required.';
               setTitle(draft);
@@ -46,9 +56,98 @@ export const Title: Story = () => {
             state="rest"
             title={title}
             graphColor="#ffc53d"
+            content={
+              open ? (
+                <MarkdownCardBody
+                  source="## Open Card body"
+                  ariaLabel={`Markdown source of ${title}`}
+                />
+              ) : undefined
+            }
+            onOpenChange={setOpen}
             onBeginTitleEdit={() => setEditing(true)}
           />
         )}
+      </div>
+    </div>
+  );
+}
+
+export const Title: Story = () => (
+  <div className="flex flex-wrap items-start gap-8 p-8">
+    <section aria-label="Closed Card title editing" className="flex flex-col gap-2">
+      <p className="text-xs text-muted-foreground">Closed</p>
+      <TitleEditingCard initiallyOpen={false} />
+    </section>
+    <section aria-label="Open Card title editing" className="flex flex-col gap-2">
+      <p className="text-xs text-muted-foreground">Open</p>
+      <TitleEditingCard initiallyOpen />
+    </section>
+  </div>
+);
+
+type CardFrameStyle = CSSProperties & {
+  readonly '--card-width': string;
+  readonly '--card-height': string;
+};
+
+const openFrame: CardFrameStyle = {
+  '--card-width': '480px',
+  '--card-height': '360px',
+  width: '480px',
+  height: '360px',
+};
+
+const markdown = `## Placement is authored
+
+A **Layout** owns explicit Card rects. The strategy only supplies a computed View.`;
+
+type Mode = 'rendered' | 'focused' | 'unfocused';
+
+export const Markdown: Story = () => {
+  const [source, setSource] = useState(markdown);
+  const [mode, setMode] = useState<Mode>('rendered');
+  const [open, setOpen] = useState(true);
+  const editing = mode !== 'rendered';
+  const body = editing ? (
+    <MarkdownCardBody
+      source={source}
+      ariaLabel="Markdown source of Strategies"
+      onBeginEdit={() => setMode('focused')}
+      autoFocus={mode === 'focused'}
+      editor={{ onComplete: setSource, onEnd: () => setMode('rendered') }}
+    />
+  ) : (
+    <MarkdownCardBody
+      source={source}
+      ariaLabel="Markdown source of Strategies"
+      onBeginEdit={() => setMode('focused')}
+    />
+  );
+
+  return (
+    <div className="flex flex-col items-start gap-3 p-8">
+      <div className="flex gap-2" aria-label="Markdown editing state">
+        <Button type="button" variant="ghost" onClick={() => setMode('rendered')}>
+          Rendered
+        </Button>
+        <Button type="button" variant="ghost" onClick={() => setMode('focused')}>
+          Focused edit
+        </Button>
+        <Button type="button" variant="ghost" onClick={() => setMode('unfocused')}>
+          Unfocused edit
+        </Button>
+      </div>
+      <div style={openFrame}>
+        <CanvasCard
+          front={{ kind: 'markdown' }}
+          state="rest"
+          title="Strategies"
+          graphColor="#ffc53d"
+          content={open ? body : undefined}
+          onOpenChange={setOpen}
+          onBeginContentEdit={() => setMode('focused')}
+        />
       </div>
     </div>
   );

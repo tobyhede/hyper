@@ -2,6 +2,7 @@ import type { CSSProperties, ReactNode } from 'react';
 import type { Card } from '@project/core';
 import { CardKindIcon } from './CardKindIcon';
 import { CardHeader } from './components/card';
+import { cn } from './lib/utils';
 import './card-rail.css';
 
 /**
@@ -42,10 +43,7 @@ export function CardRail({ kind, graphColor, children, className }: CardRailProp
   const style: CardRailStyle = { '--card-rail-graph': graphColor };
 
   return (
-    <CardHeader
-      className={className === undefined ? 'card-rail' : `card-rail ${className}`}
-      style={style}
-    >
+    <CardHeader className={cn('card-rail', className)} style={style}>
       <span className="card-rail__kind">
         <CardKindIcon kind={kind} />
       </span>

@@ -8,7 +8,7 @@ import {
   type CardId,
   type LayoutPosition,
 } from '@project/core';
-import { graphCardIds, type ResolvedContentCard } from '@project/graph';
+import { graphCardIds } from '@project/graph';
 import type { OpenedSpace } from './space';
 import { composeApp, openingPlacement } from './compose-app';
 import type { AuthoringRefusal } from './space-authoring';
@@ -444,16 +444,32 @@ export const createApp = ({ spaceSession }: OpenedSpace) => {
         // surface back that the author had never returned to.
         if (openedCardId !== null || creatingAlias) return;
         const cardId = uuidSchema.safeParse(cardIdInput);
-        if (cardId.success && editableCardIds.has(cardId.data)) openCard(cardId.data);
+        if (!cardId.success || !editableCardIds.has(cardId.data)) return;
+        const card = rendererSpace.lookup.card(cardId.data);
+        if (card?.kind === 'alias') openCard(cardId.data);
+        else authoring.complete({ kind: 'opened-card', cardId: cardId.data });
       },
-      [openCard, editableCardIds, openedCardId, creatingAlias],
+      [openCard, editableCardIds, openedCardId, creatingAlias, rendererSpace],
     );
 
     const openedCard = openedCardId ? rendererSpace.lookup.card(openedCardId) : undefined;
-    const completeOpenedCard = useCallback((completed: ResolvedContentCard) => {
-      const { id, ...document } = completed;
-      const result = authoring.complete({ kind: 'edited-card', cardId: id, document });
-      return result.kind === 'refused' ? result.refusal : null;
+    const closeExpandedCard = useCallback((cardId: CardId) => {
+      authoring.complete({ kind: 'closed-card', cardId });
+    }, []);
+    const resizeExpandedCard = useCallback(
+      (cardId: CardId, size: { width: number; height: number }) => {
+        authoring.complete({ kind: 'resized-card', cardId, size });
+      },
+      [],
+    );
+    const completeCardBody = useCallback((cardId: CardId, body: string) => {
+      const card = currentSpace().lookup.card(cardId);
+      if (card?.kind !== 'markdown') return;
+      authoring.complete({
+        kind: 'edited-card',
+        cardId,
+        document: { kind: 'markdown', title: card.title, body },
+      });
     }, []);
 
     /**
@@ -625,6 +641,9 @@ export const createApp = ({ spaceSession }: OpenedSpace) => {
                 onAddCard={addCard}
                 nameOnCreation={createdCardId}
                 onOpenCard={openCardForEditing}
+                onCloseCard={closeExpandedCard}
+                onCompleteCardBody={completeCardBody}
+                onResizeCard={resizeExpandedCard}
                 onCompleteCardTitle={completeCardTitle}
                 editableCardIds={editableCardIds}
                 graphs={projection.visibleGraphs}
@@ -650,26 +669,18 @@ export const createApp = ({ spaceSession }: OpenedSpace) => {
 
           {/* An Alias authors only its own metadata. Its Target must be opened
               explicitly to author shared content (ADR 0049). */}
-          {openedCard &&
-            (openedCard.kind === 'alias' ? (
-              <OpenCard
-                through={openedCard}
-                graphColor={editorGraphColor}
-                occurrence={{
-                  targets: aliasTargets,
-                  onEdit: (change: { title: string; target: CardId }) =>
-                    editAlias(openedCard, change),
-                }}
-                onCancel={closeCard}
-              />
-            ) : (
-              <OpenCard
-                card={openedCard}
-                graphColor={editorGraphColor}
-                onComplete={completeOpenedCard}
-                onCancel={closeCard}
-              />
-            ))}
+          {openedCard?.kind === 'alias' && (
+            <OpenCard
+              through={openedCard}
+              graphColor={editorGraphColor}
+              occurrence={{
+                targets: aliasTargets,
+                onEdit: (change: { title: string; target: CardId }) =>
+                  editAlias(openedCard, change),
+              }}
+              onCancel={closeCard}
+            />
+          )}
 
           {creatingAlias && openedCardId === null && (
             <NewAlias

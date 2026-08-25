@@ -1,6 +1,6 @@
-import { useState, type ReactNode } from 'react';
+import { useState, type CSSProperties, type ReactNode } from 'react';
 import type { Story } from '@ladle/react';
-import { CanvasCard, type CanvasCardState } from '@project/ui';
+import { CanvasCard, MarkdownCardBody, type CanvasCardState } from '@project/ui';
 import { cardSizeVars } from '#src/card';
 import { CanvasCardSpecimen } from '../support/CanvasCardSpecimen';
 import { CatalogueSection, Specimen } from '../support/Catalogue';
@@ -182,3 +182,73 @@ export const Actions: Story = () => (
     <Instance initialTitle="Opening, again" aliasOf="Opening" />
   </div>
 );
+
+type CardFrameStyle = CSSProperties & {
+  readonly '--card-width': string;
+  readonly '--card-height': string;
+};
+
+const closedFrame: CardFrameStyle = {
+  '--card-width': '240px',
+  '--card-height': '135px',
+};
+
+const openFrame: CardFrameStyle = {
+  '--card-width': '480px',
+  '--card-height': '360px',
+  width: '480px',
+  height: '360px',
+};
+
+const openMarkdown = `## Placement is authored
+
+A **Layout** owns explicit Card rects. The strategy only supplies a computed View.
+
+- Open in place
+- Edit the source
+- Keep the canvas beneath it`;
+
+/** The Card's actual Open and Close operation, including its change in authored size. */
+export const OpenAndClose: Story = () => {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <div className="flex flex-wrap items-start gap-8 p-8">
+      <section aria-label="Interactive Card" className="flex flex-col gap-2">
+        <p className="text-xs text-muted-foreground">{open ? 'Open' : 'Closed'}</p>
+        <div style={open ? openFrame : closedFrame}>
+          <CanvasCard
+            front={{ kind: 'markdown' }}
+            state="rest"
+            title="Strategies"
+            graphColor="#ffc53d"
+            content={
+              open ? (
+                <MarkdownCardBody source={openMarkdown} ariaLabel="Markdown source of Strategies" />
+              ) : undefined
+            }
+            onOpenChange={setOpen}
+          />
+        </div>
+      </section>
+      <section aria-label="Long Open Card" className="flex flex-col gap-2">
+        <p className="text-xs text-muted-foreground">Open · long Markdown</p>
+        <div style={openFrame}>
+          <CanvasCard
+            front={{ kind: 'markdown' }}
+            state="rest"
+            title="Long Markdown"
+            graphColor="#ffc53d"
+            content={
+              <MarkdownCardBody
+                source={`${openMarkdown}\n\n### A deliberately long section\n\n${openMarkdown}\n\n${openMarkdown}`}
+                ariaLabel="Markdown source of Long Markdown"
+              />
+            }
+            onOpenChange={() => undefined}
+          />
+        </div>
+      </section>
+    </div>
+  );
+};

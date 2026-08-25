@@ -15,6 +15,9 @@ import {
   Workflow,
   X,
 } from 'lucide-react';
+import type { ComponentProps } from 'react';
+
+type CardActionIconProps = ComponentProps<typeof Pencil>;
 
 /** The computed View that draws Cards and every Graph in the Space. */
 export const FlowIcon = () => <Workflow size={16} />;
@@ -38,19 +41,21 @@ export const GraphIcon = ({
 export const PresentIcon = ({ color }: { color: string }) => <Play color={color} size={12} />;
 
 /** Edit the content of a Markdown Card. */
-export const EditIcon = () => <Pencil size={14} />;
+export const EditIcon = (props: CardActionIconProps) => <Pencil size={14} {...props} />;
 
 /** Commit the edit running on a Card's content. */
-export const CommitEditIcon = () => <Check size={14} />;
+export const CommitEditIcon = (props: CardActionIconProps) => <Check size={14} {...props} />;
 
 /** Abandon the edit running on a Card's content. */
-export const AbandonEditIcon = () => <X size={14} strokeWidth={3} />;
+export const AbandonEditIcon = (props: CardActionIconProps) => (
+  <X size={14} strokeWidth={3} {...props} />
+);
 
 /** Open a Card in place. */
-export const OpenCardIcon = () => <Maximize2 size={14} />;
+export const OpenCardIcon = (props: CardActionIconProps) => <Maximize2 size={14} {...props} />;
 
 /** Close a Card that is open in place. */
-export const CloseCardIcon = () => <Minimize2 size={14} />;
+export const CloseCardIcon = (props: CardActionIconProps) => <Minimize2 size={14} {...props} />;
 
 /** The shared affordance for a trigger that opens a list or menu. */
 export const ChevronDownIcon = () => <ChevronDown size={14} />;

@@ -1,6 +1,7 @@
 import type { z } from 'zod';
 import type {
   cardFrontmatterSchema,
+  cardPlacementSchema,
   cardDocumentSchema,
   cardSchema,
   importSpaceFileSchema,
@@ -41,6 +42,7 @@ export type CardFrontmatter = z.infer<typeof cardFrontmatterSchema>;
 export type GraphEdge = z.infer<typeof graphEdgeSchema>;
 export type Graph = z.infer<typeof graphSchema>;
 export type LayoutPosition = z.infer<typeof layoutPositionSchema>;
+export type CardPlacement = z.infer<typeof cardPlacementSchema>;
 export type PositionedLayout = z.infer<typeof positionedLayoutSchema>;
 
 /**

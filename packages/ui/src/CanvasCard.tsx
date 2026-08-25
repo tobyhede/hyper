@@ -1,4 +1,12 @@
-import { useEffect, useId, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import {
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+} from 'react';
 import { Button } from './Button';
 import { CardContentEditProvider, type CardContentEdit } from './card-content-edit';
 import { CardRail } from './CardRail';
@@ -146,12 +154,19 @@ export function CanvasCard(props: CanvasCardProps) {
    * asks the content, and the content answers (`card-content-edit.ts`).
    */
   const [contentEdit, setContentEdit] = useState<CardContentEdit | null>(null);
+  const editControl = useRef<HTMLButtonElement>(null);
+  const contentEditingWas = useRef(false);
   const beginContentEdit = contentEditAction(content, onOpenChange, onBeginContentEdit);
   const showActions =
     state !== 'dragging' &&
     state !== 'editing' &&
     (contentEdit !== null || onOpenChange !== undefined || beginContentEdit !== undefined);
   const style: CanvasCardStyle = { '--canvas-card-graph': graphColor };
+
+  useLayoutEffect(() => {
+    if (contentEditingWas.current && contentEdit === null) editControl.current?.focus();
+    contentEditingWas.current = contentEdit !== null;
+  }, [contentEdit]);
 
   return (
     <Card
@@ -180,6 +195,7 @@ export function CanvasCard(props: CanvasCardProps) {
             {contentEdit === null ? (
               beginContentEdit !== undefined && (
                 <Button
+                  ref={editControl}
                   variant="ghost"
                   size="icon"
                   className="card__rail-action nodrag nopan"
@@ -191,7 +207,7 @@ export function CanvasCard(props: CanvasCardProps) {
                   onPointerDown={(event) => event.stopPropagation()}
                   onKeyDown={(event) => event.stopPropagation()}
                 >
-                  <EditIcon />
+                  <EditIcon data-icon="inline-start" />
                 </Button>
               )
             ) : (
@@ -216,7 +232,11 @@ export function CanvasCard(props: CanvasCardProps) {
                 onPointerDown={(event) => event.stopPropagation()}
                 onKeyDown={(event) => event.stopPropagation()}
               >
-                {content === undefined ? <OpenCardIcon /> : <CloseCardIcon />}
+                {content === undefined ? (
+                  <OpenCardIcon data-icon="inline-start" />
+                ) : (
+                  <CloseCardIcon data-icon="inline-start" />
+                )}
               </Button>
             )}
           </div>
@@ -233,12 +253,12 @@ export function CanvasCard(props: CanvasCardProps) {
         ) : (
           <CardTitle
             className="canvas-card__title"
-            data-editable={onBeginTitleEdit !== undefined}
+            data-editable={onBeginTitleEdit !== undefined && contentEdit === null}
             role="heading"
             aria-level={2}
             aria-label={title}
           >
-            {onBeginTitleEdit === undefined ? (
+            {onBeginTitleEdit === undefined || contentEdit !== null ? (
               title
             ) : (
               // ADR 0065 composes the shared shadcn/Base Button inside the
@@ -327,7 +347,7 @@ function ContentEditActions({ title, edit }: ContentEditActionsProps) {
         onPointerDown={(event) => event.stopPropagation()}
         onKeyDown={(event) => event.stopPropagation()}
       >
-        <CommitEditIcon />
+        <CommitEditIcon data-icon="inline-start" />
       </Button>
       <Button
         variant="ghost"
@@ -340,7 +360,7 @@ function ContentEditActions({ title, edit }: ContentEditActionsProps) {
         onPointerDown={(event) => event.stopPropagation()}
         onKeyDown={(event) => event.stopPropagation()}
       >
-        <AbandonEditIcon />
+        <AbandonEditIcon data-icon="inline-start" />
       </Button>
     </>
   );

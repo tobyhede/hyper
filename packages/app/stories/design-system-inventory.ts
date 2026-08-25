@@ -36,11 +36,6 @@
  */
 export const uncataloguedComponents = [
   {
-    module: 'packages/ui/src/MarkdownCardBody.tsx',
-    reason:
-      "The Markdown kind's Expanded Card front (ADR 0064), built ahead of the state that reaches it. Production cannot open a Card into it yet — `openedCardId` and the covering pane are still what opening a Card does — and ADR 0052 is explicit that a state production cannot reach cannot carry a stable story. It is exercised by `packages/ui/test/MarkdownCardBody.test.tsx` and drawn by `stories/review/expanding-cards`, which is a proposal rather than evidence. This entry is deleted along with the pane, in the slice that makes Expanding how a Card opens.",
-  },
-  {
     module: 'packages/app/src/App.tsx',
     reason:
       'Composition root. It wires Navigation, Space Authoring, the render adapter and every surface below into one tree; it has no visual state of its own, and a story of it would be the application rather than a catalogue entry.',
@@ -112,11 +107,6 @@ export const uncataloguedComponents = [
     module: 'packages/react-flow-adapter/src/GraphConnectionLine.tsx',
     reason:
       'The line React Flow draws between the pointer and its origin during a connection drag. Like the new-Card preview above, it exists only for the duration of a gesture and has no still state to render.',
-  },
-  {
-    module: 'packages/ui/src/CardContent.tsx',
-    reason:
-      'Rendered by the presented Card rather than by a story: `CardNode` mounts it inside `.rf-card-node__content`, where its type scales with the frame, and at 1:1 in a story it would show a size the product never draws. Covered by `packages/ui/test/CardContent.test.tsx` and by `presenting.spec.ts`.',
   },
   {
     module: 'packages/ui/src/Select.tsx',

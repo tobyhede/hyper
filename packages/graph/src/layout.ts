@@ -100,17 +100,18 @@ export function buildLayoutStrategyGraph(
   cardIds: readonly CardId[],
   handlesByCard: ReadonlyMap<CardId, CardHandleSet>,
   edges: readonly GraphRenderEdge[],
-  size: { width: number; height: number },
+  sizeOf: (cardId: CardId) => { width: number; height: number },
 ): LayoutStrategyGraph {
   const visible = new Set(cardIds);
 
   return {
     cards: cardIds.map((id) => {
       const handles = handlesByCard.get(id);
+      const cardSize = sizeOf(id);
       return {
         id,
-        width: size.width,
-        height: size.height,
+        width: cardSize.width,
+        height: cardSize.height,
         ports: [
           ...(handles?.targetHandles ?? []).map((h) => ({ id: h.id, side: 'in' as const })),
           ...(handles?.sourceHandles ?? []).map((h) => ({ id: h.id, side: 'out' as const })),

@@ -74,6 +74,8 @@ test(
     tag: [
       '@parity:canvas-card-exposes-kind-and-keyboard-actions',
       '@parity:canvas-card-shows-kind-treatment',
+      '@parity:markdown-card-opens-and-closes-in-place',
+      '@parity:open-markdown-card-owns-its-editing-lifecycle',
     ],
   },
   async ({ page }) => {
@@ -89,7 +91,16 @@ test(
     await open.focus();
     await expect(open).toBeFocused();
     await open.press('Enter');
-    await expect(page.getByRole('textbox', { name: 'Markdown source' })).toBeVisible();
+    await expect(markdown.getByRole('heading', { name: 'A', exact: true })).toBeVisible();
+    await expect(markdown.getByText('entry point')).toBeVisible();
+    await markdown.getByRole('button', { name: 'Edit Card A' }).click();
+    const source = markdown.getByRole('textbox', { name: 'Markdown source of A' });
+    await expect(source).toBeFocused();
+    await markdown.getByRole('heading', { name: 'A', exact: true }).click();
+    await expect(source).toBeVisible();
+    await expect(markdown.getByRole('button', { name: 'Close Card A' })).toBeDisabled();
+    await source.press('Escape');
+    await expect(markdown.getByRole('button', { name: 'Edit Card A' })).toBeFocused();
   },
 );
 

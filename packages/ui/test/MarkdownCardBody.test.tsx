@@ -1,5 +1,6 @@
 import '@testing-library/jest-dom/vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { useState } from 'react';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { CanvasCard, MarkdownCardBody } from '../src';
 
@@ -55,8 +56,25 @@ const onCard = (props: Partial<Parameters<typeof MarkdownCardBody>[0]> = {}) => 
     title="Strategies"
     graphColor="#ffc53d"
     content={body(props)}
+    onBeginContentEdit={vi.fn()}
   />
 );
+
+function EditingCard() {
+  const [editing, setEditing] = useState(true);
+  return (
+    <CanvasCard
+      front={{ kind: 'markdown' }}
+      state="rest"
+      title="Strategies"
+      graphColor="#ffc53d"
+      content={
+        editing ? body({ editor: { onComplete: vi.fn(), onEnd: () => setEditing(false) } }) : body()
+      }
+      onBeginContentEdit={() => setEditing(true)}
+    />
+  );
+}
 
 describe('MarkdownCardBody', () => {
   it('draws parsed Markdown at rest through the presentation renderer', () => {
@@ -64,7 +82,6 @@ describe('MarkdownCardBody', () => {
       <MarkdownCardBody
         source={'# Heading\n\nA paragraph with **bold** text.\n\n- one\n- two'}
         ariaLabel="Markdown source of Strategies"
-        onBeginEdit={vi.fn()}
       />,
     );
 
@@ -82,17 +99,17 @@ describe('MarkdownCardBody', () => {
     expect(screen.queryByRole('button')).not.toBeInTheDocument();
   });
 
-  it('asks to begin an edit on one activation, and does not take the Card click with it', () => {
+  it('makes the complete rendered Markdown surface the semantic edit control', () => {
     const onBeginEdit = vi.fn();
-    const onCardClick = vi.fn();
-    render(<div onClick={onCardClick}>{body({ onBeginEdit })}</div>);
+    render(body({ onBeginEdit }));
 
-    const panel = screen.getByRole('button', { name: 'Edit Markdown source of Strategies' });
-    expect(panel.querySelector('svg')).not.toBeInTheDocument();
-    fireEvent.click(panel);
+    const control = screen.getByRole('button', {
+      name: 'Edit Markdown source of Strategies',
+    });
+    expect(control.querySelector('svg')).not.toBeInTheDocument();
+    fireEvent.click(control);
 
     expect(onBeginEdit).toHaveBeenCalledTimes(1);
-    expect(onCardClick).not.toHaveBeenCalled();
   });
 
   it('leaves pointer-down available to begin a Card drag at rest', () => {
@@ -108,20 +125,18 @@ describe('MarkdownCardBody', () => {
 
   it('takes a caret when the caller supplies an editor, and lets it go when the caller withdraws one', async () => {
     const editor = { onComplete: vi.fn(), onEnd: vi.fn() };
-    const { rerender } = render(body({ onBeginEdit: vi.fn(), editor }));
+    const { rerender } = render(body({ editor }));
 
     expect(await source()).toHaveAttribute('contenteditable', 'true');
 
-    rerender(body({ onBeginEdit: vi.fn() }));
+    rerender(body());
     await waitFor(() => expect(screen.queryByRole('textbox')).not.toBeInTheDocument());
-    expect(
-      screen.getByRole('button', { name: 'Edit Markdown source of Strategies' }),
-    ).toBeVisible();
+    expect(screen.getByText('No strategy is privileged.')).toBeVisible();
   });
 
   it('commits the draft on Mod-Enter and abandons it on Escape', async () => {
     const editor = { onComplete: vi.fn(), onEnd: vi.fn() };
-    const { rerender } = render(body({ onBeginEdit: vi.fn(), editor }));
+    const { rerender } = render(body({ editor }));
     await source();
 
     fireEvent.keyDown(await source(), { key: 'Enter', metaKey: true });
@@ -129,7 +144,7 @@ describe('MarkdownCardBody', () => {
     expect(editor.onEnd).toHaveBeenCalledTimes(1);
 
     editor.onComplete.mockClear();
-    rerender(body({ onBeginEdit: vi.fn(), editor }));
+    rerender(body({ editor }));
     fireEvent.keyDown(await source(), { key: 'Escape' });
     // Abandoning completes nothing — the two exits differ in exactly this.
     expect(editor.onComplete).not.toHaveBeenCalled();
@@ -138,7 +153,7 @@ describe('MarkdownCardBody', () => {
 
   it('keeps a draft the author clicked away from, committing and abandoning nothing', async () => {
     const editor = { onComplete: vi.fn(), onEnd: vi.fn() };
-    const { container } = render(body({ onBeginEdit: vi.fn(), editor }));
+    const { container } = render(body({ editor }));
     const editable = await source();
     const surface = container.querySelector('.markdown-card-body');
     if (surface === null) throw new Error('missing body surface');
@@ -160,9 +175,7 @@ describe('MarkdownCardBody', () => {
     ['Win32', 'Ctrl+↵Save'],
   ])('names the modifier for %s and sets each key beside its word', async (platform, save) => {
     const platformGetter = vi.spyOn(navigator, 'platform', 'get').mockReturnValue(platform);
-    const { container } = render(
-      body({ onBeginEdit: vi.fn(), editor: { onComplete: vi.fn(), onEnd: vi.fn() } }),
-    );
+    const { container } = render(body({ editor: { onComplete: vi.fn(), onEnd: vi.fn() } }));
     await source();
     const hint = container.querySelector('.markdown-card-body__shortcut-hint');
     if (hint === null) throw new Error('missing shortcut hint');
@@ -180,7 +193,7 @@ describe('MarkdownCardBody', () => {
   });
 
   it('offers no control of its own when nothing published a rail to draw one on', async () => {
-    render(body({ onBeginEdit: vi.fn(), editor: { onComplete: vi.fn(), onEnd: vi.fn() } }));
+    render(body({ editor: { onComplete: vi.fn(), onEnd: vi.fn() } }));
     await source();
 
     expect(screen.queryByRole('button', { name: /^Save Card/ })).not.toBeInTheDocument();
@@ -189,7 +202,7 @@ describe('MarkdownCardBody', () => {
 
   it('takes the same two exits from the rail as from its own keys', async () => {
     const editor = { onComplete: vi.fn(), onEnd: vi.fn() };
-    render(onCard({ onBeginEdit: vi.fn(), editor }));
+    render(onCard({ editor }));
     await source();
 
     // Abandoning has nothing to commit — the pairing `onEnd` deliberately does
@@ -206,13 +219,11 @@ describe('MarkdownCardBody', () => {
   });
 
   it('withdraws those two ends from the rail when the caret goes back', async () => {
-    const { rerender } = render(
-      onCard({ onBeginEdit: vi.fn(), editor: { onComplete: vi.fn(), onEnd: vi.fn() } }),
-    );
+    const { rerender } = render(onCard({ editor: { onComplete: vi.fn(), onEnd: vi.fn() } }));
     await source();
     expect(screen.getByRole('button', { name: 'Save Card Strategies' })).toBeVisible();
 
-    rerender(onCard({ onBeginEdit: vi.fn() }));
+    rerender(onCard());
 
     expect(screen.queryByRole('button', { name: 'Save Card Strategies' })).not.toBeInTheDocument();
     expect(
@@ -220,21 +231,33 @@ describe('MarkdownCardBody', () => {
     ).not.toBeInTheDocument();
   });
 
+  it.each([['Save Card Strategies'], ['Cancel editing Card Strategies']])(
+    'returns focus to Edit after leaving through %s',
+    async (action) => {
+      render(<EditingCard />);
+      await source();
+
+      fireEvent.click(screen.getByRole('button', { name: action }));
+
+      expect(screen.getByRole('button', { name: 'Edit Card Strategies' })).toHaveFocus();
+    },
+  );
+
   // Two separate edits, so the lazy editor mounts twice — past the default budget.
   it(
     'ends a second edit from its own keys, including one never given the caret',
     { timeout: 20_000 },
     async () => {
       const editor = { onComplete: vi.fn(), onEnd: vi.fn() };
-      const { rerender } = render(body({ onBeginEdit: vi.fn(), editor }));
+      const { rerender } = render(body({ editor }));
       await source();
       fireEvent.keyDown(await source(), { key: 'Escape' });
 
       // An editor supplied with `autoFocus={false}` is one the caret was never
       // placed in. Its keys are still its own — nothing about a previous exit
       // may survive into it and spend this edit's.
-      rerender(body({ onBeginEdit: vi.fn() }));
-      rerender(body({ onBeginEdit: vi.fn(), editor, autoFocus: false }));
+      rerender(body());
+      rerender(body({ editor, autoFocus: false }));
       const editable = await source();
 
       fireEvent.keyDown(editable, { key: 'Enter', metaKey: true });
@@ -244,14 +267,14 @@ describe('MarkdownCardBody', () => {
   );
 
   it('withholds the React Flow escape hatches until there is a caret to protect', () => {
-    const { container, rerender } = render(body({ onBeginEdit: vi.fn() }));
+    const { container, rerender } = render(body());
     const surface = container.querySelector('.markdown-card-body');
 
     // At rest the rendered Markdown is text on a Card, and dragging by it is what
     // an author expects.
     expect(surface).not.toHaveClass('nodrag');
 
-    rerender(body({ onBeginEdit: vi.fn(), editor: { onComplete: vi.fn(), onEnd: vi.fn() } }));
+    rerender(body({ editor: { onComplete: vi.fn(), onEnd: vi.fn() } }));
     expect(surface).toHaveClass('nodrag', 'nopan', 'nokey');
     // `nowheel` is deliberately absent: the wheel belongs to the canvas
     // everywhere, so no Expanded Card is a hole to wheel-pan across (ADR 0064).

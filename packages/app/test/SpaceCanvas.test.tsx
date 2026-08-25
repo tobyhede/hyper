@@ -112,6 +112,9 @@ function mountGraph(nodes: CardFlowNode[] = [cardNode('A')]): Harness {
         onAddCard={addCard}
         nameOnCreation={named}
         onOpenCard={openCard}
+        onCloseCard={() => undefined}
+        onCompleteCardBody={() => undefined}
+        onResizeCard={() => undefined}
         onCompleteCardTitle={() => 'A Card needs a title'}
         editableCardIds={editableCardIds}
         graphs={[]}

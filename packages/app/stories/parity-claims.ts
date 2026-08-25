@@ -16,6 +16,20 @@ export interface ParityClaim {
 
 export const parityClaims: readonly ParityClaim[] = [
   {
+    id: 'markdown-card-opens-and-closes-in-place',
+    storyFile: 'components/card.stories.tsx',
+    storyExport: 'OpenAndClose',
+    claim:
+      'A Markdown Card opens and closes in place while retaining one Card and Title treatment.',
+  },
+  {
+    id: 'open-markdown-card-owns-its-editing-lifecycle',
+    storyFile: 'components/card-editing.stories.tsx',
+    storyExport: 'Markdown',
+    claim:
+      'An open Markdown Card begins editing from its body or rail, keeps blur inert, and ends through Save, Cancel, Escape or Mod-Enter while Close remains disabled.',
+  },
+  {
     id: 'canvas-card-exposes-kind-and-keyboard-actions',
     storyFile: 'components/card.stories.tsx',
     storyExport: 'Actions',

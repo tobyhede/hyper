@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 
-const expandStory = '/?story=review--card--expand&mode=preview';
-const markdownStory = '/?story=review--card--editing--markdown&mode=preview';
+const openCloseStory = '/?story=components--card--open-and-close&mode=preview';
+const markdownStory = '/?story=components--card--editing--markdown&mode=preview';
 
 const open = async (page: Page, story: string): Promise<void> => {
   await page.goto(story);
@@ -10,46 +10,49 @@ const open = async (page: Page, story: string): Promise<void> => {
   });
 };
 
-test('compact and Expanded Cards retain one Title treatment', async ({ page }) => {
-  await open(page, expandStory);
-  const compact = page.getByRole('region', { name: 'Compact Card' });
-  const expanded = page.getByRole('region', { name: 'Expanded Card' });
-  const compactTitle = compact.getByRole('heading', { name: 'Strategies' });
-  const expandedTitle = expanded.getByRole('heading', { name: 'Strategies' });
-
-  await expect(expandedTitle).toHaveAttribute(
-    'class',
-    (await compactTitle.getAttribute('class')) ?? '',
-  );
-  const titleStyle = (element: HTMLElement) => {
-    const style = getComputedStyle(element);
-    return {
-      fontSize: style.fontSize,
-      lineHeight: style.lineHeight,
-      paddingInline: style.paddingInline,
+test(
+  'Open and Close retain one Card and Title treatment',
+  { tag: '@parity:markdown-card-opens-and-closes-in-place' },
+  async ({ page }) => {
+    await open(page, openCloseStory);
+    const specimen = page.getByRole('region', { name: 'Interactive Card' });
+    const card = specimen.getByRole('article', { name: 'Strategies' });
+    const title = card.getByRole('heading', { name: 'Strategies' });
+    const closedClass = await title.getAttribute('class');
+    const titleStyle = (element: HTMLElement) => {
+      const style = getComputedStyle(element);
+      return {
+        fontSize: style.fontSize,
+        lineHeight: style.lineHeight,
+        paddingInline: style.paddingInline,
+      };
     };
-  };
-  expect(await expandedTitle.evaluate(titleStyle)).toEqual(await compactTitle.evaluate(titleStyle));
-  const titleInset = async (card: typeof compact, title: typeof compactTitle) => {
-    const cardBox = await card.getByRole('article', { name: 'Strategies' }).boundingBox();
-    const titleBox = await title.boundingBox();
-    if (cardBox === null || titleBox === null)
-      throw new Error('Card title geometry is unavailable');
-    return {
-      left: titleBox.x - cardBox.x,
-      bottom: cardBox.y + cardBox.height - (titleBox.y + titleBox.height),
+    const closedStyle = await title.evaluate(titleStyle);
+    const titleLeftInset = async () => {
+      const cardBox = await card.boundingBox();
+      const titleBox = await title.boundingBox();
+      if (cardBox === null || titleBox === null)
+        throw new Error('Card title geometry is unavailable');
+      return titleBox.x - cardBox.x;
     };
-  };
-  expect(await titleInset(expanded, expandedTitle)).toEqual(
-    await titleInset(compact, compactTitle),
-  );
-  await expect(
-    expanded.getByRole('heading', { name: 'Placement is authored' }).first(),
-  ).toBeVisible();
-  await expect(page.getByRole('region', { name: 'Long Expanded Card' })).toBeVisible();
-});
+    const closedInset = await titleLeftInset();
 
-test('the Expanded Card rail offers its edit action before Close', async ({ page }) => {
+    await card.hover();
+    await card.getByRole('button', { name: 'Open Card Strategies' }).click();
+    await expect(card.getByRole('heading', { name: 'Placement is authored' })).toBeVisible();
+    await expect(card.getByRole('button', { name: 'Close Card Strategies' })).toBeVisible();
+    await expect(title).toHaveAttribute('class', closedClass ?? '');
+    expect(await title.evaluate(titleStyle)).toEqual(closedStyle);
+    expect(await titleLeftInset()).toBeCloseTo(closedInset, 0);
+
+    await card.getByRole('button', { name: 'Close Card Strategies' }).click();
+    await expect(card.getByRole('heading', { name: 'Placement is authored' })).toHaveCount(0);
+    await expect(card.getByRole('button', { name: 'Open Card Strategies' })).toBeVisible();
+    await expect(page.getByRole('region', { name: 'Long Open Card' })).toBeVisible();
+  },
+);
+
+test('the open Card rail offers its edit action before Close', async ({ page }) => {
   await open(page, markdownStory);
   const card = page.getByRole('article', { name: 'Strategies' });
   const edit = card.getByRole('button', { name: 'Edit Card Strategies' });
@@ -129,29 +132,45 @@ test('a Card running an edit is not drawn at rest, however it is left', async ({
   await expect(rail).toHaveCSS('background-color', quiet);
 });
 
-test('the two ends are the only way out, and a press on one keeps the caret', async ({ page }) => {
-  await open(page, markdownStory);
-  const card = page.getByRole('article', { name: 'Strategies' });
-  const editor = page.getByRole('textbox', { name: 'Markdown source of Strategies' });
+test(
+  'the two ends are the only way out, and a press on one keeps the caret',
+  {
+    tag: '@parity:open-markdown-card-owns-its-editing-lifecycle',
+  },
+  async ({ page }) => {
+    await open(page, markdownStory);
+    const card = page.getByRole('article', { name: 'Strategies' });
+    const editor = page.getByRole('textbox', { name: 'Markdown source of Strategies' });
 
-  await page.getByRole('button', { name: 'Focused edit', exact: true }).click();
-  await editor.pressSequentially('Abandoned. ');
-  // Clicking away is not an exit: the draft is still there and the editor is
-  // still up. Four exits and no more — two keys and the two controls.
-  await page.getByRole('heading', { name: 'Strategies', exact: true }).click();
-  await expect(editor).toHaveCount(1);
-  await expect(editor).toContainText('Abandoned.');
+    await page.getByRole('button', { name: 'Focused edit', exact: true }).click();
+    await editor.pressSequentially('Abandoned. ');
+    // Clicking away is not an exit: the draft is still there and the editor is
+    // still up. Four exits and no more — two keys and the two controls.
+    await page.getByRole('heading', { name: 'Strategies', exact: true }).click();
+    await expect(editor).toHaveCount(1);
+    await expect(editor).toContainText('Abandoned.');
 
-  await card.getByRole('button', { name: 'Cancel editing Card Strategies' }).click();
-  await expect(editor).toHaveCount(0);
-  await expect(card).not.toContainText('Abandoned.');
+    await card.getByRole('button', { name: 'Cancel editing Card Strategies' }).click();
+    await expect(editor).toHaveCount(0);
+    await expect(card).not.toContainText('Abandoned.');
+    await expect(card.getByRole('button', { name: 'Edit Card Strategies' })).toBeFocused();
 
-  await page.getByRole('button', { name: 'Focused edit', exact: true }).click();
-  await editor.pressSequentially('Kept. ');
-  await card.getByRole('button', { name: 'Save Card Strategies' }).click();
-  await expect(editor).toHaveCount(0);
-  await expect(card).toContainText('Kept.');
-});
+    await card.getByRole('button', { name: 'Edit Card Strategies' }).click();
+    await editor.pressSequentially('Kept. ');
+    await card.getByRole('button', { name: 'Save Card Strategies' }).click();
+    await expect(editor).toHaveCount(0);
+    await expect(card).toContainText('Kept.');
+    await expect(card.getByRole('button', { name: 'Edit Card Strategies' })).toBeFocused();
+
+    await card.getByRole('button', { name: 'Edit Card Strategies' }).click();
+    await editor.press('Escape');
+    await expect(card.getByRole('button', { name: 'Edit Card Strategies' })).toBeFocused();
+
+    await card.getByRole('button', { name: 'Edit Card Strategies' }).click();
+    await editor.press(process.platform === 'darwin' ? 'Meta+Enter' : 'Control+Enter');
+    await expect(card.getByRole('button', { name: 'Edit Card Strategies' })).toBeFocused();
+  },
+);
 
 test('the body editor shows its shortcut hint only with actual focus', async ({ page }) => {
   await open(page, markdownStory);

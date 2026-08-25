@@ -185,7 +185,11 @@ export function CardNode({ data, selected, dragging, isConnectable }: NodeProps<
   const canvasCardOptionalProps: Mutable<
     Pick<CanvasCardProps, 'onBeginTitleEdit' | 'onOpenChange' | 'onBeginContentEdit'>
   > = {};
-  if (data.titleEditingEnabled === true && data.onBeginTitleEditing !== undefined) {
+  if (
+    data.bodyEditor === undefined &&
+    data.titleEditingEnabled === true &&
+    data.onBeginTitleEditing !== undefined
+  ) {
     canvasCardOptionalProps.onBeginTitleEdit = data.onBeginTitleEditing;
   }
   if (data.cardEditingEnabled === true && data.onEditCard !== undefined) {
@@ -201,7 +205,7 @@ export function CardNode({ data, selected, dragging, isConnectable }: NodeProps<
   /* The editor's presence is the editing state, and it arrives with the two
      operations that end it — so nothing here has to stand in for a completion
      the composition did not supply. */
-  const titleEditor = data.titleEditor;
+  const titleEditor = data.bodyEditor === undefined ? data.titleEditor : undefined;
 
   /*
    * What an Expanded Card draws below its title (ADR 0064).
@@ -270,7 +274,9 @@ export function CardNode({ data, selected, dragging, isConnectable }: NodeProps<
           lineClassName="rf-card-node__resize-line"
           handleClassName="rf-card-node__resize-handle"
           shouldResize={(_event, params) => growsFromOrigin(params.direction)}
-          onResize={(_event, next) => resize.onResize({ width: next.width, height: next.height })}
+          onResizeEnd={(_event, next) =>
+            resize.onResize({ width: next.width, height: next.height })
+          }
         />
       )}
       {data.targetHandles.map((handle) => renderHandle(handle, 'target'))}
