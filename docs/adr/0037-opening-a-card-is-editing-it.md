@@ -1,8 +1,9 @@
 # Opening a card is editing it
 
-Status: accepted
+Status: superseded
+Superseded by: 0064
 Refines: 0011
-Refined by: 0039, 0048, 0051, 0063, 0064
+Refined by: 0039, 0048, 0051, 0063
 Related: 0006, 0020, 0024, 0035, 0036
 
 Opening a card shows one surface, and that surface is editable. A markdown card opens on its **title**, its **description** and its **Markdown source**, all authored in place. There is no reading state to enter first and no action that turns reading into editing.

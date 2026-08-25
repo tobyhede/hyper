@@ -50,11 +50,12 @@ interface CanvasCardCommonProps {
   /**
    * Put a caret in this Card's kind-owned content.
    *
-   * Offered whatever the Card's size, because Edit is something an author does
-   * to a Card rather than something available only inside one already open. On a
-   * collapsed Card the rail's Edit control runs `onOpenChange(true)` first and
-   * this second — the same two calls the Open and Edit controls make in
-   * sequence, so nothing about opening is reimplemented for that path.
+   * Offered whatever the Card's size (ADR 0066): opening and editing are
+   * separate actions, and Edit is something an author does to a Card rather than
+   * something available only inside one already open. On a collapsed Card the
+   * rail's Edit control runs `onOpenChange(true)` first and this second — the
+   * same two calls the Open and Edit controls make in sequence, so there is no
+   * second expansion path and no transient approximation of opening.
    */
   readonly onBeginContentEdit?: () => void;
 }
@@ -103,9 +104,8 @@ type CanvasCardStyle = CSSProperties & { readonly '--canvas-card-graph': string 
  * control to draw.
  *
  * On an Expanded Card it is simply the caret operation the caller supplied. On a
- * **collapsed** one it is the two gestures the author would otherwise have made
- * in order — open the Card, then place the caret — composed from the Card's own
- * two existing operations and nothing else. Opening is not reimplemented or
+ * **collapsed** one it is ADR 0066's rule — open the Card, then place the caret
+ * — composed from the Card's own two existing operations and nothing else. Opening is not reimplemented or
  * approximated here: `onOpenChange` is the same call the Open control makes, so
  * the growth, the neighbours' displacement and the transition are the ones
  * opening always produces.

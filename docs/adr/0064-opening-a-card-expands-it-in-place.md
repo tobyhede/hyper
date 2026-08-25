@@ -1,76 +1,103 @@
-# Opening a Card expands it in place, and expansion is a Layout property
+# Opening a Card expands it in place
 
 Status: accepted
-Supersedes: 0006
-Refines: 0037
-Related: 0011, 0024, 0025, 0027, 0036, 0040, 0045, 0048, 0051, 0058, 0063
+Supersedes: 0006, 0011, 0037
+Refines: 0048, 0063
+Related: 0024, 0025, 0027, 0036, 0040, 0045, 0051, 0058, 0065
 
-Opening a Card draws its content **on the Card**, by growing that Card on the canvas it already sits on. There is no surface over the canvas: the Card keeps its rail, its paper, its ink and its Edges, and changes size. Several Cards may be open at once, which is the capability a covering surface forecloses by construction and the thing the rest of this cost buys.
+Opening a Card draws its content **on the Card**, by growing that Card on the
+canvas where it already sits. There is no surface over the canvas. The Card keeps
+its rail, paper, ink and Edges, and changes size. Several Cards may be open at
+once.
 
-Which Cards are open is **authored**. A Layout's placement stops being a card-to-position map and becomes a card-to-**rect** map: where a Card sits, whether it is expanded, and how big it is when it is. Expanding a Card is therefore an Edit, it survives a reload, and it is exported with the Space. A collapsed Card carries no size — it is the ratio constant `card.ts` argues for, and nothing about expanding needs that to change.
+Which Cards are open is authored. A Layout's placement is a card-to-rect map:
+where a Card sits, whether it is Expanded, and how large it is while Expanded.
+Opening and closing are therefore Edits, survive reload and export with the
+Space. Opening on an Algorithmic View converts it into a Layout under ADR 0025.
 
-The prototype this decision was taken on is `packages/app/stories/review/expanding-cards.{tsx,css,stories.tsx}`, and its findings are `.scratch/space-cards/expanding-cards-prototype.md`.
+## Open and Edit are separate actions
 
-## An expanded Card displaces its neighbours, and the displacement is never authored
+Opening changes Layout state. Editing puts a caret in one open Card's content.
+Keeping them separate lets a persisted Layout contain several open Cards without
+giving every Card a live editor or making each one compete for the keyboard.
 
-A Layout's positions were authored for collapsed Cards. Expand one and it is over its neighbours immediately. The rule: a Card `+x` of an expanded Card takes that Card's growth on its own `x`, and the same for `y`, summed over every expanded Card, with both comparisons reading **authored** coordinates on both sides so the result does not depend on the order Cards are visited.
+The Card rail exposes the complete interaction:
 
-That displacement is **derived from which Cards are expanded and never written down**. It is not an Edit to the neighbours. Collapsing removes it exactly rather than approximately, the authored Layout is what the author wrote whatever is open, and a Layout that opens with Cards already expanded is arranged the same way as one an author expanded by hand.
+- A closed Card offers **Edit** and **Open**.
+- **Open** expands the Card.
+- **Edit** on a closed Card opens it and then begins editing.
+- An open Card offers **Edit** and **Close**.
+- While editing, **Save** and **Cancel** replace **Edit**. **Close** remains in
+  place but is disabled.
 
-Two alternatives were rejected. **Editing the neighbours out of the way** — a real Edit to their positions, or a strategy re-run over the Layout — makes opening a Card rewrite the placement of Cards the author never touched, and collapsing cannot put them back, because by then their authored positions *are* the displaced ones. **Letting Cards simply overlap** was the honest do-nothing, and it is still one switch away in the prototype; it was rejected because the overlap is immediate, total and unavoidable rather than an edge case, and because the Card that grew is the one thing on screen the author is looking at.
+Edit on a closed Card composes the same Open operation with the same begin-edit
+operation an open Card uses. It is not a second expansion path.
 
-The cost accepted is that the rule is defined on origins and is a step function. A Card that starts left of an expanded Card's `x` but overlaps its width is not moved, so the expanded Card grows over it. And dragging a Card across an expanded Card's authored `x` flips which side of it that Card is on, so the drawn position jumps by that Card's growth mid-drag. Both are visible, and both are what any rule with a boundary does at the boundary.
+An open Markdown Card draws rendered Markdown through the shared sanitised
+renderer. Editing replaces that body with `MarkdownSourceEditor` and focuses it.
+There is no commit on blur. Four exits and no more: `Mod-Enter`, `Escape`, Save
+and Cancel. `Mod-Enter` and Save commit; `Escape` and Cancel abandon. A click
+elsewhere leaves the draft and the editor up. Every exit leaves the Card open.
 
-## Editing is a gesture, and this is not the mode ADR 0037 deleted
+Close is disabled during editing so the Card cannot collapse out from under a
+live caret and an unresolved draft. Keeping the disabled control in its rail
+position also prevents the actions from rearranging while the author writes.
 
-An expanded Card shows its title and its Markdown source. A **double click on either puts a caret in it** — `Enter` completes a title, `Mod-Enter` completes the source, `Escape` abandons either, and a click away completes either. One caret at a time, canvas-wide.
+## Expanded Cards displace their neighbours
 
-ADR 0037 deleted a reading state and left a negative behind: a future review will propose a read-only default with an action that turns reading into editing, and "that is this decision reversed, not extended". This looks like exactly that, and it is not, for a reason that did not exist when 0037 was written.
+A Card `+x` of an Expanded Card takes that Card's growth on its own `x`, and the
+same rule applies on `y`. Growth is summed over every Expanded Card, with every
+comparison reading authored coordinates so the result is independent of visit
+order.
 
-0037's surface was one Card, filling the screen, entered by a deliberate gesture. A read-only step in front of it is pure friction — you asked for this Card, so of course you want the caret. Under this decision expansion is a **property of the Layout**: a Card is open because the author arranged it that way, possibly weeks ago, possibly several at once. A live caret in every expanded Card is not "the thing the author came for"; it is several editors competing for a keyboard on a canvas where `Escape`, the arrow keys and ordinary typing all already mean something. The double click does not answer *is this readable or writable* — the bytes are identical either way, which was 0037's whole argument and is still true. It answers *which of the things on screen is the keyboard talking to*, which is the question selection answers for a Card and the question the title's own double click has answered since ADR 0036, on the graph, throughout 0037's life.
+That displacement is derived and never written to the Layout. Closing removes it
+exactly; the authored positions remain what the author wrote. The accepted cost
+is a step boundary: a Card crossing an Expanded Card's authored origin may jump
+between the two sides of the displacement rule.
 
-Two things 0037 decided are untouched. There is still no rendered read outside presenting — an expanded Card shows source (ADR 0011, ADR 0024), and drawing it rendered would be a different feature and a different ADR. And the title is still editable in both places, writing the same Card through Space Authoring.
+## One Card, one renderer and one editor
 
-## What ADR 0006 keeps
+An Expanded Card is the existing Card with a content region, not a second Card
+component. Card kinds own what fills that region under ADR 0051. Markdown at rest
+reuses the rendering boundary presentation uses, so the same source cannot be
+interpreted by competing Markdown pipelines. Editing uses the one Hyper-owned
+CodeMirror wrapper from ADR 0063.
 
-0006 decided a Card in the graph draws its title and not its content. That sentence is what this decision reverses, and it is worth being precise about what reversing it does *not* cost, because 0006's two stated consequences both survive.
+Title editing remains the Title's own interaction under ADR 0065. Content editing
+is the Card-level Edit action described here. Only one content edit owns the
+keyboard at a time, canvas-wide.
 
-**A Card's size is still not a measurement.** 0006's payoff was that a bounded, uniform Card makes size a constant rather than something read from the DOM, which deleted the measure-then-reflow work React Flow's elkjs example needs. An expanded Card's size is **authored** — the author drew that box — so it is still not measured, and the strategies still reason about rects they were given rather than rects they discovered.
+## Three behaviours stay off
 
-**Content still leaves the projection for Cards that are not open.** 0006 removed eager `markdownByCardId` embedding of every Card's body. Body is still loaded for the Cards that are open, and the open set is small and authored.
+**Scroll is not contained.** No `nowheel` is added to an Expanded Card. The wheel
+belongs to the canvas everywhere. An open Card that needs more room is resized;
+while editing, CodeMirror may scroll its document without turning the Card into a
+permanent hole in canvas wheel-panning.
 
-What does not survive is 0006's framing of "show full content" as a **View** setting. It is a per-Card Layout property, which is the specific sentence that moves. Its rejected alternatives are answered rather than ignored: silent clipping and unreadability at overview zoom were both consequences of *every* Card drawing content at a size nobody chose, and neither applies to an author-chosen Card at an author-chosen size. The third, the scroll fight, is answered below.
+**No 16:9 constraint.** The collapsed Card keeps the presentation silhouette. An
+Expanded Card takes the authored rect its document needs.
 
-## Three behaviours decided off
+**The camera does not follow.** The Card grows where the author placed it and the
+author travels to it.
 
-Each was a switch in the prototype so it could be felt both ways. Each is now off, and each buys one rule that holds everywhere on the canvas instead of a rule with holes in it.
+## What this replaces
 
-**Scroll is not contained.** React Flow's `nowheel` would stop a wheel over an expanded Card reaching the canvas, which fixes ADR 0006's third objection mechanically and moves the cost: every expanded Card becomes a hole the canvas cannot be wheel-panned across, and the better the feature works the more of the canvas is hole. Off, the wheel is the canvas's everywhere. A Card showing less than its source is **resized**, not scrolled — which is what an authored rect means — so at rest there is no second scroll region and therefore no fight. The cost is real and narrow: while a source is being edited, CodeMirror scrolls its own content, so a wheel there both scrolls the document and moves the canvas. The narrower variant — `nowheel` while editing only — was considered and rejected for now: it is a hole that appears and disappears under the pointer, and the editing gesture is short. If it proves intolerable in use, that variant is the change to make, and it is one line.
+ADR 0006's title-only Card remains the closed state; an open Card also draws its
+content. ADR 0011's single-renderer concern is retained by sharing the renderer,
+rather than by withholding rendered Markdown from an open Card. ADR 0037's
+immediate editing is replaced by distinct Open and Edit actions because expansion
+is persisted Layout state rather than a transient visit to one Card.
 
-**No 16:9.** `card.ts` couples a Card's silhouette to the presentation surface so that clicking a Card, presenting it, and seeing the same shape is a promise the graph keeps. Holding an expanded Card to that ratio keeps the promise and gives the author the box the ratio allows, which is rarely the box a document wants. Off, the **collapsed** Card keeps the silhouette — and the collapsed Card is what an overview shows and what predicts what an audience sees — while an expanded one is whatever the author drew. The promise moves to where it is actually read rather than being dropped.
+The transient `openedCardId`, its `openCard`/`closeCard` navigation operations and
+the covering Card pane are replaced by Layout-owned expansion. Alias creation is
+unaffected: creating a Card that does not exist yet is not opening one.
 
-**The camera does not follow.** Bringing the camera to a Card as it expands makes the source legible at once, and the further that is followed the more it becomes the surface this decision deleted, with the backdrop removed. Off, the Card grows where the author put it and the author travels to it, which is the infinite-canvas answer. The cost is that expanding a Card at overview zoom produces something too small to read until you go to it.
+## The negative to remember
 
-## What this deletes
+Open/Close and Edit/Save/Cancel are separate state machines with one composition:
+Edit may open first, but opening never begins an edit by itself. During an edit,
+Close stays visible and disabled, and blur leaves the draft and editor intact.
 
-`openedCardId` in `packages/app/src/navigation.ts` with `openCard`/`closeCard`, its readers in `App.tsx` and `SpaceCanvas.tsx`, and the covering pane itself. Opening stops being transient viewer state and becomes Layout data, the same shape as ADR 0037 deleting the reading mode and ADR 0058 deleting `WorkspaceSelection`. The Alias *creation* surface is not affected: creating a Card that does not exist yet is not opening one.
-
-## The cost that is not yet paid
-
-Opening a Card is now an Edit, so **opening a Card on an Algorithmic View converts it into a Layout** under ADR 0025, exactly as moving one does. Reading a Card therefore authors something. This is the one consequence of this decision that is surprising in a bad way rather than a good one, and it is accepted rather than solved: the alternatives are transient expansion, which loses the whole point — that an author arranges open Cards and they stay arranged — or two mechanisms for opening depending on what is drawing the canvas, which is worse than the surprise. `CONTEXT.md`'s **Algorithmic View** entry already says every edit converts before writing, so nothing there gains an exception; what changes is that the list of gestures that convert now includes opening.
-
-## The negatives to remember
-
-**Do not propose storing the neighbour displacement.** It is derived on purpose, and writing it down is what makes collapsing lossy.
-
-**Do not propose a read-only expanded Card with an Edit action on it.** The double click is not that (above), and adding an explicit mode on top of it would be ADR 0037 reversed for real.
-
-**Do not propose `nowheel` on every expanded Card.** It was measured, it works, and the hole it makes in the canvas is the reason it is off.
-
-**Do not propose measuring an expanded Card to fit its content.** The rect is authored. A Card that does not fit its content is an authoring decision, exactly as a Card that does not fit the presentation frame already is.
-
-## What this does not decide
-
-What a Card of each kind draws when expanded is the kind's own decision (ADR 0051). Markdown is settled — title and source, per ADR 0037. An **Alias** expanded should presumably draw its Target's content, since that is what an Alias *is*, but that displaces the Alias metadata surface and leaves retargeting without a home; that earns its own decision. A **Space Card** expanded is issue 01, needs the `space` kind in `core` first, and is the only kind that needs sub-flows — ADR 0058's navigation into a nested Space stands until then.
-
-Whether a pointer gesture on the **body** of a collapsed Card may open it is ADR 0036's question and is left exactly as 0036 answered it: nothing a pointer does to the body opens a Card, and the rail's control is how it is opened. The premise 0036 reasoned from — a Card centres its title, so the centre of a Card is the rename target — is no longer true of the Card front ADR 0051 built, so the question is re-openable. It is not re-opened here.
+Neighbour displacement remains derived. Expanded geometry remains authored. No
+content measurement, camera follow, 16:9 constraint or permanent wheel-containment
+hole is introduced by opening a Card.

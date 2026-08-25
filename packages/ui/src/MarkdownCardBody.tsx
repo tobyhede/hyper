@@ -91,15 +91,13 @@ function MarkdownEditControl({ ariaLabel, onBeginEdit }: MarkdownEditControlProp
  * CodeMirror** (ADR 0063, `PANE_OWNED_KEYS`): `Escape` abandons the draft and
  * `Mod-Enter` commits it.
  *
- * **A focus that leaves does not end the edit.** Those two keys and the two
- * controls that pair with them are the whole of how an edit ends — nothing a
- * pointer does elsewhere on the canvas decides for the author what happens to
- * their draft. It is the one place this surface departs from the Card's title
- * editor, which does complete on blur: a title is one refusable line and a body
- * is a document, and losing a document to a stray click is not a cost worth
- * paying for the convenience of not saying so. (ADR 0064 as accepted says a
- * click away completes either; this is a deliberate divergence, and the ADR is
- * the thing to change if it stands.)
+ * **A focus that leaves does not end the edit** (ADR 0066). Those two keys and
+ * the two controls that pair with them are the whole of how an edit ends —
+ * nothing a pointer does elsewhere on the canvas decides for the author what
+ * happens to their draft. It is the one place this surface departs from the
+ * Card's title editor, which does complete on blur: a title is one refusable
+ * line and a body is a document, and losing a document to a stray click is not
+ * a cost worth paying for the convenience of not saying so.
  *
  * Those same two exits are published to the surrounding Card through
  * `CardContentEdit`, which draws them on its rail in place of the control that
