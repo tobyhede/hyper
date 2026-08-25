@@ -77,91 +77,18 @@
    existing review story. The compact shell and rail stay unchanged; expansion
    adds hierarchy inside the Card rather than inventing a second surface. */
 
-.proto-canvas--sectioned .canvas-card[data-expanded='true'] {
-  --proto-markdown-content-gap: 8px;
-  --proto-markdown-gutter-width: 29px;
+/* What the prototype adds to the Expanded Card, and nothing the Card already
+   owns.
 
-  gap: 0;
-}
-
-/* Expansion leaves the shared Title exactly where the compact Card draws it.
-   The Markdown surface owns its own gutter; applying that gutter to the Title
-   would shift the Title on open. */
-.proto-canvas--sectioned .canvas-card[data-expanded='true'] .canvas-card__body {
-  border-bottom: 0;
-}
+   `markdown-card-body.css` owns the body's inset, gutter, edit target, shortcut
+   hint and every `--markdown-source-*` the editor reads. This file used to
+   restate all of it under `.proto-canvas--sectioned`, at higher specificity —
+   which meant the story silently drew a frozen copy of the component rather than
+   the component, and a change to the real thing did not show up on the surface
+   the change was being reviewed on. That is the opposite of what this story is
+   for (its own doc comment: "This is the application's canvas, not a drawing of
+   it"), so the duplicates are gone. */
 
 .proto-canvas--sectioned .canvas-card[data-expanded='true'] .canvas-card__content {
-  position: relative;
   min-height: 0;
-}
-
-.proto-canvas--sectioned .markdown-card-body__rendered {
-  padding: 18px 22px 22px
-    calc(var(--proto-markdown-gutter-width) + var(--proto-markdown-content-gap));
-  font-size: 15px;
-  line-height: 1.55;
-}
-
-.proto-canvas--sectioned .markdown-card-body__edit-control {
-  inset: 0;
-  z-index: 2;
-  display: flex;
-  align-items: flex-start;
-  justify-content: flex-end;
-  width: 100%;
-  height: 100%;
-  padding: 6px 8px;
-  border: 0;
-  border-radius: 0;
-  color: var(--canvas-card-muted-color);
-  background: transparent;
-  cursor: default;
-}
-
-.proto-canvas--sectioned .markdown-card-body__edit-control:hover {
-  border-color: transparent;
-  color: var(--canvas-card-muted-color);
-  background: color-mix(in srgb, var(--canvas-card-graph) 4%, transparent);
-}
-
-.proto-canvas--sectioned .markdown-card-body__shortcut-hint {
-  position: absolute;
-  inset-block-start: 0;
-  inset-inline-end: 8px;
-  z-index: 2;
-  display: flex;
-  align-items: center;
-  height: 34px;
-  color: var(--canvas-card-muted-color);
-  font:
-    10px/14px ui-monospace,
-    SFMono-Regular,
-    Menlo,
-    monospace;
-  letter-spacing: 0.02em;
-  opacity: 0;
-  pointer-events: none;
-}
-
-.proto-canvas--sectioned
-  .markdown-card-body--editing:focus-within
-  .markdown-card-body__shortcut-hint {
-  opacity: 0.52;
-}
-
-.proto-canvas--sectioned .markdown-card-body--editing {
-  --markdown-source-content-inset: var(--proto-markdown-content-gap);
-  --markdown-source-content-padding-top: 18px;
-  --markdown-source-focus-outline: none;
-  --markdown-source-gutter-padding: 0 6px 0 4px;
-  --markdown-source-gutter-rule-color: color-mix(
-    in srgb,
-    var(--canvas-card-muted-color) 28%,
-    transparent
-  );
-  --markdown-source-gutter-width: var(--proto-markdown-gutter-width);
-  --markdown-source-line-number-font-size: 12px;
-
-  padding-top: 0;
 }

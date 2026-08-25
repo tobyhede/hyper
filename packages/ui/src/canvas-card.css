@@ -41,7 +41,12 @@
    adapter's, but the coupling is a CSS selector string, not an import — no
    React Flow reaches this package, and this rule degrades to plain `:hover`
    wherever no such sibling exists (every Ladle story in this file). */
-.canvas-card:is(:hover, :has(~ .rf-card-node__authoring-handle:hover), :not([data-state='rest'])) {
+.canvas-card:is(
+  :hover,
+  :has(~ .rf-card-node__authoring-handle:hover),
+  :not([data-state='rest']),
+  [data-content-editing='true']
+) {
   background: var(--canvas-card-active-face);
 }
 
@@ -68,10 +73,19 @@
    Card on the canvas is quiet, and reveals its rail with itself. That is this
    Card's state, not the rail's, so the resting case is written here as the
    negation of the same "not resting" set the face and the glyph use — a Card at
-   rest that no pointer is over, and that no authoring handle of its own is
-   under. Everything else, selection and dragging included, leaves the rail as
-   `CardRail` draws it. */
-.canvas-card[data-state='rest']:not(:hover):not(:has(~ .rf-card-node__authoring-handle:hover))
+   rest that no pointer is over, that no authoring handle of its own is under,
+   **and that is not running an edit**. Everything else, selection and dragging
+   included, leaves the rail as `CardRail` draws it.
+
+   A running edit belongs in that set because it outlives every other reason the
+   rail is up. The caret is in the body, so no hover, selection or focus of the
+   rail's own is true — and a blur ends nothing (ADR 0066), so deselecting a Card
+   mid-edit used to quiet the band and the glyph while leaving Save, Cancel and
+   Close lit on top of nothing. The exits stay visible because the ADR says they
+   do; this is what stops them being the only thing left. */
+.canvas-card[data-state='rest']:not(:hover):not(:has(~ .rf-card-node__authoring-handle:hover)):not(
+    [data-content-editing='true']
+  )
   .card-rail {
   background: transparent;
 }
@@ -80,7 +94,9 @@
   color: var(--canvas-card-ink);
 }
 
-.canvas-card[data-state='rest']:not(:hover):not(:has(~ .rf-card-node__authoring-handle:hover))
+.canvas-card[data-state='rest']:not(:hover):not(:has(~ .rf-card-node__authoring-handle:hover)):not(
+    [data-content-editing='true']
+  )
   .card-rail__kind {
   opacity: 0.28;
 }
@@ -94,7 +110,12 @@
   transition: opacity 100ms ease;
 }
 
-.canvas-card:is(:hover, :has(~ .rf-card-node__authoring-handle:hover), [data-state='selected'])
+.canvas-card:is(
+    :hover,
+    :has(~ .rf-card-node__authoring-handle:hover),
+    [data-state='selected'],
+    [data-content-editing='true']
+  )
   .canvas-card__actions,
 .canvas-card__actions:focus-within {
   opacity: 1;
@@ -146,15 +167,6 @@
 .canvas-card .card__rail-action:focus-visible {
   outline: 2px solid var(--canvas-card-ink);
   outline-offset: 2px;
-}
-
-/* An edit is not a hover. The rail hides its actions at rest and reveals them
-   with the Card, but the way out of a running edit has to be visible the whole
-   time it is running — the caret is in the body, not on the rail, so no pointer
-   or focus state of the rail's own is true while the author writes. */
-.canvas-card[data-content-editing='true'] .canvas-card__actions {
-  opacity: 1;
-  pointer-events: auto;
 }
 
 .canvas-card__body {

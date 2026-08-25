@@ -24,7 +24,7 @@
 
 - [ ] The exit is a small presence hook in `@project/ui` — the `AnimatePresence` pattern without the dependency: keep the children mounted for the exit duration, mark them leaving, then unmount. Do not add an animation library, and do not reach for the View Transitions API (its snapshots scale-blur a growing Card's border and title, and a named element breaks free of the ancestor clip and transform that React Flow's zoomed pane and the Card's `overflow: hidden` depend on).
 - [ ] The hook is presentation-agnostic and takes its duration from the caller. It knows nothing about Cards, expansion or React Flow.
-- [ ] A leaving body is inert: no caret, no edit affordance, no focus target. A Card closed mid-edit must not leave a live CodeMirror in a shrinking box.
+- [ ] A leaving body is inert: no caret, no edit affordance, no focus target, nothing tabbable. Note that a Card *cannot* be closed mid-edit — ADR 0064 disables Close while editing precisely so the Card cannot collapse out from under a live caret and an unresolved draft — so the leaving body is always a settled one, and this criterion is about the fade not remaining interactive rather than about rescuing a live editor.
 - [ ] Toggling faster than the duration must settle correctly — reopening during a collapse cancels the exit rather than queueing a second one.
 
 ## Evidence

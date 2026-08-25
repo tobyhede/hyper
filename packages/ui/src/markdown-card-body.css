@@ -24,6 +24,7 @@
    (ADR 0063). */
 .markdown-card-body {
   --markdown-card-content-gap: 8px;
+  --markdown-card-content-top: 10px;
   --markdown-card-gutter-width: 29px;
 
   position: relative;
@@ -40,7 +41,12 @@
 .markdown-card-body__rendered {
   flex: 1;
   min-height: 0;
-  padding: 18px 22px 22px
+  /* `--markdown-card-content-top` is the one place the body's top inset is
+     written. Read here for the rendered body and handed to the editor below as
+     its own content padding, so the two cannot drift apart and move the text
+     when a caret arrives — which is what `rendered and source modes keep one
+     content column` asserts. */
+  padding: var(--markdown-card-content-top) 22px 22px
     calc(var(--markdown-card-gutter-width) + var(--markdown-card-content-gap) + 1px);
   overflow: hidden;
   font-size: 15px;
@@ -133,7 +139,7 @@
 
 .markdown-card-body--editing {
   --markdown-source-content-inset: var(--markdown-card-content-gap);
-  --markdown-source-content-padding-top: 18px;
+  --markdown-source-content-padding-top: var(--markdown-card-content-top);
   --markdown-source-focus-outline: none;
   --markdown-source-gutter-padding: 0 6px 0 4px;
   --markdown-source-gutter-rule-color: color-mix(
@@ -167,7 +173,9 @@
   position: absolute;
   inset-block-start: 0;
   inset-inline-end: 10px;
-  height: 34px;
+  /* Sits in the band the body's own top inset opens, so tightening that inset
+     brings the hint up with the text rather than leaving it stranded. */
+  height: calc(var(--markdown-card-content-top) * 2 + 10px);
   z-index: 2;
   display: flex;
   align-items: center;

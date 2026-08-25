@@ -106,6 +106,29 @@ test('the rail replaces its Edit action with the two ends of a running edit', as
   await expect(actions).toHaveCSS('opacity', '1');
 });
 
+test('a Card running an edit is not drawn at rest, however it is left', async ({ page }) => {
+  await open(page, markdownStory);
+  const card = page.getByRole('article', { name: 'Strategies' });
+  const rail = card.locator('.card-rail');
+  const quiet = 'rgba(0, 0, 0, 0)';
+
+  await page.mouse.move(0, 0);
+  await expect(rail).toHaveCSS('background-color', quiet);
+
+  await page.getByRole('button', { name: 'Focused edit', exact: true }).click();
+  await expect(page.getByRole('textbox', { name: 'Markdown source of Strategies' })).toBeFocused();
+  // Nothing is hovering the Card, the caret is in its body rather than on its
+  // rail, and a blur ends nothing — so without this the band and the kind glyph
+  // would quiet down and leave Save, Cancel and Close lit on top of nothing.
+  await page.mouse.move(0, 0);
+  await expect(rail).not.toHaveCSS('background-color', quiet);
+  await expect(card.getByTestId('canvas-card-actions')).toHaveCSS('opacity', '1');
+
+  await card.getByRole('button', { name: 'Cancel editing Card Strategies' }).click();
+  await page.mouse.move(0, 0);
+  await expect(rail).toHaveCSS('background-color', quiet);
+});
+
 test('the two ends are the only way out, and a press on one keeps the caret', async ({ page }) => {
   await open(page, markdownStory);
   const card = page.getByRole('article', { name: 'Strategies' });
