@@ -162,6 +162,29 @@ describe('MarkdownCardBody', () => {
     expect(editor.onEnd).toHaveBeenCalledTimes(2);
   });
 
+  it('does not rebuild the editor on a commit the application accepted', async () => {
+    const editor = { onComplete: vi.fn(() => 'completed' as const), onEnd: vi.fn() };
+    render(body({ editor }));
+    const before = await source();
+
+    fireEvent.keyDown(before, { key: 'Enter', metaKey: true });
+
+    // This caller keeps the editor mounted across its own `onEnd`. A committed
+    // draft is the source it is about to hand back, so rebuilding would put the
+    // pre-save document back under a live caret.
+    expect(await source()).toBe(before);
+  });
+
+  it('rebuilds the editor on an abandon, so the caret does not return to the text just discarded', async () => {
+    const editor = { onComplete: vi.fn(), onEnd: vi.fn() };
+    render(body({ editor }));
+    const before = await source();
+
+    fireEvent.keyDown(before, { key: 'Escape' });
+
+    expect(await source()).not.toBe(before);
+  });
+
   it('keeps the draft and caret when the application retains a refused save', async () => {
     const editor = { onComplete: vi.fn(() => 'retained' as const), onEnd: vi.fn() };
     render(body({ editor }));

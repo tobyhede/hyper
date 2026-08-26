@@ -315,4 +315,12 @@
   .canvas-card__actions {
     transition: none;
   }
+
+  /* The content cross-fade reads the placement token rather than a transition
+     of its own, so it is withdrawn through the token — the same one the
+     application sets on `.graph-area`. Declared here as well so a Card mounted
+     outside that container, which every story is, honours the preference. */
+  .canvas-card {
+    --card-placement-duration: 1ms;
+  }
 }

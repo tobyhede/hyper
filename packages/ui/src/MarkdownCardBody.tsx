@@ -183,7 +183,6 @@ export function MarkdownCardBody({
 
   const leave = (commit: boolean): void => {
     if (editor === undefined) return;
-    if (commit && editor.onComplete(draft) === 'retained') return;
     // A committed draft *is* the source the caller is about to hand back, so the
     // document already agrees with it and there is nothing to rebuild.
     //
@@ -193,7 +192,13 @@ export function MarkdownCardBody({
     // thing this is here to prevent. Both are needed because a caller may keep
     // the editor mounted across its own `onEnd`; a caller that withdraws it
     // synchronously never sees either.
-    else {
+    //
+    // The two arms are separate rather than one condition and an `else`: a
+    // refused commit leaves without ending, and an accepted one must not fall
+    // into the rebuild the sentence above says it has no use for.
+    if (commit) {
+      if (editor.onComplete(draft) === 'retained') return;
+    } else {
       setDraft(source);
       setGeneration((current) => current + 1);
     }
