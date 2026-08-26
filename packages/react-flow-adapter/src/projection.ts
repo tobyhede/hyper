@@ -156,14 +156,13 @@ export type CardNodeData = {
    *  target's body. Absent otherwise — content is not embedded in every node
    *  (ADR 0006), which is the constraint that made this per-card.
    *
-   *  **An Expanded Card does not carry one yet.** ADR 0064 narrows ADR 0006
-   *  rather than lifting it — an Expanded Card should carry its source because
-   *  the author asked for that one, not because every Card does — but nothing
-   *  tells this projection which Cards the Layout Expanded, so there is no
-   *  `expanded` to read here. Wiring that is issue 02's, and it has to supply
-   *  `body` in the same change: `CardNode` reads `data.body ?? ''`, so an
-   *  Expanded Card left out of this would draw an empty document over a working
-   *  editor rather than fail. */
+   *  **An Expanded Card carries one too.** ADR 0064 narrows ADR 0006 rather
+   *  than lifting it — an Expanded Card carries its source because the author
+   *  asked for that one, not because every Card does. `expandedCardIds` is what
+   *  tells this projection which Cards the Layout Expanded, and `body` is
+   *  resolved for them in the same pass: `CardNode` reads `data.body ?? ''`, so
+   *  a Card resolved into one set and not the other would draw an empty
+   *  document over a working editor rather than fail. */
   body?: string;
   /** The graph being emphasised, if any. Drives handle dimming. */
   activeGraphId: GraphId | null;

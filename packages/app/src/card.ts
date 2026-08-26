@@ -31,8 +31,6 @@
 import type { CSSProperties } from 'react';
 import { COLLAPSED_CARD_SIZE } from '@project/core';
 
-export const CARD_ASPECT_RATIO = 16 / 9;
-
 export const CARD_WIDTH = COLLAPSED_CARD_SIZE.width;
 export const CARD_HEIGHT = COLLAPSED_CARD_SIZE.height;
 

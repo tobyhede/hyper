@@ -248,7 +248,12 @@ export function CardNode({ data, selected, dragging, isConnectable }: NodeProps<
       data-connection-seeking={seeking ?? 'none'}
       // The wrapper React Flow sizes from `node.width`/`node.height` is this
       // element's parent, so an Expanded Card only reaches its own rect if this
-      // one stops declaring the collapsed constant. Read by `styles.css`.
+      // one stops declaring the collapsed constant — which `styles.css` does
+      // unconditionally rather than under this attribute, because keying
+      // geometry on the flag is exactly the discontinuity that makes a close
+      // snap. **No stylesheet reads this**, deliberately: it publishes authored
+      // open state for tests and assistive technology, and geometry is never
+      // allowed to depend on it.
       data-expanded={open}
     >
       {/*
