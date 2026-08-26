@@ -29,7 +29,8 @@ const SPECIALIST_IMPORTS = [
 ] as const;
 
 const MARKDOWN_SOURCE_EDITOR_SPECIFIER = /(?:^|\/)MarkdownSourceEditor$/;
-const STATIC_IMPORT = /^[ \t]*import(?:[ \t]+([^;\n]*?)[ \t]+from)?[ \t]*['"]([^'"]+)['"]/gm;
+const STATIC_IMPORT =
+  /^[ \t]*import(?:[ \t\r\n]+([^;'"\n]*(?:\n[^;'"\n]*)*?)[ \t\r\n]+from)?[ \t\r\n]*['"]([^'"]+)['"]/gm;
 const DYNAMIC_IMPORT = /import\(\s*['"]([^'"]+)['"]\s*\)/g;
 
 /**
@@ -79,6 +80,16 @@ describe('CodeMirror stays behind its wrapper', () => {
     expect(
       hasStaticEditorValueImport(
         "import { type MarkdownSourceEditorHandle } from '../MarkdownSourceEditor';",
+      ),
+    ).toBe(false);
+    expect(
+      hasStaticEditorValueImport(
+        "import {\n  MarkdownSourceEditor,\n} from '../MarkdownSourceEditor';",
+      ),
+    ).toBe(true);
+    expect(
+      hasStaticEditorValueImport(
+        "import {\n  type MarkdownSourceEditorHandle,\n} from '../MarkdownSourceEditor';",
       ),
     ).toBe(false);
   });

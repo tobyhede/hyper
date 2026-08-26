@@ -291,6 +291,17 @@ describe('Edit Card', () => {
 });
 
 describe('Expanded Card geometry', () => {
+  it('refuses Opening from an Algorithmic View before converting it', () => {
+    const { authoring, session } = openAutomatic();
+    const before = session.getState().working;
+
+    expect(authoring.complete({ kind: 'opened-card', cardId: CARD_A })).toEqual({
+      kind: 'refused',
+      refusal: { code: 'layout-required', operation: 'opened-card' },
+    });
+    expect(session.getState().working).toBe(before);
+  });
+
   it('refuses a stale resize completion for a Card that is no longer Expanded', () => {
     const { authoring, session } = openPositioned();
     const before = session.getState().working;

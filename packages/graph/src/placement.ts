@@ -208,7 +208,7 @@ function next(
  * Convert one point from drawn canvas coordinates back to Layout authorship.
  *
  * Each Expanded Card creates a step after its authored origin. In drawn space
- * that step ends after the accumulated growth before it, so walking origins in
+ * that step ends after the accumulated growth before it, so iterating origins in
  * order identifies exactly the growth already present in a reachable drawn
  * coordinate. `movingCardId` excludes the Card being moved: a Card never
  * displaces itself, even when it is Expanded.

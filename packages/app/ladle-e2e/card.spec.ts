@@ -155,9 +155,22 @@ test(
     await open.press('Enter');
     await expect(page.getByText('Strategies is open.')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Close Card Strategies' })).toBeVisible();
-    expect(await titleTreatment()).toEqual(closedTitleTreatment);
+    await expect.poll(() => titleTreatment()).toEqual(closedTitleTreatment);
   },
 );
+
+test('reduced motion removes Card content and rail-action transitions', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.goto('/?story=components--card--open-and-close&mode=preview');
+
+  const card = page.getByRole('region', { name: 'Long Markdown Card' }).getByRole('article');
+  const content = card.locator('.canvas-card__content');
+  const action = card.getByRole('button', { name: 'Close Card Long Markdown' });
+
+  await expect(content).toHaveCSS('transition-duration', '0s');
+  await expect(content).toHaveCSS('transition-delay', '0s');
+  await expect(action).toHaveCSS('transition-duration', '0s');
+});
 
 test(
   "the Card's Title control begins editing by pointer or keyboard, stays field-local on a refusal, and completes or cancels from the keyboard",

@@ -79,6 +79,7 @@ test(
   },
   async ({ page }) => {
     await page.goto('/');
+    await selectCanvas(page, 'Collection 1');
 
     const alias = nodeByTitle(page, 'A′').first();
     await expect(alias.getByRole('img', { name: 'Alias' })).toBeVisible();
@@ -294,6 +295,7 @@ test('a card shows its title in the graph, and opens to show rendered Markdown',
   page,
 }) => {
   await page.goto('/');
+  await selectCanvas(page, 'Collection 1');
   await expect(page.locator('.react-flow__node').first()).toBeVisible();
 
   // The graph draws the title, never the card's body (ADR 0051). "entry point"
@@ -313,6 +315,7 @@ test('a card shows its title in the graph, and opens to show rendered Markdown',
 
 test('the Close action closes an opened card', async ({ page }) => {
   await page.goto('/');
+  await selectCanvas(page, 'Collection 1');
   const card = nodeByTitle(page, 'A').first();
   await openCard(card, 'A');
   await expect(card.locator('.canvas-card__content')).toHaveAttribute('data-presence', 'present');
@@ -324,15 +327,14 @@ test('the Close action closes an opened card', async ({ page }) => {
   await expect(card.getByRole('button', { name: 'Open Card A' })).toBeVisible();
 });
 
-test('a card can be opened even when it is not on the selected graph', async ({ page }) => {
+test('a card outside the selected Layout cannot be opened', async ({ page }) => {
   await page.goto('/');
-
-  // "E" is in the Echo collection; select Long (band 1), then open E anyway.
-  await activateGraph(page, 'Long');
+  await selectCanvas(page, 'Collection 1');
 
   const card = nodeByTitle(page, 'E');
   await openCard(card, 'E');
-  await expect(card).toContainText('Echo collection');
+  await expect(card).not.toContainText('Echo collection');
+  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '0');
 });
 
 test('cards are drawn at exactly the size the layout placed them at', async ({ page }) => {

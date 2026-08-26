@@ -421,6 +421,18 @@ describe('withdrawing canvas authoring from an Expanded Card', () => {
     expect(bodyEditingChanged).toHaveBeenLastCalledWith(true);
   });
 
+  it.each(['Enter', ' '])('does not Open a Card with %s while its body is being edited', (key) => {
+    const expanded = cardNode('A', CARD_ID, true);
+    expanded.data.expanded = true;
+    expanded.data.body = '# A';
+    const { openCard } = mountGraph([expanded]);
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Markdown source of A' }));
+
+    fireEvent.keyDown(nodeOf(CARD_ID), { key });
+
+    expect(openCard).not.toHaveBeenCalled();
+  });
+
   it('does not let another edit or Card creation replace a live body caret', () => {
     const a = cardNode('A');
     a.data.expanded = true;

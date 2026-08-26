@@ -1,5 +1,6 @@
 /* v8 ignore next -- V8 attributes ESM module initialization to this import as a function. */
 import { z } from 'zod';
+import { COLLAPSED_CARD_SIZE } from './card-geometry';
 
 /**
  * Zod schemas for the space file (`space.json`).
@@ -137,7 +138,12 @@ export const layoutPositionSchema = z.object({
 
 /** What a Layout stores for one Card: its origin and, when Expanded, its authored size. */
 export const cardPlacementSchema = layoutPositionSchema.extend({
-  expanded: z.object({ width: z.number().positive(), height: z.number().positive() }).optional(),
+  expanded: z
+    .object({
+      width: z.number().min(COLLAPSED_CARD_SIZE.width),
+      height: z.number().min(COLLAPSED_CARD_SIZE.height),
+    })
+    .optional(),
 });
 
 /**

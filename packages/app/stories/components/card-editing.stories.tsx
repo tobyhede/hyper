@@ -20,6 +20,19 @@ function TitleEditingCard({ initiallyOpen }: { readonly initiallyOpen: boolean }
     return 'completed' as const;
   };
   const group = useRef<HTMLDivElement>(null);
+  const front: CanvasCardFront = open
+    ? {
+        kind: 'markdown',
+        source: '## Open Card body',
+        open: true,
+        onOpenChange: changeOpen,
+      }
+    : {
+        kind: 'markdown',
+        source: '## Open Card body',
+        open: false,
+        onOpenChange: changeOpen,
+      };
 
   return (
     <div style={open ? openFrame : cardSizeVars}>
@@ -30,58 +43,27 @@ function TitleEditingCard({ initiallyOpen }: { readonly initiallyOpen: boolean }
         ref={group}
         data-testid="card-group"
       >
-        {editing ? (
-          <CanvasCard
-            front={
-              open
-                ? {
-                    kind: 'markdown',
-                    source: '## Open Card body',
-                    open: true,
-                    onOpenChange: changeOpen,
-                  }
-                : {
-                    kind: 'markdown',
-                    source: '## Open Card body',
-                    open: false,
-                    onOpenChange: changeOpen,
-                  }
-            }
-            state="editing"
-            title={title}
-            graphColor="#ffc53d"
-            onCompleteTitleEdit={(draft) => {
-              if (draft.trim().length === 0) return 'A Card title is required.';
-              setTitle(draft);
-              setEditing(false);
-              return null;
-            }}
-            onCancelTitleEdit={() => setEditing(false)}
-            onReturnFocus={() => group.current?.focus()}
-          />
-        ) : (
-          <CanvasCard
-            front={
-              open
-                ? {
-                    kind: 'markdown',
-                    source: '## Open Card body',
-                    open: true,
-                    onOpenChange: changeOpen,
-                  }
-                : {
-                    kind: 'markdown',
-                    source: '## Open Card body',
-                    open: false,
-                    onOpenChange: changeOpen,
-                  }
-            }
-            state="rest"
-            title={title}
-            graphColor="#ffc53d"
-            onBeginTitleEdit={() => setEditing(true)}
-          />
-        )}
+        <CanvasCard
+          front={front}
+          title={title}
+          graphColor="#ffc53d"
+          {...(editing
+            ? {
+                state: 'editing' as const,
+                onCompleteTitleEdit: (draft: string) => {
+                  if (draft.trim().length === 0) return 'A Card title is required.';
+                  setTitle(draft);
+                  setEditing(false);
+                  return null;
+                },
+                onCancelTitleEdit: () => setEditing(false),
+                onReturnFocus: () => group.current?.focus(),
+              }
+            : {
+                state: 'rest' as const,
+                onBeginTitleEdit: () => setEditing(true),
+              })}
+        />
       </div>
     </div>
   );

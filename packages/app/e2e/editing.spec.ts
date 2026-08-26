@@ -272,6 +272,7 @@ test('a click selects a Card, and no pointer gesture on its body opens it', asyn
 
 test('the Card affordance opens rendered Markdown and edits it in place', async ({ page }) => {
   await page.goto('/');
+  await selectCanvas(page, 'Collection 1');
   const card = nodeByTitle(page, 'A').first();
   await expect(card).toBeVisible();
   await settled(page);
@@ -295,6 +296,7 @@ test(
   { tag: '@parity:open-markdown-card-owns-its-editing-lifecycle' },
   async ({ page }) => {
     await page.goto('/');
+    await selectCanvas(page, 'Collection 1');
     const cardA = nodeByTitle(page, 'A').first();
     await settled(page);
     await openCard(cardA, 'A');
@@ -367,6 +369,7 @@ test(
  */
 test('the rail Cancel discards edited source', async ({ page }) => {
   await page.goto('/');
+  await selectCanvas(page, 'Collection 1');
   const cardA = nodeByTitle(page, 'A').first();
   await settled(page);
 
@@ -391,6 +394,7 @@ test('the Markdown editor code loads only when a Markdown Card opens', async ({ 
   });
 
   await page.goto('/');
+  await selectCanvas(page, 'Collection 1');
   const card = nodeByTitle(page, 'A').first();
   await expect(card).toBeVisible();
   await settled(page);
@@ -424,6 +428,7 @@ test('the opened Card draws Markdown and its editor on the same paper surface', 
   page,
 }) => {
   await page.goto('/');
+  await selectCanvas(page, 'Collection 1');
   const card = nodeByTitle(page, 'A').first();
   await expect(card).toBeVisible();
   await settled(page);
@@ -449,6 +454,7 @@ test('opened Markdown editing persists source while expansion displaces and rest
   page,
 }) => {
   await page.goto('/');
+  await selectCanvas(page, 'Collection 1');
   const card = nodeByTitle(page, 'A').first();
   await expect(card).toBeVisible();
   await settled(page);
@@ -617,7 +623,7 @@ test(
   },
 );
 
-test('opening from Flow converts once and keeps the computed Card positions', async ({ page }) => {
+test('opening from Flow is refused without converting or moving Cards', async ({ page }) => {
   await page.goto('/');
   const card = nodeByTitle(page, 'A').first();
   await expect(card).toBeVisible();
@@ -629,12 +635,11 @@ test('opening from Flow converts once and keeps the computed Card positions', as
 
   await openCard(card, 'A');
 
-  await expect(canvasKind(page)).toHaveText('Authored layout');
-  await expect(selectedCanvas(page)).toContainText('Layout 1');
-  await expect(persistence).toHaveAttribute('data-revision', '1');
-  await expect(persistence).toHaveText('Persisted');
-  expect(await allPositions(page)).not.toEqual(before);
-  expect((await positionOf(card)).x).toBe(before[(await card.getAttribute('data-id')) ?? '']?.x);
+  await expect(canvasKind(page)).toHaveText('Computed view');
+  await expect(selectedCanvas(page)).toContainText('Flow');
+  await expect(persistence).toHaveAttribute('data-revision', '0');
+  expect(await allPositions(page)).toEqual(before);
+  await expect(card).not.toContainText('entry point');
 });
 
 test(
@@ -2124,7 +2129,11 @@ test('an Alias is renamed in the editor its creation leaves open', async ({ page
   const title = page.getByRole('textbox', { name: 'Title' });
   await expect(title).toHaveValue('B');
   // The reopened editor opens on its Target picker, not the title it just left.
-  await expect(page.getByRole('combobox', { name: 'Target' })).toBeFocused();
+  const target = page.getByRole('combobox', { name: 'Target' });
+  await expect(target).toBeFocused();
+  const targetFrame = target.locator('xpath=ancestor::*[@data-slot="input-group"]');
+  await expect(targetFrame).toHaveCSS('outline-style', 'solid');
+  await expect(targetFrame).toHaveCSS('outline-offset', '2px');
   await title.fill('Recap');
   await page.getByRole('button', { name: 'Done' }).click();
 

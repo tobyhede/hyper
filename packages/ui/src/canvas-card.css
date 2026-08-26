@@ -312,8 +312,14 @@
 
 @media (prefers-reduced-motion: reduce) {
   .canvas-card,
-  .canvas-card__actions {
+  .canvas-card__actions,
+  .canvas-card__content,
+  .canvas-card .card__rail-action {
     transition: none;
+  }
+
+  .canvas-card__content {
+    transition-delay: 0ms;
   }
 
   /* The content cross-fade reads the placement token rather than a transition

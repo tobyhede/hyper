@@ -173,6 +173,7 @@ type LayoutRequiredOperation = Extract<
   AuthoringCompletion,
   | { readonly kind: 'added-card-to-layout' }
   | { readonly kind: 'removed-card-from-layout' }
+  | { readonly kind: 'opened-card' }
   | { readonly kind: 'closed-card' }
   | { readonly kind: 'resized-card' }
   | { readonly kind: 'renamed-graph' }
@@ -449,6 +450,7 @@ const indexOfEdge = (edges: readonly GraphEdge[], edge: GraphEdge): number =>
 const LAYOUT_ONLY = new Set<LayoutRequiredOperation>([
   'added-card-to-layout',
   'removed-card-from-layout',
+  'opened-card',
   'closed-card',
   'resized-card',
   'renamed-graph',

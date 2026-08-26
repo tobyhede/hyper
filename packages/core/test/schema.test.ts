@@ -335,6 +335,35 @@ describe('space file layouts', () => {
     });
   });
 
+  it('requires an Expanded Card to be at least the Closed Card size', () => {
+    const positions = (width: number, height: number) => ({
+      '00000000-0000-4000-8000-000000000002': {
+        x: 0,
+        y: 0,
+        expanded: { width, height },
+      },
+    });
+
+    expect(
+      spaceFileSchema.safeParse({
+        ...validSpaceFile,
+        layouts: [{ ...working, positions: positions(259, 146) }],
+      }).success,
+    ).toBe(false);
+    expect(
+      spaceFileSchema.safeParse({
+        ...validSpaceFile,
+        layouts: [{ ...working, positions: positions(260, 145) }],
+      }).success,
+    ).toBe(false);
+    expect(
+      spaceFileSchema.safeParse({
+        ...validSpaceFile,
+        layouts: [{ ...working, positions: positions(260, 146) }],
+      }).success,
+    ).toBe(true);
+  });
+
   it('defaults a layout with no kind to positioned, so one can be hand-written', () => {
     const file = spaceFileSchema.parse({
       ...validSpaceFile,

@@ -35,7 +35,7 @@
 
 ## Verification
 
-- [ ] Run `pnpm verify` successfully. (Run; blocked by the pre-existing failure recorded below.)
+- [x] Run `pnpm verify` successfully.
 - [x] Run `pnpm e2e`.
 - [x] Run `pnpm e2e:ladle`.
 - [x] Report the real output of all three commands and record the final evidence under `## Answer` before resolving the ticket.
@@ -50,8 +50,8 @@ The box geometry (02), the `NodeResizer` handles, which are bound to selection r
 
 The existing stable `OpenAndClose` story exercises entering, present and leaving states from the production component's `open` prop. Ladle E2E observes the running opacity transition with `getAnimations()`, verifies the leaving body is inert, and verifies its eventual removal. The application parity test verifies the same inert leaving lifecycle through the real authored Close operation. The parity claim now states the cross-fade behavior explicitly.
 
-Final command results:
+Final command results on the PR head:
 
-- `pnpm e2e`: 112 passed.
-- `pnpm e2e:ladle`: 47 passed.
-- `pnpm verify`: failed at `test/unit/ui-import-restrictions.test.ts` after 1,708 tests passed, 8 skipped and one failed. The committed `eslint.config.js` currently includes all `@project/ui/*` imports in `APP_UI_IMPLEMENTATION_PATTERN`, while that existing test requires the deliberate app-only `@project/ui/MarkdownSourceEditor` split point to be permitted. This issue changed neither file and leaves that unrelated baseline inconsistency untouched.
+- `pnpm verify`: passed — 155 test files passed; 1,728 tests passed and 8 skipped.
+- `pnpm e2e`: passed — 112 tests passed.
+- `pnpm e2e:ladle`: passed — 48 tests passed.

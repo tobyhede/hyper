@@ -145,6 +145,19 @@ describe('Placement.next', () => {
     expect(Placement.drawn(next).get(CARD_B)).toEqual({ x: 500, y: 400 });
   });
 
+  it('clamps a rendered coordinate inside an expansion gap to its near boundary', () => {
+    const authored = Placement.fromEntries([
+      [CARD_A, { x: 10, y: 0, expanded: { width: 360, height: 196 } }],
+      [CARD_B, { x: 300, y: 0 }],
+    ]);
+    const rendered = Placement.place(Placement.drawn(authored), CARD_B, { x: 60, y: 0 });
+
+    const next = Placement.next(authored, rendered, [CARD_B]);
+
+    expect(next.get(CARD_B)).toEqual({ x: 10, y: 0 });
+    expect(Placement.drawn(next).get(CARD_B)).toEqual({ x: 10, y: 0 });
+  });
+
   it('adopts the whole rendered map when nothing is authored yet', () => {
     // An Algorithmic View authors nothing, and conversion copies every Card
     // already on screen so nothing moves at the moment it happens (ADR 0025).

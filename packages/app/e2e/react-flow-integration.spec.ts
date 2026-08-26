@@ -1,8 +1,9 @@
 import { expect, test } from './fixtures';
-import { nodeByTitle, settled } from './graph';
+import { nodeByTitle, selectCanvas, settled } from './graph';
 
 test('a focused Card opens with Enter and Space', async ({ page }) => {
   await page.goto('/');
+  await selectCanvas(page, 'Collection 1');
   const card = nodeByTitle(page, 'A').first();
   await expect(card).toBeVisible();
   await settled(page);
@@ -14,6 +15,7 @@ test('a focused Card opens with Enter and Space', async ({ page }) => {
   await page.keyboard.press('Enter');
   await expect(card).toContainText('entry point');
 
+  await card.hover();
   await card.getByRole('button', { name: 'Close Card A' }).click();
   await card.focus();
   await expect(card).toBeFocused();

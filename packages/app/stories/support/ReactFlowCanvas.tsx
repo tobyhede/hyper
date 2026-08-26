@@ -108,7 +108,6 @@ export interface CanvasCardNodeSpecimenProps {
   readonly editingTitle?: boolean;
   readonly graphColor?: string;
   readonly cardEditingEnabled?: boolean;
-  readonly onEditCard?: () => 'completed' | 'retained';
   readonly nodeSize?: { readonly width: number; readonly height: number };
   readonly expanded?: boolean;
   readonly onOpenChange?: (open: boolean) => 'completed' | 'retained';
@@ -127,7 +126,6 @@ export function CanvasCardNodeSpecimen({
   editingTitle = false,
   graphColor,
   cardEditingEnabled,
-  onEditCard = () => 'completed',
   nodeSize,
   expanded,
   onOpenChange,
@@ -146,11 +144,10 @@ export function CanvasCardNodeSpecimen({
     ...source.data,
     titleEditingEnabled: true,
     cardEditingEnabled: cardEditingEnabled ?? source.data.kind === 'markdown',
-    onEditCard,
+    onEditCard: onOpenChange ?? (() => 'completed'),
     onBeginTitleEditing: () => undefined,
   };
   if (expanded !== undefined) data.expanded = expanded;
-  if (onOpenChange !== undefined) data.onEditCard = onOpenChange;
   if (title !== undefined) data.title = title;
   if (body !== undefined) data.body = body;
   // The editor is the state, so a specimen that asks to be renaming supplies

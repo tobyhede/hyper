@@ -191,6 +191,8 @@
    system's ring rather than drawing over it. */
 .card-editor__alias-target [data-slot='input-group']:focus-within {
   border-color: var(--card-editor-ink-color);
+  outline: 2px solid var(--card-editor-ink-color);
+  outline-offset: 2px;
   box-shadow: none;
 }
 

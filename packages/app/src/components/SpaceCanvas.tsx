@@ -326,6 +326,7 @@ export function SpaceCanvas({
     (event: ReactKeyboardEvent<HTMLDivElement>) => {
       if (presenting || !(event.target instanceof Element)) return;
       if (event.key === 'Enter' || event.key === ' ') {
+        if (bodyEditing) return;
         // The same exclusion the `C` branch below makes, and now load-bearing
         // rather than defensive: an Expanded Card draws its editor *inside* the
         // node, so a Space typed into it would otherwise be cancelled here
