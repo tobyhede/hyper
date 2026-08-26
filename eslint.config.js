@@ -64,7 +64,16 @@ const UI_IMPLEMENTATION_PATTERN = {
 };
 
 const APP_UI_IMPLEMENTATION_PATTERN = {
-  group: ['@base-ui/react/*', 'cmdk/*', 'lucide-react/*', '@project/ui/*'],
+  // The one negated entry: the public Markdown editor split point stays
+  // importable from app composition (AGENTS.md, ADR 0063). The dynamic-import
+  // split itself is held by codemirror-encapsulation.test.ts, not here.
+  group: [
+    '@base-ui/react/*',
+    'cmdk/*',
+    'lucide-react/*',
+    '@project/ui/*',
+    '!@project/ui/MarkdownSourceEditor',
+  ],
   message: UI_IMPLEMENTATION_MESSAGE,
 };
 
