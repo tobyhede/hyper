@@ -1,6 +1,7 @@
 # Opening a card shows its Markdown source, not rendered content
 
-Status: accepted
+Status: superseded
+Superseded by: 0064
 Refines: 0006, 0008
 Refined by: 0037, 0063
 Related: 0024

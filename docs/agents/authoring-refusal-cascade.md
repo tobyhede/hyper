@@ -40,6 +40,9 @@ names what gate 3 does for that action.
 | `edited-card` | converts | `card-not-found` → `card-kind-immutable` → `card-title-required` → (identical to current ⇒ `unchanged`) → `alias-target-not-found` → `alias-target-must-own-content` → completed |
 | `created-card` | converts | none → completed |
 | `created-alias` | converts | `alias-target-not-found` → `alias-target-must-own-content` → completed |
+| `opened-card` | converts | `card-not-in-layout` → (already Expanded ⇒ `unchanged`) → completed |
+| `closed-card` | **layout-required** | `card-not-in-layout` → (already closed ⇒ `unchanged`) → completed |
+| `resized-card` | **layout-required** | `card-not-in-layout` → `card-not-expanded` → (same size ⇒ `unchanged`) → completed |
 | `added-card-to-layout` | **layout-required** | `card-not-found` → `card-already-in-layout` → completed |
 | `removed-card-from-layout` | **layout-required** | `card-not-in-layout` → completed |
 | `deleted-card` | converts | `card-not-found` → `card-has-aliases` → completed |
@@ -75,9 +78,9 @@ the 15 action-specific codes tabulated above — none is produced anywhere else.
 `describeAuthoringRefusal` in `authoring-refusal.ts` is the one place every
 code gets its copy, and the exhaustive placement records beside it are the one
 place each surface's field mapping lives: the domain names the code, the
-application owns the sentence. Six surfaces map it today — Markdown Card
+application owns the sentence. Five surfaces map it today — Markdown Card
 editing (`title`), Alias editing and Alias creation (`title` / `target`),
-keyboard connection (`target`), Edge endpoint editing (the attempted `from` or
-`to`, never both) and Edge deletion (form only). Every record is
+Edge endpoint editing (the attempted `from` or `to`, never both) and Edge
+deletion (form only). Every record is
 `Record<AuthoringRefusalCode, …>`, so a new code fails to compile until each
 surface has said where it goes.
