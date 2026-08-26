@@ -340,7 +340,12 @@ function CanvasHarness({
       onOpenCard={() => 'completed'}
       onCloseCard={() => 'completed'}
       onCompleteCardBody={() => 'completed'}
-      onResizeCard={() => undefined}
+      cardResize={{
+        beginResize: () => undefined,
+        previewResize: () => undefined,
+        finishResize: () => undefined,
+        cancelResize: () => undefined,
+      }}
       onCompleteCardTitle={() => null}
       editableCardIds={new Set([CARD_A, CARD_B, CARD_C])}
       graphs={currentSpace().graphs}

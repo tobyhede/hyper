@@ -1,5 +1,5 @@
-import { useRef } from 'react';
-import { Handle, NodeResizer, Position, useConnection, type NodeProps } from '@xyflow/react';
+import { useEffect, useRef, useState } from 'react';
+import { Handle, NodeResizeControl, Position, useConnection, type NodeProps } from '@xyflow/react';
 import { CanvasCard, CardContent, type CanvasCardFront, type CanvasCardProps } from '@project/ui';
 import type { CardFlowNode, CardHandle } from './projection';
 import { AUTHORING_HANDLE_DIAMETER, GRAPH_PORT_DIAMETER } from './authoring-handle';
@@ -50,24 +50,6 @@ type AliasFront = Mutable<Extract<CanvasCardFront, { kind: 'alias' }>>;
  * lets an Edge completed onto this Card resolve in the render that first makes
  * it incident, before the projection catches up.
  */
-/**
- * Whether a resize drag in this direction leaves the Card's top-left where the
- * author placed it.
- *
- * `CardNodeData.resize.onResize` answers a size and no origin, which is what
- * keeps a resize out of the family of gestures that must go back through the
- * authored placement. React Flow's eight controls do not all respect that: a
- * top or left drag moves the node's top-left in React Flow's own store, and the
- * composition hears only the new size — so the authored origin stays where it
- * was and the next projection publish snaps the Card back under the author's
- * pointer. Refusing those drags is what makes a reported size sufficient.
- *
- * React Flow reports direction as `[x, y]`, where `-1` is the leading edge
- * moving. If a resize is ever allowed to move the top-left, this goes and
- * `onResize` reports an origin (`projection.ts`).
- */
-export const growsFromOrigin = (direction: readonly number[]): boolean =>
-  direction[0] !== -1 && direction[1] !== -1;
 
 export function CardNode({ data, selected, dragging, isConnectable }: NodeProps<CardFlowNode>) {
   /**
@@ -232,7 +214,50 @@ export function CardNode({ data, selected, dragging, isConnectable }: NodeProps<
    * live editor as one front rather than receiving body markup from this adapter.
    */
   const resize = data.resize;
-  const open = data.expanded === true && data.kind === 'markdown';
+  const resizeOperation = useRef(resize);
+  useEffect(() => {
+    resizeOperation.current = resize;
+  }, [resize]);
+  const resizing = useRef(false);
+  const [resizeActive, setResizeActive] = useState(false);
+  /*
+   * Narrow interactive deviation for cancellation the specialist control does
+   * not expose:
+   * - Existing Hyper component considered: the existing CardNode composition.
+   * - shadcn/Base UI component considered: none owns graph-node resizing.
+   * - Product requirement that cannot be expressed: pointer cancellation,
+   *   window focus loss and unmount must discard the whole canvas draft.
+   * - Why composition or a variant is insufficient: NodeResizeControl exposes
+   *   start/change/end only, with no cancellation callback.
+   * - Custom behavior being introduced: translate those three loss signals to
+   *   the resize capability's one cancellation operation.
+   * - Tests proving the deviation: render-adapter cancellation and replacement
+   *   tests, plus the application browser's pointer-cancellation assertion.
+   */
+  useEffect(() => {
+    const finish = () => {
+      if (!resizing.current) return;
+      resizing.current = false;
+      setResizeActive(false);
+      resizeOperation.current?.onResizeEnd();
+    };
+    const cancel = () => {
+      if (!resizing.current) return;
+      resizing.current = false;
+      setResizeActive(false);
+      resizeOperation.current?.onResizeCancel();
+    };
+    window.addEventListener('pointerup', finish);
+    window.addEventListener('pointercancel', cancel);
+    window.addEventListener('blur', cancel);
+    return () => {
+      window.removeEventListener('pointerup', finish);
+      window.removeEventListener('pointercancel', cancel);
+      window.removeEventListener('blur', cancel);
+      cancel();
+    };
+  }, []);
+  const expanded = data.expanded === true;
 
   const onReturnFocus = () => {
     inner.current?.closest<HTMLElement>('.react-flow__node')?.focus();
@@ -246,6 +271,7 @@ export function CardNode({ data, selected, dragging, isConnectable }: NodeProps<
       data-selected={visuallySelected}
       data-connection-in-progress={connectionInProgress}
       data-connection-seeking={seeking ?? 'none'}
+      data-resizing={resizeActive}
       // The wrapper React Flow sizes from `node.width`/`node.height` is this
       // element's parent, so an Expanded Card only reaches its own rect if this
       // one stops declaring the collapsed constant — which `styles.css` does
@@ -254,12 +280,13 @@ export function CardNode({ data, selected, dragging, isConnectable }: NodeProps<
       // snap. **No stylesheet reads this**, deliberately: it publishes authored
       // open state for tests and assistive technology, and geometry is never
       // allowed to depend on it.
-      data-expanded={open}
+      data-expanded={expanded}
     >
       {/*
-        React Flow's own resizer, on an Expanded Card the author has selected.
-        An Expanded Card is whatever box the author drew — there is no ratio on
-        it, because the collapsed Card is what keeps the silhouette that predicts
+        React Flow's own bottom-right resize control, revealed on an Expanded Card
+        by hover, Selection or focus rather than drawn only once selected. An
+        Expanded Card is whatever box the author drew — there is no ratio on it,
+        because the closed Card is what keeps the silhouette that predicts
         what an audience sees (ADR 0064).
 
         Rendered *before* the Card, which is not cosmetic: `canvas-card.css`
@@ -269,18 +296,28 @@ export function CardNode({ data, selected, dragging, isConnectable }: NodeProps<
         those handles would be invisible to that rule; anything before the Card
         is harmless to it.
       */}
-      {open && resize !== undefined && (
-        <NodeResizer
-          isVisible={visuallySelected}
+      {expanded && resize !== undefined && (
+        <NodeResizeControl
+          position="bottom-right"
           minWidth={resize.minWidth}
           minHeight={resize.minHeight}
-          lineClassName="rf-card-node__resize-line"
-          handleClassName="rf-card-node__resize-handle"
-          shouldResize={(_event, params) => growsFromOrigin(params.direction)}
-          onResizeEnd={(_event, next) =>
-            resize.onResize({ width: next.width, height: next.height })
-          }
-        />
+          className="rf-card-node__resize-control"
+          onResizeStart={() => {
+            resizing.current = true;
+            setResizeActive(true);
+            resize.onResizeStart();
+          }}
+          // React Flow otherwise applies this Card's dimensions immediately
+          // after calling the proposal callback. Returning false keeps that
+          // node-only change out: the render adapter projects the proposed
+          // Placement and publishes Card, neighbours, handles and Edges once.
+          shouldResize={(_event, next) => {
+            resize.onResize({ width: next.width, height: next.height });
+            return false;
+          }}
+        >
+          <span className="rf-card-node__resize-mark" aria-hidden="true" />
+        </NodeResizeControl>
       )}
       {data.targetHandles.map((handle) => renderHandle(handle, 'target'))}
       {data.showContent ? (

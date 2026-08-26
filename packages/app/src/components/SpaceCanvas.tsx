@@ -25,7 +25,7 @@ import { activeGraphColor } from '../colors';
 import { CARD_SIZE } from '../card';
 import { useEdgeAuthoring } from '../edge-authoring-react';
 import type { EdgeAuthoring } from '../edge-authoring';
-import type { CanvasSelection, EdgeSubject } from '../render-adapter';
+import type { CanvasSelection, CardResize, EdgeSubject } from '../render-adapter';
 import { MAX_ZOOM, OVERVIEW_FIT } from '../camera';
 import { OverviewCamera, PresentingCamera } from './cameras';
 
@@ -137,7 +137,6 @@ export interface SpaceCanvasProps {
   onOpenCard: (cardId: string) => 'completed' | 'retained';
   onCloseCard: (cardId: CardId) => 'completed' | 'retained';
   onCompleteCardBody: (cardId: CardId, body: string) => 'completed' | 'retained';
-  onResizeCard: (cardId: CardId, size: { width: number; height: number }) => void;
   /**
    * Whether a content edit is running, for the one control outside this canvas
    * that has to know: Present.
@@ -148,6 +147,7 @@ export interface SpaceCanvasProps {
    * one bit a sibling surface needs to stay out of the way.
    */
   onBodyEditingChange?: (editing: boolean) => void;
+  cardResize: CardResize;
   /** Complete one locally validated title draft, or return its field error. */
   onCompleteCardTitle: (cardId: string, title: string) => string | null;
   /** Which Cards may be opened for editing — every Card of the Space (ADR 0049). */
@@ -180,7 +180,7 @@ export function SpaceCanvas({
   onCloseCard,
   onBodyEditingChange,
   onCompleteCardBody,
-  onResizeCard,
+  cardResize,
   onCompleteCardTitle,
   editableCardIds,
   graphs,
@@ -432,20 +432,29 @@ export function SpaceCanvas({
               openObserved: node.data.expanded === true,
             });
         }
-        if (node.data.expanded === true && node.data.kind === 'markdown') {
-          if (canAuthorOnCanvas) {
-            data.resize = {
-              minWidth: CARD_SIZE.width,
-              minHeight: CARD_SIZE.height,
-              onResize: (size) => onResizeCard(node.data.cardId, size),
-            };
-          }
-          if (bodyEditorCardId === node.id) {
-            data.bodyEditor = {
-              onComplete: (body) => onCompleteCardBody(node.data.cardId, body),
-              onEnd: () => setCaret(null),
-            };
-          }
+        // Resize belongs to Card and follows authored Expanded state; the body
+        // editor belongs separately to the Markdown kind (ADR 0064).
+        if (node.data.expanded === true && canAuthorOnCanvas) {
+          data.resize = {
+            minWidth: CARD_SIZE.width,
+            minHeight: CARD_SIZE.height,
+            // A resize gesture begun on an unselected Card selects it, so the
+            // control that grows the box also becomes the thing Selected — one
+            // drag, not a drag followed by a separate click.
+            onResizeStart: () => {
+              onSelectCard(node.data.cardId);
+              cardResize.beginResize(node.data.cardId);
+            },
+            onResize: (size) => cardResize.previewResize(node.data.cardId, size),
+            onResizeEnd: () => cardResize.finishResize(node.data.cardId),
+            onResizeCancel: () => cardResize.cancelResize(node.data.cardId),
+          };
+        }
+        if (node.data.kind === 'markdown' && bodyEditorCardId === node.id) {
+          data.bodyEditor = {
+            onComplete: (body) => onCompleteCardBody(node.data.cardId, body),
+            onEnd: () => setCaret(null),
+          };
         }
         // The editor is the Card being renamed, and it arrives with what ends
         // it rather than as a flag beside two callbacks that might not be there.
@@ -471,8 +480,9 @@ export function SpaceCanvas({
       onOpenCard,
       onCloseCard,
       onCompleteCardBody,
-      onResizeCard,
       bodyEditorCardId,
+      cardResize,
+      onSelectCard,
     ],
   );
 

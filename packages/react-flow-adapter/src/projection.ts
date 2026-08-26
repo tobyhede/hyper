@@ -129,16 +129,25 @@ export type CardNodeData = {
    * an adapter that hardcoded a minimum would be a second opinion about a
    * constant `app` already owns.
    *
-   * `onResize` answers a size and no origin. Displacement moves Cards and does
+   * `onResize` previews a size and no origin. Displacement moves Cards and does
    * not scale them, so a reported size needs no inversion — which is what keeps
    * this out of the family of gestures that must go back through the authored
    * placement. If a resize is ever allowed to move the Card's top-left, it joins
    * that family.
+   *
+   * The lifecycle travels as one capability: the composition supplies every
+   * operation together because a resize gesture begun on an
+   * unselected Card has to select it before there is anything for `onResize`
+   * to complete against — one control, one drag, and Selection is not a second
+   * Edit (ADR 0066).
    */
   resize?: {
     readonly minWidth: number;
     readonly minHeight: number;
+    onResizeStart: () => void;
     onResize: (size: { width: number; height: number }) => void;
+    onResizeEnd: () => void;
+    onResizeCancel: () => void;
   };
   /** For an alias, the title of the card it shows — so the node can name what it
    *  redraws. Absent on non-alias cards. */

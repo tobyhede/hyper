@@ -18,9 +18,16 @@ export const parityClaims: readonly ParityClaim[] = [
   {
     id: 'canvas-card-fills-authored-node-rect',
     storyFile: 'components/card.stories.tsx',
-    storyExport: 'NodeContainment',
+    storyExport: 'ResizeControl',
     claim:
       'The production CanvasCard fills a React Flow node whose authored rect differs from the collapsed default.',
+  },
+  {
+    id: 'open-card-offers-one-resize-control',
+    storyFile: 'components/card.stories.tsx',
+    storyExport: 'ResizeControl',
+    claim:
+      'Every Open Card exposes one bottom-right resize control revealed by hover, selection or focus, and a Closed Card exposes none.',
   },
   {
     id: 'markdown-card-opens-and-closes-in-place',

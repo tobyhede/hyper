@@ -107,21 +107,55 @@ export const Hover: Story = () => (
   </div>
 );
 
-export const NodeContainment: Story = () => (
+/** A specimen that keeps its own size in state, so a real drag on the real
+ *  production control actually grows the real node — the round trip
+ *  `SpaceCanvas` makes through Space Authoring, condensed to local state. */
+function ResizableOpenSpecimen({ selected = false }: { readonly selected?: boolean }) {
+  const [size, setSize] = useState({ width: 480, height: 360 });
+  return (
+    <CanvasCardNodeSpecimen
+      expanded
+      selected={selected}
+      nodeSize={size}
+      onResize={setSize}
+      stageClassName="inv-card-node-stage--large"
+    />
+  );
+}
+
+/**
+ * Every Open Card exposes one bottom-right resize control, revealed by hover,
+ * Selection or focus; a Closed Card exposes none (ADR 0066). Both specimens
+ * mount the real production `CardNode` through the real `nodeTypes`, so what
+ * is proved here is the shared Card control rather than a facsimile of it.
+ */
+export const ResizeControl: Story = () => (
   <div className="inv inv-sheet" style={cardSizeVars}>
     <CatalogueSection
-      title="React Flow node containment"
-      note="The production CanvasCard fills the rect React Flow declares. This specimen deliberately differs from the collapsed default so equality cannot pass by coincidence."
+      title="Resize control"
+      note="Hover, select or focus the Open Card to reveal its bottom-right control, then drag it. The Closed Card beside it offers none."
     >
       <div className="inv-row">
-        <Specimen label="340 × 210 node">
-          <CanvasCardNodeSpecimen nodeSize={{ width: 340, height: 210 }} />
+        <Specimen label="Open · resizable">
+          <section aria-label="Open Card">
+            <ResizableOpenSpecimen />
+          </section>
+        </Specimen>
+        <Specimen label="Open · Selected">
+          <section aria-label="Selected Card">
+            <ResizableOpenSpecimen selected />
+          </section>
+        </Specimen>
+        <Specimen label="Closed · no control">
+          <section aria-label="Closed Card">
+            <CanvasCardNodeSpecimen />
+          </section>
         </Specimen>
       </div>
     </CatalogueSection>
   </div>
 );
-NodeContainment.storyName = 'Node containment';
+ResizeControl.storyName = 'Resize control';
 
 /**
  * One instance wired the way `CardNode` wires the production component: real
@@ -228,7 +262,7 @@ export const OpenAndClose: Story = () => {
           onOpenChange={changeOpen}
           body={openMarkdown}
           nodeSize={open ? openFrame : closedFrame}
-          stageClassName="inv-card-node-stage--open-close"
+          stageClassName="inv-card-node-stage--large"
         />
       </section>
       <section aria-label="Long Markdown Card" className="flex flex-col gap-2">
@@ -241,7 +275,7 @@ export const OpenAndClose: Story = () => {
           title="Long Markdown"
           body={`${openMarkdown}\n\n### A deliberately long section\n\n${openMarkdown}\n\n${openMarkdown}`}
           nodeSize={longOpen ? openFrame : closedFrame}
-          stageClassName="inv-card-node-stage--open-close"
+          stageClassName="inv-card-node-stage--large"
         />
       </section>
     </div>

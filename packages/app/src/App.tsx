@@ -133,13 +133,14 @@ export const createApp = ({ spaceSession }: OpenedSpace) => {
     // uses it. `replacePlacement` keeps the map's identity when the value is
     // unchanged, so this does not defeat the memo below.
     const authoredPositions = authoring.authoredPlacement();
+    const resizeDraft = useRenderAdapter((s) => s.resizeDraft);
     const selection = useRenderAdapter((s) => s.selection);
     const selectedCardId = selectedCardOf(selection);
     const moved = useRenderAdapter((s) => s.moved);
     const placement = usePlacementRendering(
       projection.strategyGraph,
       renderer.strategy,
-      authoredPositions,
+      resizeDraft?.placement ?? authoredPositions,
     );
     const laidOut = placement.kind === 'ready' ? placement.strategyGraph : null;
 
@@ -473,12 +474,6 @@ export const createApp = ({ spaceSession }: OpenedSpace) => {
       const result = authoring.complete({ kind: 'closed-card', cardId });
       return result.kind === 'completed' || result.kind === 'unchanged' ? 'completed' : 'retained';
     }, []);
-    const resizeExpandedCard = useCallback(
-      (cardId: CardId, size: { width: number; height: number }) => {
-        authoring.complete({ kind: 'resized-card', cardId, size });
-      },
-      [],
-    );
     const completeCardBody = useCallback(
       (cardId: CardId, body: string): 'completed' | 'retained' => {
         const stored = spaceSession.getState().working.cards.find((card) => card.id === cardId);
@@ -670,7 +665,7 @@ export const createApp = ({ spaceSession }: OpenedSpace) => {
                 onBodyEditingChange={setEditingCardBody}
                 onCloseCard={closeExpandedCard}
                 onCompleteCardBody={completeCardBody}
-                onResizeCard={resizeExpandedCard}
+                cardResize={useRenderAdapter.getState()}
                 onCompleteCardTitle={completeCardTitle}
                 editableCardIds={editableCardIds}
                 graphs={projection.visibleGraphs}

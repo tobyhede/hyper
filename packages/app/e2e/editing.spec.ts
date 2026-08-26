@@ -42,6 +42,17 @@ async function quiescent(page: Page): Promise<void> {
   await page.waitForTimeout(250);
 }
 
+function sameEdgeGeometry(left: string | null, right: string | null): boolean {
+  if (left === null || right === null) return left === right;
+  const numbers = (path: string) => (path.match(/-?\d+(?:\.\d+)?/g) ?? []).map(Number);
+  const leftNumbers = numbers(left);
+  const rightNumbers = numbers(right);
+  return (
+    leftNumbers.length === rightNumbers.length &&
+    leftNumbers.every((value, index) => Math.abs(value - (rightNumbers[index] ?? Infinity)) < 0.01)
+  );
+}
+
 /**
  * A point on the pane far enough from every handle that React Flow resolves no
  * connection target — `connectionRadius` is 20 at the pinned 12.11.2, so a
@@ -690,6 +701,149 @@ test(
     }));
     expect(persistedSize).toEqual(resized);
     expect(await positionOf(persisted)).toEqual(beforePosition);
+  },
+);
+
+test(
+  'an Open Card offers one resize control, revealed on hover, that selects the Card and clears a Selected Edge without a second Edit',
+  { tag: '@parity:open-card-offers-one-resize-control' },
+  async ({ page }) => {
+    await page.goto('/');
+    await selectCanvas(page, 'Collection 1');
+    const card = nodeByTitle(page, 'A').first();
+    const closed = nodeByTitle(page, 'B').first();
+    await expect(card).toBeVisible();
+    await openCard(card, 'A');
+    const persistence = page.getByTestId('persistence-status');
+    await expect(persistence).toHaveText('Persisted');
+    const openedRevision = await persistence.getAttribute('data-revision');
+    const beforePosition = await positionOf(card);
+    // Opening grows the Card through a CSS transition, so its rect is still
+    // moving for a moment after the Edit persists. Settling it first is what
+    // makes the mid-gesture growth below evidence of the drag rather than of
+    // an animation that had not finished.
+    await card.evaluate(async (element) => {
+      await Promise.all(element.getAnimations().map((animation) => animation.finished));
+    });
+    const beforeSize = await card.evaluate((element) => ({
+      width: Number.parseFloat(getComputedStyle(element).width),
+      height: Number.parseFloat(getComputedStyle(element).height),
+    }));
+    const neighbour = nodeByTitle(page, 'B').first();
+    const beforeNeighbourPosition = await positionOf(neighbour);
+    const edgePath = page.locator('.react-flow__edge-path').first();
+    const beforeEdgePath = await edgePath.getAttribute('d');
+
+    // A Closed Card offers no control at all.
+    await expect(closed.locator('.react-flow__resize-control')).toHaveCount(0);
+
+    // The Open Card offers exactly one, at its bottom-right corner, and it is
+    // not visible until hovered — the actual reveal mechanism. `openCard` left
+    // keyboard focus on its own control, which is *also* a reveal condition
+    // (Card focus), so that focus is moved off the Card first to observe rest.
+    const control = card.locator('.react-flow__resize-control.handle.bottom.right');
+    await expect(card.locator('.react-flow__resize-control')).toHaveCount(1);
+    await page.evaluate(() => {
+      const focused = document.activeElement;
+      if (focused instanceof HTMLElement) focused.blur();
+    });
+    await page.mouse.move(0, 0);
+    await expect(control).toHaveCSS('opacity', '0');
+    await card.hover();
+    await expect(control).toHaveCSS('opacity', '1');
+
+    // Select an Edge first, and leave the Card unselected, so the gesture below
+    // is proven to move both — not merely to arrive with the Card already
+    // Selected from an earlier click.
+    await selectAnEdge(page);
+    await expect(page.locator('.react-flow__edge.selected')).toHaveCount(1);
+    await expect(page.locator('.react-flow__node.selected')).toHaveCount(0);
+
+    const box = await boxOf(control, "Card A's resize control");
+    // A hit target a hand can find. React Flow's own two-class `.handle` rule
+    // declares a 5px box and outranks a rule naming one class, so this is
+    // asserted as a size rather than inferred from the drag below succeeding:
+    // a pointer driven by test code hits 5px exactly, and a person does not.
+    expect(box.width).toBeGreaterThanOrEqual(20);
+    expect(box.height).toBeGreaterThanOrEqual(20);
+
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(box.x + box.width / 2 + 120, box.y + box.height / 2 + 80, { steps: 6 });
+    // Mid-gesture, before release: the Card is already following the pointer.
+    // Beginning a resize Selects the Card, and the selected Card is an input to
+    // the projection, so a reprojection lands mid-drag — the render adapter has
+    // to hold the live rect through it or every frame redraws the Card at the
+    // size it had before the gesture and nothing moves until release. Polled
+    // rather than sampled once: the last pointer move and the frame that paints
+    // it are not the same tick, and a single read races that.
+    await expect
+      .poll(async () =>
+        card.evaluate((element) => Number.parseFloat(getComputedStyle(element).width)),
+      )
+      .toBeGreaterThan(beforeSize.width);
+    await expect.poll(async () => positionOf(neighbour)).not.toEqual(beforeNeighbourPosition);
+    await expect.poll(async () => edgePath.getAttribute('d')).not.toBe(beforeEdgePath);
+    await expect(card.locator('.canvas-card__rail')).toHaveCSS('opacity', '0');
+    await expect(card.locator('.rf-card-node__authoring-handle--source').first()).toHaveCSS(
+      'opacity',
+      '0',
+    );
+    // Pointer movement owns only the canvas draft. Persistence sees nothing
+    // until the gesture releases.
+    await expect(persistence).toHaveAttribute('data-revision', openedRevision ?? '');
+
+    await page.mouse.up();
+
+    // One drag both Selected the Card and cleared the Selected Edge — no
+    // separate click, and Selection was never a second Edit.
+    await expect(card).toHaveClass(/selected/);
+    await expect(page.locator('.react-flow__edge.selected')).toHaveCount(0);
+    await expect(persistence).toHaveText('Persisted');
+    await expect(persistence).toHaveAttribute('data-revision', String(Number(openedRevision) + 1));
+
+    await card.evaluate(async (element) => {
+      await Promise.all(element.getAnimations().map((animation) => animation.finished));
+    });
+    const afterSize = await card.evaluate((element) => ({
+      width: Number.parseFloat(getComputedStyle(element).width),
+      height: Number.parseFloat(getComputedStyle(element).height),
+    }));
+    expect(afterSize.width).toBeGreaterThan(beforeSize.width);
+    expect(afterSize.height).toBeGreaterThan(beforeSize.height);
+    // The authored top-left origin is unchanged: only the box grew.
+    expect(await positionOf(card)).toEqual(beforePosition);
+
+    const afterNeighbourPosition = await positionOf(neighbour);
+    const afterEdgePath = await edgePath.getAttribute('d');
+    const completedRevision = await persistence.getAttribute('data-revision');
+    const secondBox = await boxOf(control, "Card A's resize control after completion");
+    await page.mouse.move(secondBox.x + secondBox.width / 2, secondBox.y + secondBox.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(
+      secondBox.x + secondBox.width / 2 + 90,
+      secondBox.y + secondBox.height / 2 + 60,
+      { steps: 4 },
+    );
+    await expect
+      .poll(async () =>
+        card.evaluate((element) => Number.parseFloat(getComputedStyle(element).width)),
+      )
+      .toBeGreaterThan(afterSize.width);
+    await page.evaluate(() => window.dispatchEvent(new PointerEvent('pointercancel')));
+    await page.mouse.up();
+
+    await expect
+      .poll(async () =>
+        card.evaluate((element) => Number.parseFloat(getComputedStyle(element).width)),
+      )
+      .toBe(afterSize.width);
+    await expect.poll(async () => positionOf(neighbour)).toEqual(afterNeighbourPosition);
+    await expect
+      .poll(async () => sameEdgeGeometry(await edgePath.getAttribute('d'), afterEdgePath))
+      .toBe(true);
+    await quiescent(page);
+    await expect(persistence).toHaveAttribute('data-revision', completedRevision ?? '');
   },
 );
 

@@ -2,7 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 
 const openCloseStory = '/?story=components--card--open-and-close&mode=preview';
 const markdownStory = '/?story=components--card--editing--markdown&mode=preview';
-const containmentStory = '/?story=components--card--node-containment&mode=preview';
+const resizeControlStory = '/?story=components--card--resize-control&mode=preview';
 
 const open = async (page: Page, story: string): Promise<void> => {
   await page.goto(story);
@@ -162,8 +162,9 @@ test(
   'the Card fills a React Flow node whose rect differs from the collapsed default',
   { tag: '@parity:canvas-card-fills-authored-node-rect' },
   async ({ page }) => {
-    await page.goto(containmentStory);
-    const node = page.locator('.react-flow__node').first();
+    await page.goto(resizeControlStory);
+    const openRegion = page.getByRole('region', { name: 'Open Card', exact: true });
+    const node = openRegion.locator('.react-flow__node');
     const card = node.getByRole('article', { name: 'Strategies' });
     await expect(card).toBeVisible({ timeout: 20_000 });
 
@@ -180,6 +181,82 @@ test(
     expect(boxes.node.width).not.toBeCloseTo(260, 0);
     expect(boxes.node.height).not.toBeCloseTo(146, 0);
     expect(boxes.card).toEqual(boxes.node);
+  },
+);
+
+test(
+  'every Open Card exposes one bottom-right resize control, revealed by hover, Selection or focus; a Closed Card exposes none',
+  { tag: '@parity:open-card-offers-one-resize-control' },
+  async ({ page }) => {
+    await page.goto(resizeControlStory);
+    const openRegion = page.getByRole('region', { name: 'Open Card', exact: true });
+    const closedRegion = page.getByRole('region', { name: 'Closed Card', exact: true });
+    await expect(openRegion.getByRole('article', { name: 'Strategies' })).toBeVisible({
+      timeout: 20_000,
+    });
+
+    const openControl = openRegion.locator('.react-flow__resize-control');
+    await expect(openControl).toHaveCount(1);
+    await expect(openControl).toHaveClass(/\bbottom\b/);
+    await expect(openControl).toHaveClass(/\bright\b/);
+    await expect(closedRegion.locator('.react-flow__resize-control')).toHaveCount(0);
+
+    // Three independent reveals, each asserted rather than assumed from the
+    // one that is easiest to drive (ADR 0066). Hover is pointer discovery;
+    // Selection holds the control for touch, which has no hover to give; and
+    // Card focus offers the keyboard the same authoring affordance.
+    await page.mouse.move(0, 0);
+    await expect(openControl).toHaveCSS('opacity', '0');
+
+    await openRegion.getByRole('article', { name: 'Strategies' }).hover();
+    await expect(openControl).toHaveCSS('opacity', '1');
+
+    const selectedRegion = page.getByRole('region', { name: 'Selected Card' });
+    const selectedControl = selectedRegion.locator('.react-flow__resize-control');
+    await page.mouse.move(0, 0);
+    await expect(selectedControl).toHaveCSS('opacity', '1');
+
+    await page.mouse.move(0, 0);
+    await expect(openControl).toHaveCSS('opacity', '0');
+    await openRegion.locator('.react-flow__node').focus();
+    await expect(openControl).toHaveCSS('opacity', '1');
+
+    await openRegion.getByRole('article', { name: 'Strategies' }).hover();
+
+    const node = openRegion.locator('.react-flow__node');
+    const before = await node.boundingBox();
+    if (before === null) throw new Error('The Open Card node has no box.');
+    const box = await openControl.boundingBox();
+    if (box === null) throw new Error('The Open resize control has no box.');
+
+    // The hit target, asserted as a size rather than left to the drag below.
+    // React Flow's own `.react-flow__resize-control.handle` declares a 5px box
+    // and outranks a rule naming one class, so this passed while the control
+    // was too small for a pointer to find — Playwright hits 5px exactly and a
+    // hand does not. The mark stays smaller than the target it sits in.
+    expect(box.width).toBeGreaterThanOrEqual(20);
+    expect(box.height).toBeGreaterThanOrEqual(20);
+    const mark = await openControl.locator('.rf-card-node__resize-mark').boundingBox();
+    if (mark === null) throw new Error('The Open resize control draws no mark.');
+    expect(mark.width).toBeLessThan(box.width);
+    expect(mark.height).toBeLessThan(box.height);
+
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(box.x + box.width / 2 + 120, box.y + box.height / 2 + 80, { steps: 6 });
+    await page.mouse.up();
+    // The node's own CSS transitions width/height/transform (`.rf-card-node`),
+    // so the released rect is reached only once that settles.
+    await node.evaluate(async (element) => {
+      await Promise.all(element.getAnimations().map((animation) => animation.finished));
+    });
+
+    const after = await node.boundingBox();
+    if (after === null) throw new Error('The Open Card node has no box after resizing.');
+    expect(after.width).toBeGreaterThan(before.width);
+    expect(after.height).toBeGreaterThan(before.height);
+    expect(after.x).toBeCloseTo(before.x, 0);
+    expect(after.y).toBeCloseTo(before.y, 0);
   },
 );
 

@@ -6,6 +6,7 @@ import type { CardFlowNode } from '@project/react-flow-adapter';
 import { SpaceCanvas } from '../src/components/SpaceCanvas';
 import type { EdgeAuthoring } from '../src/edge-authoring';
 import { CARD_SIZE } from '../src/card';
+import type { CardResize } from '../src/render-adapter';
 
 const CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 const OTHER_CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
@@ -86,7 +87,16 @@ function inertEdgeAuthoring(): EdgeAuthoring {
 }
 
 /** A SpaceCanvas whose title Edit always refuses, so a draft can be left unsettled. */
-function mountGraph(initialNodes: CardFlowNode[] = [cardNode('A')]): Harness {
+function mountGraph(
+  initialNodes: CardFlowNode[] = [cardNode('A')],
+  onSelectCard: (cardId: string) => void = () => undefined,
+  cardResize: CardResize = {
+    beginResize: () => undefined,
+    previewResize: () => undefined,
+    finishResize: () => undefined,
+    cancelResize: () => undefined,
+  },
+): Harness {
   const openCard = vi.fn();
   const addCard = vi.fn();
   const bodyEditingChanged = vi.fn();
@@ -109,7 +119,7 @@ function mountGraph(initialNodes: CardFlowNode[] = [cardNode('A')]): Harness {
         onEdgesChange={() => undefined}
         edgeAuthoring={edgeAuthoring}
         selection={{ kind: 'none' }}
-        onSelectCard={() => undefined}
+        onSelectCard={onSelectCard}
         onSelectEdge={() => undefined}
         subjectCards={[]}
         newCardTitle="Card 2"
@@ -119,7 +129,7 @@ function mountGraph(initialNodes: CardFlowNode[] = [cardNode('A')]): Harness {
         onBodyEditingChange={bodyEditingChanged}
         onCloseCard={() => 'completed'}
         onCompleteCardBody={() => 'completed'}
-        onResizeCard={() => undefined}
+        cardResize={cardResize}
         onCompleteCardTitle={() => 'A Card needs a title'}
         editableCardIds={editableCardIds}
         graphs={[]}
@@ -471,6 +481,105 @@ describe('withdrawing canvas authoring from an Expanded Card', () => {
     fireEvent.keyDown(document.body, { key: 'F2' });
     expect(addCard).not.toHaveBeenCalled();
     expect(screen.queryByRole('textbox', { name: 'Card title' })).toBeNull();
+  });
+});
+
+/**
+ * Resize is Card behaviour rather than kind behaviour (ADR 0066): a Card owns
+ * the surrounding rect and the resize interaction, while a kind owns only what
+ * fills an Open front. Alias has no Open front yet, but that is content
+ * ownership and must not read back as a second resize gate.
+ */
+describe('resize belongs to Card rather than to a Card kind', () => {
+  it('offers a resize operation to an Open Card whatever its kind', () => {
+    const alias = cardNode('Alias', CARD_ID, false);
+    alias.data.kind = 'alias';
+    alias.data.aliasOf = 'A';
+    alias.data.expanded = true;
+    const { view } = mountGraph([alias]);
+
+    expect(view.container.querySelector('.react-flow__resize-control')).toBeInTheDocument();
+  });
+
+  it('offers no resize operation to a Closed Card', () => {
+    const { view } = mountGraph([cardNode('A')]);
+
+    expect(view.container.querySelector('.react-flow__resize-control')).toBeNull();
+  });
+
+  /**
+   * `onResizeStart` is what the composition put on the node's data
+   * (`projection.ts`'s `CardNodeData.resize`); a mouse press on the drawn
+   * control is what invokes it, through the real `NodeResizeControl` rather
+   * than a stand-in for it. One drag both selects the Card and grows it —
+   * never a separate click first.
+   */
+  it('routes one resize lifecycle from the control to the canvas capability', () => {
+    const expanded = cardNode('A', CARD_ID, false);
+    expanded.data.expanded = true;
+    expanded.data.body = '# A';
+    const onSelectCard = vi.fn();
+    const cardResize: CardResize = {
+      beginResize: vi.fn(),
+      previewResize: vi.fn(),
+      finishResize: vi.fn(),
+      cancelResize: vi.fn(),
+    };
+    mountGraph([expanded], onSelectCard, cardResize);
+
+    const control = document.querySelector('.react-flow__resize-control.bottom.right');
+    if (control === null) throw new Error('No resize control is drawn for Card A.');
+    // React Flow's control begins its drag through real d3-drag, which reads
+    // `event.view.document` on the native mousedown — and jsdom's own `MouseEvent`
+    // constructor rejects this environment's ambient `window` as a `view` even
+    // though it is the real one, so the event is built and dispatched directly
+    // rather than through `fireEvent`, which goes through that same constructor.
+    const mouseDown = new MouseEvent('mousedown', {
+      bubbles: true,
+      cancelable: true,
+      clientX: 0,
+      clientY: 0,
+    });
+    Object.defineProperty(mouseDown, 'view', { value: window, configurable: true });
+    control.dispatchEvent(mouseDown);
+
+    expect(onSelectCard).toHaveBeenCalledWith(CARD_ID);
+    expect(cardResize.beginResize).toHaveBeenCalledWith(CARD_ID);
+
+    const mouseMove = new MouseEvent('mousemove', {
+      bubbles: true,
+      cancelable: true,
+      clientX: 80,
+      clientY: 60,
+    });
+    Object.defineProperty(mouseMove, 'view', { value: window, configurable: true });
+    window.dispatchEvent(mouseMove);
+    expect(cardResize.previewResize).toHaveBeenCalledWith(CARD_ID, expect.any(Object));
+
+    fireEvent.pointerUp(window);
+    expect(cardResize.finishResize).toHaveBeenCalledWith(CARD_ID);
+  });
+
+  it('routes loss of an active resize to cancellation', () => {
+    const expanded = cardNode('A', CARD_ID, false);
+    expanded.data.expanded = true;
+    const cardResize: CardResize = {
+      beginResize: vi.fn(),
+      previewResize: vi.fn(),
+      finishResize: vi.fn(),
+      cancelResize: vi.fn(),
+    };
+    mountGraph([expanded], () => undefined, cardResize);
+    const control = document.querySelector('.react-flow__resize-control.bottom.right');
+    if (control === null) throw new Error('No resize control is drawn for Card A.');
+    const mouseDown = new MouseEvent('mousedown', { bubbles: true, cancelable: true });
+    Object.defineProperty(mouseDown, 'view', { value: window, configurable: true });
+    control.dispatchEvent(mouseDown);
+
+    fireEvent.blur(window);
+
+    expect(cardResize.cancelResize).toHaveBeenCalledWith(CARD_ID);
+    expect(cardResize.finishResize).not.toHaveBeenCalled();
   });
 });
 
