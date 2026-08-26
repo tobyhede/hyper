@@ -40,8 +40,8 @@ const ASIDE = {
 };
 
 const POSITIONS = {
-  [A]: { x: 40, y: 10 },
-  [B]: { x: 400, y: 250 },
+  [A]: { x: 40, y: 10, state: 'closed' },
+  [B]: { x: 400, y: 250, state: 'closed' },
 };
 
 /** The Layout under test, owning one Graph unless a case says otherwise. */
@@ -62,8 +62,8 @@ const SECOND = {
   title: 'Second',
   kind: 'positioned',
   positions: {
-    [A]: { x: 0, y: 600 },
-    [B]: { x: 320, y: 600 },
+    [A]: { x: 0, y: 600, state: 'closed' },
+    [B]: { x: 320, y: 600, state: 'closed' },
   },
   graphs: [ASIDE],
 };
@@ -271,7 +271,7 @@ describe('the subject a renderer names', () => {
       layouts: [
         {
           ...WORKING,
-          positions: { [A]: { x: 40, y: 10 } },
+          positions: { [A]: { x: 40, y: 10, state: 'closed' } },
           graphs: [{ ...MAIN, edges: [{ from: A, to: A }] }],
         },
       ],
@@ -338,8 +338,8 @@ describe('the Graph a renderer opens on', () => {
 
 describe('converting a View into a Layout’s Graphs', () => {
   const onScreen = Placement.fromEntries([
-    [A, { x: 40, y: 10 }],
-    [B, { x: 400, y: 250 }],
+    [A, { x: 40, y: 10, state: 'closed' }],
+    [B, { x: 400, y: 250, state: 'closed' }],
   ]);
 
   it('answers a fresh empty Graph, numbered above the Graphs it was showing', () => {
@@ -396,7 +396,7 @@ describe('converting a View into a Layout’s Graphs', () => {
 
   it('refuses a Placement that is not exactly the subject’s Cards', () => {
     const view = asView(spaceWith());
-    const short = Placement.fromEntries([[A, { x: 0, y: 0 }]]);
+    const short = Placement.fromEntries([[A, { x: 0, y: 0, state: 'closed' }]]);
 
     const refused = refusal(() => view.convert(short));
 
@@ -407,8 +407,8 @@ describe('converting a View into a Layout’s Graphs', () => {
   it('refuses a Placement of the right size naming a different Card', () => {
     const view = asView(spaceWith());
     const wrong = Placement.fromEntries([
-      [A, { x: 0, y: 0 }],
-      [uuidSchema.parse('00000000-0000-4000-8000-000000000099'), { x: 1, y: 1 }],
+      [A, { x: 0, y: 0, state: 'closed' }],
+      [uuidSchema.parse('00000000-0000-4000-8000-000000000099'), { x: 1, y: 1, state: 'closed' }],
     ]);
 
     expect(refusal(() => view.convert(wrong)).reason).toBe('placement-does-not-match-subject');

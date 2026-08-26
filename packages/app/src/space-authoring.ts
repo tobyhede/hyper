@@ -939,32 +939,43 @@ export function createSpaceAuthoring({
     } else if (completion.kind === 'opened-card') {
       const at = completedPlacement.get(completion.cardId);
       if (at === undefined) return refuse({ code: 'card-not-in-layout' });
-      if (at.expanded !== undefined) return UNCHANGED;
+      if (at.state === 'open') return UNCHANGED;
       completedPlacement = Placement.place(completedPlacement, completion.cardId, {
-        ...at,
-        expanded: DEFAULT_OPEN_CARD_SIZE,
+        x: at.x,
+        y: at.y,
+        state: 'open',
+        // The remembered size is the author's, from the Close before this
+        // Open; the default is only for a Card that has never been Opened.
+        // Storing the concrete value (rather than reading the default at
+        // render time) is what keeps this Card's geometry stable if the
+        // application default ever changes later (ADR 0066).
+        openSize: at.openSize ?? DEFAULT_OPEN_CARD_SIZE,
       });
     } else if (completion.kind === 'closed-card') {
       const at = completedPlacement.get(completion.cardId);
       if (at === undefined) return refuse({ code: 'card-not-in-layout' });
-      if (at.expanded === undefined) return UNCHANGED;
+      if (at.state === 'closed') return UNCHANGED;
+      // Close changes `state` only — the Open Size is preserved so reopening
+      // restores it (ADR 0066).
       completedPlacement = Placement.place(completedPlacement, completion.cardId, {
         x: at.x,
         y: at.y,
+        state: 'closed',
+        openSize: at.openSize,
       });
     } else if (completion.kind === 'resized-card') {
       const at = completedPlacement.get(completion.cardId);
       if (at === undefined) return refuse({ code: 'card-not-in-layout' });
-      if (at.expanded === undefined) return refuse({ code: 'card-not-open' });
+      if (at.state === 'closed') return refuse({ code: 'card-not-open' });
       if (
-        at.expanded.width === completion.size.width &&
-        at.expanded.height === completion.size.height
+        at.openSize.width === completion.size.width &&
+        at.openSize.height === completion.size.height
       ) {
         return UNCHANGED;
       }
       completedPlacement = Placement.place(completedPlacement, completion.cardId, {
         ...at,
-        expanded: completion.size,
+        openSize: completion.size,
       });
     } else if (completion.kind === 'created-card') {
       createdCard = createCard(
@@ -995,11 +1006,11 @@ export function createSpaceAuthoring({
       // Membership and a position, and nothing else: a re-added Card is detached,
       // and the Edges it once had are never inferred back.
       const authoredAnchor = Placement.authoredPoint(completedPlacement, completion.anchor);
-      completedPlacement = Placement.place(
-        completedPlacement,
-        completion.cardId,
-        freeAnchor(completedPlacement, authoredAnchor),
-      );
+      // A created or (re-)added Card is never-Opened (ADR 0066).
+      completedPlacement = Placement.place(completedPlacement, completion.cardId, {
+        ...freeAnchor(completedPlacement, authoredAnchor),
+        state: 'closed',
+      });
     } else if (completion.kind === 'removed-card-from-layout') {
       if (!completedPlacement.has(completion.cardId)) {
         return refuse({ code: 'card-not-in-layout' });
@@ -1085,13 +1096,13 @@ export function createSpaceAuthoring({
     // what the Edit adds to it and takes away.
     if (createdCard !== null) {
       const authoredPosition = Placement.authoredPoint(completedPlacement, createdCard.position);
-      completedPlacement = Placement.place(
-        completedPlacement,
-        createdCard.id,
-        createdCard.avoidingOverlap
+      // A created Card is never-Opened (ADR 0066).
+      completedPlacement = Placement.place(completedPlacement, createdCard.id, {
+        ...(createdCard.avoidingOverlap
           ? freeAnchor(completedPlacement, authoredPosition)
-          : authoredPosition,
-      );
+          : authoredPosition),
+        state: 'closed',
+      });
     }
     if (deletedCardId !== undefined) {
       completedPlacement = Placement.remove(completedPlacement, deletedCardId);

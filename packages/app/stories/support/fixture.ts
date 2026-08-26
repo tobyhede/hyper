@@ -122,12 +122,12 @@ export const colorByGraphId = {
  * distinguish Cards with different Graph membership.
  */
 export const positions = {
-  [cardIds.opening]: { x: 40, y: 170 },
-  [cardIds.problem]: { x: 380, y: 30 },
-  [cardIds.strategies]: { x: 720, y: 170 },
-  [cardIds.traversal]: { x: 1060, y: 30 },
-  [cardIds.openingAlias]: { x: 1400, y: 170 },
-  [cardIds.closing]: { x: 1060, y: 330 },
+  [cardIds.opening]: { x: 40, y: 170, state: 'closed' },
+  [cardIds.problem]: { x: 380, y: 30, state: 'closed' },
+  [cardIds.strategies]: { x: 720, y: 170, state: 'closed' },
+  [cardIds.traversal]: { x: 1060, y: 30, state: 'closed' },
+  [cardIds.openingAlias]: { x: 1400, y: 170, state: 'closed' },
+  [cardIds.closing]: { x: 1060, y: 330, state: 'closed' },
 } as const;
 
 export const layouts: readonly Layout[] = [
@@ -136,7 +136,7 @@ export const layouts: readonly Layout[] = [
     kind: 'positioned',
     title: 'Collection 1',
     positions: Object.fromEntries(
-      cards.map((card) => [card.id, positions[card.id] ?? { x: 0, y: 0 }]),
+      cards.map((card) => [card.id, positions[card.id] ?? { x: 0, y: 0, state: 'closed' }]),
     ),
     graphs: [...graphs],
     activeGraph: graphIds.long,

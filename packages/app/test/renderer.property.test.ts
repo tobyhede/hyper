@@ -43,9 +43,11 @@ const GENERATED_VIEW: BuiltInViewId = 'flow';
 
 const cardId = fc.integer({ min: 2, max: 7 }).map((n) => uuidSchema.parse(uuid(n)));
 
+/** A never-Opened Closed placement entry — the shape a Placement generator needs. */
 const point = fc.record({
   x: fc.integer({ min: -1000, max: 1000 }),
   y: fc.integer({ min: -1000, max: 1000 }),
+  state: fc.constant('closed' as const),
 });
 
 /**
@@ -67,7 +69,9 @@ function sourceSpace(): Space {
           id: uuid(0x500),
           title: 'Working',
           kind: 'positioned',
-          positions: Object.fromEntries(ids.map((id, index) => [id, { x: index * 320, y: 0 }])),
+          positions: Object.fromEntries(
+            ids.map((id, index) => [id, { x: index * 320, y: 0, state: 'closed' as const }]),
+          ),
           graphs: [{ id: SOURCE_GRAPH, title: 'Main', edges: [{ from: ids[0], to: ids[1] }] }],
         },
       ],

@@ -367,8 +367,8 @@ describe('runHyper', () => {
             title: 'Authored layout',
             kind: 'positioned',
             positions: {
-              [THIRD_SPACE_ID]: { x: 30, y: 40 },
-              [CARD_ID]: { x: 10, y: 20 },
+              [THIRD_SPACE_ID]: { x: 30, y: 40, state: 'closed' },
+              [CARD_ID]: { x: 10, y: 20, state: 'closed' },
             },
             graphs: [
               {
@@ -691,14 +691,14 @@ describe('runHyper', () => {
             id: OTHER_SPACE_ID,
             title: 'First owner',
             kind: 'positioned',
-            positions: { [CARD_ID]: { x: 0, y: 0 } },
+            positions: { [CARD_ID]: { x: 0, y: 0, state: 'closed' } },
             graphs: [{ id: GRAPH_ID, title: 'Shared', edges: [{ from: CARD_ID, to: CARD_ID }] }],
           },
           {
             id: THIRD_SPACE_ID,
             title: 'Second owner',
             kind: 'positioned',
-            positions: { [CARD_ID]: { x: 10, y: 10 } },
+            positions: { [CARD_ID]: { x: 10, y: 10, state: 'closed' } },
             graphs: [{ id: GRAPH_ID, title: 'Shared', edges: [{ from: CARD_ID, to: CARD_ID }] }],
           },
         ],

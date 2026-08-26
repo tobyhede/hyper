@@ -36,7 +36,10 @@ const snapshot: SpaceSnapshot = {
         id: LAYOUT_ID,
         title: 'Layout 1',
         kind: 'positioned',
-        positions: { [CARD_A]: { x: 10, y: 20 }, [CARD_B]: { x: 300, y: 40 } },
+        positions: {
+          [CARD_A]: { x: 10, y: 20, state: 'closed' },
+          [CARD_B]: { x: 300, y: 40, state: 'closed' },
+        },
         graphs: [{ id: GRAPH_ID, title: 'Main', edges: [{ from: CARD_A, to: CARD_B }] }],
       },
     ],
@@ -104,8 +107,8 @@ describe('what the composition opens on', () => {
 
     expect(authoring.authoredPlacement()).toEqual(
       Placement.fromEntries([
-        [CARD_A, { x: 10, y: 20 }],
-        [CARD_B, { x: 300, y: 40 }],
+        [CARD_A, { x: 10, y: 20, state: 'closed' }],
+        [CARD_B, { x: 300, y: 40, state: 'closed' }],
       ]),
     );
   });
@@ -156,7 +159,7 @@ describe('where a composition mints identities', () => {
       cards: [{ id: CARD_A, document: { title: 'Card 1', kind: 'markdown', body: '' } }],
     };
     const spaceSession = openSession(viewOnly);
-    const rendered = Placement.fromEntries([[CARD_A, { x: 10, y: 20 }]]);
+    const rendered = Placement.fromEntries([[CARD_A, { x: 10, y: 20, state: 'closed' }]]);
     const { authoring, navigation } = composeApp({
       spaceSession,
       selection: { kind: 'view', view: 'flow' },

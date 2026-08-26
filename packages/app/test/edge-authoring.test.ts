@@ -69,9 +69,9 @@ const positionedSnapshot: SpaceSnapshot = {
         title: 'Layout 1',
         kind: 'positioned',
         positions: {
-          [CARD_A]: { x: 10, y: 20 },
-          [CARD_B]: { x: 300, y: 40 },
-          [CARD_C]: { x: 600, y: 40 },
+          [CARD_A]: { x: 10, y: 20, state: 'closed' },
+          [CARD_B]: { x: 300, y: 40, state: 'closed' },
+          [CARD_C]: { x: 600, y: 40, state: 'closed' },
         },
         graphs: [
           { id: GRAPH_ID, title: 'Main', edges: [EDGE] },
@@ -96,9 +96,9 @@ function open(
     newGraphId: mintingGraphIds(MINTED_GRAPH),
     newId,
     initialPlacement: Placement.fromEntries([
-      [CARD_A, { x: 10, y: 20 }],
-      [CARD_B, { x: 300, y: 40 }],
-      [CARD_C, { x: 600, y: 40 }],
+      [CARD_A, { x: 10, y: 20, state: 'closed' }],
+      [CARD_B, { x: 300, y: 40, state: 'closed' }],
+      [CARD_C, { x: 600, y: 40, state: 'closed' }],
     ]),
   });
   adapter.getState().syncProjection(PROJECTED, []);
@@ -333,9 +333,9 @@ describe('draft invalidation', () => {
       selection: { kind: 'layout', layoutId: LAYOUT_ID },
       newGraphId: mintingGraphIds(MINTED_GRAPH),
       initialPlacement: Placement.fromEntries([
-        [CARD_A, { x: 10, y: 20 }],
-        [CARD_B, { x: 300, y: 40 }],
-        [CARD_C, { x: 600, y: 40 }],
+        [CARD_A, { x: 10, y: 20, state: 'closed' }],
+        [CARD_B, { x: 300, y: 40, state: 'closed' }],
+        [CARD_C, { x: 600, y: 40, state: 'closed' }],
       ]),
     });
     edges.openEdgeEditor(SUBJECT);

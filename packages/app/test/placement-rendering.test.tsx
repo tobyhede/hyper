@@ -40,7 +40,7 @@ describe('usePlacementRendering', () => {
       automaticCalls += 1;
       return new Promise(() => undefined);
     };
-    const authoredPositions = Placement.fromEntries([[CARD_A, { x: 80, y: 120 }]]);
+    const authoredPositions = Placement.fromEntries([[CARD_A, { x: 80, y: 120, state: 'closed' }]]);
     const { result } = renderHook(() =>
       usePlacementRendering(strategyGraph, neverResolves, authoredPositions),
     );
@@ -67,8 +67,8 @@ describe('usePlacementRendering', () => {
     // back on every render, so only the strategyGraph half can produce the second
     // layout run.
     const authored = Placement.fromEntries([
-      [CARD_A, { x: 80, y: 120 }],
-      [CARD_B, { x: 400, y: 260 }],
+      [CARD_A, { x: 80, y: 120, state: 'closed' }],
+      [CARD_B, { x: 400, y: 260, state: 'closed' }],
     ]);
     const automatic = gridStrategy();
     const gainedCard: LayoutStrategyGraph = {

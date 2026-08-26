@@ -4,6 +4,7 @@ import {
   SPACE_FILE_VERSION,
   spaceSnapshotSchema,
   type Card,
+  type CardPlacement,
   type SpaceFile,
   type UUID,
 } from '@project/core';
@@ -47,6 +48,25 @@ const canonicalGraphs = (
       : { id: graph.id, title: graph.title, color: graph.color, edges };
   });
 
+/**
+ * Rebuild one Layout position in the canonical key order the schema declares:
+ * `x`, `y`, `state` and, when present, `openSize` (ADR 0066).
+ */
+const canonicalPoint = (point: CardPlacement): CardPlacement => {
+  if (point.state === 'open') {
+    const { width, height } = point.openSize;
+    return { x: point.x, y: point.y, state: 'open', openSize: { width, height } };
+  }
+  return point.openSize === undefined
+    ? { x: point.x, y: point.y, state: 'closed' }
+    : {
+        x: point.x,
+        y: point.y,
+        state: 'closed',
+        openSize: { width: point.openSize.width, height: point.openSize.height },
+      };
+};
+
 const canonicalSpaceFile = ({ snapshot }: LoadedSpace): SpaceFile => {
   const layouts = snapshot.document.layouts?.map((layout) => {
     const layoutBase: Omit<NonNullable<SpaceFile['layouts']>[number], 'activeGraph'> = {
@@ -56,13 +76,13 @@ const canonicalSpaceFile = ({ snapshot }: LoadedSpace): SpaceFile => {
       positions: Object.fromEntries(
         Object.entries(layout.positions)
           .sort(([left], [right]) => compareOrdinal(left, right))
-          // The point is rebuilt too, not passed through: a stored `{"y":…,"x":…}`
-          // would otherwise export in that order. An absent value cannot come off
-          // a parsed document — the optionality is the `Partial<Record>` the
-          // schema's key branding produces — and dropping it matches what
-          // `JSON.stringify` already did with one.
-          .flatMap(([id, point]) =>
-            point === undefined ? [] : [[id, { x: point.x, y: point.y }]],
+          // The point is rebuilt too, not passed through: a stored
+          // `{"y":…,"x":…,"state":…}` would otherwise export in that order. An
+          // absent value cannot come off a parsed document — the optionality
+          // is the `Partial<Record>` the schema's key branding produces — and
+          // dropping it matches what `JSON.stringify` already did with one.
+          .flatMap(([id, point]): (readonly [string, CardPlacement])[] =>
+            point === undefined ? [] : [[id, canonicalPoint(point)]],
           ),
       ),
       graphs: canonicalGraphs(layout.graphs),

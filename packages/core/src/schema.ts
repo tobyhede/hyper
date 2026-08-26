@@ -135,10 +135,36 @@ export const layoutPositionSchema = z.object({
   y: z.number(),
 });
 
-/** What a Layout stores for one Card: its origin and, when Expanded, its authored size. */
-export const cardPlacementSchema = layoutPositionSchema.extend({
-  expanded: z.object({ width: z.number().positive(), height: z.number().positive() }).optional(),
-});
+const openSizeSchema = z.object({ width: z.number().positive(), height: z.number().positive() });
+
+/**
+ * What a Layout stores for one Card: its origin, plus an explicit Open or
+ * Closed `state` (ADR 0066). An Open entry carries the Open Size it
+ * remembers — required, because an Open Card is always drawn at some size. A
+ * Closed entry may retain the Open Size from before it was last Closed, so
+ * reopening restores it; a Card that has never been Opened carries none.
+ * Closed Size itself is fixed domain policy (`CLOSED_CARD_SIZE`), not a fact
+ * about any one Card, so it is never stored here.
+ *
+ * **Strict on both members**, the same argument {@link positionedLayoutSchema}
+ * makes for itself: a plain object silently strips a key it does not
+ * declare, and the retired `expanded` shape this replaces would otherwise
+ * parse as a Closed entry with its remembered size quietly discarded. Strict
+ * rejects it instead, so a leftover `expanded` key — or any other stray key —
+ * fails intake rather than losing data no one asked to lose. This is a
+ * codebase edit to a renamed persisted key, not a `documentRefusal` case (ADR
+ * 0056).
+ *
+ * `state` is required, with no hand-authoring default: defaulting it would
+ * let the same fact be written two ways, which is the same ground ADR 0066
+ * rejected an optional stored Closed Size on.
+ */
+export const cardPlacementSchema = z.discriminatedUnion('state', [
+  layoutPositionSchema
+    .extend({ state: z.literal('closed'), openSize: openSizeSchema.optional() })
+    .strict(),
+  layoutPositionSchema.extend({ state: z.literal('open'), openSize: openSizeSchema }).strict(),
+]);
 
 /**
  * A layout the author wrote: a card-to-position map and the graphs over it

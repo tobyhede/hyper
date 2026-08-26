@@ -19,7 +19,10 @@ const snapshot: SpaceSnapshot = {
         id: LAYOUT_ID,
         title: 'Working',
         kind: 'positioned',
-        positions: { [CARD_A]: { x: 0, y: 0 }, [CARD_B]: { x: 320, y: 0 } },
+        positions: {
+          [CARD_A]: { x: 0, y: 0, state: 'closed' },
+          [CARD_B]: { x: 320, y: 0, state: 'closed' },
+        },
         graphs: [{ id: GRAPH_ID, title: 'Main', edges: [{ from: CARD_A, to: CARD_B }] }],
       },
     ],

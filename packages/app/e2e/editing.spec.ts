@@ -684,6 +684,29 @@ test(
     }));
     expect(persistedSize).toEqual(resized);
     expect(await positionOf(persisted)).toEqual(beforePosition);
+
+    // Close preserves the resized Open Size for the next Open (ADR 0066):
+    // reloading Closed and then reopening must restore the resized rect
+    // rather than the application default.
+    await persisted.hover();
+    await persisted.getByRole('button', { name: 'Close Card A' }).click();
+    await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
+
+    await page.reload();
+    await selectCanvas(page, 'Collection 1');
+    const closed = nodeByTitle(page, 'A').first();
+    await expect(closed.getByRole('button', { name: 'Open Card A' })).toBeVisible();
+
+    await openCard(closed, 'A');
+    await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
+    await closed.evaluate(async (element) => {
+      await Promise.all(element.getAnimations().map((animation) => animation.finished));
+    });
+    const reopenedSize = await closed.evaluate((element) => ({
+      width: Number.parseFloat(getComputedStyle(element).width),
+      height: Number.parseFloat(getComputedStyle(element).height),
+    }));
+    expect(reopenedSize).toEqual(resized);
   },
 );
 

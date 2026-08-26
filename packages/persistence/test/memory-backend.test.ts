@@ -14,6 +14,7 @@ spaceBackendContract('MemorySpaceBackend', (initial) =>
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 const CARD_B = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
+const CARD_C = uuidSchema.parse('00000000-0000-4000-8000-000000000006');
 const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
 const LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
 const MISSING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000099');
@@ -96,7 +97,7 @@ describe('MemorySpaceBackend', () => {
               id: LAYOUT_ID,
               title: 'Owner',
               kind: 'positioned' as const,
-              positions: { [CARD_ID]: { x: 0, y: 0 } },
+              positions: { [CARD_ID]: { x: 0, y: 0, state: 'closed' as const } },
               graphs: [
                 { id: GRAPH_ID, title: 'Dangling', edges: [{ from: CARD_ID, to: MISSING_ID }] },
               ],
@@ -113,7 +114,10 @@ describe('MemorySpaceBackend', () => {
               id: LAYOUT_ID,
               title: 'Owner',
               kind: 'positioned' as const,
-              positions: { [CARD_ID]: { x: 0, y: 0 }, [CARD_B]: { x: 300, y: 0 } },
+              positions: {
+                [CARD_ID]: { x: 0, y: 0, state: 'closed' as const },
+                [CARD_B]: { x: 300, y: 0, state: 'closed' as const },
+              },
               graphs: [
                 {
                   id: GRAPH_ID,
@@ -150,7 +154,7 @@ describe('MemorySpaceBackend', () => {
               id: LAYOUT_ID,
               title: 'Broken positions',
               kind: 'positioned' as const,
-              positions: { [MISSING_ID]: { x: 0, y: 0 } },
+              positions: { [MISSING_ID]: { x: 0, y: 0, state: 'closed' as const } },
               // A member, so the edge rule is satisfied and only the position's
               // own reference fails — one rule per snapshot, as above.
               graphs: [
@@ -174,7 +178,7 @@ describe('MemorySpaceBackend', () => {
               id: LAYOUT_ID,
               title: 'Placed',
               kind: 'positioned' as const,
-              positions: { [CARD_ID]: { x: 0, y: 0 } },
+              positions: { [CARD_ID]: { x: 0, y: 0, state: 'closed' as const } },
               graphs: [
                 {
                   id: GRAPH_ID,
@@ -196,5 +200,68 @@ describe('MemorySpaceBackend', () => {
       });
     }
     await expect(backend.loadSpace(SPACE_ID)).resolves.toEqual(loaded);
+  });
+
+  /**
+   * The HTTP-boundary shape evidence for ADR 0066: the backend validates a
+   * commit through `loadSpaceSnapshot`, the same intake the server uses, so a
+   * Layout holding all three Placement states round-trips exactly as
+   * committed — nothing here re-derives or normalizes an entry's shape.
+   */
+  it('round-trips a never-Opened, an Open and a Closed-with-remembered-size Placement entry', async () => {
+    const backend = new MemorySpaceBackend([loaded]);
+    const secondCard = {
+      id: CARD_B,
+      document: { title: 'B', kind: 'markdown' as const, body: 'B' },
+    };
+    const thirdCard = {
+      id: CARD_C,
+      document: { title: 'C', kind: 'markdown' as const, body: 'C' },
+    };
+    const committed = {
+      ...loaded.snapshot,
+      document: {
+        ...loaded.snapshot.document,
+        layouts: [
+          {
+            id: LAYOUT_ID,
+            title: 'Owner',
+            kind: 'positioned' as const,
+            positions: {
+              [CARD_ID]: { x: 0, y: 0, state: 'closed' as const },
+              [CARD_B]: {
+                x: 320,
+                y: 0,
+                state: 'open' as const,
+                openSize: { width: 560, height: 420 },
+              },
+              [CARD_C]: {
+                x: 640,
+                y: 0,
+                state: 'closed' as const,
+                openSize: { width: 700, height: 500 },
+              },
+            },
+            graphs: [{ id: GRAPH_ID, title: 'Main', edges: [{ from: CARD_ID, to: CARD_B }] }],
+          },
+        ],
+      },
+      cards: [...loaded.snapshot.cards, secondCard, thirdCard],
+    };
+
+    await expect(backend.commitSpace(committed, 3n)).resolves.toMatchObject({
+      kind: 'committed',
+    });
+    const stored = await backend.loadSpace(SPACE_ID);
+    expect(stored?.snapshot.document.layouts?.[0]?.positions).toEqual({
+      [CARD_ID]: { x: 0, y: 0, state: 'closed' },
+      [CARD_B]: { x: 320, y: 0, state: 'open', openSize: { width: 560, height: 420 } },
+      [CARD_C]: {
+        x: 640,
+        y: 0,
+        state: 'closed',
+        openSize: { width: 700, height: 500 },
+      },
+    });
   });
 });

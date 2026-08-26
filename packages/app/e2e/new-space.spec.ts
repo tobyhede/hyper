@@ -26,7 +26,7 @@ const seedNewSpaceLayout = (page: Page) =>
   seedPositionedLayout(page, 'Authored Layout', (snapshot) => {
     const cardId = snapshot.cards[0]?.id;
     if (cardId === undefined) throw new Error('The new Space must hold Card 1.');
-    return { [cardId]: { x: 0, y: 0 } };
+    return { [cardId]: { x: 0, y: 0, state: 'closed' } };
   });
 
 /**
@@ -485,7 +485,7 @@ test(
                   id: layoutId,
                   title: 'Layout',
                   kind: 'positioned',
-                  positions: { [cardId]: { x: 0, y: 0 } },
+                  positions: { [cardId]: { x: 0, y: 0, state: 'closed' } },
                   graphs: [
                     { id: graphId, title: 'Graph', edges: [{ from: cardId, to: missingCardId }] },
                   ],

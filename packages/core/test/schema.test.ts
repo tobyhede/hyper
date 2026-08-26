@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   BUILT_IN_VIEW_IDS,
   cardFrontmatterSchema,
+  cardPlacementSchema,
   cardSchema,
   isBuiltInViewId,
   spaceFileSchema,
@@ -21,8 +22,8 @@ const WORKING = {
   title: 'Working',
   kind: 'positioned',
   positions: {
-    '00000000-0000-4000-8000-000000000002': { x: 0, y: 0 },
-    '00000000-0000-4000-8000-000000000003': { x: 320, y: -40 },
+    '00000000-0000-4000-8000-000000000002': { x: 0, y: 0, state: 'closed' },
+    '00000000-0000-4000-8000-000000000003': { x: 320, y: -40, state: 'closed' },
   },
   graphs: [MAIN],
 };
@@ -57,8 +58,8 @@ describe('space file schema', () => {
           id: '00000000-0000-4000-8000-000000000010',
           title: 'Working',
           positions: {
-            '00000000-0000-4000-8000-000000000002': { x: 0, y: 0 },
-            '00000000-0000-4000-8000-000000000003': { x: 320, y: -40 },
+            '00000000-0000-4000-8000-000000000002': { x: 0, y: 0, state: 'closed' },
+            '00000000-0000-4000-8000-000000000003': { x: 320, y: -40, state: 'closed' },
           },
           graphs: [
             {
@@ -330,8 +331,8 @@ describe('space file layouts', () => {
     const layout = file.layouts?.[0];
     expect(layout?.kind).toBe('positioned');
     expect(layout?.positions).toEqual({
-      '00000000-0000-4000-8000-000000000002': { x: 0, y: 0 },
-      '00000000-0000-4000-8000-000000000003': { x: 320, y: -40 },
+      '00000000-0000-4000-8000-000000000002': { x: 0, y: 0, state: 'closed' },
+      '00000000-0000-4000-8000-000000000003': { x: 320, y: -40, state: 'closed' },
     });
   });
 
@@ -374,7 +375,7 @@ describe('space file layouts', () => {
   it('rejects a position keyed by an empty card id', () => {
     const result = spaceFileSchema.safeParse({
       ...validSpaceFile,
-      layouts: [{ ...working, positions: { '': { x: 0, y: 0 } } }],
+      layouts: [{ ...working, positions: { '': { x: 0, y: 0, state: 'closed' } } }],
     });
     expect(result.success).toBe(false);
   });
@@ -459,6 +460,51 @@ describe('space file layouts', () => {
     expect(spaceFileSchema.safeParse({ ...validSpaceFile, defaultRenderer: '' }).success).toBe(
       false,
     );
+  });
+});
+
+describe('card placement schema', () => {
+  it('accepts a never-Opened Closed entry, with no remembered Open Size', () => {
+    const at = cardPlacementSchema.parse({ x: 10, y: 20, state: 'closed' });
+    expect(at).toEqual({ x: 10, y: 20, state: 'closed' });
+  });
+
+  it('accepts a Closed entry that retains a remembered Open Size', () => {
+    const at = cardPlacementSchema.parse({
+      x: 10,
+      y: 20,
+      state: 'closed',
+      openSize: { width: 700, height: 500 },
+    });
+    expect(at).toEqual({ x: 10, y: 20, state: 'closed', openSize: { width: 700, height: 500 } });
+  });
+
+  it('accepts an Open entry, which must carry its Open Size', () => {
+    const at = cardPlacementSchema.parse({
+      x: 10,
+      y: 20,
+      state: 'open',
+      openSize: { width: 560, height: 420 },
+    });
+    expect(at).toEqual({ x: 10, y: 20, state: 'open', openSize: { width: 560, height: 420 } });
+  });
+
+  it('rejects a placement with no state — state is required, not defaulted', () => {
+    expect(cardPlacementSchema.safeParse({ x: 10, y: 20 }).success).toBe(false);
+  });
+
+  it('rejects an Open entry with no Open Size', () => {
+    expect(cardPlacementSchema.safeParse({ x: 10, y: 20, state: 'open' }).success).toBe(false);
+  });
+
+  it('rejects the retired expanded shape rather than normalizing it', () => {
+    expect(
+      cardPlacementSchema.safeParse({
+        x: 10,
+        y: 20,
+        expanded: { width: 560, height: 420 },
+      }).success,
+    ).toBe(false);
   });
 });
 

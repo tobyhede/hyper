@@ -115,8 +115,8 @@ const mixedImport: ImportSpace = {
         title: 'Mixed layout',
         kind: 'positioned',
         positions: {
-          [MIXED_FIRST_CARD_ID]: { x: 40, y: 80 },
-          [MIXED_SECOND_CARD_ID]: { x: 300, y: 80 },
+          [MIXED_FIRST_CARD_ID]: { x: 40, y: 80, state: 'closed' },
+          [MIXED_SECOND_CARD_ID]: { x: 300, y: 80, state: 'closed' },
         },
         graphs: [
           {
@@ -161,7 +161,7 @@ const idlessImport = (cardId: UUID): ImportSpace => ({
       {
         title: 'Generated layout',
         kind: 'positioned',
-        positions: { [cardId]: { x: 0, y: 0 } },
+        positions: { [cardId]: { x: 0, y: 0, state: 'closed' } },
         graphs: [{ title: 'Generated graph', edges: [{ from: cardId, to: cardId }] }],
       },
     ],
@@ -395,7 +395,7 @@ describe('PostgresSpaceRepository', () => {
             id: LAYOUT_ID,
             title: 'Owner',
             kind: 'positioned',
-            positions: { [CARD_ID]: { x: 0, y: 0 } },
+            positions: { [CARD_ID]: { x: 0, y: 0, state: 'closed' } },
             graphs: [
               {
                 id: GRAPH_ID,
@@ -573,8 +573,8 @@ describe('PostgresSpaceRepository', () => {
     );
     expect(graph.edges).toEqual([{ from: MIXED_FIRST_CARD_ID, to: MIXED_SECOND_CARD_ID }]);
     expect(layout.positions).toEqual({
-      [MIXED_FIRST_CARD_ID]: { x: 40, y: 80 },
-      [MIXED_SECOND_CARD_ID]: { x: 300, y: 80 },
+      [MIXED_FIRST_CARD_ID]: { x: 40, y: 80, state: 'closed' },
+      [MIXED_SECOND_CARD_ID]: { x: 300, y: 80, state: 'closed' },
     });
     await expect(repository.loadSpace(stored.snapshot.id)).resolves.toEqual(stored);
   });
@@ -778,7 +778,10 @@ describe('PostgresSpaceRepository', () => {
             id: LAYOUT_ID,
             title: 'Owner',
             kind: 'positioned',
-            positions: { [CARD_ID]: { x: 0, y: 0 }, [OMITTED_CARD_ID]: { x: 300, y: 0 } },
+            positions: {
+              [CARD_ID]: { x: 0, y: 0, state: 'closed' },
+              [OMITTED_CARD_ID]: { x: 300, y: 0, state: 'closed' },
+            },
             graphs: [
               {
                 id: GRAPH_ID,
@@ -805,8 +808,8 @@ describe('PostgresSpaceRepository', () => {
             title: 'Owner',
             kind: 'positioned',
             positions: {
-              [OTHER_CARD_ID]: { x: 0, y: 0 },
-              [MIXED_FIRST_CARD_ID]: { x: 300, y: 0 },
+              [OTHER_CARD_ID]: { x: 0, y: 0, state: 'closed' },
+              [MIXED_FIRST_CARD_ID]: { x: 300, y: 0, state: 'closed' },
             },
             graphs: [
               {
@@ -855,7 +858,10 @@ describe('PostgresSpaceRepository', () => {
             id: LAYOUT_ID,
             title: 'Owner',
             kind: 'positioned',
-            positions: { [CARD_ID]: { x: 0, y: 0 }, [OMITTED_CARD_ID]: { x: 300, y: 0 } },
+            positions: {
+              [CARD_ID]: { x: 0, y: 0, state: 'closed' },
+              [OMITTED_CARD_ID]: { x: 300, y: 0, state: 'closed' },
+            },
             graphs: [
               {
                 id: GRAPH_ID,
@@ -882,8 +888,8 @@ describe('PostgresSpaceRepository', () => {
             title: 'Owner',
             kind: 'positioned',
             positions: {
-              [OTHER_CARD_ID]: { x: 0, y: 0 },
-              [MIXED_FIRST_CARD_ID]: { x: 300, y: 0 },
+              [OTHER_CARD_ID]: { x: 0, y: 0, state: 'closed' },
+              [MIXED_FIRST_CARD_ID]: { x: 300, y: 0, state: 'closed' },
             },
             graphs: [
               {
@@ -918,7 +924,10 @@ describe('PostgresSpaceRepository', () => {
             id: LAYOUT_ID,
             title: 'Owner',
             kind: 'positioned',
-            positions: { [CARD_ID]: { x: 0, y: 0 }, [OMITTED_CARD_ID]: { x: 300, y: 0 } },
+            positions: {
+              [CARD_ID]: { x: 0, y: 0, state: 'closed' },
+              [OMITTED_CARD_ID]: { x: 300, y: 0, state: 'closed' },
+            },
             graphs: [
               {
                 id: CARD_ID,
@@ -969,7 +978,10 @@ describe('PostgresSpaceRepository', () => {
             id: LAYOUT_ID,
             title: 'First owner',
             kind: 'positioned',
-            positions: { [CARD_ID]: { x: 0, y: 0 }, [OMITTED_CARD_ID]: { x: 300, y: 0 } },
+            positions: {
+              [CARD_ID]: { x: 0, y: 0, state: 'closed' },
+              [OMITTED_CARD_ID]: { x: 300, y: 0, state: 'closed' },
+            },
             graphs: [
               { id: GRAPH_ID, title: 'First', edges: [{ from: CARD_ID, to: OMITTED_CARD_ID }] },
             ],
@@ -978,7 +990,10 @@ describe('PostgresSpaceRepository', () => {
             id: OTHER_LAYOUT_ID,
             title: 'Second owner',
             kind: 'positioned',
-            positions: { [CARD_ID]: { x: 0, y: 0 }, [OMITTED_CARD_ID]: { x: 300, y: 0 } },
+            positions: {
+              [CARD_ID]: { x: 0, y: 0, state: 'closed' },
+              [OMITTED_CARD_ID]: { x: 300, y: 0, state: 'closed' },
+            },
             graphs: [
               { id: GRAPH_ID, title: 'Second', edges: [{ from: OMITTED_CARD_ID, to: CARD_ID }] },
             ],

@@ -99,14 +99,15 @@ export function canvasProjection(
   const openCardIds = new Set(
     authored === null
       ? []
-      : [...authored].filter(([, at]) => at.expanded !== undefined).map(([cardId]) => cardId),
+      : [...authored].filter(([, at]) => at.state === 'open').map(([cardId]) => cardId),
   );
-  const strategyGraph = buildLayoutStrategyGraph(
-    cardIds,
-    handles,
-    edges,
-    (cardId) => authored?.get(cardId)?.expanded ?? CARD_SIZE,
-  );
+  const strategyGraph = buildLayoutStrategyGraph(cardIds, handles, edges, (cardId) => {
+    const at = authored?.get(cardId);
+    // A Closed Card that remembers an Open Size still measures Closed — the
+    // one reason `Placement.effectiveSize` exists rather than reading
+    // `openSize` here directly (ADR 0066).
+    return at === undefined ? CARD_SIZE : Placement.effectiveSize(at);
+  });
 
   return {
     strategyGraph,

@@ -78,12 +78,27 @@ const brand = (positions: ReadonlyMap<CardId, Readonly<CardPlacement>>): Placeme
   positions as Placement;
 
 const point = (at: CardPlacement): CardPlacement => {
-  const copied: CardPlacement = { x: at.x, y: at.y };
-  if (at.expanded !== undefined) {
-    copied.expanded = { width: at.expanded.width, height: at.expanded.height };
+  if (at.state === 'open') {
+    return { x: at.x, y: at.y, state: 'open', openSize: { ...at.openSize } };
   }
-  return copied;
+  return at.openSize === undefined
+    ? { x: at.x, y: at.y, state: 'closed' }
+    : { x: at.x, y: at.y, state: 'closed', openSize: { ...at.openSize } };
 };
+
+/**
+ * The size a Placement entry draws at (ADR 0066). Placement owns the one
+ * effective-size operation used by displacement, rendering, Edge geometry
+ * and hit testing, so those consumers cannot choose different rects: a
+ * Closed Card that remembers an Open Size still measures Closed. Fresh
+ * copies both ways, so no caller can mutate an internal Open Size or the
+ * shared `CLOSED_CARD_SIZE` constant through the value handed back.
+ */
+function effectiveSize(at: Readonly<CardPlacement>): { width: number; height: number } {
+  return at.state === 'open'
+    ? { width: at.openSize.width, height: at.openSize.height }
+    : { width: CLOSED_CARD_SIZE.width, height: CLOSED_CARD_SIZE.height };
+}
 
 /** The placement a Layout holds. */
 function fromLayout(layout: Layout): Placement {
@@ -106,13 +121,17 @@ function fromLayout(layout: Layout): Placement {
  * and the ADR 0025 crossing from computed to authored.
  *
  * A card the strategy left unplaced is omitted rather than defaulted, because
- * collapsing that to `(0, 0)` would assert a placement no strategy made.
+ * collapsing that to `(0, 0)` would assert a placement no strategy made. An
+ * automatic strategy supplies Closed entries with no Open Size: it has no
+ * remembered size to hand over, and conversion copies exactly that — a
+ * never-Opened Card stays never-Opened, and the first Open on it adds the
+ * default in that Edit (ADR 0066).
  */
 function fromLayoutStrategyGraph(strategyGraph: LayoutStrategyGraph): Placement {
   const positions = new Map<CardId, CardPlacement>();
   for (const card of strategyGraph.cards) {
     if (card.x === undefined || card.y === undefined) continue;
-    positions.set(card.id, { x: card.x, y: card.y });
+    positions.set(card.id, { x: card.x, y: card.y, state: 'closed' });
   }
   return brand(positions);
 }
@@ -139,8 +158,9 @@ function equals(a: Placement | null, b: Placement | null): boolean {
     const other = b.get(cardId);
     if (other === undefined) return false;
     if (other.x !== at.x || other.y !== at.y) return false;
-    if (other.expanded?.width !== at.expanded?.width) return false;
-    if (other.expanded?.height !== at.expanded?.height) return false;
+    if (other.state !== at.state) return false;
+    if (other.openSize?.width !== at.openSize?.width) return false;
+    if (other.openSize?.height !== at.openSize?.height) return false;
   }
   return true;
 }
@@ -188,15 +208,17 @@ function next(
     const original = authored.get(cardId);
     if (at !== undefined) {
       const authoredAt = authoredPoint(authored, at, cardId);
-      merged.set(
-        cardId,
-        point({
-          ...at,
-          ...original,
-          x: authoredAt.x,
-          y: authoredAt.y,
-        }),
-      );
+      // A report speaks geometry only; `state` and Open Size are authored
+      // facts, read from the authored side when this card already has one.
+      // A card the report admits — not yet in `authored` — has no authored
+      // fact to read, so its entry adopts the report's own, which (see
+      // `placementFromNodes`) can only honestly claim Closed (ADR 0066).
+      // Behaviour-identical to the old `{ ...at, ...original }` double
+      // spread for a `CardPlacement` that carried at most one optional key;
+      // well-typed here over the discriminated union where that spread is
+      // not.
+      const base = original ?? at;
+      merged.set(cardId, point({ ...base, x: authoredAt.x, y: authoredAt.y }));
     }
   }
 
@@ -222,18 +244,16 @@ function authoredPoint(
   at: LayoutPosition,
   movingCardId?: CardId,
 ): LayoutPosition {
-  const open = [...placement]
-    .filter(([cardId, point]) => cardId !== movingCardId && point.expanded !== undefined)
-    .map(([, point]) => point);
+  const open = [...placement].flatMap(([cardId, entry]) =>
+    cardId !== movingCardId && entry.state === 'open' ? [entry] : [],
+  );
 
   const invert = (coordinate: 'x' | 'y', size: 'width' | 'height', closed: number): number => {
     const ordered = [...open].sort((left, right) => left[coordinate] - right[coordinate]);
     let growth = 0;
     let authored = at[coordinate];
     for (const point of ordered) {
-      // The filter above establishes this for every entry.
-      const rect = point.expanded;
-      if (rect === undefined) continue;
+      const rect = point.openSize;
       growth += rect[size] - closed;
       if (at[coordinate] > point[coordinate] + growth) {
         authored -= rect[size] - closed;
@@ -299,9 +319,9 @@ function drawn(placement: Placement): Placement {
     let x = at.x;
     let y = at.y;
     for (const [otherId, other] of placement) {
-      if (otherId === cardId || other.expanded === undefined) continue;
-      if (at.x > other.x) x += other.expanded.width - CLOSED_CARD_SIZE.width;
-      if (at.y > other.y) y += other.expanded.height - CLOSED_CARD_SIZE.height;
+      if (otherId === cardId || other.state !== 'open') continue;
+      if (at.x > other.x) x += other.openSize.width - CLOSED_CARD_SIZE.width;
+      if (at.y > other.y) y += other.openSize.height - CLOSED_CARD_SIZE.height;
     }
     result.set(cardId, point({ ...at, x, y }));
   }
@@ -314,6 +334,7 @@ export const Placement = {
   fromLayoutStrategyGraph,
   fromEntries,
   equals,
+  effectiveSize,
   drawn,
   authoredPoint,
   next,

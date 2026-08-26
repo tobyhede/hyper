@@ -74,7 +74,7 @@ export const spaceBackendContract = (
           id: LAYOUT_ID,
           title: 'Owner',
           kind: 'positioned',
-          positions: { [CARD_ID]: { x: 0, y: 0 } },
+          positions: { [CARD_ID]: { x: 0, y: 0, state: 'closed' } },
           graphs: [{ id: GRAPH_ID, title: 'Dangling', edges: [{ from: CARD_ID, to: MISSING_ID }] }],
         },
       ];

@@ -84,7 +84,7 @@ const spaceWithDanglingEdge = (id: UUID, title: string, memberId: UUID): SpaceSn
         id: LAYOUT_ID,
         title: 'Dangling',
         kind: 'positioned',
-        positions: { [memberId]: { x: 0, y: 0 } },
+        positions: { [memberId]: { x: 0, y: 0, state: 'closed' as const } },
         graphs: [
           { id: GRAPH_ID, title: 'Dangling', edges: [{ from: memberId, to: MISSING_CARD_ID }] },
         ],
@@ -423,13 +423,16 @@ export const spaceRepositoryContract = (
             {
               title: 'Minted layout',
               kind: 'positioned',
-              positions: { [CARD_ID]: { x: 4, y: 8 }, [SECOND_CARD_ID]: { x: 12, y: 16 } },
+              positions: {
+                [CARD_ID]: { x: 4, y: 8, state: 'closed' as const },
+                [SECOND_CARD_ID]: { x: 12, y: 16, state: 'closed' as const },
+              },
               graphs: [{ title: 'Explicit cards', edges: [{ from: CARD_ID, to: SECOND_CARD_ID }] }],
             },
             {
               title: 'Second minted layout',
               kind: 'positioned',
-              positions: { [CARD_ID]: { x: 0, y: 0 } },
+              positions: { [CARD_ID]: { x: 0, y: 0, state: 'closed' as const } },
               graphs: [
                 { id: GRAPH_ID, title: 'Explicit graph', edges: [{ from: CARD_ID, to: CARD_ID }] },
               ],
@@ -461,8 +464,8 @@ export const spaceRepositoryContract = (
       expect(new Set(identities).size).toBe(identities.length);
       expect(graph.edges).toEqual([{ from: CARD_ID, to: SECOND_CARD_ID }]);
       expect(layout.positions).toEqual({
-        [CARD_ID]: { x: 4, y: 8 },
-        [SECOND_CARD_ID]: { x: 12, y: 16 },
+        [CARD_ID]: { x: 4, y: 8, state: 'closed' },
+        [SECOND_CARD_ID]: { x: 12, y: 16, state: 'closed' },
       });
       // The explicit graph id is kept, and kept under its own owner rather than
       // pooled with the minted one.

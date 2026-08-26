@@ -34,7 +34,10 @@ const snapshot: SpaceSnapshot = spaceSnapshotSchema.parse({
         id: LAYOUT_ID,
         title: 'Layout',
         kind: 'positioned',
-        positions: { [CARD_ID]: { x: 10, y: 20 }, [OTHER_CARD_ID]: { x: 300, y: 20 } },
+        positions: {
+          [CARD_ID]: { x: 10, y: 20, state: 'closed' },
+          [OTHER_CARD_ID]: { x: 300, y: 20, state: 'closed' },
+        },
         graphs: [{ id: GRAPH_ID, title: 'Graph', edges: [{ from: CARD_ID, to: OTHER_CARD_ID }] }],
       },
     ],
@@ -56,7 +59,7 @@ const aliased: SpaceSnapshot = spaceSnapshotSchema.parse({
         ...snapshot.document.layouts![0],
         positions: {
           ...snapshot.document.layouts![0]!.positions,
-          [ALIAS_ID]: { x: 600, y: 20 },
+          [ALIAS_ID]: { x: 600, y: 20, state: 'closed' },
         },
       },
     ],
@@ -649,7 +652,7 @@ describe('retargeting an Alias', () => {
       id: ALIAS_ID,
       document: { title: 'A again', kind: 'alias', target: OTHER_CARD_ID },
     });
-    expect(layoutsOf(session)[0]?.positions[ALIAS_ID]).toEqual({ x: 600, y: 20 });
+    expect(layoutsOf(session)[0]?.positions[ALIAS_ID]).toEqual({ x: 600, y: 20, state: 'closed' });
     await settled(session);
   });
 

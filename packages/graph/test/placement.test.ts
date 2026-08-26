@@ -1,6 +1,6 @@
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
-import type { CardId, Layout } from '@project/core';
+import type { CardId, CardPlacement, Layout } from '@project/core';
 import { Placement, positionedStrategy } from '../src/index';
 import type { LayoutStrategyCard, LayoutStrategyGraph } from '../src/index';
 import { uuid } from './card-files';
@@ -25,7 +25,9 @@ function cardsOf(...ids: CardId[]): LayoutStrategyCard[] {
 const graph: LayoutStrategyGraph = { cards: cardsOf(CARD_A, CARD_B, CARD_C), edges: [] };
 
 const at = (entries: Record<string, [number, number]>) =>
-  Placement.fromEntries(Object.entries(entries).map(([id, [x, y]]) => [uuid(id), { x, y }]));
+  Placement.fromEntries(
+    Object.entries(entries).map(([id, [x, y]]) => [uuid(id), { x, y, state: 'closed' as const }]),
+  );
 
 const asObject = (placement: Placement) => Object.fromEntries(placement);
 
@@ -35,13 +37,16 @@ describe('Placement.fromLayout', () => {
       id: uuid('00000000-0000-4000-8000-000000000021'),
       title: 'Layout 1',
       kind: 'positioned',
-      positions: { [CARD_A]: { x: 10, y: 20 }, [CARD_B]: { x: 300, y: 40 } },
+      positions: {
+        [CARD_A]: { x: 10, y: 20, state: 'closed' },
+        [CARD_B]: { x: 300, y: 40, state: 'closed' },
+      },
       graphs: [],
     };
 
     expect(asObject(Placement.fromLayout(layout))).toEqual({
-      [CARD_A]: { x: 10, y: 20 },
-      [CARD_B]: { x: 300, y: 40 },
+      [CARD_A]: { x: 10, y: 20, state: 'closed' },
+      [CARD_B]: { x: 300, y: 40, state: 'closed' },
     });
   });
 
@@ -59,6 +64,39 @@ describe('Placement.fromLayout', () => {
   });
 });
 
+describe('Placement.effectiveSize', () => {
+  it('measures an Open entry at its remembered Open Size', () => {
+    const placement = Placement.fromEntries([
+      [CARD_A, { x: 10, y: 20, state: 'open', openSize: { width: 700, height: 500 } }],
+    ]);
+
+    expect(Placement.effectiveSize(placement.get(CARD_A)!)).toEqual({
+      width: 700,
+      height: 500,
+    });
+  });
+
+  it('measures a never-Opened Closed entry at Closed Size', () => {
+    const placement = Placement.fromEntries([[CARD_A, { x: 10, y: 20, state: 'closed' }]]);
+
+    expect(Placement.effectiveSize(placement.get(CARD_A)!)).toEqual({
+      width: 260,
+      height: 146,
+    });
+  });
+
+  it('measures a Closed entry at Closed Size even when it remembers an Open Size', () => {
+    const placement = Placement.fromEntries([
+      [CARD_A, { x: 10, y: 20, state: 'closed', openSize: { width: 700, height: 500 } }],
+    ]);
+
+    expect(Placement.effectiveSize(placement.get(CARD_A)!)).toEqual({
+      width: 260,
+      height: 146,
+    });
+  });
+});
+
 describe('Placement.fromLayoutStrategyGraph', () => {
   it('reads back what a strategy placed', async () => {
     const laid = await positionedStrategy(
@@ -70,9 +108,9 @@ describe('Placement.fromLayoutStrategyGraph', () => {
     )(graph);
 
     expect(asObject(Placement.fromLayoutStrategyGraph(laid))).toEqual({
-      [CARD_A]: { x: 10, y: 20 },
-      [CARD_B]: { x: 300, y: 20 },
-      [CARD_C]: { x: 600, y: 20 },
+      [CARD_A]: { x: 10, y: 20, state: 'closed' },
+      [CARD_B]: { x: 300, y: 20, state: 'closed' },
+      [CARD_C]: { x: 600, y: 20, state: 'closed' },
     });
   });
 
@@ -86,41 +124,65 @@ describe('Placement.fromLayoutStrategyGraph', () => {
 describe('Placement.next', () => {
   it('inverts Open Card displacement before authoring a rendered position', () => {
     const authored = Placement.fromEntries([
-      [CARD_A, { x: 10, y: 20, expanded: { width: 360, height: 196 } }],
-      [CARD_B, { x: 300, y: 200 }],
+      [CARD_A, { x: 10, y: 20, state: 'open', openSize: { width: 360, height: 196 } }],
+      [CARD_B, { x: 300, y: 200, state: 'closed' }],
     ]);
     const drawn = Placement.drawn(authored);
 
     expect(asObject(drawn)).toEqual({
-      [CARD_A]: { x: 10, y: 20, expanded: { width: 360, height: 196 } },
-      [CARD_B]: { x: 400, y: 250 },
+      [CARD_A]: { x: 10, y: 20, state: 'open', openSize: { width: 360, height: 196 } },
+      [CARD_B]: { x: 400, y: 250, state: 'closed' },
     });
     expect(Placement.next(authored, drawn, [CARD_A, CARD_B])).toBe(authored);
   });
 
   it('preserves an Open Card rect when the renderer reports only its moved position', () => {
     const authored = Placement.fromEntries([
-      [CARD_A, { x: 10, y: 20, expanded: { width: 560, height: 420 } }],
+      [CARD_A, { x: 10, y: 20, state: 'open', openSize: { width: 560, height: 420 } }],
     ]);
-    const rendered = Placement.fromEntries([[CARD_A, { x: 90, y: 80 }]]);
+    const rendered = Placement.fromEntries([[CARD_A, { x: 90, y: 80, state: 'closed' }]]);
 
     expect(asObject(Placement.next(authored, rendered, [CARD_A]))).toEqual({
-      [CARD_A]: { x: 90, y: 80, expanded: { width: 560, height: 420 } },
+      [CARD_A]: { x: 90, y: 80, state: 'open', openSize: { width: 560, height: 420 } },
     });
   });
 
   it('inverts displacement when admitting a Card the Layout did not yet place', () => {
     const authored = Placement.fromEntries([
-      [CARD_A, { x: 10, y: 20, expanded: { width: 560, height: 420 } }],
+      [CARD_A, { x: 10, y: 20, state: 'open', openSize: { width: 560, height: 420 } }],
     ]);
-    const rendered = Placement.fromEntries([[CARD_B, { x: 500, y: 400 }]]);
+    const rendered = Placement.fromEntries([[CARD_B, { x: 500, y: 400, state: 'closed' }]]);
 
     const next = Placement.next(authored, rendered, [CARD_B]);
     expect(asObject(next)).toEqual({
-      [CARD_A]: { x: 10, y: 20, expanded: { width: 560, height: 420 } },
-      [CARD_B]: { x: 200, y: 126 },
+      [CARD_A]: { x: 10, y: 20, state: 'open', openSize: { width: 560, height: 420 } },
+      [CARD_B]: { x: 200, y: 126, state: 'closed' },
     });
-    expect(Placement.drawn(next).get(CARD_B)).toEqual({ x: 500, y: 400 });
+    expect(Placement.drawn(next).get(CARD_B)).toEqual({ x: 500, y: 400, state: 'closed' });
+  });
+
+  it('displaces nothing from a Closed Card that remembers an Open Size', () => {
+    // Only `state === 'open'` drives displacement (ADR 0066) — a remembered
+    // Open Size on a Closed Card is for the next Open, not a rect the Closed
+    // Card occupies now.
+    const authored = Placement.fromEntries([
+      [CARD_A, { x: 10, y: 20, state: 'closed', openSize: { width: 560, height: 420 } }],
+      [CARD_B, { x: 300, y: 200, state: 'closed' }],
+    ]);
+
+    expect(asObject(Placement.drawn(authored))).toEqual({
+      [CARD_A]: { x: 10, y: 20, state: 'closed', openSize: { width: 560, height: 420 } },
+      [CARD_B]: { x: 300, y: 200, state: 'closed' },
+    });
+
+    const rendered = Placement.fromEntries([[CARD_C, { x: 700, y: 800, state: 'closed' }]]);
+    const authoredAt = Placement.authoredPoint(authored, { x: 700, y: 800 });
+    expect(authoredAt).toEqual({ x: 700, y: 800 });
+    expect(Placement.next(authored, rendered, [CARD_C]).get(CARD_C)).toEqual({
+      x: 700,
+      y: 800,
+      state: 'closed',
+    });
   });
 
   it('adopts the whole rendered map when nothing is authored yet', () => {
@@ -155,8 +217,8 @@ describe('Placement.next', () => {
     });
 
     expect(asObject(Placement.next(authored, rendered, [CARD_B]))).toEqual({
-      [CARD_A]: { x: 10, y: 20 },
-      [CARD_B]: { x: 500, y: 60 },
+      [CARD_A]: { x: 10, y: 20, state: 'closed' },
+      [CARD_B]: { x: 500, y: 60, state: 'closed' },
     });
   });
 
@@ -165,7 +227,7 @@ describe('Placement.next', () => {
     const rendered = at({ '00000000-0000-4000-8000-000000000002': [90, 90] });
 
     expect(asObject(Placement.next(authored, rendered, [CARD_A]))).toEqual({
-      [CARD_A]: { x: 90, y: 90 },
+      [CARD_A]: { x: 90, y: 90, state: 'closed' },
     });
   });
 
@@ -179,7 +241,7 @@ describe('Placement.next', () => {
     const rendered = at({ '00000000-0000-4000-8000-000000000002': [90, 90] });
 
     expect(asObject(Placement.next(authored, rendered, []))).toEqual({
-      [CARD_A]: { x: 10, y: 20 },
+      [CARD_A]: { x: 10, y: 20, state: 'closed' },
     });
     expect(Placement.next(authored, rendered, [])).toBe(authored);
   });
@@ -200,8 +262,8 @@ describe('Placement.next', () => {
     });
 
     expect(asObject(Placement.next(authored, rendered, [CARD_B]))).toEqual({
-      [CARD_A]: { x: 10, y: 20 },
-      [CARD_B]: { x: 500, y: 60 },
+      [CARD_A]: { x: 10, y: 20, state: 'closed' },
+      [CARD_B]: { x: 500, y: 60, state: 'closed' },
     });
   });
 
@@ -229,10 +291,12 @@ describe('Placement.place', () => {
     // which cannot arrive through `next` because nothing has rendered it.
     const authored = at({ '00000000-0000-4000-8000-000000000002': [10, 20] });
 
-    expect(asObject(Placement.place(authored, CARD_B, { x: 640, y: 80 }))).toEqual({
-      [CARD_A]: { x: 10, y: 20 },
-      [CARD_B]: { x: 640, y: 80 },
-    });
+    expect(asObject(Placement.place(authored, CARD_B, { x: 640, y: 80, state: 'closed' }))).toEqual(
+      {
+        [CARD_A]: { x: 10, y: 20, state: 'closed' },
+        [CARD_B]: { x: 640, y: 80, state: 'closed' },
+      },
+    );
   });
 });
 
@@ -247,7 +311,7 @@ describe('Placement.remove', () => {
     });
 
     expect(asObject(Placement.remove(authored, CARD_A))).toEqual({
-      [CARD_B]: { x: 300, y: 40 },
+      [CARD_B]: { x: 300, y: 40, state: 'closed' },
     });
   });
 
@@ -282,13 +346,13 @@ describe('Placement immutability', () => {
     });
 
     Placement.next(authored, rendered, [CARD_A, CARD_B]);
-    Placement.place(authored, CARD_C, { x: 1, y: 2 });
+    Placement.place(authored, CARD_C, { x: 1, y: 2, state: 'closed' });
     Placement.remove(authored, CARD_A);
 
-    expect(asObject(authored)).toEqual({ [CARD_A]: { x: 10, y: 20 } });
+    expect(asObject(authored)).toEqual({ [CARD_A]: { x: 10, y: 20, state: 'closed' } });
     expect(asObject(rendered)).toEqual({
-      [CARD_A]: { x: 90, y: 90 },
-      [CARD_B]: { x: 500, y: 60 },
+      [CARD_A]: { x: 90, y: 90, state: 'closed' },
+      [CARD_B]: { x: 500, y: 60, state: 'closed' },
     });
   });
 
@@ -296,12 +360,12 @@ describe('Placement immutability', () => {
     // `fromEntries` is built from React Flow's live `node.position` objects. A
     // Placement holding those would follow the next drag frame, which is exactly
     // the authored-from-a-report mistake this module exists to prevent.
-    const live = { x: 10, y: 20 };
+    const live: CardPlacement = { x: 10, y: 20, state: 'closed' };
     const placement = Placement.fromEntries([[CARD_A, live]]);
 
     live.x = 999;
 
-    expect(placement.get(CARD_A)).toEqual({ x: 10, y: 20 });
+    expect(placement.get(CARD_A)).toEqual({ x: 10, y: 20, state: 'closed' });
   });
 });
 
@@ -338,6 +402,25 @@ describe('Placement.equals', () => {
     ).toBe(false);
     expect(Placement.equals(base, Placement.empty())).toBe(false);
   });
+
+  it('distinguishes state and a remembered Open Size at the same coordinates (ADR 0066)', () => {
+    const neverOpened = Placement.fromEntries([[CARD_A, { x: 10, y: 20, state: 'closed' }]]);
+    const closedRemembering = Placement.fromEntries([
+      [CARD_A, { x: 10, y: 20, state: 'closed', openSize: { width: 700, height: 500 } }],
+    ]);
+    const open = Placement.fromEntries([
+      [CARD_A, { x: 10, y: 20, state: 'open', openSize: { width: 700, height: 500 } }],
+    ]);
+
+    expect(Placement.equals(neverOpened, closedRemembering)).toBe(false);
+    expect(Placement.equals(open, closedRemembering)).toBe(false);
+    expect(
+      Placement.equals(
+        neverOpened,
+        Placement.fromEntries([[CARD_A, { x: 10, y: 20, state: 'closed' }]]),
+      ),
+    ).toBe(true);
+  });
 });
 
 describe('Placement.toPositions', () => {
@@ -362,7 +445,7 @@ const idsArb = fc
   .uniqueArray(fc.uuid(), { minLength: 1, maxLength: 8 })
   .map((ids): CardId[] => ids.map(uuid));
 const coordArb = fc.integer({ min: -1000, max: 1000 });
-const expandedSizeArb = fc.record({
+const openSizeArb = fc.record({
   width: fc.integer({ min: 261, max: 900 }),
   height: fc.integer({ min: 147, max: 700 }),
 });
@@ -373,26 +456,35 @@ describe('Placement properties', () => {
       fc.property(
         idsArb,
         fc.array(coordArb, { minLength: 16, maxLength: 16 }),
-        fc.array(fc.option(expandedSizeArb, { nil: undefined }), {
+        fc.array(fc.option(openSizeArb, { nil: undefined }), {
           minLength: 8,
           maxLength: 8,
         }),
-        (ids, coords, expansions) => {
+        (ids, coords, openSizes) => {
           const authored = Placement.fromEntries(
             ids.map((id, index) => {
               const at = {
                 x: coords[index * 2] ?? 0,
                 y: coords[index * 2 + 1] ?? 0,
               };
-              const expanded = expansions[index];
-              return [id, expanded === undefined ? at : { ...at, expanded }] as const;
+              const openSize = openSizes[index];
+              const entry: CardPlacement =
+                openSize === undefined
+                  ? { ...at, state: 'closed' }
+                  : { ...at, state: 'open', openSize };
+              return [id, entry] as const;
             }),
           );
-          // Production reports React Flow node positions only. Keeping the
-          // authored `expanded` rect on this report would make the inverse test
-          // vacuous and is the defect this property exists to prevent.
+          // Production reports React Flow node positions only, always Closed —
+          // the renderer never claims a Card is Open on this Card's behalf
+          // (`placementFromNodes`). Keeping the authored Open Size on this
+          // report would make the inverse test vacuous and is the defect this
+          // property exists to prevent.
           const rendered = Placement.fromEntries(
-            [...Placement.drawn(authored)].map(([id, at]) => [id, { x: at.x, y: at.y }]),
+            [...Placement.drawn(authored)].map(([id, at]) => [
+              id,
+              { x: at.x, y: at.y, state: 'closed' as const },
+            ]),
           );
 
           expect(Placement.next(authored, rendered, [...authored.keys()])).toBe(authored);
@@ -407,7 +499,10 @@ describe('Placement properties', () => {
     await fc.assert(
       fc.asyncProperty(idsArb, fc.array(coordArb, { minLength: 60 }), async (ids, coords) => {
         const positions = Placement.fromEntries(
-          ids.map((id, i) => [id, { x: coords[i * 2] ?? 0, y: coords[i * 2 + 1] ?? 0 }]),
+          ids.map(
+            (id, i) =>
+              [id, { x: coords[i * 2] ?? 0, y: coords[i * 2 + 1] ?? 0, state: 'closed' }] as const,
+          ),
         );
         const laid = await positionedStrategy(positions)({ cards: cardsOf(...ids), edges: [] });
         const replayed = await positionedStrategy(Placement.fromLayoutStrategyGraph(laid))({
@@ -429,7 +524,10 @@ describe('Placement properties', () => {
       fc.asyncProperty(idsArb, fc.array(coordArb, { minLength: 60 }), async (ids, coords) => {
         const authoredIds = ids.slice(0, Math.ceil(ids.length / 2));
         const authored = Placement.fromEntries(
-          authoredIds.map((id, i) => [id, { x: coords[i * 2] ?? 0, y: coords[i * 2 + 1] ?? 0 }]),
+          authoredIds.map(
+            (id, i) =>
+              [id, { x: coords[i * 2] ?? 0, y: coords[i * 2 + 1] ?? 0, state: 'closed' }] as const,
+          ),
         );
         // Everything on screen, including the fallback band the omitted Cards sit in.
         const laid = await positionedStrategy(authored)({ cards: cardsOf(...ids), edges: [] });
@@ -451,11 +549,24 @@ describe('Placement properties', () => {
       fc.property(idsArb, fc.array(coordArb, { minLength: 120 }), (ids, coords) => {
         const authoredIds = ids.slice(0, Math.ceil(ids.length / 2));
         const authored = Placement.fromEntries(
-          authoredIds.map((id, i) => [id, { x: coords[i * 2] ?? 0, y: coords[i * 2 + 1] ?? 0 }]),
+          authoredIds.map(
+            (id, i) =>
+              [id, { x: coords[i * 2] ?? 0, y: coords[i * 2 + 1] ?? 0, state: 'closed' }] as const,
+          ),
         );
         // Every Card on screen, each one somewhere unrelated to what was authored.
         const rendered = Placement.fromEntries(
-          ids.map((id, i) => [id, { x: coords[60 + i * 2] ?? 0, y: coords[60 + i * 2 + 1] ?? 0 }]),
+          ids.map(
+            (id, i) =>
+              [
+                id,
+                {
+                  x: coords[60 + i * 2] ?? 0,
+                  y: coords[60 + i * 2 + 1] ?? 0,
+                  state: 'closed' as const,
+                },
+              ] as const,
+          ),
         );
 
         expect(Placement.next(authored, rendered, [])).toBe(authored);

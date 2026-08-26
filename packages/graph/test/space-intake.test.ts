@@ -87,12 +87,27 @@ const graph = (id: string, title: string, edges: { from: string; to: string }[] 
   edges,
 });
 
+/**
+ * Every position built through this helper is a never-Opened Closed entry
+ * (ADR 0066) — Open/Closed intake shape itself is `schema.test.ts`'s
+ * business, and this file is about reference relationships, which every
+ * card here being Closed leaves untouched.
+ */
 const layout = (
   id: string,
   positions: Record<string, { x: number; y: number }>,
   graphs: unknown[],
   extra: { readonly activeGraph?: string } = {},
-) => ({ id, title: `Layout ${id}`, kind: 'positioned', positions, graphs, ...extra });
+) => ({
+  id,
+  title: `Layout ${id}`,
+  kind: 'positioned',
+  positions: Object.fromEntries(
+    Object.entries(positions).map(([cardId, at]) => [cardId, { ...at, state: 'closed' }]),
+  ),
+  graphs,
+  ...extra,
+});
 
 /** One Layout over A and B, owning one Graph that joins them. */
 const simple = (defaultRenderer?: string): Document => {
@@ -594,6 +609,51 @@ describe.each([
           ],
         });
       expect(refused(document())).toEqual(refused(document()));
+    });
+  });
+
+  describe('Open and Closed placement (ADR 0066)', () => {
+    it('rejects a Layout position carrying the retired expanded shape', () => {
+      const result = load({
+        cards: [markdown(A, 'A')],
+        layouts: [
+          {
+            id: WORKING,
+            title: 'Layout Working',
+            kind: 'positioned',
+            positions: { [A]: { x: 0, y: 0, expanded: { width: 560, height: 420 } } },
+            graphs: [graph(MAIN, 'Main')],
+          },
+        ],
+      });
+
+      expect(result.ok).toBe(false);
+    });
+
+    it('loads a Layout position that is Open, carrying its Open Size', () => {
+      const space = loaded(
+        load({
+          cards: [markdown(A, 'A')],
+          layouts: [
+            {
+              id: WORKING,
+              title: 'Layout Working',
+              kind: 'positioned',
+              positions: {
+                [A]: { x: 0, y: 0, state: 'open', openSize: { width: 560, height: 420 } },
+              },
+              graphs: [graph(MAIN, 'Main')],
+            },
+          ],
+        }),
+      );
+
+      expect(space.lookup.layout(WORKING)?.layout.positions[A]).toEqual({
+        x: 0,
+        y: 0,
+        state: 'open',
+        openSize: { width: 560, height: 420 },
+      });
     });
   });
 });

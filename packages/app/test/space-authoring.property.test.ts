@@ -58,7 +58,10 @@ const start: SpaceSnapshot = {
         id: LAYOUT_ID,
         title: 'Layout 1',
         kind: 'positioned',
-        positions: { [CARD_A]: { x: 10, y: 20 }, [CARD_B]: { x: 300, y: 40 } },
+        positions: {
+          [CARD_A]: { x: 10, y: 20, state: 'closed' },
+          [CARD_B]: { x: 300, y: 40, state: 'closed' },
+        },
         graphs: [
           { id: GRAPH_ID, title: 'Main', edges: [{ from: CARD_A, to: CARD_B }] },
           { id: OTHER_GRAPH_ID, title: 'Aside', edges: [{ from: CARD_B, to: CARD_B }] },
@@ -68,7 +71,10 @@ const start: SpaceSnapshot = {
         id: OTHER_LAYOUT_ID,
         title: 'Layout 2',
         kind: 'positioned',
-        positions: { [CARD_A]: { x: 0, y: 400 }, [CARD_C]: { x: 0, y: 600 } },
+        positions: {
+          [CARD_A]: { x: 0, y: 400, state: 'closed' },
+          [CARD_C]: { x: 0, y: 600, state: 'closed' },
+        },
         graphs: [
           {
             id: uuidSchema.parse('00000000-0000-4000-8000-000000000006'),
@@ -194,9 +200,9 @@ it('keeps the working Space loadable through any sequence of semantic operations
         authoring.replacePlacement(
           opened === undefined
             ? Placement.fromEntries([
-                [CARD_A, { x: 10, y: 20 }],
-                [CARD_B, { x: 300, y: 40 }],
-                [CARD_C, { x: 600, y: 40 }],
+                [CARD_A, { x: 10, y: 20, state: 'closed' }],
+                [CARD_B, { x: 300, y: 40, state: 'closed' }],
+                [CARD_C, { x: 600, y: 40, state: 'closed' }],
               ])
             : Placement.fromLayout(opened),
         );

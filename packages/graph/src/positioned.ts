@@ -52,8 +52,8 @@ export function positionedStrategy(positions: Placement): LayoutStrategy {
             ...card,
             x: at.x,
             y: at.y,
-            width: at.expanded?.width ?? card.width,
-            height: at.expanded?.height ?? card.height,
+            width: at.state === 'open' ? at.openSize.width : card.width,
+            height: at.state === 'open' ? at.openSize.height : card.height,
           }
         : card;
     });

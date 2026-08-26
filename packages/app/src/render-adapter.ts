@@ -222,7 +222,17 @@ function placementFromNodes(nodes: readonly CardFlowNode[]): Placement {
   // SAFETY: a node id is the Card id it was projected from, widened to
   // `string` by React Flow's `Node` type — the same erasure
   // `consumeSettledMovedIds` repairs below.
-  return Placement.fromEntries(nodes.map((node) => [node.id as CardId, node.position]));
+  //
+  // A renderer reports geometry, not authored state (ADR 0066): `Placement.next`
+  // reads `state` and Open Size from the authored side whenever a card already
+  // has one, so this report can only honestly claim Closed for the one case
+  // that matters — a card the report admits that authoring has never seen.
+  return Placement.fromEntries(
+    nodes.map((node) => [
+      node.id as CardId,
+      { x: node.position.x, y: node.position.y, state: 'closed' },
+    ]),
+  );
 }
 
 function trackDragOrigins(

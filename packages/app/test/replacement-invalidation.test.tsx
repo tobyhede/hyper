@@ -90,7 +90,7 @@ const snapshot = (
           id: LAYOUT_ID,
           title: 'Layout',
           kind: 'positioned',
-          positions: { [CARD_ID]: { x, y } },
+          positions: { [CARD_ID]: { x, y, state: 'closed' } },
           graphs: [{ id: GRAPH_ID, title: 'Graph', edges: [] }],
         },
       ],

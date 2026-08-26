@@ -62,7 +62,9 @@ const layoutSpaceArb = cardIdPool.chain((pool) =>
             id: LAYOUT_ID,
             title: 'Working',
             kind: 'positioned',
-            positions: Object.fromEntries(cards.map((id, index) => [id, { x: index * 400, y: 0 }])),
+            positions: Object.fromEntries(
+              cards.map((id, index) => [id, { x: index * 400, y: 0, state: 'closed' }]),
+            ),
             graphs: graphs.map((graph, index) => ({
               id: uuidFrom(index + 100),
               title: `Graph ${index}`,
