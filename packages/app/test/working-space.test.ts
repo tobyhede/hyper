@@ -17,8 +17,8 @@ const snapshot = (title: string): SpaceSnapshot =>
           title: 'Working',
           kind: 'positioned',
           positions: {
-            '00000000-0000-4000-8000-000000000002': { x: 0, y: 0 },
-            '00000000-0000-4000-8000-000000000003': { x: 400, y: 0 },
+            '00000000-0000-4000-8000-000000000002': { x: 0, y: 0, open: false },
+            '00000000-0000-4000-8000-000000000003': { x: 400, y: 0, open: false },
           },
           graphs: [
             {

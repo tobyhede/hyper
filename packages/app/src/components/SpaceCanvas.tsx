@@ -188,8 +188,25 @@ export function SpaceCanvas({
   activeGraphId,
   activeGraphCardIds,
 }: SpaceCanvasProps) {
-  const [caret, setCaret] = useState<{ cardId: string; field: 'title' | 'body' } | null>(null);
+  const [caret, setCaret] = useState<
+    | { cardId: string; field: 'title' }
+    | { cardId: string; field: 'body'; openObserved: boolean }
+    | null
+  >(null);
   const editingTitleCardId = caret?.field === 'title' ? caret.cardId : null;
+  const bodyCaretNamesOpenMarkdown =
+    caret?.field === 'body' &&
+    nodes.some(
+      (node) =>
+        node.id === caret.cardId && node.data.expanded === true && node.data.kind === 'markdown',
+    );
+  if (caret?.field === 'body') {
+    if (bodyCaretNamesOpenMarkdown && !caret.openObserved) {
+      setCaret({ ...caret, openObserved: true });
+    } else if (!bodyCaretNamesOpenMarkdown && caret.openObserved) {
+      setCaret(null);
+    }
+  }
   /**
    * Which Card carries a live content editor — **derived, never stored**.
    *
@@ -212,13 +229,7 @@ export function SpaceCanvas({
    * different thing, and it ends the edit because the Card stops being drawn.
    */
   const bodyEditorCardId =
-    caret?.field === 'body' &&
-    editable &&
-    !presenting &&
-    nodes.some(
-      (node) =>
-        node.id === caret.cardId && node.data.expanded === true && node.data.kind === 'markdown',
-    )
+    caret?.field === 'body' && editable && !presenting && bodyCaretNamesOpenMarkdown
       ? caret.cardId
       : null;
   const bodyEditing = bodyEditorCardId !== null;
@@ -271,8 +282,8 @@ export function SpaceCanvas({
   if (canvasAuthoringWasEnabled !== canAuthorOnCanvas) {
     setCanvasAuthoringWasEnabled(canAuthorOnCanvas);
     // The *title* editor only. It is a canvas control and goes with the rest of
-    // them. A content edit is the Card's, not the canvas's: it is answered by
-    // `bodyEditorCardId` above, which needs no reset because it stores nothing.
+    // them. A content edit is the Card's, not the canvas's: presenting may hide
+    // it without withdrawing the author's caret.
     if (!canAuthorOnCanvas && caret?.field === 'title') setCaret(null);
   }
 
@@ -414,7 +425,12 @@ export function SpaceCanvas({
           data.onBeginTitleEditing = () => setCaret({ cardId: node.id, field: 'title' });
         }
         if (canAuthorOnCanvas && !bodyEditing && node.data.kind === 'markdown') {
-          data.onBeginBodyEditing = () => setCaret({ cardId: node.id, field: 'body' });
+          data.onBeginBodyEditing = () =>
+            setCaret({
+              cardId: node.id,
+              field: 'body',
+              openObserved: node.data.expanded === true,
+            });
         }
         if (node.data.expanded === true && node.data.kind === 'markdown') {
           if (canAuthorOnCanvas) {

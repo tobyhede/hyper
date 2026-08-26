@@ -80,7 +80,7 @@ const spaceFileArb = cardIdPool.chain((pool) =>
             title: 'Only layout',
             kind: 'positioned',
             positions: Object.fromEntries(
-              visited.map((id, index) => [id, { x: index * 300, y: 0 }]),
+              visited.map((id, index) => [id, { x: index * 300, y: 0, open: false }]),
             ),
             graphs: graphs.map((graph, index) => ({
               id: uuidFrom(index + 100),

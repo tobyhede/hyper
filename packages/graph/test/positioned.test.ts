@@ -60,9 +60,9 @@ describe('positionedStrategy', () => {
     const positions = Placement.fromEntries([
       [
         uuid('00000000-0000-4000-8000-000000000002'),
-        { x: 0, y: 0, expanded: { width: 360, height: 196 } },
+        { x: 0, y: 0, open: true, openSize: { width: 360, height: 196 } },
       ],
-      [uuid('00000000-0000-4000-8000-000000000003'), { x: 300, y: 200 }],
+      [uuid('00000000-0000-4000-8000-000000000003'), { x: 300, y: 200, open: false }],
     ]);
     const laid = await positionedStrategy(positions)({
       cards: cardsOf(
@@ -186,7 +186,10 @@ describe('positionedStrategy properties', () => {
         // Authored positions for a prefix of the cards; the rest are omitted.
         const authored = ids.slice(0, Math.floor(coords.length / 2));
         const positions = Placement.fromEntries(
-          authored.map((id, i) => [id, { x: coords[i * 2] ?? 0, y: coords[i * 2 + 1] ?? 0 }]),
+          authored.map((id, i) => [
+            id,
+            { x: coords[i * 2] ?? 0, y: coords[i * 2 + 1] ?? 0, open: false },
+          ]),
         );
         const laid = await positionedStrategy(positions)({ cards: cardsOf(...ids), edges: [] });
 
@@ -204,7 +207,10 @@ describe('positionedStrategy properties', () => {
       fc.asyncProperty(idsArb, fc.array(coordArb), async (ids, coords) => {
         const authored = ids.slice(0, Math.floor(coords.length / 2));
         const positions = Placement.fromEntries(
-          authored.map((id, i) => [id, { x: coords[i * 2] ?? 0, y: coords[i * 2 + 1] ?? 0 }]),
+          authored.map((id, i) => [
+            id,
+            { x: coords[i * 2] ?? 0, y: coords[i * 2 + 1] ?? 0, open: false },
+          ]),
         );
         const laid = await positionedStrategy(positions)({ cards: cardsOf(...ids), edges: [] });
 

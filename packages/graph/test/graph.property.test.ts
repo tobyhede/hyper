@@ -28,7 +28,9 @@ function layoutOver(index: number, ids: number[], graphCount: number) {
     id: layoutId(index),
     title: `Layout ${index}`,
     kind: 'positioned' as const,
-    positions: Object.fromEntries(ids.map((id, i) => [cardId(id), { x: i * 320, y: index * 200 }])),
+    positions: Object.fromEntries(
+      ids.map((id, i) => [cardId(id), { x: i * 320, y: index * 200, open: false }]),
+    ),
     graphs: Array.from({ length: graphCount }, (_, g) => ({
       id: graphId(index * 100 + g),
       title: `Graph ${index}.${g}`,

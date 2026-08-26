@@ -33,7 +33,7 @@ describe('graph identity types', () => {
     positionedStrategy(new Map<CardId, LayoutPosition>());
     // @ts-expect-error Nor through the sanctioned constructor: closing construction
     // would mean nothing if `fromEntries` re-opened the seam it exists to hold.
-    Placement.fromEntries([['card', { x: 0, y: 0 }]]);
+    Placement.fromEntries([['card', { x: 0, y: 0, open: false }]]);
 
     // A stored point is a value, not a handle into the map. Writing through one
     // would author a position no Edit made, past `next` and `place` both.

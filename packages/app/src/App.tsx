@@ -481,12 +481,14 @@ export const createApp = ({ spaceSession }: OpenedSpace) => {
     );
     const completeCardBody = useCallback(
       (cardId: CardId, body: string): 'completed' | 'retained' => {
-        const card = currentSpace().lookup.card(cardId);
-        if (card?.kind !== 'markdown') return 'retained';
+        const stored = spaceSession.getState().working.cards.find((card) => card.id === cardId);
+        if (stored?.document.kind !== 'markdown') return 'retained';
+        const parsed = cardDocumentSchema.safeParse({ ...stored.document, body });
+        if (!parsed.success) return 'retained';
         const result = authoring.complete({
           kind: 'edited-card',
           cardId,
-          document: { kind: 'markdown', title: card.title, body },
+          document: parsed.data,
         });
         return result.kind === 'completed' || result.kind === 'unchanged'
           ? 'completed'

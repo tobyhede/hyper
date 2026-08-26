@@ -1,6 +1,7 @@
 import {
   type CardDocument,
   type CardId,
+  DEFAULT_EXPANDED_CARD_SIZE,
   type Graph,
   type GraphEdge,
   type GraphId,
@@ -17,7 +18,6 @@ import {
   type SpaceSessionState,
 } from '@project/persistence';
 import { nextGraphColor } from './colors';
-import { DEFAULT_EXPANDED_CARD_SIZE } from './card';
 import type { Navigation, NavigationState } from './navigation';
 import {
   updatePositionedLayout,
@@ -941,32 +941,33 @@ export function createSpaceAuthoring({
     } else if (completion.kind === 'opened-card') {
       const at = completedPlacement.get(completion.cardId);
       if (at === undefined) return refuse({ code: 'card-not-in-layout' });
-      if (at.expanded !== undefined) return UNCHANGED;
+      if (at.open) return UNCHANGED;
       completedPlacement = Placement.place(completedPlacement, completion.cardId, {
         ...at,
-        expanded: DEFAULT_EXPANDED_CARD_SIZE,
+        open: true,
+        openSize: at.openSize ?? DEFAULT_EXPANDED_CARD_SIZE,
       });
     } else if (completion.kind === 'closed-card') {
       const at = completedPlacement.get(completion.cardId);
       if (at === undefined) return refuse({ code: 'card-not-in-layout' });
-      if (at.expanded === undefined) return UNCHANGED;
+      if (!at.open) return UNCHANGED;
       completedPlacement = Placement.place(completedPlacement, completion.cardId, {
-        x: at.x,
-        y: at.y,
+        ...at,
+        open: false,
       });
     } else if (completion.kind === 'resized-card') {
       const at = completedPlacement.get(completion.cardId);
       if (at === undefined) return refuse({ code: 'card-not-in-layout' });
-      if (at.expanded === undefined) return refuse({ code: 'card-not-expanded' });
+      if (!at.open) return refuse({ code: 'card-not-expanded' });
       if (
-        at.expanded.width === completion.size.width &&
-        at.expanded.height === completion.size.height
+        at.openSize.width === completion.size.width &&
+        at.openSize.height === completion.size.height
       ) {
         return UNCHANGED;
       }
       completedPlacement = Placement.place(completedPlacement, completion.cardId, {
         ...at,
-        expanded: completion.size,
+        openSize: completion.size,
       });
     } else if (completion.kind === 'created-card') {
       createdCard = createCard(

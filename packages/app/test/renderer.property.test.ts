@@ -67,7 +67,9 @@ function sourceSpace(): Space {
           id: uuid(0x500),
           title: 'Working',
           kind: 'positioned',
-          positions: Object.fromEntries(ids.map((id, index) => [id, { x: index * 320, y: 0 }])),
+          positions: Object.fromEntries(
+            ids.map((id, index) => [id, { x: index * 320, y: 0, open: false }]),
+          ),
           graphs: [{ id: SOURCE_GRAPH, title: 'Main', edges: [{ from: ids[0], to: ids[1] }] }],
         },
       ],

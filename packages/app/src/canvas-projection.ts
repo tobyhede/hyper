@@ -97,16 +97,12 @@ export function canvasProjection(
   const authored =
     renderer.kind === 'layout' ? Placement.fromLayout(renderer.resolvedLayout.layout) : null;
   const expandedCardIds = new Set(
-    authored === null
-      ? []
-      : [...authored].filter(([, at]) => at.expanded !== undefined).map(([cardId]) => cardId),
+    authored === null ? [] : [...authored].filter(([, at]) => at.open).map(([cardId]) => cardId),
   );
-  const strategyGraph = buildLayoutStrategyGraph(
-    cardIds,
-    handles,
-    edges,
-    (cardId) => authored?.get(cardId)?.expanded ?? CARD_SIZE,
-  );
+  const strategyGraph = buildLayoutStrategyGraph(cardIds, handles, edges, (cardId) => {
+    const at = authored?.get(cardId);
+    return at?.open === true ? at.openSize : CARD_SIZE;
+  });
 
   return {
     strategyGraph,

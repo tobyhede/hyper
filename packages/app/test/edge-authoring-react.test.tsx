@@ -88,9 +88,9 @@ const snapshot: SpaceSnapshot = {
         title: 'Layout 1',
         kind: 'positioned',
         positions: {
-          [CARD_A]: { x: 0, y: 0 },
-          [CARD_B]: { x: 400, y: 0 },
-          [CARD_C]: { x: 800, y: 0 },
+          [CARD_A]: { x: 0, y: 0, open: false },
+          [CARD_B]: { x: 400, y: 0, open: false },
+          [CARD_C]: { x: 800, y: 0, open: false },
         },
         graphs: [
           { id: GRAPH_ID, title: 'Main', edges: [EDGE] },
@@ -208,9 +208,9 @@ function compose({
     selection: { kind: 'layout', layoutId: LAYOUT_ID },
     newGraphId: mintingGraphIds(MINTED_GRAPH_ID),
     initialPlacement: Placement.fromEntries([
-      [CARD_A, { x: 0, y: 0 }],
-      [CARD_B, { x: 400, y: 0 }],
-      [CARD_C, { x: 800, y: 0 }],
+      [CARD_A, { x: 0, y: 0, open: false }],
+      [CARD_B, { x: 400, y: 0, open: false }],
+      [CARD_C, { x: 800, y: 0, open: false }],
     ]),
     connections,
   });

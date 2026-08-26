@@ -89,7 +89,7 @@ _Avoid_: revision (that is what a stored Space is versioned by, and the two move
 ## Layout and views
 
 **Layout**:
-A card-to-rect map the author wrote — which of a Space's Cards are in the Layout, where they sit, which of them are Open, and the Open Size each remembers. It belongs to the Space and is part of what the Space is. A Space may hold several Layouts, and may hold none. Membership, position, Opening and Open Size are properties of the Layout, never of the Card: the same Card may be absent from one Layout, sit at different coordinates in others, and be Open at different sizes in each. A Layout may not name Cards the Space does not have.
+A card-to-rect map the author wrote — which of a Space's Cards are in the Layout, where they sit, their Open/Closed state, and the Open Size each remembers. It belongs to the Space and is part of what the Space is. A Space may hold several Layouts, and may hold none. Membership, position, Open/Closed state and Open Size are properties of the Layout, never of the Card: the same Card may be absent from one Layout, sit at different coordinates in others, and be Open at different sizes in each. A Layout may not name Cards the Space does not have.
 
 A Layout is authored by definition; the computed kind is not a layout at all but an automatic **layout strategy** (ADR 0014). An **Algorithmic View** the application supplies renders a subject of Cards and Graphs, and **editing turns that into a Layout**: the View returns the Cards and positions already on screen along with one or more Graphs, so nothing moves at the moment it happens. Every Graph it returns carries a new identity owned by the new Layout, so no conversion can leave two Layouts owning one Graph (ADR 0045).
 

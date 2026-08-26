@@ -17,7 +17,10 @@ const identified = {
         id: LAYOUT_ID,
         title: 'Working',
         kind: 'positioned' as const,
-        positions: { [CARD_A]: { x: 0, y: 0 }, [CARD_B]: { x: 320, y: 0 } },
+        positions: {
+          [CARD_A]: { x: 0, y: 0, open: false },
+          [CARD_B]: { x: 320, y: 0, open: false },
+        },
         graphs: [{ id: GRAPH_ID, title: 'Main', edges: [{ from: CARD_A, to: CARD_B }] }],
       },
     ],
@@ -47,7 +50,7 @@ describe('import space schema', () => {
       layouts: [
         {
           title: 'Generated layout',
-          positions: { [CARD_A]: { x: 0, y: 0 } },
+          positions: { [CARD_A]: { x: 0, y: 0, open: false } },
           graphs: [{ title: 'Generated graph', edges: [{ from: CARD_A, to: CARD_B }] }],
         },
       ],
@@ -76,7 +79,7 @@ describe('import space schema', () => {
         layouts: [
           {
             title: 'Working',
-            positions: { [CARD_A]: { x: 0, y: 0 } },
+            positions: { [CARD_A]: { x: 0, y: 0, open: false } },
             graphs: [{ ...graph, id: undefined }],
           },
         ],

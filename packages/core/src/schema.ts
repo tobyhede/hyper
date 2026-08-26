@@ -136,15 +136,16 @@ export const layoutPositionSchema = z.object({
   y: z.number(),
 });
 
-/** What a Layout stores for one Card: its origin and, when Expanded, its authored size. */
-export const cardPlacementSchema = layoutPositionSchema.extend({
-  expanded: z
-    .object({
-      width: z.number().min(COLLAPSED_CARD_SIZE.width),
-      height: z.number().min(COLLAPSED_CARD_SIZE.height),
-    })
-    .optional(),
+const openSizeSchema = z.object({
+  width: z.number().min(COLLAPSED_CARD_SIZE.width),
+  height: z.number().min(COLLAPSED_CARD_SIZE.height),
 });
+
+/** What a Layout stores for one Card: its origin, Open/Closed state and remembered Open Size. */
+export const cardPlacementSchema = z.discriminatedUnion('open', [
+  layoutPositionSchema.extend({ open: z.literal(true), openSize: openSizeSchema }),
+  layoutPositionSchema.extend({ open: z.literal(false), openSize: openSizeSchema.optional() }),
+]);
 
 /**
  * A layout the author wrote: a card-to-position map and the graphs over it

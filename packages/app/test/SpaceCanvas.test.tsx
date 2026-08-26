@@ -410,6 +410,21 @@ describe('withdrawing canvas authoring from an Expanded Card', () => {
     expect(addCard).toHaveBeenCalled();
   });
 
+  it('does not restore body editing when a replacement Space reopens the Card', async () => {
+    const expanded = cardNode('A', CARD_ID, true);
+    expanded.data.expanded = true;
+    expanded.data.body = '# A';
+    const { setNodes } = mountGraph([expanded]);
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Markdown source of A' }));
+    await screen.findByRole('textbox', { name: 'Markdown source of A' });
+
+    setNodes([cardNode('A', CARD_ID, true)]);
+    setNodes([expanded]);
+
+    expect(screen.queryByRole('textbox', { name: 'Markdown source of A' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Edit Markdown source of A' })).toBeVisible();
+  });
+
   it('tells its parent a content edit is live, so presenting cannot start over one', () => {
     const expanded = cardNode('A', CARD_ID, true);
     expanded.data.expanded = true;
@@ -421,17 +436,23 @@ describe('withdrawing canvas authoring from an Expanded Card', () => {
     expect(bodyEditingChanged).toHaveBeenLastCalledWith(true);
   });
 
-  it.each(['Enter', ' '])('does not Open a Card with %s while its body is being edited', (key) => {
-    const expanded = cardNode('A', CARD_ID, true);
-    expanded.data.expanded = true;
-    expanded.data.body = '# A';
-    const { openCard } = mountGraph([expanded]);
-    fireEvent.click(screen.getByRole('button', { name: 'Edit Markdown source of A' }));
+  it.each(['Enter', ' '])(
+    'does not Open a Card with %s while its body is being edited',
+    async (key) => {
+      const expanded = cardNode('A', CARD_ID, true);
+      expanded.data.expanded = true;
+      expanded.data.body = '# A';
+      const { openCard } = mountGraph([expanded]);
+      fireEvent.click(screen.getByRole('button', { name: 'Edit Markdown source of A' }));
 
-    fireEvent.keyDown(nodeOf(CARD_ID), { key });
+      const editor = await screen.findByRole('textbox', { name: 'Markdown source of A' });
+      editor.focus();
+      expect(editor).toBe(document.activeElement);
+      fireEvent.keyDown(editor, { key });
 
-    expect(openCard).not.toHaveBeenCalled();
-  });
+      expect(openCard).not.toHaveBeenCalled();
+    },
+  );
 
   it('does not let another edit or Card creation replace a live body caret', () => {
     const a = cardNode('A');

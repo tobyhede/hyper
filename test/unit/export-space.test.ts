@@ -41,7 +41,10 @@ const storedSpace: LoadedSpace = {
           id: SPINE_LAYOUT_ID,
           title: 'Spine',
           kind: 'positioned',
-          positions: { [CARD_B]: { x: 260, y: 0 }, [CARD_A]: { x: 0, y: 0 } },
+          positions: {
+            [CARD_B]: { x: 260, y: 0, open: false },
+            [CARD_A]: { x: 0, y: 0, open: false },
+          },
           graphs: [
             {
               id: SHORT_GRAPH_ID,
@@ -57,7 +60,10 @@ const storedSpace: LoadedSpace = {
           id: ECHO_LAYOUT_ID,
           title: 'Echo',
           kind: 'positioned',
-          positions: { [CARD_E]: { x: 0, y: 200 }, [CARD_F]: { x: 260, y: 200 } },
+          positions: {
+            [CARD_E]: { x: 0, y: 200, open: false },
+            [CARD_F]: { x: 260, y: 200, open: false },
+          },
           graphs: [{ id: ECHO_GRAPH_ID, title: 'Echo', edges: [{ from: CARD_E, to: CARD_F }] }],
         },
       ],
@@ -105,7 +111,10 @@ describe('canonical export', () => {
           id: SPINE_LAYOUT_ID,
           title: 'Spine',
           kind: 'positioned',
-          positions: { [CARD_A]: { x: 0, y: 0 }, [CARD_B]: { x: 260, y: 0 } },
+          positions: {
+            [CARD_A]: { x: 0, y: 0, open: false },
+            [CARD_B]: { x: 260, y: 0, open: false },
+          },
           graphs: [
             {
               id: SHORT_GRAPH_ID,
@@ -121,7 +130,10 @@ describe('canonical export', () => {
           id: ECHO_LAYOUT_ID,
           title: 'Echo',
           kind: 'positioned',
-          positions: { [CARD_E]: { x: 0, y: 200 }, [CARD_F]: { x: 260, y: 200 } },
+          positions: {
+            [CARD_E]: { x: 0, y: 200, open: false },
+            [CARD_F]: { x: 260, y: 200, open: false },
+          },
           graphs: [{ id: ECHO_GRAPH_ID, title: 'Echo', edges: [{ from: CARD_E, to: CARD_F }] }],
         },
       ],
@@ -171,12 +183,18 @@ describe('canonical export', () => {
               { edges: [{ to: CARD_B, from: CARD_A }], id: LONG_GRAPH_ID, title: 'Long' },
             ],
             title: 'Spine',
-            positions: { [CARD_A]: { y: 0, x: 0 }, [CARD_B]: { y: 0, x: 260 } },
+            positions: {
+              [CARD_A]: { y: 0, x: 0, open: false },
+              [CARD_B]: { y: 0, x: 260, open: false },
+            },
             id: SPINE_LAYOUT_ID,
           },
           {
             title: 'Echo',
-            positions: { [CARD_F]: { y: 200, x: 260 }, [CARD_E]: { y: 200, x: 0 } },
+            positions: {
+              [CARD_F]: { y: 200, x: 260, open: false },
+              [CARD_E]: { y: 200, x: 0, open: false },
+            },
             graphs: [{ title: 'Echo', edges: [{ to: CARD_F, from: CARD_E }], id: ECHO_GRAPH_ID }],
             id: ECHO_LAYOUT_ID,
             kind: 'positioned',

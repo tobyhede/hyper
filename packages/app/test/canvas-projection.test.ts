@@ -34,7 +34,7 @@ const layoutOwning = (...graphs: readonly object[]) => ({
   id: LAYOUT,
   title: 'Working',
   kind: 'positioned',
-  positions: { [CARD_A]: { x: 0, y: 0 }, [CARD_B]: { x: 400, y: 0 } },
+  positions: { [CARD_A]: { x: 0, y: 0, open: false }, [CARD_B]: { x: 400, y: 0, open: false } },
   graphs,
 });
 
@@ -167,8 +167,8 @@ describe('canvasProjection', () => {
     const layout = {
       ...layoutOwning(DRAWN),
       positions: {
-        [CARD_A]: { x: 0, y: 0, expanded: { width: 560, height: 420 } },
-        [CARD_B]: { x: 700, y: 0 },
+        [CARD_A]: { x: 0, y: 0, open: true, openSize: { width: 560, height: 420 } },
+        [CARD_B]: { x: 700, y: 0, open: false },
       },
     };
     const space = spaceWith({ layouts: [layout] });

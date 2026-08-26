@@ -28,7 +28,7 @@ const snapshot = (title: string, cardTitle: string, x: number, y: number): Space
           id: LAYOUT_ID,
           title: 'Layout',
           kind: 'positioned',
-          positions: { [CARD_ID]: { x, y } },
+          positions: { [CARD_ID]: { x, y, open: false } },
           // A Layout owns at least one Graph (ADR 0040), and one Card has
           // nothing to connect — so the Graph it opens on holds no Edges.
           graphs: [{ id: OWNED_GRAPH_ID, title: 'Graph', edges: [] }],

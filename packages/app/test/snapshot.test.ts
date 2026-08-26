@@ -29,7 +29,10 @@ const snapshot = spaceSnapshotSchema.parse({
         id: LAYOUT_ID,
         title: 'Layout',
         kind: 'positioned',
-        positions: { [CARD_A]: { x: 0, y: 0 }, [CARD_B]: { x: 200, y: 0 } },
+        positions: {
+          [CARD_A]: { x: 0, y: 0, open: false },
+          [CARD_B]: { x: 200, y: 0, open: false },
+        },
         graphs: [MAIN],
       },
     ],
@@ -45,8 +48,8 @@ it('writes a Layout that owns its Graphs as a complete valid persistence snapsho
     layoutId: LAYOUT_ID,
     title: 'Layout',
     positions: Placement.fromEntries([
-      [CARD_A, { x: 10, y: 20 }],
-      [CARD_B, { x: 300, y: 40 }],
+      [CARD_A, { x: 10, y: 20, open: false }],
+      [CARD_B, { x: 300, y: 40, open: false }],
     ]),
     graphs: [MAIN],
     activeGraphId: GRAPH_ID,
@@ -59,7 +62,10 @@ it('writes a Layout that owns its Graphs as a complete valid persistence snapsho
       id: LAYOUT_ID,
       title: 'Layout',
       kind: 'positioned',
-      positions: { [CARD_A]: { x: 10, y: 20 }, [CARD_B]: { x: 300, y: 40 } },
+      positions: {
+        [CARD_A]: { x: 10, y: 20, open: false },
+        [CARD_B]: { x: 300, y: 40, open: false },
+      },
       graphs: [MAIN],
       activeGraph: GRAPH_ID,
     },
@@ -77,7 +83,7 @@ it('appends a converted Layout owning its own Graph without touching the Space',
   const changed = updatePositionedLayout(snapshot, {
     layoutId: OTHER_LAYOUT_ID,
     title: 'Layout 2',
-    positions: Placement.fromEntries([[CARD_A, { x: 1, y: 2 }]]),
+    positions: Placement.fromEntries([[CARD_A, { x: 1, y: 2, open: false }]]),
     graphs: [minted],
     activeGraphId: OTHER_GRAPH_ID,
   });
@@ -109,7 +115,7 @@ it('leaves unrelated layouts standing while replacing placement', () => {
           id: OTHER_LAYOUT_ID,
           title: 'Other',
           kind: 'positioned',
-          positions: { [CARD_A]: { x: 0, y: 400 } },
+          positions: { [CARD_A]: { x: 0, y: 400, open: false } },
           graphs: [{ id: OTHER_GRAPH_ID, title: 'Aside', edges: [{ from: CARD_A, to: CARD_A }] }],
         },
       ],
@@ -120,8 +126,8 @@ it('leaves unrelated layouts standing while replacing placement', () => {
     layoutId: LAYOUT_ID,
     title: 'Layout',
     positions: Placement.fromEntries([
-      [CARD_A, { x: 5, y: 6 }],
-      [CARD_B, { x: 7, y: 8 }],
+      [CARD_A, { x: 5, y: 6, open: false }],
+      [CARD_B, { x: 7, y: 8, open: false }],
     ]),
     graphs: [MAIN],
     activeGraphId: GRAPH_ID,
@@ -148,8 +154,8 @@ it('leaves an authored active Graph alone when the Edit names none', () => {
     layoutId: LAYOUT_ID,
     title: 'Layout',
     positions: Placement.fromEntries([
-      [CARD_A, { x: 5, y: 6 }],
-      [CARD_B, { x: 7, y: 8 }],
+      [CARD_A, { x: 5, y: 6, open: false }],
+      [CARD_B, { x: 7, y: 8, open: false }],
     ]),
     graphs: [MAIN],
     activeGraphId: null,
@@ -162,8 +168,8 @@ it('leaves an authored active Graph alone when the Edit names none', () => {
       layoutId: LAYOUT_ID,
       title: 'Layout',
       positions: Placement.fromEntries([
-        [CARD_A, { x: 5, y: 6 }],
-        [CARD_B, { x: 7, y: 8 }],
+        [CARD_A, { x: 5, y: 6, open: false }],
+        [CARD_B, { x: 7, y: 8, open: false }],
       ]),
       graphs: [MAIN],
       activeGraphId: GRAPH_ID,
@@ -172,8 +178,8 @@ it('leaves an authored active Graph alone when the Edit names none', () => {
       layoutId: LAYOUT_ID,
       title: 'Layout',
       positions: Placement.fromEntries([
-        [CARD_A, { x: 9, y: 9 }],
-        [CARD_B, { x: 7, y: 8 }],
+        [CARD_A, { x: 9, y: 9, open: false }],
+        [CARD_B, { x: 7, y: 8, open: false }],
       ]),
       graphs: [MAIN],
       activeGraphId: null,
@@ -201,7 +207,10 @@ it('cascades a deleted Card out of every Layout that held it', () => {
           id: OTHER_LAYOUT_ID,
           title: 'Other',
           kind: 'positioned',
-          positions: { [CARD_A]: { x: 0, y: 400 }, [CARD_B]: { x: 0, y: 600 } },
+          positions: {
+            [CARD_A]: { x: 0, y: 400, open: false },
+            [CARD_B]: { x: 0, y: 600, open: false },
+          },
           graphs: [
             {
               id: OTHER_GRAPH_ID,
@@ -219,9 +228,13 @@ it('cascades a deleted Card out of every Layout that held it', () => {
 
   const changed = withCardRemovedFromLayouts(withLayouts, CARD_A);
 
-  expect(changed.document.layouts?.[0]?.positions).toEqual({ [CARD_B]: { x: 200, y: 0 } });
+  expect(changed.document.layouts?.[0]?.positions).toEqual({
+    [CARD_B]: { x: 200, y: 0, open: false },
+  });
   expect(changed.document.layouts?.[0]?.graphs).toEqual([{ ...MAIN, edges: [] }]);
-  expect(changed.document.layouts?.[1]?.positions).toEqual({ [CARD_B]: { x: 0, y: 600 } });
+  expect(changed.document.layouts?.[1]?.positions).toEqual({
+    [CARD_B]: { x: 0, y: 600, open: false },
+  });
   expect(changed.document.layouts?.[1]?.graphs).toEqual([
     { id: OTHER_GRAPH_ID, title: 'Aside', edges: [] },
   ]);

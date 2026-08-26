@@ -170,6 +170,7 @@ test('reduced motion removes Card content and rail-action transitions', async ({
   await expect(content).toHaveCSS('transition-duration', '0s');
   await expect(content).toHaveCSS('transition-delay', '0s');
   await expect(action).toHaveCSS('transition-duration', '0s');
+  await expect(action).toHaveCSS('transition-delay', '0s');
 });
 
 test(
