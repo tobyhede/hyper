@@ -759,6 +759,31 @@ describe('CardNode Expanded Card front', () => {
     expect(onResizeCancel).toHaveBeenCalledOnce();
   });
 
+  it('proposes nothing from a gesture that was already cancelled', () => {
+    const onResize = vi.fn();
+    const resize = {
+      minWidth: 260,
+      minHeight: 146,
+      onResizeStart: () => undefined,
+      onResize,
+      onResizeEnd: () => undefined,
+      onResizeCancel: () => undefined,
+    };
+    render(<CardNode {...props({ expanded: true, body: SOURCE, resize })} />);
+
+    fireEvent.mouseDown(screen.getByTestId('resize-control'));
+    fireEvent.blur(window);
+    fireEvent.mouseMove(screen.getByTestId('resize-control'));
+
+    // Losing the window discards the draft, but it does not end the drag:
+    // d3-drag installs its own `mousemove`/`mouseup` on the window at
+    // `mousedown` and removes them only at `mouseup`, so React Flow keeps
+    // asking this Card for geometry while the pointer is still down. A
+    // cancelled gesture proposes nothing, so the Card the author sees and the
+    // draft the adapter holds cannot disagree.
+    expect(onResize).not.toHaveBeenCalled();
+  });
+
   it('proposes resize geometry without allowing React Flow to apply it locally', () => {
     const onResize = vi.fn();
     const resize = {
@@ -771,6 +796,9 @@ describe('CardNode Expanded Card front', () => {
     };
     render(<CardNode {...props({ expanded: true, body: SOURCE, resize })} />);
 
+    // The press is the gesture: geometry is proposed only from a drag this Card
+    // started, so a move without it proves nothing about the live one.
+    fireEvent.mouseDown(screen.getByTestId('resize-control'));
     fireEvent.mouseMove(screen.getByTestId('resize-control'));
 
     expect(onResize).toHaveBeenCalledWith({ width: 620, height: 440 });

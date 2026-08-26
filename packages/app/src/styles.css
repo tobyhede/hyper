@@ -159,16 +159,36 @@ body {
    Qualifying by the node wrapper outranks that pair without this file naming a
    bare `.handle`, which belongs to React Flow and which no module here names.
 
-   The control is the hit target and the mark is only what it draws. Only
-   `opacity` is off at rest: withholding `pointer-events` too deadlocks the
-   gesture, because React Flow's own `translate` centres this box on the corner
-   it resizes from, so half of it lies outside the Card. A pointer arriving
-   there hits the pane instead, the Card stops being hovered, and the control
-   the hover was revealing is withheld again. Left interactive it is reachable,
-   and nothing is grabbable that hovering the Card does not also show. */
+   The control is the hit target and the mark is only what it draws, and the
+   whole of it stays inside the Card: `translate` is overridden rather than left
+   as React Flow's centring of the box on the corner it resizes from. Centred,
+   three quarters of a 24px target lay over the pane while `opacity` kept it
+   invisible, and hover is no answer to a pointer that has none — a touch beside
+   an unselected Open Card's bottom-right corner began a resize on a control
+   nothing had revealed. Anchored inside, the mark sits just within the corner
+   rather than straddling it, and there is nothing over the pane to hit.
+
+   Anchoring it inside is what makes `z-index` load-bearing. The control is
+   rendered before the Card so `canvas-card.css` can reach the authoring handles
+   with `~`, and a positioned later sibling otherwise paints over it — with the
+   overhang gone, every point of the control lay under `.canvas-card` and the
+   press landed on the Card body instead. It takes the same layer the authoring
+   handles take, for the same reason.
+
+   `pointer-events` is gated on reveal, as the authoring handles gate theirs.
+   Against the centred box that deadlocked the gesture outright — a pointer
+   arriving on the overhang hit the pane, the Card stopped being hovered, and
+   the control the hover was revealing was withheld from under it, so
+   `onResizeStart` never fired. Inside the Card the gate cannot do that: being
+   on the control is being on the Card, so the hover the reveal reads is already
+   true. What the gate buys is the corner back — invisible and always grabbable,
+   it would otherwise swallow every press on the Card's own bottom-right, the
+   caret included. */
 .rf-card-node__inner .react-flow__resize-control.rf-card-node__resize-control {
+  z-index: 1;
   width: 24px;
   height: 24px;
+  translate: -100% -100%;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -177,6 +197,7 @@ body {
   border-radius: 0;
   cursor: nwse-resize;
   opacity: 0;
+  pointer-events: none;
   transition: opacity 100ms ease;
 }
 
@@ -197,6 +218,7 @@ body {
 .rf-card-node__inner[data-selected='true'] .react-flow__resize-control.rf-card-node__resize-control,
 .react-flow__node:focus-within .react-flow__resize-control.rf-card-node__resize-control {
   opacity: 1;
+  pointer-events: auto;
 }
 
 .new-card-preview {

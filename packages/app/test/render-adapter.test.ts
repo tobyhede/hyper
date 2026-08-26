@@ -746,6 +746,35 @@ describe('render adapter', () => {
     });
   });
 
+  /**
+   * The canvas holds the resize capability across a live gesture — it is a
+   * dependency of the memo that builds every node's data, and React Flow's own
+   * resize control re-registers its drag handler whenever the callbacks built
+   * from it change identity. Zustand merges every partial into a fresh state
+   * object, so the capability has to be a value of its own rather than the
+   * state that carries it.
+   */
+  it('answers one resize capability across writes resize knows nothing about', () => {
+    const spy = authoringSpy({
+      authoredPlacement: Placement.fromEntries([
+        [CARD_A, { x: 10, y: 20, open: true, openSize: { width: 500, height: 360 } }],
+      ]),
+    });
+    const store = createRenderAdapter(spy.authoring);
+    spy.attach(store);
+    const capability = store.getState().cardResize;
+
+    store.getState().syncProjection(PROJECTED, []);
+    store.getState().selectCard(CARD_A);
+    completeDrag(store, CARD_A, 111, 222);
+
+    expect(store.getState().cardResize).toBe(capability);
+    // Still the live capability and not a snapshot of one: the canvas holds it
+    // from before the gesture and the store has to answer that same value.
+    capability.beginResize(CARD_A);
+    expect(store.getState().resizeDraft?.cardId).toBe(CARD_A);
+  });
+
   it('previews one resize through a derived Placement and completes only its final size', () => {
     const authored = Placement.fromEntries([
       [CARD_A, { x: 10, y: 20, open: true, openSize: { width: 500, height: 360 } }],
@@ -755,8 +784,8 @@ describe('render adapter', () => {
     const store = createRenderAdapter(spy.authoring);
     spy.attach(store);
 
-    store.getState().beginResize(CARD_A);
-    store.getState().previewResize(CARD_A, { width: 620, height: 440 });
+    store.getState().cardResize.beginResize(CARD_A);
+    store.getState().cardResize.previewResize(CARD_A, { width: 620, height: 440 });
 
     expect(store.getState().resizeDraft).toEqual({
       cardId: CARD_A,
@@ -768,7 +797,7 @@ describe('render adapter', () => {
     });
     expect(spy.completions).toEqual([]);
 
-    store.getState().finishResize(CARD_A);
+    store.getState().cardResize.finishResize(CARD_A);
 
     expect(spy.completions).toEqual([
       { kind: 'resized-card', cardId: CARD_A, size: { width: 620, height: 440 } },
@@ -776,7 +805,16 @@ describe('render adapter', () => {
     expect(store.getState().resizeDraft).toBeNull();
   });
 
-  it('rejects React Flow local dimensions while the complete resize draft is projecting', () => {
+  /**
+   * A resize draft leaves the live nodes alone. Nothing rejects a node-only
+   * rect here because React Flow never proposes one: its resize control emits
+   * that `dimensions` change from the callback `shouldResize` gates, and the
+   * Card refuses every frame while still handing the rect on. What proves that
+   * end of it is the real control under a real gesture, in
+   * `SpaceCanvas.test.tsx`; what this holds is that the draft alone does not
+   * touch the published projection.
+   */
+  it('leaves the published projection alone while the resize draft grows', () => {
     const authored = Placement.fromEntries([
       [CARD_A, { x: 10, y: 20, open: true, openSize: { width: 500, height: 360 } }],
       [CARD_B, { x: 300, y: 200, open: false }],
@@ -788,17 +826,8 @@ describe('render adapter', () => {
     store.getState().syncProjection([open, node(CARD_B, 300, 200)], [EDGE]);
     const beforeDraftProjection = store.getState().projection;
 
-    store.getState().beginResize(CARD_A);
-    store.getState().previewResize(CARD_A, { width: 620, height: 440 });
-    store.getState().changeNodes([
-      {
-        type: 'dimensions',
-        id: CARD_A,
-        dimensions: { width: 620, height: 440 },
-        resizing: true,
-        setAttributes: true,
-      },
-    ]);
+    store.getState().cardResize.beginResize(CARD_A);
+    store.getState().cardResize.previewResize(CARD_A, { width: 620, height: 440 });
 
     expect(store.getState().projection).toBe(beforeDraftProjection);
     expect(store.getState().projection?.nodes[0]).toMatchObject({ width: 500, height: 360 });
@@ -812,9 +841,9 @@ describe('render adapter', () => {
     });
     const store = createRenderAdapter(spy.authoring);
 
-    store.getState().beginResize(CARD_A);
-    store.getState().previewResize(CARD_A, { width: 620, height: 440 });
-    store.getState().cancelResize(CARD_A);
+    store.getState().cardResize.beginResize(CARD_A);
+    store.getState().cardResize.previewResize(CARD_A, { width: 620, height: 440 });
+    store.getState().cardResize.cancelResize(CARD_A);
 
     expect(store.getState().resizeDraft).toBeNull();
     expect(spy.completions).toEqual([]);
@@ -992,8 +1021,8 @@ describe('render adapter', () => {
     completeDrag(store, CARD_A, 500, 400);
     await vi.waitFor(() => expect(session.getState().persistence.kind).toBe('conflicted'));
     expect(authoring.complete({ kind: 'opened-card', cardId: CARD_A }).kind).toBe('completed');
-    store.getState().beginResize(CARD_A);
-    store.getState().previewResize(CARD_A, { width: 620, height: 440 });
+    store.getState().cardResize.beginResize(CARD_A);
+    store.getState().cardResize.previewResize(CARD_A, { width: 620, height: 440 });
     expect(store.getState().projection).not.toBeNull();
     expect(store.getState().resizeDraft).not.toBeNull();
 

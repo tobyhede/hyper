@@ -173,6 +173,7 @@ export const createApp = ({ spaceSession }: OpenedSpace) => {
     const liveProjection = useRenderAdapter((s) => s.projection);
     const changeNodes = useRenderAdapter((s) => s.changeNodes);
     const changeEdges = useRenderAdapter((s) => s.changeEdges);
+    const cardResize = useRenderAdapter((s) => s.cardResize);
     // There are Cards on the canvas to drag once the layout has resolved and the
     // store has taken it. Not a permission — every view is editable (ADR 0025) —
     // but it is false for the frame before the first placement resolves, and again
@@ -587,7 +588,15 @@ export const createApp = ({ spaceSession }: OpenedSpace) => {
         addCard={{
           onAddCard: addCard,
           onAddAlias: () => setCreatingAlias(true),
-          disabled: !editable || presenting || openedCardId !== null || creatingAlias,
+          // `editingCardBody` is here for the reason it is on `canPresent`
+          // above, and it is the condition that makes this control agree with
+          // the `C` shortcut answering the same operation on the canvas. Add
+          // Card ends by putting a caret in the created Card's title editor, and
+          // title editing is withdrawn while a content edit owns the keyboard
+          // (ADR 0064) — so a live toolbar created a Card and then swallowed the
+          // naming it exists to begin.
+          disabled:
+            !editable || presenting || openedCardId !== null || creatingAlias || editingCardBody,
           keyShortcut: ADD_CARD_KEY,
           menuTriggerRef: addCardMenu,
         }}
@@ -665,7 +674,7 @@ export const createApp = ({ spaceSession }: OpenedSpace) => {
                 onBodyEditingChange={setEditingCardBody}
                 onCloseCard={closeExpandedCard}
                 onCompleteCardBody={completeCardBody}
-                cardResize={useRenderAdapter.getState()}
+                cardResize={cardResize}
                 onCompleteCardTitle={completeCardTitle}
                 editableCardIds={editableCardIds}
                 graphs={projection.visibleGraphs}

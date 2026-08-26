@@ -241,6 +241,18 @@ test(
     expect(mark.width).toBeLessThan(box.width);
     expect(mark.height).toBeLessThan(box.height);
 
+    // Nothing of the control may sit over the pane. It is invisible at rest and
+    // always grabbable, so an overhang is a hit target no reveal announces —
+    // and touch, having no hover, would meet it first on an unselected Card.
+    // React Flow's own `.handle` centres this box on the corner it resizes
+    // from, which is the overhang; the rule that anchors it inside the Card is
+    // what this asserts, and gating `pointer-events` instead deadlocks the
+    // gesture (`.scratch/card-resizing/issues/02-…`).
+    expect(box.x).toBeGreaterThanOrEqual(before.x);
+    expect(box.y).toBeGreaterThanOrEqual(before.y);
+    expect(box.x + box.width).toBeLessThanOrEqual(before.x + before.width + 0.5);
+    expect(box.y + box.height).toBeLessThanOrEqual(before.y + before.height + 0.5);
+
     await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
     await page.mouse.down();
     await page.mouse.move(box.x + box.width / 2 + 120, box.y + box.height / 2 + 80, { steps: 6 });

@@ -1,5 +1,13 @@
-import { useEffect, useRef, useState } from 'react';
-import { Handle, NodeResizeControl, Position, useConnection, type NodeProps } from '@xyflow/react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  Handle,
+  NodeResizeControl,
+  Position,
+  useConnection,
+  type NodeProps,
+  type OnResizeStart,
+  type ShouldResize,
+} from '@xyflow/react';
 import { CanvasCard, CardContent, type CanvasCardFront, type CanvasCardProps } from '@project/ui';
 import type { CardFlowNode, CardHandle } from './projection';
 import { AUTHORING_HANDLE_DIAMETER, GRAPH_PORT_DIAMETER } from './authoring-handle';
@@ -257,6 +265,45 @@ export function CardNode({ data, selected, dragging, isConnectable }: NodeProps<
       cancel();
     };
   }, []);
+  /*
+   * One identity for the life of the node, which is a contract rather than a
+   * tidy-up: `NodeResizeControl` lists the resize callbacks among an effect's
+   * dependencies, and that effect's cleanup is `selection.on('.drag', null)` —
+   * it strips *every* `.drag` listener from the control element. d3-drag leaves
+   * a touch gesture's `touchmove` and `touchend` there for the whole gesture,
+   * so a callback rebuilt mid-drag takes the gesture down with it and the
+   * resize dies on its first frame. And this node re-renders mid-drag by
+   * construction: the adapter republishes the projection on every preview
+   * frame, and beginning the gesture flips `resizeActive` here as well. A mouse
+   * gesture survives the same teardown only by accident, because d3-drag moved
+   * its two listeners to the window at `mousedown`. The ref above is what lets
+   * a stable callback still reach a replaced capability.
+   */
+  const beginResize = useCallback<OnResizeStart>(() => {
+    resizing.current = true;
+    setResizeActive(true);
+    resizeOperation.current?.onResizeStart();
+  }, []);
+  /*
+   * React Flow otherwise applies this Card's dimensions immediately after
+   * calling the proposal callback. Returning false keeps that node-only change
+   * out: the render adapter projects the proposed Placement and publishes Card,
+   * neighbours, handles and Edges once.
+   *
+   * The guard is what makes the three loss signals above final. None of them
+   * ends the drag underneath: `NodeResizeControl` drives d3-drag, which installs
+   * its own `mousemove`/`mouseup` on the window at `mousedown` and removes them
+   * only at `mouseup`, and neither `pointercancel` nor losing the window is a
+   * signal it listens for. So frames keep arriving after cancellation, with no
+   * way to stop them and no draft left to answer them. Refusing them here is
+   * what keeps the Card the author sees — back at its authored rect, controls
+   * returned — the same fact as the draft the adapter holds.
+   */
+  const proposeResize = useCallback<ShouldResize>((_event, next) => {
+    if (!resizing.current) return false;
+    resizeOperation.current?.onResize({ width: next.width, height: next.height });
+    return false;
+  }, []);
   const expanded = data.expanded === true;
 
   const onReturnFocus = () => {
@@ -302,19 +349,8 @@ export function CardNode({ data, selected, dragging, isConnectable }: NodeProps<
           minWidth={resize.minWidth}
           minHeight={resize.minHeight}
           className="rf-card-node__resize-control"
-          onResizeStart={() => {
-            resizing.current = true;
-            setResizeActive(true);
-            resize.onResizeStart();
-          }}
-          // React Flow otherwise applies this Card's dimensions immediately
-          // after calling the proposal callback. Returning false keeps that
-          // node-only change out: the render adapter projects the proposed
-          // Placement and publishes Card, neighbours, handles and Edges once.
-          shouldResize={(_event, next) => {
-            resize.onResize({ width: next.width, height: next.height });
-            return false;
-          }}
+          onResizeStart={beginResize}
+          shouldResize={proposeResize}
         >
           <span className="rf-card-node__resize-mark" aria-hidden="true" />
         </NodeResizeControl>

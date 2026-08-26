@@ -321,8 +321,31 @@ test('the Close action closes an opened card', async ({ page }) => {
   await expect(card.locator('.canvas-card__content')).toHaveAttribute('data-presence', 'present');
   await card.getByRole('button', { name: 'Close Card A' }).click();
   const leavingContent = card.locator('.canvas-card__content');
-  await expect(leavingContent).toHaveAttribute('data-presence', 'leaving');
-  await expect(leavingContent).toHaveAttribute('inert', '');
+  // One sample of both facts rather than one auto-retrying assertion each.
+  // `usePresence` keeps the leaving content mounted for the duration the
+  // element itself declares — `--card-placement-duration * 0.4`, 80ms — and
+  // then unmounts it, so two assertions are two independent polling windows
+  // over a state that is already on its way out: the second can arrive after
+  // the unmount and then wait out its own timeout against an element that is
+  // never coming back. Read together in one `evaluateAll`, the two attributes
+  // are one observation of one commit, which is also what `CanvasCard` makes
+  // them — the `inert` layout effect runs in the same commit that writes
+  // `data-presence`. `evaluateAll` rather than a locator assertion because it
+  // answers `[]` for content that has gone instead of waiting for it.
+  await expect
+    .poll(
+      () =>
+        leavingContent.evaluateAll((elements) =>
+          elements.map((element) => ({
+            presence: element.getAttribute('data-presence'),
+            inert: element.getAttribute('inert'),
+          })),
+        ),
+      // Well inside those 80ms. `expect.poll`'s own first gap is 100ms, which
+      // can step straight over the window this is here to observe.
+      { intervals: [10, 10, 10, 20, 20] },
+    )
+    .toEqual([{ presence: 'leaving', inert: '' }]);
   await expect(leavingContent).toHaveCount(0);
   await expect(card.getByRole('button', { name: 'Open Card A' })).toBeVisible();
 });

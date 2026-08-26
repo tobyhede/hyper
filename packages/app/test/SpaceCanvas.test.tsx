@@ -52,6 +52,8 @@ interface Harness {
   readonly setNodes: (next: CardFlowNode[]) => void;
   /** What the canvas told its parent about a live content edit. */
   readonly bodyEditingChanged: ReturnType<typeof vi.fn>;
+  /** Every change React Flow proposed to the node array. */
+  readonly nodesChanged: ReturnType<typeof vi.fn>;
 }
 
 /**
@@ -100,6 +102,7 @@ function mountGraph(
   const openCard = vi.fn();
   const addCard = vi.fn();
   const bodyEditingChanged = vi.fn();
+  const nodesChanged = vi.fn();
   let nodes = initialNodes;
   let editableCardIds = new Set(nodes.map((node) => node.id));
   const edgeAuthoring = inertEdgeAuthoring();
@@ -115,7 +118,7 @@ function mountGraph(
         presenting={false}
         editable={true}
         titleEditingEnabled={titleEditing}
-        onNodesChange={() => undefined}
+        onNodesChange={nodesChanged}
         onEdgesChange={() => undefined}
         edgeAuthoring={edgeAuthoring}
         selection={{ kind: 'none' }}
@@ -145,6 +148,7 @@ function mountGraph(
     openCard,
     addCard,
     bodyEditingChanged,
+    nodesChanged,
     setNodes: (next) => {
       nodes = next;
       editableCardIds = new Set(next.map((node) => node.id));
@@ -485,6 +489,69 @@ describe('withdrawing canvas authoring from an Expanded Card', () => {
 });
 
 /**
+ * React Flow's control begins its drag through real d3-drag, which reads
+ * `event.view.document` on the native mouse event — and jsdom's own `MouseEvent`
+ * constructor rejects this environment's ambient `window` as a `view` even
+ * though it is the real one, so the event is built and dispatched directly
+ * rather than through `fireEvent`, which goes through that same constructor.
+ */
+function mouseEventInView(type: 'mousedown' | 'mousemove', clientX = 0, clientY = 0): MouseEvent {
+  const event = new MouseEvent(type, { bubbles: true, cancelable: true, clientX, clientY });
+  Object.defineProperty(event, 'view', { value: window, configurable: true });
+  return event;
+}
+
+/**
+ * A touch gesture on that same control, built by hand for a neighbouring
+ * reason: jsdom has `TouchEvent` but no `Touch` constructor, so a `TouchInit`
+ * cannot be filled. The two lists the gesture is read through are installed on
+ * the event afterwards — `changedTouches`, which d3-drag identifies and
+ * positions the gesture from, and `touches`, which is where React Flow's
+ * `getEventPosition` looks once it sees no `clientX` on the event itself.
+ */
+function touchEventOnControl(
+  type: 'touchstart' | 'touchmove' | 'touchend',
+  clientX = 0,
+  clientY = 0,
+): TouchEvent {
+  const event = new TouchEvent(type, { bubbles: true, cancelable: true });
+  const touch = { identifier: 0, clientX, clientY };
+  Object.defineProperty(event, 'changedTouches', { value: [touch], configurable: true });
+  Object.defineProperty(event, 'touches', { value: [touch], configurable: true });
+  return event;
+}
+
+/** The one bottom-right control the Open Card draws. */
+function resizeControl(): Element {
+  const control = document.querySelector('.react-flow__resize-control.bottom.right');
+  if (control === null) throw new Error('No resize control is drawn for Card A.');
+  return control;
+}
+
+/** Press that control. */
+function pressResizeControl(): void {
+  resizeControl().dispatchEvent(mouseEventInView('mousedown'));
+}
+
+/**
+ * One frame of a touch gesture. Unlike the mouse, every frame goes to the
+ * control element: d3-drag keeps a touch gesture's `touchmove`/`touchend` on
+ * the element it began on, and moves only the mouse's to the window.
+ */
+function touchResizeControl(
+  type: 'touchstart' | 'touchmove' | 'touchend',
+  clientX = 0,
+  clientY = 0,
+): void {
+  resizeControl().dispatchEvent(touchEventOnControl(type, clientX, clientY));
+}
+
+/** Carry a pressed control to a pointer position, the way one drag frame does. */
+function dragResizeControlTo(clientX: number, clientY: number): void {
+  window.dispatchEvent(mouseEventInView('mousemove', clientX, clientY));
+}
+
+/**
  * Resize is Card behaviour rather than kind behaviour (ADR 0066): a Card owns
  * the surrounding rect and the resize interaction, while a kind owns only what
  * fills an Open front. Alias has no Open front yet, but that is content
@@ -527,37 +594,48 @@ describe('resize belongs to Card rather than to a Card kind', () => {
     };
     mountGraph([expanded], onSelectCard, cardResize);
 
-    const control = document.querySelector('.react-flow__resize-control.bottom.right');
-    if (control === null) throw new Error('No resize control is drawn for Card A.');
-    // React Flow's control begins its drag through real d3-drag, which reads
-    // `event.view.document` on the native mousedown — and jsdom's own `MouseEvent`
-    // constructor rejects this environment's ambient `window` as a `view` even
-    // though it is the real one, so the event is built and dispatched directly
-    // rather than through `fireEvent`, which goes through that same constructor.
-    const mouseDown = new MouseEvent('mousedown', {
-      bubbles: true,
-      cancelable: true,
-      clientX: 0,
-      clientY: 0,
-    });
-    Object.defineProperty(mouseDown, 'view', { value: window, configurable: true });
-    control.dispatchEvent(mouseDown);
+    pressResizeControl();
 
     expect(onSelectCard).toHaveBeenCalledWith(CARD_ID);
     expect(cardResize.beginResize).toHaveBeenCalledWith(CARD_ID);
 
-    const mouseMove = new MouseEvent('mousemove', {
-      bubbles: true,
-      cancelable: true,
-      clientX: 80,
-      clientY: 60,
-    });
-    Object.defineProperty(mouseMove, 'view', { value: window, configurable: true });
-    window.dispatchEvent(mouseMove);
+    dragResizeControlTo(80, 60);
     expect(cardResize.previewResize).toHaveBeenCalledWith(CARD_ID, expect.any(Object));
 
     fireEvent.pointerUp(window);
     expect(cardResize.finishResize).toHaveBeenCalledWith(CARD_ID);
+  });
+
+  /**
+   * The whole gesture reaches the capability and proposes nothing to React
+   * Flow's own node array.
+   *
+   * `NodeResizeControl` asks `shouldResize` before it emits anything, and the
+   * Card answers `false` to every frame while still handing the proposed rect
+   * on (`CardNode`). So the only producer of a `dimensions` change never runs,
+   * and there is no node-only rect for anything downstream to have to reject:
+   * the next projected draft publishes the resized Card, its displaced
+   * neighbours, handles and Edges together.
+   */
+  it('proposes no node change to React Flow while it resizes', () => {
+    const expanded = cardNode('A', CARD_ID, false);
+    expanded.data.expanded = true;
+    const cardResize: CardResize = {
+      beginResize: vi.fn(),
+      previewResize: vi.fn(),
+      finishResize: vi.fn(),
+      cancelResize: vi.fn(),
+    };
+    const { nodesChanged } = mountGraph([expanded], () => undefined, cardResize);
+    nodesChanged.mockClear();
+
+    pressResizeControl();
+    dragResizeControlTo(80, 60);
+    dragResizeControlTo(160, 120);
+    fireEvent.pointerUp(window);
+
+    expect(cardResize.previewResize).toHaveBeenCalledTimes(2);
+    expect(nodesChanged).not.toHaveBeenCalled();
   });
 
   it('routes loss of an active resize to cancellation', () => {
@@ -570,16 +648,51 @@ describe('resize belongs to Card rather than to a Card kind', () => {
       cancelResize: vi.fn(),
     };
     mountGraph([expanded], () => undefined, cardResize);
-    const control = document.querySelector('.react-flow__resize-control.bottom.right');
-    if (control === null) throw new Error('No resize control is drawn for Card A.');
-    const mouseDown = new MouseEvent('mousedown', { bubbles: true, cancelable: true });
-    Object.defineProperty(mouseDown, 'view', { value: window, configurable: true });
-    control.dispatchEvent(mouseDown);
+    pressResizeControl();
 
     fireEvent.blur(window);
 
     expect(cardResize.cancelResize).toHaveBeenCalledWith(CARD_ID);
     expect(cardResize.finishResize).not.toHaveBeenCalled();
+  });
+
+  /**
+   * A gesture outlives the re-renders the resize itself causes.
+   *
+   * Touch is what proves it, and ADR 0066 makes resizing pointer *and* touch.
+   * `NodeResizeControl` lists its resize callbacks among an effect's
+   * dependencies and tears the d3-drag binding down with
+   * `selection.on('.drag', null)` whenever they change — which strips every
+   * `.drag` listener the control element carries. For a touch gesture that is
+   * `touchmove` and `touchend`, which d3-drag leaves on the element for the
+   * whole gesture, so the drag dies on its first frame; a mouse gesture happens
+   * to survive only because d3-drag moved its two to the window at `mousedown`.
+   *
+   * The re-render is not hypothetical: the render adapter republishes the
+   * projection on every preview frame, which is exactly the publish staged here
+   * between the first frame and the second.
+   */
+  it('keeps a touch gesture alive across the projection its own frames publish', () => {
+    const expanded = cardNode('A', CARD_ID, false);
+    expanded.data.expanded = true;
+    const cardResize: CardResize = {
+      beginResize: vi.fn(),
+      previewResize: vi.fn(),
+      finishResize: vi.fn(),
+      cancelResize: vi.fn(),
+    };
+    const { setNodes } = mountGraph([expanded], () => undefined, cardResize);
+
+    touchResizeControl('touchstart');
+    expect(cardResize.beginResize).toHaveBeenCalledWith(CARD_ID);
+
+    const republished = cardNode('A', CARD_ID, false);
+    republished.data.expanded = true;
+    setNodes([republished]);
+
+    touchResizeControl('touchmove', 80, 60);
+
+    expect(cardResize.previewResize).toHaveBeenCalledWith(CARD_ID, expect.any(Object));
   });
 });
 
