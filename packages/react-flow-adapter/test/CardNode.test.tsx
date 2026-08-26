@@ -826,9 +826,7 @@ describe('CardNode Expanded Card front', () => {
       onResizeCancel: () => undefined,
     };
     render(
-      <CardNode
-        {...props({ kind: 'alias', aliasOf: 'Strategies', expanded: true, resize })}
-      />,
+      <CardNode {...props({ kind: 'alias', aliasOf: 'Strategies', expanded: true, resize })} />,
     );
 
     // `projection.ts` never marks an Alias Expanded in production (ADR 0064), but

@@ -130,7 +130,7 @@ function ResizableOpenSpecimen({ selected = false }: { readonly selected?: boole
   const [size, setSize] = useState({ width: 480, height: 360 });
   return (
     <CanvasCardNodeSpecimen
-      open
+      expanded
       selected={selected}
       nodeSize={size}
       onResize={setSize}

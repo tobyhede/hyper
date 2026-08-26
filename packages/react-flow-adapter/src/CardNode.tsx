@@ -212,7 +212,7 @@ export function CardNode({ data, selected, dragging, isConnectable }: NodeProps<
    * The Alias kind has no open front yet, so authored `expanded` state is false
    * for one. `CanvasCard` receives the Markdown source, authored open state and
    * live editor as one front rather than receiving body markup from this adapter.
-  */
+   */
   const resize = data.resize;
   const resizeOperation = useRef(resize);
   useEffect(() => {

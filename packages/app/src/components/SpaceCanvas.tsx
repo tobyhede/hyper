@@ -145,7 +145,7 @@ export interface SpaceCanvasProps {
    * it, so an editor cannot survive it and the draft would go with no exit
    * spent. The caret stays this component's (`spec.md` §6) — what leaves is the
    * one bit a sibling surface needs to stay out of the way.
-  */
+   */
   onBodyEditingChange?: (editing: boolean) => void;
   cardResize: CardResize;
   /** Complete one locally validated title draft, or return its field error. */
