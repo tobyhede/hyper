@@ -33,6 +33,22 @@ export interface Projection {
   readonly edges: Edge[];
 }
 
+export interface ResizeDraft {
+  readonly cardId: CardId;
+  readonly size: { readonly width: number; readonly height: number };
+  readonly placement: Placement;
+}
+
+export interface CardResize {
+  beginResize: (cardId: CardId) => void;
+  previewResize: (
+    cardId: CardId,
+    size: { readonly width: number; readonly height: number },
+  ) => void;
+  finishResize: (cardId: CardId) => void;
+  cancelResize: (cardId: CardId) => void;
+}
+
 /**
  * One Edge, named the way everything that acts on an Edge has to name it.
  *
@@ -142,7 +158,7 @@ function withSelection(nodes: readonly CardFlowNode[], selection: CanvasSelectio
   );
 }
 
-export interface RenderAdapterState {
+export interface RenderAdapterState extends CardResize {
   /**
    * The published projection, or `null` before the first layout resolves. Until
    * then there is nothing worth owning — every projected card sits at the origin
@@ -160,6 +176,8 @@ export interface RenderAdapterState {
   moved: boolean;
   /** The ordinary React Flow selection used for continued authoring. */
   selection: CanvasSelection;
+  /** One transient resize layered over the authored Placement. */
+  resizeDraft: ResizeDraft | null;
   /** Publish projected Card nodes, their declared handles and Graph Edges together. */
   syncProjection: (nodes: readonly CardFlowNode[], edges: readonly Edge[]) => void;
   /**
@@ -359,6 +377,7 @@ export function createRenderAdapter(authoring: SpaceAuthoring): RenderAdapter {
     dragOrigins: new Map(),
     moved: false,
     selection: NO_SELECTION,
+    resizeDraft: null,
 
     // Compute, publish, then tell Authoring where the cards ended up — the same
     // order as `changeNodes` and `connectCards` below. Installing from inside
@@ -401,6 +420,7 @@ export function createRenderAdapter(authoring: SpaceAuthoring): RenderAdapter {
         dragOrigins: new Map(),
         moved: false,
         selection: NO_SELECTION,
+        resizeDraft: null,
       });
       authoring.replacePlacement(placement);
     },
@@ -411,6 +431,44 @@ export function createRenderAdapter(authoring: SpaceAuthoring): RenderAdapter {
       set((state) => selecting(state, { kind: 'edge', graphId, edge })),
 
     clearSelection: () => set((state) => selecting(state, NO_SELECTION)),
+
+    beginResize: (cardId) => {
+      const authored = authoring.authoredPlacement();
+      const at = authored?.get(cardId);
+      if (authored === null || at?.expanded === undefined) return;
+      set({
+        resizeDraft: {
+          cardId,
+          size: at.expanded,
+          placement: authored,
+        },
+      });
+    },
+
+    previewResize: (cardId, size) => {
+      const draft = get().resizeDraft;
+      if (draft?.cardId !== cardId) return;
+      const at = draft.placement.get(cardId);
+      if (at?.expanded === undefined) return;
+      set({
+        resizeDraft: {
+          cardId,
+          size,
+          placement: Placement.place(draft.placement, cardId, { ...at, expanded: size }),
+        },
+      });
+    },
+
+    finishResize: (cardId) => {
+      const draft = get().resizeDraft;
+      if (draft?.cardId !== cardId) return;
+      authoring.complete({ kind: 'resized-card', cardId, size: draft.size });
+      set({ resizeDraft: null });
+    },
+
+    cancelResize: (cardId) => {
+      if (get().resizeDraft?.cardId === cardId) set({ resizeDraft: null });
+    },
 
     renderedPlacement: () => {
       const projection = get().projection;
@@ -448,7 +506,20 @@ export function createRenderAdapter(authoring: SpaceAuthoring): RenderAdapter {
       // Returning no update when nothing real changed keeps the array
       // reference stable and is what breaks that loop.
       const owned = new Set(projection.nodes.map((node) => node.id));
-      const relevant = changes.filter((change) => !('id' in change) || owned.has(change.id));
+      // NodeResizeControl calls `onResize` before emitting its local dimensions
+      // change. The callback has therefore installed the complete Placement
+      // draft by the time this runs. Reject the node-only mutation: the next
+      // projected draft publishes the resized Card, displaced neighbours,
+      // handles and Edges together, so no split frame can be constructed.
+      const relevant = changes.filter(
+        (change) =>
+          (!('id' in change) || owned.has(change.id)) &&
+          !(
+            change.type === 'dimensions' &&
+            change.resizing === true &&
+            change.id === state.resizeDraft?.cardId
+          ),
+      );
       if (relevant.length === 0) return;
 
       const beforeById = new Map(projection.nodes.map((node) => [node.id, node.position]));
@@ -550,6 +621,7 @@ export function createRenderAdapter(authoring: SpaceAuthoring): RenderAdapter {
       dragOrigins: new Map(),
       moved: false,
       selection: NO_SELECTION,
+      resizeDraft: null,
     });
   });
   return adapter;

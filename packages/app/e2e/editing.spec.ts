@@ -42,6 +42,17 @@ async function quiescent(page: Page): Promise<void> {
   await page.waitForTimeout(250);
 }
 
+function sameEdgeGeometry(left: string | null, right: string | null): boolean {
+  if (left === null || right === null) return left === right;
+  const numbers = (path: string) => (path.match(/-?\d+(?:\.\d+)?/g) ?? []).map(Number);
+  const leftNumbers = numbers(left);
+  const rightNumbers = numbers(right);
+  return (
+    leftNumbers.length === rightNumbers.length &&
+    leftNumbers.every((value, index) => Math.abs(value - (rightNumbers[index] ?? Infinity)) < 0.01)
+  );
+}
+
 /**
  * A point on the pane far enough from every handle that React Flow resolves no
  * connection target — `connectionRadius` is 20 at the pinned 12.11.2, so a
@@ -718,6 +729,10 @@ test(
       width: Number.parseFloat(getComputedStyle(element).width),
       height: Number.parseFloat(getComputedStyle(element).height),
     }));
+    const neighbour = nodeByTitle(page, 'B').first();
+    const beforeNeighbourPosition = await positionOf(neighbour);
+    const edgePath = page.locator('.react-flow__edge-path').first();
+    const beforeEdgePath = await edgePath.getAttribute('d');
 
     // A Closed Card offers no control at all.
     await expect(closed.locator('.react-flow__resize-control')).toHaveCount(0);
@@ -767,6 +782,16 @@ test(
         card.evaluate((element) => Number.parseFloat(getComputedStyle(element).width)),
       )
       .toBeGreaterThan(beforeSize.width);
+    await expect.poll(async () => positionOf(neighbour)).not.toEqual(beforeNeighbourPosition);
+    await expect.poll(async () => edgePath.getAttribute('d')).not.toBe(beforeEdgePath);
+    await expect(card.locator('.canvas-card__rail')).toHaveCSS('opacity', '0');
+    await expect(card.locator('.rf-card-node__authoring-handle--source').first()).toHaveCSS(
+      'opacity',
+      '0',
+    );
+    // Pointer movement owns only the canvas draft. Persistence sees nothing
+    // until the gesture releases.
+    await expect(persistence).toHaveAttribute('data-revision', openedRevision ?? '');
 
     await page.mouse.up();
 
@@ -788,6 +813,37 @@ test(
     expect(afterSize.height).toBeGreaterThan(beforeSize.height);
     // The authored top-left origin is unchanged: only the box grew.
     expect(await positionOf(card)).toEqual(beforePosition);
+
+    const afterNeighbourPosition = await positionOf(neighbour);
+    const afterEdgePath = await edgePath.getAttribute('d');
+    const completedRevision = await persistence.getAttribute('data-revision');
+    const secondBox = await boxOf(control, "Card A's resize control after completion");
+    await page.mouse.move(secondBox.x + secondBox.width / 2, secondBox.y + secondBox.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(
+      secondBox.x + secondBox.width / 2 + 90,
+      secondBox.y + secondBox.height / 2 + 60,
+      { steps: 4 },
+    );
+    await expect
+      .poll(async () =>
+        card.evaluate((element) => Number.parseFloat(getComputedStyle(element).width)),
+      )
+      .toBeGreaterThan(afterSize.width);
+    await page.evaluate(() => window.dispatchEvent(new PointerEvent('pointercancel')));
+    await page.mouse.up();
+
+    await expect
+      .poll(async () =>
+        card.evaluate((element) => Number.parseFloat(getComputedStyle(element).width)),
+      )
+      .toBe(afterSize.width);
+    await expect.poll(async () => positionOf(neighbour)).toEqual(afterNeighbourPosition);
+    await expect
+      .poll(async () => sameEdgeGeometry(await edgePath.getAttribute('d'), afterEdgePath))
+      .toBe(true);
+    await quiescent(page);
+    await expect(persistence).toHaveAttribute('data-revision', completedRevision ?? '');
   },
 );
 

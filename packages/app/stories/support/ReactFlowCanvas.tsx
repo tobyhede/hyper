@@ -167,6 +167,8 @@ export function CanvasCardNodeSpecimen({
         minHeight: CARD_SIZE.height,
         onResizeStart: () => undefined,
         onResize,
+        onResizeEnd: () => undefined,
+        onResizeCancel: () => undefined,
       };
     }
   }

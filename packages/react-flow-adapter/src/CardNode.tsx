@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Handle, NodeResizeControl, Position, useConnection, type NodeProps } from '@xyflow/react';
 import { CanvasCard, CardContent, type CanvasCardFront, type CanvasCardProps } from '@project/ui';
 import type { CardFlowNode, CardHandle } from './projection';
@@ -214,6 +214,49 @@ export function CardNode({ data, selected, dragging, isConnectable }: NodeProps<
    * live editor as one front rather than receiving body markup from this adapter.
   */
   const resize = data.resize;
+  const resizeOperation = useRef(resize);
+  useEffect(() => {
+    resizeOperation.current = resize;
+  }, [resize]);
+  const resizing = useRef(false);
+  const [resizeActive, setResizeActive] = useState(false);
+  /*
+   * Narrow interactive deviation for cancellation the specialist control does
+   * not expose:
+   * - Existing Hyper component considered: the existing CardNode composition.
+   * - shadcn/Base UI component considered: none owns graph-node resizing.
+   * - Product requirement that cannot be expressed: pointer cancellation,
+   *   window focus loss and unmount must discard the whole canvas draft.
+   * - Why composition or a variant is insufficient: NodeResizeControl exposes
+   *   start/change/end only, with no cancellation callback.
+   * - Custom behavior being introduced: translate those three loss signals to
+   *   the resize capability's one cancellation operation.
+   * - Tests proving the deviation: render-adapter cancellation and replacement
+   *   tests, plus the application browser's pointer-cancellation assertion.
+   */
+  useEffect(() => {
+    const finish = () => {
+      if (!resizing.current) return;
+      resizing.current = false;
+      setResizeActive(false);
+      resizeOperation.current?.onResizeEnd();
+    };
+    const cancel = () => {
+      if (!resizing.current) return;
+      resizing.current = false;
+      setResizeActive(false);
+      resizeOperation.current?.onResizeCancel();
+    };
+    window.addEventListener('pointerup', finish);
+    window.addEventListener('pointercancel', cancel);
+    window.addEventListener('blur', cancel);
+    return () => {
+      window.removeEventListener('pointerup', finish);
+      window.removeEventListener('pointercancel', cancel);
+      window.removeEventListener('blur', cancel);
+      cancel();
+    };
+  }, []);
   const expanded = data.expanded === true;
 
   const onReturnFocus = () => {
@@ -228,6 +271,7 @@ export function CardNode({ data, selected, dragging, isConnectable }: NodeProps<
       data-selected={visuallySelected}
       data-connection-in-progress={connectionInProgress}
       data-connection-seeking={seeking ?? 'none'}
+      data-resizing={resizeActive}
       // The wrapper React Flow sizes from `node.width`/`node.height` is this
       // element's parent, so an Expanded Card only reaches its own rect if this
       // one stops declaring the collapsed constant — which `styles.css` does
@@ -258,10 +302,19 @@ export function CardNode({ data, selected, dragging, isConnectable }: NodeProps<
           minWidth={resize.minWidth}
           minHeight={resize.minHeight}
           className="rf-card-node__resize-control"
-          onResizeStart={() => resize.onResizeStart()}
-          onResizeEnd={(_event, next) =>
-            resize.onResize({ width: next.width, height: next.height })
-          }
+          onResizeStart={() => {
+            resizing.current = true;
+            setResizeActive(true);
+            resize.onResizeStart();
+          }}
+          // React Flow otherwise applies this Card's dimensions immediately
+          // after calling the proposal callback. Returning false keeps that
+          // node-only change out: the render adapter projects the proposed
+          // Placement and publishes Card, neighbours, handles and Edges once.
+          shouldResize={(_event, next) => {
+            resize.onResize({ width: next.width, height: next.height });
+            return false;
+          }}
         >
           <span className="rf-card-node__resize-mark" aria-hidden="true" />
         </NodeResizeControl>

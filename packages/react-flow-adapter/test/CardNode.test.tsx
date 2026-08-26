@@ -53,6 +53,11 @@ type MockResizeControlProps = {
   minHeight?: number;
   className?: string;
   children?: ReactNode;
+  onResizeStart?: () => void;
+  shouldResize?: (
+    event: MouseEvent,
+    size: { width: number; height: number },
+  ) => boolean | undefined;
 };
 
 vi.mock('@xyflow/react', async (importOriginal) => {
@@ -75,6 +80,8 @@ vi.mock('@xyflow/react', async (importOriginal) => {
       minHeight,
       className,
       children,
+      onResizeStart,
+      shouldResize,
     }: MockResizeControlProps) => (
       <div
         className={[
@@ -89,6 +96,8 @@ vi.mock('@xyflow/react', async (importOriginal) => {
         data-testid="resize-control"
         data-min-width={String(minWidth)}
         data-min-height={String(minHeight)}
+        onMouseDown={onResizeStart}
+        onMouseMove={() => shouldResize?.(new MouseEvent('mousemove'), { width: 620, height: 440 })}
       >
         {children}
       </div>
@@ -718,6 +727,8 @@ describe('CardNode Expanded Card front', () => {
       minHeight: 146,
       onResizeStart: () => undefined,
       onResize: () => undefined,
+      onResizeEnd: () => undefined,
+      onResizeCancel: () => undefined,
     };
     render(<CardNode {...props({ expanded: true, body: SOURCE, resize })} />);
 
@@ -730,12 +741,67 @@ describe('CardNode Expanded Card front', () => {
     expect(controls[0]).toHaveAttribute('data-min-height', '146');
   });
 
+  it('cancels an active resize when the interaction loses the window', () => {
+    const onResizeCancel = vi.fn();
+    const resize = {
+      minWidth: 260,
+      minHeight: 146,
+      onResizeStart: () => undefined,
+      onResize: () => undefined,
+      onResizeEnd: () => undefined,
+      onResizeCancel,
+    };
+    render(<CardNode {...props({ expanded: true, body: SOURCE, resize })} />);
+
+    fireEvent.mouseDown(screen.getByTestId('resize-control'));
+    fireEvent.blur(window);
+
+    expect(onResizeCancel).toHaveBeenCalledOnce();
+  });
+
+  it('proposes resize geometry without allowing React Flow to apply it locally', () => {
+    const onResize = vi.fn();
+    const resize = {
+      minWidth: 260,
+      minHeight: 146,
+      onResizeStart: () => undefined,
+      onResize,
+      onResizeEnd: () => undefined,
+      onResizeCancel: () => undefined,
+    };
+    render(<CardNode {...props({ expanded: true, body: SOURCE, resize })} />);
+
+    fireEvent.mouseMove(screen.getByTestId('resize-control'));
+
+    expect(onResize).toHaveBeenCalledWith({ width: 620, height: 440 });
+  });
+
+  it('finishes the active draft on pointer release', () => {
+    const onResizeEnd = vi.fn();
+    const resize = {
+      minWidth: 260,
+      minHeight: 146,
+      onResizeStart: () => undefined,
+      onResize: () => undefined,
+      onResizeEnd,
+      onResizeCancel: () => undefined,
+    };
+    render(<CardNode {...props({ expanded: true, body: SOURCE, resize })} />);
+
+    fireEvent.mouseDown(screen.getByTestId('resize-control'));
+    fireEvent.pointerUp(window);
+
+    expect(onResizeEnd).toHaveBeenCalledOnce();
+  });
+
   it('offers no resize control on a Collapsed Card', () => {
     const resize = {
       minWidth: 260,
       minHeight: 146,
       onResizeStart: () => undefined,
       onResize: () => undefined,
+      onResizeEnd: () => undefined,
+      onResizeCancel: () => undefined,
     };
     render(<CardNode {...props({ body: SOURCE, resize })} />);
 
@@ -756,6 +822,8 @@ describe('CardNode Expanded Card front', () => {
       minHeight: 146,
       onResizeStart: () => undefined,
       onResize: () => undefined,
+      onResizeEnd: () => undefined,
+      onResizeCancel: () => undefined,
     };
     render(
       <CardNode
@@ -775,6 +843,8 @@ describe('CardNode Expanded Card front', () => {
       minHeight: 146,
       onResizeStart: () => undefined,
       onResize: () => undefined,
+      onResizeEnd: () => undefined,
+      onResizeCancel: () => undefined,
     };
     render(<CardNode {...props({ expanded: true, body: SOURCE, resize })} />);
 

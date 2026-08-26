@@ -242,6 +242,17 @@ body {
   pointer-events: auto;
 }
 
+/* Resizing is the Card's one active authoring gesture. The resize control stays
+   reachable until release, while the rail and Edge-authoring handles withdraw
+   so no second operation competes with the pointer or remains visually armed. */
+.react-flow__node .rf-card-node__inner[data-resizing='true'] .canvas-card__rail,
+.react-flow__node
+  .rf-card-node__inner[data-resizing='true']
+  .rf-card-node__authoring-handle.react-flow__handle {
+  opacity: 0;
+  pointer-events: none;
+}
+
 .card {
   background: var(--card);
   border: 1px solid var(--border);

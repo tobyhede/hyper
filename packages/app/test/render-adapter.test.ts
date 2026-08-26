@@ -53,10 +53,11 @@ interface InstallRecord {
 interface AuthoringCapabilities {
   /** The proposal kind this Authoring refuses; every other kind is eligible. */
   readonly refusing?: EdgeProposal['kind'];
+  readonly authoredPlacement?: Placement | null;
 }
 
 /** A Space Authoring that records what it was told, without a session behind it. */
-function authoringSpy({ refusing }: AuthoringCapabilities = {}) {
+function authoringSpy({ refusing, authoredPlacement = null }: AuthoringCapabilities = {}) {
   const installs: InstallRecord[] = [];
   const completions: unknown[] = [];
   let adapter: RenderAdapter | null = null;
@@ -64,7 +65,7 @@ function authoringSpy({ refusing }: AuthoringCapabilities = {}) {
     // SAFETY: `getState` is never read by these tests — the spy only needs to
     // satisfy `SpaceAuthoring`'s shape, not implement a real state.
     getState: () => ({}) as never,
-    authoredPlacement: () => null,
+    authoredPlacement: () => authoredPlacement,
     subscribe: () => () => undefined,
     reportRendered: (placement: ReadonlyMap<string, LayoutPosition>) => {
       installs.push({
@@ -745,6 +746,80 @@ describe('render adapter', () => {
     });
   });
 
+  it('previews one resize through a derived Placement and completes only its final size', () => {
+    const authored = Placement.fromEntries([
+      [CARD_A, { x: 10, y: 20, expanded: { width: 500, height: 360 } }],
+      [CARD_B, { x: 300, y: 200 }],
+    ]);
+    const spy = authoringSpy({ authoredPlacement: authored });
+    const store = createRenderAdapter(spy.authoring);
+    spy.attach(store);
+
+    store.getState().beginResize(CARD_A);
+    store.getState().previewResize(CARD_A, { width: 620, height: 440 });
+
+    expect(store.getState().resizeDraft).toEqual({
+      cardId: CARD_A,
+      size: { width: 620, height: 440 },
+      placement: Placement.fromEntries([
+        [CARD_A, { x: 10, y: 20, expanded: { width: 620, height: 440 } }],
+        [CARD_B, { x: 300, y: 200 }],
+      ]),
+    });
+    expect(spy.completions).toEqual([]);
+
+    store.getState().finishResize(CARD_A);
+
+    expect(spy.completions).toEqual([
+      { kind: 'resized-card', cardId: CARD_A, size: { width: 620, height: 440 } },
+    ]);
+    expect(store.getState().resizeDraft).toBeNull();
+  });
+
+  it('rejects React Flow local dimensions while the complete resize draft is projecting', () => {
+    const authored = Placement.fromEntries([
+      [CARD_A, { x: 10, y: 20, expanded: { width: 500, height: 360 } }],
+      [CARD_B, { x: 300, y: 200 }],
+    ]);
+    const store = createRenderAdapter(authoringSpy({ authoredPlacement: authored }).authoring);
+    const open = node(CARD_A, 10, 20);
+    open.width = 500;
+    open.height = 360;
+    store.getState().syncProjection([open, node(CARD_B, 300, 200)], [EDGE]);
+    const beforeDraftProjection = store.getState().projection;
+
+    store.getState().beginResize(CARD_A);
+    store.getState().previewResize(CARD_A, { width: 620, height: 440 });
+    store.getState().changeNodes([
+      {
+        type: 'dimensions',
+        id: CARD_A,
+        dimensions: { width: 620, height: 440 },
+        resizing: true,
+        setAttributes: true,
+      },
+    ]);
+
+    expect(store.getState().projection).toBe(beforeDraftProjection);
+    expect(store.getState().projection?.nodes[0]).toMatchObject({ width: 500, height: 360 });
+  });
+
+  it('discards the complete resize draft without an Edit when the gesture is cancelled', () => {
+    const spy = authoringSpy({
+      authoredPlacement: Placement.fromEntries([
+        [CARD_A, { x: 10, y: 20, expanded: { width: 500, height: 360 } }],
+      ]),
+    });
+    const store = createRenderAdapter(spy.authoring);
+
+    store.getState().beginResize(CARD_A);
+    store.getState().previewResize(CARD_A, { width: 620, height: 440 });
+    store.getState().cancelResize(CARD_A);
+
+    expect(store.getState().resizeDraft).toBeNull();
+    expect(spy.completions).toEqual([]);
+  });
+
   it('keeps an in-flight drag position while applying projected expanded geometry', () => {
     const spy = authoringSpy();
     const store = createRenderAdapter(spy.authoring);
@@ -916,12 +991,17 @@ describe('render adapter', () => {
     store.getState().syncProjection(PROJECTED, [EDGE]);
     completeDrag(store, CARD_A, 500, 400);
     await vi.waitFor(() => expect(session.getState().persistence.kind).toBe('conflicted'));
+    expect(authoring.complete({ kind: 'opened-card', cardId: CARD_A }).kind).toBe('completed');
+    store.getState().beginResize(CARD_A);
+    store.getState().previewResize(CARD_A, { width: 620, height: 440 });
     expect(store.getState().projection).not.toBeNull();
+    expect(store.getState().resizeDraft).not.toBeNull();
 
     expect(authoring.acceptStoredSpace()).toBeNull();
 
     expect(store.getState().projection).toBeNull();
     expect(store.getState().selection).toEqual({ kind: 'none' });
     expect(store.getState().moved).toBe(false);
+    expect(store.getState().resizeDraft).toBeNull();
   });
 });
