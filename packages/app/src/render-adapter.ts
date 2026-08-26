@@ -435,11 +435,11 @@ export function createRenderAdapter(authoring: SpaceAuthoring): RenderAdapter {
     beginResize: (cardId) => {
       const authored = authoring.authoredPlacement();
       const at = authored?.get(cardId);
-      if (authored === null || at?.expanded === undefined) return;
+      if (authored === null || at?.open !== true) return;
       set({
         resizeDraft: {
           cardId,
-          size: at.expanded,
+          size: at.openSize,
           placement: authored,
         },
       });
@@ -449,12 +449,12 @@ export function createRenderAdapter(authoring: SpaceAuthoring): RenderAdapter {
       const draft = get().resizeDraft;
       if (draft?.cardId !== cardId) return;
       const at = draft.placement.get(cardId);
-      if (at?.expanded === undefined) return;
+      if (at?.open !== true) return;
       set({
         resizeDraft: {
           cardId,
           size,
-          placement: Placement.place(draft.placement, cardId, { ...at, expanded: size }),
+          placement: Placement.place(draft.placement, cardId, { ...at, openSize: size }),
         },
       });
     },

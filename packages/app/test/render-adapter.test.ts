@@ -748,8 +748,8 @@ describe('render adapter', () => {
 
   it('previews one resize through a derived Placement and completes only its final size', () => {
     const authored = Placement.fromEntries([
-      [CARD_A, { x: 10, y: 20, expanded: { width: 500, height: 360 } }],
-      [CARD_B, { x: 300, y: 200 }],
+      [CARD_A, { x: 10, y: 20, open: true, openSize: { width: 500, height: 360 } }],
+      [CARD_B, { x: 300, y: 200, open: false }],
     ]);
     const spy = authoringSpy({ authoredPlacement: authored });
     const store = createRenderAdapter(spy.authoring);
@@ -762,8 +762,8 @@ describe('render adapter', () => {
       cardId: CARD_A,
       size: { width: 620, height: 440 },
       placement: Placement.fromEntries([
-        [CARD_A, { x: 10, y: 20, expanded: { width: 620, height: 440 } }],
-        [CARD_B, { x: 300, y: 200 }],
+        [CARD_A, { x: 10, y: 20, open: true, openSize: { width: 620, height: 440 } }],
+        [CARD_B, { x: 300, y: 200, open: false }],
       ]),
     });
     expect(spy.completions).toEqual([]);
@@ -778,8 +778,8 @@ describe('render adapter', () => {
 
   it('rejects React Flow local dimensions while the complete resize draft is projecting', () => {
     const authored = Placement.fromEntries([
-      [CARD_A, { x: 10, y: 20, expanded: { width: 500, height: 360 } }],
-      [CARD_B, { x: 300, y: 200 }],
+      [CARD_A, { x: 10, y: 20, open: true, openSize: { width: 500, height: 360 } }],
+      [CARD_B, { x: 300, y: 200, open: false }],
     ]);
     const store = createRenderAdapter(authoringSpy({ authoredPlacement: authored }).authoring);
     const open = node(CARD_A, 10, 20);
@@ -807,7 +807,7 @@ describe('render adapter', () => {
   it('discards the complete resize draft without an Edit when the gesture is cancelled', () => {
     const spy = authoringSpy({
       authoredPlacement: Placement.fromEntries([
-        [CARD_A, { x: 10, y: 20, expanded: { width: 500, height: 360 } }],
+        [CARD_A, { x: 10, y: 20, open: true, openSize: { width: 500, height: 360 } }],
       ]),
     });
     const store = createRenderAdapter(spy.authoring);
