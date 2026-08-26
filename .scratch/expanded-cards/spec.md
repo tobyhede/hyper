@@ -2,7 +2,19 @@
 
 Status: ready-for-human
 Decides: how ADR 0064 is built. The decision itself is the ADR; this is the seam design.
-Relates: ADR 0064, ADR 0025, ADR 0037, ADR 0051, ADR 0063, `.scratch/space-cards/expanding-cards-prototype.md`
+Relates: ADR 0064, ADR 0025, ADR 0037, ADR 0051, ADR 0063, ADR 0066, `.scratch/space-cards/expanding-cards-prototype.md`
+
+**§1's placement contract is superseded by ADR 0066, and §7's invariant with it.**
+This spec was written when a Card that closed forgot the size it was opened at,
+and it argued for that on purpose. ADR 0066 decided the opposite: Placement
+carries an explicit Open or Closed state, an Open entry carries the Open Size it
+remembers, a Closed entry may retain one so reopening returns to it, and the
+Closed Size is fixed domain policy that is never stored. Both passages below are
+rewritten to the decided model and marked where they were. **Do not take the
+optional-size shape from any older copy of this document** — intake now rejects
+it by schema strictness (ADR 0066, ADR 0054, ADR 0056), so following it would
+write fixtures and property tests the parser refuses. Everything else here still
+describes the seams as designed.
 
 The prototype (`packages/app/stories/review/expanding-cards.*`) proved the interaction. It proved nothing about where any of it lives: it holds one `Record<string, CardPlacement>` in a story and reads it straight into React Flow nodes. Production has seven packages, a branded `Placement`, a completed-Edit seam and a curated `graph` index between those two ends. This is the design for crossing them.
 
@@ -17,7 +29,7 @@ Read ADR 0064 first. Nothing here reopens it.
 | `react-flow-adapter` | `CardNode` draws an expanded front. Node size and handle geometry already come per Card. |
 | `ui` | `CanvasCard` becomes the deep Markdown front; its body surface and caret are internal implementation. |
 | `app` | `openedCardId` and the pane are deleted; three completions are added; the projection carries rects. |
-| `persistence`, `http` | Nothing. The Space is one `Json` document (`src/prisma/contract.prisma`), so an additive field needs no migration. |
+| `persistence`, `http` | Nothing. The Space is one `Json` document (`src/prisma/contract.prisma`), and the repository is the only source of state, so a document-shape change needs no migration (ADR 0054, ADR 0056). |
 
 ## 1. `core` — split the point from the rect
 
@@ -25,24 +37,26 @@ Read ADR 0064 first. Nothing here reopens it.
 
 So split, which is the option that comment names:
 
+**Superseded here by ADR 0066.** What this section originally proposed was one optional `expanded` size field, with presence as the state and closing forgetting the size. ADR 0066 rejected that and the built schema is a discriminated union instead:
+
 ```ts
 // unchanged, still the shared point
 export const layoutPositionSchema = z.object({ x: z.number(), y: z.number() });
 
-// new: what a Layout stores per Card
-export const cardPlacementSchema = z.object({
-  x: z.number(),
-  y: z.number(),
-  /** Present exactly when the Card is Expanded, and the size it is Expanded to. */
-  expanded: z.object({ width: z.number(), height: z.number() }).optional(),
-});
+// what a Layout stores per Card: origin, Open/Closed state, remembered Open Size
+export const cardPlacementSchema = z.discriminatedUnion('open', [
+  layoutPositionSchema.extend({ open: z.literal(true), openSize: openSizeSchema }),
+  layoutPositionSchema.extend({ open: z.literal(false), openSize: openSizeSchema.optional() }),
+]);
 ```
+
+`packages/core/src/schema.ts` is the authority for the exact spelling; read it before writing a fixture rather than copying the block above.
 
 `positionedLayoutSchema.positions` becomes `z.record(idSchema, cardPlacementSchema)`.
 
-**Presence is the state.** One field, so `expanded: true` cannot disagree with a missing size and a collapsed Card cannot carry a stale one — ADR 0064 says a collapsed Card is the ratio constant and carries no size. The cost is that closing a Card forgets the size it was opened at; re-opening uses the default. That is deliberate, and if remembering is wanted later it is a second optional field with a name that says so, not a boolean beside this one.
+**The state is explicit, and the size outlives it.** An Open entry must carry an Open Size, so `open: true` cannot disagree with a missing rect. A Closed entry may retain the size it was last Open at, so Close flips the state alone and reopening returns to the same rect; a Card that has never been Opened carries none. Closed Size stays fixed domain policy (`COLLAPSED_CARD_SIZE` in `packages/core/src/card-geometry.ts`) and is never written per Card — an optional stored Closed Size was rejected as two document shapes for one fact, and a required one as a value that never varies (ADR 0066).
 
-**Purely additive**, so every existing space file and every stored document parses unchanged, and `.strict()` on the Layout object is unaffected because the growth is in the value. Fixtures and the tracked space file roll forward in the same change (ADR 0054).
+**Not purely additive, and that is decided.** The retired optional-`expanded` shape does not parse: the discriminant is required with no hand-authoring default, and intake rejects the old shape by schema strictness rather than by a `documentRefusal` naming it (ADR 0066, ADR 0056). There is no migration to write, because there is no state outside the repository to migrate — fixtures, examples and tests roll forward in the same change (ADR 0054).
 
 The key stays `positions` although the value is now a rect. Renaming it to `cards` is a better name and a **separate commit** — the workflow forbids a rename riding along with a structural change, and this one touches fixtures, the E2E tracked space and every test that writes a Layout.
 
@@ -147,7 +161,7 @@ One at a time, canvas-wide — which is what makes "several Cards Expanded" not 
 | --- | --- |
 | A drawn coordinate never reaches a Layout un-inverted | `Placement.next` is the only door; property test round-trips `next(p, drawn(p), …) === p` |
 | Closing restores the neighbours exactly | The same property test, with an Expanded Card closed between the two halves |
-| A collapsed Card carries no size | `cardPlacementSchema` — presence of `expanded` is the state |
+| A Closed Card is never given a stored Closed Size, and may keep the Open Size it remembers | `cardPlacementSchema`'s discriminated union — the state is explicit and `openSize` is optional only on the Closed member (ADR 0066) |
 | Opening and closing animate identically | The node box owns the rect and `.canvas-card` declares no size — Ladle E2E asserts a running `width` transition on the node wrapper *and* that the Card's computed box matches it |
 | An Expanded Card's declared box is the box the strategy reasoned about | `canvas-projection` property test (extends the existing handle-resolution one) |
 | The bundle does not gain CodeMirror | `codemirror-encapsulation.test.ts`, with its scan moved to both trees |

@@ -182,8 +182,8 @@ export const presentEdgeEndpointRefusal = (
  * Error placement for a refused Delete, which stays on the controls that asked.
  *
  * Total by construction rather than by an exhaustive record: a surface with no
- * field has nowhere else for a code to go, so a second eighteen-line table
- * saying `form` eighteen times would be a thing to keep in step and never a
+ * field has nowhere else for a code to go, so a second nineteen-line table
+ * saying `form` nineteen times would be a thing to keep in step and never a
  * thing to decide.
  */
 export const presentEdgeDeletionRefusal = (

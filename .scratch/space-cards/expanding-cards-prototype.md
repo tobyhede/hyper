@@ -63,6 +63,12 @@ and nothing about expanding needs that to change.
   selection dragging the Card out from under the caret), `nopan` (a click-drag
   in the editor panning the canvas), `nokey` (arrow keys moving the Card instead
   of the caret), `nowheel` (the scroll fight).
+
+  **Superseded as guidance by ADR 0064** ("Three behaviours stay off"): the
+  containment works, and it is not adopted. No `nowheel` is added to an Open
+  Card — the wheel belongs to the canvas everywhere, and an Open Card that needs
+  more room is resized. Read this bullet as what the prototype measured, not as
+  what to build. The other three hatches are untouched by that decision.
 - **React Flow's own `NodeResizer` is in the pinned 12.11.2** and carries
   `keepAspectRatio`, so the 16:9 question is a prop rather than a rewrite.
 
@@ -124,11 +130,14 @@ answer would need the click position mapped into the mounted editor.
   take its growth, derived and reversible (above). The question underneath is
   whether an author wants the arrangement to answer for the expansion at all,
   or would rather place the expanded Card themselves.
-- **contain scroll** — ADR 0006 rejected content in a node partly because "it
-  makes a card a container and its scroll fights the canvas pan". On, `nowheel`
-  fixes that and the cost moves: every expanded Card becomes a hole you cannot
+- **contain scroll** — **decided off by ADR 0064; recorded here as the question
+  it answered.** ADR 0006 rejected content in a node partly because "it makes a
+  card a container and its scroll fights the canvas pan". On, `nowheel` fixes
+  that and the cost moves: every expanded Card becomes a hole you cannot
   wheel-pan across, and the more the feature succeeds the more of the canvas is
-  hole. Off, ADR 0006's objection is live.
+  hole. Off, ADR 0006's objection is live. ADR 0064 took the second, accepting
+  the objection rather than paying that cost; CodeMirror may still scroll its
+  own document while editing.
 - **keep 16:9** — `card.ts` couples the Card's silhouette to the presentation
   surface: "click a card, present it, and the shape does not change". Off, a
   resized Card breaks that promise. On, the box is the box the ratio allows,
@@ -145,10 +154,12 @@ Its closing line: "a future architecture pass will see a graph of 'cards' that
 do not show their content and suggest showing it; that suggestion is this ADR,
 already considered." Two of its three reasons are answered by author-chosen,
 per-Card expansion with a size that fits — silent clipping, and unreadability at
-overview zoom. The third, the scroll fight, is answered mechanically by
-`nowheel` at the cost above. ADR 0006 also framed "show full content" as a
-*View* setting; making it a per-Card Layout property is the specific sentence
-that moves.
+overview zoom. The third, the scroll fight, this document proposed to answer
+mechanically with `nowheel` at the cost above — **and ADR 0064 declined that
+answer.** It leaves the wheel with the canvas and accepts the fight instead, so
+ADR 0006's third reason is not reversed by a mechanism here; it is outweighed.
+ADR 0006 also framed "show full content" as a *View* setting; making it a
+per-Card Layout property is the specific sentence that moves.
 
 ## What this would delete
 

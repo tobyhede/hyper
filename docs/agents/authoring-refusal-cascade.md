@@ -40,12 +40,20 @@ names what gate 3 does for that action.
 | `edited-card` | converts | `card-not-found` → `card-kind-immutable` → `card-title-required` → (identical to current ⇒ `unchanged`) → `alias-target-not-found` → `alias-target-must-own-content` → completed |
 | `created-card` | converts | none → completed |
 | `created-alias` | converts | `alias-target-not-found` → `alias-target-must-own-content` → completed |
-| `opened-card` | converts | `card-not-in-layout` → (already Expanded ⇒ `unchanged`) → completed |
-| `closed-card` | **layout-required** | `card-not-in-layout` → (already closed ⇒ `unchanged`) → completed |
+| `opened-card` | converts | `card-not-in-layout` → (already Open ⇒ `unchanged`) → completed |
+| `closed-card` | **layout-required** | `card-not-in-layout` → (already Closed ⇒ `unchanged`) → completed |
 | `resized-card` | **layout-required** | `card-not-in-layout` → `card-not-expanded` → (same size ⇒ `unchanged`) → completed |
 | `added-card-to-layout` | **layout-required** | `card-not-found` → `card-already-in-layout` → completed |
 | `removed-card-from-layout` | **layout-required** | `card-not-in-layout` → completed |
 | `deleted-card` | converts | `card-not-found` → `card-has-aliases` → completed |
+
+`card-not-expanded` is the code `resized-card` raises for a Card that is
+**Closed**. The prose in this file speaks `CONTEXT.md`'s Open/Closed vocabulary;
+every code string is quoted exactly as `AuthoringRefusal['code']` declares it,
+retired wording included. A refusal code is a stable identity across the seam
+(ADR 0057), so renaming this one is a change to the domain surface rather than a
+wording fix — do not correct it here, and do not let the mismatch tempt a rename
+that has not been decided.
 
 ### Connections
 
@@ -71,10 +79,14 @@ names what gate 3 does for that action.
 | --- | --- | --- |
 | `settled-card-movement` | converts | none → completed |
 
-## The 18 codes
+## The 19 codes
 
 3 universal (`placement-pending`, `layout-not-found`, `layout-required`) plus
-the 15 action-specific codes tabulated above — none is produced anywhere else.
+the 16 action-specific codes tabulated above — none is produced anywhere else.
+Count the codes, not the cells: several serve more than one action —
+`card-not-found`, `card-not-in-layout`, `graph-not-owned`,
+`edge-card-outside-layout` and the two `alias-target-*` each appear in more than
+one row.
 `describeAuthoringRefusal` in `authoring-refusal.ts` is the one place every
 code gets its copy, and the exhaustive placement records beside it are the one
 place each surface's field mapping lives: the domain names the code, the
