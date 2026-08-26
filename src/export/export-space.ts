@@ -4,6 +4,7 @@ import {
   SPACE_FILE_VERSION,
   spaceSnapshotSchema,
   type Card,
+  type CardPlacement,
   type SpaceFile,
   type UUID,
 } from '@project/core';
@@ -14,6 +15,15 @@ import type { SpaceRepository } from '../persistence/space-repository';
 
 const compareOrdinal = (left: string, right: string): number =>
   left < right ? -1 : left > right ? 1 : 0;
+
+const canonicalPlacement = (point: CardPlacement): CardPlacement => {
+  if (point.open) {
+    return { x: point.x, y: point.y, open: true, openSize: point.openSize };
+  }
+  return point.openSize === undefined
+    ? { x: point.x, y: point.y, open: false }
+    : { x: point.x, y: point.y, open: false, openSize: point.openSize };
+};
 
 /**
  * A layout's graphs, rebuilt key by key and emitted in the order the layout
@@ -61,9 +71,10 @@ const canonicalSpaceFile = ({ snapshot }: LoadedSpace): SpaceFile => {
           // a parsed document — the optionality is the `Partial<Record>` the
           // schema's key branding produces — and dropping it matches what
           // `JSON.stringify` already did with one.
-          .flatMap(([id, point]) =>
-            point === undefined ? [] : [[id, { x: point.x, y: point.y }]],
-          ),
+          .flatMap<readonly [string, CardPlacement]>(([id, point]) => {
+            if (point === undefined) return [];
+            return [[id, canonicalPlacement(point)]];
+          }),
       ),
       graphs: canonicalGraphs(layout.graphs),
     };

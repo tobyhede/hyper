@@ -175,8 +175,8 @@ function sparsePositionedAdapter(newId?: () => UUID) {
           title: 'Layout 1',
           kind: 'positioned',
           positions: {
-            [uuidSchema.parse(CARD_A)]: { x: 10, y: 20 },
-            [uuidSchema.parse(CARD_B)]: { x: 300, y: 20 },
+            [uuidSchema.parse(CARD_A)]: { x: 10, y: 20, open: false },
+            [uuidSchema.parse(CARD_B)]: { x: 300, y: 20, open: false },
           },
           graphs: [
             {
@@ -208,8 +208,8 @@ function sparsePositionedAdapter(newId?: () => UUID) {
     snapshot,
     { kind: 'layout', layoutId: LAYOUT_ID },
     Placement.fromEntries([
-      [CARD_A, { x: 10, y: 20 }],
-      [CARD_B, { x: 300, y: 20 }],
+      [CARD_A, { x: 10, y: 20, open: false }],
+      [CARD_B, { x: 300, y: 20, open: false }],
     ]),
     undefined,
     newId,
@@ -229,8 +229,8 @@ function storedSpaceAdapter() {
           title: 'Layout 1',
           kind: 'positioned',
           positions: {
-            [uuidSchema.parse(CARD_A)]: { x: 10, y: 20 },
-            [uuidSchema.parse(CARD_B)]: { x: 300, y: 20 },
+            [uuidSchema.parse(CARD_A)]: { x: 10, y: 20, open: false },
+            [uuidSchema.parse(CARD_B)]: { x: 300, y: 20, open: false },
           },
           graphs: [
             {
@@ -256,8 +256,8 @@ function storedSpaceAdapter() {
     snapshot,
     { kind: 'layout', layoutId: LAYOUT_ID },
     Placement.fromEntries([
-      [CARD_A, { x: 10, y: 20 }],
-      [CARD_B, { x: 300, y: 20 }],
+      [CARD_A, { x: 10, y: 20, open: false }],
+      [CARD_B, { x: 300, y: 20, open: false }],
     ]),
     stored,
   );
@@ -519,8 +519,8 @@ describe('render adapter', () => {
     expect(spy.installs[0]?.nodesAtCall?.map((entry) => entry.id)).toEqual([CARD_A, CARD_B]);
     expect(spy.installs[0]?.placement).toEqual(
       Placement.fromEntries([
-        [CARD_A, { x: 10, y: 20 }],
-        [CARD_B, { x: 300, y: 20 }],
+        [CARD_A, { x: 10, y: 20, open: false }],
+        [CARD_B, { x: 300, y: 20, open: false }],
       ]),
     );
     expect(store.getState().projection?.nodes.map((entry) => entry.id)).toEqual([CARD_A, CARD_B]);
@@ -540,8 +540,8 @@ describe('render adapter', () => {
 
     // C was rendered and is still not a member of this Layout.
     expect(session.getState().working.document.layouts?.[0]?.positions).toEqual({
-      [CARD_A]: { x: 10, y: 20 },
-      [CARD_B]: { x: 300, y: 20 },
+      [CARD_A]: { x: 10, y: 20, open: false },
+      [CARD_B]: { x: 300, y: 20, open: false },
     });
   });
 
@@ -607,8 +607,8 @@ describe('render adapter', () => {
     ).toEqual({ kind: 'completed', cardId: CARD_A });
 
     expect(session.getState().working.document.layouts?.[0]?.positions).toEqual({
-      [CARD_A]: { x: 10, y: 20 },
-      [CARD_B]: { x: 300, y: 20 },
+      [CARD_A]: { x: 10, y: 20, open: false },
+      [CARD_B]: { x: 300, y: 20, open: false },
     });
   });
 
@@ -619,9 +619,9 @@ describe('render adapter', () => {
     completeDrag(store, CARD_C, 400, 120);
 
     expect(session.getState().working.document.layouts?.[0]?.positions).toEqual({
-      [CARD_A]: { x: 10, y: 20 },
-      [CARD_B]: { x: 300, y: 20 },
-      [CARD_C]: { x: 400, y: 120 },
+      [CARD_A]: { x: 10, y: 20, open: false },
+      [CARD_B]: { x: 300, y: 20, open: false },
+      [CARD_C]: { x: 400, y: 120, open: false },
     });
   });
 
@@ -645,8 +645,8 @@ describe('render adapter', () => {
 
     expect(authoring.authoredPlacement()).toEqual(
       Placement.fromEntries([
-        [CARD_A, { x: 10, y: 20 }],
-        [CARD_B, { x: 300, y: 20 }],
+        [CARD_A, { x: 10, y: 20, open: false }],
+        [CARD_B, { x: 300, y: 20, open: false }],
       ]),
     );
   });
@@ -664,9 +664,9 @@ describe('render adapter', () => {
     ).toEqual({ kind: 'completed', cardId: CREATED_CARD_ID });
 
     expect(session.getState().working.document.layouts?.[0]?.positions).toEqual({
-      [CARD_A]: { x: 10, y: 20 },
-      [CARD_B]: { x: 300, y: 20 },
-      [CREATED_CARD_ID]: { x: 420, y: 360 },
+      [CARD_A]: { x: 10, y: 20, open: false },
+      [CARD_B]: { x: 300, y: 20, open: false },
+      [CREATED_CARD_ID]: { x: 420, y: 360, open: false },
     });
   });
 
@@ -719,22 +719,54 @@ describe('render adapter', () => {
     expect(spy.installs).toHaveLength(installedBefore);
   });
 
-  it('keeps a live node position across a reprojection', () => {
+  it('applies projected rect and stacking to an existing live node', () => {
+    const spy = authoringSpy();
+    const store = createRenderAdapter(spy.authoring);
+    spy.attach(store);
+
+    const closed = node(CARD_A, 10, 20);
+    closed.width = 260;
+    closed.height = 146;
+    store.getState().syncProjection([closed], []);
+
+    const expanded = node(CARD_A, 40, 60);
+    expanded.width = 560;
+    expanded.height = 420;
+    expanded.zIndex = 10;
+    expanded.data.expanded = true;
+    store.getState().syncProjection([expanded], []);
+
+    expect(store.getState().projection?.nodes[0]).toMatchObject({
+      position: { x: 40, y: 60 },
+      width: 560,
+      height: 420,
+      zIndex: 10,
+      data: { expanded: true },
+    });
+  });
+
+  it('keeps an in-flight drag position while applying projected expanded geometry', () => {
     const spy = authoringSpy();
     const store = createRenderAdapter(spy.authoring);
     spy.attach(store);
 
     store.getState().syncProjection([node(CARD_A, 10, 20)], []);
-    completeDrag(store, CARD_A, 111, 222);
+    store.getState().changeNodes(moving(CARD_A, 111, 222));
 
-    // A projection carries the title and handles, never the position — the live
-    // node owns that. Re-projecting at the origin must not move a dragged card.
-    store.getState().syncProjection([node(CARD_A, 0, 0)], []);
+    const expanded = node(CARD_A, 40, 60);
+    expanded.width = 560;
+    expanded.height = 420;
+    expanded.zIndex = 10;
+    expanded.data.expanded = true;
+    store.getState().syncProjection([expanded], []);
 
-    expect(store.getState().projection?.nodes[0]?.position).toEqual({ x: 111, y: 222 });
-    expect(spy.installs.at(-1)?.placement).toEqual(
-      Placement.fromEntries([[CARD_A, { x: 111, y: 222 }]]),
-    );
+    expect(store.getState().projection?.nodes[0]).toMatchObject({
+      position: { x: 111, y: 222 },
+      width: 560,
+      height: 420,
+      zIndex: 10,
+      data: { expanded: true },
+    });
   });
 
   it('completes no Edit for a drag that returns to where it began', () => {
@@ -794,8 +826,8 @@ describe('render adapter', () => {
       {
         kind: 'settled-card-movement',
         rendered: Placement.fromEntries([
-          [CARD_A, { x: 500, y: 400 }],
-          [CARD_B, { x: 300, y: 20 }],
+          [CARD_A, { x: 500, y: 400, open: false }],
+          [CARD_B, { x: 300, y: 20, open: false }],
         ]),
         placed: [CARD_A],
       },

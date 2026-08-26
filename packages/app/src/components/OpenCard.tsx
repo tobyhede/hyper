@@ -1,6 +1,4 @@
 import {
-  Suspense,
-  useCallback,
   useRef,
   useState,
   type CSSProperties,
@@ -8,94 +6,28 @@ import {
   type KeyboardEvent,
   type ReactNode,
 } from 'react';
-import { markdownCardSchema, uuidSchema, type Card, type CardId } from '@project/core';
-import type { ResolvedContentCard } from '@project/graph';
+import { uuidSchema, type Card, type CardId } from '@project/core';
 import {
   Alert,
   AlertDescription,
   AlertIcon,
   AlertTitle,
   Button,
+  CardRail,
   CardSearchCombobox,
   CloseIcon,
   Field,
   FieldError,
   FieldGroup,
   FieldLabel,
+  Input,
 } from '@project/ui';
-import type { MarkdownSourceEditorHandle } from '@project/ui/MarkdownSourceEditor';
 import { CardPane } from './CardPane';
-import { MarkdownSourceEditor } from './markdown-source-editor-lazy';
 import './card-editor.css';
 import { paneInitialFocus } from './pane-focus';
-import { presentAliasCardRefusal, presentMarkdownCardRefusal } from '../authoring-refusal';
+import { presentAliasCardRefusal } from '../authoring-refusal';
 import { GRAPH_PALETTE } from '../colors';
 import type { AuthoringRefusal } from '../space-authoring';
-
-/**
- * The two values the Card dialog authors. Description remains valid domain
- * metadata, but it is not Card-front copy and it is not duplicated in this
- * writing surface.
- */
-type MarkdownDraft = {
-  readonly title: string;
-  readonly body: string;
-  readonly titleError: string | null;
-};
-
-type MarkdownCard = Extract<ResolvedContentCard, { kind: 'markdown' }>;
-
-const seedMarkdown = (card: MarkdownCard): MarkdownDraft => ({
-  title: card.title,
-  body: card.body,
-  titleError: null,
-});
-
-function settleMarkdown(
-  card: MarkdownCard,
-  draft: MarkdownDraft,
-):
-  | { readonly ok: true; readonly card: MarkdownCard }
-  | { readonly ok: false; readonly draft: MarkdownDraft; readonly refusal: string | null } {
-  // The title is trimmed for the same reason as the graph's inline editor:
-  // `min(1)` counts spaces. The Markdown body is preserved byte-for-byte.
-  const named = draft.title.trim();
-  const parsed = markdownCardSchema.safeParse({
-    ...card,
-    title: named,
-    body: draft.body,
-  });
-  if (parsed.success) return { ok: true, card: parsed.data };
-
-  const forTitle = parsed.error.issues.find((candidate) => candidate.path[0] === 'title');
-  const titleError =
-    forTitle === undefined
-      ? null
-      : named.length === 0
-        ? 'A Card title is required.'
-        : forTitle.message;
-  const unattributed = parsed.error.issues.some((candidate) => candidate.path[0] !== 'title');
-  return {
-    ok: false,
-    draft: { ...draft, titleError },
-    refusal: unattributed ? 'The Card could not be completed.' : null,
-  };
-}
-
-/**
- * A Card opened on its own content — the ordinary case, and one Card.
- *
- * `through` is declared absent so this variant cannot also be an Alias open.
- */
-interface DirectOpen {
-  /** The Card that was opened, which owns the content this pane authors. */
-  readonly card: ResolvedContentCard;
-  /** Active Graph colour carried from the canvas into the Card's writing rail. */
-  readonly graphColor?: string;
-  readonly through?: never;
-  readonly occurrence?: never;
-  readonly onComplete: (card: ResolvedContentCard) => AuthoringRefusal | null;
-}
 
 /**
  * Authoring the Alias itself: its title, and which Card it points at.
@@ -126,45 +58,29 @@ interface OccurrenceAuthoring {
 /**
  * An Alias opened on its own metadata.
  */
-interface AliasOpen {
+export interface OpenCardProps {
   /** The Alias whose own metadata this pane authors. */
   readonly through: Extract<Card, { kind: 'alias' }>;
   /** Active Graph colour carried from the canvas into the Card's writing rail. */
   readonly graphColor?: string;
   /** The one canonical capability for changing its title and Target. */
   readonly occurrence: OccurrenceAuthoring;
-  readonly card?: never;
-  readonly onComplete?: never;
+  /** Close this pane; invoked after a completed Done action as well as cancellation. */
+  readonly onCancel: () => void;
 }
 
 /**
- * What the pane was opened on, in exactly one of its two forms. A content Card
- * carries its completion; an Alias carries only the capability that authors
- * its metadata. The props cannot express content authoring through an Alias.
+ * The Alias metadata form. Markdown Cards author their front in `CanvasCard`.
  */
-export type OpenCardProps = {
-  /** Close this pane; invoked after a completed Done action as well as cancellation. */
-  readonly onCancel: () => void;
-} & (DirectOpen | AliasOpen);
-
-/**
- * The stable Card-writing surface shared by every Card kind.
- *
- * It owns dialog and form presentation only. Each kind-specific editor owns
- * its draft, validation and completion so a field that belongs to one kind
- * cannot accidentally appear on another.
- */
-function CardEditorShell({
+function AliasEditorForm({
   subjectTitle,
   graphColor,
   title,
   titleError,
-  titleStartsFocused,
   onTitleChange,
   onTitleEnter,
   children,
   error,
-  errorId,
   onSubmit,
   onCancel,
 }: {
@@ -172,15 +88,16 @@ function CardEditorShell({
   readonly graphColor: string;
   readonly title: string;
   readonly titleError: string | null;
-  readonly titleStartsFocused: boolean;
   readonly onTitleChange: (title: string) => void;
-  readonly onTitleEnter?: () => void;
+  readonly onTitleEnter: () => void;
   readonly children: ReactNode;
   readonly error: string | null;
-  readonly errorId: string;
   readonly onSubmit: (event: FormEvent<HTMLFormElement>) => void;
   readonly onCancel: () => void;
 }) {
+  const style: CSSProperties & { '--card-editor-graph': string | undefined } = {
+    '--card-editor-graph': graphColor,
+  };
   const submitShortcut = (event: KeyboardEvent<HTMLFormElement>): void => {
     if (event.key !== 'Enter' || (!event.metaKey && !event.ctrlKey)) return;
     event.preventDefault();
@@ -196,58 +113,50 @@ function CardEditorShell({
     >
       <form
         className="card-editor"
-        // SAFETY: CSSProperties doesn't type CSS custom properties (`--*`);
-        // this one is read only by the stylesheet, which is its actual contract.
-        style={{ '--card-editor-graph': graphColor } as CSSProperties}
+        style={style}
         aria-invalid={error !== null}
-        aria-describedby={error === null ? undefined : errorId}
+        aria-describedby={error === null ? undefined : 'open-alias-error'}
         onSubmit={onSubmit}
         onKeyDown={submitShortcut}
       >
+        <CardRail kind="alias" graphColor={graphColor} className="card-editor__rail">
+          <Button
+            type="button"
+            variant="secondary"
+            size="icon"
+            className="card-editor__close"
+            aria-label="Close Card editor"
+            onClick={onCancel}
+          >
+            <CloseIcon />
+          </Button>
+        </CardRail>
         <FieldGroup className="card-editor__fields">
-          <header className="card-editor__rail">
-            <Field className="card-editor__title-field" data-invalid={titleError !== null}>
-              <FieldLabel className="sr-only" htmlFor="open-card-title">
-                Title
-              </FieldLabel>
-              <input
-                id="open-card-title"
-                className="card-editor__title"
-                aria-invalid={titleError !== null}
-                aria-describedby={titleError === null ? undefined : 'open-card-title-error'}
-                value={title}
-                {...paneInitialFocus(titleStartsFocused)}
-                onChange={(event) => onTitleChange(event.currentTarget.value)}
-                onKeyDown={(event) => {
-                  if (
-                    event.key !== 'Enter' ||
-                    event.metaKey ||
-                    event.ctrlKey ||
-                    onTitleEnter === undefined
-                  ) {
-                    return;
-                  }
-                  event.preventDefault();
-                  onTitleEnter();
-                }}
-              />
-              <FieldError id="open-card-title-error">{titleError}</FieldError>
-            </Field>
-            <Button
-              type="button"
-              variant="secondary"
-              size="icon"
-              className="card-editor__close"
-              aria-label="Close Card editor"
-              onClick={onCancel}
-            >
-              <CloseIcon />
-            </Button>
-          </header>
+          <Field className="card-editor__title-field" data-invalid={titleError !== null}>
+            <FieldLabel className="card-editor__label" htmlFor="open-card-title">
+              Title
+            </FieldLabel>
+            <Input
+              id="open-card-title"
+              className="card-editor__title"
+              aria-invalid={titleError !== null}
+              aria-describedby={titleError === null ? undefined : 'open-card-title-error'}
+              value={title}
+              onChange={(event) => onTitleChange(event.currentTarget.value)}
+              onKeyDown={(event) => {
+                if (event.key !== 'Enter' || event.metaKey || event.ctrlKey) {
+                  return;
+                }
+                event.preventDefault();
+                onTitleEnter();
+              }}
+            />
+            <FieldError id="open-card-title-error">{titleError}</FieldError>
+          </Field>
           {children}
         </FieldGroup>
         {error !== null && (
-          <Alert id={errorId} variant="destructive" className="card-editor__error">
+          <Alert id="open-alias-error" variant="destructive" className="card-editor__error">
             <AlertIcon />
             <AlertTitle>Couldn’t save changes</AlertTitle>
             <AlertDescription>{error}</AlertDescription>
@@ -263,109 +172,6 @@ function CardEditorShell({
         </footer>
       </form>
     </CardPane>
-  );
-}
-
-/**
- * The content Card's form. Every field belongs to that one Card.
- */
-function MarkdownCardEditor({
-  content,
-  graphColor,
-  onComplete,
-  onCancel,
-}: {
-  readonly content: MarkdownCard;
-  readonly graphColor: string;
-  readonly onComplete: (card: ResolvedContentCard) => AuthoringRefusal | null;
-  readonly onCancel: () => void;
-}) {
-  const [draft, setDraft] = useState<MarkdownDraft>(() => seedMarkdown(content));
-  const [contentRefusal, setContentRefusal] = useState<string | null>(null);
-  const [authoringRefusal, setAuthoringRefusal] = useState<AuthoringRefusal | null>(null);
-  const body = useRef<MarkdownSourceEditorHandle | null>(null);
-  const focusBodyOnMount = useRef(false);
-  const authoringErrors =
-    authoringRefusal === null ? { fields: {} } : presentMarkdownCardRefusal(authoringRefusal);
-  const titleError = draft.titleError ?? authoringErrors.fields.title ?? null;
-  const formError = contentRefusal ?? authoringErrors.form ?? null;
-
-  const submit = (event: FormEvent<HTMLFormElement>): void => {
-    event.preventDefault();
-    const settled = settleMarkdown(content, draft);
-    if (!settled.ok) {
-      setDraft(settled.draft);
-      setContentRefusal(settled.refusal);
-      return;
-    }
-    const refusal = onComplete(settled.card);
-    if (refusal !== null) {
-      setAuthoringRefusal(refusal);
-      return;
-    }
-    onCancel();
-  };
-
-  const titleStartsFocused = true;
-  const changeTitle = useCallback((title: string) => {
-    // Typing here withdraws any body focus still waiting on the lazy editor: the
-    // author has stopped waiting for it, and a caret arriving mid-word would put the
-    // rest of the title into the Markdown.
-    focusBodyOnMount.current = false;
-    setDraft((current) => ({ ...current, title, titleError: null }));
-    setContentRefusal(null);
-    setAuthoringRefusal(null);
-  }, []);
-  const changeBody = useCallback((body: string) => {
-    setDraft((current) => ({ ...current, body }));
-    setContentRefusal(null);
-    setAuthoringRefusal(null);
-  }, []);
-  const receiveBody = useCallback((handle: MarkdownSourceEditorHandle | null) => {
-    body.current = handle;
-    if (handle !== null && focusBodyOnMount.current) {
-      requestAnimationFrame(() => {
-        if (body.current === handle && focusBodyOnMount.current) {
-          focusBodyOnMount.current = false;
-          handle.focus();
-        }
-      });
-    }
-  }, []);
-  const focusBody = (): void => {
-    if (body.current === null) {
-      focusBodyOnMount.current = true;
-      return;
-    }
-    body.current.focus();
-  };
-
-  return (
-    <CardEditorShell
-      subjectTitle={content.title}
-      graphColor={graphColor}
-      title={draft.title}
-      titleError={titleError}
-      titleStartsFocused={titleStartsFocused}
-      onTitleChange={changeTitle}
-      onTitleEnter={focusBody}
-      error={formError}
-      errorId="open-card-error"
-      onSubmit={submit}
-      onCancel={onCancel}
-    >
-      <Field className="card-editor__body">
-        <Suspense fallback={<div className="card-editor__markdown" aria-hidden="true" />}>
-          <MarkdownSourceEditor
-            ref={receiveBody}
-            className="card-editor__markdown"
-            value={draft.body}
-            ariaLabel="Markdown source"
-            onValueChange={changeBody}
-          />
-        </Suspense>
-      </Field>
-    </CardEditorShell>
   );
 }
 
@@ -403,19 +209,17 @@ function AliasCardEditor({
   };
 
   return (
-    <CardEditorShell
+    <AliasEditorForm
       subjectTitle={alias.title}
       graphColor={graphColor}
       title={title}
       titleError={titleError}
-      titleStartsFocused={false}
       onTitleChange={(nextTitle) => {
         setTitle(nextTitle);
         setAuthoringRefusal(null);
       }}
       onTitleEnter={() => targetInput.current?.focus()}
       error={formError}
-      errorId="open-alias-error"
       onSubmit={submit}
       onCancel={onCancel}
     >
@@ -423,7 +227,7 @@ function AliasCardEditor({
         className="card-editor__body card-editor__alias-target"
         data-invalid={targetError !== null}
       >
-        <FieldLabel className="card-editor__alias-label" htmlFor="open-alias-target">
+        <FieldLabel className="card-editor__label" htmlFor="open-alias-target">
           Alias of
         </FieldLabel>
         <CardSearchCombobox
@@ -453,50 +257,18 @@ function AliasCardEditor({
         />
         <FieldError id="open-alias-target-error">{targetError}</FieldError>
       </Field>
-    </CardEditorShell>
+    </AliasEditorForm>
   );
 }
 
-/**
- * A card opened over the graph — one editable surface, and the only one.
- *
- * Opening a card *is* editing it (ADR 0037). There was a reading state in front
- * of this, and it drew the same bytes in the same order: a `CardRenderer` put
- * the Markdown source in a `<pre>`, the editor puts it in a `<textarea>`, and
- * the only difference was whether the caret could enter. The mode around that
- * non-difference is gone, along with the action that crossed it — and so, now,
- * is the component, which outlived its last caller by one release.
- *
- * The surface it is drawn on — the covering panel, its focus trap and its
- * Escape — is `CardPane`, a Base UI Dialog shared with the Alias creation state.
- * What is left here is what the pane is *for*: which Card is being authored, by
- * which fields, and what one commit over them means.
- *
- * Source, still — not rendered prose. ADR 0011 removed the reading pane's
- * Markdown renderer so a card could not read one way and present another, and
- * that half holds: presenting remains the one place a card is drawn rendered.
- *
- * A content Card authors its title and Markdown. Description metadata is left
- * untouched. An Alias authors only its own title and Target; its Target must be
- * opened separately to author that Card's content.
- */
-export function OpenCard(props: OpenCardProps) {
-  const { onCancel } = props;
-
-  return props.through === undefined ? (
-    <MarkdownCardEditor
-      key={props.card.id}
-      content={props.card}
-      graphColor={props.graphColor ?? GRAPH_PALETTE[0]}
-      onComplete={props.onComplete}
-      onCancel={onCancel}
-    />
-  ) : (
+/** The modal metadata editor retained for Alias Cards, which have no open front. */
+export function OpenCard({ through, graphColor, occurrence, onCancel }: OpenCardProps) {
+  return (
     <AliasCardEditor
-      key={props.through.id}
-      alias={props.through}
-      graphColor={props.graphColor ?? GRAPH_PALETTE[0]}
-      occurrence={props.occurrence}
+      key={through.id}
+      alias={through}
+      graphColor={graphColor ?? GRAPH_PALETTE[0]}
+      occurrence={occurrence}
       onCancel={onCancel}
     />
   );

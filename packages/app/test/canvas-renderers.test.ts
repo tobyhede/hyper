@@ -19,7 +19,7 @@ const layout = (id: string, title: string, graphId: string) => ({
   id,
   title,
   kind: 'positioned' as const,
-  positions: { [CARD_A]: { x: 0, y: 0 }, [CARD_B]: { x: 420, y: 0 } },
+  positions: { [CARD_A]: { x: 0, y: 0, open: false }, [CARD_B]: { x: 420, y: 0, open: false } },
   graphs: [{ id: graphId, title: `${title} graph`, edges: [{ from: CARD_A, to: CARD_B }] }],
 });
 

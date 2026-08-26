@@ -7,6 +7,27 @@ export interface CardContentProps {
   markdown: string;
 }
 
+interface RenderedMarkdownProps {
+  readonly markdown: string;
+  readonly className?: string;
+}
+
+/**
+ * The one Markdown parser and sanitiser shared by every rendered Card body.
+ *
+ * Kept separate from {@link CardContent} so an Expanded Card can reuse the
+ * presentation-mode rendering without also drawing presentation mode's title
+ * and outer frame.
+ */
+export function RenderedMarkdown({ markdown, className }: RenderedMarkdownProps) {
+  const html = useMemo(
+    () => DOMPurify.sanitize(marked.parse(markdown, { async: false })),
+    [markdown],
+  );
+
+  return <div className={className} dangerouslySetInnerHTML={{ __html: html }} />;
+}
+
 /**
  * Renders a card's title and its Markdown content, **parsed**.
  *
@@ -36,15 +57,10 @@ export interface CardContentProps {
  * HTTP, which is not a property to bet the origin on either.
  */
 export function CardContent({ title, markdown }: CardContentProps) {
-  const html = useMemo(
-    () => DOMPurify.sanitize(marked.parse(markdown, { async: false })),
-    [markdown],
-  );
-
   return (
     <article className="card card--full" data-testid="card-content">
       <h2 className="card__title">{title}</h2>
-      <div className="card__body" dangerouslySetInnerHTML={{ __html: html }} />
+      <RenderedMarkdown className="card__body" markdown={markdown} />
     </article>
   );
 }

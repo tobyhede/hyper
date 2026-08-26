@@ -21,8 +21,8 @@ const WORKING = {
   title: 'Working',
   kind: 'positioned',
   positions: {
-    '00000000-0000-4000-8000-000000000002': { x: 0, y: 0 },
-    '00000000-0000-4000-8000-000000000003': { x: 320, y: -40 },
+    '00000000-0000-4000-8000-000000000002': { x: 0, y: 0, open: false },
+    '00000000-0000-4000-8000-000000000003': { x: 320, y: -40, open: false },
   },
   graphs: [MAIN],
 };
@@ -57,8 +57,8 @@ describe('space file schema', () => {
           id: '00000000-0000-4000-8000-000000000010',
           title: 'Working',
           positions: {
-            '00000000-0000-4000-8000-000000000002': { x: 0, y: 0 },
-            '00000000-0000-4000-8000-000000000003': { x: 320, y: -40 },
+            '00000000-0000-4000-8000-000000000002': { x: 0, y: 0, open: false },
+            '00000000-0000-4000-8000-000000000003': { x: 320, y: -40, open: false },
           },
           graphs: [
             {
@@ -124,7 +124,7 @@ describe('space file schema', () => {
         {
           id: '00000000-0000-4000-8000-000000000010',
           title: 'Working',
-          positions: { '00000000-0000-4000-8000-000000000002': { x: 0, y: 0 } },
+          positions: { '00000000-0000-4000-8000-000000000002': { x: 0, y: 0, open: false } },
           activeGraph: '00000000-0000-4000-8000-000000000004',
         },
       ],
@@ -144,7 +144,7 @@ describe('space file schema', () => {
         {
           id: 'working',
           title: 'Working',
-          positions: { a: { x: 0, y: 0 } },
+          positions: { a: { x: 0, y: 0, open: false } },
           graphs: [{ id: 'main', title: 'Main', edges: [{ from: 'a', to: 'b' }] }],
         },
       ],
@@ -330,9 +330,39 @@ describe('space file layouts', () => {
     const layout = file.layouts?.[0];
     expect(layout?.kind).toBe('positioned');
     expect(layout?.positions).toEqual({
-      '00000000-0000-4000-8000-000000000002': { x: 0, y: 0 },
-      '00000000-0000-4000-8000-000000000003': { x: 320, y: -40 },
+      '00000000-0000-4000-8000-000000000002': { x: 0, y: 0, open: false },
+      '00000000-0000-4000-8000-000000000003': { x: 320, y: -40, open: false },
     });
+  });
+
+  it('requires an Expanded Card to be at least the Closed Card size', () => {
+    const positions = (width: number, height: number) => ({
+      '00000000-0000-4000-8000-000000000002': {
+        x: 0,
+        y: 0,
+        open: true,
+        openSize: { width, height },
+      },
+    });
+
+    expect(
+      spaceFileSchema.safeParse({
+        ...validSpaceFile,
+        layouts: [{ ...working, positions: positions(259, 146) }],
+      }).success,
+    ).toBe(false);
+    expect(
+      spaceFileSchema.safeParse({
+        ...validSpaceFile,
+        layouts: [{ ...working, positions: positions(260, 145) }],
+      }).success,
+    ).toBe(false);
+    expect(
+      spaceFileSchema.safeParse({
+        ...validSpaceFile,
+        layouts: [{ ...working, positions: positions(260, 146) }],
+      }).success,
+    ).toBe(true);
   });
 
   it('defaults a layout with no kind to positioned, so one can be hand-written', () => {
@@ -362,7 +392,7 @@ describe('space file layouts', () => {
     for (const positions of [
       { '00000000-0000-4000-8000-000000000002': { x: 0 } },
       { '00000000-0000-4000-8000-000000000002': [0, 0] },
-      { '00000000-0000-4000-8000-000000000002': { x: '0', y: '0' } },
+      { '00000000-0000-4000-8000-000000000002': { x: '0', y: '0', open: false } },
     ]) {
       expect(
         spaceFileSchema.safeParse({ ...validSpaceFile, layouts: [{ ...working, positions }] })
@@ -374,7 +404,7 @@ describe('space file layouts', () => {
   it('rejects a position keyed by an empty card id', () => {
     const result = spaceFileSchema.safeParse({
       ...validSpaceFile,
-      layouts: [{ ...working, positions: { '': { x: 0, y: 0 } } }],
+      layouts: [{ ...working, positions: { '': { x: 0, y: 0, open: false } } }],
     });
     expect(result.success).toBe(false);
   });

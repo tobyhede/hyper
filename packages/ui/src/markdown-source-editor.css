@@ -6,6 +6,6 @@
 }
 
 .markdown-source-editor:focus-within {
-  outline: 2px solid var(--ring);
+  outline: var(--markdown-source-focus-outline, 2px solid var(--ring));
   outline-offset: -2px;
 }

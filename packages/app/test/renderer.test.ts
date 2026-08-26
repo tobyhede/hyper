@@ -40,8 +40,8 @@ const ASIDE = {
 };
 
 const POSITIONS = {
-  [A]: { x: 40, y: 10 },
-  [B]: { x: 400, y: 250 },
+  [A]: { x: 40, y: 10, open: false },
+  [B]: { x: 400, y: 250, open: false },
 };
 
 /** The Layout under test, owning one Graph unless a case says otherwise. */
@@ -62,8 +62,8 @@ const SECOND = {
   title: 'Second',
   kind: 'positioned',
   positions: {
-    [A]: { x: 0, y: 600 },
-    [B]: { x: 320, y: 600 },
+    [A]: { x: 0, y: 600, open: false },
+    [B]: { x: 320, y: 600, open: false },
   },
   graphs: [ASIDE],
 };
@@ -150,7 +150,7 @@ async function arrange(space: Space) {
     space.cards.map((c) => c.id),
     new Map(),
     [],
-    CARD_SIZE,
+    () => CARD_SIZE,
   );
   const laid = await renderer.strategy(graph);
   return Object.fromEntries(laid.cards.map((c) => [c.id, { x: c.x, y: c.y }]));
@@ -170,7 +170,7 @@ describe('resolving a renderer', () => {
       space.cards.map((card) => card.id),
       new Map(),
       [],
-      CARD_SIZE,
+      () => CARD_SIZE,
     );
     const laid = await renderer.strategy(graph);
     expect(laid.cards[0]).toMatchObject({ x: 0, y: 0 });
@@ -189,7 +189,7 @@ describe('resolving a renderer', () => {
       space.cards.map((card) => card.id),
       new Map(),
       [],
-      CARD_SIZE,
+      () => CARD_SIZE,
     );
     const laid = await renderer.strategy(graph);
     expect(laid.cards.map(({ x, y }) => ({ x, y }))).toEqual([
@@ -271,7 +271,7 @@ describe('the subject a renderer names', () => {
       layouts: [
         {
           ...WORKING,
-          positions: { [A]: { x: 40, y: 10 } },
+          positions: { [A]: { x: 40, y: 10, open: false } },
           graphs: [{ ...MAIN, edges: [{ from: A, to: A }] }],
         },
       ],
@@ -338,8 +338,8 @@ describe('the Graph a renderer opens on', () => {
 
 describe('converting a View into a Layout’s Graphs', () => {
   const onScreen = Placement.fromEntries([
-    [A, { x: 40, y: 10 }],
-    [B, { x: 400, y: 250 }],
+    [A, { x: 40, y: 10, open: false }],
+    [B, { x: 400, y: 250, open: false }],
   ]);
 
   it('answers a fresh empty Graph, numbered above the Graphs it was showing', () => {
@@ -396,7 +396,7 @@ describe('converting a View into a Layout’s Graphs', () => {
 
   it('refuses a Placement that is not exactly the subject’s Cards', () => {
     const view = asView(spaceWith());
-    const short = Placement.fromEntries([[A, { x: 0, y: 0 }]]);
+    const short = Placement.fromEntries([[A, { x: 0, y: 0, open: false }]]);
 
     const refused = refusal(() => view.convert(short));
 
@@ -407,8 +407,8 @@ describe('converting a View into a Layout’s Graphs', () => {
   it('refuses a Placement of the right size naming a different Card', () => {
     const view = asView(spaceWith());
     const wrong = Placement.fromEntries([
-      [A, { x: 0, y: 0 }],
-      [uuidSchema.parse('00000000-0000-4000-8000-000000000099'), { x: 1, y: 1 }],
+      [A, { x: 0, y: 0, open: false }],
+      [uuidSchema.parse('00000000-0000-4000-8000-000000000099'), { x: 1, y: 1, open: false }],
     ]);
 
     expect(refusal(() => view.convert(wrong)).reason).toBe('placement-does-not-match-subject');

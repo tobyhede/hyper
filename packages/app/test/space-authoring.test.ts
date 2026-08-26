@@ -96,7 +96,10 @@ const positionedSnapshot: SpaceSnapshot = {
         id: LAYOUT_ID,
         title: 'Layout 1',
         kind: 'positioned',
-        positions: { [CARD_A]: { x: 10, y: 20 }, [CARD_B]: { x: 300, y: 40 } },
+        positions: {
+          [CARD_A]: { x: 10, y: 20, open: false },
+          [CARD_B]: { x: 300, y: 40, open: false },
+        },
         graphs: [MAIN_GRAPH],
       },
     ],
@@ -264,9 +267,9 @@ const openRefusalFixture = () => {
   replacePlacementForTest(
     opened.authoring,
     Placement.fromEntries([
-      [CARD_A, { x: 10, y: 20 }],
-      [CARD_B, { x: 300, y: 40 }],
-      [CARD_C, { x: 600, y: 40 }],
+      [CARD_A, { x: 10, y: 20, open: false }],
+      [CARD_B, { x: 300, y: 40, open: false }],
+      [CARD_C, { x: 600, y: 40, open: false }],
     ]),
   );
   return opened;
@@ -293,7 +296,10 @@ const openConflictedAgainstStoredSpace = async () => {
           id: LAYOUT_ID,
           title: 'Stored Layout',
           kind: 'positioned',
-          positions: { [CARD_A]: { x: 900, y: 700 }, [CARD_B]: { x: 600, y: 500 } },
+          positions: {
+            [CARD_A]: { x: 900, y: 700, open: false },
+            [CARD_B]: { x: 600, y: 500, open: false },
+          },
           graphs: [MAIN_GRAPH],
         },
       ],
@@ -312,8 +318,8 @@ const openConflictedAgainstStoredSpace = async () => {
   replacePlacementForTest(
     authoring,
     Placement.fromEntries([
-      [CARD_A, { x: 500, y: 600 }],
-      [CARD_B, { x: 300, y: 40 }],
+      [CARD_A, { x: 500, y: 600, open: false }],
+      [CARD_B, { x: 300, y: 40, open: false }],
     ]),
   );
   complete(authoring, { kind: 'settled-card-movement' });
@@ -331,8 +337,8 @@ describe('Space Authoring', () => {
     replacePlacementForTest(
       authoring,
       Placement.fromEntries([
-        [CARD_A, { x: 10, y: 20 }],
-        [CARD_B, { x: 300, y: 40 }],
+        [CARD_A, { x: 10, y: 20, open: false }],
+        [CARD_B, { x: 300, y: 40, open: false }],
       ]),
     );
     expect(
@@ -350,8 +356,8 @@ describe('Space Authoring', () => {
       { id: CARD_B, document: { title: 'B', kind: 'markdown', body: 'B' } },
     ]);
     expect(session.getState().working.document.layouts?.[0]?.positions).toEqual({
-      [CARD_A]: { x: 10, y: 20 },
-      [CARD_B]: { x: 300, y: 40 },
+      [CARD_A]: { x: 10, y: 20, open: false },
+      [CARD_B]: { x: 300, y: 40, open: false },
     });
     expect(session.getState().working.document.layouts?.[0]?.graphs[0]?.id).toBe(MINTED_GRAPH_ID);
     // Written *and* selected. A conversion that stored the Layout without
@@ -380,8 +386,8 @@ describe('Space Authoring', () => {
     replacePlacementForTest(
       authoring,
       Placement.fromEntries([
-        [CARD_A, { x: 10, y: 20 }],
-        [CARD_B, { x: 300, y: 40 }],
+        [CARD_A, { x: 10, y: 20, open: false }],
+        [CARD_B, { x: 300, y: 40, open: false }],
       ]),
     );
 
@@ -411,8 +417,8 @@ describe('Space Authoring', () => {
     replacePlacementForTest(
       authoring,
       Placement.fromEntries([
-        [CARD_A, { x: 10, y: 20 }],
-        [CARD_B, { x: 300, y: 40 }],
+        [CARD_A, { x: 10, y: 20, open: false }],
+        [CARD_B, { x: 300, y: 40, open: false }],
       ]),
     );
     const before = session.getState().working;
@@ -478,8 +484,8 @@ describe('Space Authoring', () => {
     replacePlacementForTest(
       authoring,
       Placement.fromEntries([
-        [CARD_A, { x: 10, y: 20 }],
-        [CARD_B, { x: 300, y: 40 }],
+        [CARD_A, { x: 10, y: 20, open: false }],
+        [CARD_B, { x: 300, y: 40, open: false }],
       ]),
     );
     expect(
@@ -537,9 +543,9 @@ describe('Space Authoring', () => {
       { id: CARD_C, document: { title: 'C', kind: 'markdown', body: 'C' } },
     ]);
     expect(session.getState().working.document.layouts?.[0]?.positions).toEqual({
-      [CARD_A]: { x: 10, y: 20 },
-      [CARD_B]: { x: 300, y: 40 },
-      [CARD_C]: { x: 600, y: 40 },
+      [CARD_A]: { x: 10, y: 20, open: false },
+      [CARD_B]: { x: 300, y: 40, open: false },
+      [CARD_C]: { x: 600, y: 40, open: false },
     });
     expect(graphsOf(session.getState().working)).toEqual([MAIN_GRAPH]);
   });
@@ -580,8 +586,8 @@ describe('Space Authoring', () => {
     replacePlacementForTest(
       authoring,
       Placement.fromEntries([
-        [CARD_A, { x: 10, y: 20 }],
-        [CARD_B, { x: 300, y: 40 }],
+        [CARD_A, { x: 10, y: 20, open: false }],
+        [CARD_B, { x: 300, y: 40, open: false }],
       ]),
     );
 
@@ -593,8 +599,8 @@ describe('Space Authoring', () => {
         title: 'Layout 1',
         kind: 'positioned',
         positions: {
-          [CARD_A]: { x: 10, y: 20 },
-          [CARD_B]: { x: 300, y: 40 },
+          [CARD_A]: { x: 10, y: 20, open: false },
+          [CARD_B]: { x: 300, y: 40, open: false },
         },
         // Coloured on the way out: a Graph a conversion mints stores the same
         // rotating palette choice Add Graph would have given it, so the two
@@ -623,8 +629,8 @@ describe('Space Authoring', () => {
     replacePlacementForTest(
       authoring,
       Placement.fromEntries([
-        [CARD_A, { x: 10, y: 20 }],
-        [CARD_B, { x: 300, y: 40 }],
+        [CARD_A, { x: 10, y: 20, open: false }],
+        [CARD_B, { x: 300, y: 40, open: false }],
       ]),
     );
 
@@ -671,8 +677,8 @@ describe('Space Authoring', () => {
     replacePlacementForTest(
       authoring,
       Placement.fromEntries([
-        [CARD_A, { x: 10, y: 20 }],
-        [CARD_B, { x: 300, y: 40 }],
+        [CARD_A, { x: 10, y: 20, open: false }],
+        [CARD_B, { x: 300, y: 40, open: false }],
       ]),
     );
     expect(navigation.getState().activeGraphId).toBe(GRAPH_ID);
@@ -732,7 +738,10 @@ describe('Space Authoring', () => {
             title: 'Layout 1',
             kind: 'positioned',
             // CARD_C is a Card of the Space and not a member of this Layout.
-            positions: { [CARD_A]: { x: 10, y: 20 }, [CARD_B]: { x: 300, y: 40 } },
+            positions: {
+              [CARD_A]: { x: 10, y: 20, open: false },
+              [CARD_B]: { x: 300, y: 40, open: false },
+            },
             graphs: [MAIN_GRAPH],
           },
         ],
@@ -746,8 +755,8 @@ describe('Space Authoring', () => {
     replacePlacementForTest(
       authoring,
       Placement.fromEntries([
-        [CARD_A, { x: 10, y: 20 }],
-        [CARD_B, { x: 300, y: 40 }],
+        [CARD_A, { x: 10, y: 20, open: false }],
+        [CARD_B, { x: 300, y: 40, open: false }],
       ]),
     );
     const before = session.getState().working;
@@ -789,7 +798,10 @@ describe('Space Authoring', () => {
             id: ASIDE_LAYOUT,
             title: 'Aside Layout',
             kind: 'positioned',
-            positions: { [CARD_A]: { x: 0, y: 400 }, [CARD_B]: { x: 320, y: 400 } },
+            positions: {
+              [CARD_A]: { x: 0, y: 400, open: false },
+              [CARD_B]: { x: 320, y: 400, open: false },
+            },
             graphs: [{ id: ASIDE_GRAPH, title: 'Aside', edges: [{ from: CARD_B, to: CARD_A }] }],
           },
         ],
@@ -807,8 +819,8 @@ describe('Space Authoring', () => {
     replacePlacementForTest(
       authoring,
       Placement.fromEntries([
-        [CARD_A, { x: 10, y: 20 }],
-        [CARD_B, { x: 300, y: 40 }],
+        [CARD_A, { x: 10, y: 20, open: false }],
+        [CARD_B, { x: 300, y: 40, open: false }],
       ]),
     );
 
@@ -858,7 +870,7 @@ describe('Space Authoring', () => {
             id: LAYOUT_ID,
             title: 'Layout 1',
             kind: 'positioned',
-            positions: { [CARD_A]: { x: 10, y: 20 } },
+            positions: { [CARD_A]: { x: 10, y: 20, open: false } },
             graphs: [{ id: MINTED_GRAPH_ID, title: 'Graph 1', edges: [] }],
           },
         ],
@@ -871,7 +883,10 @@ describe('Space Authoring', () => {
       { kind: 'layout', layoutId: LAYOUT_ID },
       { newId: minted },
     );
-    replacePlacementForTest(authoring, Placement.fromEntries([[CARD_A, { x: 10, y: 20 }]]));
+    replacePlacementForTest(
+      authoring,
+      Placement.fromEntries([[CARD_A, { x: 10, y: 20, open: false }]]),
+    );
 
     expect(graphsOf(session.getState().working)).toEqual([
       { id: MINTED_GRAPH_ID, title: 'Graph 1', edges: [] },
@@ -944,7 +959,10 @@ describe('Space Authoring', () => {
       resolveRenderer,
       newId: mintingIds(LAYOUT_ID),
     });
-    replacePlacementForTest(authoring, Placement.fromEntries([[CARD_A, { x: 10, y: 20 }]]));
+    replacePlacementForTest(
+      authoring,
+      Placement.fromEntries([[CARD_A, { x: 10, y: 20, open: false }]]),
+    );
 
     expect(complete(authoring, { kind: 'connected-cards', from: CARD_A, to: CARD_A })).toEqual({
       kind: 'completed',
@@ -985,7 +1003,10 @@ describe('Space Authoring', () => {
     const { authoring, session } = openAuthoring(graphLess, undefined, {
       newId: mintingIds(CREATED_CARD_ID, LAYOUT_ID),
     });
-    replacePlacementForTest(authoring, Placement.fromEntries([[CARD_A, { x: 120, y: 240 }]]));
+    replacePlacementForTest(
+      authoring,
+      Placement.fromEntries([[CARD_A, { x: 120, y: 240, open: false }]]),
+    );
 
     expect(offersEmptyDrop(authoring, CARD_A)).toBe(true);
     expect(
@@ -1006,8 +1027,8 @@ describe('Space Authoring', () => {
             title: 'Layout 1',
             kind: 'positioned',
             positions: {
-              [CARD_A]: { x: 120, y: 240 },
-              [CREATED_CARD_ID]: { x: 420, y: 360 },
+              [CARD_A]: { x: 120, y: 240, open: false },
+              [CREATED_CARD_ID]: { x: 420, y: 360, open: false },
             },
             graphs: [
               {
@@ -1048,8 +1069,8 @@ describe('Space Authoring', () => {
             title: 'Layout 1',
             kind: 'positioned',
             positions: {
-              [CARD_A]: { x: 10, y: 20 },
-              [CARD_B]: { x: 300, y: 40 },
+              [CARD_A]: { x: 10, y: 20, open: false },
+              [CARD_B]: { x: 300, y: 40, open: false },
             },
             graphs: [MAIN_GRAPH],
           },
@@ -1064,8 +1085,8 @@ describe('Space Authoring', () => {
     replacePlacementForTest(
       authoring,
       Placement.fromEntries([
-        [CARD_A, { x: 10, y: 20 }],
-        [CARD_B, { x: 300, y: 40 }],
+        [CARD_A, { x: 10, y: 20, open: false }],
+        [CARD_B, { x: 300, y: 40, open: false }],
       ]),
     );
     let reentered = false;
@@ -1076,8 +1097,8 @@ describe('Space Authoring', () => {
       replacePlacementForTest(
         authoring,
         Placement.fromEntries([
-          [CARD_A, { x: 10, y: 20 }],
-          [CARD_B, { x: 500, y: 400 }],
+          [CARD_A, { x: 10, y: 20, open: false }],
+          [CARD_B, { x: 500, y: 400, open: false }],
         ]),
       );
       reentrantResult = complete(authoring, { kind: 'settled-card-movement' });
@@ -1116,8 +1137,8 @@ describe('Space Authoring', () => {
     replacePlacementForTest(
       authoring,
       Placement.fromEntries([
-        [CARD_A, { x: 10, y: 20 }],
-        [CARD_B, { x: 300, y: 40 }],
+        [CARD_A, { x: 10, y: 20, open: false }],
+        [CARD_B, { x: 300, y: 40, open: false }],
       ]),
     );
     let reentered = false;
@@ -1128,8 +1149,8 @@ describe('Space Authoring', () => {
       replacePlacementForTest(
         authoring,
         Placement.fromEntries([
-          [CARD_A, { x: 10, y: 20 }],
-          [CARD_B, { x: 500, y: 400 }],
+          [CARD_A, { x: 10, y: 20, open: false }],
+          [CARD_B, { x: 500, y: 400, open: false }],
         ]),
       );
       reentrantResult = complete(authoring, { kind: 'settled-card-movement' });
@@ -1146,8 +1167,8 @@ describe('Space Authoring', () => {
     // And it is the queued gesture's geometry that survives, written into that
     // same Layout rather than into a second one.
     expect(working.document.layouts?.[0]?.positions).toEqual({
-      [CARD_A]: { x: 10, y: 20 },
-      [CARD_B]: { x: 500, y: 400 },
+      [CARD_A]: { x: 10, y: 20, open: false },
+      [CARD_B]: { x: 500, y: 400, open: false },
     });
     expect(navigation.getState().selectedRenderer).toEqual({
       kind: 'layout',
@@ -1174,8 +1195,8 @@ describe('Space Authoring', () => {
       replacePlacementForTest(
         authoring,
         Placement.fromEntries([
-          [CARD_A, { x: 10, y: 20 }],
-          [UNKNOWN_CARD, { x: 700, y: 800 }],
+          [CARD_A, { x: 10, y: 20, open: false }],
+          [UNKNOWN_CARD, { x: 700, y: 800, open: false }],
         ]),
       );
       complete(authoring, { kind: 'settled-card-movement' });
@@ -1201,8 +1222,8 @@ describe('Space Authoring', () => {
     replacePlacementForTest(
       authoring,
       Placement.fromEntries([
-        [CARD_A, { x: 10, y: 20 }],
-        [CARD_B, { x: 300, y: 40 }],
+        [CARD_A, { x: 10, y: 20, open: false }],
+        [CARD_B, { x: 300, y: 40, open: false }],
       ]),
     );
     const observed: { readonly defaultRenderer: string | undefined; readonly renderer: string }[] =
@@ -1246,8 +1267,8 @@ describe('Space Authoring', () => {
     replacePlacementForTest(
       authoring,
       Placement.fromEntries([
-        [CARD_A, { x: 10, y: 20 }],
-        [CARD_B, { x: 300, y: 40 }],
+        [CARD_A, { x: 10, y: 20, open: false }],
+        [CARD_B, { x: 300, y: 40, open: false }],
       ]),
     );
     expect(offersConnection(authoring, CARD_A, CARD_B)).toBe(false);
@@ -1274,8 +1295,8 @@ describe('Space Authoring', () => {
             title: 'Layout 1',
             kind: 'positioned',
             positions: {
-              [CARD_A]: { x: 10, y: 20 },
-              [CARD_B]: { x: 300, y: 40 },
+              [CARD_A]: { x: 10, y: 20, open: false },
+              [CARD_B]: { x: 300, y: 40, open: false },
             },
             graphs: [MAIN_GRAPH],
           },
@@ -1300,8 +1321,8 @@ describe('Space Authoring', () => {
     replacePlacementForTest(
       authoring,
       Placement.fromEntries([
-        [CARD_A, { x: 100, y: 200 }],
-        [CARD_B, { x: 300, y: 40 }],
+        [CARD_A, { x: 100, y: 200, open: false }],
+        [CARD_B, { x: 300, y: 40, open: false }],
       ]),
     );
     complete(authoring, { kind: 'settled-card-movement' });
@@ -1310,8 +1331,8 @@ describe('Space Authoring', () => {
     replacePlacementForTest(
       authoring,
       Placement.fromEntries([
-        [CARD_A, { x: 500, y: 600 }],
-        [CARD_B, { x: 300, y: 40 }],
+        [CARD_A, { x: 500, y: 600, open: false }],
+        [CARD_B, { x: 300, y: 40, open: false }],
       ]),
     );
     expect(complete(authoring, { kind: 'settled-card-movement' })).toEqual({ kind: 'completed' });
@@ -1322,6 +1343,7 @@ describe('Space Authoring', () => {
     expect(control.attempts.at(-1)?.snapshot.document.layouts?.[0]?.positions[CARD_A]).toEqual({
       x: 500,
       y: 600,
+      open: false,
     });
   });
 
@@ -1335,7 +1357,7 @@ describe('Space Authoring', () => {
             id: LAYOUT_ID,
             title: 'Layout 1',
             kind: 'positioned',
-            positions: { [CARD_A]: { x: 10, y: 20 } },
+            positions: { [CARD_A]: { x: 10, y: 20, open: false } },
             graphs: [{ id: GRAPH_ID, title: 'Graph 1', edges: [] }],
           },
         ],
@@ -1347,19 +1369,25 @@ describe('Space Authoring', () => {
       layoutId: LAYOUT_ID,
     });
 
-    replacePlacementForTest(authoring, Placement.fromEntries([[CARD_A, { x: 10, y: 20 }]]));
+    replacePlacementForTest(
+      authoring,
+      Placement.fromEntries([[CARD_A, { x: 10, y: 20, open: false }]]),
+    );
 
     // One accessor, answering the value that is actually installed. A second
     // copy carried on the published state could only disagree with this, since
     // installing a placement is not a publication.
     const installed = authoring.authoredPlacement();
-    expect(installed).toEqual(Placement.fromEntries([[CARD_A, { x: 10, y: 20 }]]));
+    expect(installed).toEqual(Placement.fromEntries([[CARD_A, { x: 10, y: 20, open: false }]]));
 
     // An equal placement is not a change, and must keep its identity:
     // `usePlacementRendering` rebuilds the positioned strategy whenever this map
     // changes identity and re-runs layout, so a fresh copy would re-arrange a
     // settled graph on every projection.
-    replacePlacementForTest(authoring, Placement.fromEntries([[CARD_A, { x: 10, y: 20 }]]));
+    replacePlacementForTest(
+      authoring,
+      Placement.fromEntries([[CARD_A, { x: 10, y: 20, open: false }]]),
+    );
     expect(authoring.authoredPlacement()).toBe(installed);
 
     // Only an authored Layout supplies positions; an Algorithmic View computes
@@ -1383,12 +1411,12 @@ describe('Space Authoring', () => {
         }),
         ({ baseAX, baseAY, baseBX, baseBY, renderedAX, renderedAY, renderedBX, renderedBY }) => {
           const base = Placement.fromEntries([
-            [CARD_A, { x: baseAX, y: baseAY }],
-            [CARD_B, { x: baseBX, y: baseBY }],
+            [CARD_A, { x: baseAX, y: baseAY, open: false }],
+            [CARD_B, { x: baseBX, y: baseBY, open: false }],
           ]);
           const rendered = Placement.fromEntries([
-            [CARD_A, { x: renderedAX, y: renderedAY }],
-            [CARD_B, { x: renderedBX, y: renderedBY }],
+            [CARD_A, { x: renderedAX, y: renderedAY, open: false }],
+            [CARD_B, { x: renderedBX, y: renderedBY, open: false }],
           ]);
 
           // A fresh minter per case, which is what a constant mock could not be:
@@ -1404,8 +1432,8 @@ describe('Space Authoring', () => {
             placed: [CARD_A],
           });
           expect(converting.session.getState().working.document.layouts?.[0]?.positions).toEqual({
-            [CARD_A]: { x: renderedAX, y: renderedAY },
-            [CARD_B]: { x: renderedBX, y: renderedBY },
+            [CARD_A]: { x: renderedAX, y: renderedAY, open: false },
+            [CARD_B]: { x: renderedBX, y: renderedBY, open: false },
           });
 
           const loaded = { snapshot: positionedSnapshot, revision: 0n, exportedRevision: null };
@@ -1422,13 +1450,13 @@ describe('Space Authoring', () => {
             placed: [CARD_A],
           });
           expect(authoring.session.getState().working.document.layouts?.[0]?.positions).toEqual({
-            [CARD_A]: { x: renderedAX, y: renderedAY },
-            [CARD_B]: { x: baseBX, y: baseBY },
+            [CARD_A]: { x: renderedAX, y: renderedAY, open: false },
+            [CARD_B]: { x: baseBX, y: baseBY, open: false },
           });
           expect(authoring.authoring.authoredPlacement()).toEqual(
             Placement.fromEntries([
-              [CARD_A, { x: renderedAX, y: renderedAY }],
-              [CARD_B, { x: baseBX, y: baseBY }],
+              [CARD_A, { x: renderedAX, y: renderedAY, open: false }],
+              [CARD_B, { x: baseBX, y: baseBY, open: false }],
             ]),
           );
         },
@@ -1473,7 +1501,10 @@ describe('Space Authoring', () => {
           // ordering is not a difference an author made.
           {
             kind: 'positioned',
-            positions: { [CARD_B]: { x: 300, y: 40 }, [CARD_A]: { x: 10, y: 20 } },
+            positions: {
+              [CARD_B]: { x: 300, y: 40, open: false },
+              [CARD_A]: { x: 10, y: 20, open: false },
+            },
             activeGraph: GRAPH_ID,
             graphs: [MAIN_GRAPH],
             title: 'Layout 1',
@@ -1491,8 +1522,8 @@ describe('Space Authoring', () => {
     replacePlacementForTest(
       authoring,
       Placement.fromEntries([
-        [CARD_A, { x: 10, y: 20 }],
-        [CARD_B, { x: 300, y: 40 }],
+        [CARD_A, { x: 10, y: 20, open: false }],
+        [CARD_B, { x: 300, y: 40, open: false }],
       ]),
     );
 
@@ -1550,8 +1581,8 @@ describe('Space Authoring', () => {
     replacePlacementForTest(
       authoring,
       Placement.fromEntries([
-        [CARD_A, { x: 10, y: 20 }],
-        [CARD_B, { x: 300, y: 40 }],
+        [CARD_A, { x: 10, y: 20, open: false }],
+        [CARD_B, { x: 300, y: 40, open: false }],
       ]),
     );
 
@@ -1596,8 +1627,8 @@ describe('Space Authoring', () => {
     replacePlacementForTest(
       authoring,
       Placement.fromEntries([
-        [CARD_A, { x: 10, y: 20 }],
-        [CARD_B, { x: 300, y: 40 }],
+        [CARD_A, { x: 10, y: 20, open: false }],
+        [CARD_B, { x: 300, y: 40, open: false }],
       ]),
     );
     for (const edge of [
@@ -1640,8 +1671,8 @@ describe('Space Authoring', () => {
     replacePlacementForTest(
       authoring,
       Placement.fromEntries([
-        [CARD_A, { x: 90, y: 90 }],
-        [CARD_B, { x: 300, y: 40 }],
+        [CARD_A, { x: 90, y: 90, open: false }],
+        [CARD_B, { x: 300, y: 40, open: false }],
       ]),
     );
     const reported = authoring.authoredPlacement();
@@ -1652,8 +1683,8 @@ describe('Space Authoring', () => {
     expect(authoring.authoredPlacement()).toBe(reported);
     expect(session.getState().working).not.toBe(workingBefore);
     expect(session.getState().working.document.layouts?.[0]?.positions).toEqual({
-      [CARD_A]: { x: 90, y: 90 },
-      [CARD_B]: { x: 300, y: 40 },
+      [CARD_A]: { x: 90, y: 90, open: false },
+      [CARD_B]: { x: 300, y: 40, open: false },
     });
   });
 
@@ -1686,8 +1717,8 @@ describe('Space Authoring', () => {
       newGraphId: graphIds(),
       newId: mintingIds(CREATED_CARD_ID),
       initialPlacement: Placement.fromEntries([
-        [CARD_A, { x: 10, y: 20 }],
-        [CARD_B, { x: 300, y: 40 }],
+        [CARD_A, { x: 10, y: 20, open: false }],
+        [CARD_B, { x: 300, y: 40, open: false }],
       ]),
       reportObserverError: (error) => reported.push(error),
     });
@@ -1746,8 +1777,8 @@ describe('Space Authoring', () => {
     replacePlacementForTest(
       authoring,
       Placement.fromEntries([
-        [CARD_A, { x: 10, y: 20 }],
-        [CARD_B, { x: 300, y: 40 }],
+        [CARD_A, { x: 10, y: 20, open: false }],
+        [CARD_B, { x: 300, y: 40, open: false }],
       ]),
     );
     const published: number[] = [];
@@ -1815,7 +1846,10 @@ describe('Space Authoring', () => {
       resolveRenderer,
       newId: mintingIds(LAYOUT_ID),
     });
-    replacePlacementForTest(authoring, Placement.fromEntries([[CARD_A, { x: 10, y: 20 }]]));
+    replacePlacementForTest(
+      authoring,
+      Placement.fromEntries([[CARD_A, { x: 10, y: 20, open: false }]]),
+    );
     const published: NavigationState[] = [];
     authoring.subscribe(() => published.push(authoring.getState().navigation));
 
@@ -1864,8 +1898,8 @@ describe('Space Authoring', () => {
     replacePlacementForTest(
       authoring,
       Placement.fromEntries([
-        [CARD_A, { x: 10, y: 20 }],
-        [CARD_B, { x: 300, y: 40 }],
+        [CARD_A, { x: 10, y: 20, open: false }],
+        [CARD_B, { x: 300, y: 40, open: false }],
       ]),
     );
     // Two observers each completing one further Edit, so the drain still holds
@@ -1986,8 +2020,8 @@ describe('Space Authoring', () => {
     replacePlacementForTest(
       authoring,
       Placement.fromEntries([
-        [CARD_A, { x: 10, y: 20 }],
-        [CARD_B, { x: 300, y: 40 }],
+        [CARD_A, { x: 10, y: 20, open: false }],
+        [CARD_B, { x: 300, y: 40, open: false }],
       ]),
     );
     const before = session.getState().working;
@@ -2016,8 +2050,8 @@ describe('Space Authoring', () => {
     replacePlacementForTest(
       authoring,
       Placement.fromEntries([
-        [CARD_A, { x: 100, y: 200 }],
-        [CARD_B, { x: 300, y: 40 }],
+        [CARD_A, { x: 100, y: 200, open: false }],
+        [CARD_B, { x: 300, y: 40, open: false }],
       ]),
     );
     complete(authoring, { kind: 'settled-card-movement' });
@@ -2028,8 +2062,8 @@ describe('Space Authoring', () => {
     replacePlacementForTest(
       authoring,
       Placement.fromEntries([
-        [CARD_A, { x: 500, y: 600 }],
-        [CARD_B, { x: 300, y: 40 }],
+        [CARD_A, { x: 500, y: 600, open: false }],
+        [CARD_B, { x: 300, y: 40, open: false }],
       ]),
     );
 
@@ -2037,6 +2071,7 @@ describe('Space Authoring', () => {
     expect(authoring.getState().session.working.document.layouts?.[0]?.positions[CARD_A]).toEqual({
       x: 500,
       y: 600,
+      open: false,
     });
     expect(authoring.getState().session.persistence.kind).toBe('conflicted');
   });
@@ -2052,8 +2087,8 @@ describe('Space Authoring', () => {
             title: 'Layout 1',
             kind: 'positioned',
             positions: {
-              [CARD_A]: { x: 10, y: 20 },
-              [CARD_B]: { x: 300, y: 40 },
+              [CARD_A]: { x: 10, y: 20, open: false },
+              [CARD_B]: { x: 300, y: 40, open: false },
             },
             graphs: [MAIN_GRAPH],
             activeGraph: GRAPH_ID,
@@ -2077,8 +2112,8 @@ describe('Space Authoring', () => {
             title: 'Stored Layout',
             kind: 'positioned',
             positions: {
-              [CARD_A]: { x: 900, y: 700 },
-              [CARD_B]: { x: 600, y: 500 },
+              [CARD_A]: { x: 900, y: 700, open: false },
+              [CARD_B]: { x: 600, y: 500, open: false },
             },
             graphs: [
               MAIN_GRAPH,
@@ -2100,8 +2135,8 @@ describe('Space Authoring', () => {
     replacePlacementForTest(
       authoring,
       Placement.fromEntries([
-        [CARD_A, { x: 100, y: 200 }],
-        [CARD_B, { x: 300, y: 40 }],
+        [CARD_A, { x: 100, y: 200, open: false }],
+        [CARD_B, { x: 300, y: 40, open: false }],
       ]),
     );
     complete(authoring, { kind: 'settled-card-movement' });
@@ -2111,8 +2146,8 @@ describe('Space Authoring', () => {
     replacePlacementForTest(
       authoring,
       Placement.fromEntries([
-        [CARD_A, { x: 500, y: 600 }],
-        [CARD_B, { x: 300, y: 40 }],
+        [CARD_A, { x: 500, y: 600, open: false }],
+        [CARD_B, { x: 300, y: 40, open: false }],
       ]),
     );
     complete(authoring, { kind: 'settled-card-movement' });
@@ -2146,8 +2181,8 @@ describe('Space Authoring', () => {
     });
     expect(authoring.authoredPlacement()).toEqual(
       Placement.fromEntries([
-        [CARD_A, { x: 900, y: 700 }],
-        [CARD_B, { x: 600, y: 500 }],
+        [CARD_A, { x: 900, y: 700, open: false }],
+        [CARD_B, { x: 600, y: 500, open: false }],
       ]),
     );
   });
@@ -2206,7 +2241,10 @@ describe('Space Authoring', () => {
             id: LAYOUT_ID,
             title: 'Layout 1',
             kind: 'positioned',
-            positions: { [CARD_A]: { x: 10, y: 20 }, [CARD_B]: { x: 300, y: 40 } },
+            positions: {
+              [CARD_A]: { x: 10, y: 20, open: false },
+              [CARD_B]: { x: 300, y: 40, open: false },
+            },
             graphs: [{ id: GRAPH_ID, title: 'Main', edges: [{ from: CARD_A, to: UNKNOWN_CARD }] }],
           },
         ],
@@ -2223,8 +2261,8 @@ describe('Space Authoring', () => {
     replacePlacementForTest(
       authoring,
       Placement.fromEntries([
-        [CARD_A, { x: 500, y: 600 }],
-        [CARD_B, { x: 300, y: 40 }],
+        [CARD_A, { x: 500, y: 600, open: false }],
+        [CARD_B, { x: 300, y: 40, open: false }],
       ]),
     );
     complete(authoring, { kind: 'settled-card-movement' });
@@ -2273,8 +2311,8 @@ describe('Space Authoring', () => {
     replacePlacementForTest(
       authoring,
       Placement.fromEntries([
-        [CARD_A, { x: 500, y: 600 }],
-        [CARD_B, { x: 300, y: 40 }],
+        [CARD_A, { x: 500, y: 600, open: false }],
+        [CARD_B, { x: 300, y: 40, open: false }],
       ]),
     );
     complete(authoring, { kind: 'settled-card-movement' });
@@ -2330,8 +2368,8 @@ describe('Space Authoring', () => {
       replacePlacementForTest(
         authoring,
         Placement.fromEntries([
-          [CARD_A, { x: 111, y: 222 }],
-          [CARD_B, { x: 300, y: 40 }],
+          [CARD_A, { x: 111, y: 222, open: false }],
+          [CARD_B, { x: 300, y: 40, open: false }],
         ]),
       );
       queuedResult = complete(authoring, { kind: 'settled-card-movement' });
@@ -2341,8 +2379,8 @@ describe('Space Authoring', () => {
     replacePlacementForTest(
       authoring,
       Placement.fromEntries([
-        [CARD_A, { x: 700, y: 800 }],
-        [CARD_B, { x: 300, y: 40 }],
+        [CARD_A, { x: 700, y: 800, open: false }],
+        [CARD_B, { x: 300, y: 40, open: false }],
       ]),
     );
     expect(complete(authoring, { kind: 'settled-card-movement' })).toEqual({ kind: 'completed' });
@@ -2358,8 +2396,8 @@ describe('Space Authoring', () => {
     expect(authoring.getState().session.working).toEqual(remote);
     expect(authoring.authoredPlacement()).toEqual(
       Placement.fromEntries([
-        [CARD_A, { x: 900, y: 700 }],
-        [CARD_B, { x: 600, y: 500 }],
+        [CARD_A, { x: 900, y: 700, open: false }],
+        [CARD_B, { x: 600, y: 500, open: false }],
       ]),
     );
     // Reported rather than dropped in silence: the author completed that Edit,
@@ -2384,8 +2422,8 @@ describe('Space Authoring', () => {
       replacePlacementForTest(
         authoring,
         Placement.fromEntries([
-          [CARD_A, { x: 111, y: 222 }],
-          [CARD_B, { x: 300, y: 40 }],
+          [CARD_A, { x: 111, y: 222, open: false }],
+          [CARD_B, { x: 300, y: 40, open: false }],
         ]),
       );
       complete(authoring, { kind: 'settled-card-movement' });
@@ -2401,8 +2439,8 @@ describe('Space Authoring', () => {
       replacePlacementForTest(
         authoring,
         Placement.fromEntries([
-          [CARD_A, { x: 40, y: 50 }],
-          [CARD_B, { x: 600, y: 500 }],
+          [CARD_A, { x: 40, y: 50, open: false }],
+          [CARD_B, { x: 600, y: 500, open: false }],
         ]),
       );
       queuedAfterwards = complete(authoring, { kind: 'settled-card-movement' });
@@ -2411,8 +2449,8 @@ describe('Space Authoring', () => {
     replacePlacementForTest(
       authoring,
       Placement.fromEntries([
-        [CARD_A, { x: 700, y: 800 }],
-        [CARD_B, { x: 300, y: 40 }],
+        [CARD_A, { x: 700, y: 800, open: false }],
+        [CARD_B, { x: 300, y: 40, open: false }],
       ]),
     );
     expect(complete(authoring, { kind: 'settled-card-movement' })).toEqual({ kind: 'completed' });
@@ -2423,8 +2461,8 @@ describe('Space Authoring', () => {
     // that named the replaced Space contributed nothing.
     expect(authoring.getState().session.working.document.title).toBe('Stored');
     expect(authoring.getState().session.working.document.layouts?.[0]?.positions).toEqual({
-      [CARD_A]: { x: 40, y: 50 },
-      [CARD_B]: { x: 600, y: 500 },
+      [CARD_A]: { x: 40, y: 50, open: false },
+      [CARD_B]: { x: 600, y: 500, open: false },
     });
     expect(reported).toHaveLength(1);
     expect(String(reported[0])).toMatch(/discarded 1 queued completion.*replaced/);
@@ -2462,15 +2500,15 @@ describe('Space Authoring', () => {
       selection: { kind: 'layout', layoutId: LAYOUT_ID },
       newGraphId: graphIds(),
       initialPlacement: Placement.fromEntries([
-        [CARD_A, { x: 10, y: 20 }],
-        [CARD_B, { x: 300, y: 40 }],
+        [CARD_A, { x: 10, y: 20, open: false }],
+        [CARD_B, { x: 300, y: 40, open: false }],
       ]),
     });
     replacePlacementForTest(
       authoring,
       Placement.fromEntries([
-        [CARD_A, { x: 500, y: 600 }],
-        [CARD_B, { x: 300, y: 40 }],
+        [CARD_A, { x: 500, y: 600, open: false }],
+        [CARD_B, { x: 300, y: 40, open: false }],
       ]),
     );
     complete(authoring, { kind: 'settled-card-movement' });

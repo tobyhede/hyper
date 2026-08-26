@@ -34,7 +34,7 @@ const layoutOwning = (...graphs: readonly object[]) => ({
   id: LAYOUT,
   title: 'Working',
   kind: 'positioned',
-  positions: { [CARD_A]: { x: 0, y: 0 }, [CARD_B]: { x: 400, y: 0 } },
+  positions: { [CARD_A]: { x: 0, y: 0, open: false }, [CARD_B]: { x: 400, y: 0, open: false } },
   graphs,
 });
 
@@ -161,5 +161,25 @@ describe('canvasProjection', () => {
       [DRAWN_GRAPH, OTHER_GRAPH].sort(),
     );
     expect(handledGraphIds(nodes)).toEqual([DRAWN_GRAPH, OTHER_GRAPH].sort());
+  });
+
+  it('carries each authored Expanded rect through strategy input and node projection', async () => {
+    const layout = {
+      ...layoutOwning(DRAWN),
+      positions: {
+        [CARD_A]: { x: 0, y: 0, open: true, openSize: { width: 560, height: 420 } },
+        [CARD_B]: { x: 700, y: 0, open: false },
+      },
+    };
+    const space = spaceWith({ layouts: [layout] });
+    const renderer = resolveRenderer(space, { kind: 'layout', layoutId: LAYOUT });
+    const projection = canvasProjection(space, renderer);
+    const strategyCard = projection.strategyGraph.cards.find(({ id }) => id === CARD_A);
+
+    expect(strategyCard).toMatchObject({ width: 560, height: 420 });
+
+    const laidOut = await renderer.strategy(projection.strategyGraph);
+    const node = projection.project(laidOut, AT_REST).nodes.find(({ id }) => id === CARD_A);
+    expect(node).toMatchObject({ width: 560, height: 420, data: { expanded: true } });
   });
 });

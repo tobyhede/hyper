@@ -1,6 +1,7 @@
 # A card in the graph shows its title, not its content
 
-Status: accepted
+Status: superseded
+Superseded by: 0064
 Refines: 0002
 Refined by: 0008, 0011, 0051
 Related: 0027

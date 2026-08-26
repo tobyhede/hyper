@@ -50,6 +50,11 @@
   background: var(--canvas);
 }
 
+.inv-card-node-stage--open-close {
+  width: 560px;
+  height: 420px;
+}
+
 /* Canvas-card visuals live with CanvasCard in the shared UI package. Ladle owns only the catalogue furniture below. */
 
 /* ---- Inventory page furniture ----
@@ -59,6 +64,13 @@
   padding: 28px 32px;
   background: var(--canvas);
   min-height: 100%;
+}
+
+/* A modal story's ground has to fill the frame: the pane portals to the document
+   body and covers the viewport, so whatever the sheet does not reach shows the
+   catalogue's own white through the backdrop instead of the canvas. */
+.inv-sheet--viewport {
+  min-height: 100vh;
 }
 
 .inv-section + .inv-section {

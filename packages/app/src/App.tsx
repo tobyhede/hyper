@@ -8,7 +8,7 @@ import {
   type CardId,
   type LayoutPosition,
 } from '@project/core';
-import { graphCardIds, type ResolvedContentCard } from '@project/graph';
+import { graphCardIds } from '@project/graph';
 import type { OpenedSpace } from './space';
 import { composeApp, openingPlacement } from './compose-app';
 import type { AuthoringRefusal } from './space-authoring';
@@ -61,6 +61,16 @@ export const createApp = ({ spaceSession }: OpenedSpace) => {
      * than a partial entity. Closing it creates nothing.
      */
     const [creatingAlias, setCreatingAlias] = useState(false);
+    /**
+     * Whether a Card's content edit is running, reported up by the canvas.
+     *
+     * Read by one control. Presenting draws the active Card's content *instead
+     * of* the Card (`showActiveCardContent`), so a live editor cannot survive it
+     * and the draft would go without one of ADR 0064's four exits being spent.
+     * The two modal surfaces need nothing here: `CardPane` owns its own
+     * modality, and the editor is still there when it closes.
+     */
+    const [editingCardBody, setEditingCardBody] = useState(false);
     const [aliasRefusal, setAliasRefusal] = useState<AuthoringRefusal | null>(null);
     /** The Card a completed creation asks the canvas to open its name editor on. */
     const [createdCardId, setCreatedCardId] = useState<CardId | null>(null);
@@ -430,7 +440,7 @@ export const createApp = ({ spaceSession }: OpenedSpace) => {
       [rendererSpace],
     );
     const openCardForEditing = useCallback(
-      (cardIdInput: string): void => {
+      (cardIdInput: string): 'completed' | 'retained' => {
         // An opened Card covers the graph, so a pointer cannot reach a second
         // one — but the pane traps no focus, and `Enter` on a node still behind
         // it asked to open that Card, swapping the pane's subject out from under
@@ -442,19 +452,50 @@ export const createApp = ({ spaceSession }: OpenedSpace) => {
         // to discard it. Opening anyway used to leave `creatingAlias` set while
         // the pane hid itself on `openedCardId`, so closing the Card brought a
         // surface back that the author had never returned to.
-        if (openedCardId !== null || creatingAlias) return;
+        if (openedCardId !== null || creatingAlias) return 'retained';
         const cardId = uuidSchema.safeParse(cardIdInput);
-        if (cardId.success && editableCardIds.has(cardId.data)) openCard(cardId.data);
+        if (!cardId.success || !editableCardIds.has(cardId.data)) return 'retained';
+        const card = rendererSpace.lookup.card(cardId.data);
+        if (card?.kind === 'alias') {
+          openCard(cardId.data);
+          return 'completed';
+        }
+        const result = authoring.complete({ kind: 'opened-card', cardId: cardId.data });
+        return result.kind === 'completed' || result.kind === 'unchanged'
+          ? 'completed'
+          : 'retained';
       },
-      [openCard, editableCardIds, openedCardId, creatingAlias],
+      [openCard, editableCardIds, openedCardId, creatingAlias, rendererSpace],
     );
 
     const openedCard = openedCardId ? rendererSpace.lookup.card(openedCardId) : undefined;
-    const completeOpenedCard = useCallback((completed: ResolvedContentCard) => {
-      const { id, ...document } = completed;
-      const result = authoring.complete({ kind: 'edited-card', cardId: id, document });
-      return result.kind === 'refused' ? result.refusal : null;
+    const closeExpandedCard = useCallback((cardId: CardId): 'completed' | 'retained' => {
+      const result = authoring.complete({ kind: 'closed-card', cardId });
+      return result.kind === 'completed' || result.kind === 'unchanged' ? 'completed' : 'retained';
     }, []);
+    const resizeExpandedCard = useCallback(
+      (cardId: CardId, size: { width: number; height: number }) => {
+        authoring.complete({ kind: 'resized-card', cardId, size });
+      },
+      [],
+    );
+    const completeCardBody = useCallback(
+      (cardId: CardId, body: string): 'completed' | 'retained' => {
+        const stored = spaceSession.getState().working.cards.find((card) => card.id === cardId);
+        if (stored?.document.kind !== 'markdown') return 'retained';
+        const parsed = cardDocumentSchema.safeParse({ ...stored.document, body });
+        if (!parsed.success) return 'retained';
+        const result = authoring.complete({
+          kind: 'edited-card',
+          cardId,
+          document: parsed.data,
+        });
+        return result.kind === 'completed' || result.kind === 'unchanged'
+          ? 'completed'
+          : 'retained';
+      },
+      [],
+    );
 
     /**
      * Every Card an Alias may name.
@@ -544,6 +585,7 @@ export const createApp = ({ spaceSession }: OpenedSpace) => {
           colorByGraphId: projection.colors,
           onActivate: activateGraph,
           onPresent: present,
+          canPresent: !editingCardBody,
           presenting,
           onExitPresenting: exitPresenting,
         }}
@@ -625,6 +667,10 @@ export const createApp = ({ spaceSession }: OpenedSpace) => {
                 onAddCard={addCard}
                 nameOnCreation={createdCardId}
                 onOpenCard={openCardForEditing}
+                onBodyEditingChange={setEditingCardBody}
+                onCloseCard={closeExpandedCard}
+                onCompleteCardBody={completeCardBody}
+                onResizeCard={resizeExpandedCard}
                 onCompleteCardTitle={completeCardTitle}
                 editableCardIds={editableCardIds}
                 graphs={projection.visibleGraphs}
@@ -650,26 +696,18 @@ export const createApp = ({ spaceSession }: OpenedSpace) => {
 
           {/* An Alias authors only its own metadata. Its Target must be opened
               explicitly to author shared content (ADR 0049). */}
-          {openedCard &&
-            (openedCard.kind === 'alias' ? (
-              <OpenCard
-                through={openedCard}
-                graphColor={editorGraphColor}
-                occurrence={{
-                  targets: aliasTargets,
-                  onEdit: (change: { title: string; target: CardId }) =>
-                    editAlias(openedCard, change),
-                }}
-                onCancel={closeCard}
-              />
-            ) : (
-              <OpenCard
-                card={openedCard}
-                graphColor={editorGraphColor}
-                onComplete={completeOpenedCard}
-                onCancel={closeCard}
-              />
-            ))}
+          {openedCard?.kind === 'alias' && (
+            <OpenCard
+              through={openedCard}
+              graphColor={editorGraphColor}
+              occurrence={{
+                targets: aliasTargets,
+                onEdit: (change: { title: string; target: CardId }) =>
+                  editAlias(openedCard, change),
+              }}
+              onCancel={closeCard}
+            />
+          )}
 
           {creatingAlias && openedCardId === null && (
             <NewAlias

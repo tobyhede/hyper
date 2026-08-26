@@ -1,9 +1,9 @@
 import {
   uuidSchema,
+  type CardPlacement,
   type CardId,
   type GraphEdge,
   type GraphId,
-  type LayoutPosition,
   type SpaceSnapshot,
 } from '@project/core';
 import {
@@ -50,8 +50,10 @@ const CARD_E = uuidSchema.parse('00000000-0000-4000-8000-00000000000c');
 /** Five Cards in a row. The sidebar draws none of them; the geometry only has to be legal. */
 const SPINE = [CARD_A, CARD_B, CARD_C, CARD_D, CARD_E] as const;
 
-const positions = (count: number): Record<string, LayoutPosition> =>
-  Object.fromEntries(SPINE.slice(0, count).map((id, index) => [id, { x: index * 420, y: 0 }]));
+const positions = (count: number): Record<string, CardPlacement> =>
+  Object.fromEntries(
+    SPINE.slice(0, count).map((id, index) => [id, { x: index * 420, y: 0, open: false }]),
+  );
 
 /** The first `links` steps along the spine: three Graphs of one shape at three lengths. */
 const chain = (links: number): GraphEdge[] =>
@@ -248,8 +250,8 @@ export const storyGraphIds = (): (() => GraphId) => {
  * between destinations, and the design pass this catalogue exists for cannot
  * judge a row of choices whose labels are all the same length.
  */
-const traversalPositions = (ids: readonly CardId[]): Record<string, LayoutPosition> =>
-  Object.fromEntries(ids.map((id, index) => [id, { x: index * 420, y: 0 }]));
+const traversalPositions = (ids: readonly CardId[]): Record<string, CardPlacement> =>
+  Object.fromEntries(ids.map((id, index) => [id, { x: index * 420, y: 0, open: false }]));
 
 const traversalCards = (titled: readonly (readonly [CardId, string])[]): SpaceSnapshot['cards'] =>
   titled.map(([id, title]) => ({ id, document: { title, kind: 'markdown', body: '' } }));

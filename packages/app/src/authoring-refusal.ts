@@ -33,6 +33,8 @@ export const describeAuthoringRefusal = (refusal: AuthoringRefusal): string => {
       return 'This Card is already in this Layout.';
     case 'card-not-in-layout':
       return 'This Card is not in this Layout.';
+    case 'card-not-expanded':
+      return 'Open this Card before resizing it.';
     case 'card-has-aliases':
       return `Retarget or delete the Aliases of this Card first: ${refusal.aliasTitles.join(', ')}.`;
     case 'graph-title-required':
@@ -73,27 +75,6 @@ const presentRefusal = <Field extends string>(
 
 const form = null;
 
-const markdownCardPlacements = {
-  'placement-pending': form,
-  'layout-not-found': form,
-  'layout-required': form,
-  'card-not-found': form,
-  'card-kind-immutable': form,
-  'card-title-required': 'title',
-  'alias-target-not-found': form,
-  'alias-target-must-own-content': form,
-  'card-already-in-layout': form,
-  'card-not-in-layout': form,
-  'card-has-aliases': form,
-  'graph-title-required': form,
-  'layout-must-keep-graph': form,
-  'graph-not-owned': form,
-  'edge-not-found': form,
-  'edge-card-outside-layout': form,
-  'edge-already-exists': form,
-  'layout-active-graph-required': form,
-} as const satisfies Readonly<Record<AuthoringRefusalCode, 'title' | null>>;
-
 /** Alias editing and Alias creation both own Title and Target, and nothing else. */
 const titleAndTargetPlacements = {
   'placement-pending': form,
@@ -106,6 +87,7 @@ const titleAndTargetPlacements = {
   'alias-target-must-own-content': 'target',
   'card-already-in-layout': form,
   'card-not-in-layout': form,
+  'card-not-expanded': form,
   'card-has-aliases': form,
   'graph-title-required': form,
   'layout-must-keep-graph': form,
@@ -116,13 +98,8 @@ const titleAndTargetPlacements = {
   'layout-active-graph-required': form,
 } as const satisfies Readonly<Record<AuthoringRefusalCode, 'title' | 'target' | null>>;
 
-export type MarkdownCardRefusalErrors = AuthoringRefusalErrors<'title'>;
 export type AliasCardRefusalErrors = AuthoringRefusalErrors<'title' | 'target'>;
 export type NewAliasRefusalErrors = AuthoringRefusalErrors<'title' | 'target'>;
-
-/** Error placement for a Markdown Card editor, which owns only Title. */
-export const presentMarkdownCardRefusal = (refusal: AuthoringRefusal): MarkdownCardRefusalErrors =>
-  presentRefusal(refusal, markdownCardPlacements);
 
 /** Error placement for an Alias editor, which owns Title and Target. */
 export const presentAliasCardRefusal = (refusal: AuthoringRefusal): AliasCardRefusalErrors =>
@@ -141,11 +118,9 @@ export const presentNewAliasRefusal = (refusal: AuthoringRefusal): NewAliasRefus
  * Graph the Space no longer holds, an Edge that has gone — describes the
  * subject rather than the choice, and no row in either list would fix it.
  *
- * One record for the two Card-choosing Edge surfaces, because the question is
- * the same on both: keyboard connection names one Card and endpoint editing
- * names two, and neither can correct a stale subject. It is exhaustive over the
- * codes rather than a list of the two that are true, so a new refusal has to be
- * decided here before it will compile.
+ * Endpoint editing names two Cards and cannot correct a stale subject. The
+ * record is exhaustive over the codes rather than a list of the two that are
+ * true, so a new refusal has to be decided here before it will compile.
  */
 const correctableByCardChoice = {
   'placement-pending': false,
@@ -158,6 +133,7 @@ const correctableByCardChoice = {
   'alias-target-must-own-content': false,
   'card-already-in-layout': false,
   'card-not-in-layout': false,
+  'card-not-expanded': false,
   'card-has-aliases': false,
   'graph-title-required': false,
   'layout-must-keep-graph': false,
@@ -168,7 +144,6 @@ const correctableByCardChoice = {
   'layout-active-graph-required': false,
 } as const satisfies Readonly<Record<AuthoringRefusalCode, boolean>>;
 
-export type EdgeConnectionRefusalErrors = AuthoringRefusalErrors<'target'>;
 export type EdgeEndpointRefusalErrors = AuthoringRefusalErrors<EdgeEndpoint>;
 
 /**
@@ -187,14 +162,6 @@ export interface EdgeDeletionRefusalErrors {
 const formChannel = <Field extends string>(
   refusal: AuthoringRefusal,
 ): AuthoringRefusalErrors<Field> => ({ fields: {}, form: describeAuthoringRefusal(refusal) });
-
-/** Error placement for the keyboard connection picker, which owns only Target. */
-export const presentEdgeConnectionRefusal = (
-  refusal: AuthoringRefusal,
-): EdgeConnectionRefusalErrors =>
-  correctableByCardChoice[refusal.code]
-    ? { fields: { target: describeAuthoringRefusal(refusal) } }
-    : formChannel(refusal);
 
 /**
  * Error placement for endpoint editing, which owns From and To.

@@ -1,11 +1,12 @@
 import {
-  ArrowRightFromLine,
   Check,
   ChevronDown,
   CircleAlert,
   CornerDownRight,
   FileText,
   Grid2x2,
+  Maximize2,
+  Minimize2,
   Network,
   PanelsTopLeft,
   Pencil,
@@ -14,6 +15,9 @@ import {
   Workflow,
   X,
 } from 'lucide-react';
+import type { ComponentProps } from 'react';
+
+type CardActionIconProps = ComponentProps<typeof Pencil>;
 
 /** The computed View that draws Cards and every Graph in the Space. */
 export const FlowIcon = () => <Workflow size={16} />;
@@ -37,7 +41,21 @@ export const GraphIcon = ({
 export const PresentIcon = ({ color }: { color: string }) => <Play color={color} size={12} />;
 
 /** Edit the content of a Markdown Card. */
-export const EditIcon = () => <Pencil size={14} />;
+export const EditIcon = (props: CardActionIconProps) => <Pencil size={14} {...props} />;
+
+/** Commit the edit running on a Card's content. */
+export const CommitEditIcon = (props: CardActionIconProps) => <Check size={14} {...props} />;
+
+/** Abandon the edit running on a Card's content. */
+export const AbandonEditIcon = (props: CardActionIconProps) => (
+  <X size={14} strokeWidth={3} {...props} />
+);
+
+/** Open a Card in place. */
+export const OpenCardIcon = (props: CardActionIconProps) => <Maximize2 size={14} {...props} />;
+
+/** Close a Card that is open in place. */
+export const CloseCardIcon = (props: CardActionIconProps) => <Minimize2 size={14} {...props} />;
 
 /** The shared affordance for a trigger that opens a list or menu. */
 export const ChevronDownIcon = () => <ChevronDown size={14} />;
@@ -47,9 +65,6 @@ export const PlusIcon = () => <Plus size={14} />;
 
 /** The Card kind that points at another Card's content (ADR 0009). */
 export const AliasIcon = ({ size = 14 }: { size?: number }) => <CornerDownRight size={size} />;
-
-/** Start a Graph connection from the Card that carries the control. */
-export const ConnectIcon = ({ size = 12 }: { size?: number }) => <ArrowRightFromLine size={size} />;
 
 /** The Card kind that owns the Markdown it draws. */
 export const MarkdownIcon = ({ size = 14 }: { size?: number }) => <FileText size={size} />;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { uuidSchema } from '@project/core';
+import { uuidSchema, type SpaceSnapshot } from '@project/core';
 import type { LoadedSpace } from '../src/index';
 import { MemorySpaceBackend } from '../src/index';
 import { spaceBackendContract } from './backend-contract';
@@ -84,7 +84,7 @@ describe('MemorySpaceBackend', () => {
       id: CARD_B,
       document: { title: 'B', kind: 'markdown' as const, body: 'B' },
     };
-    const invalidSnapshots = [
+    const invalidSnapshots: readonly SpaceSnapshot[] = [
       // A graph reaches intake only through the layout that owns it (ADR 0040),
       // so both graph rules are broken inside one, over its own members.
       {
@@ -96,7 +96,7 @@ describe('MemorySpaceBackend', () => {
               id: LAYOUT_ID,
               title: 'Owner',
               kind: 'positioned' as const,
-              positions: { [CARD_ID]: { x: 0, y: 0 } },
+              positions: { [CARD_ID]: { x: 0, y: 0, open: false } },
               graphs: [
                 { id: GRAPH_ID, title: 'Dangling', edges: [{ from: CARD_ID, to: MISSING_ID }] },
               ],
@@ -113,7 +113,10 @@ describe('MemorySpaceBackend', () => {
               id: LAYOUT_ID,
               title: 'Owner',
               kind: 'positioned' as const,
-              positions: { [CARD_ID]: { x: 0, y: 0 }, [CARD_B]: { x: 300, y: 0 } },
+              positions: {
+                [CARD_ID]: { x: 0, y: 0, open: false },
+                [CARD_B]: { x: 300, y: 0, open: false },
+              },
               graphs: [
                 {
                   id: GRAPH_ID,
@@ -150,7 +153,7 @@ describe('MemorySpaceBackend', () => {
               id: LAYOUT_ID,
               title: 'Broken positions',
               kind: 'positioned' as const,
-              positions: { [MISSING_ID]: { x: 0, y: 0 } },
+              positions: { [MISSING_ID]: { x: 0, y: 0, open: false } },
               // A member, so the edge rule is satisfied and only the position's
               // own reference fails — one rule per snapshot, as above.
               graphs: [
@@ -174,7 +177,7 @@ describe('MemorySpaceBackend', () => {
               id: LAYOUT_ID,
               title: 'Placed',
               kind: 'positioned' as const,
-              positions: { [CARD_ID]: { x: 0, y: 0 } },
+              positions: { [CARD_ID]: { x: 0, y: 0, open: false } },
               graphs: [
                 {
                   id: GRAPH_ID,

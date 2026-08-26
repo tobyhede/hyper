@@ -263,29 +263,41 @@ function consumeSettledMovedIds(
 
 /**
  * Fold the freshly projected nodes into the live list. A card that survives
- * keeps its live node — position, measured size, drag, selection — and refreshes
- * only the parts the projection owns, so a drag in flight is never interrupted
- * and a measured size is never thrown away. Mapping over `projected` also drops
- * nodes whose card no longer exists.
+ * keeps its React Flow runtime state while refreshing the geometry and domain
+ * presentation the projection owns. Position is the one exception during an
+ * active drag: the pointer's live position wins until the settled change authors
+ * it. Mapping over `projected` also drops nodes whose card no longer exists.
  */
 function reconcile(
   current: readonly CardFlowNode[],
   projected: readonly CardFlowNode[],
+  dragOrigins: ReadonlyMap<string, LayoutPosition>,
 ): CardFlowNode[] {
   const byId = new Map(current.map((node) => [node.id, node]));
   return projected.map((node) => {
     const live = byId.get(node.id);
     if (!live) return node;
-    // `data`, `className` and `handles` are the projection's to own — they carry
-    // the title, kind-owned presentation, active/emphasis styling and declared
-    // handle geometry. Everything else is React Flow's runtime and belongs to the
-    // live node. `handles` must come through: React Flow builds `handleBounds`
+    // The projection owns authored position, declared size, stacking, data,
+    // className and handles. The live node owns React Flow's measured and gesture
+    // bookkeeping. An active drag alone keeps its live position: replacing it
+    // would jump the Card away from the pointer mid-gesture. `handles` must come
+    // through: React Flow builds `handleBounds`
     // from the declaration rather than measuring the DOM (docs/agents/rendering.md), so a live
     // node that kept a stale set would resolve a new Edge against the handles the
     // Card had before it gained one. `handles`/`className` are assigned only when
     // the projection sets them, for `exactOptionalPropertyTypes`; the projection
     // always sets a className.
-    const merged: CardFlowNode = { ...live, data: node.data };
+    const merged: CardFlowNode = {
+      ...live,
+      position: dragOrigins.has(node.id) ? live.position : node.position,
+      data: node.data,
+    };
+    if (node.width === undefined) delete merged.width;
+    else merged.width = node.width;
+    if (node.height === undefined) delete merged.height;
+    else merged.height = node.height;
+    if (node.zIndex === undefined) delete merged.zIndex;
+    else merged.zIndex = node.zIndex;
     if (node.handles !== undefined) merged.handles = node.handles;
     if (node.className !== undefined) merged.className = node.className;
     return merged;
@@ -372,7 +384,11 @@ export function createRenderAdapter(authoring: SpaceAuthoring): RenderAdapter {
       // right, while React Flow holds no selected node at all — and `F2` asks
       // React Flow, so `F2` is what stops working until a click repairs it.
       // Add Card, Add Alias and create-and-connect all land here.
-      const reconciled = withSelection(reconcile(current?.nodes ?? [], nodes), get().selection);
+      const state = get();
+      const reconciled = withSelection(
+        reconcile(current?.nodes ?? [], nodes, state.dragOrigins),
+        state.selection,
+      );
       set({ projection: { nodes: reconciled, edges: [...edges] } });
       // Reporting geometry, not authoring it: a Card the selected Layout omits is
       // drawn in the fallback band and must stay unplaced.
@@ -412,7 +428,10 @@ export function createRenderAdapter(authoring: SpaceAuthoring): RenderAdapter {
       set({
         projection: {
           ...projection,
-          nodes: withSelection(reconcile(projection.nodes, projected), state.selection),
+          nodes: withSelection(
+            reconcile(projection.nodes, projected, state.dragOrigins),
+            state.selection,
+          ),
         },
       });
     },

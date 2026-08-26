@@ -5,9 +5,9 @@ import { CardSearchCombobox, type CardChoice } from '../src/index';
 
 /**
  * The one production picker, tested at the component rather than through the
- * four surfaces that compose it — Edge `From`/`To`, keyboard Connect, new Alias
- * Target and opened Alias Target. Every behaviour here is the picker's own
- * contract with all four, so a regression belongs to this file rather than to
+ * surfaces that compose it — Edge `From`/`To`, new Alias Target and opened
+ * Alias Target. Every behaviour here is the picker's own contract with all of
+ * them, so a regression belongs to this file rather than to
  * whichever surface happened to notice.
  *
  * Base UI's popup positions itself by measuring, and jsdom ships no

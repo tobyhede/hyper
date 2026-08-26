@@ -16,14 +16,35 @@ export interface ParityClaim {
 
 export const parityClaims: readonly ParityClaim[] = [
   {
+    id: 'canvas-card-fills-authored-node-rect',
+    storyFile: 'components/card.stories.tsx',
+    storyExport: 'NodeContainment',
+    claim:
+      'The production CanvasCard fills a React Flow node whose authored rect differs from the collapsed default.',
+  },
+  {
+    id: 'markdown-card-opens-and-closes-in-place',
+    storyFile: 'components/card.stories.tsx',
+    storyExport: 'OpenAndClose',
+    claim:
+      'A Markdown Card opens and closes inside its production React Flow node with authoring handles present, retaining one Card and Title treatment; its content fades out inertly before unmounting while its Title stays bottom-anchored for the whole closing motion.',
+  },
+  {
+    id: 'open-markdown-card-owns-its-editing-lifecycle',
+    storyFile: 'components/card-editing.stories.tsx',
+    storyExport: 'Markdown',
+    claim:
+      'An open Markdown Card begins editing from its rendered body or rail without a second visible affordance, keeps blur inert, and ends through Save, Cancel, Escape or Mod-Enter while Close remains disabled.',
+  },
+  {
     id: 'canvas-card-exposes-kind-and-keyboard-actions',
-    storyFile: 'components/canvas-card.stories.tsx',
-    storyExport: 'Interaction',
+    storyFile: 'components/card.stories.tsx',
+    storyExport: 'Actions',
     claim: 'The production canvas Card exposes Alias identity and keyboard-focusable actions.',
   },
   {
     id: 'canvas-card-shows-rest-selected-and-dragging-states',
-    storyFile: 'components/canvas-card.stories.tsx',
+    storyFile: 'components/card.stories.tsx',
     storyExport: 'States',
     claim:
       'Rest, selected and dragging are visually distinct states for both the Markdown and Alias front.',
@@ -44,21 +65,21 @@ export const parityClaims: readonly ParityClaim[] = [
   },
   {
     id: 'canvas-card-shows-kind-treatment',
-    storyFile: 'components/canvas-card.stories.tsx',
+    storyFile: 'components/card.stories.tsx',
     storyExport: 'Kinds',
     claim:
       "An Alias front's dotted border and redraw glyph, and a long Markdown title's three-line clamp, are the kind's own presentation.",
   },
   {
     id: 'canvas-card-shows-active-graph-colour',
-    storyFile: 'components/canvas-card.stories.tsx',
+    storyFile: 'components/card.stories.tsx',
     storyExport: 'Colours',
     claim: "A selected Card's rail carries the Active Graph's own colour.",
   },
   {
     id: 'canvas-card-hover-reveals-actions-and-handles-together',
-    storyFile: 'components/canvas-card.stories.tsx',
-    storyExport: 'HoverActions',
+    storyFile: 'components/card.stories.tsx',
+    storyExport: 'Hover',
     claim:
       "Hovering the real React Flow node reveals CanvasCard's own rail actions and the adapter's Edge handles together.",
     // The two halves of this claim already have real application evidence
@@ -77,23 +98,10 @@ export const parityClaims: readonly ParityClaim[] = [
   },
   {
     id: 'canvas-card-owns-title-editing-and-refusal',
-    storyFile: 'components/canvas-card.stories.tsx',
-    storyExport: 'TitleEditing',
+    storyFile: 'components/card-editing.stories.tsx',
+    storyExport: 'Title',
     claim:
       "The canvas Card's displayed Title is a named pointer and keyboard control that opens its field with the value selected, keeps a refused draft field-local, completes on Enter and cancels on Escape.",
-  },
-  {
-    id: 'markdown-pane-refusal-is-field-local',
-    storyFile: 'components/card-and-alias-panes.stories.tsx',
-    storyExport: 'Markdown',
-    claim: 'A refused Markdown Card title stays field-local and the whole draft can be cancelled.',
-  },
-  {
-    id: 'markdown-source-editor-preserves-pane-ownership',
-    storyFile: 'components/card-and-alias-panes.stories.tsx',
-    storyExport: 'Markdown',
-    claim:
-      'The Markdown source editor preserves exact source while Tab remains focus navigation and Escape remains pane dismissal.',
   },
   {
     id: 'alias-pane-authors-metadata',

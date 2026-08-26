@@ -1,25 +1,17 @@
 import { useRef } from 'react';
-import { Handle, Position, useConnection, type NodeProps } from '@xyflow/react';
+import { Handle, NodeResizer, Position, useConnection, type NodeProps } from '@xyflow/react';
 import { CanvasCard, CardContent, type CanvasCardFront, type CanvasCardProps } from '@project/ui';
 import type { CardFlowNode, CardHandle } from './projection';
 import { AUTHORING_HANDLE_DIAMETER, GRAPH_PORT_DIAMETER } from './authoring-handle';
 
 /**
- * React Flow custom node: a card's title, with one colored handle per graph at
- * the vertical offset ELK computed for it.
- *
- * The card's content is deliberately not drawn here (ADR 0006) — a graph is for
- * reading the shape of a space, and a wall of clipped markdown at graph zoom is
- * unreadable anyway. Opening a card is how you read it.
- *
- * The one exception is the Card reached during traversal while presenting, which draws
- * its content instead: presenting is the graph seen close enough that one card
- * fills the screen (ADR 0027), so at that zoom the content is exactly what is
- * legible. It is still the same node — nothing is transformed into anything, and
- * there is no second artefact (ADR 0024).
+ * React Flow custom node: a Card front with one coloured handle per Graph at
+ * the vertical offset the strategy computed for it. An opened Markdown Card
+ * draws its content inside the same node; presenting independently draws the
+ * active Card's rendered content at the frame's scale (ADR 0064, ADR 0027).
  *
  * The Card front itself — Markdown and Alias treatment, title editing, refusal
- * display, Connect/Edit controls and interaction-state visuals — is the
+ * display, Open/Edit controls and interaction-state visuals — is the
  * production `@project/ui` `CanvasCard`. This module owns everything React
  * Flow: handles and their declared geometry, connection state, translating
  * selection/dragging into the Card's four external visual states, keeping a
@@ -34,6 +26,10 @@ const AUTHORING_SIDES = [Position.Top, Position.Right, Position.Bottom, Position
  *  spread — the props themselves stay readonly to every other caller. The keys
  *  are already optional; this changes nothing but their mutability. */
 type Mutable<T> = { -readonly [K in keyof T]: T[K] };
+type MarkdownOperations = Mutable<
+  Pick<Extract<CanvasCardFront, { kind: 'markdown' }>, 'onOpenChange' | 'onBeginEdit'>
+>;
+type AliasFront = Mutable<Extract<CanvasCardFront, { kind: 'alias' }>>;
 
 /*
  * Handle geometry is *declared*, not measured, so nothing here reports a change
@@ -54,6 +50,25 @@ type Mutable<T> = { -readonly [K in keyof T]: T[K] };
  * lets an Edge completed onto this Card resolve in the render that first makes
  * it incident, before the projection catches up.
  */
+/**
+ * Whether a resize drag in this direction leaves the Card's top-left where the
+ * author placed it.
+ *
+ * `CardNodeData.resize.onResize` answers a size and no origin, which is what
+ * keeps a resize out of the family of gestures that must go back through the
+ * authored placement. React Flow's eight controls do not all respect that: a
+ * top or left drag moves the node's top-left in React Flow's own store, and the
+ * composition hears only the new size — so the authored origin stays where it
+ * was and the next projection publish snaps the Card back under the author's
+ * pointer. Refusing those drags is what makes a reported size sufficient.
+ *
+ * React Flow reports direction as `[x, y]`, where `-1` is the leading edge
+ * moving. If a resize is ever allowed to move the top-left, this goes and
+ * `onResize` reports an origin (`projection.ts`).
+ */
+export const growsFromOrigin = (direction: readonly number[]): boolean =>
+  direction[0] !== -1 && direction[1] !== -1;
+
 export function CardNode({ data, selected, dragging, isConnectable }: NodeProps<CardFlowNode>) {
   /**
    * Which handle role the live drag is looking for, or `null` when none is.
@@ -87,8 +102,39 @@ export function CardNode({ data, selected, dragging, isConnectable }: NodeProps<
   // Alias front carries the Target title as required. The empty string is how
   // that reaches `CanvasCard` as "no Target to name", and `CanvasCard` draws no
   // Target line for it rather than an empty one.
-  const front: CanvasCardFront =
-    data.kind === 'alias' ? { kind: 'alias', aliasOf: data.aliasOf ?? '' } : { kind: 'markdown' };
+  const markdownOperations: MarkdownOperations = {};
+  if (data.cardEditingEnabled === true && data.onEditCard !== undefined) {
+    markdownOperations.onOpenChange = data.onEditCard;
+  }
+  if (data.onBeginBodyEditing !== undefined) {
+    markdownOperations.onBeginEdit = data.onBeginBodyEditing;
+  }
+  const markdownFront: CanvasCardFront =
+    data.expanded === true && data.bodyEditor !== undefined
+      ? {
+          kind: 'markdown',
+          source: data.body ?? '',
+          open: true,
+          editor: data.bodyEditor,
+          ...markdownOperations,
+        }
+      : data.expanded === true
+        ? { kind: 'markdown', source: data.body ?? '', open: true, ...markdownOperations }
+        : {
+            kind: 'markdown',
+            source: data.body ?? '',
+            open: false,
+            ...markdownOperations,
+          };
+  const aliasFront: AliasFront = {
+    kind: 'alias',
+    aliasOf: data.aliasOf ?? '',
+  };
+  if (data.cardEditingEnabled === true && data.onEditCard !== undefined) {
+    const openAlias = data.onEditCard;
+    aliasFront.onOpen = () => openAlias(true);
+  }
+  const front: CanvasCardFront = data.kind === 'alias' ? aliasFront : markdownFront;
 
   const renderHandle = (handle: CardHandle, type: 'source' | 'target') => (
     <Handle
@@ -156,23 +202,37 @@ export function CardNode({ data, selected, dragging, isConnectable }: NodeProps<
    * miss silent. `CanvasCard` draws no control it has no operation for, so
    * withholding it here is the same answer one layer up.
    */
-  const canvasCardOptionalProps: Mutable<
-    Pick<CanvasCardProps, 'onBeginTitleEdit' | 'onConnect' | 'onEdit'>
-  > = {};
-  if (data.titleEditingEnabled === true && data.onBeginTitleEditing !== undefined) {
+  const canvasCardOptionalProps: Mutable<Pick<CanvasCardProps, 'onBeginTitleEdit'>> = {};
+  if (
+    data.bodyEditor === undefined &&
+    data.titleEditingEnabled === true &&
+    data.onBeginTitleEditing !== undefined
+  ) {
     canvasCardOptionalProps.onBeginTitleEdit = data.onBeginTitleEditing;
-  }
-  if (data.connectingEnabled === true && data.onBeginConnect !== undefined) {
-    canvasCardOptionalProps.onConnect = data.onBeginConnect;
-  }
-  if (data.cardEditingEnabled === true && data.onEditCard !== undefined) {
-    canvasCardOptionalProps.onEdit = data.onEditCard;
   }
 
   /* The editor's presence is the editing state, and it arrives with the two
      operations that end it — so nothing here has to stand in for a completion
      the composition did not supply. */
-  const titleEditor = data.titleEditor;
+  const titleEditor = data.bodyEditor === undefined ? data.titleEditor : undefined;
+
+  /*
+   * What an open Card draws below its title (ADR 0064).
+   *
+   * **Not a fourth arm of the branch below.** It is a prop handed to whichever
+   * arm the *title* state selects, so a Card can be open while it is being
+   * renamed — expansion is what the Layout authored and the caret is a gesture,
+   * and a branch would have made them exclusive. It is not `showContent`
+   * either: both presenting and expanding draw through the one rendered-Markdown
+   * seam, while the open Card swaps that display for source only during an
+   * edit.
+   *
+   * The Alias kind has no open front yet, so authored `expanded` state is false
+   * for one. `CanvasCard` receives the Markdown source, authored open state and
+   * live editor as one front rather than receiving body markup from this adapter.
+   */
+  const resize = data.resize;
+  const open = data.expanded === true && data.kind === 'markdown';
 
   const onReturnFocus = () => {
     inner.current?.closest<HTMLElement>('.react-flow__node')?.focus();
@@ -186,7 +246,42 @@ export function CardNode({ data, selected, dragging, isConnectable }: NodeProps<
       data-selected={visuallySelected}
       data-connection-in-progress={connectionInProgress}
       data-connection-seeking={seeking ?? 'none'}
+      // The wrapper React Flow sizes from `node.width`/`node.height` is this
+      // element's parent, so an Expanded Card only reaches its own rect if this
+      // one stops declaring the collapsed constant — which `styles.css` does
+      // unconditionally rather than under this attribute, because keying
+      // geometry on the flag is exactly the discontinuity that makes a close
+      // snap. **No stylesheet reads this**, deliberately: it publishes authored
+      // open state for tests and assistive technology, and geometry is never
+      // allowed to depend on it.
+      data-expanded={open}
     >
+      {/*
+        React Flow's own resizer, on an Expanded Card the author has selected.
+        An Expanded Card is whatever box the author drew — there is no ratio on
+        it, because the collapsed Card is what keeps the silhouette that predicts
+        what an audience sees (ADR 0064).
+
+        Rendered *before* the Card, which is not cosmetic: `canvas-card.css`
+        keeps the Card's hover treatment alive while the pointer is on an
+        authoring handle through `:has(~ …__authoring-handle:hover)`, and `~`
+        reaches following siblings only. Anything inserted between the Card and
+        those handles would be invisible to that rule; anything before the Card
+        is harmless to it.
+      */}
+      {open && resize !== undefined && (
+        <NodeResizer
+          isVisible={visuallySelected}
+          minWidth={resize.minWidth}
+          minHeight={resize.minHeight}
+          lineClassName="rf-card-node__resize-line"
+          handleClassName="rf-card-node__resize-handle"
+          shouldResize={(_event, params) => growsFromOrigin(params.direction)}
+          onResizeEnd={(_event, next) =>
+            resize.onResize({ width: next.width, height: next.height })
+          }
+        />
+      )}
       {data.targetHandles.map((handle) => renderHandle(handle, 'target'))}
       {data.showContent ? (
         <div className="rf-card-node__content">

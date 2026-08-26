@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { Card } from '@project/core';
+import type { Card, CardPlacement } from '@project/core';
 import { loadSpace, loadSpaceSnapshot, type LoadSpaceResult } from '../src/index';
 import type { SpaceReferenceError } from '../src/validate';
 import { aliasFile, cardFile, uuid } from './card-files';
@@ -89,7 +89,7 @@ const graph = (id: string, title: string, edges: { from: string; to: string }[] 
 
 const layout = (
   id: string,
-  positions: Record<string, { x: number; y: number }>,
+  positions: Record<string, CardPlacement>,
   graphs: unknown[],
   extra: { readonly activeGraph?: string } = {},
 ) => ({ id, title: `Layout ${id}`, kind: 'positioned', positions, graphs, ...extra });
@@ -99,7 +99,7 @@ const simple = (defaultRenderer?: string): Document => {
   const document: Document = {
     cards: [markdown(A, 'A'), markdown(B, 'B')],
     layouts: [
-      layout(WORKING, { [A]: { x: 0, y: 0 }, [B]: { x: 320, y: 0 } }, [
+      layout(WORKING, { [A]: { x: 0, y: 0, open: false }, [B]: { x: 320, y: 0, open: false } }, [
         graph(MAIN, 'Main', [{ from: A, to: B }]),
       ]),
     ],
@@ -136,11 +136,15 @@ describe.each([
         load({
           cards: [markdown(A, 'A'), markdown(B, 'B')],
           layouts: [
-            layout(WORKING, { [A]: { x: 0, y: 0 }, [B]: { x: 320, y: 0 } }, [
-              graph(MAIN, 'Main', [{ from: A, to: B }]),
-              graph(ASIDE, 'Aside', [{ from: B, to: A }]),
-            ]),
-            layout(SECOND, { [A]: { x: 0, y: 200 } }, [graph(THIRD, 'Third')]),
+            layout(
+              WORKING,
+              { [A]: { x: 0, y: 0, open: false }, [B]: { x: 320, y: 0, open: false } },
+              [
+                graph(MAIN, 'Main', [{ from: A, to: B }]),
+                graph(ASIDE, 'Aside', [{ from: B, to: A }]),
+              ],
+            ),
+            layout(SECOND, { [A]: { x: 0, y: 200, open: false } }, [graph(THIRD, 'Third')]),
           ],
         }),
       );
@@ -175,7 +179,7 @@ describe.each([
           layouts: [
             layout(
               WORKING,
-              { [A]: { x: 0, y: 0 }, [B]: { x: 320, y: 0 } },
+              { [A]: { x: 0, y: 0, open: false }, [B]: { x: 320, y: 0, open: false } },
               [graph(MAIN, 'Main', [{ from: A, to: B }]), graph(ASIDE, 'Aside')],
               { activeGraph: ASIDE },
             ),
@@ -192,10 +196,11 @@ describe.each([
         load({
           cards: [markdown(A, 'A'), markdown(B, 'B')],
           layouts: [
-            layout(WORKING, { [A]: { x: 0, y: 0 }, [B]: { x: 320, y: 0 } }, [
-              graph(MAIN, 'Main', [{ from: A, to: B }]),
-              graph(ASIDE, 'Aside'),
-            ]),
+            layout(
+              WORKING,
+              { [A]: { x: 0, y: 0, open: false }, [B]: { x: 320, y: 0, open: false } },
+              [graph(MAIN, 'Main', [{ from: A, to: B }]), graph(ASIDE, 'Aside')],
+            ),
           ],
         }),
       );
@@ -234,7 +239,9 @@ describe.each([
       const space = loaded(
         load({
           cards: [markdown(A, 'A')],
-          layouts: [layout(WORKING, { [A]: { x: 0, y: 0 } }, [graph(MAIN, 'Graph 1')])],
+          layouts: [
+            layout(WORKING, { [A]: { x: 0, y: 0, open: false } }, [graph(MAIN, 'Graph 1')]),
+          ],
         }),
       );
       expect(space.lookup.graph(MAIN)?.graph.edges).toEqual([]);
@@ -247,15 +254,23 @@ describe.each([
         load({
           cards: [markdown(A, 'A'), markdown(B, 'B'), markdown(C, 'C')],
           layouts: [
-            layout(WORKING, { [A]: { x: 0, y: 0 }, [B]: { x: 320, y: 0 }, [C]: { x: 640, y: 0 } }, [
-              graph(MAIN, 'Main', [
-                { from: A, to: B },
-                { from: B, to: A },
-                { from: B, to: B },
-                { from: A, to: C },
-                { from: C, to: B },
-              ]),
-            ]),
+            layout(
+              WORKING,
+              {
+                [A]: { x: 0, y: 0, open: false },
+                [B]: { x: 320, y: 0, open: false },
+                [C]: { x: 640, y: 0, open: false },
+              },
+              [
+                graph(MAIN, 'Main', [
+                  { from: A, to: B },
+                  { from: B, to: A },
+                  { from: B, to: B },
+                  { from: A, to: C },
+                  { from: C, to: B },
+                ]),
+              ],
+            ),
           ],
         }),
       );
@@ -267,10 +282,14 @@ describe.each([
         load({
           cards: [markdown(A, 'A'), markdown(B, 'B')],
           layouts: [
-            layout(WORKING, { [A]: { x: 0, y: 0 }, [B]: { x: 320, y: 0 } }, [
-              graph(MAIN, 'Main', [{ from: A, to: B }]),
-              graph(ASIDE, 'Alt', [{ from: A, to: B }]),
-            ]),
+            layout(
+              WORKING,
+              { [A]: { x: 0, y: 0, open: false }, [B]: { x: 320, y: 0, open: false } },
+              [
+                graph(MAIN, 'Main', [{ from: A, to: B }]),
+                graph(ASIDE, 'Alt', [{ from: A, to: B }]),
+              ],
+            ),
           ],
         }),
       );
@@ -282,12 +301,16 @@ describe.each([
         load({
           cards: [markdown(A, 'A'), markdown(B, 'B')],
           layouts: [
-            layout(WORKING, { [A]: { x: 0, y: 0 }, [B]: { x: 320, y: 0 } }, [
-              graph(MAIN, 'Main', [
-                { from: A, to: B },
-                { from: A, to: B },
-              ]),
-            ]),
+            layout(
+              WORKING,
+              { [A]: { x: 0, y: 0, open: false }, [B]: { x: 320, y: 0, open: false } },
+              [
+                graph(MAIN, 'Main', [
+                  { from: A, to: B },
+                  { from: A, to: B },
+                ]),
+              ],
+            ),
           ],
         }),
       );
@@ -301,9 +324,11 @@ describe.each([
         load({
           cards: [markdown(A, 'A'), markdown(B, 'B')],
           layouts: [
-            layout(WORKING, { [A]: { x: 0, y: 0 }, [B]: { x: 320, y: 0 } }, [
-              graph(MAIN, 'Main', [{ from: A, to: ABSENT }]),
-            ]),
+            layout(
+              WORKING,
+              { [A]: { x: 0, y: 0, open: false }, [B]: { x: 320, y: 0, open: false } },
+              [graph(MAIN, 'Main', [{ from: A, to: ABSENT }])],
+            ),
           ],
         }),
       );
@@ -323,9 +348,11 @@ describe.each([
         load({
           cards: [markdown(A, 'A'), markdown(B, 'B'), markdown(C, 'C')],
           layouts: [
-            layout(WORKING, { [A]: { x: 0, y: 0 }, [B]: { x: 320, y: 0 } }, [
-              graph(MAIN, 'Main', [{ from: B, to: C }]),
-            ]),
+            layout(
+              WORKING,
+              { [A]: { x: 0, y: 0, open: false }, [B]: { x: 320, y: 0, open: false } },
+              [graph(MAIN, 'Main', [{ from: B, to: C }])],
+            ),
           ],
         }),
       );
@@ -340,10 +367,12 @@ describe.each([
         load({
           cards: [markdown(A, 'A'), markdown(B, 'B'), markdown(C, 'C')],
           layouts: [
-            layout(WORKING, { [A]: { x: 0, y: 0 }, [B]: { x: 320, y: 0 } }, [
-              graph(MAIN, 'Main', [{ from: A, to: C }]),
-            ]),
-            layout(SECOND, { [C]: { x: 0, y: 200 } }, [graph(ASIDE, 'Aside')]),
+            layout(
+              WORKING,
+              { [A]: { x: 0, y: 0, open: false }, [B]: { x: 320, y: 0, open: false } },
+              [graph(MAIN, 'Main', [{ from: A, to: C }])],
+            ),
+            layout(SECOND, { [C]: { x: 0, y: 200, open: false } }, [graph(ASIDE, 'Aside')]),
           ],
         }),
       );
@@ -357,9 +386,11 @@ describe.each([
         load({
           cards: [markdown(A, 'A')],
           layouts: [
-            layout(WORKING, { [A]: { x: 0, y: 0 }, [ABSENT]: { x: 320, y: 0 } }, [
-              graph(MAIN, 'Main', [{ from: A, to: ABSENT }]),
-            ]),
+            layout(
+              WORKING,
+              { [A]: { x: 0, y: 0, open: false }, [ABSENT]: { x: 320, y: 0, open: false } },
+              [graph(MAIN, 'Main', [{ from: A, to: ABSENT }])],
+            ),
           ],
         }),
       );
@@ -373,9 +404,11 @@ describe.each([
         load({
           cards: [markdown(A, 'A'), markdown(B, 'B'), markdown(C, 'C')],
           layouts: [
-            layout(WORKING, { [A]: { x: 0, y: 0 }, [B]: { x: 320, y: 0 } }, [
-              graph(MAIN, 'Main', [{ from: A, to: B }]),
-            ]),
+            layout(
+              WORKING,
+              { [A]: { x: 0, y: 0, open: false }, [B]: { x: 320, y: 0, open: false } },
+              [graph(MAIN, 'Main', [{ from: A, to: B }])],
+            ),
           ],
         }),
       );
@@ -391,7 +424,7 @@ describe.each([
           layouts: [
             layout(
               WORKING,
-              { [A]: { x: 0, y: 0 }, [B]: { x: 320, y: 0 } },
+              { [A]: { x: 0, y: 0, open: false }, [B]: { x: 320, y: 0, open: false } },
               [graph(MAIN, 'Main', [{ from: A, to: B }]), graph(ASIDE, 'Aside')],
               { activeGraph: ASIDE },
             ),
@@ -408,7 +441,7 @@ describe.each([
           layouts: [
             layout(
               WORKING,
-              { [A]: { x: 0, y: 0 }, [B]: { x: 320, y: 0 } },
+              { [A]: { x: 0, y: 0, open: false }, [B]: { x: 320, y: 0, open: false } },
               [graph(MAIN, 'Main', [{ from: A, to: B }])],
               { activeGraph: ABSENT },
             ),
@@ -430,11 +463,11 @@ describe.each([
           layouts: [
             layout(
               WORKING,
-              { [A]: { x: 0, y: 0 }, [B]: { x: 320, y: 0 } },
+              { [A]: { x: 0, y: 0, open: false }, [B]: { x: 320, y: 0, open: false } },
               [graph(MAIN, 'Main', [{ from: A, to: B }])],
               { activeGraph: ASIDE },
             ),
-            layout(SECOND, { [A]: { x: 0, y: 200 } }, [graph(ASIDE, 'Aside')]),
+            layout(SECOND, { [A]: { x: 0, y: 200, open: false } }, [graph(ASIDE, 'Aside')]),
           ],
         }),
       );
@@ -455,11 +488,14 @@ describe.each([
         load({
           cards: [markdown(A, 'A'), markdown(B, 'B')],
           layouts: [
-            layout(WORKING, { [A]: { x: 0, y: 0 }, [B]: { x: 320, y: 0 } }, [
-              graph(MAIN, 'Main', [{ from: A, to: B }]),
-              graph(MAIN, 'Main again'),
+            layout(
+              WORKING,
+              { [A]: { x: 0, y: 0, open: false }, [B]: { x: 320, y: 0, open: false } },
+              [graph(MAIN, 'Main', [{ from: A, to: B }]), graph(MAIN, 'Main again')],
+            ),
+            layout(SECOND, { [A]: { x: 0, y: 200, open: false } }, [
+              graph(MAIN, 'Main a third time'),
             ]),
-            layout(SECOND, { [A]: { x: 0, y: 200 } }, [graph(MAIN, 'Main a third time')]),
           ],
         }),
       );
@@ -477,12 +513,16 @@ describe.each([
         load({
           cards: [markdown(A, 'A'), markdown(B, 'B')],
           layouts: [
-            layout(WORKING, { [A]: { x: 0, y: 0 }, [B]: { x: 320, y: 0 } }, [
-              graph(MAIN, 'Main', [{ from: A, to: B }]),
-            ]),
-            layout(SECOND, { [A]: { x: 0, y: 200 }, [B]: { x: 320, y: 200 } }, [
-              graph(ASIDE, 'Aside', [{ from: B, to: A }]),
-            ]),
+            layout(
+              WORKING,
+              { [A]: { x: 0, y: 0, open: false }, [B]: { x: 320, y: 0, open: false } },
+              [graph(MAIN, 'Main', [{ from: A, to: B }])],
+            ),
+            layout(
+              SECOND,
+              { [A]: { x: 0, y: 200, open: false }, [B]: { x: 320, y: 200, open: false } },
+              [graph(ASIDE, 'Aside', [{ from: B, to: A }])],
+            ),
           ],
         }),
       );
@@ -494,8 +534,8 @@ describe.each([
         load({
           cards: [markdown(A, 'A')],
           layouts: [
-            layout(WORKING, { [A]: { x: 0, y: 0 } }, [graph(MAIN, 'Main')]),
-            layout(WORKING, { [A]: { x: 0, y: 200 } }, [graph(ASIDE, 'Aside')]),
+            layout(WORKING, { [A]: { x: 0, y: 0, open: false } }, [graph(MAIN, 'Main')]),
+            layout(WORKING, { [A]: { x: 0, y: 200, open: false } }, [graph(ASIDE, 'Aside')]),
           ],
         }),
       );
@@ -570,8 +610,8 @@ describe.each([
         load({
           cards: [markdown(A, 'A'), aliasTo(B, ABSENT)],
           layouts: [
-            layout(WORKING, { [A]: { x: 0, y: 0 } }, [graph(MAIN, 'Main')]),
-            layout(WORKING, { [A]: { x: 0, y: 200 } }, [graph(ASIDE, 'Aside')]),
+            layout(WORKING, { [A]: { x: 0, y: 0, open: false } }, [graph(MAIN, 'Main')]),
+            layout(WORKING, { [A]: { x: 0, y: 200, open: false } }, [graph(ASIDE, 'Aside')]),
           ],
           defaultRenderer: ABSENT,
         }),
@@ -587,10 +627,11 @@ describe.each([
         load({
           cards: [markdown(A, 'A')],
           layouts: [
-            layout(WORKING, { [A]: { x: 0, y: 0 }, [ABSENT]: { x: 1, y: 1 } }, [
-              graph(MAIN, 'Main'),
-              graph(MAIN, 'Main again'),
-            ]),
+            layout(
+              WORKING,
+              { [A]: { x: 0, y: 0, open: false }, [ABSENT]: { x: 1, y: 1, open: false } },
+              [graph(MAIN, 'Main'), graph(MAIN, 'Main again')],
+            ),
           ],
         });
       expect(refused(document())).toEqual(refused(document()));

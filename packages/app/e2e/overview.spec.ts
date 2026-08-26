@@ -69,15 +69,17 @@ test('draws every graph at once, each in its own color', async ({ page }) => {
 });
 
 test(
-  'production Canvas Cards expose Alias identity and keyboard authoring actions',
+  'production Canvas Cards expose Alias identity and a keyboard Open action',
   {
     tag: [
       '@parity:canvas-card-exposes-kind-and-keyboard-actions',
       '@parity:canvas-card-shows-kind-treatment',
+      '@parity:markdown-card-opens-and-closes-in-place',
     ],
   },
   async ({ page }) => {
     await page.goto('/');
+    await selectCanvas(page, 'Collection 1');
 
     const alias = nodeByTitle(page, 'A′').first();
     await expect(alias.getByRole('img', { name: 'Alias' })).toBeVisible();
@@ -85,11 +87,20 @@ test(
 
     const markdown = nodeByTitle(page, 'A').first();
     await markdown.click();
-    const connect = markdown.getByRole('button', { name: 'Connect from A' });
-    await connect.focus();
-    await expect(connect).toBeFocused();
-    await connect.press('Enter');
-    await expect(page.getByRole('combobox', { name: 'Connect to' })).toBeVisible();
+    const open = markdown.getByRole('button', { name: 'Open Card A' });
+    await open.focus();
+    await expect(open).toBeFocused();
+    await open.press('Enter');
+    await expect(markdown.getByRole('heading', { name: 'A', exact: true })).toBeVisible();
+    await expect(markdown.getByText('entry point')).toBeVisible();
+    await markdown.getByRole('button', { name: 'Edit Card A' }).click();
+    const source = markdown.getByRole('textbox', { name: 'Markdown source of A' });
+    await expect(source).toBeFocused();
+    await markdown.getByRole('heading', { name: 'A', exact: true }).click();
+    await expect(source).toBeVisible();
+    await expect(markdown.getByRole('button', { name: 'Close Card A' })).toBeDisabled();
+    await source.press('Escape');
+    await expect(markdown.getByRole('button', { name: 'Edit Card A' })).toBeFocused();
   },
 );
 
@@ -280,10 +291,11 @@ test('selecting a graph emphasises it without hiding the others', async ({ page 
   await expect(page.locator('.react-flow__edge')).toHaveCount(13);
 });
 
-test('a card shows its title in the graph, and opens to show its Markdown source', async ({
+test('a card shows its title in the graph, and opens to show rendered Markdown', async ({
   page,
 }) => {
   await page.goto('/');
+  await selectCanvas(page, 'Collection 1');
   await expect(page.locator('.react-flow__node').first()).toBeVisible();
 
   // The graph draws the title, never the card's body (ADR 0051). "entry point"
@@ -291,39 +303,38 @@ test('a card shows its title in the graph, and opens to show its Markdown source
   const a = nodeByTitle(page, 'A');
   await expect(a).toBeVisible();
   await expect(a).not.toContainText('entry point');
-  await expect(page.getByTestId('open-card')).toBeHidden();
+  await expect(a.getByRole('button', { name: 'Open Card A' })).toBeVisible();
 
-  // Opening shows the Markdown source verbatim, not rendered (ADR 0011) — the
-  // `**` emphasis markers survive rather than becoming bold text — and it is
-  // editable on arrival (ADR 0037).
+  // Opening renders the Markdown in the existing Card and keeps Close reachable.
   await openCard(a, 'A');
-  const opened = page.getByTestId('open-card');
-  await expect(opened).toBeVisible();
-  await expect(opened.getByRole('textbox', { name: 'Markdown source' })).toContainText('**A**');
+  await expect(a.getByText('A', { exact: true }).last()).toHaveCSS('font-weight', '700');
 
-  await page.getByRole('button', { name: 'Cancel' }).click();
-  await expect(opened).toBeHidden();
+  await a.getByRole('button', { name: 'Close Card A' }).click();
+  await expect(a.getByRole('button', { name: 'Open Card A' })).toBeVisible();
 });
 
-test('escape closes an opened card', async ({ page }) => {
+test('the Close action closes an opened card', async ({ page }) => {
   await page.goto('/');
-  await openCard(nodeByTitle(page, 'A').first(), 'A');
-  await expect(page.getByTestId('open-card')).toBeVisible();
-
-  await page.keyboard.press('Escape');
-  await expect(page.getByTestId('open-card')).toBeHidden();
+  await selectCanvas(page, 'Collection 1');
+  const card = nodeByTitle(page, 'A').first();
+  await openCard(card, 'A');
+  await expect(card.locator('.canvas-card__content')).toHaveAttribute('data-presence', 'present');
+  await card.getByRole('button', { name: 'Close Card A' }).click();
+  const leavingContent = card.locator('.canvas-card__content');
+  await expect(leavingContent).toHaveAttribute('data-presence', 'leaving');
+  await expect(leavingContent).toHaveAttribute('inert', '');
+  await expect(leavingContent).toHaveCount(0);
+  await expect(card.getByRole('button', { name: 'Open Card A' })).toBeVisible();
 });
 
-test('a card can be opened even when it is not on the selected graph', async ({ page }) => {
+test('a card outside the selected Layout cannot be opened', async ({ page }) => {
   await page.goto('/');
+  await selectCanvas(page, 'Collection 1');
 
-  // "E" is in the Echo collection; select Long (band 1), then open E anyway.
-  await activateGraph(page, 'Long');
-
-  await openCard(nodeByTitle(page, 'E'), 'E');
-  await expect(
-    page.getByTestId('open-card').getByRole('textbox', { name: 'Markdown source' }),
-  ).toContainText('Echo collection');
+  const card = nodeByTitle(page, 'E');
+  await openCard(card, 'E');
+  await expect(card).not.toContainText('Echo collection');
+  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '0');
 });
 
 test('cards are drawn at exactly the size the layout placed them at', async ({ page }) => {
@@ -354,55 +365,6 @@ test('cards are drawn at exactly the size the layout placed them at', async ({ p
 
   // 16:9, matching the presentation surface — wider than tall.
   expect(parseFloat(drawn.w)).toBeGreaterThan(parseFloat(drawn.h));
-});
-
-test('the card editor remains bounded across viewport shapes', async ({ page }) => {
-  await page.setViewportSize({ width: 1440, height: 900 });
-  await page.goto('/');
-  await openCard(nodeByTitle(page, 'A').first(), 'A');
-  await expect(page.getByTestId('open-card')).toBeVisible();
-
-  for (const viewport of [
-    { width: 900, height: 1200 },
-    { width: 2200, height: 700 },
-  ]) {
-    await page.setViewportSize(viewport);
-    const panel = (await page.locator('.card-pane__panel').boundingBox())!;
-    expect(panel.width).toBeLessThanOrEqual(viewport.width);
-    expect(panel.height).toBeLessThanOrEqual(viewport.height);
-  }
-});
-
-test('content that exceeds the frame scrolls inside it, keeping controls reachable', async ({
-  page,
-}) => {
-  // A small viewport shrinks the 16:9 frame until the fixture's longest card (D)
-  // overflows it. The frame is fixed, so content scrolls rather than the frame
-  // growing — which is what makes the ratio mean anything.
-  //
-  // Having to shrink the viewport at all is the flaw card-display/05 records:
-  // the frame has a fixed ratio but not a fixed size, so whether a card
-  // overflows depends on the window rather than on the card.
-  //
-  // Open D first, then shrink: at the tiny viewport D's node sits under the
-  // minimap and can't be clicked, but the open-card overlay re-letterboxes on
-  // resize, so the overflow is exercised all the same.
-  await page.goto('/');
-  await openCard(nodeByTitle(page, 'D'), 'D');
-  const content = page.locator('[data-slot="markdown-source-editor"] .cm-scroller');
-  await expect(content).toBeVisible();
-
-  await page.setViewportSize({ width: 520, height: 380 });
-
-  expect(await content.evaluate((el) => el.scrollHeight > el.clientHeight)).toBe(true);
-
-  const panel = (await page.locator('.card-pane__panel').boundingBox())!;
-  expect(panel.width).toBeLessThanOrEqual(520);
-  expect(panel.height).toBeLessThanOrEqual(380);
-
-  // Actions stay inside the frame, so step controls never scroll away.
-  const actions = (await page.locator('.card-editor__footer').boundingBox())!;
-  expect(actions.y + actions.height).toBeLessThanOrEqual(panel.y + panel.height + 1);
 });
 
 /**

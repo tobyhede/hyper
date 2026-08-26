@@ -47,6 +47,10 @@ interface Harness {
   readonly setNameOnCreation: (cardId: string | null) => void;
   /** Re-render with nothing changed at all, the way a parent's render does. */
   readonly rerender: () => void;
+  /** Re-render over a different projection, the way a completed Edit does. */
+  readonly setNodes: (next: CardFlowNode[]) => void;
+  /** What the canvas told its parent about a live content edit. */
+  readonly bodyEditingChanged: ReturnType<typeof vi.fn>;
 }
 
 /**
@@ -71,8 +75,6 @@ function inertEdgeAuthoring(): EdgeAuthoring {
     connect: () => null,
     createConnectedCard: () => null,
     endPointerDrag: () => null,
-    beginKeyboardConnect: () => undefined,
-    completeKeyboardConnect: () => null,
     beginPointerReconnect: () => undefined,
     openEdgeEditor: () => undefined,
     reconnect: () => false,
@@ -84,10 +86,12 @@ function inertEdgeAuthoring(): EdgeAuthoring {
 }
 
 /** A SpaceCanvas whose title Edit always refuses, so a draft can be left unsettled. */
-function mountGraph(nodes: CardFlowNode[] = [cardNode('A')]): Harness {
+function mountGraph(initialNodes: CardFlowNode[] = [cardNode('A')]): Harness {
   const openCard = vi.fn();
   const addCard = vi.fn();
-  const editableCardIds = new Set(nodes.map((node) => node.id));
+  const bodyEditingChanged = vi.fn();
+  let nodes = initialNodes;
+  let editableCardIds = new Set(nodes.map((node) => node.id));
   const edgeAuthoring = inertEdgeAuthoring();
   let titleEditing = true;
   let named: string | null = null;
@@ -112,6 +116,10 @@ function mountGraph(nodes: CardFlowNode[] = [cardNode('A')]): Harness {
         onAddCard={addCard}
         nameOnCreation={named}
         onOpenCard={openCard}
+        onBodyEditingChange={bodyEditingChanged}
+        onCloseCard={() => 'completed'}
+        onCompleteCardBody={() => 'completed'}
+        onResizeCard={() => undefined}
         onCompleteCardTitle={() => 'A Card needs a title'}
         editableCardIds={editableCardIds}
         graphs={[]}
@@ -126,6 +134,12 @@ function mountGraph(nodes: CardFlowNode[] = [cardNode('A')]): Harness {
     view,
     openCard,
     addCard,
+    bodyEditingChanged,
+    setNodes: (next) => {
+      nodes = next;
+      editableCardIds = new Set(next.map((node) => node.id));
+      view.rerender(graph());
+    },
     setTitleEditing: (enabled) => {
       titleEditing = enabled;
       view.rerender(graph());
@@ -201,7 +215,7 @@ describe('a title Edit the graph refused', () => {
   it('leaves the rest of the graph working', () => {
     const { openCard } = refuseTitleEdit('blur');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Edit Card B' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Open Card B' }));
 
     expect(openCard).toHaveBeenCalledWith(OTHER_CARD_ID);
   });
@@ -227,7 +241,7 @@ describe('opening a Card', () => {
   it('happens from the Card affordance', () => {
     const { openCard } = mountGraph();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Edit Card A' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Open Card A' }));
 
     expect(openCard).toHaveBeenCalledWith(CARD_ID);
   });
@@ -254,7 +268,7 @@ describe('F2 while a control has focus', () => {
   it('does not rename the selected Card from a control on a different Card', () => {
     mountGraph([cardNode('A', CARD_ID, true), cardNode('B', OTHER_CARD_ID)]);
 
-    fireEvent.keyDown(screen.getByRole('button', { name: 'Edit Card B' }), { key: 'F2' });
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Open Card B' }), { key: 'F2' });
 
     expect(screen.queryByRole('textbox', { name: 'Card title' })).not.toBeInTheDocument();
   });
@@ -286,7 +300,7 @@ describe.each([
 ] as const)('%s on the focused Card affordance', (_name, key) => {
   it("does not open the Card twice — the keydown is the button's, not the graph's", () => {
     const { openCard } = mountGraph();
-    const button = screen.getByRole('button', { name: 'Edit Card A' });
+    const button = screen.getByRole('button', { name: 'Open Card A' });
     button.focus();
 
     fireEvent.keyDown(button, { key });
@@ -296,7 +310,7 @@ describe.each([
 
   it('opens the Card', () => {
     const { openCard } = mountGraph();
-    const button = screen.getByRole('button', { name: 'Edit Card A' });
+    const button = screen.getByRole('button', { name: 'Open Card A' });
     button.focus();
 
     fireEvent.keyDown(button, { key });
@@ -310,7 +324,7 @@ describe('the Card affordance', () => {
   it('opens the Card rather than renaming its title on the graph', () => {
     const { openCard } = mountGraph();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Edit Card A' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Open Card A' }));
 
     expect(openCard).toHaveBeenCalledWith(CARD_ID);
     expect(screen.queryByRole('textbox', { name: 'Card title' })).not.toBeInTheDocument();
@@ -341,9 +355,122 @@ describe('withdrawing title editing', () => {
 
     setTitleEditing(false);
     setTitleEditing(true);
-    fireEvent.click(screen.getByRole('button', { name: 'Edit Card A' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Open Card A' }));
 
     expect(openCard).toHaveBeenCalledWith(CARD_ID);
+  });
+});
+
+describe('withdrawing canvas authoring from an Expanded Card', () => {
+  it('withdraws body editing and resize through the same complete gate', () => {
+    const expanded = cardNode('A', CARD_ID, true);
+    expanded.data.expanded = true;
+    expanded.data.body = '# A';
+    const { view, setTitleEditing } = mountGraph([expanded]);
+
+    expect(screen.getByRole('button', { name: 'Edit Markdown source of A' })).toBeVisible();
+    expect(view.container.querySelector('.react-flow__resize-control')).toBeInTheDocument();
+
+    setTitleEditing(false);
+
+    expect(screen.queryByRole('button', { name: 'Edit Markdown source of A' })).toBeNull();
+    expect(view.container.querySelector('.react-flow__resize-control')).toBeNull();
+  });
+
+  it('keeps a live editor when a modal withdraws canvas authoring', () => {
+    const expanded = cardNode('A', CARD_ID, true);
+    expanded.data.expanded = true;
+    expanded.data.body = '# A';
+    const { setTitleEditing } = mountGraph([expanded]);
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Markdown source of A' }));
+    expect(screen.getByRole('button', { name: 'Save Card A' })).toBeVisible();
+
+    setTitleEditing(false);
+
+    // A modal over the canvas owns its own modality, and the editor is still
+    // there when it closes. Four exits and no more (ADR 0064) — a surface
+    // opening over the graph is not one of them.
+    expect(screen.getByRole('button', { name: 'Save Card A' })).toBeVisible();
+  });
+
+  it('does not lock the canvas when the edited Card stops being Expanded', () => {
+    const expanded = cardNode('A', CARD_ID, true);
+    expanded.data.expanded = true;
+    expanded.data.body = '# A';
+    const { addCard, setNodes } = mountGraph([expanded]);
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Markdown source of A' }));
+
+    // The Card the caret names is no longer Expanded — a replacement Space is
+    // the route. Nothing will call `onEnd`, so a stored answer would stay true
+    // and take title editing, F2 and `c` with it for the rest of the session.
+    const collapsed = cardNode('A', CARD_ID, true);
+    setNodes([collapsed]);
+
+    fireEvent.keyDown(nodeOf(CARD_ID), { key: 'c' });
+    expect(addCard).toHaveBeenCalled();
+  });
+
+  it('does not restore body editing when a replacement Space reopens the Card', async () => {
+    const expanded = cardNode('A', CARD_ID, true);
+    expanded.data.expanded = true;
+    expanded.data.body = '# A';
+    const { setNodes } = mountGraph([expanded]);
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Markdown source of A' }));
+    await screen.findByRole('textbox', { name: 'Markdown source of A' });
+
+    setNodes([cardNode('A', CARD_ID, true)]);
+    setNodes([expanded]);
+
+    expect(screen.queryByRole('textbox', { name: 'Markdown source of A' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Edit Markdown source of A' })).toBeVisible();
+  });
+
+  it('tells its parent a content edit is live, so presenting cannot start over one', () => {
+    const expanded = cardNode('A', CARD_ID, true);
+    expanded.data.expanded = true;
+    expanded.data.body = '# A';
+    const { bodyEditingChanged } = mountGraph([expanded]);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Markdown source of A' }));
+
+    expect(bodyEditingChanged).toHaveBeenLastCalledWith(true);
+  });
+
+  it.each(['Enter', ' '])(
+    'does not Open a Card with %s while its body is being edited',
+    async (key) => {
+      const expanded = cardNode('A', CARD_ID, true);
+      expanded.data.expanded = true;
+      expanded.data.body = '# A';
+      const { openCard } = mountGraph([expanded]);
+      fireEvent.click(screen.getByRole('button', { name: 'Edit Markdown source of A' }));
+
+      const editor = await screen.findByRole('textbox', { name: 'Markdown source of A' });
+      editor.focus();
+      expect(editor).toBe(document.activeElement);
+      fireEvent.keyDown(editor, { key });
+
+      expect(openCard).not.toHaveBeenCalled();
+    },
+  );
+
+  it('does not let another edit or Card creation replace a live body caret', () => {
+    const a = cardNode('A');
+    a.data.expanded = true;
+    a.data.body = '# A';
+    const b = cardNode('B', OTHER_CARD_ID);
+    b.data.expanded = true;
+    b.data.body = '# B';
+    const { addCard } = mountGraph([a, b]);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Markdown source of A' }));
+
+    expect(screen.queryByRole('button', { name: 'Edit Title B' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Edit Markdown source of B' })).toBeNull();
+    fireEvent.keyDown(nodeOf(OTHER_CARD_ID), { key: 'c' });
+    fireEvent.keyDown(document.body, { key: 'F2' });
+    expect(addCard).not.toHaveBeenCalled();
+    expect(screen.queryByRole('textbox', { name: 'Card title' })).toBeNull();
   });
 });
 
@@ -490,5 +617,31 @@ describe("React Flow's delete keys", () => {
     rerender();
 
     expect(listen.mock.calls.filter(([type]) => type === 'keydown')).toEqual([]);
+  });
+});
+
+/**
+ * Opening is a command of the *canvas*, and a Card now contains the text control
+ * its content is edited in. The `C` shortcut already asks this question; the
+ * open key did not, and a Space typed into an Expanded Card's editor is a
+ * character rather than a request to open the Card it is inside.
+ *
+ * Modelled with a plain `contenteditable` rather than the real editor because
+ * `MarkdownSourceEditor` is reached by dynamic import: the rule under test is
+ * about where the key came from, not which component put it there.
+ */
+describe.each([
+  ['Enter', 'Enter'],
+  ['Space', ' '],
+] as const)('%s typed into a text control inside a Card', (_name, key) => {
+  it('is a keypress rather than a request to open that Card', () => {
+    const { openCard } = mountGraph();
+    const field = document.createElement('div');
+    field.setAttribute('contenteditable', 'true');
+    nodeOf(CARD_ID).append(field);
+
+    fireEvent.keyDown(field, { key });
+
+    expect(openCard).not.toHaveBeenCalled();
   });
 });

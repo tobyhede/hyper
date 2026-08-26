@@ -36,7 +36,7 @@ const snapshot = (title: string, cardTitle: string, x: number, y: number): Space
           id: LAYOUT_ID,
           title: 'Layout',
           kind: 'positioned',
-          positions: { [CARD_ID]: { x, y } },
+          positions: { [CARD_ID]: { x, y, open: false } },
           // A Layout owns at least one Graph (ADR 0040); this one holds no
           // Edges, which is all a single-Card Space has to connect.
           graphs: [{ id: GRAPH_ID, title: 'Main', edges: [] }],

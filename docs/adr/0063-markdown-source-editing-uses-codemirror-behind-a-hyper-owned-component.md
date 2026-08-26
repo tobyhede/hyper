@@ -2,6 +2,7 @@
 
 Status: accepted
 Refines: 0011, 0037
+Refined by: 0064, 0067
 Related: 0047, 0048, 0050, 0052
 
 An opened Markdown Card continues to author its literal Markdown string, but the
@@ -20,9 +21,9 @@ format-on-save behavior or independent panel chrome.
 
 The wrapper is exported from the narrow public
 `@project/ui/MarkdownSourceEditor` subpath rather than the package root. The
-application lazy-loads that subpath inside an already-mounted `CardPane`: the
-pane and its focus trap therefore exist throughout loading, Alias editing never
-loads CodeMirror, and the specialist dependency stays out of the initial bundle.
+specialist dependency stays out of the initial bundle through a lazy boundary;
+ADR 0067 refines ownership of that boundary now that `MarkdownCardBody` is a
+second consumer inside `ui`.
 
 ## Why
 

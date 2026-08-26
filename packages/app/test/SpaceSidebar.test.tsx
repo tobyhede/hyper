@@ -237,6 +237,31 @@ describe('SpaceSidebar', () => {
     expect(props.graph.onPresent).not.toHaveBeenCalled();
   });
 
+  /**
+   * Presenting draws the active Card's content in place of the Card, so a live
+   * content editor cannot survive it and its draft would go without one of
+   * ADR 0064's four exits being spent. The control says so rather than taking
+   * the click.
+   */
+  it('cannot present over a live content edit', () => {
+    const base = settledProps();
+    const props: SpaceSidebarProps = {
+      ...base,
+      graph: {
+        ...base.graph,
+        graphs: [{ id: GRAPH_ID, title: 'Graph 1', edges: [{ from: CARD_A, to: CARD_B }] }],
+        activeGraphId: GRAPH_ID,
+        canPresent: false,
+      },
+    };
+    draw(<SpaceSidebar {...props} />);
+
+    const present = screen.getByRole('button', { name: 'Present Graph 1' });
+    expect(present).toBeDisabled();
+    fireEvent.click(present);
+    expect(props.graph.onPresent).not.toHaveBeenCalled();
+  });
+
   it('exits presenting through the Overview action', () => {
     const base = settledProps();
     const props: SpaceSidebarProps = {

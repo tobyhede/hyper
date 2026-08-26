@@ -61,6 +61,8 @@
   --canvas-card-face-rest: #f4efe4;
   --canvas-card-face-active: #fffaf0;
   --canvas-card-title-color: #12161c;
+  --card-hover-duration: 120ms;
+  --card-hover-easing: ease;
   /* Text roles the Card draws on its own cream faces. The app's own
      `--muted-foreground` and the old `#fca5a5` refusal red were both picked
      against the dark `--card` face and fall under 2.5:1 here;

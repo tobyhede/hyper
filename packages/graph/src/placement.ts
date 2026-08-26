@@ -1,4 +1,10 @@
-import type { CardId, Layout, LayoutPosition } from '@project/core';
+import {
+  COLLAPSED_CARD_SIZE,
+  type CardId,
+  type CardPlacement,
+  type Layout,
+  type LayoutPosition,
+} from '@project/core';
 import type { LayoutStrategyGraph } from './layout';
 
 /** The brand's carrier. See `Placement` below for what the type means. */
@@ -49,7 +55,7 @@ declare const PLACEMENT: unique symbol;
  * `placement.get(id)!.x = 1` would author a position past `next` and `place`
  * both — the only two things allowed to decide what a placement authors.
  */
-export type Placement = ReadonlyMap<CardId, Readonly<LayoutPosition>> & {
+export type Placement = ReadonlyMap<CardId, Readonly<CardPlacement>> & {
   readonly [PLACEMENT]: true;
 };
 
@@ -68,14 +74,34 @@ export type Placement = ReadonlyMap<CardId, Readonly<LayoutPosition>> & {
  * `CardId` keys, because a constructor open to plain strings would re-open the
  * seam the brand exists to hold — pinned by `identity-types.test.ts`.
  */
-const brand = (positions: ReadonlyMap<CardId, Readonly<LayoutPosition>>): Placement =>
+const brand = (positions: ReadonlyMap<CardId, Readonly<CardPlacement>>): Placement =>
   positions as Placement;
 
-const point = (at: LayoutPosition): LayoutPosition => ({ x: at.x, y: at.y });
+type PlacementPoint = CardPlacement | (LayoutPosition & { readonly open?: never });
+
+const point = (at: PlacementPoint): CardPlacement => {
+  if (at.open === undefined) return { x: at.x, y: at.y, open: false };
+  if (at.open) {
+    return {
+      x: at.x,
+      y: at.y,
+      open: true,
+      openSize: { width: at.openSize.width, height: at.openSize.height },
+    };
+  }
+  return at.openSize === undefined
+    ? { x: at.x, y: at.y, open: false }
+    : {
+        x: at.x,
+        y: at.y,
+        open: false,
+        openSize: { width: at.openSize.width, height: at.openSize.height },
+      };
+};
 
 /** The placement a Layout holds. */
 function fromLayout(layout: Layout): Placement {
-  const positions = new Map<CardId, LayoutPosition>();
+  const positions = new Map<CardId, CardPlacement>();
   for (const [cardId, at] of Object.entries(layout.positions)) {
     if (at !== undefined) {
       // SAFETY: `Object.entries` widens this key to `string`, but it was
@@ -97,10 +123,10 @@ function fromLayout(layout: Layout): Placement {
  * collapsing that to `(0, 0)` would assert a placement no strategy made.
  */
 function fromLayoutStrategyGraph(strategyGraph: LayoutStrategyGraph): Placement {
-  const positions = new Map<CardId, LayoutPosition>();
+  const positions = new Map<CardId, CardPlacement>();
   for (const card of strategyGraph.cards) {
     if (card.x === undefined || card.y === undefined) continue;
-    positions.set(card.id, { x: card.x, y: card.y });
+    positions.set(card.id, { x: card.x, y: card.y, open: false });
   }
   return brand(positions);
 }
@@ -112,8 +138,8 @@ function fromLayoutStrategyGraph(strategyGraph: LayoutStrategyGraph): Placement 
  * is never installed directly over an authored placement. `next` decides what
  * any of it is allowed to author.
  */
-function fromEntries(entries: Iterable<readonly [CardId, LayoutPosition]>): Placement {
-  const positions = new Map<CardId, LayoutPosition>();
+function fromEntries(entries: Iterable<readonly [CardId, PlacementPoint]>): Placement {
+  const positions = new Map<CardId, CardPlacement>();
   for (const [cardId, at] of entries) positions.set(cardId, point(at));
   return brand(positions);
 }
@@ -127,6 +153,9 @@ function equals(a: Placement | null, b: Placement | null): boolean {
     const other = b.get(cardId);
     if (other === undefined) return false;
     if (other.x !== at.x || other.y !== at.y) return false;
+    if (other.open !== at.open) return false;
+    if (other.openSize?.width !== at.openSize?.width) return false;
+    if (other.openSize?.height !== at.openSize?.height) return false;
   }
   return true;
 }
@@ -168,14 +197,79 @@ function next(
   if (authored === null) return rendered;
   if (placed.length === 0) return authored;
 
-  const merged = new Map<CardId, LayoutPosition>(authored);
+  const merged = new Map<CardId, CardPlacement>(authored);
   for (const cardId of placed) {
     const at = rendered.get(cardId);
-    if (at !== undefined) merged.set(cardId, point(at));
+    const original = authored.get(cardId);
+    if (at !== undefined) {
+      const authoredAt = authoredPoint(authored, at, cardId);
+      merged.set(
+        cardId,
+        point({
+          ...at,
+          ...original,
+          x: authoredAt.x,
+          y: authoredAt.y,
+        }),
+      );
+    }
   }
 
   const nextPlacement = brand(merged);
   return equals(authored, nextPlacement) ? authored : nextPlacement;
+}
+
+/**
+ * Convert one point from drawn canvas coordinates back to Layout authorship.
+ *
+ * Each Expanded Card creates a step after its authored origin. In drawn space
+ * that step ends after the accumulated growth before it, so iterating origins in
+ * order identifies exactly the growth already present in a reachable drawn
+ * coordinate. `movingCardId` excludes the Card being moved: a Card never
+ * displaces itself, even when it is Expanded.
+ *
+ * Coordinates inside a step's unreachable gap stay on its near side. That is
+ * ADR 0064's accepted step boundary; every coordinate produced by `drawn`
+ * remains an exact inverse.
+ */
+function authoredPoint(
+  placement: Placement,
+  at: LayoutPosition,
+  movingCardId?: CardId,
+): LayoutPosition {
+  const expanded = [...placement]
+    .filter(([cardId, point]) => cardId !== movingCardId && point.open)
+    .map(([, point]) => point);
+
+  const invert = (coordinate: 'x' | 'y', size: 'width' | 'height', collapsed: number): number => {
+    const ordered = [...expanded].sort((left, right) => left[coordinate] - right[coordinate]);
+    let growth = 0;
+    let authored = at[coordinate];
+    for (const point of ordered) {
+      if (!point.open) continue;
+      const rect = point.openSize;
+      // Floored for the same reason `drawn` floors it: a rect smaller than the
+      // collapsed constant would otherwise displace backwards, and an inverse
+      // of a backwards step is not one.
+      const step = Math.max(0, rect[size] - collapsed);
+      const drawnOrigin = point[coordinate] + growth;
+      growth += step;
+      if (at[coordinate] > point[coordinate] + growth) {
+        authored -= step;
+      } else if (at[coordinate] > drawnOrigin) {
+        // Inside the step's unreachable gap, which is the Expanded Card's own
+        // drawn box. Authoring the near side is what makes the drop settle where
+        // it was released instead of jumping the full growth one frame later.
+        authored = point[coordinate];
+      }
+    }
+    return authored;
+  };
+
+  return {
+    x: invert('x', 'width', COLLAPSED_CARD_SIZE.width),
+    y: invert('y', 'height', COLLAPSED_CARD_SIZE.height),
+  };
 }
 
 /**
@@ -185,7 +279,7 @@ function next(
  * dropped it, which is authorship rather than a report — no renderer has drawn
  * that Card yet, so it cannot come through `next`.
  */
-function place(placement: Placement, cardId: CardId, at: LayoutPosition): Placement {
+function place(placement: Placement, cardId: CardId, at: PlacementPoint): Placement {
   const placed = new Map(placement);
   placed.set(cardId, point(at));
   return brand(placed);
@@ -211,7 +305,7 @@ function remove(placement: Placement, cardId: CardId): Placement {
 }
 
 /** The record a Layout stores. Keys are already card ids; this only widens them. */
-function toPositions(placement: Placement): Record<CardId, LayoutPosition> {
+function toPositions(placement: Placement): Record<CardId, CardPlacement> {
   return Object.fromEntries([...placement].map(([cardId, at]) => [cardId, point(at)]));
 }
 
@@ -222,12 +316,35 @@ function toPositions(placement: Placement): Record<CardId, LayoutPosition> {
  */
 const empty = (): Placement => brand(new Map());
 
+/** The derived rects drawn on the canvas, including displacement from Expanded Cards. */
+function drawn(placement: Placement): Placement {
+  const result = new Map<CardId, CardPlacement>();
+  for (const [cardId, at] of placement) {
+    let x = at.x;
+    let y = at.y;
+    for (const [otherId, other] of placement) {
+      if (otherId === cardId || !other.open) continue;
+      // Floored: an Expanded rect smaller than the collapsed constant is not a
+      // shrink of its neighbours. Nothing authors one today — the resizer's
+      // minimum is the collapsed size — but a stored Space is bytes, and a
+      // negative step would displace neighbours backwards over the Card that
+      // caused it and leave `authoredPoint` with no inverse to compute.
+      if (at.x > other.x) x += Math.max(0, other.openSize.width - COLLAPSED_CARD_SIZE.width);
+      if (at.y > other.y) y += Math.max(0, other.openSize.height - COLLAPSED_CARD_SIZE.height);
+    }
+    result.set(cardId, point({ ...at, x, y }));
+  }
+  return brand(result);
+}
+
 export const Placement = {
   empty,
   fromLayout,
   fromLayoutStrategyGraph,
   fromEntries,
   equals,
+  drawn,
+  authoredPoint,
   next,
   place,
   remove,

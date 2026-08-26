@@ -20,9 +20,9 @@ function loadFixture(): Space {
           id: '00000000-0000-4000-8000-000000000022',
           title: 'Working',
           positions: {
-            '00000000-0000-4000-8000-000000000002': { x: 0, y: 0 },
-            '00000000-0000-4000-8000-000000000003': { x: 320, y: 0 },
-            '00000000-0000-4000-8000-000000000005': { x: 640, y: 0 },
+            '00000000-0000-4000-8000-000000000002': { x: 0, y: 0, open: false },
+            '00000000-0000-4000-8000-000000000003': { x: 320, y: 0, open: false },
+            '00000000-0000-4000-8000-000000000005': { x: 640, y: 0, open: false },
           },
           graphs: [
             {
@@ -67,7 +67,7 @@ describe('buildLayoutStrategyGraph', () => {
       ],
       buildCardHandles(space),
       buildGraphRenderEdges(space),
-      SIZE,
+      () => SIZE,
     );
 
     const b = graph.cards.find((c) => c.id === '00000000-0000-4000-8000-000000000003')!;
@@ -85,7 +85,7 @@ describe('buildLayoutStrategyGraph', () => {
       [uuid('00000000-0000-4000-8000-000000000002'), uuid('00000000-0000-4000-8000-000000000003')],
       buildCardHandles(space),
       buildGraphRenderEdges(space),
-      SIZE,
+      () => SIZE,
     );
     expect(graph.edges.map((e) => e.id)).toEqual(['00000000-0000-4000-8000-000000000004::0']);
   });
@@ -100,7 +100,7 @@ describe('gridStrategy', () => {
     ],
     buildCardHandles(space),
     buildGraphRenderEdges(space),
-    SIZE,
+    () => SIZE,
   );
 
   it('satisfies the uniformly-async LayoutStrategy contract', () => {

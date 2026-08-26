@@ -43,7 +43,7 @@ const SECOND_MINTED_GRAPH = uuidSchema.parse('00000000-0000-4000-8000-0000000000
 const UNKNOWN_CARD = uuidSchema.parse('00000000-0000-4000-8000-000000000099');
 const UNKNOWN_GRAPH = uuidSchema.parse('00000000-0000-4000-8000-000000000098');
 
-const CENTRE = { x: 400, y: 300 };
+const CENTRE = { x: 400, y: 300, open: false };
 
 const MAIN_GRAPH: Graph = { id: GRAPH_ID, title: 'Main', edges: [{ from: CARD_A, to: CARD_B }] };
 
@@ -67,7 +67,10 @@ const positionedSnapshot: SpaceSnapshot = {
         id: LAYOUT_ID,
         title: 'Layout 1',
         kind: 'positioned',
-        positions: { [CARD_A]: { x: 10, y: 20 }, [CARD_B]: { x: 300, y: 40 } },
+        positions: {
+          [CARD_A]: { x: 10, y: 20, open: false },
+          [CARD_B]: { x: 300, y: 40, open: false },
+        },
         graphs: [MAIN_GRAPH],
       },
     ],
@@ -148,8 +151,8 @@ describe('Add Card', () => {
       document: { title: 'Card 1', kind: 'markdown', body: '' },
     });
     expect(layoutOf(session.getState().working, LAYOUT_ID)?.positions).toEqual({
-      [CARD_A]: { x: 10, y: 20 },
-      [CARD_B]: { x: 300, y: 40 },
+      [CARD_A]: { x: 10, y: 20, open: false },
+      [CARD_B]: { x: 300, y: 40, open: false },
       [MINTED]: CENTRE,
     });
     // No Edge, and no second Graph: Add Card adds neither (ADR 0040).
@@ -171,7 +174,40 @@ describe('Add Card', () => {
     );
     // A visible stack, not collision avoidance: the first Card never moves, and
     // the second takes one small diagonal step off it.
-    expect(stacked).toEqual([CENTRE, { x: CENTRE.x + 24, y: CENTRE.y + 24 }]);
+    expect(stacked).toEqual([CENTRE, { x: CENTRE.x + 24, y: CENTRE.y + 24, open: false }]);
+  });
+
+  it('stores a canvas anchor without the displacement already drawn into it', () => {
+    const expandedSnapshot: SpaceSnapshot = {
+      ...positionedSnapshot,
+      document: {
+        ...positionedSnapshot.document,
+        layouts: [
+          {
+            ...positionedSnapshot.document.layouts![0]!,
+            positions: {
+              [CARD_A]: { x: 10, y: 20, open: true, openSize: { width: 560, height: 420 } },
+              [CARD_B]: { x: 300, y: 40, open: false },
+            },
+          },
+        ],
+      },
+    };
+    const { authoring, session } = open(expandedSnapshot);
+    authoring.replacePlacement(
+      Placement.fromEntries([
+        [CARD_A, { x: 10, y: 20, open: true, openSize: { width: 560, height: 420 } }],
+        [CARD_B, { x: 300, y: 40, open: false }],
+      ]),
+    );
+
+    authoring.complete({ kind: 'created-card', anchor: { x: 500, y: 400 } });
+
+    expect(layoutOf(session.getState().working, LAYOUT_ID)?.positions[MINTED]).toEqual({
+      x: 200,
+      y: 126,
+      open: false,
+    });
   });
 
   it('converts an Algorithmic View in the same Edit, leaving the Cards on screen where they are', () => {
@@ -187,8 +223,8 @@ describe('Add Card', () => {
       title: 'Layout 1',
       kind: 'positioned',
       positions: {
-        [CARD_A]: { x: 10, y: 20 },
-        [CARD_B]: { x: 300, y: 40 },
+        [CARD_A]: { x: 10, y: 20, open: false },
+        [CARD_B]: { x: 300, y: 40, open: false },
         [MINTED]: CENTRE,
       },
       graphs: [{ id: MINTED_GRAPH, title: 'Graph 1', color: GRAPH_PALETTE[0], edges: [] }],
@@ -255,6 +291,67 @@ describe('Edit Card', () => {
         document: { title: 'Renamed ', kind: 'markdown', body: 'A' },
       }),
     ).toEqual({ kind: 'unchanged' });
+  });
+});
+
+describe('Expanded Card geometry', () => {
+  it('restores a resized Open Size after Closing and Opening again', () => {
+    const { authoring, session } = openPositioned();
+
+    expect(authoring.complete({ kind: 'opened-card', cardId: CARD_A })).toEqual({
+      kind: 'completed',
+    });
+    expect(
+      authoring.complete({
+        kind: 'resized-card',
+        cardId: CARD_A,
+        size: { width: 640, height: 480 },
+      }),
+    ).toEqual({ kind: 'completed' });
+    expect(authoring.complete({ kind: 'closed-card', cardId: CARD_A })).toEqual({
+      kind: 'completed',
+    });
+    expect(layoutOf(session.getState().working, LAYOUT_ID)?.positions[CARD_A]).toEqual({
+      x: 10,
+      y: 20,
+      open: false,
+      openSize: { width: 640, height: 480 },
+    });
+
+    expect(authoring.complete({ kind: 'opened-card', cardId: CARD_A })).toEqual({
+      kind: 'completed',
+    });
+    expect(layoutOf(session.getState().working, LAYOUT_ID)?.positions[CARD_A]).toEqual({
+      x: 10,
+      y: 20,
+      open: true,
+      openSize: { width: 640, height: 480 },
+    });
+  });
+
+  it('refuses Opening from an Algorithmic View before converting it', () => {
+    const { authoring, session } = openAutomatic();
+    const before = session.getState().working;
+
+    expect(authoring.complete({ kind: 'opened-card', cardId: CARD_A })).toEqual({
+      kind: 'refused',
+      refusal: { code: 'layout-required', operation: 'opened-card' },
+    });
+    expect(session.getState().working).toBe(before);
+  });
+
+  it('refuses a stale resize completion for a Card that is no longer Expanded', () => {
+    const { authoring, session } = openPositioned();
+    const before = session.getState().working;
+
+    expect(
+      authoring.complete({
+        kind: 'resized-card',
+        cardId: CARD_A,
+        size: { width: 560, height: 420 },
+      }),
+    ).toEqual({ kind: 'refused', refusal: { code: 'card-not-expanded' } });
+    expect(session.getState().working).toBe(before);
   });
 });
 
@@ -334,7 +431,10 @@ describe('Add Graph', () => {
             id: OTHER_LAYOUT_ID,
             title: 'Layout 2',
             kind: 'positioned',
-            positions: { [CARD_A]: { x: 20, y: 30 }, [CARD_B]: { x: 310, y: 50 } },
+            positions: {
+              [CARD_A]: { x: 20, y: 30, open: false },
+              [CARD_B]: { x: 310, y: 50, open: false },
+            },
             graphs: [{ id: OTHER_GRAPH_ID, title: 'Other', edges: [] }],
           },
         ],
@@ -519,7 +619,7 @@ describe('Delete Graph', () => {
             id: OTHER_LAYOUT_ID,
             title: 'Layout 2',
             kind: 'positioned',
-            positions: { [CARD_A]: { x: 0, y: 400 } },
+            positions: { [CARD_A]: { x: 0, y: 400, open: false } },
             graphs: [{ id: OTHER_GRAPH_ID, title: 'Aside', edges: [] }],
           },
         ],
@@ -549,9 +649,9 @@ describe('Edge lifecycle', () => {
           {
             ...positionedSnapshot.document.layouts![0]!,
             positions: {
-              [CARD_A]: { x: 10, y: 20 },
-              [CARD_B]: { x: 300, y: 40 },
-              [CARD_C]: { x: 600, y: 40 },
+              [CARD_A]: { x: 10, y: 20, open: false },
+              [CARD_B]: { x: 300, y: 40, open: false },
+              [CARD_C]: { x: 600, y: 40, open: false },
             },
           },
         ],
@@ -714,8 +814,8 @@ describe('Edge eligibility', () => {
 
   /** What a pointer gesture reports: where React Flow has drawn the Layout's Cards. */
   const RENDERED = Placement.fromEntries([
-    [CARD_A, { x: 10, y: 20 }],
-    [CARD_B, { x: 300, y: 40 }],
+    [CARD_A, { x: 10, y: 20, open: false }],
+    [CARD_B, { x: 300, y: 40, open: false }],
   ]);
 
   it('offers a connection the completion accepts', () => {
@@ -907,11 +1007,48 @@ describe('Layout membership', () => {
     ).toEqual({ kind: 'completed' });
 
     expect(layoutOf(session.getState().working, LAYOUT_ID)?.positions).toEqual({
-      [CARD_A]: { x: 10, y: 20 },
-      [CARD_B]: { x: 300, y: 40 },
+      [CARD_A]: { x: 10, y: 20, open: false },
+      [CARD_B]: { x: 300, y: 40, open: false },
       [CARD_C]: CENTRE,
     });
     expect(graphsOf(session.getState().working)).toEqual([MAIN_GRAPH]);
+  });
+
+  it('inverts drawn displacement when adding an absent Card to a Layout', () => {
+    const expandedSparse: SpaceSnapshot = {
+      ...sparse,
+      document: {
+        ...sparse.document,
+        layouts: [
+          {
+            ...sparse.document.layouts![0]!,
+            positions: {
+              [CARD_A]: { x: 10, y: 20, open: true, openSize: { width: 560, height: 420 } },
+              [CARD_B]: { x: 300, y: 40, open: false },
+            },
+          },
+        ],
+      },
+    };
+    const { authoring, session } = open(expandedSparse);
+    authoring.replacePlacement(
+      Placement.fromEntries([
+        [CARD_A, { x: 10, y: 20, open: true, openSize: { width: 560, height: 420 } }],
+        [CARD_B, { x: 300, y: 40, open: false }],
+      ]),
+    );
+
+    authoring.complete({
+      kind: 'added-card-to-layout',
+      cardId: CARD_C,
+      anchor: { x: 500, y: 400 },
+    });
+
+    expect(layoutOf(session.getState().working, LAYOUT_ID)?.positions[CARD_C]).toEqual({
+      x: 200,
+      y: 126,
+      open: false,
+    });
   });
 
   it('refuses a Card the Space no longer holds', () => {
@@ -962,7 +1099,10 @@ describe('Layout membership', () => {
             id: OTHER_LAYOUT_ID,
             title: 'Layout 2',
             kind: 'positioned',
-            positions: { [CARD_A]: { x: 0, y: 400 }, [CARD_B]: { x: 0, y: 600 } },
+            positions: {
+              [CARD_A]: { x: 0, y: 400, open: false },
+              [CARD_B]: { x: 0, y: 600, open: false },
+            },
             graphs: [{ id: MINTED, title: 'Elsewhere', edges: [{ from: CARD_A, to: CARD_B }] }],
           },
         ],
@@ -976,7 +1116,9 @@ describe('Layout membership', () => {
     });
 
     const working = session.getState().working;
-    expect(layoutOf(working, LAYOUT_ID)?.positions).toEqual({ [CARD_A]: { x: 10, y: 20 } });
+    expect(layoutOf(working, LAYOUT_ID)?.positions).toEqual({
+      [CARD_A]: { x: 10, y: 20, open: false },
+    });
     expect(layoutOf(working, LAYOUT_ID)?.graphs).toEqual([
       { id: GRAPH_ID, title: 'Main', edges: [] },
       { id: OTHER_GRAPH_ID, title: 'Aside', edges: [] },
@@ -1008,7 +1150,10 @@ describe('Delete Card from Space', () => {
           id: OTHER_LAYOUT_ID,
           title: 'Layout 2',
           kind: 'positioned',
-          positions: { [CARD_A]: { x: 0, y: 400 }, [CARD_B]: { x: 0, y: 600 } },
+          positions: {
+            [CARD_A]: { x: 0, y: 400, open: false },
+            [CARD_B]: { x: 0, y: 600, open: false },
+          },
           graphs: [
             {
               id: OTHER_GRAPH_ID,
@@ -1034,9 +1179,13 @@ describe('Delete Card from Space', () => {
 
     const working = session.getState().working;
     expect(working.cards).toEqual([positionedSnapshot.cards[0]]);
-    expect(layoutOf(working, LAYOUT_ID)?.positions).toEqual({ [CARD_A]: { x: 10, y: 20 } });
+    expect(layoutOf(working, LAYOUT_ID)?.positions).toEqual({
+      [CARD_A]: { x: 10, y: 20, open: false },
+    });
     expect(layoutOf(working, LAYOUT_ID)?.graphs).toEqual([{ ...MAIN_GRAPH, edges: [] }]);
-    expect(layoutOf(working, OTHER_LAYOUT_ID)?.positions).toEqual({ [CARD_A]: { x: 0, y: 400 } });
+    expect(layoutOf(working, OTHER_LAYOUT_ID)?.positions).toEqual({
+      [CARD_A]: { x: 0, y: 400, open: false },
+    });
     // Empty Graphs and Layouts remain: deleting a Card is not an instruction to
     // delete either.
     expect(layoutOf(working, OTHER_LAYOUT_ID)?.graphs).toEqual([
@@ -1112,7 +1261,7 @@ describe('Delete Card from Space', () => {
     // The converted Layout never holds the deleted Card, so nothing has to
     // remove it afterwards.
     expect(layoutOf(session.getState().working, LAYOUT_ID)?.positions).toEqual({
-      [CARD_A]: { x: 10, y: 20 },
+      [CARD_A]: { x: 10, y: 20, open: false },
     });
   });
 

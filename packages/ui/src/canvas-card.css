@@ -18,9 +18,9 @@
   background: var(--canvas-card-face);
   box-shadow: none;
   transition:
-    box-shadow 120ms ease,
-    transform 120ms ease,
-    background-color 120ms ease;
+    box-shadow var(--card-hover-duration, 120ms) var(--card-hover-easing, ease),
+    transform var(--card-hover-duration, 120ms) var(--card-hover-easing, ease),
+    background-color var(--card-hover-duration, 120ms) var(--card-hover-easing, ease);
 }
 
 .canvas-card[data-kind='alias'] {
@@ -41,7 +41,12 @@
    adapter's, but the coupling is a CSS selector string, not an import — no
    React Flow reaches this package, and this rule degrades to plain `:hover`
    wherever no such sibling exists (every Ladle story in this file). */
-.canvas-card:is(:hover, :has(~ .rf-card-node__authoring-handle:hover), :not([data-state='rest'])) {
+.canvas-card:is(
+  :hover,
+  :has(~ .rf-card-node__authoring-handle:hover),
+  :not([data-state='rest']),
+  [data-content-editing='true']
+) {
   background: var(--canvas-card-active-face);
 }
 
@@ -63,38 +68,37 @@
   transform: rotate(-1deg);
 }
 
-.canvas-card__rail {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  height: 34px;
-  min-height: 34px;
-  padding: 0 8px;
-  border-radius: 0;
+/* The rail's geometry and its Active-Graph band are `CardRail`'s, in
+   `card-rail.css`. What belongs to the canvas Card is *when* it shows: a resting
+   Card on the canvas is quiet, and reveals its rail with itself. That is this
+   Card's state, not the rail's, so the resting case is written here as the
+   negation of the same "not resting" set the face and the glyph use — a Card at
+   rest that no pointer is over, that no authoring handle of its own is under,
+   **and that is not running an edit**. Everything else, selection and dragging
+   included, leaves the rail as `CardRail` draws it.
+
+   A running edit belongs in that set because it outlives every other reason the
+   rail is up. The caret is in the body, so no hover, selection or focus of the
+   rail's own is true — and a blur ends nothing (ADR 0064), so deselecting a Card
+   mid-edit used to quiet the band and the glyph while leaving Save, Cancel and
+   Close lit on top of nothing. The exits stay visible because the ADR says they
+   do; this is what stops them being the only thing left. */
+.canvas-card[data-state='rest']:not(:hover):not(:has(~ .rf-card-node__authoring-handle:hover)):not(
+    [data-content-editing='true']
+  )
+  .card-rail {
   background: transparent;
-  transition: background-color 120ms ease;
 }
 
-.canvas-card:is(:hover, :has(~ .rf-card-node__authoring-handle:hover), :not([data-state='rest']))
-  .canvas-card__rail {
-  background: var(--canvas-card-graph);
-}
-
-.canvas-card__kind {
-  display: flex;
-  align-items: center;
+.canvas-card .card-rail__kind {
   color: var(--canvas-card-ink);
+}
+
+.canvas-card[data-state='rest']:not(:hover):not(:has(~ .rf-card-node__authoring-handle:hover)):not(
+    [data-content-editing='true']
+  )
+  .card-rail__kind {
   opacity: 0.28;
-  transition: opacity 120ms ease;
-}
-
-.canvas-card__kind [data-card-kind] {
-  color: currentcolor;
-}
-
-.canvas-card:is(:hover, :has(~ .rf-card-node__authoring-handle:hover), :not([data-state='rest']))
-  .canvas-card__kind {
-  opacity: 1;
 }
 
 .canvas-card__actions {
@@ -103,17 +107,22 @@
   gap: 4px;
   opacity: 0;
   pointer-events: none;
-  transition: opacity 100ms ease;
+  transition: opacity var(--card-hover-duration, 120ms) var(--card-hover-easing, ease);
 }
 
-.canvas-card:is(:hover, :has(~ .rf-card-node__authoring-handle:hover), [data-state='selected'])
+.canvas-card:is(
+    :hover,
+    :has(~ .rf-card-node__authoring-handle:hover),
+    [data-state='selected'],
+    [data-content-editing='true']
+  )
   .canvas-card__actions,
 .canvas-card__actions:focus-within {
   opacity: 1;
   pointer-events: auto;
 }
 
-.canvas-card :is(.card__connect, .card__edit) {
+.canvas-card .card__rail-action {
   width: 22px;
   height: 22px;
   border: 2px solid var(--canvas-card-ink);
@@ -122,17 +131,40 @@
   background: var(--canvas-card-face);
   color: var(--canvas-card-ink);
   transition:
-    color 100ms ease,
-    background-color 100ms ease;
+    color var(--card-hover-duration, 120ms) var(--card-hover-easing, ease),
+    background-color var(--card-hover-duration, 120ms) var(--card-hover-easing, ease);
 }
 
-.canvas-card :is(.card__connect, .card__edit):hover {
+/* Unavailable, at any rail colour.
+
+   Two things go wrong on a coloured band and both are fixed the same way. First,
+   `Button`'s own `disabled:opacity-50` makes the control semi-transparent, and
+   what is behind it is the rail's Active-Graph colour — the paper and the ink
+   both take that colour on, and the result reads as a differently-coloured
+   control rather than an unavailable one. Second, a border pulled close to the
+   paper leaves an edgeless square floating on the band, which washes out against
+   a mid-tone rail and disappears entirely against a pale one.
+
+   So: full opacity, opaque paper, and a border that is still unambiguously an
+   edge. Every value is mixed from the Card's own **ink** and **paper** and
+   nothing is mixed from the rail, which is what makes one rule hold for every
+   Graph colour the Space has. The quieting is a step down from the ink the
+   enabled controls use, not a step toward whatever is behind. */
+.canvas-card .card__rail-action:disabled,
+.canvas-card .card__rail-action:disabled:hover {
+  opacity: 1;
+  border-color: color-mix(in srgb, var(--canvas-card-ink) 45%, var(--canvas-card-face));
+  background: var(--canvas-card-face);
+  color: color-mix(in srgb, var(--canvas-card-ink) 32%, var(--canvas-card-face));
+}
+
+.canvas-card .card__rail-action:not(:disabled):hover {
   border-color: var(--canvas-card-ink);
   background: var(--canvas-card-ink);
   color: var(--canvas-card-graph);
 }
 
-.canvas-card :is(.card__connect, .card__edit):focus-visible {
+.canvas-card .card__rail-action:focus-visible {
   outline: 2px solid var(--canvas-card-ink);
   outline-offset: 2px;
 }
@@ -161,15 +193,16 @@
 }
 
 /* The Title's one-activation control (ADR 0065) must claim only the pixels it
-   draws — the body is a left-aligned column, and a block title spans its full
-   width with most of it blank, which would put the edit target across the band
-   beside a short title rather than just the title itself. */
+   draws. Its wrapper still spans the editor's full width so the hover treatment
+   previews the field that replaces it without making that whole band clickable. */
 .canvas-card__title[data-editable='true'] {
-  width: fit-content;
+  width: 100%;
   max-width: 100%;
 }
 
 .canvas-card__title-control {
+  display: block;
+  width: fit-content;
   max-width: 100%;
   padding: 0;
   border: 0;
@@ -179,14 +212,12 @@
   font: inherit;
   letter-spacing: inherit;
   text-align: inherit;
-  cursor: text;
+  cursor: default;
 }
 
-.canvas-card__title-control:hover {
-  text-decoration: underline;
-  text-decoration-color: var(--canvas-card-graph);
-  text-decoration-thickness: 2px;
-  text-underline-offset: 3px;
+.canvas-card__title:has(.canvas-card__title-control:hover) {
+  background: color-mix(in srgb, var(--canvas-card-graph) 10%, transparent);
+  box-shadow: inset 0 -2px 0 var(--canvas-card-graph);
 }
 
 .canvas-card__title-control:focus-visible {
@@ -205,13 +236,58 @@
   white-space: nowrap;
 }
 
+/* A Markdown Title is the same bottom passenger before, during and after the
+   React Flow wrapper moves. Expansion adds the writing surface above it; it
+   never switches the Title's layout in the middle of that motion. */
+.canvas-card[data-kind='markdown'] .canvas-card__body {
+  order: 2;
+  flex: none;
+  margin-top: auto;
+}
+
+.canvas-card__content {
+  order: 1;
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
+  border-bottom: 2px solid var(--canvas-card-ink);
+  /* The Card's ink, not the ambient `--foreground`. A Card's face is its own
+     paper and a body drawn in the surrounding theme's text colour is the one
+     part of an Expanded Card that would not look like the Card. */
+  color: var(--canvas-card-title);
+  opacity: 1;
+  transition-property: opacity;
+  transition-duration: calc(var(--card-placement-duration, 200ms) * 0.4);
+  transition-timing-function: var(--card-placement-easing, ease);
+}
+
+/* Markdown enters over the tail of the node's growth, after its reflow has
+   mostly settled. It leaves immediately and is gone before the node finishes
+   shrinking. The border belongs to this container, so it travels with the
+   document rather than appearing as a separate full-strength line. */
+.canvas-card__content[data-presence='entering'],
+.canvas-card__content[data-presence='leaving'] {
+  opacity: 0;
+}
+
+.canvas-card__content[data-presence='entering'] {
+  transition-delay: calc(var(--card-placement-duration, 200ms) * 0.6);
+}
+
+.canvas-card__content[data-presence='leaving'] {
+  pointer-events: none;
+  transition-delay: 0ms;
+}
+
 .canvas-card .card__title-editor,
 .canvas-card .card__title-input {
   width: 100%;
 }
 
 .canvas-card .card__title-input {
-  padding: 0 0 3px;
+  display: block;
+  padding: 0;
   border: 0;
   border-radius: 0;
   outline: 0;
@@ -222,6 +298,7 @@
   font-size: 18px;
   font-weight: 600;
   line-height: 1.12;
+  letter-spacing: -0.02em;
   text-align: left;
 }
 
@@ -235,9 +312,21 @@
 
 @media (prefers-reduced-motion: reduce) {
   .canvas-card,
-  .canvas-card__rail,
-  .canvas-card__kind,
-  .canvas-card__actions {
+  .canvas-card__actions,
+  .canvas-card__content,
+  .canvas-card .card__rail-action {
     transition: none;
+  }
+
+  .canvas-card__content {
+    transition-delay: 0ms;
+  }
+
+  /* The content cross-fade reads the placement token rather than a transition
+     of its own, so it is withdrawn through the token — the same one the
+     application sets on `.graph-area`. Declared here as well so a Card mounted
+     outside that container, which every story is, honours the preference. */
+  .canvas-card {
+    --card-placement-duration: 1ms;
   }
 }

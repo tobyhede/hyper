@@ -1,5 +1,5 @@
 import type { LayoutStrategyCard, LayoutStrategyGraph, LayoutStrategy } from './layout';
-import type { Placement } from './placement';
+import { Placement } from './placement';
 
 /**
  * The positioned strategy: the cards go where the author put them.
@@ -44,9 +44,18 @@ export function positionedStrategy(positions: Placement): LayoutStrategy {
   // Uniformly-async contract (ADR 0005); there is nothing to await.
   // eslint-disable-next-line @typescript-eslint/require-await
   return async (strategyGraph: LayoutStrategyGraph): Promise<LayoutStrategyGraph> => {
+    const drawn = Placement.drawn(positions);
     const placed = strategyGraph.cards.map((card) => {
-      const at = positions.get(card.id);
-      return at ? { ...card, x: at.x, y: at.y } : card;
+      const at = drawn.get(card.id);
+      return at
+        ? {
+            ...card,
+            x: at.x,
+            y: at.y,
+            width: at.open ? at.openSize.width : card.width,
+            height: at.open ? at.openSize.height : card.height,
+          }
+        : card;
     });
 
     const unplaced = placed.filter((card) => card.x === undefined || card.y === undefined);
