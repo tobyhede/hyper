@@ -1,4 +1,5 @@
-import { uuidSchema, type CardPlacement, type SpaceSnapshot } from '@project/core';
+import { uuidSchema } from '@project/core';
+import type { CardPlacement, SpaceSnapshot } from '@project/core';
 import { expect, type Page } from './fixtures';
 
 /**

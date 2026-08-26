@@ -1,7 +1,7 @@
 import {
   type CardDocument,
   type CardId,
-  DEFAULT_EXPANDED_CARD_SIZE,
+  DEFAULT_OPEN_SIZE,
   type Graph,
   type GraphEdge,
   type GraphId,
@@ -945,7 +945,7 @@ export function createSpaceAuthoring({
       completedPlacement = Placement.place(completedPlacement, completion.cardId, {
         ...at,
         open: true,
-        openSize: at.openSize ?? DEFAULT_EXPANDED_CARD_SIZE,
+        openSize: at.openSize ?? DEFAULT_OPEN_SIZE,
       });
     } else if (completion.kind === 'closed-card') {
       const at = completedPlacement.get(completion.cardId);
