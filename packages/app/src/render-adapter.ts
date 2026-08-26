@@ -9,6 +9,7 @@ import { create, type StoreApi, type UseBoundStore } from 'zustand';
 import type { CardId, GraphEdge, GraphId, LayoutPosition } from '@project/core';
 import { Placement } from '@project/graph';
 import type { CardFlowNode, RoutedEdgeData } from '@project/react-flow-adapter';
+import { snapCardSizeToClose } from './card';
 import type { SpaceAuthoring } from './space-authoring';
 
 /**
@@ -415,11 +416,15 @@ export function createRenderAdapter(authoring: SpaceAuthoring): RenderAdapter {
         if (draft?.cardId !== cardId) return;
         const at = draft.placement.get(cardId);
         if (at?.open !== true) return;
+        const proposedSize = snapCardSizeToClose(size);
         set({
           resizeDraft: {
             cardId,
-            size,
-            placement: Placement.place(draft.placement, cardId, { ...at, openSize: size }),
+            size: proposedSize,
+            placement: Placement.place(draft.placement, cardId, {
+              ...at,
+              openSize: proposedSize,
+            }),
           },
         });
       },

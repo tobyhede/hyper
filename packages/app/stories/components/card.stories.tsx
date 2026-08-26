@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { Story } from '@ladle/react';
 import { CanvasCard, type CanvasCardFront, type CanvasCardState } from '@project/ui';
-import { cardSizeVars } from '#src/card';
+import { cardSizeVars, snapCardSizeToClose } from '#src/card';
 import { CanvasCardSpecimen } from '../support/CanvasCardSpecimen';
 import { CatalogueSection, Specimen } from '../support/Catalogue';
 import { CanvasCardNodeSpecimen } from '../support/ReactFlowCanvas';
@@ -117,7 +117,7 @@ function ResizableOpenSpecimen({ selected = false }: { readonly selected?: boole
       expanded
       selected={selected}
       nodeSize={size}
-      onResize={setSize}
+      onResize={(proposal) => setSize(snapCardSizeToClose(proposal))}
       stageClassName="inv-card-node-stage--large"
     />
   );

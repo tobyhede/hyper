@@ -1101,6 +1101,83 @@ test.describe('resizing by touch', () => {
   });
 });
 
+test(
+  'resizing into the complete Close range previews Closed geometry, completes one Close Edit and preserves Open Size through reload',
+  { tag: '@parity:resize-preview-snaps-to-closed-rect' },
+  async ({ page }) => {
+    await page.goto('/');
+    await selectCanvas(page, 'Collection 1');
+    const card = nodeByTitle(page, 'A').first();
+    await expect(card).toBeVisible();
+    await openCard(card, 'A');
+    const persistence = page.getByTestId('persistence-status');
+    await expect(persistence).toHaveText('Persisted');
+    await card.evaluate(async (element) => {
+      await Promise.all(element.getAnimations().map((animation) => animation.finished));
+    });
+
+    const size = async (subject: Locator) =>
+      subject.evaluate((element) => ({
+        width: Number.parseFloat(getComputedStyle(element).width),
+        height: Number.parseFloat(getComputedStyle(element).height),
+      }));
+    const initialSize = await size(card);
+    const control = card.locator('.react-flow__resize-control.handle.bottom.right');
+    await card.hover();
+    const growBox = await boxOf(control, "Card A's resize control before growing");
+    await page.mouse.move(growBox.x + growBox.width / 2, growBox.y + growBox.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(
+      growBox.x + growBox.width / 2 + 100,
+      growBox.y + growBox.height / 2 + 60,
+      { steps: 6 },
+    );
+    await page.mouse.up();
+    await expect(persistence).toHaveText('Persisted');
+    await card.evaluate(async (element) => {
+      await Promise.all(element.getAnimations().map((animation) => animation.finished));
+    });
+    const rememberedSize = await size(card);
+    expect(rememberedSize.width).toBeGreaterThan(initialSize.width);
+    expect(rememberedSize.height).toBeGreaterThan(initialSize.height);
+
+    const beforeCloseRevision = await persistence.getAttribute('data-revision');
+    const zoom = Number(/scale\(([\d.]+)\)/.exec(await viewportTransform(page))?.[1] ?? 1);
+    const closeBox = await boxOf(control, "Card A's resize control before Closing");
+    await page.mouse.move(closeBox.x + closeBox.width / 2, closeBox.y + closeBox.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(
+      closeBox.x + closeBox.width / 2 + (280 - rememberedSize.width) * zoom,
+      closeBox.y + closeBox.height / 2 + (166 - rememberedSize.height) * zoom,
+      { steps: 8 },
+    );
+
+    await expect.poll(async () => size(card)).toEqual({ width: 260, height: 146 });
+    await expect(card.locator('.rf-card-node__inner')).toHaveAttribute('data-expanded', 'true');
+    await expect(persistence).toHaveAttribute('data-revision', beforeCloseRevision ?? '');
+
+    await page.mouse.up();
+
+    await expect(card.locator('.rf-card-node__inner')).toHaveAttribute('data-expanded', 'false');
+    await expect(card.locator('.react-flow__resize-control')).toHaveCount(0);
+    await expect(persistence).toHaveText('Persisted');
+    await expect(persistence).toHaveAttribute(
+      'data-revision',
+      String(Number(beforeCloseRevision) + 1),
+    );
+
+    await page.reload();
+    await selectCanvas(page, 'Collection 1');
+    const persisted = nodeByTitle(page, 'A').first();
+    await expect(persisted.getByRole('button', { name: 'Open Card A' })).toBeVisible();
+    await openCard(persisted, 'A');
+    await persisted.evaluate(async (element) => {
+      await Promise.all(element.getAnimations().map((animation) => animation.finished));
+    });
+    expect(await size(persisted)).toEqual(rememberedSize);
+  },
+);
+
 test('opening animates the Card wrapper and displaced neighbours from one duration token', async ({
   page,
 }) => {

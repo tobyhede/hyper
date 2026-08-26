@@ -73,11 +73,13 @@ function RealReactFlow({
   edges,
   className,
   controls = false,
+  zoom,
 }: {
   readonly nodes: readonly CardFlowNode[];
   readonly edges: readonly Edge[];
   readonly className: string;
   readonly controls?: boolean;
+  readonly zoom?: number | undefined;
 }) {
   return (
     <div className={className} style={cardSizeVars}>
@@ -86,8 +88,9 @@ function RealReactFlow({
         edges={[...edges]}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
-        fitView
+        fitView={zoom === undefined}
         fitViewOptions={OVERVIEW_FIT}
+        defaultViewport={{ x: 0, y: 0, zoom: zoom ?? 1 }}
         minZoom={0.2}
         maxZoom={MAX_ZOOM}
         nodesConnectable
@@ -113,6 +116,7 @@ export interface CanvasCardNodeSpecimenProps {
   readonly onOpenChange?: (open: boolean) => 'completed' | 'retained';
   readonly onResize?: (size: { readonly width: number; readonly height: number }) => void;
   readonly stageClassName?: string;
+  readonly zoom?: number | undefined;
   readonly title?: string;
   readonly body?: string;
 }
@@ -132,6 +136,7 @@ export function CanvasCardNodeSpecimen({
   onOpenChange,
   onResize,
   stageClassName = '',
+  zoom,
   title,
   body,
 }: CanvasCardNodeSpecimenProps) {
@@ -173,9 +178,21 @@ export function CanvasCardNodeSpecimen({
     }
   }
 
-  const node: CardFlowNode = { ...source, ...nodeSize, selected, data };
+  const nodePosition = zoom === undefined ? source.position : { x: 40, y: 40 };
+  const node: CardFlowNode = {
+    ...source,
+    position: nodePosition,
+    ...nodeSize,
+    selected,
+    data,
+  };
 
   return (
-    <RealReactFlow className={`inv-card-node-stage ${stageClassName}`} nodes={[node]} edges={[]} />
+    <RealReactFlow
+      className={`inv-card-node-stage ${stageClassName}`}
+      nodes={[node]}
+      edges={[]}
+      zoom={zoom}
+    />
   );
 }

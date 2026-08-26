@@ -30,6 +30,13 @@ export const parityClaims: readonly ParityClaim[] = [
       'Every Open Card exposes one bottom-right resize control revealed by hover, selection or focus, and a Closed Card exposes none.',
   },
   {
+    id: 'resize-preview-snaps-to-closed-rect',
+    storyFile: 'components/card.stories.tsx',
+    storyExport: 'ResizeControl',
+    claim:
+      'A resize proposal entering the complete Close range previews the exact Closed rect while the active gesture still owns an Open Card.',
+  },
+  {
     id: 'markdown-card-opens-and-closes-in-place',
     storyFile: 'components/card.stories.tsx',
     storyExport: 'OpenAndClose',

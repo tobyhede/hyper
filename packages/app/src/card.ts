@@ -37,6 +37,19 @@ export const CARD_HEIGHT = COLLAPSED_CARD_SIZE.height;
 /** The size a layout arranges cards at. */
 export const CARD_SIZE = { width: CARD_WIDTH, height: CARD_HEIGHT } as const;
 
+/** Application-owned magnetic range for resizing an Open Card to Close. */
+export const CARD_CLOSE_SNAP_DISTANCE = 24;
+
+/** Snap a complete near-Closed proposal to the one exact Closed rect. */
+export const snapCardSizeToClose = (size: {
+  readonly width: number;
+  readonly height: number;
+}): { readonly width: number; readonly height: number } =>
+  Math.abs(size.width - CARD_WIDTH) <= CARD_CLOSE_SNAP_DISTANCE &&
+  Math.abs(size.height - CARD_HEIGHT) <= CARD_CLOSE_SNAP_DISTANCE
+    ? CARD_SIZE
+    : size;
+
 /**
  * Handed to the graph container so the stylesheet draws cards at exactly the size
  * the layout placed them at. If these drift, ports land where the card isn't.

@@ -272,6 +272,53 @@ test(
   },
 );
 
+test(
+  'a resize proposal inside the complete Close range previews the exact Closed rect while the gesture remains active',
+  { tag: '@parity:resize-preview-snaps-to-closed-rect' },
+  async ({ page }) => {
+    await page.goto(resizeControlStory);
+    const openRegion = page.getByRole('region', { name: 'Open Card', exact: true });
+    const node = openRegion.locator('.react-flow__node');
+    const control = openRegion.locator('.react-flow__resize-control');
+    await expect(openRegion.getByRole('article', { name: 'Strategies' })).toBeVisible({
+      timeout: 20_000,
+    });
+    await openRegion.getByRole('article', { name: 'Strategies' }).hover();
+
+    const before = await node.evaluate((element) => ({
+      width: Number.parseFloat(getComputedStyle(element).width),
+      height: Number.parseFloat(getComputedStyle(element).height),
+    }));
+    const zoom = await node.evaluate((element) => {
+      const viewport = element
+        .closest('.react-flow')
+        ?.querySelector<HTMLElement>('.react-flow__viewport');
+      return Number(/scale\(([\d.]+)\)/.exec(viewport?.style.transform ?? '')?.[1] ?? 1);
+    });
+    const box = await control.boundingBox();
+    if (box === null) throw new Error('The Open resize control has no box.');
+
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(
+      box.x + box.width / 2 + (280 - before.width) * zoom,
+      box.y + box.height / 2 + (166 - before.height) * zoom,
+      { steps: 6 },
+    );
+
+    await expect
+      .poll(async () =>
+        node.evaluate((element) => ({
+          width: Number.parseFloat(getComputedStyle(element).width),
+          height: Number.parseFloat(getComputedStyle(element).height),
+        })),
+      )
+      .toEqual({ width: 260, height: 146 });
+    await expect(node.locator('.rf-card-node__inner')).toHaveAttribute('data-expanded', 'true');
+    await page.mouse.up();
+  },
+);
+
 test('the open Card rail offers its edit action before Close', async ({ page }) => {
   await open(page, markdownStory);
   const card = page.getByRole('article', { name: 'Strategies' });
