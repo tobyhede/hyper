@@ -847,6 +847,260 @@ test(
   },
 );
 
+/**
+ * Resizing is pointer *and* touch (ADR 0066), and touch is the half that only a
+ * real browser can answer.
+ *
+ * `NodeResizeControl` lists its resize callbacks among an effect's dependencies
+ * and that effect's cleanup is `selection.on('.drag', null)`, which strips every
+ * `.drag` listener the control element carries. d3-drag leaves a touch gesture's
+ * `touchmove`/`touchend` on that element for the whole gesture and relocates
+ * only the mouse's pair to the window at `mousedown` — so a callback rebuilt
+ * mid-drag takes a touch resize down with it while a mouse resize survives by
+ * accident. This node re-renders mid-drag by construction: the render adapter
+ * republishes the projection on every preview frame.
+ *
+ * `SpaceCanvas.test.tsx` asserts the same thing in jsdom, where `TouchEvent` is
+ * a synthetic object with none of the browser's `touch-action` or passivity
+ * semantics and no compatibility `pointer*` events at all — which is precisely
+ * why the release cannot be proven there. Here it is Chromium's own input
+ * pipeline, so both halves are real.
+ */
+test.describe('resizing by touch', () => {
+  test.use({ hasTouch: true });
+
+  /** A touch gesture already under way: one finger, moved and then ended. */
+  interface TouchGesture {
+    moveTo(x: number, y: number): Promise<void>;
+    release(): Promise<void>;
+    /** End the gesture the way the platform takes it away, rather than the way a hand does. */
+    cancel(): Promise<void>;
+  }
+
+  /**
+   * Press one finger, through CDP.
+   *
+   * `page.touchscreen` offers `tap()` and nothing else, and a `TouchEvent`
+   * constructed inside `page.evaluate` arrives untrusted: Chromium derives no
+   * `pointerdown`/`pointerup` from it, so the release — the thing `CardNode`'s
+   * window listener answers with `finishResize` — would never happen. CDP's
+   * `Input.dispatchTouchEvent` is what `touchscreen.tap()` uses underneath and
+   * produces the real thing, compatibility pointer events included.
+   *
+   * `id` is what d3-drag tracks the gesture by. `touchEnd` carries no points:
+   * the array is the fingers still down, so an empty one releases the gesture
+   * and leaves Chromium to fill `changedTouches` with what it lifted.
+   */
+  async function beginTouchGesture(page: Page, x: number, y: number): Promise<TouchGesture> {
+    const session = await page.context().newCDPSession(page);
+    const point = { id: 0, radiusX: 8, radiusY: 8, force: 1 };
+    await session.send('Input.dispatchTouchEvent', {
+      type: 'touchStart',
+      touchPoints: [{ ...point, x, y }],
+    });
+    return {
+      async moveTo(nextX, nextY) {
+        await session.send('Input.dispatchTouchEvent', {
+          type: 'touchMove',
+          touchPoints: [{ ...point, x: nextX, y: nextY }],
+        });
+      },
+      async release() {
+        await session.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+        await session.detach();
+      },
+      async cancel() {
+        await session.send('Input.dispatchTouchEvent', { type: 'touchCancel', touchPoints: [] });
+        await session.detach();
+      },
+    };
+  }
+
+  // No `@parity` tag: the reporter wants exactly one test per claim, and the
+  // mouse tests above already carry the two this Card's resize control owns.
+  test('a touch drag resizes an Open Card to the rect it dragged and commits one Edit on release', async ({
+    page,
+  }) => {
+    await page.goto('/');
+    await selectCanvas(page, 'Collection 1');
+    const card = nodeByTitle(page, 'A').first();
+    await expect(card).toBeVisible();
+    await openCard(card, 'A');
+    const persistence = page.getByTestId('persistence-status');
+    await expect(persistence).toHaveText('Persisted');
+    const openedRevision = await persistence.getAttribute('data-revision');
+    const beforePosition = await positionOf(card);
+    // Opening grows the Card through a CSS transition, so its rect is still
+    // moving for a moment after the Edit persists — settling it first is what
+    // makes the growth below evidence of the drag.
+    await card.evaluate(async (element) => {
+      await Promise.all(element.getAnimations().map((animation) => animation.finished));
+    });
+    const width = async () =>
+      card.evaluate((element) => Number.parseFloat(getComputedStyle(element).width));
+    const size = async () =>
+      card.evaluate((element) => ({
+        width: Number.parseFloat(getComputedStyle(element).width),
+        height: Number.parseFloat(getComputedStyle(element).height),
+      }));
+    const beforeSize = await size();
+
+    await card.hover();
+    const control = card.locator('.react-flow__resize-control.handle.bottom.right');
+    const box = await boxOf(control, "Card A's resize control");
+    const from = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+
+    // The drag is expressed in screen pixels and the Card's rect is in flow
+    // units, so the expected rect is the one the pointer described, divided
+    // through the camera. Asserting the whole delta — not merely "bigger" —
+    // is what makes every frame after the first load-bearing.
+    const dragX = 140;
+    const dragY = 90;
+    const zoom = Number(/scale\(([\d.]+)\)/.exec(await viewportTransform(page))?.[1] ?? 1);
+    const expected = {
+      width: beforeSize.width + dragX / zoom,
+      height: beforeSize.height + dragY / zoom,
+    };
+
+    const gesture = await beginTouchGesture(page, from.x, from.y);
+    // The first frame is already the regression: against inline callbacks this
+    // poll never moves off the Card's opened width, because the re-render the
+    // gesture's own start schedules — `setResizeActive(true)`, before any
+    // preview — lands before the browser delivers the next touch. The later
+    // frames are not redundant, though: the rect asserted after release is
+    // absolute rather than accumulated, so a gesture that dies part-way through
+    // would still finish at whatever frame it last saw.
+    await gesture.moveTo(from.x + dragX / 2, from.y + dragY / 2);
+    await expect.poll(width).toBeGreaterThan(beforeSize.width);
+    await gesture.moveTo(from.x + dragX * 0.8, from.y + dragY * 0.8);
+    await gesture.moveTo(from.x + dragX, from.y + dragY);
+    // Pointer movement owns only the canvas draft; persistence sees nothing
+    // until the gesture releases.
+    await expect(persistence).toHaveAttribute('data-revision', openedRevision ?? '');
+
+    await gesture.release();
+
+    // Chromium raises `pointerup` from the touch release, which is the signal
+    // `CardNode` turns into the one completing Edit.
+    await expect(persistence).toHaveText('Persisted');
+    await expect(persistence).toHaveAttribute('data-revision', String(Number(openedRevision) + 1));
+
+    await card.evaluate(async (element) => {
+      await Promise.all(element.getAnimations().map((animation) => animation.finished));
+    });
+    const resized = await size();
+    expect(resized.width).toBeCloseTo(expected.width, 0);
+    expect(resized.height).toBeCloseTo(expected.height, 0);
+    // The authored top-left origin is unchanged: only the box grew.
+    expect(await positionOf(card)).toEqual(beforePosition);
+    // Exactly one Edit, not one-so-far: the revision assertion above succeeds on
+    // its first poll, so only elapsed time can rule out a second arriving behind
+    // it — and touch is the path where a stray `pointerup`/`touchend` pair could
+    // plausibly complete the same gesture twice.
+    await quiescent(page);
+    await expect(persistence).toHaveAttribute('data-revision', String(Number(openedRevision) + 1));
+
+    await page.reload();
+    await selectCanvas(page, 'Collection 1');
+    const persisted = nodeByTitle(page, 'A').first();
+    await expect(persisted.getByRole('button', { name: 'Close Card A' })).toBeVisible();
+    await persisted.evaluate(async (element) => {
+      await Promise.all(element.getAnimations().map((animation) => animation.finished));
+    });
+    expect(
+      await persisted.evaluate((element) => ({
+        width: Number.parseFloat(getComputedStyle(element).width),
+        height: Number.parseFloat(getComputedStyle(element).height),
+      })),
+    ).toEqual(resized);
+    expect(await positionOf(persisted)).toEqual(beforePosition);
+  });
+
+  /**
+   * Cancellation, on the one signal touch actually delivers.
+   *
+   * d3-drag sets `touch-action: none` on the control, which takes away the
+   * browser's usual reason to seize a touch gesture — but the platform can
+   * still take one (a call arriving, a system gesture, the page backgrounded),
+   * and a probe written before this test confirmed CDP `touchCancel` raises a
+   * real `pointercancel` on `window` in this Chromium. What that probe also
+   * showed is that `pointercancel` is the *whole* of what reaches `window`
+   * here: `touchstart`, `touchmove`, `touchend` and `touchcancel` never arrive,
+   * because d3-drag calls `stopImmediatePropagation` on each and leaves the
+   * compatibility `pointer*` pair alone. The observed sequence for a cancelled
+   * gesture is `pointerdown, pointermove, pointercancel` and nothing after it.
+   *
+   * Nothing underneath answers that signal either. `shouldResize` always
+   * returns false, so `XYResizer` never sets `resizeDetected` and its `end`
+   * handler returns early every time — React Flow never calls `onResizeEnd`,
+   * and d3-drag contributes nothing to ending or cancelling. `CardNode`'s three
+   * `window` listeners are the entire lifecycle. Miss the cancellation and
+   * `resizing.current` stays true with the draft still live, so the *next*
+   * `pointerup` anywhere on the page finishes a gesture the author abandoned
+   * and authors a rect they never released. The last assertion here is that
+   * one, and nothing else in the stack would catch it.
+   */
+  test('a cancelled touch resize discards the draft and leaves no gesture armed for the next pointerup', async ({
+    page,
+  }) => {
+    await page.goto('/');
+    await selectCanvas(page, 'Collection 1');
+    const card = nodeByTitle(page, 'A').first();
+    await expect(card).toBeVisible();
+    await openCard(card, 'A');
+    const persistence = page.getByTestId('persistence-status');
+    await expect(persistence).toHaveText('Persisted');
+    const openedRevision = await persistence.getAttribute('data-revision');
+    const beforePosition = await positionOf(card);
+    // Opening grows the Card through a CSS transition, so its rect is still
+    // moving for a moment after the Edit persists — settling it first is what
+    // makes this the authored rect the cancellation has to restore.
+    await card.evaluate(async (element) => {
+      await Promise.all(element.getAnimations().map((animation) => animation.finished));
+    });
+    const size = async () =>
+      card.evaluate((element) => ({
+        width: Number.parseFloat(getComputedStyle(element).width),
+        height: Number.parseFloat(getComputedStyle(element).height),
+      }));
+    const authored = await size();
+
+    await card.hover();
+    const control = card.locator('.react-flow__resize-control.handle.bottom.right');
+    const box = await boxOf(control, "Card A's resize control");
+    const from = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+
+    const gesture = await beginTouchGesture(page, from.x, from.y);
+    await gesture.moveTo(from.x + 70, from.y + 45);
+    await gesture.moveTo(from.x + 140, from.y + 90);
+    // The draft has to be live before it can be discarded: a cancellation of a
+    // gesture that never grew the Card would restore the authored rect by
+    // having never left it, and prove nothing.
+    await expect.poll(async () => (await size()).width).toBeGreaterThan(authored.width);
+    await expect(persistence).toHaveAttribute('data-revision', openedRevision ?? '');
+
+    await gesture.cancel();
+
+    // The draft is discarded: the Card is the rect it was authored at, not the
+    // rect the finger dragged to, and its origin never moved either.
+    await expect.poll(size).toEqual(authored);
+    expect(await positionOf(card)).toEqual(beforePosition);
+    await quiescent(page);
+    await expect(persistence).toHaveAttribute('data-revision', openedRevision ?? '');
+
+    // And the gesture is disarmed. A later, unrelated press anywhere on the
+    // page raises the `pointerup` that `finish()` answers, so a cancellation
+    // that only *looked* like one — draft discarded but `resizing.current` left
+    // true — commits the abandoned rect here, one click after the author
+    // stopped thinking about it.
+    const elsewhere = await emptyCanvasPoint(page);
+    await page.mouse.click(elsewhere.x, elsewhere.y);
+    await quiescent(page);
+    await expect(persistence).toHaveAttribute('data-revision', openedRevision ?? '');
+    expect(await size()).toEqual(authored);
+  });
+});
+
 test('opening animates the Card wrapper and displaced neighbours from one duration token', async ({
   page,
 }) => {

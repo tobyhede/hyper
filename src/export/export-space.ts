@@ -16,13 +16,29 @@ import type { SpaceRepository } from '../persistence/space-repository';
 const compareOrdinal = (left: string, right: string): number =>
   left < right ? -1 : left > right ? 1 : 0;
 
+/**
+ * One placement, rebuilt key by key — the remembered Open Size included, on both
+ * arms of the union, because a rect carried through would export whatever order
+ * `jsonb` handed it back in. `Placement.point` establishes width-then-height as
+ * the canonical order and this is the same order written to disk.
+ */
 const canonicalPlacement = (point: CardPlacement): CardPlacement => {
   if (point.open) {
-    return { x: point.x, y: point.y, open: true, openSize: point.openSize };
+    return {
+      x: point.x,
+      y: point.y,
+      open: true,
+      openSize: { width: point.openSize.width, height: point.openSize.height },
+    };
   }
   return point.openSize === undefined
     ? { x: point.x, y: point.y, open: false }
-    : { x: point.x, y: point.y, open: false, openSize: point.openSize };
+    : {
+        x: point.x,
+        y: point.y,
+        open: false,
+        openSize: { width: point.openSize.width, height: point.openSize.height },
+      };
 };
 
 /**

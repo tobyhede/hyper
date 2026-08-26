@@ -223,6 +223,81 @@ describe('canonical export', () => {
   });
 
   /**
+   * Both arms of the placement union carrying a remembered Open Size (ADR 0066)
+   * — an Open Card, and a Closed one that kept its rect for the next Open — each
+   * stored *height first*, which is an order `jsonb` is free to hand back.
+   */
+  const storedSpaceWithOpenSizes: LoadedSpace = {
+    snapshot: {
+      id: SPACE_ID,
+      document: {
+        version: 1,
+        title: 'Stored talk',
+        layouts: [
+          {
+            id: SPINE_LAYOUT_ID,
+            title: 'Spine',
+            kind: 'positioned',
+            positions: {
+              [CARD_A]: { x: 0, y: 0, open: true, openSize: { height: 420, width: 560 } },
+              [CARD_B]: { x: 260, y: 0, open: false, openSize: { height: 300, width: 400 } },
+            },
+            graphs: [{ id: LONG_GRAPH_ID, title: 'Long', edges: [{ from: CARD_A, to: CARD_B }] }],
+          },
+        ],
+      },
+      cards: [
+        { id: CARD_A, document: { title: 'A', kind: 'markdown', body: 'A body.\n' } },
+        { id: CARD_B, document: { title: 'B', kind: 'markdown', body: 'B body.\n' } },
+      ],
+    },
+    revision: 7n,
+    exportedRevision: null,
+  };
+
+  /**
+   * The keys of every exported `openSize`, in the order the bytes hold them.
+   * Read off the text rather than a parsed value: re-parsing through the schema
+   * would impose the schema's own key order and hide the thing under test.
+   */
+  const exportedOpenSizeKeys = (json: string): string[][] =>
+    [...json.matchAll(/"openSize": \{([^}]*)\}/g)].map((openSize) =>
+      [...(openSize[1] ?? '').matchAll(/"(\w+)":/g)].map((key) => key[1] ?? ''),
+    );
+
+  it('writes every Open Size width before height, however it was stored', async () => {
+    const destination = join(await makeTemporaryDirectory(), 'exported');
+    const repository = new MemorySpaceRepository([storedSpaceWithOpenSizes]);
+
+    await exportSpace(repository, SPACE_ID, destination);
+
+    const written = await readFile(join(destination, 'space.json'), 'utf8');
+    // Positions export sorted by Card id, so the Open Card's rect is first and
+    // the Closed Card's remembered rect second.
+    expect(exportedOpenSizeKeys(written)).toEqual([
+      ['width', 'height'],
+      ['width', 'height'],
+    ]);
+    expect(JSON.parse(written)).toEqual({
+      version: 1,
+      id: SPACE_ID,
+      title: 'Stored talk',
+      layouts: [
+        {
+          id: SPINE_LAYOUT_ID,
+          title: 'Spine',
+          kind: 'positioned',
+          positions: {
+            [CARD_A]: { x: 0, y: 0, open: true, openSize: { width: 560, height: 420 } },
+            [CARD_B]: { x: 260, y: 0, open: false, openSize: { width: 400, height: 300 } },
+          },
+          graphs: [{ id: LONG_GRAPH_ID, title: 'Long', edges: [{ from: CARD_A, to: CARD_B }] }],
+        },
+      ],
+    });
+  });
+
+  /**
    * Separate from the ordering above: this is the staged, validated replacement
    * running over a destination it has already written, which is the path an
    * author actually repeats.

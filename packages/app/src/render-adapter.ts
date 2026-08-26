@@ -158,7 +158,22 @@ function withSelection(nodes: readonly CardFlowNode[], selection: CanvasSelectio
   );
 }
 
-export interface RenderAdapterState extends CardResize {
+export interface RenderAdapterState {
+  /**
+   * The four resize operations as one value, minted with the store and never
+   * written again.
+   *
+   * A field rather than four operations on the state, because the canvas holds
+   * this across a live gesture: it is a dependency of the memo that builds every
+   * node's data, and React Flow's resize control tears down and re-registers its
+   * drag handler whenever the callbacks built from it change identity. Zustand
+   * merges every partial into a fresh state object, so a state that *was* a
+   * `CardResize` handed the canvas a new capability after every selection,
+   * projection and drag frame — writes resize knows nothing about. Naming the
+   * capability separately is also what stops the whole state being passed as
+   * one.
+   */
+  readonly cardResize: CardResize;
   /**
    * The published projection, or `null` before the first layout resolves. Until
    * then there is nothing worth owning — every projected card sits at the origin
@@ -379,6 +394,48 @@ export function createRenderAdapter(authoring: SpaceAuthoring): RenderAdapter {
     selection: NO_SELECTION,
     resizeDraft: null,
 
+    // Written once, here, and by nothing after: every `set` below merges a
+    // partial, so this reference is what the canvas keeps holding.
+    cardResize: {
+      beginResize: (cardId) => {
+        const authored = authoring.authoredPlacement();
+        const at = authored?.get(cardId);
+        if (authored === null || at?.open !== true) return;
+        set({
+          resizeDraft: {
+            cardId,
+            size: at.openSize,
+            placement: authored,
+          },
+        });
+      },
+
+      previewResize: (cardId, size) => {
+        const draft = get().resizeDraft;
+        if (draft?.cardId !== cardId) return;
+        const at = draft.placement.get(cardId);
+        if (at?.open !== true) return;
+        set({
+          resizeDraft: {
+            cardId,
+            size,
+            placement: Placement.place(draft.placement, cardId, { ...at, openSize: size }),
+          },
+        });
+      },
+
+      finishResize: (cardId) => {
+        const draft = get().resizeDraft;
+        if (draft?.cardId !== cardId) return;
+        authoring.complete({ kind: 'resized-card', cardId, size: draft.size });
+        set({ resizeDraft: null });
+      },
+
+      cancelResize: (cardId) => {
+        if (get().resizeDraft?.cardId === cardId) set({ resizeDraft: null });
+      },
+    },
+
     // Compute, publish, then tell Authoring where the cards ended up — the same
     // order as `changeNodes` and `connectCards` below. Installing from inside
     // the `set` updater put the cross-store write before the state it describes
@@ -432,44 +489,6 @@ export function createRenderAdapter(authoring: SpaceAuthoring): RenderAdapter {
 
     clearSelection: () => set((state) => selecting(state, NO_SELECTION)),
 
-    beginResize: (cardId) => {
-      const authored = authoring.authoredPlacement();
-      const at = authored?.get(cardId);
-      if (authored === null || at?.open !== true) return;
-      set({
-        resizeDraft: {
-          cardId,
-          size: at.openSize,
-          placement: authored,
-        },
-      });
-    },
-
-    previewResize: (cardId, size) => {
-      const draft = get().resizeDraft;
-      if (draft?.cardId !== cardId) return;
-      const at = draft.placement.get(cardId);
-      if (at?.open !== true) return;
-      set({
-        resizeDraft: {
-          cardId,
-          size,
-          placement: Placement.place(draft.placement, cardId, { ...at, openSize: size }),
-        },
-      });
-    },
-
-    finishResize: (cardId) => {
-      const draft = get().resizeDraft;
-      if (draft?.cardId !== cardId) return;
-      authoring.complete({ kind: 'resized-card', cardId, size: draft.size });
-      set({ resizeDraft: null });
-    },
-
-    cancelResize: (cardId) => {
-      if (get().resizeDraft?.cardId === cardId) set({ resizeDraft: null });
-    },
-
     renderedPlacement: () => {
       const projection = get().projection;
       return projection === null ? null : placementFromNodes(projection.nodes);
@@ -506,20 +525,15 @@ export function createRenderAdapter(authoring: SpaceAuthoring): RenderAdapter {
       // Returning no update when nothing real changed keeps the array
       // reference stable and is what breaks that loop.
       const owned = new Set(projection.nodes.map((node) => node.id));
-      // NodeResizeControl calls `onResize` before emitting its local dimensions
-      // change. The callback has therefore installed the complete Placement
-      // draft by the time this runs. Reject the node-only mutation: the next
-      // projected draft publishes the resized Card, displaced neighbours,
-      // handles and Edges together, so no split frame can be constructed.
-      const relevant = changes.filter(
-        (change) =>
-          (!('id' in change) || owned.has(change.id)) &&
-          !(
-            change.type === 'dimensions' &&
-            change.resizing === true &&
-            change.id === state.resizeDraft?.cardId
-          ),
-      );
+      // No resize clause here, deliberately. `NodeResizeControl` emits its
+      // node-only `dimensions` change from the same callback `shouldResize`
+      // gates, and the Card answers `false` to every frame while still handing
+      // the proposed rect on (`CardNode`), so that change is never produced and
+      // this store never has a split frame to refuse. The draft is what makes
+      // the resized Card, its displaced neighbours, handles and Edges one
+      // publication; `SpaceCanvas.test.tsx` drives the real control and holds
+      // the whole gesture to proposing nothing here.
+      const relevant = changes.filter((change) => !('id' in change) || owned.has(change.id));
       if (relevant.length === 0) return;
 
       const beforeById = new Map(projection.nodes.map((node) => [node.id, node.position]));

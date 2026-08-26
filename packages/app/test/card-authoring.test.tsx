@@ -375,6 +375,39 @@ describe('authoring an opened Card', () => {
   });
 
   /**
+   * Add Card finishes by putting a caret in the created Card's title editor, and
+   * title editing is withdrawn while a content edit owns the keyboard (ADR
+   * 0064). The canvas already withholds the `C` shortcut for that reason; the
+   * toolbar reaches the same operation and had to agree, or one of the two paths
+   * created a Card the author was never given the editor to name.
+   */
+  it('cannot add a Card over a live content edit', async () => {
+    const session = mount();
+    await openEditor();
+
+    const addCard = screen.getByRole('button', { name: 'Add Card' });
+    expect(addCard).toBeDisabled();
+    fireEvent.click(addCard);
+
+    expect(session.getState().working.cards).toHaveLength(2);
+    await settled(session);
+  });
+
+  it('adds a Card again once the author has settled the edit', async () => {
+    const session = mount();
+    await openEditor();
+    fireEvent.keyDown(screen.getByRole('textbox', { name: 'Markdown source of A' }), {
+      key: 'Escape',
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add Card' }));
+
+    expect(session.getState().working.cards).toHaveLength(3);
+    expect(await screen.findByRole('textbox', { name: 'Card title' })).toHaveValue('Card 1');
+    await settled(session);
+  });
+
+  /**
    * The pane keeps its draft in `useState`, seeded once from the Card it was
    * mounted on. Opening a second Card without closing the first therefore had
    * the same React element in the same position — so the state survived while

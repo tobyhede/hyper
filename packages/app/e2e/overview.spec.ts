@@ -313,17 +313,61 @@ test('a card shows its title in the graph, and opens to show rendered Markdown',
   await expect(a.getByRole('button', { name: 'Open Card A' })).toBeVisible();
 });
 
+/** The two attributes of a Card's content as one commit left them. */
+interface PresenceCommit {
+  readonly presence: string | null;
+  readonly inert: string | null;
+}
+
 test('the Close action closes an opened card', async ({ page }) => {
   await page.goto('/');
   await selectCanvas(page, 'Collection 1');
   const card = nodeByTitle(page, 'A').first();
   await openCard(card, 'A');
   await expect(card.locator('.canvas-card__content')).toHaveAttribute('data-presence', 'present');
+
+  // Installed ahead of the Close click, because leaving is over before anything
+  // out here can ask about it. `usePresence` keeps the leaving content mounted
+  // for the duration the element itself declares — `--card-placement-duration
+  // * 0.4`, 80ms — and then unmounts it, so an `expect.poll` from the test
+  // process is spending a CDP round trip on a window that is already closing;
+  // on a loaded runner the first sample lands after the unmount and sees an
+  // empty list. Shortening the intervals only narrows the odds, and widening
+  // the timeout or accepting `[]` would pin nothing. Recording inside the page
+  // has no round trip to lose: the observer runs on the commit itself, and the
+  // record is read back afterwards at leisure.
+  //
+  // Both attributes are read together in the one callback, which is what makes
+  // this one observation of one commit — `CanvasCard`'s `inert` layout effect
+  // runs in the commit that writes `data-presence`, and a MutationObserver is
+  // delivered after that whole commit rather than between its two writes. The
+  // observer then stops, so `inert` arriving a commit later would be recorded
+  // here as the `null` it was when `leaving` appeared, and fail. An empty
+  // record is a failure too, and a different one: the content never entered
+  // `leaving` at all.
+  const leaving = await card.evaluateHandle((node) => {
+    const commits: PresenceCommit[] = [];
+    new MutationObserver((_mutations, observer) => {
+      const content = node.querySelector('.canvas-card__content');
+      if (content === null) return;
+      const presence = content.getAttribute('data-presence');
+      if (presence !== 'leaving') return;
+      commits.push({ presence, inert: content.getAttribute('inert') });
+      observer.disconnect();
+    }).observe(node, {
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['data-presence', 'inert'],
+    });
+    return commits;
+  });
+
   await card.getByRole('button', { name: 'Close Card A' }).click();
-  const leavingContent = card.locator('.canvas-card__content');
-  await expect(leavingContent).toHaveAttribute('data-presence', 'leaving');
-  await expect(leavingContent).toHaveAttribute('inert', '');
-  await expect(leavingContent).toHaveCount(0);
+  // The unmount is a fact worth asserting on its own and also the proof that
+  // the leaving window has closed, so what the observer caught is read once
+  // after it rather than polled for.
+  await expect(card.locator('.canvas-card__content')).toHaveCount(0);
+  expect(await leaving.jsonValue()).toEqual([{ presence: 'leaving', inert: '' }]);
   await expect(card.getByRole('button', { name: 'Open Card A' })).toBeVisible();
 });
 

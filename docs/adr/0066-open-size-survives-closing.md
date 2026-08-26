@@ -25,11 +25,15 @@ does not create a second resize model.
 
 A resize drag is an Interaction draft and produces one Edit when it ends. It
 either changes the Open Size or, when both dimensions reach the fixed Closed
-rect, performs Close without first replacing the remembered Open Size. This
-semantic snap is not a general spatial grid; grid snapping remains undecided.
-The interaction's magnetic range is not persisted: a completed Close always
-writes the exact Closed Size. Its distance is application-owned interaction
-tuning, reviewed at multiple zoom levels rather than fixed by the domain.
+rect, performs Close without first replacing the remembered Open Size. A Close
+completed this way records the Closed state and nothing else: it writes no
+Closed Size, because the rect the canvas then draws is the fixed Closed Size the
+effective-size operation already returns for any Closed entry. This semantic
+snap is not a general spatial grid; grid snapping remains undecided. The
+interaction's magnetic range is not persisted either — no distance the author
+dragged reaches the Layout, only the state the drag settled on. That distance is
+application-owned interaction tuning, reviewed at multiple zoom levels rather
+than fixed by the domain.
 
 Authoring, not React Flow event wiring, decides whether the proposed rect
 completes Resize or Close. An Open Card may share either the Closed width or the

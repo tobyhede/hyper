@@ -404,7 +404,7 @@ const idsArb = fc
   .uniqueArray(fc.uuid(), { minLength: 1, maxLength: 8 })
   .map((ids): CardId[] => ids.map(uuid));
 const coordArb = fc.integer({ min: -1000, max: 1000 });
-const expandedSizeArb = fc.record({
+const openSizeArb = fc.record({
   width: fc.integer({ min: 261, max: 900 }),
   height: fc.integer({ min: 147, max: 700 }),
 });
@@ -415,23 +415,29 @@ describe('Placement properties', () => {
       fc.property(
         idsArb,
         fc.array(coordArb, { minLength: 16, maxLength: 16 }),
-        fc.array(fc.option(expandedSizeArb, { nil: undefined }), {
+        fc.array(fc.option(openSizeArb, { nil: undefined }), {
           minLength: 8,
           maxLength: 8,
         }),
-        (ids, coords, expansions) => {
+        (ids, coords, openSizes) => {
           const authored = Placement.fromEntries(
             ids.map((id, index) => {
               const at = {
                 x: coords[index * 2] ?? 0,
                 y: coords[index * 2 + 1] ?? 0,
               };
-              const expanded = expansions[index];
-              return [id, expanded === undefined ? at : { ...at, expanded }] as const;
+              // A generated Open Size makes the Card Open — the only entry that
+              // displaces its neighbours, so it is the only one that gives the
+              // inverse below anything to undo.
+              const openSize = openSizes[index];
+              return [
+                id,
+                openSize === undefined ? { ...at, open: false } : { ...at, open: true, openSize },
+              ] as const;
             }),
           );
           // Production reports React Flow node positions only. Keeping the
-          // authored `expanded` rect on this report would make the inverse test
+          // authored Open Size on this report would make the inverse test
           // vacuous and is the defect this property exists to prevent.
           const rendered = Placement.fromEntries(
             [...Placement.drawn(authored)].map(([id, at]) => [
