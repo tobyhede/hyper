@@ -1,5 +1,5 @@
 import {
-  COLLAPSED_CARD_SIZE,
+  CLOSED_CARD_SIZE,
   type CardId,
   type CardPlacement,
   type Layout,
@@ -207,11 +207,11 @@ function next(
 /**
  * Convert one point from drawn canvas coordinates back to Layout authorship.
  *
- * Each Expanded Card creates a step after its authored origin. In drawn space
+ * Each Open Card creates a step after its authored origin. In drawn space
  * that step ends after the accumulated growth before it, so walking origins in
  * order identifies exactly the growth already present in a reachable drawn
  * coordinate. `movingCardId` excludes the Card being moved: a Card never
- * displaces itself, even when it is Expanded.
+ * displaces itself, even when it is Open.
  *
  * Coordinates inside a step's unreachable gap stay on its near side. That is
  * ADR 0064's accepted step boundary; every coordinate produced by `drawn`
@@ -222,29 +222,29 @@ function authoredPoint(
   at: LayoutPosition,
   movingCardId?: CardId,
 ): LayoutPosition {
-  const expanded = [...placement]
+  const open = [...placement]
     .filter(([cardId, point]) => cardId !== movingCardId && point.expanded !== undefined)
     .map(([, point]) => point);
 
-  const invert = (coordinate: 'x' | 'y', size: 'width' | 'height', collapsed: number): number => {
-    const ordered = [...expanded].sort((left, right) => left[coordinate] - right[coordinate]);
+  const invert = (coordinate: 'x' | 'y', size: 'width' | 'height', closed: number): number => {
+    const ordered = [...open].sort((left, right) => left[coordinate] - right[coordinate]);
     let growth = 0;
     let authored = at[coordinate];
     for (const point of ordered) {
       // The filter above establishes this for every entry.
       const rect = point.expanded;
       if (rect === undefined) continue;
-      growth += rect[size] - collapsed;
+      growth += rect[size] - closed;
       if (at[coordinate] > point[coordinate] + growth) {
-        authored -= rect[size] - collapsed;
+        authored -= rect[size] - closed;
       }
     }
     return authored;
   };
 
   return {
-    x: invert('x', 'width', COLLAPSED_CARD_SIZE.width),
-    y: invert('y', 'height', COLLAPSED_CARD_SIZE.height),
+    x: invert('x', 'width', CLOSED_CARD_SIZE.width),
+    y: invert('y', 'height', CLOSED_CARD_SIZE.height),
   };
 }
 
@@ -292,7 +292,7 @@ function toPositions(placement: Placement): Record<CardId, CardPlacement> {
  */
 const empty = (): Placement => brand(new Map());
 
-/** The derived rects drawn on the canvas, including displacement from Expanded Cards. */
+/** The derived rects drawn on the canvas, including displacement from Open Cards. */
 function drawn(placement: Placement): Placement {
   const result = new Map<CardId, CardPlacement>();
   for (const [cardId, at] of placement) {
@@ -300,8 +300,8 @@ function drawn(placement: Placement): Placement {
     let y = at.y;
     for (const [otherId, other] of placement) {
       if (otherId === cardId || other.expanded === undefined) continue;
-      if (at.x > other.x) x += other.expanded.width - COLLAPSED_CARD_SIZE.width;
-      if (at.y > other.y) y += other.expanded.height - COLLAPSED_CARD_SIZE.height;
+      if (at.x > other.x) x += other.expanded.width - CLOSED_CARD_SIZE.width;
+      if (at.y > other.y) y += other.expanded.height - CLOSED_CARD_SIZE.height;
     }
     result.set(cardId, point({ ...at, x, y }));
   }

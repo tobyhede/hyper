@@ -15,7 +15,7 @@ interface RenderedMarkdownProps {
 /**
  * The one Markdown parser and sanitiser shared by every rendered Card body.
  *
- * Kept separate from {@link CardContent} so an Expanded Card can reuse the
+ * Kept separate from {@link CardContent} so an Open Card can reuse the
  * presentation-mode rendering without also drawing presentation mode's title
  * and outer frame.
  */

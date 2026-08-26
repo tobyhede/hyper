@@ -20,7 +20,7 @@ export const parityClaims: readonly ParityClaim[] = [
     storyFile: 'components/card.stories.tsx',
     storyExport: 'NodeContainment',
     claim:
-      'The production CanvasCard fills a React Flow node whose authored rect differs from the collapsed default.',
+      'The production CanvasCard fills a React Flow node whose authored rect differs from the closed default.',
   },
   {
     id: 'markdown-card-opens-and-closes-in-place',

@@ -290,8 +290,8 @@ describe('Edit Card', () => {
   });
 });
 
-describe('Expanded Card geometry', () => {
-  it('refuses a stale resize completion for a Card that is no longer Expanded', () => {
+describe('Open Card geometry', () => {
+  it('refuses a stale resize completion for a Card that is no longer Open', () => {
     const { authoring, session } = openPositioned();
     const before = session.getState().working;
 
@@ -301,7 +301,7 @@ describe('Expanded Card geometry', () => {
         cardId: CARD_A,
         size: { width: 560, height: 420 },
       }),
-    ).toEqual({ kind: 'refused', refusal: { code: 'card-not-expanded' } });
+    ).toEqual({ kind: 'refused', refusal: { code: 'card-not-open' } });
     expect(session.getState().working).toBe(before);
   });
 });

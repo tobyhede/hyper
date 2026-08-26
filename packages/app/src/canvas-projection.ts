@@ -96,7 +96,7 @@ export function canvasProjection(
   const cardIds = space.cards.map((card) => card.id);
   const authored =
     renderer.kind === 'layout' ? Placement.fromLayout(renderer.resolvedLayout.layout) : null;
-  const expandedCardIds = new Set(
+  const openCardIds = new Set(
     authored === null
       ? []
       : [...authored].filter(([, at]) => at.expanded !== undefined).map(([cardId]) => cardId),
@@ -136,7 +136,7 @@ export function canvasProjection(
           strategyGraph: laidOut,
           nodeHeight: CARD_HEIGHT,
           cardIds,
-          expandedCardIds,
+          openCardIds,
         }),
         edges: projectGraphEdges(edges, colors, edgeOptions),
       };

@@ -17,7 +17,7 @@ import {
   type SpaceSessionState,
 } from '@project/persistence';
 import { nextGraphColor } from './colors';
-import { DEFAULT_EXPANDED_CARD_SIZE } from './card';
+import { DEFAULT_OPEN_CARD_SIZE } from './card';
 import type { Navigation, NavigationState } from './navigation';
 import {
   updatePositionedLayout,
@@ -194,7 +194,7 @@ export type AuthoringRefusal =
   | { readonly code: 'alias-target-must-own-content'; readonly targetId: CardId }
   | { readonly code: 'card-already-in-layout' }
   | { readonly code: 'card-not-in-layout' }
-  | { readonly code: 'card-not-expanded' }
+  | { readonly code: 'card-not-open' }
   | {
       readonly code: 'card-has-aliases';
       readonly aliasTitles: readonly string[];
@@ -942,7 +942,7 @@ export function createSpaceAuthoring({
       if (at.expanded !== undefined) return UNCHANGED;
       completedPlacement = Placement.place(completedPlacement, completion.cardId, {
         ...at,
-        expanded: DEFAULT_EXPANDED_CARD_SIZE,
+        expanded: DEFAULT_OPEN_CARD_SIZE,
       });
     } else if (completion.kind === 'closed-card') {
       const at = completedPlacement.get(completion.cardId);
@@ -955,7 +955,7 @@ export function createSpaceAuthoring({
     } else if (completion.kind === 'resized-card') {
       const at = completedPlacement.get(completion.cardId);
       if (at === undefined) return refuse({ code: 'card-not-in-layout' });
-      if (at.expanded === undefined) return refuse({ code: 'card-not-expanded' });
+      if (at.expanded === undefined) return refuse({ code: 'card-not-open' });
       if (
         at.expanded.width === completion.size.width &&
         at.expanded.height === completion.size.height

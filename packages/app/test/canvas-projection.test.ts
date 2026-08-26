@@ -163,7 +163,7 @@ describe('canvasProjection', () => {
     expect(handledGraphIds(nodes)).toEqual([DRAWN_GRAPH, OTHER_GRAPH].sort());
   });
 
-  it('carries each authored Expanded rect through strategy input and node projection', async () => {
+  it('carries each authored Open rect through strategy input and node projection', async () => {
     const layout = {
       ...layoutOwning(DRAWN),
       positions: {
@@ -180,6 +180,6 @@ describe('canvasProjection', () => {
 
     const laidOut = await renderer.strategy(projection.strategyGraph);
     const node = projection.project(laidOut, AT_REST).nodes.find(({ id }) => id === CARD_A);
-    expect(node).toMatchObject({ width: 560, height: 420, data: { expanded: true } });
+    expect(node).toMatchObject({ width: 560, height: 420, data: { open: true } });
   });
 });

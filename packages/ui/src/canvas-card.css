@@ -236,29 +236,29 @@
   white-space: nowrap;
 }
 
-/* ---- Expanded (ADR 0064) ------------------------------------------------
-   Everything an Expanded Card changes about the Card itself, and it is only
+/* ---- Open (ADR 0064) ----------------------------------------------------
+   Everything an Open Card changes about the Card itself, and it is only
    these three rules — the paper, the ink, the rail, the Title's type and the
-   whole `data-state` matrix above are untouched, because an Expanded Card is
-   the Card it Expanded from.
+   whole `data-state` matrix above are untouched, because an Open Card is
+   the Card it Opened from.
 
-   It fills its container rather than declaring a size. Collapsed, that
+   It fills its container rather than declaring a size. Closed, that
    container is the node the Layout placed at `--card-width` x `--card-height`
-   and the result is identical to the constant it replaces; Expanded, it is
+   and the result is identical to the constant it replaces; Open, it is
    whatever rect the author drew. So growth is the Layout's statement and this
-   Card has no second opinion about it. The collapsed default stays a declared
+   Card has no second opinion about it. The closed default stays a declared
    size because a Card is also mounted outside a sized box — the component
    stories do exactly that — and 100% of an auto-height parent is nothing.
 
-   Expansion adds the writing surface above the Title rather than moving the
+   Opening adds the writing surface above the Title rather than moving the
    Title away from the Card's floor. The DOM keeps the shared Title before the
    kind-owned content; flex order changes only their visual placement in this
-   Expanded state. */
-.canvas-card[data-expanded='true'] {
+   Open state. */
+.canvas-card[data-open='true'] {
   gap: 0;
 }
 
-.canvas-card[data-expanded='true'] .canvas-card__body {
+.canvas-card[data-open='true'] .canvas-card__body {
   order: 2;
   flex: none;
 }
@@ -272,7 +272,7 @@
   border-bottom: 2px solid var(--canvas-card-ink);
   /* The Card's ink, not the ambient `--foreground`. A Card's face is its own
      paper and a body drawn in the surrounding theme's text colour is the one
-     part of an Expanded Card that would not look like the Card. */
+     part of an Open Card that would not look like the Card. */
   color: var(--canvas-card-title);
   opacity: 1;
   transition-property: opacity;

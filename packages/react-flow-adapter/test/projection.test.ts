@@ -156,13 +156,13 @@ describe('projectCardNodes', () => {
     });
   });
 
-  it("spreads a placed card's anchors down the card's own box, not the collapsed constant", () => {
-    // The strategies arrange every collapsed Card at `CARD_SIZE`, so this only
-    // ever differs for an Expanded one (ADR 0064) — and it has to differ, or an
+  it("spreads a placed card's anchors down the card's own box, not the closed constant", () => {
+    // The strategies arrange every closed Card at `CARD_SIZE`, so this only
+    // ever differs for an Open one (ADR 0064) — and it has to differ, or an
     // Edge attaches partway down a box the Card no longer occupies. `ports` is
     // left empty because `positionedStrategy` places none: this is the fallback
     // spread, which is what an authored Layout actually draws.
-    const expanded = projectCardNodes(space, handles, colors, {
+    const open = projectCardNodes(space, handles, colors, {
       nodeHeight: 146,
       strategyGraph: {
         cards: [
@@ -178,7 +178,7 @@ describe('projectCardNodes', () => {
         edges: [],
       },
     });
-    const a = expanded.find((n) => n.id === '00000000-0000-4000-8000-000000000002')!;
+    const a = open.find((n) => n.id === '00000000-0000-4000-8000-000000000002')!;
     // One anchor of each role, so each sits at half the Card's own height.
     expect(a.data.sourceHandles[0]!.offsetY).toBe(210);
     expect(a.data.targetHandles[0]!.offsetY).toBe(210);

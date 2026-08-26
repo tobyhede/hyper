@@ -84,7 +84,7 @@ describe('Placement.fromLayoutStrategyGraph', () => {
 });
 
 describe('Placement.next', () => {
-  it('inverts Expanded Card displacement before authoring a rendered position', () => {
+  it('inverts Open Card displacement before authoring a rendered position', () => {
     const authored = Placement.fromEntries([
       [CARD_A, { x: 10, y: 20, expanded: { width: 360, height: 196 } }],
       [CARD_B, { x: 300, y: 200 }],
@@ -98,7 +98,7 @@ describe('Placement.next', () => {
     expect(Placement.next(authored, drawn, [CARD_A, CARD_B])).toBe(authored);
   });
 
-  it('preserves an Expanded Card rect when the renderer reports only its moved position', () => {
+  it('preserves an Open Card rect when the renderer reports only its moved position', () => {
     const authored = Placement.fromEntries([
       [CARD_A, { x: 10, y: 20, expanded: { width: 560, height: 420 } }],
     ]);

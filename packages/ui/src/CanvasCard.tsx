@@ -198,11 +198,11 @@ export function CanvasCard(props: CanvasCardProps) {
       data-testid="card"
       data-kind={visualKind}
       data-state={state}
-      // Read by `canvas-card.css` for the two things Expanding changes about
+      // Read by `canvas-card.css` for the two things Opening changes about
       // the Card itself: it fills the box the Layout gave it rather than the
       // closed constant, and its content fills the space above the Title.
       // Derived from the Markdown front's authored state.
-      data-expanded={open}
+      data-open={open}
       // The rail is normally revealed with the Card and hidden again at rest.
       // A running edit is not a hover, so the controls that end it are read off
       // this instead — an author writing in the body must be able to see the way

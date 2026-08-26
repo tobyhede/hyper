@@ -348,12 +348,12 @@ describe('withdrawing title editing', () => {
   });
 });
 
-describe('withdrawing canvas authoring from an Expanded Card', () => {
+describe('withdrawing canvas authoring from an Open Card', () => {
   it('withdraws body editing and resize through the same complete gate', () => {
-    const expanded = cardNode('A', CARD_ID, true);
-    expanded.data.expanded = true;
-    expanded.data.body = '# A';
-    const { view, setTitleEditing } = mountGraph([expanded]);
+    const open = cardNode('A', CARD_ID, true);
+    open.data.open = true;
+    open.data.body = '# A';
+    const { view, setTitleEditing } = mountGraph([open]);
 
     expect(screen.getByRole('button', { name: 'Edit Markdown source of A' })).toBeVisible();
     expect(view.container.querySelector('.react-flow__resize-control')).toBeInTheDocument();
@@ -366,10 +366,10 @@ describe('withdrawing canvas authoring from an Expanded Card', () => {
 
   it('does not let another edit or Card creation replace a live body caret', () => {
     const a = cardNode('A');
-    a.data.expanded = true;
+    a.data.open = true;
     a.data.body = '# A';
     const b = cardNode('B', OTHER_CARD_ID);
-    b.data.expanded = true;
+    b.data.open = true;
     b.data.body = '# B';
     const { addCard } = mountGraph([a, b]);
 

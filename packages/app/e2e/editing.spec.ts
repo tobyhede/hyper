@@ -445,7 +445,7 @@ test('the opened Card draws Markdown and its editor on the same paper surface', 
   );
 });
 
-test('opened Markdown editing persists source while expansion displaces and restores Cards', async ({
+test('opened Markdown editing persists source while opening displaces and restores Cards', async ({
   page,
 }) => {
   await page.goto('/');
@@ -456,12 +456,11 @@ test('opened Markdown editing persists source while expansion displaces and rest
   const openedId = await card.getAttribute('data-id');
 
   await openCard(card, 'A');
-  const expanded = await allPositions(page);
-  expect(expanded[openedId ?? '']).toEqual(before[openedId ?? '']);
+  const open = await allPositions(page);
+  expect(open[openedId ?? '']).toEqual(before[openedId ?? '']);
   expect(
     Object.entries(before).some(
-      ([id, position]) =>
-        id !== openedId && JSON.stringify(expanded[id]) !== JSON.stringify(position),
+      ([id, position]) => id !== openedId && JSON.stringify(open[id]) !== JSON.stringify(position),
     ),
   ).toBe(true);
   await card.getByRole('button', { name: 'Edit Card A' }).click();
@@ -470,7 +469,7 @@ test('opened Markdown editing persists source while expansion displaces and rest
 
   await expect(page.getByRole('textbox', { name: 'Markdown source of A' })).toHaveCount(0);
   await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
-  expect(await allPositions(page)).toEqual(expanded);
+  expect(await allPositions(page)).toEqual(open);
 
   await card.getByRole('button', { name: 'Close Card A' }).click();
   expect(await allPositions(page)).toEqual(before);

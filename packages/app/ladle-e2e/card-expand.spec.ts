@@ -75,7 +75,7 @@ test(
 );
 
 test(
-  'the Card fills a React Flow node whose rect differs from the collapsed default',
+  'the Card fills a React Flow node whose rect differs from the closed default',
   { tag: '@parity:canvas-card-fills-authored-node-rect' },
   async ({ page }) => {
     await page.goto(containmentStory);

@@ -40,9 +40,9 @@ names what gate 3 does for that action.
 | `edited-card` | converts | `card-not-found` → `card-kind-immutable` → `card-title-required` → (identical to current ⇒ `unchanged`) → `alias-target-not-found` → `alias-target-must-own-content` → completed |
 | `created-card` | converts | none → completed |
 | `created-alias` | converts | `alias-target-not-found` → `alias-target-must-own-content` → completed |
-| `opened-card` | converts | `card-not-in-layout` → (already Expanded ⇒ `unchanged`) → completed |
+| `opened-card` | converts | `card-not-in-layout` → (already Open ⇒ `unchanged`) → completed |
 | `closed-card` | **layout-required** | `card-not-in-layout` → (already closed ⇒ `unchanged`) → completed |
-| `resized-card` | **layout-required** | `card-not-in-layout` → `card-not-expanded` → (same size ⇒ `unchanged`) → completed |
+| `resized-card` | **layout-required** | `card-not-in-layout` → `card-not-open` → (same size ⇒ `unchanged`) → completed |
 | `added-card-to-layout` | **layout-required** | `card-not-found` → `card-already-in-layout` → completed |
 | `removed-card-from-layout` | **layout-required** | `card-not-in-layout` → completed |
 | `deleted-card` | converts | `card-not-found` → `card-has-aliases` → completed |

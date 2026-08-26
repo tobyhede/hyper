@@ -729,23 +729,23 @@ describe('render adapter', () => {
     closed.height = 146;
     store.getState().syncProjection([closed], []);
 
-    const expanded = node(CARD_A, 40, 60);
-    expanded.width = 560;
-    expanded.height = 420;
-    expanded.zIndex = 10;
-    expanded.data.expanded = true;
-    store.getState().syncProjection([expanded], []);
+    const open = node(CARD_A, 40, 60);
+    open.width = 560;
+    open.height = 420;
+    open.zIndex = 10;
+    open.data.open = true;
+    store.getState().syncProjection([open], []);
 
     expect(store.getState().projection?.nodes[0]).toMatchObject({
       position: { x: 40, y: 60 },
       width: 560,
       height: 420,
       zIndex: 10,
-      data: { expanded: true },
+      data: { open: true },
     });
   });
 
-  it('keeps an in-flight drag position while applying projected expanded geometry', () => {
+  it('keeps an in-flight drag position while applying projected open geometry', () => {
     const spy = authoringSpy();
     const store = createRenderAdapter(spy.authoring);
     spy.attach(store);
@@ -753,19 +753,19 @@ describe('render adapter', () => {
     store.getState().syncProjection([node(CARD_A, 10, 20)], []);
     store.getState().changeNodes(moving(CARD_A, 111, 222));
 
-    const expanded = node(CARD_A, 40, 60);
-    expanded.width = 560;
-    expanded.height = 420;
-    expanded.zIndex = 10;
-    expanded.data.expanded = true;
-    store.getState().syncProjection([expanded], []);
+    const open = node(CARD_A, 40, 60);
+    open.width = 560;
+    open.height = 420;
+    open.zIndex = 10;
+    open.data.open = true;
+    store.getState().syncProjection([open], []);
 
     expect(store.getState().projection?.nodes[0]).toMatchObject({
       position: { x: 111, y: 222 },
       width: 560,
       height: 420,
       zIndex: 10,
-      data: { expanded: true },
+      data: { open: true },
     });
   });
 

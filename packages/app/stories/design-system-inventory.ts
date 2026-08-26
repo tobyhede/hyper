@@ -157,7 +157,7 @@ export const handRolledStyles = [
   {
     block: 'rf-card-node',
     reason:
-      "The adapter's node wrapper: card sizing from `--card-width`/`--card-height` and the Expanded Card's fill of the box the Layout authored, per-Graph port and authoring-handle geometry, handle reveal driven by the connection state, React Flow's own `NodeResizer` in the Card's palette, and the one rule naming the actively presented Card. React Flow measures against this box, so it cannot move into the component it wraps.",
+      "The adapter's node wrapper: card sizing from `--card-width`/`--card-height` and the Open Card's fill of the box the Layout authored, per-Graph port and authoring-handle geometry, handle reveal driven by the connection state, React Flow's own `NodeResizer` in the Card's palette, and the one rule naming the actively presented Card. React Flow measures against this box, so it cannot move into the component it wraps.",
   },
   {
     block: 'card',

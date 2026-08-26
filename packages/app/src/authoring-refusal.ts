@@ -33,7 +33,7 @@ export const describeAuthoringRefusal = (refusal: AuthoringRefusal): string => {
       return 'This Card is already in this Layout.';
     case 'card-not-in-layout':
       return 'This Card is not in this Layout.';
-    case 'card-not-expanded':
+    case 'card-not-open':
       return 'Open this Card before resizing it.';
     case 'card-has-aliases':
       return `Retarget or delete the Aliases of this Card first: ${refusal.aliasTitles.join(', ')}.`;
@@ -87,7 +87,7 @@ const titleAndTargetPlacements = {
   'alias-target-must-own-content': 'target',
   'card-already-in-layout': form,
   'card-not-in-layout': form,
-  'card-not-expanded': form,
+  'card-not-open': form,
   'card-has-aliases': form,
   'graph-title-required': form,
   'layout-must-keep-graph': form,
@@ -133,7 +133,7 @@ const correctableByCardChoice = {
   'alias-target-must-own-content': false,
   'card-already-in-layout': false,
   'card-not-in-layout': false,
-  'card-not-expanded': false,
+  'card-not-open': false,
   'card-has-aliases': false,
   'graph-title-required': false,
   'layout-must-keep-graph': false,

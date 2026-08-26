@@ -88,18 +88,18 @@ export type CardNodeData = {
    */
   titleEditor?: CardTitleEditor;
   /**
-   * Whether the Layout has Expanded this Card, so it draws its content on the
+   * Whether the Layout has Opened this Card, so it draws its content on the
    * Card rather than its title alone (ADR 0064).
    *
    * Authored, not derived: it is a fact about the Layout, and the Card's rect
    * follows from it rather than the other way round. The adapter cannot read it
-   * off the geometry — a Card is not Expanded because it is large.
+   * off the geometry — a Card is not Open because it is large.
    *
-   * The Alias kind has no Expanded front yet (ADR 0064 leaves it open), so
+   * The Alias kind has no Open front yet (ADR 0064 leaves it open), so
    * nothing sets this for one.
    */
-  expanded?: boolean;
-  /** Present only when activating the Expanded body may place a caret. */
+  open?: boolean;
+  /** Present only when activating the Open body may place a caret. */
   onBeginBodyEditing?: () => void;
   /**
    * The live body edit, absent on a Card whose rendered Markdown is at rest.
@@ -115,16 +115,16 @@ export type CardNodeData = {
    * the editor mounted. A composition that gave `onEnd` the abandon meaning
    * would undo every accepted save.
    *
-   * Independent of `titleEditor` on purpose. Expansion is what the Layout
+   * Independent of `titleEditor` on purpose. Opening is what the Layout
    * authored and the caret is a gesture the author just made, so a Card can be
-   * Expanded while its *title* is being renamed (ADR 0064).
+   * Open while its *title* is being renamed (ADR 0064).
    */
   bodyEditor?: CanvasCardBodyEditor;
   /**
-   * Resizing this Expanded Card, absent on one that may not be resized.
+   * Resizing this Open Card, absent on one that may not be resized.
    *
    * Presence is the capability and it carries its own floor, for the same reason
-   * the two editors above carry their own completions: the collapsed size is
+   * the two editors above carry their own completions: the closed size is
    * `CARD_SIZE`, which belongs to the composition and not to this package —
    * an adapter that hardcoded a minimum would be a second opinion about a
    * constant `app` already owns.
@@ -156,13 +156,13 @@ export type CardNodeData = {
    *  target's body. Absent otherwise — content is not embedded in every node
    *  (ADR 0006), which is the constraint that made this per-card.
    *
-   *  **An Expanded Card does not carry one yet.** ADR 0064 narrows ADR 0006
-   *  rather than lifting it — an Expanded Card should carry its source because
+   *  **An Open Card does not carry one yet.** ADR 0064 narrows ADR 0006
+   *  rather than lifting it — an Open Card should carry its source because
    *  the author asked for that one, not because every Card does — but nothing
-   *  tells this projection which Cards the Layout Expanded, so there is no
-   *  `expanded` to read here. Wiring that is issue 02's, and it has to supply
+   *  tells this projection which Cards the Layout Opened, so there is no
+   *  `open` to read here. Wiring that is issue 02's, and it has to supply
    *  `body` in the same change: `CardNode` reads `data.body ?? ''`, so an
-   *  Expanded Card left out of this would draw an empty document over a working
+   *  Open Card left out of this would draw an empty document over a working
    *  editor rather than fail. */
   body?: string;
   /** The graph being emphasised, if any. Drives handle dimming. */
@@ -202,8 +202,8 @@ export interface ProjectCardNodesOptions {
   nodeHeight?: number;
   /** Restrict the projection to these card ids (e.g. one graph's cards). */
   cardIds?: readonly CardId[];
-  /** Layout-authored Expanded Cards whose Markdown body is drawn in place. */
-  expandedCardIds?: ReadonlySet<CardId>;
+  /** Layout-authored Open Cards whose Markdown body is drawn in place. */
+  openCardIds?: ReadonlySet<CardId>;
 }
 
 function resolveHandles(
@@ -334,16 +334,15 @@ export function projectCardNodes(
     const cardLayout = laidOut.get(card.id);
     const active = card.id === activeCardId;
     const showContent = active && showActiveCardContent;
-    const expanded = options.expandedCardIds?.has(card.id) === true && card.kind === 'markdown';
+    const open = options.openCardIds?.has(card.id) === true && card.kind === 'markdown';
     // An alias names the card it redraws; a markdown card names nothing (ADR 0009).
     const aliasOf = card.kind === 'alias' ? resolveContentCard(space, card.id)?.title : undefined;
     // An alias shows its target's content under its own title (ADR 0009).
-    const body =
-      showContent || expanded ? (resolveContentCard(space, card.id)?.body ?? '') : undefined;
+    const body = showContent || open ? (resolveContentCard(space, card.id)?.body ?? '') : undefined;
     const portsById = new Map((cardLayout?.ports ?? []).map((port) => [port.id, port]));
     // The Card's own height once a layout has placed it, and the constant only
-    // before one has. The two agree for every collapsed Card — the strategies
-    // arrange at `CARD_SIZE` — and differ exactly for an Expanded one, whose
+    // before one has. The two agree for every closed Card — the strategies
+    // arrange at `CARD_SIZE` — and differ exactly for an Open one, whose
     // anchors have to spread down the box it actually occupies (ADR 0064).
     // Read from the same rect `declaredHandles` reasons about below, so a
     // Graph's drawn anchor and its declared one cannot land in different places.
@@ -398,8 +397,8 @@ export function projectCardNodes(
     // Omit rather than set undefined: absent means "not an alias" (ADR 0009).
     if (aliasOf !== undefined) node.data.aliasOf = aliasOf;
     if (body !== undefined) node.data.body = body;
-    if (expanded) {
-      node.data.expanded = true;
+    if (open) {
+      node.data.open = true;
       node.zIndex = 10;
     }
     return node;

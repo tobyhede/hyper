@@ -118,7 +118,7 @@ export function CardNode({ data, selected, dragging, isConnectable }: NodeProps<
     markdownOperations.onBeginEdit = data.onBeginBodyEditing;
   }
   const markdownFront: CanvasCardFront =
-    data.expanded === true && data.bodyEditor !== undefined
+    data.open === true && data.bodyEditor !== undefined
       ? {
           kind: 'markdown',
           source: data.body ?? '',
@@ -126,7 +126,7 @@ export function CardNode({ data, selected, dragging, isConnectable }: NodeProps<
           editor: data.bodyEditor,
           ...markdownOperations,
         }
-      : data.expanded === true
+      : data.open === true
         ? { kind: 'markdown', source: data.body ?? '', open: true, ...markdownOperations }
         : {
             kind: 'markdown',
@@ -229,18 +229,18 @@ export function CardNode({ data, selected, dragging, isConnectable }: NodeProps<
    *
    * **Not a fourth arm of the branch below.** It is a prop handed to whichever
    * arm the *title* state selects, so a Card can be open while it is being
-   * renamed — expansion is what the Layout authored and the caret is a gesture,
+   * renamed — opening is what the Layout authored and the caret is a gesture,
    * and a branch would have made them exclusive. It is not `showContent`
-   * either: both presenting and expanding draw through the one rendered-Markdown
+   * either: both presenting and opening draw through the one rendered-Markdown
    * seam, while the open Card swaps that display for source only during an
    * edit.
    *
-   * The Alias kind has no open front yet, so authored `expanded` state is false
+   * The Alias kind has no open front yet, so authored `open` state is false
    * for one. `CanvasCard` receives the Markdown source, authored open state and
    * live editor as one front rather than receiving body markup from this adapter.
    */
   const resize = data.resize;
-  const open = data.expanded === true && data.kind === 'markdown';
+  const open = data.open === true && data.kind === 'markdown';
 
   const onReturnFocus = () => {
     inner.current?.closest<HTMLElement>('.react-flow__node')?.focus();
@@ -255,14 +255,14 @@ export function CardNode({ data, selected, dragging, isConnectable }: NodeProps<
       data-connection-in-progress={connectionInProgress}
       data-connection-seeking={seeking ?? 'none'}
       // The wrapper React Flow sizes from `node.width`/`node.height` is this
-      // element's parent, so an Expanded Card only reaches its own rect if this
-      // one stops declaring the collapsed constant. Read by `styles.css`.
-      data-expanded={open}
+      // element's parent, so an Open Card only reaches its own rect if this
+      // one stops declaring the closed constant. Read by `styles.css`.
+      data-open={open}
     >
       {/*
-        React Flow's own resizer, on an Expanded Card the author has selected.
-        An Expanded Card is whatever box the author drew — there is no ratio on
-        it, because the collapsed Card is what keeps the silhouette that predicts
+        React Flow's own resizer, on an Open Card the author has selected.
+        An Open Card is whatever box the author drew — there is no ratio on
+        it, because the closed Card is what keeps the silhouette that predicts
         what an audience sees (ADR 0064).
 
         Rendered *before* the Card, which is not cosmetic: `canvas-card.css`

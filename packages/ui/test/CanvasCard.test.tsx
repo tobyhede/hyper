@@ -175,7 +175,7 @@ describe('CanvasCard Open and Close operation', () => {
       );
     expect(labels()).toEqual(['Edit Card A', 'Open Card A']);
 
-    // Collapsed, Edit is the two gestures an author would otherwise make in
+    // Closed, Edit is the two gestures an author would otherwise make in
     // order, and both are the Card's own operations — opening is the same call
     // the Open control makes, so nothing about it has a second implementation.
     screen.getByRole('button', { name: 'Edit Card A' }).click();
@@ -205,7 +205,7 @@ describe('CanvasCard Open and Close operation', () => {
     expect(onBeginContentEdit).toHaveBeenCalledTimes(2);
   });
 
-  it('withholds Edit from a collapsed Card that cannot be opened', () => {
+  it('withholds Edit from a Closed Card that cannot be opened', () => {
     render(
       <CanvasCard
         front={{ kind: 'markdown', source: '', open: false, onBeginEdit: vi.fn() }}
@@ -220,7 +220,7 @@ describe('CanvasCard Open and Close operation', () => {
     expect(screen.queryByRole('button', { name: 'Edit Card A' })).not.toBeInTheDocument();
   });
 
-  it('does not place the content caret when opening a collapsed Card is retained', () => {
+  it('does not place the content caret when opening a Closed Card is retained', () => {
     const onBeginContentEdit = vi.fn();
     render(
       <CanvasCard
@@ -582,7 +582,7 @@ describe('CanvasCard open Markdown front', () => {
     );
 
     expect(screen.getByRole('article', { name: 'Strategies' })).toHaveAttribute(
-      'data-expanded',
+      'data-open',
       'false',
     );
   });
@@ -598,7 +598,7 @@ describe('CanvasCard open Markdown front', () => {
     );
 
     const card = screen.getByRole('article', { name: 'Strategies' });
-    expect(card).toHaveAttribute('data-expanded', 'true');
+    expect(card).toHaveAttribute('data-open', 'true');
     expect(screen.getByText('the Card’s own source')).toBeVisible();
   });
 

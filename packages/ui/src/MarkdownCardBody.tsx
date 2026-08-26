@@ -58,11 +58,11 @@ export interface MarkdownCardBodyProps {
 }
 
 /**
- * The Markdown kind's Expanded front: rendered Markdown, on the Card (ADR 0064).
+ * The Markdown kind's Open front: rendered Markdown, on the Card (ADR 0064).
  *
  * **The same rendering as presentation mode.** At rest this reuses
  * `RenderedMarkdown`, the parser and sanitiser beneath `CardContent`; an
- * Expanded Card therefore cannot interpret the same Markdown differently from
+ * Open Card therefore cannot interpret the same Markdown differently from
  * the Card reached during traversal. It omits only presentation mode's title
  * and frame, which the surrounding `CanvasCard` already owns.
  *

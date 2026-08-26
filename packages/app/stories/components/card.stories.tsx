@@ -111,7 +111,7 @@ export const NodeContainment: Story = () => (
   <div className="inv inv-sheet" style={cardSizeVars}>
     <CatalogueSection
       title="React Flow node containment"
-      note="The production CanvasCard fills the rect React Flow declares. This specimen deliberately differs from the collapsed default so equality cannot pass by coincidence."
+      note="The production CanvasCard fills the rect React Flow declares. This specimen deliberately differs from the closed default so equality cannot pass by coincidence."
     >
       <div className="inv-row">
         <Specimen label="340 × 210 node">

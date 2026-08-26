@@ -459,11 +459,11 @@ export const createApp = ({ spaceSession }: OpenedSpace) => {
     );
 
     const openedCard = openedCardId ? rendererSpace.lookup.card(openedCardId) : undefined;
-    const closeExpandedCard = useCallback((cardId: CardId): 'completed' | 'retained' => {
+    const closeOpenedCard = useCallback((cardId: CardId): 'completed' | 'retained' => {
       const result = authoring.complete({ kind: 'closed-card', cardId });
       return result.kind === 'completed' || result.kind === 'unchanged' ? 'completed' : 'retained';
     }, []);
-    const resizeExpandedCard = useCallback(
+    const resizeOpenedCard = useCallback(
       (cardId: CardId, size: { width: number; height: number }) => {
         authoring.complete({ kind: 'resized-card', cardId, size });
       },
@@ -654,9 +654,9 @@ export const createApp = ({ spaceSession }: OpenedSpace) => {
                 onAddCard={addCard}
                 nameOnCreation={createdCardId}
                 onOpenCard={openCardForEditing}
-                onCloseCard={closeExpandedCard}
+                onCloseCard={closeOpenedCard}
                 onCompleteCardBody={completeCardBody}
-                onResizeCard={resizeExpandedCard}
+                onResizeCard={resizeOpenedCard}
                 onCompleteCardTitle={completeCardTitle}
                 editableCardIds={editableCardIds}
                 graphs={projection.visibleGraphs}

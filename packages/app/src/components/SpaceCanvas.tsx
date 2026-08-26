@@ -362,7 +362,7 @@ export function SpaceCanvas({
         if (canAuthorOnCanvas && !bodyEditing && node.data.kind === 'markdown') {
           data.onBeginBodyEditing = () => setCaret({ cardId: node.id, field: 'body' });
         }
-        if (node.data.expanded === true && node.data.kind === 'markdown') {
+        if (node.data.open === true && node.data.kind === 'markdown') {
           if (canAuthorOnCanvas) {
             data.resize = {
               minWidth: CARD_SIZE.width,
