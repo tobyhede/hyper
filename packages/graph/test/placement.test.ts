@@ -76,6 +76,28 @@ describe('Placement.fromLayoutStrategyGraph', () => {
     });
   });
 
+  it('carries no expansion across, which is why only a View may be converted', async () => {
+    const authored = Placement.fromEntries([
+      [CARD_A, { x: 0, y: 0, expanded: { width: 560, height: 420 } }],
+      [CARD_B, { x: 300, y: 0 }],
+    ]);
+    const laid = await positionedStrategy(authored)({
+      cards: cardsOf(CARD_A, CARD_B),
+      edges: [],
+    });
+
+    const converted = Placement.fromLayoutStrategyGraph(laid);
+
+    // Nothing comes back Expanded: a converted Layout is authored from an
+    // Algorithmic View, where nothing is (ADR 0025, ADR 0064).
+    expect([...converted.values()].every((at) => at.expanded === undefined)).toBe(true);
+    // And B comes back at its *drawn* x, carrying A's growth as authorship.
+    // That is the whole reason this may only ever be handed a strategy graph
+    // with nothing Expanded in it: conversion has no inverse, and
+    // `Placement.next` is the one door that does.
+    expect(converted.get(CARD_B)).toEqual({ x: 600, y: 0 });
+  });
+
   it('omits a card no strategy placed, rather than calling it the origin', () => {
     expect([
       ...Placement.fromLayoutStrategyGraph({ cards: cardsOf(CARD_A, CARD_B), edges: [] }).keys(),
@@ -461,5 +483,36 @@ describe('Placement properties', () => {
         expect(Placement.next(authored, rendered, [])).toBe(authored);
       }),
     );
+  });
+});
+
+describe('Placement.next over an Expanded Card', () => {
+  it('authors a drop inside an Expanded Card on the near side of its step', () => {
+    const authored = Placement.fromEntries([
+      [CARD_A, { x: 0, y: 0, expanded: { width: 560, height: 420 } }],
+      [CARD_B, { x: 1000, y: 1000 }],
+    ]);
+    // Dropped on top of A, inside the band of drawn coordinates no authored
+    // point draws into — the step ADR 0064 accepts.
+    const rendered = Placement.fromEntries([[CARD_B, { x: 50, y: 30 }]]);
+
+    const next = Placement.next(authored, rendered, [CARD_B]);
+
+    expect(next.get(CARD_B)).toEqual({ x: 0, y: 0 });
+    // The near side is a fixed point, so the Card settles where it was dropped
+    // rather than jumping the full growth on the frame after release.
+    expect(Placement.drawn(next).get(CARD_B)).toEqual({ x: 0, y: 0 });
+  });
+});
+
+describe('Placement.drawn under a stored rect smaller than a collapsed Card', () => {
+  it('displaces nothing rather than displacing backwards', () => {
+    const authored = Placement.fromEntries([
+      [CARD_A, { x: 0, y: 0, expanded: { width: 100, height: 100 } }],
+      [CARD_B, { x: 400, y: 400 }],
+    ]);
+
+    expect(Placement.drawn(authored).get(CARD_B)).toEqual({ x: 400, y: 400 });
+    expect(Placement.next(authored, Placement.drawn(authored), [CARD_B])).toBe(authored);
   });
 });

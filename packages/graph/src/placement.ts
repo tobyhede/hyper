@@ -234,9 +234,19 @@ function authoredPoint(
       // The filter above establishes this for every entry.
       const rect = point.expanded;
       if (rect === undefined) continue;
-      growth += rect[size] - collapsed;
+      // Floored for the same reason `drawn` floors it: a rect smaller than the
+      // collapsed constant would otherwise displace backwards, and an inverse
+      // of a backwards step is not one.
+      const step = Math.max(0, rect[size] - collapsed);
+      const drawnOrigin = point[coordinate] + growth;
+      growth += step;
       if (at[coordinate] > point[coordinate] + growth) {
-        authored -= rect[size] - collapsed;
+        authored -= step;
+      } else if (at[coordinate] > drawnOrigin) {
+        // Inside the step's unreachable gap, which is the Expanded Card's own
+        // drawn box. Authoring the near side is what makes the drop settle where
+        // it was released instead of jumping the full growth one frame later.
+        authored = point[coordinate];
       }
     }
     return authored;
@@ -300,8 +310,13 @@ function drawn(placement: Placement): Placement {
     let y = at.y;
     for (const [otherId, other] of placement) {
       if (otherId === cardId || other.expanded === undefined) continue;
-      if (at.x > other.x) x += other.expanded.width - COLLAPSED_CARD_SIZE.width;
-      if (at.y > other.y) y += other.expanded.height - COLLAPSED_CARD_SIZE.height;
+      // Floored: an Expanded rect smaller than the collapsed constant is not a
+      // shrink of its neighbours. Nothing authors one today — the resizer's
+      // minimum is the collapsed size — but a stored Space is bytes, and a
+      // negative step would displace neighbours backwards over the Card that
+      // caused it and leave `authoredPoint` with no inverse to compute.
+      if (at.x > other.x) x += Math.max(0, other.expanded.width - COLLAPSED_CARD_SIZE.width);
+      if (at.y > other.y) y += Math.max(0, other.expanded.height - COLLAPSED_CARD_SIZE.height);
     }
     result.set(cardId, point({ ...at, x, y }));
   }
