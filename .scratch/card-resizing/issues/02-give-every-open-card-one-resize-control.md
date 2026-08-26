@@ -29,10 +29,14 @@ ratio.
       control rather than a story-only facsimile. Keyboard resizing is explicitly
       out of scope; do not invent arrow-key behavior.
 - [x] `pnpm verify`, `pnpm e2e` and `pnpm e2e:ladle` pass at the branch head,
-      with the real output recorded. All three pass. Issue 03's "Verification
-      status" holds the one branch-wide answer and the run it was taken from; the
-      numbers recorded below this line predate the rebase and are kept only as
-      the superseded run they are.
+      with the real output recorded. All three pass at the branch head, proven by
+      CI rather than locally: run `32965026364` against commit
+      `ca14fbb0ac4a15530ff2c13f47c885cd95a6b0b8` is green on `verify`, `e2e`,
+      `ladle` and the `postgres` job local runs never cover. Issue 03's
+      "Verification status" holds the one branch-wide answer and distinguishes
+      that CI result from the local working-tree run beside it; the numbers
+      recorded below this line predate the rebase and are kept only as the
+      superseded run they are.
 
 ## Answer
 

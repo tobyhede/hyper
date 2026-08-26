@@ -27,9 +27,12 @@ replacement restores the last authored canvas without producing an outcome.
 - [x] Unit, application, and browser evidence cover live Card, neighbour and
       Edge geometry as well as completion and cancellation.
 - [x] `pnpm verify`, `pnpm e2e` and `pnpm e2e:ladle` pass at the branch head,
-      with the real output recorded. All three pass — see "Verification status"
-      below for the run, which covers the working tree rather than a committed
-      state.
+      with the real output recorded. All three pass at the branch head, proven by
+      CI rather than locally: run `32965026364` against commit
+      `ca14fbb0ac4a15530ff2c13f47c885cd95a6b0b8` is green on `verify`, `e2e`,
+      `ladle` and the `postgres` job local runs never cover. The local run
+      recorded beside it covers the working tree rather than a committed state
+      and is labelled that way. See "Verification status" below for both.
 
 ## Answer
 
@@ -53,43 +56,48 @@ revision on release and full authored restoration after cancellation.
 
 ## Verification status
 
-**One honest statement: the three suites have not been run against this branch's
-head, and nothing below should be read as saying they have.**
+**Two runs exist, over two different states, and neither speaks for the other.**
+The branch head has a complete CI result; the local run does not, because it was
+taken over an uncommitted tree. Both are recorded below, each labelled with the
+state it actually covered.
 
-The results this record used to present as "Final verification" were produced at
-commit `b1e9289` (`Implement canvas resize draft preview`), which is the commit
-that resolved this issue and is **not** the branch head. Since then the branch
-has been rebased and four commits have landed on top — `7696913`
-(`Contain canvas card background paint`), `09cd557`
-(`fix: align resize story with rebased card state`), `e970c52`
-(`refactor: consolidate card canvas stories`) and `c6cef6b`
-(`fix: derive resize drafts from open placement`) — with further uncommitted work
-in the tree. All four touch what this issue's evidence rests on — the Card
-stylesheet and its contrast guard, the story and Ladle spec, the `CardNode` and
-`SpaceCanvas` seams, and the render adapter's own draft derivation — so the
-earlier numbers do not transfer. AGENTS.md forbids asserting a suite passed without having run it, so
-they are recorded below as what they are — a superseded run — rather than
-restated as the current result.
+### Branch head — GitHub Actions
 
-Superseded, kept for the record (commit `b1e9289`, pre-rebase):
+Commit `ca14fbb0ac4a15530ff2c13f47c885cd95a6b0b8`
+(`docs: reconcile the resize records with the built model`), which is PR #123's
+head. Run <https://github.com/tobyhede/hyper/actions/runs/32965026364>,
+conclusion `success`. Every job passed:
 
-- `pnpm verify` — reported passing; TypeScript 7.0.2 toolchain assertion, root
-  and package typechecks, UI catalogue, ESLint, anti-slop, formatting and
-  coverage all green.
-- `pnpm e2e` — reported 113 passed (2.3m). That run first found four orphaned
-  test-only Vite processes on ports 5304–5307 after an interrupted attempt;
-  stopping those exact processes allowed the clean full run.
-- `pnpm e2e:ladle` — reported 48 passed (14.4s).
+- `verify` — passed, 3m11s. The job runs `pnpm contract:check` and then
+  `pnpm verify`, so this is the whole gate sequence against a clean checkout of
+  that commit.
+- `e2e` — passed, 4m11s.
+- `ladle` — passed, 1m22s.
+- `postgres` — passed, 50s. **This job has no local counterpart, on this branch
+  or any other.** `pnpm verify` and `pnpm e2e` are database-free by design and
+  the PostgreSQL integration run is opt-in locally (AGENTS.md, "Commands"), so
+  the proof that a real database round-trip survives is something only CI holds.
+  A green local run never covered it and never could.
+- `CI passed` — passed, 4s, the aggregate over the four.
 
-### Branch-head result
+The head commit is `gh pr view 123 --json headRefOid`; the conclusions and
+durations are `gh pr checks 123` and `gh run view 32965026364 --json
+headSha,conclusion,jobs`, whose `headSha` is the same commit. No per-suite test
+counts are quoted from this run: the run summary does not carry them, and a
+count is not a thing to reconstruct.
 
-Run against commit `c6cef6b` (`fix: derive resize drafts from open placement`)
-plus the uncommitted review fixes in the tree — the resize control's layering and
-reveal gate, the render adapter's `cardResize` capability, the stable `CardNode`
-resize callbacks, the deleted unreachable `dimensions` clause, the Add Card gate,
-the canonical `openSize` key order, and the `overview.spec.ts` presence sample.
-The tree is not clean, so this is the result for the work as it stands, not for a
-commit anyone can check out.
+### Working tree — local run
+
+Taken over an **uncommitted** tree sitting on `c6cef6b`
+(`fix: derive resize drafts from open placement`), carrying the review fixes that
+went on to land as `43ba645` (`fix: address resize review findings`) — the resize
+control's layering and reveal gate, the render adapter's `cardResize` capability,
+the stable `CardNode` resize callbacks, the deleted unreachable `dimensions`
+clause, the Add Card gate, the canonical `openSize` key order, and the
+`overview.spec.ts` presence sample. It is a result for the work as it stood in
+the tree, **not for a commit anyone can check out**, which is why it is not
+labelled a branch-head result. It is kept because it carries the per-suite counts
+and the gesture reasoning the CI summary does not.
 
 - `pnpm verify` — passed, exit 0. All eight gates ran in order: `typecheck:toolchain`,
   `typecheck`, `typecheck:packages`, `ui:catalog:check`, `lint`, `lint:anti-slop`,
@@ -110,6 +118,28 @@ commit anyone can check out.
   added to `card-expand.spec.ts` sits inside the existing parity test, whose file
   still declares the same ten tests it declared at `c6cef6b`. The extra case came
   in with the story commits landed after `b1e9289`.
+
+### Superseded — commit `b1e9289`, pre-rebase
+
+**These numbers are not a current result and must not be quoted as one.** They
+were produced at `b1e9289` (`Implement canvas resize draft preview`), the commit
+that resolved this issue. Since then the branch was rebased and further commits
+landed — `7696913` (`Contain canvas card background paint`), `09cd557`
+(`fix: align resize story with rebased card state`), `e970c52`
+(`refactor: consolidate card canvas stories`), `c6cef6b`
+(`fix: derive resize drafts from open placement`), and the two above. All of them
+touch what this issue's evidence rests on — the Card stylesheet and its contrast
+guard, the story and Ladle spec, the `CardNode` and `SpaceCanvas` seams, and the
+render adapter's own draft derivation — so the earlier numbers do not transfer.
+They are kept as the record of a run that happened, not restated as the answer.
+
+- `pnpm verify` — reported passing; TypeScript 7.0.2 toolchain assertion, root
+  and package typechecks, UI catalogue, ESLint, anti-slop, formatting and
+  coverage all green.
+- `pnpm e2e` — reported 113 passed (2.3m). That run first found four orphaned
+  test-only Vite processes on ports 5304–5307 after an interrupted attempt;
+  stopping those exact processes allowed the clean full run.
+- `pnpm e2e:ladle` — reported 48 passed (14.4s).
 
 ### A documentation inconsistency this reconciliation surfaced
 

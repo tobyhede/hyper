@@ -67,8 +67,15 @@ and nothing about expanding needs that to change.
   **Superseded as guidance by ADR 0064** ("Three behaviours stay off"): the
   containment works, and it is not adopted. No `nowheel` is added to an Open
   Card — the wheel belongs to the canvas everywhere, and an Open Card that needs
-  more room is resized. Read this bullet as what the prototype measured, not as
-  what to build. The other three hatches are untouched by that decision.
+  more room is resized. **The one exception ADR 0064 states in the same breath is
+  CodeMirror's, not the Card's**: while editing, CodeMirror may still scroll its
+  own document. That is what the built Card does — `MarkdownCardBody` applies
+  `nodrag`, `nopan` and `nokey` while the caret is in and deliberately not
+  `nowheel`, and `MarkdownSourceEditor`'s own `.cm-scroller` keeps its
+  `overflow: auto` inside the Card's authored rect. So the source scrolls where
+  the rendered body clips, and neither makes the Card a permanent hole in canvas
+  wheel-panning. Read this bullet as what the prototype measured, not as what to
+  build. The other three hatches are untouched by that decision.
 - **React Flow's own `NodeResizer` is in the pinned 12.11.2** and carries
   `keepAspectRatio`, so the 16:9 question is a prop rather than a rewrite.
 
@@ -136,8 +143,10 @@ answer would need the click position mapped into the mounted editor.
   that and the cost moves: every expanded Card becomes a hole you cannot
   wheel-pan across, and the more the feature succeeds the more of the canvas is
   hole. Off, ADR 0006's objection is live. ADR 0064 took the second, accepting
-  the objection rather than paying that cost; CodeMirror may still scroll its
-  own document while editing.
+  the objection rather than paying that cost. The one thing that still scrolls is
+  CodeMirror's own document while editing, inside the editor's own scroller and
+  inside the Card's authored rect. That is an exception about the editor, not a
+  narrower containment: the Card carries no `nowheel` either way.
 - **keep 16:9** — `card.ts` couples the Card's silhouette to the presentation
   surface: "click a card, present it, and the shape does not change". Off, a
   resized Card breaks that promise. On, the box is the box the ratio allows,
