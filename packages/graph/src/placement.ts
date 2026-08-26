@@ -213,10 +213,6 @@ function next(
       // A card the report admits — not yet in `authored` — has no authored
       // fact to read, so its entry adopts the report's own, which (see
       // `placementFromNodes`) can only honestly claim Closed (ADR 0066).
-      // Behaviour-identical to the old `{ ...at, ...original }` double
-      // spread for a `CardPlacement` that carried at most one optional key;
-      // well-typed here over the discriminated union where that spread is
-      // not.
       const base = original ?? at;
       merged.set(cardId, point({ ...base, x: authoredAt.x, y: authoredAt.y }));
     }

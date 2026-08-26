@@ -1096,7 +1096,6 @@ export function createSpaceAuthoring({
     // what the Edit adds to it and takes away.
     if (createdCard !== null) {
       const authoredPosition = Placement.authoredPoint(completedPlacement, createdCard.position);
-      // A created Card is never-Opened (ADR 0066).
       completedPlacement = Placement.place(completedPlacement, createdCard.id, {
         ...(createdCard.avoidingOverlap
           ? freeAnchor(completedPlacement, authoredPosition)
