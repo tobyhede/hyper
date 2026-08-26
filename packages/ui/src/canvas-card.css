@@ -16,6 +16,7 @@
   border: 4px solid var(--canvas-card-ink);
   border-radius: 0;
   background: var(--canvas-card-face);
+  background-clip: padding-box;
   box-shadow: none;
   transition:
     box-shadow var(--card-hover-duration, 120ms) var(--card-hover-easing, ease),

@@ -85,3 +85,11 @@ describe('canvas Card text on its own faces', () => {
     expect(ratio).toBeGreaterThanOrEqual(AA_BODY_TEXT);
   });
 });
+
+describe('canvas Card face paint', () => {
+  it('stops at the inner edge of its border', () => {
+    const cardRule = /^\.canvas-card \{(?<declarations>[\s\S]*?)^\}/mu.exec(cardCss);
+
+    expect(cardRule?.groups?.['declarations']).toMatch(/background-clip:\s*padding-box;/u);
+  });
+});
