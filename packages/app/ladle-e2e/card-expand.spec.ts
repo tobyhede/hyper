@@ -45,9 +45,25 @@ test(
     await expect(title).toHaveAttribute('class', closedClass ?? '');
     expect(await title.evaluate(titleStyle)).toEqual(closedStyle);
     expect(await titleLeftInset()).toBeCloseTo(closedInset, 0);
+    await expect(card.locator('.canvas-card__content')).toHaveAttribute('data-presence', 'present');
 
     await card.getByRole('button', { name: 'Close Card Strategies' }).click();
-    await expect(card.getByRole('heading', { name: 'Placement is authored' })).toHaveCount(0);
+    const leavingContent = card.locator('.canvas-card__content');
+    await expect(leavingContent).toHaveAttribute('data-presence', 'leaving');
+    await expect(leavingContent).toHaveAttribute('inert', '');
+    expect(
+      await leavingContent.evaluate((element) =>
+        element
+          .getAnimations()
+          .some(
+            (animation) =>
+              animation.playState === 'running' &&
+              animation.effect instanceof KeyframeEffect &&
+              animation.effect.getKeyframes().some((frame) => frame['opacity'] !== undefined),
+          ),
+      ),
+    ).toBe(true);
+    await expect(leavingContent).toHaveCount(0);
     await expect(card.getByRole('button', { name: 'Open Card Strategies' })).toBeVisible();
     const longCard = page.getByRole('region', { name: 'Long Markdown Card' });
     await expect(longCard).toBeVisible();

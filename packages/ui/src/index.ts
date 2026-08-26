@@ -17,6 +17,8 @@ export type {
   CanvasCardProps,
   CanvasCardState,
 } from './CanvasCard';
+export { usePresence } from './use-presence';
+export type { Presence, PresenceState } from './use-presence';
 export { CardRail } from './CardRail';
 export type { CardRailProps } from './CardRail';
 export { CardKindIcon } from './CardKindIcon';

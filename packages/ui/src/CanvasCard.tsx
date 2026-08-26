@@ -10,6 +10,9 @@ import {
   type MarkdownCardBodyProps,
 } from './MarkdownCardBody';
 import './canvas-card.css';
+import { usePresence } from './use-presence';
+
+const CARD_PLACEMENT_DURATION_MS = 200;
 
 /**
  * What a Card front draws beyond its shared Title (ADR 0051): a kind-owned
@@ -141,6 +144,7 @@ export function CanvasCard(props: CanvasCardProps) {
   const { front, title, graphColor, onBeginTitleEdit, state } = props;
   const visualKind = front.kind === 'preview' ? 'markdown' : front.kind;
   const open = front.kind === 'markdown' && front.open;
+  const contentPresence = usePresence(open, CARD_PLACEMENT_DURATION_MS);
   const onOpenChange = front.kind === 'markdown' ? front.onOpenChange : undefined;
   const onOpenAlias = front.kind === 'alias' ? front.onOpen : undefined;
   const onBeginContentEdit = front.kind === 'markdown' ? front.onBeginEdit : undefined;
@@ -153,6 +157,7 @@ export function CanvasCard(props: CanvasCardProps) {
    */
   const [contentEdit, setContentEdit] = useState<CardContentEdit | null>(null);
   const editControl = useRef<HTMLButtonElement>(null);
+  const contentControl = useRef<HTMLDivElement>(null);
   const contentEditingWas = useRef(false);
   const beginContentEdit = contentEditAction(open, onOpenChange, onBeginContentEdit);
   const showActions =
@@ -178,6 +183,12 @@ export function CanvasCard(props: CanvasCardProps) {
     if (contentEditingWas.current && contentEdit === null) editControl.current?.focus();
     contentEditingWas.current = contentEdit !== null;
   }, [contentEdit]);
+
+  useLayoutEffect(() => {
+    if (contentControl.current !== null) {
+      contentControl.current.inert = contentPresence.state === 'leaving';
+    }
+  }, [contentPresence.state]);
 
   return (
     <Card
@@ -321,8 +332,12 @@ export function CanvasCard(props: CanvasCardProps) {
           inset so a Title sits off the Card's border; a writing surface brings
           its own gutter and padding and has to reach the paper's edges, and
           nesting it would draw one inset inside another. */}
-      {front.kind === 'markdown' && front.open && (
-        <div className="canvas-card__content">
+      {front.kind === 'markdown' && contentPresence.mounted && (
+        <div
+          ref={contentControl}
+          className="canvas-card__content"
+          data-presence={contentPresence.state}
+        >
           <CardContentEditProvider value={setContentEdit}>
             <MarkdownCardBody
               source={front.source}

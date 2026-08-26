@@ -315,7 +315,12 @@ test('the Close action closes an opened card', async ({ page }) => {
   await page.goto('/');
   const card = nodeByTitle(page, 'A').first();
   await openCard(card, 'A');
+  await expect(card.locator('.canvas-card__content')).toHaveAttribute('data-presence', 'present');
   await card.getByRole('button', { name: 'Close Card A' }).click();
+  const leavingContent = card.locator('.canvas-card__content');
+  await expect(leavingContent).toHaveAttribute('data-presence', 'leaving');
+  await expect(leavingContent).toHaveAttribute('inert', '');
+  await expect(leavingContent).toHaveCount(0);
   await expect(card.getByRole('button', { name: 'Open Card A' })).toBeVisible();
 });
 

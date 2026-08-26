@@ -226,6 +226,7 @@ describe('presenting after a conversion', () => {
 /** Open Card A in place, then put its Markdown body under the caret. */
 async function openEditor(): Promise<void> {
   fireEvent.click(await screen.findByRole('button', { name: 'Open Card A' }));
+  await screen.findByTestId('markdown-card-body-edit-target');
   fireEvent.click(await screen.findByRole('button', { name: 'Edit Card A' }));
   await screen.findByRole('textbox', { name: 'Markdown source of A' });
 }

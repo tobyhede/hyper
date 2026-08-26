@@ -27,7 +27,7 @@ export const parityClaims: readonly ParityClaim[] = [
     storyFile: 'components/card.stories.tsx',
     storyExport: 'OpenAndClose',
     claim:
-      'A Markdown Card opens and closes in place while retaining one Card and Title treatment.',
+      'A Markdown Card opens and closes in place while retaining one Card and Title treatment; its content fades in over the tail of growth and fades out inertly before unmounting on close.',
   },
   {
     id: 'open-markdown-card-owns-its-editing-lifecycle',

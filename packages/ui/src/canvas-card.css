@@ -274,6 +274,28 @@
      paper and a body drawn in the surrounding theme's text colour is the one
      part of an Expanded Card that would not look like the Card. */
   color: var(--canvas-card-title);
+  opacity: 1;
+  transition-property: opacity;
+  transition-duration: calc(var(--card-placement-duration, 200ms) * 0.4);
+  transition-timing-function: var(--card-placement-easing, ease);
+}
+
+/* Markdown enters over the tail of the node's growth, after its reflow has
+   mostly settled. It leaves immediately and is gone before the node finishes
+   shrinking. The border belongs to this container, so it travels with the
+   document rather than appearing as a separate full-strength line. */
+.canvas-card__content[data-presence='entering'],
+.canvas-card__content[data-presence='leaving'] {
+  opacity: 0;
+}
+
+.canvas-card__content[data-presence='entering'] {
+  transition-delay: calc(var(--card-placement-duration, 200ms) * 0.6);
+}
+
+.canvas-card__content[data-presence='leaving'] {
+  pointer-events: none;
+  transition-delay: 0ms;
 }
 
 .canvas-card .card__title-editor,
