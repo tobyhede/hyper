@@ -138,6 +138,16 @@ export interface SpaceCanvasProps {
   onCloseCard: (cardId: CardId) => 'completed' | 'retained';
   onCompleteCardBody: (cardId: CardId, body: string) => 'completed' | 'retained';
   onResizeCard: (cardId: CardId, size: { width: number; height: number }) => void;
+  /**
+   * Whether a content edit is running, for the one control outside this canvas
+   * that has to know: Present.
+   *
+   * Presenting replaces the Card with its content rather than drawing content on
+   * it, so an editor cannot survive it and the draft would go with no exit
+   * spent. The caret stays this component's (`spec.md` §6) — what leaves is the
+   * one bit a sibling surface needs to stay out of the way.
+   */
+  onBodyEditingChange?: (editing: boolean) => void;
   /** Complete one locally validated title draft, or return its field error. */
   onCompleteCardTitle: (cardId: string, title: string) => string | null;
   /** Which Cards may be opened for editing — every Card of the Space (ADR 0049). */
@@ -168,6 +178,7 @@ export function SpaceCanvas({
   nameOnCreation,
   onOpenCard,
   onCloseCard,
+  onBodyEditingChange,
   onCompleteCardBody,
   onResizeCard,
   onCompleteCardTitle,
@@ -178,8 +189,42 @@ export function SpaceCanvas({
   activeGraphCardIds,
 }: SpaceCanvasProps) {
   const [caret, setCaret] = useState<{ cardId: string; field: 'title' | 'body' } | null>(null);
-  const bodyEditing = caret?.field === 'body';
   const editingTitleCardId = caret?.field === 'title' ? caret.cardId : null;
+  /**
+   * Which Card carries a live content editor — **derived, never stored**.
+   *
+   * The caret is the author's intent and is real state. Whether that intent is
+   * running is not: it is true exactly while the Card the caret names is still
+   * an Expanded Markdown Card this canvas may edit. Deriving it is what makes
+   * the answer and the editor one fact rather than two that can disagree.
+   *
+   * Storing it is how the canvas used to lock: `onEnd` is the only thing that
+   * clears the caret and it arrives through `data.bodyEditor`, so a Card that
+   * stopped being Expanded — a replacement Space accepted mid-edit — took the
+   * callback away and left a stored `true` behind. Title editing, `F2` and `C`
+   * are all withheld while an edit runs, so the canvas stayed withdrawn until
+   * the author presented or reloaded.
+   *
+   * `editable` and `presenting` belong here and `titleEditingEnabled` does not.
+   * A modal over the canvas hides the editor and gives it back — it owns its own
+   * modality (`CardPane`), and ADR 0064 allows exactly four exits, none of which
+   * is a surface opening over the graph. Leaving authoring altogether is a
+   * different thing, and it ends the edit because the Card stops being drawn.
+   */
+  const bodyEditorCardId =
+    caret?.field === 'body' &&
+    editable &&
+    !presenting &&
+    nodes.some(
+      (node) =>
+        node.id === caret.cardId && node.data.expanded === true && node.data.kind === 'markdown',
+    )
+      ? caret.cardId
+      : null;
+  const bodyEditing = bodyEditorCardId !== null;
+  useEffect(() => {
+    onBodyEditingChange?.(bodyEditing);
+  }, [bodyEditing, onBodyEditingChange]);
   /**
    * Whether a drag may begin at a Card's authoring handles.
    *
@@ -225,7 +270,10 @@ export function SpaceCanvas({
   const [canvasAuthoringWasEnabled, setCanvasAuthoringWasEnabled] = useState(canAuthorOnCanvas);
   if (canvasAuthoringWasEnabled !== canAuthorOnCanvas) {
     setCanvasAuthoringWasEnabled(canAuthorOnCanvas);
-    if (!canAuthorOnCanvas) setCaret(null);
+    // The *title* editor only. It is a canvas control and goes with the rest of
+    // them. A content edit is the Card's, not the canvas's: it is answered by
+    // `bodyEditorCardId` above, which needs no reset because it stores nothing.
+    if (!canAuthorOnCanvas && caret?.field === 'title') setCaret(null);
   }
 
   // A created Card is named in place, in the editor that already exists for
@@ -278,6 +326,11 @@ export function SpaceCanvas({
     (event: ReactKeyboardEvent<HTMLDivElement>) => {
       if (presenting || !(event.target instanceof Element)) return;
       if (event.key === 'Enter' || event.key === ' ') {
+        // The same exclusion the `C` branch below makes, and now load-bearing
+        // rather than defensive: an Expanded Card draws its editor *inside* the
+        // node, so a Space typed into it would otherwise be cancelled here
+        // before the document ever received the character.
+        if (event.target.closest(NOT_A_CANVAS_COMMAND) !== null) return;
         const card = event.target.closest<HTMLElement>('.react-flow__node[data-id]');
         if (card === null || !event.currentTarget.contains(card)) return;
         const cardId = card.dataset['id'];
@@ -370,7 +423,7 @@ export function SpaceCanvas({
               onResize: (size) => onResizeCard(node.data.cardId, size),
             };
           }
-          if (canAuthorOnCanvas && caret?.cardId === node.id && caret.field === 'body') {
+          if (bodyEditorCardId === node.id) {
             data.bodyEditor = {
               onComplete: (body) => onCompleteCardBody(node.data.cardId, body),
               onEnd: () => setCaret(null),
@@ -402,7 +455,7 @@ export function SpaceCanvas({
       onCloseCard,
       onCompleteCardBody,
       onResizeCard,
-      caret,
+      bodyEditorCardId,
     ],
   );
 

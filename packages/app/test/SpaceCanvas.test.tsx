@@ -47,6 +47,10 @@ interface Harness {
   readonly setNameOnCreation: (cardId: string | null) => void;
   /** Re-render with nothing changed at all, the way a parent's render does. */
   readonly rerender: () => void;
+  /** Re-render over a different projection, the way a completed Edit does. */
+  readonly setNodes: (next: CardFlowNode[]) => void;
+  /** What the canvas told its parent about a live content edit. */
+  readonly bodyEditingChanged: ReturnType<typeof vi.fn>;
 }
 
 /**
@@ -82,10 +86,12 @@ function inertEdgeAuthoring(): EdgeAuthoring {
 }
 
 /** A SpaceCanvas whose title Edit always refuses, so a draft can be left unsettled. */
-function mountGraph(nodes: CardFlowNode[] = [cardNode('A')]): Harness {
+function mountGraph(initialNodes: CardFlowNode[] = [cardNode('A')]): Harness {
   const openCard = vi.fn();
   const addCard = vi.fn();
-  const editableCardIds = new Set(nodes.map((node) => node.id));
+  const bodyEditingChanged = vi.fn();
+  let nodes = initialNodes;
+  let editableCardIds = new Set(nodes.map((node) => node.id));
   const edgeAuthoring = inertEdgeAuthoring();
   let titleEditing = true;
   let named: string | null = null;
@@ -110,6 +116,7 @@ function mountGraph(nodes: CardFlowNode[] = [cardNode('A')]): Harness {
         onAddCard={addCard}
         nameOnCreation={named}
         onOpenCard={openCard}
+        onBodyEditingChange={bodyEditingChanged}
         onCloseCard={() => 'completed'}
         onCompleteCardBody={() => 'completed'}
         onResizeCard={() => undefined}
@@ -127,6 +134,12 @@ function mountGraph(nodes: CardFlowNode[] = [cardNode('A')]): Harness {
     view,
     openCard,
     addCard,
+    bodyEditingChanged,
+    setNodes: (next) => {
+      nodes = next;
+      editableCardIds = new Set(next.map((node) => node.id));
+      view.rerender(graph());
+    },
     setTitleEditing: (enabled) => {
       titleEditing = enabled;
       view.rerender(graph());
@@ -364,6 +377,50 @@ describe('withdrawing canvas authoring from an Expanded Card', () => {
     expect(view.container.querySelector('.react-flow__resize-control')).toBeNull();
   });
 
+  it('keeps a live editor when a modal withdraws canvas authoring', () => {
+    const expanded = cardNode('A', CARD_ID, true);
+    expanded.data.expanded = true;
+    expanded.data.body = '# A';
+    const { setTitleEditing } = mountGraph([expanded]);
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Markdown source of A' }));
+    expect(screen.getByRole('button', { name: 'Save Card A' })).toBeVisible();
+
+    setTitleEditing(false);
+
+    // A modal over the canvas owns its own modality, and the editor is still
+    // there when it closes. Four exits and no more (ADR 0064) — a surface
+    // opening over the graph is not one of them.
+    expect(screen.getByRole('button', { name: 'Save Card A' })).toBeVisible();
+  });
+
+  it('does not lock the canvas when the edited Card stops being Expanded', () => {
+    const expanded = cardNode('A', CARD_ID, true);
+    expanded.data.expanded = true;
+    expanded.data.body = '# A';
+    const { addCard, setNodes } = mountGraph([expanded]);
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Markdown source of A' }));
+
+    // The Card the caret names is no longer Expanded — a replacement Space is
+    // the route. Nothing will call `onEnd`, so a stored answer would stay true
+    // and take title editing, F2 and `c` with it for the rest of the session.
+    const collapsed = cardNode('A', CARD_ID, true);
+    setNodes([collapsed]);
+
+    fireEvent.keyDown(nodeOf(CARD_ID), { key: 'c' });
+    expect(addCard).toHaveBeenCalled();
+  });
+
+  it('tells its parent a content edit is live, so presenting cannot start over one', () => {
+    const expanded = cardNode('A', CARD_ID, true);
+    expanded.data.expanded = true;
+    expanded.data.body = '# A';
+    const { bodyEditingChanged } = mountGraph([expanded]);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Markdown source of A' }));
+
+    expect(bodyEditingChanged).toHaveBeenLastCalledWith(true);
+  });
+
   it('does not let another edit or Card creation replace a live body caret', () => {
     const a = cardNode('A');
     a.data.expanded = true;
@@ -527,5 +584,31 @@ describe("React Flow's delete keys", () => {
     rerender();
 
     expect(listen.mock.calls.filter(([type]) => type === 'keydown')).toEqual([]);
+  });
+});
+
+/**
+ * Opening is a command of the *canvas*, and a Card now contains the text control
+ * its content is edited in. The `C` shortcut already asks this question; the
+ * open key did not, and a Space typed into an Expanded Card's editor is a
+ * character rather than a request to open the Card it is inside.
+ *
+ * Modelled with a plain `contenteditable` rather than the real editor because
+ * `MarkdownSourceEditor` is reached by dynamic import: the rule under test is
+ * about where the key came from, not which component put it there.
+ */
+describe.each([
+  ['Enter', 'Enter'],
+  ['Space', ' '],
+] as const)('%s typed into a text control inside a Card', (_name, key) => {
+  it('is a keypress rather than a request to open that Card', () => {
+    const { openCard } = mountGraph();
+    const field = document.createElement('div');
+    field.setAttribute('contenteditable', 'true');
+    nodeOf(CARD_ID).append(field);
+
+    fireEvent.keyDown(field, { key });
+
+    expect(openCard).not.toHaveBeenCalled();
   });
 });

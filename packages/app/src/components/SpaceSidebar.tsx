@@ -58,6 +58,13 @@ export interface SpaceSidebarProps {
     readonly activeGraphId: string | null;
     readonly onActivate: (graphId: GraphId) => void;
     readonly onPresent: () => void;
+    /**
+     * Whether presenting may start. False while a content edit is running:
+     * presenting draws the Card's content in place of the Card, so a live
+     * editor cannot survive it and its draft would go with no exit spent
+     * (ADR 0064).
+     */
+    readonly canPresent?: boolean;
     readonly presenting?: boolean;
     readonly onExitPresenting: () => void;
   };
@@ -196,7 +203,8 @@ export function SpaceSidebar({
   // in the same Edit (ADR 0040), so a Layout converted out of a View by a plain
   // Card drag is always in this state until the author draws something.
   const presentDisabled =
-    !graph.presenting && (activeGraph === undefined || activeGraph.edges.length === 0);
+    !graph.presenting &&
+    (graph.canPresent === false || activeGraph === undefined || activeGraph.edges.length === 0);
 
   return (
     <Sidebar collapsible="offcanvas" data-testid="space-sidebar">

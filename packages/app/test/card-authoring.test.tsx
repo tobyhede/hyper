@@ -336,20 +336,37 @@ describe('authoring an opened Card', () => {
   });
 
   /**
-   * Presenting is read-only, and the reason no Edit action survives into it is
-   * that no opened Card does: starting traversal closes whatever was open, and
-   * the graph refuses to open a Card while presenting. `OpenCard` is handed its
-   * Edit action without being told the mode, so this is the guarantee that keeps
-   * that honest, and it is a long way from the component relying on it.
+   * Presenting draws the active Card's content *in place of* the Card
+   * (`showActiveCardContent`), so a live editor cannot survive it and its draft
+   * would go with none of ADR 0064's four exits spent. Rather than let a mode
+   * change discard a document, presenting is unavailable while an edit runs and
+   * the author settles it first.
+   *
+   * This is the one control outside the canvas that needs to know an edit is
+   * running. The two modal surfaces need nothing: `CardPane` owns its own
+   * modality, and the editor is still there when it closes.
    */
-  it('leaves no opened Card, and so no Edit action, once presenting starts', async () => {
+  it('cannot start presenting over a live content edit', async () => {
     const session = mount();
     await openEditor();
     expect(screen.getByRole('button', { name: 'Save Card A' })).toBeVisible();
 
+    expect(screen.getByTestId('present-button')).toBeDisabled();
     fireEvent.click(screen.getByTestId('present-button'));
 
-    expect(screen.queryByRole('textbox', { name: 'Markdown source of A' })).not.toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: 'Markdown source of A' })).toBeVisible();
+    await settled(session);
+  });
+
+  it('presents once the author has settled the edit', async () => {
+    const session = mount();
+    await openEditor();
+    fireEvent.keyDown(screen.getByRole('textbox', { name: 'Markdown source of A' }), {
+      key: 'Escape',
+    });
+
+    fireEvent.click(screen.getByTestId('present-button'));
+
     expect(screen.queryByRole('button', { name: /^Open Card/ })).not.toBeInTheDocument();
     await settled(session);
   });

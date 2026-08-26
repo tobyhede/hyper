@@ -61,6 +61,16 @@ export const createApp = ({ spaceSession }: OpenedSpace) => {
      * than a partial entity. Closing it creates nothing.
      */
     const [creatingAlias, setCreatingAlias] = useState(false);
+    /**
+     * Whether a Card's content edit is running, reported up by the canvas.
+     *
+     * Read by one control. Presenting draws the active Card's content *instead
+     * of* the Card (`showActiveCardContent`), so a live editor cannot survive it
+     * and the draft would go without one of ADR 0064's four exits being spent.
+     * The two modal surfaces need nothing here: `CardPane` owns its own
+     * modality, and the editor is still there when it closes.
+     */
+    const [editingCardBody, setEditingCardBody] = useState(false);
     const [aliasRefusal, setAliasRefusal] = useState<AuthoringRefusal | null>(null);
     /** The Card a completed creation asks the canvas to open its name editor on. */
     const [createdCardId, setCreatedCardId] = useState<CardId | null>(null);
@@ -573,6 +583,7 @@ export const createApp = ({ spaceSession }: OpenedSpace) => {
           colorByGraphId: projection.colors,
           onActivate: activateGraph,
           onPresent: present,
+          canPresent: !editingCardBody,
           presenting,
           onExitPresenting: exitPresenting,
         }}
@@ -654,6 +665,7 @@ export const createApp = ({ spaceSession }: OpenedSpace) => {
                 onAddCard={addCard}
                 nameOnCreation={createdCardId}
                 onOpenCard={openCardForEditing}
+                onBodyEditingChange={setEditingCardBody}
                 onCloseCard={closeExpandedCard}
                 onCompleteCardBody={completeCardBody}
                 onResizeCard={resizeExpandedCard}
