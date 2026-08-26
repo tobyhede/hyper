@@ -50,17 +50,11 @@
   background: var(--canvas);
 }
 
-.inv-card-node-stage--open-close {
-  width: 560px;
-  height: 420px;
-}
-
-/* A bigger stage for a specimen a test actually drags: the default stage fits
-   an Open node by zooming it down to a few screen pixels, too small a target
-   for a pointer gesture to land reliably. */
-.inv-card-node-stage.inv-card-node-stage--resizable {
-  width: 640px;
-  height: 480px;
+/* Open and resizable specimens need enough room for the authored Card rect plus
+   React Flow's fit-view padding, so the Card remains legible and draggable. */
+.inv-card-node-stage--large {
+  width: 720px;
+  height: 540px;
 }
 
 /* Canvas-card visuals live with CanvasCard in the shared UI package. Ladle owns only the catalogue furniture below. */

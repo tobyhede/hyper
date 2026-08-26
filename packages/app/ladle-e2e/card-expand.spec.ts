@@ -2,7 +2,6 @@ import { expect, test, type Page } from '@playwright/test';
 
 const openCloseStory = '/?story=components--card--open-and-close&mode=preview';
 const markdownStory = '/?story=components--card--editing--markdown&mode=preview';
-const containmentStory = '/?story=components--card--node-containment&mode=preview';
 const resizeControlStory = '/?story=components--card--resize-control&mode=preview';
 
 const open = async (page: Page, story: string): Promise<void> => {
@@ -163,8 +162,9 @@ test(
   'the Card fills a React Flow node whose rect differs from the collapsed default',
   { tag: '@parity:canvas-card-fills-authored-node-rect' },
   async ({ page }) => {
-    await page.goto(containmentStory);
-    const node = page.locator('.react-flow__node').first();
+    await page.goto(resizeControlStory);
+    const openRegion = page.getByRole('region', { name: 'Open Card', exact: true });
+    const node = openRegion.locator('.react-flow__node');
     const card = node.getByRole('article', { name: 'Strategies' });
     await expect(card).toBeVisible({ timeout: 20_000 });
 

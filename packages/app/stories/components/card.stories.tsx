@@ -107,22 +107,6 @@ export const Hover: Story = () => (
   </div>
 );
 
-export const NodeContainment: Story = () => (
-  <div className="inv inv-sheet" style={cardSizeVars}>
-    <CatalogueSection
-      title="React Flow node containment"
-      note="The production CanvasCard fills the rect React Flow declares. This specimen deliberately differs from the collapsed default so equality cannot pass by coincidence."
-    >
-      <div className="inv-row">
-        <Specimen label="340 × 210 node">
-          <CanvasCardNodeSpecimen nodeSize={{ width: 340, height: 210 }} />
-        </Specimen>
-      </div>
-    </CatalogueSection>
-  </div>
-);
-NodeContainment.storyName = 'Node containment';
-
 /** A specimen that keeps its own size in state, so a real drag on the real
  *  production control actually grows the real node — the round trip
  *  `SpaceCanvas` makes through Space Authoring, condensed to local state. */
@@ -134,7 +118,7 @@ function ResizableOpenSpecimen({ selected = false }: { readonly selected?: boole
       selected={selected}
       nodeSize={size}
       onResize={setSize}
-      stageClassName="inv-card-node-stage inv-card-node-stage--resizable"
+      stageClassName="inv-card-node-stage--large"
     />
   );
 }
@@ -278,7 +262,7 @@ export const OpenAndClose: Story = () => {
           onOpenChange={changeOpen}
           body={openMarkdown}
           nodeSize={open ? openFrame : closedFrame}
-          stageClassName="inv-card-node-stage--open-close"
+          stageClassName="inv-card-node-stage--large"
         />
       </section>
       <section aria-label="Long Markdown Card" className="flex flex-col gap-2">
@@ -291,7 +275,7 @@ export const OpenAndClose: Story = () => {
           title="Long Markdown"
           body={`${openMarkdown}\n\n### A deliberately long section\n\n${openMarkdown}\n\n${openMarkdown}`}
           nodeSize={longOpen ? openFrame : closedFrame}
-          stageClassName="inv-card-node-stage--open-close"
+          stageClassName="inv-card-node-stage--large"
         />
       </section>
     </div>
