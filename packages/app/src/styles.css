@@ -102,6 +102,8 @@ body {
 
 /* ---- Graph area ---- */
 .graph-area {
+  --card-placement-duration: 200ms;
+  --card-placement-easing: ease;
   position: absolute;
   inset: 0;
 }
@@ -109,11 +111,53 @@ body {
 /* ---- Card node ---- */
 .rf-card-node {
   border-radius: 10px;
+  transition:
+    width var(--card-placement-duration) var(--card-placement-easing),
+    height var(--card-placement-duration) var(--card-placement-easing),
+    transform var(--card-placement-duration) var(--card-placement-easing);
 }
 
 .rf-card-node__inner {
   position: relative;
-  width: var(--card-width);
+  width: 100%;
+  height: 100%;
+}
+
+/* An Expanded Card is whatever rect the Layout authored, so the node's own
+   subtree stops declaring the collapsed constant and fills the box React Flow
+   sized from `node.width`/`node.height` (ADR 0064). The declared width stays the
+   default because a Card is drawn before any layout resolves, and 100% of an
+   unsized wrapper is nothing. */
+.rf-card-node__inner > .canvas-card {
+  width: 100%;
+  height: 100%;
+}
+
+.react-flow__node[class~='dragging'].rf-card-node {
+  transition: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .graph-area {
+    --card-placement-duration: 1ms;
+  }
+}
+
+/* React Flow's own `NodeResizer`, in the Card's palette. Drawn through the two
+   `className` props it publishes rather than by naming its internal selectors,
+   and here rather than beside `CanvasCard` because the resizer is the
+   framework's — the Card being resized knows nothing about it. */
+.rf-card-node__resize-line {
+  border-color: color-mix(in srgb, var(--canvas-card-ink-color) 40%, transparent);
+  border-width: 1px;
+}
+
+.rf-card-node__resize-handle {
+  width: 10px;
+  height: 10px;
+  background: var(--canvas-card-face-active);
+  border: 2px solid var(--canvas-card-ink-color);
+  border-radius: 0;
 }
 
 .new-card-preview {
@@ -140,7 +184,7 @@ body {
   border-radius: 50%;
   opacity: 0;
   pointer-events: none;
-  transition: opacity 100ms ease;
+  transition: opacity var(--card-hover-duration) var(--card-hover-easing);
 }
 
 /* Idle, a Card offers where an Edge may start; mid-drag, it offers whichever
@@ -203,25 +247,6 @@ body {
   background: var(--card);
   color: var(--destructive);
   font-size: 0.8rem;
-  box-shadow: 0 12px 40px rgb(0 0 0 / 50%);
-  transform: translateX(-50%);
-}
-
-/* The keyboard connection's target picker. Screen-fixed rather than drawn at the
-   source Card: it opens from a control the author has just activated, and the
-   Card it belongs to may be anywhere in the viewport. */
-.edge-connect-picker {
-  position: absolute;
-  top: 0.75rem;
-  left: 50%;
-  z-index: 10;
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 0.5rem;
-  background: var(--card);
   box-shadow: 0 12px 40px rgb(0 0 0 / 50%);
   transform: translateX(-50%);
 }

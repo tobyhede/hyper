@@ -29,16 +29,16 @@
  */
 
 import type { CSSProperties } from 'react';
+import { COLLAPSED_CARD_SIZE } from '@project/core';
 
 export const CARD_ASPECT_RATIO = 16 / 9;
 
-const BASE_WIDTH = 260;
-
-export const CARD_WIDTH = BASE_WIDTH;
-export const CARD_HEIGHT = Math.round(BASE_WIDTH / CARD_ASPECT_RATIO);
+export const CARD_WIDTH = COLLAPSED_CARD_SIZE.width;
+export const CARD_HEIGHT = COLLAPSED_CARD_SIZE.height;
 
 /** The size a layout arranges cards at. */
 export const CARD_SIZE = { width: CARD_WIDTH, height: CARD_HEIGHT } as const;
+export const DEFAULT_EXPANDED_CARD_SIZE = { width: 560, height: 420 } as const;
 
 /**
  * Handed to the graph container so the stylesheet draws cards at exactly the size

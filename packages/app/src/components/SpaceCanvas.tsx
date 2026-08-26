@@ -22,6 +22,7 @@ import {
   type CardFlowNode,
 } from '@project/react-flow-adapter';
 import { activeGraphColor } from '../colors';
+import { CARD_SIZE } from '../card';
 import { useEdgeAuthoring } from '../edge-authoring-react';
 import type { EdgeAuthoring } from '../edge-authoring';
 import type { CanvasSelection, EdgeSubject } from '../render-adapter';
@@ -133,7 +134,10 @@ export interface SpaceCanvasProps {
    */
   nameOnCreation: string | null;
   /** Opening a card is a view gesture; the graph only reports which was picked. */
-  onOpenCard: (cardId: string) => void;
+  onOpenCard: (cardId: string) => 'completed' | 'retained';
+  onCloseCard: (cardId: CardId) => 'completed' | 'retained';
+  onCompleteCardBody: (cardId: CardId, body: string) => 'completed' | 'retained';
+  onResizeCard: (cardId: CardId, size: { width: number; height: number }) => void;
   /** Complete one locally validated title draft, or return its field error. */
   onCompleteCardTitle: (cardId: string, title: string) => string | null;
   /** Which Cards may be opened for editing — every Card of the Space (ADR 0049). */
@@ -163,6 +167,9 @@ export function SpaceCanvas({
   onAddCard,
   nameOnCreation,
   onOpenCard,
+  onCloseCard,
+  onCompleteCardBody,
+  onResizeCard,
   onCompleteCardTitle,
   editableCardIds,
   graphs,
@@ -170,7 +177,9 @@ export function SpaceCanvas({
   activeGraphId,
   activeGraphCardIds,
 }: SpaceCanvasProps) {
-  const [editingTitleCardId, setEditingTitleCardId] = useState<string | null>(null);
+  const [caret, setCaret] = useState<{ cardId: string; field: 'title' | 'body' } | null>(null);
+  const bodyEditing = caret?.field === 'body';
+  const editingTitleCardId = caret?.field === 'title' ? caret.cardId : null;
   /**
    * Whether a drag may begin at a Card's authoring handles.
    *
@@ -199,11 +208,8 @@ export function SpaceCanvas({
    * not cosmetic. React Flow subscribes the delete key on `document`, excluding
    * only inputs and `.nokey`; a pane's `Done` and `Cancel` are neither, so a
    * `Backspace` aimed at the open dialog deleted whichever Edge was selected
-   * behind it. Hiding the Connect control while leaving the gesture live is the
-   * asymmetry — the two agree here, and `edge-authoring-react.test.tsx` holds
-   * them to it. Loosening the control to match Edge authoring was the other way
-   * to close it, and it is the wrong one: it would put a Connect button on every
-   * Card behind a modal dialog.
+   * behind it. The Card controls and spatial Edge gestures agree here, and
+   * `edge-authoring-react.test.tsx` holds them to it.
    */
   const canAuthorOnCanvas = canConnectOnCanvas && !presenting;
 
@@ -219,7 +225,7 @@ export function SpaceCanvas({
   const [canvasAuthoringWasEnabled, setCanvasAuthoringWasEnabled] = useState(canAuthorOnCanvas);
   if (canvasAuthoringWasEnabled !== canAuthorOnCanvas) {
     setCanvasAuthoringWasEnabled(canAuthorOnCanvas);
-    if (!canAuthorOnCanvas) setEditingTitleCardId(null);
+    if (!canAuthorOnCanvas) setCaret(null);
   }
 
   // A created Card is named in place, in the editor that already exists for
@@ -231,7 +237,9 @@ export function SpaceCanvas({
   const [lastCreatedCardId, setLastCreatedCardId] = useState(nameOnCreation);
   if (lastCreatedCardId !== nameOnCreation) {
     setLastCreatedCardId(nameOnCreation);
-    if (nameOnCreation !== null) setEditingTitleCardId(nameOnCreation);
+    if (nameOnCreation !== null && !bodyEditing) {
+      setCaret({ cardId: nameOnCreation, field: 'title' });
+    }
   }
 
   const edgeSurface = useEdgeAuthoring({
@@ -302,11 +310,11 @@ export function SpaceCanvas({
       // The default is prevented only where the command can actually run
       // (`docs/agents/rendering.md`'s keyboard contract), so a `c` typed while authoring is
       // withdrawn is left to whatever else would have had it.
-      if (!canAuthorOnCanvas) return;
+      if (!canAuthorOnCanvas || bodyEditing) return;
       event.preventDefault();
       onAddCard();
     },
-    [presenting, onOpenCard, canAuthorOnCanvas, onAddCard],
+    [presenting, onOpenCard, canAuthorOnCanvas, bodyEditing, onAddCard],
   );
 
   // `F2` renames the selected Card, and this is the *only* handler that answers
@@ -316,7 +324,7 @@ export function SpaceCanvas({
   // handlers for one key means one of them is the unguarded one; don't add a
   // second back.
   useEffect(() => {
-    if (!canAuthorOnCanvas) return;
+    if (!canAuthorOnCanvas || bodyEditing) return;
     const beginSelectedTitleEdit = (event: KeyboardEvent): void => {
       if (event.key !== 'F2') return;
       if (event.target instanceof Element && event.target.closest(NOT_A_CANVAS_COMMAND) !== null) {
@@ -325,44 +333,60 @@ export function SpaceCanvas({
       const selected = nodes.find((node) => node.selected);
       if (selected === undefined) return;
       event.preventDefault();
-      setEditingTitleCardId(selected.id);
+      setCaret({ cardId: selected.id, field: 'title' });
     };
     window.addEventListener('keydown', beginSelectedTitleEdit);
     return () => window.removeEventListener('keydown', beginSelectedTitleEdit);
-  }, [canAuthorOnCanvas, nodes]);
+  }, [canAuthorOnCanvas, bodyEditing, nodes]);
 
   // The operations, not the surface holding them: `useEdgeAuthoring` answers a
   // fresh object literal per render while each of these is stable, and a hook
   // that depended on the object would be rebuilt every time.
-  const beginConnectFrom = edgeSurface.beginConnectFrom;
   const deleteEdges = edgeSurface.deleteEdges;
   const editableNodes = useMemo(
     () =>
       nodes.map((node) => {
         const data: CardFlowNode['data'] = {
           ...node.data,
-          // Three controls, three flags. The Title's direct edit is offered on
-          // every Card; the affordance only on one that owns content to edit;
-          // the Connect control wherever an Edge may begin. Each flag travels
+          // The Title's direct edit is offered on every Card; the Card
+          // affordance only on one that owns content to edit. Each flag travels
           // with the operation that performs it — `CardNode` withholds a control
           // it was offered without one.
-          titleEditingEnabled: canAuthorOnCanvas,
+          titleEditingEnabled: canAuthorOnCanvas && !bodyEditing,
           cardEditingEnabled: canAuthorOnCanvas && editableCardIds.has(node.id),
-          connectingEnabled: canAuthorOnCanvas,
-          onBeginConnect: () => beginConnectFrom(node.id),
-          onEditCard: () => onOpenCard(node.id),
-          onBeginTitleEditing: () => setEditingTitleCardId(node.id),
+          onEditCard: (open) => (open ? onOpenCard(node.id) : onCloseCard(node.data.cardId)),
         };
+        if (canAuthorOnCanvas && !bodyEditing) {
+          data.onBeginTitleEditing = () => setCaret({ cardId: node.id, field: 'title' });
+        }
+        if (canAuthorOnCanvas && !bodyEditing && node.data.kind === 'markdown') {
+          data.onBeginBodyEditing = () => setCaret({ cardId: node.id, field: 'body' });
+        }
+        if (node.data.expanded === true && node.data.kind === 'markdown') {
+          if (canAuthorOnCanvas) {
+            data.resize = {
+              minWidth: CARD_SIZE.width,
+              minHeight: CARD_SIZE.height,
+              onResize: (size) => onResizeCard(node.data.cardId, size),
+            };
+          }
+          if (canAuthorOnCanvas && caret?.cardId === node.id && caret.field === 'body') {
+            data.bodyEditor = {
+              onComplete: (body) => onCompleteCardBody(node.data.cardId, body),
+              onEnd: () => setCaret(null),
+            };
+          }
+        }
         // The editor is the Card being renamed, and it arrives with what ends
         // it rather than as a flag beside two callbacks that might not be there.
         if (canAuthorOnCanvas && node.id === editingTitleCardId) {
           data.titleEditor = {
             onComplete: (title: string) => {
               const error = onCompleteCardTitle(node.id, title);
-              if (error === null) setEditingTitleCardId(null);
+              if (error === null) setCaret(null);
               return error;
             },
-            onCancel: () => setEditingTitleCardId(null),
+            onCancel: () => setCaret(null),
           };
         }
         return { ...node, data };
@@ -370,11 +394,15 @@ export function SpaceCanvas({
     [
       nodes,
       canAuthorOnCanvas,
+      bodyEditing,
       editableCardIds,
       editingTitleCardId,
       onCompleteCardTitle,
       onOpenCard,
-      beginConnectFrom,
+      onCloseCard,
+      onCompleteCardBody,
+      onResizeCard,
+      caret,
     ],
   );
 

@@ -4,6 +4,7 @@ import {
   buildGraphRenderEdges,
   buildLayoutStrategyGraph,
   filterHandlesByGraphs,
+  Placement,
   type LayoutStrategyGraph,
   type Space,
 } from '@project/graph';
@@ -93,7 +94,19 @@ export function canvasProjection(
   // never be derived from the Graphs either — that would draw a new Space as an
   // empty canvas.
   const cardIds = space.cards.map((card) => card.id);
-  const strategyGraph = buildLayoutStrategyGraph(cardIds, handles, edges, CARD_SIZE);
+  const authored =
+    renderer.kind === 'layout' ? Placement.fromLayout(renderer.resolvedLayout.layout) : null;
+  const expandedCardIds = new Set(
+    authored === null
+      ? []
+      : [...authored].filter(([, at]) => at.expanded !== undefined).map(([cardId]) => cardId),
+  );
+  const strategyGraph = buildLayoutStrategyGraph(
+    cardIds,
+    handles,
+    edges,
+    (cardId) => authored?.get(cardId)?.expanded ?? CARD_SIZE,
+  );
 
   return {
     strategyGraph,
@@ -123,6 +136,7 @@ export function canvasProjection(
           strategyGraph: laidOut,
           nodeHeight: CARD_HEIGHT,
           cardIds,
+          expandedCardIds,
         }),
         edges: projectGraphEdges(edges, colors, edgeOptions),
       };

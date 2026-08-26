@@ -63,18 +63,8 @@ const UI_IMPLEMENTATION_PATTERN = {
   message: UI_IMPLEMENTATION_MESSAGE,
 };
 
-/** One exported specialist-widget entry is a deliberate application split
- * point: keeping CodeMirror behind the root barrel puts its entire editor stack
- * in the initial bundle. It remains owned by and imported from `@project/ui`;
- * the adapter receives no exception, and every other UI subpath stays barred. */
 const APP_UI_IMPLEMENTATION_PATTERN = {
-  group: [
-    '@base-ui/react/*',
-    'cmdk/*',
-    'lucide-react/*',
-    '@project/ui/*',
-    '!@project/ui/MarkdownSourceEditor',
-  ],
+  group: ['@base-ui/react/*', 'cmdk/*', 'lucide-react/*', '@project/ui/*'],
   message: UI_IMPLEMENTATION_MESSAGE,
 };
 

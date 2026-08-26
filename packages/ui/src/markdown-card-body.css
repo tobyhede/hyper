@@ -1,0 +1,226 @@
+/* The Markdown kind's Expanded front, beside the component that draws it.
+
+   Custom composite record (shadcn-first-ui):
+   - Existing Hyper component considered: CanvasCard, Button, RenderedMarkdown
+     and MarkdownSourceEditor are composed here rather than duplicated.
+   - shadcn/Base UI component considered: CanvasCard's existing Button supplies
+     the rail Edit action; no registry primitive owns rendered/source Markdown
+     geometry.
+   - Product requirement that cannot be expressed: read and edit modes reserve
+     one stable line-number gutter inside an authored Card rect.
+   - Why composition or a variant is insufficient: the gutter, paper inset and
+     focus disclosure are the Markdown kind's visual contract, not a reusable
+     control variant.
+   - Custom behavior being introduced: none; Button and MarkdownSourceEditor
+     retain activation, keyboard and focus behavior. The two ends of a running
+     edit are published to the surrounding `CanvasCard`, whose existing rail
+     actions draw them. This surface keeps only a transparent pointer target;
+     the rail remains its sole visible control.
+   - Tests proving the deviation: MarkdownCardBody.test.tsx and
+     packages/app/ladle-e2e/card-expand.spec.ts.
+
+   Geometry and the editor's two published contracts only. Everything about how
+   the source *looks* — type, gutter, line numbers, wrapping, highlighting — is
+   `MarkdownSourceEditor`'s own theme, and this file names no `.cm-*` class
+   (ADR 0063). */
+.markdown-card-body {
+  --markdown-card-content-gap: 8px;
+  --markdown-card-content-top: 10px;
+  --markdown-card-gutter-width: 29px;
+
+  position: relative;
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
+}
+
+.markdown-card-body__rendered {
+  flex: 1;
+  min-height: 0;
+  /* `--markdown-card-content-top` is the one place the body's top inset is
+     written. Read here for the rendered body and handed to the editor below as
+     its own content padding, so the two cannot drift apart and move the text
+     when a caret arrives — which is what `rendered and source modes keep one
+     content column` asserts. */
+  padding: var(--markdown-card-content-top) 22px 22px
+    calc(var(--markdown-card-gutter-width) + var(--markdown-card-content-gap) + 1px);
+  overflow: hidden;
+  font-size: 15px;
+  line-height: 1.55;
+}
+
+.markdown-card-body__rendered > * {
+  margin: 0 0 0.75em;
+}
+
+.markdown-card-body__rendered > :last-child {
+  margin-bottom: 0;
+}
+
+.markdown-card-body__rendered :is(h1, h2, h3, h4) {
+  margin-bottom: 0.5em;
+  font-size: 1.2em;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.markdown-card-body__rendered :is(ul, ol) {
+  padding-left: 1.5em;
+}
+
+.markdown-card-body__rendered ul {
+  list-style: disc;
+}
+
+.markdown-card-body__rendered ol {
+  list-style: decimal;
+}
+
+.markdown-card-body__rendered strong {
+  font-weight: 700;
+}
+
+.markdown-card-body__rendered a {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-color: var(--canvas-card-graph, currentcolor);
+  text-underline-offset: 2px;
+}
+
+.markdown-card-body__rendered blockquote {
+  padding-left: 0.75em;
+  border-left: 3px solid var(--canvas-card-graph, currentcolor);
+}
+
+.markdown-card-body__rendered :is(code, pre) {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.9em;
+}
+
+.markdown-card-body__rendered pre {
+  padding: 0.75em;
+  overflow: hidden;
+  background: color-mix(in srgb, currentcolor 8%, transparent);
+}
+
+/* Pointer activation for the rendered body, with no second visible affordance.
+   Keyboard authors use the rail's Edit Button; this sibling only preserves the
+   established click-to-edit gesture without drawing another pencil or button. */
+.markdown-card-body__edit-target {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  opacity: 0;
+}
+
+.markdown-card-body--editing {
+  --markdown-source-content-inset: var(--markdown-card-content-gap);
+  --markdown-source-content-padding-top: var(--markdown-card-content-top);
+  --markdown-source-focus-outline: none;
+  --markdown-source-gutter-padding: 0 6px 0 4px;
+  --markdown-source-gutter-rule-color: color-mix(
+    in srgb,
+    var(--canvas-card-muted-color, currentcolor) 28%,
+    transparent
+  );
+  --markdown-source-gutter-width: var(--markdown-card-gutter-width);
+  --markdown-source-line-number-font-size: 12px;
+}
+
+/* The keys this surface spends, named where the author is typing.
+
+   Drawn the way every application that names an inline shortcut draws one: the
+   key as a **cap** — filled, bordered, its own small box — and the word beside
+   it in plain muted text. A cap is recognised as an object without being read;
+   glyphs set into running text at low contrast have to be parsed, and that is
+   what made the earlier line illegible. `Kbd`'s default variant is that cap and
+   the design system already ships it; the only thing added here is the Card's
+   own palette, because `bg-muted` is the application's paper and this sits on
+   the Card's.
+
+   No panel behind it: the Card's face is a shade darker than the editor's own
+   surface, so a filled backing reads as a grey box floated over the document.
+   It sits in the reserved band above the first line instead.
+
+   Grouping is the second rule: one gap holds a cap to its word, a wider one
+   separates the pairs, so the eye takes `⌘+↵ Save` and `Esc Cancel` as two
+   things rather than one run. */
+.markdown-card-body__shortcut-hint {
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline-end: 10px;
+  /* Sits in the band the body's own top inset opens, so tightening that inset
+     brings the hint up with the text rather than leaving it stranded. */
+  height: calc(var(--markdown-card-content-top) * 2 + 10px);
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  color: var(--canvas-card-muted-color, currentcolor);
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 1;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.markdown-card-body__shortcut {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.markdown-card-body__shortcut-keys {
+  gap: 3px;
+}
+
+/* The Card's palette over `Kbd`'s theme tokens, and a cap sized for a 10px line
+   rather than the 14px one the default variant assumes.
+
+   Outlined rather than filled: the rule is drawn on the Card's own paper, and a
+   second grey fill inside it adds a value the Card's palette does not have. The
+   border alone is what makes a cap read as a key, and it does that at any
+   size. */
+.markdown-card-body__shortcut-hint [data-slot='kbd'] {
+  height: 14px;
+  min-width: 14px;
+  padding: 0 3px;
+  border: 1px solid color-mix(in srgb, currentcolor 42%, transparent);
+  border-radius: 3px;
+  background: transparent;
+  /* One ink for the whole line. A cap set in the Card's full-strength ink beside
+     a muted word reads as two different kinds of text; the cap is already told
+     apart by its outline, and nothing is gained by also making it darker. */
+  color: inherit;
+  font-size: 9px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.markdown-card-body--editing:focus-within .markdown-card-body__shortcut-hint {
+  opacity: 1;
+}
+
+.markdown-card-body__source.markdown-source-editor {
+  flex: 1;
+  min-height: 0;
+  /* `markdown-source-editor.css` sets `--foreground` on itself, which wins over
+     anything the surface inherits. A Card's body is the Card's ink, so this
+     hands the colour back to whatever mounted the body. */
+  color: inherit;
+  background: transparent;
+}
+
+/* The frame the lazily-loaded editor arrives into, so the Card does not change
+   height as it lands. */
+.markdown-card-body__pending {
+  flex: 1;
+  min-height: 0;
+}

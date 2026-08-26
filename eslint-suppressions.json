@@ -29,11 +29,6 @@
       "count": 1
     }
   },
-  "packages/app/src/components/OpenCard.tsx": {
-    "@typescript-eslint/no-unsafe-type-assertion": {
-      "count": 1
-    }
-  },
   "packages/app/src/render-adapter.ts": {
     "@typescript-eslint/no-unsafe-type-assertion": {
       "count": 8
@@ -42,11 +37,6 @@
   "packages/app/src/space-authoring.ts": {
     "@typescript-eslint/no-unsafe-type-assertion": {
       "count": 3
-    }
-  },
-  "packages/app/test/OpenCard.test.tsx": {
-    "@typescript-eslint/no-unsafe-type-assertion": {
-      "count": 1
     }
   },
   "packages/app/test/canvas-renderers.test.ts": {

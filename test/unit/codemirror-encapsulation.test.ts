@@ -15,23 +15,45 @@ import { describe, expect, it } from 'vitest';
  */
 const CODEMIRROR_SELECTOR = /^[^@/*]*\.cm-[\w-]+/m;
 
-const SPECIALIST_MODULE = '@project/ui/MarkdownSourceEditor';
+/**
+ * The editor's one dynamic-import boundary. `MarkdownCardBody` lives in `ui`,
+ * so `ui` owns the lazy module and names the editor by relative path. A static
+ * import from anywhere in that tree would put the CodeMirror stack in the
+ * barrel, and from the barrel into the adapter and every other consumer.
+ */
+const SPECIALIST_IMPORTS = [
+  {
+    tree: 'packages/ui/src',
+    lazyModule: 'packages/ui/src/markdown-source-editor-lazy.ts',
+  },
+] as const;
+
+const MARKDOWN_SOURCE_EDITOR_SPECIFIER = /(?:^|\/)MarkdownSourceEditor$/;
+const STATIC_IMPORT = /^[ \t]*import(?:[ \t]+([^;\n]*?)[ \t]+from)?[ \t]*['"]([^'"]+)['"]/gm;
+const DYNAMIC_IMPORT = /import\(\s*['"]([^'"]+)['"]\s*\)/g;
 
 /**
- * A static `import ... from '<specifier>'`, capturing the `type` keyword when it is
- * there. Bounded by `[^;]` so the match cannot start at an earlier import statement and
- * run through to this specifier's `from` — leftmost-match would otherwise report the
- * bindings of a different, unrelated import.
+ * Whether an import's bindings survive compilation — the only kind that can pull the
+ * stack back into the bundle.
+ *
+ * Both spellings are erased, so both are allowed: `import type { X } from` and
+ * `import { type X } from`. Reading only the leading keyword classified the inline
+ * form as a value import and failed the split test over an import that costs nothing.
  */
-const STATIC_IMPORT = new RegExp(
-  String.raw`^[ \t]*import[ \t]+(type[ \t]+)?[^;]*?from[ \t]*['"]` +
-    SPECIALIST_MODULE +
-    String.raw`['"]`,
-  'gm',
-);
-const DYNAMIC_IMPORT = new RegExp(
-  String.raw`import\(\s*['"]` + SPECIALIST_MODULE + String.raw`['"]\s*\)`,
-);
+const isValueImport = (bindings: string): boolean => {
+  const clause = bindings.trim();
+  if (clause.startsWith('type ') || clause === 'type') return false;
+  const braced = /^\{([^}]*)\}$/.exec(clause);
+  if (braced === null) return true;
+  const named = braced[1]!.split(',').filter((entry) => entry.trim() !== '');
+  return named.length === 0 || !named.every((entry) => entry.trim().startsWith('type '));
+};
+
+const hasStaticEditorValueImport = (source: string): boolean =>
+  [...source.matchAll(STATIC_IMPORT)].some(
+    (match) =>
+      MARKDOWN_SOURCE_EDITOR_SPECIFIER.test(match[2] ?? '') && isValueImport(match[1] ?? ''),
+  );
 
 const sourcesUnder = (directory: string): readonly string[] =>
   readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
@@ -49,6 +71,18 @@ const stylesheetsUnder = (directory: string): readonly string[] =>
   });
 
 describe('CodeMirror stays behind its wrapper', () => {
+  it('recognises side-effect and nested relative editor imports as value imports', () => {
+    expect(hasStaticEditorValueImport("import '../MarkdownSourceEditor';")).toBe(true);
+    expect(
+      hasStaticEditorValueImport("import { MarkdownSourceEditor } from '../MarkdownSourceEditor';"),
+    ).toBe(true);
+    expect(
+      hasStaticEditorValueImport(
+        "import { type MarkdownSourceEditorHandle } from '../MarkdownSourceEditor';",
+      ),
+    ).toBe(false);
+  });
+
   it('is styled by no stylesheet in the repository', () => {
     const root = join(import.meta.dirname, '../..');
     const stylesheets = stylesheetsUnder(join(root, 'packages'));
@@ -71,23 +105,23 @@ describe('CodeMirror stays behind its wrapper', () => {
    * A type-only import is erased and costs nothing, which is why `OpenCard` may keep
    * one for the handle. A value import is what would pull the stack back in.
    */
-  it('is reached from the application by dynamic import only', () => {
-    const root = join(import.meta.dirname, '../..');
-    const sources = sourcesUnder(join(root, 'packages/app/src'));
-    expect(sources.length).toBeGreaterThan(0);
+  it.each(SPECIALIST_IMPORTS)(
+    'is reached from $tree by dynamic import only',
+    ({ tree, lazyModule }) => {
+      const root = join(import.meta.dirname, '../..');
+      const sources = sourcesUnder(join(root, tree));
+      expect(sources.length).toBeGreaterThan(0);
 
-    const valueImports = sources.filter((path) =>
-      [...readFileSync(path, 'utf8').matchAll(STATIC_IMPORT)].some(
-        (match) => match[1] === undefined,
-      ),
-    );
-    const dynamicImports = sources.filter((path) =>
-      DYNAMIC_IMPORT.test(readFileSync(path, 'utf8')),
-    );
+      const valueImports = sources.filter((path) => {
+        return hasStaticEditorValueImport(readFileSync(path, 'utf8'));
+      });
+      const dynamicImports = sources.filter((path) => {
+        const imports = readFileSync(path, 'utf8').matchAll(DYNAMIC_IMPORT);
+        return [...imports].some((match) => MARKDOWN_SOURCE_EDITOR_SPECIFIER.test(match[1] ?? ''));
+      });
 
-    expect(valueImports.map((path) => relative(root, path))).toEqual([]);
-    expect(dynamicImports.map((path) => relative(root, path))).toEqual([
-      'packages/app/src/components/markdown-source-editor-lazy.ts',
-    ]);
-  });
+      expect(valueImports.map((path) => relative(root, path))).toEqual([]);
+      expect(dynamicImports.map((path) => relative(root, path))).toEqual([lazyModule]);
+    },
+  );
 });

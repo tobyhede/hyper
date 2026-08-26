@@ -22,8 +22,8 @@ import {
 import type { Card, CardId, Graph, GraphEdge, GraphId } from '@project/core';
 import { uuidSchema } from '@project/core';
 import type { CardFlowNode } from '@project/react-flow-adapter';
-import { CardSearchCombobox, Field, FieldError, type CardChoice } from '@project/ui';
-import { describeAuthoringRefusal, presentEdgeConnectionRefusal } from './authoring-refusal';
+import type { CardChoice } from '@project/ui';
+import { describeAuthoringRefusal } from './authoring-refusal';
 import { cardChoiceOf } from './card-choice';
 import {
   dropTarget,
@@ -89,7 +89,7 @@ export interface EdgeAuthoringSurface {
   readonly edges: Edge[];
   readonly edgeTypes: EdgeTypes;
   readonly reactFlowProps: EdgeOwnedReactFlowProps;
-  /** Drawn inside the flow: the empty-drop preview and the keyboard target picker. */
+  /** Drawn inside the flow: the empty-drop preview and pointer-refusal announcement. */
   readonly layer: ReactNode;
   /**
    * Wrap the mounted flow so each authorable Edge can read its commands.
@@ -102,8 +102,6 @@ export interface EdgeAuthoringSurface {
   readonly provide: (children: ReactNode) => ReactNode;
   /** The Edge-only half of the canvas's `onBeforeDelete` dispatch. */
   readonly deleteEdges: (edges: readonly Edge[]) => void;
-  /** Begin a keyboard connection from a Card, for the Card's own control. */
-  readonly beginConnectFrom: (cardId: string) => void;
 }
 
 export interface EdgeAuthoringInput {
@@ -122,8 +120,8 @@ export interface EdgeAuthoringInput {
    * Edge authoring is withdrawn before a placement resolves, while a modal pane
    * covers the graph, and while presenting — the same three conditions the Card
    * controls are withdrawn on, and the canvas passes one value to both. The pane
-   * was missing here, which left the Connect control hidden and its gesture
-   * live; see `SpaceCanvas`'s `canAuthorOnCanvas`.
+   * was missing here, which left the pointer gesture live behind it; see
+   * `SpaceCanvas`'s `canAuthorOnCanvas`.
    *
    * *Placement*, not Layout: an Algorithmic View has no Layout and its Cards are
    * authorable the moment its strategy resolves — editing one is what creates a
@@ -139,16 +137,6 @@ const EDGE_TYPES: EdgeTypes = { routed: AuthorableEdge };
 
 /** One shared instance, for the identity `useKeyPress` reads. See the prop above. */
 const DELETE_KEYS: ['Backspace', 'Delete'] = ['Backspace', 'Delete'];
-
-/**
- * The connection picker's error id, a constant rather than a `useId`.
- *
- * There is exactly one keyboard connection draft at a time and exactly one
- * picker drawn for it, so the id cannot collide with a second instance — and a
- * literal is what lets the `aria-describedby` and the `FieldError` be read as
- * the same fact in one glance.
- */
-const CONNECT_TARGET_ERROR = 'edge-connect-target-error';
 
 /**
  * Which `ElementDropTarget` the element under the pointer is. Both class names
@@ -485,11 +473,6 @@ export function useEdgeAuthoring({
     }
   }, []);
 
-  const beginConnectFrom = useCallback((cardId: string) => {
-    const from = uuidSchema.safeParse(cardId);
-    if (from.success) latest.current.authoring.beginKeyboardConnect(from.data);
-  }, []);
-
   /**
    * Repair the focus React Flow's native Edge Escape leaves on `body`.
    *
@@ -649,23 +632,8 @@ export function useEdgeAuthoring({
 
   // **Every Edge surface is gated on `enabled`, not on the draft alone.** The
   // module cancels a draft the moment authoring is withdrawn, but that lands on
-  // a notification and this renders before it — so a picker read only off the
-  // draft is briefly usable over a presentation that has already begun.
+  // a notification and this renders before it.
   const draft = enabled ? state.draft : null;
-  const connectTarget = draft?.kind === 'keyboard-connect' ? draft.from : null;
-
-  /**
-   * Give the keyboard target picker focus as it opens.
-   *
-   * The control that opened it is the Card's Connect button, which stays on
-   * screen — so without this the picker would be a surface the author has to
-   * Tab to, and the Escape that cancels it would never reach the container
-   * holding the handler.
-   */
-  useEffect(() => {
-    if (connectTarget === null) return;
-    document.querySelector<HTMLElement>('[data-testid="connect-target"]')?.focus();
-  }, [connectTarget]);
 
   // `editing` is derived *inside* the memo rather than beside it: as a plain
   // render computation it would be a fresh object on every render, so the memo
@@ -684,30 +652,6 @@ export function useEdgeAuthoring({
     [draft, state.refusal, authoring, endpointChoices],
   );
 
-  const connectChoices = useMemo((): CardChoice[] => {
-    if (connectTarget === null) return [];
-    return subjectCards.map((card) =>
-      cardChoiceOf(
-        card,
-        authoring.eligibility({ kind: 'connect', from: connectTarget, to: card.id }),
-      ),
-    );
-  }, [connectTarget, subjectCards, authoring]);
-
-  /**
-   * The keyboard connection's own two channels, derived per render.
-   *
-   * Nothing is stored: the module retains the structured refusal and this maps
-   * it once, here, where the Target field and the form beneath it both exist
-   * (ADR 0057). A refusal from any other Edge channel is not this surface's and
-   * is left alone.
-   */
-  const connectionRefusal =
-    state.refusal?.kind === 'connection'
-      ? presentEdgeConnectionRefusal(state.refusal.refusal)
-      : null;
-  const connectTargetError = connectionRefusal?.fields.target ?? null;
-
   const layer = (
     <>
       <NewCardPreview
@@ -716,95 +660,12 @@ export function useEdgeAuthoring({
         pointerOver={pointerOver}
         accepts={acceptsEmptyDrop}
       />
-      {connectTarget !== null && (
-        <div
-          className="edge-connect-picker nopan nodrag nokey"
-          data-testid="connect-target-picker"
-          /*
-           * Escape cancels exactly one topmost Edge surface, and the open
-           * combobox is a surface above this one.
-           *
-           * **A portal is not an escape from the React tree.** Base UI renders
-           * the popup through `createPortal`, but React dispatches synthetic
-           * events along the *fiber* tree, so a keydown inside the portalled
-           * content is not out of this handler's reach — and Base UI's own
-           * Escape handling calls `preventDefault` but does not stop the event
-           * from bubbling to this listener.
-           *
-           * The combobox input's `aria-expanded` is what separates the two
-           * layers: while it reads `true` the press belongs to Base UI's
-           * Combobox, and the next one — with the list closed and focus back
-           * on the input — is this one's.
-           *
-           * **In Chromium the guard is not what produces those two stages**, and
-           * a claim here that it did was measured and refused. Base UI's
-           * `useDismiss` closes from a bubble-phase `keydown` listener on
-           * `document`, and the microtask checkpoint the browser performs
-           * *between* listeners commits that close before React's delegated
-           * listener runs — so the portalled content is unmounted and its fiber
-           * stripped, nothing dispatches, and this handler is never asked; the
-           * input already reads `aria-expanded="false"`. jsdom performs no such
-           * checkpoint, dispatching a whole event in one frame, which is the
-           * only reason a unit test can see the guard at all. `editing.spec.ts`
-           * passes with the guard removed.
-           *
-           * It stays because it is the rule this handler owns, and it becomes
-           * load-bearing again the moment the picker moves to a primitive that
-           * answers Escape from React rather than from a document listener.
-           *
-           * **Bubble here, capture in `SelectedEdgeControls`, and the two do not
-           * disagree.** This is a plain div in the app's own tree, so the event
-           * reaches React's delegated bubble listener normally. That editor is a
-           * Base UI popup, where a document listener stops the event before the
-           * bubble half of that delegation runs and only a capture handler is
-           * ever asked. The host decides the phase, not a preference.
-           */
-          onKeyDown={(event) => {
-            if (event.key !== 'Escape') return;
-            const trigger = event.currentTarget.querySelector('[data-testid="connect-target"]');
-            if (trigger?.getAttribute('aria-expanded') === 'true') return;
-            event.stopPropagation();
-            authoring.cancelDraft();
-          }}
-        >
-          <Field data-invalid={connectTargetError !== null}>
-            <CardSearchCombobox
-              label="Connect to"
-              testId="connect-target"
-              choices={connectChoices}
-              value={null}
-              inputAttributes={{
-                'aria-invalid': connectTargetError !== null,
-                'aria-describedby': connectTargetError === null ? undefined : CONNECT_TARGET_ERROR,
-              }}
-              onValueChange={(cardId) => {
-                // No parse: `CardChoice` names its id a `CardId`, and this list
-                // is built from the subject Cards themselves.
-                const completed = authoring.completeKeyboardConnect(
-                  cardId,
-                  latest.current.projectedNodes,
-                );
-                if (completed !== null) requestAnimationFrame(() => onSelectCard(completed));
-              }}
-            />
-            <FieldError id={CONNECT_TARGET_ERROR} data-testid="connect-refusal">
-              {connectTargetError}
-            </FieldError>
-          </Field>
-          {/* The form channel: a Layout with no Active Graph, a placement still
-              resolving, a Space that has moved — none of which choosing another
-              Card would answer, so the Target field stays valid. */}
-          {connectionRefusal?.form !== undefined && (
-            <FieldError data-testid="connect-form-refusal">{connectionRefusal.form}</FieldError>
-          )}
-        </div>
-      )}
       {/*
         The canvas announcement channel: the one refusal with no surface left.
 
         Every other channel is owned by a surface that is still on screen — the
-        picker above, the Edge's endpoint editor, the selected Edge's own
-        controls. A **completed pointer gesture** has none: the drag is over,
+        Edge's endpoint editor and the selected Edge's own controls. A
+        **completed pointer gesture** has none: the drag is over,
         its draft is gone, and this sentence is the whole of what the author is
         told. Which channel a refusal is on is Edge Authoring's answer, so this
         no longer has to infer it from an absent draft.
@@ -860,6 +721,5 @@ export function useEdgeAuthoring({
     layer,
     provide,
     deleteEdges,
-    beginConnectFrom,
   };
 }

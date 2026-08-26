@@ -20,6 +20,7 @@ describe('application UI import restrictions', () => {
     'cmdk/internal',
     'lucide-react',
     'lucide-react/icons',
+    '@project/ui/MarkdownSourceEditor',
     '@project/ui/components/button',
     '../../ui/src/components/button',
   ])('rejects %s from app composition', async (specifier) => {
@@ -34,6 +35,7 @@ describe('application UI import restrictions', () => {
     'cmdk/internal',
     'lucide-react',
     'lucide-react/icons',
+    '@project/ui/MarkdownSourceEditor',
     '@project/ui/components/button',
     '../../ui/src/components/button',
   ])('rejects %s from the React Flow adapter', async (specifier) => {
@@ -48,19 +50,4 @@ describe('application UI import restrictions', () => {
       expect(messages).toEqual([]);
     },
   );
-
-  it('permits the public Markdown editor split point from app composition only', async () => {
-    expect(
-      await lintImport(
-        '@project/ui/MarkdownSourceEditor',
-        'packages/app/src/components/OpenCard.tsx',
-      ),
-    ).toEqual([]);
-    expect(
-      await lintImport(
-        '@project/ui/MarkdownSourceEditor',
-        'packages/react-flow-adapter/src/CardNode.tsx',
-      ),
-    ).toHaveLength(1);
-  });
 });

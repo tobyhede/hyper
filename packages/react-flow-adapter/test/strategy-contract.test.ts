@@ -74,7 +74,7 @@ function sampleGraph(): LayoutStrategyGraph {
     targetHandle: `${graphId}::in`,
   }));
 
-  return buildLayoutStrategyGraph(cardIds, handlesByCard, edges, SIZE);
+  return buildLayoutStrategyGraph(cardIds, handlesByCard, edges, () => SIZE);
 }
 
 /** Positions for `positionedStrategy`, which reads an authored Layout. */
@@ -182,7 +182,7 @@ describe.each(STRATEGIES)('LayoutStrategy contract: %s', (_name, make) => {
       [uuid('00000000-0000-4000-8000-000000000099')],
       new Map(),
       [],
-      SIZE,
+      () => SIZE,
     );
     const output = await make()(only);
 

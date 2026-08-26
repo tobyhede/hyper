@@ -3,10 +3,8 @@ import { uuidSchema } from '@project/core';
 import {
   describeAuthoringRefusal,
   presentAliasCardRefusal,
-  presentEdgeConnectionRefusal,
   presentEdgeDeletionRefusal,
   presentEdgeEndpointRefusal,
-  presentMarkdownCardRefusal,
   presentNewAliasRefusal,
 } from '../src/authoring-refusal';
 import type { AuthoringRefusal } from '../src/space-authoring';
@@ -25,6 +23,7 @@ const EVERY_REFUSAL = {
   'alias-target-must-own-content': { code: 'alias-target-must-own-content', targetId: TARGET_ID },
   'card-already-in-layout': { code: 'card-already-in-layout' },
   'card-not-in-layout': { code: 'card-not-in-layout' },
+  'card-not-expanded': { code: 'card-not-expanded' },
   'card-has-aliases': { code: 'card-has-aliases', aliasTitles: ['Recap'] },
   'graph-title-required': { code: 'graph-title-required' },
   'layout-must-keep-graph': { code: 'layout-must-keep-graph' },
@@ -38,23 +37,6 @@ const EVERY_REFUSAL = {
 describe('Alias Card editing and New Alias creation place every refusal identically', () => {
   it.each(Object.values(EVERY_REFUSAL))('for $code', (refusal) => {
     expect(presentAliasCardRefusal(refusal)).toEqual(presentNewAliasRefusal(refusal));
-  });
-});
-
-describe('presentMarkdownCardRefusal', () => {
-  it('attaches a title refusal to the title field and nothing else', () => {
-    expect(presentMarkdownCardRefusal({ code: 'card-title-required' })).toEqual({
-      fields: { title: 'A Card title is required.' },
-    });
-  });
-
-  it('routes every other refusal to the form, since Markdown editing owns no other field', () => {
-    for (const [code, refusal] of Object.entries(EVERY_REFUSAL)) {
-      if (code === 'card-title-required') continue;
-      const errors = presentMarkdownCardRefusal(refusal);
-      expect(errors.fields).toEqual({});
-      expect(errors.form).toBe(describeAuthoringRefusal(refusal));
-    }
   });
 });
 
@@ -72,26 +54,6 @@ const CORRECTABLE_BY_CHOOSING_ANOTHER_CARD = [
 
 /** The same list, widened once so the loops below can ask it about any code. */
 const correctable: ReadonlySet<string> = new Set(CORRECTABLE_BY_CHOOSING_ANOTHER_CARD);
-
-describe('presentEdgeConnectionRefusal', () => {
-  it('puts a refusal another target could correct on the Target field', () => {
-    for (const code of CORRECTABLE_BY_CHOOSING_ANOTHER_CARD) {
-      const refusal = EVERY_REFUSAL[code];
-      expect(presentEdgeConnectionRefusal(refusal)).toEqual({
-        fields: { target: describeAuthoringRefusal(refusal) },
-      });
-    }
-  });
-
-  it('routes every other refusal to the form channel', () => {
-    for (const [code, refusal] of Object.entries(EVERY_REFUSAL)) {
-      if (correctable.has(code)) continue;
-      const errors = presentEdgeConnectionRefusal(refusal);
-      expect(errors.fields).toEqual({});
-      expect(errors.form).toBe(describeAuthoringRefusal(refusal));
-    }
-  });
-});
 
 describe('presentEdgeEndpointRefusal', () => {
   it.each(['from', 'to'] as const)('marks only the attempted %s Field invalid', (endpoint) => {

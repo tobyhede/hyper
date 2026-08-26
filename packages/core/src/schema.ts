@@ -135,6 +135,11 @@ export const layoutPositionSchema = z.object({
   y: z.number(),
 });
 
+/** What a Layout stores for one Card: its origin and, when Expanded, its authored size. */
+export const cardPlacementSchema = layoutPositionSchema.extend({
+  expanded: z.object({ width: z.number().positive(), height: z.number().positive() }).optional(),
+});
+
 /**
  * A layout the author wrote: a card-to-position map and the graphs over it
  * (ADR 0025, ADR 0040).
@@ -162,7 +167,7 @@ export const positionedLayoutSchema = z
     id: idSchema,
     title: z.string().min(1),
     kind: z.literal('positioned'),
-    positions: z.record(idSchema, layoutPositionSchema),
+    positions: z.record(idSchema, cardPlacementSchema),
     /**
      * The graphs this layout owns, in author order. **At least one**: creating a
      * layout creates its initial graph in the same edit, and graph management

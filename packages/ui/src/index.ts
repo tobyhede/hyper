@@ -11,7 +11,16 @@ export type { StatusBusyProps, StatusFailureProps } from './StatusPanel';
 export { CardContent } from './CardContent';
 export type { CardContentProps } from './CardContent';
 export { CanvasCard } from './CanvasCard';
-export type { CanvasCardFront, CanvasCardProps, CanvasCardState } from './CanvasCard';
+export type {
+  CanvasCardBodyEditor,
+  CanvasCardFront,
+  CanvasCardProps,
+  CanvasCardState,
+} from './CanvasCard';
+export { usePresence } from './use-presence';
+export type { Presence, PresenceState } from './use-presence';
+export { CardRail } from './CardRail';
+export type { CardRailProps } from './CardRail';
 export { CardKindIcon } from './CardKindIcon';
 export type { CardKindIconProps } from './CardKindIcon';
 export { CardSearchCombobox } from './CardSearchCombobox';
@@ -35,18 +44,21 @@ export {
 export { FALLBACK_GRAPH_COLOR, graphColor } from './graph-color';
 export { Popover, PopoverContent, PopoverTrigger } from './Popover';
 export {
+  AbandonEditIcon,
   AlertIcon,
   AliasIcon,
   CheckIcon,
+  CommitEditIcon,
   ChevronDownIcon,
   CloseIcon,
-  ConnectIcon,
+  CloseCardIcon,
   EditIcon,
   FlowIcon,
   GraphIcon,
   GridIcon,
   LayoutIcon,
   MarkdownIcon,
+  OpenCardIcon,
   PlusIcon,
   PresentIcon,
 } from './icons';

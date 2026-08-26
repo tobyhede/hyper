@@ -17,6 +17,7 @@ import {
   type SpaceSessionState,
 } from '@project/persistence';
 import { nextGraphColor } from './colors';
+import { DEFAULT_EXPANDED_CARD_SIZE } from './card';
 import type { Navigation, NavigationState } from './navigation';
 import {
   updatePositionedLayout,
@@ -83,6 +84,13 @@ export type AuthoringCompletion =
       readonly kind: 'settled-card-movement';
       readonly rendered: Placement;
       readonly placed: readonly CardId[];
+    }
+  | { readonly kind: 'opened-card'; readonly cardId: CardId }
+  | { readonly kind: 'closed-card'; readonly cardId: CardId }
+  | {
+      readonly kind: 'resized-card';
+      readonly cardId: CardId;
+      readonly size: { readonly width: number; readonly height: number };
     }
   | {
       readonly kind: 'connected-cards';
@@ -165,6 +173,8 @@ type LayoutRequiredOperation = Extract<
   AuthoringCompletion,
   | { readonly kind: 'added-card-to-layout' }
   | { readonly kind: 'removed-card-from-layout' }
+  | { readonly kind: 'closed-card' }
+  | { readonly kind: 'resized-card' }
   | { readonly kind: 'renamed-graph' }
   | { readonly kind: 'recolored-graph' }
   | { readonly kind: 'deleted-graph' }
@@ -184,6 +194,7 @@ export type AuthoringRefusal =
   | { readonly code: 'alias-target-must-own-content'; readonly targetId: CardId }
   | { readonly code: 'card-already-in-layout' }
   | { readonly code: 'card-not-in-layout' }
+  | { readonly code: 'card-not-expanded' }
   | {
       readonly code: 'card-has-aliases';
       readonly aliasTitles: readonly string[];
@@ -438,6 +449,8 @@ const indexOfEdge = (edges: readonly GraphEdge[], edge: GraphEdge): number =>
 const LAYOUT_ONLY = new Set<LayoutRequiredOperation>([
   'added-card-to-layout',
   'removed-card-from-layout',
+  'closed-card',
+  'resized-card',
   'renamed-graph',
   'recolored-graph',
   'deleted-graph',
@@ -923,6 +936,36 @@ export function createSpaceAuthoring({
       const cards = [...snapshot.cards];
       cards[cardIndex] = { id: card.id, document };
       snapshot = { ...snapshot, cards };
+    } else if (completion.kind === 'opened-card') {
+      const at = completedPlacement.get(completion.cardId);
+      if (at === undefined) return refuse({ code: 'card-not-in-layout' });
+      if (at.expanded !== undefined) return UNCHANGED;
+      completedPlacement = Placement.place(completedPlacement, completion.cardId, {
+        ...at,
+        expanded: DEFAULT_EXPANDED_CARD_SIZE,
+      });
+    } else if (completion.kind === 'closed-card') {
+      const at = completedPlacement.get(completion.cardId);
+      if (at === undefined) return refuse({ code: 'card-not-in-layout' });
+      if (at.expanded === undefined) return UNCHANGED;
+      completedPlacement = Placement.place(completedPlacement, completion.cardId, {
+        x: at.x,
+        y: at.y,
+      });
+    } else if (completion.kind === 'resized-card') {
+      const at = completedPlacement.get(completion.cardId);
+      if (at === undefined) return refuse({ code: 'card-not-in-layout' });
+      if (at.expanded === undefined) return refuse({ code: 'card-not-expanded' });
+      if (
+        at.expanded.width === completion.size.width &&
+        at.expanded.height === completion.size.height
+      ) {
+        return UNCHANGED;
+      }
+      completedPlacement = Placement.place(completedPlacement, completion.cardId, {
+        ...at,
+        expanded: completion.size,
+      });
     } else if (completion.kind === 'created-card') {
       createdCard = createCard(
         { title: nextCardTitle(snapshot), kind: 'markdown', body: '' },
@@ -951,10 +994,11 @@ export function createSpaceAuthoring({
       }
       // Membership and a position, and nothing else: a re-added Card is detached,
       // and the Edges it once had are never inferred back.
+      const authoredAnchor = Placement.authoredPoint(completedPlacement, completion.anchor);
       completedPlacement = Placement.place(
         completedPlacement,
         completion.cardId,
-        freeAnchor(completedPlacement, completion.anchor),
+        freeAnchor(completedPlacement, authoredAnchor),
       );
     } else if (completion.kind === 'removed-card-from-layout') {
       if (!completedPlacement.has(completion.cardId)) {
@@ -1040,12 +1084,13 @@ export function createSpaceAuthoring({
     // Applied only now: conversion is over the Space as it stands, and these are
     // what the Edit adds to it and takes away.
     if (createdCard !== null) {
+      const authoredPosition = Placement.authoredPoint(completedPlacement, createdCard.position);
       completedPlacement = Placement.place(
         completedPlacement,
         createdCard.id,
         createdCard.avoidingOverlap
-          ? freeAnchor(completedPlacement, createdCard.position)
-          : createdCard.position,
+          ? freeAnchor(completedPlacement, authoredPosition)
+          : authoredPosition,
       );
     }
     if (deletedCardId !== undefined) {

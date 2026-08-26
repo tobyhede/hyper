@@ -84,6 +84,45 @@ describe('Placement.fromLayoutStrategyGraph', () => {
 });
 
 describe('Placement.next', () => {
+  it('inverts Expanded Card displacement before authoring a rendered position', () => {
+    const authored = Placement.fromEntries([
+      [CARD_A, { x: 10, y: 20, expanded: { width: 360, height: 196 } }],
+      [CARD_B, { x: 300, y: 200 }],
+    ]);
+    const drawn = Placement.drawn(authored);
+
+    expect(asObject(drawn)).toEqual({
+      [CARD_A]: { x: 10, y: 20, expanded: { width: 360, height: 196 } },
+      [CARD_B]: { x: 400, y: 250 },
+    });
+    expect(Placement.next(authored, drawn, [CARD_A, CARD_B])).toBe(authored);
+  });
+
+  it('preserves an Expanded Card rect when the renderer reports only its moved position', () => {
+    const authored = Placement.fromEntries([
+      [CARD_A, { x: 10, y: 20, expanded: { width: 560, height: 420 } }],
+    ]);
+    const rendered = Placement.fromEntries([[CARD_A, { x: 90, y: 80 }]]);
+
+    expect(asObject(Placement.next(authored, rendered, [CARD_A]))).toEqual({
+      [CARD_A]: { x: 90, y: 80, expanded: { width: 560, height: 420 } },
+    });
+  });
+
+  it('inverts displacement when admitting a Card the Layout did not yet place', () => {
+    const authored = Placement.fromEntries([
+      [CARD_A, { x: 10, y: 20, expanded: { width: 560, height: 420 } }],
+    ]);
+    const rendered = Placement.fromEntries([[CARD_B, { x: 500, y: 400 }]]);
+
+    const next = Placement.next(authored, rendered, [CARD_B]);
+    expect(asObject(next)).toEqual({
+      [CARD_A]: { x: 10, y: 20, expanded: { width: 560, height: 420 } },
+      [CARD_B]: { x: 200, y: 126 },
+    });
+    expect(Placement.drawn(next).get(CARD_B)).toEqual({ x: 500, y: 400 });
+  });
+
   it('adopts the whole rendered map when nothing is authored yet', () => {
     // An Algorithmic View authors nothing, and conversion copies every Card
     // already on screen so nothing moves at the moment it happens (ADR 0025).
@@ -323,8 +362,45 @@ const idsArb = fc
   .uniqueArray(fc.uuid(), { minLength: 1, maxLength: 8 })
   .map((ids): CardId[] => ids.map(uuid));
 const coordArb = fc.integer({ min: -1000, max: 1000 });
+const expandedSizeArb = fc.record({
+  width: fc.integer({ min: 261, max: 900 }),
+  height: fc.integer({ min: 147, max: 700 }),
+});
 
 describe('Placement properties', () => {
+  it('round-trips every authored rect through a production-shaped drawn report', () => {
+    fc.assert(
+      fc.property(
+        idsArb,
+        fc.array(coordArb, { minLength: 16, maxLength: 16 }),
+        fc.array(fc.option(expandedSizeArb, { nil: undefined }), {
+          minLength: 8,
+          maxLength: 8,
+        }),
+        (ids, coords, expansions) => {
+          const authored = Placement.fromEntries(
+            ids.map((id, index) => {
+              const at = {
+                x: coords[index * 2] ?? 0,
+                y: coords[index * 2 + 1] ?? 0,
+              };
+              const expanded = expansions[index];
+              return [id, expanded === undefined ? at : { ...at, expanded }] as const;
+            }),
+          );
+          // Production reports React Flow node positions only. Keeping the
+          // authored `expanded` rect on this report would make the inverse test
+          // vacuous and is the defect this property exists to prevent.
+          const rendered = Placement.fromEntries(
+            [...Placement.drawn(authored)].map(([id, at]) => [id, { x: at.x, y: at.y }]),
+          );
+
+          expect(Placement.next(authored, rendered, [...authored.keys()])).toBe(authored);
+        },
+      ),
+    );
+  });
+
   it('round-trips: replaying a laid-out graph reproduces its placement', async () => {
     // The property that makes conversion a capture rather than a reinterpretation:
     // what the automatic strategy computed is exactly what the Layout means.

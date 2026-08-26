@@ -657,13 +657,24 @@ const CLASS_STEM = /^[a-zA-Z][\w-]*$/u;
  */
 const CLASS_BUILDERS = new Set(['cn', 'clsx', 'classNames', 'twMerge']);
 
+/**
+ * A component that draws several elements publishes several class props, and
+ * each of them names classes exactly as `className` does — React Flow's
+ * `NodeResizer` takes `lineClassName` and `handleClassName`, which is the only
+ * way to style what it renders. Read on the suffix rather than by listing the
+ * names, because the list is a third-party API's to grow and a missing entry
+ * fails as a false "no production module names this", which reads as a dead
+ * rule to delete.
+ */
+const namesClassProp = (name: string): boolean =>
+  name === 'className' || name === 'class' || name.endsWith('ClassName');
+
 const namesClasses = (node: ts.Node): boolean => {
-  if (ts.isJsxAttribute(node))
-    return node.name.getText() === 'className' || node.name.getText() === 'class';
+  if (ts.isJsxAttribute(node)) return namesClassProp(node.name.getText());
   if (ts.isPropertyAssignment(node))
     return (
       (ts.isIdentifier(node.name) || ts.isStringLiteral(node.name)) &&
-      node.name.text === 'className'
+      namesClassProp(node.name.text)
     );
   return (
     ts.isCallExpression(node) &&

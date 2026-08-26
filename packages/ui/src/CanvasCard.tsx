@@ -1,9 +1,24 @@
-import { useEffect, useId, useRef, useState, type CSSProperties } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+} from 'react';
 import { Button } from './Button';
-import { CardKindIcon } from './CardKindIcon';
-import { Card, CardContent, CardHeader, CardTitle } from './components/card';
-import { ConnectIcon, EditIcon } from './icons';
+import { CardContentEditProvider, type CardContentEdit } from './card-content-edit';
+import { CardRail } from './CardRail';
+import { Card, CardContent, CardTitle } from './components/card';
+import { AbandonEditIcon, CloseCardIcon, CommitEditIcon, EditIcon, OpenCardIcon } from './icons';
+import {
+  MarkdownCardBody,
+  type MarkdownCardBodyEditor,
+  type MarkdownCardBodyProps,
+} from './MarkdownCardBody';
 import './canvas-card.css';
+import { usePresence } from './use-presence';
 
 /**
  * What a Card front draws beyond its shared Title (ADR 0051): a kind-owned
@@ -11,8 +26,44 @@ import './canvas-card.css';
  * Space Card variant is deliberately not modelled here — building one ahead
  * of the domain schema would be a Card front nothing can render.
  */
+interface CanvasMarkdownCardFront {
+  readonly kind: 'markdown';
+  /** The Markdown bytes this Card owns. */
+  readonly source: string;
+  /** Request that authored state open or close this Card. */
+  readonly onOpenChange?: (open: boolean) => 'completed' | 'retained';
+  /** Put a caret in this Card's Markdown source. */
+  readonly onBeginEdit?: () => void;
+}
+
 export type CanvasCardFront =
-  { readonly kind: 'markdown' } | { readonly kind: 'alias'; readonly aliasOf: string };
+  | {
+      /** A creation ghost: Markdown treatment without authored content or open state. */
+      readonly kind: 'preview';
+    }
+  | (CanvasMarkdownCardFront & {
+      /** Closed authored state cannot carry a body editor. */
+      readonly open: false;
+      readonly editor?: never;
+      readonly autoFocusEditor?: never;
+    })
+  | (CanvasMarkdownCardFront & {
+      /** Authored Layout state. CanvasCard renders it; it does not own it. */
+      readonly open: true;
+      /** Present exactly while the Markdown body holds the canvas caret. */
+      readonly editor?: CanvasCardBodyEditor;
+      /** Whether a newly supplied body editor takes focus. */
+      readonly autoFocusEditor?: boolean;
+    })
+  | {
+      readonly kind: 'alias';
+      readonly aliasOf: string;
+      /** Open this Alias's metadata editor; Alias Cards do not expand. */
+      readonly onOpen?: () => void;
+    };
+
+/** The two authored operations that end a live Markdown body edit. */
+export type CanvasCardBodyEditor = MarkdownCardBodyEditor;
 
 /** External visual facts the adapter knows and CanvasCard cannot derive:
  *  React Flow selection, drag and inline-title-editing. Hover and the
@@ -26,10 +77,6 @@ interface CanvasCardCommonProps {
   readonly graphColor: string;
   /** Present only when activating the displayed Title may begin a rename. */
   readonly onBeginTitleEdit?: () => void;
-  /** Present only when this Card may be connected from. */
-  readonly onConnect?: () => void;
-  /** Present only when this Card owns content or metadata to edit. */
-  readonly onEdit?: () => void;
 }
 
 /**
@@ -60,6 +107,7 @@ export type CanvasCardProps = CanvasCardCommonProps &
  * construction and needs no claim the compiler cannot check (ADR 0062).
  */
 type CanvasCardStyle = CSSProperties & { readonly '--canvas-card-graph': string };
+type Mutable<T> = { -readonly [K in keyof T]: T[K] };
 
 /**
  * The one visual Card front shared by the production canvas and its stories.
@@ -71,13 +119,98 @@ type CanvasCardStyle = CSSProperties & { readonly '--canvas-card-graph': string 
  * `CardNode`) — nothing here imports React Flow or reaches into its DOM. Its
  * own visual treatment lives in `canvas-card.css`, colocated with this module.
  */
+/**
+ * What the rail's Edit control runs, or `undefined` when the Card has no such
+ * control to draw.
+ *
+ * On an open Card it is simply the caret operation the caller supplied. On a
+ * **closed** one it is ADR 0064's rule — open the Card, then place the caret
+ * — composed from the Card's own two existing operations and nothing else. Opening is not reimplemented or
+ * approximated here: `onOpenChange` is the same call the Open control makes, so
+ * the growth, the neighbours' displacement and the transition are the ones
+ * opening always produces.
+ *
+ * A closed Card that cannot be opened has no Edit control, because the first
+ * half of that pair would be missing and the caret would have nowhere to land.
+ */
+const contentEditAction = (
+  open: boolean,
+  onOpenChange: ((open: boolean) => 'completed' | 'retained') | undefined,
+  onBeginContentEdit: (() => void) | undefined,
+): (() => void) | undefined => {
+  if (onBeginContentEdit === undefined) return undefined;
+  if (open) return onBeginContentEdit;
+  if (onOpenChange === undefined) return undefined;
+  return () => {
+    if (onOpenChange(true) === 'completed') onBeginContentEdit();
+  };
+};
+
 export function CanvasCard(props: CanvasCardProps) {
-  const { front, title, graphColor, onBeginTitleEdit, onConnect, onEdit, state } = props;
+  const { front, title, graphColor, onBeginTitleEdit, state } = props;
+  const visualKind = front.kind === 'preview' ? 'markdown' : front.kind;
+  const open = front.kind === 'markdown' && front.open;
+  const contentControl = useRef<HTMLDivElement>(null);
+  const contentExitDuration = useCallback(() => {
+    const content = contentControl.current;
+    if (content === null) return 0;
+    const style = getComputedStyle(content);
+    const opacityIndex = style.transitionProperty
+      .split(',')
+      .map((property) => property.trim())
+      .indexOf('opacity');
+    const durations = style.transitionDuration.split(',').map((duration) => duration.trim());
+    const duration = durations[opacityIndex] ?? durations[0];
+    if (duration === undefined) return 0;
+    const milliseconds = duration.endsWith('ms')
+      ? Number.parseFloat(duration)
+      : Number.parseFloat(duration) * 1000;
+    return Number.isFinite(milliseconds) ? milliseconds : 0;
+  }, []);
+  const contentPresence = usePresence(open, contentExitDuration);
+  const onOpenChange = front.kind === 'markdown' ? front.onOpenChange : undefined;
+  const onOpenAlias = front.kind === 'alias' ? front.onOpen : undefined;
+  const onBeginContentEdit = front.kind === 'markdown' ? front.onBeginEdit : undefined;
+  /**
+   * The edit running inside the Markdown front this Card owns.
+   *
+   * State rather than a second prop because the draft and caret live inside
+   * the body. `front.editor` supplies domain completion; the body publishes
+   * the Save and Cancel closures for its current draft (`card-content-edit.ts`).
+   */
+  const [contentEdit, setContentEdit] = useState<CardContentEdit | null>(null);
+  const editControl = useRef<HTMLButtonElement>(null);
+  const contentEditingWas = useRef(false);
+  const beginContentEdit = contentEditAction(open, onOpenChange, onBeginContentEdit);
   const showActions =
     state !== 'dragging' &&
     state !== 'editing' &&
-    (onConnect !== undefined || onEdit !== undefined);
+    (contentEdit !== null ||
+      onOpenChange !== undefined ||
+      onOpenAlias !== undefined ||
+      beginContentEdit !== undefined);
   const style: CanvasCardStyle = { '--canvas-card-graph': graphColor };
+  const markdownBodyProps: Mutable<
+    Pick<MarkdownCardBodyProps, 'onBeginEdit' | 'editor' | 'autoFocus'>
+  > = {};
+  if (onBeginContentEdit !== undefined) markdownBodyProps.onBeginEdit = onBeginContentEdit;
+  if (front.kind === 'markdown' && front.editor !== undefined) {
+    markdownBodyProps.editor = front.editor;
+  }
+  if (front.kind === 'markdown' && front.autoFocusEditor !== undefined) {
+    markdownBodyProps.autoFocus = front.autoFocusEditor;
+  }
+
+  useLayoutEffect(() => {
+    if (contentEditingWas.current && contentEdit === null) editControl.current?.focus();
+    contentEditingWas.current = contentEdit !== null;
+  }, [contentEdit]);
+
+  useLayoutEffect(() => {
+    if (contentControl.current !== null) {
+      contentControl.current.inert = contentPresence.state === 'leaving';
+    }
+  }, [contentPresence.state]);
 
   return (
     <Card
@@ -85,52 +218,89 @@ export function CanvasCard(props: CanvasCardProps) {
       aria-label={title}
       className="canvas-card"
       data-testid="card"
-      data-kind={front.kind}
+      data-kind={visualKind}
       data-state={state}
+      // Exposes authored state for the Card's public treatment and evidence.
+      // The React Flow wrapper owns the moving rect, while the Markdown Title's
+      // layout remains invariant; no wall-clock presentation state is allowed
+      // to become a second expansion fact and move the Title mid-close.
+      data-expanded={open}
+      // The rail is normally revealed with the Card and hidden again at rest.
+      // A running edit is not a hover, so the controls that end it are read off
+      // this instead — an author writing in the body must be able to see the way
+      // out without going looking for it with the pointer.
+      data-content-editing={contentEdit !== null}
       style={style}
     >
-      <CardHeader className="canvas-card__rail">
-        <span className="canvas-card__kind">
-          <CardKindIcon kind={front.kind} />
-        </span>
+      <CardRail kind={visualKind} graphColor={graphColor} className="canvas-card__rail">
         {showActions && (
           <div className="canvas-card__actions" data-testid="canvas-card-actions">
-            {onConnect !== undefined && (
+            {contentEdit === null ? (
+              beginContentEdit !== undefined && (
+                <Button
+                  ref={editControl}
+                  variant="ghost"
+                  size="icon"
+                  className="card__rail-action nodrag nopan"
+                  aria-label={`Edit Card ${title}`}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    beginContentEdit();
+                  }}
+                  onPointerDown={(event) => event.stopPropagation()}
+                  onKeyDown={(event) => event.stopPropagation()}
+                >
+                  <EditIcon data-icon="inline-start" />
+                </Button>
+              )
+            ) : (
+              <ContentEditActions title={title} edit={contentEdit} />
+            )}
+            {onOpenChange !== undefined && (
               <Button
                 variant="ghost"
                 size="icon"
-                className="card__connect nodrag nopan"
-                data-testid="connect-from-card"
-                aria-label={`Connect from ${title}`}
+                className="card__rail-action nodrag nopan"
+                aria-label={`${open ? 'Close' : 'Open'} Card ${title}`}
+                // Closing mid-edit would drop the Card's box out from under a
+                // live caret with a draft in it. The control keeps its slot and
+                // goes disabled rather than disappearing: the rail's row does not
+                // reshuffle while the author writes, and what is unavailable says
+                // so instead of vanishing.
+                disabled={contentEdit !== null}
                 onClick={(event) => {
                   event.stopPropagation();
-                  onConnect();
+                  onOpenChange(!open);
                 }}
                 onPointerDown={(event) => event.stopPropagation()}
                 onKeyDown={(event) => event.stopPropagation()}
               >
-                <ConnectIcon />
+                {open ? (
+                  <CloseCardIcon data-icon="inline-start" />
+                ) : (
+                  <OpenCardIcon data-icon="inline-start" />
+                )}
               </Button>
             )}
-            {onEdit !== undefined && (
+            {onOpenAlias !== undefined && (
               <Button
                 variant="ghost"
                 size="icon"
-                className="card__edit nodrag nopan"
-                aria-label={`Edit Card ${title}`}
+                className="card__rail-action nodrag nopan"
+                aria-label={`Open Card ${title}`}
                 onClick={(event) => {
                   event.stopPropagation();
-                  onEdit();
+                  onOpenAlias();
                 }}
                 onPointerDown={(event) => event.stopPropagation()}
                 onKeyDown={(event) => event.stopPropagation()}
               >
-                <EditIcon />
+                <OpenCardIcon data-icon="inline-start" />
               </Button>
             )}
           </div>
         )}
-      </CardHeader>
+      </CardRail>
       <CardContent className="canvas-card__body">
         {state === 'editing' ? (
           <TitleEditor
@@ -142,12 +312,12 @@ export function CanvasCard(props: CanvasCardProps) {
         ) : (
           <CardTitle
             className="canvas-card__title"
-            data-editable={onBeginTitleEdit !== undefined}
+            data-editable={onBeginTitleEdit !== undefined && contentEdit === null}
             role="heading"
             aria-level={2}
             aria-label={title}
           >
-            {onBeginTitleEdit === undefined ? (
+            {onBeginTitleEdit === undefined || contentEdit !== null ? (
               title
             ) : (
               // ADR 0065 composes the shared shadcn/Base Button inside the
@@ -180,7 +350,88 @@ export function CanvasCard(props: CanvasCardProps) {
           </p>
         )}
       </CardContent>
+      {/* A sibling of the Title's body rather than a child of it. The body is
+          inset so a Title sits off the Card's border; a writing surface brings
+          its own gutter and padding and has to reach the paper's edges, and
+          nesting it would draw one inset inside another. */}
+      {front.kind === 'markdown' && contentPresence.mounted && (
+        <div
+          ref={contentControl}
+          className="canvas-card__content"
+          data-presence={contentPresence.state}
+        >
+          <CardContentEditProvider value={setContentEdit}>
+            <MarkdownCardBody
+              source={front.source}
+              ariaLabel={`Markdown source of ${title}`}
+              {...markdownBodyProps}
+            />
+          </CardContentEditProvider>
+        </div>
+      )}
     </Card>
+  );
+}
+
+interface ContentEditActionsProps {
+  readonly title: string;
+  readonly edit: CardContentEdit;
+}
+
+/**
+ * The two ends of an edit running inside the Card's content, in the rail slot
+ * the Edit control had. Close keeps its own slot beside them — it belongs to the
+ * Card rather than to the edit, and a Card stays closable while one runs.
+ *
+ * The same `card__rail-action` icon buttons as everything else on the rail: same
+ * box, same border, same paper and ink, same hover inversion. The key each one
+ * spends is stated with `aria-keyshortcuts` and drawn by the body's own shortcut
+ * hint, which is where a canvas Card names a key.
+ *
+ * **A press here must not take the caret with it.** These controls sit on the
+ * Card's rail and the caret sits in its content, so the pointer press that
+ * activates one is also a focus leaving the writing surface — taking the
+ * author's selection and the editor's own focus treatment with it, mid-edit and
+ * for a control that may well be Cancel. Suppressing the default on `mousedown`
+ * keeps the focus where it is, so the edit stays intact right up to the exit the
+ * author actually chose.
+ */
+function ContentEditActions({ title, edit }: ContentEditActionsProps) {
+  const hold = (event: { preventDefault: () => void }): void => event.preventDefault();
+  const run = (operation: () => void) => (event: { stopPropagation: () => void }) => {
+    event.stopPropagation();
+    operation();
+  };
+
+  return (
+    <>
+      <Button
+        variant="ghost"
+        size="icon"
+        className="card__rail-action nodrag nopan"
+        aria-label={`Save Card ${title}`}
+        aria-keyshortcuts="Meta+Enter Control+Enter"
+        onClick={run(edit.onSave)}
+        onMouseDown={hold}
+        onPointerDown={(event) => event.stopPropagation()}
+        onKeyDown={(event) => event.stopPropagation()}
+      >
+        <CommitEditIcon data-icon="inline-start" />
+      </Button>
+      <Button
+        variant="ghost"
+        size="icon"
+        className="card__rail-action nodrag nopan"
+        aria-label={`Cancel editing Card ${title}`}
+        aria-keyshortcuts="Escape"
+        onClick={run(edit.onCancel)}
+        onMouseDown={hold}
+        onPointerDown={(event) => event.stopPropagation()}
+        onKeyDown={(event) => event.stopPropagation()}
+      >
+        <AbandonEditIcon data-icon="inline-start" />
+      </Button>
+    </>
   );
 }
 

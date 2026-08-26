@@ -28,9 +28,24 @@ export interface MarkdownSourceEditorProps {
 }
 
 export interface MarkdownSourceEditorHandle {
+  /**
+   * Put the caret in the source, as soon as the editor can hold one.
+   *
+   * The wrapper can arrive through React.lazy one commit before CodeMirror has
+   * installed its view ref. Waiting for that implementation detail belongs here,
+   * rather than making callers race the specialist editor's mount.
+   */
   focus(): void;
   getContentElement(): HTMLElement | null;
 }
+
+/**
+ * How long `focus()` waits for the content element to become editable before
+ * giving up. Ten frames is about a sixth of a second — long enough for a
+ * reconfiguration a commit or two away, short enough that a focus which is never
+ * going to land stops rather than polling for the life of the editor.
+ */
+const FOCUS_FRAMES = 10;
 
 const markdownSourceTheme = EditorView.theme({
   '&': {
@@ -46,7 +61,8 @@ const markdownSourceTheme = EditorView.theme({
     lineHeight: '1.65',
   },
   '.cm-content': {
-    padding: '1rem 1rem 1.5rem 0.75rem',
+    padding:
+      'var(--markdown-source-content-padding-top, 1rem) 1rem 1.5rem var(--markdown-source-content-inset, 0.75rem)',
     caretColor: 'currentColor',
   },
   '.cm-line': {
@@ -59,8 +75,10 @@ const markdownSourceTheme = EditorView.theme({
     borderRight: '1px solid var(--markdown-source-gutter-rule-color, var(--border))',
   },
   '.cm-lineNumbers .cm-gutterElement': {
-    minWidth: '3rem',
-    padding: '0 0.75rem 0 0.5rem',
+    boxSizing: 'border-box',
+    minWidth: 'var(--markdown-source-gutter-width, 3rem)',
+    padding: 'var(--markdown-source-gutter-padding, 0 0.75rem 0 0.5rem)',
+    fontSize: 'var(--markdown-source-line-number-font-size, inherit)',
   },
   '.cm-activeLine, .cm-activeLineGutter': {
     backgroundColor: 'transparent',
@@ -170,10 +188,15 @@ const stableLineNumberLocator = ViewPlugin.define((view) => {
  * application callers. `PANE_OWNED_KEYS` below states which keys are withheld from
  * it and why; unit and browser tests prove each arrives at the surface unconsumed.
  *
- * Two custom properties are the gutter's whole styling contract —
+ * Eight custom properties are the whole styling contract —
  * `--markdown-source-gutter-color` and `--markdown-source-gutter-rule-color`, each
- * falling back to the ambient token. A caller sets them on this component and never
- * names a `.cm-*` class: those are CodeMirror's, they are renamed by CodeMirror, and a
+ * falling back to the ambient token; `--markdown-source-gutter-width`,
+ * `--markdown-source-gutter-padding`, `--markdown-source-content-inset`,
+ * `--markdown-source-content-padding-top` and
+ * `--markdown-source-line-number-font-size`, falling back to the shared editor
+ * geometry. A caller sets them on this component. `--markdown-source-focus-outline` similarly lets its
+ * containing surface quiet the wrapper's focus ring without reaching into the
+ * editor. A caller never names a `.cm-*` class: those are CodeMirror's, they are renamed by CodeMirror, and a
  * rule that stops matching one fails by silently reverting rather than by breaking.
  * `test/unit/codemirror-encapsulation.test.ts` holds every stylesheet to that.
  */
@@ -196,7 +219,29 @@ export const MarkdownSourceEditor = forwardRef<
     ref,
     () => ({
       focus() {
-        codeMirror.current?.view?.focus();
+        let frames = 0;
+        const attempt = (): void => {
+          const view = codeMirror.current?.view;
+          // The forwarded product handle can be installed one commit before
+          // the wrapper has installed CodeMirror's own view ref (notably when
+          // this module arrives through React.lazy), so retry rather than
+          // silently dropping the caller's caret.
+          if (view === undefined) {
+            if (frames++ < FOCUS_FRAMES) requestAnimationFrame(attempt);
+            return;
+          }
+          // The attribute rather than `isContentEditable`: CodeMirror writes
+          // `contenteditable` itself, every environment that runs these tests
+          // exposes it, and the IDL property is not implemented everywhere —
+          // reading one jsdom answers `undefined` for would make this wait
+          // forever in exactly the place a test would catch it.
+          if (view.contentDOM.getAttribute('contenteditable') === 'true') {
+            view.focus();
+            return;
+          }
+          if (frames++ < FOCUS_FRAMES) requestAnimationFrame(attempt);
+        };
+        attempt();
       },
       getContentElement() {
         return codeMirror.current?.view?.contentDOM ?? null;

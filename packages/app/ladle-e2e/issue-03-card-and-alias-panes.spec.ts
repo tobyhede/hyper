@@ -1,114 +1,10 @@
 import { expect, test } from '@playwright/test';
-import { markdownSource, PRIMARY_MODIFIER } from '../e2e/markdown-source';
-
-test(
-  'Markdown Card story validates atomically and Escape cancels the whole draft',
-  { tag: '@parity:markdown-pane-refusal-is-field-local' },
-  async ({ page }) => {
-    await page.goto('/?story=components--card-and-alias-panes--markdown&mode=preview');
-
-    const dialog = page.getByRole('dialog', { name: 'Architecture notes' });
-    const title = dialog.getByRole('textbox', { name: 'Title' });
-    const body = dialog.getByRole('textbox', { name: 'Markdown source' });
-    await expect(title).toBeFocused();
-    await expect(body).toContainText('## Placement');
-
-    await title.fill('   ');
-    await body.fill('A pending replacement');
-    await dialog.getByRole('button', { name: 'Done' }).click();
-
-    await expect(dialog.getByRole('alert')).toHaveText('A Card title is required.');
-    await expect(title).toHaveAttribute('aria-invalid', 'true');
-    await expect(dialog).toBeVisible();
-
-    await body.press('Escape');
-    await expect(dialog).toBeHidden();
-    await expect(page.getByText('No edit completed.')).toBeVisible();
-  },
-);
-
-test(
-  'Markdown source keeps exact bytes while the pane owns Tab and Escape',
-  { tag: '@parity:markdown-source-editor-preserves-pane-ownership' },
-  async ({ page }) => {
-    await page.goto('/?story=components--card-and-alias-panes--markdown&mode=preview');
-
-    const dialog = page.getByRole('dialog', { name: 'Architecture notes' });
-    const title = dialog.getByRole('textbox', { name: 'Title' });
-    const source = dialog.getByRole('textbox', { name: 'Markdown source' });
-    await expect(title).toBeFocused();
-    await title.press('Enter');
-    await expect(source).toBeFocused();
-    const lineNumbers = dialog.locator('[data-slot="markdown-source-line-numbers"]');
-    await expect(lineNumbers).toBeVisible();
-    const originalLineNumbers = await lineNumbers.elementHandle();
-    expect(originalLineNumbers).not.toBeNull();
-
-    expect(
-      await source.evaluate((element) =>
-        getComputedStyle(element.firstElementChild ?? element, '::selection').getPropertyValue(
-          'background-color',
-        ),
-      ),
-    ).toBe('rgb(110, 168, 254)');
-
-    const exact = '# Exact\n\n  two spaces and `code`';
-    await source.fill(exact);
-    expect(await originalLineNumbers?.evaluate((element) => element.isConnected)).toBe(true);
-    await expect(lineNumbers).toBeVisible();
-    expect(await markdownSource(source)).toBe(exact);
-    await source.press(`${PRIMARY_MODIFIER}+z`);
-    await expect(source).toContainText('## Placement');
-    await source.press(`${PRIMARY_MODIFIER}+Shift+z`);
-    expect(await markdownSource(source)).toBe(exact);
-
-    await source.press('Tab');
-    await expect(dialog.getByRole('button', { name: 'Cancel' })).toBeFocused();
-    await page.keyboard.press('Shift+Tab');
-    await expect(source).toBeFocused();
-    await source.press(`${PRIMARY_MODIFIER}+a`);
-    await source.press('Escape');
-
-    await expect(dialog).toBeHidden();
-    await expect(page.getByText('No edit completed.')).toBeVisible();
-  },
-);
-
-/**
- * The same paper treatment `editing.spec.ts` pins in the application, pinned here
- * because the catalogue is a different bundle: `.ladle/components.tsx` loads
- * `styles.css` before `tailwind.css`, the reverse of `main.tsx`. The editor's own
- * stylesheet arrives through the component either way, but only a computed-style
- * assertion in both bundles proves it — a Tailwind or cascade divergence between
- * the two surfaces is precisely what looked correct in one and wrong in the other
- * when this treatment was last rewritten.
- *
- * Untagged on purpose: it guards the move, and is not a parity claim of its own.
- */
-test('the Markdown story draws the flat paper treatment in the catalogue bundle', async ({
-  page,
-}) => {
-  await page.goto('/?story=components--card-and-alias-panes--markdown&mode=preview');
-
-  const panel = page.locator('.card-pane__panel--card-editor');
-  await expect(panel).toHaveCSS('background-color', 'rgb(255, 250, 240)');
-  await expect(panel).toHaveCSS('border-top-color', 'rgb(11, 13, 17)');
-  await expect(panel).toHaveCSS('border-top-width', '4px');
-
-  const body = page.locator('[data-slot="markdown-source-editor"]');
-  await expect(body).toHaveCSS('background-color', 'rgb(255, 250, 240)');
-  await expect(body).toHaveCSS('color', 'rgb(43, 48, 59)');
-  await expect(page.locator('[data-slot="markdown-source-line-numbers"]')).toHaveCSS(
-    'color',
-    'rgb(107, 99, 83)',
-  );
-});
 
 test(
   'Alias Card story is present in the production catalogue',
   { tag: '@parity:alias-pane-authors-metadata' },
   async ({ page }) => {
-    await page.goto('/?story=components--card-and-alias-panes--alias&mode=preview');
+    await page.goto('/?story=components--alias-panes--alias&mode=preview');
 
     const dialog = page.getByRole('dialog', { name: 'Placement recap' });
     await expect(dialog.getByRole('textbox', { name: 'Title' })).toHaveValue('Placement recap');
@@ -128,7 +24,7 @@ test(
   'adding an Alias completes on the Target chosen, with no create action beside Cancel',
   { tag: '@parity:new-alias-completes-on-the-target-chosen' },
   async ({ page }) => {
-    await page.goto('/?story=components--card-and-alias-panes--new-alias-pane&mode=preview');
+    await page.goto('/?story=components--alias-panes--new-alias-pane&mode=preview');
 
     const dialog = page.getByRole('dialog', { name: 'New Alias' });
     const target = dialog.getByRole('combobox', { name: 'Target' });
@@ -161,7 +57,7 @@ test(
 test('the Card-choice popup draws its paper theme from the component that owns it', async ({
   page,
 }) => {
-  await page.goto('/?story=components--card-and-alias-panes--new-alias-pane&mode=preview');
+  await page.goto('/?story=components--alias-panes--new-alias-pane&mode=preview');
 
   const dialog = page.getByRole('dialog', { name: 'New Alias' });
   await dialog.getByRole('combobox', { name: 'Target' }).fill('Architecture');
@@ -200,11 +96,11 @@ test('review stale Alias Target refusal stays field-local', async ({ page }) => 
   await expect(dialog).toBeVisible();
 });
 
-test('Card pane stories are isolated from the Ladle catalogue', async ({ page }) => {
-  await page.goto('/?story=components--card-and-alias-panes--markdown');
+test('Alias pane stories are isolated from the Ladle catalogue', async ({ page }) => {
+  await page.goto('/?story=components--alias-panes--alias');
 
   const storyFrame = page.frameLocator('iframe');
-  await expect(storyFrame.getByRole('dialog', { name: 'Architecture notes' })).toBeVisible();
+  await expect(storyFrame.getByRole('dialog', { name: 'Placement recap' })).toBeVisible();
 
   const storySearch = page.getByLabel('Search stories');
   await storySearch.fill('Persistence Indicator');

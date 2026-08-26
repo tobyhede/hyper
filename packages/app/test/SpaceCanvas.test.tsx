@@ -71,8 +71,6 @@ function inertEdgeAuthoring(): EdgeAuthoring {
     connect: () => null,
     createConnectedCard: () => null,
     endPointerDrag: () => null,
-    beginKeyboardConnect: () => undefined,
-    completeKeyboardConnect: () => null,
     beginPointerReconnect: () => undefined,
     openEdgeEditor: () => undefined,
     reconnect: () => false,
@@ -112,6 +110,9 @@ function mountGraph(nodes: CardFlowNode[] = [cardNode('A')]): Harness {
         onAddCard={addCard}
         nameOnCreation={named}
         onOpenCard={openCard}
+        onCloseCard={() => 'completed'}
+        onCompleteCardBody={() => 'completed'}
+        onResizeCard={() => undefined}
         onCompleteCardTitle={() => 'A Card needs a title'}
         editableCardIds={editableCardIds}
         graphs={[]}
@@ -201,7 +202,7 @@ describe('a title Edit the graph refused', () => {
   it('leaves the rest of the graph working', () => {
     const { openCard } = refuseTitleEdit('blur');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Edit Card B' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Open Card B' }));
 
     expect(openCard).toHaveBeenCalledWith(OTHER_CARD_ID);
   });
@@ -227,7 +228,7 @@ describe('opening a Card', () => {
   it('happens from the Card affordance', () => {
     const { openCard } = mountGraph();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Edit Card A' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Open Card A' }));
 
     expect(openCard).toHaveBeenCalledWith(CARD_ID);
   });
@@ -254,7 +255,7 @@ describe('F2 while a control has focus', () => {
   it('does not rename the selected Card from a control on a different Card', () => {
     mountGraph([cardNode('A', CARD_ID, true), cardNode('B', OTHER_CARD_ID)]);
 
-    fireEvent.keyDown(screen.getByRole('button', { name: 'Edit Card B' }), { key: 'F2' });
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Open Card B' }), { key: 'F2' });
 
     expect(screen.queryByRole('textbox', { name: 'Card title' })).not.toBeInTheDocument();
   });
@@ -286,7 +287,7 @@ describe.each([
 ] as const)('%s on the focused Card affordance', (_name, key) => {
   it("does not open the Card twice — the keydown is the button's, not the graph's", () => {
     const { openCard } = mountGraph();
-    const button = screen.getByRole('button', { name: 'Edit Card A' });
+    const button = screen.getByRole('button', { name: 'Open Card A' });
     button.focus();
 
     fireEvent.keyDown(button, { key });
@@ -296,7 +297,7 @@ describe.each([
 
   it('opens the Card', () => {
     const { openCard } = mountGraph();
-    const button = screen.getByRole('button', { name: 'Edit Card A' });
+    const button = screen.getByRole('button', { name: 'Open Card A' });
     button.focus();
 
     fireEvent.keyDown(button, { key });
@@ -310,7 +311,7 @@ describe('the Card affordance', () => {
   it('opens the Card rather than renaming its title on the graph', () => {
     const { openCard } = mountGraph();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Edit Card A' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Open Card A' }));
 
     expect(openCard).toHaveBeenCalledWith(CARD_ID);
     expect(screen.queryByRole('textbox', { name: 'Card title' })).not.toBeInTheDocument();
@@ -341,9 +342,45 @@ describe('withdrawing title editing', () => {
 
     setTitleEditing(false);
     setTitleEditing(true);
-    fireEvent.click(screen.getByRole('button', { name: 'Edit Card A' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Open Card A' }));
 
     expect(openCard).toHaveBeenCalledWith(CARD_ID);
+  });
+});
+
+describe('withdrawing canvas authoring from an Expanded Card', () => {
+  it('withdraws body editing and resize through the same complete gate', () => {
+    const expanded = cardNode('A', CARD_ID, true);
+    expanded.data.expanded = true;
+    expanded.data.body = '# A';
+    const { view, setTitleEditing } = mountGraph([expanded]);
+
+    expect(screen.getByRole('button', { name: 'Edit Markdown source of A' })).toBeVisible();
+    expect(view.container.querySelector('.react-flow__resize-control')).toBeInTheDocument();
+
+    setTitleEditing(false);
+
+    expect(screen.queryByRole('button', { name: 'Edit Markdown source of A' })).toBeNull();
+    expect(view.container.querySelector('.react-flow__resize-control')).toBeNull();
+  });
+
+  it('does not let another edit or Card creation replace a live body caret', () => {
+    const a = cardNode('A');
+    a.data.expanded = true;
+    a.data.body = '# A';
+    const b = cardNode('B', OTHER_CARD_ID);
+    b.data.expanded = true;
+    b.data.body = '# B';
+    const { addCard } = mountGraph([a, b]);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Markdown source of A' }));
+
+    expect(screen.queryByRole('button', { name: 'Edit Title B' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Edit Markdown source of B' })).toBeNull();
+    fireEvent.keyDown(nodeOf(OTHER_CARD_ID), { key: 'c' });
+    fireEvent.keyDown(document.body, { key: 'F2' });
+    expect(addCard).not.toHaveBeenCalled();
+    expect(screen.queryByRole('textbox', { name: 'Card title' })).toBeNull();
   });
 });
 

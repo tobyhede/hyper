@@ -9,7 +9,7 @@ test(
   'rest, selected and dragging draw visually distinct treatments, for both fronts',
   { tag: '@parity:canvas-card-shows-rest-selected-and-dragging-states' },
   async ({ page }) => {
-    await page.goto('/?story=components--canvas-card--states&mode=preview');
+    await page.goto('/?story=components--card--states&mode=preview');
 
     const rest = specimen(page, 'card · rest').getByRole('article');
     const selected = specimen(page, 'card · selected').getByRole('article');
@@ -40,7 +40,7 @@ test(
   "an Alias front's dotted border and a long Markdown title's three-line clamp are the kind's own presentation",
   { tag: '@parity:canvas-card-shows-kind-treatment' },
   async ({ page }) => {
-    await page.goto('/?story=components--canvas-card--kinds&mode=preview');
+    await page.goto('/?story=components--card--kinds&mode=preview');
 
     await expect(specimen(page, 'markdown').getByRole('article')).toHaveCSS(
       'border-style',
@@ -64,7 +64,7 @@ test(
   "a selected Card's rail carries the exact colour supplied to it, across the full palette",
   { tag: '@parity:canvas-card-shows-active-graph-colour' },
   async ({ page }) => {
-    await page.goto('/?story=components--canvas-card--colours&mode=preview');
+    await page.goto('/?story=components--card--colours&mode=preview');
 
     const specimens = page.locator('.inv-specimen');
     await expect(specimens.first()).toBeVisible();
@@ -97,7 +97,7 @@ test(
   "hovering the real React Flow node reveals CanvasCard's rail actions and the adapter's Edge handles together",
   { tag: '@parity:canvas-card-hover-reveals-actions-and-handles-together' },
   async ({ page }) => {
-    await page.goto('/?story=components--canvas-card--hover-actions&mode=preview');
+    await page.goto('/?story=components--card--hover&mode=preview');
 
     const node = specimen(page, 'hover to show actions and Edge handles').locator(
       '.react-flow__node',
@@ -118,7 +118,7 @@ test(
   'production Canvas Cards expose Alias identity and keyboard-focusable actions',
   { tag: '@parity:canvas-card-exposes-kind-and-keyboard-actions' },
   async ({ page }) => {
-    await page.goto('/?story=components--canvas-card--interaction&mode=preview');
+    await page.goto('/?story=components--card--actions&mode=preview');
 
     const alias = page.getByRole('article', { name: 'Opening, again' });
     await expect(alias.getByRole('img', { name: 'Alias' })).toBeVisible();
@@ -126,19 +126,36 @@ test(
 
     const markdown = page.getByRole('article', { name: 'Strategies' });
     const actions = markdown.getByTestId('canvas-card-actions');
-    const connect = page.getByRole('button', { name: 'Connect from Strategies' });
+    const open = page.getByRole('button', { name: 'Open Card Strategies' });
     // Hidden at rest and revealed on pointer hover, the same rule the actions
     // rail draws by everywhere it appears.
     await expect(actions).toHaveCSS('opacity', '0');
     await markdown.hover();
     await expect(actions).toHaveCSS('opacity', '1');
-    await expect(connect).toBeVisible();
+    await expect(open).toBeVisible();
+
+    const title = markdown.getByRole('heading', { name: 'Strategies' });
+    const titleTreatment = async () => {
+      const titleBox = await title.boundingBox();
+      const cardBox = await markdown.boundingBox();
+      if (titleBox === null || cardBox === null) throw new Error('Card title geometry unavailable');
+      return {
+        left: titleBox.x - cardBox.x,
+        bottom: cardBox.y + cardBox.height - (titleBox.y + titleBox.height),
+        bodyPadding: await title
+          .locator('..')
+          .evaluate((element) => getComputedStyle(element).padding),
+      };
+    };
+    const closedTitleTreatment = await titleTreatment();
 
     // Reachable and activatable from the keyboard alone, independent of hover.
-    await connect.focus();
-    await expect(connect).toBeFocused();
-    await connect.press('Enter');
-    await expect(page.getByText('Connected from Strategies.')).toBeVisible();
+    await open.focus();
+    await expect(open).toBeFocused();
+    await open.press('Enter');
+    await expect(page.getByText('Strategies is open.')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Close Card Strategies' })).toBeVisible();
+    expect(await titleTreatment()).toEqual(closedTitleTreatment);
   },
 );
 
@@ -146,19 +163,35 @@ test(
   "the Card's Title control begins editing by pointer or keyboard, stays field-local on a refusal, and completes or cancels from the keyboard",
   { tag: '@parity:canvas-card-owns-title-editing-and-refusal' },
   async ({ page }) => {
-    await page.goto('/?story=components--canvas-card--title-editing&mode=preview');
+    await page.goto('/?story=components--card--editing--title&mode=preview');
 
-    const group = page.getByTestId('card-group');
+    const closedSpecimen = page.getByRole('region', { name: 'Closed Card title editing' });
+    const group = closedSpecimen.getByTestId('card-group');
     const control = group.getByRole('button', { name: 'Edit Title Draft entry' });
-    await expect(group.getByRole('heading', { name: 'Draft entry' })).toContainText('Draft entry');
+    const heading = group.getByRole('heading', { name: 'Draft entry' });
+    await expect(heading).toContainText('Draft entry', {
+      timeout: 20_000,
+    });
     await control.hover();
-    await expect(control).toHaveCSS('text-decoration-line', 'underline');
+    // The pointer is on the control, but the treatment is the Title's:
+    // `canvas-card.css` draws it on `.canvas-card__title:has(…__title-control:hover)`
+    // so the tint and rule span the whole heading rather than the text's own box.
+    await expect
+      .poll(() => heading.evaluate((element) => getComputedStyle(element).boxShadow))
+      .not.toBe('none');
+    await expect
+      .poll(() => heading.evaluate((element) => getComputedStyle(element).backgroundColor))
+      .not.toBe('rgba(0, 0, 0, 0)');
     await control.focus();
     await expect(control).toHaveCSS('outline-style', 'solid');
+    const titleBox = await control.boundingBox();
     await control.click();
 
     const input = page.getByRole('textbox', { name: 'Card title' });
     await expect(input).toBeFocused();
+    const inputBox = await input.boundingBox();
+    expect(inputBox?.x).toBeCloseTo(titleBox?.x ?? 0, 0);
+    expect(inputBox?.y).toBeCloseTo(titleBox?.y ?? 0, 0);
     await expect(input).toHaveJSProperty('selectionStart', 0);
     await expect(input).toHaveJSProperty('selectionEnd', 'Draft entry'.length);
 
@@ -191,5 +224,14 @@ test(
     await spaceControl.press('Space');
     await page.getByRole('textbox', { name: 'Card title' }).press('Escape');
     await expect(group).toBeFocused();
+
+    // The dedicated Title story also proves that opening a Card does not
+    // introduce a second title editor or hide the Card body while it runs.
+    const openSpecimen = page.getByRole('region', { name: 'Open Card title editing' });
+    const openGroup = openSpecimen.getByTestId('card-group');
+    await expect(openGroup.getByRole('heading', { name: 'Open Card body' })).toBeVisible();
+    await openGroup.getByRole('button', { name: 'Edit Title Draft entry' }).click();
+    await expect(openGroup.getByRole('textbox', { name: 'Card title' })).toBeFocused();
+    await expect(openGroup.getByRole('heading', { name: 'Open Card body' })).toBeVisible();
   },
 );

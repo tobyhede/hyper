@@ -1,0 +1,37 @@
+/* The band across the top of a Card, beside the component that draws it.
+
+   Geometry and colour only. A Card that hides its own rail at rest — the canvas
+   Card does, revealing it with the Card itself — overrides these from its own
+   stylesheet, because when the rail shows is the Card's state and not the rail's.
+
+   `--card-rail-graph` is published by `CardRail` from its `graphColor` prop, so
+   the rail does not depend on which Card mounted it. */
+.card-rail {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 34px;
+  min-height: 34px;
+  padding: 0 8px;
+  border-radius: 0;
+  background: var(--card-rail-graph);
+  transition: background-color var(--card-hover-duration, 120ms) var(--card-hover-easing, ease);
+}
+
+.card-rail__kind {
+  display: flex;
+  align-items: center;
+  color: inherit;
+  transition: opacity var(--card-hover-duration, 120ms) var(--card-hover-easing, ease);
+}
+
+.card-rail__kind [data-card-kind] {
+  color: currentcolor;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card-rail,
+  .card-rail__kind {
+    transition: none;
+  }
+}

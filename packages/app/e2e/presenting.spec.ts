@@ -201,7 +201,7 @@ test(
  * test used to aim a forced click at a Card that was only in the viewport while
  * the camera was still moving, and failed about half the time.
  */
-test('clicking a card while presenting does not open a reading panel', async ({ page }) => {
+test('clicking a card while presenting does not open it', async ({ page }) => {
   await present(page);
 
   await expect(activeCard(page)).toHaveCSS('pointer-events', 'none');
@@ -210,7 +210,7 @@ test('clicking a card while presenting does not open a reading panel', async ({ 
   await activeCard(page).dispatchEvent('click');
   await nodeByTitle(page, 'E').dispatchEvent('click');
 
-  await expect(page.getByTestId('open-card')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: /^Close Card/ })).toHaveCount(0);
 });
 
 test('returning to the overview restores the space and its gestures', async ({ page }) => {
@@ -226,8 +226,8 @@ test('returning to the overview restores the space and its gestures', async ({ p
   // pointer graph to it (ADR 0036, 0037).
   const b = nodeByTitle(page, 'B');
   await b.hover();
-  await b.getByRole('button', { name: 'Edit Card B' }).click();
-  await expect(page.getByTestId('open-card')).toBeVisible();
+  await b.getByRole('button', { name: 'Open Card B' }).click();
+  await expect(b.getByRole('button', { name: 'Close Card B' })).toBeVisible();
 });
 
 /**

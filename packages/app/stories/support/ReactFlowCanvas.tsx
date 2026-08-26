@@ -108,7 +108,13 @@ export interface CanvasCardNodeSpecimenProps {
   readonly editingTitle?: boolean;
   readonly graphColor?: string;
   readonly cardEditingEnabled?: boolean;
-  readonly onEditCard?: () => void;
+  readonly onEditCard?: () => 'completed' | 'retained';
+  readonly nodeSize?: { readonly width: number; readonly height: number };
+  readonly expanded?: boolean;
+  readonly onOpenChange?: (open: boolean) => 'completed' | 'retained';
+  readonly stageClassName?: string;
+  readonly title?: string;
+  readonly body?: string;
 }
 
 /**
@@ -121,7 +127,13 @@ export function CanvasCardNodeSpecimen({
   editingTitle = false,
   graphColor,
   cardEditingEnabled,
-  onEditCard = () => undefined,
+  onEditCard = () => 'completed',
+  nodeSize,
+  expanded,
+  onOpenChange,
+  stageClassName = '',
+  title,
+  body,
 }: CanvasCardNodeSpecimenProps) {
   const projected = useProjection(graphIds.long);
   if (projected === null) return null;
@@ -134,11 +146,13 @@ export function CanvasCardNodeSpecimen({
     ...source.data,
     titleEditingEnabled: true,
     cardEditingEnabled: cardEditingEnabled ?? source.data.kind === 'markdown',
-    connectingEnabled: true,
-    onBeginConnect: () => undefined,
     onEditCard,
     onBeginTitleEditing: () => undefined,
   };
+  if (expanded !== undefined) data.expanded = expanded;
+  if (onOpenChange !== undefined) data.onEditCard = onOpenChange;
+  if (title !== undefined) data.title = title;
+  if (body !== undefined) data.body = body;
   // The editor is the state, so a specimen that asks to be renaming supplies
   // what ends the edit along with it.
   if (editingTitle) {
@@ -146,7 +160,9 @@ export function CanvasCardNodeSpecimen({
   }
   if (graphColor !== undefined) data.activeGraphColor = graphColor;
 
-  const node: CardFlowNode = { ...source, selected, data };
+  const node: CardFlowNode = { ...source, ...nodeSize, selected, data };
 
-  return <RealReactFlow className="inv-card-node-stage" nodes={[node]} edges={[]} />;
+  return (
+    <RealReactFlow className={`inv-card-node-stage ${stageClassName}`} nodes={[node]} edges={[]} />
+  );
 }

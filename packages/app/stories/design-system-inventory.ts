@@ -66,7 +66,7 @@ export const uncataloguedComponents = [
   {
     module: 'packages/app/src/edge-authoring-react.tsx',
     reason:
-      'The canvas-wide Edge gesture layer: React Flow connection callbacks, the keyboard Connect picker and the pointer-refusal announcement, bound to a live `ReactFlow` instance. Its rendered surfaces are catalogued through `Components/Selected Edge Controls` and reviewed on a real canvas in `Review/Selected Edge On Canvas`; the gesture layer itself has no state a story can hold still.',
+      'The canvas-wide Edge gesture layer: React Flow connection callbacks and the pointer-refusal announcement, bound to a live `ReactFlow` instance. Its rendered surfaces are catalogued through `Components/Selected Edge Controls` and reviewed on a real canvas in `Review/Selected Edge On Canvas`; the gesture layer itself has no state a story can hold still.',
   },
   {
     module: 'packages/app/src/components/SpaceCanvas.tsx',
@@ -107,11 +107,6 @@ export const uncataloguedComponents = [
     module: 'packages/react-flow-adapter/src/GraphConnectionLine.tsx',
     reason:
       'The line React Flow draws between the pointer and its origin during a connection drag. Like the new-Card preview above, it exists only for the duration of a gesture and has no still state to render.',
-  },
-  {
-    module: 'packages/ui/src/CardContent.tsx',
-    reason:
-      'Rendered by the presented Card rather than by a story: `CardNode` mounts it inside `.rf-card-node__content`, where its type scales with the frame, and at 1:1 in a story it would show a size the product never draws. Covered by `packages/ui/test/CardContent.test.tsx` and by `presenting.spec.ts`.',
   },
   {
     module: 'packages/ui/src/Select.tsx',
@@ -162,7 +157,7 @@ export const handRolledStyles = [
   {
     block: 'rf-card-node',
     reason:
-      "The adapter's node wrapper: card sizing from `--card-width`/`--card-height`, per-Graph port and authoring-handle geometry, handle reveal driven by the connection state, and the one rule naming the actively presented Card. React Flow measures against this box, so it cannot move into the component it wraps.",
+      "The adapter's node wrapper: card sizing from `--card-width`/`--card-height` and the Expanded Card's fill of the box the Layout authored, per-Graph port and authoring-handle geometry, handle reveal driven by the connection state, React Flow's own `NodeResizer` in the Card's palette, and the one rule naming the actively presented Card. React Flow measures against this box, so it cannot move into the component it wraps.",
   },
   {
     block: 'card',
@@ -207,11 +202,6 @@ export const handRolledStyles = [
     block: 'edge-refusal',
     reason:
       'Screen-fixed placement for the sentence a finished pointer gesture leaves behind. The gesture is over, so there is no surface left on the canvas to attach it to.',
-  },
-  {
-    block: 'edge-connect-picker',
-    reason:
-      "Screen-fixed placement for the keyboard connection's Target picker, which opens from a control whose Card may be anywhere in the viewport. The picker itself is `CardSearchCombobox`.",
   },
   {
     block: 'shell',

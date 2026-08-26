@@ -1,6 +1,6 @@
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import type { Story } from '@ladle/react';
-import { CanvasCard, type CanvasCardState } from '@project/ui';
+import { CanvasCard, type CanvasCardFront, type CanvasCardState } from '@project/ui';
 import { cardSizeVars } from '#src/card';
 import { CanvasCardSpecimen } from '../support/CanvasCardSpecimen';
 import { CatalogueSection, Specimen } from '../support/Catalogue';
@@ -8,7 +8,7 @@ import { CanvasCardNodeSpecimen } from '../support/ReactFlowCanvas';
 import { GRAPH_PALETTE } from '../support/fixture';
 import '../support/inventory.css';
 
-export default { title: 'Components/Canvas Card' };
+export default { title: 'Components/Card' };
 
 export const States: Story = () => (
   <div className="inv inv-sheet" style={cardSizeVars}>
@@ -89,7 +89,7 @@ export const Colours: Story = () => (
 );
 Colours.storyName = 'Colours';
 
-export const HoverActions: Story = () => (
+export const Hover: Story = () => (
   <div className="inv inv-sheet" style={cardSizeVars}>
     <CatalogueSection
       title="Hover actions"
@@ -106,7 +106,22 @@ export const HoverActions: Story = () => (
     </CatalogueSection>
   </div>
 );
-HoverActions.storyName = 'Hover actions';
+
+export const NodeContainment: Story = () => (
+  <div className="inv inv-sheet" style={cardSizeVars}>
+    <CatalogueSection
+      title="React Flow node containment"
+      note="The production CanvasCard fills the rect React Flow declares. This specimen deliberately differs from the collapsed default so equality cannot pass by coincidence."
+    >
+      <div className="inv-row">
+        <Specimen label="340 × 210 node">
+          <CanvasCardNodeSpecimen nodeSize={{ width: 340, height: 210 }} />
+        </Specimen>
+      </div>
+    </CatalogueSection>
+  </div>
+);
+NodeContainment.storyName = 'Node containment';
 
 /**
  * One instance wired the way `CardNode` wires the production component: real
@@ -124,15 +139,22 @@ function Instance({
   const [title] = useState(initialTitle);
   const [selected, setSelected] = useState(false);
   const [dragging, setDragging] = useState(false);
-  const [connected, setConnected] = useState(false);
-  const front =
-    aliasOf === undefined ? ({ kind: 'markdown' } as const) : { kind: 'alias' as const, aliasOf };
+  const [open, setOpen] = useState(false);
+  const changeOpen = (next: boolean) => {
+    setOpen(next);
+    return 'completed' as const;
+  };
+  const front: CanvasCardFront =
+    aliasOf === undefined
+      ? open
+        ? { kind: 'markdown', source: 'Markdown content', open: true, onOpenChange: changeOpen }
+        : { kind: 'markdown', source: 'Markdown content', open: false, onOpenChange: changeOpen }
+      : { kind: 'alias', aliasOf };
   const state: Exclude<CanvasCardState, 'editing'> = dragging
     ? 'dragging'
     : selected
       ? 'selected'
       : 'rest';
-
   return (
     <div className="flex flex-col items-start gap-2">
       <div
@@ -141,13 +163,7 @@ function Instance({
         tabIndex={-1}
         onClick={() => setSelected(true)}
       >
-        <CanvasCard
-          front={front}
-          state={state}
-          title={title}
-          graphColor="#ffc53d"
-          onConnect={() => setConnected(true)}
-        />
+        <CanvasCard front={front} state={state} title={title} graphColor="#ffc53d" />
       </div>
       <label className="flex items-center gap-1 text-xs text-muted-foreground">
         <input
@@ -157,9 +173,11 @@ function Instance({
         />
         Dragging
       </label>
-      <p className="text-xs text-muted-foreground" data-testid="connect-report">
-        {connected ? `Connected from ${title}.` : 'Not connected.'}
-      </p>
+      {front.kind === 'markdown' && (
+        <p className="text-xs text-muted-foreground" data-testid="open-report">
+          {open ? `${title} is open.` : `${title} is closed.`}
+        </p>
+      )}
     </div>
   );
 }
@@ -167,64 +185,65 @@ function Instance({
 /**
  * The production component's keyboard, pointer and callback behaviour: real
  * hover, click-to-select, a dragging toggle standing in for React Flow's own,
- * and the keyboard-focusable Connect control the graph reaches through the
- * same handler React Flow attaches. `States` above is the visual reference;
+ * and keyboard-focusable Card actions. `States` above is the visual reference;
  * this is its behaviour proof.
  */
-export const Interaction: Story = () => (
+export const Actions: Story = () => (
   <div className="flex flex-wrap gap-8 p-8" style={cardSizeVars}>
     <Instance initialTitle="Strategies" />
     <Instance initialTitle="Opening, again" aliasOf="Opening" />
   </div>
 );
 
-/**
- * The Card's own title editor, entirely private to this component: begins from
- * the Title's native control, keeps a refused draft local with a field-local `role="alert"`
- * error, completes and exits on a valid Enter, cancels on Escape, and asks its
- * caller to hand focus back once either keyboard path ends — proven here by
- * focusing the surrounding group the same way `CardNode` focuses the React
- * Flow node around it.
- */
-export const TitleEditing: Story = () => {
-  const [title, setTitle] = useState('Draft entry');
-  const [editing, setEditing] = useState(false);
-  const group = useRef<HTMLDivElement>(null);
+const closedFrame = { width: 240, height: 135 };
+const openFrame = { width: 480, height: 360 };
+
+const openMarkdown = `## Placement is authored
+
+A **Layout** owns explicit Card rects. The strategy only supplies a computed View.
+
+- Open in place
+- Edit the source
+- Keep the canvas beneath it`;
+
+/** The Card's actual Open and Close operation, including its change in authored size. */
+export const OpenAndClose: Story = () => {
+  const [open, setOpen] = useState(false);
+  const [longOpen, setLongOpen] = useState(true);
+  const changeOpen = (next: boolean) => {
+    setOpen(next);
+    return 'completed' as const;
+  };
+  const changeLongOpen = (next: boolean) => {
+    setLongOpen(next);
+    return 'completed' as const;
+  };
 
   return (
-    <div style={cardSizeVars}>
-      <div
-        role="group"
-        aria-label={`${title} on the canvas`}
-        tabIndex={-1}
-        ref={group}
-        data-testid="card-group"
-      >
-        {editing ? (
-          <CanvasCard
-            front={{ kind: 'markdown' }}
-            state="editing"
-            title={title}
-            graphColor="#ffc53d"
-            onCompleteTitleEdit={(draft) => {
-              if (draft.trim().length === 0) return 'A Card title is required.';
-              setTitle(draft);
-              setEditing(false);
-              return null;
-            }}
-            onCancelTitleEdit={() => setEditing(false)}
-            onReturnFocus={() => group.current?.focus()}
-          />
-        ) : (
-          <CanvasCard
-            front={{ kind: 'markdown' }}
-            state="rest"
-            title={title}
-            graphColor="#ffc53d"
-            onBeginTitleEdit={() => setEditing(true)}
-          />
-        )}
-      </div>
+    <div className="flex flex-wrap items-start gap-8 p-8">
+      <section aria-label="Interactive Card" className="flex flex-col gap-2">
+        <p className="text-xs text-muted-foreground">{open ? 'Open' : 'Closed'}</p>
+        <CanvasCardNodeSpecimen
+          expanded={open}
+          onOpenChange={changeOpen}
+          body={openMarkdown}
+          nodeSize={open ? openFrame : closedFrame}
+          stageClassName="inv-card-node-stage--open-close"
+        />
+      </section>
+      <section aria-label="Long Markdown Card" className="flex flex-col gap-2">
+        <p className="text-xs text-muted-foreground">
+          {longOpen ? 'Open' : 'Closed'} · long Markdown
+        </p>
+        <CanvasCardNodeSpecimen
+          expanded={longOpen}
+          onOpenChange={changeLongOpen}
+          title="Long Markdown"
+          body={`${openMarkdown}\n\n### A deliberately long section\n\n${openMarkdown}\n\n${openMarkdown}`}
+          nodeSize={longOpen ? openFrame : closedFrame}
+          stageClassName="inv-card-node-stage--open-close"
+        />
+      </section>
     </div>
   );
 };

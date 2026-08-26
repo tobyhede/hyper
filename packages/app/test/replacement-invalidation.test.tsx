@@ -245,36 +245,27 @@ afterEach(() => {
 
 describe('accepting a stored Space discards the open Interaction draft', () => {
   /**
-   * The opened-Card pane (`OpenCard`), which holds the largest draft in the app —
-   * a title and a body of Markdown (`MarkdownDraft`).
-   *
-   * It renders outside the keyed canvas subtree and carries no key of its own, so
-   * neither the canvas key nor the placeholder branch that unmounts the
-   * `ReactFlowProvider` subtree reaches it. What discards it is `acceptStoredSpace`
-   * calling `navigation.openFresh`, which republishes Navigation whole with no
-   * opened Card.
-   *
-   * The editor's own state is keyed by the content Card's id, which survives the
-   * replacement — so a pane that stayed open would keep this draft rather than
-   * reseed from the accepted Card.
+   * The inline Title draft lives inside the Canvas Card. Replacement remounts
+   * the keyed canvas subtree, so neither its caret nor its uncompleted value can
+   * cross into the new Space. An open Markdown draft cannot be staged against
+   * this fixture: opening is itself an authored commit and therefore raises the
+   * fixture's deliberately waiting conflict before body editing can begin.
    */
-  it('closes an opened Card whose editor holds an uncompleted draft', async () => {
+  it('discards a Card title editor holding an uncompleted draft', async () => {
     const session = await mountedSpaceApp();
-    fireEvent.click(screen.getByRole('button', { name: 'Edit Card Local card' }));
-    const source = await screen.findByRole('textbox', { name: 'Markdown source' });
-    source.focus();
-    fireEvent.keyDown(source, { key: 'a', ctrlKey: true });
-    fireEvent.paste(source, {
-      clipboardData: { getData: () => 'Prose nobody pressed Done on' },
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Title Local card' }));
+    const title = screen.getByRole('textbox', { name: 'Card title' });
+    fireEvent.change(title, {
+      target: { value: 'Title nobody pressed Enter on' },
     });
-    expect(source).toHaveTextContent('Prose nobody pressed Done on');
+    expect(title).toHaveValue('Title nobody pressed Enter on');
 
     await raiseConflict(session);
     acceptRemote();
 
     await replacementLanded();
-    expect(screen.queryByTestId('open-card')).not.toBeInTheDocument();
-    expect(screen.queryByDisplayValue('Prose nobody pressed Done on')).not.toBeInTheDocument();
+    expect(screen.queryByRole('textbox', { name: 'Card title' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Title nobody pressed Enter on')).not.toBeInTheDocument();
     expect(session.getState().working).toEqual(REMOTE);
     expect(await screen.findByRole('heading', { name: 'Remote card' })).toBeVisible();
   });

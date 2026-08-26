@@ -103,7 +103,7 @@ export function activeCard(page: Page): Locator {
  */
 export async function openCard(node: Locator, title: string): Promise<void> {
   await node.hover();
-  await node.getByRole('button', { name: `Edit Card ${title}` }).click();
+  await node.getByRole('button', { name: `Open Card ${title}` }).click();
 }
 
 /** The Space's command surface: one list of everything the canvas can draw. */

@@ -337,7 +337,10 @@ function CanvasHarness({
       newCardTitle="Card 4"
       onAddCard={() => undefined}
       nameOnCreation={null}
-      onOpenCard={() => undefined}
+      onOpenCard={() => 'completed'}
+      onCloseCard={() => 'completed'}
+      onCompleteCardBody={() => 'completed'}
+      onResizeCard={() => undefined}
       onCompleteCardTitle={() => null}
       editableCardIds={new Set([CARD_A, CARD_B, CARD_C])}
       graphs={currentSpace().graphs}
@@ -551,8 +554,8 @@ describe("React Flow's document-level delete key", () => {
 });
 
 /**
- * A pane over the graph withdraws the Edge lifecycle exactly as it withdraws the
- * Card controls — one authoring surface at a time.
+ * A pane over the graph withdraws the Edge lifecycle — one authoring surface at
+ * a time.
  *
  * `titleEditingEnabled` is named for the first control it took away and means
  * "no modal pane covers the graph": `App` passes
@@ -562,28 +565,25 @@ describe("React Flow's document-level delete key", () => {
  * *not* to Edge authoring, so the two disagreed about when the graph is
  * authorable.
  *
- * Hidden control, live gesture is the asymmetry that matters, and the delete key
- * is where it bites. `useGlobalKeyHandler` subscribes `deleteKeyCode` on
+ * A hidden live gesture is the asymmetry that matters, and the delete key is
+ * where it bites. `useGlobalKeyHandler` subscribes `deleteKeyCode` on
  * `document`, and its one exclusion, `isInputDOMNode`, covers
  * `INPUT`/`SELECT`/`TEXTAREA`, `contenteditable` and `.nokey` — a pane's `Done`
  * and `Cancel` are `Button`s with none of those, so a `Backspace` aimed at the
  * dialog the author is working in deleted the Edge selected behind it.
  */
 describe('a pane covering the graph', () => {
-  it('withdraws the Edge surface with the Connect control, not after it', () => {
+  it('withdraws the Edge surface while the pane covers it', () => {
     mountCanvas(null, { covered: true });
 
-    expect(screen.queryAllByRole('button', { name: /^Connect from/ })).toEqual([]);
     expect(edgeElement(`${GRAPH_ID}::0`)).not.toHaveAttribute('tabindex');
   });
 
-  it('offers both again once the pane closes', () => {
+  it('offers the Edge surface again once the pane closes', () => {
     const { setCovered } = mountCanvas(null, { covered: true });
-    expect(screen.queryAllByRole('button', { name: /^Connect from/ })).toEqual([]);
 
     setCovered(false);
 
-    expect(screen.queryAllByRole('button', { name: /^Connect from/ })).not.toEqual([]);
     expect(edgeElement(`${GRAPH_ID}::0`)).toHaveAttribute('tabindex', '0');
   });
 
@@ -1056,118 +1056,9 @@ describe('focusing an Edge a completed Edit has just produced', () => {
 });
 
 /**
- * Withdrawing Edge authoring withdraws its surfaces in the same render.
- *
- * The module cancels an open draft when presenting begins, but that arrives on
- * a notification and the layer renders before it — so a picker read off the
- * draft alone stays usable over a presentation that has already started. Both
- * halves are needed: this one closes the window, and the module's cancellation
- * is what stops the draft reopening afterwards.
- */
-describe('withdrawing Edge authoring', () => {
-  const withEnabled = (composed: ReturnType<typeof compose>, enabled: boolean) =>
-    renderHook(
-      () =>
-        useEdgeAuthoring({
-          authoring: composed.edgeAuthoring,
-          edges: EDGES,
-          projectedNodes: null,
-          selection: { kind: 'none' },
-          activeGraphId: GRAPH_ID,
-          graphs: composed.currentSpace().graphs,
-          subjectCards: composed.currentSpace().cards,
-          newCardTitle: 'Card 4',
-          enabled,
-          onSelectCard: NO_OP,
-          onSelectEdge: NO_OP,
-        }),
-      { wrapper: ({ children }) => <ReactFlowProvider>{children}</ReactFlowProvider> },
-    );
-
-  it('draws no keyboard target picker while authoring is withdrawn', () => {
-    const composed = compose();
-    act(() => composed.edgeAuthoring.beginKeyboardConnect(CARD_A));
-
-    const { result } = withEnabled(composed, false);
-    render(<ReactFlowProvider>{result.current.layer}</ReactFlowProvider>);
-
-    expect(screen.queryByTestId('connect-target-picker')).not.toBeInTheDocument();
-  });
-
-  it('draws it again once authoring returns', () => {
-    const composed = compose();
-    act(() => composed.edgeAuthoring.beginKeyboardConnect(CARD_A));
-
-    const { result } = withEnabled(composed, true);
-    render(<ReactFlowProvider>{result.current.layer}</ReactFlowProvider>);
-
-    expect(screen.getByTestId('connect-target-picker')).toBeVisible();
-  });
-});
-
-/**
- * Escape cancels exactly one topmost surface, and the picker's open list is a
- * surface above the connection draft.
- *
- * **In Chromium the `aria-expanded` guard is not what produces those two
- * stages**, and that is the first thing to know about this test. Measured
- * against the fixture: Base UI closes from a document listener, and the
- * microtask checkpoint the browser performs *between* listeners commits that
- * close before React's delegated listener runs — by which time the cmdk input
- * is detached and React has stripped its fiber, so nothing dispatches, the
- * handler is never asked, and the trigger already reads `false`.
- * `editing.spec.ts` passes with the guard removed, and the author's two stages
- * are the e2e's to pin.
- *
- * What this pins is the **rule**, in the one environment that can see it. A
- * portal is no escape from the React tree — Base UI renders the list through a
- * portal, React dispatches synthetic events along the *fiber* tree, and the
- * popup's Escape handling calls `preventDefault` and never `stopPropagation` —
- * and jsdom dispatches a whole event in one frame with no
- * checkpoint, so here the press really does arrive in front of the guard.
- * Without it this fails with the picker gone on the first press: one gesture
- * cancelled by a keystroke the author aimed at a list. That is what will matter
- * the next time the primitive moves to one answering Escape from React rather
- * than from the document.
- *
- * It also holds the guard to the primitive underneath it: the picker is
- * shadcn's Combobox — a Base UI Popover over cmdk. Its trigger continues to
- * expose its expanded state to the surrounding keyboard interaction.
- */
-describe('Escape in the keyboard target picker', () => {
-  it('closes the open list first and cancels the connection only on the press after', async () => {
-    const { edgeAuthoring, session } = mountCanvas();
-    const before = session.getState().working;
-    act(() => edgeAuthoring.beginKeyboardConnect(CARD_A));
-    const trigger = screen.getByRole('combobox', { name: 'Connect to' });
-
-    fireEvent.keyDown(trigger, { key: 'ArrowDown' });
-    await waitFor(() => expect(trigger).toHaveAttribute('aria-expanded', 'true'));
-    fireEvent.keyDown(trigger, { key: 'Escape' });
-
-    // The list has gone and the gesture has not.
-    expect(trigger).toHaveAttribute('aria-expanded', 'false');
-    expect(screen.getByTestId('connect-target-picker')).toBeVisible();
-    expect(edgeAuthoring.getState().draft).toEqual({ kind: 'keyboard-connect', from: CARD_A });
-
-    fireEvent.keyDown(trigger, { key: 'Escape' });
-
-    expect(screen.queryByTestId('connect-target-picker')).not.toBeInTheDocument();
-    expect(edgeAuthoring.getState().draft).toBeNull();
-    // Cancelling authors nothing: the same working snapshot, not an equal one.
-    expect(session.getState().working).toBe(before);
-  });
-});
-
-/**
- * Every refusal reaches a surface, including the one with no draft left.
- *
- * A refusal is retained beside the draft that ran into it, and a keyboard draft
- * has a surface of its own to show it in context. A **pointer** gesture has
- * neither by the time the refusal exists — the drag is over and its draft is
- * gone — so without a canvas-level alert the sentence is stored and shown
- * nowhere. It is rare by design, because eligibility refuses most of these
- * during the drag through `isValidConnection`, but "rare" is not "announced".
+ * A finished pointer gesture has no draft or surface left, so its refusal is
+ * announced at canvas level. It is rare by design, because eligibility refuses
+ * most proposals during the drag, but "rare" is not "announced".
  */
 describe('announcing a refusal', () => {
   it('shows the reason a finished pointer gesture ran into', () => {
@@ -1184,52 +1075,6 @@ describe('announcing a refusal', () => {
 
     expect(screen.getByRole('alert')).toHaveTextContent(
       'These Cards are already connected in this Graph.',
-    );
-  });
-
-  it('says nothing while a keyboard draft has a surface of its own', () => {
-    const { edgeAuthoring } = mountCanvas();
-
-    act(() => edgeAuthoring.beginKeyboardConnect(CARD_A));
-    act(() => {
-      edgeAuthoring.completeKeyboardConnect(CARD_B, null);
-    });
-
-    // The picker shows it inline; a second copy over the canvas would say the
-    // same thing twice, in a place the author is not looking.
-    expect(screen.getByTestId('connect-refusal')).toBeVisible();
-    expect(screen.queryByTestId('edge-gesture-refusal')).not.toBeInTheDocument();
-  });
-
-  /**
-   * The picker's *other* channel: a refusal no row in its list could answer.
-   *
-   * `edge-already-exists` above is about the Card chosen, so it marks Target and
-   * the author corrects it by choosing again. A Layout whose Active Graph has
-   * gone is about the subject — every row would be refused the same way — so it
-   * belongs beneath the field with the field left valid (ADR 0057).
-   */
-  it('says a refusal no Card choice could answer beneath the field, not on it', () => {
-    const { edgeAuthoring } = mountCanvas(null, {
-      connections: () => ({
-        connect: () => ({ kind: 'refused', refusal: { code: 'layout-active-graph-required' } }),
-        createAndConnect: () => ({ kind: 'unavailable' }),
-      }),
-    });
-
-    act(() => edgeAuthoring.beginKeyboardConnect(CARD_A));
-    act(() => {
-      edgeAuthoring.completeKeyboardConnect(CARD_B, null);
-    });
-
-    expect(screen.getByTestId('connect-form-refusal')).toHaveTextContent(
-      'This Layout has no active Graph for the connection to join.',
-    );
-    // Target stays valid, and says so: choosing another Card is not the fix.
-    expect(screen.queryByTestId('connect-refusal')).not.toBeInTheDocument();
-    expect(screen.getByRole('combobox', { name: 'Connect to' })).toHaveAttribute(
-      'aria-invalid',
-      'false',
     );
   });
 });
