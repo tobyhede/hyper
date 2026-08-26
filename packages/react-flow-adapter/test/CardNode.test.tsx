@@ -2,9 +2,9 @@ import '@testing-library/jest-dom/vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import type * as ReactFlowReact from '@xyflow/react';
 import { Position, type NodeProps } from '@xyflow/react';
-import type { HTMLAttributes } from 'react';
+import type { HTMLAttributes, ReactNode } from 'react';
 import { vi } from 'vitest';
-import { CardNode, growsFromOrigin } from '../src/CardNode';
+import { CardNode } from '../src/CardNode';
 import type { CardFlowNode, CardHandle, CardNodeData, CardTitleEditor } from '../src/projection';
 import { uuid } from './uuid';
 
@@ -45,15 +45,14 @@ type MockHandleProps = HTMLAttributes<HTMLButtonElement> & {
   isConnectableEnd?: boolean;
 };
 
-/** The constraint and visibility `CardNode` hands React Flow's resizer. */
-type MockResizerProps = {
-  isVisible?: boolean;
+/** The floor and position `CardNode` hands React Flow's one bottom-right resize
+ *  control. */
+type MockResizeControlProps = {
+  position?: string;
   minWidth?: number;
   minHeight?: number;
-  /** React Flow's own veto. Its argument is a d3 drag event no stand-in can
-   *  build, so the mock reports only *that* one was supplied — what it decides
-   *  is `growsFromOrigin`'s, tested directly below. */
-  shouldResize?: ReactFlowReact.NodeResizerProps['shouldResize'];
+  className?: string;
+  children?: ReactNode;
 };
 
 vi.mock('@xyflow/react', async (importOriginal) => {
@@ -63,19 +62,36 @@ vi.mock('@xyflow/react', async (importOriginal) => {
     useUpdateNodeInternals: () => updateNodeInternals,
     useConnection: <T,>(selector: (state: MockConnectionState) => T): T => selector(connection),
     /**
-     * React Flow's own resizer, which reaches for the flow store and so cannot
-     * render outside a provider. Stood in for like every other piece of React
-     * Flow here: what matters is the box `CardNode` told it to respect and when
-     * it asked for it to be visible.
+     * React Flow's own resize control, which reaches for the flow store and so
+     * cannot render outside a provider. Stood in for like every other piece of
+     * React Flow here, replicating the class list React Flow's own control
+     * publishes for a given `position` — `controlPosition.split('-')` — so a
+     * test can pin the same `.bottom.right` selector production code and
+     * `editing.spec.ts` both key off, rather than asserting a fixture invention.
      */
-    NodeResizer: ({ isVisible, minWidth, minHeight, shouldResize }: MockResizerProps) => (
+    NodeResizeControl: ({
+      position,
+      minWidth,
+      minHeight,
+      className,
+      children,
+    }: MockResizeControlProps) => (
       <div
-        data-testid="node-resizer"
-        data-visible={String(isVisible)}
+        className={[
+          'react-flow__resize-control',
+          'nodrag',
+          ...(position ?? '').split('-'),
+          'handle',
+          className ?? '',
+        ]
+          .filter((part) => part.length > 0)
+          .join(' ')}
+        data-testid="resize-control"
         data-min-width={String(minWidth)}
         data-min-height={String(minHeight)}
-        data-vetoes-resizes={String(shouldResize !== undefined)}
-      />
+      >
+        {children}
+      </div>
     ),
     Handle: ({
       className,
@@ -696,48 +712,77 @@ describe('CardNode Expanded Card front', () => {
     expect(screen.getByRole('heading', { name: 'Strategies' })).toBeVisible();
   });
 
-  it('refuses the resizes that would move the Card away from its authored origin', () => {
-    // `onResize` answers a size and no origin, which is what keeps a resize out
-    // of the family of gestures that must go back through authored placement.
-    // The eight controls do not all respect that: dragging a top or left one
-    // moves the node's top-left in React Flow's own store, and the composition
-    // is told only the new size — so the authored origin stays put and the next
-    // projection publish snaps the Card back. Offering only the drags that grow
-    // the box away from its origin is what makes the reported size sufficient.
-    const resize = { minWidth: 260, minHeight: 146, onResize: () => undefined };
-    render(<CardNode {...props({ expanded: true, body: SOURCE, selected: true, resize })} />);
+  it('draws exactly one bottom-right resize control on an Expanded Card given a resize operation', () => {
+    const resize = {
+      minWidth: 260,
+      minHeight: 146,
+      onResizeStart: () => undefined,
+      onResize: () => undefined,
+    };
+    render(<CardNode {...props({ expanded: true, body: SOURCE, resize })} />);
 
-    // The two drags that differ: one grows the box away from its origin, the
-    // other would move the origin the Card is placed at.
-    expect(growsFromOrigin([1, 1])).toBe(true);
-    expect(growsFromOrigin([1, 0])).toBe(true);
-    expect(growsFromOrigin([0, 1])).toBe(true);
-    expect(growsFromOrigin([-1, -1])).toBe(false);
-    expect(growsFromOrigin([-1, 1])).toBe(false);
-    expect(growsFromOrigin([1, -1])).toBe(false);
-
-    // And the resizer is actually asked. Without this the policy above could be
-    // correct and unwired.
-    expect(screen.getByTestId('node-resizer')).toHaveAttribute('data-vetoes-resizes', 'true');
+    // One control, not React Flow's eight — a bottom-right-only control cannot
+    // move the authored origin by construction, so there is nothing else to draw.
+    const controls = screen.getAllByTestId('resize-control');
+    expect(controls).toHaveLength(1);
+    expect(controls[0]).toHaveClass('react-flow__resize-control', 'bottom', 'right');
+    expect(controls[0]).toHaveAttribute('data-min-width', '260');
+    expect(controls[0]).toHaveAttribute('data-min-height', '146');
   });
 
-  it('offers resizing only where the composition supplied the operation and its floor', () => {
-    const resize = { minWidth: 260, minHeight: 146, onResize: () => undefined };
-    const { rerender } = render(
-      <CardNode {...props({ expanded: true, body: SOURCE, selected: true })} />,
-    );
+  it('offers no resize control on a Collapsed Card', () => {
+    const resize = {
+      minWidth: 260,
+      minHeight: 146,
+      onResizeStart: () => undefined,
+      onResize: () => undefined,
+    };
+    render(<CardNode {...props({ body: SOURCE, resize })} />);
+
+    // A Collapsed Card has no box the author drew, so nothing to resize.
+    expect(screen.queryByTestId('resize-control')).not.toBeInTheDocument();
+  });
+
+  it('offers no resize control on an Expanded Card the composition gave no resize operation', () => {
+    render(<CardNode {...props({ expanded: true, body: SOURCE })} />);
     // The capability carries its own floor, so a Card offered no operation is
-    // offered no resizer either — there is no minimum for this package to guess.
-    expect(screen.queryByTestId('node-resizer')).not.toBeInTheDocument();
+    // offered no control either — there is no minimum for this package to guess.
+    expect(screen.queryByTestId('resize-control')).not.toBeInTheDocument();
+  });
 
-    rerender(<CardNode {...props({ expanded: true, body: SOURCE, selected: true, resize })} />);
-    const resizer = screen.getByTestId('node-resizer');
-    expect(resizer).toHaveAttribute('data-visible', 'true');
-    expect(resizer).toHaveAttribute('data-min-width', '260');
-    expect(resizer).toHaveAttribute('data-min-height', '146');
+  it('offers a resize control on an Expanded Alias, because resize follows state rather than Card kind', () => {
+    const resize = {
+      minWidth: 260,
+      minHeight: 146,
+      onResizeStart: () => undefined,
+      onResize: () => undefined,
+    };
+    render(
+      <CardNode
+        {...props({ kind: 'alias', aliasOf: 'Strategies', expanded: true, resize })}
+      />,
+    );
 
-    // A collapsed Card has no box the author drew, so nothing to resize.
-    rerender(<CardNode {...props({ body: SOURCE, selected: true, resize })} />);
-    expect(screen.queryByTestId('node-resizer')).not.toBeInTheDocument();
+    // `projection.ts` never marks an Alias Expanded in production (ADR 0064), but
+    // this Card's own resize gate must not repeat that as a second opinion —
+    // ADR 0066 makes resize Card behaviour, not kind behaviour.
+    expect(screen.getByTestId('resize-control')).toBeInTheDocument();
+  });
+
+  it("draws the resize control's mark as the control's own child", () => {
+    const resize = {
+      minWidth: 260,
+      minHeight: 146,
+      onResizeStart: () => undefined,
+      onResize: () => undefined,
+    };
+    render(<CardNode {...props({ expanded: true, body: SOURCE, resize })} />);
+
+    // The hit target (the control) is comfortably larger than the visible mark;
+    // that sizing is CSS, but the structure it depends on is pinned here.
+    const control = screen.getByTestId('resize-control');
+    const mark = control.querySelector('.rf-card-node__resize-mark');
+    expect(mark).not.toBeNull();
+    expect(mark?.parentElement).toBe(control);
   });
 });

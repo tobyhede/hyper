@@ -55,6 +55,14 @@
   height: 420px;
 }
 
+/* A bigger stage for a specimen a test actually drags: the default stage fits
+   an Open node by zooming it down to a few screen pixels, too small a target
+   for a pointer gesture to land reliably. */
+.inv-card-node-stage.inv-card-node-stage--resizable {
+  width: 640px;
+  height: 480px;
+}
+
 /* Canvas-card visuals live with CanvasCard in the shared UI package. Ladle owns only the catalogue furniture below. */
 
 /* ---- Inventory page furniture ----

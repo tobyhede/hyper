@@ -432,20 +432,24 @@ export function SpaceCanvas({
               openObserved: node.data.expanded === true,
             });
         }
-        if (node.data.expanded === true && node.data.kind === 'markdown') {
-          if (canAuthorOnCanvas) {
-            data.resize = {
-              minWidth: CARD_SIZE.width,
-              minHeight: CARD_SIZE.height,
-              onResize: (size) => onResizeCard(node.data.cardId, size),
-            };
-          }
-          if (bodyEditorCardId === node.id) {
-            data.bodyEditor = {
-              onComplete: (body) => onCompleteCardBody(node.data.cardId, body),
-              onEnd: () => setCaret(null),
-            };
-          }
+        // Resize belongs to Card and follows authored Expanded state; the body
+        // editor belongs separately to the Markdown kind (ADR 0064).
+        if (node.data.expanded === true && canAuthorOnCanvas) {
+          data.resize = {
+            minWidth: CARD_SIZE.width,
+            minHeight: CARD_SIZE.height,
+            // A resize gesture begun on an unselected Card selects it, so the
+            // control that grows the box also becomes the thing Selected — one
+            // drag, not a drag followed by a separate click.
+            onResizeStart: () => onSelectCard(node.data.cardId),
+            onResize: (size) => onResizeCard(node.data.cardId, size),
+          };
+        }
+        if (node.data.kind === 'markdown' && bodyEditorCardId === node.id) {
+          data.bodyEditor = {
+            onComplete: (body) => onCompleteCardBody(node.data.cardId, body),
+            onEnd: () => setCaret(null),
+          };
         }
         // The editor is the Card being renamed, and it arrives with what ends
         // it rather than as a flag beside two callbacks that might not be there.
@@ -473,6 +477,7 @@ export function SpaceCanvas({
       onCompleteCardBody,
       onResizeCard,
       bodyEditorCardId,
+      onSelectCard,
     ],
   );
 

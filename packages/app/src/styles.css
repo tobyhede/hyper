@@ -141,23 +141,62 @@ body {
   .graph-area {
     --card-placement-duration: 1ms;
   }
+
+  .rf-card-node__inner .react-flow__resize-control.rf-card-node__resize-control {
+    transition: none;
+  }
 }
 
-/* React Flow's own `NodeResizer`, in the Card's palette. Drawn through the two
-   `className` props it publishes rather than by naming its internal selectors,
-   and here rather than beside `CanvasCard` because the resizer is the
-   framework's — the Card being resized knows nothing about it. */
-.rf-card-node__resize-line {
-  border-color: color-mix(in srgb, var(--canvas-card-ink-color) 40%, transparent);
-  border-width: 1px;
+/* React Flow's own `NodeResizeControl`, in the Card's palette: one bottom-right
+   control, and here rather than beside `CanvasCard` because the control is the
+   framework's — the Card being resized knows nothing about it.
+
+   **The wrapper is named to win the cascade, not for reach.** The default
+   variant carries React Flow's own `.handle`, and `.react-flow__resize-control.handle`
+   declares the box itself — width, height, border and background. A rule
+   naming only our class is one class weaker, so it loses the whole box and the
+   control renders at React Flow's 5px: visible, and far too small to hit.
+   Qualifying by the node wrapper outranks that pair without this file naming a
+   bare `.handle`, which belongs to React Flow and which no module here names.
+
+   The control is the hit target and the mark is only what it draws. Only
+   `opacity` is off at rest: withholding `pointer-events` too deadlocks the
+   gesture, because React Flow's own `translate` centres this box on the corner
+   it resizes from, so half of it lies outside the Card. A pointer arriving
+   there hits the pane instead, the Card stops being hovered, and the control
+   the hover was revealing is withheld again. Left interactive it is reachable,
+   and nothing is grabbable that hovering the Card does not also show. */
+.rf-card-node__inner .react-flow__resize-control.rf-card-node__resize-control {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  cursor: nwse-resize;
+  opacity: 0;
+  transition: opacity 100ms ease;
 }
 
-.rf-card-node__resize-handle {
+.rf-card-node__resize-mark {
   width: 10px;
   height: 10px;
   background: var(--canvas-card-face-active);
   border: 2px solid var(--canvas-card-ink-color);
-  border-radius: 0;
+}
+
+/* Hover discovers the control, Selection keeps it stable for touch (no hover
+   state to reveal it), and Card focus offers the keyboard the same authoring
+   affordance — three independent ways an Open Card is "in play" (ADR 0066).
+   Hover and focus are read off `.react-flow__node`, the element React Flow
+   itself makes hoverable and focusable; Selected is read off `data-selected`,
+   which only `.rf-card-node__inner` carries. */
+.react-flow__node:hover .react-flow__resize-control.rf-card-node__resize-control,
+.rf-card-node__inner[data-selected='true'] .react-flow__resize-control.rf-card-node__resize-control,
+.react-flow__node:focus-within .react-flow__resize-control.rf-card-node__resize-control {
+  opacity: 1;
 }
 
 .new-card-preview {

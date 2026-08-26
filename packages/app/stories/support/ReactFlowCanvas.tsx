@@ -4,7 +4,7 @@ import type { CardId, GraphId } from '@project/core';
 import { nodeTypes, edgeTypes, type CardFlowNode } from '@project/react-flow-adapter';
 import { MAX_ZOOM, OVERVIEW_FIT } from '#src/camera';
 import { canvasProjection, type CanvasInteraction } from '#src/canvas-projection';
-import { cardSizeVars } from '#src/card';
+import { CARD_SIZE, cardSizeVars } from '#src/card';
 import { createRendererResolver } from '#src/renderer';
 import { cardIds, graphIds, layoutId, space } from './fixture';
 
@@ -111,6 +111,7 @@ export interface CanvasCardNodeSpecimenProps {
   readonly nodeSize?: { readonly width: number; readonly height: number };
   readonly expanded?: boolean;
   readonly onOpenChange?: (open: boolean) => 'completed' | 'retained';
+  readonly onResize?: (size: { readonly width: number; readonly height: number }) => void;
   readonly stageClassName?: string;
   readonly title?: string;
   readonly body?: string;
@@ -129,6 +130,7 @@ export function CanvasCardNodeSpecimen({
   nodeSize,
   expanded,
   onOpenChange,
+  onResize,
   stageClassName = '',
   title,
   body,
@@ -156,6 +158,18 @@ export function CanvasCardNodeSpecimen({
     data.titleEditor = { onComplete: () => null, onCancel: () => undefined };
   }
   if (graphColor !== undefined) data.activeGraphColor = graphColor;
+  // Set exactly the way `SpaceCanvas` sets it: resize is Card behaviour, not
+  // kind behaviour, so its presence follows Open state alone.
+  if (expanded === true) {
+    if (onResize !== undefined) {
+      data.resize = {
+        minWidth: CARD_SIZE.width,
+        minHeight: CARD_SIZE.height,
+        onResizeStart: () => undefined,
+        onResize,
+      };
+    }
+  }
 
   const node: CardFlowNode = { ...source, ...nodeSize, selected, data };
 

@@ -123,6 +123,56 @@ export const NodeContainment: Story = () => (
 );
 NodeContainment.storyName = 'Node containment';
 
+/** A specimen that keeps its own size in state, so a real drag on the real
+ *  production control actually grows the real node — the round trip
+ *  `SpaceCanvas` makes through Space Authoring, condensed to local state. */
+function ResizableOpenSpecimen({ selected = false }: { readonly selected?: boolean }) {
+  const [size, setSize] = useState({ width: 480, height: 360 });
+  return (
+    <CanvasCardNodeSpecimen
+      open
+      selected={selected}
+      nodeSize={size}
+      onResize={setSize}
+      stageClassName="inv-card-node-stage inv-card-node-stage--resizable"
+    />
+  );
+}
+
+/**
+ * Every Open Card exposes one bottom-right resize control, revealed by hover,
+ * Selection or focus; a Closed Card exposes none (ADR 0066). Both specimens
+ * mount the real production `CardNode` through the real `nodeTypes`, so what
+ * is proved here is the shared Card control rather than a facsimile of it.
+ */
+export const ResizeControl: Story = () => (
+  <div className="inv inv-sheet" style={cardSizeVars}>
+    <CatalogueSection
+      title="Resize control"
+      note="Hover, select or focus the Open Card to reveal its bottom-right control, then drag it. The Closed Card beside it offers none."
+    >
+      <div className="inv-row">
+        <Specimen label="Open · resizable">
+          <section aria-label="Open Card">
+            <ResizableOpenSpecimen />
+          </section>
+        </Specimen>
+        <Specimen label="Open · Selected">
+          <section aria-label="Selected Card">
+            <ResizableOpenSpecimen selected />
+          </section>
+        </Specimen>
+        <Specimen label="Closed · no control">
+          <section aria-label="Closed Card">
+            <CanvasCardNodeSpecimen />
+          </section>
+        </Specimen>
+      </div>
+    </CatalogueSection>
+  </div>
+);
+ResizeControl.storyName = 'Resize control';
+
 /**
  * One instance wired the way `CardNode` wires the production component: real
  * selection and dragging toggles standing in for React Flow's own, a real

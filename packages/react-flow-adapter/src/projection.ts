@@ -134,10 +134,17 @@ export type CardNodeData = {
    * this out of the family of gestures that must go back through the authored
    * placement. If a resize is ever allowed to move the Card's top-left, it joins
    * that family.
+   *
+   * `onResizeStart` is the other half of the same pairing: the composition
+   * supplies both operations together because a resize gesture begun on an
+   * unselected Card has to select it before there is anything for `onResize`
+   * to complete against — one control, one drag, and Selection is not a second
+   * Edit (ADR 0066).
    */
   resize?: {
     readonly minWidth: number;
     readonly minHeight: number;
+    onResizeStart: () => void;
     onResize: (size: { width: number; height: number }) => void;
   };
   /** For an alias, the title of the card it shows — so the node can name what it
