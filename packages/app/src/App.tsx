@@ -1,18 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { ReactFlowProvider } from '@xyflow/react';
 import { AppShell } from '@project/ui';
-import {
-  cardDocumentSchema,
-  uuidSchema,
-  type Card,
-  type CardId,
-  type LayoutPosition,
-} from '@project/core';
+import { type Card, type CardId, type LayoutPosition } from '@project/core';
 import { graphCardIds } from '@project/graph';
 import type { OpenedSpace } from './space';
 import { composeApp, openingPlacement } from './compose-app';
 import type { AuthoringRefusal } from './space-authoring';
-import { describeAuthoringRefusal } from './authoring-refusal';
 import { selectedCardOf, type EdgeSubject } from './render-adapter';
 import { canvasProjection } from './canvas-projection';
 import { canvasRenderers, currentRenderer } from './canvas-renderers';
@@ -393,105 +386,7 @@ export const createApp = ({ spaceSession }: OpenedSpace) => {
       setAliasRefusal(null);
     }, [presenting]);
 
-    const completeCardTitle = useCallback((cardIdInput: string, title: string): string | null => {
-      const cardId = uuidSchema.safeParse(cardIdInput);
-      if (!cardId.success) return 'This Card is no longer available.';
-      const stored = spaceSession.getState().working.cards.find((card) => card.id === cardId.data);
-      if (stored === undefined) return 'This Card is no longer available.';
-      // Trimmed, because `z.string().min(1)` counts characters and a space is
-      // one: the schema alone accepts a title that draws as nothing, leaving a
-      // Card indistinguishable from its neighbours and an `Edit title of` label
-      // naming nobody. Blank is the empty case wearing different bytes.
-      const named = title.trim();
-      const parsed = cardDocumentSchema.safeParse({ ...stored.document, title: named });
-      if (!parsed.success) {
-        return named.length === 0
-          ? 'A Card title is required.'
-          : (parsed.error.issues[0]?.message ?? 'The Card title is invalid.');
-      }
-      const result = authoring.complete({
-        kind: 'edited-card',
-        cardId: cardId.data,
-        document: parsed.data,
-      });
-      switch (result.kind) {
-        case 'refused':
-          return describeAuthoringRefusal(result.refusal);
-        case 'completed':
-        case 'unchanged':
-        case 'queued':
-          return null;
-      }
-    }, []);
-
-    // Every Card the Space holds, and deliberately no narrower: a Card's kind
-    // decides which fields the pane draws, never whether it opens. An Alias is
-    // editable on its own metadata (ADR 0049), not only through the Card whose
-    // content it resolves to, so there is nothing left for a filter here to
-    // remove — the resolve-to-content test that used to stand in this `map` said
-    // an Alias could be opened only as a way to reach another Card, which is the
-    // reading 0049 withdrew.
-    //
-    // It is a set rather than a plain count because both readers ask membership
-    // of an id they did not choose: the canvas asks it per node to decide
-    // whether that Card offers its editing affordance, and `openCardForEditing`
-    // below asks it of a string arriving from React Flow, which names a Card of
-    // this Space only by convention.
-    const editableCardIds = useMemo(
-      () => new Set(rendererSpace.cards.map((card) => card.id)),
-      [rendererSpace],
-    );
-    const openCardForEditing = useCallback(
-      (cardIdInput: string): 'completed' | 'retained' => {
-        // An opened Card covers the graph, so a pointer cannot reach a second
-        // one — but the pane traps no focus, and `Enter` on a node still behind
-        // it asked to open that Card, swapping the pane's subject out from under
-        // a draft in progress. Declining here matches what the pointer can do.
-        //
-        // The Alias creation pane covers it identically, and is declined for the
-        // same reason rather than closed: an unfinished creation state is the
-        // author's, and a keypress that landed behind the pane is not a request
-        // to discard it. Opening anyway used to leave `creatingAlias` set while
-        // the pane hid itself on `openedCardId`, so closing the Card brought a
-        // surface back that the author had never returned to.
-        if (openedCardId !== null || creatingAlias) return 'retained';
-        const cardId = uuidSchema.safeParse(cardIdInput);
-        if (!cardId.success || !editableCardIds.has(cardId.data)) return 'retained';
-        const card = rendererSpace.lookup.card(cardId.data);
-        if (card?.kind === 'alias') {
-          openCard(cardId.data);
-          return 'completed';
-        }
-        const result = authoring.complete({ kind: 'opened-card', cardId: cardId.data });
-        return result.kind === 'completed' || result.kind === 'unchanged'
-          ? 'completed'
-          : 'retained';
-      },
-      [openCard, editableCardIds, openedCardId, creatingAlias, rendererSpace],
-    );
-
     const openedCard = openedCardId ? rendererSpace.lookup.card(openedCardId) : undefined;
-    const closeExpandedCard = useCallback((cardId: CardId): 'completed' | 'retained' => {
-      const result = authoring.complete({ kind: 'closed-card', cardId });
-      return result.kind === 'completed' || result.kind === 'unchanged' ? 'completed' : 'retained';
-    }, []);
-    const completeCardBody = useCallback(
-      (cardId: CardId, body: string): 'completed' | 'retained' => {
-        const stored = spaceSession.getState().working.cards.find((card) => card.id === cardId);
-        if (stored?.document.kind !== 'markdown') return 'retained';
-        const parsed = cardDocumentSchema.safeParse({ ...stored.document, body });
-        if (!parsed.success) return 'retained';
-        const result = authoring.complete({
-          kind: 'edited-card',
-          cardId,
-          document: parsed.data,
-        });
-        return result.kind === 'completed' || result.kind === 'unchanged'
-          ? 'completed'
-          : 'retained';
-      },
-      [],
-    );
 
     /**
      * Every Card an Alias may name.
@@ -670,13 +565,11 @@ export const createApp = ({ spaceSession }: OpenedSpace) => {
                 newCardTitle={newCardTitle}
                 onAddCard={addCard}
                 nameOnCreation={createdCardId}
-                onOpenCard={openCardForEditing}
+                authoring={authoring}
+                spaceSession={spaceSession}
+                onOpenAlias={openCard}
                 onBodyEditingChange={setEditingCardBody}
-                onCloseCard={closeExpandedCard}
-                onCompleteCardBody={completeCardBody}
                 cardResize={cardResize}
-                onCompleteCardTitle={completeCardTitle}
-                editableCardIds={editableCardIds}
                 graphs={projection.visibleGraphs}
                 colorByGraphId={projection.colors}
                 activeGraphId={activeGraphId}

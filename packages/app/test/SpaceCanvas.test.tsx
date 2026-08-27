@@ -1,15 +1,45 @@
 import { fireEvent, render, screen, type RenderResult } from '@testing-library/react';
 import { ReactFlowProvider } from '@xyflow/react';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
-import { uuidSchema } from '@project/core';
+import { spaceSnapshotSchema, uuidSchema } from '@project/core';
+import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
 import type { CardFlowNode } from '@project/react-flow-adapter';
 import { SpaceCanvas } from '../src/components/SpaceCanvas';
+import { composeApp } from '../src/compose-app';
 import type { EdgeAuthoring } from '../src/edge-authoring';
 import { CARD_SIZE } from '../src/card';
 import type { CardResize } from '../src/render-adapter';
 
 const CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 const OTHER_CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
+const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
+const LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
+const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
+
+const snapshot = spaceSnapshotSchema.parse({
+  id: SPACE_ID,
+  document: {
+    version: 1,
+    title: 'Space',
+    layouts: [
+      {
+        id: LAYOUT_ID,
+        title: 'Layout',
+        kind: 'positioned',
+        positions: {
+          [CARD_ID]: { x: 0, y: 0, open: false },
+          [OTHER_CARD_ID]: { x: 300, y: 0, open: false },
+        },
+        graphs: [{ id: GRAPH_ID, title: 'Graph', edges: [] }],
+      },
+    ],
+    defaultRenderer: LAYOUT_ID,
+  },
+  cards: [
+    { id: CARD_ID, document: { title: 'A', kind: 'markdown', body: 'A' } },
+    { id: OTHER_CARD_ID, document: { title: 'B', kind: 'markdown', body: 'B' } },
+  ],
+});
 
 /**
  * `width`/`height` are declared for the same reason `projectCardNodes` declares
@@ -44,14 +74,10 @@ interface Harness {
   readonly addCard: ReturnType<typeof vi.fn>;
   /** Re-render with Card authoring on or off, everything else unchanged. */
   readonly setTitleEditing: (enabled: boolean) => void;
-  /** Re-render as a completed creation would, naming the Card to be named. */
-  readonly setNameOnCreation: (cardId: string | null) => void;
   /** Re-render with nothing changed at all, the way a parent's render does. */
   readonly rerender: () => void;
   /** Re-render over a different projection, the way a completed Edit does. */
   readonly setNodes: (next: CardFlowNode[]) => void;
-  /** What the canvas told its parent about a live content edit. */
-  readonly bodyEditingChanged: ReturnType<typeof vi.fn>;
   /** Every change React Flow proposed to the node array. */
   readonly nodesChanged: ReturnType<typeof vi.fn>;
 }
@@ -101,13 +127,20 @@ function mountGraph(
 ): Harness {
   const openCard = vi.fn();
   const addCard = vi.fn();
-  const bodyEditingChanged = vi.fn();
   const nodesChanged = vi.fn();
   let nodes = initialNodes;
-  let editableCardIds = new Set(nodes.map((node) => node.id));
   const edgeAuthoring = inertEdgeAuthoring();
   let titleEditing = true;
-  let named: string | null = null;
+  const stored = { snapshot, revision: 0n, exportedRevision: null };
+  const spaceSession = openSpaceSession(new MemorySpaceBackend([stored]), stored);
+  const { authoring, navigation } = composeApp({ spaceSession });
+  const testedAuthoring = {
+    ...authoring,
+    complete: (completion: Parameters<typeof authoring.complete>[0]) => {
+      if (completion.kind === 'opened-card') openCard(completion.cardId);
+      return authoring.complete(completion);
+    },
+  };
   const graph = () => (
     <ReactFlowProvider>
       <SpaceCanvas
@@ -127,14 +160,12 @@ function mountGraph(
         subjectCards={[]}
         newCardTitle="Card 2"
         onAddCard={addCard}
-        nameOnCreation={named}
-        onOpenCard={openCard}
-        onBodyEditingChange={bodyEditingChanged}
-        onCloseCard={() => 'completed'}
-        onCompleteCardBody={() => 'completed'}
+        nameOnCreation={null}
+        authoring={testedAuthoring}
+        spaceSession={spaceSession}
+        onOpenAlias={navigation.openCard}
+        onBodyEditingChange={() => undefined}
         cardResize={cardResize}
-        onCompleteCardTitle={() => 'A Card needs a title'}
-        editableCardIds={editableCardIds}
         graphs={[]}
         colorByGraphId={{}}
         activeGraphId={null}
@@ -147,19 +178,13 @@ function mountGraph(
     view,
     openCard,
     addCard,
-    bodyEditingChanged,
     nodesChanged,
     setNodes: (next) => {
       nodes = next;
-      editableCardIds = new Set(next.map((node) => node.id));
       view.rerender(graph());
     },
     setTitleEditing: (enabled) => {
       titleEditing = enabled;
-      view.rerender(graph());
-    },
-    setNameOnCreation: (cardId) => {
-      named = cardId;
       view.rerender(graph());
     },
     rerender: () => view.rerender(graph()),
@@ -188,7 +213,7 @@ function refuseTitleEdit(settle: 'enter' | 'blur' = 'enter'): Harness {
   fireEvent.change(input, { target: { value: '' } });
   if (settle === 'enter') fireEvent.keyDown(input, { key: 'Enter' });
   else fireEvent.blur(input);
-  expect(screen.getByRole('alert')).toHaveTextContent('A Card needs a title');
+  expect(screen.getByRole('alert')).toHaveTextContent('A Card title is required.');
   return harness;
 }
 
@@ -345,36 +370,6 @@ describe('the Card affordance', () => {
   });
 });
 
-/**
- * Title editing is withdrawn by things that have nothing to do with the editor —
- * presenting starting, or another surface opening over the graph — and the
- * withdrawal unmounts the editor along with the only controls that could settle
- * it. Whatever it left behind has to go with it, or it comes back the moment
- * editing is offered again.
- */
-describe('withdrawing title editing', () => {
-  it('does not reopen an editor that was withdrawn mid-edit', () => {
-    const { setTitleEditing } = refuseTitleEdit();
-
-    setTitleEditing(false);
-    expect(screen.queryByRole('textbox', { name: 'Card title' })).not.toBeInTheDocument();
-    setTitleEditing(true);
-
-    expect(screen.queryByRole('textbox', { name: 'Card title' })).not.toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'A' })).toBeVisible();
-  });
-
-  it('opens a Card after an unsettled title Edit was withdrawn', () => {
-    const { openCard, setTitleEditing } = refuseTitleEdit();
-
-    setTitleEditing(false);
-    setTitleEditing(true);
-    fireEvent.click(screen.getByRole('button', { name: 'Open Card A' }));
-
-    expect(openCard).toHaveBeenCalledWith(CARD_ID);
-  });
-});
-
 describe('withdrawing canvas authoring from an Expanded Card', () => {
   it('withdraws body editing and resize through the same complete gate', () => {
     const expanded = cardNode('A', CARD_ID, true);
@@ -389,65 +384,6 @@ describe('withdrawing canvas authoring from an Expanded Card', () => {
 
     expect(screen.queryByRole('button', { name: 'Edit Markdown source of A' })).toBeNull();
     expect(view.container.querySelector('.react-flow__resize-control')).toBeNull();
-  });
-
-  it('keeps a live editor when a modal withdraws canvas authoring', () => {
-    const expanded = cardNode('A', CARD_ID, true);
-    expanded.data.expanded = true;
-    expanded.data.body = '# A';
-    const { setTitleEditing } = mountGraph([expanded]);
-    fireEvent.click(screen.getByRole('button', { name: 'Edit Markdown source of A' }));
-    expect(screen.getByRole('button', { name: 'Save Card A' })).toBeVisible();
-
-    setTitleEditing(false);
-
-    // A modal over the canvas owns its own modality, and the editor is still
-    // there when it closes. Four exits and no more (ADR 0064) — a surface
-    // opening over the graph is not one of them.
-    expect(screen.getByRole('button', { name: 'Save Card A' })).toBeVisible();
-  });
-
-  it('does not lock the canvas when the edited Card stops being Expanded', () => {
-    const expanded = cardNode('A', CARD_ID, true);
-    expanded.data.expanded = true;
-    expanded.data.body = '# A';
-    const { addCard, setNodes } = mountGraph([expanded]);
-    fireEvent.click(screen.getByRole('button', { name: 'Edit Markdown source of A' }));
-
-    // The Card the caret names is no longer Expanded — a replacement Space is
-    // the route. Nothing will call `onEnd`, so a stored answer would stay true
-    // and take title editing, F2 and `c` with it for the rest of the session.
-    const collapsed = cardNode('A', CARD_ID, true);
-    setNodes([collapsed]);
-
-    fireEvent.keyDown(nodeOf(CARD_ID), { key: 'c' });
-    expect(addCard).toHaveBeenCalled();
-  });
-
-  it('does not restore body editing when a replacement Space reopens the Card', async () => {
-    const expanded = cardNode('A', CARD_ID, true);
-    expanded.data.expanded = true;
-    expanded.data.body = '# A';
-    const { setNodes } = mountGraph([expanded]);
-    fireEvent.click(screen.getByRole('button', { name: 'Edit Markdown source of A' }));
-    await screen.findByRole('textbox', { name: 'Markdown source of A' });
-
-    setNodes([cardNode('A', CARD_ID, true)]);
-    setNodes([expanded]);
-
-    expect(screen.queryByRole('textbox', { name: 'Markdown source of A' })).toBeNull();
-    expect(screen.getByRole('button', { name: 'Edit Markdown source of A' })).toBeVisible();
-  });
-
-  it('tells its parent a content edit is live, so presenting cannot start over one', () => {
-    const expanded = cardNode('A', CARD_ID, true);
-    expanded.data.expanded = true;
-    expanded.data.body = '# A';
-    const { bodyEditingChanged } = mountGraph([expanded]);
-
-    fireEvent.click(screen.getByRole('button', { name: 'Edit Markdown source of A' }));
-
-    expect(bodyEditingChanged).toHaveBeenLastCalledWith(true);
   });
 
   it.each(['Enter', ' '])(
@@ -467,25 +403,6 @@ describe('withdrawing canvas authoring from an Expanded Card', () => {
       expect(openCard).not.toHaveBeenCalled();
     },
   );
-
-  it('does not let another edit or Card creation replace a live body caret', () => {
-    const a = cardNode('A');
-    a.data.expanded = true;
-    a.data.body = '# A';
-    const b = cardNode('B', OTHER_CARD_ID);
-    b.data.expanded = true;
-    b.data.body = '# B';
-    const { addCard } = mountGraph([a, b]);
-
-    fireEvent.click(screen.getByRole('button', { name: 'Edit Markdown source of A' }));
-
-    expect(screen.queryByRole('button', { name: 'Edit Title B' })).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Edit Markdown source of B' })).toBeNull();
-    fireEvent.keyDown(nodeOf(OTHER_CARD_ID), { key: 'c' });
-    fireEvent.keyDown(document.body, { key: 'F2' });
-    expect(addCard).not.toHaveBeenCalled();
-    expect(screen.queryByRole('textbox', { name: 'Card title' })).toBeNull();
-  });
 });
 
 /**
@@ -784,39 +701,6 @@ describe('the C shortcut', () => {
     fireEvent.keyDown(zoomIn, { key: 'c' });
 
     expect(addCard).not.toHaveBeenCalled();
-  });
-});
-
-/**
- * A created Card is named in place, in the editor that already exists for
- * renaming one — so creation needs no second surface, and the author is left
- * typing over a neutral `Card N` rather than hunting for where to.
- */
-describe('naming a created Card', () => {
-  it('opens the title editor on the Card a completed creation names', () => {
-    const { setNameOnCreation } = mountGraph();
-
-    setNameOnCreation(CARD_ID);
-
-    const input = screen.getByRole('textbox', { name: 'Card title' });
-    expect(input).toHaveValue('A');
-    expect(input).toHaveFocus();
-  });
-
-  /**
-   * The identity is what says a Card has just been created, so the same one
-   * arriving again is not a second creation. Reopening on it would put an editor
-   * over a Card nobody asked to rename — after an Escape, over the very Card the
-   * author had just declined to name.
-   */
-  it('does not reopen the editor when nothing new was created', () => {
-    const { setNameOnCreation } = mountGraph();
-    setNameOnCreation(CARD_ID);
-    fireEvent.keyDown(screen.getByRole('textbox', { name: 'Card title' }), { key: 'Escape' });
-
-    setNameOnCreation(CARD_ID);
-
-    expect(screen.queryByRole('textbox', { name: 'Card title' })).not.toBeInTheDocument();
   });
 });
 

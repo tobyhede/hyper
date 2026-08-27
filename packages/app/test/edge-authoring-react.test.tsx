@@ -309,9 +309,15 @@ function CanvasHarness({
   adapter,
   edgeAuthoring,
   currentSpace,
+  authoring,
+  navigation,
+  session,
   covered,
   presenting,
-}: Pick<ReturnType<typeof compose>, 'adapter' | 'edgeAuthoring' | 'currentSpace'> & {
+}: Pick<
+  ReturnType<typeof compose>,
+  'adapter' | 'edgeAuthoring' | 'currentSpace' | 'authoring' | 'navigation' | 'session'
+> & {
   /** A modal pane is open over the graph — what `App` reports as no title editing. */
   readonly covered: boolean;
   readonly presenting: boolean;
@@ -337,17 +343,15 @@ function CanvasHarness({
       newCardTitle="Card 4"
       onAddCard={() => undefined}
       nameOnCreation={null}
-      onOpenCard={() => 'completed'}
-      onCloseCard={() => 'completed'}
-      onCompleteCardBody={() => 'completed'}
+      authoring={authoring}
+      spaceSession={session}
+      onOpenAlias={navigation.openCard}
       cardResize={{
         beginResize: () => undefined,
         previewResize: () => undefined,
         finishResize: () => undefined,
         cancelResize: () => undefined,
       }}
-      onCompleteCardTitle={() => null}
-      editableCardIds={new Set([CARD_A, CARD_B, CARD_C])}
       graphs={currentSpace().graphs}
       colorByGraphId={{}}
       activeGraphId={GRAPH_ID}
