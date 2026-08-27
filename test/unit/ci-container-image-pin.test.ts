@@ -89,6 +89,14 @@ describe('ci.yml container jobs', () => {
     }
   });
 
+  it('overlay the repository Node pin without replacing the Playwright image', () => {
+    const nodeVersionConsumers = workflow.match(/node-version-file: \.node-version/g) ?? [];
+
+    // verify, postgres, e2e and ladle each consume the one exact runtime pin.
+    expect(nodeVersionConsumers).toHaveLength(4);
+    expect(workflow).not.toContain("The image's Node must satisfy .node-version");
+  });
+
   // `--ipc=host` because the default 64MB `/dev/shm` makes Chromium run out of
   // memory and crash, and `--init` because Actions holds the container open for
   // the whole job, so an orphaned browser helper reparents onto a PID 1 that

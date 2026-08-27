@@ -5,7 +5,7 @@
   "type": "module",
   "packageManager": "pnpm@9.15.0",
   "engines": {
-    "node": ">=24"
+    "node": ">=26.8.1"
   },
   "scripts": {
     "dev": "pnpm --filter @project/app dev",
