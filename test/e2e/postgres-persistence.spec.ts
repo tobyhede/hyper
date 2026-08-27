@@ -1,6 +1,6 @@
 import { fileURLToPath } from 'node:url';
 import { expect, test, type Browser, type BrowserContext, type Page } from '@playwright/test';
-import { newUuid, type UUID } from '@project/core';
+import { encodeCompactUuid, newUuid, type UUID } from '@project/core';
 import { createServer, type ViteDevServer } from 'vite';
 import { PostgresSpaceRepository } from '../../src/persistence/postgres-space-repository';
 import { db } from '../../src/prisma/db';
@@ -43,9 +43,7 @@ const openImportedSpace = async (
 ): Promise<{ context: BrowserContext; page: Page }> => {
   const context = await browser.newContext({ baseURL });
   const page = await context.newPage();
-  await page.goto('/');
-  const choice = page.getByRole('button', { name: `${title} ${spaceId}` });
-  if ((await choice.count()) > 0) await choice.click();
+  await page.goto(`/spaces/${encodeCompactUuid(spaceId)}`);
   await expect(page.getByRole('heading', { name: title, exact: true })).toBeVisible();
   return { context, page };
 };

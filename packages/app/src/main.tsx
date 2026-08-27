@@ -10,8 +10,5 @@ if (!rootElement) throw new Error('Root element #root not found');
 
 const root = createRoot(rootElement);
 const spaceStartup = createSpaceStartup();
-void startApplication(
-  root,
-  () => spaceStartup.resolve(),
-  (id) => spaceStartup.openSelected(id),
-);
+const compactSpaceId = /^\/spaces\/([^/]+)$/.exec(window.location.pathname)?.[1] ?? '';
+void startApplication(root, () => spaceStartup.resolve(compactSpaceId));

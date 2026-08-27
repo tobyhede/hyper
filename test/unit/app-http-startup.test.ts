@@ -1,4 +1,4 @@
-import { uuidSchema, type SpaceSnapshot } from '@project/core';
+import { encodeCompactUuid, uuidSchema, type SpaceSnapshot } from '@project/core';
 import { createSpaceHttpApp, HttpSpaceBackend } from '@project/http';
 import { describe, expect, it } from 'vitest';
 import { E2eMemorySpaceRepository } from '../support/e2e-memory-space-repository';
@@ -28,40 +28,35 @@ const startupFor = (...snapshots: SpaceSnapshot[]) => {
 };
 
 describe('HTTP space startup composition', () => {
-  it('opens the only durable space through the HTTP backend', async () => {
+  it('opens the Space named by the compact product-route id through HTTP', async () => {
     const startup = startupFor(snapshot());
 
-    const result = await startup.resolve();
+    const result = await startup.resolve(encodeCompactUuid(SPACE_ID));
 
     expect(result.kind).toBe('opened');
-    if (result.kind !== 'opened') throw new Error('Expected opened space');
     expect(result.opened.space.id).toBe(SPACE_ID);
     expect(result.opened.spaceSession.getState().acknowledgedRevision).toBe(0n);
   });
 
-  it('fails rather than inventing a space when the catalog is empty', async () => {
-    // Server-side startup is what guarantees a database has at least one Space,
-    // so an empty catalog here means that policy did not run. The browser has
-    // no import path of its own to fall back to, and quietly opening something
-    // it minted locally would be a space with nowhere to commit.
+  it('fails when the product-route id no longer resolves', async () => {
     const startup = startupFor();
 
-    await expect(startup.resolve()).rejects.toThrow(
-      'The persistence service returned no database spaces.',
-    );
+    await expect(startup.resolve(encodeCompactUuid(SPACE_ID))).rejects.toThrow(SPACE_ID);
   });
 
-  it('returns the complete catalog and opens the exact selected UUID', async () => {
+  it('opens the exact named Space when several are stored', async () => {
     const startup = startupFor(snapshot(), snapshot(OTHER_SPACE_ID, OTHER_CARD_ID, 'Other space'));
 
-    await expect(startup.resolve()).resolves.toEqual({
-      kind: 'selection',
-      spaces: [
-        { id: SPACE_ID, title: 'Stored space' },
-        { id: OTHER_SPACE_ID, title: 'Other space' },
-      ],
-    });
-    const opened = await startup.openSelected(OTHER_SPACE_ID);
-    expect(opened.space.id).toBe(OTHER_SPACE_ID);
+    const result = await startup.resolve(encodeCompactUuid(OTHER_SPACE_ID));
+
+    expect(result.opened.space.id).toBe(OTHER_SPACE_ID);
+  });
+
+  it('rejects a malformed compact product-route id', async () => {
+    const startup = startupFor(snapshot());
+
+    await expect(startup.resolve('not-a-compact-uuid')).rejects.toThrow(
+      'The Space URL contains an invalid id.',
+    );
   });
 });

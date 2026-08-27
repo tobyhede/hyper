@@ -23,9 +23,10 @@ export const decodeCompactUuid = (value: string): UUID | undefined => {
   } catch {
     return undefined;
   }
-  if (bytes.length !== 16) return undefined;
-  if (bytes.toBase64({ alphabet: 'base64url', omitPadding: true }) !== value) return undefined;
 
+  // Twenty-two base64 digits encode exactly 16 bytes, and strict final-chunk
+  // handling above rejects any non-zero unused bits rather than accepting an
+  // alternate spelling for those bytes.
   const hex = bytes.toHex();
   return uuidSchema.safeParse(
     `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`,

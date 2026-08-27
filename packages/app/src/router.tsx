@@ -11,12 +11,12 @@ export const createAppRouter = (App: ComponentType) => {
   const rootRoute = createRootRoute({
     component: () => <Outlet />,
   });
-  const indexRoute = createRoute({
+  const spaceRoute = createRoute({
     getParentRoute: () => rootRoute,
-    path: '/',
+    path: '/spaces/$spaceId',
     component: () => <App />,
   });
-  const router = createRouter({ routeTree: rootRoute.addChildren([indexRoute]) });
+  const router = createRouter({ routeTree: rootRoute.addChildren([spaceRoute]) });
 
   return function AppRouter() {
     return <RouterProvider router={router} />;

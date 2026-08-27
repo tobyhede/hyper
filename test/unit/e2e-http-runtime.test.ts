@@ -1,4 +1,4 @@
-import { uuidSchema } from '@project/core';
+import { encodeCompactUuid, uuidSchema } from '@project/core';
 import { describe, expect, it } from 'vitest';
 import { HttpSpaceBackend } from '@project/http';
 import { createApp, type E2eHttpRuntimeOptions } from '../support/e2e-http-runtime';
@@ -34,6 +34,17 @@ describe('e2e HTTP runtime', () => {
     await expect(second.loadSpace(FIXTURE_ID)).resolves.toMatchObject({
       revision: 0n,
       snapshot: { document: { title: 'Layout fixture' } },
+    });
+  });
+
+  it('configures the tracked fixture as the explicit Entry Space', async () => {
+    const app = await createApp({ catalog: 'fixture', startup: true });
+
+    await expect(app.resolveProductRequest('/')).resolves.toEqual({
+      status: 302,
+      headers: {
+        location: `/spaces/${encodeCompactUuid(FIXTURE_ID)}`,
+      },
     });
   });
 

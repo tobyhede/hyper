@@ -46,11 +46,6 @@ export const uncataloguedComponents = [
       "Composition root, and an error boundary. What it draws when it catches is catalogued — `operational-feedback-space-app-failure` renders the boundary's own failure panel — and the rest of it is the session wiring around App.",
   },
   {
-    module: 'packages/app/src/SpaceSelection.tsx',
-    reason:
-      'Condemned. ADR 0058 deletes the Space chooser rather than designing it, and `space-cards/04` owns retiring this module with `importSpaces`. Giving it a stable story now would be parity evidence for a surface that is going.',
-  },
-  {
     module: 'packages/app/src/main.tsx',
     reason: 'The browser entry point: one `createRoot` call and the router.',
   },
@@ -139,12 +134,8 @@ export const uncataloguedComponents = [
  * its leading attribute or id, or failing both by its leading element name, so those
  * cannot slip past by having no class to record.
  *
- * One entry below is product appearance and says so, because the alternative to
- * recording it is not recording it. `space-selection` is condemned with its
- * component under ADR 0058 and goes with `space-cards/04`; design-system baseline
- * Issue 08 leaves its "removed or explicitly limited" acceptance line unticked until
- * it lands — a reason is not a substitute for the move. `card-editor` was the other,
- * and Issue 16 moved it to `src/components/card-editor.css` beside `OpenCard`, taking
+ * `card-editor` was product appearance until Issue 16 moved it to
+ * `src/components/card-editor.css` beside `OpenCard`, taking
  * the Card-choice popup's theme with it to `packages/ui/src/card-search-combobox.css`
  * beside `CardSearchCombobox`, which is the component it actually styles.
  */
@@ -212,10 +203,5 @@ export const handRolledStyles = [
     block: 'card-pane',
     reason:
       "The modal frame a Card is authored on: the 16:9 silhouette that matches `card.ts`, and the scroll boundary that keeps Cancel and Done reachable. Base UI's Dialog owns modality, focus and dismissal; this owns the frame's geometry against the canvas behind it.",
-  },
-  {
-    block: 'space-selection',
-    reason:
-      "Product appearance too, and also going. Condemned with the component: ADR 0058 deletes the Space chooser rather than designing it, and `space-cards/04` owns retiring it. These rules go when it does — restyling them first would be work on a surface that isn't staying.",
   },
 ] as const;

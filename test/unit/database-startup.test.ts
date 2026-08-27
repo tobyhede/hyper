@@ -6,7 +6,11 @@ import type {
   RepositoryImportResult,
   SpaceRepository,
 } from '../../src/persistence/space-repository';
-import { openDatabaseSelection, resolveDatabaseStartup } from '../../src/startup/database-startup';
+import {
+  bootstrapEmptyDatabase,
+  openDatabaseSelection,
+  resolveDatabaseStartup,
+} from '../../src/startup/database-startup';
 import { MemorySpaceRepository } from '../support/memory-space-repository';
 
 const SPACE_ID = uuidSchema.parse('11111111-1111-4111-8111-111111111111');
@@ -122,7 +126,6 @@ describe('resolveDatabaseStartup', () => {
     const result = await resolveDatabaseStartup(repository);
 
     expect(result.kind).toBe('opened');
-    if (result.kind !== 'opened') throw new Error('Expected the new space to open');
     expect(result.space.snapshot.id).toBe(SPACE_ID);
     expect(uuidSchema.safeParse(result.space.snapshot.cards[0]?.id).success).toBe(true);
   });
@@ -133,7 +136,6 @@ describe('resolveDatabaseStartup', () => {
     const result = await resolveDatabaseStartup(repository);
 
     expect(result.kind).toBe('opened');
-    if (result.kind !== 'opened') throw new Error('Expected the new space to open');
     expect(uuidSchema.safeParse(result.space.snapshot.id).success).toBe(true);
     const cardId = result.space.snapshot.cards[0]?.id;
     expect(uuidSchema.safeParse(cardId).success).toBe(true);
@@ -219,6 +221,29 @@ describe('resolveDatabaseStartup', () => {
     await expect(
       resolveDatabaseStartup(repository, [firstImported, secondImported]),
     ).rejects.toThrow('The database has no configured Entry Space');
+    await expect(repository.entrySpaceId()).resolves.toBeUndefined();
+  });
+});
+
+describe('bootstrapEmptyDatabase', () => {
+  it('creates and configures the normal new Space when the database is empty', async () => {
+    const repository = new MemorySpaceRepository();
+
+    await bootstrapEmptyDatabase(repository);
+
+    const spaces = await repository.listSpaces();
+    expect(spaces).toHaveLength(1);
+    expect(spaces[0]?.title).toBe('New space');
+    await expect(repository.entrySpaceId()).resolves.toBe(spaces[0]?.id);
+  });
+
+  it('leaves a non-empty database without an Entry Space available to the host', async () => {
+    const existing = storedSpace(4n);
+    const repository = new MemorySpaceRepository([existing]);
+
+    await bootstrapEmptyDatabase(repository);
+
+    await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual(existing);
     await expect(repository.entrySpaceId()).resolves.toBeUndefined();
   });
 });

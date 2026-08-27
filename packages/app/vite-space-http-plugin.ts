@@ -5,6 +5,13 @@ import type { Plugin } from 'vite';
 
 interface FetchApplication {
   fetch(request: Request, env?: unknown): Response | Promise<Response>;
+  resolveProductRequest(pathname: string): Promise<ProductResponse | undefined>;
+}
+
+interface ProductResponse {
+  status: number;
+  headers?: Readonly<Record<string, string>>;
+  body?: string;
 }
 
 interface SpaceHttpRuntime {
@@ -40,6 +47,17 @@ const isApiRequest = (request: IncomingMessage): boolean => {
   return pathname === '/api' || (pathname?.startsWith('/api/') ?? false);
 };
 
+const pathname = (request: IncomingMessage): string | undefined =>
+  URL.parse(request.url ?? '/', 'http://hyper.invalid')?.pathname ?? undefined;
+
+const writeProductResponse = (response: ServerResponse, product: ProductResponse): void => {
+  response.statusCode = product.status;
+  for (const [name, value] of Object.entries(product.headers ?? {})) {
+    response.setHeader(name, value);
+  }
+  response.end(product.body);
+};
+
 const asRuntime = (loaded: unknown, modulePath: string): SpaceHttpRuntime => {
   if (
     typeof loaded !== 'object' ||
@@ -64,8 +82,8 @@ const installMiddleware = (
   modulePath: string,
   runtimeOptions: unknown,
 ): void => {
-  const listener = runtime.then(async (loaded) => {
-    const application = await asRuntime(loaded, modulePath).createApp(runtimeOptions);
+  const host = runtime.then(async (loaded) => {
+    const created = await asRuntime(loaded, modulePath).createApp(runtimeOptions);
     // `getRequestListener` replaces `globalThis.Request`/`Response` with its own
     // lightweight classes unless `overrideGlobalObjects: false` is passed, and
     // it defines them non-writable and non-configurable, so the swap is
@@ -74,19 +92,34 @@ const installMiddleware = (
     // `Request` constructor on an instance this adapter made. Disabling the
     // override answers 500 to every commit; `vite-hono-host.test.ts` pins both
     // the accepted and the oversized path against exactly that change.
-    return getRequestListener((request, env) => application.fetch(request, env));
+    return {
+      created,
+      handle: getRequestListener((request, env) => created.fetch(request, env)),
+    };
   });
   // A runtime that fails to load rejects once, here, and nothing is waiting on
   // it until the first request arrives — Node calls that an unhandled rejection
   // and takes the server down with it. Marking it handled costs nothing: the
   // same settled promise still delivers the real error to `next` per request.
-  listener.catch(() => undefined);
+  host.catch(() => undefined);
   register((request, response, next) => {
-    if (!isApiRequest(request)) {
+    if (isApiRequest(request)) {
+      void host.then(({ handle }) => handle(request, response)).catch(next);
+      return;
+    }
+
+    const productPath = pathname(request);
+    if (request.method !== 'GET' || productPath === undefined) {
       next();
       return;
     }
-    void listener.then((handle) => handle(request, response)).catch(next);
+    void host
+      .then(async ({ created }) => {
+        const product = await created.resolveProductRequest(productPath);
+        if (product === undefined) next();
+        else writeProductResponse(response, product);
+      })
+      .catch(next);
   });
 };
 

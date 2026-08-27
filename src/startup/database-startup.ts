@@ -35,6 +35,22 @@ const createNewSpaceImport = (): ImportSpace => {
   return { document, cards };
 };
 
+/** Establish the normal first Space only when the repository is empty. */
+export const bootstrapEmptyDatabase = async (repository: SpaceRepository): Promise<void> => {
+  const catalog = await repository.listSpaces();
+  if (catalog.length > 0) return;
+
+  const imported = requireImportedSpaces(
+    await repository.importSpaces([createNewSpaceImport()], 'insert'),
+  );
+  const [created] = imported;
+  if (created === undefined || imported.length !== 1) {
+    throw new Error(`New-space import returned ${imported.length} spaces`);
+  }
+
+  await repository.setEntrySpace(created.snapshot.id);
+};
+
 /** Resolve the initial durable Space from the database catalog. */
 export const resolveDatabaseStartup = async (
   repository: SpaceRepository,
@@ -54,17 +70,8 @@ export const resolveDatabaseStartup = async (
     return openDatabaseSelection(repository, imported.snapshot.id);
   }
 
-  const catalog = await repository.listSpaces();
-  if (catalog.length > 0) throw new Error('The database has no configured Entry Space');
-
-  const imported = requireImportedSpaces(
-    await repository.importSpaces([createNewSpaceImport()], 'insert'),
-  );
-  const [created] = imported;
-  if (created === undefined || imported.length !== 1) {
-    throw new Error(`New-space import returned ${imported.length} spaces`);
-  }
-
-  await repository.setEntrySpace(created.snapshot.id);
-  return openDatabaseSelection(repository, created.snapshot.id);
+  await bootstrapEmptyDatabase(repository);
+  const configured = await repository.entrySpaceId();
+  if (configured === undefined) throw new Error('The database has no configured Entry Space');
+  return openDatabaseSelection(repository, configured);
 };
