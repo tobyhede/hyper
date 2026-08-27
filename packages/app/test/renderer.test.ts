@@ -234,7 +234,7 @@ describe('resolving a renderer', () => {
     });
   });
 
-  it('resolves the built-in grid, which computes placement and carries no Layout', async () => {
+  it('resolves the Grid Computed View, which computes placement and carries no Layout', async () => {
     const space = spaceWith({ defaultRenderer: GRID_SPACE_VIEW_ID });
     expect(resolver()(space).kind).toBe('view');
     // The grid's own arithmetic, not ELK's: first card at the origin.

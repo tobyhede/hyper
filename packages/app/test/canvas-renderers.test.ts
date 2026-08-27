@@ -57,7 +57,7 @@ const FLOW: CanvasRendererId = FLOW_SPACE_VIEW_ID;
 const GRID: CanvasRendererId = GRID_SPACE_VIEW_ID;
 
 describe('canvasRenderers', () => {
-  it('offers every built-in View and every authored Layout, in the order each is declared', () => {
+  it('offers every Computed View and every authored Layout, in the order each is declared', () => {
     const renderers = canvasRenderers(AUTHORED);
 
     expect(renderers.computed.map((renderer) => renderer.title)).toEqual(['Flow', 'Grid']);
@@ -152,14 +152,14 @@ describe('canvasRenderers', () => {
   });
 
   /**
-   * Every built-in View resolves, and to the very row the computed group holds.
+   * Every Computed View resolves, and to the very row the computed group holds.
    *
-   * `BuiltInViewId` is a closed union and `BY_VIEW` has a row for each member,
-   * so this is the whole of the View case rather than a sample of it. Reference
-   * identity is the assertion because it is what the canvas header draws and
-   * what the sidebar's list is asked about.
+   * `COMPUTED_VIEW_IDS` enumerates the durable identities the registry holds,
+   * so this is the whole Computed View case rather than a sample of it.
+   * Reference identity is the assertion because it is what the canvas header
+   * draws and what the sidebar's list is asked about.
    */
-  it('answers every built-in View with the row the computed group holds', () => {
+  it('answers every Computed View with the row the computed group holds', () => {
     const renderers = canvasRenderers(AUTHORED);
 
     COMPUTED_VIEW_IDS.forEach((view, index) => {
@@ -168,10 +168,11 @@ describe('canvasRenderers', () => {
   });
 
   /**
-   * A View is answered by lookup and not by searching the group it was handed.
+   * A Computed View is answered by registry lookup, not by searching the group
+   * it was handed.
    *
-   * `BY_VIEW` is total over `BuiltInViewId`: there is no "no such View" case to
-   * write and none to leave untested. Searching the supplied group put one back
+   * The registry is total over `COMPUTED_VIEW_IDS`: there is no "no such
+   * Computed View" case to write and none to leave untested. Searching the supplied group put one back
    * — a refusal reachable only by handing in a list `canvasRenderers` would
    * never build, so no test could reach it without a cast. This pins the lookup
    * by asking with the group emptied: the answer never depended on it.

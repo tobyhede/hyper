@@ -36,7 +36,7 @@ const uuid = (n: number): string => `00000000-0000-4000-8000-${n.toString(16).pa
 /**
  * Which renderer a refusal below names. Nothing here turns on it — a message is
  * the only thing that reads it — but the boundary takes the closed vocabulary a
- * selection is written in, so a generated View borrows a built-in id rather than
+ * selection is written in, so a generated View borrows a Computed View id rather than
  * inventing a spelling no selection could hold.
  */
 const GENERATED_VIEW = FLOW_SPACE_VIEW_ID;

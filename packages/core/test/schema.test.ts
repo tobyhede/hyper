@@ -495,7 +495,7 @@ describe('space file layouts', () => {
   });
 });
 
-describe('built-in view ids', () => {
+describe('Computed View ids', () => {
   it('names the automatic views a space can open in without declaring one', () => {
     expect([...COMPUTED_VIEW_IDS]).toEqual([FLOW_SPACE_VIEW_ID, GRID_SPACE_VIEW_ID]);
   });

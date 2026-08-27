@@ -234,7 +234,7 @@ export function validateReferences(space: Referenceable): SpaceReferenceError[] 
     }
   }
 
-  // `defaultRenderer` names a declared layout or a built-in automatic view, and
+  // `defaultRenderer` names a declared Layout or a Computed View, and
   // nothing else — it records which view opens, never how to compute one.
   if (space.defaultRenderer !== undefined) {
     const declared = new Set(layouts.map((l) => l.id));

@@ -29,7 +29,7 @@ export function newSpace(): NewSpace {
   // than one. No Layouts *is* also "no graphs" — a Layout owns at least one (ADR
   // 0040) and there is nowhere else for a Graph to live — and that is the state a
   // new space starts in. No `defaultRenderer` says nothing about graphs at all:
-  // the field names a built-in automatic renderer as readily as an authored
+  // the field names a Computed View as readily as an authored
   // Layout (ADR 0055), so leaving it unset only declines to record which renderer
   // opens, and the application falls back to its default Computed View.
   //
