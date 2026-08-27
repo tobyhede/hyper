@@ -31,7 +31,7 @@ export function newSpace(): NewSpace {
   // new space starts in. No `defaultRenderer` says nothing about graphs at all:
   // the field names a built-in automatic renderer as readily as an authored
   // Layout (ADR 0055), so leaving it unset only declines to record which renderer
-  // opens, and the application falls back to a built-in View.
+  // opens, and the application falls back to its default Computed View.
   //
   // A new space's card carries no position either, because centering is the
   // view's job — `fitView` frames whatever is on screen, and a position nobody

@@ -1,7 +1,7 @@
 import { createRef, type ReactElement } from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { uuidSchema } from '@project/core';
+import { FLOW_SPACE_VIEW_ID, GRID_SPACE_VIEW_ID, uuidSchema } from '@project/core';
 import { PersistenceIndicator, SidebarProvider, SidebarTrigger } from '@project/ui';
 import type { CanvasRenderer } from '../src/canvas-renderers';
 import { SpaceSidebar, type SpaceSidebarProps } from '../src/components/SpaceSidebar';
@@ -69,10 +69,11 @@ const draw = (element: ReactElement) => render(<SidebarProvider>{element}</Sideb
  * which is convenience here, not the contract: the sidebar matches by
  * `canvasRendererKey`, and the test below hands it an equal row it never listed.
  */
-const FLOW: CanvasRenderer = { selection: { kind: 'view', view: 'flow' }, title: 'Flow' };
-const GRID: CanvasRenderer = { selection: { kind: 'view', view: 'grid' }, title: 'Grid' };
+const FLOW: CanvasRenderer = { kind: 'computed', selection: FLOW_SPACE_VIEW_ID, title: 'Flow' };
+const GRID: CanvasRenderer = { kind: 'computed', selection: GRID_SPACE_VIEW_ID, title: 'Grid' };
 const LAYOUT: CanvasRenderer = {
-  selection: { kind: 'layout', layoutId: LAYOUT_ID },
+  kind: 'authored',
+  selection: LAYOUT_ID,
   title: 'Layout 1',
 };
 
@@ -159,7 +160,8 @@ describe('SpaceSidebar', () => {
   it('presses an equal row that a second derivation built', () => {
     const base = withLayout(settledProps());
     const rebuilt: CanvasRenderer = {
-      selection: { kind: 'layout', layoutId: LAYOUT_ID },
+      kind: 'authored',
+      selection: LAYOUT_ID,
       title: 'Layout 1',
     };
     expect(rebuilt).not.toBe(LAYOUT);
@@ -170,7 +172,7 @@ describe('SpaceSidebar', () => {
       .getAllByTestId('canvas-renderer')
       .filter((renderer) => renderer.getAttribute('aria-pressed') === 'true');
     expect(pressed).toHaveLength(1);
-    expect(pressed[0]).toHaveAttribute('data-renderer', `layout:${LAYOUT_ID}`);
+    expect(pressed[0]).toHaveAttribute('data-renderer', LAYOUT_ID);
   });
 
   it('forwards the selection', () => {
@@ -178,10 +180,10 @@ describe('SpaceSidebar', () => {
     draw(<SpaceSidebar {...props} />);
 
     fireEvent.click(screen.getByRole('button', { name: 'Grid' }));
-    expect(props.canvas.onSelect).toHaveBeenCalledWith({ kind: 'view', view: 'grid' });
+    expect(props.canvas.onSelect).toHaveBeenCalledWith(GRID_SPACE_VIEW_ID);
 
     fireEvent.click(screen.getByRole('button', { name: 'Layout 1' }));
-    expect(props.canvas.onSelect).toHaveBeenCalledWith({ kind: 'layout', layoutId: LAYOUT_ID });
+    expect(props.canvas.onSelect).toHaveBeenCalledWith(LAYOUT_ID);
   });
 
   /** A Space authors its first Layout by editing a View (ADR 0025), so this is how it opens. */

@@ -1,8 +1,8 @@
-import { BUILT_IN_VIEW_IDS, type BuiltInViewId } from '@project/core';
+import { COMPUTED_VIEW_IDS } from '@project/core';
 import type { Space } from '@project/graph';
 import {
-  builtInViewTitle,
-  layoutNotFound,
+  computedViewTitle,
+  spaceViewNotFound,
   canvasRendererKey,
   type CanvasRendererId,
 } from './renderer';
@@ -37,6 +37,7 @@ import {
 
 /** One thing the canvas can draw. */
 export interface CanvasRenderer {
+  readonly kind: 'computed' | 'authored';
   /**
    * The selection itself rather than an id and a kind, so choosing a row hands
    * back exactly what Navigation takes and nothing is reassembled — or narrowed
@@ -52,27 +53,14 @@ export interface CanvasRenderers {
   readonly authored: readonly CanvasRenderer[];
 }
 
-/**
- * Every built-in View's row, by id.
- *
- * Keyed rather than searched, because a View selection names a `BuiltInViewId`
- * and every one of them has a row here: indexing is **total**, so there is no
- * "no such View" case to write, and none to leave untested. Searching for it
- * produced exactly that twice — once in the operation that returned the list
- * and the selection together, and again in `currentRenderer` when they were
- * separated. Both times the refusal was one no caller could reach and no test
- * could cover without a cast.
- *
- * Written out per id under `satisfies`, the same shape `BUILT_IN_VIEWS` and
- * `VIEW_ICONS` already take, so a new built-in View is a compile error here
- * rather than a View the canvas cannot be switched to. The titles still come
- * from `builtInViewTitle`; only the keys are named twice, which is what makes
- * the compiler able to ask.
- */
-const BY_VIEW = {
-  flow: { selection: { kind: 'view', view: 'flow' }, title: builtInViewTitle('flow') },
-  grid: { selection: { kind: 'view', view: 'grid' }, title: builtInViewTitle('grid') },
-} as const satisfies Record<BuiltInViewId, CanvasRenderer>;
+/** Every application-supplied Computed View row, keyed by its durable UUID. */
+const COMPUTED: readonly CanvasRenderer[] = Object.freeze(
+  COMPUTED_VIEW_IDS.map((id) => ({
+    kind: 'computed' as const,
+    selection: id,
+    title: computedViewTitle(id),
+  })),
+);
 
 /**
  * The computed group, built once, in the order `core` ships the ids.
@@ -80,9 +68,7 @@ const BY_VIEW = {
  * It reads nothing from the `Space`, so there is no per-call work here and no
  * reason for two calls to answer with two arrays. Frozen against a caller
  * pushing a row onto the shared array — shallowly, which is all `readonly`
- * claims here anyway. Its members are the very values `BY_VIEW` holds, which is
- * what lets a View selection be answered by lookup and still be one of these
- * rows by reference.
+ * claims here anyway.
  *
  * Not exported. A sidebar importing this directly would be going to a second
  * source for half its list, which is the defect this module removes; it would
@@ -90,17 +76,14 @@ const BY_VIEW = {
  * a tree View whose subject is one Graph's Cards is a row that is offered or
  * refused according to what the Space holds.
  */
-const COMPUTED: readonly CanvasRenderer[] = Object.freeze(
-  BUILT_IN_VIEW_IDS.map((view) => BY_VIEW[view]),
-);
-
 /**
  * Everything the canvas can draw. Total for every valid Space: the identity of
  * the current renderer is deliberately not an input.
  */
 export function canvasRenderers(space: Space): CanvasRenderers {
   const authored: readonly CanvasRenderer[] = space.layouts.map((layout) => ({
-    selection: { kind: 'layout', layoutId: layout.id },
+    kind: 'authored',
+    selection: layout.id,
     title: layout.title,
   }));
   return { computed: COMPUTED, authored };
@@ -109,27 +92,17 @@ export function canvasRenderers(space: Space): CanvasRenderers {
 /**
  * The row named by the current renderer id.
  *
- * Partial in exactly one place, and the id's own shape says where: a View names
- * a `BuiltInViewId`, which `BY_VIEW` answers totally, so only the Layout arm can
- * fail — and it throws in the same words as `resolveRenderer`. Asking for the
- * list itself remains total.
- *
- * Each arm is answered from the one source that can answer it, rather than by
- * searching both groups for either kind. Searching wrote a "no such View" case
- * the type had already ruled out, and the module constant `computed` always
- * holds is `COMPUTED` — the very rows `BY_VIEW` does — so the View arm still
- * returns a member of the supplied list by reference.
+ * Resolution asks the Computed View registry and authored Layout rows in the
+ * same UUID namespace. Intake makes overlap impossible, so neither variant has
+ * precedence and an unresolved id has one refusal.
  */
 export function currentRenderer(renderers: CanvasRenderers, id: CanvasRendererId): CanvasRenderer {
-  if (id.kind === 'view') return BY_VIEW[id.view];
-
-  // The one identity rule, and it is the one `canvasRendererKey` already
-  // states. Comparing the two selections field by field here would be a second
-  // answer to "are these the same choice".
   const key = canvasRendererKey(id);
+  const computed = COMPUTED.find((candidate) => canvasRendererKey(candidate.selection) === key);
+  if (computed !== undefined) return computed;
   const row = renderers.authored.find(
     (candidate) => canvasRendererKey(candidate.selection) === key,
   );
-  if (row === undefined) throw layoutNotFound(id.layoutId);
+  if (row === undefined) throw spaceViewNotFound(id);
   return row;
 }

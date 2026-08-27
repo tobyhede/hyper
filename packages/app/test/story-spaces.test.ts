@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { FLOW_SPACE_VIEW_ID } from '@project/core';
 import { graphStartCard, loadSpaceSnapshot, outgoingEdges, type Space } from '@project/graph';
 import { canvasRenderers, currentRenderer } from '../src/canvas-renderers';
 import { defaultRenderer } from '../src/renderer';
@@ -31,7 +32,7 @@ describe('the story Spaces', () => {
   it('opens the authored Space on the Layout its stories press', () => {
     const opens = defaultRenderer(authoredSpace);
 
-    expect(opens.kind).toBe('layout');
+    expect(opens).toBe(authoredSpace.defaultRenderer);
     expect(currentRenderer(canvasRenderers(authoredSpace), opens).title).toBe('Collection 1');
   });
 
@@ -39,7 +40,7 @@ describe('the story Spaces', () => {
   it('opens the unauthored Space on Flow, owning no Layout to open on', () => {
     const opens = defaultRenderer(unauthoredSpace);
 
-    expect(opens).toEqual({ kind: 'view', view: 'flow' });
+    expect(opens).toEqual(FLOW_SPACE_VIEW_ID);
     expect(unauthoredSpace.layouts).toEqual([]);
     expect(unauthoredSpace.graphs).toEqual([]);
     expect(currentRenderer(canvasRenderers(unauthoredSpace), opens).title).toBe('Flow');
@@ -143,7 +144,7 @@ describe('the story Spaces', () => {
       [deepDiveSpace, 'Deep dive'],
     ] as const) {
       const opens = defaultRenderer(space);
-      expect(opens.kind).toBe('layout');
+      expect(opens).toBe(space.defaultRenderer);
       expect(currentRenderer(canvasRenderers(space), opens).title).toBe(title);
       expect(space.graphs.map((graph) => graph.title)).toEqual([title]);
     }

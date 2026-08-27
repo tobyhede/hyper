@@ -1,4 +1,5 @@
 import {
+  isComputedViewId,
   type CardDocument,
   type CardId,
   COLLAPSED_CARD_SIZE,
@@ -26,7 +27,12 @@ import {
   withoutIncidentEdges,
 } from './snapshot';
 import { nextCardTitle, nextGraphTitle, nextLayoutTitle } from './titles';
-import { defaultRenderer, type CanvasRendererId, type ResolveRenderer } from './renderer';
+import {
+  defaultRenderer,
+  type CanvasRendererId,
+  type ResolvedRenderer,
+  type ResolveRenderer,
+} from './renderer';
 
 /** Which end of an Edge a reconnection replaces. */
 export type EdgeEndpoint = 'from' | 'to';
@@ -645,8 +651,11 @@ export function createSpaceAuthoring({
     placement = nextPlacement;
   };
 
+  const selectedResolvedRenderer = (): ResolvedRenderer =>
+    resolveRenderer(currentSpace(), navigation.getState().selectedRenderer);
+
   const mergeBase = (): Placement | null =>
-    navigation.getState().selectedRenderer.kind === 'layout' ? placement : null;
+    isComputedViewId(navigation.getState().selectedRenderer) ? null : placement;
 
   const reportRendered = (rendered: Placement): void => {
     install(Placement.next(mergeBase(), rendered, []));
@@ -720,10 +729,12 @@ export function createSpaceAuthoring({
    * Space (ADR 0045), so there is no second Graph the id could have meant.
    */
   const ownedGraph = (graphId: GraphId): Graph | undefined => {
-    const { selectedRenderer } = navigation.getState();
+    const selectedRenderer = selectedResolvedRenderer();
     if (selectedRenderer.kind === 'view') return undefined;
     const owned = currentSpace().lookup.graph(graphId);
-    return owned?.owner.layout.id === selectedRenderer.layoutId ? owned.graph : undefined;
+    return owned?.owner.layout.id === selectedRenderer.resolvedLayout.layout.id
+      ? owned.graph
+      : undefined;
   };
 
   /**
@@ -790,7 +801,7 @@ export function createSpaceAuthoring({
     if (!connectable(from) || (to !== null && !connectable(to))) {
       return { code: 'edge-card-outside-layout' };
     }
-    if (navigation.getState().selectedRenderer.kind === 'view') return null;
+    if (selectedResolvedRenderer().kind === 'view') return null;
     const graph = targetGraph();
     if (graph === null) return { code: 'layout-active-graph-required' };
     if (to !== null && indexOfEdge(graph.edges, { from, to }) !== -1) {
@@ -819,7 +830,7 @@ export function createSpaceAuthoring({
     // Reconnection has no answer at all without a Layout, and refusing here
     // rather than converting is the same rule `LAYOUT_ONLY` states for the
     // completion: an Algorithmic View owns no Edge to move an endpoint of.
-    if (navigation.getState().selectedRenderer.kind === 'view') {
+    if (selectedResolvedRenderer().kind === 'view') {
       return {
         kind: 'refused',
         refusal: { code: 'layout-required', operation: 'reconnected-edge' },
@@ -873,17 +884,17 @@ export function createSpaceAuthoring({
     // question of the Space instead, and the answer is an author's state rather
     // than a defect: the Layout this gesture was aimed at is gone, so there is
     // nothing to write it into.
-    if (selection.kind === 'layout' && space.lookup.layout(selection.layoutId) === undefined) {
+    if (!isComputedViewId(selection) && space.lookup.layout(selection) === undefined) {
       return refuse({ code: 'layout-not-found' });
     }
+    const renderer = resolveRenderer(space, selection);
     // The operations with no answer at all before a Layout exists, refused
     // *before* conversion rather than after it. An Algorithmic View has no
     // membership to add to and no Graph to manage, and converting first would
     // mint a Layout whose only purpose was to fail the next line.
-    if (selection.kind === 'view' && requiresLayout(completion.kind)) {
+    if (renderer.kind === 'view' && requiresLayout(completion.kind)) {
       return refuse({ code: 'layout-required', operation: completion.kind });
     }
-    const renderer = resolveRenderer(space, selection);
     /**
      * What this Edit does to the placement, held rather than applied.
      *
@@ -1228,7 +1239,7 @@ export function createSpaceAuthoring({
         snapshot: next,
         placement: completedPlacement,
         nextActiveGraphId: activeGraphId,
-        nextRenderer: { kind: 'layout', layoutId },
+        nextRenderer: layoutId,
         ...created,
       },
     };

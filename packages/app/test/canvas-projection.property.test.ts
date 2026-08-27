@@ -82,7 +82,7 @@ async function projectThroughLayout(generated: { file: unknown; cardFiles: CardF
   const result = loadSpace(generated.file, generated.cardFiles);
   if (!result.ok) throw new Error(`generated space should load: ${JSON.stringify(result.errors)}`);
 
-  const renderer = resolveRenderer(result.space, { kind: 'layout', layoutId: LAYOUT_ID });
+  const renderer = resolveRenderer(result.space, LAYOUT_ID);
   if (renderer.kind !== 'layout') throw new Error('expected a Layout renderer');
   const projection = canvasProjection(result.space, renderer);
   const laidOut = await renderer.strategy(projection.strategyGraph);

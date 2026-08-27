@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
-  BUILT_IN_VIEW_IDS,
+  COMPUTED_VIEW_IDS,
+  FLOW_SPACE_VIEW_ID,
+  GRID_SPACE_VIEW_ID,
   cardFrontmatterSchema,
   cardSchema,
-  isBuiltInViewId,
+  isComputedViewId,
   spaceFileSchema,
+  uuidSchema,
 } from '../src/index';
 
 const MAIN = {
@@ -478,7 +481,7 @@ describe('space file layouts', () => {
     expect(file.layouts?.[0]?.activeGraph).toBe('00000000-0000-4000-8000-000000000099');
   });
 
-  it('accepts defaultRenderer as a plain name, resolved elsewhere', () => {
+  it('accepts defaultRenderer as a durable Space View id', () => {
     // Shape only: whether the name resolves is a reference check, since it needs
     // the declared layouts in view.
     const file = spaceFileSchema.parse({
@@ -486,7 +489,7 @@ describe('space file layouts', () => {
       defaultRenderer: '00000000-0000-4000-8000-000000000010',
     });
     expect(file.defaultRenderer).toBe('00000000-0000-4000-8000-000000000010');
-    expect(spaceFileSchema.safeParse({ ...validSpaceFile, defaultRenderer: '' }).success).toBe(
+    expect(spaceFileSchema.safeParse({ ...validSpaceFile, defaultRenderer: 'flow' }).success).toBe(
       false,
     );
   });
@@ -494,13 +497,12 @@ describe('space file layouts', () => {
 
 describe('built-in view ids', () => {
   it('names the automatic views a space can open in without declaring one', () => {
-    expect([...BUILT_IN_VIEW_IDS]).toEqual(['flow', 'grid']);
+    expect([...COMPUTED_VIEW_IDS]).toEqual([FLOW_SPACE_VIEW_ID, GRID_SPACE_VIEW_ID]);
   });
 
   it('recognises exactly those names', () => {
-    expect(isBuiltInViewId('flow')).toBe(true);
-    expect(isBuiltInViewId('grid')).toBe(true);
-    expect(isBuiltInViewId('00000000-0000-4000-8000-000000000010')).toBe(false);
-    expect(isBuiltInViewId('')).toBe(false);
+    expect(isComputedViewId(FLOW_SPACE_VIEW_ID)).toBe(true);
+    expect(isComputedViewId(GRID_SPACE_VIEW_ID)).toBe(true);
+    expect(isComputedViewId(uuidSchema.parse('00000000-0000-4000-8000-000000000010'))).toBe(false);
   });
 });

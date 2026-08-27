@@ -14,7 +14,7 @@ const resolveRenderer = createRendererResolver({
   // story-specific partial adapter.
   newGraphId: () => graphIds.short,
 });
-const renderer = resolveRenderer(space, { kind: 'layout', layoutId });
+const renderer = resolveRenderer(space, layoutId);
 const pending = canvasProjection(space, renderer);
 const laidOut = renderer.strategy(pending.strategyGraph);
 

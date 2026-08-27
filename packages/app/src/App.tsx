@@ -186,7 +186,14 @@ export const createApp = ({ spaceSession }: OpenedSpace) => {
     // with two sources of truth.
     const selectCanvasRenderer = useCallback((selection: CanvasRendererId) => {
       const resolved = resolveRenderer(currentSpace(), selection);
+      const changesRenderer = navigation.getState().selectedRenderer !== selection;
       navigation.selectRenderer(selection);
+      // A current row can be chosen again after reload. Its UUID is already the
+      // Navigation value, so no renderer dependency will change and no placement
+      // effect will rerun; clearing the published projection here would strand
+      // the canvas in its pending state. Navigation still receives the choice so
+      // it can apply its own same-renderer semantics.
+      if (!changesRenderer) return;
       useRenderAdapter.getState().selectRenderer(openingPlacement(resolved));
     }, []);
 

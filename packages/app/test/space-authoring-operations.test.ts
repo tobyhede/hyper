@@ -1,5 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
-import { uuidSchema, type Graph, type SpaceSnapshot, type UUID } from '@project/core';
+import {
+  FLOW_SPACE_VIEW_ID,
+  uuidSchema,
+  type Graph,
+  type SpaceSnapshot,
+  type UUID,
+} from '@project/core';
 import { loadSpaceSnapshot, Placement } from '@project/graph';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
 import { GRAPH_PALETTE } from '../src/colors';
@@ -92,7 +98,7 @@ const graphIds = () => mintingGraphIds(MINTED_GRAPH, SECOND_MINTED_GRAPH);
 
 function open(
   snapshot: SpaceSnapshot = positionedSnapshot,
-  renderer: CanvasRendererId = { kind: 'layout', layoutId: LAYOUT_ID },
+  renderer: CanvasRendererId = LAYOUT_ID,
   // The ids this Edit will mint, named by the test that asserts on them rather
   // than taken from the ambient generator (ADR 0016, and `./minting`).
   newId: () => UUID = mintingIds(MINTED),
@@ -129,7 +135,7 @@ const openPositioned = (newId?: () => UUID) => {
 };
 
 const openAutomatic = (newId: () => UUID = mintingIds(MINTED)) => {
-  const opened = open(automaticSnapshot, { kind: 'view', view: 'flow' }, newId);
+  const opened = open(automaticSnapshot, FLOW_SPACE_VIEW_ID, newId);
   place(opened.authoring, {
     [CARD_A]: [10, 20],
     [CARD_B]: [300, 40],
@@ -230,7 +236,7 @@ describe('Add Card', () => {
       graphs: [{ id: MINTED_GRAPH, title: 'Graph 1', color: GRAPH_PALETTE[0], edges: [] }],
       activeGraph: MINTED_GRAPH,
     });
-    expect(navigation.getState().selectedRenderer).toEqual({ kind: 'layout', layoutId: LAYOUT_ID });
+    expect(navigation.getState().selectedRenderer).toEqual(LAYOUT_ID);
     expect(navigation.getState().activeGraphId).toBe(MINTED_GRAPH);
   });
 });
@@ -1323,7 +1329,7 @@ describe('Keep local', () => {
     const session = openSpaceSession(backend, local);
     const { authoring } = composeApp({
       spaceSession: session,
-      selection: { kind: 'layout', layoutId: LAYOUT_ID },
+      selection: LAYOUT_ID,
       newGraphId: graphIds(),
       initialPlacement: null,
     });
@@ -1365,7 +1371,7 @@ describe('Stale identities', () => {
   });
 
   it('refuses every operation before the view has arranged anything', () => {
-    const { authoring } = open(automaticSnapshot, { kind: 'view', view: 'flow' });
+    const { authoring } = open(automaticSnapshot, FLOW_SPACE_VIEW_ID);
 
     expect(authoring.complete({ kind: 'created-card', anchor: CENTRE })).toEqual({
       kind: 'refused',

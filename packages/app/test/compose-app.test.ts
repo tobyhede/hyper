@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { uuidSchema, type SpaceSnapshot } from '@project/core';
+import { FLOW_SPACE_VIEW_ID, uuidSchema, type SpaceSnapshot } from '@project/core';
 import { Placement } from '@project/graph';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
 import { composeApp, composeCore } from '../src/compose-app';
@@ -99,7 +99,7 @@ describe('what the composition opens on', () => {
   it('opens in the Space default when no selection is named', () => {
     const { navigation } = composeCore({ spaceSession: openSession() });
 
-    expect(navigation.getState().selectedRenderer).toEqual({ kind: 'layout', layoutId: LAYOUT_ID });
+    expect(navigation.getState().selectedRenderer).toEqual(LAYOUT_ID);
   });
 
   it('opens a selected Layout on the placement that Layout already authored', () => {
@@ -116,7 +116,7 @@ describe('what the composition opens on', () => {
   it('opens an Algorithmic View on no placement at all', () => {
     const { authoring } = composeApp({
       spaceSession: openSession(),
-      selection: { kind: 'view', view: 'flow' },
+      selection: FLOW_SPACE_VIEW_ID,
     });
 
     expect(authoring.authoredPlacement()).toBeNull();
@@ -162,7 +162,7 @@ describe('where a composition mints identities', () => {
     const rendered = Placement.fromEntries([[CARD_A, { x: 10, y: 20, open: false }]]);
     const { authoring, navigation } = composeApp({
       spaceSession,
-      selection: { kind: 'view', view: 'flow' },
+      selection: FLOW_SPACE_VIEW_ID,
       newId: mintingIds(MINTED_LAYOUT_ID),
       newGraphId: mintingGraphIds(MINTED_GRAPH_ID),
       initialPlacement: rendered,

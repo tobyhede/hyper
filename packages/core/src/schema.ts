@@ -214,22 +214,22 @@ export const layoutSchema = z.preprocess(
   z.discriminatedUnion('kind', [positionedLayoutSchema]),
 );
 
+/** Durable identities of the Computed Views supplied by the application. */
+export const FLOW_SPACE_VIEW_ID = uuidSchema.parse('2e84c9f4-63bb-4e26-8f32-3c2a5ef6b001');
+export const GRID_SPACE_VIEW_ID = uuidSchema.parse('2e84c9f4-63bb-4e26-8f32-3c2a5ef6b002');
+
 /**
- * The canvas renderers a space can name without declaring anything: the
- * graph-driven flow and a plain grid. Both are automatic Views, so they are
- * named, never configured — `defaultRenderer` records intent ("open me like
- * this") and carries no parameters, because parameters would put computed
- * geometry back into authored content (ADR 0025). A `defaultRenderer` naming
- * none of these and no declared Layout is a reference error.
+ * Computed View identity is independent of product naming. These ids are
+ * application constants, available in every Space, and share the same
+ * namespace as authored Layout ids (ADR 0068).
  */
-export const BUILT_IN_VIEW_IDS = ['flow', 'grid'] as const;
+export const COMPUTED_VIEW_IDS: readonly z.infer<typeof uuidSchema>[] = Object.freeze([
+  FLOW_SPACE_VIEW_ID,
+  GRID_SPACE_VIEW_ID,
+]);
 
-export type BuiltInViewId = (typeof BUILT_IN_VIEW_IDS)[number];
-
-export function isBuiltInViewId(id: string): id is BuiltInViewId {
-  // SAFETY: widened only so `.includes` accepts an arbitrary `string`; the
-  // values actually held are still exactly `BUILT_IN_VIEW_IDS`'s two literals.
-  return (BUILT_IN_VIEW_IDS as readonly string[]).includes(id);
+export function isComputedViewId(id: z.infer<typeof uuidSchema>): boolean {
+  return COMPUTED_VIEW_IDS.includes(id);
 }
 
 /**
@@ -277,8 +277,8 @@ export const spaceFileSchema = z.object({
    * space *is*: it renders and it cannot be presented (ADR 0015).
    */
   layouts: z.array(layoutSchema).optional(),
-  /** A declared Layout's id, or a built-in View's id. See {@link BUILT_IN_VIEW_IDS}. */
-  defaultRenderer: z.union([z.enum(BUILT_IN_VIEW_IDS), uuidSchema]).optional(),
+  /** A declared Layout's id or an available Computed View's durable id. */
+  defaultRenderer: uuidSchema.optional(),
 });
 
 /** The JSONB document stored beside a space's relational UUID. */

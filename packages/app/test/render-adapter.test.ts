@@ -1,6 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Position, type Edge } from '@xyflow/react';
-import { uuidSchema, type LayoutPosition, type SpaceSnapshot, type UUID } from '@project/core';
+import {
+  FLOW_SPACE_VIEW_ID,
+  uuidSchema,
+  type LayoutPosition,
+  type SpaceSnapshot,
+  type UUID,
+} from '@project/core';
 import { Placement } from '@project/graph';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
 import type { CardFlowNode } from '@project/react-flow-adapter';
@@ -207,7 +213,7 @@ function sparsePositionedAdapter(newId?: () => UUID) {
   };
   return sessionBackedAdapter(
     snapshot,
-    { kind: 'layout', layoutId: LAYOUT_ID },
+    LAYOUT_ID,
     Placement.fromEntries([
       [CARD_A, { x: 10, y: 20, open: false }],
       [CARD_B, { x: 300, y: 20, open: false }],
@@ -255,7 +261,7 @@ function storedSpaceAdapter() {
   };
   return sessionBackedAdapter(
     snapshot,
-    { kind: 'layout', layoutId: LAYOUT_ID },
+    LAYOUT_ID,
     Placement.fromEntries([
       [CARD_A, { x: 10, y: 20, open: false }],
       [CARD_B, { x: 300, y: 20, open: false }],
@@ -592,7 +598,7 @@ describe('render adapter', () => {
     // Converting mints the Layout's Graph before the Layout itself.
     const { session, store, authoring } = sessionBackedAdapter(
       snapshot,
-      { kind: 'view', view: 'flow' },
+      FLOW_SPACE_VIEW_ID,
       undefined,
       undefined,
       mintingIds(GRAPH_ID, LAYOUT_ID),

@@ -1,6 +1,8 @@
 import fc from 'fast-check';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
+  FLOW_SPACE_VIEW_ID,
+  GRID_SPACE_VIEW_ID,
   newUuid,
   uuidSchema,
   type CardDocument,
@@ -228,7 +230,7 @@ function attachAuthoring(
 
 function openAuthoring(
   snapshot: SpaceSnapshot = automaticSnapshot,
-  renderer: CanvasRendererId = { kind: 'view', view: 'flow' },
+  renderer: CanvasRendererId = FLOW_SPACE_VIEW_ID,
   options: AuthoringOptions = {},
 ) {
   const loaded = { snapshot, revision: 0n, exportedRevision: null };
@@ -263,7 +265,7 @@ const openRefusalFixture = () => {
       { id: CARD_C, document: { title: 'C', kind: 'markdown', body: 'C' } },
     ],
   };
-  const opened = openAuthoring(aliased, { kind: 'layout', layoutId: LAYOUT_ID });
+  const opened = openAuthoring(aliased, LAYOUT_ID);
   replacePlacementForTest(
     opened.authoring,
     Placement.fromEntries([
@@ -312,7 +314,7 @@ const openConflictedAgainstStoredSpace = async () => {
   const { authoring } = attachAuthoring(
     backend,
     { snapshot: positionedSnapshot, revision: 3n, exportedRevision: null },
-    { kind: 'layout', layoutId: LAYOUT_ID },
+    LAYOUT_ID,
     { reportObserverError: (error) => reported.push(error) },
   );
   replacePlacementForTest(
@@ -364,7 +366,7 @@ describe('Space Authoring', () => {
     // repointing the renderer leaves the graph drawing the Algorithmic View it
     // just replaced, so the next placement would be computed rather than read
     // back from the Layout this Edit created.
-    expect(navigation.getState().selectedRenderer).toEqual({ kind: 'layout', layoutId: LAYOUT_ID });
+    expect(navigation.getState().selectedRenderer).toEqual(LAYOUT_ID);
   });
 
   it('binds a Card value to the completion that reports it', () => {
@@ -411,7 +413,7 @@ describe('Space Authoring', () => {
     const { authoring, session } = attachAuthoring(
       new MemorySpaceBackend([loaded], control),
       loaded,
-      { kind: 'view', view: 'flow' },
+      FLOW_SPACE_VIEW_ID,
       { newId: minted },
     );
     replacePlacementForTest(
@@ -440,7 +442,7 @@ describe('Space Authoring', () => {
     const { authoring, session } = attachAuthoring(
       new MemorySpaceBackend([loaded], control),
       loaded,
-      { kind: 'layout', layoutId: LAYOUT_ID },
+      LAYOUT_ID,
     );
     expect(
       complete(authoring, {
@@ -477,10 +479,7 @@ describe('Space Authoring', () => {
         { id: CARD_B, document: { title: 'A again', kind: 'alias', target: CARD_A } },
       ],
     };
-    const { authoring, session } = openAuthoring(aliased, {
-      kind: 'layout',
-      layoutId: LAYOUT_ID,
-    });
+    const { authoring, session } = openAuthoring(aliased, LAYOUT_ID);
     replacePlacementForTest(
       authoring,
       Placement.fromEntries([
@@ -611,7 +610,7 @@ describe('Space Authoring', () => {
     ]);
     expect(Object.hasOwn(session.getState().working.document, 'graphs')).toBe(false);
     expect(session.getState().working.document.defaultRenderer).toBe(LAYOUT_ID);
-    expect(navigation.getState().selectedRenderer).toEqual({ kind: 'layout', layoutId: LAYOUT_ID });
+    expect(navigation.getState().selectedRenderer).toEqual(LAYOUT_ID);
     expect(navigation.getState().activeGraphId).toBe(MINTED_GRAPH_ID);
   });
 
@@ -622,10 +621,7 @@ describe('Space Authoring', () => {
    * rejects (ADR 0032) and the second attempt is refused before it is attempted.
    */
   it('uses one eligibility policy for preview and completion of an existing-Card Edge', () => {
-    const { authoring, session } = openAuthoring(positionedSnapshot, {
-      kind: 'layout',
-      layoutId: LAYOUT_ID,
-    });
+    const { authoring, session } = openAuthoring(positionedSnapshot, LAYOUT_ID);
     replacePlacementForTest(
       authoring,
       Placement.fromEntries([
@@ -671,7 +667,7 @@ describe('Space Authoring', () => {
         ...positionedSnapshot,
         document: { ...positionedSnapshot.document, defaultRenderer: undefined },
       },
-      { kind: 'view', view: 'flow' },
+      FLOW_SPACE_VIEW_ID,
       { newId: mintingIds(CONVERTED_LAYOUT_ID) },
     );
     replacePlacementForTest(
@@ -751,7 +747,7 @@ describe('Space Authoring', () => {
         { id: CARD_C, document: { title: 'C', kind: 'markdown', body: 'C' } },
       ],
     };
-    const { authoring, session } = openAuthoring(sparse, { kind: 'layout', layoutId: LAYOUT_ID });
+    const { authoring, session } = openAuthoring(sparse, LAYOUT_ID);
     replacePlacementForTest(
       authoring,
       Placement.fromEntries([
@@ -813,7 +809,7 @@ describe('Space Authoring', () => {
     const { authoring, session, navigation } = attachAuthoring(
       new MemorySpaceBackend([loaded], control),
       loaded,
-      { kind: 'view', view: 'flow' },
+      FLOW_SPACE_VIEW_ID,
       { newId: mintingIds(CONVERTED_LAYOUT_ID) },
     );
     replacePlacementForTest(
@@ -878,11 +874,9 @@ describe('Space Authoring', () => {
       },
       cards: [{ id: CARD_A, document: { title: 'Card 1', kind: 'markdown', body: '' } }],
     };
-    const { authoring, session, navigation } = openAuthoring(
-      emptyGraph,
-      { kind: 'layout', layoutId: LAYOUT_ID },
-      { newId: minted },
-    );
+    const { authoring, session, navigation } = openAuthoring(emptyGraph, LAYOUT_ID, {
+      newId: minted,
+    });
     replacePlacementForTest(
       authoring,
       Placement.fromEntries([[CARD_A, { x: 10, y: 20, open: false }]]),
@@ -938,7 +932,7 @@ describe('Space Authoring', () => {
       navigation: real,
     } = composeCore({
       spaceSession: session,
-      selection: { kind: 'view', view: 'flow' },
+      selection: FLOW_SPACE_VIEW_ID,
       newGraphId: graphIds(),
     });
     const adopted: { renderer: CanvasRendererId; graphId: GraphId | null }[] = [];
@@ -968,11 +962,9 @@ describe('Space Authoring', () => {
       kind: 'completed',
     });
 
-    expect(adopted).toEqual([
-      { renderer: { kind: 'layout', layoutId: LAYOUT_ID }, graphId: MINTED_GRAPH_ID },
-    ]);
+    expect(adopted).toEqual([{ renderer: LAYOUT_ID, graphId: MINTED_GRAPH_ID }]);
     expect(real.getState()).toMatchObject({
-      selectedRenderer: { kind: 'layout', layoutId: LAYOUT_ID },
+      selectedRenderer: LAYOUT_ID,
       activeGraphId: MINTED_GRAPH_ID,
     });
     // The Graph is inside the Layout that owns it, and that Layout draws it.
@@ -985,9 +977,7 @@ describe('Space Authoring', () => {
       },
     ]);
     expect(
-      resolveRenderer(currentSpace(), { kind: 'layout', layoutId: LAYOUT_ID }).subject.graphs.map(
-        (graph) => graph.id,
-      ),
+      resolveRenderer(currentSpace(), LAYOUT_ID).subject.graphs.map((graph) => graph.id),
     ).toEqual([MINTED_GRAPH_ID]);
   });
 
@@ -1078,10 +1068,7 @@ describe('Space Authoring', () => {
         defaultRenderer: LAYOUT_ID,
       },
     };
-    const { authoring } = openAuthoring(positioned, {
-      kind: 'layout',
-      layoutId: LAYOUT_ID,
-    });
+    const { authoring } = openAuthoring(positioned, LAYOUT_ID);
     replacePlacementForTest(
       authoring,
       Placement.fromEntries([
@@ -1170,10 +1157,7 @@ describe('Space Authoring', () => {
       [CARD_A]: { x: 10, y: 20, open: false },
       [CARD_B]: { x: 500, y: 400, open: false },
     });
-    expect(navigation.getState().selectedRenderer).toEqual({
-      kind: 'layout',
-      layoutId: CONVERTED_LAYOUT_ID,
-    });
+    expect(navigation.getState().selectedRenderer).toEqual(CONVERTED_LAYOUT_ID);
   });
 
   it('reports a failed queued completion instead of charging it to the Edit that drained it', () => {
@@ -1184,7 +1168,7 @@ describe('Space Authoring', () => {
     const { authoring, session } = attachAuthoring(
       new MemorySpaceBackend([loaded]),
       loaded,
-      { kind: 'layout', layoutId: LAYOUT_ID },
+      LAYOUT_ID,
       { reportObserverError: (error) => failures.push(error) },
     );
     let reentered = false;
@@ -1232,10 +1216,7 @@ describe('Space Authoring', () => {
       const state = authoring.getState();
       observed.push({
         defaultRenderer: state.session.working.document.defaultRenderer,
-        renderer:
-          state.navigation.selectedRenderer.kind === 'layout'
-            ? state.navigation.selectedRenderer.layoutId
-            : state.navigation.selectedRenderer.view,
+        renderer: state.navigation.selectedRenderer,
       });
     });
 
@@ -1249,10 +1230,7 @@ describe('Space Authoring', () => {
     // duplicate *of*. On an Algorithmic View the Edge would join the Graph the
     // conversion mints, which holds nothing — that case is the "offers an Edge
     // the emphasised Graph already holds" test above.
-    const { authoring, session } = openAuthoring(positionedSnapshot, {
-      kind: 'layout',
-      layoutId: LAYOUT_ID,
-    });
+    const { authoring, session } = openAuthoring(positionedSnapshot, LAYOUT_ID);
     const staleCard = uuidSchema.parse('00000000-0000-4000-8000-000000000099');
 
     // The reason, asked directly. A boolean here cannot fail for its own
@@ -1314,7 +1292,7 @@ describe('Space Authoring', () => {
     const session = openSpaceSession(backend, loaded);
     const { authoring } = composeApp({
       spaceSession: session,
-      selection: { kind: 'layout', layoutId: LAYOUT_ID },
+      selection: LAYOUT_ID,
       newGraphId: graphIds(),
       initialPlacement: null,
     });
@@ -1364,10 +1342,7 @@ describe('Space Authoring', () => {
         defaultRenderer: LAYOUT_ID,
       },
     };
-    const { authoring, navigation } = openAuthoring(positioned, {
-      kind: 'layout',
-      layoutId: LAYOUT_ID,
-    });
+    const { authoring, navigation } = openAuthoring(positioned, LAYOUT_ID);
 
     replacePlacementForTest(
       authoring,
@@ -1392,7 +1367,7 @@ describe('Space Authoring', () => {
 
     // Only an authored Layout supplies positions; an Algorithmic View computes
     // its own, so it must answer null however much placement is installed.
-    navigation.selectRenderer({ kind: 'view', view: 'flow' });
+    navigation.selectRenderer(FLOW_SPACE_VIEW_ID);
     expect(authoring.authoredPlacement()).toBeNull();
   });
 
@@ -1438,10 +1413,7 @@ describe('Space Authoring', () => {
 
           const loaded = { snapshot: positionedSnapshot, revision: 0n, exportedRevision: null };
           const backend = new MemorySpaceBackend([loaded]);
-          const authoring = attachAuthoring(backend, loaded, {
-            kind: 'layout',
-            layoutId: LAYOUT_ID,
-          });
+          const authoring = attachAuthoring(backend, loaded, LAYOUT_ID);
           fc.pre(renderedAX !== 10 || renderedAY !== 20 || baseBX !== 300 || baseBY !== 40);
           authoring.authoring.replacePlacement(base);
           authoring.authoring.complete({
@@ -1514,10 +1486,7 @@ describe('Space Authoring', () => {
         defaultRenderer: LAYOUT_ID,
       },
     };
-    const { authoring, session } = openAuthoring(positioned, {
-      kind: 'layout',
-      layoutId: LAYOUT_ID,
-    });
+    const { authoring, session } = openAuthoring(positioned, LAYOUT_ID);
     const before = session.getState().working;
     replacePlacementForTest(
       authoring,
@@ -1615,7 +1584,7 @@ describe('Space Authoring', () => {
     const reported: unknown[] = [];
     const { authoring } = composeApp({
       spaceSession: session,
-      selection: { kind: 'view', view: 'flow' },
+      selection: FLOW_SPACE_VIEW_ID,
       newGraphId: graphIds(),
       newId: mintingIds(LAYOUT_ID),
       initialPlacement: null,
@@ -1664,10 +1633,11 @@ describe('Space Authoring', () => {
     // Edit replaces the working snapshot, which is what the render path derives
     // its `LayoutStrategyGraph` from. Lose that and a settled Edit renders stale.
     const loaded = { snapshot: positionedSnapshot, revision: 0n, exportedRevision: null };
-    const { authoring, session } = attachAuthoring(new MemorySpaceBackend([loaded]), loaded, {
-      kind: 'layout',
-      layoutId: LAYOUT_ID,
-    });
+    const { authoring, session } = attachAuthoring(
+      new MemorySpaceBackend([loaded]),
+      loaded,
+      LAYOUT_ID,
+    );
     replacePlacementForTest(
       authoring,
       Placement.fromEntries([
@@ -1713,7 +1683,7 @@ describe('Space Authoring', () => {
     const reported: unknown[] = [];
     const { authoring } = composeApp({
       spaceSession: session,
-      selection: { kind: 'layout', layoutId: LAYOUT_ID },
+      selection: LAYOUT_ID,
       newGraphId: graphIds(),
       newId: mintingIds(CREATED_CARD_ID),
       initialPlacement: Placement.fromEntries([
@@ -1770,7 +1740,7 @@ describe('Space Authoring', () => {
     };
     const { authoring } = composeApp({
       spaceSession: session,
-      selection: { kind: 'layout', layoutId: LAYOUT_ID },
+      selection: LAYOUT_ID,
       newGraphId: graphIds(),
       initialPlacement: null,
     });
@@ -1830,7 +1800,7 @@ describe('Space Authoring', () => {
       navigation: real,
     } = composeCore({
       spaceSession: session,
-      selection: { kind: 'view', view: 'flow' },
+      selection: FLOW_SPACE_VIEW_ID,
       newGraphId: graphIds(),
     });
     const navigation: Navigation = {
@@ -1863,12 +1833,12 @@ describe('Space Authoring', () => {
     expect(graphsOf(session.getState().working)).toHaveLength(1);
     expect(graphsOf(authoring.getState().session.working)).toHaveLength(1);
     expect(real.getState()).toMatchObject({
-      selectedRenderer: { kind: 'view', view: 'flow' },
+      selectedRenderer: FLOW_SPACE_VIEW_ID,
       activeGraphId: null,
     });
     expect(published).toHaveLength(1);
     expect(published[0]).toMatchObject({
-      selectedRenderer: { kind: 'view', view: 'flow' },
+      selectedRenderer: FLOW_SPACE_VIEW_ID,
       activeGraphId: null,
     });
   });
@@ -1889,7 +1859,7 @@ describe('Space Authoring', () => {
     const reported: unknown[] = [];
     const { authoring } = composeApp({
       spaceSession: session,
-      selection: { kind: 'view', view: 'flow' },
+      selection: FLOW_SPACE_VIEW_ID,
       newGraphId: graphIds(),
       newId: mintingIds(LAYOUT_ID),
       initialPlacement: null,
@@ -1988,14 +1958,14 @@ describe('Space Authoring', () => {
       navigation: real,
     } = composeCore({
       spaceSession: session,
-      selection: { kind: 'view', view: 'flow' },
+      selection: FLOW_SPACE_VIEW_ID,
       newGraphId: graphIds(),
     });
     const navigation: Navigation = {
       ...real,
       getState: () => ({
         ...real.getState(),
-        selectedRenderer: { kind: 'layout', layoutId: LAYOUT_ID },
+        selectedRenderer: LAYOUT_ID,
         activeGraphId: GRAPH_ID,
       }),
       // The refusal this test pins happens before Authoring would adopt a
@@ -2045,7 +2015,7 @@ describe('Space Authoring', () => {
     const { authoring } = attachAuthoring(
       backend,
       { snapshot: positioned, revision: 0n, exportedRevision: null },
-      { kind: 'layout', layoutId: LAYOUT_ID },
+      LAYOUT_ID,
     );
     replacePlacementForTest(
       authoring,
@@ -2130,7 +2100,7 @@ describe('Space Authoring', () => {
     const { navigation, authoring } = attachAuthoring(
       backend,
       { snapshot: positioned, revision: 3n, exportedRevision: null },
-      { kind: 'layout', layoutId: LAYOUT_ID },
+      LAYOUT_ID,
     );
     replacePlacementForTest(
       authoring,
@@ -2151,7 +2121,7 @@ describe('Space Authoring', () => {
       ]),
     );
     complete(authoring, { kind: 'settled-card-movement' });
-    navigation.selectRenderer({ kind: 'view', view: 'grid' });
+    navigation.selectRenderer(GRID_SPACE_VIEW_ID);
     navigation.present();
     navigation.openCard(CARD_B);
 
@@ -2173,7 +2143,7 @@ describe('Space Authoring', () => {
         persistence: { kind: 'settled' },
       },
       navigation: {
-        selectedRenderer: { kind: 'layout', layoutId: LAYOUT_ID },
+        selectedRenderer: LAYOUT_ID,
         activeGraphId: STORED_GRAPH_ID,
         mode: 'overview',
         openedCardId: null,
@@ -2194,10 +2164,7 @@ describe('Space Authoring', () => {
     // iterates — an assertion that cannot fail. `completed` and `subscribed` are
     // asserted for the same reason: they are what stop it going vacuous again.
     const loaded = { snapshot: positionedSnapshot, revision: 0n, exportedRevision: null };
-    const { authoring } = attachAuthoring(new MemorySpaceBackend([loaded]), loaded, {
-      kind: 'layout',
-      layoutId: LAYOUT_ID,
-    });
+    const { authoring } = attachAuthoring(new MemorySpaceBackend([loaded]), loaded, LAYOUT_ID);
     const late: string[] = [];
     let subscribed = false;
     authoring.subscribe(() => {
@@ -2217,10 +2184,7 @@ describe('Space Authoring', () => {
   });
 
   it('has nothing to accept when persistence is not in conflict', () => {
-    const { authoring } = openAuthoring(positionedSnapshot, {
-      kind: 'layout',
-      layoutId: LAYOUT_ID,
-    });
+    const { authoring } = openAuthoring(positionedSnapshot, LAYOUT_ID);
     const before = authoring.getState();
 
     expect(authoring.acceptStoredSpace()).toBeNull();
@@ -2256,7 +2220,7 @@ describe('Space Authoring', () => {
     const { authoring } = attachAuthoring(
       backend,
       { snapshot: positionedSnapshot, revision: 3n, exportedRevision: null },
-      { kind: 'layout', layoutId: LAYOUT_ID },
+      LAYOUT_ID,
     );
     replacePlacementForTest(
       authoring,
@@ -2306,7 +2270,7 @@ describe('Space Authoring', () => {
     const { authoring, session } = attachAuthoring(
       backend,
       { snapshot: positionedSnapshot, revision: 3n, exportedRevision: null },
-      { kind: 'layout', layoutId: LAYOUT_ID },
+      LAYOUT_ID,
     );
     replacePlacementForTest(
       authoring,
@@ -2497,7 +2461,7 @@ describe('Space Authoring', () => {
     };
     const { authoring } = composeApp({
       spaceSession: session,
-      selection: { kind: 'layout', layoutId: LAYOUT_ID },
+      selection: LAYOUT_ID,
       newGraphId: graphIds(),
       initialPlacement: Placement.fromEntries([
         [CARD_A, { x: 10, y: 20, open: false }],

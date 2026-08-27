@@ -1,6 +1,6 @@
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
-import { uuidSchema, type BuiltInViewId, type GraphId } from '@project/core';
+import { FLOW_SPACE_VIEW_ID, uuidSchema, type GraphId } from '@project/core';
 import { loadSpace, Placement, type Space } from '@project/graph';
 import {
   checkSubject,
@@ -39,7 +39,7 @@ const uuid = (n: number): string => `00000000-0000-4000-8000-${n.toString(16).pa
  * selection is written in, so a generated View borrows a built-in id rather than
  * inventing a spelling no selection could hold.
  */
-const GENERATED_VIEW: BuiltInViewId = 'flow';
+const GENERATED_VIEW = FLOW_SPACE_VIEW_ID;
 
 const cardId = fc.integer({ min: 2, max: 7 }).map((n) => uuidSchema.parse(uuid(n)));
 
