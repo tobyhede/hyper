@@ -65,6 +65,7 @@ vi.mock('@xyflow/react', async (importOriginal) => {
   return {
     ...actual,
     useUpdateNodeInternals: () => updateNodeInternals,
+    useViewport: () => ({ zoom: 1 }),
     useConnection: <T,>(selector: (state: MockConnectionState) => T): T => selector(connection),
     /**
      * React Flow's own resize control, which reaches for the flow store and so
@@ -863,7 +864,7 @@ describe('CardNode Expanded Card front', () => {
     expect(screen.getByTestId('resize-control')).toBeInTheDocument();
   });
 
-  it("draws the resize control's mark as the control's own child", () => {
+  it('draws the inert resize mark behind the Card, separately from the interactive control', () => {
     const resize = {
       minWidth: 260,
       minHeight: 146,
@@ -874,11 +875,12 @@ describe('CardNode Expanded Card front', () => {
     };
     render(<CardNode {...props({ expanded: true, body: SOURCE, resize })} />);
 
-    // The hit target (the control) is comfortably larger than the visible mark;
-    // that sizing is CSS, but the structure it depends on is pinned here.
+    // The control owns the hit target's upper layer. The inert mark is its
+    // preceding sibling so the later Card face can occlude their overlap.
     const control = screen.getByTestId('resize-control');
-    const mark = control.querySelector('.rf-card-node__resize-mark');
+    const mark = document.querySelector<HTMLElement>('.rf-card-node__resize-mark');
     expect(mark).not.toBeNull();
-    expect(mark?.parentElement).toBe(control);
+    expect(control).not.toContainElement(mark);
+    expect(mark?.nextElementSibling).toBe(control);
   });
 });

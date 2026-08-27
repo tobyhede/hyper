@@ -4,6 +4,7 @@ import {
   NodeResizeControl,
   Position,
   useConnection,
+  useViewport,
   type NodeProps,
   type OnResizeStart,
   type ShouldResize,
@@ -305,6 +306,7 @@ export function CardNode({ data, selected, dragging, isConnectable }: NodeProps<
     return false;
   }, []);
   const expanded = data.expanded === true;
+  const resizeScale = Math.max(1 / useViewport().zoom, 1);
 
   const onReturnFocus = () => {
     inner.current?.closest<HTMLElement>('.react-flow__node')?.focus();
@@ -344,16 +346,25 @@ export function CardNode({ data, selected, dragging, isConnectable }: NodeProps<
         is harmless to it.
       */}
       {expanded && resize !== undefined && (
-        <NodeResizeControl
-          position="bottom-right"
-          minWidth={resize.minWidth}
-          minHeight={resize.minHeight}
-          className="rf-card-node__resize-control"
-          onResizeStart={beginResize}
-          shouldResize={proposeResize}
-        >
-          <span className="rf-card-node__resize-mark" aria-hidden="true" />
-        </NodeResizeControl>
+        <>
+          <span
+            className="rf-card-node__resize-mark"
+            style={{
+              right: `${-4 * resizeScale}px`,
+              bottom: `${-4 * resizeScale}px`,
+              scale: String(resizeScale),
+            }}
+            aria-hidden="true"
+          />
+          <NodeResizeControl
+            position="bottom-right"
+            minWidth={resize.minWidth}
+            minHeight={resize.minHeight}
+            className="rf-card-node__resize-control"
+            onResizeStart={beginResize}
+            shouldResize={proposeResize}
+          />
+        </>
       )}
       {data.targetHandles.map((handle) => renderHandle(handle, 'target'))}
       {data.showContent ? (
