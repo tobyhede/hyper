@@ -117,6 +117,10 @@ body {
     transform var(--card-placement-duration) var(--card-placement-easing);
 }
 
+.rf-card-node:has(> .rf-card-node__inner[data-resizing='true']) {
+  transition-property: transform;
+}
+
 .rf-card-node__inner {
   position: relative;
   width: 100%;
@@ -186,8 +190,8 @@ body {
    caret included. */
 .rf-card-node__inner .react-flow__resize-control.rf-card-node__resize-control {
   z-index: 1;
-  width: 24px;
-  height: 24px;
+  width: 48px;
+  height: 48px;
   translate: -100% -100%;
   display: flex;
   align-items: center;
@@ -202,9 +206,12 @@ body {
 }
 
 .rf-card-node__resize-mark {
-  width: 10px;
-  height: 10px;
-  background: var(--canvas-card-face-active);
+  position: relative;
+  top: -4px;
+  left: -4px;
+  width: 20px;
+  height: 20px;
+  background: #000;
   border: 2px solid var(--canvas-card-ink-color);
 }
 

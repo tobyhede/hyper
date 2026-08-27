@@ -234,12 +234,18 @@ test(
     // and outranks a rule naming one class, so this passed while the control
     // was too small for a pointer to find — Playwright hits 5px exactly and a
     // hand does not. The mark stays smaller than the target it sits in.
-    expect(box.width).toBeGreaterThanOrEqual(20);
-    expect(box.height).toBeGreaterThanOrEqual(20);
+    expect(box.width).toBe(48);
+    expect(box.height).toBe(48);
     const mark = await openControl.locator('.rf-card-node__resize-mark').boundingBox();
     if (mark === null) throw new Error('The Open resize control draws no mark.');
-    expect(mark.width).toBeLessThan(box.width);
-    expect(mark.height).toBeLessThan(box.height);
+    expect(mark.width).toBe(20);
+    expect(mark.height).toBe(20);
+    expect(mark.x - box.x).toBe(10);
+    expect(mark.y - box.y).toBe(10);
+    await expect(openControl.locator('.rf-card-node__resize-mark')).toHaveCSS(
+      'background-color',
+      'rgb(0, 0, 0)',
+    );
 
     // Nothing of the control may sit over the pane. It is invisible at rest and
     // always grabbable, so an overhang is a hit target no reveal announces —
@@ -315,6 +321,42 @@ test(
       )
       .toEqual({ width: 260, height: 146 });
     await expect(node.locator('.rf-card-node__inner')).toHaveAttribute('data-expanded', 'true');
+    await page.mouse.up();
+  },
+);
+
+test(
+  'an active Card resize does not animate its dimensions behind the pointer',
+  { tag: '@parity:active-card-resize-tracks-pointer-without-dimension-animation' },
+  async ({ page }) => {
+    await page.goto(resizeControlStory);
+    const openRegion = page.getByRole('region', { name: 'Open Card', exact: true });
+    const card = openRegion.getByRole('article', { name: 'Strategies' });
+    const node = openRegion.locator('.react-flow__node');
+    const control = openRegion.locator('.react-flow__resize-control');
+    await expect(card).toBeVisible({ timeout: 20_000 });
+    await card.hover();
+
+    const box = await control.boundingBox();
+    if (box === null) throw new Error('The Open resize control has no box.');
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(box.x + box.width / 2 + 45, box.y + box.height / 2 + 35, {
+      steps: 2,
+    });
+    await expect(node.locator('.rf-card-node__inner')).toHaveAttribute('data-resizing', 'true');
+
+    const dimensionAnimationRunning = await node.evaluate((element) =>
+      element.getAnimations().some((animation) => {
+        if (!(animation instanceof CSSTransition) || animation.playState !== 'running') {
+          return false;
+        }
+        return (
+          animation.transitionProperty === 'width' || animation.transitionProperty === 'height'
+        );
+      }),
+    );
+    expect(dimensionAnimationRunning).toBe(false);
     await page.mouse.up();
   },
 );
