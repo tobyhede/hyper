@@ -37,6 +37,7 @@ const storedSpace: LoadedSpace = {
 
 class ImportRepository implements SpaceRepository {
   private readonly outcome: RepositoryImportResult | Error;
+  private entryId: UUID | undefined;
 
   constructor(outcome: RepositoryImportResult | Error) {
     this.outcome = outcome;
@@ -59,6 +60,21 @@ class ImportRepository implements SpaceRepository {
       throw new Error('Unexpected loadSpace call');
     }
     return Promise.resolve(this.outcome.spaces.find(({ snapshot }) => snapshot.id === id));
+  }
+
+  entrySpaceId(): Promise<UUID | undefined> {
+    return Promise.resolve(this.entryId);
+  }
+
+  setEntrySpace(id: UUID): Promise<void> {
+    if (this.outcome instanceof Error || this.outcome.kind !== 'imported') {
+      throw new Error('Unexpected setEntrySpace call');
+    }
+    if (!this.outcome.spaces.some(({ snapshot }) => snapshot.id === id)) {
+      throw new Error(`Space ${id} does not exist`);
+    }
+    this.entryId = id;
+    return Promise.resolve();
   }
 
   markExported(_id: UUID, _revision: bigint): Promise<void> {
@@ -480,12 +496,12 @@ describe('runHyper', () => {
     expect(cardFile).toContain('\nFirst\nSecond\nThird\n');
   });
 
-  it('opens the only database space without filesystem import and preserves its revision', async () => {
+  it('opens the configured Entry Space without filesystem import and preserves its revision', async () => {
     const revision = 9_007_199_254_740_993n;
     const output = captureIo();
 
     const exitCode = await runHyper([], {
-      repository: new MemorySpaceRepository([{ ...storedSpace, revision }]),
+      repository: new MemorySpaceRepository([{ ...storedSpace, revision }], SPACE_ID),
       io: output.io,
     });
 
@@ -571,7 +587,7 @@ describe('runHyper', () => {
     ]);
   });
 
-  it('reports the complete post-import catalog for a batch without filesystem paths', async () => {
+  it('refuses to infer an Entry Space from a batch import', async () => {
     const collection = await makeTemporaryDirectory();
     const first = join(collection, 'first');
     const second = join(collection, 'second');
@@ -593,12 +609,12 @@ describe('runHyper', () => {
       io: output.io,
     });
 
-    expect(exitCode).toBe(0);
-    expect(output.stdout).toEqual([
-      `Choose a space:\nStored talk (${SPACE_ID})\nFirst imported (${OTHER_SPACE_ID})\nSecond imported (${THIRD_SPACE_ID})\n`,
-    ]);
+    expect(exitCode).toBe(1);
+    expect(output.stdout).toEqual([]);
     expect(output.stdout.join('')).not.toContain(collection);
-    expect(output.stderr).toEqual([]);
+    expect(output.stderr).toEqual([
+      'Database startup failed: The database has no configured Entry Space\n',
+    ]);
   });
 
   it('reports every file diagnostic with its path', async () => {
@@ -825,7 +841,7 @@ describe('runCliMain', () => {
     let closed = false;
 
     const exitCode = await runCliMain([], {
-      repository: new MemorySpaceRepository([storedSpace]),
+      repository: new MemorySpaceRepository([storedSpace], SPACE_ID),
       io: output.io,
       close: () => {
         closed = true;

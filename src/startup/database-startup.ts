@@ -1,7 +1,7 @@
 import type { ImportSpace, UUID } from '@project/core';
 import { newSpace, parseCardFile } from '@project/graph';
 import { requireImportedSpaces } from '../import/import-space';
-import type { LoadedSpace, SpaceSummary } from '@project/persistence';
+import type { LoadedSpace } from '@project/persistence';
 import type { SpaceRepository } from '../persistence/space-repository';
 
 export interface OpenedDatabaseStartup {
@@ -9,12 +9,7 @@ export interface OpenedDatabaseStartup {
   space: LoadedSpace;
 }
 
-export interface DatabaseStartupSelection {
-  kind: 'selection';
-  spaces: readonly SpaceSummary[];
-}
-
-export type DatabaseStartupResult = OpenedDatabaseStartup | DatabaseStartupSelection;
+export type DatabaseStartupResult = OpenedDatabaseStartup;
 
 /** Open the durable Space selected from the database catalog. */
 export const openDatabaseSelection = async (
@@ -47,22 +42,20 @@ export const resolveDatabaseStartup = async (
 ): Promise<DatabaseStartupResult> => {
   if (importedSpaces !== undefined) {
     if (importedSpaces.length === 0) throw new Error('Database import returned no spaces');
-    if (importedSpaces.length === 1) {
-      const [imported] = importedSpaces;
-      if (imported === undefined) throw new Error('The imported space changed unexpectedly');
-      return openDatabaseSelection(repository, imported.snapshot.id);
-    }
+  }
+
+  const entrySpaceId = await repository.entrySpaceId();
+  if (entrySpaceId !== undefined) return openDatabaseSelection(repository, entrySpaceId);
+
+  if (importedSpaces?.length === 1) {
+    const imported = importedSpaces[0];
+    if (imported === undefined) throw new Error('The imported space changed unexpectedly');
+    await repository.setEntrySpace(imported.snapshot.id);
+    return openDatabaseSelection(repository, imported.snapshot.id);
   }
 
   const catalog = await repository.listSpaces();
-  if (catalog.length === 1) {
-    const [summary] = catalog;
-    if (summary === undefined) throw new Error('The database catalog changed unexpectedly');
-    return openDatabaseSelection(repository, summary.id);
-  }
-  if (catalog.length > 1) {
-    return { kind: 'selection', spaces: catalog };
-  }
+  if (catalog.length > 0) throw new Error('The database has no configured Entry Space');
 
   const imported = requireImportedSpaces(
     await repository.importSpaces([createNewSpaceImport()], 'insert'),
@@ -72,5 +65,6 @@ export const resolveDatabaseStartup = async (
     throw new Error(`New-space import returned ${imported.length} spaces`);
   }
 
+  await repository.setEntrySpace(created.snapshot.id);
   return openDatabaseSelection(repository, created.snapshot.id);
 };
