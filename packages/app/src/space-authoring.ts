@@ -1,6 +1,7 @@
 import {
   type CardDocument,
   type CardId,
+  COLLAPSED_CARD_SIZE,
   DEFAULT_OPEN_SIZE,
   type Graph,
   type GraphEdge,
@@ -960,15 +961,24 @@ export function createSpaceAuthoring({
       if (at === undefined) return refuse({ code: 'card-not-in-layout' });
       if (!at.open) return refuse({ code: 'card-not-expanded' });
       if (
+        completion.size.width === COLLAPSED_CARD_SIZE.width &&
+        completion.size.height === COLLAPSED_CARD_SIZE.height
+      ) {
+        completedPlacement = Placement.place(completedPlacement, completion.cardId, {
+          ...at,
+          open: false,
+        });
+      } else if (
         at.openSize.width === completion.size.width &&
         at.openSize.height === completion.size.height
       ) {
         return UNCHANGED;
+      } else {
+        completedPlacement = Placement.place(completedPlacement, completion.cardId, {
+          ...at,
+          openSize: completion.size,
+        });
       }
-      completedPlacement = Placement.place(completedPlacement, completion.cardId, {
-        ...at,
-        openSize: completion.size,
-      });
     } else if (completion.kind === 'created-card') {
       createdCard = createCard(
         { title: nextCardTitle(snapshot), kind: 'markdown', body: '' },

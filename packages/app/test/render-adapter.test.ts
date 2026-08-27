@@ -805,6 +805,49 @@ describe('render adapter', () => {
     expect(store.getState().resizeDraft).toBeNull();
   });
 
+  it('snaps both dimensions inside the Close range to the exact Closed rect', () => {
+    const authored = Placement.fromEntries([
+      [CARD_A, { x: 10, y: 20, open: true, openSize: { width: 500, height: 360 } }],
+    ]);
+    const spy = authoringSpy({ authoredPlacement: authored });
+    const store = createRenderAdapter(spy.authoring);
+
+    store.getState().cardResize.beginResize(CARD_A);
+    store.getState().cardResize.previewResize(CARD_A, { width: 280, height: 166 });
+
+    expect(store.getState().resizeDraft).toMatchObject({
+      cardId: CARD_A,
+      size: { width: 260, height: 146 },
+    });
+    expect(store.getState().resizeDraft?.placement.get(CARD_A)).toEqual({
+      x: 10,
+      y: 20,
+      open: true,
+      openSize: { width: 260, height: 146 },
+    });
+
+    store.getState().cardResize.finishResize(CARD_A);
+
+    expect(spy.completions).toEqual([
+      { kind: 'resized-card', cardId: CARD_A, size: { width: 260, height: 146 } },
+    ]);
+  });
+
+  it('keeps an Open resize proposal when only one dimension reaches the Close range', () => {
+    const authored = Placement.fromEntries([
+      [CARD_A, { x: 10, y: 20, open: true, openSize: { width: 500, height: 360 } }],
+    ]);
+    const store = createRenderAdapter(authoringSpy({ authoredPlacement: authored }).authoring);
+
+    store.getState().cardResize.beginResize(CARD_A);
+    store.getState().cardResize.previewResize(CARD_A, { width: 280, height: 240 });
+
+    expect(store.getState().resizeDraft).toMatchObject({
+      cardId: CARD_A,
+      size: { width: 280, height: 240 },
+    });
+  });
+
   /**
    * A resize draft leaves the live nodes alone. Nothing rejects a node-only
    * rect here because React Flow never proposes one: its resize control emits

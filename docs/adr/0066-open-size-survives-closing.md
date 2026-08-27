@@ -1,6 +1,6 @@
 # Open Size survives Closing
 
-Status: proposed
+Status: accepted
 Refines: 0064
 
 Opening and size are separate facts in a Layout's Placement. Every entry carries
@@ -66,8 +66,7 @@ no keyboard contract, and Hyper does not invent a hidden arrow-key resize mode.
 If keyboard sizing is required later, explicit dimensions are the more
 discoverable candidate.
 
-The schema must enforce that an Open Card has a concrete Open Size, while
-allowing a Closed Card to retain one and a Card that has never Opened to have
-none. Placement owns the one effective-size operation used by displacement,
-rendering, Edge geometry and hit testing, so those consumers cannot choose
-different rects.
+The schema enforces that an Open Card has a concrete Open Size, while allowing a
+Closed Card to retain one and a Card that has never Opened to have none. Every
+geometry derivation reads the same discriminant: Closed means the fixed Closed
+Size and Open means the required Open Size.

@@ -329,6 +329,35 @@ describe('Expanded Card geometry', () => {
     });
   });
 
+  it('Closes at the exact Closed rect without replacing the remembered Open Size', () => {
+    const { authoring, session } = openPositioned();
+
+    expect(authoring.complete({ kind: 'opened-card', cardId: CARD_A })).toEqual({
+      kind: 'completed',
+    });
+    expect(
+      authoring.complete({
+        kind: 'resized-card',
+        cardId: CARD_A,
+        size: { width: 640, height: 480 },
+      }),
+    ).toEqual({ kind: 'completed' });
+
+    expect(
+      authoring.complete({
+        kind: 'resized-card',
+        cardId: CARD_A,
+        size: { width: 260, height: 146 },
+      }),
+    ).toEqual({ kind: 'completed' });
+    expect(layoutOf(session.getState().working, LAYOUT_ID)?.positions[CARD_A]).toEqual({
+      x: 10,
+      y: 20,
+      open: false,
+      openSize: { width: 640, height: 480 },
+    });
+  });
+
   it('refuses Opening from an Algorithmic View before converting it', () => {
     const { authoring, session } = openAutomatic();
     const before = session.getState().working;
