@@ -2,6 +2,7 @@ import { Component, type ReactElement, type ReactNode } from 'react';
 import { createApp } from './App';
 import { SpaceAppFailureView } from './components/SpaceAppFailureView';
 import type { OpenedSpace } from './space';
+import type { CanvasRendererId } from './renderer';
 
 export type SpaceAppRenderer = (app: ReactElement) => void;
 
@@ -58,10 +59,14 @@ class SpaceAppFailure extends Component<{ children: ReactNode }, SpaceAppFailure
  * logs as well as reports because — unlike the boundary below, which React
  * traces for us — nothing else would say what threw.
  */
-export function mountSpaceApp(opened: OpenedSpace, render: SpaceAppRenderer): void {
+export function mountSpaceApp(
+  opened: OpenedSpace,
+  render: SpaceAppRenderer,
+  selection?: CanvasRendererId,
+): void {
   let App: ReturnType<typeof createApp>;
   try {
-    App = createApp(opened);
+    App = createApp(opened, selection);
   } catch (error) {
     console.error('Composing the Space app failed', error);
     render(<SpaceAppFailureView message={failureMessage(error)} />);

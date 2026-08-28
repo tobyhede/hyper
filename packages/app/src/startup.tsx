@@ -1,6 +1,7 @@
 import { StrictMode, type ReactNode } from 'react';
 import { createAppRouter } from './router';
 import type { OpenedSpace } from './open-space';
+import type { CanvasRendererId } from './renderer';
 import { mountSpaceApp } from './SpaceApp';
 import { StartupFailure } from './components/StartupFailure';
 
@@ -11,21 +12,30 @@ export interface ApplicationRoot {
 export interface OpenedApplicationStartup {
   kind: 'opened';
   opened: OpenedSpace;
+  selection?: CanvasRendererId | undefined;
 }
 
 export type ApplicationStartupResult = OpenedApplicationStartup;
 
 export type ApplicationStartupResolver = () => Promise<ApplicationStartupResult>;
 
-const renderOpenedSpace = (root: ApplicationRoot, opened: OpenedSpace): void => {
-  mountSpaceApp(opened, (app) => {
-    const AppRouter = createAppRouter(() => app);
-    root.render(
-      <StrictMode>
-        <AppRouter />
-      </StrictMode>,
-    );
-  });
+const renderOpenedSpace = (
+  root: ApplicationRoot,
+  opened: OpenedSpace,
+  selection?: CanvasRendererId,
+): void => {
+  mountSpaceApp(
+    opened,
+    (app) => {
+      const AppRouter = createAppRouter(() => app);
+      root.render(
+        <StrictMode>
+          <AppRouter />
+        </StrictMode>,
+      );
+    },
+    selection,
+  );
 };
 
 const errorMessage = (error: unknown): string =>
@@ -42,8 +52,8 @@ export const startApplication = async (
 ): Promise<void> => {
   try {
     const startup = await resolveStartup();
-    const { opened } = startup;
-    renderOpenedSpace(root, opened);
+    const { opened, selection } = startup;
+    renderOpenedSpace(root, opened, selection);
   } catch (error) {
     renderStartupError(root, error);
   }

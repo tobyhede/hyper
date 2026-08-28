@@ -6,7 +6,12 @@ import {
   type ServerResponse,
 } from 'node:http';
 import { connect } from 'node:net';
-import { encodeCompactUuid, uuidSchema, type SpaceSnapshot } from '@project/core';
+import {
+  FLOW_SPACE_VIEW_ID,
+  encodeCompactUuid,
+  uuidSchema,
+  type SpaceSnapshot,
+} from '@project/core';
 import { createSpaceHttpApp, MAX_COMMIT_BODY_BYTES } from '@project/http';
 import { encodeCommitRequest, type SpaceResourceRepository } from '@project/persistence';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -210,6 +215,21 @@ describe('Vite Hono host', () => {
 
     expect(response.status).toBe(200);
     await expect(response.text()).resolves.toBe('<main>Canonical Space</main>');
+  });
+
+  it('lets an existing Computed View destination reach the SPA fallback', async () => {
+    const stored = { snapshot, revision: 0n, exportedRevision: null };
+    const hostApp = createSpaceHost(new MemorySpaceRepository([stored]));
+    const { host } = await startHost(hostApp, (_request, response) => {
+      response.end('<main>Computed View</main>');
+    });
+
+    const response = await fetch(
+      `${host.url}/spaces/${encodeCompactUuid(SPACE_ID)}/views/${encodeCompactUuid(FLOW_SPACE_VIEW_ID)}`,
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.text()).resolves.toBe('<main>Computed View</main>');
   });
 
   it('resolves HEAD like GET while sending no product response body', async () => {

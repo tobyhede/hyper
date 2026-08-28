@@ -1,4 +1,4 @@
-import { decodeCompactUuid, encodeCompactUuid } from '@project/core';
+import { decodeCompactUuid, encodeCompactUuid, resolveSpaceViewDestination } from '@project/core';
 import { createSpaceHttpApp, type SpaceHttpApp } from '@project/http';
 import type { SpaceRepository } from '../persistence/space-repository';
 
@@ -31,6 +31,20 @@ export const createSpaceHost = (repository: SpaceRepository): SpaceHostApplicati
     }
 
     if (!pathname.startsWith('/spaces')) return undefined;
+    const viewMatch = /^\/spaces\/([^/]+)\/views\/.+$/.exec(pathname);
+    if (viewMatch !== null) {
+      const compactSpaceId = viewMatch[1];
+      if (compactSpaceId === undefined) return problem(400, 'Invalid Space View URL');
+      const spaceId = decodeCompactUuid(compactSpaceId);
+      if (spaceId === undefined) return problem(400, 'Invalid Space id');
+      const loaded = await repository.loadSpace(spaceId);
+      if (loaded === undefined) return problem(404, 'Space not found');
+      const resolution = resolveSpaceViewDestination(loaded.snapshot, pathname);
+      if (resolution.kind === 'malformed') return problem(400, 'Invalid Space View URL');
+      if (resolution.kind === 'unresolved') return problem(404, 'Space View not found');
+      return undefined;
+    }
+
     const match = /^\/spaces\/([^/]+)$/.exec(pathname);
     if (match === null) return problem(400, 'Invalid Space URL');
     const compactId = match[1];

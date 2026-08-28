@@ -13,7 +13,7 @@ export const createAppRouter = (App: ComponentType) => {
   });
   const spaceRoute = createRoute({
     getParentRoute: () => rootRoute,
-    path: '/spaces/$spaceId',
+    path: '/spaces/$',
     component: () => <App />,
   });
   const router = createRouter({ routeTree: rootRoute.addChildren([spaceRoute]) });

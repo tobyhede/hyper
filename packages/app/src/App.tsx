@@ -1,7 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { ReactFlowProvider } from '@xyflow/react';
 import { AppShell } from '@project/ui';
-import { type Card, type CardId, type LayoutPosition } from '@project/core';
+import {
+  encodeCompactUuid,
+  parseSpaceViewDestination,
+  spaceViewDestinationPath,
+  type Card,
+  type CardId,
+  type LayoutPosition,
+} from '@project/core';
 import { graphCardIds } from '@project/graph';
 import type { OpenedSpace } from './space';
 import { composeApp, openingPlacement } from './compose-app';
@@ -16,7 +23,7 @@ import { canRetreat } from './navigation';
 import { usePresentingKeys } from './presenting-keys';
 import { nextCardTitle } from './titles';
 import { activeGraphColor } from './colors';
-import type { CanvasRendererId } from './renderer';
+import { defaultRenderer, type CanvasRendererId } from './renderer';
 import { ADD_CARD_KEY, SpaceCanvas } from './components/SpaceCanvas';
 import { CanvasCentre, type VisibleCentre } from './components/CanvasCentre';
 import { NewAlias } from './components/NewAlias';
@@ -27,7 +34,7 @@ import { PresentingChrome } from './components/PresentingChrome';
 import { PersistenceControl, PersistenceNotice } from './components/PersistenceControl';
 import { SelectedCanvasRenderer, SpaceSidebar } from './components/SpaceSidebar';
 
-export const createApp = ({ spaceSession }: OpenedSpace) => {
+export const createApp = ({ spaceSession }: OpenedSpace, selection?: CanvasRendererId) => {
   // What an opened Space is composed of, stated once (`compose-app.ts`): one
   // working-space reader every collaborator shares, one renderer resolver, and
   // the order the six of them have to be built in.
@@ -39,7 +46,7 @@ export const createApp = ({ spaceSession }: OpenedSpace) => {
     authoring,
     adapter: useRenderAdapter,
     edgeAuthoring,
-  } = composeApp({ spaceSession });
+  } = composeApp({ spaceSession, selection });
 
   function App() {
     const authoringState = useSyncExternalStore(authoring.subscribe, authoring.getState);
@@ -184,7 +191,7 @@ export const createApp = ({ spaceSession }: OpenedSpace) => {
     // the rendered one matters because Navigation resolves against the live one
     // too: deciding from a snapshot Navigation will not consult is one decision
     // with two sources of truth.
-    const selectCanvasRenderer = useCallback((selection: CanvasRendererId) => {
+    const installCanvasRenderer = useCallback((selection: CanvasRendererId) => {
       const resolved = resolveRenderer(currentSpace(), selection);
       const changesRenderer = navigation.getState().selectedRenderer !== selection;
       navigation.selectRenderer(selection);
@@ -196,6 +203,31 @@ export const createApp = ({ spaceSession }: OpenedSpace) => {
       if (!changesRenderer) return;
       useRenderAdapter.getState().selectRenderer(openingPlacement(resolved));
     }, []);
+
+    const selectCanvasRenderer = useCallback(
+      (selection: CanvasRendererId) => {
+        if (navigation.getState().selectedRenderer === selection) return;
+        installCanvasRenderer(selection);
+        window.history.pushState(null, '', spaceViewDestinationPath(currentSpace().id, selection));
+      },
+      [installCanvasRenderer],
+    );
+
+    useEffect(() => {
+      const restoreDestination = () => {
+        const space = currentSpace();
+        const parsed = parseSpaceViewDestination(window.location.pathname);
+        if (parsed.kind === 'parsed' && parsed.spaceId === space.id) {
+          installCanvasRenderer(parsed.spaceViewId);
+          return;
+        }
+        if (window.location.pathname === `/spaces/${encodeCompactUuid(space.id)}`) {
+          installCanvasRenderer(defaultRenderer(space));
+        }
+      };
+      window.addEventListener('popstate', restoreDestination);
+      return () => window.removeEventListener('popstate', restoreDestination);
+    }, [installCanvasRenderer]);
 
     // Leaving while persistence is not settled asks first. The handler is absent
     // in the normal durable state, preserving the browser's back/forward cache.

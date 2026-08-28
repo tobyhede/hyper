@@ -4,7 +4,7 @@
 
 **Blocked by:** None — can start immediately.
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [ ] Renaming a Computed View leaves its authored selections and public identity unchanged.
 - [ ] A Space rejects or reports a Layout whose Id collides with an available Computed View.
