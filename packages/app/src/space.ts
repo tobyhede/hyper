@@ -1,11 +1,6 @@
-import { HttpSpaceBackend } from '@project/http';
+import { HttpSpaceBackend, resolveProductDestination } from '@project/http';
 import type { SpaceBackend } from '@project/persistence';
-import { openStoredSpace } from './open-space';
-import {
-  decodeCompactUuid,
-  parseSpaceViewDestination,
-  resolveSpaceViewDestination,
-} from '@project/core';
+import { openLoadedSpace } from './open-space';
 import type { OpenedApplicationStartup } from './startup';
 
 export type { OpenedSpace } from './open-space';
@@ -19,19 +14,15 @@ export const createSpaceStartup = (
   backend: SpaceBackend = new HttpSpaceBackend(),
 ): SpaceStartup => ({
   resolve: async (pathname) => {
-    const view = parseSpaceViewDestination(pathname);
-    const compactId =
-      /^\/spaces\/([^/]+)$/.exec(pathname)?.[1] ??
-      (pathname.startsWith('/') ? undefined : pathname);
-    const id = view.kind === 'parsed' ? view.spaceId : decodeCompactUuid(compactId ?? '');
-    if (id === undefined) throw new Error('The Space URL contains an invalid id.');
-    const opened = await openStoredSpace(backend, id);
-    if (view.kind === 'malformed') return { kind: 'opened', opened };
-    const resolution = resolveSpaceViewDestination(
-      opened.spaceSession.getState().working,
-      pathname,
-    );
-    if (resolution.kind !== 'resolved') throw new Error('The Space View URL does not resolve.');
-    return { kind: 'opened', opened, selection: resolution.spaceViewId };
+    const resolution = await resolveProductDestination(backend, pathname);
+    if (resolution.kind === 'outside') {
+      throw new Error('The URL is outside product addressing.');
+    }
+    if (resolution.kind === 'malformed') throw new Error('The product URL is malformed.');
+    if (resolution.kind === 'unresolved') throw new Error('The product URL does not resolve.');
+    const opened = openLoadedSpace(backend, resolution.loaded);
+    return resolution.destination.kind === 'space'
+      ? { kind: 'opened', opened }
+      : { kind: 'opened', opened, selection: resolution.destination.spaceViewId };
   },
 });

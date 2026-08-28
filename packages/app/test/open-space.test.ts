@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { uuidSchema, type SpaceSnapshot } from '@project/core';
 import { MemorySpaceBackend } from '@project/persistence';
-import { openImportedSpace, openStoredSpace } from '../src/open-space';
+import { openImportedSpace, openLoadedSpace, openStoredSpace } from '../src/open-space';
 
 const SPACE_ID = '00000000-0000-4000-8000-000000000001';
 const CARD_ID = '00000000-0000-4000-8000-000000000002';
@@ -35,6 +35,22 @@ kind: markdown
 ];
 
 describe('openStoredSpace', () => {
+  it('composes an already-loaded Space without looking it up again', () => {
+    const loaded = {
+      snapshot: storedSnapshot,
+      revision: 3n,
+      exportedRevision: 2n,
+    };
+    const backend = new MemorySpaceBackend([loaded]);
+    const loadSpace = vi.spyOn(backend, 'loadSpace');
+
+    const opened = openLoadedSpace(backend, loaded);
+
+    expect(opened.space.id).toBe(storedSnapshot.id);
+    expect(opened.spaceSession.getState().acknowledgedRevision).toBe(3n);
+    expect(loadSpace).not.toHaveBeenCalled();
+  });
+
   it('opens the requested stored space with its acknowledged revision', async () => {
     const revision = BigInt(Number.MAX_SAFE_INTEGER) + 17n;
     const backend = new MemorySpaceBackend([

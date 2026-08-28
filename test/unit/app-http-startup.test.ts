@@ -1,5 +1,6 @@
-import { encodeCompactUuid, uuidSchema, type SpaceSnapshot } from '@project/core';
-import { createSpaceHttpApp, HttpSpaceBackend } from '@project/http';
+import { FLOW_SPACE_VIEW_ID, uuidSchema, type SpaceSnapshot } from '@project/core';
+import { createSpaceHttpApp, HttpSpaceBackend, productDestinationPath } from '@project/http';
+import { MemorySpaceBackend } from '@project/persistence';
 import { describe, expect, it } from 'vitest';
 import { E2eMemorySpaceRepository } from '../support/e2e-memory-space-repository';
 import { createSpaceStartup } from '../../packages/app/src/space';
@@ -31,7 +32,9 @@ describe('HTTP space startup composition', () => {
   it('opens the Space named by the compact product-route id through HTTP', async () => {
     const startup = startupFor(snapshot());
 
-    const result = await startup.resolve(encodeCompactUuid(SPACE_ID));
+    const result = await startup.resolve(
+      productDestinationPath({ kind: 'space', spaceId: SPACE_ID }),
+    );
 
     expect(result.kind).toBe('opened');
     expect(result.opened.space.id).toBe(SPACE_ID);
@@ -41,13 +44,17 @@ describe('HTTP space startup composition', () => {
   it('fails when the product-route id no longer resolves', async () => {
     const startup = startupFor();
 
-    await expect(startup.resolve(encodeCompactUuid(SPACE_ID))).rejects.toThrow(SPACE_ID);
+    await expect(
+      startup.resolve(productDestinationPath({ kind: 'space', spaceId: SPACE_ID })),
+    ).rejects.toThrow('The product URL does not resolve.');
   });
 
   it('opens the exact named Space when several are stored', async () => {
     const startup = startupFor(snapshot(), snapshot(OTHER_SPACE_ID, OTHER_CARD_ID, 'Other space'));
 
-    const result = await startup.resolve(encodeCompactUuid(OTHER_SPACE_ID));
+    const result = await startup.resolve(
+      productDestinationPath({ kind: 'space', spaceId: OTHER_SPACE_ID }),
+    );
 
     expect(result.opened.space.id).toBe(OTHER_SPACE_ID);
   });
@@ -55,8 +62,28 @@ describe('HTTP space startup composition', () => {
   it('rejects a malformed compact product-route id', async () => {
     const startup = startupFor(snapshot());
 
-    await expect(startup.resolve('not-a-compact-uuid')).rejects.toThrow(
-      'The Space URL contains an invalid id.',
+    await expect(startup.resolve('/spaces/not-a-compact-uuid')).rejects.toThrow(
+      'The product URL is malformed.',
     );
+  });
+
+  it('opens a resolved Space View from one backend load', async () => {
+    const loaded = { snapshot: snapshot(), revision: 0n, exportedRevision: null };
+    const backend = new MemorySpaceBackend([loaded]);
+    const loadSpace = vi.spyOn(backend, 'loadSpace');
+    const startup = createSpaceStartup(backend);
+
+    const result = await startup.resolve(
+      productDestinationPath({
+        kind: 'space-view',
+        spaceId: SPACE_ID,
+        spaceViewId: FLOW_SPACE_VIEW_ID,
+      }),
+    );
+
+    expect(result.selection).toBe(FLOW_SPACE_VIEW_ID);
+    expect(result.opened.space.id).toBe(SPACE_ID);
+    expect(loadSpace).toHaveBeenCalledOnce();
+    expect(loadSpace).toHaveBeenCalledWith(SPACE_ID);
   });
 });
