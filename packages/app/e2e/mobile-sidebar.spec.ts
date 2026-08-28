@@ -70,6 +70,23 @@ test('choosing a canvas or a Graph closes the mobile sidebar', async ({ page }) 
   await expect(sheet(page)).toHaveCount(0);
 });
 
+test('Card and Graph copy commands close the mobile sidebar', async ({ page }) => {
+  await page.goto('/');
+  await expect(nodeByTitle(page, 'A').first()).toBeVisible();
+  await nodeByTitle(page, 'A').first().click();
+
+  for (const name of [
+    'Copy link to A',
+    'Copy link in this Space View',
+    'Copy link to Long',
+    'Copy link to Long in this Space View',
+  ]) {
+    await openMobileSidebar(page);
+    await page.getByRole('button', { name, exact: true }).click();
+    await expect(sheet(page)).toHaveCount(0);
+  }
+});
+
 test('Present from the mobile sidebar leaves the presentation reachable', async ({ page }) => {
   await page.goto('/');
   await expect(nodeByTitle(page, 'A').first()).toBeVisible();

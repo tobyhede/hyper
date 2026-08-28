@@ -71,7 +71,7 @@ export const createApp = ({ spaceSession }: OpenedSpace, opening?: DestinationOp
      */
     const [creatingAlias, setCreatingAlias] = useState(false);
     const [addressedCardId, setAddressedCardId] = useState<CardId | null>(opening?.cardId ?? null);
-    // Keyed on the renderer as well as the Card: `installCanvasRenderer` clears
+    // Keyed on the renderer as well as the Card: `installDestinationOpening` clears
     // the published selection, and moving between two Space Views that address
     // the *same* Card leaves `addressedCardId` untouched, so keying on the Card
     // alone would let React bail out and never restore it. Clearing on `null` is
@@ -256,10 +256,15 @@ export const createApp = ({ spaceSession }: OpenedSpace, opening?: DestinationOp
     // the rendered one matters because Navigation resolves against the live one
     // too: deciding from a snapshot Navigation will not consult is one decision
     // with two sources of truth.
-    const installCanvasRenderer = useCallback((selection: CanvasRendererId) => {
-      const resolved = resolveRenderer(currentSpace(), selection);
-      const changesRenderer = navigation.getState().selectedRenderer !== selection;
-      navigation.selectRenderer(selection);
+    const installDestinationOpening = useCallback((opening: DestinationOpening) => {
+      const resolved = resolveRenderer(currentSpace(), opening.selection);
+      const changesRenderer = navigation.getState().selectedRenderer !== opening.selection;
+      if (opening.graphId === null) navigation.selectRenderer(opening.selection);
+      else if (opening.presentationCardId === null) {
+        navigation.openGraph(opening.selection, opening.graphId);
+      } else {
+        navigation.openPresentation(opening.selection, opening.graphId, opening.presentationCardId);
+      }
       // A current row can be chosen again after reload. Its UUID is already the
       // Navigation value, so no renderer dependency will change and no placement
       // effect will rerun; clearing the published projection here would strand
@@ -285,7 +290,12 @@ export const createApp = ({ spaceSession }: OpenedSpace, opening?: DestinationOp
       (selection: CanvasRendererId) => {
         const moves = navigation.getState().selectedRenderer !== selection;
         setAddressedCardId(null);
-        installCanvasRenderer(selection);
+        installDestinationOpening({
+          selection,
+          graphId: null,
+          presentationCardId: null,
+          cardId: null,
+        });
         const destination: ProductDestination = {
           kind: 'space-view',
           spaceId: currentSpace().id,
@@ -293,26 +303,7 @@ export const createApp = ({ spaceSession }: OpenedSpace, opening?: DestinationOp
         };
         syncDestination(moves ? 'push' : 'replace', destination);
       },
-      [installCanvasRenderer, syncDestination],
-    );
-
-    const installGraphRenderer = useCallback((selection: CanvasRendererId, graphId: GraphId) => {
-      const resolved = resolveRenderer(currentSpace(), selection);
-      const changesRenderer = navigation.getState().selectedRenderer !== selection;
-      navigation.openGraph(selection, graphId);
-      if (!changesRenderer) return;
-      useRenderAdapter.getState().selectRenderer(openingPlacement(resolved));
-    }, []);
-
-    const installPresentationRenderer = useCallback(
-      (selection: CanvasRendererId, graphId: GraphId, cardId: CardId) => {
-        const resolved = resolveRenderer(currentSpace(), selection);
-        const changesRenderer = navigation.getState().selectedRenderer !== selection;
-        navigation.openPresentation(selection, graphId, cardId);
-        if (!changesRenderer) return;
-        useRenderAdapter.getState().selectRenderer(openingPlacement(resolved));
-      },
-      [],
+      [installDestinationOpening, syncDestination],
     );
 
     const pushPresentationCard = useCallback(
@@ -410,21 +401,12 @@ export const createApp = ({ spaceSession }: OpenedSpace, opening?: DestinationOp
         }
         setDestinationNotFound(false);
         const { opening } = restoration;
-        if (opening.graphId === null) installCanvasRenderer(opening.selection);
-        else if (opening.presentationCardId === null) {
-          installGraphRenderer(opening.selection, opening.graphId);
-        } else {
-          installPresentationRenderer(
-            opening.selection,
-            opening.graphId,
-            opening.presentationCardId,
-          );
-        }
+        installDestinationOpening(opening);
         setAddressedCardId(opening.cardId);
       };
       window.addEventListener('popstate', restoreDestination);
       return () => window.removeEventListener('popstate', restoreDestination);
-    }, [installCanvasRenderer, installGraphRenderer, installPresentationRenderer]);
+    }, [installDestinationOpening]);
 
     // Leaving while persistence is not settled asks first. The handler is absent
     // in the normal durable state, preserving the browser's back/forward cache.

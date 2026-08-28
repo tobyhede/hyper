@@ -371,7 +371,7 @@ export function SpaceSidebar({
                   variant="secondary"
                   size="toolbar"
                   className="w-full justify-start"
-                  onClick={() => graph.links?.onCopyCanonical(activeGraph.id)}
+                  onClick={onCanvas(() => graph.links?.onCopyCanonical(activeGraph.id))}
                 >
                   Copy link to {activeGraph.title}
                 </Button>
@@ -379,7 +379,7 @@ export function SpaceSidebar({
                   variant="secondary"
                   size="toolbar"
                   className="w-full justify-start"
-                  onClick={() => graph.links?.onCopyContextual(activeGraph.id)}
+                  onClick={onCanvas(() => graph.links?.onCopyContextual(activeGraph.id))}
                 >
                   Copy link to {activeGraph.title} in this Space View
                 </Button>
@@ -392,11 +392,19 @@ export function SpaceSidebar({
       <SidebarFooter className="nokey">
         {cardLinks !== undefined && (
           <div className="grid gap-1">
-            <Button variant="secondary" size="toolbar" onClick={cardLinks.onCopyCanonical}>
+            <Button
+              variant="secondary"
+              size="toolbar"
+              onClick={onCanvas(cardLinks.onCopyCanonical)}
+            >
               Copy link to {cardLinks.title}
             </Button>
             {cardLinks.onCopyContextual !== undefined && (
-              <Button variant="secondary" size="toolbar" onClick={cardLinks.onCopyContextual}>
+              <Button
+                variant="secondary"
+                size="toolbar"
+                onClick={onCanvas(cardLinks.onCopyContextual)}
+              >
                 Copy link in this Space View
               </Button>
             )}

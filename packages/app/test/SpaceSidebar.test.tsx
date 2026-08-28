@@ -433,6 +433,75 @@ describe('SpaceSidebar', () => {
       await dismissed();
     });
 
+    it.each([
+      {
+        name: 'the canonical Card link is copied',
+        button: 'Copy link to Start here',
+        callback: 'canonical' as const,
+      },
+      {
+        name: 'the contextual Card link is copied',
+        button: 'Copy link in this Space View',
+        callback: 'contextual' as const,
+      },
+    ])('dismisses itself when $name', async ({ button, callback }) => {
+      const onCopyCanonical = vi.fn();
+      const onCopyContextual = vi.fn();
+      const props: SpaceSidebarProps = {
+        ...settledProps(),
+        cardLinks: {
+          title: 'Start here',
+          onCopyCanonical,
+          onCopyContextual,
+        },
+      };
+      openSheet(props);
+
+      fireEvent.click(screen.getByRole('button', { name: button }));
+
+      const expected = callback === 'canonical' ? onCopyCanonical : onCopyContextual;
+      const other = callback === 'canonical' ? onCopyContextual : onCopyCanonical;
+      expect(expected).toHaveBeenCalledOnce();
+      expect(other).not.toHaveBeenCalled();
+      await dismissed();
+    });
+
+    it.each([
+      {
+        name: 'the canonical Graph link is copied',
+        button: 'Copy link to Graph 1',
+        callback: 'canonical' as const,
+      },
+      {
+        name: 'the contextual Graph link is copied',
+        button: 'Copy link to Graph 1 in this Space View',
+        callback: 'contextual' as const,
+      },
+    ])('dismisses itself when $name', async ({ button, callback }) => {
+      const onCopyCanonical = vi.fn();
+      const onCopyContextual = vi.fn();
+      const base = settledProps();
+      const props: SpaceSidebarProps = {
+        ...base,
+        graph: {
+          ...base.graph,
+          graphs: [{ id: GRAPH_ID, title: 'Graph 1', edges: [] }],
+          activeGraphId: GRAPH_ID,
+          links: { onCopyCanonical, onCopyContextual },
+        },
+      };
+      openSheet(props);
+
+      fireEvent.click(screen.getByRole('button', { name: button }));
+
+      const expected = callback === 'canonical' ? onCopyCanonical : onCopyContextual;
+      const other = callback === 'canonical' ? onCopyContextual : onCopyCanonical;
+      expect(expected).toHaveBeenCalledOnce();
+      expect(expected).toHaveBeenCalledWith(GRAPH_ID);
+      expect(other).not.toHaveBeenCalled();
+      await dismissed();
+    });
+
     it('dismisses itself when presenting begins', async () => {
       const base = settledProps();
       const props: SpaceSidebarProps = {
