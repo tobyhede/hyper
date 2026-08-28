@@ -32,6 +32,25 @@ const snapshot = spaceSnapshotSchema.parse({
   cards: [{ id: CARD_ID, document: { title: 'A', kind: 'markdown', body: 'A source' } }],
 });
 
+const snapshotWithoutCard = spaceSnapshotSchema.parse({
+  id: SPACE_ID,
+  document: {
+    version: 1,
+    title: 'Space',
+    layouts: [
+      {
+        id: LAYOUT_ID,
+        title: 'Layout',
+        kind: 'positioned',
+        positions: {},
+        graphs: [{ id: GRAPH_ID, title: 'Graph', edges: [] }],
+      },
+    ],
+    defaultRenderer: LAYOUT_ID,
+  },
+  cards: [],
+});
+
 const node = (
   expanded: boolean,
   cardId = CARD_ID,
@@ -259,6 +278,18 @@ describe('canvas Card authoring', () => {
       expect(missing.data.bodyEditor).toBeUndefined();
     },
   );
+
+  it('withdraws authoring when the working Space changes without a projection render', () => {
+    const { result, spaceSession } = mountAuthoring();
+    expect(onlyNode(result.current.nodes).data.cardEditingEnabled).toBe(true);
+
+    act(() => spaceSession.submit(snapshotWithoutCard));
+
+    const staleProjection = onlyNode(result.current.nodes);
+    expect(staleProjection.data.titleEditingEnabled).toBe(false);
+    expect(staleProjection.data.cardEditingEnabled).toBeUndefined();
+    expect(staleProjection.data.onBeginTitleEditing).toBeUndefined();
+  });
 
   it('forgets an observed body caret when the Card stops being Open', () => {
     const bodyEditingChanged = vi.fn();

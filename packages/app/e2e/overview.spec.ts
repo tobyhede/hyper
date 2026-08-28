@@ -447,6 +447,12 @@ test(
     await expect(page.getByTestId('open-card')).toBeVisible();
     await page.getByRole('button', { name: 'Cancel' }).click();
 
+    // Pointer and keyboard activation are separate production paths. Keep both:
+    // this affordance is the Alias front's explicit Open operation.
+    await openCard(recap, 'A′');
+    await expect(page.getByRole('textbox', { name: 'Title' })).toHaveValue('A′');
+    await page.getByRole('button', { name: 'Cancel' }).click();
+
     // Its own title is still authored, inline on the graph.
     await recap.getByRole('button', { name: 'Edit Title A′', exact: true }).click();
     await expect(page.getByRole('textbox', { name: 'Card title' })).toHaveValue('A′');

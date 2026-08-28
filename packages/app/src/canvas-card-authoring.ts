@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { cardDocumentSchema, uuidSchema, type CardId } from '@project/core';
 import type { SpaceSession } from '@project/persistence';
 import type { CardFlowNode } from '@project/react-flow-adapter';
@@ -158,7 +158,8 @@ export function useCanvasCardAuthoring({
   const beginTitleEditing = useCallback((cardId: string) => {
     setCaret({ cardId, field: 'title' });
   }, []);
-  const working = spaceSession.getState().working;
+  const getWorking = useCallback(() => spaceSession.getState().working, [spaceSession]);
+  const working = useSyncExternalStore(spaceSession.subscribe, getWorking);
   const editableCardIds = useMemo(() => new Set(working.cards.map((card) => card.id)), [working]);
 
   const decoratedNodes = useMemo(
