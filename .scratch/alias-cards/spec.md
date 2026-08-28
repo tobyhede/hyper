@@ -57,3 +57,4 @@ resolved — `04` was added after this line first claimed three.
 - `01-grill-alias-model` — settle the above before writing schema.
 - `02-card-kind-union` — the schema and validation change.
 - `03-render-aliased-cards` — how an alias reads on screen.
+- `05-jump-to-alias-target` — deferred navigation from an Open Alias to its Target, blocked on Card URL addressability.
