@@ -1,5 +1,9 @@
-import { decodeCompactUuid, encodeCompactUuid, resolveSpaceViewDestination } from '@project/core';
-import { createSpaceHttpApp, type SpaceHttpApp } from '@project/http';
+import {
+  createSpaceHttpApp,
+  productDestinationPath,
+  resolveProductDestination,
+  type SpaceHttpApp,
+} from '@project/http';
 import type { SpaceRepository } from '../persistence/space-repository';
 
 export interface ProductResponse {
@@ -26,35 +30,20 @@ export const createSpaceHost = (repository: SpaceRepository): SpaceHostApplicati
       }
       return {
         status: 302,
-        headers: { location: `/spaces/${encodeCompactUuid(entrySpaceId)}` },
+        headers: { location: productDestinationPath({ kind: 'space', spaceId: entrySpaceId }) },
       };
     }
 
-    if (!pathname.startsWith('/spaces')) return undefined;
-    const viewMatch = /^\/spaces\/([^/]+)\/views\/.+$/.exec(pathname);
-    if (viewMatch !== null) {
-      const compactSpaceId = viewMatch[1];
-      if (compactSpaceId === undefined) return problem(400, 'Invalid Space View URL');
-      const spaceId = decodeCompactUuid(compactSpaceId);
-      if (spaceId === undefined) return problem(400, 'Invalid Space id');
-      const loaded = await repository.loadSpace(spaceId);
-      if (loaded === undefined) return problem(404, 'Space not found');
-      const resolution = resolveSpaceViewDestination(loaded.snapshot, pathname);
-      if (resolution.kind === 'malformed') return problem(400, 'Invalid Space View URL');
-      if (resolution.kind === 'unresolved') return problem(404, 'Space View not found');
-      return undefined;
+    const resolution = await resolveProductDestination(repository, pathname);
+    switch (resolution.kind) {
+      case 'outside':
+      case 'resolved':
+        return undefined;
+      case 'malformed':
+        return problem(400, 'Invalid product URL');
+      case 'unresolved':
+        return problem(404, 'Product destination not found');
     }
-
-    const match = /^\/spaces\/([^/]+)$/.exec(pathname);
-    if (match === null) return problem(400, 'Invalid Space URL');
-    const compactId = match[1];
-    if (compactId === undefined) return problem(400, 'Invalid Space URL');
-    const spaceId = decodeCompactUuid(compactId);
-    if (spaceId === undefined) return problem(400, 'Invalid Space id');
-    if ((await repository.loadSpace(spaceId)) === undefined) {
-      return problem(404, 'Space not found');
-    }
-    return undefined;
   };
   return Object.assign(api, { resolveProductRequest });
 };

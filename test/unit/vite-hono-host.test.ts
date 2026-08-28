@@ -219,7 +219,9 @@ describe('Vite Hono host', () => {
 
   it('lets an existing Computed View destination reach the SPA fallback', async () => {
     const stored = { snapshot, revision: 0n, exportedRevision: null };
-    const hostApp = createSpaceHost(new MemorySpaceRepository([stored]));
+    const spaceRepository = new MemorySpaceRepository([stored]);
+    const loadSpace = vi.spyOn(spaceRepository, 'loadSpace');
+    const hostApp = createSpaceHost(spaceRepository);
     const { host } = await startHost(hostApp, (_request, response) => {
       response.end('<main>Computed View</main>');
     });
@@ -230,6 +232,23 @@ describe('Vite Hono host', () => {
 
     expect(response.status).toBe(200);
     await expect(response.text()).resolves.toBe('<main>Computed View</main>');
+    expect(loadSpace).toHaveBeenCalledOnce();
+    expect(loadSpace).toHaveBeenCalledWith(SPACE_ID);
+  });
+
+  it('leaves a path outside product addressing to the SPA fallback without loading', async () => {
+    const spaceRepository = new MemorySpaceRepository();
+    const loadSpace = vi.spyOn(spaceRepository, 'loadSpace');
+    const hostApp = createSpaceHost(spaceRepository);
+    const { host } = await startHost(hostApp, (_request, response) => {
+      response.end('<main>Outside product addressing</main>');
+    });
+
+    const response = await fetch(`${host.url}/index.html`);
+
+    expect(response.status).toBe(200);
+    await expect(response.text()).resolves.toBe('<main>Outside product addressing</main>');
+    expect(loadSpace).not.toHaveBeenCalled();
   });
 
   it('resolves HEAD like GET while sending no product response body', async () => {
