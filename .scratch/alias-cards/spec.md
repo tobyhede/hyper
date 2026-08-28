@@ -2,6 +2,20 @@
 
 Source: grilling during the retire-Node change, 2026-07-19. Committed to as "Node first, Alias next."
 
+## Current direction — ADR 0070
+
+The original Alias schema and single-hop resolution remain. ADR 0070 supersedes the later metadata-pane and retargeting design:
+
+- An Alias chooses its immutable Target when created; changing the Target means creating a new Alias and deleting the old one.
+- An Alias remains independently authorable as a Card and through its Layouts and Graphs: Title, placement, Edges, Open/Closed state and Open Size all remain authorable.
+- Opening an Alias is the normal Layout-owned Open operation and renders the Target Card's content read-only under the Alias Title.
+- A Markdown Target supplies rendered Markdown without source authoring.
+- A Space Card Target supplies its selected Space View and Graph without controls that change either selection.
+- Target content and content configuration are authored only by opening the Target Card itself.
+- Jump to Target and a possible Edit Target shortcut are deferred under issue 05 until ADR 0069's durable Card URLs are implemented.
+
+Issue 06 implements the new behavior. The completed issues below record how the original Alias model entered the codebase; their metadata-pane assumptions are historical where ADR 0070 now differs.
+
 ## Problem
 
 Retiring the authored Node (commit `c2abb74`, ADR 0004) removed the one way an author could place the same card at two graph positions. **Alias** is what fills that gap, and it does not exist yet — so today the authored graph cannot reuse a card at all. ADR 0004 records that as deliberate and temporary; this feature closes it.
@@ -58,3 +72,4 @@ resolved — `04` was added after this line first claimed three.
 - `02-card-kind-union` — the schema and validation change.
 - `03-render-aliased-cards` — how an alias reads on screen.
 - `05-jump-to-alias-target` — deferred navigation from an Open Alias to its Target, blocked on Card URL addressability.
+- `06-open-alias-shows-target-content-read-only` — implement ADR 0070 and remove existing-Alias retargeting.

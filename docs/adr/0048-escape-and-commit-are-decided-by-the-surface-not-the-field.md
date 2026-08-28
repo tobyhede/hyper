@@ -2,7 +2,7 @@
 
 Status: accepted
 Refines: 0037, 0046
-Refined by: 0049, 0051, 0064
+Refined by: 0049, 0051, 0064, 0070
 Related: 0036, 0039, 0042, 0047
 
 Two surfaces author a Card, and each gets one rule for when a field commits and one for what Escape means. Neither rule belongs to the field.

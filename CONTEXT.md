@@ -35,9 +35,9 @@ A card of kind **space**: a reference to another Space, shown through the target
 _Avoid_: subspace, portal, link, nested space (as a second name for the same thing — it is a Space, full stop).
 
 **Alias**:
-A card that shows another card's **content**: the same content appearing again elsewhere in the space, with a single source of truth, so editing the target changes every place it appears. An alias carries its own title — only content is shared. An alias may target any non-alias card kind, including a Markdown card or a space card, but never another alias: aliasing is a single hop, so an alias never points at itself and alias chains cannot form.
+A card that shows another card's **content** read-only: the same content appearing again elsewhere in the space, with a single source of truth, so editing the Target changes every place it appears. An Alias carries its own Title and chooses its immutable Target when created; it may target any non-Alias card kind, including a Markdown Card or a Space Card, but never itself or another Alias.
 
-Authoring an alias changes its title or which Card it targets, and it is renamed where it is drawn. Opening an alias exposes only that metadata. It does not author the target's content; the target Card must be opened explicitly to edit that content at its single source of truth, so every alias then shows the change.
+An Alias is authorable as a Card and through the Layouts and Graphs that contain it: it may be renamed, moved, connected, Opened, Closed and Resized. An Open Alias renders its Target's content without authoring it: rendered Markdown for a Markdown Target, or the selected Space View and Graph for a Space Card Target; the Target Card must be opened explicitly to author that content or configuration.
 _Avoid_: reference, link (an alias shows content, it does not merely jump), copy, transclusion, mirror.
 
 ## Graphs
@@ -141,12 +141,12 @@ Projecting a space into the repository-friendly form an author can review, commi
 _Avoid_: saving, publishing, syncing.
 
 **Opening**:
-Bringing a single card's content up **on the Card itself**, by growing it where it already sits. A Markdown Card opens on its Title and rendered Markdown; putting a caret in its source is a separate Edit. An Alias edits the two things it owns, its own Title and Target, and nothing of the Card that Target names — that Card is opened explicitly to author its content, at the single source of truth every Alias then shows; and a Space Card opens on its nested Graph to explore. Opening is not presenting — the canvas it happens on is still the thing being worked in — and an open Markdown Card reads through the same renderer used while presenting.
+Bringing a single card's content up **on the Card itself**, by growing it where it already sits. A Markdown Card opens on its Title and rendered Markdown; putting a caret in its source is a separate Edit. An Alias opens on its own Title and its immutable Target's content read-only. A Space Card opens on its nested Graph to explore. Opening is not presenting — the canvas it happens on is still the thing being worked in — and Open Markdown content reads through the same renderer used while presenting.
 
 A Card is **Open** or **Closed**, and that state is a property of the **Layout**, not of the Card and not of the viewer: opening a Card is an Edit, it survives a reload, and any number of a Layout's Cards may be Open at once. Every Closed Card has the fixed Card size. Every Open Card has an **Open Size**: the concrete dimensions authored when it first Opens and changed by Resize. Close preserves the Open Size, so reopening returns to it. Resizing is a Card capability, not behavior supplied by a Card kind; a kind decides what its Open Card contains.
 
 Putting a caret in one of an Open Card's fields is a separate gesture from Opening. The surface may keep transient caret and content-edit state locally while that interaction is live; only the authored Space must not persist which field is being typed into, exactly as it does not persist which title field is currently being renamed on the graph.
-_Avoid_: Expanded and expansion as state beside Open and Opening, preview, popup, modal, dialog, drill-down, view mode and edit mode for content Opening (which has one surface, the Card). An Alias's metadata-authoring dialog is the explicit exception: the dialog is not content Opening and does not make the Alias Open.
+_Avoid_: Expanded and expansion as state beside Open and Opening, preview, popup, modal, dialog, drill-down, view mode and edit mode for content Opening (which has one surface, the Card).
 
 **Presenting**:
 Traversing a Graph through a Space View for an audience, drawn close enough that one Card fills the screen. At the Active Card, the presenter follows one of the Active Graph's outgoing Edges, including the applicable cross-Space Edges carried through Space Cards. A Graph that is a line traverses as a line; a Graph that forks offers a choice. There is no separate artefact and no second surface — a presentation is not a thing a Graph is turned into, it is a way of moving through one.

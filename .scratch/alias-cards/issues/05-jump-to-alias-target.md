@@ -16,7 +16,7 @@ Neither belongs in the initial read-only Open Alias work. Both require a settled
 
 ## Blocked by
 
-Card URL addressability, including the address of a Card within a Space and the behavior when the addressed Card is outside the current Layout or otherwise unavailable on the current canvas.
+Implementation of ADR 0069's Card URL addressability, including the behavior when the addressed Card is outside the current Layout or otherwise unavailable on the current canvas.
 
 ## Questions to settle
 
@@ -37,4 +37,3 @@ Card URL addressability, including the address of a Card within a Space and the 
 - [ ] The Alias remains read-only: Jump does not retarget it or author Target content in place.
 - [ ] If **Edit Target** is retained, it reuses the Target Card's ordinary authoring interaction after navigation rather than introducing an Alias-specific editor.
 - [ ] Keyboard names, focus continuation and unavailable-Target behavior are covered by browser tests.
-

@@ -2,6 +2,7 @@
 
 Status: accepted
 Refines: 0006, 0020, 0037, 0039, 0046, 0048, 0049
+Refined by: 0070
 
 A Card has one shared authored field beyond its identity and kind: its **Title**.
 Everything else belongs to the Card kind, including its additional fields, its
