@@ -220,4 +220,26 @@ describe('product destinations', () => {
       ),
     ).rejects.toThrow(/collision/);
   });
+
+  it('throws for a canonical Space when a Computed View and Layout collide', async () => {
+    const collision: LoadedSpace = {
+      ...loaded,
+      snapshot: {
+        ...loaded.snapshot,
+        document: {
+          ...loaded.snapshot.document,
+          layouts: loaded.snapshot.document.layouts?.map((layout) => ({
+            ...layout,
+            id: FLOW_SPACE_VIEW_ID,
+          })),
+        },
+      },
+    };
+    const path = `/spaces/${encodeCompactUuid(SPACE_ID)}`;
+
+    expect(() => resolveProductDestinationInSnapshot(collision.snapshot, path)).toThrow(
+      /collision/,
+    );
+    await expect(resolveProductDestination(loader(collision), path)).rejects.toThrow(/collision/);
+  });
 });

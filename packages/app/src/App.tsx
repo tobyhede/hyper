@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { ReactFlowProvider } from '@xyflow/react';
-import { AppShell } from '@project/ui';
+import { Alert, AlertDescription, AlertIcon, AlertTitle, AppShell } from '@project/ui';
 import { type Card, type CardId, type LayoutPosition } from '@project/core';
 import { productDestinationPath, resolveProductDestinationInSnapshot } from '@project/http';
 import { graphCardIds } from '@project/graph';
@@ -78,6 +78,7 @@ export const createApp = (
      */
     const [editingCardBody, setEditingCardBody] = useState(false);
     const [aliasRefusal, setAliasRefusal] = useState<AuthoringRefusal | null>(null);
+    const [clipboardFailure, setClipboardFailure] = useState<string | null>(null);
     /** The Card a completed creation asks the canvas to open its name editor on. */
     const [createdCardId, setCreatedCardId] = useState<CardId | null>(null);
     const rendererSpace = useMemo(
@@ -573,7 +574,10 @@ export const createApp = (
                     spaceId: rendererSpace.id,
                     cardId: selectedCard.id,
                   });
-                  void navigator.clipboard.writeText(new URL(path, window.location.href).href);
+                  setClipboardFailure(null);
+                  void navigator.clipboard
+                    .writeText(new URL(path, window.location.href).href)
+                    .catch(() => setClipboardFailure('The browser refused clipboard access.'));
                 },
                 onCopyContextual: () => {
                   const path = productDestinationPath({
@@ -582,7 +586,10 @@ export const createApp = (
                     spaceViewId: selectedRenderer,
                     cardId: selectedCard.id,
                   });
-                  void navigator.clipboard.writeText(new URL(path, window.location.href).href);
+                  setClipboardFailure(null);
+                  void navigator.clipboard
+                    .writeText(new URL(path, window.location.href).href)
+                    .catch(() => setClipboardFailure('The browser refused clipboard access.'));
                 },
               }
         }
@@ -594,10 +601,19 @@ export const createApp = (
         sidebar={sidebar}
         header={<SelectedCanvasRenderer renderer={current} />}
         notice={
-          <PersistenceNotice
-            persistence={sessionState.persistence}
-            onRetry={authoring.retryPersistence}
-          />
+          <>
+            {clipboardFailure === null ? null : (
+              <Alert variant="destructive">
+                <AlertIcon />
+                <AlertTitle>Link not copied</AlertTitle>
+                <AlertDescription>{clipboardFailure}</AlertDescription>
+              </Alert>
+            )}
+            <PersistenceNotice
+              persistence={sessionState.persistence}
+              onRetry={authoring.retryPersistence}
+            />
+          </>
         }
       >
         <div className="graph-area" style={cardSizeVars}>

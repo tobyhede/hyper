@@ -74,16 +74,18 @@ const destinationInSnapshot = (
   destination: ProductDestination,
 ): ProductDestinationSnapshotResolution => {
   if (destination.spaceId !== snapshot.id) return { kind: 'unresolved' };
+  const collision = snapshot.document.layouts?.find(({ id }) => isComputedViewId(id));
+  if (collision !== undefined) {
+    throw new Error(`Space View identity collision for ${collision.id}`);
+  }
   if (destination.kind === 'card' || destination.kind === 'space-view-card') {
     if (!snapshot.cards.some(({ id }) => id === destination.cardId)) return { kind: 'unresolved' };
   }
   if (destination.kind === 'space-view' || destination.kind === 'space-view-card') {
     const layout = snapshot.document.layouts?.find(({ id }) => id === destination.spaceViewId);
-    const computed = isComputedViewId(destination.spaceViewId);
-    if (layout !== undefined && computed) {
-      throw new Error(`Space View identity collision for ${destination.spaceViewId}`);
+    if (layout === undefined && !isComputedViewId(destination.spaceViewId)) {
+      return { kind: 'unresolved' };
     }
-    if (layout === undefined && !computed) return { kind: 'unresolved' };
     if (
       destination.kind === 'space-view-card' &&
       layout !== undefined &&
