@@ -366,6 +366,25 @@ it('activating a Graph ends the current Traversal history without changing the S
   expect(space.defaultRenderer).toBeUndefined();
 });
 
+it('opens a Graph destination in its named renderer with one navigation publication', () => {
+  const space = fixture();
+  const navigation = navigationFor(() => space, FLOW_SPACE_VIEW_ID);
+  navigation.openCard(CARD_A);
+  const observed: NavigationState[] = [];
+  navigation.subscribe(() => observed.push(navigation.getState()));
+
+  navigation.openGraph(LAYOUT, GRAPH_TWO);
+
+  expect(observed).toHaveLength(1);
+  expect(navigation.getState()).toEqual({
+    selectedRenderer: LAYOUT,
+    activeGraphId: GRAPH_TWO,
+    openedCardId: null,
+    mode: 'overview',
+  });
+  expect(space.defaultRenderer).toBeUndefined();
+});
+
 it('refuses to activate a Graph the current Space does not hold', () => {
   const space = fixture();
   const navigation = navigationFor(() => space, FLOW_SPACE_VIEW_ID);

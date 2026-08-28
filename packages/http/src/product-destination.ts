@@ -3,6 +3,7 @@ import {
   encodeCompactUuid,
   isComputedViewId,
   type CardId,
+  type GraphId,
   type SpaceSnapshot,
   type UUID,
 } from '@project/core';
@@ -12,11 +13,18 @@ export type ProductDestination =
   | { readonly kind: 'space'; readonly spaceId: UUID }
   | { readonly kind: 'space-view'; readonly spaceId: UUID; readonly spaceViewId: UUID }
   | { readonly kind: 'card'; readonly spaceId: UUID; readonly cardId: CardId }
+  | { readonly kind: 'graph'; readonly spaceId: UUID; readonly graphId: GraphId }
   | {
       readonly kind: 'space-view-card';
       readonly spaceId: UUID;
       readonly spaceViewId: UUID;
       readonly cardId: CardId;
+    }
+  | {
+      readonly kind: 'space-view-graph';
+      readonly spaceId: UUID;
+      readonly spaceViewId: UUID;
+      readonly graphId: GraphId;
     };
 
 export type ProductDestinationResolution =
@@ -39,10 +47,15 @@ export const productDestinationPath = (destination: ProductDestination): string 
   const space = `/spaces/${encodeCompactUuid(destination.spaceId)}`;
   if (destination.kind === 'space') return space;
   if (destination.kind === 'card') return `${space}/cards/${encodeCompactUuid(destination.cardId)}`;
+  if (destination.kind === 'graph') {
+    return `${space}/graphs/${encodeCompactUuid(destination.graphId)}`;
+  }
   const view = `${space}/views/${encodeCompactUuid(destination.spaceViewId)}`;
   return destination.kind === 'space-view'
     ? view
-    : `${view}/cards/${encodeCompactUuid(destination.cardId)}`;
+    : destination.kind === 'space-view-card'
+      ? `${view}/cards/${encodeCompactUuid(destination.cardId)}`
+      : `${view}/graphs/${encodeCompactUuid(destination.graphId)}`;
 };
 
 type ProductDestinationLoader = Pick<SpaceBackend, 'loadSpace'>;
@@ -58,15 +71,27 @@ const parseProductDestination = (pathname: string): ProductDestination | undefin
     const cardId = decodeCompactUuid(segments[4] ?? '');
     return cardId === undefined ? undefined : { kind: 'card', spaceId, cardId };
   }
+  if (segments[3] === 'graphs' && segments.length === 5) {
+    const graphId = decodeCompactUuid(segments[4] ?? '');
+    return graphId === undefined ? undefined : { kind: 'graph', spaceId, graphId };
+  }
   if (segments[3] !== 'views') return undefined;
   const spaceViewId = decodeCompactUuid(segments[4] ?? '');
   if (spaceViewId === undefined) return undefined;
   if (segments.length === 5) return { kind: 'space-view', spaceId, spaceViewId };
-  if (segments[5] !== 'cards') return undefined;
-  const cardId = decodeCompactUuid(segments[6] ?? '');
-  return cardId === undefined
-    ? undefined
-    : { kind: 'space-view-card', spaceId, spaceViewId, cardId };
+  if (segments[5] === 'cards') {
+    const cardId = decodeCompactUuid(segments[6] ?? '');
+    return cardId === undefined
+      ? undefined
+      : { kind: 'space-view-card', spaceId, spaceViewId, cardId };
+  }
+  if (segments[5] === 'graphs') {
+    const graphId = decodeCompactUuid(segments[6] ?? '');
+    return graphId === undefined
+      ? undefined
+      : { kind: 'space-view-graph', spaceId, spaceViewId, graphId };
+  }
+  return undefined;
 };
 
 const destinationInSnapshot = (
@@ -81,7 +106,23 @@ const destinationInSnapshot = (
   if (destination.kind === 'card' || destination.kind === 'space-view-card') {
     if (!snapshot.cards.some(({ id }) => id === destination.cardId)) return { kind: 'unresolved' };
   }
-  if (destination.kind === 'space-view' || destination.kind === 'space-view-card') {
+  const graphOwner =
+    destination.kind === 'graph' || destination.kind === 'space-view-graph'
+      ? snapshot.document.layouts?.find((layout) =>
+          layout.graphs.some(({ id }) => id === destination.graphId),
+        )
+      : undefined;
+  if (
+    (destination.kind === 'graph' || destination.kind === 'space-view-graph') &&
+    graphOwner === undefined
+  ) {
+    return { kind: 'unresolved' };
+  }
+  if (
+    destination.kind === 'space-view' ||
+    destination.kind === 'space-view-card' ||
+    destination.kind === 'space-view-graph'
+  ) {
     const layout = snapshot.document.layouts?.find(({ id }) => id === destination.spaceViewId);
     if (layout === undefined && !isComputedViewId(destination.spaceViewId)) {
       return { kind: 'unresolved' };
@@ -90,6 +131,13 @@ const destinationInSnapshot = (
       destination.kind === 'space-view-card' &&
       layout !== undefined &&
       layout.positions[destination.cardId] === undefined
+    ) {
+      return { kind: 'unresolved' };
+    }
+    if (
+      destination.kind === 'space-view-graph' &&
+      layout !== undefined &&
+      layout.id !== graphOwner?.id
     ) {
       return { kind: 'unresolved' };
     }

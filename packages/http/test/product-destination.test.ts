@@ -83,6 +83,98 @@ describe('product destinations', () => {
         cardId: CARD_ID,
       },
     });
+    await expect(
+      resolveProductDestination(
+        loader(),
+        `/spaces/${encodeCompactUuid(SPACE_ID)}/views/${encodeCompactUuid(FLOW_SPACE_VIEW_ID)}/graphs/${encodeCompactUuid(GRAPH_ID)}`,
+      ),
+    ).resolves.toMatchObject({
+      kind: 'resolved',
+      destination: { kind: 'space-view-graph', spaceViewId: FLOW_SPACE_VIEW_ID },
+    });
+  });
+
+  it('classifies malformed and missing Graph destinations', async () => {
+    const missing = uuidSchema.parse('00000000-0000-4000-8000-000000000099');
+
+    await expect(
+      resolveProductDestination(
+        loader(),
+        `/spaces/${encodeCompactUuid(SPACE_ID)}/views/${encodeCompactUuid(LAYOUT_ID)}/graphs/not-a-compact-uuid`,
+      ),
+    ).resolves.toEqual({ kind: 'malformed' });
+    await expect(
+      resolveProductDestination(
+        loader(),
+        `/spaces/${encodeCompactUuid(SPACE_ID)}/views/${encodeCompactUuid(LAYOUT_ID)}/not-graphs/${encodeCompactUuid(GRAPH_ID)}`,
+      ),
+    ).resolves.toEqual({ kind: 'malformed' });
+    await expect(
+      resolveProductDestination(
+        loader(),
+        `/spaces/${encodeCompactUuid(SPACE_ID)}/graphs/${encodeCompactUuid(missing)}`,
+      ),
+    ).resolves.toEqual({ kind: 'unresolved' });
+  });
+
+  it('formats and resolves canonical and contextual Graph destinations', async () => {
+    const canonical = `/spaces/${encodeCompactUuid(SPACE_ID)}/graphs/${encodeCompactUuid(GRAPH_ID)}`;
+    const contextual = `/spaces/${encodeCompactUuid(SPACE_ID)}/views/${encodeCompactUuid(LAYOUT_ID)}/graphs/${encodeCompactUuid(GRAPH_ID)}`;
+
+    expect(productDestinationPath({ kind: 'graph', spaceId: SPACE_ID, graphId: GRAPH_ID })).toBe(
+      canonical,
+    );
+    expect(
+      productDestinationPath({
+        kind: 'space-view-graph',
+        spaceId: SPACE_ID,
+        spaceViewId: LAYOUT_ID,
+        graphId: GRAPH_ID,
+      }),
+    ).toBe(contextual);
+    await expect(resolveProductDestination(loader(), canonical)).resolves.toMatchObject({
+      kind: 'resolved',
+      destination: { kind: 'graph', spaceId: SPACE_ID, graphId: GRAPH_ID },
+    });
+    await expect(resolveProductDestination(loader(), contextual)).resolves.toMatchObject({
+      kind: 'resolved',
+      destination: {
+        kind: 'space-view-graph',
+        spaceId: SPACE_ID,
+        spaceViewId: LAYOUT_ID,
+        graphId: GRAPH_ID,
+      },
+    });
+  });
+
+  it('does not resolve a contextual Layout-and-Graph destination when the Layout does not own the Graph', async () => {
+    const otherLayout = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
+    const withOtherLayout: LoadedSpace = {
+      ...loaded,
+      snapshot: {
+        ...loaded.snapshot,
+        document: {
+          ...loaded.snapshot.document,
+          layouts: [
+            ...(loaded.snapshot.document.layouts ?? []),
+            {
+              id: otherLayout,
+              title: 'Other Layout',
+              kind: 'positioned',
+              positions: { [CARD_ID]: { x: 30, y: 40, open: false } },
+              graphs: [],
+            },
+          ],
+        },
+      },
+    };
+
+    await expect(
+      resolveProductDestination(
+        loader(withOtherLayout),
+        `/spaces/${encodeCompactUuid(SPACE_ID)}/views/${encodeCompactUuid(otherLayout)}/graphs/${encodeCompactUuid(GRAPH_ID)}`,
+      ),
+    ).resolves.toEqual({ kind: 'unresolved' });
   });
 
   it('does not resolve a contextual Layout-and-Card destination when the Layout omits the Card', async () => {
@@ -170,16 +262,17 @@ describe('product destinations', () => {
     expect(backend.loadSpace).not.toHaveBeenCalled();
   });
 
-  it.each([
-    '/spaces',
-    '/spaces/not-a-compact-uuid',
-    `/spaces/${encodeCompactUuid(SPACE_ID)}/graphs/${encodeCompactUuid(LAYOUT_ID)}`,
-  ])('classifies the claimed product address %s as malformed', async (path) => {
-    const backend = loader();
+  it.each(['/spaces', '/spaces/not-a-compact-uuid'])(
+    'classifies the claimed product address %s as malformed',
+    async (path) => {
+      const backend = loader();
 
-    await expect(resolveProductDestination(backend, path)).resolves.toEqual({ kind: 'malformed' });
-    expect(backend.loadSpace).not.toHaveBeenCalled();
-  });
+      await expect(resolveProductDestination(backend, path)).resolves.toEqual({
+        kind: 'malformed',
+      });
+      expect(backend.loadSpace).not.toHaveBeenCalled();
+    },
+  );
 
   it('classifies a missing root Space as unresolved', async () => {
     await expect(

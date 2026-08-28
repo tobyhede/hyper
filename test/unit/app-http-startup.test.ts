@@ -9,6 +9,8 @@ const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const OTHER_SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
 const CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 const OTHER_CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
+const LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
+const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000006');
 
 const snapshot = (id = SPACE_ID, cardId = CARD_ID, title = 'Stored space'): SpaceSnapshot => ({
   id,
@@ -85,6 +87,37 @@ describe('HTTP space startup composition', () => {
     expect(result.opened.space.id).toBe(SPACE_ID);
     expect(loadSpace).toHaveBeenCalledOnce();
     expect(loadSpace).toHaveBeenCalledWith(SPACE_ID);
+  });
+
+  it('opens a canonical Graph in its owning Layout as navigation context', async () => {
+    const loaded = {
+      snapshot: {
+        ...snapshot(),
+        document: {
+          version: 1 as const,
+          title: 'Stored space',
+          layouts: [
+            {
+              id: LAYOUT_ID,
+              title: 'Layout',
+              kind: 'positioned' as const,
+              positions: { [CARD_ID]: { x: 0, y: 0, open: false as const } },
+              graphs: [{ id: GRAPH_ID, title: 'Graph', edges: [] }],
+            },
+          ],
+        },
+      },
+      revision: 0n,
+      exportedRevision: null,
+    };
+    const startup = createSpaceStartup(new MemorySpaceBackend([loaded]));
+
+    const result = await startup.resolve(
+      productDestinationPath({ kind: 'graph', spaceId: SPACE_ID, graphId: GRAPH_ID }),
+    );
+
+    expect(result.selection).toBe(LAYOUT_ID);
+    expect(result.graphId).toBe(GRAPH_ID);
   });
 
   it('opens a contextual Card in its named Space View without authoring it open', async () => {

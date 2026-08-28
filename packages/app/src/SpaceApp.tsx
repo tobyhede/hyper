@@ -3,7 +3,7 @@ import { createApp } from './App';
 import { SpaceAppFailureView } from './components/SpaceAppFailureView';
 import type { OpenedSpace } from './space';
 import type { CanvasRendererId } from './renderer';
-import type { CardId } from '@project/core';
+import type { CardId, GraphId } from '@project/core';
 
 export type SpaceAppRenderer = (app: ReactElement) => void;
 
@@ -65,10 +65,11 @@ export function mountSpaceApp(
   render: SpaceAppRenderer,
   selection?: CanvasRendererId,
   cardId?: CardId,
+  graphId?: GraphId,
 ): void {
   let App: ReturnType<typeof createApp>;
   try {
-    App = createApp(opened, selection, cardId);
+    App = createApp(opened, selection, cardId, graphId);
   } catch (error) {
     console.error('Composing the Space app failed', error);
     render(<SpaceAppFailureView message={failureMessage(error)} />);

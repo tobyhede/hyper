@@ -63,6 +63,10 @@ export interface SpaceSidebarProps {
     readonly colorByGraphId: Readonly<Record<string, string>>;
     readonly activeGraphId: string | null;
     readonly onActivate: (graphId: GraphId) => void;
+    readonly links?: {
+      readonly onCopyCanonical: (graphId: GraphId) => void;
+      readonly onCopyContextual: (graphId: GraphId) => void;
+    };
     readonly onPresent: () => void;
     /**
      * Whether presenting may start. False while a content edit is running:
@@ -298,6 +302,26 @@ export function SpaceSidebar({
                   );
                 })}
               </SidebarMenu>
+            )}
+            {graph.links !== undefined && activeGraph !== undefined && (
+              <div className="grid gap-1 pt-1">
+                <Button
+                  variant="secondary"
+                  size="toolbar"
+                  className="w-full justify-start"
+                  onClick={() => graph.links?.onCopyCanonical(activeGraph.id)}
+                >
+                  Copy link to {activeGraph.title}
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="toolbar"
+                  className="w-full justify-start"
+                  onClick={() => graph.links?.onCopyContextual(activeGraph.id)}
+                >
+                  Copy link to {activeGraph.title} in this Space View
+                </Button>
+              </div>
             )}
           </SidebarGroupContent>
         </SidebarGroup>

@@ -1,8 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { ReactFlowProvider } from '@xyflow/react';
 import { Alert, AlertDescription, AlertIcon, AlertTitle, AppShell } from '@project/ui';
-import { type Card, type CardId, type LayoutPosition } from '@project/core';
-import { productDestinationPath, resolveProductDestinationInSnapshot } from '@project/http';
+import { type Card, type CardId, type GraphId, type LayoutPosition } from '@project/core';
+import {
+  productDestinationPath,
+  resolveProductDestinationInSnapshot,
+  type ProductDestination,
+} from '@project/http';
 import { graphCardIds } from '@project/graph';
 import type { OpenedSpace } from './space';
 import { composeApp, openingPlacement } from './compose-app';
@@ -34,6 +38,7 @@ export const createApp = (
   { spaceSession }: OpenedSpace,
   selection?: CanvasRendererId,
   destinationCardId?: CardId,
+  destinationGraphId?: GraphId,
 ) => {
   // What an opened Space is composed of, stated once (`compose-app.ts`): one
   // working-space reader every collaborator shares, one renderer resolver, and
@@ -47,6 +52,9 @@ export const createApp = (
     adapter: useRenderAdapter,
     edgeAuthoring,
   } = composeApp({ spaceSession, selection });
+  if (destinationGraphId !== undefined) {
+    navigation.openGraph(navigation.getState().selectedRenderer, destinationGraphId);
+  }
 
   function App() {
     const authoringState = useSyncExternalStore(authoring.subscribe, authoring.getState);
@@ -79,6 +87,13 @@ export const createApp = (
     const [editingCardBody, setEditingCardBody] = useState(false);
     const [aliasRefusal, setAliasRefusal] = useState<AuthoringRefusal | null>(null);
     const [clipboardFailure, setClipboardFailure] = useState<string | null>(null);
+    const copyProductDestination = useCallback((destination: ProductDestination) => {
+      const path = productDestinationPath(destination);
+      setClipboardFailure(null);
+      void navigator.clipboard
+        .writeText(new URL(path, window.location.href).href)
+        .catch(() => setClipboardFailure('The browser refused clipboard access.'));
+    }, []);
     /** The Card a completed creation asks the canvas to open its name editor on. */
     const [createdCardId, setCreatedCardId] = useState<CardId | null>(null);
     const rendererSpace = useMemo(
@@ -104,7 +119,6 @@ export const createApp = (
 
     const { activeGraphId, openedCardId } = navigationState;
     const editorGraphColor = activeGraphColor(projection.colors, activeGraphId);
-    const activateGraph = navigation.activateGraph;
     const openCard = navigation.openCard;
     const closeCard = navigation.closeCard;
     const presenting = navigationState.mode === 'presenting';
@@ -231,6 +245,33 @@ export const createApp = (
       [installCanvasRenderer],
     );
 
+    const installGraphRenderer = useCallback((selection: CanvasRendererId, graphId: GraphId) => {
+      const resolved = resolveRenderer(currentSpace(), selection);
+      const changesRenderer = navigation.getState().selectedRenderer !== selection;
+      navigation.openGraph(selection, graphId);
+      if (!changesRenderer) return;
+      useRenderAdapter.getState().selectRenderer(openingPlacement(resolved));
+    }, []);
+
+    const activateGraph = useCallback(
+      (graphId: GraphId) => {
+        if (navigation.getState().activeGraphId === graphId) return;
+        setAddressedCardId(null);
+        navigation.activateGraph(graphId);
+        window.history.pushState(
+          null,
+          '',
+          productDestinationPath({
+            kind: 'space-view-graph',
+            spaceId: currentSpace().id,
+            spaceViewId: selectedRenderer,
+            graphId,
+          }),
+        );
+      },
+      [selectedRenderer],
+    );
+
     useEffect(() => {
       const restoreDestination = () => {
         const space = currentSpace();
@@ -240,12 +281,13 @@ export const createApp = (
         );
         if (resolution.kind !== 'resolved') return;
         const opening = destinationOpening(space, resolution.destination);
-        installCanvasRenderer(opening.selection);
+        if (opening.graphId === null) installCanvasRenderer(opening.selection);
+        else installGraphRenderer(opening.selection, opening.graphId);
         setAddressedCardId(opening.cardId);
       };
       window.addEventListener('popstate', restoreDestination);
       return () => window.removeEventListener('popstate', restoreDestination);
-    }, [installCanvasRenderer]);
+    }, [installCanvasRenderer, installGraphRenderer]);
 
     // Leaving while persistence is not settled asks first. The handler is absent
     // in the normal durable state, preserving the browser's back/forward cache.
@@ -532,6 +574,21 @@ export const createApp = (
           activeGraphId,
           colorByGraphId: projection.colors,
           onActivate: activateGraph,
+          links: {
+            onCopyCanonical: (graphId) =>
+              copyProductDestination({
+                kind: 'graph',
+                spaceId: rendererSpace.id,
+                graphId,
+              }),
+            onCopyContextual: (graphId) =>
+              copyProductDestination({
+                kind: 'space-view-graph',
+                spaceId: rendererSpace.id,
+                spaceViewId: selectedRenderer,
+                graphId,
+              }),
+          },
           onPresent: present,
           canPresent: !editingCardBody,
           presenting,
@@ -568,29 +625,19 @@ export const createApp = (
             ? undefined
             : {
                 title: selectedCard.title,
-                onCopyCanonical: () => {
-                  const path = productDestinationPath({
+                onCopyCanonical: () =>
+                  copyProductDestination({
                     kind: 'card',
                     spaceId: rendererSpace.id,
                     cardId: selectedCard.id,
-                  });
-                  setClipboardFailure(null);
-                  void navigator.clipboard
-                    .writeText(new URL(path, window.location.href).href)
-                    .catch(() => setClipboardFailure('The browser refused clipboard access.'));
-                },
-                onCopyContextual: () => {
-                  const path = productDestinationPath({
+                  }),
+                onCopyContextual: () =>
+                  copyProductDestination({
                     kind: 'space-view-card',
                     spaceId: rendererSpace.id,
                     spaceViewId: selectedRenderer,
                     cardId: selectedCard.id,
-                  });
-                  setClipboardFailure(null);
-                  void navigator.clipboard
-                    .writeText(new URL(path, window.location.href).href)
-                    .catch(() => setClipboardFailure('The browser refused clipboard access.'));
-                },
+                  }),
               }
         }
       />

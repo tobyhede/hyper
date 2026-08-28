@@ -9,6 +9,9 @@ import { expect, test } from './fixtures';
 const FIXTURE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000040');
 const MISSING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000041');
 const FIRST_LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000050');
+const LONG_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000023');
+const MID_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000024');
+const ECHO_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000026');
 const CARD_A_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 const CARD_E_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000008');
 
@@ -80,6 +83,16 @@ test('malformed and unresolved Space URLs have real host statuses', async ({ pag
     `/spaces/${encodeCompactUuid(FIXTURE_ID)}/views/${encodeCompactUuid(MISSING_ID)}`,
   );
   expect(unresolvedView?.status()).toBe(404);
+
+  const malformedGraph = await page.goto(
+    `/spaces/${encodeCompactUuid(FIXTURE_ID)}/graphs/not-a-compact-uuid`,
+  );
+  expect(malformedGraph?.status()).toBe(400);
+
+  const unresolvedGraph = await page.goto(
+    `/spaces/${encodeCompactUuid(FIXTURE_ID)}/graphs/${encodeCompactUuid(MISSING_ID)}`,
+  );
+  expect(unresolvedGraph?.status()).toBe(404);
 });
 
 test('canonical and contextual Card links reveal a Closed Card without authoring', async ({
@@ -169,4 +182,90 @@ test('copy commands distinguish canonical Card identity from its current Space V
   await expect
     .poll(() => page.evaluate(() => navigator.clipboard.readText()))
     .toBe(`${new URL(page.url()).origin}${view}/cards/${encodeCompactUuid(CARD_A_ID)}`);
+});
+
+test('canonical and contextual Graph links restore navigation context without authoring', async ({
+  page,
+}) => {
+  const canonical = `/spaces/${encodeCompactUuid(FIXTURE_ID)}/graphs/${encodeCompactUuid(LONG_GRAPH_ID)}`;
+  const contextual = `/spaces/${encodeCompactUuid(FIXTURE_ID)}/views/${encodeCompactUuid(FLOW_SPACE_VIEW_ID)}/graphs/${encodeCompactUuid(ECHO_GRAPH_ID)}`;
+  const before = await page.request
+    .get(`/api/spaces/${FIXTURE_ID}`)
+    .then((response) => response.text());
+
+  expect((await page.goto(canonical))?.status()).toBe(200);
+  await expect(page.getByTestId('selected-canvas')).toContainText('Collection 1');
+  await expect(page.getByRole('button', { name: 'Present Long' })).toBeVisible();
+
+  expect((await page.goto(contextual))?.status()).toBe(200);
+  await expect(page.getByTestId('selected-canvas')).toContainText('Flow');
+  await expect(page.getByRole('button', { name: 'Present Echo' })).toBeVisible();
+  await page.reload();
+  await expect(page.getByRole('button', { name: 'Present Echo' })).toBeVisible();
+  await page.goBack();
+  await expect(page).toHaveURL(canonical);
+  await expect(page.getByRole('button', { name: 'Present Long' })).toBeVisible();
+  await page.goForward();
+  await expect(page).toHaveURL(contextual);
+  await expect(page.getByRole('button', { name: 'Present Echo' })).toBeVisible();
+
+  const after = await page.request
+    .get(`/api/spaces/${FIXTURE_ID}`)
+    .then((response) => response.text());
+  expect(after).toEqual(before);
+});
+
+test('activating a Graph pushes a contextual destination restored by Back and Forward', async ({
+  page,
+}) => {
+  const view = `/spaces/${encodeCompactUuid(FIXTURE_ID)}/views/${encodeCompactUuid(FIRST_LAYOUT_ID)}`;
+  const mid = `${view}/graphs/${encodeCompactUuid(MID_GRAPH_ID)}`;
+  await page.goto(view);
+
+  await page.getByRole('button', { name: 'Mid', exact: true }).click();
+  await expect(page).toHaveURL(mid);
+  await page.goBack();
+  await expect(page).toHaveURL(view);
+  await expect(page.getByRole('button', { name: 'Present Long' })).toBeVisible();
+  await page.goForward();
+  await expect(page).toHaveURL(mid);
+  await expect(page.getByRole('button', { name: 'Present Mid' })).toBeVisible();
+});
+
+test('Graph copy commands distinguish canonical identity from the current Space View', async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, 'clipboard', {
+      value: {
+        writeText: (value: string) => {
+          sessionStorage.setItem('copied-product-url', value);
+          return Promise.resolve();
+        },
+        readText: () => Promise.resolve(sessionStorage.getItem('copied-product-url') ?? ''),
+      },
+    });
+  });
+  const view = `/spaces/${encodeCompactUuid(FIXTURE_ID)}/views/${encodeCompactUuid(FIRST_LAYOUT_ID)}`;
+  await page.goto(view);
+
+  await page.getByRole('button', { name: 'Copy link to Long', exact: true }).click();
+  await expect
+    .poll(() => page.evaluate(() => navigator.clipboard.readText()))
+    .toBe(
+      `${new URL(page.url()).origin}/spaces/${encodeCompactUuid(FIXTURE_ID)}/graphs/${encodeCompactUuid(LONG_GRAPH_ID)}`,
+    );
+
+  await page.getByRole('button', { name: 'Copy link to Long in this Space View' }).click();
+  await expect
+    .poll(() => page.evaluate(() => navigator.clipboard.readText()))
+    .toBe(`${new URL(page.url()).origin}${view}/graphs/${encodeCompactUuid(LONG_GRAPH_ID)}`);
+});
+
+test('an incompatible contextual Layout-and-Graph destination has a real 404', async ({ page }) => {
+  const response = await page.goto(
+    `/spaces/${encodeCompactUuid(FIXTURE_ID)}/views/${encodeCompactUuid(FIRST_LAYOUT_ID)}/graphs/${encodeCompactUuid(ECHO_GRAPH_ID)}`,
+  );
+
+  expect(response?.status()).toBe(404);
 });

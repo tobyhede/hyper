@@ -75,6 +75,8 @@ export interface Navigation {
    * and not something Navigation carries across from the renderer before it.
    */
   readonly continueInRenderer: (selection: CanvasRendererId, activeGraphId: GraphId | null) => void;
+  /** Open an addressed Graph in one compatible renderer without authoring either selection. */
+  readonly openGraph: (selection: CanvasRendererId, graphId: GraphId) => void;
   readonly activateGraph: (graphId: GraphId) => void;
   readonly openCard: (cardId: CardId) => void;
   readonly closeCard: () => void;
@@ -257,6 +259,22 @@ export function createNavigation(
       setState({
         selectedRenderer: selection,
         activeGraphId,
+      });
+    },
+    openGraph: (selection, graphId) => {
+      const space = currentSpace();
+      if (space.lookup.graph(graphId) === undefined) {
+        throw new Error(`The Graph ${graphId} does not exist.`);
+      }
+      const renderer = resolveRenderer(space, selection);
+      if (!rendererShowsGraph(renderer, graphId)) {
+        throw new Error(`The selected renderer does not show the Graph ${graphId}.`);
+      }
+      observable.publish({
+        selectedRenderer: selection,
+        activeGraphId: graphId,
+        openedCardId: null,
+        mode: 'overview',
       });
     },
     // Resolved first, for the same reason a renderer is: Navigation may not name

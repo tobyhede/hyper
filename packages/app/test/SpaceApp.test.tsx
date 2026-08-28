@@ -311,7 +311,41 @@ describe('Space app permanent save refusal', () => {
 });
 
 describe('Space app failure reporting', () => {
-  it.each(['Copy link to Card', 'Copy link in this Space View'])(
+  it('opens an addressed Graph as navigation context without editing the Space', async () => {
+    const addressed = {
+      ...snapshot('Space', 'Card', 10, 20),
+      document: {
+        ...snapshot('Space', 'Card', 10, 20).document,
+        layouts: snapshot('Space', 'Card', 10, 20).document.layouts?.map((layout) => ({
+          ...layout,
+          graphs: [...layout.graphs, { id: GRAPH_ID, title: 'Addressed', edges: [] }],
+        })),
+      },
+    };
+    const session = openSpaceSession(new MemorySpaceBackend(), {
+      snapshot: addressed,
+      revision: 0n,
+      exportedRevision: null,
+    });
+
+    mountSpaceApp(
+      { space: runtime(addressed), spaceSession: session },
+      (app) => render(app),
+      LAYOUT_ID,
+      undefined,
+      GRAPH_ID,
+    );
+
+    expect(await screen.findByRole('button', { name: 'Present Addressed' })).toBeVisible();
+    expect(session.getState().working).toEqual(addressed);
+  });
+
+  it.each([
+    'Copy link to Card',
+    'Copy link in this Space View',
+    'Copy link to Graph',
+    'Copy link to Graph in this Space View',
+  ])(
     'reports a rejected clipboard write from %s without unmounting the Space',
     async (copyAction) => {
       const valid = snapshot('Space', 'Card', 10, 20);

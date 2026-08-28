@@ -232,6 +232,31 @@ describe('SpaceSidebar', () => {
     expect(props.graph.onActivate).toHaveBeenCalledWith(GRAPH_ID);
   });
 
+  it('offers distinct canonical and Space View copy commands for the Active Graph', () => {
+    const base = settledProps();
+    const props: SpaceSidebarProps = {
+      ...base,
+      graph: {
+        ...base.graph,
+        graphs: [{ id: GRAPH_ID, title: 'Authored', color: '#123456', edges: [] }],
+        activeGraphId: GRAPH_ID,
+        links: {
+          onCopyCanonical: vi.fn(),
+          onCopyContextual: vi.fn(),
+        },
+      },
+    };
+    draw(<SpaceSidebar {...props} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Copy link to Authored' }));
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Copy link to Authored in this Space View' }),
+    );
+
+    expect(props.graph.links?.onCopyCanonical).toHaveBeenCalledWith(GRAPH_ID);
+    expect(props.graph.links?.onCopyContextual).toHaveBeenCalledWith(GRAPH_ID);
+  });
+
   /**
    * A Layout is created with its initial Active Graph empty (ADR 0040), so this
    * is the state every conversion out of a View leaves behind until the author
