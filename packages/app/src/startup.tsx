@@ -1,4 +1,5 @@
 import { StrictMode, type ReactNode } from 'react';
+import type { CardId } from '@project/core';
 import type { OpenedSpace } from './open-space';
 import type { CanvasRendererId } from './renderer';
 import { mountSpaceApp } from './SpaceApp';
@@ -12,6 +13,7 @@ export interface OpenedApplicationStartup {
   kind: 'opened';
   opened: OpenedSpace;
   selection?: CanvasRendererId | undefined;
+  cardId?: CardId | undefined;
 }
 
 export type ApplicationStartupResult = OpenedApplicationStartup;
@@ -22,6 +24,7 @@ const renderOpenedSpace = (
   root: ApplicationRoot,
   opened: OpenedSpace,
   selection?: CanvasRendererId,
+  cardId?: CardId,
 ): void => {
   mountSpaceApp(
     opened,
@@ -29,6 +32,7 @@ const renderOpenedSpace = (
       root.render(<StrictMode>{app}</StrictMode>);
     },
     selection,
+    cardId,
   );
 };
 
@@ -46,8 +50,8 @@ export const startApplication = async (
 ): Promise<void> => {
   try {
     const startup = await resolveStartup();
-    const { opened, selection } = startup;
-    renderOpenedSpace(root, opened, selection);
+    const { opened, selection, cardId } = startup;
+    renderOpenedSpace(root, opened, selection, cardId);
   } catch (error) {
     renderStartupError(root, error);
   }

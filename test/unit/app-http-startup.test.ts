@@ -86,4 +86,100 @@ describe('HTTP space startup composition', () => {
     expect(loadSpace).toHaveBeenCalledOnce();
     expect(loadSpace).toHaveBeenCalledWith(SPACE_ID);
   });
+
+  it('opens a contextual Card in its named Space View without authoring it open', async () => {
+    const layoutId = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
+    const loaded = {
+      snapshot: {
+        ...snapshot(),
+        document: {
+          version: 1 as const,
+          title: 'Stored space',
+          layouts: [
+            {
+              id: layoutId,
+              title: 'Layout',
+              kind: 'positioned' as const,
+              positions: { [CARD_ID]: { x: 0, y: 0, open: false as const } },
+              graphs: [
+                {
+                  id: uuidSchema.parse('00000000-0000-4000-8000-000000000006'),
+                  title: 'Graph',
+                  edges: [],
+                },
+              ],
+            },
+          ],
+        },
+      },
+      revision: 0n,
+      exportedRevision: null,
+    };
+    const startup = createSpaceStartup(new MemorySpaceBackend([loaded]));
+
+    const result = await startup.resolve(
+      productDestinationPath({
+        kind: 'space-view-card',
+        spaceId: SPACE_ID,
+        spaceViewId: layoutId,
+        cardId: CARD_ID,
+      }),
+    );
+
+    expect(result.selection).toBe(layoutId);
+    expect(result.cardId).toBe(CARD_ID);
+    expect(result.opened.space.lookup.layout(layoutId)?.layout.positions[CARD_ID]?.open).toBe(
+      false,
+    );
+  });
+
+  it('reveals a canonical Card omitted by the default Layout in the Cards collection', async () => {
+    const layoutId = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
+    const omittedId = uuidSchema.parse('00000000-0000-4000-8000-000000000007');
+    const loaded = {
+      snapshot: {
+        ...snapshot(),
+        document: {
+          version: 1 as const,
+          title: 'Stored space',
+          defaultRenderer: layoutId,
+          layouts: [
+            {
+              id: layoutId,
+              title: 'Layout',
+              kind: 'positioned' as const,
+              positions: { [CARD_ID]: { x: 0, y: 0, open: false as const } },
+              graphs: [
+                {
+                  id: uuidSchema.parse('00000000-0000-4000-8000-000000000006'),
+                  title: 'Graph',
+                  edges: [],
+                },
+              ],
+            },
+          ],
+        },
+        cards: [
+          ...snapshot().cards,
+          {
+            id: omittedId,
+            document: { title: 'Omitted', kind: 'markdown' as const, body: '' },
+          },
+        ],
+      },
+      revision: 0n,
+      exportedRevision: null,
+    };
+    const startup = createSpaceStartup(new MemorySpaceBackend([loaded]));
+
+    const result = await startup.resolve(
+      productDestinationPath({ kind: 'card', spaceId: SPACE_ID, cardId: omittedId }),
+    );
+
+    expect(result.selection).toBe(FLOW_SPACE_VIEW_ID);
+    expect(result.cardId).toBe(omittedId);
+    expect(
+      result.opened.space.lookup.layout(layoutId)?.layout.positions[omittedId],
+    ).toBeUndefined();
+  });
 });

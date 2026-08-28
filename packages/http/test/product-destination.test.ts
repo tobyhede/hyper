@@ -6,11 +6,16 @@ import {
 } from '@project/core';
 import type { LoadedSpace, SpaceBackend } from '@project/persistence';
 import { describe, expect, it, vi } from 'vitest';
-import { productDestinationPath, resolveProductDestination } from '../src';
+import {
+  productDestinationPath,
+  resolveProductDestination,
+  resolveProductDestinationInSnapshot,
+} from '../src';
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const LAYOUT_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
+const CARD_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
 const loaded: LoadedSpace = {
   snapshot: spaceSnapshotSchema.parse({
     id: SPACE_ID,
@@ -22,12 +27,12 @@ const loaded: LoadedSpace = {
           id: LAYOUT_ID,
           title: 'Layout',
           kind: 'positioned',
-          positions: {},
+          positions: { [CARD_ID]: { x: 10, y: 20, open: false } },
           graphs: [{ id: GRAPH_ID, title: 'Graph', edges: [] }],
         },
       ],
     },
-    cards: [],
+    cards: [{ id: CARD_ID, document: { title: 'Card', kind: 'markdown', body: '' } }],
   }),
   revision: 7n,
   exportedRevision: 6n,
@@ -48,6 +53,80 @@ describe('product destinations', () => {
     expect(
       productDestinationPath({ kind: 'space-view', spaceId: SPACE_ID, spaceViewId: LAYOUT_ID }),
     ).toBe(`/spaces/${encodeCompactUuid(SPACE_ID)}/views/${encodeCompactUuid(LAYOUT_ID)}`);
+  });
+
+  it('formats and resolves canonical and contextual Card destinations', async () => {
+    const canonical = `/spaces/${encodeCompactUuid(SPACE_ID)}/cards/${encodeCompactUuid(CARD_ID)}`;
+    const contextual = `/spaces/${encodeCompactUuid(SPACE_ID)}/views/${encodeCompactUuid(LAYOUT_ID)}/cards/${encodeCompactUuid(CARD_ID)}`;
+
+    expect(productDestinationPath({ kind: 'card', spaceId: SPACE_ID, cardId: CARD_ID })).toBe(
+      canonical,
+    );
+    expect(
+      productDestinationPath({
+        kind: 'space-view-card',
+        spaceId: SPACE_ID,
+        spaceViewId: LAYOUT_ID,
+        cardId: CARD_ID,
+      }),
+    ).toBe(contextual);
+    await expect(resolveProductDestination(loader(), canonical)).resolves.toMatchObject({
+      kind: 'resolved',
+      destination: { kind: 'card', spaceId: SPACE_ID, cardId: CARD_ID },
+    });
+    await expect(resolveProductDestination(loader(), contextual)).resolves.toMatchObject({
+      kind: 'resolved',
+      destination: {
+        kind: 'space-view-card',
+        spaceId: SPACE_ID,
+        spaceViewId: LAYOUT_ID,
+        cardId: CARD_ID,
+      },
+    });
+  });
+
+  it('does not resolve a contextual Layout-and-Card destination when the Layout omits the Card', async () => {
+    const omitted = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
+    const withOmittedCard: LoadedSpace = {
+      ...loaded,
+      snapshot: {
+        ...loaded.snapshot,
+        cards: [
+          ...loaded.snapshot.cards,
+          { id: omitted, document: { title: 'Omitted', kind: 'markdown', body: '' } },
+        ],
+      },
+    };
+
+    await expect(
+      resolveProductDestination(
+        loader(withOmittedCard),
+        `/spaces/${encodeCompactUuid(SPACE_ID)}/views/${encodeCompactUuid(LAYOUT_ID)}/cards/${encodeCompactUuid(omitted)}`,
+      ),
+    ).resolves.toEqual({ kind: 'unresolved' });
+  });
+
+  it('resolves a browser-history destination against an already loaded snapshot', () => {
+    expect(
+      resolveProductDestinationInSnapshot(
+        loaded.snapshot,
+        `/spaces/${encodeCompactUuid(SPACE_ID)}/cards/${encodeCompactUuid(CARD_ID)}`,
+      ),
+    ).toEqual({
+      kind: 'resolved',
+      destination: { kind: 'card', spaceId: SPACE_ID, cardId: CARD_ID },
+    });
+  });
+
+  it.each([
+    ['/assets/hyper.svg', { kind: 'outside' }],
+    ['/spaces/not-a-compact-uuid', { kind: 'malformed' }],
+    [
+      `/spaces/${encodeCompactUuid(uuidSchema.parse('00000000-0000-4000-8000-000000000099'))}`,
+      { kind: 'unresolved' },
+    ],
+  ] as const)('classifies an already-loaded browser-history path %s', (path, expected) => {
+    expect(resolveProductDestinationInSnapshot(loaded.snapshot, path)).toEqual(expected);
   });
 
   it.each([
@@ -94,7 +173,7 @@ describe('product destinations', () => {
   it.each([
     '/spaces',
     '/spaces/not-a-compact-uuid',
-    `/spaces/${encodeCompactUuid(SPACE_ID)}/cards/${encodeCompactUuid(LAYOUT_ID)}`,
+    `/spaces/${encodeCompactUuid(SPACE_ID)}/graphs/${encodeCompactUuid(LAYOUT_ID)}`,
   ])('classifies the claimed product address %s as malformed', async (path) => {
     const backend = loader();
 

@@ -124,6 +124,24 @@ describe('SpaceSidebar', () => {
     expect(screen.getByTestId('persistence-status')).toHaveAttribute('data-revision', '4');
   });
 
+  it('offers distinct canonical and contextual copy commands for a selected Card', () => {
+    const props: SpaceSidebarProps = {
+      ...settledProps(),
+      cardLinks: {
+        title: 'Start here',
+        onCopyCanonical: vi.fn(),
+        onCopyContextual: vi.fn(),
+      },
+    };
+    draw(<SpaceSidebar {...props} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Copy link to Start here' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Copy link in this Space View' }));
+
+    expect(props.cardLinks?.onCopyCanonical).toHaveBeenCalledOnce();
+    expect(props.cardLinks?.onCopyContextual).toHaveBeenCalledOnce();
+  });
+
   /**
    * The whole of ADR 0053's first claim, asserted as one state: every computed
    * View and every authored Layout is a row of one list, exactly one is pressed,

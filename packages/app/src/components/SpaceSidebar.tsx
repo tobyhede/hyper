@@ -86,6 +86,13 @@ export interface SpaceSidebarProps {
     readonly state: SpaceSessionState['persistence']['kind'];
     readonly acknowledgedRevision: bigint;
   };
+  readonly cardLinks?:
+    | {
+        readonly title: string;
+        readonly onCopyCanonical: () => void;
+        readonly onCopyContextual: () => void;
+      }
+    | undefined;
 }
 
 /**
@@ -180,6 +187,7 @@ export function SpaceSidebar({
   graph,
   addCard,
   persistence,
+  cardLinks,
 }: SpaceSidebarProps) {
   // Below the primitive's breakpoint this whole surface is a modal Sheet drawn
   // *over* the canvas, with a focus trap and everything behind it inert. Every
@@ -296,6 +304,16 @@ export function SpaceSidebar({
       </SidebarContent>
 
       <SidebarFooter className="nokey">
+        {cardLinks !== undefined && (
+          <div className="grid gap-1">
+            <Button variant="secondary" size="toolbar" onClick={cardLinks.onCopyCanonical}>
+              Copy link to {cardLinks.title}
+            </Button>
+            <Button variant="secondary" size="toolbar" onClick={cardLinks.onCopyContextual}>
+              Copy link in this Space View
+            </Button>
+          </div>
+        )}
         <Button
           variant="secondary"
           size="toolbar"

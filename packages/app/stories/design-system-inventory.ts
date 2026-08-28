@@ -80,6 +80,11 @@ export const uncataloguedComponents = [
       'Camera behaviour, not appearance: it centres the viewport and renders nothing. Covered by `packages/app/test/CanvasCentre.test.tsx`.',
   },
   {
+    module: 'packages/app/src/components/CardDestinationFocus.tsx',
+    reason:
+      'URL-to-camera coordination inside React Flow. It renders nothing and is covered through browser routing behavior.',
+  },
+  {
     module: 'packages/app/src/components/cameras.tsx',
     reason:
       'Camera behaviour, not appearance: `fitView` calls for presenting and overview, rendering nothing. Covered by `packages/app/test/cameras.test.tsx` and by the camera assertions in `presenting.spec.ts`.',

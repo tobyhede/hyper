@@ -2,6 +2,7 @@
 
 Status: accepted
 Related: 0068, 0070
+Refined by: 0071
 
 Every Space, Card, Graph and Space View has a durable product URL built from its
 Id. A URL may identify the entity alone or establish an explicit Space View,

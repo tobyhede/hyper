@@ -198,7 +198,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: { persist-credentials: false }
-      # The image's Node is deliberately replaced from `.node-version`: ADR 0070
+      # The image's Node is deliberately replaced from `.node-version`: ADR 0071
       # admits native Typed Array codecs that its Node 24 does not carry. The
       # image still owns the browsers and system libraries, and its exact tag
       # stays paired with `@playwright/test`. `setup-node` has no `cache: pnpm`
